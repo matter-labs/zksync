@@ -1,0 +1,34 @@
+[package]
+authors = ["Sean Bowe <sean@z.cash>"]
+description = "Cryptographic library for Zcash Sapling"
+documentation = "https://github.com/zcash-hackworks/sapling"
+homepage = "https://github.com/zcash-hackworks/sapling"
+license = "MIT/Apache-2.0"
+name = "sapling-crypto"
+repository = "https://github.com/zcash-hackworks/sapling"
+version = "0.0.1"
+
+[dependencies.pairing]
+path = "../pairing"
+features = ["expose-arith"]
+
+[dependencies.bellman]
+path = "../bellman"
+
+[dependencies]
+rand = "0.4"
+digest = "0.7"
+byteorder = "1"
+ff = { version = "0.4", features = ["derive"] }
+
+[dependencies.blake2-rfc]
+git = "https://github.com/gtank/blake2-rfc"
+rev = "7a5b5fc99ae483a0043db7547fb79a6fa44b88a9"
+
+[dev-dependencies]
+hex-literal = "0.1"
+rust-crypto = "0.2"
+
+#[features]
+#default = ["u128-support"]
+#u128-support = ["pairing/u128-support"]

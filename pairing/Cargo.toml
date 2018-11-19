@@ -1,0 +1,25 @@
+[package]
+name = "pairing"
+
+# Remember to change version string in README.md.
+version = "0.14.2"
+authors = [
+    "Sean Bowe <ewillbefull@gmail.com>",
+    "Jack Grigg <jack@z.cash>",
+]
+license = "MIT/Apache-2.0"
+
+description = "Pairing-friendly elliptic curve library"
+documentation = "https://docs.rs/pairing/"
+homepage = "https://github.com/ebfull/pairing"
+repository = "https://github.com/ebfull/pairing"
+
+[dependencies]
+rand = "0.4"
+byteorder = "1"
+ff = { version = "0.4", features = ["derive"] }
+
+[features]
+unstable-features = ["expose-arith"]
+expose-arith = []
+default = []

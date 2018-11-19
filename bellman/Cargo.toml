@@ -1,0 +1,24 @@
+[package]
+authors = ["Sean Bowe <ewillbefull@gmail.com>"]
+description = "zk-SNARK library"
+documentation = "https://github.com/ebfull/bellman"
+homepage = "https://github.com/ebfull/bellman"
+license = "MIT/Apache-2.0"
+name = "bellman"
+repository = "https://github.com/ebfull/bellman"
+version = "0.1.0"
+
+[dependencies]
+rand = "0.4"
+bit-vec = "0.4.4"
+futures = "0.1"
+futures-cpupool = "0.1"
+num_cpus = "1"
+crossbeam = "0.3"
+pairing = { path = "../pairing" }
+#pairing = "0.14"
+byteorder = "1"
+ff = { version = "0.4", features = ["derive"] }
+
+[features]
+default = []
