@@ -1,0 +1,12 @@
+[package]
+name = "bellman-demo"
+version = "0.1.0"
+authors = ["alex"]
+
+[dependencies]
+rand = "0.4"
+ff = { version = "0.4", features = ["derive"] }
+bellman = { path = "../bellman" }
+
+[dependencies.pairing]
+path = "../pairing"
