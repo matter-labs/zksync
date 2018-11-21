@@ -441,33 +441,17 @@ impl<E: JubjubEngine> EdwardsPoint<E> {
     ) -> Result<Self, SynthesisError>
         where CS: ConstraintSystem<E>
     {
-        // Compute U = (x1 + y1) * (x2 + y2)
-        let u = AllocatedNum::alloc(cs.namespace(|| "U"), || {
-            let mut t0 = *self.x.get_value().get()?;
-            t0.add_assign(self.y.get_value().get()?);
-
-            let mut t1 = *other.x.get_value().get()?;
-            t1.add_assign(other.y.get_value().get()?);
-
-            t0.mul_assign(&t1);
-
-            Ok(t0)
-        })?;
-
-        cs.enforce(
-            || "U computation",
-            |lc| lc + self.x.get_variable()
-                    + self.y.get_variable(),
-            |lc| lc + other.x.get_variable()
-                    + other.y.get_variable(),
-            |lc| lc + u.get_variable()
-        );
-
         // Compute A = y2 * x1
         let a = other.y.mul(cs.namespace(|| "A computation"), &self.x)?;
 
         // Compute B = x2 * y1
         let b = other.x.mul(cs.namespace(|| "B computation"), &self.y)?;
+
+        // Compute T = x1 * x2
+        let t = other.x.mul(cs.namespace(|| "T computation"), &self.x)?;
+
+        // Compute U = y1 * y2
+        let u = other.y.mul(cs.namespace(|| "U computation"), &self.y)?;
 
         // Compute C = d*A*B
         let c = AllocatedNum::alloc(cs.namespace(|| "C"), || {
@@ -514,20 +498,23 @@ impl<E: JubjubEngine> EdwardsPoint<E> {
                     + b.get_variable()
         );
 
-        // Compute y3 = (U - A - B) / (1 - C)
+        // Compute y3 = (U - edwards.a.T) / (1 - C)
         let y3 = AllocatedNum::alloc(cs.namespace(|| "y3"), || {
-            let mut t0 = *u.get_value().get()?;
-            t0.sub_assign(a.get_value().get()?);
-            t0.sub_assign(b.get_value().get()?);
+            let mut u0 = *u.get_value().get()?;
+
+            let mut t0 = *t.get_value().get()?;
+            t0.mul_assign(params.edwards_a());
+
+            u0.sub_assign(&t0);
 
             let mut t1 = E::Fr::one();
             t1.sub_assign(c.get_value().get()?);
 
             match t1.inverse() {
                 Some(t1) => {
-                    t0.mul_assign(&t1);
+                    u0.mul_assign(&t1);
 
-                    Ok(t0)
+                    Ok(u0)
                 },
                 None => {
                     Err(SynthesisError::DivisionByZero)
@@ -540,8 +527,7 @@ impl<E: JubjubEngine> EdwardsPoint<E> {
             |lc| lc + one - c.get_variable(),
             |lc| lc + y3.get_variable(),
             |lc| lc + u.get_variable()
-                    - a.get_variable()
-                    - b.get_variable()
+                    - (*params.edwards_a(), t.get_variable())
         );
 
         Ok(EdwardsPoint {
@@ -1065,11 +1051,11 @@ mod test {
             assert!(p3.x.get_value().unwrap() == x2);
             assert!(p3.y.get_value().unwrap() == y2);
 
-            let u = cs.get("addition/U/num");
-            cs.set("addition/U/num", rng.gen());
-            assert_eq!(cs.which_is_unsatisfied(), Some("addition/U computation"));
-            cs.set("addition/U/num", u);
-            assert!(cs.is_satisfied());
+            // let u = cs.get("addition/U/num");
+            // cs.set("addition/U/num", rng.gen());
+            // assert_eq!(cs.which_is_unsatisfied(), Some("addition/U computation"));
+            // cs.set("addition/U/num", u);
+            // assert!(cs.is_satisfied());
 
             let x3 = cs.get("addition/x3/num");
             cs.set("addition/x3/num", rng.gen());
