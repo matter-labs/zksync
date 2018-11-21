@@ -7,6 +7,7 @@ authors = ["alex"]
 rand = "0.4"
 ff = { version = "0.4", features = ["derive"] }
 bellman = { path = "../bellman" }
+hex = "0.3.2"
 
 [dependencies.pairing]
 path = "../pairing"
