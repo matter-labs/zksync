@@ -19,7 +19,7 @@ use rand::{XorShiftRng, SeedableRng, Rand};
 
 pub fn test_suite<E: JubjubEngine>(params: &E::Params) {
     test_back_and_forth::<E>(params);
-    test_jubjub_params::<E>(params);
+    // test_jubjub_params::<E>(params);
     test_rand::<E>(params);
     test_get_for::<E>(params);
     test_identities::<E>(params);
@@ -264,7 +264,7 @@ fn test_read_write<E: JubjubEngine>(params: &E::Params) {
     }
 }
 
-pub fn test_rand<E: JubjubEngine>(params: &E::Params) {
+fn test_rand<E: JubjubEngine>(params: &E::Params) {
     let rng = &mut XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
     for _ in 0..1000 {

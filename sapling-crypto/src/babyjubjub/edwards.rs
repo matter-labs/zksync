@@ -464,7 +464,7 @@ impl<E: JubjubEngine, Subgroup> Point<E, Subgroup> {
         h.sub_assign(&a_a);
 
         // E = (x1 + y1) * (x2 + y2) - A - B
-        //   = (x1 + y1) * (x2 + y2) - H
+        //   != (x1 + y1) * (x2 + y2) - H !!!
         let mut e = self.x;
         e.add_assign(&self.y);
         {
@@ -472,7 +472,9 @@ impl<E: JubjubEngine, Subgroup> Point<E, Subgroup> {
             tmp.add_assign(&other.y);
             e.mul_assign(&tmp);
         }
-        e.sub_assign(&h);
+        e.sub_assign(&a);
+        e.sub_assign(&b);
+        // e.sub_assign(&h);
 
         // F = D - C
         let mut f = d;
