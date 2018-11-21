@@ -19,7 +19,7 @@ use rand::{XorShiftRng, SeedableRng, Rand};
 
 pub fn test_suite<E: JubjubEngine>(params: &E::Params) {
     test_back_and_forth::<E>(params);
-    // test_jubjub_params::<E>(params);
+    test_jubjub_params::<E>(params);
     test_rand::<E>(params);
     test_get_for::<E>(params);
     test_identities::<E>(params);

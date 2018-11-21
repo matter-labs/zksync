@@ -7,8 +7,10 @@ pub mod uint32;
 pub mod blake2s;
 pub mod num;
 pub mod lookup;
+pub mod baby_ecc;
 pub mod ecc;
 pub mod pedersen_hash;
+pub mod baby_pedersen_hash;
 pub mod multipack;
 pub mod sha256;
 

@@ -22,7 +22,7 @@ pub fn group_hash<E: JubjubEngine>(
 {
     assert_eq!(personalization.len(), 8);
 
-    // Check to see that scalar field is 255 bits
+    // Check to see that scalar field is 254 bits
     assert!(E::Fr::NUM_BITS == 254);
 
     let mut h = Blake2s::with_params(32, &[], &[], personalization);

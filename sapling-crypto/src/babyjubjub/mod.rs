@@ -172,8 +172,9 @@ impl JubjubParams<Bn256> for JubjubBn256 {
     fn pedersen_hash_exp_table(&self) -> &[Vec<Vec<edwards::Point<Bn256, PrimeOrder>>>] {
         &self.pedersen_hash_exp
     }
+    // HERE it's different from jubjub
     fn pedersen_hash_chunks_per_generator(&self) -> usize {
-        63
+        62
     }
     fn fixed_base_chunks_per_generator(&self) -> usize {
         84
