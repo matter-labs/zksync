@@ -310,7 +310,7 @@ impl<E: JubjubEngine> EdwardsPoint<E> {
     ) -> Result<Self, SynthesisError>
         where CS: ConstraintSystem<E>
     {
-        // -x^2 + y^2 = 1 + dx^2y^2
+        // a*x^2 + y^2 = 1 + dx^2y^2
 
         let x2 = x.square(cs.namespace(|| "x^2"))?;
         let y2 = y.square(cs.namespace(|| "y^2"))?;
@@ -319,7 +319,7 @@ impl<E: JubjubEngine> EdwardsPoint<E> {
         let one = CS::one();
         cs.enforce(
             || "on curve check",
-            |lc| lc - x2.get_variable()
+            |lc| lc + (*params.edwards_a(), x2.get_variable())
                     + y2.get_variable(),
             |lc| lc + one,
             |lc| lc + one
@@ -339,30 +339,14 @@ impl<E: JubjubEngine> EdwardsPoint<E> {
     ) -> Result<Self, SynthesisError>
         where CS: ConstraintSystem<E>
     {
-        // Compute T = (x1 + y1) * (x1 + y1)
-        let t = AllocatedNum::alloc(cs.namespace(|| "T"), || {
-            let mut t0 = *self.x.get_value().get()?;
-            t0.add_assign(self.y.get_value().get()?);
-
-            let mut t1 = *self.x.get_value().get()?;
-            t1.add_assign(self.y.get_value().get()?);
-
-            t0.mul_assign(&t1);
-
-            Ok(t0)
-        })?;
-
-        cs.enforce(
-            || "T computation",
-            |lc| lc + self.x.get_variable()
-                    + self.y.get_variable(),
-            |lc| lc + self.x.get_variable()
-                    + self.y.get_variable(),
-            |lc| lc + t.get_variable()
-        );
-
         // Compute A = x1 * y1
         let a = self.x.mul(cs.namespace(|| "A computation"), &self.y)?;
+
+        // Compute T = x1 * x1
+        let t = self.x.mul(cs.namespace(|| "T computation"), &self.x)?;
+
+        // Compute U = y1 * y1
+        let u = self.y.mul(cs.namespace(|| "U computation"), &self.y)?;
 
         // Compute C = d*A*A
         let c = AllocatedNum::alloc(cs.namespace(|| "C"), || {
@@ -409,12 +393,14 @@ impl<E: JubjubEngine> EdwardsPoint<E> {
                     + a.get_variable()
         );
 
-        // Compute y3 = (U - 2.A) / (1 - C)
+        // Compute y3 = (U - edwards_a.T) / (1 - C)
         let y3 = AllocatedNum::alloc(cs.namespace(|| "y3"), || {
-            let mut t0 = *a.get_value().get()?;
-            t0.double();
-            t0.negate();
-            t0.add_assign(t.get_value().get()?);
+            let mut t0 = *u.get_value().get()?;
+
+            let mut u0 = *t.get_value().get()?;
+            u0.mul_assign(params.edwards_a());
+
+            t0.sub_assign(&u0);
 
             let mut t1 = E::Fr::one();
             t1.sub_assign(c.get_value().get()?);
@@ -431,13 +417,13 @@ impl<E: JubjubEngine> EdwardsPoint<E> {
             }
         })?;
 
+        // y3 = (U - edwards_a.T) / (1 - C)
         cs.enforce(
             || "y3 computation",
             |lc| lc + one - c.get_variable(),
             |lc| lc + y3.get_variable(),
-            |lc| lc + t.get_variable()
-                    - a.get_variable()
-                    - a.get_variable()
+            |lc| lc + u.get_variable()
+                    - (*params.edwards_a(), t.get_variable())
         );
 
         Ok(EdwardsPoint {
