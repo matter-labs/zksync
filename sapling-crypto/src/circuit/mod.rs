@@ -1,5 +1,6 @@
 #[cfg(test)]
 pub mod test;
+// pub mod alt_baby_ecc;
 
 pub mod boolean;
 pub mod multieq;
@@ -13,6 +14,7 @@ pub mod pedersen_hash;
 pub mod baby_pedersen_hash;
 pub mod multipack;
 pub mod sha256;
+pub mod baby_eddsa;
 
 pub mod sapling;
 pub mod sprout;

@@ -1,21 +1,3 @@
-//! Implementation of RedJubjub, a specialization of RedDSA to the Jubjub curve.
-//! See section 5.4.6 of the Sapling protocol specification.
-
-use ff::{Field, PrimeField, PrimeFieldRepr};
-use rand::{Rng, Rand};
-use std::io::{self, Read, Write};
-
-// use jubjub::{FixedGenerators, JubjubEngine, JubjubParams, Unknown, edwards::Point};
-use util::{hash_to_scalar};
-
-use redjubjub::{
-    PrivateKey, 
-    PublicKey,
-    BatchEntry,
-    batch_verify,
-    Signature
-};
-
 #[cfg(test)]
 mod tests {
     use pairing::bn256::Bn256;

@@ -78,3 +78,4 @@ pub fn baby_group_hash<E: JubjubEngine>(
         Err(_) => None
     }
 }
+

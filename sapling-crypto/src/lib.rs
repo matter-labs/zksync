@@ -27,6 +27,4 @@ pub mod redbabyjubjub;
 pub mod redjubjub;
 pub mod baby_util;
 pub mod util;
-
-#[cfg(test)]
-pub mod redaltbabyjubjub;
+pub mod eddsa;
