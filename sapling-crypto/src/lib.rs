@@ -15,6 +15,7 @@ extern crate crypto;
 
 pub mod babyjubjub;
 pub mod jubjub;
+pub mod alt_babyjubjub;
 pub mod baby_group_hash;
 pub mod group_hash;
 pub mod circuit;

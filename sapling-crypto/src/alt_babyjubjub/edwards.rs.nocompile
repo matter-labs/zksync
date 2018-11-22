@@ -6,7 +6,7 @@ use ff::{
     BitIterator
 };
 
-use super::{
+use ::jubjub::{
     JubjubEngine,
     JubjubParams,
     Unknown,
@@ -194,8 +194,7 @@ impl<E: JubjubEngine, Subgroup> Point<E, Subgroup> {
     {
         let (x, y) = self.into_xy();
 
-        assert!(E::Fr::NUM_BITS <= 255);
-        // assert_eq!(E::Fr::NUM_BITS, 255);
+        assert_eq!(E::Fr::NUM_BITS, 255);
 
         let x_repr = x.into_repr();
         let mut y_repr = y.into_repr();
