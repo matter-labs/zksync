@@ -1,12 +1,15 @@
 //! Alternative Baby Jubjub is a twisted Edwards curve defined over the BN256 scalar
 //! field, Fr. 
-//! Fr modulus = 21888242871839275222246405745257275088548364400416034343698204186575808495617
+//! `Fr modulus = 21888242871839275222246405745257275088548364400416034343698204186575808495617`
+//! 
 //! It takes the form `-x^2 + y^2 = 1 + dx^2y^2` with
 //! `d = -(168696/168700)` using the isomorphism from usual Baby Jubjub 
-//! with a requirement that a' = -1, a = 168696, that results in 
+//! with a requirement that `a' = -1, a = 168696`, that results in 
+//! ```
 //! scaling = 1911982854305225074381251344103329931637610209014896889891168275855466657090 
 //! a' = 21888242871839275222246405745257275088548364400416034343698204186575808495616 == -1 = a*scale^2 mod P
 //! d' = 12181644023421730124874158521699555681764249180949974110617291017600649128846 == -(168696/168700) = d*scale^2
+//! ```
 //! 
 //! It is birationally equivalent to a Montgomery
 //! curve of the form `y^2 = x^3 + Ax^2 + x` with `A = 168698`. This
@@ -29,16 +32,14 @@ use pairing::{
     Engine,
 };
 
-use ::jubjub::{
-    Unknown,
-    PrimeOrder,
-    FixedGenerators,
-    ToUniform,
-    JubjubEngine,
-    JubjubParams,
-    edwards,
-    montgomery
-};
+// use ::jubjub::{
+//     Unknown,
+//     PrimeOrder,
+//     FixedGenerators,
+//     ToUniform,
+//     JubjubEngine,
+//     JubjubParams,
+// };
 
 use ff::{
     Field,
@@ -53,6 +54,17 @@ use constants;
 use pairing::bn256::{
     Bn256,
     Fr
+};
+
+pub use ::jubjub::{
+    Unknown,
+    PrimeOrder,
+    FixedGenerators,
+    ToUniform,
+    JubjubEngine,
+    JubjubParams,
+    edwards,
+    montgomery
 };
 
 // /// This is an implementation of the twisted Edwards Jubjub curve.

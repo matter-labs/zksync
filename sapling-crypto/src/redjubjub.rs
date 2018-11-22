@@ -155,9 +155,9 @@ impl<E: JubjubEngine> PublicKey<E> {
 }
 
 pub struct BatchEntry<'a, E: JubjubEngine> {
-    vk: PublicKey<E>,
-    msg: &'a [u8],
-    sig: Signature,
+    pub vk: PublicKey<E>,
+    pub msg: &'a [u8],
+    pub sig: Signature,
 }
 
 // TODO: #82: This is a naive implementation currently,
