@@ -1,6 +1,6 @@
 # Modified bellman
 
-See `bellman-demo` for usage examples.
+See [bellman-demo](bellman-demo) for usage examples.
 
 ## Docker
 
