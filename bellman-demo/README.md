@@ -38,3 +38,17 @@ Now deploy `DemoVerifier` contract from `demo.sol` (e.g. in [remix](https://remi
 ```$bash
 cargo run --release [num_constraints]
 ```
+
+## Docker
+
+Create container:
+
+```$bash
+docker build -t bellman .
+```
+
+Run bench:
+
+```$bash
+docker run bellman bench [num_constraints]
+```
