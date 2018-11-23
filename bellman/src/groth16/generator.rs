@@ -180,21 +180,20 @@ impl<E: Engine> ConstraintSystem<E> for KeypairAssembly<E> {
     }
 }
 
-//static mut verbose_g: i8 = -1;
+const MIN_STEP: u64 = 1000;
+
+static mut VERBOSE_SWITCH: i8 = -1;
 
 fn verbose_flag() -> bool {
-//    unsafe {
-//        if verbose_g < 0 {
-//            verbose_g = FromStr::from_str(&env::var("BELLMAN_VERBOSE").unwrap_or(String::new())).unwrap_or(0);
-//        }
-//        match verbose_g {
-//            1 => true,
-//            _ => false,
-//        }
-//    }
-
-    // TODO: fix the multi-progress-bars and uncomment code above
-    true
+    unsafe {
+        if VERBOSE_SWITCH < 0 {
+            VERBOSE_SWITCH = FromStr::from_str(&env::var("BELLMAN_VERBOSE").unwrap_or(String::new())).unwrap_or(0);
+        }
+        match VERBOSE_SWITCH {
+            1 => true,
+            _ => false,
+        }
+    }
 }
 
 /// Create parameters for a circuit, given some toxic waste.
@@ -302,13 +301,14 @@ pub fn generate_parameters<E, C>(
         if verbose {eprintln!("computing the H query with multiple threads...")};
         // Compute the H query with multiple threads
         worker.scope(h.len(), |scope, chunk| {
-            // let mut mb = MultiBar::new();
+            let mut mb = if verbose {Some(MultiBar::new())} else {None};
             for (h, p) in h.chunks_mut(chunk).zip(powers_of_tau.as_ref().chunks(chunk))
             {
                 let mut g1_wnaf = g1_wnaf.shared();
-                // let mut progress_bar = mb.create_bar(h.len() as u64);
+                let mut progress_bar = if let Some(mb) = mb.as_mut() {Some(mb.create_bar(h.len() as u64))} else {None};
                 scope.spawn(move || {
                     // Set values of the H query to g1^{(tau^i * t(tau)) / delta}
+                    let mut step: u64 = 0;
                     for (h, p) in h.iter_mut().zip(p.iter())
                     {
                         // Compute final exponent
@@ -317,21 +317,26 @@ pub fn generate_parameters<E, C>(
 
                         // Exponentiate
                         *h = g1_wnaf.scalar(exp.into_repr());
-                        // progress_bar.inc();
+                        if let Some(progress_bar) = progress_bar.as_mut() {
+                            step += 1;
+                            if step % MIN_STEP == 0 {
+                                progress_bar.add(MIN_STEP);
+                            };
+                        };
                     }
 
                     // Batch normalize
                     E::G1::batch_normalization(h);
-                    // progress_bar.finish();
+                    if let Some(progress_bar) = progress_bar.as_mut() {progress_bar.finish();}
                 });
             }
-            // if verbose {mb.listen()};
+            if let Some(mb) = mb.as_mut() {mb.listen();}
         });
     }
     let powers_of_tau_end = PreciseTime::now();
     if verbose {eprintln!("{} seconds for powers of tau.", powers_of_tau_start.to(powers_of_tau_end))};
     if verbose {eprintln!("done")};
-    
+
     if verbose {eprintln!("using inverse FFT to convert powers of tau to Lagrange coefficients...")};
     let powers_of_tau_start2 = PreciseTime::now();
     // Use inverse FFT to convert powers of tau to Lagrange coefficients
@@ -392,7 +397,7 @@ pub fn generate_parameters<E, C>(
 
         // Evaluate polynomials in multiple threads
         worker.scope(a.len(), |scope, chunk| {
-            // let mut mb = MultiBar::new();
+            let mut mb = if verbose {Some(MultiBar::new())} else {None};
             for ((((((a, b_g1), b_g2), ext), at), bt), ct) in a.chunks_mut(chunk)
                                                                .zip(b_g1.chunks_mut(chunk))
                                                                .zip(b_g2.chunks_mut(chunk))
@@ -404,8 +409,9 @@ pub fn generate_parameters<E, C>(
                 let mut g1_wnaf = g1_wnaf.shared();
                 let mut g2_wnaf = g2_wnaf.shared();
 
-                // let mut progress_bar = mb.create_bar(a.len() as u64);
+                let mut progress_bar = if let Some(mb) = mb.as_mut() {Some(mb.create_bar(a.len() as u64))} else {None};
                 scope.spawn(move || {
+                    let mut step: u64 = 0;
                     for ((((((a, b_g1), b_g2), ext), at), bt), ct) in a.iter_mut()
                                                                        .zip(b_g1.iter_mut())
                                                                        .zip(b_g2.iter_mut())
@@ -460,15 +466,15 @@ pub fn generate_parameters<E, C>(
                         e.mul_assign(inv);
 
                         *ext = g1_wnaf.scalar(e.into_repr());
-
-                        let point_mul_end = PreciseTime::now();
-                        // if verbose {eprintln!("{} seconds for polynomial evaluation at point.", p_eval_start.to(p_eval_end))};
-                        // if verbose {eprintln!("{} seconds for point multilication.", p_eval_end.to(point_mul_end))};
-
-                        // if verbose {progress_bar.inc();}
+                        if let Some(progress_bar) = progress_bar.as_mut() {
+                            step += 1;
+                            if step % MIN_STEP == 0 {
+                                progress_bar.add(MIN_STEP);
+                            };
+                        };
                     }
 
-                    // progress_bar.finish();
+                    if let Some(progress_bar) = progress_bar.as_mut() {progress_bar.finish();}
 
                     // Batch normalize
                     E::G1::batch_normalization(a);
@@ -477,7 +483,7 @@ pub fn generate_parameters<E, C>(
                     E::G1::batch_normalization(ext);
                 });
             };
-            // mb.listen();
+            if let Some(mb) = mb.as_mut() {mb.listen();}
         });
     }
 
