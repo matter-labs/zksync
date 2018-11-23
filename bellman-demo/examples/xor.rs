@@ -108,5 +108,5 @@ fn main() {
     let inputs = &[Fr::one()];
     let success = verify_proof(&pvk, &proof, inputs).unwrap();
     assert!(success);
-    println!("{}", bellman_demo::generate_demo_contract(&params.vk, &proof, inputs));
+    println!("{}", bellman_demo::generate_demo_contract(&params.vk, &proof, inputs, ""));
 }

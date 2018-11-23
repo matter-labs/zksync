@@ -13,8 +13,8 @@ use bellman::groth16;
 use pairing::bn256::{Bn256, Fr};
 use std::fmt;
 
-pub fn generate_demo_contract<E: Engine>(vk: &groth16::VerifyingKey<E>, proof: &groth16::Proof<E>, inputs: &[E::Fr]) -> String {
-    format!("{}{}", STANDARD_VERIFIER, demo_verifier(vk, proof, inputs))
+pub fn generate_demo_contract<E: Engine>(vk: &groth16::VerifyingKey<E>, proof: &groth16::Proof<E>, inputs: &[E::Fr], inputs_extra: &str) -> String {
+    format!("{}{}", STANDARD_VERIFIER, demo_verifier(vk, proof, inputs, inputs_extra))
 }
 
 const STANDARD_VERIFIER: &str =
@@ -27,7 +27,7 @@ contract Verifier {
         return q - (Y % q);
     }
 
-    function Verify ( uint256[14] in_vk, uint256[] vk_gammaABC, uint256[8] in_proof, uint256[] proof_inputs ) public view returns (bool) {
+    function Verify ( uint256[14] in_vk, uint256[] vk_gammaABC, uint256[8] in_proof, uint256[] proof_inputs ) internal view returns (bool) {
         require( ((vk_gammaABC.length / 2) - 1) == proof_inputs.length );
 
         // Compute the linear combination vk_x
@@ -87,7 +87,7 @@ contract Verifier {
 }
 "#;
 
-fn demo_verifier<E: Engine>(vk: &groth16::VerifyingKey<E>, proof: &groth16::Proof<E>, inputs: &[E::Fr]) -> String {
+fn demo_verifier<E: Engine>(vk: &groth16::VerifyingKey<E>, proof: &groth16::Proof<E>, inputs: &[E::Fr], inputs_extra: &str) -> String {
     format!(
 r#"
 contract DemoVerifier is Verifier {{
@@ -102,6 +102,7 @@ contract DemoVerifier is Verifier {{
 
     function getInputs() internal view returns (uint256[] memory inputs) {{
         {inputs}
+        {inputs_extra}
     }}
 
     function verify( ) public view returns (bool) {{
@@ -112,7 +113,8 @@ contract DemoVerifier is Verifier {{
 "#,
     vk = hardcode_vk(vk),
     proof = hardcode_proof(proof),
-    inputs = hardcode_inputs::<E>(inputs))
+    inputs = hardcode_inputs::<E>(inputs),
+    inputs_extra = inputs_extra)
 }
 
 fn unpack<T: CurveAffine>(t: &T) -> Vec<String>
@@ -120,7 +122,7 @@ fn unpack<T: CurveAffine>(t: &T) -> Vec<String>
     t.into_uncompressed().as_ref().chunks(32).map(|c| "0x".to_owned() + &hex::encode(c)).collect()
 }
 
-const SHIFT: &str = "       ";
+const SHIFT: &str = "        ";
 
 fn render_array(name: &str, allocate: bool, values: &[Vec<String>]) -> String {
     let mut out = String::new();
