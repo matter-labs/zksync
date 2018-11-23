@@ -38,12 +38,12 @@ const R2: FsRepr = FsRepr([
 // INV = -(s^{-1} mod 2^64) mod s
 const INV: u64 = 0x532ce5aebc48f5ef;
 
-// GENERATOR = 6 (multiplicative generator of r-1 order, that is also quadratic nonresidue)
+// GENERATOR = 7 (multiplicative generator of r-1 order, that is also quadratic nonresidue)
 const GENERATOR: FsRepr = FsRepr([
-    0xc3bfeb5b8a3c83d3,
-    0xc2cf10ef8a74bfb7,
-    0x9b15635440657577,
-    0x059bcf0eee3e96d8,
+    0x6380695df1aaf958,
+    0xff3d22fdf1ecc3f8,
+    0x5c65ec9f484e3a81,
+    0x0180a96573d3d9f8,
 ]);
 
 // 2^S * t = MODULUS - 1 with t odd
@@ -51,10 +51,10 @@ const S: u32 = 4;
 
 // 2^S root of unity computed by GENERATOR^t
 const ROOT_OF_UNITY: FsRepr = FsRepr([
-    0xc63a12730aa62a41,
-    0xf3b5774b679b7a3f,
-    0x61c37cb55b406751,
-    0x02b93e6d311ac48a,
+    0xa13885692e7afcb0,
+    0xb789766cd18573ca,
+    0xd5468c0174efc3b9,
+    0x03534b612b0b6f7a,
 ]);
 
 // -((2**256) mod s) mod s
@@ -1271,7 +1271,7 @@ fn test_fs_num_bits() {
 #[test]
 fn test_fs_root_of_unity() {
     // assert_eq!(Fs::S, 1);
-    assert_eq!(Fs::multiplicative_generator(), Fs::from_repr(FsRepr::from(6)).unwrap());
+    assert_eq!(Fs::multiplicative_generator(), Fs::from_repr(FsRepr::from(7)).unwrap());
     assert_eq!(
         Fs::multiplicative_generator().pow([
             0xa677297dc392126f,
