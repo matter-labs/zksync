@@ -1,3 +1,9 @@
+extern crate pbr;
+
+use self::pbr::{MultiBar};
+use std::env;
+use std::str::FromStr;
+
 use rand::Rng;
 
 use std::sync::Arc;
@@ -172,6 +178,23 @@ impl<E: Engine> ConstraintSystem<E> for KeypairAssembly<E> {
     }
 }
 
+//static mut verbose_g: i8 = -1;
+
+fn verbose_flag() -> bool {
+//    unsafe {
+//        if verbose_g < 0 {
+//            verbose_g = FromStr::from_str(&env::var("BELLMAN_VERBOSE").unwrap_or(String::new())).unwrap_or(0);
+//        }
+//        match verbose_g {
+//            1 => true,
+//            _ => false,
+//        }
+//    }
+
+    // TODO: fix the multi-progress-bars and uncomment code above
+    true
+}
+
 /// Create parameters for a circuit, given some toxic waste.
 pub fn generate_parameters<E, C>(
     circuit: C,
@@ -185,6 +208,8 @@ pub fn generate_parameters<E, C>(
 ) -> Result<Parameters<E>, SynthesisError>
     where E: Engine, C: Circuit<E>
 {
+    let verbose = verbose_flag();
+
     let mut assembly = KeypairAssembly {
         num_inputs: 0,
         num_aux: 0,
@@ -217,6 +242,8 @@ pub fn generate_parameters<E, C>(
     let powers_of_tau = vec![Scalar::<E>(E::Fr::zero()); assembly.num_constraints];
     let mut powers_of_tau = EvaluationDomain::from_coeffs(powers_of_tau)?;
 
+    if verbose {eprintln!("assembly.num_constraints: {}", assembly.num_constraints)};
+
     // Compute G1 window table
     let mut g1_wnaf = Wnaf::new();
     let g1_wnaf = g1_wnaf.base(g1, {
@@ -245,11 +272,13 @@ pub fn generate_parameters<E, C>(
     let mut h = vec![E::G1::zero(); powers_of_tau.as_ref().len() - 1];
     {
         // Compute powers of tau
+        if verbose {eprintln!("computing powers of tau...")};
         {
             let powers_of_tau = powers_of_tau.as_mut();
             worker.scope(powers_of_tau.len(), |scope, chunk| {
                 for (i, powers_of_tau) in powers_of_tau.chunks_mut(chunk).enumerate()
                 {
+                    //let mut progress_bar = mb.create_bar(a.len() as u64);
                     scope.spawn(move || {
                         let mut current_tau_power = tau.pow(&[(i*chunk) as u64]);
 
@@ -261,17 +290,20 @@ pub fn generate_parameters<E, C>(
                 }
             });
         }
+        if verbose {eprintln!("done")};
 
         // coeff = t(x) / delta
         let mut coeff = powers_of_tau.z(&tau);
         coeff.mul_assign(&delta_inverse);
 
+        if verbose {eprintln!("computing the H query with multiple threads...")};
         // Compute the H query with multiple threads
         worker.scope(h.len(), |scope, chunk| {
+            let mut mb = MultiBar::new();
             for (h, p) in h.chunks_mut(chunk).zip(powers_of_tau.as_ref().chunks(chunk))
             {
                 let mut g1_wnaf = g1_wnaf.shared();
-
+                let mut progress_bar = mb.create_bar(h.len() as u64);
                 scope.spawn(move || {
                     // Set values of the H query to g1^{(tau^i * t(tau)) / delta}
                     for (h, p) in h.iter_mut().zip(p.iter())
@@ -282,18 +314,24 @@ pub fn generate_parameters<E, C>(
 
                         // Exponentiate
                         *h = g1_wnaf.scalar(exp.into_repr());
+                        progress_bar.inc();
                     }
 
                     // Batch normalize
                     E::G1::batch_normalization(h);
+                    progress_bar.finish();
                 });
             }
+            if verbose {mb.listen()};
         });
+        if verbose {eprintln!("done")};
     }
 
+    if verbose {eprintln!("using inverse FFT to convert powers of tau to Lagrange coefficients...")};
     // Use inverse FFT to convert powers of tau to Lagrange coefficients
     powers_of_tau.ifft(&worker);
     let powers_of_tau = powers_of_tau.into_coeffs();
+    if verbose {eprintln!("done")};
 
     let mut a = vec![E::G1::zero(); assembly.num_inputs + assembly.num_aux];
     let mut b_g1 = vec![E::G1::zero(); assembly.num_inputs + assembly.num_aux];
@@ -301,6 +339,7 @@ pub fn generate_parameters<E, C>(
     let mut ic = vec![E::G1::zero(); assembly.num_inputs];
     let mut l = vec![E::G1::zero(); assembly.num_aux];
 
+    if verbose {eprintln!("evaluating polynomials...")};
     fn eval<E: Engine>(
         // wNAF window tables
         g1_wnaf: &Wnaf<usize, &[E::G1], &mut Vec<i64>>,
@@ -331,6 +370,8 @@ pub fn generate_parameters<E, C>(
         worker: &Worker
     )
     {
+        let verbose = verbose_flag();
+
         // Sanity check
         assert_eq!(a.len(), at.len());
         assert_eq!(a.len(), bt.len());
@@ -341,6 +382,7 @@ pub fn generate_parameters<E, C>(
 
         // Evaluate polynomials in multiple threads
         worker.scope(a.len(), |scope, chunk| {
+            let mut mb = MultiBar::new();
             for ((((((a, b_g1), b_g2), ext), at), bt), ct) in a.chunks_mut(chunk)
                                                                .zip(b_g1.chunks_mut(chunk))
                                                                .zip(b_g2.chunks_mut(chunk))
@@ -352,6 +394,7 @@ pub fn generate_parameters<E, C>(
                 let mut g1_wnaf = g1_wnaf.shared();
                 let mut g2_wnaf = g2_wnaf.shared();
 
+                let mut progress_bar = mb.create_bar(a.len() as u64);
                 scope.spawn(move || {
                     for ((((((a, b_g1), b_g2), ext), at), bt), ct) in a.iter_mut()
                                                                        .zip(b_g1.iter_mut())
@@ -403,7 +446,11 @@ pub fn generate_parameters<E, C>(
                         e.mul_assign(inv);
 
                         *ext = g1_wnaf.scalar(e.into_repr());
+
+                        if verbose {progress_bar.inc();}
                     }
+
+                    progress_bar.finish();
 
                     // Batch normalize
                     E::G1::batch_normalization(a);
@@ -411,7 +458,8 @@ pub fn generate_parameters<E, C>(
                     E::G2::batch_normalization(b_g2);
                     E::G1::batch_normalization(ext);
                 });
-            }
+            };
+            mb.listen();
         });
     }
 
@@ -450,6 +498,8 @@ pub fn generate_parameters<E, C>(
         &beta,
         &worker
     );
+
+    if verbose {eprintln!("done")};
 
     // Don't allow any elements be unconstrained, so that
     // the L query is always fully dense.

@@ -57,14 +57,14 @@ fn main() {
     println!("generating setup...");
     let start = PreciseTime::now();
     let params = generate_random_parameters(bench_circuit(), rng).unwrap();
-    println!("done in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);
+    println!("setup generated in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);
 
     let pvk = prepare_verifying_key(&params.vk);
 
     println!("creating proof...");
     let start = PreciseTime::now();
     let proof = create_random_proof(bench_circuit(), &params, rng).unwrap();
-    println!("done in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);
+    println!("proof created in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);
 
     let success = verify_proof(&pvk, &proof, &[]).unwrap();
     assert!(success);
