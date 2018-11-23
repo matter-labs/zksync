@@ -40,9 +40,10 @@ use std::env;
 
 fn main() {
 
+    const DEFAULT: usize = 100_000;
     let num_constraints: usize = match env::args().nth(1) {
-        Some(n) => n.parse().unwrap(),
-        None => 100_000,
+        Some(n) => {println!("{}", n); n.parse().unwrap_or(DEFAULT)},
+        None => DEFAULT,
     };
 
     println!("bench test for ~{} constraints", num_constraints);
