@@ -28,5 +28,5 @@ Now deploy `DemoVerifier` contract from `demo.sol` (e.g. in [remix](https://remi
 ## Benchmarking
 
 ```$bash
-cargo run --example bench [num_constraints]
+cargo run --release --example bench [num_constraints]
 ```
