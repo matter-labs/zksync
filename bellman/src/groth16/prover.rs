@@ -1,3 +1,6 @@
+extern crate time;
+use self::time::PreciseTime;
+
 use rand::Rng;
 
 use std::sync::Arc;
@@ -212,6 +215,8 @@ pub fn create_proof<E, C, P: ParameterSource<E>>(
 ) -> Result<Proof<E>, SynthesisError>
     where E: Engine, C: Circuit<E>
 {
+    let verbose = true;
+
     let mut prover = ProvingAssignment {
         a_aux_density: DensityTracker::new(),
         b_input_density: DensityTracker::new(),
@@ -239,6 +244,8 @@ pub fn create_proof<E, C, P: ParameterSource<E>>(
 
     let vk = params.get_vk(prover.input_assignment.len())?;
 
+    let h_start = PreciseTime::now();
+
     let h = {
         let mut a = EvaluationDomain::from_coeffs(prover.a)?;
         let mut b = EvaluationDomain::from_coeffs(prover.b)?;
@@ -264,6 +271,11 @@ pub fn create_proof<E, C, P: ParameterSource<E>>(
 
         multiexp(&worker, params.get_h(a.len())?, FullDensity, a)
     };
+
+    let h_end = PreciseTime::now();
+    if verbose {eprintln!("{} seconds for prover for H evaluation", h_start.to(h_end))};
+
+    let points_start = PreciseTime::now();
 
     // TODO: parallelize if it's even helpful
     let input_assignment = Arc::new(prover.input_assignment.into_iter().map(|s| s.into_repr()).collect::<Vec<_>>());
@@ -328,6 +340,9 @@ pub fn create_proof<E, C, P: ParameterSource<E>>(
     g_c.add_assign(&b1_answer);
     g_c.add_assign(&h.wait()?);
     g_c.add_assign(&l.wait()?);
+
+    let points_end = PreciseTime::now();
+    if verbose {eprintln!("{} seconds for prover for point multiplication", points_start.to(points_end))};
 
     Ok(Proof {
         a: g_a.into_affine(),

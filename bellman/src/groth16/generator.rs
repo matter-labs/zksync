@@ -462,8 +462,8 @@ pub fn generate_parameters<E, C>(
                         *ext = g1_wnaf.scalar(e.into_repr());
 
                         let point_mul_end = PreciseTime::now();
-                        if verbose {eprintln!("{} seconds for polynomial evaluation at point.", p_eval_start.to(p_eval_end))};
-                        if verbose {eprintln!("{} seconds for point multilication.", p_eval_end.to(point_mul_end))};
+                        // if verbose {eprintln!("{} seconds for polynomial evaluation at point.", p_eval_start.to(p_eval_end))};
+                        // if verbose {eprintln!("{} seconds for point multilication.", p_eval_end.to(point_mul_end))};
 
                         // if verbose {progress_bar.inc();}
                     }
