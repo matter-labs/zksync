@@ -1,5 +1,7 @@
 extern crate pbr;
+extern crate time;
 
+use self::time::PreciseTime;
 use self::pbr::{MultiBar};
 use std::env;
 use std::str::FromStr;
@@ -269,6 +271,7 @@ pub fn generate_parameters<E, C>(
 
     let worker = Worker::new();
 
+    let powers_of_tau_start = PreciseTime::now();
     let mut h = vec![E::G1::zero(); powers_of_tau.as_ref().len() - 1];
     {
         // Compute powers of tau
@@ -299,11 +302,11 @@ pub fn generate_parameters<E, C>(
         if verbose {eprintln!("computing the H query with multiple threads...")};
         // Compute the H query with multiple threads
         worker.scope(h.len(), |scope, chunk| {
-            let mut mb = MultiBar::new();
+            // let mut mb = MultiBar::new();
             for (h, p) in h.chunks_mut(chunk).zip(powers_of_tau.as_ref().chunks(chunk))
             {
                 let mut g1_wnaf = g1_wnaf.shared();
-                let mut progress_bar = mb.create_bar(h.len() as u64);
+                // let mut progress_bar = mb.create_bar(h.len() as u64);
                 scope.spawn(move || {
                     // Set values of the H query to g1^{(tau^i * t(tau)) / delta}
                     for (h, p) in h.iter_mut().zip(p.iter())
@@ -314,23 +317,28 @@ pub fn generate_parameters<E, C>(
 
                         // Exponentiate
                         *h = g1_wnaf.scalar(exp.into_repr());
-                        progress_bar.inc();
+                        // progress_bar.inc();
                     }
 
                     // Batch normalize
                     E::G1::batch_normalization(h);
-                    progress_bar.finish();
+                    // progress_bar.finish();
                 });
             }
-            if verbose {mb.listen()};
+            // if verbose {mb.listen()};
         });
-        if verbose {eprintln!("done")};
     }
-
+    let powers_of_tau_end = PreciseTime::now();
+    if verbose {eprintln!("{} seconds for powers of tau.", powers_of_tau_start.to(powers_of_tau_end))};
+    if verbose {eprintln!("done")};
+    
     if verbose {eprintln!("using inverse FFT to convert powers of tau to Lagrange coefficients...")};
+    let powers_of_tau_start2 = PreciseTime::now();
     // Use inverse FFT to convert powers of tau to Lagrange coefficients
     powers_of_tau.ifft(&worker);
     let powers_of_tau = powers_of_tau.into_coeffs();
+    let powers_of_tau_end2 = PreciseTime::now();
+    if verbose {eprintln!("{} seconds for powers of tau stage 2.", powers_of_tau_start2.to(powers_of_tau_end2))};
     if verbose {eprintln!("done")};
 
     let mut a = vec![E::G1::zero(); assembly.num_inputs + assembly.num_aux];
@@ -340,6 +348,8 @@ pub fn generate_parameters<E, C>(
     let mut l = vec![E::G1::zero(); assembly.num_aux];
 
     if verbose {eprintln!("evaluating polynomials...")};
+    let poly_start = PreciseTime::now();
+
     fn eval<E: Engine>(
         // wNAF window tables
         g1_wnaf: &Wnaf<usize, &[E::G1], &mut Vec<i64>>,
@@ -382,7 +392,7 @@ pub fn generate_parameters<E, C>(
 
         // Evaluate polynomials in multiple threads
         worker.scope(a.len(), |scope, chunk| {
-            let mut mb = MultiBar::new();
+            // let mut mb = MultiBar::new();
             for ((((((a, b_g1), b_g2), ext), at), bt), ct) in a.chunks_mut(chunk)
                                                                .zip(b_g1.chunks_mut(chunk))
                                                                .zip(b_g2.chunks_mut(chunk))
@@ -394,7 +404,7 @@ pub fn generate_parameters<E, C>(
                 let mut g1_wnaf = g1_wnaf.shared();
                 let mut g2_wnaf = g2_wnaf.shared();
 
-                let mut progress_bar = mb.create_bar(a.len() as u64);
+                // let mut progress_bar = mb.create_bar(a.len() as u64);
                 scope.spawn(move || {
                     for ((((((a, b_g1), b_g2), ext), at), bt), ct) in a.iter_mut()
                                                                        .zip(b_g1.iter_mut())
@@ -404,6 +414,8 @@ pub fn generate_parameters<E, C>(
                                                                        .zip(bt.iter())
                                                                        .zip(ct.iter())
                     {
+                        let p_eval_start = PreciseTime::now();
+
                         fn eval_at_tau<E: Engine>(
                             powers_of_tau: &[Scalar<E>],
                             p: &[(E::Fr, usize)]
@@ -424,6 +436,8 @@ pub fn generate_parameters<E, C>(
                         let mut at = eval_at_tau(powers_of_tau, at);
                         let mut bt = eval_at_tau(powers_of_tau, bt);
                         let ct = eval_at_tau(powers_of_tau, ct);
+
+                        let p_eval_end = PreciseTime::now();
 
                         // Compute A query (in G1)
                         if !at.is_zero() {
@@ -447,10 +461,14 @@ pub fn generate_parameters<E, C>(
 
                         *ext = g1_wnaf.scalar(e.into_repr());
 
-                        if verbose {progress_bar.inc();}
+                        let point_mul_end = PreciseTime::now();
+                        if verbose {eprintln!("{} seconds for polynomial evaluation at point.", p_eval_start.to(p_eval_end))};
+                        if verbose {eprintln!("{} seconds for point multilication.", p_eval_end.to(point_mul_end))};
+
+                        // if verbose {progress_bar.inc();}
                     }
 
-                    progress_bar.finish();
+                    // progress_bar.finish();
 
                     // Batch normalize
                     E::G1::batch_normalization(a);
@@ -459,7 +477,7 @@ pub fn generate_parameters<E, C>(
                     E::G1::batch_normalization(ext);
                 });
             };
-            mb.listen();
+            // mb.listen();
         });
     }
 
@@ -498,7 +516,8 @@ pub fn generate_parameters<E, C>(
         &beta,
         &worker
     );
-
+    let poly_end = PreciseTime::now();
+    if verbose {eprintln!("{} seconds for polynomial evaluation.", poly_start.to(poly_end))};
     if verbose {eprintln!("done")};
 
     // Don't allow any elements be unconstrained, so that

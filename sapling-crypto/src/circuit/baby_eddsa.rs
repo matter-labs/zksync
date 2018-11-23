@@ -31,7 +31,8 @@ use super::lookup::{
 
 use super::boolean::{Boolean, 
     field_into_allocated_bits_le, 
-    field_into_boolean_vec_le
+    field_into_boolean_vec_le,
+    AllocatedBit
 };
 
 use super::ecc::EdwardsPoint;
@@ -67,63 +68,83 @@ impl <E: JubjubEngine>EddsaSignature<E> {
         let scalar_bits = field_into_boolean_vec_le(cs.namespace(|| "Get S bits"), self.s.get_value());
         assert!(scalar_bits.is_ok());
         let scalar_bits_conv: &[Boolean] = &(scalar_bits.unwrap());
-        let sb = generator.mul(cs.namespace(|| "S*B computation"), &scalar_bits_conv, params);
-        assert!(sb.is_ok());
+        let sb = generator.mul(cs.namespace(|| "S*B computation"), &scalar_bits_conv, params).unwrap();
 
-        // let personalization_bytes = &personalization.get_bits();
         let personalization_bytes: &[u8] = &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
         // h = Hash(R, pubkey, message)
 
         // only order of R is checked. Public key and generator can be guaranteed to be in proper group!
         // by some other means for out particular case
         let r_is_in_order = self.r.assert_not_small_order(cs.namespace(|| "R is in right order"), &params);
+
         assert!(r_is_in_order.is_ok());
-        // let r_x_serialized = field_into_allocated_bits_le(cs, r.get_x().get_value());
+        // let bit_length = scalar_bits_conv.len();
+        // let zero_bit = Boolean::Constant(false);
+
+        let mut hash_bits: Vec<Boolean> = vec![];
+
         let r_x_value = self.r.get_x().get_value();
-        let r_x_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize R_X"), r_x_value);
-        assert!(r_x_serialized.is_ok());
+        let r_x_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize R_X"), r_x_value).unwrap();
+        print!("{}\n", r_x_serialized.len());
 
-        // let r_y_serialized = field_into_allocated_bits_le(cs, r.get_y().get_value());
+        let mut toAppend = 256 - r_x_serialized.len();
+        for _ in 0..toAppend {
+            hash_bits.push(Boolean::Constant(false));
+        }
+        hash_bits.extend(r_x_serialized.into_iter());
+
         let r_y_value = self.r.get_y().get_value();
-        let r_y_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize R_Y"), r_y_value);
-        assert!(r_y_serialized.is_ok());
+        let r_y_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize R_Y"), r_y_value).unwrap();
+        toAppend = 256 - r_y_serialized.len();
+        for _ in 0..toAppend {
+            hash_bits.push(Boolean::Constant(false));
+        }
+        hash_bits.extend(r_y_serialized.into_iter());
 
-        // let pk_x_serialized = field_into_allocated_bits_le(cs, pk.get_x().get_value());
         let pk_x_value = self.pk.get_x().get_value();
-        let pk_x_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize PK_X"), pk_x_value);
-        assert!(pk_x_serialized.is_ok());
+        let pk_x_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize PK_X"), pk_x_value).unwrap();
+        toAppend = 256 - pk_x_serialized.len();
+        for _ in 0..toAppend {
+            hash_bits.push(Boolean::Constant(false));
+        }
+        hash_bits.extend(pk_x_serialized.into_iter());
 
-        // let pk_y_serialized = field_into_allocated_bits_le(cs, pk.get_y().get_value());
         let pk_y_value = self.pk.get_y().get_value();
-        let pk_y_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize PK_Y"), pk_y_value);
-        assert!(pk_y_serialized.is_ok());
+        let pk_y_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize PK_Y"), pk_y_value).unwrap();
+        toAppend = 256 - pk_y_serialized.len();
+        for _ in 0..toAppend {
+            hash_bits.push(Boolean::Constant(false));
+        }
+        hash_bits.extend(pk_y_serialized.into_iter());
+        // for i in 0..message.len() {
+        //     let bit = message[i];
+        //     hash_bits.push(bit);
+        // }
+        hash_bits.extend(message.iter().cloned());
 
-        let mut hash_content = r_x_serialized.unwrap();
-        hash_content.extend(r_y_serialized.unwrap());
-        hash_content.extend(pk_x_serialized.unwrap());
-        hash_content.extend(pk_y_serialized.unwrap());
-        hash_content.extend(message.iter().cloned());
+        let hash_content_slice: &[Boolean] = &hash_bits;
 
-        let hash_content_slice: &[Boolean] = &hash_content;
+        print!("{}\n", hash_content_slice.len());
 
-        let h = blake2s(cs.namespace(|| "Calculate EdDSA hash"), hash_content_slice, &personalization_bytes);
-        assert!(h.is_ok());
+        for e in hash_content_slice.into_iter() {
+            if e.get_value().unwrap() {
+                print!("{}", 1);
+            } else {
+                print!("{}", 0);
+            }
+        }
+
+        let h = blake2s(cs.namespace(|| "Calculate EdDSA hash"), hash_content_slice, &personalization_bytes).unwrap();
         
-        let pk_mul_hash = self.pk.mul(cs.namespace(|| "Calculate h*PK"), &h.unwrap(), params);
-        assert!(pk_mul_hash.is_ok());
+        let pk_mul_hash = self.pk.mul(cs.namespace(|| "Calculate h*PK"), &h, params).unwrap();
 
-        let rhs = pk_mul_hash.unwrap().add(cs.namespace(|| "Make signature RHS"), &self.r, params);
-        assert!(rhs.is_ok());
+        let rhs = pk_mul_hash.add(cs.namespace(|| "Make signature RHS"), &self.r, params).unwrap();
 
-        let rhs_unwrapped = rhs.unwrap();
+        let rhs_x = rhs.get_x();
+        let rhs_y = rhs.get_y();
 
-        let rhs_x = rhs_unwrapped.get_x();
-        let rhs_y = rhs_unwrapped.get_y();
-
-        let sb_unwrapped = sb.unwrap();
-
-        let sb_x = sb_unwrapped.get_x();
-        let sb_y = sb_unwrapped.get_y();
+        let sb_x = sb.get_x();
+        let sb_y = sb.get_y();
 
         // let one = CS::one();
         // cs.enforce(

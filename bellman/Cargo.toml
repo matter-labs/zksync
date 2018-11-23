@@ -20,6 +20,7 @@ pairing = { path = "../pairing" }
 byteorder = "1"
 ff = { version = "0.4", features = ["derive"] }
 pbr = "1.0.1"
+time = "*"
 
 [features]
 default = []

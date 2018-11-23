@@ -1,12 +1,12 @@
 //! This is an implementation of EdDSA as refered in literature
 //! Generation of randomness is not specified
 
-use ff::{Field, PrimeField, PrimeFieldRepr};
+use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
 use rand::{Rng, Rand};
 use std::io::{self, Read, Write};
 
 use jubjub::{FixedGenerators, JubjubEngine, JubjubParams, Unknown, edwards::Point};
-use util::{hash_to_scalar};
+use util::{hash_to_scalar_s};
 
 use blake2_rfc::{blake2s};
 
@@ -27,8 +27,9 @@ fn write_scalar<E: JubjubEngine, W: Write>(s: &E::Fs, writer: W) -> io::Result<(
     s.into_repr().write_le(writer)
 }
 
-fn h_star<E: JubjubEngine>(a: &[u8], b: &[u8]) -> E::Fs {
-    hash_to_scalar::<E>(b"Zcash_RedJubjubH", a, b)
+fn h_star_s<E: JubjubEngine>(a: &[u8], b: &[u8]) -> E::Fs {
+    let personalization_bytes: &[u8] = &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+    hash_to_scalar_s::<E>(personalization_bytes, a, b)
 }
 
 #[derive(Copy, Clone)]
@@ -93,7 +94,7 @@ impl<E: JubjubEngine> PrivateKey<E> {
 
         // Generate randomness using hash function based on some entropy and the message
         // r = H*(T || M)
-        let r = h_star::<E>(&t[..], msg);
+        let r = h_star_s::<E>(&t[..], msg);
 
         let pk = PublicKey::from_private(&self, p_g, params);
         let order_check = pk.0.mul(E::Fs::char(), params);
@@ -118,8 +119,21 @@ impl<E: JubjubEngine> PrivateKey<E> {
 
         let concatenated: Vec<u8> = r_g_x_bytes.iter().chain(r_g_y_bytes.iter()).chain(pk_x_bytes.iter()).chain(pk_y_bytes.iter()).cloned().collect();
 
+        print!("{}\n", concatenated.len() * 8);
+
+        for b in concatenated.clone().into_iter() {
+            for i in (0..8).into_iter() {
+                if (b & (1 << i) != 0) {
+                    print!("{}", 1);
+                } else {
+                    print!("{}", 0)
+                } 
+            }
+        }
+        print!("------------");
+
         // S = r + H*(Rbar || Pk || M) . sk
-        let mut s = h_star::<E>(&concatenated[..], msg);
+        let mut s = h_star_s::<E>(&concatenated[..], msg);
         s.mul_assign(&self.0);
         s.add_assign(&r);
     
@@ -173,7 +187,7 @@ impl<E: JubjubEngine> PublicKey<E> {
 
         let concatenated: Vec<u8> = r_g_x_bytes.iter().chain(r_g_y_bytes.iter()).chain(pk_x_bytes.iter()).chain(pk_y_bytes.iter()).cloned().collect();
 
-        let c = h_star::<E>(&concatenated[..], msg);
+        let c = h_star_s::<E>(&concatenated[..], msg);
 
         // this one is for a simple sanity check. In application purposes the pk will always be in a right group 
         let order_check_pk = self.0.mul(E::Fs::char(), params);
@@ -208,7 +222,7 @@ impl<E: JubjubEngine> PublicKey<E> {
         params: &E::Params,
     ) -> bool {
         // c = H*(Rbar || M)
-        let c = h_star::<E>(&sig.rbar[..], msg);
+        let c = h_star_s::<E>(&sig.rbar[..], msg);
 
         // Signature checks:
         // R != invalid
