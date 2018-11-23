@@ -5,8 +5,9 @@ We use elliptic curve BN256, for which pairings can be efficiently performed in 
 
 ## Project structure
 
-- `examples/xor.rs`: simple XOR circuit
-- `examples/sha256.rs`: sha256 preimage (using gadgets from `sapling-crypto` crate)
+- `examples/xor.rs`: simple XOR circuit demo
+- `examples/sha256.rs`: sha256 preimage demo (using gadgets from `sapling-crypto` crate)
+- `examples/bench.rs`: benchmarking
 
 ## Usage:
 
@@ -23,3 +24,9 @@ cargo run --example sha256 > demo.sol
 ```
 
 Now deploy `DemoVerifier` contract from `demo.sol` (e.g. in [remix](https://remix.ethereum.org)) and run method `verify()`.
+
+## Benchmarking
+
+```$bash
+cargo run --example bench [num_constraints]
+```
