@@ -270,11 +270,11 @@ pub fn generate_parameters<E, C>(
 
     let worker = Worker::new();
 
-    let powers_of_tau_start = PreciseTime::now();
     let mut h = vec![E::G1::zero(); powers_of_tau.as_ref().len() - 1];
     {
         // Compute powers of tau
         if verbose {eprintln!("computing powers of tau...")};
+        let start = PreciseTime::now();
         {
             let powers_of_tau = powers_of_tau.as_mut();
             worker.scope(powers_of_tau.len(), |scope, chunk| {
@@ -292,13 +292,14 @@ pub fn generate_parameters<E, C>(
                 }
             });
         }
-        if verbose {eprintln!("done")};
+        if verbose {eprintln!("done in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);};
 
         // coeff = t(x) / delta
         let mut coeff = powers_of_tau.z(&tau);
         coeff.mul_assign(&delta_inverse);
 
         if verbose {eprintln!("computing the H query with multiple threads...")};
+        let start = PreciseTime::now();
         // Compute the H query with multiple threads
         worker.scope(h.len(), |scope, chunk| {
             let mut mb = if verbose {Some(MultiBar::new())} else {None};
@@ -332,10 +333,8 @@ pub fn generate_parameters<E, C>(
             }
             if let Some(mb) = mb.as_mut() {mb.listen();}
         });
+        if verbose {eprintln!("done in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);};
     }
-    let powers_of_tau_end = PreciseTime::now();
-    if verbose {eprintln!("{} seconds for powers of tau.", powers_of_tau_start.to(powers_of_tau_end))};
-    if verbose {eprintln!("done")};
 
     if verbose {eprintln!("using inverse FFT to convert powers of tau to Lagrange coefficients...")};
     let powers_of_tau_start2 = PreciseTime::now();
@@ -353,8 +352,7 @@ pub fn generate_parameters<E, C>(
     let mut l = vec![E::G1::zero(); assembly.num_aux];
 
     if verbose {eprintln!("evaluating polynomials...")};
-    let poly_start = PreciseTime::now();
-
+    let start = PreciseTime::now();
     fn eval<E: Engine>(
         // wNAF window tables
         g1_wnaf: &Wnaf<usize, &[E::G1], &mut Vec<i64>>,
@@ -522,9 +520,8 @@ pub fn generate_parameters<E, C>(
         &beta,
         &worker
     );
-    let poly_end = PreciseTime::now();
-    if verbose {eprintln!("{} seconds for polynomial evaluation.", poly_start.to(poly_end))};
-    if verbose {eprintln!("done")};
+
+    if verbose {eprintln!("done in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);};
 
     // Don't allow any elements be unconstrained, so that
     // the L query is always fully dense.
