@@ -16,5 +16,5 @@ pub fn hash_to_scalar_s<E: JubjubEngine>(persona: &[u8], a: &[u8], b: &[u8]) -> 
     hasher.update(a);
     hasher.update(b);
     let ret = hasher.finalize();
-    E::Fs::to_uniform(ret.as_ref())
+    E::Fs::to_uniform_32(ret.as_ref())
 }

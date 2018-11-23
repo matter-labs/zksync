@@ -6,7 +6,7 @@ use rand::{Rng, Rand};
 use std::io::{self, Read, Write};
 
 use jubjub::{FixedGenerators, JubjubEngine, JubjubParams, Unknown, edwards::Point};
-use util::{hash_to_scalar_s};
+use util::{hash_to_scalar, hash_to_scalar_s};
 
 use blake2_rfc::{blake2s};
 
@@ -25,6 +25,10 @@ fn read_scalar<E: JubjubEngine, R: Read>(reader: R) -> io::Result<E::Fs> {
 
 fn write_scalar<E: JubjubEngine, W: Write>(s: &E::Fs, writer: W) -> io::Result<()> {
     s.into_repr().write_le(writer)
+}
+
+fn h_star<E: JubjubEngine>(a: &[u8], b: &[u8]) -> E::Fs {
+    hash_to_scalar::<E>(b"Zcash_RedJubjubH", a, b)
 }
 
 fn h_star_s<E: JubjubEngine>(a: &[u8], b: &[u8]) -> E::Fs {
@@ -80,6 +84,71 @@ impl<E: JubjubEngine> PrivateKey<E> {
         write_scalar::<E, W>(&self.0, writer)
     }
 
+    pub fn sign_for_snark<R: Rng>(
+        &self,
+        msg: &[u8],
+        rng: &mut R,
+        p_g: FixedGenerators,
+        params: &E::Params,
+    ) -> Signature<E> {
+        // T = (l_H + 128) bits of randomness
+        // For H*, l_H = 512 bits
+        let mut t = [0u8; 80];
+        rng.fill_bytes(&mut t[..]);
+
+        // Generate randomness using hash function based on some entropy and the message
+        // Generation of randommess is completely off-chain, so we use BLAKE2b!
+        // r = H*(T || M)
+        let r = h_star::<E>(&t[..], msg);
+
+        let pk = PublicKey::from_private(&self, p_g, params);
+        let order_check = pk.0.mul(E::Fs::char(), params);
+        assert!(order_check.eq(&Point::zero()));
+
+        // for hash function for a part that is INSIDE the zkSNARK it's 
+        // BLAKE2s has 512 of input and 256 bits of output,
+        // so we use R_X || M as an input to hash only (without public key component),
+        // with a point coordinate padded to 256 bits
+
+        // R = r . P_G
+        let r_g = params.generator(p_g).mul(r, params);
+
+        let (r_g_x, _) = r_g.into_xy();
+        let mut r_g_x_bytes = [0u8; 32];
+        r_g_x.into_repr().write_le(& mut r_g_x_bytes[..]).expect("has serialized r_g_x");
+
+        // we also pad message to 256 bits as LE
+
+        let concatenated: Vec<u8> = r_g_x_bytes.iter().cloned().collect();
+
+
+        // print!("{}\n", concatenated.len() * 8);
+
+        // for b in concatenated.clone().into_iter() {
+        //     for i in (0..8).into_iter() {
+        //         if (b & (1 << i) != 0) {
+        //             print!("{}", 1);
+        //         } else {
+        //             print!("{}", 0)
+        //         } 
+        //     }
+        // }
+        // print!("------------");
+
+        let mut msg_padded : Vec<u8> = msg.iter().cloned().collect();
+        for _ in 0..(256-msg.len()) {
+            msg_padded.extend(&[0u8;1]);
+        }
+
+        // S = r + H*(R_X || M) . sk
+        let mut s = h_star_s::<E>(&concatenated[..], &msg_padded[..]);
+        s.mul_assign(&self.0);
+        s.add_assign(&r);
+    
+        let as_unknown = Point::from(r_g);
+        Signature { r: as_unknown, s: s }
+    }
+
     pub fn sign<R: Rng>(
         &self,
         msg: &[u8],
@@ -88,17 +157,22 @@ impl<E: JubjubEngine> PrivateKey<E> {
         params: &E::Params,
     ) -> Signature<E> {
         // T = (l_H + 128) bits of randomness
-        // For H*, l_H = 128 bits
-        let mut t = [0u8; 32];
+        // For H*, l_H = 512 bits
+        let mut t = [0u8; 80];
         rng.fill_bytes(&mut t[..]);
 
         // Generate randomness using hash function based on some entropy and the message
+        // Generation of randommess is completely off-chain, so we use BLAKE2b!
         // r = H*(T || M)
-        let r = h_star_s::<E>(&t[..], msg);
+        let r = h_star::<E>(&t[..], msg);
 
         let pk = PublicKey::from_private(&self, p_g, params);
         let order_check = pk.0.mul(E::Fs::char(), params);
         assert!(order_check.eq(&Point::zero()));
+
+        // for hash function for a part that is INSIDE the zkSNARK it's 
+        // BLAKE2s has 512 of input and 256 bits of output,
+        // so we use R_X || M as an input to hash only (without public key component), with point coordinates badded to 
 
         // R = r . P_G
         let r_g = params.generator(p_g).mul(r, params);
@@ -119,21 +193,8 @@ impl<E: JubjubEngine> PrivateKey<E> {
 
         let concatenated: Vec<u8> = r_g_x_bytes.iter().chain(r_g_y_bytes.iter()).chain(pk_x_bytes.iter()).chain(pk_y_bytes.iter()).cloned().collect();
 
-        print!("{}\n", concatenated.len() * 8);
-
-        for b in concatenated.clone().into_iter() {
-            for i in (0..8).into_iter() {
-                if (b & (1 << i) != 0) {
-                    print!("{}", 1);
-                } else {
-                    print!("{}", 0)
-                } 
-            }
-        }
-        print!("------------");
-
         // S = r + H*(Rbar || Pk || M) . sk
-        let mut s = h_star_s::<E>(&concatenated[..], msg);
+        let mut s = h_star::<E>(&concatenated[..], msg);
         s.mul_assign(&self.0);
         s.add_assign(&r);
     
@@ -187,7 +248,53 @@ impl<E: JubjubEngine> PublicKey<E> {
 
         let concatenated: Vec<u8> = r_g_x_bytes.iter().chain(r_g_y_bytes.iter()).chain(pk_x_bytes.iter()).chain(pk_y_bytes.iter()).cloned().collect();
 
-        let c = h_star_s::<E>(&concatenated[..], msg);
+        let c = h_star::<E>(&concatenated[..], msg);
+
+        // this one is for a simple sanity check. In application purposes the pk will always be in a right group 
+        let order_check_pk = self.0.mul(E::Fs::char(), params);
+        if !order_check_pk.eq(&Point::zero()) {
+            return false;
+        }
+
+        // r is input from user, so always check it!
+        let order_check_r = sig.r.mul(E::Fs::char(), params);
+        if !order_check_r.eq(&Point::zero()) {
+            return false;
+        }
+
+        // self.0.mul(c, params).add(&sig.r, params).add(
+        //     &params.generator(p_g).mul(sig.s, params).negate().into(),
+        //     params
+        // ).mul_by_cofactor(params).eq(&Point::zero());
+
+
+        // 0 = h_G(-S . P_G + R + c . vk)
+        self.0.mul(c, params).add(&sig.r, params).add(
+            &params.generator(p_g).mul(sig.s, params).negate().into(),
+            params
+        ).eq(&Point::zero())
+    }
+
+    pub fn verify_for_snark(
+        &self,
+        msg: &[u8],
+        sig: &Signature<E>,
+        p_g: FixedGenerators,
+        params: &E::Params,
+    ) -> bool {
+        // c = H*(Rbar || Pk || M)
+        let (r_g_x, _) = sig.r.into_xy();
+        let mut r_g_x_bytes = [0u8; 32];
+        r_g_x.into_repr().write_le(& mut r_g_x_bytes[..]).expect("has serialized r_g_x");
+
+        let concatenated: Vec<u8> = r_g_x_bytes.iter().cloned().collect();
+
+        let mut msg_padded : Vec<u8> = msg.iter().cloned().collect();
+        for _ in 0..(256-msg.len()) {
+            msg_padded.extend(&[0u8;1]);
+        }
+
+        let c = h_star_s::<E>(&concatenated[..], &msg_padded[..]);
 
         // this one is for a simple sanity check. In application purposes the pk will always be in a right group 
         let order_check_pk = self.0.mul(E::Fs::char(), params);
@@ -222,7 +329,7 @@ impl<E: JubjubEngine> PublicKey<E> {
         params: &E::Params,
     ) -> bool {
         // c = H*(Rbar || M)
-        let c = h_star_s::<E>(&sig.rbar[..], msg);
+        let c = h_star::<E>(&sig.rbar[..], msg);
 
         // Signature checks:
         // R != invalid
@@ -350,6 +457,41 @@ mod baby_tests {
             assert!(rvk.verify(msg2, &sig2, p_g, params));
             assert!(!rvk.verify(msg1, &sig2, p_g, params));
             assert!(!rvk.verify(msg2, &sig1, p_g, params));
+        }
+    }
+
+    #[test]
+    fn random_signatures_for_snark() {
+        let rng = &mut thread_rng();
+        let p_g = FixedGenerators::SpendingKeyGenerator;
+        let params = &AltJubjubBn256::new();
+
+        for _ in 0..1000 {
+            let sk = PrivateKey::<Bn256>(rng.gen());
+            let vk = PublicKey::from_private(&sk, p_g, params);
+
+            let msg1 = b"Foo bar";
+            let msg2 = b"Spam eggs";
+
+            let sig1 = sk.sign_for_snark(msg1, rng, p_g, params);
+            let sig2 = sk.sign_for_snark(msg2, rng, p_g, params);
+
+            assert!(vk.verify_for_snark(msg1, &sig1, p_g, params));
+            assert!(vk.verify_for_snark(msg2, &sig2, p_g, params));
+            assert!(!vk.verify_for_snark(msg1, &sig2, p_g, params));
+            assert!(!vk.verify_for_snark(msg2, &sig1, p_g, params));
+
+            let alpha = rng.gen();
+            let rsk = sk.randomize(alpha);
+            let rvk = vk.randomize(alpha, p_g, params);
+
+            let sig1 = rsk.sign_for_snark(msg1, rng, p_g, params);
+            let sig2 = rsk.sign_for_snark(msg2, rng, p_g, params);
+
+            assert!(rvk.verify_for_snark(msg1, &sig1, p_g, params));
+            assert!(rvk.verify_for_snark(msg2, &sig2, p_g, params));
+            assert!(!rvk.verify_for_snark(msg1, &sig2, p_g, params));
+            assert!(!rvk.verify_for_snark(msg2, &sig1, p_g, params));
         }
     }
 }

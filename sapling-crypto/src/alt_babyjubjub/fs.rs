@@ -594,25 +594,23 @@ impl Fs {
     }
 }
 
-// impl ToUniform for Fs {
-//     /// Convert a little endian byte string into a uniform
-//     /// field element. The number is reduced mod s. The caller
-//     /// is responsible for ensuring the input is 64 bytes of
-//     /// Random Oracle output.
-//     fn to_uniform(digest: &[u8]) -> Self {
-//         assert_eq!(digest.len(), 64);
-//         let mut repr: [u64; 8] = [0; 8];
-//         LittleEndian::read_u64_into(digest, &mut repr);
-//         Self::one().mul_bits(BitIterator::new(repr))
-//     }
-// }
-
 impl ToUniform for Fs {
     /// Convert a little endian byte string into a uniform
     /// field element. The number is reduced mod s. The caller
     /// is responsible for ensuring the input is 64 bytes of
     /// Random Oracle output.
     fn to_uniform(digest: &[u8]) -> Self {
+        assert_eq!(digest.len(), 64);
+        let mut repr: [u64; 8] = [0; 8];
+        LittleEndian::read_u64_into(digest, &mut repr);
+        Self::one().mul_bits(BitIterator::new(repr))
+    }
+
+    /// Convert a little endian byte string into a uniform
+    /// field element. The number is reduced mod s. The caller
+    /// is responsible for ensuring the input is 32 bytes of
+    /// Random Oracle output.
+    fn to_uniform_32(digest: &[u8]) -> Self {
         assert_eq!(digest.len(), 32);
         let mut repr: [u64; 4] = [0; 4];
         LittleEndian::read_u64_into(digest, &mut repr);

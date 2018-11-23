@@ -90,6 +90,7 @@ pub enum FixedGenerators {
 
 pub trait ToUniform {
     fn to_uniform(digest: &[u8]) -> Self;
+    fn to_uniform_32(digest: &[u8]) -> Self;
 }
 
 /// This is an extension to the pairing Engine trait which
