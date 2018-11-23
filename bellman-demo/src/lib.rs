@@ -20,6 +20,7 @@ pub fn generate_demo_contract<E: Engine>(vk: &groth16::VerifyingKey<E>, proof: &
 const STANDARD_VERIFIER: &str =
 r#"pragma solidity ^0.4.24;
 
+// from https://github.com/HarryR/ethsnarks/blob/master/contracts/Verifier.sol
 contract Verifier {
 
     function NegateY( uint256 Y ) internal pure returns (uint256) {
