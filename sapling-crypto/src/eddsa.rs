@@ -14,7 +14,7 @@ use jubjub::{
     ToUniform};
 use util::{hash_to_scalar, hash_to_scalar_s};
 
-use blake2_rfc::{blake2s};
+use ::constants::{MATTER_EDDSA_BLAKE2S_PERSONALIZATION};
 
 fn read_scalar<E: JubjubEngine, R: Read>(reader: R) -> io::Result<E::Fs> {
     let mut s_repr = <E::Fs as PrimeField>::Repr::default();
@@ -38,8 +38,7 @@ fn h_star<E: JubjubEngine>(a: &[u8], b: &[u8]) -> E::Fs {
 }
 
 fn h_star_s<E: JubjubEngine>(a: &[u8], b: &[u8]) -> E::Fs {
-    let personalization_bytes: &[u8] = &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
-    hash_to_scalar_s::<E>(personalization_bytes, a, b)
+    hash_to_scalar_s::<E>(MATTER_EDDSA_BLAKE2S_PERSONALIZATION, a, b)
 }
 
 #[derive(Copy, Clone)]

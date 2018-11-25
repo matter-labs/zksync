@@ -25,4 +25,3 @@ use super::blake2s;
 use super::sha256;
 use super::num;
 use super::multipack;
-

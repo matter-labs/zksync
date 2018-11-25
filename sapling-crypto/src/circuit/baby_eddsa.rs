@@ -29,19 +29,14 @@ use super::lookup::{
     lookup3_xy
 };
 
-use super::boolean::{Boolean, 
-    field_into_allocated_bits_le, 
+use super::boolean::{
+    Boolean, 
     field_into_boolean_vec_le,
-    AllocatedBit
 };
 
 use super::ecc::EdwardsPoint;
 
-use ::redjubjub::{PublicKey};
-
 use super::blake2s::{blake2s};
-
-use super::pedersen_hash::{Personalization};
 
 #[derive(Clone)]
 pub struct EddsaSignature<E: JubjubEngine> {
@@ -52,100 +47,89 @@ pub struct EddsaSignature<E: JubjubEngine> {
 
 use ::alt_babyjubjub::{fs::Fs};
 
+use constants::{MATTER_EDDSA_BLAKE2S_PERSONALIZATION};
+
 impl <E: JubjubEngine>EddsaSignature<E> {
 
-    pub fn verify_on_message<CS>(
-        &self,
-        mut cs: CS,
-        params: &E::Params,
-        personalization: Personalization,
-        message: &[Boolean],
-        generator: EdwardsPoint<E>
-    ) -> Result<Boolean, SynthesisError>
-        where CS: ConstraintSystem<E>
-    {
-        // TODO check that s < Fs::Char
-        let scalar_bits = field_into_boolean_vec_le(cs.namespace(|| "Get S bits"), self.s.get_value());
-        assert!(scalar_bits.is_ok());
-        let scalar_bits_conv: &[Boolean] = &(scalar_bits.unwrap());
-        let sb = generator.mul(cs.namespace(|| "S*B computation"), &scalar_bits_conv, params).unwrap();
+    // pub fn verify_on_message<CS>(
+    //     &self,
+    //     mut cs: CS,
+    //     params: &E::Params,
+    //     message: &[Boolean],
+    //     generator: EdwardsPoint<E>
+    // ) -> Result<Boolean, SynthesisError>
+    //     where CS: ConstraintSystem<E>
+    // {
+    //     // TODO check that s < Fs::Char
+    //     let scalar_bits = field_into_boolean_vec_le(cs.namespace(|| "Get S bits"), self.s.get_value());
+    //     assert!(scalar_bits.is_ok());
+    //     let scalar_bits_conv: &[Boolean] = &(scalar_bits.unwrap());
+    //     let sb = generator.mul(cs.namespace(|| "S*B computation"), &scalar_bits_conv, params).unwrap();
 
-        let personalization_bytes: &[u8] = &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
-        // h = Hash(R, pubkey, message)
+    //     // h = Hash(R, pubkey, message)
 
-        // only order of R is checked. Public key and generator can be guaranteed to be in proper group!
-        // by some other means for out particular case
-        let r_is_in_order = self.r.assert_not_small_order(cs.namespace(|| "R is in right order"), &params);
+    //     // only order of R is checked. Public key and generator can be guaranteed to be in proper group!
+    //     // by some other means for out particular case
+    //     let r_is_in_order = self.r.assert_not_small_order(cs.namespace(|| "R is in right order"), &params);
 
-        assert!(r_is_in_order.is_ok());
-        // let bit_length = scalar_bits_conv.len();
-        // let zero_bit = Boolean::Constant(false);
+    //     assert!(r_is_in_order.is_ok());
+    //     // let bit_length = scalar_bits_conv.len();
+    //     // let zero_bit = Boolean::Constant(false);
 
-        let mut hash_bits: Vec<Boolean> = vec![];
+    //     let mut hash_bits: Vec<Boolean> = vec![];
 
-        let r_x_value = self.r.get_x().get_value();
-        let r_x_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize R_X"), r_x_value).unwrap();
-        print!("{}\n", r_x_serialized.len());
+    //     let r_x_value = self.r.get_x().get_value();
+    //     let r_x_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize R_X"), r_x_value).unwrap();
 
-        let mut to_append = 256 - r_x_serialized.len();
-        for _ in 0..to_append {
-            hash_bits.push(Boolean::Constant(false));
-        }
-        hash_bits.extend(r_x_serialized.into_iter());
+    //     let mut to_append = 256 - r_x_serialized.len();
+    //     for _ in 0..to_append {
+    //         hash_bits.push(Boolean::Constant(false));
+    //     }
+    //     hash_bits.extend(r_x_serialized.into_iter());
 
-        let r_y_value = self.r.get_y().get_value();
-        let r_y_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize R_Y"), r_y_value).unwrap();
-        to_append = 256 - r_y_serialized.len();
-        for _ in 0..to_append {
-            hash_bits.push(Boolean::Constant(false));
-        }
-        hash_bits.extend(r_y_serialized.into_iter());
+    //     let r_y_value = self.r.get_y().get_value();
+    //     let r_y_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize R_Y"), r_y_value).unwrap();
+    //     to_append = 256 - r_y_serialized.len();
+    //     for _ in 0..to_append {
+    //         hash_bits.push(Boolean::Constant(false));
+    //     }
+    //     hash_bits.extend(r_y_serialized.into_iter());
 
-        let pk_x_value = self.pk.get_x().get_value();
-        let pk_x_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize PK_X"), pk_x_value).unwrap();
-        to_append = 256 - pk_x_serialized.len();
-        for _ in 0..to_append {
-            hash_bits.push(Boolean::Constant(false));
-        }
-        hash_bits.extend(pk_x_serialized.into_iter());
+    //     let pk_x_value = self.pk.get_x().get_value();
+    //     let pk_x_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize PK_X"), pk_x_value).unwrap();
+    //     to_append = 256 - pk_x_serialized.len();
+    //     for _ in 0..to_append {
+    //         hash_bits.push(Boolean::Constant(false));
+    //     }
+    //     hash_bits.extend(pk_x_serialized.into_iter());
 
-        let pk_y_value = self.pk.get_y().get_value();
-        let pk_y_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize PK_Y"), pk_y_value).unwrap();
-        to_append = 256 - pk_y_serialized.len();
-        for _ in 0..to_append {
-            hash_bits.push(Boolean::Constant(false));
-        }
-        hash_bits.extend(pk_y_serialized.into_iter());
-        // for i in 0..message.len() {
-        //     let bit = message[i];
-        //     hash_bits.push(bit);
-        // }
-        hash_bits.extend(message.iter().cloned());
+    //     let pk_y_value = self.pk.get_y().get_value();
+    //     let pk_y_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize PK_Y"), pk_y_value).unwrap();
+    //     to_append = 256 - pk_y_serialized.len();
+    //     for _ in 0..to_append {
+    //         hash_bits.push(Boolean::Constant(false));
+    //     }
+    //     hash_bits.extend(pk_y_serialized.into_iter());
+    //     // for i in 0..message.len() {
+    //     //     let bit = message[i];
+    //     //     hash_bits.push(bit);
+    //     // }
+    //     hash_bits.extend(message.iter().cloned());
 
-        let hash_content_slice: &[Boolean] = &hash_bits;
-        assert!(hash_content_slice.len() == 256);
+    //     let hash_content_slice: &[Boolean] = &hash_bits;
+    //     assert!(hash_content_slice.len() == 256);
 
-        print!("{}\n", hash_content_slice.len());
-
-        for e in hash_content_slice.into_iter() {
-            if e.get_value().unwrap() {
-                print!("{}", 1);
-            } else {
-                print!("{}", 0);
-            }
-        }
-
-        let h = blake2s(cs.namespace(|| "Calculate EdDSA hash"), hash_content_slice, &personalization_bytes).unwrap();
+    //     let h = blake2s(cs.namespace(|| "Calculate EdDSA hash"), hash_content_slice, MATTER_EDDSA_BLAKE2S_PERSONALIZATION).unwrap();
         
-        let pk_mul_hash = self.pk.mul(cs.namespace(|| "Calculate h*PK"), &h, params).unwrap();
+    //     let pk_mul_hash = self.pk.mul(cs.namespace(|| "Calculate h*PK"), &h, params).unwrap();
 
-        let rhs = pk_mul_hash.add(cs.namespace(|| "Make signature RHS"), &self.r, params).unwrap();
+    //     let rhs = pk_mul_hash.add(cs.namespace(|| "Make signature RHS"), &self.r, params).unwrap();
 
-        let rhs_x = rhs.get_x();
-        let rhs_y = rhs.get_y();
+    //     let rhs_x = rhs.get_x();
+    //     let rhs_y = rhs.get_y();
 
-        let sb_x = sb.get_x();
-        let sb_y = sb.get_y();
+    //     let sb_x = sb.get_x();
+    //     let sb_y = sb.get_y();
 
         // let one = CS::one();
         // cs.enforce(
@@ -162,14 +146,13 @@ impl <E: JubjubEngine>EddsaSignature<E> {
         //     |lc| lc + sb_y.get_variable()
         // );
 
-        return Ok(Boolean::constant(true));
-    }
+    //     return Ok(Boolean::constant(true));
+    // }
 
     pub fn verify_eddsa_for_snark<CS>(
         &self,
         mut cs: CS,
         params: &E::Params,
-        personalization: Personalization,
         message: &[Boolean],
         generator: EdwardsPoint<E>
     ) -> Result<Boolean, SynthesisError>
@@ -181,7 +164,6 @@ impl <E: JubjubEngine>EddsaSignature<E> {
         let scalar_bits_conv: &[Boolean] = &(scalar_bits.unwrap());
         let sb = generator.mul(cs.namespace(|| "S*B computation"), &scalar_bits_conv, params).unwrap();
 
-        let personalization_bytes: &[u8] = &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
         // h = Hash(R_X || message)
 
         // only order of R is checked. Public key and generator can be guaranteed to be in proper group!
@@ -210,7 +192,7 @@ impl <E: JubjubEngine>EddsaSignature<E> {
         let hash_content_slice: &[Boolean] = &hash_bits;
         assert!(hash_content_slice.len() == 512);
 
-        let h = blake2s(cs.namespace(|| "Calculate EdDSA hash"), hash_content_slice, &personalization_bytes).unwrap();
+        let h = blake2s(cs.namespace(|| "Calculate EdDSA hash"), hash_content_slice, MATTER_EDDSA_BLAKE2S_PERSONALIZATION).unwrap();
         
         let pk_mul_hash = self.pk.mul(cs.namespace(|| "Calculate h*PK"), &h, params).unwrap();
 
@@ -315,7 +297,6 @@ mod test {
     use pairing::bn256::{Bn256, Fr};
     use ff::{PrimeField, PrimeFieldRepr};
     use ::alt_babyjubjub::AltJubjubBn256;
-    use ::alt_babyjubjub::fs::Fs;
     
     #[test]
     fn test_valid_for_snark_signatures() {
@@ -323,7 +304,6 @@ mod test {
         let mut rng = XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let params = &AltJubjubBn256::new();
-        let personalization = Personalization::NoteCommitment;
         let mut cs = TestConstraintSystem::<Bn256>::new();
         let sk = PrivateKey::<Bn256>(rng.gen());
         let vk = PublicKey::from_private(&sk, p_g, params);
@@ -372,7 +352,7 @@ mod test {
         let pk = EdwardsPoint::witness(cs.namespace(|| "allocate pk"), Some(vk.0), params).unwrap();
 
         let signature = EddsaSignature{r, s, pk};
-        signature.verify_eddsa_for_snark(cs.namespace(|| "verify signature"), params, personalization, &input_bools, generator).expect("succesfully generated verifying gadget");
+        signature.verify_eddsa_for_snark(cs.namespace(|| "verify signature"), params, &input_bools, generator).expect("succesfully generated verifying gadget");
 
         assert!(cs.is_satisfied());
         print!("EdDSA variant for snark verification takes constraints: {}\n", cs.num_constraints());

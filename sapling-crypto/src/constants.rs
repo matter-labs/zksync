@@ -38,3 +38,7 @@ pub const VALUE_COMMITMENT_GENERATOR_PERSONALIZATION: &'static [u8; 8]
 /// BLAKE2s Personalization for the nullifier position generator (for computing rho)
 pub const NULLIFIER_POSITION_IN_TREE_GENERATOR_PERSONALIZATION: &'static [u8; 8]
           = b"Zcash_J_";
+
+/// BLAKE2s Personalization hash of (R_x || message) in EdDSA variant with 256 bit hash
+pub const MATTER_EDDSA_BLAKE2S_PERSONALIZATION: &'static [u8; 8] 
+            = b"Matter_H";
