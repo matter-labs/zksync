@@ -1,7 +1,7 @@
 extern crate pbr;
 extern crate time;
 
-use groth16::verbose_flag;
+use super::super::verbose_flag;
 
 use self::time::PreciseTime;
 use self::pbr::{MultiBar};

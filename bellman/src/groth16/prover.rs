@@ -1,7 +1,7 @@
 extern crate time;
 use self::time::PreciseTime;
 
-use groth16::verbose_flag;
+use super::super::verbose_flag;
 
 use rand::Rng;
 
