@@ -1,10 +1,10 @@
 extern crate pbr;
 extern crate time;
 
+use groth16::verbose_flag;
+
 use self::time::PreciseTime;
 use self::pbr::{MultiBar};
-use std::env;
-use std::str::FromStr;
 
 use rand::Rng;
 
@@ -181,20 +181,6 @@ impl<E: Engine> ConstraintSystem<E> for KeypairAssembly<E> {
 }
 
 const MIN_STEP: u64 = 1000;
-
-static mut VERBOSE_SWITCH: i8 = -1;
-
-fn verbose_flag() -> bool {
-    unsafe {
-        if VERBOSE_SWITCH < 0 {
-            VERBOSE_SWITCH = FromStr::from_str(&env::var("BELLMAN_VERBOSE").unwrap_or(String::new())).unwrap_or(0);
-        }
-        match VERBOSE_SWITCH {
-            1 => true,
-            _ => false,
-        }
-    }
-}
 
 /// Create parameters for a circuit, given some toxic waste.
 pub fn generate_parameters<E, C>(

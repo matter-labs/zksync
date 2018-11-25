@@ -1,6 +1,8 @@
 extern crate time;
 use self::time::PreciseTime;
 
+use groth16::verbose_flag;
+
 use rand::Rng;
 
 use std::sync::Arc;
@@ -215,7 +217,7 @@ pub fn create_proof<E, C, P: ParameterSource<E>>(
 ) -> Result<Proof<E>, SynthesisError>
     where E: Engine, C: Circuit<E>
 {
-    let verbose = true;
+    let verbose = verbose_flag();
 
     let mut prover = ProvingAssignment {
         a_aux_density: DensityTracker::new(),

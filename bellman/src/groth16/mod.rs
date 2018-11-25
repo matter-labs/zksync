@@ -574,3 +574,20 @@ mod test_with_bls12_381 {
         }
     }
 }
+
+static mut VERBOSE_SWITCH: i8 = -1;
+
+use std::str::FromStr;
+use std::env;
+
+fn verbose_flag() -> bool {
+    unsafe {
+        if VERBOSE_SWITCH < 0 {
+            VERBOSE_SWITCH = FromStr::from_str(&env::var("BELLMAN_VERBOSE").unwrap_or(String::new())).unwrap_or(0);
+        }
+        match VERBOSE_SWITCH {
+            1 => true,
+            _ => false,
+        }
+    }
+}
