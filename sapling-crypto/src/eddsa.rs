@@ -5,7 +5,13 @@ use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
 use rand::{Rng, Rand};
 use std::io::{self, Read, Write};
 
-use jubjub::{FixedGenerators, JubjubEngine, JubjubParams, Unknown, edwards::Point};
+use jubjub::{
+    FixedGenerators, 
+    JubjubEngine, 
+    JubjubParams, 
+    Unknown, 
+    edwards::Point,
+    ToUniform};
 use util::{hash_to_scalar, hash_to_scalar_s};
 
 use blake2_rfc::{blake2s};
@@ -84,6 +90,56 @@ impl<E: JubjubEngine> PrivateKey<E> {
         write_scalar::<E, W>(&self.0, writer)
     }
 
+    pub fn sign_raw_message<R: Rng>(
+        &self,
+        msg: &[u8],
+        rng: &mut R,
+        p_g: FixedGenerators,
+        params: &E::Params,
+        max_message_size: usize,
+    ) -> Signature<E> {
+        // T = (l_H + 128) bits of randomness
+        // For H*, l_H = 512 bits
+        let mut t = [0u8; 80];
+        rng.fill_bytes(&mut t[..]);
+
+        // Generate randomness using hash function based on some entropy and the message
+        // Generation of randommess is completely off-chain, so we use BLAKE2b!
+        // r = H*(T || M)
+        let r = h_star::<E>(&t[..], msg);
+
+        let pk = PublicKey::from_private(&self, p_g, params);
+        let order_check = pk.0.mul(E::Fs::char(), params);
+        assert!(order_check.eq(&Point::zero()));
+
+        // R = r . P_G
+        let r_g = params.generator(p_g).mul(r, params);
+
+        // In a VERY LIMITED case of messages known to be unique due to application level
+        // and being less than the group order when interpreted as integer, one can sign
+        // the message directly without hashing
+
+        assert!(msg.len() <= max_message_size);
+        assert!(max_message_size * 8 <= E::Fs::CAPACITY as usize);
+        // assert!(max_message_size * 8 <= E::Fs::Repr::len());
+        // we also pad message to max size
+
+        // pad with zeroes to match representation length
+        let mut msg_padded : Vec<u8> = msg.iter().cloned().collect();
+        for _ in 0..(32 - msg.len()) {
+            msg_padded.extend(&[0u8;1]);
+        }
+
+        // S = r + M . sk
+        let mut s = E::Fs::to_uniform_32(msg_padded.as_ref());
+        
+        s.mul_assign(&self.0);
+        s.add_assign(&r);
+    
+        let as_unknown = Point::from(r_g);
+        Signature { r: as_unknown, s: s }
+    }
+
     pub fn sign_for_snark<R: Rng>(
         &self,
         msg: &[u8],
@@ -121,22 +177,8 @@ impl<E: JubjubEngine> PrivateKey<E> {
 
         let concatenated: Vec<u8> = r_g_x_bytes.iter().cloned().collect();
 
-
-        // print!("{}\n", concatenated.len() * 8);
-
-        // for b in concatenated.clone().into_iter() {
-        //     for i in (0..8).into_iter() {
-        //         if (b & (1 << i) != 0) {
-        //             print!("{}", 1);
-        //         } else {
-        //             print!("{}", 0)
-        //         } 
-        //     }
-        // }
-        // print!("------------");
-
         let mut msg_padded : Vec<u8> = msg.iter().cloned().collect();
-        for _ in 0..(256-msg.len()) {
+        for _ in 0..(32-msg.len()) {
             msg_padded.extend(&[0u8;1]);
         }
 
@@ -262,19 +304,69 @@ impl<E: JubjubEngine> PublicKey<E> {
             return false;
         }
 
+        // 0 = h_G(-S . P_G + R + c . vk)
         // self.0.mul(c, params).add(&sig.r, params).add(
         //     &params.generator(p_g).mul(sig.s, params).negate().into(),
         //     params
         // ).mul_by_cofactor(params).eq(&Point::zero());
 
 
-        // 0 = h_G(-S . P_G + R + c . vk)
+        // 0 = -S . P_G + R + c . vk that requires all points to be in the same group
         self.0.mul(c, params).add(&sig.r, params).add(
             &params.generator(p_g).mul(sig.s, params).negate().into(),
             params
         ).eq(&Point::zero())
     }
 
+    pub fn verify_for_raw_message(
+        &self,
+        msg: &[u8],
+        sig: &Signature<E>,
+        p_g: FixedGenerators,
+        params: &E::Params,
+        max_message_size: usize,
+    ) -> bool {
+        // c = M
+
+        assert!(msg.len() <= max_message_size);
+        assert!(max_message_size * 8 <= E::Fs::CAPACITY as usize);
+        // assert!(max_message_size * 8 <= E::Fs::Repr::len());
+        // we also pad message to max size
+
+        // pad with zeroes to match representation length
+        let mut msg_padded : Vec<u8> = msg.iter().cloned().collect();
+        for _ in 0..(32 - msg.len()) {
+            msg_padded.extend(&[0u8;1]);
+        }
+
+        let c = E::Fs::to_uniform_32(msg_padded.as_ref());
+
+        // this one is for a simple sanity check. In application purposes the pk will always be in a right group 
+        let order_check_pk = self.0.mul(E::Fs::char(), params);
+        if !order_check_pk.eq(&Point::zero()) {
+            return false;
+        }
+
+        // r is input from user, so always check it!
+        let order_check_r = sig.r.mul(E::Fs::char(), params);
+        if !order_check_r.eq(&Point::zero()) {
+            return false;
+        }
+
+        // 0 = h_G(-S . P_G + R + c . vk)
+        // self.0.mul(c, params).add(&sig.r, params).add(
+        //     &params.generator(p_g).mul(sig.s, params).negate().into(),
+        //     params
+        // ).mul_by_cofactor(params).eq(&Point::zero());
+
+
+        // 0 = -S . P_G + R + c . vk that requires all points to be in the same group
+        self.0.mul(c, params).add(&sig.r, params).add(
+            &params.generator(p_g).mul(sig.s, params).negate().into(),
+            params
+        ).eq(&Point::zero())
+    }
+    
     pub fn verify_for_snark(
         &self,
         msg: &[u8],
@@ -282,7 +374,7 @@ impl<E: JubjubEngine> PublicKey<E> {
         p_g: FixedGenerators,
         params: &E::Params,
     ) -> bool {
-        // c = H*(Rbar || Pk || M)
+        // c = H*(R_x || M)
         let (r_g_x, _) = sig.r.into_xy();
         let mut r_g_x_bytes = [0u8; 32];
         r_g_x.into_repr().write_le(& mut r_g_x_bytes[..]).expect("has serialized r_g_x");
@@ -290,7 +382,7 @@ impl<E: JubjubEngine> PublicKey<E> {
         let concatenated: Vec<u8> = r_g_x_bytes.iter().cloned().collect();
 
         let mut msg_padded : Vec<u8> = msg.iter().cloned().collect();
-        for _ in 0..(256-msg.len()) {
+        for _ in 0..(32-msg.len()) {
             msg_padded.extend(&[0u8;1]);
         }
 
@@ -308,13 +400,14 @@ impl<E: JubjubEngine> PublicKey<E> {
             return false;
         }
 
+        // 0 = h_G(-S . P_G + R + c . vk)
         // self.0.mul(c, params).add(&sig.r, params).add(
         //     &params.generator(p_g).mul(sig.s, params).negate().into(),
         //     params
         // ).mul_by_cofactor(params).eq(&Point::zero());
 
 
-        // 0 = h_G(-S . P_G + R + c . vk)
+        // 0 = -S . P_G + R + c . vk that requires all points to be in the same group
         self.0.mul(c, params).add(&sig.r, params).add(
             &params.generator(p_g).mul(sig.s, params).negate().into(),
             params
@@ -492,6 +585,43 @@ mod baby_tests {
             assert!(rvk.verify_for_snark(msg2, &sig2, p_g, params));
             assert!(!rvk.verify_for_snark(msg1, &sig2, p_g, params));
             assert!(!rvk.verify_for_snark(msg2, &sig1, p_g, params));
+        }
+    }
+
+    #[test]
+    fn random_signatures_for_raw_message() {
+        let rng = &mut thread_rng();
+        let p_g = FixedGenerators::SpendingKeyGenerator;
+        let params = &AltJubjubBn256::new();
+
+        for _ in 0..1000 {
+            let sk = PrivateKey::<Bn256>(rng.gen());
+            let vk = PublicKey::from_private(&sk, p_g, params);
+
+            let msg1 = b"Foo bar";
+            let msg2 = b"Spam eggs";
+
+            let max_message_size: usize = 16;
+
+            let sig1 = sk.sign_raw_message(msg1, rng, p_g, params, max_message_size);
+            let sig2 = sk.sign_raw_message(msg2, rng, p_g, params, max_message_size);
+
+            assert!(vk.verify_for_raw_message(msg1, &sig1, p_g, params, max_message_size));
+            assert!(vk.verify_for_raw_message(msg2, &sig2, p_g, params, max_message_size));
+            assert!(!vk.verify_for_raw_message(msg1, &sig2, p_g, params, max_message_size));
+            assert!(!vk.verify_for_raw_message(msg2, &sig1, p_g, params, max_message_size));
+
+            let alpha = rng.gen();
+            let rsk = sk.randomize(alpha);
+            let rvk = vk.randomize(alpha, p_g, params);
+
+            let sig1 = rsk.sign_raw_message(msg1, rng, p_g, params, max_message_size);
+            let sig2 = rsk.sign_raw_message(msg2, rng, p_g, params, max_message_size);
+
+            assert!(rvk.verify_for_raw_message(msg1, &sig1, p_g, params, max_message_size));
+            assert!(rvk.verify_for_raw_message(msg2, &sig2, p_g, params, max_message_size));
+            assert!(!rvk.verify_for_raw_message(msg1, &sig2, p_g, params, max_message_size));
+            assert!(!rvk.verify_for_raw_message(msg2, &sig1, p_g, params, max_message_size));
         }
     }
 }
