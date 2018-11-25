@@ -292,7 +292,7 @@ pub fn generate_parameters<E, C>(
                 }
             });
         }
-        if verbose {eprintln!("done in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);};
+        if verbose {eprintln!("powers of tau stage 1 done in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);};
 
         // coeff = t(x) / delta
         let mut coeff = powers_of_tau.z(&tau);
@@ -333,17 +333,15 @@ pub fn generate_parameters<E, C>(
             }
             if let Some(mb) = mb.as_mut() {mb.listen();}
         });
-        if verbose {eprintln!("done in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);};
+        if verbose {eprintln!("computing the H query done in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);};
     }
 
     if verbose {eprintln!("using inverse FFT to convert powers of tau to Lagrange coefficients...")};
-    let powers_of_tau_start2 = PreciseTime::now();
+    let start = PreciseTime::now();
     // Use inverse FFT to convert powers of tau to Lagrange coefficients
     powers_of_tau.ifft(&worker);
     let powers_of_tau = powers_of_tau.into_coeffs();
-    let powers_of_tau_end2 = PreciseTime::now();
-    if verbose {eprintln!("{} seconds for powers of tau stage 2.", powers_of_tau_start2.to(powers_of_tau_end2))};
-    if verbose {eprintln!("done")};
+    if verbose {eprintln!("powers of tau stage 2 done in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0)};
 
     let mut a = vec![E::G1::zero(); assembly.num_inputs + assembly.num_aux];
     let mut b_g1 = vec![E::G1::zero(); assembly.num_inputs + assembly.num_aux];
@@ -521,7 +519,7 @@ pub fn generate_parameters<E, C>(
         &worker
     );
 
-    if verbose {eprintln!("done in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);};
+    if verbose {eprintln!("evaluating polynomials done in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);};
 
     // Don't allow any elements be unconstrained, so that
     // the L query is always fully dense.
