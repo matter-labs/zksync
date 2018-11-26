@@ -18,6 +18,7 @@ pub mod baby_eddsa;
 
 pub mod sapling;
 pub mod sprout;
+pub mod matter;
 
 use bellman::{
     SynthesisError

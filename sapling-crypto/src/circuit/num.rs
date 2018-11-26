@@ -397,6 +397,42 @@ impl<E: Engine> AllocatedNum<E> {
         Ok((c, d))
     }
 
+    /// Takes two allocated numbers (a, b) and returns
+    /// a if the condition is true, and b
+    /// otherwise.
+    /// Most often to be used with b = 0
+    pub fn conditionally_select<CS>(
+        mut cs: CS,
+        a: &Self,
+        b: &Self,
+        condition: &Boolean
+    ) -> Result<(Self), SynthesisError>
+        where CS: ConstraintSystem<E>
+    {
+        let c = Self::alloc(
+            cs.namespace(|| "conditional select result"),
+            || {
+                if *condition.get_value().get()? {
+                    Ok(*a.value.get()?)
+                } else {
+                    Ok(*b.value.get()?)
+                }
+            }
+        )?;
+
+        // a * condition + b*(1-condition) = c ->
+        // a * condition - b*condition = c - b
+
+        cs.enforce(
+            || "conditional select constraint",
+            |lc| lc + a.variable - b.variable,
+            |_| condition.lc(CS::one(), E::Fr::one()),
+            |lc| lc + c.variable - b.variable
+        );
+
+        Ok(c)
+    }
+
     pub fn get_value(&self) -> Option<E::Fr> {
         self.value
     }
@@ -537,6 +573,28 @@ mod test {
 
             assert_eq!(a.value.unwrap(), d.value.unwrap());
             assert_eq!(b.value.unwrap(), c.value.unwrap());
+        }
+    }
+
+    #[test]
+    fn test_num_conditional_select() {
+        let mut rng = XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        {
+            let mut cs = TestConstraintSystem::<Bls12>::new();
+
+            let a = AllocatedNum::alloc(cs.namespace(|| "a"), || Ok(rng.gen())).unwrap();
+            let b = AllocatedNum::alloc(cs.namespace(|| "b"), || Ok(rng.gen())).unwrap();
+
+            let condition_true = Boolean::constant(true);
+            let c = AllocatedNum::conditionally_select(&mut cs, &a, &b, &condition_true).unwrap();
+
+            let condition_false = Boolean::constant(false);
+            let d = AllocatedNum::conditionally_select(&mut cs, &a, &b, &condition_false).unwrap();
+
+            assert!(cs.is_satisfied());
+
+            assert_eq!(a.value.unwrap(), c.value.unwrap());
+            assert_eq!(b.value.unwrap(), d.value.unwrap());
         }
     }
 
