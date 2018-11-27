@@ -1,10 +1,28 @@
 // Plasma sidechain state implementation
 
 use ff::{Field, PrimeField};
-use rand::{Rand, thread_rng};
-use pairing::{Engine};
+//use rand::{Rand, thread_rng};
+//use pairing::{Engine, bn256::Bn256};
+//use sapling_crypto::{
+//    //jubjub::JubjubEngine,
+//    alt_babyjubjub::{
+//        JubjubEngine,
+//        AltJubjubBn256,
+//        edwards::Point,
+//        PrimeOrder,
+//    },
+//    pedersen_hash::{
+//        baby_pedersen_hash,
+//        Personalization::NoteCommitment
+//    }
+//};
 
-use sapling_crypto::jubjub::JubjubEngine;
+use rand::{Rand, thread_rng};
+use pairing::bn256::Bn256;
+use sapling_crypto::alt_babyjubjub::{JubjubEngine, AltJubjubBn256, edwards::Point, PrimeOrder};
+use sapling_crypto::pedersen_hash::{pedersen_hash, Personalization::NoteCommitment};
+
+use super::sparse_merkle_tree::{Hasher, SparseMerkleTree};
 
 #[derive(Debug, Clone)]
 pub struct Account<E: JubjubEngine> {
@@ -13,29 +31,82 @@ pub struct Account<E: JubjubEngine> {
     //pubkey:     EdwardsPoint<E>,
 }
 
-pub type AccountId = u32;
-
-pub type Value = u32;
-
-pub struct Tx {
-    from:   AccountId,
-    to:     AccountId,
-    value:  Value,
-    fee:    Value,
+struct AccountPedersenHasher {
 }
 
-pub type ValuePacked = u32;
+impl AccountPedersenHasher {
 
-// 112 bit
-pub struct TxPacked {
-    from:   AccountId,
-    to:     AccountId,
-    value:  ValuePacked,
-    fee:    ValuePacked,
 }
 
-pub type TxPubInput = TxPacked;
 
+impl Hasher<Account<Bn256>> for AccountPedersenHasher {
+
+    type Hash = Point<Bn256, PrimeOrder>;
+
+    fn empty_hash() -> Self::Hash {
+        Self::Hash::zero()
+    }
+
+    fn hash(value: &Account<Bn256>) -> Self::Hash {
+        let params = AltJubjubBn256::new();
+        let rng = &mut thread_rng();
+        let input = (0..510).map(|_| bool::rand(rng)).collect::<Vec<_>>();
+        pedersen_hash::<Bn256, _>(NoteCommitment, input.into_iter(), &params)
+    }
+
+    fn compress(lhs: &Self::Hash, rhs: &Self::Hash) -> Self::Hash {
+        Self::Hash::zero()
+    }
+}
+
+//impl<E: JubjubEngine> Hasher<Account<E>> for AccountPedersenHasher {
+//
+//    type Hash = Point<E, PrimeOrder>;
+//
+//    fn empty_hash() -> Self::Hash {
+//        Self::Hash::zero()
+//    }
+//
+//    fn hash(value: &Account<E>) -> Self::Hash {
+//        //let params = JubjubParams<E>::new();
+//        //let params: &<E as sapling_crypto::jubjub::JubjubEngine>::Params = &AltJubjubBn256::new();
+//        let rng = &mut thread_rng();
+//        let input = (0..510).map(|_| bool::rand(rng)).collect::<Vec<_>>();
+//        pedersen_hash::<E, _>(NoteCommitment, input.into_iter(), &Self::params())
+//    }
+//
+//    fn compress(lhs: Self::Hash, rhs: Self::Hash) -> Self::Hash {
+//        Self::Hash::zero()
+//    }
+//}
+
+#[test]
+fn test_account_merkle_tree() {
+
+}
+
+//pub type AccountId = u32;
+//pub type Value = u32;
+//
+//pub struct Tx {
+//    from:   AccountId,
+//    to:     AccountId,
+//    value:  Value,
+//    fee:    Value,
+//}
+//
+//pub type ValuePacked = u32;
+//
+//// 112 bit
+//pub struct TxPacked {
+//    from:   AccountId,
+//    to:     AccountId,
+//    value:  ValuePacked,
+//    fee:    ValuePacked,
+//}
+//
+//pub type TxPubInput = TxPacked;
+//
 //#[derive(Debug, Clone)]
 //pub struct PlasmaState<E: JubjubEngine> {
 //    tree_height: usize,

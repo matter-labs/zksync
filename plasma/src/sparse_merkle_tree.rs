@@ -13,10 +13,9 @@ type Depth = usize;
 type HashIndex = usize;
 
 pub trait Hasher<T> {
-    type Hash: Copy;
-
-    fn hash(value: T) -> Self::Hash;
-    fn compress(lhs: Self::Hash, rhs: Self::Hash) -> Self::Hash;
+    type Hash: Clone;
+    fn hash(value: &T) -> Self::Hash;
+    fn compress(lhs: &Self::Hash, rhs: &Self::Hash) -> Self::Hash;
     fn empty_hash() -> Self::Hash;
 }
 
@@ -37,9 +36,10 @@ impl<T, H: Hasher<T>> SparseMerkleTree<T, H> {
         let hashes = HashMap::new();
         let mut prehashed = Vec::with_capacity(tree_depth-1);
         let mut cur = H::empty_hash();
-        for _ in 0..tree_depth {
-            cur = H::compress(cur, cur);
-            prehashed.push(cur);
+        prehashed.push(cur.clone());
+        for _ in 0..tree_depth-1 {
+            cur = H::compress(&cur, &cur).clone();
+            prehashed.push(cur.clone());
         }
         prehashed.reverse();
         Self{tree_depth, prehashed, items, hashes}
@@ -73,8 +73,8 @@ impl<T, H: Hasher<T>> SparseMerkleTree<T, H> {
         assert!(index < self.capacity());
 
         // if hash for this index exists, return it
-        if let Some(&hash) = self.hashes.get(&index) {
-            return hash
+        if let Some(hash) = self.hashes.get(&index) {
+            return hash.clone()
         }
 
         // indices for child nodes in the tree
@@ -83,10 +83,10 @@ impl<T, H: Hasher<T>> SparseMerkleTree<T, H> {
 
         // if both child nodes are empty, use precomputed hash
         if !self.hashes.contains_key(&lhs) && !self.hashes.contains_key(&rhs) {
-            return *self.prehashed.get(Self::depth(index)).unwrap()
+            return self.prehashed.get(Self::depth(index)).unwrap().clone()
         }
 
-        H::compress(self.get_hash(lhs), self.get_hash(rhs))
+        H::compress(&self.get_hash(lhs), &self.get_hash(rhs))
     }
 
     fn root_hash(&self) -> H::Hash {
@@ -106,16 +106,16 @@ mod tests {
     impl Hasher<u64> for TestHasher {
         type Hash = u64;
 
-        fn hash(value: u64) -> Self::Hash {
+        fn hash(value: &u64) -> Self::Hash {
             value * 7
         }
 
-        fn compress(lhs: Self::Hash, rhs: Self::Hash) -> Self::Hash {
+        fn compress(lhs: &Self::Hash, rhs: &Self::Hash) -> Self::Hash {
             11 * lhs + 17 * rhs + 1
         }
 
         fn empty_hash() -> Self::Hash {
-            0
+            7
         }
     }
 
@@ -134,6 +134,6 @@ mod tests {
         let mut tree = TestSMT::new(3);
         tree.insert(0, 1);
         println!("{:?}", tree);
-        assert_eq!(tree.root_hash(), 813);
+        assert_eq!(tree.root_hash(), 5517);
     }
 }
