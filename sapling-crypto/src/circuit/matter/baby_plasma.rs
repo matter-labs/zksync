@@ -175,52 +175,45 @@ fn find_common_prefix<E, CS>(
     // - calculate result like you work with normal operators
     // - constraint
 
-    for (a_bit, b_bit) in a.iter().zip(b.iter())
-    {
-        // we need to assert that 1(a-b) = 
+    let mut first_divergence_found = false;
+
+    for (a_bit, b_bit) in a.iter().zip(b.iter()) {
+        if first_divergence_found {
+            result.push(boolean::Boolean::Constant(false));
+        } else {
+            if a_bit.clone().get_value().unwrap() == b_bit.clone().get_value().unwrap() {
+                result.push(boolean::Boolean::Constant(true));
+            } else {
+                first_divergence_found = true;
+                result.push(boolean::Boolean::Constant(false));
+            }
+        }
+    }
+
+    for (i, ((a_bit, b_bit), mask_bit) ) in a.iter().zip(b.iter()).zip(result.clone().iter()).enumerate() {
+        // This calculated bitmask makes it easy to constraint equality
+        // first we calculate an AND between bitmask and vectors A and B
+        let a_masked = boolean::Boolean::and(
+            cs.namespace(|| format!("bitmask vector a for bit {}", i)), 
+            &a_bit, 
+            &mask_bit
+        ).unwrap();
+
+        let b_masked = boolean::Boolean::and(
+            cs.namespace(|| format!("bitmask vector b for bit {}", i)), 
+            &b_bit, 
+            &mask_bit
+        ).unwrap();
+
+        boolean::Boolean::enforce_equal(
+            cs.namespace(|| format!("constraint bitmasked values equal for bit {}", i)),
+            &a_masked, 
+            &b_masked
+        ).unwrap();
     }
 
     Ok(result)
 }
-
-// /// Decomposes inputs as bits for old root, new root
-// /// and final truncated rolling sha256
-// fn expose_inputs<E, CS>(
-//     mut cs: CS,
-//     update: Option<Update<E>>,
-//     params: &E::Params
-// ) -> Result<(AllocatedNum<E>, AllocatedNum<E>, Vec<boolean::Boolean>), SynthesisError>
-//     where E: JubjubEngine,
-//           CS: ConstraintSystem<E>
-// {
-//     let old_root = AllocatedNum::alloc(
-//         cs.namespace(|| "old root"),
-//         || Ok(update.unwrap().old_root.unwrap().clone())
-//     )?;
-
-//     old_root.inputize(cs.namespace(|| "old root input"))?;
-
-//     let new_root = AllocatedNum::alloc(
-//         cs.namespace(|| "new root"),
-//         || Ok(update.unwrap().new_root.unwrap().clone())
-//     )?;
-
-//     new_root.inputize(cs.namespace(|| "new root input"))?;
-
-//     let rolling_hash = AllocatedNum::alloc(
-//         cs.namespace(|| "rolling hash"),
-//         || Ok(update.unwrap().public_data_commitment.unwrap().clone())
-//     )?;
-
-//     rolling_hash.inputize(cs.namespace(|| "rolling hash input"))?;
-
-//     let hash_bits = boolean::field_into_boolean_vec_le(
-//         cs.namespace(|| "rolling hash bits"), 
-//         rolling_hash.get_value()
-//     )?;
-
-//     Ok((old_root, new_root, hash_bits))
-// }
 
 /// Applies one transaction to the tree,
 /// outputs a new root
@@ -238,7 +231,77 @@ fn apply_transaction<E, CS>(
     let tx = tx_data.0;
     let tx_witness = tx_data.1;
 
-    // first we calculate leaf value commitment
+    // before having fun with leafs calculate the common prefix
+    // of two audit paths
+
+    let mut common_prefix: Vec<boolean::Boolean> = vec![];
+
+    {
+        let cs = & mut cs.namespace(|| "common prefix search");
+        
+        let mut reversed_path_from = tx_witness.auth_path_from.clone();
+        reversed_path_from.reverse();
+        let bitmap_path_from: Vec<boolean::Boolean> = reversed_path_from.clone().into_iter().enumerate().map(|(i, e)| 
+        {
+            let bit = boolean::Boolean::from(
+                boolean::AllocatedBit::alloc(
+                    cs.namespace(|| format!("merkle tree path for from leaf for bit {}", i)),
+                    e.map(|e| e.1)
+                ).unwrap()
+            );
+            bit
+        }
+        ).collect();
+
+        let mut reversed_path_to = tx_witness.auth_path_to.clone();
+        reversed_path_to.reverse();
+        let bitmap_path_to: Vec<boolean::Boolean> = reversed_path_to.clone().into_iter().enumerate().map(|(i, e)| 
+        {
+            let bit = boolean::Boolean::from(
+                boolean::AllocatedBit::alloc(
+                    cs.namespace(|| format!("merkle tree path for to leaf for bit {}", i)),
+                    e.map(|e| e.1)
+                ).unwrap()
+            );
+            bit
+        }
+        ).collect();
+
+        common_prefix = find_common_prefix(
+            cs.namespace(|| "common prefix search"), 
+            bitmap_path_from,
+            bitmap_path_to
+        ).unwrap();
+
+        // Common prefix is found, not we enforce equality of 
+        // audit path elements on a common prefix
+
+        for (i, ((e_from, e_to), bitmask_bit)) in reversed_path_from.into_iter().zip(reversed_path_to.into_iter()).zip(common_prefix.clone().into_iter()).enumerate()
+        {
+            let path_element_from = num::AllocatedNum::alloc(
+                cs.namespace(|| format!("path element from {}", i)),
+                || {
+                    Ok(e_from.get()?.0)
+                }
+            )?;
+
+            let path_element_to = num::AllocatedNum::alloc(
+                cs.namespace(|| format!("path element to {}", i)),
+                || {
+                    Ok(e_to.get()?.0)
+                }
+            )?;
+
+            cs.enforce(
+                || format!("enforce audit path equality for {}", i),
+                |lc| lc + path_element_from.get_variable() - path_element_to.get_variable(),
+                |_| bitmask_bit.lc(CS::one(), E::Fr::one()),
+                |lc| lc
+            );
+        }
+    }
+
+    // Now we calculate leaf value commitment
 
     let mut leaf_content = vec![];
 
@@ -268,7 +331,6 @@ fn apply_transaction<E, CS>(
         pub_x_content.push(boolean::Boolean::Constant(false));
     }
     leaf_content.extend(pub_x_content.clone());
-
 
     let mut pub_y_content = boolean::field_into_boolean_vec_le(
         cs.namespace(|| "from leaf pub_y bits"), 
