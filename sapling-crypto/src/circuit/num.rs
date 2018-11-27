@@ -586,12 +586,13 @@ mod test {
             let b = AllocatedNum::alloc(cs.namespace(|| "b"), || Ok(rng.gen())).unwrap();
 
             let condition_true = Boolean::constant(true);
-            let c = AllocatedNum::conditionally_select(&mut cs, &a, &b, &condition_true).unwrap();
+            let c = AllocatedNum::conditionally_select(cs.namespace(|| "c"), &a, &b, &condition_true).unwrap();
 
             let condition_false = Boolean::constant(false);
-            let d = AllocatedNum::conditionally_select(&mut cs, &a, &b, &condition_false).unwrap();
+            let d = AllocatedNum::conditionally_select(cs.namespace(|| "d"), &a, &b, &condition_false).unwrap();
 
             assert!(cs.is_satisfied());
+            assert!(cs.num_constraints() == 2);
 
             assert_eq!(a.value.unwrap(), c.value.unwrap());
             assert_eq!(b.value.unwrap(), d.value.unwrap());

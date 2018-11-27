@@ -47,7 +47,7 @@ pub struct SerializedSignature {
     sbar: [u8; 32],
 }
 
-// #[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct Signature<E: JubjubEngine> {
     pub r: Point<E, Unknown>,
     pub s: E::Fs,

@@ -25,5 +25,8 @@ use super::blake2s;
 use super::sha256;
 use super::num;
 use super::multipack;
+use super::baby_eddsa;
 
+mod plasma_constants;
+pub mod baby_plasma;
 pub mod float_point;
