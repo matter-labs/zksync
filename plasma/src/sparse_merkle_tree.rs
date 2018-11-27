@@ -81,6 +81,11 @@ impl<T, H: Hasher<T>> SparseMerkleTree<T, H> {
 
     fn insert(&mut self, index: ItemIndex, item: T) {
         self.items.insert(index, item);
+        let mut i = index;
+        while i > 0 {
+            self.get_hash(i);
+            i >>= 1;
+        }
     }
 
     fn get_hash(&self, index: HashIndex) -> H::Hash {
