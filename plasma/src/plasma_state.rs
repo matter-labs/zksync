@@ -36,44 +36,44 @@ pub struct TxPacked {
 
 pub type TxPubInput = TxPacked;
 
-#[derive(Debug, Clone)]
-pub struct PlasmaState<E: JubjubEngine> {
-    tree_height: usize,
-    accounts: Vec<Account<E>>,
-    // hashes
-    merkle_root: E::Fs,
-}
-
-impl<E: JubjubEngine> PlasmaState<E> {
-
-    fn new(tree_height: usize) -> Self {
-
-        assert!(tree_height > 0 && tree_height < 32);
-
-        let accounts = vec![Account::<_>{
-            balance: E::Fs::zero(),
-            nonce:   E::Fs::zero(),
-            //pubkey:  EdwardsPoint<E>::
-        }; Self::capacity(tree_height)];
-
-        let merkle_root = E::Fs::zero();
-
-        Self{tree_height, accounts, merkle_root}.update_merkle_root()
-    }
-
-    fn capacity(tree_height: usize) -> usize {
-        2 << tree_height
-    }
-
-    // State transition function: S_new <= S_old.apply(tx)
-    fn apply(&mut self, tx: &Tx) -> &Self {
-        self
-    }
-
-    fn update_merkle_root(&mut self) -> &Self {
-        self
-    }
-}
+//#[derive(Debug, Clone)]
+//pub struct PlasmaState<E: JubjubEngine> {
+//    tree_height: usize,
+//    accounts: Vec<Account<E>>,
+//    // hashes
+//    merkle_root: E::Fs,
+//}
+//
+//impl<E: JubjubEngine> PlasmaState<E> {
+//
+//    fn new(tree_height: usize) -> Self {
+//
+//        assert!(tree_height > 0 && tree_height < 32);
+//
+//        let accounts = vec![Account::<_>{
+//            balance: E::Fs::zero(),
+//            nonce:   E::Fs::zero(),
+//            //pubkey:  EdwardsPoint<E>::
+//        }; Self::capacity(tree_height)];
+//
+//        let merkle_root = E::Fs::zero();
+//
+//        Self{tree_height, accounts, merkle_root}.update_merkle_root()
+//    }
+//
+//    fn capacity(tree_height: usize) -> usize {
+//        2 << tree_height
+//    }
+//
+//    // State transition function: S_new <= S_old.apply(tx)
+//    fn apply(&mut self, tx: &Tx) -> &Self {
+//        self
+//    }
+//
+//    fn update_merkle_root(&mut self) -> &Self {
+//        self
+//    }
+//}
 
 //#[derive(Clone)]
 //struct Leaf<E: JubjubEngine, TreeHeight: usize> {

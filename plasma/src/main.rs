@@ -8,7 +8,10 @@ extern crate ff;
 extern crate sapling_crypto;
 
 mod plasma_state;
+mod merkle_tree;
 mod update_circuit;
+
+use merkle_tree::MerkleTree;
 
 fn main() {
     //let plasma_params = plasma_state::PlasmaBN256{};
