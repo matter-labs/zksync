@@ -1,4 +1,4 @@
-// SNARK Plasma, update circuit
+// Plasma update circuit implementation
 
 use ff::{Field, PrimeField};
 use rand::{Rand, thread_rng};
@@ -10,49 +10,8 @@ use sapling_crypto::circuit::ecc::EdwardsPoint;
 use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
 use sapling_crypto::pedersen_hash::{pedersen_hash, Personalization};
 
-pub trait PlasmaParams<E: JubjubEngine> {
+use super::plasma_state::PlasmaParams;
 
-    type Engine:    JubjubEngine;
-    type Fs:        PrimeField;
-
-    fn tree_height(&self) -> usize;
-}
-
-//struct Account<E: JubjubEngine> {
-//    balance:    E::Fs,
-//    nonce:      E::Fs,
-//    pubkey:     EdwardsPoint<E>,
-//}
-//
-//struct PlasmaState<E: JubjubEngine, TreeHeight: usize> {
-//    // accounts
-//    // Display
-//    // apply(tx: Tx)
-//}
-//
-//type AccountId = u32;
-//
-//type Value = u32;
-//
-//struct Tx {
-//    from:   AccountId,
-//    to:     AccountId,
-//    value:  Value,
-//    fee:    Value,
-//}
-//
-//type ValuePacked = u32;
-//
-//// 112 bit
-//struct TxPacked {
-//    from:   AccountId,
-//    to:     AccountId,
-//    value:  ValuePacked,
-//    fee:    ValuePacked,
-//}
-//
-//type TxPubInput = TxPacked;
-//
 //#[derive(Clone)]
 //struct Leaf<E: JubjubEngine, TreeHeight: usize> {
 //
@@ -94,3 +53,33 @@ pub trait PlasmaParams<E: JubjubEngine> {
 //        Ok(())
 //    }
 //}
+
+pub fn test_circuit() {
+//    use rand::thread_rng;
+//    use pairing::bn256::{Bn256, Fr};
+//    use bellman::groth16::{
+//        create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
+//    };
+//
+//    let rng = &mut thread_rng();
+//
+//    let params = {
+//        let c = PlasmaUpdateCircuit::<Bn256> {
+//            final_hash: None,
+//        };
+//        generate_random_parameters(c, rng).unwrap()
+//    };
+//
+//    let pvk = prepare_verifying_key(&params.vk);
+//
+//    let c = PlasmaUpdateCircuit {
+//        final_hash: Some(Fr::zero()),
+//    };
+//
+//    let proof = create_random_proof(c, &params, rng).unwrap();
+//
+//    let inputs = &[
+//    ];
+//    let success = verify_proof(&pvk, &proof, inputs).unwrap();
+//    assert!(success);
+}

@@ -1,16 +1,11 @@
-#![allow(unused_imports)]
-// SNARK Plasma, update circuit
-// spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
+// Plasma sidechain state implementation
 
 use ff::{Field, PrimeField};
 use rand::{Rand, thread_rng};
 use pairing::{Engine};
-use bellman::{Circuit, ConstraintSystem, SynthesisError};
 
 use sapling_crypto::jubjub::JubjubEngine;
 use sapling_crypto::circuit::ecc::EdwardsPoint;
-use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
-use sapling_crypto::pedersen_hash::{pedersen_hash, Personalization};
 
 pub trait PlasmaParams<E: JubjubEngine> {
 
@@ -19,6 +14,14 @@ pub trait PlasmaParams<E: JubjubEngine> {
 
     fn tree_height(&self) -> usize;
 }
+
+pub struct PlasmaBN256 {}
+
+pub fn test() {
+
+}
+
+
 
 //struct Account<E: JubjubEngine> {
 //    balance:    E::Fs,
