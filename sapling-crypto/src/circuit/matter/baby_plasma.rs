@@ -38,6 +38,8 @@ use super::float_point::*;
 use super::baby_eddsa::EddsaSignature;
 
 /// This is transaction data
+
+#[derive(Clone)]
 pub struct Transaction<E: JubjubEngine> {
     pub from: Option<E::Fr>,
     pub to: Option<E::Fr>,
@@ -48,11 +50,13 @@ pub struct Transaction<E: JubjubEngine> {
     pub signature: Option<TransactionSignature<E>>
 }
 
+#[derive(Clone)]
 pub struct TransactionSignature<E: JubjubEngine> {
     pub r: edwards::Point<E, Unknown>,
     pub s: E::Fr,
 }
 
+#[derive(Clone)]
 pub struct TransactionWitness<E: JubjubEngine> {
     /// The authentication path of the "from" in the tree
     pub auth_path_from: Vec<Option<(E::Fr, bool)>>,
@@ -142,7 +146,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
         let generator = ecc::EdwardsPoint::witness(cs.namespace(|| "allocate public generator"), Some(public_generator), self.params).unwrap();
 
         for (i, tx) in self.transactions.into_iter().enumerate() {
-            let (intermediate_root, fee) = apply_transaction(
+            let (intermediate_root, fee, _) = apply_transaction(
                 cs.namespace(|| format!("applying transaction {}", i)),
                 old_root,
                 tx, 
@@ -223,7 +227,7 @@ fn apply_transaction<E, CS>(
     transaction: Option<(Transaction<E>, TransactionWitness<E>)>,
     params: &E::Params,
     generator: ecc::EdwardsPoint<E>
-) -> Result<(AllocatedNum<E>, AllocatedNum<E>), SynthesisError>
+) -> Result<(AllocatedNum<E>, AllocatedNum<E>, AllocatedNum<E>), SynthesisError>
     where E: JubjubEngine,
           CS: ConstraintSystem<E>
 {
@@ -305,43 +309,43 @@ fn apply_transaction<E, CS>(
 
     let mut leaf_content = vec![];
 
-    let mut value_content = boolean::field_into_boolean_vec_le(
+    let mut value_content_from = boolean::field_into_boolean_vec_le(
         cs.namespace(|| "from leaf amount bits"), 
         tx_witness.balance_from
     ).unwrap();
 
-    value_content.truncate(*plasma_constants::BALANCE_BIT_WIDTH);
-    leaf_content.extend(value_content.clone());
+    value_content_from.truncate(*plasma_constants::BALANCE_BIT_WIDTH);
+    leaf_content.extend(value_content_from.clone());
 
-    let mut nonce_content = boolean::field_into_boolean_vec_le(
+    let mut nonce_content_from = boolean::field_into_boolean_vec_le(
         cs.namespace(|| "from leaf nonce bits"), 
         tx_witness.nonce_from
     ).unwrap();
 
-    nonce_content.truncate(*plasma_constants::NONCE_BIT_WIDTH);
-    leaf_content.extend(nonce_content.clone());
+    nonce_content_from.truncate(*plasma_constants::NONCE_BIT_WIDTH);
+    leaf_content.extend(nonce_content_from.clone());
 
-    let mut pub_x_content = boolean::field_into_boolean_vec_le(
+    let mut pub_x_content_from = boolean::field_into_boolean_vec_le(
         cs.namespace(|| "from leaf pub_x bits"), 
         tx_witness.pub_x_from
     ).unwrap();
 
-    for _ in 0..(*plasma_constants::FR_BIT_WIDTH - pub_x_content.len())
+    for _ in 0..(*plasma_constants::FR_BIT_WIDTH - pub_x_content_from.len())
     {
-        pub_x_content.push(boolean::Boolean::Constant(false));
+        pub_x_content_from.push(boolean::Boolean::Constant(false));
     }
-    leaf_content.extend(pub_x_content.clone());
+    leaf_content.extend(pub_x_content_from.clone());
 
-    let mut pub_y_content = boolean::field_into_boolean_vec_le(
+    let mut pub_y_content_from = boolean::field_into_boolean_vec_le(
         cs.namespace(|| "from leaf pub_y bits"), 
         tx_witness.pub_y_from
     ).unwrap();
 
-    for _ in 0..(*plasma_constants::FR_BIT_WIDTH - pub_y_content.len())
+    for _ in 0..(*plasma_constants::FR_BIT_WIDTH - pub_y_content_from.len())
     {
-        pub_y_content.push(boolean::Boolean::Constant(false));
+        pub_y_content_from.push(boolean::Boolean::Constant(false));
     }
-    leaf_content.extend(pub_y_content.clone());
+    leaf_content.extend(pub_y_content_from.clone());
 
     assert_eq!(leaf_content.len(), *plasma_constants::BALANCE_BIT_WIDTH 
                                 + *plasma_constants::NONCE_BIT_WIDTH
@@ -349,7 +353,7 @@ fn apply_transaction<E, CS>(
     );
 
     // Compute the hash of the from leaf
-    let from_leaf_hash = pedersen_hash::pedersen_hash(
+    let mut from_leaf_hash = pedersen_hash::pedersen_hash(
         cs.namespace(|| "from leaf content hash"),
         pedersen_hash::Personalization::NoteCommitment,
         &leaf_content,
@@ -449,7 +453,7 @@ fn apply_transaction<E, CS>(
     ).unwrap();
 
     nonce_content_to.truncate(*plasma_constants::NONCE_BIT_WIDTH);
-    leaf_content.extend(nonce_content_to);
+    leaf_content.extend(nonce_content_to.clone());
 
     let mut pub_x_content_to = boolean::field_into_boolean_vec_le(
         cs.namespace(|| "to leaf pub_x bits"), 
@@ -460,7 +464,7 @@ fn apply_transaction<E, CS>(
     {
         pub_x_content_to.push(boolean::Boolean::Constant(false));
     }
-    leaf_content.extend(pub_x_content_to);
+    leaf_content.extend(pub_x_content_to.clone());
 
     let mut pub_y_content_to = boolean::field_into_boolean_vec_le(
         cs.namespace(|| "to leaf pub_y bits"), 
@@ -471,7 +475,7 @@ fn apply_transaction<E, CS>(
     {
         pub_y_content_to.push(boolean::Boolean::Constant(false));
     }
-    leaf_content.extend(pub_y_content_to);
+    leaf_content.extend(pub_y_content_to.clone());
 
     assert_eq!(leaf_content.len(), *plasma_constants::BALANCE_BIT_WIDTH 
                                 + *plasma_constants::NONCE_BIT_WIDTH
@@ -479,7 +483,7 @@ fn apply_transaction<E, CS>(
     );
 
     // Compute the hash of the from leaf
-    let to_leaf_hash = pedersen_hash::pedersen_hash(
+    let mut to_leaf_hash = pedersen_hash::pedersen_hash(
         cs.namespace(|| "to leaf content hash"),
         pedersen_hash::Personalization::NoteCommitment,
         &leaf_content,
@@ -585,6 +589,14 @@ fn apply_transaction<E, CS>(
     fee_bits.truncate(*plasma_constants::FEE_EXPONENT_BIT_WIDTH + *plasma_constants::FEE_MANTISSA_BIT_WIDTH);
     message_bits.extend(fee_bits.clone());
 
+    let mut block_number_bits = boolean::field_into_boolean_vec_le(
+        cs.namespace(|| "block number bits"),
+        tx.good_until_block
+    ).unwrap();
+
+    block_number_bits.truncate(*plasma_constants::BLOCK_NUMBER_BIT_WIDTH);
+    message_bits.extend(block_number_bits.clone());
+
     let sender_pk_x = AllocatedNum::alloc(
         cs.namespace(|| "sender public key x"),
         || Ok(tx_witness.pub_x_from.unwrap())
@@ -602,7 +614,7 @@ fn apply_transaction<E, CS>(
         params
     ).unwrap();
 
-    let tx_signature = tx.signature.unwrap();
+    let tx_signature = tx.clone().signature.unwrap();
 
     let (signature_r_x_value, signature_r_y_value) = tx_signature.r.into_xy();
 
@@ -639,7 +651,8 @@ fn apply_transaction<E, CS>(
                         + *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH 
                         + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH
                         + *plasma_constants::FEE_EXPONENT_BIT_WIDTH
-                        + *plasma_constants::FEE_MANTISSA_BIT_WIDTH;
+                        + *plasma_constants::FEE_MANTISSA_BIT_WIDTH
+                        + *plasma_constants::BLOCK_NUMBER_BIT_WIDTH;
 
     signature.verify_raw_message_signature(
         cs.namespace(|| "verify transaction signature"),
@@ -668,7 +681,7 @@ fn apply_transaction<E, CS>(
     // repack balances as we have truncated bit decompositions already
     let mut old_balance_from_lc = Num::<E>::zero();
     let mut coeff = E::Fr::one();
-    for bit in value_content {
+    for bit in value_content_from {
         old_balance_from_lc = old_balance_from_lc.add_bool_with_coeff(CS::one(), &bit, coeff);
         coeff.double();
     }
@@ -682,7 +695,7 @@ fn apply_transaction<E, CS>(
 
     let mut nonce_lc = Num::<E>::zero();
     coeff = E::Fr::one();
-    for bit in nonce_content {
+    for bit in nonce_content_from {
         nonce_lc = nonce_lc.add_bool_with_coeff(CS::one(), &bit, coeff);
         coeff.double();
     }
@@ -774,7 +787,232 @@ fn apply_transaction<E, CS>(
         |lc| lc + nonce.get_variable() + CS::one()
     );
 
-    Ok((cur_from, fee))
+    let allocated_block_number = AllocatedNum::alloc(
+        cs.namespace(|| "allocate block number in transaction"),
+        || Ok(tx.good_until_block.clone().unwrap())
+    ).unwrap();
+
+    // Now we should assemble a new root. It's more tricky as it requires
+    // to calculate an intersection point and for a part of the tree that is
+    // "below" intersection point use individual merkle brancher,
+    // for the intersection - use the other current value,
+    // for the rest - use any of the braches, as it's constrained that 
+    // those coincide
+
+    // first of new "from" leaf
+    {
+
+        leaf_content = vec![];
+
+        // change balance and nonce
+        let mut value_content = boolean::field_into_boolean_vec_le(
+            cs.namespace(|| "from leaf amount bits update"), 
+            new_balance_from.get_value()
+        ).unwrap();
+
+        value_content.truncate(*plasma_constants::BALANCE_BIT_WIDTH);
+        leaf_content.extend(value_content.clone());
+
+        let mut nonce_content = boolean::field_into_boolean_vec_le(
+            cs.namespace(|| "from leaf nonce bits updated"), 
+            new_nonce.get_value()
+        ).unwrap();
+
+        nonce_content.truncate(*plasma_constants::NONCE_BIT_WIDTH);
+        leaf_content.extend(nonce_content);
+
+        // keep public keys
+        leaf_content.extend(pub_x_content_from);
+        leaf_content.extend(pub_y_content_from);
+
+        assert_eq!(leaf_content.len(), *plasma_constants::BALANCE_BIT_WIDTH 
+                                    + *plasma_constants::NONCE_BIT_WIDTH
+                                    + 2 * (*plasma_constants::FR_BIT_WIDTH)
+        );
+
+        // Compute the hash of the from leaf
+        from_leaf_hash = pedersen_hash::pedersen_hash(
+            cs.namespace(|| "from leaf content hash updated"),
+            pedersen_hash::Personalization::NoteCommitment,
+            &leaf_content,
+            params
+        )?;
+    }
+
+    // first of new "to" leaf
+    {
+
+        leaf_content = vec![];
+
+        // change balance only
+        let mut value_content = boolean::field_into_boolean_vec_le(
+            cs.namespace(|| "to leaf amount bits upted"), 
+            new_balance_to.get_value()
+        ).unwrap();
+
+        value_content.truncate(*plasma_constants::BALANCE_BIT_WIDTH);
+        leaf_content.extend(value_content.clone());
+
+        // everything else remains the same
+        leaf_content.extend(nonce_content_to);
+        leaf_content.extend(pub_x_content_to);
+        leaf_content.extend(pub_y_content_to);
+
+        assert_eq!(leaf_content.len(), *plasma_constants::BALANCE_BIT_WIDTH 
+                                    + *plasma_constants::NONCE_BIT_WIDTH
+                                    + 2 * (*plasma_constants::FR_BIT_WIDTH)
+        );
+
+        // Compute the hash of the from leaf
+        to_leaf_hash = pedersen_hash::pedersen_hash(
+            cs.namespace(|| "to leaf content hash updated"),
+            pedersen_hash::Personalization::NoteCommitment,
+            &leaf_content,
+            params
+        )?;
+
+    }
+
+    // Now we have to find a "point of intersection"
+    // Good for us it's just common prefix interpreted as binary number + 1
+    // and bit decomposed
+
+    let mut intersection_point_lc = Num::<E>::zero();
+    coeff = E::Fr::one();
+    for bit in common_prefix.into_iter() {
+        intersection_point_lc = intersection_point_lc.add_bool_with_coeff(CS::one(), &bit, coeff);
+        coeff.double();
+    }
+    // and add one
+    intersection_point_lc = intersection_point_lc.add_bool_with_coeff(CS::one(), &boolean::Boolean::Constant(true), E::Fr::one());
+
+    let intersection_point = AllocatedNum::alloc(
+        cs.namespace(|| "intersection as number"),
+        || Ok(intersection_point_lc.get_value().unwrap())
+    ).unwrap();
+
+    cs.enforce(
+        || "pack intersection",
+        |lc| lc + intersection_point.get_variable(),
+        |lc| lc + CS::one(),
+        |_| intersection_point_lc.lc(E::Fr::one())
+    );
+
+    // parse it backwards
+
+    let mut intersection_point_bits = boolean::field_into_boolean_vec_le(
+        cs.namespace(|| "unpack intersection"),
+        intersection_point.get_value()
+    ).unwrap();
+
+    // truncating guarantees that even if the common prefix coincides everywhere
+    // up to the last bit, it can still be properly used in next actions
+    intersection_point_bits.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
+
+    // First assemble new leafs
+    cur_from = from_leaf_hash.get_x().clone();
+    cur_to = to_leaf_hash.get_x().clone();
+
+    {
+        let audit_path_from = tx_witness.auth_path_from.clone();
+        let audit_path_to = tx_witness.auth_path_to.clone();
+        // Ascend the merkle tree authentication path
+        for (i, ((e_from, e_to), intersection_bit) ) in audit_path_from.into_iter().zip(audit_path_to.into_iter()).zip(intersection_point_bits.into_iter()).enumerate() {
+            let cs = &mut cs.namespace(|| format!("assemble new state root{}", i));
+
+            let cur_from_is_right = boolean::Boolean::from(boolean::AllocatedBit::alloc(
+                cs.namespace(|| "position bit from"),
+                e_from.map(|e| e.1)
+            )?);
+
+            let cur_to_is_right = boolean::Boolean::from(boolean::AllocatedBit::alloc(
+                cs.namespace(|| "position bit to"),
+                e_to.map(|e| e.1)
+            )?);
+
+            let mut path_element_from = num::AllocatedNum::alloc(
+                cs.namespace(|| "path element from"),
+                || {
+                    Ok(e_from.get()?.0)
+                }
+            )?;
+
+            let mut path_element_to = num::AllocatedNum::alloc(
+                cs.namespace(|| "path element to"),
+                || {
+                    Ok(e_to.get()?.0)
+                }
+            )?;
+
+            // Now the most fancy part is to determine when to use path element form witness,
+            // or recalculated element from another subtree
+
+            path_element_from = num::AllocatedNum::conditionally_select(
+                cs.namespace(|| "conditional select of preimage from"),
+                &cur_to,
+                &path_element_to, 
+                &intersection_bit
+            ).unwrap();
+
+            // Swap the two if the current subtree is on the right
+            let (xl_from, xr_from) = num::AllocatedNum::conditionally_reverse(
+                cs.namespace(|| "conditional reversal of preimage from"),
+                &cur_from,
+                &path_element_from,
+                &cur_from_is_right
+            )?;
+
+            let mut preimage_from = vec![];
+            preimage_from.extend(xl_from.into_bits_le(cs.namespace(|| "xl_from into bits"))?);
+            preimage_from.extend(xr_from.into_bits_le(cs.namespace(|| "xr_from into bits"))?);
+
+            // same for to
+
+            path_element_to = num::AllocatedNum::conditionally_select(
+                cs.namespace(|| "conditional select of preimage to"),
+                &cur_from,
+                &path_element_to, 
+                &intersection_bit
+            ).unwrap();
+
+            // Swap the two if the current subtree is on the right
+            let (xl_to, xr_to) = num::AllocatedNum::conditionally_reverse(
+                cs.namespace(|| "conditional reversal of preimage to"),
+                &cur_to,
+                &path_element_to,
+                &cur_from_is_right
+            )?;
+
+            let mut preimage_to = vec![];
+            preimage_to.extend(xl_to.into_bits_le(cs.namespace(|| "xl_to into bits"))?);
+            preimage_to.extend(xr_to.into_bits_le(cs.namespace(|| "xr_to into bits"))?);
+
+            // Compute the new subtree value
+            cur_from = pedersen_hash::pedersen_hash(
+                cs.namespace(|| "computation of pedersen hash from"),
+                pedersen_hash::Personalization::MerkleTree(i),
+                &preimage_from,
+                params
+            )?.get_x().clone(); // Injective encoding
+
+            // Compute the new subtree value
+            cur_to = pedersen_hash::pedersen_hash(
+                cs.namespace(|| "computation of pedersen hash to"),
+                pedersen_hash::Personalization::MerkleTree(i),
+                &preimage_to,
+                params
+            )?.get_x().clone(); // Injective encoding
+        }
+
+        // enforce roots are the same
+        cs.enforce(
+            || "enforce correct new root recalculation",
+            |lc| lc + cur_to.get_variable(),
+            |lc| lc + CS::one(),
+            |lc| lc + cur_from.get_variable()
+        );
+    }
+    Ok((cur_from, fee, allocated_block_number))
 }
 
 

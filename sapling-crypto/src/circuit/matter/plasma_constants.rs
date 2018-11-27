@@ -12,7 +12,7 @@ pub const BLOCK_NUMBER_BIT_WIDTH: &'static usize = &32;
 
 /// Amount bit widths
 pub const AMOUNT_EXPONENT_BIT_WIDTH: &'static usize = &5;
-pub const AMOUNT_MANTISSA_BIT_WIDTH: &'static usize = &10;
+pub const AMOUNT_MANTISSA_BIT_WIDTH: &'static usize = &11;
 
 /// Fee bit widths
 pub const FEE_EXPONENT_BIT_WIDTH: &'static usize = &5;
