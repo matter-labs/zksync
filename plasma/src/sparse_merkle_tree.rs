@@ -38,7 +38,7 @@ impl<T, H: Hasher<T>> SparseMerkleTree<T, H> {
         let mut cur = H::empty_hash();
         prehashed.push(cur.clone());
         for _ in 0..tree_depth-1 {
-            cur = H::compress(&cur, &cur).clone();
+            cur = H::compress(&cur, &cur);
             prehashed.push(cur.clone());
         }
         prehashed.reverse();
