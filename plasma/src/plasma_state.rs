@@ -34,28 +34,32 @@ pub struct Account<E: JubjubEngine> {
 struct AccountPedersenHasher {
 }
 
+//static ALT_JUBJUB_PARAMS: Option<&AltJubjubBn256> = Some(&AltJubjubBn256::new());
+//static ALT_JUBJUB_PARAMS: &AltJubjubBn256 = &AltJubjubBn256::new();
+
 impl AccountPedersenHasher {
 
 }
-
 
 impl Hasher<Account<Bn256>> for AccountPedersenHasher {
 
     type Hash = Point<Bn256, PrimeOrder>;
 
     fn empty_hash() -> Self::Hash {
-        Self::Hash::zero()
+        let params = AltJubjubBn256::new();
+        pedersen_hash::<Bn256, _>(NoteCommitment, vec![].into_iter(), &params)
     }
 
     fn hash(value: &Account<Bn256>) -> Self::Hash {
+        let input = vec![]; // decompose `value` into bits
         let params = AltJubjubBn256::new();
-        let rng = &mut thread_rng();
-        let input = (0..510).map(|_| bool::rand(rng)).collect::<Vec<_>>();
         pedersen_hash::<Bn256, _>(NoteCommitment, input.into_iter(), &params)
     }
 
     fn compress(lhs: &Self::Hash, rhs: &Self::Hash) -> Self::Hash {
-        Self::Hash::zero()
+        let params = AltJubjubBn256::new();
+        let input = vec![]; // to_bits(lhs) || to_bits(rhs)
+        pedersen_hash::<Bn256, _>(NoteCommitment, input.into_iter(), &params)
     }
 }
 
