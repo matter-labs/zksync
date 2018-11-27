@@ -29,25 +29,6 @@ pub struct SparseMerkleTree<T, H: Hasher<T>>
     hashes: HashMap<HashIndex, H::Hash>,
 }
 
-#[derive(Debug)]
-struct U64Hasher {}
-
-impl Hasher<u64> for U64Hasher {
-    type Hash = u64;
-
-    fn hash(value: u64) -> Self::Hash {
-        value * 7
-    }
-
-    fn compress(lhs: Self::Hash, rhs: Self::Hash) -> Self::Hash {
-        11 * lhs + 17 * rhs + 1
-    }
-
-    fn empty_hash() -> Self::Hash {
-        0
-    }
-}
-
 impl<T, H: Hasher<T>> SparseMerkleTree<T, H> {
 
     fn new(depth: Depth) -> Self {
@@ -114,19 +95,45 @@ impl<T, H: Hasher<T>> SparseMerkleTree<T, H> {
 
 }
 
+#[cfg(test)]
+mod tests {
 
-#[test]
-fn test_merkle_tree_depth() {
-    assert_eq!(SparseMerkleTree::<u64, U64Hasher>::depth(1), 0);
-    assert_eq!(SparseMerkleTree::<u64, U64Hasher>::depth(2), 1);
-    assert_eq!(SparseMerkleTree::<u64, U64Hasher>::depth(3), 1);
-    assert_eq!(SparseMerkleTree::<u64, U64Hasher>::depth(4), 2);
-}
+    use super::*;
 
-#[test]
-fn test_merkle_tree_insert() {
-    let mut tree = SparseMerkleTree::<u64, U64Hasher>::new(3);
-    tree.insert(0, 1);
-    println!("{:?}", tree);
-    assert_eq!(tree.root_hash(), 813);
+    #[derive(Debug)]
+    struct U64Hasher {}
+
+    impl Hasher<u64> for U64Hasher {
+        type Hash = u64;
+
+        fn hash(value: u64) -> Self::Hash {
+            value * 7
+        }
+
+        fn compress(lhs: Self::Hash, rhs: Self::Hash) -> Self::Hash {
+            11 * lhs + 17 * rhs + 1
+        }
+
+        fn empty_hash() -> Self::Hash {
+            0
+        }
+    }
+
+    type TestSMT = SparseMerkleTree<u64, U64Hasher>;
+
+    #[test]
+    fn test_merkle_tree_depth() {
+        assert_eq!(TestSMT::depth(1), 0);
+        assert_eq!(TestSMT::depth(2), 1);
+        assert_eq!(TestSMT::depth(3), 1);
+        assert_eq!(TestSMT::depth(4), 2);
+    }
+
+    #[test]
+    fn test_merkle_tree_insert() {
+        let mut tree = TestSMT::new(3);
+        tree.insert(0, 1);
+        println!("{:?}", tree);
+        assert_eq!(tree.root_hash(), 813);
+    }
 }
