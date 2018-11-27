@@ -433,6 +433,59 @@ impl<E: Engine> AllocatedNum<E> {
         Ok(c)
     }
 
+    /// Limits number of bits. The easiest example when required
+    /// is to add or subtract two "small" (with bit length smaller 
+    /// than one of the field) numbers and check for overflow
+    pub fn limit_number_of_bits<CS>(
+        mut cs: CS,
+        a: &Self,
+        number_of_bits: usize
+    ) -> Result<(), SynthesisError>
+        where CS: ConstraintSystem<E>
+    {
+        // do the bit decomposition and check that higher bits are all zeros
+
+        let mut bits = boolean::field_into_boolean_vec_le(
+            cs.namespace(|| "unpack to limit number of bits"), 
+            a.get_value()
+        ).unwrap();
+
+        bits.drain(0..number_of_bits);
+
+        // repack
+
+        let mut top_bits_lc = Num::<E>::zero();
+        let mut coeff = E::Fr::one();
+        for bit in bits.into_iter() {
+            top_bits_lc = top_bits_lc.add_bool_with_coeff(CS::one(), &bit, coeff);
+            coeff.double();
+        }
+
+        let top_bits_value = AllocatedNum::alloc(
+            cs.namespace(|| "allocate top bits"),
+            || Ok(top_bits_lc.get_value().unwrap())
+        ).unwrap();
+
+        // enforce packing and zeroness
+        cs.enforce(
+            || "repack top bits",
+            |lc| lc,
+            |lc| lc + CS::one(),
+            |_| top_bits_lc.lc(E::Fr::one())
+        );
+
+        // // enforce top bits to be zero
+        // cs.enforce(
+        //     || "repack top bits",
+        //     |lc| lc + top_bits_value.get_variable(),
+        //     |lc| lc + CS::one(),
+        //     |_| top_bits_lc.lc(E::Fr::one())
+        // );
+
+
+        Ok(())
+    }
+
     pub fn get_value(&self) -> Option<E::Fr> {
         self.value
     }

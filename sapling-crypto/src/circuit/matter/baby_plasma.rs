@@ -15,7 +15,6 @@ use jubjub::{
     FixedGenerators,
     Unknown,
     edwards,
-    PrimeOrder,
     JubjubParams
 };
 
@@ -747,6 +746,13 @@ fn apply_transaction<E, CS>(
         || Ok(new_balance_from_value)
     ).unwrap();
 
+    // constraint no overflow
+    num::AllocatedNum::limit_number_of_bits(
+        cs.namespace(|| "limit number of bits for new balance from"),
+        &new_balance_from,
+        *plasma_constants::NONCE_BIT_WIDTH
+    )?;
+
     // enforce reduction of balance
     cs.enforce(
         || "enforce sender's balance reduced",
@@ -763,6 +769,13 @@ fn apply_transaction<E, CS>(
         || Ok(new_balance_to_value)
     ).unwrap();
 
+    // constraint no overflow
+    num::AllocatedNum::limit_number_of_bits(
+        cs.namespace(|| "limit number of bits for new balance to"),
+        &new_balance_to,
+        *plasma_constants::BALANCE_BIT_WIDTH
+    )?;
+
     // enforce increase of balance
     cs.enforce(
         || "enforce recipients's balance increased",
@@ -778,6 +791,13 @@ fn apply_transaction<E, CS>(
         cs.namespace(|| "new nonce"),
         || Ok(new_nonce_value)
     ).unwrap();
+
+    // constraint no overflow
+    num::AllocatedNum::limit_number_of_bits(
+        cs.namespace(|| "limit number of bits for new nonce from"),
+        &new_nonce,
+        *plasma_constants::BALANCE_BIT_WIDTH
+    )?;
 
     // enforce increase of balance
     cs.enforce(
@@ -908,6 +928,8 @@ fn apply_transaction<E, CS>(
     // truncating guarantees that even if the common prefix coincides everywhere
     // up to the last bit, it can still be properly used in next actions
     intersection_point_bits.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
+    // reverse cause bits here are counted from root, and later we need from the leaf
+    intersection_point_bits.reverse();
 
     // First assemble new leafs
     cur_from = from_leaf_hash.get_x().clone();
