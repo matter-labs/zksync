@@ -23,6 +23,7 @@ use super::boolean;
 use super::ecc;
 use super::pedersen_hash;
 use super::blake2s;
+use super::sha256;
 use super::num;
 use super::multipack;
 use super::num::{AllocatedNum, Num};
@@ -140,12 +141,17 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
         }
 
         let mut fees = vec![];
+        let mut block_numbers = vec![];
+        let mut public_data_vector = vec![];
 
         let public_generator = self.params.generator(FixedGenerators::SpendingKeyGenerator).clone();
         let generator = ecc::EdwardsPoint::witness(cs.namespace(|| "allocate public generator"), Some(public_generator), self.params).unwrap();
 
-        for (i, tx) in self.transactions.into_iter().enumerate() {
-            let (intermediate_root, fee, _) = apply_transaction(
+        // Ok, now we need to update the old root by applying transactions in sequence
+        let transactions = self.transactions.clone();
+
+        for (i, tx) in transactions.into_iter().enumerate() {
+            let (intermediate_root, fee, block_number, public_data) = apply_transaction(
                 cs.namespace(|| format!("applying transaction {}", i)),
                 old_root,
                 tx, 
@@ -154,9 +160,148 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
             ).unwrap();
             old_root = intermediate_root;
             fees.push(fee);
+            block_numbers.push(block_number);
+            public_data_vector.push(public_data);
         }
 
-        // Ok, now we need to update the old root by applying transactions in sequence
+        // constraint the new hash to be equal to updated hash
+
+        cs.enforce(
+            || "enforce new root equal to recalculated one",
+            |lc| lc + new_root.get_variable(),
+            |lc| lc + CS::one(),
+            |lc| lc + old_root.get_variable()
+        );
+
+        // Inside the circuit with work with LE bit order, 
+        // so an account number "1" that would have a natural representation of e.g. 0x000001
+        // will have a bit decomposition [1, 0, 0, 0, ......]
+
+        // Don't deal with it here, but rather do on application layer when parsing the data!
+        // The only requirement is to properly seed initial hash value with block number and fees,
+        // as those are going to be naturally represented as Ethereum units
+
+        // First calculate a final fee amount
+
+        let mut total_fee_lc = Num::<E>::zero();
+        for fee in fees.into_iter() {
+            total_fee_lc = total_fee_lc.add_bool_with_coeff(
+                CS::one(), 
+                &boolean::Boolean::Constant(true), 
+                fee.get_value().unwrap()
+            );
+        }
+
+        let total_fee = self.total_fee.clone();
+
+        let total_fee_allocated = AllocatedNum::alloc(
+            cs.namespace(|| "allocate total fees"),
+            || Ok(total_fee.unwrap())
+        ).unwrap();
+
+        cs.enforce(
+            || "enforce total fee",
+            |lc| lc + total_fee_allocated.get_variable(),
+            |lc| lc + CS::one(),
+            |_| total_fee_lc.lc(E::Fr::one())
+        );
+
+        // Then check that for every transaction in this block 
+        // the parameter "good until" was greater or equal
+        // than the current block number
+
+        let block_number = self.block_number.clone();
+
+        let block_number_allocated = AllocatedNum::alloc(
+            cs.namespace(|| "allocate block number"),
+            || Ok(block_number.clone().unwrap())
+        ).unwrap();
+
+        for (i, block_number_in_tx) in block_numbers.into_iter().enumerate() {
+            // first name a new value and constraint that it's a proper subtraction
+
+            let mut difference = block_number_in_tx.get_value().unwrap();
+            difference.sub_assign(&block_number.clone().unwrap());
+
+            let difference_allocated = AllocatedNum::alloc(
+                cs.namespace(|| format!("allocate block number difference {}", i)),
+                || Ok(difference)
+            ).unwrap();
+
+            // enforce proper subtraction
+            cs.enforce(
+                || format!("enforce subtraction in block number calculation {}", i),
+                |lc| lc + difference_allocated.get_variable(),
+                |lc| lc + CS::one(),
+                |lc| lc + block_number_in_tx.get_variable() - block_number_allocated.get_variable()
+            );
+
+            // check for overflow
+
+            AllocatedNum::limit_number_of_bits(
+                cs.namespace(|| format!("check for subtraction overflow {}", i)),
+                &difference_allocated, 
+                *plasma_constants::BLOCK_NUMBER_BIT_WIDTH
+            )?;
+        }
+
+        // Now it's time to pack the initial SHA256 hash due to Ethereum BE encoding
+        // and start rolling the hash
+
+        let mut initial_hash_data = vec![];
+
+        // make initial hash as sha256(uint256(block_number)||uint256(total_fees))
+        let mut block_number_bits = block_number_allocated.into_bits_le(
+            cs.namespace(|| "unpack block number for hashing")
+        ).unwrap();
+
+        for _ in 0..(*plasma_constants::FR_BIT_WIDTH - block_number_bits.len()) {
+            block_number_bits.push(boolean::Boolean::Constant(false));
+        }
+        initial_hash_data.extend(block_number_bits.into_iter());
+
+        let mut total_fees_bits = total_fee_allocated.into_bits_le(
+            cs.namespace(|| "unpack fees for hashing")
+        ).unwrap();
+
+        for _ in 0..(*plasma_constants::FR_BIT_WIDTH - total_fees_bits.len()) {
+            total_fees_bits.push(boolean::Boolean::Constant(false));
+        }
+        initial_hash_data.extend(total_fees_bits.into_iter());
+
+        assert_eq!(initial_hash_data.len(), 512);
+
+        let initial_hash = sha256::sha256_block_no_padding(
+            cs.namespace(|| "initial rolling sha256"),
+            &initial_hash_data
+        ).unwrap();
+
+        // now we do a "dense packing", i.e. take 256 / public_data.len() items 
+        // and push them into the second half of sha256 block
+
+        let public_data_size = *plasma_constants::BALANCE_TREE_DEPTH 
+                                    + *plasma_constants::BALANCE_TREE_DEPTH
+                                    + *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH
+                                    + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH
+                                    + *plasma_constants::FEE_EXPONENT_BIT_WIDTH
+                                    + *plasma_constants::FEE_MANTISSA_BIT_WIDTH;
+
+        let pack_by = 256 / public_data_size;
+
+        let number_of_packs = self.number_of_transactions / pack_by;
+        let remaining_to_pack = self.number_of_transactions % pack_by;
+        let padding_in_pack = 256 - pack_by*public_data_size;
+        let padding_in_remainder = 256 - remaining_to_pack*public_data_size;
+
+        for j in 0..number_of_packs 
+        {
+            let cs = & mut cs.namespace(|| format!("packing a batch number {}", j));
+            for i in 0..pack_by 
+            {
+                let cs = & mut cs.namespace(|| format!("packing an item {}", i));
+
+            }
+        }
 
         Ok(())
     }
@@ -226,7 +371,7 @@ fn apply_transaction<E, CS>(
     transaction: Option<(Transaction<E>, TransactionWitness<E>)>,
     params: &E::Params,
     generator: ecc::EdwardsPoint<E>
-) -> Result<(AllocatedNum<E>, AllocatedNum<E>, AllocatedNum<E>), SynthesisError>
+) -> Result<(AllocatedNum<E>, AllocatedNum<E>, AllocatedNum<E>, Vec<boolean::Boolean>), SynthesisError>
     where E: JubjubEngine,
           CS: ConstraintSystem<E>
 {
@@ -569,6 +714,7 @@ fn apply_transaction<E, CS>(
 
     let mut message_bits = vec![];
 
+    // add sender and recipient addresses to check
     message_bits.extend(from_path_bits.clone());
     message_bits.extend(to_path_bits.clone());
 
@@ -578,6 +724,8 @@ fn apply_transaction<E, CS>(
     ).unwrap();
 
     amount_bits.truncate(*plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH);
+    
+    // add amount to check
     message_bits.extend(amount_bits.clone());
 
     let mut fee_bits = boolean::field_into_boolean_vec_le(
@@ -586,7 +734,12 @@ fn apply_transaction<E, CS>(
     ).unwrap();
 
     fee_bits.truncate(*plasma_constants::FEE_EXPONENT_BIT_WIDTH + *plasma_constants::FEE_MANTISSA_BIT_WIDTH);
+
+    // add fee to check
     message_bits.extend(fee_bits.clone());
+
+    // add nonce to check
+    message_bits.extend(nonce_content_from.clone());
 
     let mut block_number_bits = boolean::field_into_boolean_vec_le(
         cs.namespace(|| "block number bits"),
@@ -594,6 +747,8 @@ fn apply_transaction<E, CS>(
     ).unwrap();
 
     block_number_bits.truncate(*plasma_constants::BLOCK_NUMBER_BIT_WIDTH);
+
+    // add block number to check
     message_bits.extend(block_number_bits.clone());
 
     let sender_pk_x = AllocatedNum::alloc(
@@ -651,6 +806,7 @@ fn apply_transaction<E, CS>(
                         + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH
                         + *plasma_constants::FEE_EXPONENT_BIT_WIDTH
                         + *plasma_constants::FEE_MANTISSA_BIT_WIDTH
+                        + *plasma_constants::NONCE_BIT_WIDTH
                         + *plasma_constants::BLOCK_NUMBER_BIT_WIDTH;
 
     signature.verify_raw_message_signature(
@@ -698,8 +854,6 @@ fn apply_transaction<E, CS>(
         nonce_lc = nonce_lc.add_bool_with_coeff(CS::one(), &bit, coeff);
         coeff.double();
     }
-
-    // TODO this is insecure, keep for now, use UInt32 gadgets later for nonce and manual implementation for UInt128
 
     let old_balance_from = AllocatedNum::alloc(
         cs.namespace(|| "allocate old balance from"),
@@ -1034,7 +1188,23 @@ fn apply_transaction<E, CS>(
             |lc| lc + cur_from.get_variable()
         );
     }
-    Ok((cur_from, fee, allocated_block_number))
+
+    // the last step - we expose public data for later commitment
+
+    let mut public_data = vec![];
+    public_data.extend(from_path_bits.clone());
+    public_data.extend(to_path_bits.clone());
+    public_data.extend(amount_bits.clone());
+    public_data.extend(fee_bits.clone());
+
+    assert_eq!(public_data.len(), *plasma_constants::BALANCE_TREE_DEPTH 
+                                    + *plasma_constants::BALANCE_TREE_DEPTH
+                                    + *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH
+                                    + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH
+                                    + *plasma_constants::FEE_EXPONENT_BIT_WIDTH
+                                    + *plasma_constants::FEE_MANTISSA_BIT_WIDTH);
+
+    Ok((cur_from, fee, allocated_block_number, public_data))
 }
 
 

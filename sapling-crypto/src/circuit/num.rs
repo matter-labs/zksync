@@ -445,9 +445,8 @@ impl<E: Engine> AllocatedNum<E> {
     {
         // do the bit decomposition and check that higher bits are all zeros
 
-        let mut bits = boolean::field_into_boolean_vec_le(
-            cs.namespace(|| "unpack to limit number of bits"), 
-            a.get_value()
+        let mut bits = a.into_bits_le(
+            cs.namespace(|| "unpack to limit number of bits")
         ).unwrap();
 
         bits.drain(0..number_of_bits);
@@ -461,10 +460,10 @@ impl<E: Engine> AllocatedNum<E> {
             coeff.double();
         }
 
-        let top_bits_value = AllocatedNum::alloc(
-            cs.namespace(|| "allocate top bits"),
-            || Ok(top_bits_lc.get_value().unwrap())
-        ).unwrap();
+        // let top_bits_value = AllocatedNum::alloc(
+        //     cs.namespace(|| "allocate top bits"),
+        //     || Ok(top_bits_lc.get_value().unwrap())
+        // ).unwrap();
 
         // enforce packing and zeroness
         cs.enforce(
