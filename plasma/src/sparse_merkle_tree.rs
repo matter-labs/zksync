@@ -31,18 +31,18 @@ pub struct SparseMerkleTree<T, H: Hasher<T>>
 
 impl<T, H: Hasher<T>> SparseMerkleTree<T, H> {
 
-    fn new(depth: Depth) -> Self {
-        assert!(depth > 1);
+    fn new(tree_depth: Depth) -> Self {
+        assert!(tree_depth > 1);
         let items = HashMap::new();
         let hashes = HashMap::new();
-        let mut prehashed = Vec::with_capacity(depth-1);
+        let mut prehashed = Vec::with_capacity(tree_depth-1);
         let mut cur = H::empty_hash();
-        for _ in 0..depth {
+        for _ in 0..tree_depth {
             cur = H::compress(cur, cur);
             prehashed.push(cur);
         }
         prehashed.reverse();
-        Self{ tree_depth: depth, prehashed, items, hashes}
+        Self{tree_depth, prehashed, items, hashes}
     }
 
     fn depth(index: HashIndex) -> Depth {
@@ -101,9 +101,9 @@ mod tests {
     use super::*;
 
     #[derive(Debug)]
-    struct U64Hasher {}
+    struct TestHasher {}
 
-    impl Hasher<u64> for U64Hasher {
+    impl Hasher<u64> for TestHasher {
         type Hash = u64;
 
         fn hash(value: u64) -> Self::Hash {
@@ -119,7 +119,7 @@ mod tests {
         }
     }
 
-    type TestSMT = SparseMerkleTree<u64, U64Hasher>;
+    type TestSMT = SparseMerkleTree<u64, TestHasher>;
 
     #[test]
     fn test_merkle_tree_depth() {
