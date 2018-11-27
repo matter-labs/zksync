@@ -110,5 +110,5 @@ fn main() {
     assert!(success);
 
     let inputs_extra = r#"assert(inputs[0] == uint(sha256("hello")) & 0x1fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);"#;
-    println!("{}", bellman_demo::generate_demo_contract(&params.vk, &proof, inputs, inputs_extra));
+    println!("{}", bellman_demo::verifier_contract::generate_demo_contract(&params.vk, &proof, inputs, inputs_extra));
 }

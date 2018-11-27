@@ -22,7 +22,7 @@ We use elliptic curve BN256, for which pairings can be efficiently performed in 
 ```$bash
 cargo run --example xor
 cargo run --example sha256
-
+cargo run --bin circuit
 ```
 
 ## Verification in EVM contract:
