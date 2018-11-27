@@ -11,6 +11,6 @@ mod plasma_state;
 mod update_circuit;
 
 fn main() {
-    let plasma_params = plasma_state::PlasmaBN256{};
+    //let plasma_params = plasma_state::PlasmaBN256{};
     update_circuit::test_circuit();
 }

@@ -10,7 +10,7 @@ use sapling_crypto::circuit::ecc::EdwardsPoint;
 use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
 use sapling_crypto::pedersen_hash::{pedersen_hash, Personalization};
 
-use super::plasma_state::PlasmaParams;
+use super::plasma_state::TxPubInput;
 
 //#[derive(Clone)]
 //struct Leaf<E: JubjubEngine, TreeHeight: usize> {

@@ -5,59 +5,63 @@ use rand::{Rand, thread_rng};
 use pairing::{Engine};
 
 use sapling_crypto::jubjub::JubjubEngine;
-use sapling_crypto::circuit::ecc::EdwardsPoint;
 
-pub trait PlasmaParams<E: JubjubEngine> {
-
-    type Engine:    JubjubEngine;
-    type Fs:        PrimeField;
-
-    fn tree_height(&self) -> usize;
+#[derive(Clone)]
+pub struct Account<E: JubjubEngine> {
+    balance:    E::Fs,
+    nonce:      E::Fs,
+    //pubkey:     EdwardsPoint<E>,
 }
 
-pub struct PlasmaBN256 {}
+pub type AccountId = u32;
 
-pub fn test() {
+pub type Value = u32;
 
+pub struct Tx {
+    from:   AccountId,
+    to:     AccountId,
+    value:  Value,
+    fee:    Value,
 }
 
+pub type ValuePacked = u32;
 
+// 112 bit
+pub struct TxPacked {
+    from:   AccountId,
+    to:     AccountId,
+    value:  ValuePacked,
+    fee:    ValuePacked,
+}
 
-//struct Account<E: JubjubEngine> {
-//    balance:    E::Fs,
-//    nonce:      E::Fs,
-//    pubkey:     EdwardsPoint<E>,
-//}
-//
-//struct PlasmaState<E: JubjubEngine, TreeHeight: usize> {
-//    // accounts
-//    // Display
-//    // apply(tx: Tx)
-//}
-//
-//type AccountId = u32;
-//
-//type Value = u32;
-//
-//struct Tx {
-//    from:   AccountId,
-//    to:     AccountId,
-//    value:  Value,
-//    fee:    Value,
-//}
-//
-//type ValuePacked = u32;
-//
-//// 112 bit
-//struct TxPacked {
-//    from:   AccountId,
-//    to:     AccountId,
-//    value:  ValuePacked,
-//    fee:    ValuePacked,
-//}
-//
-//type TxPubInput = TxPacked;
-//
+pub type TxPubInput = TxPacked;
+
+pub struct PlasmaState<E: JubjubEngine> {
+    // accounts
+    // Display
+    // apply(tx: Tx)
+
+    accounts: Vec<Account<E>>,
+}
+
+impl<'a, E: JubjubEngine> PlasmaState<E> {
+
+    fn new(tree_height: usize) -> Self {
+        Self{
+            accounts: vec![Account::<_>{
+                balance: E::Fs::zero(),
+                nonce:   E::Fs::zero(),
+                //pubkey:  EdwardsPoint<E>::
+            }; tree_height],
+        }
+    }
+
+    // State transition function: S_new <= S_old.apply(tx)
+    fn apply(&self, tx: &Tx) -> &Self {
+        &self
+    }
+}
+
 //#[derive(Clone)]
 //struct Leaf<E: JubjubEngine, TreeHeight: usize> {
 //
