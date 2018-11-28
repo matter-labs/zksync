@@ -7,27 +7,29 @@ use sapling_crypto::baby_pedersen_hash::{pedersen_hash, Personalization};
 use pairing::bn256::Bn256;
 use sapling_crypto::babyjubjub::{JubjubEngine, JubjubBn256, edwards::Point, PrimeOrder};
 
+use super::hasher::{Hasher};
+
 pub struct PedersenHasher<E: JubjubEngine> {
     params: E::Params,
 }
 
-impl<E: JubjubEngine> PedersenHasher<E> {
+impl<E: JubjubEngine> Hasher<E::Fr> for PedersenHasher<E> {
 
-    pub fn empty_hash(&self) -> E::Fr {
-       self.hash(vec![])
+    fn hash_bits<I: IntoIterator<Item=bool>>(&self, input: I) -> E::Fr {
+        pedersen_hash::<E, _>(Personalization::NoteCommitment, input, &self.params).into_xy().0
     }
 
-    pub fn hash<I>(&self, input: I) -> E::Fr where I: IntoIterator<Item=bool> {
-        let v: Vec<bool> = input.into_iter().collect();
-        pedersen_hash::<E, _>(Personalization::NoteCommitment, v, &self.params).into_xy().0
-    }
-
-    pub fn compress(&self, lhs: &E::Fr, rhs: &E::Fr, i: usize) -> E::Fr {
+    fn compress(&self, lhs: &E::Fr, rhs: &E::Fr, i: usize) -> E::Fr {
         let mut input = Vec::new();
         input.extend(BitIterator::new(lhs.into_repr()));
         input.extend(BitIterator::new(rhs.into_repr()));
         pedersen_hash::<E, _>(Personalization::MerkleTree(i), input, &self.params).into_xy().0
     }
+
+    fn empty_hash(&self) -> E::Fr {
+        self.hash_bits(vec![])
+    }
+
 }
 
 pub type BabyPedersenHasher = PedersenHasher<Bn256>;
@@ -47,7 +49,7 @@ fn test_pedersen_hash() {
     let hash = hasher.empty_hash();
     println!("empty: {:?}", &hash);
 
-    let hash = hasher.hash(vec![false, false, false, true, true, true, true, true]);
+    let hash = hasher.hash_bits(vec![false, false, false, true, true, true, true, true]);
     println!("hash:  {:?}", &hash);
 
     let hash2 = hasher.compress(&hash, &hash, 0);

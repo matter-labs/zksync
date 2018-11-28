@@ -5,11 +5,10 @@ use ff::{Field, PrimeField};
 use rand::{Rand, thread_rng};
 use pairing::bn256::{Bn256, Fr};
 use sapling_crypto::babyjubjub::{JubjubEngine, JubjubBn256, edwards::Point, PrimeOrder};
-use sapling_crypto::pedersen_hash::{pedersen_hash, Personalization::NoteCommitment};
 
 use super::smt::SparseMerkleTree;
-use super::smt::hasher::{Hasher, Factory};
-use super::smt::pedersen_hasher::{PedersenHasher, BabyPedersenHasher};
+use super::smt::hasher::IntoBits;
+use super::smt::pedersen_hasher::BabyPedersenHasher;
 
 use sapling_crypto::circuit::matter::plasma_constants;
 
@@ -19,6 +18,13 @@ pub struct Leaf<E: JubjubEngine> {
     nonce:      E::Fr,
     pub_x:      E::Fr,
     pub_y:      E::Fr,
+}
+
+impl<E: JubjubEngine> IntoBits for Leaf<E> {
+    fn into_bits(&self) -> Vec<bool> {
+        // TODO: expand
+        vec![]
+    }
 }
 
 impl<E: JubjubEngine> Default for Leaf<E> {
@@ -32,35 +38,9 @@ impl<E: JubjubEngine> Default for Leaf<E> {
     }
 }
 
-pub struct LeafHasher<E: JubjubEngine> {
-    pedersen: PedersenHasher<E>
-}
-
-impl<E: JubjubEngine> Hasher<Leaf<E>, E::Fr> for LeafHasher<E> {
-
-    fn hash(&self, leaf: &Leaf<E>) -> E::Fr {
-        // TODO: implement
-        self.pedersen.hash(vec![])
-    }
-
-    fn compress(&self, lhs: &E::Fr, rhs: &E::Fr, i: usize) -> E::Fr {
-        self.pedersen.compress(lhs, rhs, i)
-    }
-
-    fn empty_hash(&self) -> E::Fr {
-        self.hash(&Leaf::<E>::default())
-    }
-}
-
 pub type BabyLeaf = Leaf<Bn256>;
-pub type BabyLeafHasher = LeafHasher<Bn256>;
-impl Factory for BabyLeafHasher {
-    fn new() -> Self {
-        Self{ pedersen: BabyPedersenHasher::default()}
-    }
-}
 
-pub type BabyBalanceTree = SparseMerkleTree<BabyLeaf, Fr, BabyLeafHasher>;
+pub type BabyBalanceTree = SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
 
 #[test]
 fn test_account_merkle_tree() {

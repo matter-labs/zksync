@@ -1,11 +1,11 @@
+// Sparse Merkle tree with flexible hashing strategy
+
 pub mod hasher;
 pub mod pedersen_hasher;
 
-// Sparse Merkle tree with flexible hashing strategy
-
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use self::hasher::{Hasher, Factory};
+use self::hasher::{Hasher, IntoBits};
 
 // 0 .. (N - 1)
 type ItemIndex = usize;
@@ -18,7 +18,7 @@ type Depth = usize;
 type HashIndex = usize;
 
 #[derive(Debug, Clone)]
-pub struct SparseMerkleTree<T, Hash: Clone, H: Hasher<T, Hash>>
+pub struct SparseMerkleTree<T: IntoBits, Hash: Clone, H: Hasher<Hash>>
 {
     tree_depth: Depth,
     prehashed: Vec<Hash>,
@@ -28,13 +28,14 @@ pub struct SparseMerkleTree<T, Hash: Clone, H: Hasher<T, Hash>>
 }
 
 impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
-    where Hash: Clone,
-          H: Hasher<T, Hash> + Factory,
+    where T: IntoBits,
+          Hash: Clone,
+          H: Hasher<Hash> + Default,
 {
 
     pub fn new(tree_depth: Depth) -> Self {
         assert!(tree_depth > 1);
-        let hasher = H::new();
+        let hasher = H::default();
         let items = HashMap::new();
         let hashes = HashMap::new();
         let mut prehashed = Vec::with_capacity(tree_depth-1);
@@ -73,7 +74,7 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
         assert!(index < self.capacity());
 
         let hash_index = (1 << self.tree_depth-1) + index;
-        let hash = self.hasher.hash(&item);
+        let hash = self.hasher.hash_bits(item.into_bits());
         //println!("index = {}, hash_index = {}", index, hash_index);
         self.hashes.insert(hash_index, hash);
 
@@ -127,15 +128,33 @@ mod tests {
     #[derive(Debug)]
     struct TestHasher {}
 
-    impl Factory for TestHasher {
-        fn new() -> Self { Self {} }
+    impl IntoBits for u64 {
+        fn into_bits(&self) -> Vec<bool> {
+            let mut acc = Vec::new();
+            let mut i = *self;
+            while i > 0 {
+                acc.push(i & 1 == 1);
+                i >>= 1;
+            }
+            acc
+        }
     }
 
-    impl Hasher<u64, u64> for TestHasher {
-        fn hash(&self, value: &u64) -> u64 {
-            //println!("hash({}) -> {}", value, value);
-            *value
+    impl Default for TestHasher {
+        fn default() -> Self { Self {} }
+    }
+
+    impl Hasher<u64> for TestHasher {
+
+        fn hash_bits<I: IntoIterator<Item=bool>>(&self, value: I) -> u64 {
+            let mut acc = 0;
+            for i in value {
+                acc <<= 1;
+                if i {acc &= 1};
+            }
+            acc
         }
+
         fn compress(&self, lhs: &u64, rhs: &u64, i: usize) -> u64 {
             //println!("compress i {}", i);
             let r = 11 * lhs + 17 * rhs + 1;
@@ -165,11 +184,11 @@ mod tests {
         assert_eq!(tree.hash_capacity(), 7);
 
         tree.insert(0, 1);
-        println!("{:?}", tree);
-        assert_eq!(tree.root_hash(), 4791);
+        //println!("{:?}", tree);
+        assert_eq!(tree.root_hash(), 4670);
 
         tree.insert(3, 2);
         //println!("{:?}", tree);
-        assert_eq!(tree.root_hash(), 3346);
+        assert_eq!(tree.root_hash(), 2647);
     }
 }
