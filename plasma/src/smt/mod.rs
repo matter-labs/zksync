@@ -87,7 +87,7 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
     }
 
     fn update_hash(&mut self, index: HashIndex) -> Hash {
-        assert!(index <= self.hash_capacity());
+        assert!(index > 0 && index <= self.hash_capacity());
 
         // indices for child nodes in the tree
         let lhs = index * 2;
@@ -105,7 +105,7 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
     }
 
     fn get_hash(&self, index: HashIndex) -> Hash {
-        assert!(index <= self.hash_capacity());
+        assert!(index > 0 && index <= self.hash_capacity());
         if let Some(hash) = self.hashes.get(&index) {
             // if hash for this index exists, return it
             hash.clone()
@@ -113,6 +113,18 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
             // otherwise return pre-computed
             self.prehashed.get(Self::depth(index)).unwrap().clone()
         }
+    }
+
+    pub fn merkle_path(&self, index: ItemIndex) -> Vec<(Hash, bool)> {
+        assert!(index < self.capacity());
+        let item_hash_index = (1 << self.tree_depth-1) + index;
+        (0..(self.tree_depth-1)).map(|level| {
+            let dir = item_hash_index & (1 << level) > 0;
+            let hash_index = (item_hash_index >> level) ^ 1;
+            println!("i, dir, hi: {}, {}, {}", level, dir, hash_index);
+            let hash = self.get_hash(hash_index);
+            (hash, dir)
+        }).collect()
     }
 
     pub fn root_hash(&self) -> Hash {
@@ -135,7 +147,6 @@ mod tests {
                 acc.push(i & 1 == 1);
                 i >>= 1;
             }
-            //println!("into bits({}) -> {:?}", *self, acc);
             acc
         }
     }
@@ -153,14 +164,11 @@ mod tests {
                 acc <<= 1;
                 if *i {acc |= 1};
             }
-            //println!("hash bits({:?}) -> {}", &v, acc);
             acc
         }
 
         fn compress(&self, lhs: &u64, rhs: &u64, i: usize) -> u64 {
-            //println!("compress i {}", i);
             let r = 11 * lhs + 17 * rhs + 1;
-            //println!("compress({}, {}) -> {}", lhs, rhs, r);
             r
         }
 
@@ -190,5 +198,13 @@ mod tests {
         tree.insert(3, 2);
         //println!("{:?}", tree);
         assert_eq!(tree.root_hash(), 28442653);
+    }
+
+    #[test]
+    fn test_merkle_path() {
+        let mut tree = TestSMT::new(4);
+        tree.insert(2, 1);
+        let path = tree.merkle_path(2);
+        assert_eq!(path, [(32768, false), (917505, true), (25690141, false)]);
     }
 }

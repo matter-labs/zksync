@@ -68,6 +68,9 @@ fn test_account_merkle_tree() {
     tree.insert(0, leaf);
     let root = tree.root_hash();
     println!("root: {:?}", root);
+
+    let path = tree.merkle_path(0);
+    println!("path: {:?}", path);
 }
 
 #[test]
