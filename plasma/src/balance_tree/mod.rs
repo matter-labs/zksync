@@ -21,7 +21,6 @@ pub struct Leaf<E: JubjubEngine> {
 }
 
 fn get_bits<E: JubjubEngine>(value: E::Fr, n: usize) -> Vec<bool> {
-    assert!(n < 64); // we only work with small numbers here
     let mut acc = Vec::with_capacity(n);
     let mut t = value.into_repr().clone();
     for i in 0..n {

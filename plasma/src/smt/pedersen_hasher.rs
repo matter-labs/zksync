@@ -26,10 +26,6 @@ impl<E: JubjubEngine> Hasher<E::Fr> for PedersenHasher<E> {
         pedersen_hash::<E, _>(Personalization::MerkleTree(i), input, &self.params).into_xy().0
     }
 
-    fn empty_hash(&self) -> E::Fr {
-        self.hash_bits(vec![])
-    }
-
 }
 
 pub type BabyPedersenHasher = PedersenHasher<Bn256>;
@@ -45,9 +41,6 @@ impl Default for PedersenHasher<Bn256> {
 #[test]
 fn test_pedersen_hash() {
     let hasher = BabyPedersenHasher::default();
-
-    let hash = hasher.empty_hash();
-    println!("empty: {:?}", &hash);
 
     let hash = hasher.hash_bits(vec![false, false, false, true, true, true, true, true]);
     println!("hash:  {:?}", &hash);
