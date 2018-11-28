@@ -121,7 +121,6 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
         (0..(self.tree_depth-1)).map(|level| {
             let dir = item_hash_index & (1 << level) > 0;
             let hash_index = (item_hash_index >> level) ^ 1;
-            println!("i, dir, hi: {}, {}, {}", level, dir, hash_index);
             let hash = self.get_hash(hash_index);
             (hash, dir)
         }).collect()
