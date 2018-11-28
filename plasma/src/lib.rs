@@ -8,6 +8,7 @@ extern crate hex;
 extern crate ff;
 extern crate sapling_crypto;
 
-pub mod smt;
+pub mod primitives;
+pub mod sparse_merkle_tree;
 pub mod balance_tree;
 pub mod circuit;

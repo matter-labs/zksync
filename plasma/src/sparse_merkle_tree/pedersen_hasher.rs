@@ -43,13 +43,13 @@ fn test_pedersen_hash() {
     let hasher = BabyPedersenHasher::default();
 
     let hash = hasher.hash_bits(vec![false, false, false, true, true, true, true, true]);
-    println!("hash:  {:?}", &hash);
+    //println!("hash:  {:?}", &hash);
 
     let hash2 = hasher.compress(&hash, &hash, 0);
-    println!("compr: {:?}", &hash2);
+    //println!("compr: {:?}", &hash2);
 
     let hash3 = hasher.compress(&hash, &hash, 1);
-    println!("compr: {:?}", &hash3);
+    //println!("compr: {:?}", &hash3);
 
     //assert_eq!(hasher.empty_hash(),
 }
