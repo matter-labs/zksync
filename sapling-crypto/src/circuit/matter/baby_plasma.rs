@@ -127,22 +127,22 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
         )?;
         rolling_hash.inputize(cs.namespace(|| "rolling hash input"))?;
 
-        let mut hash_bits = boolean::field_into_boolean_vec_le(
-            cs.namespace(|| "rolling hash bits"), 
-            rolling_hash.get_value()
-        )?;
+        // let mut hash_bits = boolean::field_into_boolean_vec_le(
+        //     cs.namespace(|| "rolling hash bits"), 
+        //     rolling_hash.get_value()
+        // )?;
 
-        assert_eq!(hash_bits.len(), E::Fr::NUM_BITS as usize);
+        // assert_eq!(hash_bits.len(), E::Fr::NUM_BITS as usize);
 
         // Pad hash bits to 256 bits for use in hashing rounds
 
-        for _ in 0..(256 - hash_bits.len()) {
-            hash_bits.push(boolean::Boolean::Constant(false));
-        }
+        // for _ in 0..(256 - hash_bits.len()) {
+        //     hash_bits.push(boolean::Boolean::Constant(false));
+        // }
 
         let mut fees = vec![];
         let mut block_numbers = vec![];
-        let mut public_data_vector = vec![];
+        let mut public_data_vector: Vec<Vec<boolean::Boolean>> = vec![];
 
         let public_generator = self.params.generator(FixedGenerators::SpendingKeyGenerator).clone();
         let generator = ecc::EdwardsPoint::witness(cs.namespace(|| "allocate public generator"), Some(public_generator), self.params).unwrap();
@@ -248,7 +248,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
         // Now it's time to pack the initial SHA256 hash due to Ethereum BE encoding
         // and start rolling the hash
 
-        let mut initial_hash_data = vec![];
+        let mut initial_hash_data: Vec<boolean::Boolean> = vec![];
 
         // make initial hash as sha256(uint256(block_number)||uint256(total_fees))
         let mut block_number_bits = block_number_allocated.into_bits_le(
@@ -258,6 +258,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
         for _ in 0..(*plasma_constants::FR_BIT_WIDTH - block_number_bits.len()) {
             block_number_bits.push(boolean::Boolean::Constant(false));
         }
+        block_number_bits.reverse();
         initial_hash_data.extend(block_number_bits.into_iter());
 
         let mut total_fees_bits = total_fee_allocated.into_bits_le(
@@ -267,11 +268,12 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
         for _ in 0..(*plasma_constants::FR_BIT_WIDTH - total_fees_bits.len()) {
             total_fees_bits.push(boolean::Boolean::Constant(false));
         }
+        total_fees_bits.reverse();
         initial_hash_data.extend(total_fees_bits.into_iter());
 
         assert_eq!(initial_hash_data.len(), 512);
 
-        let initial_hash = sha256::sha256_block_no_padding(
+        let mut hash_block = sha256::sha256_block_no_padding(
             cs.namespace(|| "initial rolling sha256"),
             &initial_hash_data
         ).unwrap();
@@ -293,15 +295,64 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
         let padding_in_pack = 256 - pack_by*public_data_size;
         let padding_in_remainder = 256 - remaining_to_pack*public_data_size;
 
+        let mut public_data_iterator = public_data_vector.into_iter();
+
         for j in 0..number_of_packs 
         {
             let cs = & mut cs.namespace(|| format!("packing a batch number {}", j));
+            let mut pack_bits: Vec<boolean::Boolean> = vec![];
+            pack_bits.extend(hash_block.into_iter());
             for i in 0..pack_by 
             {
-                let cs = & mut cs.namespace(|| format!("packing an item {}", i));
-
+                let part: Vec<boolean::Boolean> = public_data_iterator.next().unwrap();
+                pack_bits.extend(part.into_iter());
             }
+            for _ in 0..padding_in_pack
+            {
+                pack_bits.push(boolean::Boolean::Constant(false));
+            }
+            hash_block = sha256::sha256_block_no_padding(
+                cs.namespace(|| format!("hash for block {}", j)),
+                &pack_bits
+            ).unwrap();
         }
+
+        let mut pack_bits: Vec<boolean::Boolean> = vec![];
+        pack_bits.extend(hash_block.into_iter());
+        for i in 0..remaining_to_pack
+        {
+            let part: Vec<boolean::Boolean> = public_data_iterator.next().unwrap();
+            pack_bits.extend(part.into_iter());
+        }
+
+        for _ in 0..padding_in_remainder
+        {
+            pack_bits.push(boolean::Boolean::Constant(false));
+        }
+
+        hash_block = sha256::sha256_block_no_padding(
+            cs.namespace(|| "hash the remainder"),
+            &pack_bits
+        ).unwrap();
+
+        // now pack and enforce equality to the input
+
+        hash_block.reverse();
+        hash_block.truncate(E::Fr::CAPACITY as usize);
+
+        let mut packed_hash_lc = Num::<E>::zero();
+        let mut coeff = E::Fr::one();
+        for bit in hash_block {
+            packed_hash_lc = packed_hash_lc.add_bool_with_coeff(CS::one(), &bit, coeff);
+            coeff.double();
+        }
+
+        cs.enforce(
+            || "enforce hash equality",
+            |lc| lc + rolling_hash.get_variable(),
+            |lc| lc + CS::one(),
+            |_| packed_hash_lc.lc(E::Fr::one())
+        );
 
         Ok(())
     }
