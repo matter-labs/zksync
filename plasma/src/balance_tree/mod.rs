@@ -7,9 +7,11 @@ use pairing::bn256::{Bn256, Fr};
 use sapling_crypto::babyjubjub::{JubjubEngine, JubjubBn256, edwards::Point, PrimeOrder};
 use sapling_crypto::pedersen_hash::{pedersen_hash, Personalization::NoteCommitment};
 
-use super::sparse_merkle_tree::SparseMerkleTree;
-use super::hasher::{Hasher, Factory};
-use super::pedersen_hasher::{PedersenHasher, BabyPedersenHasher};
+use super::smt::SparseMerkleTree;
+use super::smt::hasher::{Hasher, Factory};
+use super::smt::pedersen_hasher::{PedersenHasher, BabyPedersenHasher};
+
+use sapling_crypto::circuit::matter::plasma_constants;
 
 #[derive(Debug, Clone)]
 pub struct Leaf<E: JubjubEngine> {
@@ -36,9 +38,9 @@ pub struct LeafHasher<E: JubjubEngine> {
 
 impl<E: JubjubEngine> Hasher<Leaf<E>, E::Fr> for LeafHasher<E> {
 
-    fn hash(&self, value: &Leaf<E>) -> E::Fr {
+    fn hash(&self, leaf: &Leaf<E>) -> E::Fr {
         // TODO: implement
-        self.pedersen.empty_hash()
+        self.pedersen.hash(vec![])
     }
 
     fn compress(&self, lhs: &E::Fr, rhs: &E::Fr, i: usize) -> E::Fr {
@@ -74,20 +76,7 @@ fn test_account_merkle_tree() {
     println!("root: {:?}", root);
 }
 
-//impl Hasher<Account<Bn256>> for AccountPedersenHasher {
-//
-//    type Hash = Point<Bn256, PrimeOrder>;
-//
-//    fn empty_hash() -> Self::Hash {
-//        let params = AltJubjubBn256::new();
-//        pedersen_hash::<Bn256, _>(NoteCommitment, vec![].into_iter(), &params)
-//    }
-//
-//    fn hash(value: &Account<Bn256>) -> Self::Hash {
-//        let input = vec![]; // decompose `value` into bits
-//        let params = AltJubjubBn256::new();
-//        pedersen_hash::<Bn256, _>(NoteCommitment, input.into_iter(), &params)
-//
+
 ////        let mut leaf_content = vec![];
 ////
 ////        let mut value_content_from = boolean::field_into_boolean_vec_le(
@@ -140,11 +129,3 @@ fn test_account_merkle_tree() {
 ////            &leaf_content,
 ////            params
 ////        )?;
-//    }
-//
-//    fn compress(lhs: &Self::Hash, rhs: &Self::Hash) -> Self::Hash {
-//        let params = AltJubjubBn256::new();
-//        let input = vec![]; // to_bits(lhs) || to_bits(rhs)
-//        pedersen_hash::<Bn256, _>(NoteCommitment, input.into_iter(), &params)
-//    }
-//}
