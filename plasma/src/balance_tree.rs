@@ -11,21 +11,15 @@ use super::sparse_merkle_tree::SparseMerkleTree;
 use super::hasher::{Hasher, Factory};
 use super::pedersen_hasher::{PedersenHasher, BabyPedersenHasher};
 
-#[derive(Clone)]
-pub struct Account<E: JubjubEngine> {
+#[derive(Debug, Clone)]
+pub struct Leaf<E: JubjubEngine> {
     balance:    E::Fr,
     nonce:      E::Fr,
     pub_x:      E::Fr,
     pub_y:      E::Fr,
 }
 
-impl<E: JubjubEngine> Debug for Account<E> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Account {{ balance: {} }}", self.balance)
-    }
-}
-
-impl<E: JubjubEngine> Default for Account<E> {
+impl<E: JubjubEngine> Default for Leaf<E> {
     fn default() -> Self{
         Self {
             balance:    E::Fr::zero(),
@@ -36,13 +30,13 @@ impl<E: JubjubEngine> Default for Account<E> {
     }
 }
 
-pub struct AccountHasher<E: JubjubEngine> {
+pub struct LeafHasher<E: JubjubEngine> {
     pedersen: PedersenHasher<E>
 }
 
-impl<E: JubjubEngine> Hasher<Account<E>, E::Fr> for AccountHasher<E> {
+impl<E: JubjubEngine> Hasher<Leaf<E>, E::Fr> for LeafHasher<E> {
 
-    fn hash(&self, value: &Account<E>) -> E::Fr {
+    fn hash(&self, value: &Leaf<E>) -> E::Fr {
         // TODO: implement
         self.pedersen.empty_hash()
     }
@@ -52,31 +46,32 @@ impl<E: JubjubEngine> Hasher<Account<E>, E::Fr> for AccountHasher<E> {
     }
 
     fn empty_hash(&self) -> E::Fr {
-        self.hash(&Account::<E>::default())
+        self.hash(&Leaf::<E>::default())
     }
 }
 
-pub type BabyAccount = Account<Bn256>;
-pub type BabyAccountHasher = AccountHasher<Bn256>;
-impl Factory for BabyAccountHasher {
+pub type BabyLeaf = Leaf<Bn256>;
+pub type BabyLeafHasher = LeafHasher<Bn256>;
+impl Factory for BabyLeafHasher {
     fn new() -> Self {
         Self{ pedersen: BabyPedersenHasher::default()}
     }
 }
 
-pub type BabyAccountTree = SparseMerkleTree<BabyAccount, Fr, BabyAccountHasher>;
+pub type BabyBalanceTree = SparseMerkleTree<BabyLeaf, Fr, BabyLeafHasher>;
 
 #[test]
 fn test_account_merkle_tree() {
-    let mut tree = BabyAccountTree::new(3);
-    let acc = BabyAccount{
+    let mut tree = BabyBalanceTree::new(3);
+    let leaf = BabyLeaf {
         balance:    Fr::zero(),
         nonce:      Fr::one(),
         pub_x:      Fr::one(),
         pub_y:      Fr::one(),
     };
-    tree.insert(0, acc);
-    //let root = tree.root_hash();
+    tree.insert(0, leaf);
+    let root = tree.root_hash();
+    println!("root: {:?}", root);
 }
 
 //impl Hasher<Account<Bn256>> for AccountPedersenHasher {

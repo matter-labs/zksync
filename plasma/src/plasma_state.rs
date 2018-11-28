@@ -6,7 +6,7 @@ use pairing::bn256::Bn256;
 use sapling_crypto::alt_babyjubjub::{JubjubEngine, AltJubjubBn256, edwards::Point, PrimeOrder};
 use sapling_crypto::pedersen_hash::{pedersen_hash, Personalization::NoteCommitment};
 
-use super::account::BabyAccount;
+use super::balance_tree::BabyLeaf;
 
 #[test]
 fn test_account_merkle_tree() {
