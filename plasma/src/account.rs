@@ -1,5 +1,6 @@
 // Plasma account (Merkle tree leaf)
 
+use std::fmt::{self, Debug};
 use ff::{Field, PrimeField};
 use rand::{Rand, thread_rng};
 use pairing::bn256::{Bn256, Fr};
@@ -10,12 +11,18 @@ use super::sparse_merkle_tree::SparseMerkleTree;
 use super::hasher::{Hasher, Factory};
 use super::pedersen_hasher::{PedersenHasher, BabyPedersenHasher};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Account<E: JubjubEngine> {
     balance:    E::Fr,
     nonce:      E::Fr,
     pub_x:      E::Fr,
     pub_y:      E::Fr,
+}
+
+impl<E: JubjubEngine> Debug for Account<E> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Account {{ balance: {} }}", self.balance)
+    }
 }
 
 impl<E: JubjubEngine> Default for Account<E> {
@@ -64,12 +71,15 @@ pub type BabyAccountTree = SparseMerkleTree<BabyAccount, BabyHash, BabyAccountHa
 #[test]
 fn test_account_merkle_tree() {
     let mut tree = BabyAccountTree::new(3);
-    tree.insert(0, BabyAccount{
+    let acc = BabyAccount{
         balance:    Fr::zero(),
         nonce:      Fr::one(),
         pub_x:      Fr::one(),
         pub_y:      Fr::one(),
-    })
+    };
+    println!("acc: {:?}", acc);
+    tree.insert(0, acc);
+    //println!("BabyAccountTree: {:?}", tree);
 }
 
 //impl Hasher<Account<Bn256>> for AccountPedersenHasher {
