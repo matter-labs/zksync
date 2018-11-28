@@ -4,7 +4,7 @@ use std::fmt::{self, Debug};
 use ff::{Field, PrimeField};
 use rand::{Rand, thread_rng};
 use pairing::bn256::{Bn256, Fr};
-use sapling_crypto::alt_babyjubjub::{JubjubEngine, AltJubjubBn256, edwards::Point, PrimeOrder};
+use sapling_crypto::babyjubjub::{JubjubEngine, JubjubBn256, edwards::Point, PrimeOrder};
 use sapling_crypto::pedersen_hash::{pedersen_hash, Personalization::NoteCommitment};
 
 use super::sparse_merkle_tree::SparseMerkleTree;
@@ -77,9 +77,8 @@ fn test_account_merkle_tree() {
         pub_x:      Fr::one(),
         pub_y:      Fr::one(),
     };
-    println!("acc: {:?}", acc);
-    tree.insert(0, acc);
-    //println!("BabyAccountTree: {:?}", tree);
+    //tree.insert(0, acc);
+    //let root = tree.root_hash();
 }
 
 //impl Hasher<Account<Bn256>> for AccountPedersenHasher {
