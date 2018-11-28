@@ -6,9 +6,9 @@ use rand::{Rand, thread_rng};
 use pairing::bn256::{Bn256, Fr};
 use sapling_crypto::babyjubjub::{JubjubEngine, JubjubBn256, edwards::Point, PrimeOrder};
 
-use super::smt::SparseMerkleTree;
-use super::smt::hasher::IntoBits;
-use super::smt::pedersen_hasher::BabyPedersenHasher;
+use super::sparse_merkle_tree::SparseMerkleTree;
+use super::sparse_merkle_tree::hasher::IntoBits;
+use super::sparse_merkle_tree::pedersen_hasher::BabyPedersenHasher;
 
 use super::circuit::plasma_constants;
 
