@@ -39,7 +39,7 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
         let items = HashMap::new();
         let hashes = HashMap::new();
         let mut prehashed = Vec::with_capacity(tree_depth-1);
-        let mut cur = hasher.hash_bits(T::default().into_bits());
+        let mut cur = hasher.hash_bits(T::default().into_bits_le());
         prehashed.push(cur.clone());
         for i in 0..tree_depth-1 {
             cur = hasher.compress(&cur, &cur, i);
@@ -74,7 +74,7 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
         assert!(index < self.capacity());
 
         let hash_index = (1 << self.tree_depth-1) + index;
-        let hash = self.hasher.hash_bits(item.into_bits());
+        let hash = self.hasher.hash_bits(item.into_bits_le());
         //println!("index = {}, hash_index = {}", index, hash_index);
         self.hashes.insert(hash_index, hash);
 
@@ -140,7 +140,7 @@ mod tests {
     struct TestHasher {}
 
     impl IntoBits for u64 {
-        fn into_bits(&self) -> Vec<bool> {
+        fn into_bits_le(&self) -> Vec<bool> {
             let mut acc = Vec::new();
             let mut i = *self + 1;
             for _ in 0..16 {

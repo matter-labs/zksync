@@ -21,7 +21,7 @@ pub struct Leaf<E: JubjubEngine> {
 }
 
 impl<E: JubjubEngine> IntoBits for Leaf<E> {
-    fn into_bits(&self) -> Vec<bool> {
+    fn into_bits_le(&self) -> Vec<bool> {
         let mut leaf_content = Vec::new();
         leaf_content.extend(get_bits_le(self.balance, *plasma_constants::BALANCE_BIT_WIDTH));
         leaf_content.extend(get_bits_le(self.nonce, *plasma_constants::NONCE_BIT_WIDTH));

@@ -2,7 +2,7 @@ use ff::{Field, PrimeField, PrimeFieldRepr};
 
 pub trait IntoBits {
     // TODO: replace Vec with Iterator
-    fn into_bits(&self) -> Vec<bool>;
+    fn into_bits_le(&self) -> Vec<bool>;
 }
 
 pub fn get_bits_le<Fr: PrimeField>(value: Fr, n: usize) -> Vec<bool> {
