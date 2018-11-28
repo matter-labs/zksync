@@ -1,6 +1,8 @@
 use ff::{
     PrimeField,
     Field,
+    BitIterator,
+    PrimeFieldRepr
 };
 
 use bellman::{
@@ -9,7 +11,7 @@ use bellman::{
     Circuit
 };
 
-use super::sapling_crypto::jubjub::{
+use sapling_crypto::jubjub::{
     JubjubEngine,
     FixedGenerators,
     Unknown,
@@ -22,10 +24,12 @@ use super::ecc;
 use super::pedersen_hash;
 use super::sha256;
 use super::num;
+use super::multipack;
 use super::num::{AllocatedNum, Num};
 
-use super::sapling_crypto::eddsa::{
+use sapling_crypto::eddsa::{
     Signature,
+    PrivateKey,
     PublicKey
 };
 
@@ -33,7 +37,13 @@ use super::plasma_constants;
 use super::float_point::*;
 use super::baby_eddsa::EddsaSignature;
 
-/// This is transaction data
+// This is transaction data
+
+#[derive(Clone)]
+pub struct TransactionSignature<E: JubjubEngine> {
+    pub r: edwards::Point<E, Unknown>,
+    pub s: E::Fr,
+}
 
 #[derive(Clone)]
 pub struct Transaction<E: JubjubEngine> {
@@ -46,16 +56,146 @@ pub struct Transaction<E: JubjubEngine> {
     pub signature: Option<TransactionSignature<E>>
 }
 
-fn serialize_public_data_le<E: JubjubEngine> (
-    transaction: &Transaction<E>
-) -> Result<&[u8], SynthesisError> {
-    Ok(&[0u8;1])
-}
+impl <E: JubjubEngine> Transaction<E> {
+    pub fn public_data_into_bits(
+        &self
+    ) -> Vec<bool> {
+        // fields are
+        // - from
+        // - to
+        // - amount
+        // - fee
+        let mut from = BitIterator::new(self.from.clone().unwrap().into_repr());
+        let mut to = BitIterator::new(self.to.clone().unwrap().into_repr());
+        let mut amount = BitIterator::new(self.amount.clone().unwrap().into_repr());
+        let mut fee = BitIterator::new(self.fee.clone().unwrap().into_repr());
 
-#[derive(Clone)]
-pub struct TransactionSignature<E: JubjubEngine> {
-    pub r: edwards::Point<E, Unknown>,
-    pub s: E::Fr,
+        let mut packed: Vec<bool> = vec![];
+        
+        for _ in 0..*plasma_constants::BALANCE_TREE_DEPTH {
+            let bit = from.next().unwrap();
+            packed.push(bit);
+        }
+
+        for _ in 0..*plasma_constants::BALANCE_TREE_DEPTH {
+            let bit = to.next().unwrap();
+            packed.push(bit);
+        }
+
+        for _ in 0..(*plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH) {
+            let bit = amount.next().unwrap();
+            packed.push(bit);
+        }
+
+        for _ in 0..(*plasma_constants::FEE_EXPONENT_BIT_WIDTH + *plasma_constants::FEE_MANTISSA_BIT_WIDTH) {
+            let bit = fee.next().unwrap();
+            packed.push(bit);
+        }
+
+        packed
+    }
+
+    pub fn data_for_signature_into_bits(
+        &self
+    ) -> Vec<bool> {
+        // fields are
+        // - from
+        // - to
+        // - amount
+        // - fee
+        // - nonce
+        // - good_until_block
+        let mut nonce = BitIterator::new(self.nonce.clone().unwrap().into_repr());
+        let mut good_until_block = BitIterator::new(self.good_until_block.clone().unwrap().into_repr());
+
+        let mut packed: Vec<bool> = vec![];
+        
+        packed.extend(self.public_data_into_bits());
+
+        for _ in 0..*plasma_constants::NONCE_BIT_WIDTH {
+            let bit = nonce.next().unwrap();
+            packed.push(bit);
+        }
+
+        for _ in 0..*plasma_constants::BLOCK_NUMBER_BIT_WIDTH {
+            let bit = good_until_block.next().unwrap();
+            packed.push(bit);
+        }
+
+        packed
+    }
+
+    pub fn sign<R>(
+        & mut self,
+        private_key: &PrivateKey<E>,
+        p_g: FixedGenerators,
+        params: &E::Params,
+        rng: & mut R
+    ) where R: rand::Rng {
+        let raw_data = self.data_for_signature_into_bits();
+
+        // conversion example from tests
+
+        // let msg1 = b"Foo bar pad to16"; // 16 bytes
+
+        // let mut input: Vec<bool> = vec![];
+
+        // for b in msg1.iter() {  
+        //     for i in (0..8).into_iter() {
+        //         if (b & (1 << i)) != 0 {
+        //             input.extend(&[true; 1]);
+        //         } else {
+        //             input.extend(&[false; 1]);
+        //         }
+        //     }
+        // }
+
+        let mut message_bytes: Vec<u8> = vec![];
+
+        let byte_chunks = raw_data.chunks(8);
+        for byte_chunk in byte_chunks
+        {
+            let mut byte = 0u8;
+            for (i, bit) in byte_chunk.into_iter().enumerate()
+            {
+                if *bit {
+                    byte |= 1 << i;
+                }
+            }
+            message_bytes.push(byte);
+        }
+
+        let max_message_len = *plasma_constants::BALANCE_TREE_DEPTH 
+                        + *plasma_constants::BALANCE_TREE_DEPTH 
+                        + *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH 
+                        + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH
+                        + *plasma_constants::FEE_EXPONENT_BIT_WIDTH
+                        + *plasma_constants::FEE_MANTISSA_BIT_WIDTH
+                        + *plasma_constants::NONCE_BIT_WIDTH
+                        + *plasma_constants::BLOCK_NUMBER_BIT_WIDTH;
+        
+        let signature = private_key.sign_raw_message(
+            &message_bytes, 
+            rng, 
+            p_g, 
+            params,
+            max_message_len
+        );
+
+        let mut sigs_bytes = [0u8; 32];
+        signature.s.into_repr().write_le(& mut sigs_bytes[..]).expect("get LE bytes of signature S");
+        let mut sigs_repr = E::Fr::zero().into_repr();
+        sigs_repr.read_le(&sigs_bytes[..]).expect("interpret S as field element representation");
+        let sigs_converted = E::Fr::from_repr(sigs_repr).unwrap();
+
+        let converted_signature = TransactionSignature {
+            r: signature.r,
+            s: sigs_converted
+        };
+
+        self.signature = Some(converted_signature);
+
+    }
 }
 
 #[derive(Clone)]
@@ -1373,6 +1513,148 @@ fn test_update_circuit_with_bn256() {
             // assert_eq!(cs.get_input(3, "epk/x/input variable"), expected_epk_xy.0);
             // assert_eq!(cs.get_input(4, "epk/y/input variable"), expected_epk_xy.1);
             // assert_eq!(cs.get_input(5, "commitment/input variable"), expected_cm);
+        }
+    }
+}
+
+
+#[test]
+fn test_update_circuit() {
+    use ff::{Field};
+    use pairing::bn256::*;
+    use rand::{SeedableRng, Rng, XorShiftRng, Rand};
+    use sapling_crypto::circuit::test::*;
+    use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
+    use balance_tree::{BabyBalanceTree, BabyLeaf, Leaf};
+    let p_g = FixedGenerators::SpendingKeyGenerator;
+    let params = &AltJubjubBn256::new();
+
+    let mut rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+
+
+    for _ in 0..1 {
+
+        let mut tree = BabyBalanceTree::new(*plasma_constants::BALANCE_TREE_DEPTH);
+
+        let capacity = tree.capacity();
+        assert_eq!(capacity, 1 << *plasma_constants::BALANCE_TREE_DEPTH);
+
+        let sender_sk = PrivateKey::<Bn256>(rng.gen());
+        let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
+        let (sender_x, sender_y) = sender_pk.0.into_xy();
+    
+        let recipient_sk = PrivateKey::<Bn256>(rng.gen());
+        let recipient_pk = PublicKey::from_private(&recipient_sk, p_g, params);
+        let (recipient_x, recipient_y) = recipient_pk.0.into_xy();
+
+        // give some funds to sender and make zero balance for recipient
+
+        let sender_leaf_number = 0;
+        let recipient_leaf_number = 1;
+
+        let sender_leaf = BabyLeaf {
+                balance:    Fr::from_str("1000").unwrap(),
+                nonce:      Fr::zero(),
+                pub_x:      sender_x,
+                pub_y:      sender_y,
+        };
+
+        let recipient_leaf = BabyLeaf {
+                balance:    Fr::zero(),
+                nonce:      Fr::one(),
+                pub_x:      recipient_x,
+                pub_y:      recipient_y,
+        };
+
+        let initial_root = tree.root_hash();
+        print!("Initial root = {}\n", initial_root);
+
+        tree.insert(sender_leaf_number, sender_leaf);
+        tree.insert(recipient_leaf_number, recipient_leaf);
+
+        let old_root = tree.root_hash();
+        print!("Old root = {}\n", old_root);
+
+        // for now manually construct a witness
+        // Vec<Option<(E::Fr, bool)>>
+        // let auth_path_from: Vec<Option<(E::Fr, bool)>> = [];
+
+        return;
+        // No cofactor check in here
+        let r = edwards::Point::rand(rng, params);
+
+        let signature = TransactionSignature {
+            r: r,
+            s: Fr::rand(& mut rng)
+        };
+
+        let transaction = Transaction {
+            from: Some(Fr::rand(& mut rng)),
+            to: Some(Fr::rand(& mut rng)),
+            amount: Some(Fr::rand(& mut rng)),
+            fee: Some(Fr::rand(& mut rng)),
+            nonce: Some(Fr::rand(& mut rng)),
+            good_until_block: Some(Fr::rand(& mut rng)),
+            signature: Some(signature)
+        };
+
+        let pub_from : edwards::Point<Bn256, PrimeOrder> = edwards::Point::rand(rng, params).mul_by_cofactor(params);
+        let (pub_from_x, pub_from_y)= pub_from.into_xy();
+
+        let pub_to : edwards::Point<Bn256, PrimeOrder>= edwards::Point::rand(rng, params).mul_by_cofactor(params);
+        let (pub_to_x, pub_to_y): (Fr, Fr) = pub_to.into_xy();
+
+        let path_from: Vec<Option<(Fr, bool)>> = (0..(*plasma_constants::BALANCE_TREE_DEPTH)).into_iter().map(|_| {
+            let witness = rng.gen();
+            let right_or_left = rng.gen();
+
+            Some((witness, right_or_left))
+        }).collect();
+
+
+        let path_to: Vec<Option<(Fr, bool)>> = (0..(*plasma_constants::BALANCE_TREE_DEPTH)).into_iter().map(|_| {
+            let witness = rng.gen();
+            let right_or_left = rng.gen();
+
+            Some((witness, right_or_left))
+        }).collect();
+
+        let transaction_witness = TransactionWitness {
+            auth_path_from: path_from,
+            balance_from: Some(Fr::rand(& mut rng)),
+            nonce_from: Some(Fr::rand(& mut rng)),
+            pub_x_from: Some(pub_from_x),
+            pub_y_from: Some(pub_from_y),
+            auth_path_to: path_to,
+            balance_to: Some(Fr::rand(& mut rng)),
+            nonce_to: Some(Fr::rand(& mut rng)),
+            pub_x_to: Some(pub_to_x),
+            pub_y_to: Some(pub_to_y)
+        };
+
+        {
+            let mut cs = TestConstraintSystem::<Bn256>::new();
+
+            let old_root = Fr::rand(& mut rng);
+            let new_root = Fr::rand(& mut rng);
+            let public_data_commitment = Fr::rand(& mut rng);
+
+            let instance = Update {
+                params: params,
+                number_of_transactions: 1,
+                old_root: Some(old_root),
+                new_root: Some(new_root),
+                public_data_commitment: Some(public_data_commitment),
+                block_number: Some(Fr::rand(& mut rng)),
+                total_fee: Some(Fr::rand(& mut rng)),
+                transactions: vec![Some((transaction, transaction_witness))],
+            };
+
+            instance.synthesize(&mut cs).unwrap();
+
+            print!("{}\n", cs.num_constraints());
+
+            assert_eq!(cs.num_inputs(), 4);
         }
     }
 }

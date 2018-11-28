@@ -12,14 +12,6 @@ use bellman::{
 
 use sapling_crypto;
 
-use sapling_crypto::jubjub::{
-    JubjubEngine,
-    FixedGenerators,
-    Unknown,
-    edwards,
-    JubjubParams
-};
-
 use sapling_crypto::circuit::{
     boolean,
     ecc,
@@ -31,6 +23,8 @@ use sapling_crypto::circuit::{
     baby_eddsa,
     matter::float_point
 };
+
+use balance_tree;
 
 pub mod plasma_constants;
 pub mod baby_plasma;

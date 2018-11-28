@@ -12,17 +12,15 @@ use super::smt::pedersen_hasher::BabyPedersenHasher;
 
 use super::circuit::plasma_constants;
 
-// use sapling_crypto::circuit::matter::plasma_constants;
-
 #[derive(Debug, Clone)]
 pub struct Leaf<E: JubjubEngine> {
-    balance:    E::Fr,
-    nonce:      E::Fr,
-    pub_x:      E::Fr,
-    pub_y:      E::Fr,
+    pub balance:    E::Fr,
+    pub nonce:      E::Fr,
+    pub pub_x:      E::Fr,
+    pub pub_y:      E::Fr,
 }
 
-fn get_bits_le<E: JubjubEngine>(value: E::Fr, n: usize) -> Vec<bool> {
+pub fn get_bits_le<E: JubjubEngine>(value: E::Fr, n: usize) -> Vec<bool> {
     let mut acc = Vec::with_capacity(n);
     let mut t = value.into_repr().clone();
     for i in 0..n {

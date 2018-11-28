@@ -1,5 +1,5 @@
 use pairing::{Engine,};
-use ff::{Field, PrimeField};
+use ff::{Field, PrimeField, PrimeFieldRepr};
 use bellman::{ConstraintSystem, SynthesisError};
 use super::boolean::{Boolean};
 use super::num::{AllocatedNum, Num};
@@ -11,7 +11,7 @@ pub fn parse_with_exponent_le<E, CS>(
     bits: &[Boolean],
     exponent_length: usize,
     mantissa_length: usize,
-    exponent_base: u32
+    exponent_base: u64
 ) -> Result<AllocatedNum<E>, SynthesisError>
     where E: Engine, CS: ConstraintSystem<E>
 {
@@ -19,8 +19,7 @@ pub fn parse_with_exponent_le<E, CS>(
     let one_allocated = AllocatedNum::alloc(cs.namespace(|| "allocate one"), || Ok(E::Fr::one())).unwrap();
 
     let mut exponent_result = AllocatedNum::alloc(cs.namespace(|| "allocate exponent result"), || Ok(E::Fr::one())).unwrap();
-    // TODO use exponent base
-    let mut exp_base = AllocatedNum::alloc(cs.namespace(|| "allocate exponent base"), || Ok(E::Fr::from_str("10").unwrap())).unwrap();
+    let mut exp_base = AllocatedNum::alloc(cs.namespace(|| "allocate exponent base"), || Ok(E::Fr::from_str(&exponent_base.to_string()).unwrap())).unwrap();
 
     for i in 0..exponent_length
     {
