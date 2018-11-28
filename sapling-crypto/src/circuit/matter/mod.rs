@@ -27,6 +27,6 @@ use super::num;
 use super::multipack;
 use super::baby_eddsa;
 
-mod plasma_constants;
+pub mod plasma_constants;
 pub mod baby_plasma;
 pub mod float_point;
