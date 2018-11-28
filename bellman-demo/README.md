@@ -22,7 +22,7 @@ We use elliptic curve BN256, for which pairings can be efficiently performed in 
 ```$bash
 cargo run --example xor
 cargo run --example sha256
-
+cargo run --bin circuit
 ```
 
 ## Verification in EVM contract:
@@ -36,5 +36,11 @@ Now deploy `DemoVerifier` contract from `demo.sol` (e.g. in [remix](https://remi
 ## Benchmarking
 
 ```$bash
-cargo run --release [num_constraints]
+BELLMAN_VERBOSE=1 cargo run --release [num_constraints]
+```
+
+`num_constraints` is decimal:
+
+```$bash
+BELLMAN_VERBOSE=1 cargo run --release 1000000
 ```
