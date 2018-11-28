@@ -1,88 +1,12 @@
 // Plasma sidechain state implementation
 
 use ff::{Field, PrimeField};
-//use rand::{Rand, thread_rng};
-//use pairing::{Engine, bn256::Bn256};
-//use sapling_crypto::{
-//    //jubjub::JubjubEngine,
-//    alt_babyjubjub::{
-//        JubjubEngine,
-//        AltJubjubBn256,
-//        edwards::Point,
-//        PrimeOrder,
-//    },
-//    pedersen_hash::{
-//        baby_pedersen_hash,
-//        Personalization::NoteCommitment
-//    }
-//};
-
 use rand::{Rand, thread_rng};
 use pairing::bn256::Bn256;
 use sapling_crypto::alt_babyjubjub::{JubjubEngine, AltJubjubBn256, edwards::Point, PrimeOrder};
 use sapling_crypto::pedersen_hash::{pedersen_hash, Personalization::NoteCommitment};
 
-use super::sparse_merkle_tree::{Hasher, SparseMerkleTree};
-
-#[derive(Debug, Clone)]
-pub struct Account<E: JubjubEngine> {
-    balance:    E::Fs,
-    nonce:      E::Fs,
-    //pubkey:     EdwardsPoint<E>,
-}
-
-struct AccountPedersenHasher {
-}
-
-//static ALT_JUBJUB_PARAMS: Option<&AltJubjubBn256> = Some(&AltJubjubBn256::new());
-//static ALT_JUBJUB_PARAMS: &AltJubjubBn256 = &AltJubjubBn256::new();
-
-impl AccountPedersenHasher {
-
-}
-
-impl Hasher<Account<Bn256>> for AccountPedersenHasher {
-
-    type Hash = Point<Bn256, PrimeOrder>;
-
-    fn empty_hash() -> Self::Hash {
-        let params = AltJubjubBn256::new();
-        pedersen_hash::<Bn256, _>(NoteCommitment, vec![].into_iter(), &params)
-    }
-
-    fn hash(value: &Account<Bn256>) -> Self::Hash {
-        let input = vec![]; // decompose `value` into bits
-        let params = AltJubjubBn256::new();
-        pedersen_hash::<Bn256, _>(NoteCommitment, input.into_iter(), &params)
-    }
-
-    fn compress(lhs: &Self::Hash, rhs: &Self::Hash) -> Self::Hash {
-        let params = AltJubjubBn256::new();
-        let input = vec![]; // to_bits(lhs) || to_bits(rhs)
-        pedersen_hash::<Bn256, _>(NoteCommitment, input.into_iter(), &params)
-    }
-}
-
-//impl<E: JubjubEngine> Hasher<Account<E>> for AccountPedersenHasher {
-//
-//    type Hash = Point<E, PrimeOrder>;
-//
-//    fn empty_hash() -> Self::Hash {
-//        Self::Hash::zero()
-//    }
-//
-//    fn hash(value: &Account<E>) -> Self::Hash {
-//        //let params = JubjubParams<E>::new();
-//        //let params: &<E as sapling_crypto::jubjub::JubjubEngine>::Params = &AltJubjubBn256::new();
-//        let rng = &mut thread_rng();
-//        let input = (0..510).map(|_| bool::rand(rng)).collect::<Vec<_>>();
-//        pedersen_hash::<E, _>(NoteCommitment, input.into_iter(), &Self::params())
-//    }
-//
-//    fn compress(lhs: Self::Hash, rhs: Self::Hash) -> Self::Hash {
-//        Self::Hash::zero()
-//    }
-//}
+use super::account::BabyAccount;
 
 #[test]
 fn test_account_merkle_tree() {
