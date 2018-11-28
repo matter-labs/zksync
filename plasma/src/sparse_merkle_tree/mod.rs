@@ -5,7 +5,7 @@ pub mod pedersen_hasher;
 
 use std::collections::HashMap;
 use self::hasher::Hasher;
-use super::primitives::IntoBits;
+use super::primitives::GetBits;
 
 // 0 .. (N - 1)
 type ItemIndex = usize;
@@ -18,7 +18,7 @@ type Depth = usize;
 type HashIndex = usize;
 
 #[derive(Debug, Clone)]
-pub struct SparseMerkleTree<T: IntoBits + Default, Hash: Clone, H: Hasher<Hash>>
+pub struct SparseMerkleTree<T: GetBits + Default, Hash: Clone, H: Hasher<Hash>>
 {
     tree_depth: Depth,
     prehashed: Vec<Hash>,
@@ -28,7 +28,7 @@ pub struct SparseMerkleTree<T: IntoBits + Default, Hash: Clone, H: Hasher<Hash>>
 }
 
 impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
-    where T: IntoBits + Default,
+    where T: GetBits + Default,
           Hash: Clone,
           H: Hasher<Hash> + Default,
 {
@@ -39,7 +39,7 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
         let items = HashMap::new();
         let hashes = HashMap::new();
         let mut prehashed = Vec::with_capacity(tree_depth-1);
-        let mut cur = hasher.hash_bits(T::default().into_bits_le());
+        let mut cur = hasher.hash_bits(T::default().get_bits_le());
         prehashed.push(cur.clone());
         for i in 0..tree_depth-1 {
             cur = hasher.compress(&cur, &cur, i);
@@ -74,7 +74,7 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
         assert!(index < self.capacity());
 
         let hash_index = (1 << self.tree_depth-1) + index;
-        let hash = self.hasher.hash_bits(item.into_bits_le());
+        let hash = self.hasher.hash_bits(item.get_bits_le());
         //println!("index = {}, hash_index = {}", index, hash_index);
         self.hashes.insert(hash_index, hash);
 
@@ -139,8 +139,8 @@ mod tests {
     #[derive(Debug)]
     struct TestHasher {}
 
-    impl IntoBits for u64 {
-        fn into_bits_le(&self) -> Vec<bool> {
+    impl GetBits for u64 {
+        fn get_bits_le(&self) -> Vec<bool> {
             let mut acc = Vec::new();
             let mut i = *self + 1;
             for _ in 0..16 {

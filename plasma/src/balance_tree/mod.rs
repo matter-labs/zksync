@@ -6,7 +6,7 @@ use rand::{Rand, thread_rng};
 use pairing::bn256::{Bn256, Fr};
 use sapling_crypto::babyjubjub::{JubjubEngine, JubjubBn256, edwards::Point, PrimeOrder};
 
-use super::primitives::{IntoBits, IntoBitsFixed};
+use super::primitives::{GetBits, GetBitsFixed};
 use super::sparse_merkle_tree::SparseMerkleTree;
 use super::sparse_merkle_tree::pedersen_hasher::BabyPedersenHasher;
 
@@ -20,13 +20,13 @@ pub struct Leaf<E: JubjubEngine> {
     pub pub_y:      E::Fr,
 }
 
-impl<E: JubjubEngine> IntoBits for Leaf<E> {
-    fn into_bits_le(&self) -> Vec<bool> {
+impl<E: JubjubEngine> GetBits for Leaf<E> {
+    fn get_bits_le(&self) -> Vec<bool> {
         let mut leaf_content = Vec::new();
-        leaf_content.extend(self.balance.into_bits_le_fixed(*plasma_constants::BALANCE_BIT_WIDTH));
-        leaf_content.extend(self.nonce.into_bits_le_fixed(*plasma_constants::NONCE_BIT_WIDTH));
-        leaf_content.extend(self.pub_x.into_bits_le_fixed(*plasma_constants::FR_BIT_WIDTH));
-        leaf_content.extend(self.pub_y.into_bits_le_fixed(*plasma_constants::FR_BIT_WIDTH));
+        leaf_content.extend(self.balance.get_bits_le_fixed(*plasma_constants::BALANCE_BIT_WIDTH));
+        leaf_content.extend(self.nonce.get_bits_le_fixed(*plasma_constants::NONCE_BIT_WIDTH));
+        leaf_content.extend(self.pub_x.get_bits_le_fixed(*plasma_constants::FR_BIT_WIDTH));
+        leaf_content.extend(self.pub_y.get_bits_le_fixed(*plasma_constants::FR_BIT_WIDTH));
         leaf_content
     }
 }
