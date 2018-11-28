@@ -37,6 +37,7 @@ impl<E: JubjubEngine> IntoBits for Leaf<E> {
         leaf_content.extend(get_bits::<E>(self.balance, *plasma_constants::BALANCE_BIT_WIDTH));
         leaf_content.extend(get_bits::<E>(self.nonce, *plasma_constants::NONCE_BIT_WIDTH));
         leaf_content.extend(get_bits::<E>(self.pub_x, *plasma_constants::FR_BIT_WIDTH));
+        leaf_content.extend(get_bits::<E>(self.pub_y, *plasma_constants::FR_BIT_WIDTH));
         leaf_content
     }
 }
