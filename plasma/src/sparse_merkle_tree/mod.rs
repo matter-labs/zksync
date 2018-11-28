@@ -4,7 +4,8 @@ pub mod hasher;
 pub mod pedersen_hasher;
 
 use std::collections::HashMap;
-use self::hasher::{Hasher, IntoBits};
+use self::hasher::Hasher;
+use super::primitives::IntoBits;
 
 // 0 .. (N - 1)
 type ItemIndex = usize;

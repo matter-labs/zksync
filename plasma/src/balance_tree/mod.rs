@@ -6,8 +6,8 @@ use rand::{Rand, thread_rng};
 use pairing::bn256::{Bn256, Fr};
 use sapling_crypto::babyjubjub::{JubjubEngine, JubjubBn256, edwards::Point, PrimeOrder};
 
+use super::primitives::{get_bits_le, IntoBits};
 use super::sparse_merkle_tree::SparseMerkleTree;
-use super::sparse_merkle_tree::hasher::IntoBits;
 use super::sparse_merkle_tree::pedersen_hasher::BabyPedersenHasher;
 
 use super::circuit::plasma_constants;
@@ -20,23 +20,13 @@ pub struct Leaf<E: JubjubEngine> {
     pub pub_y:      E::Fr,
 }
 
-pub fn get_bits_le<E: JubjubEngine>(value: E::Fr, n: usize) -> Vec<bool> {
-    let mut acc = Vec::with_capacity(n);
-    let mut t = value.into_repr().clone();
-    for i in 0..n {
-        acc.push(t.is_odd());
-        t.shr(1);
-    }
-    acc
-}
-
 impl<E: JubjubEngine> IntoBits for Leaf<E> {
     fn into_bits(&self) -> Vec<bool> {
         let mut leaf_content = Vec::new();
-        leaf_content.extend(get_bits_le::<E>(self.balance, *plasma_constants::BALANCE_BIT_WIDTH));
-        leaf_content.extend(get_bits_le::<E>(self.nonce, *plasma_constants::NONCE_BIT_WIDTH));
-        leaf_content.extend(get_bits_le::<E>(self.pub_x, *plasma_constants::FR_BIT_WIDTH));
-        leaf_content.extend(get_bits_le::<E>(self.pub_y, *plasma_constants::FR_BIT_WIDTH));
+        leaf_content.extend(get_bits_le(self.balance, *plasma_constants::BALANCE_BIT_WIDTH));
+        leaf_content.extend(get_bits_le(self.nonce, *plasma_constants::NONCE_BIT_WIDTH));
+        leaf_content.extend(get_bits_le(self.pub_x, *plasma_constants::FR_BIT_WIDTH));
+        leaf_content.extend(get_bits_le(self.pub_y, *plasma_constants::FR_BIT_WIDTH));
         leaf_content
     }
 }
@@ -71,11 +61,4 @@ fn test_account_merkle_tree() {
 
     let path = tree.merkle_path(0);
     //println!("path: {:?}", path);
-}
-
-#[test]
-fn test_get_bits() {
-    // 12 = b1100, 3 lowest bits in little endian encoding are: 0, 0, 1.
-    let bits = get_bits_le::<Bn256>(Fr::from_str("12").unwrap(), 3);
-    assert_eq!(bits, vec![false, false, true]);
 }
