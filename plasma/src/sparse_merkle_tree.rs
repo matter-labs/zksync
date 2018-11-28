@@ -37,8 +37,8 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
         let mut prehashed = Vec::with_capacity(tree_depth-1);
         let mut cur = hasher.empty_hash();
         prehashed.push(cur.clone());
-        for _ in 0..tree_depth-1 {
-            cur = hasher.compress(&cur, &cur);
+        for i in 0..tree_depth-1 {
+            cur = hasher.compress(&cur, &cur, i);
             prehashed.push(cur.clone());
         }
         prehashed.reverse();
@@ -95,7 +95,8 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
             return self.prehashed.get(Self::depth(index)).unwrap().clone()
         }
 
-        let hash = self.hasher.compress(&self.get_hash(lhs), &self.get_hash(rhs));
+        let i = (self.tree_depth - 2) - Self::depth(index);
+        let hash = self.hasher.compress(&self.get_hash(lhs), &self.get_hash(rhs), i);
         self.hashes.insert(index, hash.clone());
         hash
     }
@@ -132,7 +133,8 @@ mod tests {
             //println!("hash({}) -> {}", value, value);
             *value
         }
-        fn compress(&self, lhs: &u64, rhs: &u64) -> u64 {
+        fn compress(&self, lhs: &u64, rhs: &u64, i: usize) -> u64 {
+            //println!("compress i {}", i);
             let r = 11 * lhs + 17 * rhs + 1;
             //println!("compress({}, {}) -> {}", lhs, rhs, r);
             r
@@ -160,7 +162,7 @@ mod tests {
         assert_eq!(tree.hash_capacity(), 7);
 
         tree.insert(0, 1);
-        //println!("{:?}", tree);
+        println!("{:?}", tree);
         assert_eq!(tree.root_hash(), 4791);
 
         tree.insert(3, 2);

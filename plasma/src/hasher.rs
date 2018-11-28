@@ -6,6 +6,6 @@ pub trait Factory {
 
 pub trait Hasher<T, Hash> {
     fn hash(&self, value: &T) -> Hash;
-    fn compress(&self, lhs: &Hash, rhs: &Hash) -> Hash;
+    fn compress(&self, lhs: &Hash, rhs: &Hash, i: usize) -> Hash;
     fn empty_hash(&self) -> Hash;
 }

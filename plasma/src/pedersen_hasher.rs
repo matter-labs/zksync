@@ -9,8 +9,6 @@ use sapling_crypto::babyjubjub::{JubjubEngine, JubjubBn256, edwards::Point, Prim
 
 pub struct PedersenHasher<E: JubjubEngine> {
     params: E::Params,
-    personalization_hash: Personalization,
-    personalization_compress: Personalization,
 }
 
 impl<E: JubjubEngine> PedersenHasher<E> {
@@ -21,14 +19,14 @@ impl<E: JubjubEngine> PedersenHasher<E> {
 
     pub fn hash<I>(&self, input: I) -> E::Fr where I: IntoIterator<Item=bool> {
         let v: Vec<bool> = input.into_iter().collect();
-        pedersen_hash::<E, _>(self.personalization_hash, v, &self.params).into_xy().0
+        pedersen_hash::<E, _>(Personalization::NoteCommitment, v, &self.params).into_xy().0
     }
 
-    pub fn compress(&self, lhs: &E::Fr, rhs: &E::Fr) -> E::Fr {
+    pub fn compress(&self, lhs: &E::Fr, rhs: &E::Fr, i: usize) -> E::Fr {
         let mut input = Vec::new();
         input.extend(BitIterator::new(lhs.into_repr()));
         input.extend(BitIterator::new(rhs.into_repr()));
-        pedersen_hash::<E, _>(self.personalization_compress, input, &self.params).into_xy().0
+        pedersen_hash::<E, _>(Personalization::MerkleTree(i), input, &self.params).into_xy().0
     }
 }
 
@@ -38,10 +36,6 @@ impl Default for PedersenHasher<Bn256> {
     fn default() -> Self {
         Self{
             params: JubjubBn256::new(),
-
-            // NB: this is hardcoded based on the baby plasma circuit spec
-            personalization_hash: Personalization::NoteCommitment,
-            personalization_compress: Personalization::MerkleTree(24),
         }
     }
 }
@@ -56,8 +50,11 @@ fn test_pedersen_hash() {
     let hash = hasher.hash(vec![false, false, false, true, true, true, true, true]);
     println!("hash:  {:?}", &hash);
 
-    let hash = hasher.compress(&hash, &hash);
-    println!("compr: {:?}", &hash);
+    let hash2 = hasher.compress(&hash, &hash, 0);
+    println!("compr: {:?}", &hash2);
+
+    let hash3 = hasher.compress(&hash, &hash, 1);
+    println!("compr: {:?}", &hash3);
 
     //assert_eq!(hasher.empty_hash(),
 }

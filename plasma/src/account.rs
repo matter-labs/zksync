@@ -47,8 +47,8 @@ impl<E: JubjubEngine> Hasher<Account<E>, E::Fr> for AccountHasher<E> {
         self.pedersen.empty_hash()
     }
 
-    fn compress(&self, lhs: &E::Fr, rhs: &E::Fr) -> E::Fr {
-        self.pedersen.compress(lhs, rhs)
+    fn compress(&self, lhs: &E::Fr, rhs: &E::Fr, i: usize) -> E::Fr {
+        self.pedersen.compress(lhs, rhs, i)
     }
 
     fn empty_hash(&self) -> E::Fr {
