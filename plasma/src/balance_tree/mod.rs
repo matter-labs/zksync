@@ -10,7 +10,9 @@ use super::smt::SparseMerkleTree;
 use super::smt::hasher::IntoBits;
 use super::smt::pedersen_hasher::BabyPedersenHasher;
 
-use sapling_crypto::circuit::matter::plasma_constants;
+use super::circuit::plasma_constants;
+
+// use sapling_crypto::circuit::matter::plasma_constants;
 
 #[derive(Debug, Clone)]
 pub struct Leaf<E: JubjubEngine> {

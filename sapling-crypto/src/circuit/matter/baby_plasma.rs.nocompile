@@ -1,6 +1,5 @@
 use ff::{
     PrimeField,
-    PrimeFieldRepr,
     Field,
 };
 
@@ -22,10 +21,8 @@ use super::Assignment;
 use super::boolean;
 use super::ecc;
 use super::pedersen_hash;
-use super::blake2s;
 use super::sha256;
 use super::num;
-use super::multipack;
 use super::num::{AllocatedNum, Num};
 
 use ::eddsa::{

@@ -1,6 +1,5 @@
-#[cfg(test)]
+// #[cfg(test)]
 pub mod test;
-// pub mod alt_baby_ecc;
 
 pub mod boolean;
 pub mod multieq;

@@ -10,3 +10,4 @@ extern crate sapling_crypto;
 
 pub mod smt;
 pub mod balance_tree;
+pub mod circuit;
