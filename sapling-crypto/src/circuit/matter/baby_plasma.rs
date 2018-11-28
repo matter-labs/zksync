@@ -50,6 +50,12 @@ pub struct Transaction<E: JubjubEngine> {
     pub signature: Option<TransactionSignature<E>>
 }
 
+fn serialize_public_data_le<E: JubjubEngine> (
+    transaction: &Transaction<E>
+) -> Result<&[u8], SynthesisError> {
+    Ok(&[0u8;1])
+}
+
 #[derive(Clone)]
 pub struct TransactionSignature<E: JubjubEngine> {
     pub r: edwards::Point<E, Unknown>,
@@ -297,12 +303,12 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
 
         let mut public_data_iterator = public_data_vector.into_iter();
 
-        for j in 0..number_of_packs 
+        for i in 0..number_of_packs 
         {
-            let cs = & mut cs.namespace(|| format!("packing a batch number {}", j));
+            let cs = & mut cs.namespace(|| format!("packing a batch number {}", i));
             let mut pack_bits: Vec<boolean::Boolean> = vec![];
             pack_bits.extend(hash_block.into_iter());
-            for i in 0..pack_by 
+            for _ in 0..pack_by 
             {
                 let part: Vec<boolean::Boolean> = public_data_iterator.next().unwrap();
                 pack_bits.extend(part.into_iter());
@@ -312,14 +318,14 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
                 pack_bits.push(boolean::Boolean::Constant(false));
             }
             hash_block = sha256::sha256_block_no_padding(
-                cs.namespace(|| format!("hash for block {}", j)),
+                cs.namespace(|| format!("hash for block {}", i)),
                 &pack_bits
             ).unwrap();
         }
 
         let mut pack_bits: Vec<boolean::Boolean> = vec![];
         pack_bits.extend(hash_block.into_iter());
-        for i in 0..remaining_to_pack
+        for _ in 0..remaining_to_pack
         {
             let part: Vec<boolean::Boolean> = public_data_iterator.next().unwrap();
             pack_bits.extend(part.into_iter());
@@ -434,7 +440,6 @@ fn apply_transaction<E, CS>(
     // of two audit paths
 
     let mut common_prefix: Vec<boolean::Boolean> = vec![];
-
     {
         let cs = & mut cs.namespace(|| "common prefix search");
         
@@ -1174,10 +1179,11 @@ fn apply_transaction<E, CS>(
             // Now the most fancy part is to determine when to use path element form witness,
             // or recalculated element from another subtree
 
+            // If we are on intersection place take a current hash from another branch instead of path element
             path_element_from = num::AllocatedNum::conditionally_select(
                 cs.namespace(|| "conditional select of preimage from"),
                 &cur_to,
-                &path_element_to, 
+                &path_element_from, 
                 &intersection_bit
             ).unwrap();
 
@@ -1195,6 +1201,7 @@ fn apply_transaction<E, CS>(
 
             // same for to
 
+            // If we are on intersection place take a current hash from another branch instead of path element
             path_element_to = num::AllocatedNum::conditionally_select(
                 cs.namespace(|| "conditional select of preimage to"),
                 &cur_from,
@@ -1207,7 +1214,7 @@ fn apply_transaction<E, CS>(
                 cs.namespace(|| "conditional reversal of preimage to"),
                 &cur_to,
                 &path_element_to,
-                &cur_from_is_right
+                &cur_to_is_right
             )?;
 
             let mut preimage_to = vec![];
