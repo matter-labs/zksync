@@ -20,7 +20,7 @@ pub struct Leaf<E: JubjubEngine> {
     pub_y:      E::Fr,
 }
 
-fn get_bits<E: JubjubEngine>(value: E::Fr, n: usize) -> Vec<bool> {
+fn get_bits_le<E: JubjubEngine>(value: E::Fr, n: usize) -> Vec<bool> {
     let mut acc = Vec::with_capacity(n);
     let mut t = value.into_repr().clone();
     for i in 0..n {
@@ -33,10 +33,10 @@ fn get_bits<E: JubjubEngine>(value: E::Fr, n: usize) -> Vec<bool> {
 impl<E: JubjubEngine> IntoBits for Leaf<E> {
     fn into_bits(&self) -> Vec<bool> {
         let mut leaf_content = Vec::new();
-        leaf_content.extend(get_bits::<E>(self.balance, *plasma_constants::BALANCE_BIT_WIDTH));
-        leaf_content.extend(get_bits::<E>(self.nonce, *plasma_constants::NONCE_BIT_WIDTH));
-        leaf_content.extend(get_bits::<E>(self.pub_x, *plasma_constants::FR_BIT_WIDTH));
-        leaf_content.extend(get_bits::<E>(self.pub_y, *plasma_constants::FR_BIT_WIDTH));
+        leaf_content.extend(get_bits_le::<E>(self.balance, *plasma_constants::BALANCE_BIT_WIDTH));
+        leaf_content.extend(get_bits_le::<E>(self.nonce, *plasma_constants::NONCE_BIT_WIDTH));
+        leaf_content.extend(get_bits_le::<E>(self.pub_x, *plasma_constants::FR_BIT_WIDTH));
+        leaf_content.extend(get_bits_le::<E>(self.pub_y, *plasma_constants::FR_BIT_WIDTH));
         leaf_content
     }
 }
@@ -68,4 +68,11 @@ fn test_account_merkle_tree() {
     tree.insert(0, leaf);
     let root = tree.root_hash();
     println!("root: {:?}", root);
+}
+
+#[test]
+fn test_get_bits() {
+    // 12 = b1100, 3 lowest bits in little endian encoding are: 0, 0, 1.
+    let bits = get_bits_le::<Bn256>(Fr::from_str("12").unwrap(), 3);
+    assert_eq!(bits, vec![false, false, true]);
 }
