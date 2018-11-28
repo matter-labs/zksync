@@ -1,6 +1,7 @@
 // Hasher trait
 
 pub trait IntoBits {
+    // TODO: replace Vec with Iterator
     fn into_bits(&self) -> Vec<bool>;
 }
 
