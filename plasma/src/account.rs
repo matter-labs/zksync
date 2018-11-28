@@ -40,25 +40,23 @@ pub struct AccountHasher<E: JubjubEngine> {
     pedersen: PedersenHasher<E>
 }
 
-impl<E: JubjubEngine> Hasher<Account<E>, Point<E, PrimeOrder>> for AccountHasher<E> {
+impl<E: JubjubEngine> Hasher<Account<E>, E::Fr> for AccountHasher<E> {
 
-    fn hash(&self, value: &Account<E>) -> Point<E, PrimeOrder> {
+    fn hash(&self, value: &Account<E>) -> E::Fr {
         // TODO: implement
         self.pedersen.empty_hash()
     }
 
-    fn compress(&self, lhs: &Point<E, PrimeOrder>, rhs: &Point<E, PrimeOrder>) -> Point<E, PrimeOrder> {
-        // TODO: implement
-        self.pedersen.empty_hash()
+    fn compress(&self, lhs: &E::Fr, rhs: &E::Fr) -> E::Fr {
+        self.pedersen.compress(lhs, rhs)
     }
 
-    fn empty_hash(&self) -> Point<E, PrimeOrder> {
+    fn empty_hash(&self) -> E::Fr {
         self.hash(&Account::<E>::default())
     }
 }
 
 pub type BabyAccount = Account<Bn256>;
-pub type BabyHash = Point<Bn256, PrimeOrder>;
 pub type BabyAccountHasher = AccountHasher<Bn256>;
 impl Factory for BabyAccountHasher {
     fn new() -> Self {
@@ -66,7 +64,7 @@ impl Factory for BabyAccountHasher {
     }
 }
 
-pub type BabyAccountTree = SparseMerkleTree<BabyAccount, BabyHash, BabyAccountHasher>;
+pub type BabyAccountTree = SparseMerkleTree<BabyAccount, Fr, BabyAccountHasher>;
 
 #[test]
 fn test_account_merkle_tree() {
@@ -77,7 +75,7 @@ fn test_account_merkle_tree() {
         pub_x:      Fr::one(),
         pub_y:      Fr::one(),
     };
-    //tree.insert(0, acc);
+    tree.insert(0, acc);
     //let root = tree.root_hash();
 }
 

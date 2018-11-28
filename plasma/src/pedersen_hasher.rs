@@ -15,23 +15,20 @@ pub struct PedersenHasher<E: JubjubEngine> {
 
 impl<E: JubjubEngine> PedersenHasher<E> {
 
-    pub fn empty_hash(&self) -> Point<E, PrimeOrder> {
-        pedersen_hash::<E, _>(self.personalization_hash, vec![].into_iter(), &self.params)
+    pub fn empty_hash(&self) -> E::Fr {
+       self.hash(vec![])
     }
 
-    pub fn hash<I>(&self, input: I) -> Point<E, PrimeOrder> where I: IntoIterator<Item=bool> {
+    pub fn hash<I>(&self, input: I) -> E::Fr where I: IntoIterator<Item=bool> {
         let v: Vec<bool> = input.into_iter().collect();
-        println!("input {:?}", &v);
-        pedersen_hash::<E, _>(self.personalization_hash, v, &self.params)
+        pedersen_hash::<E, _>(self.personalization_hash, v, &self.params).into_xy().0
     }
 
-    pub fn compress(&self, lhs: &Point<E, PrimeOrder>, rhs: &Point<E, PrimeOrder>) -> Point<E, PrimeOrder> {
+    pub fn compress(&self, lhs: &E::Fr, rhs: &E::Fr) -> E::Fr {
         let mut input = Vec::new();
-        let (x, y) = lhs.into_xy();
-        input.extend(BitIterator::new(x.into_repr()));
-        let (x, y) = rhs.into_xy();
-        input.extend(BitIterator::new(x.into_repr()));
-        pedersen_hash::<E, _>(self.personalization_compress, input, &self.params)
+        input.extend(BitIterator::new(lhs.into_repr()));
+        input.extend(BitIterator::new(rhs.into_repr()));
+        pedersen_hash::<E, _>(self.personalization_compress, input, &self.params).into_xy().0
     }
 }
 
@@ -54,16 +51,13 @@ fn test_pedersen_hash() {
     let hasher = BabyPedersenHasher::default();
 
     let hash = hasher.empty_hash();
-    let (x, y) = hash.into_xy();
-    println!("\n\nempty: {:?}, {:?}\n\n", x, y);
+    println!("empty: {:?}", &hash);
 
-    let hash2 = hasher.hash(vec![false, false, false, true, true, true, true, true]);
-    let (x, y) = hash2.into_xy();
-    println!("hash : {:?}, {:?}", x, y);
+    let hash = hasher.hash(vec![false, false, false, true, true, true, true, true]);
+    println!("hash:  {:?}", &hash);
 
-    let hash3 = hasher.compress(&hash, &hash);
-    let (x, y) = hash3.into_xy();
-    println!("compr: {:?}, {:?}", x, y);
+    let hash = hasher.compress(&hash, &hash);
+    println!("compr: {:?}", &hash);
 
     //assert_eq!(hasher.empty_hash(),
 }
