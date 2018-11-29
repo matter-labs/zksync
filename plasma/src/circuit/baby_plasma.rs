@@ -418,7 +418,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
             let difference_allocated = AllocatedNum::alloc(
                 cs.namespace(|| format!("allocate block number difference {}", i)),
                 || Ok(difference)
-            ).unwrap();
+            )?;
 
             // enforce proper subtraction
             cs.enforce(
@@ -554,7 +554,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
             |_| packed_hash_lc.lc(E::Fr::one())
         );
 
-        print!("Final hash in the snark is {}\n", rolling_hash.get_value().get()?);
+        // print!("Final hash in the snark is {}\n", rolling_hash.get_value().get()?);
 
         Ok(())
     }
@@ -1177,7 +1177,7 @@ fn apply_transaction<E, CS>(
     new_balance_from_value.sub_assign(&transfer_amount_value);
     new_balance_from_value.sub_assign(&fee_value);
 
-    print!("Updated balance from in a snark is {}\n", new_balance_from_value.clone());
+    // print!("Updated balance from in a snark is {}\n", new_balance_from_value.clone());
 
     let new_balance_from = AllocatedNum::alloc(
         cs.namespace(|| "new balance from"),
@@ -1204,7 +1204,7 @@ fn apply_transaction<E, CS>(
     let mut new_balance_to_value = old_balance_to_value;
     new_balance_to_value.add_assign(&transfer_amount_value);
 
-    print!("Updated balance to in a snark is {}\n", new_balance_to_value.clone());
+    // print!("Updated balance to in a snark is {}\n", new_balance_to_value.clone());
 
     let new_balance_to = AllocatedNum::alloc(
         cs.namespace(|| "new balance to"),
@@ -1226,15 +1226,15 @@ fn apply_transaction<E, CS>(
         |lc| lc + old_balance_to.get_variable() + amount.get_variable()
     );
 
-    let mut new_nonce_value = nonce.get_value().unwrap();
+    let mut new_nonce_value = nonce.get_value().get()?.clone();
     new_nonce_value.add_assign(&E::Fr::one());
 
-    print!("Updated nonce from in a snark is {}\n", new_nonce_value.clone());
+    // print!("Updated nonce from in a snark is {}\n", new_nonce_value.clone());
 
     let new_nonce = AllocatedNum::alloc(
         cs.namespace(|| "new nonce"),
         || Ok(new_nonce_value)
-    ).unwrap();
+    )?;
 
     // constraint no overflow
     num::AllocatedNum::limit_number_of_bits(
@@ -1253,8 +1253,8 @@ fn apply_transaction<E, CS>(
 
     let allocated_block_number = AllocatedNum::alloc(
         cs.namespace(|| "allocate block number in transaction"),
-        || Ok(tx.good_until_block.clone().unwrap())
-    ).unwrap();
+        || Ok(tx.good_until_block.get()?.clone())
+    )?;
 
     // Now we should assemble a new root. It's more tricky as it requires
     // to calculate an intersection point and for a part of the tree that is
@@ -1272,7 +1272,7 @@ fn apply_transaction<E, CS>(
 
         let mut value_content = new_balance_from.into_bits_le(
             cs.namespace(|| "from leaf updated amount bits")
-        ).unwrap();
+        )?;
 
 
         // let mut value_content = boolean::field_into_boolean_vec_le(
@@ -1285,7 +1285,7 @@ fn apply_transaction<E, CS>(
 
         let mut nonce_content = new_nonce.into_bits_le(
             cs.namespace(|| "from leaf updated nonce bits")
-        ).unwrap();
+        )?;
 
         // let mut nonce_content = boolean::field_into_boolean_vec_le(
         //     cs.namespace(|| "from leaf nonce bits updated"), 
@@ -1324,7 +1324,7 @@ fn apply_transaction<E, CS>(
         // change balance only
         let mut value_content = new_balance_to.into_bits_le(
             cs.namespace(|| "to leaf updated amount bits")
-        ).unwrap();
+        )?;
 
         // let mut value_content = boolean::field_into_boolean_vec_le(
         //     cs.namespace(|| "to leaf amount bits upted"), 
@@ -1370,8 +1370,8 @@ fn apply_transaction<E, CS>(
 
     let intersection_point = AllocatedNum::alloc(
         cs.namespace(|| "intersection as number"),
-        || Ok(intersection_point_lc.get_value().unwrap())
-    ).unwrap();
+        || Ok(intersection_point_lc.get_value().get()?.clone())
+    )?;
 
     cs.enforce(
         || "pack intersection",
@@ -1384,7 +1384,7 @@ fn apply_transaction<E, CS>(
 
     let mut intersection_point_bits = intersection_point.into_bits_le(
         cs.namespace(|| "unpack intersection")
-    ).unwrap();
+    )?;
 
     // let mut intersection_point_bits = boolean::field_into_boolean_vec_le(
     //     cs.namespace(|| "unpack intersection"),
@@ -1400,8 +1400,9 @@ fn apply_transaction<E, CS>(
     // First assemble new leafs
     cur_from = from_leaf_hash.get_x().clone();
     cur_to = to_leaf_hash.get_x().clone();
-    print!("Inside the snark new leaf hash from = {}\n", cur_from.clone().get_value().unwrap());
-    print!("Inside the snark new leaf hash to = {}\n", cur_to.clone().get_value().unwrap());
+
+    // print!("Inside the snark new leaf hash from = {}\n", cur_from.clone().get_value().unwrap());
+    // print!("Inside the snark new leaf hash to = {}\n", cur_to.clone().get_value().unwrap());
 
     {
         let audit_path_from = tx_witness.auth_path_from.clone();
@@ -1423,14 +1424,14 @@ fn apply_transaction<E, CS>(
             let mut path_element_from = num::AllocatedNum::alloc(
                 cs.namespace(|| "path element from"),
                 || {
-                    Ok(e_from.unwrap().0)
+                    Ok(e_from.get()?.0)
                 }
             )?;
 
             let mut path_element_to = num::AllocatedNum::alloc(
                 cs.namespace(|| "path element to"),
                 || {
-                    Ok(e_to.unwrap().0)
+                    Ok(e_to.get()?.0)
                 }
             )?;
 
@@ -1443,7 +1444,7 @@ fn apply_transaction<E, CS>(
                 &cur_to,
                 &path_element_from, 
                 &intersection_bit
-            ).unwrap();
+            )?;
 
             // Swap the two if the current subtree is on the right
             let (xl_from, xr_from) = num::AllocatedNum::conditionally_reverse(
@@ -1465,7 +1466,7 @@ fn apply_transaction<E, CS>(
                 &cur_from,
                 &path_element_to, 
                 &intersection_bit
-            ).unwrap();
+            )?;
 
             // Swap the two if the current subtree is on the right
             let (xl_to, xr_to) = num::AllocatedNum::conditionally_reverse(
