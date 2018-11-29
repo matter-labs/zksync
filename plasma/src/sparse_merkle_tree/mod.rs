@@ -76,7 +76,7 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
         Self{tree_depth, prehashed, items, hashes, hasher}
     }
 
-    // How many iterms can the tree hold
+    // How many items can the tree hold
     pub fn capacity(&self) -> u32 {
         1 << self.tree_depth
     }
