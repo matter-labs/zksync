@@ -10,10 +10,18 @@ use std::fmt;
 pub fn generate_vk_contract<E: Engine>(vk: &groth16::VerifyingKey<E>) -> String {
     format!(
 r#"
-contract DemoVerifier is Verifier {{
+// This contract is generated programmatically
 
-    function getVk() internal view returns (uint256[14] memory vk, uint256[] memory gammaABC) {{
+pragma solidity ^0.5.0;
+
+
+// Hardcoded constants to avoid accessing store
+contract VerificationKeys {{
+
+    function getVkUpdateCircuit() internal pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {{
+
         {vk}
+
     }}
 
 }}
