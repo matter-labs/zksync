@@ -59,7 +59,7 @@ pragma solidity ^0.5.0;
 contract VerificationKeys {{
 
     // For tree depth {tree_depth}
-    bytes32 constant EMPTY_ROOT = {initial_root};
+    bytes32 constant EMPTY_TREE_ROOT = {initial_root};
 
     function getVkUpdateCircuit() internal pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {{
 

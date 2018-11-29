@@ -40,7 +40,7 @@ contract Plasma is Verifier, VerificationKeys {
     // Public API
 
     constructor() public {
-        lastVerifiedRoot = EMPTY_ROOT;
+        lastVerifiedRoot = EMPTY_TREE_ROOT;
     }
 
     function commitBlock(uint32 blockNumber, uint128 totalFees, bytes memory txDataPacked, bytes32 newRoot) public {
