@@ -7,28 +7,6 @@ use bellman::groth16;
 use pairing::bn256::{Bn256, Fr};
 use std::fmt;
 
-pub fn generate_vk_contract<E: Engine>(vk: &groth16::VerifyingKey<E>) -> String {
-    format!(
-r#"
-// This contract is generated programmatically
-
-pragma solidity ^0.5.0;
-
-
-// Hardcoded constants to avoid accessing store
-contract VerificationKeys {{
-
-    function getVkUpdateCircuit() internal pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {{
-
-        {vk}
-
-    }}
-
-}}
-"#,
-    vk = hardcode_vk(&vk))
-}
-
 fn unpack<T: CurveAffine>(t: &T) -> Vec<String>
 {
     t.into_uncompressed().as_ref().chunks(32).map(|c| "0x".to_owned() + &hex::encode(c)).collect()
@@ -49,7 +27,7 @@ fn render_array(name: &str, allocate: bool, values: &[Vec<String>]) -> String {
     out
 }
 
-fn hardcode_vk<E: Engine>(vk: &groth16::VerifyingKey<E>) -> String {
+pub fn hardcode_vk<E: Engine>(vk: &groth16::VerifyingKey<E>) -> String {
     let mut out = String::new();
 
     let values = &[
