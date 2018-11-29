@@ -61,8 +61,7 @@ contract PlasmaStub is VerificationKeys {
         require(blockNumber == totalVerified, "may only verified next block");
         Block memory committed = blocks[blockNumber];
 
-        //require(verifyUpdateProof(proof, lastVerifiedRoot, committed.newRoot, committed.finalHash), "invalid proof");
-        success = verifyUpdateProof(proof, lastVerifiedRoot, committed.newRoot, committed.finalHash);
+        require(verifyUpdateProof(proof, lastVerifiedRoot, committed.newRoot, committed.finalHash), "invalid proof");
 
         totalVerified++;
         lastVerifiedRoot = committed.newRoot;
