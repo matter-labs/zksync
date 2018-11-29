@@ -1,12 +1,12 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.4.24;
 
 import "./Verifier.sol";
 import "./VerificationKeys.sol";
 
 
-contract Plasma is Verifier, VerificationKeys {
+contract PlasmaStub is VerificationKeys {
 
-    uint32 constant DEADLINE = 0; // seconds, to define
+    uint32 constant DEADLINE = 3600; // seconds, to define
 
     enum Circuit {
         DEPOSIT,
@@ -39,8 +39,8 @@ contract Plasma is Verifier, VerificationKeys {
 
     // Public API
 
-    constructor(bytes32 _initialRoot) public {
-        lastVerifiedRoot = _initialRoot;
+    constructor() public {
+        lastVerifiedRoot = EMPTY_TREE_ROOT;
     }
 
     function commitBlock(uint32 blockNumber, uint128 totalFees, bytes memory txDataPacked, bytes32 newRoot) public {
@@ -58,7 +58,9 @@ contract Plasma is Verifier, VerificationKeys {
         require(totalVerified < totalCommitted, "no committed block to verify");
         require(blockNumber == totalVerified, "may only verified next block");
         Block memory committed = blocks[blockNumber];
+
         require(verifyUpdateProof(proof, lastVerifiedRoot, committed.newRoot, committed.finalHash), "invalid proof");
+
         totalVerified++;
         lastVerifiedRoot = committed.newRoot;
 
@@ -66,6 +68,24 @@ contract Plasma is Verifier, VerificationKeys {
         balance[committed.prover] += committed.totalFees;
     }
 
+    function verifyUpdateProof(uint256[8] memory, bytes32, bytes32, bytes32) internal view returns (bool valid);
+
+//    function verifyUpdateProof(uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
+//    internal view returns (bool valid)
+//    {
+//        uint256[14] memory vk;
+//        uint256[] memory gammaABC;
+//        (vk, gammaABC) = getVkUpdateCircuit();
+//        uint256[] memory inputs = new uint256[](3);
+//        inputs[0] = uint256(oldRoot);
+//        inputs[1] = uint256(newRoot);
+//        inputs[2] = uint256(finalHash);
+//        return Verify(vk, gammaABC, proof, inputs);
+//    }
+
+}
+
+contract Plasma is PlasmaStub, Verifier {
     // Implementation
 
     function verifyUpdateProof(uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
