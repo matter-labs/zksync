@@ -29,7 +29,7 @@ use bellman::{
 /// This basically is just an extension to `Option`
 /// which allows for a convenient mapping to an
 /// error on `None`.
-trait Assignment<T> {
+pub trait Assignment<T> {
     fn get(&self) -> Result<&T, SynthesisError>;
 }
 

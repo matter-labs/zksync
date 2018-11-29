@@ -13,6 +13,7 @@ use bellman::{
 use sapling_crypto;
 
 use sapling_crypto::circuit::{
+    Assignment,
     boolean,
     ecc,
     pedersen_hash,
