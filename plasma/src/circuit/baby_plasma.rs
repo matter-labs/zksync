@@ -1561,6 +1561,8 @@ fn test_update_circuit_with_witness() {
     use crypto::sha2::Sha256;
     use crypto::digest::Digest;
 
+    extern crate hex;
+
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &AltJubjubBn256::new();
 
@@ -1731,6 +1733,9 @@ fn test_update_circuit_with_witness() {
             let mut hash_result = [0u8; 32];
             h.result(&mut hash_result[..]);
 
+            
+            print!("Initial hash hex {}\n", hex::encode(hash_result.clone()));
+
             // let first_round_bits = multipack::bytes_to_bits(&hash_result.clone());
             
             // for b in first_round_bits.clone() {
@@ -1760,6 +1765,8 @@ fn test_update_circuit_with_witness() {
 
             let packed_transaction_data_bytes = be_bit_vector_into_bytes(&packed_transaction_data);
 
+            print!("Packed transaction data hex {}\n", hex::encode(packed_transaction_data_bytes.clone()));
+
             let mut next_round_hash_bytes = vec![];
             next_round_hash_bytes.extend(hash_result.iter());
             next_round_hash_bytes.extend(packed_transaction_data_bytes);
@@ -1770,12 +1777,16 @@ fn test_update_circuit_with_witness() {
             hash_result = [0u8; 32];
             h.result(&mut hash_result[..]);
 
+            print!("Final hash as hex {}\n", hex::encode(hash_result.clone()));
+
             hash_result[0] &= 0x1f; // temporary solution
 
             let mut repr = Fr::zero().into_repr();
             repr.read_be(&hash_result[..]).expect("pack hash as field element");
 
             let public_data_commitment = Fr::from_repr(repr).unwrap();
+
+            print!("Final data commitment as field element = {}\n", public_data_commitment);
 
             let instance = Update {
                 params: params,
