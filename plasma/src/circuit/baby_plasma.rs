@@ -475,84 +475,86 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
         // now we do a "dense packing", i.e. take 256 / public_data.len() items 
         // and push them into the second half of sha256 block
 
-        // let public_data_size = *plasma_constants::BALANCE_TREE_DEPTH 
-        //                             + *plasma_constants::BALANCE_TREE_DEPTH
-        //                             + *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH
-        //                             + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH
-        //                             + *plasma_constants::FEE_EXPONENT_BIT_WIDTH
-        //                             + *plasma_constants::FEE_MANTISSA_BIT_WIDTH;
+        let public_data_size = *plasma_constants::BALANCE_TREE_DEPTH 
+                                    + *plasma_constants::BALANCE_TREE_DEPTH
+                                    + *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH
+                                    + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH
+                                    + *plasma_constants::FEE_EXPONENT_BIT_WIDTH
+                                    + *plasma_constants::FEE_MANTISSA_BIT_WIDTH;
 
-        // let pack_by = 256 / public_data_size;
+        let pack_by = 256 / public_data_size;
 
-        // let number_of_packs = self.number_of_transactions / pack_by;
-        // let remaining_to_pack = self.number_of_transactions % pack_by;
-        // let padding_in_pack = 256 - pack_by*public_data_size;
-        // let padding_in_remainder = 256 - remaining_to_pack*public_data_size;
+        let number_of_packs = self.number_of_transactions / pack_by;
+        let remaining_to_pack = self.number_of_transactions % pack_by;
+        let padding_in_pack = 256 - pack_by*public_data_size;
+        let padding_in_remainder = 256 - remaining_to_pack*public_data_size;
 
-        // let mut public_data_iterator = public_data_vector.into_iter();
+        let mut public_data_iterator = public_data_vector.into_iter();
 
-        // for i in 0..number_of_packs 
-        // {
-        //     let cs = & mut cs.namespace(|| format!("packing a batch number {}", i));
-        //     let mut pack_bits: Vec<boolean::Boolean> = vec![];
-        //     pack_bits.extend(hash_block.into_iter());
-        //     for _ in 0..pack_by 
-        //     {
-        //         let next: Option<Vec<boolean::Boolean>> = public_data_iterator.next().clone();
-        //         let part: &Vec<boolean::Boolean> = next.clone().get()?;
-        //         pack_bits.extend(&part);
-        //     }
-        //     for _ in 0..padding_in_pack
-        //     {
-        //         pack_bits.push(boolean::Boolean::Constant(false));
-        //     }
-        //     hash_block = sha256::sha256(
-        //         cs.namespace(|| format!("hash for block {}", i)),
-        //         &pack_bits
-        //     )?;
-        // }
+        for i in 0..number_of_packs 
+        {
+            let cs = & mut cs.namespace(|| format!("packing a batch number {}", i));
+            let mut pack_bits: Vec<boolean::Boolean> = vec![];
+            // put previous hash as first 256 bits of the SHA256 block
+            pack_bits.extend(hash_block.into_iter());
 
-        // let mut pack_bits: Vec<boolean::Boolean> = vec![];
-        // pack_bits.extend(hash_block.into_iter());
-        // for _ in 0..remaining_to_pack
-        // {
-        //     let next: Option<Vec<boolean::Boolean>> = public_data_iterator.next().clone();
-        //     let part = Ok(next.get()?);
-        //     pack_bits.extend(part);
-        // }
+            for _ in 0..pack_by 
+            {
+                let next: Vec<boolean::Boolean> = public_data_iterator.next().get()?.clone();
+                pack_bits.extend(next);
+            }
+            for _ in 0..padding_in_pack
+            {
+                pack_bits.push(boolean::Boolean::Constant(false));
+            }
+            hash_block = sha256::sha256(
+                cs.namespace(|| format!("hash for block {}", i)),
+                &pack_bits
+            )?;
+        }
 
-        // for _ in 0..padding_in_remainder
-        // {
-        //     pack_bits.push(boolean::Boolean::Constant(false));
-        // }
+        // now pack the remainder
+
+        let mut pack_bits: Vec<boolean::Boolean> = vec![];
+        pack_bits.extend(hash_block.into_iter());
+        for _ in 0..remaining_to_pack
+        {
+            let next: Vec<boolean::Boolean> = public_data_iterator.next().get()?.clone();
+            pack_bits.extend(next);
+        }
+
+        for _ in 0..padding_in_remainder
+        {
+            pack_bits.push(boolean::Boolean::Constant(false));
+        }
 
         // // print_boolean_vector(&pack_bits.clone());
 
-        // hash_block = sha256::sha256(
-        //     cs.namespace(|| "hash the remainder"),
-        //     &pack_bits
-        // )?;
+        hash_block = sha256::sha256(
+            cs.namespace(|| "hash the remainder"),
+            &pack_bits
+        )?;
 
         // // now pack and enforce equality to the input
 
-        // hash_block.reverse();
-        // hash_block.truncate(E::Fr::CAPACITY as usize);
+        hash_block.reverse();
+        hash_block.truncate(E::Fr::CAPACITY as usize);
 
-        // let mut packed_hash_lc = Num::<E>::zero();
-        // let mut coeff = E::Fr::one();
-        // for bit in hash_block {
-        //     packed_hash_lc = packed_hash_lc.add_bool_with_coeff(CS::one(), &bit, coeff);
-        //     coeff.double();
-        // }
+        let mut packed_hash_lc = Num::<E>::zero();
+        let mut coeff = E::Fr::one();
+        for bit in hash_block {
+            packed_hash_lc = packed_hash_lc.add_bool_with_coeff(CS::one(), &bit, coeff);
+            coeff.double();
+        }
 
-        // cs.enforce(
-        //     || "enforce external data hash equality",
-        //     |lc| lc + rolling_hash.get_variable(),
-        //     |lc| lc + CS::one(),
-        //     |_| packed_hash_lc.lc(E::Fr::one())
-        // );
+        cs.enforce(
+            || "enforce external data hash equality",
+            |lc| lc + rolling_hash.get_variable(),
+            |lc| lc + CS::one(),
+            |_| packed_hash_lc.lc(E::Fr::one())
+        );
 
-        // print!("Final hash in the snark is {}\n", rolling_hash.get_value().get()?);
+        print!("Final hash in the snark is {}\n", rolling_hash.get_value().get()?);
 
         Ok(())
     }
