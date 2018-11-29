@@ -6,7 +6,7 @@ extern crate sapling_crypto;
 extern crate hex;
 extern crate ff;
 
-use ff::PrimeField;
+use ff::{Field, PrimeField};
 use rand::thread_rng;
 use bellman::groth16::{
     create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof, VerifyingKey
@@ -32,12 +32,12 @@ fn main() {
         let c = Update::<Bn256> {
             params,
             number_of_transactions: 0,
-            old_root: None,
-            new_root: None,
-            public_data_commitment: None,
-            block_number: None,
-            total_fee: None,
-            transactions: vec![],
+            old_root: Some(Fr::zero()),
+            new_root: Some(Fr::zero()),
+            public_data_commitment: Some(Fr::zero()),
+            block_number: Some(Fr::one()),
+            total_fee: Some(Fr::zero()),
+            transactions: vec![/*Some((transaction, transaction_witness))*/],
         };
         generate_random_parameters(c, rng).unwrap()
     };

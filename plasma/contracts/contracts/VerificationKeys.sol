@@ -1,6 +1,6 @@
 // This contract is generated programmatically
 
-pragma solidity ^0.5.0;
+pragma solidity ^0.4.24;
 
 
 // Hardcoded constants to avoid accessing store

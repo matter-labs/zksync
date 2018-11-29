@@ -440,7 +440,7 @@ supports-color@4.4.0:
   dependencies:
     has-flag "^2.0.0"
 
-truffle@^5.0.0-beta.2:
+truffle@5.0.0-beta.2:
   version "5.0.0-beta.2"
   resolved "https://registry.yarnpkg.com/truffle/-/truffle-5.0.0-beta.2.tgz#691db3870d2ff4b99c4e02b31e88092309178e6e"
   dependencies:

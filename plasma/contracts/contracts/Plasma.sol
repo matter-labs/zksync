@@ -1,12 +1,12 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.4.24;
 
 import "./Verifier.sol";
 import "./VerificationKeys.sol";
 
 
-contract Plasma is Verifier, VerificationKeys {
+contract PlasmaStub is VerificationKeys {
 
-    uint32 constant DEADLINE = 0; // seconds, to define
+    uint32 constant DEADLINE = 3600; // seconds, to define
 
     enum Circuit {
         DEPOSIT,
@@ -66,6 +66,24 @@ contract Plasma is Verifier, VerificationKeys {
         balance[committed.prover] += committed.totalFees;
     }
 
+    function verifyUpdateProof(uint256[8] memory, bytes32, bytes32, bytes32) internal view returns (bool valid);
+
+//    function verifyUpdateProof(uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
+//    internal view returns (bool valid)
+//    {
+//        uint256[14] memory vk;
+//        uint256[] memory gammaABC;
+//        (vk, gammaABC) = getVkUpdateCircuit();
+//        uint256[] memory inputs = new uint256[](3);
+//        inputs[0] = uint256(oldRoot);
+//        inputs[1] = uint256(newRoot);
+//        inputs[2] = uint256(finalHash);
+//        return Verify(vk, gammaABC, proof, inputs);
+//    }
+
+}
+
+contract Plasma is PlasmaStub, Verifier {
     // Implementation
 
     function verifyUpdateProof(uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
