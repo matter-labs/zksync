@@ -1571,8 +1571,13 @@ fn test_update_circuit_with_witness() {
 
         // give some funds to sender and make zero balance for recipient
 
-        let sender_leaf_number = 1;
-        let recipient_leaf_number = 2;
+        // let sender_leaf_number = 1;
+        // let recipient_leaf_number = 2;
+
+        let mut sender_leaf_number : u32 = rng.gen();
+        sender_leaf_number = sender_leaf_number % capacity;
+        let mut recipient_leaf_number : u32 = rng.gen();
+        recipient_leaf_number = recipient_leaf_number % capacity;
 
         let transfer_amount : u128 = 500;
 
@@ -1587,7 +1592,18 @@ fn test_update_circuit_with_witness() {
 
         let transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
 
-        let fee_encoded = Fr::zero();
+        let fee : u128 = 0;
+
+        let fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
+
+        let fee_bits = convert_to_float(
+            fee,
+            *plasma_constants::FEE_EXPONENT_BIT_WIDTH,
+            *plasma_constants::FEE_MANTISSA_BIT_WIDTH,
+            10
+        ).unwrap();
+
+        let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
 
         let sender_leaf = BabyLeaf {
                 balance:    Fr::from_str("1000").unwrap(),
@@ -1617,9 +1633,8 @@ fn test_update_circuit_with_witness() {
 
         // check empty leafs 
 
-        print!("Empty leaf hash is {}\n", tree.get_hash((tree_depth, 0)));
+        // print!("Empty leaf hash is {}\n", tree.get_hash((tree_depth, 0)));
 
-        // let p = tree.merkle_path(sender_leaf_number);
         // print!("Verifying merkle proof for an old leaf\n");
         assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
         // print!("Done verifying merkle proof for an old leaf, result {}\n", inc);
