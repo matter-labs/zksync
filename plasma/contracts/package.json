@@ -1,0 +1,8 @@
+{
+  "name": "plasma-contracts",
+  "version": "0.1.0",
+  "license": "GPL-3.0-only",
+  "devDependencies": {
+    "truffle": "^5.0.0-beta.2"
+  }
+}
