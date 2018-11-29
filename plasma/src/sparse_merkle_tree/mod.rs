@@ -8,11 +8,11 @@ use self::hasher::Hasher;
 use super::primitives::GetBits;
 use ff::{PrimeField};
 
-// Tree of depth 0 should contait ONE element that is also a root
-// Tree of depth 1 should contait TWO elements that is also a root
-// Tree of depth 20 should contait 2^20 elements that is also a root
+// Tree of depth 0 should contain ONE element that is also a root
+// Tree of depth 1 should contain TWO elements
+// Tree of depth 20 should contain 2^20 elements
 
-// [0, (N - 1)]
+// [0, (2^TREE_DEPTH - 1)]
 type ItemIndex = u32;
 
 // [0, TREE_DEPTH]
@@ -76,7 +76,7 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
         Self{tree_depth, prehashed, items, hashes, hasher}
     }
 
-    // How many iterms can the tree hold
+    // How many items can the tree hold
     pub fn capacity(&self) -> u32 {
         1 << self.tree_depth
     }
@@ -270,7 +270,7 @@ mod tests {
 
     #[test]
     fn test_merkle_path() {
-        let mut tree = TestSMT::new(4);
+        let mut tree = TestSMT::new(3);
         tree.insert(2, 1);
         let path = tree.merkle_path(2);
         assert_eq!(path, [(32768, false), (917505, true), (25690141, false)]);

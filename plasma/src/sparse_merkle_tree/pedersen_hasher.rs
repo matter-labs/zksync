@@ -7,7 +7,8 @@ use sapling_crypto::pedersen_hash::{baby_pedersen_hash, Personalization};
 use pairing::bn256::Bn256;
 use sapling_crypto::alt_babyjubjub::{JubjubEngine, AltJubjubBn256, edwards::Point, PrimeOrder};
 
-use super::hasher::{Hasher};
+use super::super::primitives::GetBitsFixed;
+use super::hasher::Hasher;
 
 pub struct PedersenHasher<E: JubjubEngine> {
     params: E::Params,
@@ -23,15 +24,9 @@ impl<E: JubjubEngine> Hasher<E::Fr> for PedersenHasher<E> {
     }
 
     fn compress(&self, lhs: &E::Fr, rhs: &E::Fr, i: usize) -> E::Fr {
-        let mut input: Vec<bool> = Vec::new();
-        let mut lhs_bits: Vec<bool> = BitIterator::new(lhs.into_repr()).collect();
-        lhs_bits.reverse();
-        lhs_bits.truncate(E::Fr::NUM_BITS as usize);
-        input.extend(lhs_bits.into_iter());
-        let mut rhs_bits: Vec<bool> = BitIterator::new(rhs.into_repr()).collect();
-        rhs_bits.reverse();
-        rhs_bits.truncate(E::Fr::NUM_BITS as usize);
-        input.extend(rhs_bits.into_iter());
+        let mut input: Vec<bool> = Vec::with_capacity(2 * E::Fr::NUM_BITS as usize);
+        input.extend(lhs.get_bits_le_fixed(E::Fr::NUM_BITS as usize));
+        input.extend(rhs.get_bits_le_fixed(E::Fr::NUM_BITS as usize));
         baby_pedersen_hash::<E, _>(Personalization::MerkleTree(i), input, &self.params).into_xy().0
     }
 
