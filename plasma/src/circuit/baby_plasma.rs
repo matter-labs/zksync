@@ -56,10 +56,10 @@ pub struct Transaction<E: JubjubEngine> {
     pub signature: Option<TransactionSignature<E>>
 }
 
-fn le_bit_vector_into_field_element<Fr: PrimeField>
-    (bits: &Vec<bool>) -> Fr 
+fn le_bit_vector_into_field_element<P: PrimeField>
+    (bits: &Vec<bool>) -> P
 {
-    // TODO remove representation length hardcore
+    // TODO remove representation length hardcode
     let mut bytes = [0u8; 32];
 
     let byte_chunks = bits.chunks(8);
@@ -76,18 +76,17 @@ fn le_bit_vector_into_field_element<Fr: PrimeField>
         bytes[i] = byte;
     }
 
-    let mut repr = Fr::zero().into_repr();
+    let mut repr : P::Repr = P::zero().into_repr();
     repr.read_le(&bytes[..]).expect("interpret S as field element representation");
 
-    let field_element = Fr::from_repr(repr).unwrap();
+    let field_element = P::from_repr(repr).unwrap();
 
     field_element
 }
 
-fn bit_vector_into_bytes
+fn be_bit_vector_into_bytes
     (bits: &Vec<bool>) -> Vec<u8>
 {
-    // TODO remove representation length hardcore
     let mut bytes: Vec<u8> = vec![];
 
     let byte_chunks = bits.chunks(8);
@@ -100,6 +99,29 @@ fn bit_vector_into_bytes
         {
             if *bit {
                 byte |= 1 << (7 - i);
+            }
+        }
+        bytes.push(byte);
+    }
+
+    bytes
+}
+
+fn le_bit_vector_into_bytes
+    (bits: &Vec<bool>) -> Vec<u8>
+{
+    let mut bytes: Vec<u8> = vec![];
+
+    let byte_chunks = bits.chunks(8);
+
+    for byte_chunk in byte_chunks
+    {
+        let mut byte = 0u8;
+        // pack just in order
+        for (i, bit) in byte_chunk.into_iter().enumerate()
+        {
+            if *bit {
+                byte |= 1 << i;
             }
         }
         bytes.push(byte);
@@ -464,16 +486,15 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
         initial_hash_data.extend(total_fees_bits.into_iter());
 
         assert_eq!(initial_hash_data.len(), 512);
-        // initial_hash_data.reverse();
 
         // print_boolean_vector(&initial_hash_data.clone());
 
-        let mut hash_block = sha256::sha256_block_no_padding(
+        let mut hash_block = sha256::sha256(
             cs.namespace(|| "initial rolling sha256"),
             &initial_hash_data
         ).unwrap();
 
-        print_boolean_vector(&hash_block.clone());
+        // print_boolean_vector(&hash_block.clone());
 
         // now we do a "dense packing", i.e. take 256 / public_data.len() items 
         // and push them into the second half of sha256 block
@@ -508,7 +529,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
             {
                 pack_bits.push(boolean::Boolean::Constant(false));
             }
-            hash_block = sha256::sha256_block_no_padding(
+            hash_block = sha256::sha256(
                 cs.namespace(|| format!("hash for block {}", i)),
                 &pack_bits
             ).unwrap();
@@ -527,9 +548,9 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
             pack_bits.push(boolean::Boolean::Constant(false));
         }
 
-        print_boolean_vector(&pack_bits.clone());
+        // print_boolean_vector(&pack_bits.clone());
 
-        hash_block = sha256::sha256_block_no_padding(
+        hash_block = sha256::sha256(
             cs.namespace(|| "hash the remainder"),
             &pack_bits
         ).unwrap();
@@ -1325,7 +1346,6 @@ fn apply_transaction<E, CS>(
                                     + 2 * (*plasma_constants::FR_BIT_WIDTH)
         );
 
-        // print_boolean_vector(&leaf_content.clone());
 
         // Compute the hash of the from leaf
         to_leaf_hash = pedersen_hash::pedersen_hash(
@@ -1511,13 +1531,12 @@ fn test_bits_into_fr(){
     use pairing::bn256::*;
     use std::str::FromStr;
 
-    // representation of 1 + 4 + 8 = 13;
-    let bits: Vec<bool> = [true, false, true, true].to_vec();
+    // representation of 4 + 8 + 256 = 12 + 256 = 268 = 0x010c;
+    let bits: Vec<bool> = [false, false, true, true, false, false, false, false, true].to_vec();
 
-    let fe: Fr = le_bit_vector_into_field_element(&bits);
+    let fe: Fr = le_bit_vector_into_field_element::<Fr>(&bits);
 
-    let as_string = format!("{}", fe.into_repr());
-    print!("{}\n", as_string);
+    print!("{}\n", fe);
 }
 
 fn print_boolean_vector(vector: &[boolean::Boolean]) {
@@ -1687,6 +1706,8 @@ fn test_update_circuit_with_witness() {
 
             let mut public_data_initial_bits = vec![];
 
+            // these two are BE encodings because an iterator is BE. This is also an Ethereum standard behavior
+
             let block_number_bits: Vec<bool> = BitIterator::new(Fr::one().into_repr()).collect();
             for _ in 0..256-block_number_bits.len() {
                 public_data_initial_bits.push(false);
@@ -1701,7 +1722,18 @@ fn test_update_circuit_with_witness() {
 
             assert_eq!(public_data_initial_bits.len(), 512);
 
-            // for b in public_data_initial_bits.clone() {
+            let mut h = Sha256::new();
+
+            let bytes_to_hash = be_bit_vector_into_bytes(&public_data_initial_bits);
+
+            h.input(&bytes_to_hash);
+
+            let mut hash_result = [0u8; 32];
+            h.result(&mut hash_result[..]);
+
+            // let first_round_bits = multipack::bytes_to_bits(&hash_result.clone());
+            
+            // for b in first_round_bits.clone() {
             //     if b {
             //         print!("1");
             //     } else {
@@ -1710,44 +1742,6 @@ fn test_update_circuit_with_witness() {
             // }
             // print!("\n");
 
-            let mut h = Sha256::new();
-
-            let bytes_to_hash = bit_vector_into_bytes(&public_data_initial_bits);
-            // for b in bytes_to_hash.clone() {
-            //     print!("{}", b);
-            // }
-            // print!("\n");
-            h.input(&bytes_to_hash);
-
-            let mut hash_result = [0u8; 32];
-            h.result(&mut hash_result[..]);
-
-            for a in hash_result.chunks(4) {
-                let mut b = 0u32;
-                let mut c = a.into_iter();
-                b |= u32::from(*c.next().unwrap()) << 0;
-                b |= u32::from(*c.next().unwrap()) << 8;
-                b |= u32::from(*c.next().unwrap()) << 16;
-                b |= u32::from(*c.next().unwrap()) << 24;
-                print!("{}\n", b);
-            }
-
-            // for b in hash_result.iter() {
-            //     print!("{}", b);
-            // }
-            // print!("\n");
-
-            let first_round_bits = multipack::bytes_to_bits(&hash_result);
-            
-            for b in first_round_bits.clone() {
-                if b {
-                    print!("1");
-                } else {
-                    print!("0");
-                }
-            }
-            print!("\n");
-
             let mut packed_transaction_data = vec![];
             let transaction_data = transaction.public_data_into_bits();
             packed_transaction_data.extend(transaction_data.clone().into_iter());
@@ -1755,16 +1749,16 @@ fn test_update_circuit_with_witness() {
                 packed_transaction_data.push(false);
             }
 
-            for b in packed_transaction_data.clone() {
-                if b {
-                    print!("1");
-                } else {
-                    print!("0");
-                }
-            }
-            print!("\n");
+            // for b in packed_transaction_data.clone() {
+            //     if b {
+            //         print!("1");
+            //     } else {
+            //         print!("0");
+            //     }
+            // }
+            // print!("\n");
 
-            let packed_transaction_data_bytes = bit_vector_into_bytes(&packed_transaction_data);
+            let packed_transaction_data_bytes = be_bit_vector_into_bytes(&packed_transaction_data);
 
             let mut next_round_hash_bytes = vec![];
             next_round_hash_bytes.extend(hash_result.iter());
@@ -1807,7 +1801,7 @@ fn test_update_circuit_with_witness() {
                 assert!(cs.is_satisfied());
             }
 
-            // assert!(cs.is_satisfied());
+            assert!(cs.is_satisfied());
         }
     }
 }
