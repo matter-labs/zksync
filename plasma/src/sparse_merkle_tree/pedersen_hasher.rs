@@ -2,10 +2,10 @@
 
 use ff::{Field, PrimeField, BitIterator};
 use rand::{Rand, thread_rng};
-use sapling_crypto::baby_pedersen_hash::{pedersen_hash, Personalization};
+use sapling_crypto::pedersen_hash::{baby_pedersen_hash, Personalization};
 
 use pairing::bn256::Bn256;
-use sapling_crypto::babyjubjub::{JubjubEngine, JubjubBn256, edwards::Point, PrimeOrder};
+use sapling_crypto::alt_babyjubjub::{JubjubEngine, AltJubjubBn256, edwards::Point, PrimeOrder};
 
 use super::hasher::{Hasher};
 
@@ -16,14 +16,23 @@ pub struct PedersenHasher<E: JubjubEngine> {
 impl<E: JubjubEngine> Hasher<E::Fr> for PedersenHasher<E> {
 
     fn hash_bits<I: IntoIterator<Item=bool>>(&self, input: I) -> E::Fr {
-        pedersen_hash::<E, _>(Personalization::NoteCommitment, input, &self.params).into_xy().0
+        let hash = baby_pedersen_hash::<E, _>(Personalization::NoteCommitment, input, &self.params).into_xy().0;
+        // print!("Leaf hash = {}\n", hash.clone());
+
+        hash
     }
 
     fn compress(&self, lhs: &E::Fr, rhs: &E::Fr, i: usize) -> E::Fr {
-        let mut input = Vec::new();
-        input.extend(BitIterator::new(lhs.into_repr()));
-        input.extend(BitIterator::new(rhs.into_repr()));
-        pedersen_hash::<E, _>(Personalization::MerkleTree(i), input, &self.params).into_xy().0
+        let mut input: Vec<bool> = Vec::new();
+        let mut lhs_bits: Vec<bool> = BitIterator::new(lhs.into_repr()).collect();
+        lhs_bits.reverse();
+        lhs_bits.truncate(E::Fr::NUM_BITS as usize);
+        input.extend(lhs_bits.into_iter());
+        let mut rhs_bits: Vec<bool> = BitIterator::new(rhs.into_repr()).collect();
+        rhs_bits.reverse();
+        rhs_bits.truncate(E::Fr::NUM_BITS as usize);
+        input.extend(rhs_bits.into_iter());
+        baby_pedersen_hash::<E, _>(Personalization::MerkleTree(i), input, &self.params).into_xy().0
     }
 
 }
@@ -33,7 +42,7 @@ pub type BabyPedersenHasher = PedersenHasher<Bn256>;
 impl Default for PedersenHasher<Bn256> {
     fn default() -> Self {
         Self{
-            params: JubjubBn256::new(),
+            params: AltJubjubBn256::new(),
         }
     }
 }

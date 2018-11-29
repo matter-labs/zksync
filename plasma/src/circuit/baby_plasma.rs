@@ -56,6 +56,60 @@ pub struct Transaction<E: JubjubEngine> {
     pub signature: Option<TransactionSignature<E>>
 }
 
+fn le_bit_vector_into_field_element<Fr: PrimeField>
+    (bits: &Vec<bool>) -> Fr 
+{
+    // TODO remove representation length hardcore
+    let mut bytes = [0u8; 32];
+
+    let byte_chunks = bits.chunks(8);
+
+    for (i, byte_chunk) in byte_chunks.enumerate()
+    {
+        let mut byte = 0u8;
+        for (j, bit) in byte_chunk.into_iter().enumerate()
+        {
+            if *bit {
+                byte |= 1 << j;
+            }
+        }
+        bytes[i] = byte;
+    }
+
+    let mut repr = Fr::zero().into_repr();
+    repr.read_le(&bytes[..]).expect("interpret S as field element representation");
+
+    let field_element = Fr::from_repr(repr).unwrap();
+
+    field_element
+}
+
+fn bit_vector_into_bytes
+    (bits: &Vec<bool>) -> Vec<u8>
+{
+    // TODO remove representation length hardcore
+    let mut bytes: Vec<u8> = vec![];
+
+    let byte_chunks = bits.chunks(8);
+
+    for byte_chunk in byte_chunks
+    {
+        let mut byte = 0u8;
+        // pack just in order
+        for (i, bit) in byte_chunk.into_iter().enumerate()
+        {
+            if *bit {
+                byte |= 1 << (7 - i);
+            }
+        }
+        bytes.push(byte);
+    }
+
+    bytes
+}
+
+
+
 impl <E: JubjubEngine> Transaction<E> {
     pub fn public_data_into_bits(
         &self
@@ -65,32 +119,24 @@ impl <E: JubjubEngine> Transaction<E> {
         // - to
         // - amount
         // - fee
-        let mut from = BitIterator::new(self.from.clone().unwrap().into_repr());
-        let mut to = BitIterator::new(self.to.clone().unwrap().into_repr());
-        let mut amount = BitIterator::new(self.amount.clone().unwrap().into_repr());
-        let mut fee = BitIterator::new(self.fee.clone().unwrap().into_repr());
-
-        let mut packed: Vec<bool> = vec![];
+        let mut from: Vec<bool> = BitIterator::new(self.from.clone().unwrap().into_repr()).collect();
+        from.reverse();
+        from.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
+        let mut to: Vec<bool> = BitIterator::new(self.to.clone().unwrap().into_repr()).collect();
+        to.reverse();
+        to.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
+        let mut amount: Vec<bool> = BitIterator::new(self.amount.clone().unwrap().into_repr()).collect();
+        amount.reverse();
+        amount.truncate(*plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH);
+        let mut fee: Vec<bool> = BitIterator::new(self.fee.clone().unwrap().into_repr()).collect();
+        fee.reverse();
+        fee.truncate(*plasma_constants::FEE_EXPONENT_BIT_WIDTH + *plasma_constants::FEE_MANTISSA_BIT_WIDTH);
         
-        for _ in 0..*plasma_constants::BALANCE_TREE_DEPTH {
-            let bit = from.next().unwrap();
-            packed.push(bit);
-        }
-
-        for _ in 0..*plasma_constants::BALANCE_TREE_DEPTH {
-            let bit = to.next().unwrap();
-            packed.push(bit);
-        }
-
-        for _ in 0..(*plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH) {
-            let bit = amount.next().unwrap();
-            packed.push(bit);
-        }
-
-        for _ in 0..(*plasma_constants::FEE_EXPONENT_BIT_WIDTH + *plasma_constants::FEE_MANTISSA_BIT_WIDTH) {
-            let bit = fee.next().unwrap();
-            packed.push(bit);
-        }
+        let mut packed: Vec<bool> = vec![];
+        packed.extend(from.into_iter());
+        packed.extend(to.into_iter());
+        packed.extend(amount.into_iter());
+        packed.extend(fee.into_iter());
 
         packed
     }
@@ -105,34 +151,25 @@ impl <E: JubjubEngine> Transaction<E> {
         // - fee
         // - nonce
         // - good_until_block
-        let mut nonce = BitIterator::new(self.nonce.clone().unwrap().into_repr());
-        let mut good_until_block = BitIterator::new(self.good_until_block.clone().unwrap().into_repr());
-
+        let mut nonce: Vec<bool> = BitIterator::new(self.nonce.clone().unwrap().into_repr()).collect();
+        nonce.reverse();
+        nonce.truncate(*plasma_constants::NONCE_BIT_WIDTH);
+        let mut good_until_block: Vec<bool> = BitIterator::new(self.good_until_block.clone().unwrap().into_repr()).collect();
+        good_until_block.reverse();
+        good_until_block.truncate(*plasma_constants::BLOCK_NUMBER_BIT_WIDTH);
         let mut packed: Vec<bool> = vec![];
         
-        packed.extend(self.public_data_into_bits());
-
-        for _ in 0..*plasma_constants::NONCE_BIT_WIDTH {
-            let bit = nonce.next().unwrap();
-            packed.push(bit);
-        }
-
-        for _ in 0..*plasma_constants::BLOCK_NUMBER_BIT_WIDTH {
-            let bit = good_until_block.next().unwrap();
-            packed.push(bit);
-        }
+        packed.extend(self.public_data_into_bits().into_iter());
+        packed.extend(nonce.into_iter());
+        packed.extend(good_until_block.into_iter());
 
         packed
     }
 
-    pub fn sign<R>(
-        & mut self,
-        private_key: &PrivateKey<E>,
-        p_g: FixedGenerators,
-        params: &E::Params,
-        rng: & mut R
-    ) where R: rand::Rng {
-        let raw_data = self.data_for_signature_into_bits();
+    pub fn data_as_bytes(
+        & self
+    ) -> Vec<u8> {
+        let raw_data: Vec<bool> = self.data_for_signature_into_bits();
 
         // conversion example from tests
 
@@ -165,6 +202,19 @@ impl <E: JubjubEngine> Transaction<E> {
             message_bytes.push(byte);
         }
 
+        message_bytes
+    }
+
+    pub fn sign<R>(
+        & mut self,
+        private_key: &PrivateKey<E>,
+        p_g: FixedGenerators,
+        params: &E::Params,
+        rng: & mut R
+    ) where R: rand::Rng {
+
+        let message_bytes = self.data_as_bytes();
+
         let max_message_len = *plasma_constants::BALANCE_TREE_DEPTH 
                         + *plasma_constants::BALANCE_TREE_DEPTH 
                         + *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH 
@@ -179,7 +229,7 @@ impl <E: JubjubEngine> Transaction<E> {
             rng, 
             p_g, 
             params,
-            max_message_len
+            max_message_len / 8
         );
 
         let mut sigs_bytes = [0u8; 32];
@@ -414,11 +464,16 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
         initial_hash_data.extend(total_fees_bits.into_iter());
 
         assert_eq!(initial_hash_data.len(), 512);
+        // initial_hash_data.reverse();
+
+        // print_boolean_vector(&initial_hash_data.clone());
 
         let mut hash_block = sha256::sha256_block_no_padding(
             cs.namespace(|| "initial rolling sha256"),
             &initial_hash_data
         ).unwrap();
+
+        print_boolean_vector(&hash_block.clone());
 
         // now we do a "dense packing", i.e. take 256 / public_data.len() items 
         // and push them into the second half of sha256 block
@@ -472,6 +527,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
             pack_bits.push(boolean::Boolean::Constant(false));
         }
 
+        print_boolean_vector(&pack_bits.clone());
+
         hash_block = sha256::sha256_block_no_padding(
             cs.namespace(|| "hash the remainder"),
             &pack_bits
@@ -490,7 +547,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
         }
 
         cs.enforce(
-            || "enforce hash equality",
+            || "enforce external data hash equality",
             |lc| lc + rolling_hash.get_variable(),
             |lc| lc + CS::one(),
             |_| packed_hash_lc.lc(E::Fr::one())
@@ -645,6 +702,15 @@ fn apply_transaction<E, CS>(
 
     let mut leaf_content = vec![];
 
+    // let value_from_allocated = AllocatedNum::alloc(
+    //     cs.namespace(|| "allocate value from"),
+    //     || Ok(tx_witness.balance_from.clone().unwrap())
+    // ).unwrap();
+
+    // let mut value_content_from = value_from_allocated.into_bits_le(
+    //     cs.namespace(|| "unpack from leaf value")
+    // ).unwrap();
+
     let mut value_content_from = boolean::field_into_boolean_vec_le(
         cs.namespace(|| "from leaf amount bits"), 
         tx_witness.balance_from
@@ -688,6 +754,8 @@ fn apply_transaction<E, CS>(
                                 + 2 * (*plasma_constants::FR_BIT_WIDTH)
     );
 
+    // print_boolean_vector(&leaf_content.clone());
+
     // Compute the hash of the from leaf
     let mut from_leaf_hash = pedersen_hash::pedersen_hash(
         cs.namespace(|| "from leaf content hash"),
@@ -706,9 +774,13 @@ fn apply_transaction<E, CS>(
 
     from_path_bits.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
 
+    // print_boolean_vector(&from_path_bits.clone());
+
     // This is an injective encoding, as cur is a
     // point in the prime order subgroup.
     let mut cur_from = from_leaf_hash.get_x().clone();
+
+    // print!("Inside the snark leaf hash from = {}\n", cur_from.get_value().unwrap());
 
     let audit_path_from = tx_witness.auth_path_from.clone();
     // Ascend the merkle tree authentication path
@@ -761,6 +833,7 @@ fn apply_transaction<E, CS>(
             &preimage,
             params
         )?.get_x().clone(); // Injective encoding
+
     }
 
     // enforce old root before update
@@ -1087,6 +1160,8 @@ fn apply_transaction<E, CS>(
     new_balance_from_value.sub_assign(&amount.get_value().clone().unwrap());
     new_balance_from_value.sub_assign(&fee.get_value().clone().unwrap());
 
+    print!("Updated balance from in a snark is {}\n", new_balance_from_value.clone());
+
     let new_balance_from = AllocatedNum::alloc(
         cs.namespace(|| "new balance from"),
         || Ok(new_balance_from_value)
@@ -1107,8 +1182,10 @@ fn apply_transaction<E, CS>(
         |lc| lc + new_balance_from.get_variable() + fee.get_variable() + amount.get_variable()
     );
 
-    let mut new_balance_to_value = old_balance_from.get_value().unwrap();
+    let mut new_balance_to_value = old_balance_to.get_value().unwrap();
     new_balance_to_value.add_assign(&amount.get_value().clone().unwrap());
+
+    print!("Updated balance to in a snark is {}\n", new_balance_to_value.clone());
 
     let new_balance_to = AllocatedNum::alloc(
         cs.namespace(|| "new balance to"),
@@ -1127,11 +1204,13 @@ fn apply_transaction<E, CS>(
         || "enforce recipients's balance increased",
         |lc| lc + new_balance_to.get_variable(),
         |lc| lc + CS::one(),
-        |lc| lc + old_balance_from.get_variable() + amount.get_variable()
+        |lc| lc + old_balance_to.get_variable() + amount.get_variable()
     );
 
     let mut new_nonce_value = nonce.get_value().unwrap();
     new_nonce_value.add_assign(&E::Fr::one());
+
+    print!("Updated nonce from in a snark is {}\n", new_nonce_value.clone());
 
     let new_nonce = AllocatedNum::alloc(
         cs.namespace(|| "new nonce"),
@@ -1168,21 +1247,31 @@ fn apply_transaction<E, CS>(
     // first of new "from" leaf
     {
 
-        leaf_content = vec![];
+        let mut leaf_content = vec![];
 
         // change balance and nonce
-        let mut value_content = boolean::field_into_boolean_vec_le(
-            cs.namespace(|| "from leaf amount bits update"), 
-            new_balance_from.get_value()
+
+        let mut value_content = new_balance_from.into_bits_le(
+            cs.namespace(|| "from leaf updated amount bits")
         ).unwrap();
+
+
+        // let mut value_content = boolean::field_into_boolean_vec_le(
+        //     cs.namespace(|| "from leaf amount bits update"), 
+        //     new_balance_from.get_value()
+        // ).unwrap();
 
         value_content.truncate(*plasma_constants::BALANCE_BIT_WIDTH);
         leaf_content.extend(value_content.clone());
 
-        let mut nonce_content = boolean::field_into_boolean_vec_le(
-            cs.namespace(|| "from leaf nonce bits updated"), 
-            new_nonce.get_value()
+        let mut nonce_content = new_nonce.into_bits_le(
+            cs.namespace(|| "from leaf updated nonce bits")
         ).unwrap();
+
+        // let mut nonce_content = boolean::field_into_boolean_vec_le(
+        //     cs.namespace(|| "from leaf nonce bits updated"), 
+        //     new_nonce.get_value()
+        // ).unwrap();
 
         nonce_content.truncate(*plasma_constants::NONCE_BIT_WIDTH);
         leaf_content.extend(nonce_content);
@@ -1196,6 +1285,8 @@ fn apply_transaction<E, CS>(
                                     + 2 * (*plasma_constants::FR_BIT_WIDTH)
         );
 
+        // print_boolean_vector(&leaf_content.clone());
+
         // Compute the hash of the from leaf
         from_leaf_hash = pedersen_hash::pedersen_hash(
             cs.namespace(|| "from leaf content hash updated"),
@@ -1203,18 +1294,23 @@ fn apply_transaction<E, CS>(
             &leaf_content,
             params
         )?;
+
     }
 
     // first of new "to" leaf
     {
 
-        leaf_content = vec![];
+        let mut leaf_content = vec![];
 
         // change balance only
-        let mut value_content = boolean::field_into_boolean_vec_le(
-            cs.namespace(|| "to leaf amount bits upted"), 
-            new_balance_to.get_value()
+        let mut value_content = new_balance_to.into_bits_le(
+            cs.namespace(|| "to leaf updated amount bits")
         ).unwrap();
+
+        // let mut value_content = boolean::field_into_boolean_vec_le(
+        //     cs.namespace(|| "to leaf amount bits upted"), 
+        //     new_balance_to.get_value()
+        // ).unwrap();
 
         value_content.truncate(*plasma_constants::BALANCE_BIT_WIDTH);
         leaf_content.extend(value_content.clone());
@@ -1228,6 +1324,8 @@ fn apply_transaction<E, CS>(
                                     + *plasma_constants::NONCE_BIT_WIDTH
                                     + 2 * (*plasma_constants::FR_BIT_WIDTH)
         );
+
+        // print_boolean_vector(&leaf_content.clone());
 
         // Compute the hash of the from leaf
         to_leaf_hash = pedersen_hash::pedersen_hash(
@@ -1266,10 +1364,14 @@ fn apply_transaction<E, CS>(
 
     // parse it backwards
 
-    let mut intersection_point_bits = boolean::field_into_boolean_vec_le(
-        cs.namespace(|| "unpack intersection"),
-        intersection_point.get_value()
+    let mut intersection_point_bits = intersection_point.into_bits_le(
+        cs.namespace(|| "unpack intersection")
     ).unwrap();
+
+    // let mut intersection_point_bits = boolean::field_into_boolean_vec_le(
+    //     cs.namespace(|| "unpack intersection"),
+    //     intersection_point.get_value()
+    // ).unwrap();
 
     // truncating guarantees that even if the common prefix coincides everywhere
     // up to the last bit, it can still be properly used in next actions
@@ -1280,6 +1382,8 @@ fn apply_transaction<E, CS>(
     // First assemble new leafs
     cur_from = from_leaf_hash.get_x().clone();
     cur_to = to_leaf_hash.get_x().clone();
+    print!("Inside the snark new leaf hash from = {}\n", cur_from.clone().get_value().unwrap());
+    print!("Inside the snark new leaf hash to = {}\n", cur_to.clone().get_value().unwrap());
 
     {
         let audit_path_from = tx_witness.auth_path_from.clone();
@@ -1401,140 +1505,51 @@ fn apply_transaction<E, CS>(
     Ok((cur_from, fee, allocated_block_number, public_data))
 }
 
-
 #[test]
-fn test_update_circuit_with_bn256() {
-    use ff::{Field};
+fn test_bits_into_fr(){
+    use ff::{PrimeField};
     use pairing::bn256::*;
-    use rand::{SeedableRng, Rng, XorShiftRng, Rand};
-    use sapling_crypto::circuit::test::*;
-    use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
+    use std::str::FromStr;
 
-    let params = &AltJubjubBn256::new();
-    let mut rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+    // representation of 1 + 4 + 8 = 13;
+    let bits: Vec<bool> = [true, false, true, true].to_vec();
 
-    for _ in 0..1 {
+    let fe: Fr = le_bit_vector_into_field_element(&bits);
 
-        // No cofactor check in here
-        let r = edwards::Point::rand(rng, params);
-
-        let signature = TransactionSignature {
-            r: r,
-            s: Fr::rand(& mut rng)
-        };
-
-        let transaction = Transaction {
-            from: Some(Fr::rand(& mut rng)),
-            to: Some(Fr::rand(& mut rng)),
-            amount: Some(Fr::rand(& mut rng)),
-            fee: Some(Fr::rand(& mut rng)),
-            nonce: Some(Fr::rand(& mut rng)),
-            good_until_block: Some(Fr::rand(& mut rng)),
-            signature: Some(signature)
-        };
-
-        let pub_from : edwards::Point<Bn256, PrimeOrder> = edwards::Point::rand(rng, params).mul_by_cofactor(params);
-        let (pub_from_x, pub_from_y)= pub_from.into_xy();
-
-        let pub_to : edwards::Point<Bn256, PrimeOrder>= edwards::Point::rand(rng, params).mul_by_cofactor(params);
-        let (pub_to_x, pub_to_y): (Fr, Fr) = pub_to.into_xy();
-
-        let path_from: Vec<Option<(Fr, bool)>> = (0..(*plasma_constants::BALANCE_TREE_DEPTH)).into_iter().map(|_| {
-            let witness = rng.gen();
-            let right_or_left = rng.gen();
-
-            Some((witness, right_or_left))
-        }).collect();
-
-
-        let path_to: Vec<Option<(Fr, bool)>> = (0..(*plasma_constants::BALANCE_TREE_DEPTH)).into_iter().map(|_| {
-            let witness = rng.gen();
-            let right_or_left = rng.gen();
-
-            Some((witness, right_or_left))
-        }).collect();
-
-        let transaction_witness = TransactionWitness {
-            auth_path_from: path_from,
-            balance_from: Some(Fr::rand(& mut rng)),
-            nonce_from: Some(Fr::rand(& mut rng)),
-            pub_x_from: Some(pub_from_x),
-            pub_y_from: Some(pub_from_y),
-            auth_path_to: path_to,
-            balance_to: Some(Fr::rand(& mut rng)),
-            nonce_to: Some(Fr::rand(& mut rng)),
-            pub_x_to: Some(pub_to_x),
-            pub_y_to: Some(pub_to_y)
-        };
-
-        {
-            let mut cs = TestConstraintSystem::<Bn256>::new();
-
-            let old_root = Fr::rand(& mut rng);
-            let new_root = Fr::rand(& mut rng);
-            let public_data_commitment = Fr::rand(& mut rng);
-
-            let instance = Update {
-                params: params,
-                number_of_transactions: 1,
-                old_root: Some(old_root),
-                new_root: Some(new_root),
-                public_data_commitment: Some(public_data_commitment),
-                block_number: Some(Fr::rand(& mut rng)),
-                total_fee: Some(Fr::rand(& mut rng)),
-                transactions: vec![Some((transaction, transaction_witness))],
-            };
-
-            instance.synthesize(&mut cs).unwrap();
-
-            print!("{}\n", cs.num_constraints());
-
-            assert_eq!(cs.num_inputs(), 4);
-            // assert!(cs.is_satisfied());
-
-            // assert_eq!(cs.num_constraints(), 7827);
-            // assert_eq!(cs.hash(), "c26d5cdfe6ccd65c03390902c02e11393ea6bb96aae32a7f2ecb12eb9103faee");
-
-            // let expected_cm = payment_address.create_note(
-            //     value_commitment.value,
-            //     commitment_randomness,
-            //     params
-            // ).expect("should be valid").cm(params);
-
-            // let expected_value_cm = value_commitment.cm(params).into_xy();
-
-            // let expected_epk = payment_address.g_d(params).expect("should be valid").mul(esk, params);
-            // let expected_epk_xy = expected_epk.into_xy();
-
-            // assert_eq!(cs.num_inputs(), 6);
-            // assert_eq!(cs.get_input(0, "ONE"), Fr::one());
-            // assert_eq!(cs.get_input(1, "value commitment/commitment point/x/input variable"), expected_value_cm.0);
-            // assert_eq!(cs.get_input(2, "value commitment/commitment point/y/input variable"), expected_value_cm.1);
-            // assert_eq!(cs.get_input(3, "epk/x/input variable"), expected_epk_xy.0);
-            // assert_eq!(cs.get_input(4, "epk/y/input variable"), expected_epk_xy.1);
-            // assert_eq!(cs.get_input(5, "commitment/input variable"), expected_cm);
-        }
-    }
+    let as_string = format!("{}", fe.into_repr());
+    print!("{}\n", as_string);
 }
 
+fn print_boolean_vector(vector: &[boolean::Boolean]) {
+    for b in vector {
+        if b.get_value().unwrap() {
+            print!("1");
+        } else {
+            print!("0");
+        }
+    }
+    print!("\n");
+}
 
 #[test]
-fn test_update_circuit() {
+fn test_update_circuit_with_witness() {
     use ff::{Field};
     use pairing::bn256::*;
     use rand::{SeedableRng, Rng, XorShiftRng, Rand};
     use sapling_crypto::circuit::test::*;
     use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
     use balance_tree::{BabyBalanceTree, BabyLeaf, Leaf};
+    use crypto::sha2::Sha256;
+    use crypto::digest::Digest;
+
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &AltJubjubBn256::new();
 
     let mut rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
-
     for _ in 0..1 {
-
-        let mut tree = BabyBalanceTree::new(*plasma_constants::BALANCE_TREE_DEPTH);
+        let tree_depth = *plasma_constants::BALANCE_TREE_DEPTH as u32;
+        let mut tree = BabyBalanceTree::new(tree_depth);
 
         let capacity = tree.capacity();
         assert_eq!(capacity, 1 << *plasma_constants::BALANCE_TREE_DEPTH);
@@ -1549,8 +1564,23 @@ fn test_update_circuit() {
 
         // give some funds to sender and make zero balance for recipient
 
-        let sender_leaf_number = 0;
-        let recipient_leaf_number = 1;
+        let sender_leaf_number = 1;
+        let recipient_leaf_number = 2;
+
+        let transfer_amount : u128 = 500;
+
+        let transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
+
+        let transfer_amount_bits = convert_to_float(
+            transfer_amount,
+            *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+            *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH,
+            10
+        ).unwrap();
+
+        let transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
+
+        let fee_encoded = Fr::zero();
 
         let sender_leaf = BabyLeaf {
                 balance:    Fr::from_str("1000").unwrap(),
@@ -1569,75 +1599,189 @@ fn test_update_circuit() {
         let initial_root = tree.root_hash();
         print!("Initial root = {}\n", initial_root);
 
-        tree.insert(sender_leaf_number, sender_leaf);
-        tree.insert(recipient_leaf_number, recipient_leaf);
+        tree.insert(sender_leaf_number, sender_leaf.clone());
+        tree.insert(recipient_leaf_number, recipient_leaf.clone());
 
         let old_root = tree.root_hash();
         print!("Old root = {}\n", old_root);
 
-        // for now manually construct a witness
-        // Vec<Option<(E::Fr, bool)>>
-        // let auth_path_from: Vec<Option<(E::Fr, bool)>> = [];
+        print!("Sender leaf hash is {}\n", tree.get_hash((tree_depth, sender_leaf_number)));
+        print!("Recipient leaf hash is {}\n", tree.get_hash((tree_depth, recipient_leaf_number)));
 
-        return;
-        // No cofactor check in here
-        let r = edwards::Point::rand(rng, params);
+        // check empty leafs 
 
-        let signature = TransactionSignature {
-            r: r,
-            s: Fr::rand(& mut rng)
+        print!("Empty leaf hash is {}\n", tree.get_hash((tree_depth, 0)));
+
+        // let p = tree.merkle_path(sender_leaf_number);
+        // print!("Verifying merkle proof for an old leaf\n");
+        assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+        // print!("Done verifying merkle proof for an old leaf, result {}\n", inc);
+
+        let path_from : Vec<Option<(Fr, bool)>> = tree.merkle_path(sender_leaf_number).into_iter().map(|e| Some(e)).collect();
+        let path_to: Vec<Option<(Fr, bool)>>  = tree.merkle_path(recipient_leaf_number).into_iter().map(|e| Some(e)).collect();
+
+        let from = Fr::from_str(& sender_leaf_number.to_string());
+        let to = Fr::from_str(& recipient_leaf_number.to_string());
+
+        let mut transaction : Transaction<Bn256> = Transaction {
+            from: from,
+            to: to,
+            amount: Some(transfer_amount_encoded),
+            fee: Some(fee_encoded),
+            nonce: Some(Fr::zero()),
+            good_until_block: Some(Fr::one()),
+            signature: None
         };
 
-        let transaction = Transaction {
-            from: Some(Fr::rand(& mut rng)),
-            to: Some(Fr::rand(& mut rng)),
-            amount: Some(Fr::rand(& mut rng)),
-            fee: Some(Fr::rand(& mut rng)),
-            nonce: Some(Fr::rand(& mut rng)),
-            good_until_block: Some(Fr::rand(& mut rng)),
-            signature: Some(signature)
-        };
+        transaction.sign(
+            &sender_sk,
+            p_g,
+            params,
+            rng
+        );
 
-        let pub_from : edwards::Point<Bn256, PrimeOrder> = edwards::Point::rand(rng, params).mul_by_cofactor(params);
-        let (pub_from_x, pub_from_y)= pub_from.into_xy();
+        assert!(transaction.signature.is_some());
 
-        let pub_to : edwards::Point<Bn256, PrimeOrder>= edwards::Point::rand(rng, params).mul_by_cofactor(params);
-        let (pub_to_x, pub_to_y): (Fr, Fr) = pub_to.into_xy();
-
-        let path_from: Vec<Option<(Fr, bool)>> = (0..(*plasma_constants::BALANCE_TREE_DEPTH)).into_iter().map(|_| {
-            let witness = rng.gen();
-            let right_or_left = rng.gen();
-
-            Some((witness, right_or_left))
-        }).collect();
-
-
-        let path_to: Vec<Option<(Fr, bool)>> = (0..(*plasma_constants::BALANCE_TREE_DEPTH)).into_iter().map(|_| {
-            let witness = rng.gen();
-            let right_or_left = rng.gen();
-
-            Some((witness, right_or_left))
-        }).collect();
+        let mut updated_sender_leaf = sender_leaf.clone();
+        let mut updated_recipient_leaf = recipient_leaf.clone();
 
         let transaction_witness = TransactionWitness {
             auth_path_from: path_from,
-            balance_from: Some(Fr::rand(& mut rng)),
-            nonce_from: Some(Fr::rand(& mut rng)),
-            pub_x_from: Some(pub_from_x),
-            pub_y_from: Some(pub_from_y),
+            balance_from: Some(sender_leaf.balance),
+            nonce_from: Some(sender_leaf.nonce),
+            pub_x_from: Some(sender_leaf.pub_x),
+            pub_y_from: Some(sender_leaf.pub_y),
             auth_path_to: path_to,
-            balance_to: Some(Fr::rand(& mut rng)),
-            nonce_to: Some(Fr::rand(& mut rng)),
-            pub_x_to: Some(pub_to_x),
-            pub_y_to: Some(pub_to_y)
+            balance_to: Some(recipient_leaf.balance),
+            nonce_to: Some(recipient_leaf.nonce),
+            pub_x_to: Some(recipient_leaf.pub_x),
+            pub_y_to: Some(recipient_leaf.pub_y)
         };
+
+        updated_sender_leaf.balance.sub_assign(&transfer_amount_as_field_element);
+        updated_sender_leaf.nonce.add_assign(&Fr::one());
+
+        print!("Updated sender: \n");
+        print!("Amount: {}\n", updated_sender_leaf.clone().balance);
+        print!("Nonce: {}\n", updated_sender_leaf.clone().nonce);
+
+        updated_recipient_leaf.balance.add_assign(&transfer_amount_as_field_element);
+        print!("Updated recipient: \n");
+        print!("Amount: {}\n", updated_recipient_leaf.clone().balance);
+        print!("Nonce: {}\n", updated_recipient_leaf.clone().nonce);
+
+        tree.insert(sender_leaf_number, updated_sender_leaf.clone());
+        tree.insert(recipient_leaf_number, updated_recipient_leaf.clone());
+
+        assert!(tree.verify_proof(sender_leaf_number, updated_sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+        assert!(tree.verify_proof(recipient_leaf_number, updated_recipient_leaf.clone(), tree.merkle_path(recipient_leaf_number)));
+
+        let new_root = tree.root_hash();
+
+        print!("New root = {}\n", new_root);
+
+        assert!(old_root != new_root);
 
         {
             let mut cs = TestConstraintSystem::<Bn256>::new();
 
-            let old_root = Fr::rand(& mut rng);
-            let new_root = Fr::rand(& mut rng);
-            let public_data_commitment = Fr::rand(& mut rng);
+            let mut public_data_initial_bits = vec![];
+
+            let block_number_bits: Vec<bool> = BitIterator::new(Fr::one().into_repr()).collect();
+            for _ in 0..256-block_number_bits.len() {
+                public_data_initial_bits.push(false);
+            }
+            public_data_initial_bits.extend(block_number_bits.into_iter());
+
+            let total_fee_bits: Vec<bool> = BitIterator::new(Fr::zero().into_repr()).collect();
+            for _ in 0..256-total_fee_bits.len() {
+                public_data_initial_bits.push(false);
+            }
+            public_data_initial_bits.extend(total_fee_bits.into_iter());
+
+            assert_eq!(public_data_initial_bits.len(), 512);
+
+            // for b in public_data_initial_bits.clone() {
+            //     if b {
+            //         print!("1");
+            //     } else {
+            //         print!("0");
+            //     }
+            // }
+            // print!("\n");
+
+            let mut h = Sha256::new();
+
+            let bytes_to_hash = bit_vector_into_bytes(&public_data_initial_bits);
+            // for b in bytes_to_hash.clone() {
+            //     print!("{}", b);
+            // }
+            // print!("\n");
+            h.input(&bytes_to_hash);
+
+            let mut hash_result = [0u8; 32];
+            h.result(&mut hash_result[..]);
+
+            for a in hash_result.chunks(4) {
+                let mut b = 0u32;
+                let mut c = a.into_iter();
+                b |= u32::from(*c.next().unwrap()) << 0;
+                b |= u32::from(*c.next().unwrap()) << 8;
+                b |= u32::from(*c.next().unwrap()) << 16;
+                b |= u32::from(*c.next().unwrap()) << 24;
+                print!("{}\n", b);
+            }
+
+            // for b in hash_result.iter() {
+            //     print!("{}", b);
+            // }
+            // print!("\n");
+
+            let first_round_bits = multipack::bytes_to_bits(&hash_result);
+            
+            for b in first_round_bits.clone() {
+                if b {
+                    print!("1");
+                } else {
+                    print!("0");
+                }
+            }
+            print!("\n");
+
+            let mut packed_transaction_data = vec![];
+            let transaction_data = transaction.public_data_into_bits();
+            packed_transaction_data.extend(transaction_data.clone().into_iter());
+            for _ in 0..256 - transaction_data.len() {
+                packed_transaction_data.push(false);
+            }
+
+            for b in packed_transaction_data.clone() {
+                if b {
+                    print!("1");
+                } else {
+                    print!("0");
+                }
+            }
+            print!("\n");
+
+            let packed_transaction_data_bytes = bit_vector_into_bytes(&packed_transaction_data);
+
+            let mut next_round_hash_bytes = vec![];
+            next_round_hash_bytes.extend(hash_result.iter());
+            next_round_hash_bytes.extend(packed_transaction_data_bytes);
+            assert_eq!(next_round_hash_bytes.len(), 64);
+
+            h = Sha256::new();
+            h.input(&next_round_hash_bytes);
+            hash_result = [0u8; 32];
+            h.result(&mut hash_result[..]);
+
+            hash_result[0] &= 0x1f; // temporary solution
+
+            let mut repr = Fr::zero().into_repr();
+            repr.read_be(&hash_result[..]).expect("pack hash as field element");
+
+            let public_data_commitment = Fr::from_repr(repr).unwrap();
 
             let instance = Update {
                 params: params,
@@ -1645,8 +1789,8 @@ fn test_update_circuit() {
                 old_root: Some(old_root),
                 new_root: Some(new_root),
                 public_data_commitment: Some(public_data_commitment),
-                block_number: Some(Fr::rand(& mut rng)),
-                total_fee: Some(Fr::rand(& mut rng)),
+                block_number: Some(Fr::one()),
+                total_fee: Some(Fr::zero()),
                 transactions: vec![Some((transaction, transaction_witness))],
             };
 
@@ -1655,6 +1799,15 @@ fn test_update_circuit() {
             print!("{}\n", cs.num_constraints());
 
             assert_eq!(cs.num_inputs(), 4);
+
+            let err = cs.which_is_unsatisfied();
+            if err.is_some() {
+                print!("ERROR satisfying in {}\n", err.unwrap());
+            } else {
+                assert!(cs.is_satisfied());
+            }
+
+            // assert!(cs.is_satisfied());
         }
     }
 }

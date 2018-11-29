@@ -204,7 +204,7 @@ mod baby_test {
     use ::alt_babyjubjub::{AltJubjubBn256};
 
     #[test]
-    fn test_pedersen_hash_constraints() {
+    fn test_baby_pedersen_hash_constraints() {
         let mut rng = XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
         let params = &AltJubjubBn256::new();
         let mut cs = TestConstraintSystem::<Bn256>::new();
@@ -229,7 +229,7 @@ mod baby_test {
     }
 
     #[test]
-    fn test_pedersen_hash() {
+    fn test_baby_pedersen_hash() {
         let mut rng = XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
         let params = &AltJubjubBn256::new();
 
@@ -247,7 +247,7 @@ mod baby_test {
 
                 let res = pedersen_hash(
                     cs.namespace(|| "pedersen hash"),
-                    Personalization::MerkleTree(1),
+                    Personalization::MerkleTree(0),
                     &input_bools,
                     params
                 ).unwrap();
@@ -255,7 +255,7 @@ mod baby_test {
                 assert!(cs.is_satisfied());
 
                 let expected = ::pedersen_hash::pedersen_hash::<Bn256, _>(
-                    Personalization::MerkleTree(1),
+                    Personalization::MerkleTree(0),
                     input.clone().into_iter(),
                     params
                 ).into_xy();
@@ -265,7 +265,7 @@ mod baby_test {
 
                 // Test against the output of a different personalization
                 let unexpected = ::pedersen_hash::pedersen_hash::<Bn256, _>(
-                    Personalization::MerkleTree(0),
+                    Personalization::MerkleTree(1),
                     input.into_iter(),
                     params
                 ).into_xy();

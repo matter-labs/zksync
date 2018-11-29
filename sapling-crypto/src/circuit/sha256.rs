@@ -74,11 +74,11 @@ pub fn sha256<E, CS>(
     .collect())
 }
 
-fn get_sha256_iv() -> Vec<UInt32> {
+pub fn get_sha256_iv() -> Vec<UInt32> {
     IV.iter().map(|&v| UInt32::constant(v)).collect()
 }
 
-fn sha256_compression_function<E, CS>(
+pub fn sha256_compression_function<E, CS>(
     cs: CS,
     input: &[Boolean],
     current_hash_value: &[UInt32]

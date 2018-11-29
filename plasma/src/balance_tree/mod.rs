@@ -4,7 +4,7 @@ use std::fmt::{self, Debug};
 use ff::{Field, PrimeField, PrimeFieldRepr};
 use rand::{Rand, thread_rng};
 use pairing::bn256::{Bn256, Fr};
-use sapling_crypto::babyjubjub::{JubjubEngine, JubjubBn256, edwards::Point, PrimeOrder};
+use sapling_crypto::alt_babyjubjub::{JubjubEngine, AltJubjubBn256, edwards::Point, PrimeOrder};
 
 use super::primitives::{GetBits, GetBitsFixed};
 use super::sparse_merkle_tree::SparseMerkleTree;
@@ -41,6 +41,35 @@ impl<E: JubjubEngine> Default for Leaf<E> {
         }
     }
 }
+impl BabyBalanceTree {
+    pub fn verify_proof(&self, index: u32, item: BabyLeaf, proof: Vec<(Fr, bool)>) -> bool {
+        use sparse_merkle_tree::hasher::Hasher;
+        
+        assert!(index < self.capacity());
+        let item_bits = item.get_bits_le();
+        let mut hash = self.hasher.hash_bits(item_bits);
+        let mut proof_index: u32 = 0;
+
+        for (i, e) in proof.clone().into_iter().enumerate() {
+            if e.1 {
+                // current is right
+                proof_index |= 1 << i;
+                hash = self.hasher.compress(&e.0, &hash, i);
+            } else {
+                // current is left
+                hash = self.hasher.compress(&hash, &e.0, i);
+            }
+            // print!("This level hash is {}\n", hash);
+        }
+
+        if proof_index != index {
+            return false;
+        }
+
+        hash == self.root_hash()
+    }
+}
+    
 
 pub type BabyLeaf = Leaf<Bn256>;
 

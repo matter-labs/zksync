@@ -7,6 +7,7 @@ extern crate rand;
 extern crate hex;
 extern crate ff;
 extern crate sapling_crypto;
+extern crate crypto;
 
 pub mod primitives;
 pub mod sparse_merkle_tree;
