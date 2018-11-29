@@ -43,7 +43,7 @@ contract PlasmaStub is VerificationKeys {
         lastVerifiedRoot = EMPTY_TREE_ROOT;
     }
 
-    function commitBlock(uint32 blockNumber, uint128 totalFees, bytes memory txDataPacked, bytes32 newRoot) public returns (bool success) {
+    function commitBlock(uint32 blockNumber, uint128 totalFees, bytes memory txDataPacked, bytes32 newRoot) public {
         require(blockNumber == totalCommitted, "may only commit next block");
 
         bytes32 initialHash = sha256(abi.encodePacked(uint256(blockNumber), uint256(totalFees)));
@@ -52,11 +52,9 @@ contract PlasmaStub is VerificationKeys {
         // TODO: need a strategy to avoid front-running msg.sender
         blocks[totalCommitted] = Block(Circuit.UPDATE, totalFees, newRoot, finalHash, msg.sender, uint32(now + DEADLINE));
         totalCommitted++;
-
-        return true;
     }
 
-    function verifyBlock(uint32 blockNumber, uint256[8] memory proof) public returns (bool success) {
+    function verifyBlock(uint32 blockNumber, uint256[8] memory proof) public {
         require(totalVerified < totalCommitted, "no committed block to verify");
         require(blockNumber == totalVerified, "may only verified next block");
         Block memory committed = blocks[blockNumber];
