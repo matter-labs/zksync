@@ -44,8 +44,6 @@ fn main() {
 
     let tree_depth = *plasma_constants::BALANCE_TREE_DEPTH as u32;
     let initial_root = format!("{}", BabyBalanceTree::new(tree_depth).root_hash().into_repr());
-//    println!("initial_root: {} {}", initial_root, tree_depth);
-
     println!("{}", generate_vk_contract(&params.vk, initial_root.as_ref(), tree_depth));
 }
 
