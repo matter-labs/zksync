@@ -1,36 +1,43 @@
 pragma solidity ^0.5.0;
 
-contract Plasma {
+import "./Verifier.sol";
+import "./VerificationKeys.sol";
 
-    // For testing purposes: only single operator may submit new blocks
-    address public operator;
 
-    constructor() public {
-        operator = msg.sender;
-    }
+contract Plasma is Verifier, VerificationKeys {
 
     // Public API
 
-    // Deposit ERC20 tokens
-    function deposit(address /*_from*/, uint /*_amount*/) public {
+    constructor() public {}
+
+//    // Deposit ERC20 tokens
+//    function deposit(address /*_from*/, uint /*_amount*/) public {
+//
+//    }
+
+    function commitBlock(uint256 blockNumber, uint256 totalFees, bytes memory txDataPacked, bytes32 newRoot) public {
+        bytes32 initialHash = sha256(abi.encodePacked(blockNumber, totalFees));
+        bytes32 finalHash = sha256(abi.encodePacked(initialHash, txDataPacked));
 
     }
 
+    function verifyBlock() public {
 
+    }
 
     // Implementation
 
-    enum Circuit {
-        DEPOSIT,
-        UPDATE,
-        WITHDRAWAL
-    }
-
-    // Verifier stub: this part with hardcoded keys will be generated from Groth16 CRS
-    function verify(Circuit /*circuit*/, uint256[8] memory /*proof*/, uint256[] memory /*inputs*/)
-        internal pure returns (bool valid)
+    function verifyUpdateProof(uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
+        internal view returns (bool valid)
     {
-        return true;
+        uint256[14] memory vk;
+        uint256[] memory gammaABC;
+        (vk, gammaABC) = getVkUpdateCircuit();
+        uint256[] memory inputs = new uint256[](3);
+        inputs[0] = uint256(oldRoot);
+        inputs[1] = uint256(newRoot);
+        inputs[2] = uint256(finalHash);
+        return Verify(vk, gammaABC, proof, inputs);
     }
 
 
