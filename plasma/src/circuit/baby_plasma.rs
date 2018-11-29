@@ -193,22 +193,6 @@ impl <E: JubjubEngine> Transaction<E> {
     ) -> Vec<u8> {
         let raw_data: Vec<bool> = self.data_for_signature_into_bits();
 
-        // conversion example from tests
-
-        // let msg1 = b"Foo bar pad to16"; // 16 bytes
-
-        // let mut input: Vec<bool> = vec![];
-
-        // for b in msg1.iter() {  
-        //     for i in (0..8).into_iter() {
-        //         if (b & (1 << i)) != 0 {
-        //             input.extend(&[true; 1]);
-        //         } else {
-        //             input.extend(&[false; 1]);
-        //         }
-        //     }
-        // }
-
         let mut message_bytes: Vec<u8> = vec![];
 
         let byte_chunks = raw_data.chunks(8);
@@ -573,6 +557,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
             |lc| lc + CS::one(),
             |_| packed_hash_lc.lc(E::Fr::one())
         );
+
+        print!("Final hash in the snark is {}\n", rolling_hash.get_value().unwrap());
 
         Ok(())
     }
@@ -1733,7 +1719,7 @@ fn test_update_circuit_with_witness() {
             let mut hash_result = [0u8; 32];
             h.result(&mut hash_result[..]);
 
-            
+
             print!("Initial hash hex {}\n", hex::encode(hash_result.clone()));
 
             // let first_round_bits = multipack::bytes_to_bits(&hash_result.clone());
