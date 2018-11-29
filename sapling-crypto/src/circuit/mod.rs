@@ -14,10 +14,10 @@ pub mod baby_pedersen_hash;
 pub mod multipack;
 pub mod sha256;
 pub mod baby_eddsa;
+pub mod float_point;
 
 pub mod sapling;
 pub mod sprout;
-pub mod matter;
 
 use bellman::{
     SynthesisError

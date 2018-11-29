@@ -27,6 +27,7 @@ use super::sha256;
 use super::num;
 use super::multipack;
 use super::num::{AllocatedNum, Num};
+use super::float_point::{parse_with_exponent_le};
 
 use sapling_crypto::eddsa::{
     Signature,
@@ -35,7 +36,6 @@ use sapling_crypto::eddsa::{
 };
 
 use super::plasma_constants;
-use super::float_point::*;
 use super::baby_eddsa::EddsaSignature;
 
 // This is transaction data
@@ -57,7 +57,7 @@ pub struct Transaction<E: JubjubEngine> {
     pub signature: Option<TransactionSignature<E>>
 }
 
-fn le_bit_vector_into_field_element<P: PrimeField>
+pub fn le_bit_vector_into_field_element<P: PrimeField>
     (bits: &Vec<bool>) -> P
 {
     // TODO remove representation length hardcode
@@ -85,7 +85,7 @@ fn le_bit_vector_into_field_element<P: PrimeField>
     field_element
 }
 
-fn be_bit_vector_into_bytes
+pub fn be_bit_vector_into_bytes
     (bits: &Vec<bool>) -> Vec<u8>
 {
     let mut bytes: Vec<u8> = vec![];
@@ -108,7 +108,7 @@ fn be_bit_vector_into_bytes
     bytes
 }
 
-fn le_bit_vector_into_bytes
+pub fn le_bit_vector_into_bytes
     (bits: &Vec<bool>) -> Vec<u8>
 {
     let mut bytes: Vec<u8> = vec![];
@@ -130,8 +130,6 @@ fn le_bit_vector_into_bytes
 
     bytes
 }
-
-
 
 impl <E: JubjubEngine> Transaction<E> {
     pub fn public_data_into_bits(
@@ -1095,6 +1093,8 @@ fn apply_transaction<E, CS>(
         max_message_len
     )?;
 
+    print!("Parsing the amount\n");
+
     let amount = parse_with_exponent_le(
         cs.namespace(|| "parse amount"),
         &amount_bits,
@@ -1103,6 +1103,8 @@ fn apply_transaction<E, CS>(
         10
     )?;
 
+    print!("Parsed the amount\n");
+
     let fee = parse_with_exponent_le(
         cs.namespace(|| "parse fee"),
         &fee_bits,
@@ -1110,6 +1112,8 @@ fn apply_transaction<E, CS>(
         *plasma_constants::FEE_MANTISSA_BIT_WIDTH,
         10
     )?;
+
+    print!("Parsed the fee\n");
 
     // repack balances as we have truncated bit decompositions already
     let mut old_balance_from_lc = Num::<E>::zero();

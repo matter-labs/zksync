@@ -1,32 +1,65 @@
-use pairing::{Engine,};
-use ff::{Field, PrimeField, PrimeFieldRepr};
+use pairing::{Engine};
+use ff::{Field, PrimeField};
 use bellman::{ConstraintSystem, SynthesisError};
 use super::boolean::{Boolean};
 use super::num::{AllocatedNum, Num};
+use super::Assignment;
 
 /// Takes a bit decomposition, parses and packs into an AllocatedNum
 /// If exponent is equal to zero, then exponent multiplier is equal to 1
-pub fn parse_with_exponent_le<E, CS>(
+pub fn parse_with_exponent_le<E: Engine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     bits: &[Boolean],
     exponent_length: usize,
     mantissa_length: usize,
     exponent_base: u64
 ) -> Result<AllocatedNum<E>, SynthesisError>
-    where E: Engine, CS: ConstraintSystem<E>
 {
     assert!(bits.len() == exponent_length + mantissa_length);
-    let one_allocated = AllocatedNum::alloc(cs.namespace(|| "allocate one"), || Ok(E::Fr::one())).unwrap();
 
-    let mut exponent_result = AllocatedNum::alloc(cs.namespace(|| "allocate exponent result"), || Ok(E::Fr::one())).unwrap();
-    let mut exp_base = AllocatedNum::alloc(cs.namespace(|| "allocate exponent base"), || Ok(E::Fr::from_str(&exponent_base.to_string()).unwrap())).unwrap();
+    let one_allocated = AllocatedNum::alloc(
+        cs.namespace(|| "allocate one"),
+        || Ok(E::Fr::one())
+    )?;
 
-    for i in 0..exponent_length
-    {
+    print!("{}\n", one_allocated.get_value().clone().unwrap());
+
+    let mut exponent_result = AllocatedNum::alloc(
+        cs.namespace(|| "allocate exponent result"),
+        || Ok(E::Fr::one())
+    )?;
+
+    let exponent_base_string = exponent_base.to_string();
+    let exponent_base_value = E::Fr::from_str(&exponent_base_string.clone()).unwrap();
+
+    let mut exponent_base = AllocatedNum::alloc(
+        cs.namespace(|| "allocate exponent base"), 
+        || Ok(exponent_base_value)
+    )?;
+
+    for i in 0..exponent_length {
         let thisbit = &bits[i];
-        let multiplier = AllocatedNum::conditionally_select(cs.namespace(|| format!("select exponent multiplier {}", i)), &exp_base, &one_allocated, &thisbit).unwrap();
-        exponent_result = exponent_result.mul(cs.namespace(|| format!("make exponent result {}", i)), &multiplier).unwrap();
-        exp_base = exp_base.mul(cs.namespace(|| format!("make exponent base {}", i)), &exp_base.clone()).unwrap();
+
+        let multiplier = AllocatedNum::conditionally_select(
+            cs.namespace(|| format!("select exponent multiplier {}", i)),
+            &exponent_base, 
+            &one_allocated, 
+            &thisbit
+        )?;
+
+        exponent_result = exponent_result.mul(
+            cs.namespace(|| format!("make exponent result {}", i)),
+            &multiplier
+        )?;
+
+        exponent_base = exponent_base.clone().square(
+            cs.namespace(|| format!("make exponent base {}", i))
+        )?;
+
+        // exponent_base = exponent_base.mul(
+        //     cs.namespace(|| format!("make exponent base {}", i)), 
+        //     &exponent_base.clone()
+        // )?;
     }
 
     let mut mantissa_result = Num::<E>::zero();
@@ -39,9 +72,16 @@ pub fn parse_with_exponent_le<E, CS>(
         mantissa_base.double();
     }
 
-    let mut result = mantissa_result.get_value().unwrap();
-    result.mul_assign(&exponent_result.get_value().unwrap());
-    let result_allocated = AllocatedNum::alloc(cs.namespace(|| "float point parsing result"), || Ok(result)).unwrap();
+    let mut result = mantissa_result.get_value().get()?.clone();
+
+    let exponent_value = exponent_result.get_value().get()?.clone();
+
+    result.mul_assign(&exponent_value);
+
+    let result_allocated = AllocatedNum::alloc(
+        cs.namespace(|| "float point parsing result"),
+        || Ok(result)
+    )?;
 
     // num * 1 = input
     cs.enforce(

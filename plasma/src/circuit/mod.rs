@@ -22,7 +22,7 @@ use sapling_crypto::circuit::{
     num,
     multipack,
     baby_eddsa,
-    matter::float_point
+    float_point
 };
 
 use balance_tree;

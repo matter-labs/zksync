@@ -44,7 +44,7 @@ pub struct SparseMerkleTree<T: GetBits + Default, Hash: Clone + Eq, H: Hasher<Ha
 {
     tree_depth: Depth,
     prehashed: Vec<Hash>,
-    items: HashMap<ItemIndex, T>,
+    pub items: HashMap<ItemIndex, T>,
     hashes: HashMap<ItemIndexPacked, Hash>,
     pub hasher: H,
 }
