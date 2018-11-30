@@ -238,7 +238,8 @@ mod tests {
         }
 
         fn compress(&self, lhs: &u64, rhs: &u64, i: usize) -> u64 {
-            let r = 11 * lhs + 17 * rhs + 1;
+            let r = 11 * lhs + 17 * rhs + 1 + i as u64;
+            //println!("compress {} {}, {} => {}", lhs, rhs, i, r);
             r
         }
 
@@ -257,17 +258,17 @@ mod tests {
 
     #[test]
     fn test_merkle_tree_insert() {
-        let mut tree = TestSMT::new(2);
+        let mut tree = TestSMT::new(3);
 
-        assert_eq!(tree.capacity(), 4);
+        assert_eq!(tree.capacity(), 8);
 
         tree.insert(0, 1);
-        //println!("{:?}", tree);
-        assert_eq!(tree.root_hash(), 23707677);
+        println!("{:?}", tree);
+        assert_eq!(tree.root_hash(), 697516875);
 
         tree.insert(3, 2);
         //println!("{:?}", tree);
-        assert_eq!(tree.root_hash(), 28442653);
+        assert_eq!(tree.root_hash(), 749601611);
     }
 
     #[test]
@@ -275,7 +276,7 @@ mod tests {
         let mut tree = TestSMT::new(3);
         tree.insert(2, 1);
         let path = tree.merkle_path(2);
-        println!("{:?}", tree);
+        //println!("{:?}", tree);
         assert_eq!(path, [(32768, false), (917505, true), (25690141, false)]);
     }
 }
