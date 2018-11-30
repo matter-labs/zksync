@@ -4,6 +4,12 @@ use std::collections::HashMap;
 use super::hasher::Hasher;
 use super::super::primitives::GetBits;
 
+
+fn select<T>(condition: bool, a: T, b: T) -> (T, T) {
+    if condition { (a, b) } else { (b, a) }
+}
+
+
 // Lead index: 0 <= i < N
 type ItemIndex = usize;
 
@@ -90,14 +96,14 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
             let link = if dir { &mut updated_cur.rhs } else { &mut updated_cur.lhs };
             *link = Some(child);
         }
-        println!("node[{}] = {:?}", cur_i, updated_cur.clone());
+        //println!("node[{}] = {:?}", cur_i, updated_cur.clone());
         self.nodes.insert(cur_i, updated_cur);
     }
 
     pub fn insert(&mut self, item_index: ItemIndex, item: T) {
         assert!(item_index < self.capacity());
         let leaf_index = (1 << self.tree_depth) + item_index;
-        println!("\ninsert item_index = {}, leaf_index = {:?}", item_index, leaf_index);
+        //println!("\ninsert item_index = {}, leaf_index = {:?}", item_index, leaf_index);
         if let None = self.items.insert(item_index, item) {
             // inserting an item at a new index
 
@@ -105,18 +111,18 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
             let mut cur_i = 1; // we start at root
             loop {
                 let cur_node = self.nodes.get(&cur_i).unwrap().clone(); // must be present
-                println!("cur_i = {:?}", cur_i);
-                println!("cur_node = {:?}", cur_node);
+                //println!("cur_i = {:?}", cur_i);
+                //println!("cur_node = {:?}", cur_node);
 
                 let cur_depth = Self::depth(cur_i);
                 let dir = (leaf_index & (1 << (self.tree_depth - cur_depth - 1))) > 0;
-                println!("dir = {:?}", dir);
+                //println!("dir = {:?}", dir);
                 let link = if dir { cur_node.rhs } else { cur_node.lhs };
 
                 if let Some(next) = link {
                     let next_depth = Self::depth(next);
                     let leaf_index_normalized = leaf_index >> (self.tree_depth - next_depth);
-                    println!("next = {}, leaf_index_normalized = {:?}, next_depth = {:?}", next, leaf_index_normalized, next_depth);
+                    //println!("next = {}, leaf_index_normalized = {:?}, next_depth = {:?}", next, leaf_index_normalized, next_depth);
 
                     if leaf_index_normalized == next {
                         // follow the link
@@ -130,15 +136,11 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
                             while (i & 1) != (next & 1) { i >>= 1; }
                             i
                         };
-                        println!("intersection = {:?}", intersection_i);
+                        //println!("intersection = {:?}", intersection_i);
 
-                        let intersection_node = if leaf_index_normalized > next {
-                            Node{ lhs: Some(next), rhs: Some(leaf_index) }
-                        } else {
-                            Node{ lhs: Some(leaf_index), rhs: Some(next) }
-                        };
-
-                        println!("node[{}] = {:?}", intersection_i, intersection_node);
+                        let (lhs, rhs) = select(leaf_index_normalized > next, Some(next), Some(leaf_index));
+                        let intersection_node = Node{lhs, rhs};
+                        //println!("node[{}] = {:?}", intersection_i, intersection_node);
                         self.nodes.insert(intersection_i, intersection_node);
 
                         self.update_node(&cur_node, cur_i, dir, intersection_i);
@@ -153,52 +155,50 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
             }
         }
 
-//        let hash_index = (1 << self.tree_depth) + index;
-//        let hash = self.hasher.hash_bits(item.get_bits_le());
-//        self.hashes.insert(hash_index, hash);
-//
-//
-//        let mut i = hash_index >> 1;
-//        while i > 0 {
-//            self.update_hash(i);
-//            i >>= 1;
-//        }
     }
 
-//    fn update_hash(&mut self, index: NodeIndex) -> Hash {
-//        assert!(index <= self.nodes_capacity());
-//
-////        // indices for child nodes in the tree
-////        let lhs = index * 2;
-////        let rhs = index * 2 + 1;
-////
-////        // if both child nodes are empty, use precomputed hash
-////        if !self.hashes.contains_key(&lhs) && !self.hashes.contains_key(&rhs) {
-////            return self.prehashed.get(Self::depth(index)).unwrap().clone()
-////        }
-////
-////        let i = (self.tree_depth - 1) - Self::depth(index);
-////        let hash = self.hasher.compress(&self.get_hash(lhs), &self.get_hash(rhs), i);
-////        self.hashes.insert(index, hash.clone());
-////        hash
-//        Hash::default()
-//    }
+    fn hash_line(&self, from: Option<NodeIndex>, to: NodeIndex, dir: bool) -> Hash {
+        println!("hash_line {:?} {} {}", from, to, dir);
 
-//    fn get_hash(&self, index: NodeIndex) -> Hash {
-//        assert!(index <= self.nodes_capacity());
-//        if let Some(hash) = self.hashes.get(&index) {
-//            // if hash for this index exists, return it
-//            hash.clone()
-//        } else {
-//            // otherwise return pre-computed
-//            self.prehashed.get(Self::depth(index)).unwrap().clone()
-//        }
-//    }
+        let to_depth = Self::depth(to);
+        match from {
+            None => self.prehashed[to_depth + 1].clone(),
+            Some(from) => {
+                let mut cur_hash = self.get_hash(from);
+                let mut cur_depth = Self::depth(from) - 1;
+                while cur_depth > to_depth {
+                    println!("cur_depth = {}", cur_depth);
+                    let (lhs, rhs) = select(!dir, cur_hash.clone(), self.prehashed[cur_depth + 1].clone());
+                    cur_hash = self.hasher.compress(&lhs, &rhs, self.tree_depth - cur_depth - 1);
+                    cur_depth -= 1;
+                }
+                cur_hash
+            }
+        }
+    }
 
-//    pub fn root_hash(&self) -> Hash {
-//        //self.get_hash(1)
-//        self.hasher.hash(T::default())
-//    }
+    fn get_hash(&self, index: NodeIndex) -> Hash {
+        //println!("get_hash {}", index);
+
+        let cur_depth = Self::depth(index);
+        if cur_depth == self.tree_depth {
+            // leaf node: return item hash
+            let item_index = index - (1 << self.tree_depth);
+            //println!("item_index = {}", item_index);
+            return self.hasher.hash_bits(self.items[&item_index].get_bits_le())
+        }
+
+        let cur_node = self.nodes.get(&index).unwrap().clone();
+        //println!("cur_node {:?}", cur_node);
+
+        let lhs = self.hash_line(cur_node.lhs, index, false);
+        let rhs = self.hash_line(cur_node.rhs, index, true);
+        self.hasher.compress(&lhs, &rhs, self.tree_depth - cur_depth - 1)
+    }
+
+    pub fn root_hash(&self) -> Hash {
+        self.get_hash(1)
+    }
 
 }
 
@@ -245,7 +245,8 @@ mod tests {
         }
 
         fn compress(&self, lhs: &u64, rhs: &u64, i: usize) -> u64 {
-            let r = 11 * lhs + 17 * rhs + 1;
+            let r = 11 * lhs + 17 * rhs + 1 + i as u64;
+            //println!("compress {} {}, {} => {}", lhs, rhs, i, r);
             r
         }
 
@@ -263,7 +264,20 @@ mod tests {
         tree.insert(3, TestLeaf(2));
         tree.insert(5, TestLeaf(2));
         tree.insert(2, TestLeaf(2));
-        println!("{:?}\n", tree);
+        //println!("{:?}\n", tree);
+    }
+
+    #[test]
+    fn test_batching_tree_insert_comparative() {
+        let mut tree = TestSMT::new(3);
+
+        tree.insert(0,  TestLeaf(1));
+        //println!("{:?}", tree);
+        assert_eq!(tree.root_hash(), 697516875);
+
+        tree.insert(3, TestLeaf(2));
+        //println!("{:?}", tree);
+        assert_eq!(tree.root_hash(), 749601611);
     }
 
 }
