@@ -20,8 +20,17 @@ use crypto::sha2::Sha256;
 use crypto::digest::Digest;
 use std::collections::HashMap;
 
+use bellman::{
+    SynthesisError,
+    ConstraintSystem,
+    Circuit,
+};
+
 use bellman::groth16::{
-    create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
+    create_random_proof, 
+    generate_random_parameters, 
+    prepare_verifying_key, 
+    verify_proof,
 };
 
 use sapling_crypto::jubjub::{
@@ -321,7 +330,7 @@ fn main() {
     let public_data_commitment = Fr::from_repr(repr).unwrap();
 
 
-    let mut instance = Update {
+    let instance = Update {
         params: params,
         number_of_transactions: TXES_TO_TEST,
         old_root: Some(initial_root),
@@ -331,6 +340,24 @@ fn main() {
         total_fee: Some(total_fees),
         transactions: witnesses.clone(),
     };
+
+    // let mut cs = TestConstraintSystem::<Bn256>::new();
+    // instance.synthesize(&mut cs).unwrap();
+
+    // print!("{}\n", cs.num_constraints());
+
+    // assert_eq!(cs.num_inputs(), 4);
+
+    // let err = cs.which_is_unsatisfied();
+    // if err.is_some() {
+    //     print!("ERROR satisfying in {}\n", err.unwrap());
+    // } else {
+    //     assert!(cs.is_satisfied());
+    // }
+
+    // assert!(cs.is_satisfied());
+
+    // return;
 
     println!("generating setup...");
     let start = PreciseTime::now();
@@ -343,7 +370,7 @@ fn main() {
 
     let pvk = prepare_verifying_key(&cirtuit_params.vk);
 
-    instance = Update {
+    let proving_instance = Update {
         params: params,
         number_of_transactions: TXES_TO_TEST,
         old_root: Some(initial_root),
@@ -356,7 +383,7 @@ fn main() {
 
     println!("creating proof...");
     let start = PreciseTime::now();
-    let proof = create_random_proof(instance, &cirtuit_params, rng).unwrap();
+    let proof = create_random_proof(proving_instance, &cirtuit_params, rng).unwrap();
     println!("proof created in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);
 
     let success = verify_proof(&pvk, &proof, &[]).unwrap();

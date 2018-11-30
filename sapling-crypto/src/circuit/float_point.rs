@@ -22,8 +22,6 @@ pub fn parse_with_exponent_le<E: Engine, CS: ConstraintSystem<E>>(
         || Ok(E::Fr::one())
     )?;
 
-    print!("{}\n", one_allocated.get_value().clone().unwrap());
-
     let mut exponent_result = AllocatedNum::alloc(
         cs.namespace(|| "allocate exponent result"),
         || Ok(E::Fr::one())
@@ -36,6 +34,8 @@ pub fn parse_with_exponent_le<E: Engine, CS: ConstraintSystem<E>>(
         cs.namespace(|| "allocate exponent base"), 
         || Ok(exponent_base_value)
     )?;
+
+    let mut exponent_value = exponent_base_value;
 
     for i in 0..exponent_length {
         let thisbit = &bits[i];
@@ -72,26 +72,38 @@ pub fn parse_with_exponent_le<E: Engine, CS: ConstraintSystem<E>>(
         mantissa_base.double();
     }
 
-    let mut result = mantissa_result.get_value().get()?.clone();
-
-    let exponent_value = exponent_result.get_value().get()?.clone();
-
-    result.mul_assign(&exponent_value);
-
-    let result_allocated = AllocatedNum::alloc(
-        cs.namespace(|| "float point parsing result"),
-        || Ok(result)
+    let mantissa = AllocatedNum::alloc(
+        cs.namespace(|| "allocating mantissa"),
+        || Ok(*mantissa_result.get_value().get()?)
     )?;
 
-    // num * 1 = input
-    cs.enforce(
-        || "float point result constraint",
-        |lc| lc + exponent_result.get_variable(),
-        |_| mantissa_result.lc(E::Fr::one()),
-        |lc| lc + result_allocated.get_variable()
-    );
+    mantissa.mul(
+        cs.namespace(|| "calculate floating point result"),
+        &exponent_result
+    )
 
-    Ok(result_allocated)
+    // return 
+
+    // let mut result = mantissa_result.get_value().get()?.clone();
+
+    // let exponent_value = exponent_result.get_value().get()?.clone();
+
+    // result.mul_assign(&exponent_value);
+
+    // let result_allocated = AllocatedNum::alloc(
+    //     cs.namespace(|| "float point parsing result"),
+    //     || Ok(result)
+    // )?;
+
+    // // num * 1 = input
+    // cs.enforce(
+    //     || "float point result constraint",
+    //     |lc| lc + exponent_result.get_variable(),
+    //     |_| mantissa_result.lc(E::Fr::one()),
+    //     |lc| lc + result_allocated.get_variable()
+    // );
+
+    // Ok(result_allocated)
 }
 
 pub fn convert_to_float(

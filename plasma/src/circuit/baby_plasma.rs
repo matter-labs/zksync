@@ -27,7 +27,7 @@ use super::sha256;
 use super::num;
 use super::multipack;
 use super::num::{AllocatedNum, Num};
-use super::float_point::{parse_with_exponent_le};
+use super::float_point::{parse_with_exponent_le, convert_to_float};
 
 use sapling_crypto::eddsa::{
     Signature,
@@ -354,6 +354,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
             public_data_vector.push(public_data);
         }
 
+        println!("Finished with TXes");
+
         // constraint the new hash to be equal to updated hash
 
         cs.enforce(
@@ -373,49 +375,97 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
 
         // First calculate a final fee amount
 
-        let mut total_fee_lc = Num::<E>::zero();
-        for fee in fees.into_iter() {
-            total_fee_lc = total_fee_lc.add_bool_with_coeff(
-                CS::one(), 
-                &boolean::Boolean::Constant(true), 
-                *fee.get_value().get()?
-            );
-        }
+        // let mut total_fee_lc = Num::<E>::zero();
+        // for fee in fees.into_iter() {
+        //     total_fee_lc = total_fee_lc.add_bool_with_coeff(
+        //         CS::one(), 
+        //         &boolean::Boolean::Constant(true), 
+        //         *fee.get_value().get()?
+        //     );
+        // }
 
-        let total_fee = self.total_fee.clone();
+        // let mut total_fee_lc = Num::<E>::zero();
+        // for fee in fees.into_iter() {
+        //     total_fee_lc = total_fee_lc.add_bool_with_coeff(
+        //         CS::one(), 
+        //         &boolean::Boolean::Constant(true), 
+        //         E::Fr::zero()
+        //     );
+        // }
+
+        // let total_fee = self.total_fee.clone();
+
+        // let total_fee_allocated = AllocatedNum::alloc(
+        //     cs.namespace(|| "allocate total fees"),
+        //     || Ok(*total_fee.get()?)
+        // )?;
 
         let total_fee_allocated = AllocatedNum::alloc(
             cs.namespace(|| "allocate total fees"),
-            || Ok(*total_fee.get()?)
+            || {
+                let total_fee = self.total_fee;
+                Ok(*total_fee.clone().get()?)
+            }
         )?;
 
         cs.enforce(
             || "enforce total fee",
             |lc| lc + total_fee_allocated.get_variable(),
             |lc| lc + CS::one(),
-            |_| total_fee_lc.lc(E::Fr::one())
+            |lc| {
+                let mut final_lc = lc;
+                for fee in fees.into_iter() {
+                    final_lc = final_lc + fee.get_variable();
+                }
+
+                final_lc
+                }
         );
+
+        // cs.enforce(
+        //     || "enforce total fee",
+        //     |lc| lc + total_fee_allocated.get_variable(),
+        //     |lc| lc + CS::one(),
+        //     |_| total_fee_lc.lc(E::Fr::one())
+        // );
+
+        println!("Calculated total fees");
 
         // Then check that for every transaction in this block 
         // the parameter "good until" was greater or equal
         // than the current block number
 
-        let block_number = self.block_number.clone();
-
         let block_number_allocated = AllocatedNum::alloc(
             cs.namespace(|| "allocate block number"),
-            || Ok(*block_number.clone().get()?)
+            || {
+                let block_number = self.block_number;
+                Ok(*block_number.clone().get()?)
+            }
         )?;
+
+        println!("Calculated total fees");
+
 
         for (i, block_number_in_tx) in block_numbers.into_iter().enumerate() {
             // first name a new value and constraint that it's a proper subtraction
 
-            let mut difference = *block_number_in_tx.get_value().get()?;
-            difference.sub_assign(block_number.clone().get()?);
-
             let difference_allocated = AllocatedNum::alloc(
                 cs.namespace(|| format!("allocate block number difference {}", i)),
-                || Ok(difference)
+                || {
+                    let block_number = self.block_number;
+                    let mut difference = *block_number_in_tx.get_value().get()?;
+                    difference.sub_assign(block_number.clone().get()?);
+
+                    Ok(difference)
+                }
+            )?;
+
+            // check for overflow
+
+            AllocatedNum::limit_number_of_bits(
+                cs.namespace(|| format!("check for subtraction overflow {}", i)),
+                &difference_allocated, 
+                *plasma_constants::BLOCK_NUMBER_BIT_WIDTH
             )?;
 
             // enforce proper subtraction
@@ -426,13 +476,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
                 |lc| lc + block_number_in_tx.get_variable() - block_number_allocated.get_variable()
             );
 
-            // check for overflow
-
-            AllocatedNum::limit_number_of_bits(
-                cs.namespace(|| format!("check for subtraction overflow {}", i)),
-                &difference_allocated, 
-                *plasma_constants::BLOCK_NUMBER_BIT_WIDTH
-            )?;
         }
 
         // Now it's time to pack the initial SHA256 hash due to Ethereum BE encoding
@@ -486,6 +529,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
         let remaining_to_pack = self.number_of_transactions % pack_by;
         let padding_in_pack = 256 - pack_by*public_data_size;
         let padding_in_remainder = 256 - remaining_to_pack*public_data_size;
+
+        println!("Packing public data");
 
         let mut public_data_iterator = public_data_vector.into_iter();
 
@@ -1093,8 +1138,6 @@ fn apply_transaction<E, CS>(
         max_message_len
     )?;
 
-    print!("Parsing the amount\n");
-
     let amount = parse_with_exponent_le(
         cs.namespace(|| "parse amount"),
         &amount_bits,
@@ -1103,8 +1146,6 @@ fn apply_transaction<E, CS>(
         10
     )?;
 
-    print!("Parsed the amount\n");
-
     let fee = parse_with_exponent_le(
         cs.namespace(|| "parse fee"),
         &fee_bits,
@@ -1112,8 +1153,6 @@ fn apply_transaction<E, CS>(
         *plasma_constants::FEE_MANTISSA_BIT_WIDTH,
         10
     )?;
-
-    print!("Parsed the fee\n");
 
     // repack balances as we have truncated bit decompositions already
     let mut old_balance_from_lc = Num::<E>::zero();
@@ -1173,19 +1212,18 @@ fn apply_transaction<E, CS>(
         |_| nonce_lc.lc(E::Fr::one())
     );
 
-    let old_balance_from_value = old_balance_from.get_value().get()?.clone();
-    let transfer_amount_value = amount.clone().get_value().get()?.clone();
-    let fee_value = fee.clone().get_value().get()?.clone();
-
-    let mut new_balance_from_value = old_balance_from_value;
-    new_balance_from_value.sub_assign(&transfer_amount_value);
-    new_balance_from_value.sub_assign(&fee_value);
-
-    // print!("Updated balance from in a snark is {}\n", new_balance_from_value.clone());
-
     let new_balance_from = AllocatedNum::alloc(
         cs.namespace(|| "new balance from"),
-        || Ok(new_balance_from_value)
+        || {
+            let old_balance_from_value = old_balance_from.get_value().get()?.clone();
+            let transfer_amount_value = amount.clone().get_value().get()?.clone();
+            let fee_value = fee.clone().get_value().get()?.clone();
+            let mut new_balance_from_value = old_balance_from_value;
+            new_balance_from_value.sub_assign(&transfer_amount_value);
+            new_balance_from_value.sub_assign(&fee_value);
+
+            Ok(new_balance_from_value)
+        }
     )?;
 
     // constraint no overflow
@@ -1203,16 +1241,17 @@ fn apply_transaction<E, CS>(
         |lc| lc + new_balance_from.get_variable() + fee.get_variable() + amount.get_variable()
     );
 
-    let old_balance_to_value = old_balance_to.clone().get_value().get()?.clone();
-
-    let mut new_balance_to_value = old_balance_to_value;
-    new_balance_to_value.add_assign(&transfer_amount_value);
-
-    // print!("Updated balance to in a snark is {}\n", new_balance_to_value.clone());
-
     let new_balance_to = AllocatedNum::alloc(
         cs.namespace(|| "new balance to"),
-        || Ok(new_balance_to_value)
+        || {
+            let transfer_amount_value = amount.clone().get_value().get()?.clone();
+            let old_balance_to_value = old_balance_to.clone().get_value().get()?.clone();
+
+            let mut new_balance_to_value = old_balance_to_value;
+            new_balance_to_value.add_assign(&transfer_amount_value);
+
+            Ok(new_balance_to_value)
+        }
     )?;
 
     // constraint no overflow
@@ -1230,21 +1269,21 @@ fn apply_transaction<E, CS>(
         |lc| lc + old_balance_to.get_variable() + amount.get_variable()
     );
 
-    let mut new_nonce_value = nonce.get_value().get()?.clone();
-    new_nonce_value.add_assign(&E::Fr::one());
-
-    // print!("Updated nonce from in a snark is {}\n", new_nonce_value.clone());
-
     let new_nonce = AllocatedNum::alloc(
         cs.namespace(|| "new nonce"),
-        || Ok(new_nonce_value)
+        || {
+            let mut new_nonce_value = nonce.get_value().get()?.clone();
+            new_nonce_value.add_assign(&E::Fr::one());
+
+            Ok(new_nonce_value)
+        }
     )?;
 
     // constraint no overflow
     num::AllocatedNum::limit_number_of_bits(
         cs.namespace(|| "limit number of bits for new nonce from"),
         &new_nonce,
-        *plasma_constants::BALANCE_BIT_WIDTH
+        *plasma_constants::NONCE_BIT_WIDTH
     )?;
 
     // enforce increase of balance
