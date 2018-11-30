@@ -1,5 +1,6 @@
 // Sparse Merkle tree with flexible hashing strategy
 
+pub mod alt;
 pub mod hasher;
 pub mod pedersen_hasher;
 
@@ -244,16 +245,16 @@ mod tests {
 
     type TestSMT = SparseMerkleTree<u64, u64, TestHasher>;
 
-    // #[test]
-    // fn test_merkle_tree_props() {
-        // let mut tree = TestSMT::new(3);
-        // assert_eq!(TestSMT::depth(1), 0);
-        // assert_eq!(TestSMT::depth(2), 1);
-        // assert_eq!(TestSMT::depth(3), 1);
-        // assert_eq!(TestSMT::depth(4), 2);
-    // }
+//     #[test]
+//     fn test_merkle_tree_props() {
+//         let mut tree = TestSMT::new(3);
+//         assert_eq!(TestSMT::depth(1), 0);
+//         assert_eq!(TestSMT::depth(2), 1);
+//         assert_eq!(TestSMT::depth(3), 1);
+//         assert_eq!(TestSMT::depth(4), 2);
+//     }
 
-    // #[test]
+    #[test]
     fn test_merkle_tree_insert() {
         let mut tree = TestSMT::new(2);
 
@@ -261,11 +262,11 @@ mod tests {
 
         tree.insert(0, 1);
         //println!("{:?}", tree);
-        // assert_eq!(tree.root_hash(), 23707677);
+        assert_eq!(tree.root_hash(), 23707677);
 
         tree.insert(3, 2);
         //println!("{:?}", tree);
-        // assert_eq!(tree.root_hash(), 28442653);
+        assert_eq!(tree.root_hash(), 28442653);
     }
 
     #[test]
