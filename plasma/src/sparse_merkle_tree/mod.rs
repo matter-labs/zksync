@@ -1,6 +1,6 @@
 // Sparse Merkle tree with flexible hashing strategy
 
-pub mod alt;
+pub mod batching;
 pub mod hasher;
 pub mod pedersen_hasher;
 
@@ -274,6 +274,7 @@ mod tests {
         let mut tree = TestSMT::new(3);
         tree.insert(2, 1);
         let path = tree.merkle_path(2);
+        println!("{:?}", tree);
         assert_eq!(path, [(32768, false), (917505, true), (25690141, false)]);
     }
 }
