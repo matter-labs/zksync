@@ -277,6 +277,6 @@ mod tests {
         tree.insert(2, 1);
         let path = tree.merkle_path(2);
         //println!("{:?}", tree);
-        assert_eq!(path, [(32768, false), (917505, true), (25690141, false)]);
+        assert_eq!(path, [(32768, false), (917505, true), (25690142, false)]);
     }
 }
