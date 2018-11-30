@@ -22,6 +22,7 @@ use std::fmt::Write;
 use byteorder::{BigEndian, ByteOrder};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::collections::HashSet;
 
 use blake2_rfc::blake2s::Blake2s;
 
@@ -228,6 +229,76 @@ impl<E: Engine> TestConstraintSystem<E> {
         }
 
         write!(&mut s, "\n").unwrap();
+
+        s
+    }
+
+    pub fn find_unconstrained(&self) -> String {
+        let mut s = String::new();
+
+        let negone = {
+            let mut tmp = E::Fr::one();
+            tmp.negate();
+            tmp
+        };
+
+        let powers_of_two = (0..E::Fr::NUM_BITS).map(|i| {
+            E::Fr::from_str("2").unwrap().pow(&[i as u64])
+        }).collect::<Vec<_>>();
+
+        let pp = |hm: & mut HashSet<String>, lc: &LinearCombination<E>| {
+            for (var, coeff) in proc_lc::<E>(lc.as_ref()) {
+                match var.0.get_unchecked() {
+                    Index::Input(i) => {
+                        let v = self.inputs[i].clone();
+                        hm.insert(v.1);
+                        // if hm.get(&self.inputs[i].1).is_none() {
+                        //     // let val = self.inputs[i].1;
+                        //     hm.insert(self.inputs[i].1);
+                        // } 
+                    },
+                    Index::Aux(i) => {
+                        let v = self.aux[i].clone();
+                        hm.insert(v.1);
+                        // if hm.get(&self.aux[i].1).is_none() {
+                        //     hm.insert(self.aux[i].1);
+                        // } 
+                    }
+                }
+            }
+        };
+
+        let i_max = self.constraints.len();
+
+        println!("Need to lookup {} constraints", i_max);
+
+        let mut set = HashSet::new();
+        for &(ref a, ref b, ref c, ref _name) in &self.constraints {
+
+            pp(&mut set, a);
+            pp(&mut set, b);
+            pp(&mut set, c);
+        }
+
+        println!("Checking inputs being constrained");
+
+        for inp in self.inputs.iter() {
+            if set.get(&inp.1).is_none() {
+                write!(&mut s, "\n").unwrap();
+                write!(&mut s, "{}", inp.1).unwrap();
+                write!(&mut s, "\n").unwrap();
+            }
+        }
+
+        println!("Checking auxilary inputs being constrained");
+
+        for inp in self.aux.iter() {
+            if set.get(&inp.1).is_none() {
+                write!(&mut s, "\n").unwrap();
+                write!(&mut s, "{}", inp.1).unwrap();
+                write!(&mut s, "\n").unwrap();
+            }
+        }
 
         s
     }

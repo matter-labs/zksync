@@ -120,7 +120,6 @@ impl<E: JubjubEngine> PrivateKey<E> {
 
         assert!(msg.len() <= max_message_size);
         assert!(max_message_size * 8 <= E::Fs::CAPACITY as usize);
-        // assert!(max_message_size * 8 <= E::Fs::Repr::len());
         // we also pad message to max size
 
         // pad with zeroes to match representation length

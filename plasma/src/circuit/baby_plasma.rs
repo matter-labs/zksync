@@ -237,11 +237,26 @@ impl <E: JubjubEngine> Transaction<E> {
             max_message_len / 8
         );
 
-        let mut sigs_bytes = [0u8; 32];
-        signature.s.into_repr().write_le(& mut sigs_bytes[..]).expect("get LE bytes of signature S");
-        let mut sigs_repr = E::Fr::zero().into_repr();
-        sigs_repr.read_le(&sigs_bytes[..]).expect("interpret S as field element representation");
-        let sigs_converted = E::Fr::from_repr(sigs_repr).unwrap();
+        let pk = PublicKey::from_private(&private_key, p_g, params);
+        let is_valid_signature = pk.verify_for_raw_message(&message_bytes, 
+                                        &signature.clone(), 
+                                        p_g, 
+                                        params, 
+                                        max_message_len/8);
+        if !is_valid_signature {
+            return;
+        }
+
+        let mut sigs_le_bits: Vec<bool> = BitIterator::new(signature.s.into_repr()).collect();
+        sigs_le_bits.reverse();
+
+        let sigs_converted = le_bit_vector_into_field_element(&sigs_le_bits);
+
+        // let mut sigs_bytes = [0u8; 32];
+        // signature.s.into_repr().write_le(& mut sigs_bytes[..]).expect("get LE bytes of signature S");
+        // let mut sigs_repr = E::Fr::zero().into_repr();
+        // sigs_repr.read_le(&sigs_bytes[..]).expect("interpret S as field element representation");
+        // let sigs_converted = E::Fr::from_repr(sigs_repr).unwrap();
 
         let converted_signature = TransactionSignature {
             r: signature.r,
@@ -306,9 +321,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
         // Expose inputs and do the bits decomposition of hash
         let mut old_root = AllocatedNum::alloc(
             cs.namespace(|| "old root"),
-            || {
-                Ok(*old_root_value.get()?)
-            }
+            || Ok(*old_root_value.get()?)
         )?;
         old_root.inputize(cs.namespace(|| "old root input"))?;
 
@@ -354,8 +367,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
             public_data_vector.push(public_data);
         }
 
-        println!("Finished with TXes");
-
+        // return  Ok(());
         // constraint the new hash to be equal to updated hash
 
         cs.enforce(
@@ -374,31 +386,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
         // as those are going to be naturally represented as Ethereum units
 
         // First calculate a final fee amount
-
-        // let mut total_fee_lc = Num::<E>::zero();
-        // for fee in fees.into_iter() {
-        //     total_fee_lc = total_fee_lc.add_bool_with_coeff(
-        //         CS::one(), 
-        //         &boolean::Boolean::Constant(true), 
-        //         *fee.get_value().get()?
-        //     );
-        // }
-
-        // let mut total_fee_lc = Num::<E>::zero();
-        // for fee in fees.into_iter() {
-        //     total_fee_lc = total_fee_lc.add_bool_with_coeff(
-        //         CS::one(), 
-        //         &boolean::Boolean::Constant(true), 
-        //         E::Fr::zero()
-        //     );
-        // }
-
-        // let total_fee = self.total_fee.clone();
-
-        // let total_fee_allocated = AllocatedNum::alloc(
-        //     cs.namespace(|| "allocate total fees"),
-        //     || Ok(*total_fee.get()?)
-        // )?;
 
         let total_fee_allocated = AllocatedNum::alloc(
             cs.namespace(|| "allocate total fees"),
@@ -422,13 +409,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
                 }
         );
 
-        // cs.enforce(
-        //     || "enforce total fee",
-        //     |lc| lc + total_fee_allocated.get_variable(),
-        //     |lc| lc + CS::one(),
-        //     |_| total_fee_lc.lc(E::Fr::one())
-        // );
-
         // Then check that for every transaction in this block 
         // the parameter "good until" was greater or equal
         // than the current block number
@@ -436,8 +416,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
         let block_number_allocated = AllocatedNum::alloc(
             cs.namespace(|| "allocate block number"),
             || {
-                let block_number = self.block_number;
-                Ok(*block_number.clone().get()?)
+                Ok(*self.block_number.get()?)
             }
         )?;
 
@@ -447,9 +426,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
             let difference_allocated = AllocatedNum::alloc(
                 cs.namespace(|| format!("allocate block number difference {}", i)),
                 || {
-                    let block_number = self.block_number;
                     let mut difference = *block_number_in_tx.get_value().get()?;
-                    difference.sub_assign(block_number.clone().get()?);
+                    difference.sub_assign(self.block_number.get()?);
 
                     Ok(difference)
                 }
@@ -457,9 +435,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
 
             // check for overflow
 
-            AllocatedNum::limit_number_of_bits(
+            difference_allocated.limit_number_of_bits(
                 cs.namespace(|| format!("check for subtraction overflow {}", i)),
-                &difference_allocated, 
                 *plasma_constants::BLOCK_NUMBER_BIT_WIDTH
             )?;
 
@@ -501,8 +478,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
 
         assert_eq!(initial_hash_data.len(), 512);
 
-        // print_boolean_vector(&initial_hash_data.clone());
-
         let mut hash_block = sha256::sha256(
             cs.namespace(|| "initial rolling sha256"),
             &initial_hash_data
@@ -525,8 +500,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
         let padding_in_pack = 256 - pack_by*public_data_size;
         let padding_in_remainder = 256 - remaining_to_pack*public_data_size;
 
-        println!("Packing public data");
-
         let mut public_data_iterator = public_data_vector.into_iter();
 
         for i in 0..number_of_packs 
@@ -541,10 +514,12 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
                 let next: Vec<boolean::Boolean> = public_data_iterator.next().get()?.clone();
                 pack_bits.extend(next);
             }
+
             for _ in 0..padding_in_pack
             {
                 pack_bits.push(boolean::Boolean::Constant(false));
             }
+
             hash_block = sha256::sha256(
                 cs.namespace(|| format!("hash for block {}", i)),
                 &pack_bits
@@ -565,8 +540,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
         {
             pack_bits.push(boolean::Boolean::Constant(false));
         }
-
-        // // print_boolean_vector(&pack_bits.clone());
 
         hash_block = sha256::sha256(
             cs.namespace(|| "hash the remainder"),
@@ -592,8 +565,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
             |_| packed_hash_lc.lc(E::Fr::one())
         );
 
-        // print!("Final hash in the snark is {}\n", rolling_hash.get_value().get()?);
-
         Ok(())
     }
 }
@@ -601,57 +572,60 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
 // returns a bit vector with ones up to the first point of divergence
 fn find_common_prefix<E, CS>(
         mut cs: CS,
-        a: Vec<boolean::Boolean>,
-        b: Vec<boolean::Boolean>
+        a: &[boolean::Boolean],
+        b: &[boolean::Boolean]
     ) -> Result<Vec<boolean::Boolean>, SynthesisError>
         where E: JubjubEngine,
         CS: ConstraintSystem<E>
 {
     assert_eq!(a.len(), b.len());
-    let mut result = vec![];
 
-    // this is how it usually works
-    // - calculate result like you work with normal operators
-    // - constraint
+    // initiall divergence did NOT happen yet
 
-    let mut first_divergence_found = false;
+    let mut no_divergence_bool = boolean::Boolean::Constant(true);
+ 
+    // let mut no_divergence_bool = boolean::Boolean::from(
+    //     boolean::AllocatedBit::alloc(
+    //         cs.namespace(|| "Allocate divergence bit initial value"),
+    //         Some(true)
+    //     )?
+    // );
 
-    for (a_bit, b_bit) in a.iter().zip(b.iter()) {
-        if first_divergence_found {
-            result.push(boolean::Boolean::Constant(false));
-        } else {
-            if a_bit.clone().get_value().get()? == b_bit.clone().get_value().get()? {
-                result.push(boolean::Boolean::Constant(true));
-            } else {
-                first_divergence_found = true;
-                result.push(boolean::Boolean::Constant(false));
-            }
-        }
+    let mut mask_bools = vec![];
+
+    for (i, (a_bit, b_bit)) in a.iter().zip(b.iter()).enumerate() {
+
+        // on common prefix mean a == b AND divergence_bit
+
+        // a == b -> NOT (a XOR b)
+
+        let a_xor_b = boolean::Boolean::xor(
+            cs.namespace(|| format!("Common prefix a XOR b {}", i)),
+            &a_bit,
+            &b_bit
+        )?;
+
+        let mask_bool = boolean::Boolean::and(
+            cs.namespace(|| format!("Common prefix mask bit {}", i)),
+            &a_xor_b.not(),
+            &no_divergence_bool
+        )?;
+
+        // is no_divergence_bool == true: mask_bool = a == b
+        // else: mask_bool == false
+        // -->
+        // if mask_bool == false: divergence = divergence AND mask_bool
+
+        no_divergence_bool = boolean::Boolean::and(
+            cs.namespace(|| format!("recalculate divergence bit {}", i)),
+            &no_divergence_bool,
+            &mask_bool
+        )?;
+
+        mask_bools.push(no_divergence_bool.clone());
     }
 
-    for (i, ((a_bit, b_bit), mask_bit) ) in a.iter().zip(b.iter()).zip(result.clone().iter()).enumerate() {
-        // This calculated bitmask makes it easy to constraint equality
-        // first we calculate an AND between bitmask and vectors A and B
-        let a_masked = boolean::Boolean::and(
-            cs.namespace(|| format!("bitmask vector a for bit {}", i)), 
-            &a_bit, 
-            &mask_bit
-        )?;
-
-        let b_masked = boolean::Boolean::and(
-            cs.namespace(|| format!("bitmask vector b for bit {}", i)), 
-            &b_bit, 
-            &mask_bit
-        )?;
-
-        boolean::Boolean::enforce_equal(
-            cs.namespace(|| format!("constraint bitmasked values equal for bit {}", i)),
-            &a_masked, 
-            &b_masked
-        )?;
-    }
-
-    Ok(result)
+    Ok(mask_bools)
 }
 
 /// Applies one transaction to the tree,
@@ -670,122 +644,44 @@ fn apply_transaction<E, CS>(
     let tx = tx_data.0.clone();
     let tx_witness = tx_data.1.clone();
 
-    // before having fun with leafs calculate the common prefix
-    // of two audit paths
-
-    let mut common_prefix: Vec<boolean::Boolean> = vec![];
-    {
-        let cs = & mut cs.namespace(|| "common prefix search");
-        
-        let mut reversed_path_from = tx_witness.clone().auth_path_from;
-        reversed_path_from.reverse();
-
-        let mut bitmap_path_from : Vec<boolean::Boolean> = vec![];
-
-        for (i, e) in reversed_path_from.iter().enumerate() {
-            let bit = boolean::Boolean::from(
-                boolean::AllocatedBit::alloc(
-                    cs.namespace(|| format!("merkle tree path for from leaf for bit {}", i)),
-                    e.map(|e| e.1)
-                )?
-            );
-
-            bitmap_path_from.push(bit);
-        }
-        
-        let mut reversed_path_to = tx_witness.clone().auth_path_to;
-        reversed_path_to.reverse();
-
-        let mut bitmap_path_to : Vec<boolean::Boolean> = vec![];
-
-        for (i, e) in reversed_path_to.iter().enumerate() {
-            let bit = boolean::Boolean::from(
-                boolean::AllocatedBit::alloc(
-                    cs.namespace(|| format!("merkle tree path for to leaf for bit {}", i)),
-                    e.map(|e| e.1)
-                )?
-            );
-
-            bitmap_path_to.push(bit);
-        }
-
-        common_prefix = find_common_prefix(
-            cs.namespace(|| "common prefix search"), 
-            bitmap_path_from,
-            bitmap_path_to
-        )?;
-
-        // Common prefix is found, not we enforce equality of 
-        // audit path elements on a common prefix
-
-        for (i, ((e_from, e_to), bitmask_bit)) in reversed_path_from.into_iter().zip(reversed_path_to.into_iter()).zip(common_prefix.clone().into_iter()).enumerate()
-        {
-            let path_element_from = num::AllocatedNum::alloc(
-                cs.namespace(|| format!("path element from {}", i)),
-                || {
-                    Ok(e_from.get()?.0)
-                }
-            )?;
-
-            let path_element_to = num::AllocatedNum::alloc(
-                cs.namespace(|| format!("path element to {}", i)),
-                || {
-                    Ok(e_to.get()?.0)
-                }
-            )?;
-
-            cs.enforce(
-                || format!("enforce audit path equality for {}", i),
-                |lc| lc + path_element_from.get_variable() - path_element_to.get_variable(),
-                |_| bitmask_bit.lc(CS::one(), E::Fr::one()),
-                |lc| lc
-            );
-        }
-    }
-
-    // Now we calculate leaf value commitment
+    // Calculate leaf value commitment
 
     let mut leaf_content = vec![];
 
-    // let value_from_allocated = AllocatedNum::alloc(
-    //     cs.namespace(|| "allocate value from"),
-    //     || Ok(tx_witness.balance_from.clone().unwrap())
-    // ).unwrap();
+    let value_from_allocated = AllocatedNum::alloc(
+        cs.namespace(|| "allocate value from"),
+        || Ok(*tx_witness.balance_from.clone().get()?)
+    ).unwrap();
 
-    // let mut value_content_from = value_from_allocated.into_bits_le(
-    //     cs.namespace(|| "unpack from leaf value")
-    // ).unwrap();
-
-    let mut value_content_from = boolean::field_into_boolean_vec_le(
-        cs.namespace(|| "from leaf amount bits"), 
-        tx_witness.balance_from
-    )?;
+    let mut value_content_from = value_from_allocated.into_bits_le(
+        cs.namespace(|| "unpack from leaf value")
+    ).unwrap();
 
     value_content_from.truncate(*plasma_constants::BALANCE_BIT_WIDTH);
     leaf_content.extend(value_content_from.clone());
 
-    let mut nonce_content_from = boolean::field_into_boolean_vec_le(
-        cs.namespace(|| "from leaf nonce bits"), 
-        tx_witness.nonce_from
-    )?;
+    let nonce_from_allocated = AllocatedNum::alloc(
+        cs.namespace(|| "allocate nonce from"),
+        || Ok(*tx_witness.nonce_from.clone().get()?)
+    ).unwrap();
+
+    let mut nonce_content_from = nonce_from_allocated.into_bits_le(
+        cs.namespace(|| "from leaf nonce bits")
+    ).unwrap();
 
     nonce_content_from.truncate(*plasma_constants::NONCE_BIT_WIDTH);
     leaf_content.extend(nonce_content_from.clone());
 
     // we allocate (witness) public X and Y to use them also later for signature check
 
-    let pub_x_from = tx_witness.pub_x_from.get()?;
-
     let sender_pk_x = AllocatedNum::alloc(
         cs.namespace(|| "sender public key x"),
-        || Ok(*pub_x_from)
+        || Ok(*tx_witness.pub_x_from.get()?)
     )?;
-
-    let pub_y_from = tx_witness.pub_y_from.get()?;
 
     let sender_pk_y = AllocatedNum::alloc(
         cs.namespace(|| "sender public key y"),
-        || Ok(*pub_y_from)
+        || Ok(*tx_witness.pub_y_from.get()?)
     )?;
 
     let mut pub_x_content_from = sender_pk_x.into_bits_le(
@@ -813,8 +709,6 @@ fn apply_transaction<E, CS>(
                                 + 2 * (*plasma_constants::FR_BIT_WIDTH)
     );
 
-    // print_boolean_vector(&leaf_content.clone());
-
     // Compute the hash of the from leaf
     let mut from_leaf_hash = pedersen_hash::pedersen_hash(
         cs.namespace(|| "from leaf content hash"),
@@ -826,14 +720,16 @@ fn apply_transaction<E, CS>(
     // Constraint that "from" field in transaction is 
     // equal to the merkle proof path
 
-    let mut from_path_bits = boolean::field_into_boolean_vec_le(
-        cs.namespace(|| "from bit decomposition"), 
-        tx.from
+    let from_address_allocated = AllocatedNum::alloc(
+        cs.namespace(|| "sender address"),
+        || Ok(*tx.from.get()?)
+    )?;
+
+    let mut from_path_bits = from_address_allocated.into_bits_le(
+        cs.namespace(|| "sender address bit decomposition")
     )?;
 
     from_path_bits.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
-
-    // print_boolean_vector(&from_path_bits.clone());
 
     // This is an injective encoding, as cur is a
     // point in the prime order subgroup.
@@ -848,14 +744,15 @@ fn apply_transaction<E, CS>(
 
         // Determines if the current subtree is the "right" leaf at this
         // depth of the tree.
-        let cur_is_right = boolean::Boolean::from(boolean::AllocatedBit::alloc(
+        let cur_is_right = boolean::Boolean::from(
+            boolean::AllocatedBit::alloc(
             cs.namespace(|| "position bit"),
             e.map(|e| e.1)
         )?);
 
         // Constraint this bit immediately
         boolean::Boolean::enforce_equal(
-            cs.namespace(|| "position bit is equal to from field bit"),
+            cs.namespace(|| "position bit is equal to sender address field bit"),
             &cur_is_right, 
             &from_path_bits[i]
         )?;
@@ -907,27 +804,44 @@ fn apply_transaction<E, CS>(
 
     leaf_content = vec![];
 
-    let mut value_content_to = boolean::field_into_boolean_vec_le(
-        cs.namespace(|| "to leaf amount bits"), 
-        tx_witness.balance_to
-    )?;
+    let value_to_allocated = AllocatedNum::alloc(
+        cs.namespace(|| "allocate value to"),
+        || Ok(*tx_witness.balance_to.clone().get()?)
+    ).unwrap();
+
+    let mut value_content_to = value_to_allocated.into_bits_le(
+        cs.namespace(|| "unpack to leaf value")
+    ).unwrap();
 
     value_content_to.truncate(*plasma_constants::BALANCE_BIT_WIDTH);
     leaf_content.extend(value_content_to.clone());
 
-    let mut nonce_content_to = boolean::field_into_boolean_vec_le(
-        cs.namespace(|| "to leaf nonce bits"), 
-        tx_witness.nonce_to
-    )?;
+    let nonce_to_allocated = AllocatedNum::alloc(
+        cs.namespace(|| "allocate nonce to"),
+        || Ok(*tx_witness.nonce_to.clone().get()?)
+    ).unwrap();
+
+    let mut nonce_content_to = nonce_to_allocated.into_bits_le(
+        cs.namespace(|| "unpack to leaf nonce")
+    ).unwrap();
 
     nonce_content_to.truncate(*plasma_constants::NONCE_BIT_WIDTH);
     leaf_content.extend(nonce_content_to.clone());
 
-    // we do not need to use pub_x or pub_y for recipient anywhere, so just use some witness
+    // recipient public keys
 
-    let mut pub_x_content_to = boolean::field_into_boolean_vec_le(
-        cs.namespace(|| "to leaf pub_x bits"), 
-        tx_witness.pub_x_to
+    let recipient_pk_x = AllocatedNum::alloc(
+        cs.namespace(|| "recipient public key x"),
+        || Ok(*tx_witness.pub_x_to.get()?)
+    )?;
+
+    let recipient_pk_y = AllocatedNum::alloc(
+        cs.namespace(|| "recipient public key y"),
+        || Ok(*tx_witness.pub_y_to.get()?)
+    )?;
+
+    let mut pub_x_content_to = recipient_pk_x.into_bits_le(
+        cs.namespace(|| "to leaf pub_x bits")
     )?;
 
     for _ in 0..(*plasma_constants::FR_BIT_WIDTH - pub_x_content_to.len())
@@ -936,9 +850,8 @@ fn apply_transaction<E, CS>(
     }
     leaf_content.extend(pub_x_content_to.clone());
 
-    let mut pub_y_content_to = boolean::field_into_boolean_vec_le(
-        cs.namespace(|| "to leaf pub_y bits"), 
-        tx_witness.pub_y_to
+    let mut pub_y_content_to = recipient_pk_y.into_bits_le(
+        cs.namespace(|| "to leaf pub_y bits")
     )?;
 
     for _ in 0..(*plasma_constants::FR_BIT_WIDTH - pub_y_content_to.len())
@@ -963,9 +876,13 @@ fn apply_transaction<E, CS>(
     // Constraint that "to" field in transaction is 
     // equal to the merkle proof path
 
-    let mut to_path_bits = boolean::field_into_boolean_vec_le(
-        cs.namespace(|| "to bit decomposition"), 
-        tx.to
+    let to_address_allocated = AllocatedNum::alloc(
+        cs.namespace(|| "recipient address"),
+        || Ok(*tx.to.get()?)
+    )?;
+
+    let mut to_path_bits = to_address_allocated.into_bits_le(
+        cs.namespace(|| "recipient address bit decomposition")
     )?;
 
     to_path_bits.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
@@ -988,7 +905,7 @@ fn apply_transaction<E, CS>(
 
         // Constraint this bit immediately
         boolean::Boolean::enforce_equal(
-            cs.namespace(|| "position bit is equal to from field bit"),
+            cs.namespace(|| "position bit is equal to recipient address field bit"),
             &cur_is_right, 
             &to_path_bits[i]
         )?;
@@ -1035,6 +952,61 @@ fn apply_transaction<E, CS>(
         |lc| lc + old_root.get_variable()
     );
 
+    // Initial leaf values are allocated, not we can find a common prefix
+
+    // before having fun with leafs calculate the common prefix
+    // of two audit paths
+
+    let mut common_prefix: Vec<boolean::Boolean> = vec![];
+    {
+        let cs = & mut cs.namespace(|| "common prefix search");
+
+        let mut reversed_path_from = tx_witness.clone().auth_path_from;
+        reversed_path_from.reverse();
+        
+        let mut bitmap_path_from = from_path_bits.clone();
+        bitmap_path_from.reverse();
+        
+        let mut bitmap_path_to = to_path_bits.clone();
+        bitmap_path_to.reverse();
+
+        let mut reversed_path_to = tx_witness.clone().auth_path_to;
+        reversed_path_to.reverse();
+
+        common_prefix = find_common_prefix(
+            cs.namespace(|| "common prefix search"), 
+            &bitmap_path_from,
+            &bitmap_path_to
+        )?;
+
+        // Common prefix is found, not we enforce equality of 
+        // audit path elements on a common prefix
+
+        for (i, ((e_from, e_to), bitmask_bit)) in reversed_path_from.into_iter().zip(reversed_path_to.into_iter()).zip(common_prefix.clone().into_iter()).enumerate()
+        {
+            let path_element_from = num::AllocatedNum::alloc(
+                cs.namespace(|| format!("path element from {}", i)),
+                || {
+                    Ok(e_from.get()?.0)
+                }
+            )?;
+
+            let path_element_to = num::AllocatedNum::alloc(
+                cs.namespace(|| format!("path element to {}", i)),
+                || {
+                    Ok(e_to.get()?.0)
+                }
+            )?;
+
+            cs.enforce(
+                || format!("enforce audit path equality for {}", i),
+                |lc| lc + path_element_from.get_variable() - path_element_to.get_variable(),
+                |_| bitmask_bit.lc(CS::one(), E::Fr::one()),
+                |lc| lc
+            );
+        }
+    }
+
     // Ok, old leaf values are exposed, so we can check 
     // the signature and parse the rest of transaction data
 
@@ -1044,9 +1016,13 @@ fn apply_transaction<E, CS>(
     message_bits.extend(from_path_bits.clone());
     message_bits.extend(to_path_bits.clone());
 
-    let mut amount_bits = boolean::field_into_boolean_vec_le(
-        cs.namespace(|| "amount bits"),
-        tx.amount
+    let transaction_amount_allocated = AllocatedNum::alloc(
+        cs.namespace(|| "allocate transaction amount"),
+        || Ok(*tx.amount.get()?)
+    )?;
+
+    let mut amount_bits = transaction_amount_allocated.into_bits_le(
+        cs.namespace(|| "amount bits")
     )?;
 
     amount_bits.truncate(*plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH);
@@ -1054,9 +1030,13 @@ fn apply_transaction<E, CS>(
     // add amount to check
     message_bits.extend(amount_bits.clone());
 
-    let mut fee_bits = boolean::field_into_boolean_vec_le(
-        cs.namespace(|| "fee bits"),
-        tx.fee
+    let transaction_fee_allocated = AllocatedNum::alloc(
+        cs.namespace(|| "transaction fee"),
+        || Ok(*tx.fee.get()?)
+    )?;
+
+    let mut fee_bits = transaction_fee_allocated.into_bits_le(
+        cs.namespace(|| "fee bits")
     )?;
 
     fee_bits.truncate(*plasma_constants::FEE_EXPONENT_BIT_WIDTH + *plasma_constants::FEE_MANTISSA_BIT_WIDTH);
@@ -1067,9 +1047,13 @@ fn apply_transaction<E, CS>(
     // add nonce to check
     message_bits.extend(nonce_content_from.clone());
 
-    let mut block_number_bits = boolean::field_into_boolean_vec_le(
-        cs.namespace(|| "block number bits"),
-        tx.good_until_block
+    let transaction_max_block_number_allocated = AllocatedNum::alloc(
+        cs.namespace(|| "allocate transaction good until block"),
+        || Ok(*tx.good_until_block.get()?)
+    )?;
+
+    let mut block_number_bits = transaction_max_block_number_allocated.into_bits_le(
+        cs.namespace(|| "block number bits")
     )?;
 
     block_number_bits.truncate(*plasma_constants::BLOCK_NUMBER_BIT_WIDTH);
@@ -1084,18 +1068,14 @@ fn apply_transaction<E, CS>(
         params
     )?;
 
-    let tx_signature = tx.signature.get()?;
-
-    let (signature_r_x_value, signature_r_y_value) = tx_signature.r.into_xy();
-
     let signature_r_x = AllocatedNum::alloc(
         cs.namespace(|| "signature r x"),
-        || Ok(signature_r_x_value)
+        || Ok(tx.signature.get()?.r.into_xy().0)
     )?;
 
     let signature_r_y = AllocatedNum::alloc(
         cs.namespace(|| "signature r y"),
-        || Ok(signature_r_y_value)
+        || Ok(tx.signature.get()?.r.into_xy().1)
     )?;
 
     let signature_r = ecc::EdwardsPoint::interpret(
@@ -1107,7 +1087,7 @@ fn apply_transaction<E, CS>(
 
     let signature_s = AllocatedNum::alloc(
         cs.namespace(|| "signature s"),
-        || Ok(tx_signature.s)
+        || Ok(tx.signature.get()?.s)
     )?;
 
     let signature = EddsaSignature {
@@ -1222,9 +1202,8 @@ fn apply_transaction<E, CS>(
     )?;
 
     // constraint no overflow
-    num::AllocatedNum::limit_number_of_bits(
+    new_balance_from.limit_number_of_bits(
         cs.namespace(|| "limit number of bits for new balance from"),
-        &new_balance_from,
         *plasma_constants::NONCE_BIT_WIDTH
     )?;
 
@@ -1250,9 +1229,8 @@ fn apply_transaction<E, CS>(
     )?;
 
     // constraint no overflow
-    num::AllocatedNum::limit_number_of_bits(
+    new_balance_to.limit_number_of_bits(
         cs.namespace(|| "limit number of bits for new balance to"),
-        &new_balance_to,
         *plasma_constants::BALANCE_BIT_WIDTH
     )?;
 
@@ -1275,9 +1253,8 @@ fn apply_transaction<E, CS>(
     )?;
 
     // constraint no overflow
-    num::AllocatedNum::limit_number_of_bits(
+    new_nonce.limit_number_of_bits(
         cs.namespace(|| "limit number of bits for new nonce from"),
-        &new_nonce,
         *plasma_constants::NONCE_BIT_WIDTH
     )?;
 
@@ -1313,22 +1290,12 @@ fn apply_transaction<E, CS>(
         )?;
 
 
-        // let mut value_content = boolean::field_into_boolean_vec_le(
-        //     cs.namespace(|| "from leaf amount bits update"), 
-        //     new_balance_from.get_value()
-        // ).unwrap();
-
         value_content.truncate(*plasma_constants::BALANCE_BIT_WIDTH);
         leaf_content.extend(value_content.clone());
 
         let mut nonce_content = new_nonce.into_bits_le(
             cs.namespace(|| "from leaf updated nonce bits")
         )?;
-
-        // let mut nonce_content = boolean::field_into_boolean_vec_le(
-        //     cs.namespace(|| "from leaf nonce bits updated"), 
-        //     new_nonce.get_value()
-        // ).unwrap();
 
         nonce_content.truncate(*plasma_constants::NONCE_BIT_WIDTH);
         leaf_content.extend(nonce_content);
@@ -1341,8 +1308,6 @@ fn apply_transaction<E, CS>(
                                     + *plasma_constants::NONCE_BIT_WIDTH
                                     + 2 * (*plasma_constants::FR_BIT_WIDTH)
         );
-
-        // print_boolean_vector(&leaf_content.clone());
 
         // Compute the hash of the from leaf
         from_leaf_hash = pedersen_hash::pedersen_hash(
@@ -1363,11 +1328,6 @@ fn apply_transaction<E, CS>(
         let mut value_content = new_balance_to.into_bits_le(
             cs.namespace(|| "to leaf updated amount bits")
         )?;
-
-        // let mut value_content = boolean::field_into_boolean_vec_le(
-        //     cs.namespace(|| "to leaf amount bits upted"), 
-        //     new_balance_to.get_value()
-        // ).unwrap();
 
         value_content.truncate(*plasma_constants::BALANCE_BIT_WIDTH);
         leaf_content.extend(value_content.clone());
@@ -1400,15 +1360,23 @@ fn apply_transaction<E, CS>(
     let mut intersection_point_lc = Num::<E>::zero();
     coeff = E::Fr::one();
     for bit in common_prefix.into_iter() {
-        intersection_point_lc = intersection_point_lc.add_bool_with_coeff(CS::one(), &bit, coeff);
+        intersection_point_lc = intersection_point_lc.add_bool_with_coeff(
+            CS::one(), 
+            &bit, 
+            coeff
+        );
         coeff.double();
     }
     // and add one
-    intersection_point_lc = intersection_point_lc.add_bool_with_coeff(CS::one(), &boolean::Boolean::Constant(true), E::Fr::one());
+    intersection_point_lc = intersection_point_lc.add_bool_with_coeff(
+        CS::one(), 
+        &boolean::Boolean::Constant(true), 
+        E::Fr::one()
+    );
 
     let intersection_point = AllocatedNum::alloc(
         cs.namespace(|| "intersection as number"),
-        || Ok(intersection_point_lc.get_value().get()?.clone())
+        || Ok(*intersection_point_lc.get_value().get()?)
     )?;
 
     cs.enforce(
@@ -1424,11 +1392,6 @@ fn apply_transaction<E, CS>(
         cs.namespace(|| "unpack intersection")
     )?;
 
-    // let mut intersection_point_bits = boolean::field_into_boolean_vec_le(
-    //     cs.namespace(|| "unpack intersection"),
-    //     intersection_point.get_value()
-    // ).unwrap();
-
     // truncating guarantees that even if the common prefix coincides everywhere
     // up to the last bit, it can still be properly used in next actions
     intersection_point_bits.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
@@ -1438,9 +1401,6 @@ fn apply_transaction<E, CS>(
     // First assemble new leafs
     cur_from = from_leaf_hash.get_x().clone();
     cur_to = to_leaf_hash.get_x().clone();
-
-    // print!("Inside the snark new leaf hash from = {}\n", cur_from.clone().get_value().unwrap());
-    // print!("Inside the snark new leaf hash to = {}\n", cur_to.clone().get_value().unwrap());
 
     {
         let audit_path_from = tx_witness.auth_path_from.clone();
@@ -1853,18 +1813,16 @@ fn test_update_circuit_with_witness() {
 
             instance.synthesize(&mut cs).unwrap();
 
+            print!("{}\n", cs.find_unconstrained());
+
             print!("{}\n", cs.num_constraints());
 
             assert_eq!(cs.num_inputs(), 4);
 
             let err = cs.which_is_unsatisfied();
             if err.is_some() {
-                print!("ERROR satisfying in {}\n", err.unwrap());
-            } else {
-                assert!(cs.is_satisfied());
+                panic!("ERROR satisfying in {}\n", err.unwrap());
             }
-
-            assert!(cs.is_satisfied());
         }
     }
 }

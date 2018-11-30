@@ -437,17 +437,17 @@ impl<E: Engine> AllocatedNum<E> {
     /// is to add or subtract two "small" (with bit length smaller 
     /// than one of the field) numbers and check for overflow
     pub fn limit_number_of_bits<CS>(
+        &self,
         mut cs: CS,
-        a: &Self,
         number_of_bits: usize
     ) -> Result<(), SynthesisError>
         where CS: ConstraintSystem<E>
     {
         // do the bit decomposition and check that higher bits are all zeros
 
-        let mut bits = a.into_bits_le(
+        let mut bits = self.into_bits_le(
             cs.namespace(|| "unpack to limit number of bits")
-        ).unwrap();
+        )?;
 
         bits.drain(0..number_of_bits);
 
@@ -462,10 +462,11 @@ impl<E: Engine> AllocatedNum<E> {
 
         // let top_bits_value = AllocatedNum::alloc(
         //     cs.namespace(|| "allocate top bits"),
-        //     || Ok(top_bits_lc.get_value().unwrap())
+        //     || Ok(top_bits_lc.get_value().get()?)
         // ).unwrap();
 
         // enforce packing and zeroness
+
         cs.enforce(
             || "repack top bits",
             |lc| lc,
@@ -473,7 +474,7 @@ impl<E: Engine> AllocatedNum<E> {
             |_| top_bits_lc.lc(E::Fr::one())
         );
 
-        // // enforce top bits to be zero
+        // enforce top bits to be zero
         // cs.enforce(
         //     || "repack top bits",
         //     |lc| lc + top_bits_value.get_variable(),
@@ -578,6 +579,26 @@ mod test {
         assert!(cs.get("squared num") == Fr::from_str("9").unwrap());
         assert!(n2.value.unwrap() == Fr::from_str("9").unwrap());
         cs.set("squared num", Fr::from_str("10").unwrap());
+        assert!(!cs.is_satisfied());
+    }
+
+    #[test]
+    fn test_limit_number_of_bits() {
+        let mut cs = TestConstraintSystem::<Bls12>::new();
+
+        let n = AllocatedNum::alloc(&mut cs, || Ok(Fr::from_str("3").unwrap())).unwrap();
+        n.limit_number_of_bits(&mut cs, 2);
+
+        assert!(cs.is_satisfied());
+    }
+
+    #[test]
+    fn test_limit_number_of_bits_error() {
+        let mut cs = TestConstraintSystem::<Bls12>::new();
+
+        let n = AllocatedNum::alloc(&mut cs, || Ok(Fr::from_str("3").unwrap())).unwrap();
+
+        n.limit_number_of_bits(&mut cs, 1);
         assert!(!cs.is_satisfied());
     }
 

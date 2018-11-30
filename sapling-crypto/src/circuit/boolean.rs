@@ -377,6 +377,14 @@ impl Boolean {
         }
     }
 
+    pub fn get_variable(&self) -> Option<&AllocatedBit> {
+        match *self {
+            Boolean::Is(ref v) => Some(v),
+            Boolean::Not(ref v) => Some(v),
+            Boolean::Constant(_) => None
+        }
+    }
+
     pub fn enforce_equal<E, CS>(
         mut cs: CS,
         a: &Self,

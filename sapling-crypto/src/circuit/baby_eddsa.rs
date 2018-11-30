@@ -51,104 +51,6 @@ use constants::{MATTER_EDDSA_BLAKE2S_PERSONALIZATION};
 
 impl <E: JubjubEngine>EddsaSignature<E> {
 
-    // pub fn verify_on_message<CS>(
-    //     &self,
-    //     mut cs: CS,
-    //     params: &E::Params,
-    //     message: &[Boolean],
-    //     generator: EdwardsPoint<E>
-    // ) -> Result<Boolean, SynthesisError>
-    //     where CS: ConstraintSystem<E>
-    // {
-    //     // TODO check that s < Fs::Char
-    //     let scalar_bits = field_into_boolean_vec_le(cs.namespace(|| "Get S bits"), self.s.get_value());
-    //     assert!(scalar_bits.is_ok());
-    //     let scalar_bits_conv: &[Boolean] = &(scalar_bits.unwrap());
-    //     let sb = generator.mul(cs.namespace(|| "S*B computation"), &scalar_bits_conv, params).unwrap();
-
-    //     // h = Hash(R, pubkey, message)
-
-    //     // only order of R is checked. Public key and generator can be guaranteed to be in proper group!
-    //     // by some other means for out particular case
-    //     let r_is_in_order = self.r.assert_not_small_order(cs.namespace(|| "R is in right order"), &params);
-
-    //     assert!(r_is_in_order.is_ok());
-    //     // let bit_length = scalar_bits_conv.len();
-    //     // let zero_bit = Boolean::Constant(false);
-
-    //     let mut hash_bits: Vec<Boolean> = vec![];
-
-    //     let r_x_value = self.r.get_x().get_value();
-    //     let r_x_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize R_X"), r_x_value).unwrap();
-
-    //     let mut to_append = 256 - r_x_serialized.len();
-    //     for _ in 0..to_append {
-    //         hash_bits.push(Boolean::Constant(false));
-    //     }
-    //     hash_bits.extend(r_x_serialized.into_iter());
-
-    //     let r_y_value = self.r.get_y().get_value();
-    //     let r_y_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize R_Y"), r_y_value).unwrap();
-    //     to_append = 256 - r_y_serialized.len();
-    //     for _ in 0..to_append {
-    //         hash_bits.push(Boolean::Constant(false));
-    //     }
-    //     hash_bits.extend(r_y_serialized.into_iter());
-
-    //     let pk_x_value = self.pk.get_x().get_value();
-    //     let pk_x_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize PK_X"), pk_x_value).unwrap();
-    //     to_append = 256 - pk_x_serialized.len();
-    //     for _ in 0..to_append {
-    //         hash_bits.push(Boolean::Constant(false));
-    //     }
-    //     hash_bits.extend(pk_x_serialized.into_iter());
-
-    //     let pk_y_value = self.pk.get_y().get_value();
-    //     let pk_y_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize PK_Y"), pk_y_value).unwrap();
-    //     to_append = 256 - pk_y_serialized.len();
-    //     for _ in 0..to_append {
-    //         hash_bits.push(Boolean::Constant(false));
-    //     }
-    //     hash_bits.extend(pk_y_serialized.into_iter());
-    //     // for i in 0..message.len() {
-    //     //     let bit = message[i];
-    //     //     hash_bits.push(bit);
-    //     // }
-    //     hash_bits.extend(message.iter().cloned());
-
-    //     let hash_content_slice: &[Boolean] = &hash_bits;
-    //     assert!(hash_content_slice.len() == 256);
-
-    //     let h = blake2s(cs.namespace(|| "Calculate EdDSA hash"), hash_content_slice, MATTER_EDDSA_BLAKE2S_PERSONALIZATION).unwrap();
-        
-    //     let pk_mul_hash = self.pk.mul(cs.namespace(|| "Calculate h*PK"), &h, params).unwrap();
-
-    //     let rhs = pk_mul_hash.add(cs.namespace(|| "Make signature RHS"), &self.r, params).unwrap();
-
-    //     let rhs_x = rhs.get_x();
-    //     let rhs_y = rhs.get_y();
-
-    //     let sb_x = sb.get_x();
-    //     let sb_y = sb.get_y();
-
-        // let one = CS::one();
-        // cs.enforce(
-        //     || "check x coordinate of signature",
-        //     |lc| lc + rhs_x.get_variable(),
-        //     |lc| lc + one,
-        //     |lc| lc + sb_x.get_variable()
-        // );
-
-        // cs.enforce(
-        //     || "check y coordinate of signature",
-        //     |lc| lc + rhs_y.get_variable(),
-        //     |lc| lc + one,
-        //     |lc| lc + sb_y.get_variable()
-        // );
-
-    //     return Ok(Boolean::constant(true));
-    // }
-
     pub fn verify_eddsa_for_snark<CS>(
         &self,
         mut cs: CS,
@@ -229,7 +131,7 @@ impl <E: JubjubEngine>EddsaSignature<E> {
         message: &[Boolean],
         generator: EdwardsPoint<E>,
         max_message_len: usize
-    ) -> Result<Boolean, SynthesisError>
+    ) -> Result<(), SynthesisError>
         where CS: ConstraintSystem<E>
     {
         // TODO check that s < Fs::Char
@@ -237,16 +139,37 @@ impl <E: JubjubEngine>EddsaSignature<E> {
         // message is always padded to 256 bits in this gadget, but still checked on synthesis
         assert!(message.len() <= max_message_len * 8);
 
-        let scalar_bits = field_into_boolean_vec_le(cs.namespace(|| "Get S bits"), self.s.get_value());
-        assert!(scalar_bits.is_ok());
-        let scalar_bits_conv: &[Boolean] = &(scalar_bits.unwrap());
-        let sb = generator.mul(cs.namespace(|| "S*B computation"), &scalar_bits_conv, params).unwrap();
+        // let scalar_bits_allocated = AllocatedNum::alloc(
+        //     cs.namespace(|| "Allocate S witness"),
+        //     || Ok(*self.s.get_value().get()?)
+        // )?;
+
+        let scalar_bits = self.s.into_bits_le(
+            cs.namespace(|| "Get S bits")
+        )?;
+
+        generator.assert_not_small_order(
+            cs.namespace(|| "Check that generator is of correct order"),
+            &params
+        )?;
+
+        self.pk.assert_not_small_order(
+            cs.namespace(|| "Check that public key is of correct order"),
+            &params
+        )?;
+
+        let sb = generator.mul(
+            cs.namespace(|| "S*B computation"),
+            &scalar_bits, 
+            params
+        )?;
 
         // only order of R is checked. Public key and generator can be guaranteed to be in proper group!
         // by some other means for out particular case
-        let r_is_in_order = self.r.assert_not_small_order(cs.namespace(|| "R is in right order"), &params);
-
-        assert!(r_is_in_order.is_ok());
+        self.r.assert_not_small_order(
+            cs.namespace(|| "R is in right order"),
+            &params
+        )?;
 
         let mut h: Vec<Boolean> = vec![];
         let to_append = 256 - message.len();
@@ -257,9 +180,17 @@ impl <E: JubjubEngine>EddsaSignature<E> {
         }
         assert!(h.len() == 256);
         
-        let pk_mul_hash = self.pk.mul(cs.namespace(|| "Calculate h*PK"), &h, params).unwrap();
+        let pk_mul_hash = self.pk.mul(
+            cs.namespace(|| "Calculate h*PK"), 
+            &h, 
+            params
+        )?;
 
-        let rhs = pk_mul_hash.add(cs.namespace(|| "Make signature RHS"), &self.r, params).unwrap();
+        let rhs = pk_mul_hash.add(
+            cs.namespace(|| "Make signature RHS"), 
+            &self.r, 
+            params
+        )?;
 
         let rhs_x = rhs.get_x();
         let rhs_y = rhs.get_y();
@@ -282,7 +213,7 @@ impl <E: JubjubEngine>EddsaSignature<E> {
             |lc| lc + sb_y.get_variable()
         );
 
-        return Ok(Boolean::constant(true));
+        return Ok(());
     }
 } 
 
