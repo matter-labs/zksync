@@ -429,8 +429,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
         //     |_| total_fee_lc.lc(E::Fr::one())
         // );
 
-        println!("Calculated total fees");
-
         // Then check that for every transaction in this block 
         // the parameter "good until" was greater or equal
         // than the current block number
@@ -442,9 +440,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
                 Ok(*block_number.clone().get()?)
             }
         )?;
-
-        println!("Calculated total fees");
-
 
         for (i, block_number_in_tx) in block_numbers.into_iter().enumerate() {
             // first name a new value and constraint that it's a proper subtraction
