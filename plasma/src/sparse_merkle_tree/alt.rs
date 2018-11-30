@@ -24,7 +24,7 @@ pub struct SparseMerkleTree<T: GetBits + Default, Hash: Clone, H: Hasher<Hash>>
     prehashed: Vec<Hash>,
     items: HashMap<ItemIndex, T>,
     hashes: HashMap<HashIndex, Hash>,
-    hasher: H,
+    pub hasher: H,
 }
 
 impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
@@ -33,7 +33,8 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
           H: Hasher<Hash> + Default,
 {
 
-    pub fn new(tree_depth: Depth) -> Self {
+    pub fn new(d: u32) -> Self {
+        let tree_depth = d as Depth;
         assert!(tree_depth > 1);
         let hasher = H::default();
         let items = HashMap::new();
@@ -42,7 +43,7 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
         let mut cur = hasher.hash_bits(T::default().get_bits_le());
         prehashed.push(cur.clone());
         for i in 0..tree_depth-1 {
-            cur = hasher.compress(&cur, &cur, i);
+            cur = hasher.compress(&cur, &cur, i as usize);
             prehashed.push(cur.clone());
         }
         prehashed.reverse();
@@ -61,19 +62,21 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
     }
 
     // How many iterms can the tree hold
-    pub fn capacity(&self) -> usize {
-        1 << (self.tree_depth - 1)
+    pub fn capacity(&self) -> u32 {
+        (1 << (self.tree_depth - 1)) as u32
     }
 
     // How many hashes can the tree hold
-    pub fn hash_capacity(&self) -> usize {
-        (1 << self.tree_depth) - 1
+    fn hash_capacity(&self) -> usize {
+        ( (1 << self.tree_depth) - 1 ) as usize
     }
 
-    pub fn insert(&mut self, index: ItemIndex, item: T) {
-        assert!(index < self.capacity());
+    pub fn insert(&mut self, i: u32, item: T) {
+        assert!(i < self.capacity());
 
-        let hash_index = (1 << self.tree_depth-1) + index;
+        let index = i as ItemIndex;
+
+        let hash_index = ((1 << self.tree_depth-1) + index) as usize;
         let hash = self.hasher.hash_bits(item.get_bits_le());
         //println!("index = {}, hash_index = {}", index, hash_index);
         self.hashes.insert(hash_index, hash);
@@ -120,8 +123,9 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
         self.get_hash(1)
     }
 
-    pub fn merkle_path(&self, index: ItemIndex) -> Vec<(Hash, bool)> {
-        assert!(index < self.capacity());
+    pub fn merkle_path(&self, i: u32) -> Vec<(Hash, bool)> {
+        assert!(i < self.capacity());
+        let index = i as ItemIndex;
         let item_hash_index = (1 << self.tree_depth-1) + index;
         (0..(self.tree_depth-1)).map(|level| {
             let dir = item_hash_index & (1 << level) > 0;
