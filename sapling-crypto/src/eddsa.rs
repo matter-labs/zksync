@@ -1,8 +1,8 @@
 //! This is an implementation of EdDSA as refered in literature
 //! Generation of randomness is not specified
 
-use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
-use rand::{Rng, Rand};
+use ff::{Field, PrimeField, PrimeFieldRepr};
+use rand::{Rng};
 use std::io::{self, Read, Write};
 
 use jubjub::{

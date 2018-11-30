@@ -12,18 +12,15 @@ use time::PreciseTime;
 
 use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
 use pairing::bn256::*;
-use rand::{SeedableRng, Rng, XorShiftRng, Rand};
+use rand::{SeedableRng, Rng, XorShiftRng};
 use sapling_crypto::circuit::test::*;
-use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, PrimeOrder};
-use sapling_crypto::circuit::multipack::bytes_to_bits;
-use plasma::balance_tree::{BabyBalanceTree, BabyLeaf, Leaf};
+use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
+use plasma::balance_tree::{BabyBalanceTree, BabyLeaf};
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
 use std::collections::HashMap;
 
 use bellman::{
-    SynthesisError,
-    ConstraintSystem,
     Circuit,
 };
 
@@ -35,15 +32,10 @@ use bellman::groth16::{
 };
 
 use sapling_crypto::jubjub::{
-    JubjubEngine,
     FixedGenerators,
-    Unknown,
-    edwards,
-    JubjubParams
 };
 
 use sapling_crypto::eddsa::{
-    Signature,
     PrivateKey,
     PublicKey
 };
@@ -51,9 +43,8 @@ use sapling_crypto::eddsa::{
 use plasma::circuit::plasma_constants;
 use plasma::circuit::baby_plasma::{Transaction, TransactionWitness, Update, le_bit_vector_into_field_element, be_bit_vector_into_bytes};
 use sapling_crypto::circuit::float_point::{convert_to_float};
-use sapling_crypto::circuit::baby_eddsa::EddsaSignature;
 
-const TXES_TO_TEST: usize = 7;
+const TXES_TO_TEST: usize = 128;
 
 fn main() {
     let p_g = FixedGenerators::SpendingKeyGenerator;
@@ -67,7 +58,7 @@ fn main() {
 
     let mut tree = BabyBalanceTree::new(tree_depth);
 
-    let number_of_accounts = 100;
+    let number_of_accounts = 1000;
 
     let mut existing_account_hm = HashMap::<u32, bool>::new();
 
@@ -105,8 +96,6 @@ fn main() {
     println!("Inserted {} accounts", num_accounts);
 
     let initial_root = tree.root_hash();
-
-    println!("Starting with a root of {}", initial_root);
 
     let mut witnesses: Vec<Option<(Transaction<Bn256>, TransactionWitness<Bn256>)>> = vec![];
     let mut public_data_vector: Vec<Vec<bool>> = vec![];
@@ -158,7 +147,7 @@ fn main() {
         let path_from : Vec<Option<(Fr, bool)>> = tree.merkle_path(sender_leaf_number).into_iter().map(|e| Some(e)).collect();
         let path_to: Vec<Option<(Fr, bool)>> = tree.merkle_path(recipient_leaf_number).into_iter().map(|e| Some(e)).collect();
 
-        println!("Making a transfer from {} to {}", sender_leaf_number, recipient_leaf_number);
+        // println!("Making a transfer from {} to {}", sender_leaf_number, recipient_leaf_number);
 
         let from = Fr::from_str(& sender_leaf_number.to_string());
         let to = Fr::from_str(& recipient_leaf_number.to_string());
@@ -187,8 +176,8 @@ fn main() {
         assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
         assert!(tree.verify_proof(recipient_leaf_number, recipient_leaf.clone(), tree.merkle_path(recipient_leaf_number)));
 
-        println!("Sender: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", sender_leaf.balance, sender_leaf.nonce, sender_leaf.pub_x, sender_leaf.pub_y);
-        println!("Recipient: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", recipient_leaf.balance, recipient_leaf.nonce, recipient_leaf.pub_x, recipient_leaf.pub_y);
+        // println!("Sender: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", sender_leaf.balance, sender_leaf.nonce, sender_leaf.pub_x, sender_leaf.pub_y);
+        // println!("Recipient: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", recipient_leaf.balance, recipient_leaf.nonce, recipient_leaf.pub_x, recipient_leaf.pub_y);
 
         let mut updated_sender_leaf = sender_leaf.clone();
         let mut updated_recipient_leaf = recipient_leaf.clone();
@@ -202,8 +191,8 @@ fn main() {
 
         total_fees.add_assign(&fee_as_field_element);
 
-        println!("Updated sender: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", updated_sender_leaf.balance, updated_sender_leaf.nonce, updated_sender_leaf.pub_x, updated_sender_leaf.pub_y);
-        println!("Updated recipient: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", updated_recipient_leaf.balance, updated_recipient_leaf.nonce, updated_recipient_leaf.pub_x, updated_recipient_leaf.pub_y);
+        // println!("Updated sender: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", updated_sender_leaf.balance, updated_sender_leaf.nonce, updated_sender_leaf.pub_x, updated_sender_leaf.pub_y);
+        // println!("Updated recipient: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", updated_recipient_leaf.balance, updated_recipient_leaf.nonce, updated_recipient_leaf.pub_x, updated_recipient_leaf.pub_y);
 
         tree.insert(sender_leaf_number, updated_sender_leaf.clone());
         tree.insert(recipient_leaf_number, updated_recipient_leaf.clone());
@@ -278,7 +267,7 @@ fn main() {
     let padding_in_pack = 256 - pack_by*public_data_size;
     let padding_in_remainder = 256 - remaining_to_pack*public_data_size;
 
-    println!("Pack transacitons into {} batches of {} and with remainder of {} for hashing", number_of_packs, pack_by, remaining_to_pack);
+    // println!("Pack transacitons into {} batches of {} and with remainder of {} for hashing", number_of_packs, pack_by, remaining_to_pack);
 
     let mut public_data_iterator = public_data_vector.into_iter();
 
@@ -350,7 +339,7 @@ fn main() {
 
     let public_data_commitment = Fr::from_repr(repr).unwrap();
 
-    print!("Final data commitment as field element = {}\n", public_data_commitment);
+    // print!("Final data commitment as field element = {}\n", public_data_commitment);
 
     let instance_for_test_cs = Update {
         params: params,
@@ -362,12 +351,14 @@ fn main() {
         total_fee: Some(total_fees),
         transactions: witnesses.clone(),
     };
+
     {
         let mut cs = TestConstraintSystem::new();
 
         instance_for_test_cs.synthesize(&mut cs).unwrap();
 
         println!("Total of {} constraints", cs.num_constraints());
+        println!("{} constraints per TX for {} transactions", cs.num_constraints() / TXES_TO_TEST, TXES_TO_TEST);
 
         assert_eq!(cs.num_inputs(), 4);
 
@@ -376,14 +367,12 @@ fn main() {
         assert_eq!(cs.get_input(2, "new root input/input variable"), final_root);
         assert_eq!(cs.get_input(3, "rolling hash input/input variable"), public_data_commitment);
 
-        let err = cs.which_is_unsatisfied();
-        if err.is_some() {
-            panic!("ERROR satisfying in {}\n", err.unwrap());
-        }
-
-        println!("Test constraint system is satisfied");
-
-
+        // let err = cs.which_is_unsatisfied();
+        // if err.is_some() {
+        //     panic!("ERROR satisfying in {}\n", err.unwrap());
+        // } else {
+        //     println!("Test constraint system is satisfied");
+        // }
     }
 
     let instance_for_generation = Update {

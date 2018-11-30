@@ -15,7 +15,6 @@ use super::{
 
 use super::num::{
     AllocatedNum,
-    Num
 };
 
 use ::jubjub::{
@@ -57,27 +56,34 @@ impl <E: JubjubEngine>EddsaSignature<E> {
         params: &E::Params,
         message: &[Boolean],
         generator: EdwardsPoint<E>
-    ) -> Result<Boolean, SynthesisError>
+    ) -> Result<(), SynthesisError>
         where CS: ConstraintSystem<E>
     {
         // TODO check that s < Fs::Char
-        let scalar_bits = field_into_boolean_vec_le(cs.namespace(|| "Get S bits"), self.s.get_value());
-        assert!(scalar_bits.is_ok());
-        let scalar_bits_conv: &[Boolean] = &(scalar_bits.unwrap());
-        let sb = generator.mul(cs.namespace(|| "S*B computation"), &scalar_bits_conv, params).unwrap();
+        let scalar_bits = field_into_boolean_vec_le(
+            cs.namespace(|| "Get S bits"),
+            self.s.get_value()
+        )?;
+
+        let sb = generator.mul(
+            cs.namespace(|| "S*B computation"),
+            &scalar_bits, params
+        )?;
 
         // h = Hash(R_X || message)
 
         // only order of R is checked. Public key and generator can be guaranteed to be in proper group!
         // by some other means for out particular case
-        let r_is_in_order = self.r.assert_not_small_order(cs.namespace(|| "R is in right order"), &params);
-
-        assert!(r_is_in_order.is_ok());
+        self.r.assert_not_small_order(
+            cs.namespace(|| "R is in right order"),
+            &params
+        )?;
 
         let mut hash_bits: Vec<Boolean> = vec![];
 
-        let r_x_value = self.r.get_x().get_value();
-        let r_x_serialized = field_into_boolean_vec_le(cs.namespace(|| "Serialize R_X"), r_x_value).unwrap();
+        let r_x_serialized = field_into_boolean_vec_le(
+            cs.namespace(|| "Serialize R_X"), self.r.get_x().get_value()
+        )?;
 
         let mut to_append = 256 - r_x_serialized.len();
         hash_bits.extend(r_x_serialized.into_iter());
@@ -91,14 +97,25 @@ impl <E: JubjubEngine>EddsaSignature<E> {
             hash_bits.push(Boolean::Constant(false));
         }
 
-        let hash_content_slice: &[Boolean] = &hash_bits;
-        assert!(hash_content_slice.len() == 512);
+        assert!(hash_bits.len() == 512);
 
-        let h = blake2s(cs.namespace(|| "Calculate EdDSA hash"), hash_content_slice, MATTER_EDDSA_BLAKE2S_PERSONALIZATION).unwrap();
+        let h = blake2s(
+            cs.namespace(|| "Calculate EdDSA hash"),
+            &hash_bits, 
+            MATTER_EDDSA_BLAKE2S_PERSONALIZATION
+        )?;
         
-        let pk_mul_hash = self.pk.mul(cs.namespace(|| "Calculate h*PK"), &h, params).unwrap();
+        let pk_mul_hash = self.pk.mul(
+            cs.namespace(|| "Calculate h*PK"), 
+            &h, 
+            params
+        )?;
 
-        let rhs = pk_mul_hash.add(cs.namespace(|| "Make signature RHS"), &self.r, params).unwrap();
+        let rhs = pk_mul_hash.add(
+            cs.namespace(|| "Make signature RHS"), 
+            &self.r, 
+            params
+        )?;
 
         let rhs_x = rhs.get_x();
         let rhs_y = rhs.get_y();
@@ -121,7 +138,7 @@ impl <E: JubjubEngine>EddsaSignature<E> {
             |lc| lc + sb_y.get_variable()
         );
 
-        return Ok(Boolean::constant(true));
+        return Ok(());
     }
 
     pub fn verify_raw_message_signature<CS>(
@@ -139,7 +156,7 @@ impl <E: JubjubEngine>EddsaSignature<E> {
         // message is always padded to 256 bits in this gadget, but still checked on synthesis
         assert!(message.len() <= max_message_len * 8);
 
-        // let scalar_bits_allocated = AllocatedNum::alloc(
+        // let scalar_bits = AllocatedNum::alloc(
         //     cs.namespace(|| "Allocate S witness"),
         //     || Ok(*self.s.get_value().get()?)
         // )?;
@@ -148,15 +165,15 @@ impl <E: JubjubEngine>EddsaSignature<E> {
             cs.namespace(|| "Get S bits")
         )?;
 
-        generator.assert_not_small_order(
-            cs.namespace(|| "Check that generator is of correct order"),
-            &params
-        )?;
+        // generator.assert_not_small_order(
+        //     cs.namespace(|| "Temporary check that generator is of correct order"),
+        //     &params
+        // )?;
 
-        self.pk.assert_not_small_order(
-            cs.namespace(|| "Check that public key is of correct order"),
-            &params
-        )?;
+        // self.pk.assert_not_small_order(
+        //     cs.namespace(|| "Temporary check that public key is of correct order"),
+        //     &params
+        // )?;
 
         let sb = generator.mul(
             cs.namespace(|| "S*B computation"),
