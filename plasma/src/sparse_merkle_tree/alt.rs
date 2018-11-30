@@ -119,6 +119,18 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
     pub fn root_hash(&self) -> Hash {
         self.get_hash(1)
     }
+
+    pub fn merkle_path(&self, index: ItemIndex) -> Vec<(Hash, bool)> {
+        assert!(index < self.capacity());
+        let item_hash_index = (1 << self.tree_depth-1) + index;
+        (0..(self.tree_depth-1)).map(|level| {
+            let dir = item_hash_index & (1 << level) > 0;
+            let hash_index = (item_hash_index >> level) ^ 1;
+            let hash = self.get_hash(hash_index);
+            (hash, dir)
+        }).collect()
+    }
+
 }
 
 #[cfg(test)]
@@ -197,5 +209,13 @@ mod tests {
         tree.insert(3, TestLeaf(2));
         //println!("{:?}", tree);
         assert_eq!(tree.root_hash(), 28442653);
+    }
+
+    #[test]
+    fn test_merkle_path() {
+        let mut tree = TestSMT::new(3);
+        tree.insert(2, TestLeaf(1));
+        let path = tree.merkle_path(2);
+        assert_eq!(path, [(32768, false), (917505, true), (25690141, false)]);
     }
 }
