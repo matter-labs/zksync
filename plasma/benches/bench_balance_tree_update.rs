@@ -44,12 +44,13 @@ fn bench_balance_tree_update(b: &mut Bencher, n_inserts: usize) {
         pub_y:      Fr::rand(rng),
     }));
 
+    let insert_into = u32::rand(rng) % capacity;
+    for i in 0..leafs.len() {
+        tree.insert(insert_into, leafs[i].clone())
+    }
+
     b.iter(|| {
-        let insert_into = u32::rand(rng) % capacity;
-        for i in 0..leafs.len() {
-            tree.insert(u32::rand(rng) % capacity, leafs[i].clone())
-        }
-        //tree.root_hash()
+        tree.root_hash()
     });
 }
 
@@ -69,9 +70,8 @@ fn bench_batched_smt(b: &mut Bencher, n_inserts: usize) {
     }));
 
     b.iter(|| {
-        let insert_into = usize::rand(rng) % capacity;
-        //println!("insert_into {}", insert_into);
         for i in 0..leafs.len() {
+            let insert_into = usize::rand(rng) % capacity;
             tree.insert(insert_into, leafs[i].clone());
         }
         tree.root_hash();
