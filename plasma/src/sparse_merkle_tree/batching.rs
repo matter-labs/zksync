@@ -132,8 +132,13 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
                     } else {
                         // split at intersection
                         let intersection_i = {
+                            // intersection index is the longest common prefix
                             let mut i = leaf_index_normalized;
-                            while (i & 1) != (next & 1) { i >>= 1; }
+                            let mut j = next;
+                            while i != j {
+                                i >>= 1;
+                                j >>= 1;
+                            }
                             i
                         };
                         //println!("intersection = {:?}", intersection_i);
@@ -158,7 +163,7 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
     }
 
     fn hash_line(&self, from: Option<NodeIndex>, to: NodeIndex, dir: bool) -> Hash {
-        println!("hash_line {:?} {} {}", from, to, dir);
+        //println!("hash_line {:?} {} {}", from, to, dir);
 
         let to_depth = Self::depth(to);
         match from {
@@ -167,7 +172,7 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
                 let mut cur_hash = self.get_hash(from);
                 let mut cur_depth = Self::depth(from) - 1;
                 while cur_depth > to_depth {
-                    println!("cur_depth = {}", cur_depth);
+                    //println!("cur_depth = {}", cur_depth);
                     let (lhs, rhs) = select(!dir, cur_hash.clone(), self.prehashed[cur_depth + 1].clone());
                     cur_hash = self.hasher.compress(&lhs, &rhs, self.tree_depth - cur_depth - 1);
                     cur_depth -= 1;
@@ -245,7 +250,7 @@ mod tests {
         }
 
         fn compress(&self, lhs: &u64, rhs: &u64, i: usize) -> u64 {
-            let r = 11 * lhs + 17 * rhs + 1 + i as u64;
+            let r = (11 * lhs + 17 * rhs + 1 + i as u64) % 1234567891;
             //println!("compress {} {}, {} => {}", lhs, rhs, i, r);
             r
         }
@@ -254,17 +259,48 @@ mod tests {
 
     type TestSMT = SparseMerkleTree<TestLeaf, u64, TestHasher>;
 
+    use rand::{Rand, thread_rng};
 
     #[test]
-    fn test_batching_tree_insert() {
-        let mut tree = TestSMT::new(3);
-        tree.insert(0, TestLeaf(1));
-        tree.insert(3, TestLeaf(2));
-        tree.insert(1, TestLeaf(2));
-        tree.insert(3, TestLeaf(2));
-        tree.insert(5, TestLeaf(2));
-        tree.insert(2, TestLeaf(2));
-        //println!("{:?}\n", tree);
+    fn test_batching_tree_insert1() {
+        let rng = &mut thread_rng();
+        let mut tree = TestSMT::new(8);
+        let capacity = tree.capacity();
+//        tree.insert(0, TestLeaf(0));
+//        tree.insert(3, TestLeaf(2));
+//        tree.insert(1, TestLeaf(1));
+//        tree.insert(3, TestLeaf(2));
+//        tree.insert(5, TestLeaf(2));
+//        tree.insert(7, TestLeaf(2));
+//
+//        for _ in 0..1000 {
+//            let insert_into = usize::rand(rng) % capacity;
+//            tree.insert(insert_into, TestLeaf(u64::rand(rng)));
+//            tree.root_hash();
+//        }
+//        tree.insert(usize::rand(rng) % capacity, TestLeaf(2));
+//        //println!("{:?}\n", tree);
+
+        for j in 0..700 {
+            //b.iter(|| {
+            let insert_into = usize::rand(rng) % capacity;
+            //println!("insert_into {}", insert_into);
+            //for i in 0..leafs.len() {
+            let i = 0;
+            tree.insert(insert_into, TestLeaf(2));
+
+            //println!("{:?}", tree);
+            //println!("{:?}", tree.nodes);
+            tree.root_hash();
+            //println!("{:?}", tree.root_hash());
+            //println!("{:?}", tree.root_hash());
+
+            //}
+            //tree.root_hash();
+            //});
+        }
+
+        //println!("{:?}\n", tree.root_hash());
     }
 
     #[test]

@@ -13,6 +13,9 @@ use test::Bencher;
 use pairing::bn256::{Fr};
 use plasma::balance_tree::*;
 use plasma::primitives::*;
+use plasma::sparse_merkle_tree::batching;
+use plasma::sparse_merkle_tree::pedersen_hasher::BabyPedersenHasher;
+
 
 #[bench]
 fn bench_balance_tree_update_once(b: &mut Bencher) {
@@ -20,8 +23,13 @@ fn bench_balance_tree_update_once(b: &mut Bencher) {
 }
 
 #[bench]
-fn bench_balance_tree_update_100(b: &mut Bencher) {
-    bench_balance_tree_update(b, 100);
+fn bench_tree_update_100_1(b: &mut Bencher) {
+    bench_balance_tree_update(b, 10);
+}
+
+#[bench]
+fn bench_tree_update_100_batched(b: &mut Bencher) {
+    bench_batched_smt(b, 10);
 }
 
 fn bench_balance_tree_update(b: &mut Bencher, n_inserts: usize) {
@@ -41,7 +49,32 @@ fn bench_balance_tree_update(b: &mut Bencher, n_inserts: usize) {
         for i in 0..leafs.len() {
             tree.insert(u32::rand(rng) % capacity, leafs[i].clone())
         }
-        tree.root_hash()
+        //tree.root_hash()
+    });
+}
+
+fn bench_batched_smt(b: &mut Bencher, n_inserts: usize) {
+
+    type BabyBalanceTree = batching::SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
+
+    let rng = &mut thread_rng();
+    let mut tree = BabyBalanceTree::new(24);
+    let capacity = tree.capacity();
+    let mut leafs = Vec::with_capacity(n_inserts);
+    leafs.extend((0..n_inserts).map(|_| BabyLeaf {
+        balance:    Fr::rand(rng),
+        nonce:      Fr::rand(rng),
+        pub_x:      Fr::rand(rng),
+        pub_y:      Fr::rand(rng),
+    }));
+
+    b.iter(|| {
+        let insert_into = usize::rand(rng) % capacity;
+        //println!("insert_into {}", insert_into);
+        for i in 0..leafs.len() {
+            tree.insert(insert_into, leafs[i].clone());
+        }
+        tree.root_hash();
     });
 }
 
