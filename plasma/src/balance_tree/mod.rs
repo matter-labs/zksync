@@ -75,19 +75,27 @@ pub type BabyLeaf = Leaf<Bn256>;
 
 pub type BabyBalanceTree = SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
 
-#[test]
-fn test_account_merkle_tree() {
-    let mut tree = BabyBalanceTree::new(3);
-    let leaf = BabyLeaf {
-        balance:    Fr::zero(),
-        nonce:      Fr::one(),
-        pub_x:      Fr::one(),
-        pub_y:      Fr::one(),
-    };
-    tree.insert(0, leaf);
-    let root = tree.root_hash();
-    //println!("root: {:?}", root);
+#[cfg(test)]
+mod tests {
 
-    let path = tree.merkle_path(0);
-    //println!("path: {:?}", path);
+    use super::*;
+    use rand::{Rand, thread_rng};
+
+    #[test]
+    fn test_account_merkle_tree() {
+        let mut tree = BabyBalanceTree::new(3);
+        let leaf = BabyLeaf {
+            balance:    Fr::zero(),
+            nonce:      Fr::one(),
+            pub_x:      Fr::one(),
+            pub_y:      Fr::one(),
+        };
+        tree.insert(0, leaf);
+        let root = tree.root_hash();
+        //println!("root: {:?}", root);
+
+        let path = tree.merkle_path(0);
+        //println!("path: {:?}", path);
+    }
+
 }
