@@ -7,7 +7,7 @@ use pairing::bn256::{Bn256, Fr};
 use sapling_crypto::alt_babyjubjub::{JubjubEngine, AltJubjubBn256, edwards::Point, PrimeOrder};
 
 use super::primitives::{GetBits, GetBitsFixed};
-use super::sparse_merkle_tree::SparseMerkleTree;
+use super::sparse_merkle_tree::{SparseMerkleTree, batching};
 use super::sparse_merkle_tree::pedersen_hasher::BabyPedersenHasher;
 
 use super::circuit::plasma_constants;
@@ -82,7 +82,7 @@ mod tests {
     use rand::{Rand, thread_rng};
 
     #[test]
-    fn test_account_merkle_tree() {
+    fn test_balance_tree() {
         let mut tree = BabyBalanceTree::new(3);
         let leaf = BabyLeaf {
             balance:    Fr::zero(),
@@ -90,12 +90,37 @@ mod tests {
             pub_x:      Fr::one(),
             pub_y:      Fr::one(),
         };
-        tree.insert(0, leaf);
+        tree.insert(3, leaf);
         let root = tree.root_hash();
-        //println!("root: {:?}", root);
-
         let path = tree.merkle_path(0);
-        //println!("path: {:?}", path);
+//        println!("root: {:?}", root);
+//        println!("path: {:?}", path);
+    }
+
+    #[test]
+    fn test_balance_tree_alt() {
+
+        pub type AltBabyBalanceTree = batching::SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
+
+        let leaf = BabyLeaf {
+            balance:    Fr::zero(),
+            nonce:      Fr::one(),
+            pub_x:      Fr::one(),
+            pub_y:      Fr::one(),
+        };
+
+        let mut tree = BabyBalanceTree::new(3);
+        tree.insert(3, leaf.clone());
+        let root = tree.root_hash();
+        let path = tree.merkle_path(0);
+
+        let mut alt_tree = AltBabyBalanceTree::new(3);
+        alt_tree.insert(3, leaf.clone());
+        let alt_root = alt_tree.root_hash();
+        let alt_path = tree.merkle_path(0);
+
+        assert_eq!(root, alt_root);
+        assert_eq!(path, alt_path);
     }
 
 }

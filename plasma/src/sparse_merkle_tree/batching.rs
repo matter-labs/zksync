@@ -101,7 +101,6 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
             return self.prehashed.get(Self::depth(index)).unwrap().clone()
         }
 
-        println!("update hash {} {}", index, Self::depth(index));
         let i = (self.tree_depth - 1) - Self::depth(index);
         let hash = self.hasher.compress(&self.get_hash(lhs), &self.get_hash(rhs), i);
         self.hashes.insert(index, hash.clone());
@@ -157,7 +156,6 @@ mod tests {
                 acc.push(i & 1 == 1);
                 i >>= 1;
             }
-            //println!("into bits({}) -> {:?}", *self, acc);
             acc
         }
     }
@@ -175,14 +173,11 @@ mod tests {
                 acc <<= 1;
                 if *i {acc |= 1};
             }
-            //println!("hash bits({:?}) -> {}", &v, acc);
             acc
         }
 
         fn compress(&self, lhs: &u64, rhs: &u64, i: usize) -> u64 {
-            //println!("compress i {}", i);
             let r = 11 * lhs + 17 * rhs + 1;
-            //println!("compress({}, {}) -> {}", lhs, rhs, r);
             r
         }
 
@@ -200,10 +195,9 @@ mod tests {
 
     #[test]
     fn test_merkle_tree_insert() {
-        let mut tree = TestSMT::new(3);
+        let mut tree = TestSMT::new(2);
 
         assert_eq!(tree.capacity(), 4);
-        assert_eq!(tree.hash_capacity(), 7);
 
         tree.insert(0, TestLeaf(1));
         //println!("{:?}", tree);
