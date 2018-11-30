@@ -1,7 +1,4 @@
-// Sparse Merkle tree with flexible hashing strategy
-
-//pub mod hasher;
-//pub mod pedersen_hasher;
+// Sparse Merkle tree with batch updates
 
 use std::collections::HashMap;
 use super::hasher::Hasher;

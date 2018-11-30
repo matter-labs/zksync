@@ -1,5 +1,6 @@
 // Sparse Merkle tree with flexible hashing strategy
 
+pub mod alt;
 pub mod batching;
 pub mod hasher;
 pub mod pedersen_hasher;
