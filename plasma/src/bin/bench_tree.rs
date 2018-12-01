@@ -14,7 +14,7 @@ use test::Bencher;
 use pairing::bn256::{Fr};
 use plasma::balance_tree::*;
 use plasma::primitives::*;
-use plasma::sparse_merkle_tree::batching;
+use plasma::sparse_merkle_tree::batched_smt;
 use plasma::sparse_merkle_tree::pedersen_hasher::BabyPedersenHasher;
 
 
@@ -48,7 +48,7 @@ fn main() {
     }
     println!("default done in {}", (time::now() - start));
 
-    type BTree = batching::SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
+    type BTree = batched_smt::SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
 
     let mut tree = BTree::new(24);
     let mut v2 = Vec::new();
@@ -91,7 +91,7 @@ fn bench_balance_tree_update(b: &mut Bencher, n_inserts: usize) {
 
 fn bench_batched_smt(b: &mut Bencher, n_inserts: usize) {
 
-    type BabyBalanceTree = batching::SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
+    type BabyBalanceTree = batched_smt::SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
 
     let rng = &mut thread_rng();
     let mut tree = BabyBalanceTree::new(24);

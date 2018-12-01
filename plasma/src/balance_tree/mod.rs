@@ -7,7 +7,7 @@ use pairing::bn256::{Bn256, Fr};
 use sapling_crypto::alt_babyjubjub::{JubjubEngine, AltJubjubBn256, edwards::Point, PrimeOrder};
 
 use super::primitives::{GetBits, GetBitsFixed};
-use super::sparse_merkle_tree::{SparseMerkleTree, alt};
+use super::sparse_merkle_tree::{SparseMerkleTree, alt_smt};
 use super::sparse_merkle_tree::pedersen_hasher::BabyPedersenHasher;
 
 use super::circuit::plasma_constants;
@@ -100,7 +100,7 @@ mod tests {
     #[test]
     fn test_balance_tree_alt() {
 
-        pub type AltBabyBalanceTree = alt::SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
+        pub type AltBabyBalanceTree = alt_smt::SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
 
         let leaf = BabyLeaf {
             balance:    Fr::zero(),
