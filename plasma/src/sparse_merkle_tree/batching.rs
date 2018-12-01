@@ -192,8 +192,9 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
                 let mut cur_depth = from.depth - 1;
                 while cur_depth > to.depth {
                     //println!("cur_depth = {}", cur_depth);
+                    unsafe { HC += 1; }
                     let (lhs, rhs) = select(!dir, cur_hash, self.prehashed[cur_depth + 1].clone());
-                    cur_hash = self.hasher.compress(&lhs, &rhs, self.tree_depth - cur_depth - 1);
+                    cur_hash = self.prehashed[0].clone(); //self.hasher.compress(&lhs, &rhs, self.tree_depth - cur_depth - 1);
                     cur_depth -= 1;
                 }
                 cur_hash
@@ -208,6 +209,7 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
             // leaf node: return item hash
             let item_index = node.index - (1 << self.tree_depth);
             //println!("item_index = {}", item_index);
+            unsafe { HN += 1; }
             return self.hasher.hash_bits(self.items[&item_index].get_bits_le())
         }
 
@@ -221,6 +223,9 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
     }
 
 }
+
+static mut HN: usize = 0;
+static mut HC: usize = 0;
 
 #[cfg(test)]
 mod tests {
@@ -279,8 +284,6 @@ mod tests {
     #[test]
     fn test_batching_tree_insert1() {
         let rng = &mut thread_rng();
-        let mut tree = TestSMT::new(24);
-        let capacity = tree.capacity();
 //        tree.insert(0, TestLeaf(0));
 //        tree.insert(3, TestLeaf(2));
 //        tree.insert(1, TestLeaf(1));
@@ -296,29 +299,28 @@ mod tests {
 //        tree.insert(usize::rand(rng) % capacity, TestLeaf(2));
 //        //println!("{:?}\n", tree);
 
-        for j in 0..700 {
-            //b.iter(|| {
-            let insert_into = usize::rand(rng) % capacity;
-            //println!("insert_into {}", insert_into);
-            //for i in 0..leafs.len() {
-            let i = 0;
-            tree.insert(insert_into, TestLeaf(2));
-
-            //println!("{:?}", tree);
-            //println!("{:?}", tree.nodes);
+        let mut n = 1000;
+        for i in 0..3 {
+            let mut tree = TestSMT::new(24);
+            let capacity = tree.capacity();
+            tree.prepare_inserts(n);
+            unsafe {
+                HN = 0;
+                HC = 0;
+            }
+            for j in 0..n {
+                let insert_into = usize::rand(rng) % capacity;
+                tree.insert(insert_into, TestLeaf(2));
+            }
             tree.root_hash();
-            //println!("{:?}", tree.root_hash());
-            println!("{:?}", tree.root_hash());
-
-            //}
-            //tree.root_hash();
-            //});
+            unsafe {
+                println!("{}: HN = {}, HC = {}\n", n, HN, HC);
+            }
+            n = n * 10;
         }
-
-        //println!("{:?}\n", tree.root_hash());
     }
 
-    #[test]
+    //#[test]
     fn test_batching_tree_insert_comparative() {
         let mut tree = TestSMT::new(3);
 
