@@ -8,7 +8,7 @@ extern crate pairing;
 extern crate time;
 
 use ff::{Field, PrimeField, BitIterator};
-use rand::{Rand, thread_rng};
+use rand::{Rand, thread_rng, XorShiftRng, SeedableRng};
 use test::Bencher;
 
 use pairing::bn256::{Fr};
@@ -20,32 +20,39 @@ use plasma::sparse_merkle_tree::pedersen_hasher::BabyPedersenHasher;
 
 fn main() {
 
-    let n_inserts = 10;
-    let rounds: usize = 2;
-    let height: usize = 2;
+    let n_inserts = 100;
+    let rounds: usize = 3;
+    let height: usize = 24;
 
-    let rng = &mut thread_rng();
-    let mut leafs = Vec::with_capacity(n_inserts);
-    leafs.extend((0..(n_inserts * rounds)).map(|_| BabyLeaf {
+    let mut rng = &mut XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+    let mut leafs = Vec::with_capacity(n_inserts * rounds);
+    let rand_leaf = |_| BabyLeaf {
         balance:    Fr::rand(rng),
         nonce:      Fr::rand(rng),
         pub_x:      Fr::rand(rng),
         pub_y:      Fr::rand(rng),
-    }));
+    };
+    leafs.extend((0..(n_inserts * rounds)).map(rand_leaf));
+
+    let mut rng = &mut XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+    let mut pos = Vec::with_capacity(n_inserts * rounds);
+    pos.extend((0..(n_inserts * rounds)).map(|_| usize::rand(rng)));
 
     println!("running {} rounds of {} inserts each...", rounds, n_inserts);
 
     let mut tree = BabyBalanceTree::new(height as u32);
+    //println!("{:?}\n", tree.prehashed);
     let mut v1 = Vec::new();
     let start = time::now();
     let mut dummy = 0;
-    let capacity = tree.capacity();
+    let capacity = tree.capacity() as usize;
     for j in 0..rounds {
         for i in 0..n_inserts {
-            let insert_into = ((j*i+7)*j*(i+3)) % (capacity as usize);
-            let value = leafs[i].clone();
+            let insert_into = pos[i] % capacity;
+            let value = leafs[n_inserts*j + i].clone();
+            //println!("\ninsert into ({}) {:?}", insert_into, value);
             tree.insert(insert_into as u32, value);
-
+            //tree.print_hashes();
         }
         v1.push(tree.root_hash());
     }
@@ -60,10 +67,17 @@ fn main() {
     let capacity = tree.capacity();
     for j in 0..rounds {
         for i in 0..n_inserts {
-            let insert_into = ((j*i+7)*j*(i+3)) % (capacity as usize);
-            tree.insert(insert_into, leafs[i].clone())
+            let insert_into = pos[i] % capacity;
+            let value = leafs[n_inserts*j + i].clone();
+            //println!("\ninsert into ({}) {:?}", insert_into, value);
+            tree.insert(insert_into, value);
+            //println!("nodes = {:?}", tree.items[&0]);
+            tree.root_hash();
+            //tree.print_hashes();
+            //println!("nodes = {:?}", tree.nodes);
         }
         v2.push(tree.root_hash());
+        //println!("root_hash()");
     }
     println!("batch done in {}", (time::now() - start));
 
