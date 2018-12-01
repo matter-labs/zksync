@@ -230,6 +230,20 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
     pub fn root_hash(&mut self) -> Hash {
         self.get_hash(0)
     }
+
+    pub fn reset_stats() {
+        unsafe {
+            HN = 0;
+            HC = 0;
+        }
+    }
+
+    pub fn print_stats() {
+        unsafe {
+            println!("leaf hashes: {}", HN);
+            println!("tree hashes: {}", HC);
+        }
+    }
 }
 
 static mut HN: usize = 0;
