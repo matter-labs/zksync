@@ -105,8 +105,6 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
         assert!(item_index < self.capacity());
         let tree_depth = self.tree_depth;
         let leaf_index = (1 << tree_depth) + item_index;
-        //println!("\ninsert item_index = {}, leaf_index = {:?}", item_index, leaf_index);
-
         self.items.insert(item_index, item);
 
         // traverse the tree
@@ -117,20 +115,14 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
             // invalidate the cache
             self.nodes[cur_ref].cached_hash = None;
 
-            //println!("cur_i = {:?}", cur.index);
-            //println!("cur_node = {:?}", cur_node);
-
             let dir = (leaf_index & (1 << (tree_depth - cur.depth - 1))) > 0;
-            //println!("dir = {:?}", dir);
             let mut link = if dir { cur.rhs } else { cur.lhs };
             if let Some(next_ref) = link {
                 let next = { self.nodes[next_ref].clone() };
                 let leaf_index_normalized = leaf_index >> (tree_depth - next.depth);
-                //println!("next = {:?}, leaf_index_normalized = {:?}", next.index, leaf_index_normalized);
 
                 if next.index == leaf_index {
                     // we reached the leaf, invalidate cache and exit
-                    //println!("leaf_index == {}, cache[{}] = 0", leaf_index, next_ref);
                     self.nodes[next_ref].cached_hash = None;
                     break;
                 } else if leaf_index_normalized == next.index {
@@ -154,7 +146,6 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
                     let leaf_ref = self.insert_node(leaf_index, tree_depth, None, None);
                     let (lhs, rhs) = select(leaf_index_normalized > next.index, Some(next_ref), Some(leaf_ref));
                     let inter_ref = self.insert_node(inter_index, Self::depth(inter_index), lhs, rhs);
-                    //println!("node[{}] = {:?}", intersection_i, inter_node);
                     self.add_child(cur_ref, dir, inter_ref);
                     break;
                 }
@@ -165,7 +156,6 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
                 break;
             }
         }
-
     }
 
     fn add_child(&mut self, r: NodeRef, dir: bool, child: NodeRef) {
@@ -188,7 +178,7 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
         self.nodes.reserve(2 * n);
     }
 
-    fn hash_line(&mut self, from: Option<NodeRef>, to_ref: NodeRef, dir: bool) -> Hash {
+    fn hash_line(&mut self, from: Option<NodeRef>, to_ref: NodeRef) -> Hash {
         let to = &self.nodes[to_ref].clone();
         let hash = match from {
             None => self.prehashed[to.depth + 1].clone(),
@@ -197,23 +187,17 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
                 let mut cur_hash = self.get_hash(from_ref);
                 let mut cur_depth = from.depth - 1;
                 let mut cur_i = from.index;
-                //println!("  r_hash [{}] => {:?}", from.index, &cur_hash);
                 while cur_depth > to.depth {
-                    //println!("cur_depth = {}", cur_depth);
                     unsafe { HC += 1; }
                     let swap = (cur_i & 1) == 0;
-                    //println!("cur_i = {}, swap = {}", cur_i, swap);
-                    //println!("({:?}, {:?}, {})", &cur_hash, self.prehashed[&cur_depth + 1], self.tree_depth - cur_depth - 1);
                     let (lhs, rhs) = select(swap, cur_hash, self.prehashed[cur_depth + 1].clone());
                     cur_hash = self.hasher.compress(&lhs, &rhs, self.tree_depth - cur_depth - 1);
                     cur_depth -= 1;
                     cur_i >>= 1;
-                    //println!("cur_hash [{}] => {:?}, swap = {}", cur_i, &cur_hash, swap);
                 }
                 cur_hash
             }
         };
-        //println!("hash_line({:?} -> {:?}: {:?}) => {:?}", from, to.index, dir, hash);
         hash
     }
 
@@ -227,7 +211,6 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
             if node.depth == self.tree_depth {
                 // leaf node: return item hash
                 let item_index = node.index - (1 << self.tree_depth);
-                //println!("item_index = {:?}", item_index);
                 unsafe { HN += 1; }
                 self.hasher.hash_bits(self.items[&item_index].get_bits_le())
             } else {
@@ -235,12 +218,11 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
                     let level = self.tree_depth - node.depth - 1;
                     (node.lhs, node.rhs, level)
                 };
-                let hl = self.hash_line(lhs, node_ref, false);
-                let hr = self.hash_line(rhs, node_ref, true);
+                let hl = self.hash_line(lhs, node_ref);
+                let hr = self.hash_line(rhs, node_ref);
                 self.hasher.compress(&hl, &hr, level)
             }
         };
-        //println!("get_hash [{}] => {:?}", node.index, hash);
         self.nodes[node_ref].cached_hash = Some(hash.clone());
         hash
     }
