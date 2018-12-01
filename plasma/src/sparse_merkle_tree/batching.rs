@@ -279,7 +279,7 @@ mod tests {
     #[test]
     fn test_batching_tree_insert1() {
         let rng = &mut thread_rng();
-        let mut tree = TestSMT::new(8);
+        let mut tree = TestSMT::new(24);
         let capacity = tree.capacity();
 //        tree.insert(0, TestLeaf(0));
 //        tree.insert(3, TestLeaf(2));
@@ -308,7 +308,7 @@ mod tests {
             //println!("{:?}", tree.nodes);
             tree.root_hash();
             //println!("{:?}", tree.root_hash());
-            //println!("{:?}", tree.root_hash());
+            println!("{:?}", tree.root_hash());
 
             //}
             //tree.root_hash();

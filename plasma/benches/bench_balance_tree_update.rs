@@ -18,18 +18,23 @@ use plasma::sparse_merkle_tree::pedersen_hasher::BabyPedersenHasher;
 
 
 #[bench]
-fn bench_balance_tree_update_once(b: &mut Bencher) {
+fn bench_tree_update_once(b: &mut Bencher) {
     bench_balance_tree_update(b, 1);
 }
 
 #[bench]
-fn bench_tree_update_100_1(b: &mut Bencher) {
-    bench_balance_tree_update(b, 10);
+fn bench_tree_update_100(b: &mut Bencher) {
+    bench_balance_tree_update(b, 100);
+}
+
+#[bench]
+fn bench_tree_update_100_batched_once(b: &mut Bencher) {
+    bench_batched_smt(b, 1);
 }
 
 #[bench]
 fn bench_tree_update_100_batched(b: &mut Bencher) {
-    bench_batched_smt(b, 10);
+    bench_batched_smt(b, 100);
 }
 
 fn bench_balance_tree_update(b: &mut Bencher, n_inserts: usize) {
@@ -44,12 +49,11 @@ fn bench_balance_tree_update(b: &mut Bencher, n_inserts: usize) {
         pub_y:      Fr::rand(rng),
     }));
 
-    let insert_into = u32::rand(rng) % capacity;
-    for i in 0..leafs.len() {
-        tree.insert(insert_into, leafs[i].clone())
-    }
-
     b.iter(|| {
+        for i in 0..leafs.len() {
+            let insert_into = u32::rand(rng) % capacity;
+            tree.insert(insert_into, leafs[i].clone())
+        }
         tree.root_hash()
     });
 }
@@ -69,12 +73,14 @@ fn bench_batched_smt(b: &mut Bencher, n_inserts: usize) {
         pub_y:      Fr::rand(rng),
     }));
 
+    tree.prepare_inserts(n_inserts);
+    let mut i = 0;
     b.iter(|| {
-        for i in 0..leafs.len() {
+        for i in 0..n_inserts {
             let insert_into = usize::rand(rng) % capacity;
             tree.insert(insert_into, leafs[i].clone());
         }
-        tree.root_hash();
+        tree.root_hash()
     });
 }
 
