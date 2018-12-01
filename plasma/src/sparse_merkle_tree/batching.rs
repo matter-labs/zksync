@@ -194,7 +194,7 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
                     //println!("cur_depth = {}", cur_depth);
                     unsafe { HC += 1; }
                     let (lhs, rhs) = select(!dir, cur_hash, self.prehashed[cur_depth + 1].clone());
-                    cur_hash = self.prehashed[0].clone(); //self.hasher.compress(&lhs, &rhs, self.tree_depth - cur_depth - 1);
+                    cur_hash = self.hasher.compress(&lhs, &rhs, self.tree_depth - cur_depth - 1);
                     cur_depth -= 1;
                 }
                 cur_hash

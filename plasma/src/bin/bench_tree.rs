@@ -21,47 +21,48 @@ use plasma::sparse_merkle_tree::pedersen_hasher::BabyPedersenHasher;
 fn main() {
 
     let n_inserts = 1000;
-    let rounds = 20;
+    let rounds: usize = 1;
 
     let rng = &mut thread_rng();
     let mut leafs = Vec::with_capacity(n_inserts);
     leafs.extend((0..n_inserts).map(|_| BabyLeaf {
-        balance:    Fr::rand(rng),
-        nonce:      Fr::rand(rng),
-        pub_x:      Fr::rand(rng),
-        pub_y:      Fr::rand(rng),
+        balance:    Fr::zero(), //Fr::rand(rng),
+        nonce:      Fr::zero(), //Fr::rand(rng),
+        pub_x:      Fr::zero(), //Fr::rand(rng),
+        pub_y:      Fr::zero(), //Fr::rand(rng),
     }));
 
     let mut tree = BabyBalanceTree::new(24);
-    let mut v = Vec::new();
+    let mut v1 = Vec::new();
     let start = time::now();
     let mut dummy = 0;
     let capacity = tree.capacity();
     for j in 0..rounds {
         for i in 0..n_inserts {
-            let insert_into = u32::rand(rng) % capacity;
-            tree.insert(insert_into, leafs[i].clone())
+            let insert_into = ((j*i+7)*j*(i+3)) % (capacity as usize);
+            tree.insert(insert_into as u32, leafs[i].clone())
         }
-        v.push(tree.root_hash());
+        v1.push(tree.root_hash());
     }
-    println!("default done in {} [{:?}]", (time::now() - start)/rounds, v[usize::rand(rng) % v.len()]);
+    println!("default done in {}", (time::now() - start));
 
     type BTree = batching::SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
 
     let mut tree = BTree::new(24);
-    let mut v = Vec::new();
+    let mut v2 = Vec::new();
     let start = time::now();
     let mut dummy = 0;
     let capacity = tree.capacity();
     for j in 0..rounds {
         for i in 0..n_inserts {
-            let insert_into = usize::rand(rng) % capacity;
+            let insert_into = ((j*i+7)*j*(i+3)) % (capacity as usize);
             tree.insert(insert_into, leafs[i].clone())
         }
-        v.push(tree.root_hash());
+        v2.push(tree.root_hash());
     }
-    println!("batch done in {} [{:?}]", (time::now() - start) / rounds, v[usize::rand(rng) % v.len()]);
+    println!("batch done in {}", (time::now() - start));
 
+    assert_eq!(v1, v2);
 
 }
 
