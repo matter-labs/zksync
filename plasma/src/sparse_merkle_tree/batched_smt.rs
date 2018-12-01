@@ -172,12 +172,6 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
         self.nodes.len() - 1
     }
 
-    // optimization to reduce num of mem allocs
-    pub fn prepare_inserts(&mut self, n: usize) {
-        self.items.reserve(n);
-        self.nodes.reserve(2 * n);
-    }
-
     fn hash_line(&mut self, from: Option<NodeRef>, to_ref: NodeRef) -> Hash {
         let to = &self.nodes[to_ref].clone();
         let hash = match from {
