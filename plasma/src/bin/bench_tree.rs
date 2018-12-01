@@ -32,6 +32,8 @@ fn main() {
         pub_y:      Fr::zero(), //Fr::rand(rng),
     }));
 
+    println!("running {} rounds of {} inserts each...", rounds, n_inserts);
+
     let mut tree = BabyBalanceTree::new(24);
     let mut v1 = Vec::new();
     let start = time::now();
