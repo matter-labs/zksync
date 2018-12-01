@@ -20,21 +20,22 @@ use plasma::sparse_merkle_tree::pedersen_hasher::BabyPedersenHasher;
 
 fn main() {
 
-    let n_inserts = 1000;
-    let rounds: usize = 1;
+    let n_inserts = 10;
+    let rounds: usize = 2;
+    let height: usize = 2;
 
     let rng = &mut thread_rng();
     let mut leafs = Vec::with_capacity(n_inserts);
-    leafs.extend((0..n_inserts).map(|_| BabyLeaf {
-        balance:    Fr::zero(), //Fr::rand(rng),
-        nonce:      Fr::zero(), //Fr::rand(rng),
-        pub_x:      Fr::zero(), //Fr::rand(rng),
-        pub_y:      Fr::zero(), //Fr::rand(rng),
+    leafs.extend((0..(n_inserts * rounds)).map(|_| BabyLeaf {
+        balance:    Fr::rand(rng),
+        nonce:      Fr::rand(rng),
+        pub_x:      Fr::rand(rng),
+        pub_y:      Fr::rand(rng),
     }));
 
     println!("running {} rounds of {} inserts each...", rounds, n_inserts);
 
-    let mut tree = BabyBalanceTree::new(24);
+    let mut tree = BabyBalanceTree::new(height as u32);
     let mut v1 = Vec::new();
     let start = time::now();
     let mut dummy = 0;
@@ -42,7 +43,9 @@ fn main() {
     for j in 0..rounds {
         for i in 0..n_inserts {
             let insert_into = ((j*i+7)*j*(i+3)) % (capacity as usize);
-            tree.insert(insert_into as u32, leafs[i].clone())
+            let value = leafs[i].clone();
+            tree.insert(insert_into as u32, value);
+
         }
         v1.push(tree.root_hash());
     }
@@ -50,7 +53,7 @@ fn main() {
 
     type BTree = batched_smt::SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
 
-    let mut tree = BTree::new(24);
+    let mut tree = BTree::new(height);
     let mut v2 = Vec::new();
     let start = time::now();
     let mut dummy = 0;
@@ -65,6 +68,7 @@ fn main() {
     println!("batch done in {}", (time::now() - start));
 
     assert_eq!(v1, v2);
+    println!("test ok");
 
 }
 
