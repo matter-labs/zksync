@@ -39,12 +39,12 @@ pub struct SparseMerkleTree<T: GetBits + Default, Hash: Clone + Debug, H: Hasher
 {
     tree_depth: Depth,
     prehashed: Vec<Hash>,
-    pub items: HashMap<ItemIndex, T>,
+    items: HashMap<ItemIndex, T>,
     hasher: H,
 
     // intermediate nodes
     root: NodeRef,
-    pub nodes: Vec<Node<Hash>>,
+    nodes: Vec<Node<Hash>>,
 }
 
 impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
@@ -248,15 +248,6 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
     pub fn root_hash(&mut self) -> Hash {
         self.get_hash(0)
     }
-
-    pub fn print_hashes(&self) {
-        //println!("b");
-//        for n in &self.nodes {
-//            println!("{:?}", n);
-//        }
-//        println!("");
-    }
-
 }
 
 static mut HN: usize = 0;
