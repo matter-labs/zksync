@@ -5,6 +5,7 @@ pub mod batched_smt;
 pub mod hasher;
 pub mod pedersen_hasher;
 
+use std::fmt::Debug;
 use std::collections::HashMap;
 use self::hasher::Hasher;
 use super::primitives::GetBits;
@@ -42,18 +43,18 @@ impl PackToIndex for HashIndex {
 }
 
 #[derive(Debug, Clone)]
-pub struct SparseMerkleTree<T: GetBits + Default, Hash: Clone + Eq, H: Hasher<Hash>>
+pub struct SparseMerkleTree<T: GetBits + Default, Hash: Clone + Eq + Debug, H: Hasher<Hash>>
 {
     tree_depth: Depth,
-    prehashed: Vec<Hash>,
+    pub prehashed: Vec<Hash>,
     pub items: HashMap<ItemIndex, T>,
-    hashes: HashMap<ItemIndexPacked, Hash>,
+    pub hashes: HashMap<ItemIndexPacked, Hash>,
     pub hasher: H,
 }
 
 impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
     where T: GetBits + Default,
-          Hash: Clone + Eq,
+          Hash: Clone + Eq + Debug,
           H: Hasher<Hash> + Default,
 {
 
@@ -99,6 +100,9 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
         let hash = self.hasher.hash_bits(item_bits);
         // print!("Inserting at index {}\n", index);
         // print!("Packed into index {}, {}\n", hash_index.0, hash_index.1);
+
+        //println!("hash [{}] = {:?}", (1 << hash_index.0) + hash_index.1, &hash);
+
         self.hashes.insert(hash_index.pack(), hash);
 
         self.items.insert(index, item);
@@ -135,7 +139,12 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
         let lhs_hash = self.get_hash(lhs_index);
         let rhs_hash = self.get_hash(rhs_index);
 
+        //let idx = (1 << index.0) + index.1;
+        //println!("({:?}, {:?}, {})", &lhs_hash, &rhs_hash, (self.tree_depth - 1 - index.0));
+
         let hash = self.hasher.compress(&lhs_hash, &rhs_hash, (self.tree_depth - 1 - index.0) as usize);
+
+        //println!("hash [{}] = {:?}", (1 << index.0) + index.1, hash);
 
         self.hashes.insert(index.pack(), hash.clone());
         hash
@@ -266,9 +275,13 @@ mod tests {
         println!("{:?}", tree);
         assert_eq!(tree.root_hash(), 697516875);
 
+        tree.insert(0, 2);
+        println!("{:?}", tree);
+        assert_eq!(tree.root_hash(), 741131083);
+
         tree.insert(3, 2);
         //println!("{:?}", tree);
-        assert_eq!(tree.root_hash(), 749601611);
+        assert_eq!(tree.root_hash(), 793215819);
     }
 
     #[test]
