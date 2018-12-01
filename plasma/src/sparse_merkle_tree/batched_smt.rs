@@ -319,7 +319,6 @@ mod tests {
         for i in 0..3 {
             let mut tree = TestSMT::new(24);
             let capacity = tree.capacity();
-            tree.prepare_inserts(n);
             unsafe {
                 HN = 0;
                 HC = 0;
