@@ -20,8 +20,8 @@ use plasma::sparse_merkle_tree::pedersen_hasher::BabyPedersenHasher;
 
 fn main() {
 
-    let n_inserts = 10000;
-    let rounds: usize = 1;
+    let n_inserts = 1000;
+    let rounds: usize = 10;
     let height: usize = 24;
 
     let mut rng = &mut XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
@@ -49,7 +49,7 @@ fn main() {
     let start = time::now();
     for j in 0..rounds {
         for i in 0..n_inserts {
-            let insert_into = pos[i] % capacity;
+            let insert_into = pos[n_inserts*j + i] % capacity;
             let value = leafs[n_inserts*j + i].clone();
             tree.insert(insert_into as u32, value);
         }
@@ -69,7 +69,7 @@ fn main() {
     let start = time::now();
     for j in 0..rounds {
         for i in 0..n_inserts {
-            let insert_into = pos[i] % capacity;
+            let insert_into = pos[n_inserts*j + i] % capacity;
             let value = leafs[n_inserts*j + i].clone();
             tree.insert(insert_into, value);
         }
