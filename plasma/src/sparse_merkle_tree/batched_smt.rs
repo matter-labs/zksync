@@ -25,12 +25,11 @@ type NodeIndex = usize;
 type NodeRef = usize;
 
 #[derive(Debug, Clone)]
-pub struct Node<Hash: Debug> {
+pub struct Node {
     depth: Depth,
     index: NodeIndex,
     left: Option<NodeRef>,
     right: Option<NodeRef>,
-    cached_hash: Option<Hash>,
 }
 
 #[derive(Debug, Clone)]
@@ -43,7 +42,7 @@ pub struct SparseMerkleTree<T: GetBits + Default, Hash: Clone + Debug, H: Hasher
 
     // intermediate nodes
     root: NodeRef,
-    nodes: Vec<Node<Hash>>,
+    nodes: Vec<Node>,
     cache: FnvHashMap<NodeIndex, Hash>,
 }
 
@@ -63,7 +62,6 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
             depth: 0,
             left: None,
             right: None,
-            cached_hash: None,
         });
 
         let mut prehashed = Vec::with_capacity(tree_depth);
@@ -128,9 +126,6 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
         loop {
             let cur = { self.nodes[cur_ref].clone() };
 
-            // invalidate the cache
-            //self.nodes[cur_ref].cached_hash = None;
-
             let dir = (leaf_index & (1 << (tree_depth - cur.depth - 1))) > 0;
             let mut link = if dir { cur.right } else { cur.left };
             if let Some(next_ref) = link {
@@ -141,8 +136,7 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
                     // go at least one full level deeper
                     self.wipe_cache(next.index, cur.index);
                     if next.index == leaf_index {
-                        // we reached the leaf, invalidate cache and exit
-                        //self.nodes[next_ref].cached_hash = None;
+                        // we reached the leaf, exit
                         break;
                     } else {
                         // follow the link
@@ -181,7 +175,7 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
     }
 
     fn insert_node(&mut self, index: NodeIndex, depth: Depth, left: Option<NodeRef>, right: Option<NodeRef>) -> NodeRef {
-        self.nodes.push(Node{index, depth, left, right, cached_hash: None});
+        self.nodes.push(Node{index, depth, left, right});
         self.nodes.len() - 1
     }
 
@@ -223,9 +217,6 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
 
     fn get_hash(&mut self, node_ref: NodeRef) -> Hash {
         let node = &self.nodes[node_ref].clone();
-//        if let Some(cached) = &node.cached_hash {
-//            return cached.clone()
-//        }
         let hash = {
             if node.depth == self.tree_depth {
                 // leaf node: return item hash
@@ -241,7 +232,6 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
                 self.hasher.compress(&hl, &hr, level)
             }
         };
-        //self.nodes[node_ref].cached_hash = Some(hash.clone());
         self.cache.insert(node.index, hash.clone());
         hash
     }
