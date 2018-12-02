@@ -188,31 +188,31 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
         }
     }
 
-    fn hash_line(&mut self, from: Option<NodeRef>, to_ref: NodeRef, dir: usize) -> Hash {
-        let to = &self.nodes[to_ref].clone();
-        if let Some(cached) = self.cache.get(&(to.index * 2 + dir)) {
+    fn get_hash_line(&mut self, child_ref: NodeRef, parent: &Node) -> Hash {
+        let child = self.nodes[child_ref].clone();
+        let mut cur_hash = self.get_hash(child_ref);
+        let mut cur_depth = child.depth - 1;
+        let mut cur_i = child.index;
+        while cur_depth > parent.depth {
+            unsafe { HC += 1; }
+            let swap = (cur_i & 1) == 0;
+            let (lhs, rhs) = select(swap, cur_hash, self.prehashed[cur_depth + 1].clone());
+            cur_hash = self.hasher.compress(&lhs, &rhs, self.tree_depth - cur_depth - 1);
+            cur_depth -= 1;
+            cur_i >>= 1;
+            self.cache.insert(cur_i, cur_hash.clone());
+        }
+        cur_hash
+    }
+
+    fn get_child_hash(&mut self, child_ref: Option<NodeRef>, parent: &Node, dir: usize) -> Hash {
+        if let Some(cached) = self.cache.get(&(parent.index * 2 + dir)) {
             return cached.clone()
         }
-        let hash = match from {
-            None => self.prehashed[to.depth + 1].clone(),
-            Some(from_ref) => {
-                let from = self.nodes[from_ref].clone();
-                let mut cur_hash = self.get_hash(from_ref);
-                let mut cur_depth = from.depth - 1;
-                let mut cur_i = from.index;
-                while cur_depth > to.depth {
-                    unsafe { HC += 1; }
-                    let swap = (cur_i & 1) == 0;
-                    let (lhs, rhs) = select(swap, cur_hash, self.prehashed[cur_depth + 1].clone());
-                    cur_hash = self.hasher.compress(&lhs, &rhs, self.tree_depth - cur_depth - 1);
-                    cur_depth -= 1;
-                    cur_i >>= 1;
-                    self.cache.insert(cur_i, cur_hash.clone());
-                }
-                cur_hash
-            }
-        };
-        hash
+        match child_ref {
+            Some(child_ref) => self.get_hash_line(child_ref, parent),
+            None => self.prehashed[parent.depth + 1].clone(),
+        }
     }
 
     fn get_hash(&mut self, node_ref: NodeRef) -> Hash {
@@ -224,8 +224,8 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
                 unsafe { HN += 1; }
                 self.hasher.hash_bits(self.items[&item_index].get_bits_le())
             } else {
-                let hl = self.hash_line(node.left, node_ref, 0);
-                let hr = self.hash_line(node.right, node_ref, 1);
+                let hl = self.get_child_hash(node.left, node, 0);
+                let hr = self.get_child_hash(node.right, node, 1);
 
                 // level is used by hasher for personalization
                 let level = self.tree_depth - node.depth - 1;
