@@ -15,7 +15,7 @@ use time::precise_time_ns;
 use pairing::bn256::{Fr};
 use plasma::balance_tree::*;
 use plasma::primitives::*;
-use plasma::sparse_merkle_tree::batched_smt;
+use plasma::sparse_merkle_tree::parallel_smt;
 use plasma::sparse_merkle_tree::pedersen_hasher::BabyPedersenHasher;
 
 
@@ -60,7 +60,7 @@ fn main() {
     let duration = (precise_time_ns() - start) as f64 / 1_000_000_000.0;
     println!("done in {} s @ {} TPS", duration, total as f64 / duration);
 
-    type BTree = batched_smt::SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
+    type BTree = parallel_smt::SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
 
     let mut tree = BTree::new(height);
     let mut v2 = Vec::new();
