@@ -4,13 +4,14 @@ use std::fmt::Debug;
 use super::hasher::Hasher;
 use super::super::primitives::GetBits;
 use fnv::FnvHashMap;
-use bellman::multicore::{Worker, WorkerFuture};
 
+use std::time::Duration;
+
+use rayon::prelude::*;
 
 fn select<T>(condition: bool, a: T, b: T) -> (T, T) {
     if condition { (a, b) } else { (b, a) }
 }
-
 
 // Lead index: 0 <= i < N
 type ItemIndex = usize;
@@ -35,7 +36,10 @@ pub struct Node {
 }
 
 #[derive(Clone)]
-pub struct SparseMerkleTree<T: GetBits + Default, Hash: Clone + Debug, H: Hasher<Hash>>
+pub struct SparseMerkleTree<T, Hash, H>
+    where T: GetBits + Default + Sync,
+          Hash: Clone + Debug + Sync + Send,
+          H: Hasher<Hash> + Sync
 {
     tree_depth: Depth,
     prehashed: Vec<Hash>,
@@ -46,14 +50,12 @@ pub struct SparseMerkleTree<T: GetBits + Default, Hash: Clone + Debug, H: Hasher
     root: NodeRef,
     nodes: Vec<Node>,
     cache: FnvHashMap<NodeIndex, Hash>,
-
-    pool: Worker,
 }
 
 impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
-    where T: GetBits + Default,
-          Hash: Clone + Debug,
-          H: Hasher<Hash> + Default,
+    where T: GetBits + Default + Sync,
+          Hash: Clone + Debug + Sync + Send,
+          H: Hasher<Hash> + Default + Sync,
 {
 
     pub fn new(tree_depth: Depth) -> Self {
@@ -79,9 +81,7 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
 
         let cache = FnvHashMap::default();
 
-        let pool = Worker::new();
-
-        Self{tree_depth, prehashed, items, hasher, nodes, cache, root: 0, pool}
+        Self{tree_depth, prehashed, items, hasher, nodes, cache, root: 0 }
  }
 
     #[inline(always)]
@@ -197,12 +197,9 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
     fn get_hash_line(&self, child_ref: NodeRef, parent: &Node) -> (Hash, Vec<(NodeIndex, Hash)>) {
         let child = &self.nodes[child_ref];
 
-        //let mut acc = Vec::with_capacity(child.depth - parent.depth);
         let mut acc = self.get_hash(child_ref);
         let mut cur_hash = acc.0;
         let mut updates = acc.1;
-        //acc.push(( child.index, cur_hash.clone() ));
-        //acc.res
 
         let mut cur_depth = child.depth - 1;
         let mut cur_i = child.index;
@@ -222,15 +219,13 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
 
     fn get_child_hash(&self, child_ref: Option<NodeRef>, parent: &Node, dir: usize) -> (Hash, Vec<(NodeIndex, Hash)>) {
         let neighbour_index = parent.index * 2 + dir;
-        //println!("neighbour_index {}", neighbour_index);
         match self.cache.get(&neighbour_index) {
             Some(cached) => {
-                //println!("cached {:?}", cached);
-                (cached.clone(), vec![])
+                (cached.clone(), Vec::with_capacity((self.tree_depth+1)*2))
             },
             None => match child_ref {
                 Some(child_ref) => self.get_hash_line(child_ref, parent),
-                None => (self.prehashed[parent.depth + 1].clone(), vec![]),
+                None => (self.prehashed[parent.depth + 1].clone(), Vec::with_capacity((self.tree_depth+1)*2)),
             },
         }
     }
@@ -245,8 +240,10 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
                 let item_hash = self.hasher.hash_bits(self.items[&item_index].get_bits_le());
                 (item_hash, vec![])
             } else {
-                let hl = self.get_child_hash(node.left, node, 0);
-                let hr = self.get_child_hash(node.right, node, 1);
+                let (hl, hr) = rayon::join(
+                    || self.get_child_hash(node.left, node, 0),
+                    || self.get_child_hash(node.right, node, 1),
+                );
 
                 // level is used by hasher for personalization
                 let level = self.tree_depth - node.depth - 1;
@@ -264,7 +261,6 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
 
     pub fn root_hash(&mut self) -> Hash {
         let acc = self.get_hash(0);
-        //println!("acc.1 = {:?}", acc.1);
         for v in acc.1 {
             self.cache.insert(v.0, v.1);
         };
@@ -280,9 +276,44 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
 
     pub fn print_stats() {
         unsafe {
-            println!("leaf hashes: {}", HN);
-            println!("tree hashes: {}", HC);
+//            println!("leaf hashes: {}", HN);
+//            println!("tree hashes: {}", HC);
         }
+    }
+
+
+    pub fn make_a_future(&self) {
+
+//        let pool = CpuPool::new_num_cpus();
+//
+//        let r = thread::scope(|scope| {
+//            scope.spawn(move |_| {
+//                println!("Hello! {:?}", self.root_hash());
+//                std::thread::sleep(Duration::from_millis(1400));
+//                println!("done");
+//                3 + 5
+//            });
+//        }).unwrap();
+//        println!("r {:?}", r);
+
+//        println!("testing cpu");
+//        crossbeam_utils::thread::scope(|scope| {
+//            scope.spawn(move || {
+//                println!("begin");
+//            })
+//        });
+
+//        Box::new(self.pool.spawn(future::lazy(move || {
+//            println!("begin");
+//            let r = self.root_hash();
+//            println!("end: {:?}", r);
+//            future::ok::<(), ()>(())
+//        })))/*.then(|result| {
+//            println!("result {:?}", result);
+//            future::ok::<(), ()>(())
+//        }));*/
+
+        //f.wait();
     }
 }
 
@@ -395,18 +426,19 @@ mod tests {
     }
 
     #[test]
-    fn x1() {
+    fn test_cpu_pool() {
         let mut tree = TestSMT::new(3);
 
-        tree.insert(0,  TestLeaf(1));
-        println!("{}", tree.root_hash());
-        println!("{:?}", tree.prehashed);
-        println!("{:?}", tree.nodes);
+        tree.make_a_future();
 
-        tree.insert(0, TestLeaf(2));
-        println!("{}", tree.root_hash());
-        println!("{:?}", tree.nodes);
+//        tree.insert(0,  TestLeaf(1));
+//        println!("{}", tree.root_hash());
+//        println!("{:?}", tree.prehashed);
+//        println!("{:?}", tree.nodes);
+//
+//        tree.insert(0, TestLeaf(2));
+//        println!("{}", tree.root_hash());
+//        println!("{:?}", tree.nodes);
 
     }
-
 }

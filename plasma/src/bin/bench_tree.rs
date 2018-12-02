@@ -10,6 +10,7 @@ extern crate time;
 use ff::{Field, PrimeField, BitIterator};
 use rand::{Rand, thread_rng, XorShiftRng, SeedableRng};
 use test::Bencher;
+use time::precise_time_ns;
 
 use pairing::bn256::{Fr};
 use plasma::balance_tree::*;
@@ -38,15 +39,16 @@ fn main() {
     let mut pos = Vec::with_capacity(n_inserts * rounds);
     pos.extend((0..(n_inserts * rounds)).map(|_| usize::rand(rng)));
 
-    println!("running {} rounds of {} inserts each...", rounds, n_inserts);
+    let total = rounds * n_inserts;
+    println!("running {} rounds of {} updates each (total {} updates):", rounds, n_inserts, total);
 
     let mut tree = BabyBalanceTree::new(height as u32);
     let mut v1 = Vec::new();
     let mut dummy = 0;
     let capacity = tree.capacity() as usize;
 
-    println!("start");
-    let start = time::now();
+    println!("baseline implementation...");
+    let start = precise_time_ns();
     for j in 0..rounds {
         for i in 0..n_inserts {
             let insert_into = pos[n_inserts*j + i] % capacity;
@@ -55,7 +57,8 @@ fn main() {
         }
         v1.push(tree.root_hash());
     }
-    println!("default done in {}", (time::now() - start));
+    let duration = (precise_time_ns() - start) as f64 / 1_000_000_000.0;
+    println!("done in {} s @ {} TPS", duration, total as f64 / duration);
 
     type BTree = batched_smt::SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
 
@@ -65,8 +68,8 @@ fn main() {
     let capacity = tree.capacity();
 
     BTree::reset_stats();
-    println!("start");
-    let start = time::now();
+    println!("parallel batched updates...");
+    let start = precise_time_ns();
     for j in 0..rounds {
         for i in 0..n_inserts {
             let insert_into = pos[n_inserts*j + i] % capacity;
@@ -75,9 +78,10 @@ fn main() {
         }
         v2.push(tree.root_hash());
     }
-    println!("batch done in {}", (time::now() - start));
+    let duration = (precise_time_ns() - start) as f64 / 1_000_000_000.0;
+    println!("done in {} s @ {} TPS", duration, total as f64 / duration);
     BTree::print_stats();
 
     assert_eq!(v1, v2);
-    println!("test ok");
+    println!("results match: all ok");
 }
