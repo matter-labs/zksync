@@ -13,16 +13,17 @@ fn select<T>(condition: bool, a: T, b: T) -> (T, T) {
     if condition { (a, b) } else { (b, a) }
 }
 
-// Lead index: 0 <= i < N
+// Nodes enumarated starting with index(root) = 1
+// We need 2 * TREE_HEIGHT bits
+type NodeIndex = u64;
+
+// Lead index: 0 <= i < N (u64 to avoid conversions; 64 bit HW should be used anyway)
 type ItemIndex = usize;
 
 // Tree of depth 0: 1 item (which is root), level 0 only
 // Tree of depth 1: 2 items, levels 0 and 1
 // Tree of depth N: 2 ^ N items, 0 <= level < depth
 type Depth = usize;
-
-// Nodes enumarated starting with index(root) = 1
-type NodeIndex = usize;
 
 // Index of the node in the vector; slightly inefficient, won't be needed when rust gets non-lexical timelines
 type NodeRef = usize;
@@ -120,7 +121,7 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
     pub fn insert(&mut self, item_index: ItemIndex, item: T) {
         assert!(item_index < self.capacity());
         let tree_depth = self.tree_depth;
-        let leaf_index = (1 << tree_depth) + item_index;
+        let leaf_index: NodeIndex = ((1 << tree_depth) + item_index) as NodeIndex;
 
         self.items.insert(item_index, item);
 
@@ -218,7 +219,7 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
     }
 
     fn get_child_hash(&self, child_ref: Option<NodeRef>, parent: &Node, dir: usize) -> (Hash, Vec<(NodeIndex, Hash)>) {
-        let neighbour_index = parent.index * 2 + dir;
+        let neighbour_index = parent.index * 2 + dir as NodeIndex;
         match self.cache.get(&neighbour_index) {
             Some(cached) => {
                 (cached.clone(), Vec::with_capacity((self.tree_depth+1)*2))
@@ -235,7 +236,7 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
         let mut acc = {
             if node.depth == self.tree_depth {
                 // leaf node: return item hash
-                let item_index = node.index - (1 << self.tree_depth);
+                let item_index: ItemIndex = (node.index - (1 << self.tree_depth)) as ItemIndex;
                 unsafe { HN += 1; }
                 let item_hash = self.hasher.hash_bits(self.items[&item_index].get_bits_le());
                 (item_hash, vec![])
