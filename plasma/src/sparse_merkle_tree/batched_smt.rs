@@ -188,11 +188,19 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
         }
     }
 
-    fn get_hash_line(&mut self, child_ref: NodeRef, parent: &Node) -> Hash {
-        let child = self.nodes[child_ref].clone();
-        let mut cur_hash = self.get_hash(child_ref);
+    fn get_hash_line(&self, child_ref: NodeRef, parent: &Node) -> (Hash, Vec<(NodeIndex, Hash)>) {
+        let child = &self.nodes[child_ref];
+
+        //let mut acc = Vec::with_capacity(child.depth - parent.depth);
+        let mut acc = self.get_hash(child_ref);
+        let mut cur_hash = acc.0;
+        let mut updates = acc.1;
+        //acc.push(( child.index, cur_hash.clone() ));
+        //acc.res
+
         let mut cur_depth = child.depth - 1;
         let mut cur_i = child.index;
+
         while cur_depth > parent.depth {
             unsafe { HC += 1; }
             let swap = (cur_i & 1) == 0;
@@ -200,44 +208,61 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
             cur_hash = self.hasher.compress(&lhs, &rhs, self.tree_depth - cur_depth - 1);
             cur_depth -= 1;
             cur_i >>= 1;
-            self.cache.insert(cur_i, cur_hash.clone());
+            //self.cache.insert(cur_i, cur_hash.clone());
+            updates.push(( cur_i, cur_hash.clone() ));
         }
-        cur_hash
+        (cur_hash, updates)
     }
 
-    fn get_child_hash(&mut self, child_ref: Option<NodeRef>, parent: &Node, dir: usize) -> Hash {
-        if let Some(cached) = self.cache.get(&(parent.index * 2 + dir)) {
-            return cached.clone()
-        }
-        match child_ref {
-            Some(child_ref) => self.get_hash_line(child_ref, parent),
-            None => self.prehashed[parent.depth + 1].clone(),
+    fn get_child_hash(&self, child_ref: Option<NodeRef>, parent: &Node, dir: usize) -> (Hash, Vec<(NodeIndex, Hash)>) {
+        let neighbour_index = parent.index * 2 + dir;
+        //println!("neighbour_index {}", neighbour_index);
+        match self.cache.get(&neighbour_index) {
+            Some(cached) => {
+                //println!("cached {:?}", cached);
+                (cached.clone(), vec![])
+            },
+            None => match child_ref {
+                Some(child_ref) => self.get_hash_line(child_ref, parent),
+                None => (self.prehashed[parent.depth + 1].clone(), vec![]),
+            },
         }
     }
 
-    fn get_hash(&mut self, node_ref: NodeRef) -> Hash {
+    fn get_hash(&self, node_ref: NodeRef) -> (Hash, Vec<(NodeIndex, Hash)>) {
         let node = &self.nodes[node_ref].clone();
-        let hash = {
+        let mut acc = {
             if node.depth == self.tree_depth {
                 // leaf node: return item hash
                 let item_index = node.index - (1 << self.tree_depth);
                 unsafe { HN += 1; }
-                self.hasher.hash_bits(self.items[&item_index].get_bits_le())
+                let item_hash = self.hasher.hash_bits(self.items[&item_index].get_bits_le());
+                (item_hash, vec![])
             } else {
                 let hl = self.get_child_hash(node.left, node, 0);
                 let hr = self.get_child_hash(node.right, node, 1);
 
                 // level is used by hasher for personalization
                 let level = self.tree_depth - node.depth - 1;
-                self.hasher.compress(&hl, &hr, level)
+                let hash = self.hasher.compress(&hl.0, &hr.0, level);
+
+                let mut updates = hl.1;
+                updates.extend(hr.1);
+                (hash, updates)
             }
         };
-        self.cache.insert(node.index, hash.clone());
-        hash
+        acc.1.push((node.index, acc.0.clone()));
+        //self.cache.insert(node.index, hash.clone());
+        acc
     }
 
     pub fn root_hash(&mut self) -> Hash {
-        self.get_hash(0)
+        let acc = self.get_hash(0);
+        //println!("acc.1 = {:?}", acc.1);
+        for v in acc.1 {
+            self.cache.insert(v.0, v.1);
+        };
+        acc.0
     }
 
     pub fn reset_stats() {
