@@ -4,6 +4,8 @@ use std::fmt::Debug;
 use super::hasher::Hasher;
 use super::super::primitives::GetBits;
 use fnv::FnvHashMap;
+use bellman::multicore::{Worker, WorkerFuture};
+
 
 fn select<T>(condition: bool, a: T, b: T) -> (T, T) {
     if condition { (a, b) } else { (b, a) }
@@ -32,7 +34,7 @@ pub struct Node {
     right: Option<NodeRef>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SparseMerkleTree<T: GetBits + Default, Hash: Clone + Debug, H: Hasher<Hash>>
 {
     tree_depth: Depth,
@@ -44,6 +46,8 @@ pub struct SparseMerkleTree<T: GetBits + Default, Hash: Clone + Debug, H: Hasher
     root: NodeRef,
     nodes: Vec<Node>,
     cache: FnvHashMap<NodeIndex, Hash>,
+
+    pool: Worker,
 }
 
 impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
@@ -75,8 +79,10 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
 
         let cache = FnvHashMap::default();
 
-        Self{tree_depth, prehashed, items, hasher, nodes, cache, root: 0}
-    }
+        let pool = Worker::new();
+
+        Self{tree_depth, prehashed, items, hasher, nodes, cache, root: 0, pool}
+ }
 
     #[inline(always)]
     fn depth(index: NodeIndex) -> Depth {
@@ -380,17 +386,11 @@ mod tests {
     #[test]
     fn test_batching_tree_insert_comparative() {
         let mut tree = TestSMT::new(3);
-
         tree.insert(0,  TestLeaf(1));
-        //println!("{:?}", tree);
         assert_eq!(tree.root_hash(), 697516875);
-
         tree.insert(0, TestLeaf(2));
-        println!("{:?}", tree);
         assert_eq!(tree.root_hash(), 741131083);
-
         tree.insert(3, TestLeaf(2));
-        //println!("{:?}", tree);
         assert_eq!(tree.root_hash(), 793215819);
     }
 
