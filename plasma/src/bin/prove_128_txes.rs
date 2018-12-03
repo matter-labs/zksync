@@ -45,7 +45,7 @@ use plasma::circuit::plasma_constants;
 use plasma::circuit::baby_plasma::{Transaction, TransactionWitness, Update, le_bit_vector_into_field_element, be_bit_vector_into_bytes};
 use sapling_crypto::circuit::float_point::{convert_to_float};
 
-const TXES_TO_TEST: usize = 1024;
+const TXES_TO_TEST: usize = 800;
 
 fn main() {
     println!("Will try to make a proof for {} transactons", TXES_TO_TEST);
