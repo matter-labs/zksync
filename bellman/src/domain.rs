@@ -51,43 +51,65 @@ impl<E: Engine, G: Group<E>> EvaluationDomain<E, G> {
     {
         use ff::PrimeField;
         // Compute the size of our evaluation domain
-        let mut m = 1;
-        let mut exp = 0;
-        println!("Polynomial degree = {}", coeffs.len());
-        println!("Max polynomial degree = {}", (1 << E::Fr::S) - 1);
-
-        let max_degree = (1 << E::Fr::S) - 1;
 
         let coeffs_len = coeffs.len();
 
-        // Compute omega, the 2^exp primitive root of unity
+        let mut m = 1;
+        let mut exp = 0;
         let mut omega = E::Fr::root_of_unity();
+        let max_degree = (1 << E::Fr::S) - 1;
+
+        println!("Polynomial degree = {}", coeffs_len);
+        println!("Max polynomial degree = {}", max_degree);
+        println!("Initial 2^{}th root of unity is {}", E::Fr::S, omega);
+
+        // Compute omega, the 2^exp primitive root of unity
+
+
+        while m < coeffs_len {
+            m *= 2;
+            exp += 1;
+
+            // The pairing-friendly curve may not be able to support
+            // large enough (radix2) evaluation domains.
+            if exp > E::Fr::S {
+                return Err(SynthesisError::PolynomialDegreeTooLarge)
+            }
+        }
+
+        // If full domain is not needed - limit it
+        for _ in exp..E::Fr::S {
+            omega.square();
+        }
+
+        println!("Final evaluation has 2^{}th roots of unity with generator {}", exp, omega);
+        println!("Extending inital vectors to the size of {}", m);
 
         // find power of two that is larger or equal to the number of
         // constraints
 
-        if coeffs_len > max_degree {
-            return Err(SynthesisError::PolynomialDegreeTooLarge)
-        }
+        // if coeffs_len > max_degree {
+        //     return Err(SynthesisError::PolynomialDegreeTooLarge)
+        // }
 
-        if coeffs_len >= 1 << (E::Fr::S - 1) {
-            m = 1 << E::Fr::S;
-        } else {
-            while m < coeffs.len() {
-                m *= 2;
-                exp += 1;
+        // if coeffs_len >= 1 << (E::Fr::S - 1) {
+        //     m = 1 << E::Fr::S;
+        // } else {
+        //     while m < coeffs.len() {
+        //         m *= 2;
+        //         exp += 1;
 
-                // The pairing-friendly curve may not be able to support
-                // large enough (radix2) evaluation domains.
-                if exp >= E::Fr::S {
-                    return Err(SynthesisError::PolynomialDegreeTooLarge)
-                }
-            }
+        //         // The pairing-friendly curve may not be able to support
+        //         // large enough (radix2) evaluation domains.
+        //         if exp >= E::Fr::S {
+        //             return Err(SynthesisError::PolynomialDegreeTooLarge)
+        //         }
+        //     }
 
-            for _ in exp..E::Fr::S {
-                omega.square();
-            }
-        }
+        //     for _ in exp..E::Fr::S {
+        //         omega.square();
+        //     }
+        // }
 
         // Extend the coeffs vector with zeroes if necessary
         coeffs.resize(m, G::group_zero());
@@ -301,6 +323,8 @@ fn serial_fft<E: Engine, T: Group<E>>(a: &mut [T], omega: &E::Fr, log_n: u32)
         }
         r
     }
+
+    println!("A len = {}", a.len());
 
     let n = a.len() as u32;
     assert_eq!(n, 1 << log_n);
