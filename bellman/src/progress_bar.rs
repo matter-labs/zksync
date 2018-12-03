@@ -97,8 +97,6 @@ impl MultiBar {
 
                     let new_step = (self.cur * UPDATE_INTERVAL / self.total_elapsed) / self.n_workers;
                     self.step.store(new_step as usize, Ordering::Release);
-                    print!(" new_step = {} {} {}", new_step, self.cur, self.total_elapsed / 1000000);                    
-
                     
                     std::io::stdout().flush().unwrap();
                 }
