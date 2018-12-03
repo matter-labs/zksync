@@ -45,7 +45,7 @@ use plasma::circuit::plasma_constants;
 use plasma::circuit::baby_plasma::{Transaction, TransactionWitness, Update, le_bit_vector_into_field_element, be_bit_vector_into_bytes};
 use sapling_crypto::circuit::float_point::{convert_to_float};
 
-const TXES_TO_TEST: usize = 128;
+const TXES_TO_TEST: usize = 1024;
 
 fn main() {
     let p_g = FixedGenerators::SpendingKeyGenerator;
@@ -292,28 +292,28 @@ fn main() {
         transactions: witnesses.clone(),
     };
 
-    {
-        let mut cs = TestConstraintSystem::new();
+    // {
+    //     let mut cs = TestConstraintSystem::new();
 
-        instance_for_test_cs.synthesize(&mut cs).unwrap();
+    //     instance_for_test_cs.synthesize(&mut cs).unwrap();
 
-        println!("Total of {} constraints", cs.num_constraints());
-        println!("{} constraints per TX for {} transactions", cs.num_constraints() / TXES_TO_TEST, TXES_TO_TEST);
+    //     println!("Total of {} constraints", cs.num_constraints());
+    //     println!("{} constraints per TX for {} transactions", cs.num_constraints() / TXES_TO_TEST, TXES_TO_TEST);
 
-        assert_eq!(cs.num_inputs(), 4);
+    //     assert_eq!(cs.num_inputs(), 4);
 
-        assert_eq!(cs.get_input(0, "ONE"), Fr::one());
-        assert_eq!(cs.get_input(1, "old root input/input variable"), initial_root);
-        assert_eq!(cs.get_input(2, "new root input/input variable"), final_root);
-        assert_eq!(cs.get_input(3, "rolling hash input/input variable"), public_data_commitment);
+    //     assert_eq!(cs.get_input(0, "ONE"), Fr::one());
+    //     assert_eq!(cs.get_input(1, "old root input/input variable"), initial_root);
+    //     assert_eq!(cs.get_input(2, "new root input/input variable"), final_root);
+    //     assert_eq!(cs.get_input(3, "rolling hash input/input variable"), public_data_commitment);
 
-        // let err = cs.which_is_unsatisfied();
-        // if err.is_some() {
-        //     panic!("ERROR satisfying in {}\n", err.unwrap());
-        // } else {
-        //     println!("Test constraint system is satisfied");
-        // }
-    }
+    //     // let err = cs.which_is_unsatisfied();
+    //     // if err.is_some() {
+    //     //     panic!("ERROR satisfying in {}\n", err.unwrap());
+    //     // } else {
+    //     //     println!("Test constraint system is satisfied");
+    //     // }
+    // }
 
     let instance_for_generation = Update {
         params: params,
