@@ -135,7 +135,7 @@ fn test_progress_display() {
 
     let mut mb = MultiBar::new();
 
-    for j in 1..=1 { 
+    for j in 1..=0 { 
         let mut pb = mb.create_bar(3600000); 
         thread::spawn(move || {
             for i in 0..3600000 {
@@ -145,5 +145,5 @@ fn test_progress_display() {
             pb.finish();
         });
     };
-    mb.listen();
+    //mb.listen();
 }
