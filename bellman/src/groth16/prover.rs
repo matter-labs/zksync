@@ -252,18 +252,25 @@ pub fn create_proof<E, C, P: ParameterSource<E>>(
         let mut a = EvaluationDomain::from_coeffs(prover.a)?;
         let mut b = EvaluationDomain::from_coeffs(prover.b)?;
         let mut c = EvaluationDomain::from_coeffs(prover.c)?;
+        // here a coset is a domain where denominator (z) does not vanish
+        // inverse FFT is an interpolation
         a.ifft(&worker);
+        // evaluate in coset
         a.coset_fft(&worker);
+        // same is for B and C
         b.ifft(&worker);
         b.coset_fft(&worker);
         c.ifft(&worker);
         c.coset_fft(&worker);
 
+        // do A*B-C in coset
         a.mul_assign(&worker, &b);
         drop(b);
         a.sub_assign(&worker, &c);
         drop(c);
+        // z does not vanish in coset, so we divide by non-zero
         a.divide_by_z_on_coset(&worker);
+        // interpolate back in coset
         a.icoset_fft(&worker);
         let mut a = a.into_coeffs();
         let a_len = a.len() - 1;
