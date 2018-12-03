@@ -283,16 +283,16 @@ fn main() {
 
     // print!("Final data commitment as field element = {}\n", public_data_commitment);
 
-    let instance_for_test_cs = Update {
-        params: params,
-        number_of_transactions: TXES_TO_TEST,
-        old_root: Some(initial_root),
-        new_root: Some(final_root),
-        public_data_commitment: Some(public_data_commitment),
-        block_number: Some(Fr::one()),
-        total_fee: Some(total_fees),
-        transactions: witnesses.clone(),
-    };
+    // let instance_for_test_cs = Update {
+    //     params: params,
+    //     number_of_transactions: TXES_TO_TEST,
+    //     old_root: Some(initial_root),
+    //     new_root: Some(final_root),
+    //     public_data_commitment: Some(public_data_commitment),
+    //     block_number: Some(Fr::one()),
+    //     total_fee: Some(total_fees),
+    //     transactions: witnesses.clone(),
+    // };
 
     // {
     //     let mut cs = TestConstraintSystem::new();
