@@ -58,7 +58,7 @@ fn bench_pairing_miller_loop(b: &mut ::test::Bencher) {
 
     let mut count = 0;
     b.iter(|| {
-        let tmp = Bls12::miller_loop(&[(&v[count].0, &v[count].1)]);
+        let tmp = Bn256::miller_loop(&[(&v[count].0, &v[count].1)]);
         count = (count + 1) % SAMPLES;
         tmp
     });
@@ -77,12 +77,12 @@ fn bench_pairing_final_exponentiation(b: &mut ::test::Bencher) {
                 G2Affine::from(G2::rand(&mut rng)).prepare(),
             )
         })
-        .map(|(ref p, ref q)| Bls12::miller_loop(&[(p, q)]))
+        .map(|(ref p, ref q)| Bn256::miller_loop(&[(p, q)]))
         .collect();
 
     let mut count = 0;
     b.iter(|| {
-        let tmp = Bls12::final_exponentiation(&v[count]);
+        let tmp = Bn256::final_exponentiation(&v[count]);
         count = (count + 1) % SAMPLES;
         tmp
     });
@@ -100,7 +100,7 @@ fn bench_pairing_full(b: &mut ::test::Bencher) {
 
     let mut count = 0;
     b.iter(|| {
-        let tmp = Bls12::pairing(v[count].0, v[count].1);
+        let tmp = Bn256::pairing(v[count].0, v[count].1);
         count = (count + 1) % SAMPLES;
         tmp
     });
