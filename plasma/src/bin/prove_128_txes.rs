@@ -59,7 +59,7 @@ fn main() {
 
     let mut tree = BabyBalanceTree::new(tree_depth);
 
-    let number_of_accounts = 1000;
+    let number_of_accounts = 10000;
 
     let mut existing_account_hm = HashMap::<u32, bool>::new();
 
