@@ -44,14 +44,24 @@ contract PlasmaStub is VerificationKeys {
     }
 
     function commitBlock(uint32 blockNumber, uint128 totalFees, bytes memory txDataPacked, bytes32 newRoot) public {
-        require(blockNumber == totalCommitted, "may only commit next block");
+        require(blockNumber == totalCommitted + 1, "may only commit next block");
 
-        bytes32 initialHash = sha256(abi.encodePacked(uint256(blockNumber), uint256(totalFees)));
-        bytes32 finalHash = sha256(abi.encodePacked(initialHash, txDataPacked));
+        bytes32 finalHash = createPublicDataCommitment(blockNumber, totalFees, txDataPacked);
 
         // TODO: need a strategy to avoid front-running msg.sender
         blocks[totalCommitted] = Block(Circuit.UPDATE, totalFees, newRoot, finalHash, msg.sender, uint32(now + DEADLINE));
         totalCommitted++;
+    }
+
+    function createPublicDataCommitment(uint32 blockNumber, uint128 totalFees, bytes memory txDataPacked)
+    public 
+    pure
+    returns (bytes32 h) {
+
+        bytes32 initialHash = sha256(abi.encodePacked(uint256(blockNumber), uint256(totalFees)));
+        bytes32 finalHash = sha256(abi.encodePacked(initialHash, txDataPacked));
+        
+        return finalHash;
     }
 
     function verifyBlock(uint32 blockNumber, uint256[8] memory proof) public {
@@ -91,13 +101,14 @@ contract Plasma is PlasmaStub, Verifier {
     function verifyUpdateProof(uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
         internal view returns (bool valid)
     {
+        uint256 mask = (~uint256(0)) >> 3;
         uint256[14] memory vk;
         uint256[] memory gammaABC;
         (vk, gammaABC) = getVkUpdateCircuit();
         uint256[] memory inputs = new uint256[](3);
         inputs[0] = uint256(oldRoot);
         inputs[1] = uint256(newRoot);
-        inputs[2] = uint256(finalHash);
+        inputs[2] = uint256(finalHash) & mask;
         return Verify(vk, gammaABC, proof, inputs);
     }
 

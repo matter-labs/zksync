@@ -12,6 +12,7 @@ use time::PreciseTime;
 
 use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
 use pairing::bn256::*;
+use pairing::{Engine};
 use rand::{SeedableRng, Rng, XorShiftRng};
 use sapling_crypto::circuit::test::*;
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
@@ -19,6 +20,7 @@ use plasma::balance_tree::{BabyBalanceTree, BabyLeaf};
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
 use std::collections::HashMap;
+use hex::encode;
 
 use bellman::{
     Circuit,
@@ -29,7 +31,10 @@ use bellman::groth16::{
     generate_random_parameters, 
     prepare_verifying_key, 
     verify_proof,
+    VerifyingKey
 };
+
+use plasma::vk_contract_generator::hardcode_vk;
 
 use sapling_crypto::jubjub::{
     FixedGenerators,
@@ -224,7 +229,13 @@ fn main() {
 
     let block_number = Fr::one();
 
+    println!("Block number = {}", block_number.into_repr());
+
     let final_root = tree.root_hash();
+
+    let final_root_string = format!("{}", BabyBalanceTree::new(tree_depth).root_hash().into_repr());
+
+    println!("Final root = {}", final_root_string);
 
     let mut public_data_initial_bits = vec![];
 
@@ -258,7 +269,9 @@ fn main() {
 
         let mut next_round_hash_bytes = vec![];
         next_round_hash_bytes.extend(hash_result.iter());
-        next_round_hash_bytes.extend(packed_transaction_data_bytes);
+        next_round_hash_bytes.extend(packed_transaction_data_bytes.clone());
+
+        println!("Public data = {}", encode(packed_transaction_data_bytes));
 
         let mut h = Sha256::new();
 
@@ -278,7 +291,9 @@ fn main() {
 
     let public_data_commitment = Fr::from_repr(repr).unwrap();
 
-    // print!("Final data commitment as field element = {}\n", public_data_commitment);
+    println!("Total fees = {}", total_fees.into_repr());
+
+    print!("Final data commitment as field element = {}\n", public_data_commitment);
 
     let instance_for_test_cs = Update {
         params: params,
@@ -345,6 +360,9 @@ fn main() {
     let mut r = BufReader::new(f_r);
     let circuit_params = bellman::groth16::Parameters::read(& mut r, true).expect("Unable to read proving key");
 
+    let initial_root_string = format!("{}", BabyBalanceTree::new(tree_depth).root_hash().into_repr());
+    println!("{}", generate_vk_contract(&circuit_params.vk, initial_root_string.as_ref(), tree_depth));
+
     let pvk = prepare_verifying_key(&circuit_params.vk);
 
     let instance_for_proof = Update {
@@ -366,4 +384,32 @@ fn main() {
     let success = verify_proof(&pvk, &proof, &[initial_root, final_root, public_data_commitment]).unwrap();
     assert!(success);
 
+}
+
+fn generate_vk_contract<E: Engine>(vk: &VerifyingKey<E>, initial_root: &str, tree_depth: u32) -> String {
+    format!(
+        r#"
+// This contract is generated programmatically
+
+pragma solidity ^0.5.0;
+
+
+// Hardcoded constants to avoid accessing store
+contract VerificationKeys {{
+
+    // For tree depth {tree_depth}
+    bytes32 constant EMPTY_TREE_ROOT = {initial_root};
+
+    function getVkUpdateCircuit() internal pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {{
+
+        {vk}
+
+    }}
+
+}}
+"#,
+        vk = hardcode_vk(&vk),
+        initial_root = initial_root,
+        tree_depth = tree_depth,
+    )
 }

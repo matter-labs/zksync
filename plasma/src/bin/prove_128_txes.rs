@@ -12,6 +12,7 @@ use time::PreciseTime;
 
 use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
 use pairing::bn256::*;
+use pairing::{Engine};
 use rand::{SeedableRng, Rng, XorShiftRng};
 use sapling_crypto::circuit::test::*;
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
