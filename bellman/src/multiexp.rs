@@ -162,12 +162,16 @@ fn multiexp_inner<Q, D, G, S>(
         let exponents = exponents.clone();
         let density_map = density_map.clone();
 
+        // This looks like a Pippenger’s algorithm
         pool.compute(move || {
             // Accumulate the result
             let mut acc = G::Projective::zero();
 
             // Build a source for the bases
             let mut bases = bases.new();
+
+            // Create buckets to place remainders s mod 2^c,
+            // it will be 2^c - 1 buckets (no bucket for zeroes)
 
             // Create space for the buckets
             let mut buckets = vec![<G as CurveAffine>::Projective::zero(); (1 << c) - 1];
@@ -177,6 +181,7 @@ fn multiexp_inner<Q, D, G, S>(
 
             // Sort the bases into buckets
             for (&exp, density) in exponents.iter().zip(density_map.as_ref().iter()) {
+                // Go over density and exponents
                 if density {
                     if exp == zero {
                         bases.skip(1)?;
@@ -187,6 +192,11 @@ fn multiexp_inner<Q, D, G, S>(
                             bases.skip(1)?;
                         }
                     } else {
+                        // Place multiplication into the bucket: Separate s * P as 
+                        // (s/2^c) * P + (s mod 2^c) P
+                        // First multiplication is c bits less, do one can do it,
+                        // sum results from different buckets and double it c times,
+                        // then add with (s mod 2^c) P parts
                         let mut exp = exp;
                         exp.shr(skip);
                         let exp = exp.as_ref()[0] % (1 << c);

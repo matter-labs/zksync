@@ -269,6 +269,7 @@ pub fn create_proof<E, C, P: ParameterSource<E>>(
         let a_len = a.len() - 1;
         a.truncate(a_len);
         // TODO: parallelize if it's even helpful
+        // TODO: in large settings it may worth to parallelize
         let a = Arc::new(a.into_iter().map(|s| s.0.into_repr()).collect::<Vec<_>>());
 
         multiexp(&worker, params.get_h(a.len())?, FullDensity, a)
@@ -279,10 +280,15 @@ pub fn create_proof<E, C, P: ParameterSource<E>>(
 
     let points_start = PreciseTime::now();
 
+    // TODO: Check that difference in operations for different chunks is small
+
+
     // TODO: parallelize if it's even helpful
+    // TODO: in large settings it may worth to parallelize
     let input_assignment = Arc::new(prover.input_assignment.into_iter().map(|s| s.into_repr()).collect::<Vec<_>>());
     let aux_assignment = Arc::new(prover.aux_assignment.into_iter().map(|s| s.into_repr()).collect::<Vec<_>>());
 
+    // Run a dedicated process for dense vector
     let l = multiexp(&worker, params.get_l(aux_assignment.len())?, FullDensity, aux_assignment.clone());
 
     let a_aux_density_total = prover.a_aux_density.get_total_density();
