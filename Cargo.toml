@@ -1,0 +1,9 @@
+[workspace]
+
+members = [
+    "pairing",
+    "bellman",
+    "sapling-crypto",
+    "bellman-demo",
+    "plasma",
+]
