@@ -48,6 +48,8 @@ use sapling_crypto::circuit::float_point::{convert_to_float};
 const TXES_TO_TEST: usize = 1024;
 
 fn main() {
+    println!("Will try to make a proof for {} transactons", TXES_TO_TEST);
+
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &AltJubjubBn256::new();
     let mut rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
