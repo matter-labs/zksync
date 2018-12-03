@@ -341,7 +341,9 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
 
         let mut fees = vec![];
         let mut block_numbers = vec![];
-        let mut public_data_vector: Vec<Vec<boolean::Boolean>> = vec![];
+        // let mut public_data_vector: Vec<Vec<boolean::Boolean>> = vec![];
+
+        let mut public_data_vector: Vec<boolean::Boolean> = vec![];
 
         let public_generator = self.params.generator(FixedGenerators::SpendingKeyGenerator).clone();
         let generator = ecc::EdwardsPoint::witness(
@@ -364,7 +366,9 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
             old_root = intermediate_root;
             fees.push(fee);
             block_numbers.push(block_number);
-            public_data_vector.push(public_data);
+
+            // flatten the public transaction data
+            public_data_vector.extend(public_data.into_iter());
         }
 
         // return  Ok(());
@@ -493,56 +497,74 @@ impl<'a, E: JubjubEngine> Circuit<E> for Update<'a, E> {
                                     + *plasma_constants::FEE_EXPONENT_BIT_WIDTH
                                     + *plasma_constants::FEE_MANTISSA_BIT_WIDTH;
 
-        let pack_by = 256 / public_data_size;
 
-        let number_of_packs = self.number_of_transactions / pack_by;
-        let remaining_to_pack = self.number_of_transactions % pack_by;
-        let padding_in_pack = 256 - pack_by*public_data_size;
-        let padding_in_remainder = 256 - remaining_to_pack*public_data_size;
+        // pad with zeroes up to the block size
+        let required_padding = 256 - (public_data_vector.len() % public_data_size);
 
-        let mut public_data_iterator = public_data_vector.into_iter();
+        // let pack_by = 256 / public_data_size;
 
-        for i in 0..number_of_packs 
-        {
-            let cs = & mut cs.namespace(|| format!("packing a batch number {}", i));
-            let mut pack_bits: Vec<boolean::Boolean> = vec![];
-            // put previous hash as first 256 bits of the SHA256 block
-            pack_bits.extend(hash_block.into_iter());
+        // let number_of_packs = self.number_of_transactions / pack_by;
+        // let remaining_to_pack = self.number_of_transactions % pack_by;
+        // let padding_in_pack = 256 - pack_by*public_data_size;
+        // let padding_in_remainder = 256 - remaining_to_pack*public_data_size;
 
-            for _ in 0..pack_by 
-            {
-                let next: Vec<boolean::Boolean> = public_data_iterator.next().get()?.clone();
-                pack_bits.extend(next);
-            }
+        // let mut public_data_iterator = public_data_vector.into_iter();
 
-            for _ in 0..padding_in_pack
-            {
-                pack_bits.push(boolean::Boolean::Constant(false));
-            }
+        // for i in 0..number_of_packs 
+        // {
+        //     let cs = & mut cs.namespace(|| format!("packing a batch number {}", i));
+        //     let mut pack_bits: Vec<boolean::Boolean> = vec![];
+        //     // put previous hash as first 256 bits of the SHA256 block
+        //     pack_bits.extend(hash_block.into_iter());
 
-            hash_block = sha256::sha256(
-                cs.namespace(|| format!("hash for block {}", i)),
-                &pack_bits
-            )?;
-        }
+        //     for _ in 0..pack_by 
+        //     {
+        //         let next: Vec<boolean::Boolean> = public_data_iterator.next().get()?.clone();
+        //         pack_bits.extend(next);
+        //     }
 
-        // now pack the remainder
+        //     for _ in 0..padding_in_pack
+        //     {
+        //         pack_bits.push(boolean::Boolean::Constant(false));
+        //     }
 
-        let mut pack_bits: Vec<boolean::Boolean> = vec![];
-        pack_bits.extend(hash_block.into_iter());
-        for _ in 0..remaining_to_pack
-        {
-            let next: Vec<boolean::Boolean> = public_data_iterator.next().get()?.clone();
-            pack_bits.extend(next);
-        }
+        //     hash_block = sha256::sha256(
+        //         cs.namespace(|| format!("hash for block {}", i)),
+        //         &pack_bits
+        //     )?;
+        // }
 
-        for _ in 0..padding_in_remainder
-        {
-            pack_bits.push(boolean::Boolean::Constant(false));
-        }
+        // // now pack the remainder
+
+        // let mut pack_bits: Vec<boolean::Boolean> = vec![];
+        // pack_bits.extend(hash_block.into_iter());
+        // for _ in 0..remaining_to_pack
+        // {
+        //     let next: Vec<boolean::Boolean> = public_data_iterator.next().get()?.clone();
+        //     pack_bits.extend(next);
+        // }
+
+        // for _ in 0..padding_in_remainder
+        // {
+        //     pack_bits.push(boolean::Boolean::Constant(false));
+        // }
+
+        // hash_block = sha256::sha256(
+        //     cs.namespace(|| "hash the remainder"),
+        //     &pack_bits
+        // )?;
+
+        let mut pack_bits = vec![];
+        pack_bits.extend(hash_block);
+        pack_bits.extend(public_data_vector.into_iter());
+
+        // for _ in 0..required_padding
+        // {
+        //     pack_bits.push(boolean::Boolean::Constant(false));
+        // }
 
         hash_block = sha256::sha256(
-            cs.namespace(|| "hash the remainder"),
+            cs.namespace(|| "hash public data"),
             &pack_bits
         )?;
 
@@ -1762,9 +1784,9 @@ fn test_update_circuit_with_witness() {
             let mut packed_transaction_data = vec![];
             let transaction_data = transaction.public_data_into_bits();
             packed_transaction_data.extend(transaction_data.clone().into_iter());
-            for _ in 0..256 - transaction_data.len() {
-                packed_transaction_data.push(false);
-            }
+            // for _ in 0..256 - transaction_data.len() {
+            //     packed_transaction_data.push(false);
+            // }
 
             // for b in packed_transaction_data.clone() {
             //     if b {
@@ -1782,7 +1804,7 @@ fn test_update_circuit_with_witness() {
             let mut next_round_hash_bytes = vec![];
             next_round_hash_bytes.extend(hash_result.iter());
             next_round_hash_bytes.extend(packed_transaction_data_bytes);
-            assert_eq!(next_round_hash_bytes.len(), 64);
+            // assert_eq!(next_round_hash_bytes.len(), 64);
 
             h = Sha256::new();
             h.input(&next_round_hash_bytes);

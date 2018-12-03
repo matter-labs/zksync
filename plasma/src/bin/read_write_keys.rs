@@ -98,7 +98,7 @@ fn main() {
     let initial_root = tree.root_hash();
 
     let mut witnesses: Vec<Option<(Transaction<Bn256>, TransactionWitness<Bn256>)>> = vec![];
-    let mut public_data_vector: Vec<Vec<bool>> = vec![];
+    let mut public_data_vector: Vec<bool> = vec![];
 
     let transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
 
@@ -202,7 +202,7 @@ fn main() {
 
 
         let public_data = transaction.public_data_into_bits();
-        public_data_vector.push(public_data);
+        public_data_vector.extend(public_data.into_iter());
 
         let transaction_witness = TransactionWitness {
             auth_path_from: path_from,
@@ -253,45 +253,12 @@ fn main() {
     let mut hash_result = [0u8; 32];
     h.result(&mut hash_result[..]);
 
-    let public_data_size = *plasma_constants::BALANCE_TREE_DEPTH 
-                                    + *plasma_constants::BALANCE_TREE_DEPTH
-                                    + *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH
-                                    + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH
-                                    + *plasma_constants::FEE_EXPONENT_BIT_WIDTH
-                                    + *plasma_constants::FEE_MANTISSA_BIT_WIDTH;
-
-    let pack_by = 256 / public_data_size;
-
-    let number_of_packs = TXES_TO_TEST / pack_by;
-    let remaining_to_pack = TXES_TO_TEST % pack_by;
-    let padding_in_pack = 256 - pack_by*public_data_size;
-    let padding_in_remainder = 256 - remaining_to_pack*public_data_size;
-
-    // println!("Pack transacitons into {} batches of {} and with remainder of {} for hashing", number_of_packs, pack_by, remaining_to_pack);
-
-    let mut public_data_iterator = public_data_vector.into_iter();
-
-    for _ in 0..number_of_packs 
-    {
-
-        let mut packed_transaction_data = vec![];
-        
-        for _ in 0..pack_by 
-        {
-            let transaction_data = public_data_iterator.next().unwrap();
-            packed_transaction_data.extend(transaction_data.clone().into_iter());
-        }
-        for _ in 0..padding_in_pack
-        {
-            packed_transaction_data.push(false);
-        }
-
-        let packed_transaction_data_bytes = be_bit_vector_into_bytes(&packed_transaction_data);
+    {    
+        let packed_transaction_data_bytes = be_bit_vector_into_bytes(&public_data_vector);
 
         let mut next_round_hash_bytes = vec![];
         next_round_hash_bytes.extend(hash_result.iter());
         next_round_hash_bytes.extend(packed_transaction_data_bytes);
-        assert_eq!(next_round_hash_bytes.len(), 64);
 
         let mut h = Sha256::new();
 
@@ -299,37 +266,9 @@ fn main() {
 
         // let mut hash_result = [0u8; 32];
         h.result(&mut hash_result[..]);
-
     }
 
-    // now pack the remainder
-
-    let mut packed_transaction_data = vec![];
-        
-    for _ in 0..remaining_to_pack 
-    {
-        let transaction_data = public_data_iterator.next().unwrap();
-        packed_transaction_data.extend(transaction_data.clone().into_iter());
-    }
-    for _ in 0..padding_in_remainder
-    {
-        packed_transaction_data.push(false);
-    }
-
-    let packed_transaction_data_bytes = be_bit_vector_into_bytes(&packed_transaction_data);
-
-    let mut next_round_hash_bytes = vec![];
-    next_round_hash_bytes.extend(hash_result.iter());
-    next_round_hash_bytes.extend(packed_transaction_data_bytes);
-    assert_eq!(next_round_hash_bytes.len(), 64);
-
-    let mut h_final = Sha256::new();
-
-    h_final.input(&next_round_hash_bytes);
-
-    // let mut hash_result = [0u8; 32];
-    h_final.result(&mut hash_result[..]);
-
+    
     // clip to fit into field element
 
     hash_result[0] &= 0x1f; // temporary solution
