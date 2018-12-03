@@ -55,21 +55,38 @@ impl<E: Engine, G: Group<E>> EvaluationDomain<E, G> {
         let mut exp = 0;
         println!("Polynomial degree = {}", coeffs.len());
         println!("Max polynomial degree = {}", (1 << E::Fr::S) - 1);
-        while m < coeffs.len() {
-            m *= 2;
-            exp += 1;
 
-            // The pairing-friendly curve may not be able to support
-            // large enough (radix2) evaluation domains.
-            if exp >= E::Fr::S {
-                return Err(SynthesisError::PolynomialDegreeTooLarge)
-            }
-        }
+        let max_degree = (1 << E::Fr::S) - 1;
+
+        let coeffs_len = coeffs.len();
 
         // Compute omega, the 2^exp primitive root of unity
         let mut omega = E::Fr::root_of_unity();
-        for _ in exp..E::Fr::S {
-            omega.square();
+
+        // find power of two that is larger or equal to the number of
+        // constraints
+
+        if coeffs_len > max_degree {
+            return Err(SynthesisError::PolynomialDegreeTooLarge)
+        }
+
+        if coeffs_len >= 1 << (E::Fr::S - 1) {
+            m = 1 << E::Fr::S;
+        } else {
+            while m < coeffs.len() {
+                m *= 2;
+                exp += 1;
+
+                // The pairing-friendly curve may not be able to support
+                // large enough (radix2) evaluation domains.
+                if exp >= E::Fr::S {
+                    return Err(SynthesisError::PolynomialDegreeTooLarge)
+                }
+            }
+
+            for _ in exp..E::Fr::S {
+                omega.square();
+            }
         }
 
         // Extend the coeffs vector with zeroes if necessary
