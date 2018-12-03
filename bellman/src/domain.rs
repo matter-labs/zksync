@@ -53,6 +53,8 @@ impl<E: Engine, G: Group<E>> EvaluationDomain<E, G> {
         // Compute the size of our evaluation domain
         let mut m = 1;
         let mut exp = 0;
+        println!("Polynomial degree = {}", coeffs.len());
+        println!("Max polynomial degree = {}", (1 << E::Fr::S) - 1);
         while m < coeffs.len() {
             m *= 2;
             exp += 1;
