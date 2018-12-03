@@ -324,8 +324,6 @@ fn serial_fft<E: Engine, T: Group<E>>(a: &mut [T], omega: &E::Fr, log_n: u32)
         r
     }
 
-    println!("A len = {}", a.len());
-
     let n = a.len() as u32;
     assert_eq!(n, 1 << log_n);
 
