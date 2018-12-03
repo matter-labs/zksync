@@ -1,10 +1,12 @@
-extern crate pbr;
 extern crate time;
+
+extern crate pbr;
 
 use super::super::verbose_flag;
 
 use self::time::PreciseTime;
-use self::pbr::{MultiBar};
+//use self::pbr::{MultiBar};
+use super::super::progress_bar::{MultiBar};
 
 use rand::Rng;
 
