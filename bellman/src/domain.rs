@@ -12,12 +12,13 @@
 
 use pairing::{
     Engine,
-    // Field,
-    // PrimeField,
     CurveProjective
 };
 
-use ff::{Field, PrimeField};
+use ff::{
+    Field, 
+    PrimeField
+};
 
 use super::{
     SynthesisError
@@ -59,12 +60,9 @@ impl<E: Engine, G: Group<E>> EvaluationDomain<E, G> {
         let mut omega = E::Fr::root_of_unity();
         let max_degree = (1 << E::Fr::S) - 1;
 
-        println!("Polynomial degree = {}", coeffs_len);
-        println!("Max polynomial degree = {}", max_degree);
-        println!("Initial 2^{}th root of unity is {}", E::Fr::S, omega);
-
-        // Compute omega, the 2^exp primitive root of unity
-
+        if coeffs_len > max_degree {
+            return Err(SynthesisError::PolynomialDegreeTooLarge)
+        }
 
         while m < coeffs_len {
             m *= 2;
@@ -77,39 +75,12 @@ impl<E: Engine, G: Group<E>> EvaluationDomain<E, G> {
             }
         }
 
-        // If full domain is not needed - limit it
+        // If full domain is not needed - limit it,
+        // e.g. if (2^N)th power is not required, just double omega and get 2^(N-1)th
+        // Compute omega, the 2^exp primitive root of unity
         for _ in exp..E::Fr::S {
             omega.square();
         }
-
-        println!("Final evaluation has 2^{}th roots of unity with generator {}", exp, omega);
-        println!("Extending inital vectors to the size of {}", m);
-
-        // find power of two that is larger or equal to the number of
-        // constraints
-
-        // if coeffs_len > max_degree {
-        //     return Err(SynthesisError::PolynomialDegreeTooLarge)
-        // }
-
-        // if coeffs_len >= 1 << (E::Fr::S - 1) {
-        //     m = 1 << E::Fr::S;
-        // } else {
-        //     while m < coeffs.len() {
-        //         m *= 2;
-        //         exp += 1;
-
-        //         // The pairing-friendly curve may not be able to support
-        //         // large enough (radix2) evaluation domains.
-        //         if exp >= E::Fr::S {
-        //             return Err(SynthesisError::PolynomialDegreeTooLarge)
-        //         }
-        //     }
-
-        //     for _ in exp..E::Fr::S {
-        //         omega.square();
-        //     }
-        // }
 
         // Extend the coeffs vector with zeroes if necessary
         coeffs.resize(m, G::group_zero());
