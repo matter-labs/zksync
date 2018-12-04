@@ -20,12 +20,15 @@ pub struct ETHClient {
     event_loop: EventLoopHandle,
     web3:       web3::Web3<Http>,
     contract:   Contract<Http>,
-    account:    Address,
+    my_account: Address,
 }
 
 pub type U32 = u64; // because missing in web3::types; u64 is fine since only used for tokenization
 
-// all methods are blocking for now
+const PLASMA_ABI: &[u8] = include_bytes!("../../contracts/build/bin/contracts_Plasma_sol_Plasma.abi");
+const PLASMA_BIN: &str  = include_str!("../../contracts/build/bin/contracts_Plasma_sol_Plasma.bin");
+
+// all methods are blocking and panic on error for now
 impl ETHClient {
 
     pub fn new() -> Self {
@@ -37,19 +40,32 @@ impl ETHClient {
         let (event_loop, transport) = Http::new("http://localhost:8545").unwrap();
         let web3 = web3::Web3::new(transport);
 
-        // TODO: deploy
-
-        let contract_address = "664d79b5c0C762c83eBd0d1D1D5B048C0b53Ab58".parse().unwrap();
-        let contract = Contract::from_json(
-            web3.eth(),
-            contract_address,
-            include_bytes!("../../contracts/build/bin/contracts_Plasma_sol_Plasma.abi"),
-        ).unwrap();
-
         let accounts = web3.eth().accounts().wait().unwrap();
-        let account = accounts[0];
+        let my_account = accounts[0];
+
+        // Get the contract bytecode for instance from Solidity compiler
+        let bytecode: Vec<u8> = PLASMA_BIN.from_hex().unwrap();
+        // Deploying a contract
+        let contract = Contract::deploy(web3.eth(), PLASMA_ABI)
+            .unwrap()
+            //.confirmations(4)
+            .options(Options::with(|opt| {
+                opt.gas = Some(7000_000.into())
+            }))
+            .execute(bytecode, (), my_account,
+            )
+            .expect("Correct parameters are passed to the constructor.")
+            .wait()
+            .unwrap();
+
+        // let contract_address = "664d79b5c0C762c83eBd0d1D1D5B048C0b53Ab58".parse().unwrap();
+        // let contract = Contract::from_json(
+        //     web3.eth(),
+        //     contract_address,
+        //     include_bytes!(PLASMA_ABI),
+        // ).unwrap();
             
-        Self{event_loop, web3, contract, account}
+        Self{event_loop, web3, contract, my_account}
     }
 
     fn new_testnet() -> Self {
@@ -78,7 +94,10 @@ impl ETHClient {
         // let newRoot: H256 = H256::zero();
 
         let call_future = self.contract
-            .call("commitBlock", (block_num, total_fees, tx_data_packed, new_root), self.account, Options::default())
+            .call("commitBlock", 
+                (block_num, total_fees, tx_data_packed, new_root), 
+                self.my_account, 
+                Options::default())
             .then(|tx| {
                 println!("got tx: {:?}", tx);
                 Ok(()) as Result<(), ()>
@@ -100,8 +119,6 @@ fn test_web3() {
     let total_fees: U128 = U128::from_dec_str("0").unwrap();
     let tx_data_packed: Vec<u8> = vec![];
     let new_root: H256 = H256::zero();
-
-    println!("here");
 
     client.commit_block(block_num, total_fees, tx_data_packed, new_root);
 }
