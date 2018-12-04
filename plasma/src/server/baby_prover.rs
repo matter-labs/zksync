@@ -9,6 +9,7 @@ use super::super::circuit::plasma_constants;
 use super::super::balance_tree;
 use super::super::circuit::utils::be_bit_vector_into_bytes;
 use super::super::circuit::baby_plasma::{Update, Transaction, TransactionWitness};
+use super::super::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum};
 
 use sapling_crypto::circuit::float_point::parse_float_to_u128;
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
@@ -179,33 +180,17 @@ impl Prover<Bn256> for BabyProver {
         // pub b: E::G2Affine,
         // pub c: E::G1Affine
 
-        let a_uncompressed = proof.proof.a.into_uncompressed();
-        let b_uncompressed = proof.proof.b.into_uncompressed();
-        let c_uncompressed = proof.proof.c.into_uncompressed();
+        let (a_x, a_y) = serialize_g1_for_ethereum(proof.proof.a);
 
-        let a_x = U256::from_big_endian(& a_uncompressed.as_ref()[0..32]);
-        let a_y = U256::from_big_endian(& a_uncompressed.as_ref()[32..64]);
+        let ((b_x_0, b_x_1), (b_y_0, b_y_1)) = serialize_g2_for_ethereum(proof.proof.b);
 
-        let b_x_0 = U256::from_big_endian(& b_uncompressed.as_ref()[0..32]);
-        let b_x_1 = U256::from_big_endian(& b_uncompressed.as_ref()[32..64]);
-        let b_y_0 = U256::from_big_endian(& b_uncompressed.as_ref()[64..92]);
-        let b_y_1 = U256::from_big_endian(& b_uncompressed.as_ref()[92..128]);
+        let (c_x, c_y) = serialize_g1_for_ethereum(proof.proof.c);
 
+        let new_root = serialize_fe_for_ethereum(proof.inputs[1]);
 
-        let c_x = U256::from_big_endian(& c_uncompressed.as_ref()[0..32]);
-        let c_y = U256::from_big_endian(& c_uncompressed.as_ref()[32..64]);
+        let total_fees = serialize_fe_for_ethereum(proof.total_fees);
 
-        let mut root_hash_be_bytes = [0u8; 32];
-        proof.inputs[1].into_repr().write_be(& mut root_hash_be_bytes[..]).expect("get new root BE bytes");
-        let new_root = U256::from_big_endian(&root_hash_be_bytes[..]);
-
-        let mut block_number_be_bytes = [0u8; 32];
-        proof.block_number.into_repr().write_be(& mut block_number_be_bytes[..]).expect("get block number BE bytes");
-        let block_number = U256::from_big_endian(&block_number_be_bytes[..]);
-
-        let mut total_fees_be_bytes = [0u8; 32];
-        proof.total_fees.into_repr().write_be(& mut total_fees_be_bytes[..]).expect("get total fees BE bytes");
-        let total_fees = U256::from_big_endian(&total_fees_be_bytes[..]);
+        let block_number = serialize_fe_for_ethereum(proof.block_number);
 
         let public_data = Bytes::from(proof.public_data.clone());
 
@@ -219,7 +204,6 @@ impl Prover<Bn256> for BabyProver {
 
         Ok(p)
     }
-
 
     // Takes public data from transactions for further commitment to Ethereum
     fn encode_transactions(block: &Block<Bn256>) -> Result<Vec<u8>, Self::Err> {

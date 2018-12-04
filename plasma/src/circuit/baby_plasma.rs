@@ -907,7 +907,9 @@ fn apply_transaction<E, CS>(
     // before having fun with leafs calculate the common prefix
     // of two audit paths
 
-    let mut _common_prefix: Vec<boolean::Boolean> = vec![];
+    // let mut common_prefix: Vec<boolean::Boolean> = vec![];
+    // Intersection point is the only element required in outside scope
+    let mut intersection_point_lc = Num::<E>::zero();
     {
         let cs = & mut cs.namespace(|| "common prefix search");
 
@@ -923,16 +925,18 @@ fn apply_transaction<E, CS>(
         let mut reversed_path_to = tx_witness.clone().auth_path_to;
         reversed_path_to.reverse();
 
-        _common_prefix = find_common_prefix(
+        let common_prefix = find_common_prefix(
             cs.namespace(|| "common prefix search"), 
             &bitmap_path_from,
             &bitmap_path_to
         )?;
 
+
+        let common_prefix_iter = common_prefix.clone().into_iter();
         // Common prefix is found, not we enforce equality of 
         // audit path elements on a common prefix
 
-        for (i, ((e_from, e_to), bitmask_bit)) in reversed_path_from.into_iter().zip(reversed_path_to.into_iter()).zip(_common_prefix.clone().into_iter()).enumerate()
+        for (i, ((e_from, e_to), bitmask_bit)) in reversed_path_from.into_iter().zip(reversed_path_to.into_iter()).zip(common_prefix_iter).enumerate()
         {
             let path_element_from = num::AllocatedNum::alloc(
                 cs.namespace(|| format!("path element from {}", i)),
@@ -955,7 +959,42 @@ fn apply_transaction<E, CS>(
                 |lc| lc
             );
         }
+
+        // Now we have to find a "point of intersection"
+        // Good for us it's just common prefix interpreted as binary number + 1
+        // and bit decomposed
+
+        let mut coeff = E::Fr::one();
+        for bit in common_prefix.into_iter() {
+            intersection_point_lc = intersection_point_lc.add_bool_with_coeff(
+                CS::one(), 
+                &bit, 
+                coeff
+            );
+            coeff.double();
+        }
+        // and add one
+        intersection_point_lc = intersection_point_lc.add_bool_with_coeff(
+            CS::one(), 
+            &boolean::Boolean::Constant(true), 
+            E::Fr::one()
+        );
     }
+
+    // Intersection point is a number with a single bit that indicates how far
+    // from the root intersection is
+
+    let intersection_point = AllocatedNum::alloc(
+        cs.namespace(|| "intersection as number"),
+        || Ok(*intersection_point_lc.get_value().get()?)
+    )?;
+
+    cs.enforce(
+        || "pack intersection",
+        |lc| lc + intersection_point.get_variable(),
+        |lc| lc + CS::one(),
+        |_| intersection_point_lc.lc(E::Fr::one())
+    );
 
     // Ok, old leaf values are exposed, so we can check 
     // the signature and parse the rest of transaction data
@@ -1303,40 +1342,7 @@ fn apply_transaction<E, CS>(
 
     }
 
-    // Now we have to find a "point of intersection"
-    // Good for us it's just common prefix interpreted as binary number + 1
-    // and bit decomposed
-
-    let mut intersection_point_lc = Num::<E>::zero();
-    coeff = E::Fr::one();
-    for bit in _common_prefix.into_iter() {
-        intersection_point_lc = intersection_point_lc.add_bool_with_coeff(
-            CS::one(), 
-            &bit, 
-            coeff
-        );
-        coeff.double();
-    }
-    // and add one
-    intersection_point_lc = intersection_point_lc.add_bool_with_coeff(
-        CS::one(), 
-        &boolean::Boolean::Constant(true), 
-        E::Fr::one()
-    );
-
-    let intersection_point = AllocatedNum::alloc(
-        cs.namespace(|| "intersection as number"),
-        || Ok(*intersection_point_lc.get_value().get()?)
-    )?;
-
-    cs.enforce(
-        || "pack intersection",
-        |lc| lc + intersection_point.get_variable(),
-        |lc| lc + CS::one(),
-        |_| intersection_point_lc.lc(E::Fr::one())
-    );
-
-    // parse it backwards
+    // Intersection point into bits to use for root recalculation
 
     let mut intersection_point_bits = intersection_point.into_bits_le(
         cs.namespace(|| "unpack intersection")
