@@ -1,7 +1,7 @@
 use std::error::Error;
 use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
 use super::plasma_state::{State, Block};
-use super::prover::{Prover, LifetimedProver};
+use super::prover::{Prover};
 use std::fmt;
 use rand::{OsRng, Rng};
 
@@ -58,6 +58,15 @@ pub struct BabyProver {
     batch_size: usize,
     accounts_tree: balance_tree::BabyBalanceTree,
     parameters: BabyParameters,
+    jubjub_params: AltJubjubBn256,
+}
+
+#[derive(Debug)]
+pub struct FullBabyProof {
+    proof: BabyProof,
+    inputs: [Fr; 3],
+    total_fees: Fr,
+    public_data: Vec<u8>,
 }
 
 type BabyProof = Proof<Bn256>;
@@ -79,19 +88,9 @@ fn field_element_to_u32<P: PrimeField>(fr: P) -> u32 {
     res
 }
 
-// impl<'a> LifetimedProver<'a, Bn256> for BabyProver {
-//     fn create(initial_state: &'a State<E>) -> Option<Self> {
-        
-//     }
-// }
-
-impl<'b> Prover<Bn256> for BabyProver {
-
-    type Err = BabyProverErr;
-    type Proof = BabyProof;
-
-    fn new(initial_state: &State<Bn256>) 
-        -> Result<Self, Self::Err> 
+impl BabyProver {
+    pub fn create<'a>(initial_state: &'a State<'a, Bn256>) ->
+        Result<BabyProver, BabyProverErr>
     {
         use std::fs::File;
         use std::io::{BufReader};
@@ -112,29 +111,41 @@ impl<'b> Prover<Bn256> for BabyProver {
         println!("Copying states to balance tree");
 
         let mut tree = balance_tree::BabyBalanceTree::new(*plasma_constants::BALANCE_TREE_DEPTH as u32);
+        {
+            let iter = initial_state.get_accounts().into_iter();
 
-        let iter = initial_state.accounts_iter();
-
-        for e in iter {
-            let acc_number = *e.0 as u32;
-            let leaf_copy = e.1.clone();
-            tree.insert(acc_number, leaf_copy);
+            for e in iter {
+                let acc_number = e.0;
+                let leaf_copy = e.1.clone();
+                tree.insert(acc_number, leaf_copy);
+            }
         }
 
         let root = tree.root_hash();
 
-        let supplied_root = initial_state.root_hash().clone();
+        let supplied_root = initial_state.root_hash();
 
         if root != supplied_root {
             return Err(BabyProverErr::Unknown);
         }
 
+        let params = circuit_params.unwrap();
+
+        let jubjub_params = AltJubjubBn256::new();
+
         Ok(Self{
             batch_size: 128,
             accounts_tree: tree,
-            parameters: circuit_params.unwrap()
+            parameters: params,
+            jubjub_params: jubjub_params
         })
     }
+}
+
+impl Prover<Bn256> for BabyProver {
+
+    type Err = BabyProverErr;
+    type Proof = FullBabyProof;
 
     fn encode_proof(block: &Self::Proof) -> Result<Vec<u8>, Self::Err> {
 
@@ -181,10 +192,12 @@ impl<'b> Prover<Bn256> for BabyProver {
             let sender_leaf_number = field_element_to_u32(tx.from);
             let recipient_leaf_number = field_element_to_u32(tx.to);
 
-            // let mut items = tree.items.clone();
+            let mut tree = & mut self.accounts_tree;
+            let mut items = tree.items.clone();
 
-            let sender_leaf = self.accounts_tree.items.get(&sender_leaf_number);
-            let recipient_leaf = self.accounts_tree.items.get(&recipient_leaf_number);
+            let sender_leaf = items.get(&sender_leaf_number);
+            let recipient_leaf = items.get(&recipient_leaf_number);
+
             if sender_leaf.is_none() || recipient_leaf.is_none() {
                 return Err(BabyProverErr::InvalidSender);
             }
@@ -208,8 +221,8 @@ impl<'b> Prover<Bn256> for BabyProver {
             let transfer_amount_as_field_element = Fr::from_str(&parsed_transfer_amount.unwrap().to_string()).unwrap();
             let fee_as_field_element = Fr::from_str(&parsed_fee.unwrap().to_string()).unwrap();
 
-            let path_from : Vec<Option<(Fr, bool)>> = self.accounts_tree.merkle_path(sender_leaf_number).into_iter().map(|e| Some(e)).collect();
-            let path_to: Vec<Option<(Fr, bool)>> = self.accounts_tree.merkle_path(recipient_leaf_number).into_iter().map(|e| Some(e)).collect();
+            let path_from : Vec<Option<(Fr, bool)>> = tree.merkle_path(sender_leaf_number).into_iter().map(|e| Some(e)).collect();
+            let path_to: Vec<Option<(Fr, bool)>> = tree.merkle_path(recipient_leaf_number).into_iter().map(|e| Some(e)).collect();
 
             let mut transaction : Transaction<Bn256> = Transaction {
                 from: Some(tx.from.clone()),
@@ -233,11 +246,8 @@ impl<'b> Prover<Bn256> for BabyProver {
 
             total_fees.add_assign(&fee_as_field_element);
 
-            // println!("Updated sender: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", updated_sender_leaf.balance, updated_sender_leaf.nonce, updated_sender_leaf.pub_x, updated_sender_leaf.pub_y);
-            // println!("Updated recipient: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", updated_recipient_leaf.balance, updated_recipient_leaf.nonce, updated_recipient_leaf.pub_x, updated_recipient_leaf.pub_y);
-
-            self.accounts_tree.insert(sender_leaf_number, updated_sender_leaf.clone());
-            self.accounts_tree.insert(recipient_leaf_number, updated_recipient_leaf.clone());
+            tree.insert(sender_leaf_number, updated_sender_leaf.clone());
+            tree.insert(recipient_leaf_number, updated_recipient_leaf.clone());
 
             {
                 let sender_leaf = sender_leaf.unwrap();
@@ -267,6 +277,10 @@ impl<'b> Prover<Bn256> for BabyProver {
 
         let final_root = self.accounts_tree.root_hash();
 
+        if initial_root == final_root {
+            return Err(BabyProverErr::Unknown);
+        }
+
         let mut public_data_initial_bits = vec![];
 
         // these two are BE encodings because an iterator is BE. This is also an Ethereum standard behavior
@@ -295,7 +309,7 @@ impl<'b> Prover<Bn256> for BabyProver {
         h.result(&mut hash_result[..]);
 
         {    
-            let packed_transaction_data_bytes = public_data;
+            let packed_transaction_data_bytes = public_data.clone();
 
             let mut next_round_hash_bytes = vec![];
             next_round_hash_bytes.extend(hash_result.iter());
@@ -337,14 +351,24 @@ impl<'b> Prover<Bn256> for BabyProver {
             return Err(BabyProverErr::Unknown);
         }
 
+        let p = proof.unwrap();
+
         let pvk = prepare_verifying_key(&self.parameters.vk);
 
-        let success = verify_proof(&pvk, &proof.unwrap(), &[initial_root, final_root, public_data_commitment]).unwrap();
+        let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]).unwrap();
+        
         if !success {
             return Err(BabyProverErr::Unknown);
         }
 
-        Ok(proof.unwrap())
+        let full_proof = FullBabyProof{
+            proof: p,
+            inputs: [initial_root, final_root, public_data_commitment],
+            total_fees: total_fees,
+            public_data: public_data,
+        };
+
+        Ok(full_proof)
     }
     
 }

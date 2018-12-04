@@ -11,9 +11,10 @@ use super::super::circuit::baby_plasma::TransactionSignature;
 pub type Account<E> = balance_tree::Leaf<E>;
 
 pub trait State<'a, E: JubjubEngine> {  
-    fn accounts_iter(&'a self) -> hash_map::Iter<'a, usize, Account<E>>;
+    fn get_accounts(&'a self) -> Vec<(u32, Account<E>)>;
+    fn accounts_iter(&'a self) -> hash_map::Iter<'a, u32, Account<E>>;
     fn block_number(&self) -> u32;
-    fn root_hash(&'a self) -> &'a E::Fr;
+    fn root_hash(&'a self) -> E::Fr;
 }
 
 pub struct Tx<E: JubjubEngine> {
