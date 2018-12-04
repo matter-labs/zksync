@@ -12,7 +12,6 @@ pub type Account<E> = balance_tree::Leaf<E>;
 
 pub trait State<'a, E: JubjubEngine> {  
     fn get_accounts(&'a self) -> Vec<(u32, Account<E>)>;
-    fn accounts_iter(&'a self) -> hash_map::Iter<'a, u32, Account<E>>;
     fn block_number(&self) -> u32;
     fn root_hash(&'a self) -> E::Fr;
 }

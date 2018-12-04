@@ -1,8 +1,17 @@
 use std::collections::{hash_map, HashMap};
-
 use sapling_crypto::alt_babyjubjub::{JubjubEngine};
-
 use super::plasma_state::{Account, State, Block};
+use super::super::balance_tree::ParallelBalanceTree;
+use pairing::bn256::{Bn256};
+
+/// Coordinate tx processing and generation of proofs
+pub struct PlasmaServer {
+    balance_tree: ParallelBalanceTree<Bn256>,
+}
+
+impl PlasmaServer {
+
+}
 
 pub struct StateImpl<'a, E: JubjubEngine> {
     
@@ -31,10 +40,6 @@ impl<'a, E: JubjubEngine> State<'a, E> for StateImpl<'a, E> {
         accs
     }
     
-    fn accounts_iter(&'a self) -> hash_map::Iter<'a, u32, Account<E>> {
-        self.accounts.iter()
-    }
-
     fn block_number(&self) -> u32 {
         self.block_number
     }
