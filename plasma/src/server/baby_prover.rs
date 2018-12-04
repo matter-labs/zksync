@@ -100,6 +100,8 @@ fn field_element_to_u32<P: PrimeField>(fr: P) -> u32 {
     res
 }
 
+const TX_BATCH_SIZE: usize = 8;
+
 impl BabyProver {
     pub fn create<'a>(initial_state: &'a State<'a, Bn256>) ->
         Result<BabyProver, BabyProverErr>
@@ -148,7 +150,7 @@ impl BabyProver {
         let jubjub_params = AltJubjubBn256::new();
 
         Ok(Self{
-            batch_size: 128,
+            batch_size: TX_BATCH_SIZE,
             accounts_tree: tree,
             parameters: params,
             jubjub_params: jubjub_params
