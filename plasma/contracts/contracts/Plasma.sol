@@ -85,19 +85,6 @@ contract PlasmaStub is VerificationKeys {
 
     function verifyUpdateProof(uint256[8] memory, bytes32, bytes32, bytes32) internal view returns (bool valid);
 
-//    function verifyUpdateProof(uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
-//    internal view returns (bool valid)
-//    {
-//        uint256[14] memory vk;
-//        uint256[] memory gammaABC;
-//        (vk, gammaABC) = getVkUpdateCircuit();
-//        uint256[] memory inputs = new uint256[](3);
-//        inputs[0] = uint256(oldRoot);
-//        inputs[1] = uint256(newRoot);
-//        inputs[2] = uint256(finalHash);
-//        return Verify(vk, gammaABC, proof, inputs);
-//    }
-
 }
 
 
@@ -107,18 +94,24 @@ contract Plasma is PlasmaStub, Verifier {
     function verifyUpdateProof(uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
         internal view returns (bool valid)
     {
-        // uint256 mask = (~uint256(0)) >> 3;
-        // uint256[14] memory vk;
-        // uint256[] memory gammaABC;
-        // (vk, gammaABC) = getVkUpdateCircuit();
-        // uint256[] memory inputs = new uint256[](3);
-        // inputs[0] = uint256(oldRoot);
-        // inputs[1] = uint256(newRoot);
-        // inputs[2] = uint256(finalHash) & mask;
-        // return Verify(vk, gammaABC, proof, inputs);
+        uint256 mask = (~uint256(0)) >> 3;
+        uint256[14] memory vk;
+        uint256[] memory gammaABC;
+        (vk, gammaABC) = getVkUpdateCircuit();
+        uint256[] memory inputs = new uint256[](3);
+        inputs[0] = uint256(oldRoot);
+        inputs[1] = uint256(newRoot);
+        inputs[2] = uint256(finalHash) & mask;
+        return Verify(vk, gammaABC, proof, inputs);
+    }
 
-        // NOTE: FOR TESTING ONLY
-        // TODO: UNCOMMENT THE CODE ABOVE!!!
+}
+
+contract PlasmaTest is PlasmaStub, Verifier {
+    function verifyUpdateProof(uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
+        internal view returns (bool valid)
+    {
+        // always approve for test
         return true;
     }
 

@@ -14,18 +14,28 @@ pub struct ETHClient {
 
 pub type U32 = u64; // because missing in web3::types; u64 is fine since only used for tokenization
 
-const PLASMA_ABI: &[u8] = include_bytes!("../../contracts/bin/contracts_Plasma_sol_Plasma.abi");
-const PLASMA_BIN: &str  = include_str!("../../contracts/bin/contracts_Plasma_sol_Plasma.bin");
+type ABI = (&'static [u8], &'static str);
+
+static TEST_PLASMA_ALWAYS_VERIFY: ABI = (
+    include_bytes!("../../contracts/bin/contracts_Plasma_sol_PlasmaTest.abi"),
+    include_str!("../../contracts/bin/contracts_Plasma_sol_PlasmaTest.bin"),
+);
+
+static PROD_PLASMA: ABI = (
+    include_bytes!("../../contracts/bin/contracts_Plasma_sol_Plasma.abi"),
+    include_str!("../../contracts/bin/contracts_Plasma_sol_Plasma.bin"),
+);
 
 // all methods are blocking and panic on error for now
 impl ETHClient {
 
-    pub fn new() -> Self {
+    pub fn new(contract_abi: ABI) -> Self {
         // TODO: check env vars to decide local/testnet/live
-        Self::new_local()
+        Self::new_local(contract_abi)
     }
 
-    fn new_local() -> Self {
+    fn new_local(contract_abi: ABI) -> Self {
+
         let (event_loop, transport) = Http::new("http://localhost:8545").unwrap();
         let web3 = web3::Web3::new(transport);
 
@@ -33,10 +43,10 @@ impl ETHClient {
         let my_account = accounts[0];
 
         // Get the contract bytecode for instance from Solidity compiler
-        let bytecode: Vec<u8> = PLASMA_BIN.from_hex().unwrap();
+        let bytecode: Vec<u8> = contract_abi.1.from_hex().unwrap();
 
         // Deploying a contract
-        let contract = Contract::deploy(web3.eth(), PLASMA_ABI)
+        let contract = Contract::deploy(web3.eth(), contract_abi.0)
             .unwrap()
             .confirmations(0)
             .options(Options::with(|opt| {
@@ -115,7 +125,7 @@ impl ETHClient {
 #[test]
 fn test_web3() {
 
-    let client = ETHClient::new();
+    let client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
 
     let block_num: u64 = 0;
     let total_fees: U128 = U128::from_dec_str("0").unwrap();
