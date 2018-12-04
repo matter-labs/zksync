@@ -126,7 +126,6 @@ fn test_web3() {
 
     println!("committing block...");
     assert!(client.commit_block(block_num, total_fees, tx_data_packed, new_root).is_ok());
-    std::thread::sleep_ms(500);
     println!("verifying block...");
     assert!(client.verify_block(block_num, proof).is_ok());
 }
