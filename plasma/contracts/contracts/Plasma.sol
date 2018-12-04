@@ -47,11 +47,11 @@ contract PlasmaStub is VerificationKeys {
     }
     
     function commitBlock(uint32 blockNumber, uint128 totalFees, bytes memory txDataPacked, bytes32 newRoot) public {
-        require(blockNumber == totalCommitted + 1, "may only commit next block");
+        require(blockNumber == totalCommitted, "may only commit next block");
 
         bytes32 finalHash = createPublicDataCommitment(blockNumber, totalFees, txDataPacked);
 
-        // TODO: need a strategy to avoid front-running msg.sender
+        // // TODO: need a strategy to avoid front-running msg.sender
         blocks[totalCommitted] = Block(Circuit.UPDATE, totalFees, newRoot, finalHash, msg.sender, uint32(now + DEADLINE));
         emit BlockCommitted(totalCommitted);
         totalCommitted++;
@@ -70,7 +70,7 @@ contract PlasmaStub is VerificationKeys {
 
     function verifyBlock(uint32 blockNumber, uint256[8] memory proof) public {
         require(totalVerified < totalCommitted, "no committed block to verify");
-        require(blockNumber == totalVerified, "may only verified next block");
+        require(blockNumber == totalVerified, "may only verify next block");
         Block memory committed = blocks[blockNumber];
 
         require(verifyUpdateProof(proof, lastVerifiedRoot, committed.newRoot, committed.finalHash), "invalid proof");
@@ -85,20 +85,8 @@ contract PlasmaStub is VerificationKeys {
 
     function verifyUpdateProof(uint256[8] memory, bytes32, bytes32, bytes32) internal view returns (bool valid);
 
-//    function verifyUpdateProof(uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
-//    internal view returns (bool valid)
-//    {
-//        uint256[14] memory vk;
-//        uint256[] memory gammaABC;
-//        (vk, gammaABC) = getVkUpdateCircuit();
-//        uint256[] memory inputs = new uint256[](3);
-//        inputs[0] = uint256(oldRoot);
-//        inputs[1] = uint256(newRoot);
-//        inputs[2] = uint256(finalHash);
-//        return Verify(vk, gammaABC, proof, inputs);
-//    }
-
 }
+
 
 contract Plasma is PlasmaStub, Verifier {
     // Implementation
@@ -115,6 +103,16 @@ contract Plasma is PlasmaStub, Verifier {
         inputs[1] = uint256(newRoot);
         inputs[2] = uint256(finalHash) & mask;
         return Verify(vk, gammaABC, proof, inputs);
+    }
+
+}
+
+contract PlasmaTest is PlasmaStub, Verifier {
+    function verifyUpdateProof(uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
+        internal view returns (bool valid)
+    {
+        // always approve for test
+        return true;
     }
 
 }
