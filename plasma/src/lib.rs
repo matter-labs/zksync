@@ -22,3 +22,4 @@ pub mod balance_tree;
 pub mod circuit;
 pub mod vk_contract_generator;
 pub mod eth;
+pub mod server;
