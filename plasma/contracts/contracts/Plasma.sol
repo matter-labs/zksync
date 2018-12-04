@@ -49,10 +49,10 @@ contract PlasmaStub is VerificationKeys {
     function commitBlock(uint32 blockNumber, uint128 totalFees, bytes memory txDataPacked, bytes32 newRoot) public {
         require(blockNumber == totalCommitted, "may only commit next block");
 
-        // bytes32 finalHash = createPublicDataCommitment(blockNumber, totalFees, txDataPacked);
+        bytes32 finalHash = createPublicDataCommitment(blockNumber, totalFees, txDataPacked);
 
         // // TODO: need a strategy to avoid front-running msg.sender
-        // blocks[totalCommitted] = Block(Circuit.UPDATE, totalFees, newRoot, finalHash, msg.sender, uint32(now + DEADLINE));
+        blocks[totalCommitted] = Block(Circuit.UPDATE, totalFees, newRoot, finalHash, msg.sender, uint32(now + DEADLINE));
         emit BlockCommitted(totalCommitted);
         totalCommitted++;
     }

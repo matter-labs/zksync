@@ -83,7 +83,9 @@ impl ETHClient {
             .call("commitBlock", 
                 (block_num, total_fees, tx_data_packed, new_root), 
                 self.my_account, 
-                Options::default())
+                Options::with(|opt| {
+                    opt.gas = Some(3000_000.into())
+                }))
             .then(|tx| {
                 println!("got tx: {:?}", tx);
                 tx
@@ -100,7 +102,9 @@ impl ETHClient {
             .call("verifyBlock", 
                 (block_num, proof), 
                 self.my_account, 
-                Options::default())
+                Options::with(|opt| {
+                    opt.gas = Some(3000_000.into())
+                }))
             .then(|tx| {
                 println!("got tx: {:?}", tx);
                 tx
