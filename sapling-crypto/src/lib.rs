@@ -1,3 +1,7 @@
+#![allow(unused_imports)]
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
 extern crate pairing;
 extern crate bellman;
 extern crate blake2_rfc;

@@ -28,10 +28,6 @@
 //! the Montgomery curve forms a group isomorphism, allowing points
 //! to be freely converted between the two forms.
 
-use pairing::{
-    Engine,
-};
-
 // use ::jubjub::{
 //     Unknown,
 //     PrimeOrder,
@@ -44,7 +40,6 @@ use pairing::{
 use ff::{
     Field,
     PrimeField,
-    SqrtField
 };
 
 use group_hash::baby_group_hash;

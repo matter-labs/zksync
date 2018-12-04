@@ -7,14 +7,11 @@ extern crate plasma;
 extern crate pairing;
 extern crate time;
 
-use ff::{Field, PrimeField, BitIterator};
-use rand::{Rand, thread_rng, XorShiftRng, SeedableRng};
-use test::Bencher;
+use rand::{Rand, XorShiftRng, SeedableRng};
 use time::precise_time_ns;
 
 use pairing::bn256::{Fr};
 use plasma::balance_tree::*;
-use plasma::primitives::*;
 use plasma::sparse_merkle_tree::parallel_smt;
 use plasma::sparse_merkle_tree::pedersen_hasher::BabyPedersenHasher;
 
@@ -25,7 +22,7 @@ fn main() {
     let rounds: usize = 10;
     let height: usize = 24;
 
-    let mut rng = &mut XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+    let rng = &mut XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
     let mut leafs = Vec::with_capacity(n_inserts * rounds);
     let rand_leaf = |_| BabyLeaf {
         balance:    Fr::rand(rng),
@@ -35,7 +32,7 @@ fn main() {
     };
     leafs.extend((0..(n_inserts * rounds)).map(rand_leaf));
 
-    let mut rng = &mut XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+    let rng = &mut XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
     let mut pos = Vec::with_capacity(n_inserts * rounds);
     pos.extend((0..(n_inserts * rounds)).map(|_| usize::rand(rng)));
 
@@ -44,7 +41,6 @@ fn main() {
 
     let mut tree = BabyBalanceTree::new(height as u32);
     let mut v1 = Vec::new();
-    let mut dummy = 0;
     let capacity = tree.capacity() as usize;
 
     println!("baseline implementation...");
@@ -64,7 +60,6 @@ fn main() {
 
     let mut tree = BTree::new(height);
     let mut v2 = Vec::new();
-    let mut dummy = 0;
     let capacity = tree.capacity();
 
     BTree::reset_stats();
