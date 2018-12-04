@@ -10,6 +10,7 @@
   },
   "scripts": {
     "build": "solcjs -o bin --bin --abi contracts/*.sol",
-    "deploy-dev": "truffle migrate --reset --network dev"
+    "migrate": "truffle migrate --reset --network dev",
+    "ganache": "ganache-cli -l 7000000"
   }
 }

@@ -38,10 +38,11 @@ impl ETHClient {
 
         // Get the contract bytecode for instance from Solidity compiler
         let bytecode: Vec<u8> = PLASMA_BIN.from_hex().unwrap();
+
         // Deploying a contract
         let contract = Contract::deploy(web3.eth(), PLASMA_ABI)
             .unwrap()
-            //.confirmations(4)
+            .confirmations(0)
             .options(Options::with(|opt| {
                 opt.gas = Some(7000_000.into())
             }))
@@ -50,14 +51,7 @@ impl ETHClient {
             .expect("Correct parameters are passed to the constructor.")
             .wait()
             .unwrap();
-
-        // let contract_address = "664d79b5c0C762c83eBd0d1D1D5B048C0b53Ab58".parse().unwrap();
-        // let contract = Contract::from_json(
-        //     web3.eth(),
-        //     contract_address,
-        //     include_bytes!(PLASMA_ABI),
-        // ).unwrap();
-            
+ 
         Self{event_loop, web3, contract, my_account}
     }
 

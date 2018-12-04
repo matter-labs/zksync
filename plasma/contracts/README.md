@@ -6,7 +6,7 @@
 yarn
 ```
 
-## Re-compile contracts:
+## Re-build contracts:
 
 ```
 yarn build
@@ -18,14 +18,8 @@ So you need to rebuild the code on every change (to be automated soon).
 
 ## Local testing with `ganache-cli`
 
-```
-yarn ganache-cli
-```
-
-In another terminal:
+This will start ganache with 7M gas limit:
 
 ```
-yarn deploy-dev
+yarn ganache
 ```
-
-Now contracts are available for local testing.
