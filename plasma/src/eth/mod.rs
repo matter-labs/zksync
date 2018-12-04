@@ -18,8 +18,8 @@ pub struct ETHClient {
 
 pub type U32 = u64; // because missing in web3::types; u64 is fine since only used for tokenization
 
-const PLASMA_ABI: &[u8] = include_bytes!("../../contracts/build/bin/contracts_Plasma_sol_Plasma.abi");
-const PLASMA_BIN: &str  = include_str!("../../contracts/build/bin/contracts_Plasma_sol_Plasma.bin");
+const PLASMA_ABI: &[u8] = include_bytes!("../../contracts/bin/contracts_Plasma_sol_Plasma.abi");
+const PLASMA_BIN: &str  = include_str!("../../contracts/bin/contracts_Plasma_sol_Plasma.bin");
 
 // all methods are blocking and panic on error for now
 impl ETHClient {
@@ -98,7 +98,7 @@ impl ETHClient {
         call_future.wait().unwrap();
     }
 
-    pub fn prove_block() {
+    pub fn verify_block(&self, block_num: U32, proof: Vec<U256>) {
 
     }
 }

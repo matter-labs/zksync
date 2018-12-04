@@ -9,7 +9,7 @@
     "truffle": "5.0.0-beta.2"
   },
   "scripts": {
-    "build": "solcjs -o build/bin --bin --abi contracts/*.sol",
+    "build": "solcjs -o bin --bin --abi contracts/*.sol",
     "deploy-dev": "truffle migrate --reset --network dev"
   }
 }
