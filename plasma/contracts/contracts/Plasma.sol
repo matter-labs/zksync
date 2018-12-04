@@ -8,6 +8,9 @@ contract PlasmaStub is VerificationKeys {
 
     uint32 constant DEADLINE = 3600; // seconds, to define
 
+    event BlockCommitted(uint32 blockNumber);
+    event BlockVerified(uint32 blockNumber);
+
     enum Circuit {
         DEPOSIT,
         UPDATE,
@@ -29,10 +32,10 @@ contract PlasmaStub is VerificationKeys {
     bytes32 public lastVerifiedRoot;
 
     // Key is block number
-    mapping (uint256 => Block) public blocks;
+    mapping (uint32 => Block) public blocks;
 
-    uint256 public totalCommitted;
-    uint256 public totalVerified;
+    uint32 public totalCommitted;
+    uint32 public totalVerified;
 
     // Balances for distributing fees to provers
     mapping (address => uint256) public balance;
@@ -42,7 +45,7 @@ contract PlasmaStub is VerificationKeys {
     constructor() public {
         lastVerifiedRoot = EMPTY_TREE_ROOT;
     }
-
+    
     function commitBlock(uint32 blockNumber, uint128 totalFees, bytes memory txDataPacked, bytes32 newRoot) public {
         require(blockNumber == totalCommitted + 1, "may only commit next block");
 
@@ -50,6 +53,7 @@ contract PlasmaStub is VerificationKeys {
 
         // TODO: need a strategy to avoid front-running msg.sender
         blocks[totalCommitted] = Block(Circuit.UPDATE, totalFees, newRoot, finalHash, msg.sender, uint32(now + DEADLINE));
+        emit BlockCommitted(totalCommitted);
         totalCommitted++;
     }
 
@@ -71,6 +75,7 @@ contract PlasmaStub is VerificationKeys {
 
         require(verifyUpdateProof(proof, lastVerifiedRoot, committed.newRoot, committed.finalHash), "invalid proof");
 
+        emit BlockCommitted(totalVerified);
         totalVerified++;
         lastVerifiedRoot = committed.newRoot;
 
