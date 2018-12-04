@@ -6,13 +6,11 @@ extern crate test;
 extern crate plasma;
 extern crate pairing;
 
-use ff::{Field, PrimeField, BitIterator};
 use rand::{Rand, thread_rng};
 use test::Bencher;
 
 use pairing::bn256::{Fr};
 use plasma::balance_tree::*;
-use plasma::primitives::*;
 use plasma::sparse_merkle_tree::parallel_smt;
 use plasma::sparse_merkle_tree::pedersen_hasher::BabyPedersenHasher;
 
@@ -73,8 +71,6 @@ fn bench_batched_smt(b: &mut Bencher, n_inserts: usize) {
         pub_y:      Fr::rand(rng),
     }));
 
-    tree.prepare_inserts(n_inserts);
-    let mut i = 0;
     b.iter(|| {
         for i in 0..n_inserts {
             let insert_into = usize::rand(rng) % capacity;
