@@ -35,7 +35,7 @@ pub fn parse_with_exponent_le<E: Engine, CS: ConstraintSystem<E>>(
         || Ok(exponent_base_value)
     )?;
 
-    let mut exponent_value = exponent_base_value;
+    let exponent_value = exponent_base_value;
 
     for i in 0..exponent_length {
         let thisbit = &bits[i];
@@ -235,7 +235,7 @@ fn test_parsing() {
     use ::circuit::test::*;
     use super::boolean::{AllocatedBit, Boolean};
 
-    let mut rng = XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+    let rng = XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
     let mut cs = TestConstraintSystem::<Bn256>::new();
 

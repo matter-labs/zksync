@@ -65,7 +65,7 @@ impl<E: Engine> Circuit<E> for HardcodedSha256Circuit<E> {
         // get sha256 bits
         let mut hash_bits = sha256(cs.namespace(|| "sha256"), &preimage_bits).unwrap();
 
-        let mut hash_bits_from_rev = sha256(cs.namespace(|| "sha256 from rev"), &preimage_reversed).unwrap();
+        let hash_bits_from_rev = sha256(cs.namespace(|| "sha256 from rev"), &preimage_reversed).unwrap();
 
         print_boolean_vector(&hash_bits.clone());
         // hash_bits.reverse();
@@ -117,7 +117,7 @@ fn test_sha256_bitness() {
     let mut hash_result = [0u8; 32];
     h.result(&mut hash_result[..]);
 
-    let mut first_round_bits = multipack::bytes_to_bits(&hash_result.clone());
+    let first_round_bits = multipack::bytes_to_bits(&hash_result.clone());
             
     for b in first_round_bits.clone() {
         if b {
@@ -182,7 +182,7 @@ fn test_sha256_bitness() {
         use crypto::digest::Digest;
         use rand::{SeedableRng, Rng, XorShiftRng, Rand};
         use sapling_crypto::circuit::test::*;
-        let mut rng = XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let rng = XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
         let input_len = 64;
         {

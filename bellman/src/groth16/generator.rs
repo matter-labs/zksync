@@ -404,8 +404,6 @@ pub fn generate_parameters<E, C>(
                                                                        .zip(bt.iter())
                                                                        .zip(ct.iter())
                     {
-                        let p_eval_start = PreciseTime::now();
-
                         fn eval_at_tau<E: Engine>(
                             powers_of_tau: &[Scalar<E>],
                             p: &[(E::Fr, usize)]
@@ -426,8 +424,6 @@ pub fn generate_parameters<E, C>(
                         let mut at = eval_at_tau(powers_of_tau, at);
                         let mut bt = eval_at_tau(powers_of_tau, bt);
                         let ct = eval_at_tau(powers_of_tau, ct);
-
-                        let p_eval_end = PreciseTime::now();
 
                         // Compute A query (in G1)
                         if !at.is_zero() {

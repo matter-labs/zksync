@@ -5,7 +5,6 @@ use pairing::{
 use ff:: {
     Field,
     PrimeField,
-    ScalarEngine
 };
 
 mod dummy_engine;

@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 extern crate pairing;
 extern crate rand;
 extern crate num_cpus;
