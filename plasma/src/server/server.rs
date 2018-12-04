@@ -24,10 +24,6 @@ pub struct PlasmaServer {
     root_hash:      Fr,
 }
 
-impl PlasmaServer {
-
-}
-
 impl plasma_state::State<Bn256> for PlasmaServer {
 
     fn get_accounts(&self) -> Vec<(u32, Account)> {
@@ -43,40 +39,6 @@ impl plasma_state::State<Bn256> for PlasmaServer {
     }
 }
 
-/*
-pub struct StateImpl<'a, E: JubjubEngine> {
-    
-    // current state of accounts
-    accounts:       &'a HashMap<u32, Account<E>>,
+impl PlasmaServer {
 
-    // current block number
-    block_number:   u32,
-
-    // current root hash
-    root_hash:      &'a E::Fr,
 }
-
-impl<'a, E: JubjubEngine> State<'a, E> for StateImpl<'a, E> {
-
-    fn get_accounts(&'a self) -> Vec<(u32, Account<E>)> {
-        let capacity = self.accounts.capacity();
-        let mut accs = Vec::with_capacity(capacity);
-
-        for (k, v) in self.accounts.iter() {
-            let account_number = *k;
-            let account_info = v.clone();
-            accs.push((account_number, account_info));
-        }
-
-        accs
-    }
-    
-    fn block_number(&self) -> u32 {
-        self.block_number
-    }
-
-    fn root_hash (&'a self) -> E::Fr {
-        self.root_hash.clone()
-    }
-}
-*/
