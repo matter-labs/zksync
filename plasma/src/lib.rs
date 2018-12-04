@@ -16,6 +16,12 @@ extern crate crossbeam;
 extern crate crossbeam_utils;
 extern crate rayon;
 
+extern crate ethereum_types;
+extern crate ethabi;
+extern crate ethkey;
+extern crate rustc_hex;
+extern crate web3;
+
 pub mod primitives;
 pub mod sparse_merkle_tree;
 pub mod balance_tree;

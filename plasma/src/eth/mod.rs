@@ -1,15 +1,8 @@
-extern crate ethereum_types;
-extern crate ethabi;
-extern crate ethkey;
-
-extern crate rustc_hex;
-extern crate web3;
-
-use self::web3::futures::{Future, Stream};
-use self::web3::contract::{Contract, Options, CallFuture};
-use self::web3::types::{Address, U256, H256, U128, Bytes};
-use self::web3::transports::{EventLoopHandle, Http};
-use self::rustc_hex::FromHex;
+use web3::futures::{Future, Stream};
+use web3::contract::{Contract, Options, CallFuture};
+use web3::types::{Address, U256, H256, U128, Bytes};
+use web3::transports::{EventLoopHandle, Http};
+use rustc_hex::FromHex;
 
 // extern crate rustc_serialize;
 // extern crate serde;
