@@ -9,7 +9,7 @@ yarn
 ## Compile contracts:
 
 ```
-yarn truffle compile
+yarn build
 ```
 
 ## Local testing with `ganache-cli`
@@ -21,7 +21,7 @@ yarn ganache-cli
 In another terminal:
 
 ```
-yarn migrate --network dev
+yarn deploy-dev
 ```
 
 Now contracts are available for local testing.

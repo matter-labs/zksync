@@ -5,6 +5,11 @@
   "devDependencies": {},
   "dependencies": {
     "ganache-cli": "^6.2.3",
+    "solc": "^0.4.25",
     "truffle": "5.0.0-beta.2"
+  },
+  "scripts": {
+    "build": "solcjs -o build/bin --bin --abi contracts/*.sol",
+    "deploy-dev": "truffle migrate --reset --network dev"
   }
 }

@@ -14,6 +14,7 @@ ethkey = { git = "https://github.com/paritytech/parity-ethereum" }
 ethereum-types = "0.4.0"
 ethabi = "6.1.0"
 web3 = { git = "https://github.com/tomusdrw/rust-web3" }
+rustc-hex = "2.0.1"
 
 futures = "0.1.25"
 futures-cpupool = "0.1.8"
