@@ -43,15 +43,10 @@ impl<E: JubjubEngine> Default for Leaf<E> {
     }
 }
 
-pub type BalanceTree<E: JubjubEngine> = sparse_merkle_tree::SparseMerkleTree<Leaf<E>, E::Fr, PedersenHasher<E>>;
-
-pub type ParallelBalanceTree<E: JubjubEngine> = parallel_smt::SparseMerkleTree<Leaf<E>, E::Fr, PedersenHasher<E>>;
-
-
 // code below is for testing
 
 pub type BabyLeaf = Leaf<Bn256>;
-pub type BabyBalanceTree = BalanceTree<Bn256>;
+pub type BabyBalanceTree = sparse_merkle_tree::SparseMerkleTree<BabyLeaf, Fr, PedersenHasher<Bn256>>;
 
 impl BabyBalanceTree {
     pub fn verify_proof(&self, index: u32, item: BabyLeaf, proof: Vec<(Fr, bool)>) -> bool {

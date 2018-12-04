@@ -103,7 +103,7 @@ fn field_element_to_u32<P: PrimeField>(fr: P) -> u32 {
 const TX_BATCH_SIZE: usize = 8;
 
 impl BabyProver {
-    pub fn create<'a>(initial_state: &'a State<'a, Bn256>) ->
+    pub fn create(initial_state: &State<Bn256>) ->
         Result<BabyProver, BabyProverErr>
     {
         use std::fs::File;

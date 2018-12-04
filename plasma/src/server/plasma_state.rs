@@ -10,10 +10,10 @@ use super::super::circuit::baby_plasma::TransactionSignature;
 
 pub type Account<E> = balance_tree::Leaf<E>;
 
-pub trait State<'a, E: JubjubEngine> {  
-    fn get_accounts(&'a self) -> Vec<(u32, Account<E>)>;
+pub trait State<E: JubjubEngine> {  
+    fn get_accounts(&self) -> Vec<(u32, Account<E>)>;
     fn block_number(&self) -> u32;
-    fn root_hash(&'a self) -> E::Fr;
+    fn root_hash(&self) -> E::Fr;
 }
 
 pub struct Tx<E: JubjubEngine> {

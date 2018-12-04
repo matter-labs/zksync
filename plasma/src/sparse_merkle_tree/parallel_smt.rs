@@ -42,9 +42,10 @@ pub struct SparseMerkleTree<T, Hash, H>
           Hash: Clone + Debug + Sync + Send,
           H: Hasher<Hash> + Sync
 {
-    tree_depth: Depth,
+    pub items: FnvHashMap<ItemIndex, T>,
+
     prehashed: Vec<Hash>,
-    items: FnvHashMap<ItemIndex, T>,
+    tree_depth: Depth,
     hasher: H,
 
     // intermediate nodes

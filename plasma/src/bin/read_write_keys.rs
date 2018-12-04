@@ -55,7 +55,7 @@ const TXES_TO_TEST: usize = 8;
 fn main() {
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &AltJubjubBn256::new();
-    let mut rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+    let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
     let tree_depth = *plasma_constants::BALANCE_TREE_DEPTH as u32;
 
     let capacity: u32 = 1 << tree_depth;
