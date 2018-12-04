@@ -45,11 +45,7 @@ contract PlasmaStub is VerificationKeys {
     constructor() public {
         lastVerifiedRoot = EMPTY_TREE_ROOT;
     }
-
-    function test() {
-        emit BlockCommitted(777);
-    }
-
+    
     function commitBlock(uint32 blockNumber, uint128 totalFees, bytes memory txDataPacked, bytes32 newRoot) public {
         require(blockNumber == totalCommitted + 1, "may only commit next block");
 
