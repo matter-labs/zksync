@@ -24,6 +24,10 @@ impl Prover<Bn256> for BabyProver {
     }
 
     fn encode_proof(block: &Self::Proof) -> Result<Vec<u8>, Self::Err> {
+
+        // uint256[8] memory in_proof
+        // see contracts/Verifier.sol:44
+
         // TODO: implement
         unimplemented!()        
     }
