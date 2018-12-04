@@ -5,7 +5,7 @@ use web3::contract::{Contract, Options, CallFuture};
 use web3::types::{Address, U256, H256, U128, Bytes};
 use web3::transports::{EventLoopHandle, Http};
 
-pub struct ETHClient {
+pub struct Client {
     event_loop: EventLoopHandle,
     web3:       web3::Web3<Http>,
     contract:   Contract<Http>,
@@ -16,18 +16,18 @@ pub type U32 = u64; // because missing in web3::types; u64 is fine since only us
 
 type ABI = (&'static [u8], &'static str);
 
-static TEST_PLASMA_ALWAYS_VERIFY: ABI = (
+pub const TEST_PLASMA_ALWAYS_VERIFY: ABI = (
     include_bytes!("../../contracts/bin/contracts_Plasma_sol_PlasmaTest.abi"),
     include_str!("../../contracts/bin/contracts_Plasma_sol_PlasmaTest.bin"),
 );
 
-static PROD_PLASMA: ABI = (
+pub const PROD_PLASMA: ABI = (
     include_bytes!("../../contracts/bin/contracts_Plasma_sol_Plasma.abi"),
     include_str!("../../contracts/bin/contracts_Plasma_sol_Plasma.bin"),
 );
 
 // all methods are blocking and panic on error for now
-impl ETHClient {
+impl Client {
 
     pub fn new(contract_abi: ABI) -> Self {
         // TODO: check env vars to decide local/testnet/live
@@ -125,7 +125,7 @@ impl ETHClient {
 #[test]
 fn test_web3() {
 
-    let client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
+    let client = Client::new(TEST_PLASMA_ALWAYS_VERIFY);
 
     let block_num: u64 = 0;
     let total_fees: U128 = U128::from_dec_str("0").unwrap();
