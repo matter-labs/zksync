@@ -5,11 +5,6 @@ use web3::contract::{Contract, Options, CallFuture};
 use web3::types::{Address, U256, H256, U128, Bytes};
 use web3::transports::{EventLoopHandle, Http};
 
-// extern crate rustc_serialize;
-// extern crate serde;
-// extern crate serde_derive;
-// extern crate serde_json;
-
 pub struct ETHClient {
     event_loop: EventLoopHandle,
     web3:       web3::Web3<Http>,
@@ -76,6 +71,7 @@ impl ETHClient {
         // TODO: read account and secret from env var
     }
 
+    /// Returns tx hash
     pub fn commit_block(
         &self, 
         block_num: U32, 
@@ -94,8 +90,21 @@ impl ETHClient {
             }).wait()
     }
 
-    pub fn verify_block(&self, block_num: U32, proof: Vec<U256>) {
-
+    /// Returns tx hash
+    pub fn verify_block(
+        &self, 
+        block_num: U32, 
+        proof: [U256; 8]) -> Result<H256, web3::contract::Error>
+    {
+        self.contract
+            .call("verifyBlock", 
+                (block_num, proof), 
+                self.my_account, 
+                Options::default())
+            .then(|tx| {
+                println!("got tx: {:?}", tx);
+                tx
+            }).wait()
     }
 }
 
@@ -104,10 +113,16 @@ fn test_web3() {
 
     let client = ETHClient::new();
 
-    let block_num: u64 = 1;
+    let block_num: u64 = 0;
     let total_fees: U128 = U128::from_dec_str("0").unwrap();
     let tx_data_packed: Vec<u8> = vec![];
     let new_root: H256 = H256::zero();
 
+    let proof: [U256; 8] = [U256::zero(); 8];
+
+    println!("committing block...");
     assert!(client.commit_block(block_num, total_fees, tx_data_packed, new_root).is_ok());
+    std::thread::sleep_ms(500);
+    println!("verifying block...");
+    assert!(client.verify_block(block_num, proof).is_ok());
 }
