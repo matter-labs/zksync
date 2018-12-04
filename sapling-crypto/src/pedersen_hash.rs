@@ -1,5 +1,4 @@
 use jubjub::*;
-use pairing::*;
 use ff::{Field, PrimeField, PrimeFieldRepr};
 
 #[derive(Copy, Clone)]
