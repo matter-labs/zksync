@@ -10,13 +10,28 @@ pub type Account<E> = balance_tree::Leaf<E>;
 pub struct State<E: JubjubEngine> {
     
     // current state of accounts
-    pub accounts:       HashMap<usize, Account<E>>,
+    accounts:       HashMap<usize, Account<E>>,
 
     // current block number
-    pub block_number:   u32,
+    block_number:   u32,
 
     // current root hash
-    pub root_hash:      E::Fr,
+    root_hash:      E::Fr,
+}
+
+impl<'a, E: JubjubEngine> State<E> {
+    
+    fn accounts(&'a self) -> &'a HashMap<usize, Account<E>> {
+        &self.accounts
+    }
+
+    fn block_number(&self) -> u32 {
+        self.block_number
+    }
+
+    fn root_hash(&'a self) -> &'a E::Fr {
+        &self.root_hash
+    }
 }
 
 pub struct Tx<E: JubjubEngine> {
