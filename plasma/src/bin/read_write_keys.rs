@@ -45,8 +45,9 @@ use sapling_crypto::eddsa::{
     PublicKey
 };
 
+use plasma::circuit::utils::*;
 use plasma::circuit::plasma_constants;
-use plasma::circuit::baby_plasma::{Transaction, TransactionWitness, Update, le_bit_vector_into_field_element, be_bit_vector_into_bytes};
+use plasma::circuit::baby_plasma::{Transaction, TransactionWitness, Update};
 use sapling_crypto::circuit::float_point::{convert_to_float};
 
 const TXES_TO_TEST: usize = 8;
@@ -354,7 +355,7 @@ fn main() {
     tmp_cirtuit_params.write(& mut f).expect("Unable to write proving key");
     }
 
-    use std::io::{BufReader, Read};
+    use std::io::{BufReader};
 
     let f_r = File::open("pk.key").expect("Unable to open file");
     let mut r = BufReader::new(f_r);

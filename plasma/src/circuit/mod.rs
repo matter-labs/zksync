@@ -29,6 +29,7 @@ use balance_tree;
 
 pub mod plasma_constants;
 pub mod baby_plasma;
+pub mod utils;
 
 use self::baby_plasma::{
     TransactionSignature,

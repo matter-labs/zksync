@@ -9,7 +9,7 @@ pub trait Prover<E: JubjubEngine>: Sized {
     type Err: Error + Sized;
     type Proof: Debug + Sized;
 
-    fn new(initial_state: &State<E>) -> Result<Self, Self::Err>;
+    fn new<'a>(initial_state: &State<'a, E>) -> Result<Self, Self::Err>;
 
     fn encode_proof(block: &Self::Proof) -> Result<Vec<u8>, Self::Err>;
     fn encode_transactions(block: &Block<E>) -> Result<Vec<u8>, Self::Err>;
@@ -20,5 +20,4 @@ pub trait Prover<E: JubjubEngine>: Sized {
     fn apply(&mut self, block: &Block<E>) -> Result<Self::Proof, Self::Err> {
         unimplemented!()
     }
-
 }

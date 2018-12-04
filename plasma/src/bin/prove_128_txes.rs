@@ -41,8 +41,9 @@ use sapling_crypto::eddsa::{
     PublicKey
 };
 
+use plasma::circuit::utils::*;
 use plasma::circuit::plasma_constants;
-use plasma::circuit::baby_plasma::{Transaction, TransactionWitness, Update, le_bit_vector_into_field_element, be_bit_vector_into_bytes};
+use plasma::circuit::baby_plasma::{Transaction, TransactionWitness, Update};
 use sapling_crypto::circuit::float_point::{convert_to_float};
 
 const TXES_TO_TEST: usize = 800;
@@ -250,6 +251,8 @@ fn main() {
     let mut h = Sha256::new();
 
     let bytes_to_hash = be_bit_vector_into_bytes(&public_data_initial_bits);
+
+    println!("Public data size for Ethereum smart contract call = {}", bytes_to_hash.len());
 
     h.input(&bytes_to_hash);
 
