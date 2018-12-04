@@ -2,7 +2,6 @@ use super::{
     JubjubEngine, 
     JubjubParams, 
     PrimeOrder, 
-    Unknown,
     montgomery,
     edwards
 };

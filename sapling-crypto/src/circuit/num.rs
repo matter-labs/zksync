@@ -587,7 +587,8 @@ mod test {
         let mut cs = TestConstraintSystem::<Bls12>::new();
 
         let n = AllocatedNum::alloc(&mut cs, || Ok(Fr::from_str("3").unwrap())).unwrap();
-        n.limit_number_of_bits(&mut cs, 2);
+
+        n.limit_number_of_bits(&mut cs, 2).unwrap();
 
         assert!(cs.is_satisfied());
     }
@@ -598,7 +599,7 @@ mod test {
 
         let n = AllocatedNum::alloc(&mut cs, || Ok(Fr::from_str("3").unwrap())).unwrap();
 
-        n.limit_number_of_bits(&mut cs, 1);
+        n.limit_number_of_bits(&mut cs, 1).unwrap();
         assert!(!cs.is_satisfied());
     }
 

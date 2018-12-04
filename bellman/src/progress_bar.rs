@@ -1,7 +1,6 @@
 extern crate time;
 
-use std::io::{stdout, Write};
-use std::thread;
+use std::io::{Write};
 use std::sync::{
     mpsc::{channel, Sender, Receiver}, 
     Arc, 
@@ -29,7 +28,7 @@ pub struct MultiBar {
 }
 
 pub struct ProgressBar {
-    chunk:  u64,
+    //chunk:  u64,
     acc:    u64,
     step:   Arc<AtomicUsize>,
     tx:     Option<Sender<u64>>,
@@ -61,7 +60,7 @@ impl MultiBar {
         self.total += chunk;
         //println!("step 0 of {}", chunk);
         ProgressBar{
-            chunk,
+            //chunk,
             acc:    0,
             tx:     Some(Sender::clone(&self.tx)),
             step:   Arc::clone(&self.step),
@@ -133,11 +132,11 @@ fn test_progress_display() {
 
     let mut mb = MultiBar::new();
 
-    for j in 1..=0 { 
+    for _j in 1..=0 { 
         let mut pb = mb.create_bar(3600000); 
-        thread::spawn(move || {
-            for i in 0..3600000 {
-                thread::sleep(Duration::from_millis(1));
+        std::thread::spawn(move || {
+            for _i in 0..3600000 {
+                std::thread::sleep(Duration::from_millis(1));
                 pb.add(1);
             }
             pb.finish();

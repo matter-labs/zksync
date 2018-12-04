@@ -7,8 +7,9 @@ use pairing::bn256::{Bn256, Fr};
 use sapling_crypto::alt_babyjubjub::{JubjubEngine, AltJubjubBn256, edwards::Point, PrimeOrder};
 
 use super::primitives::{GetBits, GetBitsFixed};
-use super::sparse_merkle_tree::{SparseMerkleTree, alt_smt};
-use super::sparse_merkle_tree::pedersen_hasher::BabyPedersenHasher;
+use super::sparse_merkle_tree;
+use super::sparse_merkle_tree::parallel_smt;
+use super::sparse_merkle_tree::pedersen_hasher::PedersenHasher;
 
 use super::circuit::plasma_constants;
 
@@ -41,6 +42,12 @@ impl<E: JubjubEngine> Default for Leaf<E> {
         }
     }
 }
+
+// code below is for testing
+
+pub type BabyLeaf = Leaf<Bn256>;
+pub type BabyBalanceTree = sparse_merkle_tree::SparseMerkleTree<BabyLeaf, Fr, PedersenHasher<Bn256>>;
+
 impl BabyBalanceTree {
     pub fn verify_proof(&self, index: u32, item: BabyLeaf, proof: Vec<(Fr, bool)>) -> bool {
         use sparse_merkle_tree::hasher::Hasher;
@@ -70,11 +77,6 @@ impl BabyBalanceTree {
     }
 }
     
-
-pub type BabyLeaf = Leaf<Bn256>;
-
-pub type BabyBalanceTree = SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
-
 #[cfg(test)]
 mod tests {
 
@@ -93,34 +95,7 @@ mod tests {
         tree.insert(3, leaf);
         let root = tree.root_hash();
         let path = tree.merkle_path(0);
-//        println!("root: {:?}", root);
-//        println!("path: {:?}", path);
     }
 
-    #[test]
-    fn test_balance_tree_alt() {
-
-        pub type AltBabyBalanceTree = alt_smt::SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
-
-        let leaf = BabyLeaf {
-            balance:    Fr::zero(),
-            nonce:      Fr::one(),
-            pub_x:      Fr::one(),
-            pub_y:      Fr::one(),
-        };
-
-        let mut tree = BabyBalanceTree::new(3);
-        tree.insert(3, leaf.clone());
-        let root = tree.root_hash();
-        let path = tree.merkle_path(0);
-
-        let mut alt_tree = AltBabyBalanceTree::new(3);
-        alt_tree.insert(3, leaf.clone());
-        let alt_root = alt_tree.root_hash();
-        let alt_path = tree.merkle_path(0);
-
-        assert_eq!(root, alt_root);
-        assert_eq!(path, alt_path);
-    }
 
 }

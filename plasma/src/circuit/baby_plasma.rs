@@ -907,7 +907,7 @@ fn apply_transaction<E, CS>(
     // before having fun with leafs calculate the common prefix
     // of two audit paths
 
-    let mut common_prefix: Vec<boolean::Boolean> = vec![];
+    let mut _common_prefix: Vec<boolean::Boolean> = vec![];
     {
         let cs = & mut cs.namespace(|| "common prefix search");
 
@@ -923,7 +923,7 @@ fn apply_transaction<E, CS>(
         let mut reversed_path_to = tx_witness.clone().auth_path_to;
         reversed_path_to.reverse();
 
-        common_prefix = find_common_prefix(
+        _common_prefix = find_common_prefix(
             cs.namespace(|| "common prefix search"), 
             &bitmap_path_from,
             &bitmap_path_to
@@ -932,7 +932,7 @@ fn apply_transaction<E, CS>(
         // Common prefix is found, not we enforce equality of 
         // audit path elements on a common prefix
 
-        for (i, ((e_from, e_to), bitmask_bit)) in reversed_path_from.into_iter().zip(reversed_path_to.into_iter()).zip(common_prefix.clone().into_iter()).enumerate()
+        for (i, ((e_from, e_to), bitmask_bit)) in reversed_path_from.into_iter().zip(reversed_path_to.into_iter()).zip(_common_prefix.clone().into_iter()).enumerate()
         {
             let path_element_from = num::AllocatedNum::alloc(
                 cs.namespace(|| format!("path element from {}", i)),
@@ -1309,7 +1309,7 @@ fn apply_transaction<E, CS>(
 
     let mut intersection_point_lc = Num::<E>::zero();
     coeff = E::Fr::one();
-    for bit in common_prefix.into_iter() {
+    for bit in _common_prefix.into_iter() {
         intersection_point_lc = intersection_point_lc.add_bool_with_coeff(
             CS::one(), 
             &bit, 
@@ -1513,7 +1513,7 @@ fn test_update_circuit_with_witness() {
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &AltJubjubBn256::new();
 
-    let mut rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+    let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
     for _ in 0..1 {
         let tree_depth = *plasma_constants::BALANCE_TREE_DEPTH as u32;

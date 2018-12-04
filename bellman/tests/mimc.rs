@@ -16,7 +16,6 @@ use pairing::{
 
 use ff::{
     Field,
-    ScalarEngine
 };
 
 // We're going to use the BLS12-381 pairing-friendly elliptic curve.

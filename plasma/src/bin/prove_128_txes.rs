@@ -12,18 +12,12 @@ use time::PreciseTime;
 
 use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
 use pairing::bn256::*;
-use pairing::{Engine};
 use rand::{SeedableRng, Rng, XorShiftRng};
-use sapling_crypto::circuit::test::*;
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 use plasma::balance_tree::{BabyBalanceTree, BabyLeaf};
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
 use std::collections::HashMap;
-
-use bellman::{
-    Circuit,
-};
 
 use bellman::groth16::{
     create_random_proof, 
@@ -53,7 +47,7 @@ fn main() {
 
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &AltJubjubBn256::new();
-    let mut rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+    let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
     let tree_depth = *plasma_constants::BALANCE_TREE_DEPTH as u32;
 
     let capacity: u32 = 1 << tree_depth;

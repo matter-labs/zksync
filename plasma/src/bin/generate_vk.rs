@@ -9,13 +9,11 @@ extern crate ff;
 use ff::{Field, PrimeField};
 use rand::thread_rng;
 use bellman::groth16::{
-    create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof, VerifyingKey
+    generate_random_parameters, VerifyingKey
 };
 use pairing::bn256::{Bn256, Fr};
 use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
-use pairing::{Engine, CurveAffine, EncodedPoint};
-use std::fmt;
-use hex::encode;
+use pairing::{Engine};
 
 use plasma::vk_contract_generator::hardcode_vk;
 use plasma::circuit::baby_plasma::Update;

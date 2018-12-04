@@ -42,9 +42,10 @@ pub struct SparseMerkleTree<T, Hash, H>
           Hash: Clone + Debug + Sync + Send,
           H: Hasher<Hash> + Sync
 {
-    tree_depth: Depth,
+    pub items: FnvHashMap<ItemIndex, T>,
+
     prehashed: Vec<Hash>,
-    items: FnvHashMap<ItemIndex, T>,
+    tree_depth: Depth,
     hasher: H,
 
     // intermediate nodes
@@ -134,7 +135,7 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
             let cur = { self.nodes[cur_ref].clone() };
 
             let dir = (leaf_index & (1 << (tree_depth - cur.depth - 1))) > 0;
-            let mut link = if dir { cur.right } else { cur.left };
+            let link = if dir { cur.right } else { cur.left };
             if let Some(next_ref) = link {
                 let next = self.nodes[next_ref].clone();
                 let leaf_index_normalized = leaf_index >> (tree_depth - next.depth);
@@ -198,7 +199,7 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
     fn get_hash_line(&self, child_ref: NodeRef, parent: &Node) -> (Hash, Vec<(NodeIndex, Hash)>) {
         let child = &self.nodes[child_ref];
 
-        let mut acc = self.get_hash(child_ref);
+        let acc = self.get_hash(child_ref);
         let mut cur_hash = acc.0;
         let mut updates = acc.1;
 
@@ -276,10 +277,10 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
     }
 
     pub fn print_stats() {
-        unsafe {
+        // unsafe {
 //            println!("leaf hashes: {}", HN);
 //            println!("tree hashes: {}", HC);
-        }
+        // }
     }
 
 
@@ -428,7 +429,7 @@ mod tests {
 
     #[test]
     fn test_cpu_pool() {
-        let mut tree = TestSMT::new(3);
+        let tree = TestSMT::new(3);
 
         tree.make_a_future();
 
