@@ -1,8 +1,9 @@
+use rustc_hex::FromHex;
+
 use web3::futures::{Future, Stream};
 use web3::contract::{Contract, Options, CallFuture};
 use web3::types::{Address, U256, H256, U128, Bytes};
 use web3::transports::{EventLoopHandle, Http};
-use rustc_hex::FromHex;
 
 // extern crate rustc_serialize;
 // extern crate serde;
@@ -51,6 +52,8 @@ impl ETHClient {
             .expect("Correct parameters are passed to the constructor.")
             .wait()
             .unwrap();
+        
+        //println!("contract: {:?}", contract);
  
         Self{event_loop, web3, contract, my_account}
     }
@@ -73,23 +76,22 @@ impl ETHClient {
         // TODO: read account and secret from env var
     }
 
-    pub fn commit_block(&self, block_num: U32, total_fees: U128, tx_data_packed: Vec<u8>, new_root: H256) {
-
-        // let block_num: u64 = 0;
-        // let total_fees: U128 = U128::from_dec_str("0").unwrap();
-        // let txDataPacked: Vec<u8> = vec![];
-        // let newRoot: H256 = H256::zero();
-
-        let call_future = self.contract
+    pub fn commit_block(
+        &self, 
+        block_num: U32, 
+        total_fees: U128, 
+        tx_data_packed: Vec<u8>, 
+        new_root: H256) -> Result<H256, web3::contract::Error>
+    {
+        self.contract
             .call("commitBlock", 
                 (block_num, total_fees, tx_data_packed, new_root), 
                 self.my_account, 
                 Options::default())
             .then(|tx| {
                 println!("got tx: {:?}", tx);
-                Ok(()) as Result<(), ()>
-            });
-        call_future.wait().unwrap();
+                tx
+            }).wait()
     }
 
     pub fn verify_block(&self, block_num: U32, proof: Vec<U256>) {
@@ -102,10 +104,10 @@ fn test_web3() {
 
     let client = ETHClient::new();
 
-    let block_num: u64 = 0;
+    let block_num: u64 = 1;
     let total_fees: U128 = U128::from_dec_str("0").unwrap();
     let tx_data_packed: Vec<u8> = vec![];
     let new_root: H256 = H256::zero();
 
-    client.commit_block(block_num, total_fees, tx_data_packed, new_root);
+    assert!(client.commit_block(block_num, total_fees, tx_data_packed, new_root).is_ok());
 }
