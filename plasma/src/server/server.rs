@@ -51,12 +51,15 @@ impl PlasmaServer {
 
     /// Create new plasma server
     pub fn new() -> Self {
+
+        // This is blocking and requires active ETH node
         let eth = eth::Client::new(eth::PROD_PLASMA);
 
         let mut balance_tree = ParallelBalanceTree::new(*plasma_constants::BALANCE_TREE_DEPTH);
 
         // TODO: load balances from the database here (for demo, simulate this by inserting random accounts)
         
+        // Initialize root hash cache
         let root_hash = balance_tree.root_hash();
 
         Self{
