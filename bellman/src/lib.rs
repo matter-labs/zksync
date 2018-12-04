@@ -12,6 +12,7 @@ pub mod multicore;
 mod multiexp;
 pub mod domain;
 pub mod groth16;
+pub mod progress_bar;
 
 use pairing::{Engine};
 use ff::Field;
