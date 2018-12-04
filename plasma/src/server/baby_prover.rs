@@ -1,7 +1,7 @@
 use std::error::Error;
 use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
 use super::plasma_state::{State, Block};
-use super::prover::{Prover};
+use super::prover::{Prover, LifetimedProver};
 use std::fmt;
 use rand::{OsRng, Rng};
 
@@ -79,14 +79,19 @@ fn field_element_to_u32<P: PrimeField>(fr: P) -> u32 {
     res
 }
 
+// impl<'a> LifetimedProver<'a, Bn256> for BabyProver {
+//     fn create(initial_state: &'a State<E>) -> Option<Self> {
+        
+//     }
+// }
+
 impl<'b> Prover<Bn256> for BabyProver {
 
     type Err = BabyProverErr;
     type Proof = BabyProof;
 
-    fn new<'a>(initial_state: &State<'a, Bn256>) 
+    fn new(initial_state: &State<Bn256>) 
         -> Result<Self, Self::Err> 
-        where 'a: 'b 
     {
         use std::fs::File;
         use std::io::{BufReader};
@@ -110,11 +115,11 @@ impl<'b> Prover<Bn256> for BabyProver {
 
         let iter = initial_state.accounts_iter();
 
-        iter.map(|e| {
+        for e in iter {
             let acc_number = *e.0 as u32;
             let leaf_copy = e.1.clone();
             tree.insert(acc_number, leaf_copy);
-        });
+        }
 
         let root = tree.root_hash();
 
