@@ -5,17 +5,19 @@ use super::prover::{Prover};
 use std::fmt;
 use rand::{OsRng, Rng};
 
-use sapling_crypto::circuit::float_point::parse_float_to_u128;
 use super::super::circuit::plasma_constants;
 use super::super::balance_tree;
 use super::super::circuit::utils::be_bit_vector_into_bytes;
 use super::super::circuit::baby_plasma::{Update, Transaction, TransactionWitness};
 
+use sapling_crypto::circuit::float_point::parse_float_to_u128;
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
+use pairing::CurveAffine;
 
-use pairing::bn256::Bn256;
-use pairing::bn256::Fr;
+use pairing::bn256::{Bn256, Fr};
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
+
+use web3::types::{U256, Bytes};
 
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
@@ -61,10 +63,20 @@ pub struct BabyProver {
     jubjub_params: AltJubjubBn256,
 }
 
+#[derive(Debug, Clone)]
+pub struct EthereumProof {
+    groth_proof: [U256; 8],
+    new_root: U256,
+    block_number: U256,
+    total_fees: U256,
+    public_data: Bytes,
+}
+
 #[derive(Debug)]
 pub struct FullBabyProof {
     proof: BabyProof,
     inputs: [Fr; 3],
+    block_number: Fr,
     total_fees: Fr,
     public_data: Vec<u8>,
 }
@@ -123,6 +135,8 @@ impl BabyProver {
 
         let root = tree.root_hash();
 
+        println!("Root hash is {}", root);
+
         let supplied_root = initial_state.root_hash();
 
         if root != supplied_root {
@@ -146,14 +160,62 @@ impl Prover<Bn256> for BabyProver {
 
     type Err = BabyProverErr;
     type Proof = FullBabyProof;
+    type EncodedProof = EthereumProof;
 
-    fn encode_proof(block: &Self::Proof) -> Result<Vec<u8>, Self::Err> {
+    // Outputs
+    // - 8 uint256 for encoding of the field elements
+    // - one uint256 for new root hash
+    // - uint256 block number
+    // - uint256 total fees
+    // - Bytes public data
+    //
+    // Old root is available to take from the storage of the smart-contract
+    fn encode_proof(proof: &Self::Proof) -> Result<Self::EncodedProof, Self::Err> {
 
-        // uint256[8] memory in_proof
-        // see contracts/Verifier.sol:44
+        // proof     
+        // pub a: E::G1Affine,
+        // pub b: E::G2Affine,
+        // pub c: E::G1Affine
 
-        // TODO: implement
-        unimplemented!()        
+        let a_uncompressed = proof.proof.a.into_uncompressed();
+        let b_uncompressed = proof.proof.b.into_uncompressed();
+        let c_uncompressed = proof.proof.c.into_uncompressed();
+
+        let a_x = U256::from_big_endian(& a_uncompressed.as_ref()[0..32]);
+        let a_y = U256::from_big_endian(& a_uncompressed.as_ref()[32..64]);
+
+        let b_x_0 = U256::from_big_endian(& b_uncompressed.as_ref()[0..32]);
+        let b_x_1 = U256::from_big_endian(& b_uncompressed.as_ref()[32..64]);
+        let b_y_0 = U256::from_big_endian(& b_uncompressed.as_ref()[64..92]);
+        let b_y_1 = U256::from_big_endian(& b_uncompressed.as_ref()[92..128]);
+
+
+        let c_x = U256::from_big_endian(& c_uncompressed.as_ref()[0..32]);
+        let c_y = U256::from_big_endian(& c_uncompressed.as_ref()[32..64]);
+
+        let mut root_hash_be_bytes = [0u8; 32];
+        proof.inputs[1].into_repr().write_be(& mut root_hash_be_bytes[..]).expect("get new root BE bytes");
+        let new_root = U256::from_big_endian(&root_hash_be_bytes[..]);
+
+        let mut block_number_be_bytes = [0u8; 32];
+        proof.block_number.into_repr().write_be(& mut block_number_be_bytes[..]).expect("get block number BE bytes");
+        let block_number = U256::from_big_endian(&block_number_be_bytes[..]);
+
+        let mut total_fees_be_bytes = [0u8; 32];
+        proof.total_fees.into_repr().write_be(& mut total_fees_be_bytes[..]).expect("get total fees BE bytes");
+        let total_fees = U256::from_big_endian(&total_fees_be_bytes[..]);
+
+        let public_data = Bytes::from(proof.public_data.clone());
+
+        let p = EthereumProof{
+            groth_proof: [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y],
+            new_root: new_root,
+            block_number: block_number,
+            total_fees: total_fees,
+            public_data: public_data,
+        };
+
+        Ok(p)
     }
 
 
@@ -331,10 +393,8 @@ impl Prover<Bn256> for BabyProver {
 
         let public_data_commitment = Fr::from_repr(repr).unwrap();
 
-        let params = &AltJubjubBn256::new();
-
         let instance = Update {
-            params: params,
+            params: &self.jubjub_params,
             number_of_transactions: num_txes,
             old_root: Some(initial_root),
             new_root: Some(final_root),
@@ -365,6 +425,7 @@ impl Prover<Bn256> for BabyProver {
             proof: p,
             inputs: [initial_root, final_root, public_data_commitment],
             total_fees: total_fees,
+            block_number: block_number,
             public_data: public_data,
         };
 
