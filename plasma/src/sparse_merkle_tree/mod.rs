@@ -1,8 +1,11 @@
 // Sparse Merkle tree with flexible hashing strategy
 
+pub mod alt_smt;
+pub mod parallel_smt;
 pub mod hasher;
 pub mod pedersen_hasher;
 
+use std::fmt::Debug;
 use std::collections::HashMap;
 use self::hasher::Hasher;
 use super::primitives::GetBits;
@@ -40,18 +43,18 @@ impl PackToIndex for HashIndex {
 }
 
 #[derive(Debug, Clone)]
-pub struct SparseMerkleTree<T: GetBits + Default, Hash: Clone + Eq, H: Hasher<Hash>>
+pub struct SparseMerkleTree<T: GetBits + Default, Hash: Clone + Eq + Debug, H: Hasher<Hash>>
 {
     tree_depth: Depth,
-    prehashed: Vec<Hash>,
+    pub prehashed: Vec<Hash>,
     pub items: HashMap<ItemIndex, T>,
-    hashes: HashMap<ItemIndexPacked, Hash>,
+    pub hashes: HashMap<ItemIndexPacked, Hash>,
     pub hasher: H,
 }
 
 impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
     where T: GetBits + Default,
-          Hash: Clone + Eq,
+          Hash: Clone + Eq + Debug,
           H: Hasher<Hash> + Default,
 {
 
@@ -97,6 +100,9 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
         let hash = self.hasher.hash_bits(item_bits);
         // print!("Inserting at index {}\n", index);
         // print!("Packed into index {}, {}\n", hash_index.0, hash_index.1);
+
+        //println!("hash [{}] = {:?}", (1 << hash_index.0) + hash_index.1, &hash);
+
         self.hashes.insert(hash_index.pack(), hash);
 
         self.items.insert(index, item);
@@ -133,7 +139,12 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
         let lhs_hash = self.get_hash(lhs_index);
         let rhs_hash = self.get_hash(rhs_index);
 
+        //let idx = (1 << index.0) + index.1;
+        //println!("({:?}, {:?}, {})", &lhs_hash, &rhs_hash, (self.tree_depth - 1 - index.0));
+
         let hash = self.hasher.compress(&lhs_hash, &rhs_hash, (self.tree_depth - 1 - index.0) as usize);
+
+        //println!("hash [{}] = {:?}", (1 << index.0) + index.1, hash);
 
         self.hashes.insert(index.pack(), hash.clone());
         hash
@@ -236,7 +247,8 @@ mod tests {
         }
 
         fn compress(&self, lhs: &u64, rhs: &u64, i: usize) -> u64 {
-            let r = 11 * lhs + 17 * rhs + 1;
+            let r = 11 * lhs + 17 * rhs + 1 + i as u64;
+            //println!("compress {} {}, {} => {}", lhs, rhs, i, r);
             r
         }
 
@@ -244,28 +256,32 @@ mod tests {
 
     type TestSMT = SparseMerkleTree<u64, u64, TestHasher>;
 
-    // #[test]
-    // fn test_merkle_tree_props() {
-        // let mut tree = TestSMT::new(3);
-        // assert_eq!(TestSMT::depth(1), 0);
-        // assert_eq!(TestSMT::depth(2), 1);
-        // assert_eq!(TestSMT::depth(3), 1);
-        // assert_eq!(TestSMT::depth(4), 2);
-    // }
+//     #[test]
+//     fn test_merkle_tree_props() {
+//         let mut tree = TestSMT::new(3);
+//         assert_eq!(TestSMT::depth(1), 0);
+//         assert_eq!(TestSMT::depth(2), 1);
+//         assert_eq!(TestSMT::depth(3), 1);
+//         assert_eq!(TestSMT::depth(4), 2);
+//     }
 
-    // #[test]
+    #[test]
     fn test_merkle_tree_insert() {
-        let mut tree = TestSMT::new(2);
+        let mut tree = TestSMT::new(3);
 
-        assert_eq!(tree.capacity(), 4);
+        assert_eq!(tree.capacity(), 8);
 
         tree.insert(0, 1);
-        //println!("{:?}", tree);
-        // assert_eq!(tree.root_hash(), 23707677);
+        println!("{:?}", tree);
+        assert_eq!(tree.root_hash(), 697516875);
+
+        tree.insert(0, 2);
+        println!("{:?}", tree);
+        assert_eq!(tree.root_hash(), 741131083);
 
         tree.insert(3, 2);
         //println!("{:?}", tree);
-        // assert_eq!(tree.root_hash(), 28442653);
+        assert_eq!(tree.root_hash(), 793215819);
     }
 
     #[test]
@@ -273,6 +289,7 @@ mod tests {
         let mut tree = TestSMT::new(3);
         tree.insert(2, 1);
         let path = tree.merkle_path(2);
-        assert_eq!(path, [(32768, false), (917505, true), (25690141, false)]);
+        //println!("{:?}", tree);
+        assert_eq!(path, [(32768, false), (917505, true), (25690142, false)]);
     }
 }

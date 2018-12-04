@@ -24,7 +24,7 @@ pub use self::generator::*;
 pub use self::prover::*;
 pub use self::verifier::*;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Proof<E: Engine> {
     pub a: E::G1Affine,
     pub b: E::G2Affine,

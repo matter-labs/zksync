@@ -22,12 +22,16 @@ use sapling_crypto::circuit::{
     num,
     multipack,
     baby_eddsa,
-    float_point
+    float_point,
 };
 
 use balance_tree;
 
 pub mod plasma_constants;
 pub mod baby_plasma;
+
+use self::baby_plasma::{
+    TransactionSignature,
+};
 
 mod notebook;

@@ -1,13 +1,13 @@
 // Pedersen hash implementation of the Hasher trait
 
-use ff::{Field, PrimeField, BitIterator};
+use ff::{Field, PrimeField, PrimeFieldRepr};
 use rand::{Rand, thread_rng};
 use sapling_crypto::pedersen_hash::{baby_pedersen_hash, Personalization};
 
 use pairing::bn256::Bn256;
 use sapling_crypto::alt_babyjubjub::{JubjubEngine, AltJubjubBn256, edwards::Point, PrimeOrder};
 
-use super::super::primitives::GetBitsFixed;
+use super::super::primitives::BitIteratorLe;
 use super::hasher::Hasher;
 
 pub struct PedersenHasher<E: JubjubEngine> {
@@ -24,9 +24,9 @@ impl<E: JubjubEngine> Hasher<E::Fr> for PedersenHasher<E> {
     }
 
     fn compress(&self, lhs: &E::Fr, rhs: &E::Fr, i: usize) -> E::Fr {
-        let mut input: Vec<bool> = Vec::with_capacity(2 * E::Fr::NUM_BITS as usize);
-        input.extend(lhs.get_bits_le_fixed(E::Fr::NUM_BITS as usize));
-        input.extend(rhs.get_bits_le_fixed(E::Fr::NUM_BITS as usize));
+        let lhs = BitIteratorLe::new(lhs.into_repr()).take(E::Fr::NUM_BITS as usize);
+        let rhs = BitIteratorLe::new(rhs.into_repr()).take(E::Fr::NUM_BITS as usize);
+        let input = lhs.chain(rhs);
         baby_pedersen_hash::<E, _>(Personalization::MerkleTree(i), input, &self.params).into_xy().0
     }
 

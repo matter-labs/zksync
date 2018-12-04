@@ -9,6 +9,13 @@ hex = "0.3.2"
 time = "0.1"
 num-bigint = "0.2"
 rust-crypto = "0.2"
+fnv = "1.0.3"
+
+futures = "0.1.25"
+futures-cpupool = "0.1.8"
+crossbeam = "0.5.0"
+crossbeam-utils = "0.6.1"
+rayon = "1.0.3"
 
 [dependencies.pairing]
 path = "../pairing"
