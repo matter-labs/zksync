@@ -350,10 +350,12 @@ fn main() {
     use std::fs::File;
     use std::io::{BufWriter, Write};
     {
-    let f = File::create("pk.key").expect("Unable to create file");
-    let mut f = BufWriter::new(f);
-    tmp_cirtuit_params.write(& mut f).expect("Unable to write proving key");
+        let f = File::create("pk.key").expect("Unable to create file");
+        let mut f = BufWriter::new(f);
+        tmp_cirtuit_params.write(& mut f).expect("Unable to write proving key");
     }
+
+
 
     use std::io::{BufReader};
 
@@ -362,8 +364,12 @@ fn main() {
     let circuit_params = bellman::groth16::Parameters::read(& mut r, true).expect("Unable to read proving key");
 
     let initial_root_string = format!("{}", BabyBalanceTree::new(tree_depth).root_hash().into_repr());
-    println!("{}", generate_vk_contract(&circuit_params.vk, initial_root_string.as_ref(), tree_depth));
+    let contract_content = generate_vk_contract(&circuit_params.vk, initial_root_string.as_ref(), tree_depth);
 
+    let f_cont = File::create("vk.sol").expect("Unable to create file");
+    let mut f_cont = BufWriter::new(f_cont);
+    f_cont.write_all(contract_content.as_bytes()).expect("Unable to write contract");
+    
     let pvk = prepare_verifying_key(&circuit_params.vk);
 
     let instance_for_proof = Update {
