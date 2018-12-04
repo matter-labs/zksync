@@ -1336,6 +1336,10 @@ pub mod g2 {
         pub(crate) infinity: bool,
     }
 
+    // This generator does not take a random element in Fp2
+    // and tries to increment it to be on a curve, but
+    // generates a random scalar and multiplies predefined generator by it
+
     #[test]
     fn g2_generator() {
         use SqrtField;
@@ -1362,7 +1366,7 @@ pub mod g2 {
 
                 let g2 = p.into_projective();
                 if !g2.is_zero() {
-                    assert_eq!(i, 2);
+                    assert_eq!(i, 0);
                     let g2 = G2Affine::from(g2);
 
                     assert_eq!(g2, G2Affine::one());
