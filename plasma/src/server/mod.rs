@@ -4,3 +4,4 @@ pub mod baby_prover;
 pub mod server;
 pub mod account_manager;
 pub mod eth;
+pub mod demo_server;

@@ -16,6 +16,7 @@ pub trait State<E: JubjubEngine> {
     fn root_hash(&self) -> E::Fr;
 }
 
+#[derive(Clone)]
 pub struct Tx<E: JubjubEngine> {
     pub from:               E::Fr,
     pub to:                 E::Fr,

@@ -9,7 +9,7 @@ use super::super::circuit::plasma_constants;
 use super::super::balance_tree;
 use super::super::circuit::utils::be_bit_vector_into_bytes;
 use super::super::circuit::baby_plasma::{Update, Transaction, TransactionWitness};
-use super::super::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum};
+use super::super::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum, field_element_to_u32};
 
 use sapling_crypto::circuit::float_point::parse_float_to_u128;
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
@@ -84,22 +84,6 @@ pub struct FullBabyProof {
 
 type BabyProof = Proof<Bn256>;
 type BabyParameters = Parameters<Bn256>;
-
-fn field_element_to_u32<P: PrimeField>(fr: P) -> u32 {
-    let mut iterator: Vec<bool> = BitIterator::new(fr.into_repr()).collect();
-    iterator.reverse();
-    iterator.truncate(32);
-    let mut res = 0u32;
-    let mut base = 1u32;
-    for bit in iterator {
-        if bit {
-            res += base;
-        }
-        base = base << 1;
-    }
-
-    res
-}
 
 const TX_BATCH_SIZE: usize = 8;
 

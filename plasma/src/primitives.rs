@@ -30,6 +30,38 @@ use ff::{ScalarEngine};
 use pairing::{Engine, CurveAffine};
 use pairing::bn256::{Bn256, G1Uncompressed, G2Uncompressed};
 
+pub fn field_element_to_u32<P: PrimeField>(fr: P) -> u32 {
+    let mut iterator: Vec<bool> = BitIterator::new(fr.into_repr()).collect();
+    iterator.reverse();
+    iterator.truncate(32);
+    let mut res = 0u32;
+    let mut base = 1u32;
+    for bit in iterator {
+        if bit {
+            res += base;
+        }
+        base = base << 1;
+    }
+
+    res
+}
+
+pub fn field_element_to_u128<P: PrimeField>(fr: P) -> u128 {
+    let mut iterator: Vec<bool> = BitIterator::new(fr.into_repr()).collect();
+    iterator.reverse();
+    iterator.truncate(128);
+    let mut res = 0u128;
+    let mut base = 1u128;
+    for bit in iterator {
+        if bit {
+            res += base;
+        }
+        base = base << 1;
+    }
+
+    res
+}
+
 pub fn serialize_g1_for_ethereum(point: <Bn256 as Engine>::G1Affine) -> (U256, U256) {
         let uncompressed = point.into_uncompressed();
 
