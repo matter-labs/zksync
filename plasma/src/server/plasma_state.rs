@@ -7,6 +7,15 @@ use ff::{PrimeField, PrimeFieldRepr, BitIterator};
 use super::super::circuit::plasma_constants;
 use super::super::balance_tree;
 use super::super::circuit::baby_plasma::TransactionSignature;
+use sapling_crypto::eddsa::{PrivateKey, PublicKey};
+use sapling_crypto::jubjub::{
+    FixedGenerators,
+    Unknown,
+    edwards,
+    JubjubParams
+};
+
+use super::super::circuit::utils::{le_bit_vector_into_field_element};
 
 pub type Account<E> = balance_tree::Leaf<E>;
 
@@ -81,6 +90,80 @@ impl <E: JubjubEngine> Tx<E> {
         packed.extend(good_until_block.into_iter());
 
         packed
+    }
+
+    pub fn data_as_bytes(
+        & self
+    ) -> Vec<u8> {
+        let raw_data: Vec<bool> = self.data_for_signature_into_bits();
+
+        let mut message_bytes: Vec<u8> = vec![];
+
+        let byte_chunks = raw_data.chunks(8);
+        for byte_chunk in byte_chunks
+        {
+            let mut byte = 0u8;
+            for (i, bit) in byte_chunk.into_iter().enumerate()
+            {
+                if *bit {
+                    byte |= 1 << i;
+                }
+            }
+            message_bytes.push(byte);
+        }
+
+        message_bytes
+    }
+
+    pub fn sign<R>(
+        & mut self,
+        private_key: &PrivateKey<E>,
+        p_g: FixedGenerators,
+        params: &E::Params,
+        rng: & mut R
+    ) where R: rand::Rng {
+
+        let message_bytes = self.data_as_bytes();
+
+        let max_message_len = *plasma_constants::BALANCE_TREE_DEPTH 
+                        + *plasma_constants::BALANCE_TREE_DEPTH 
+                        + *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH 
+                        + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH
+                        + *plasma_constants::FEE_EXPONENT_BIT_WIDTH
+                        + *plasma_constants::FEE_MANTISSA_BIT_WIDTH
+                        + *plasma_constants::NONCE_BIT_WIDTH
+                        + *plasma_constants::BLOCK_NUMBER_BIT_WIDTH;
+        
+        let signature = private_key.sign_raw_message(
+            &message_bytes, 
+            rng, 
+            p_g, 
+            params,
+            max_message_len / 8
+        );
+
+        let pk = PublicKey::from_private(&private_key, p_g, params);
+        let is_valid_signature = pk.verify_for_raw_message(&message_bytes, 
+                                        &signature.clone(), 
+                                        p_g, 
+                                        params, 
+                                        max_message_len/8);
+        if !is_valid_signature {
+            return;
+        }
+
+        let mut sigs_le_bits: Vec<bool> = BitIterator::new(signature.s.into_repr()).collect();
+        sigs_le_bits.reverse();
+
+        let sigs_converted = le_bit_vector_into_field_element(&sigs_le_bits);
+
+        let converted_signature = TransactionSignature {
+            r: signature.r,
+            s: sigs_converted
+        };
+
+        self.signature = converted_signature;
+
     }
 }
 

@@ -58,19 +58,19 @@ impl fmt::Display for BabyProverErr {
 }
 
 pub struct BabyProver {
-    batch_size: usize,
-    accounts_tree: balance_tree::BabyBalanceTree,
-    parameters: BabyParameters,
-    jubjub_params: AltJubjubBn256,
+    pub batch_size: usize,
+    pub accounts_tree: balance_tree::BabyBalanceTree,
+    pub parameters: BabyParameters,
+    pub jubjub_params: AltJubjubBn256,
 }
 
 #[derive(Debug, Clone)]
 pub struct EthereumProof {
-    groth_proof: [U256; 8],
-    new_root: U256,
-    block_number: U256,
-    total_fees: U256,
-    public_data: Bytes,
+    pub groth_proof: [U256; 8],
+    pub new_root: U256,
+    pub block_number: U256,
+    pub total_fees: U256,
+    pub public_data: Bytes,
 }
 
 #[derive(Debug)]

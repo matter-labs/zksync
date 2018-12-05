@@ -2,47 +2,57 @@ use super::super::plasma_state::{State, Account, Tx};
 use super::super::super::balance_tree::BabyBalanceTree;
 use super::super::super::primitives::{field_element_to_u32, field_element_to_u128};
 use pairing::bn256::{Bn256, Fr};
-use sapling_crypto::jubjub::JubjubEngine;
+use sapling_crypto::jubjub::{JubjubEngine, edwards, Unknown, FixedGenerators};
+use sapling_crypto::circuit::float_point::{convert_to_float};
+use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
+use super::super::super::circuit::plasma_constants;
+use super::super::super::circuit::baby_plasma::{TransactionSignature};
+use super::super::super::circuit::utils::{le_bit_vector_into_field_element};
 use std::sync::mpsc;
 use std::{thread, time};
 use std::collections::HashMap;
+use ff::{Field, PrimeField};
+use rand::{OsRng, Rng};
+use sapling_crypto::eddsa::{PrivateKey, PublicKey};
+use super::super::plasma_state::{Block};
 
+#[derive(Debug, Clone)]
 pub struct TxInfo{
-    from: u32,
-    to: u32,
-    amount: u128,
-    fee: u128,
-    nonce: u32,
-    good_until_block: u32
+    pub from: u32,
+    pub to: u32,
+    pub amount: u128,
+    pub fee: u128,
+    pub nonce: u32,
+    pub good_until_block: u32
 }
 
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
 
     /// Accounts stored in a sparse Merkle tree
-    balance_tree: BabyBalanceTree,
+    pub balance_tree: BabyBalanceTree,
     // balance_tree: ParallelBalanceTree,
 
     /// Current block number
-    block_number: u32,
+    pub block_number: u32,
 
     /// Cache of the current root hash
-    root_hash:    Fr,
+    pub root_hash:    Fr,
 
     /// channel to receive signed and verified transactions to apply
-    transactions_channel: mpsc::Receiver<(TxInfo, mpsc::Sender<bool>)>,
+    pub transactions_channel: mpsc::Receiver<(TxInfo, mpsc::Sender<bool>)>,
 
     // outgoing channel
-    batch_channel: mpsc::Sender<(Fr, Vec<Tx<Bn256>>)>,
+    pub batch_channel: mpsc::Sender<Block<Bn256>>,
 
     // Batch size
-    batch_size : usize,
+    pub batch_size : usize,
 
     // Accumulated transactions
-    current_batch: Vec<Tx<Bn256>>,
+    pub current_batch: Vec<Tx<Bn256>>,
 
     // Keep private keys in memory
-    private_keys: HashMap<u32, <Bn256 as JubjubEngine>::Fs>
+    pub private_keys: HashMap<u32, PrivateKey<Bn256>>
 }
 
 impl State<Bn256> for PlasmaStateKeeper {
@@ -62,7 +72,7 @@ impl State<Bn256> for PlasmaStateKeeper {
 
 impl PlasmaStateKeeper{
 
-    fn run(& mut self) {
+    pub fn run(& mut self) {
         loop {
             let message = self.transactions_channel.try_recv();
             if message.is_err() {
@@ -70,6 +80,7 @@ impl PlasmaStateKeeper{
                 continue;
             }
             let (tx, return_channel) = message.unwrap();
+            println!("Got transaction!");
             self.apply_transaction(tx, return_channel);
         }
     }
@@ -81,12 +92,21 @@ impl PlasmaStateKeeper{
                 return;
             }
         }
+
+        let mut new_sender_leaf = None;
+        let mut new_recipient_leaf = None;
+
+        let from = transaction.from;
+        let to = transaction.to;
+
         {
-            let from = transaction.from;
+            let block_number = self.block_number;
 
-            let mut items = &self.balance_tree.items;
+            let tree = & mut self.balance_tree;
 
-            let current_account_state = items.get(&from);
+            // let mut items = tree.items;
+
+            let current_account_state = tree.items.get(&from);
             if current_account_state.is_none() {
                 return_channel.send(false);
                 return;
@@ -94,32 +114,100 @@ impl PlasmaStateKeeper{
 
             let mut current_account_state = current_account_state.unwrap().clone();
 
-            let pub_x = current_account_state.pub_x;
-            let pub_y = current_account_state.pub_y;
-
             let current_balance = current_account_state.balance;
             let current_nonce = current_account_state.nonce;
 
             let balance_as_u128 = field_element_to_u128(current_balance);
             let nonce_as_u32 = field_element_to_u32(current_nonce);
 
-            if transaction.nonce != nonce_as_u32 {
-                return_channel.send(false);
-                return;
-            }
+            // if transaction.nonce != nonce_as_u32 {
+            //     return_channel.send(false);
+            //     return;
+            // }
 
             if balance_as_u128 < transaction.amount {
                 return_channel.send(false);
                 return;
             }
 
+            let encoded_amount_bits = convert_to_float(transaction.amount,
+                *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH, 
+                *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH, 
+                10
+            );
+
+            if encoded_amount_bits.is_err() {
+                return_channel.send(false);
+                return;
+            }
+
+            let encoded_amount: Fr = le_bit_vector_into_field_element(&encoded_amount_bits.unwrap());
+            let encoded_fee = Fr::zero();
+
             // Will make a well-formed Tx by convering to field elements and making a signature
+
+            let empty_point: edwards::Point<Bn256, Unknown> = edwards::Point::zero();
+
+            let empty_signature = TransactionSignature{
+                r: empty_point,
+                s: Fr::zero()
+            };
+
+            let mut tx = Tx{
+                from:               Fr::from_str(&from.to_string()).unwrap(),
+                to:                 Fr::from_str(&to.to_string()).unwrap(),
+                amount:             encoded_amount,
+                fee:                encoded_fee,
+                nonce:              current_nonce,
+                good_until_block:   Fr::from_str(&block_number.to_string()).unwrap(),
+                signature:          empty_signature,
+            };
+
+            let params = &AltJubjubBn256::new();
+            let p_g = FixedGenerators::SpendingKeyGenerator;
+            let mut rng = OsRng::new().unwrap();
+
+            let sk = self.private_keys.get(& from).unwrap();
+
+            tx.sign(sk, p_g, &params, & mut rng);
+
+
+            let current_recipient_state = tree.items.get(&to);
+            if current_recipient_state.is_none() {
+                return_channel.send(false);
+                return;
+            }
+
+            let mut current_recipient_state = current_recipient_state.unwrap().clone();
+
+            let transfer_amount_as_field_element = Fr::from_str(&transaction.amount.to_string()).unwrap();
+            current_account_state.balance.sub_assign(&transfer_amount_as_field_element);
+            current_account_state.nonce.add_assign(&Fr::one());
+
+            current_recipient_state.balance.add_assign(&transfer_amount_as_field_element);
+
+            self.current_batch.push(tx);
+
+            new_sender_leaf = Some(current_account_state.clone());
+            new_recipient_leaf = Some(current_account_state.clone());
+
         }
+
+        self.balance_tree.insert(from, new_sender_leaf.unwrap());
+        self.balance_tree.insert(to, new_recipient_leaf.unwrap());
+
+        println!("Accepted transaction");
 
         if self.current_batch.len() == self.batch_size {
             {
                 let batch = &self.current_batch;
-                self.batch_channel.send((self.root_hash, batch.to_vec()));
+                let new_root = self.root_hash();
+                let block: Block<Bn256> = Block {
+                    block_number:   self.block_number,
+                    transactions:   batch.to_vec(),
+                    new_root_hash:  new_root,
+                };
+                self.batch_channel.send(block);
             }
             self.current_batch = Vec::with_capacity(self.batch_size);
         }

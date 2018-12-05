@@ -341,6 +341,17 @@ fn main() {
         transactions: witnesses.clone(),
     };
 
+    // let instance_for_generation: Update<Bn256> = Update {
+    //     params: params,
+    //     number_of_transactions: TXES_TO_TEST,
+    //     old_root: None,
+    //     new_root: None,
+    //     public_data_commitment: None,
+    //     block_number: None,
+    //     total_fee: None,
+    //     transactions: vec![None; TXES_TO_TEST],
+    // };
+
     println!("generating setup...");
     let start = PreciseTime::now();
     let tmp_cirtuit_params = generate_random_parameters(instance_for_generation, rng).unwrap();
