@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use rustc_hex::FromHex;
 
-use web3::futures::{Future, Stream};
+use web3::futures::{Future};
 use web3::contract::{Contract, Options, CallFuture};
 use web3::types::{Address, U256, H256, U128, Bytes};
 use web3::transports::{EventLoopHandle, Http};
@@ -71,7 +71,7 @@ impl Client {
             .unwrap()
             .confirmations(0)
             .options(Options::with(|opt| {
-                opt.gas = Some(7000_000.into())
+                opt.gas = Some(6000_000.into())
             }))
             .execute(bytecode, (), my_account,
             )
@@ -117,7 +117,7 @@ impl Client {
         block_num: U32, 
         total_fees: U128, 
         tx_data_packed: Vec<u8>, 
-        new_root: H256) -> Result<H256, web3::contract::Error>
+        new_root: H256) -> impl Future<Item = H256, Error = web3::contract::Error>
     {
         self.contract
             .call("commitBlock", 
@@ -129,14 +129,14 @@ impl Client {
             .then(|tx| {
                 println!("got tx: {:?}", tx);
                 tx
-            }).wait()
+            })
     }
 
     /// Returns tx hash
     pub fn verify_block(
         &self, 
         block_num: U32, 
-        proof: [U256; 8]) -> Result<H256, web3::contract::Error>
+        proof: [U256; 8]) -> impl Future<Item = H256, Error = web3::contract::Error>
     {
         self.contract
             .call("verifyBlock", 
@@ -148,7 +148,7 @@ impl Client {
             .then(|tx| {
                 println!("got tx: {:?}", tx);
                 tx
-            }).wait()
+            })
     }
 
     pub fn sign(&self) {
@@ -174,9 +174,9 @@ fn test_web3() {
     let proof: [U256; 8] = [U256::zero(); 8];
 
     println!("committing block...");
-    assert!(client.commit_block(block_num, total_fees, tx_data_packed, new_root).is_ok());
+    assert!(client.commit_block(block_num, total_fees, tx_data_packed, new_root).wait().is_ok());
     println!("verifying block...");
-    assert!(client.verify_block(block_num, proof).is_ok());
+    assert!(client.verify_block(block_num, proof).wait().is_ok());
 }
 
 #[test]
