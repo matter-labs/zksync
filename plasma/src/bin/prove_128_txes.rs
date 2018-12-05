@@ -246,8 +246,6 @@ fn main() {
 
     let bytes_to_hash = be_bit_vector_into_bytes(&public_data_initial_bits);
 
-    println!("Public data size for Ethereum smart contract call = {}", bytes_to_hash.len());
-
     h.input(&bytes_to_hash);
 
     let mut hash_result = [0u8; 32];
@@ -255,6 +253,8 @@ fn main() {
 
     {    
         let packed_transaction_data_bytes = be_bit_vector_into_bytes(&public_data_vector);
+
+        println!("Public data size for Ethereum smart contract call = {}", packed_transaction_data_bytes.len());
 
         let mut next_round_hash_bytes = vec![];
         next_round_hash_bytes.extend(hash_result.iter());
