@@ -5,7 +5,10 @@ use super::rest_api::APIServer;
 
 // Account manager API methods
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
 pub enum APICall {
+
+    Phony,
 
     Register{
         username: String,
@@ -19,20 +22,8 @@ pub enum APICall {
 
 }
 
-pub trait APIHandler: Send + Sync {
-    fn handle(&self, call: APICall);
-}
-
 /// Interface for interaction with users
 pub struct AccountManager {
-
-}
-
-impl APIHandler for AccountManager {
-
-    fn handle(&self, call: APICall) {
-        println!("called {:?}", &call);
-    }
 
 }
 
@@ -43,5 +34,16 @@ impl AccountManager {
         APIServer::new(&this);
         this
     }
+
+    pub fn handle(&self, call: APICall) {
+        println!("called {:?}", &call);
+    }
 }
 
+
+#[test]
+fn test_account_manager() {
+    let man = AccountManager::new();
+    
+    
+}
