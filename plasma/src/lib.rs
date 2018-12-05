@@ -22,6 +22,13 @@ extern crate ethkey;
 extern crate rustc_hex;
 extern crate web3;
 
+extern crate hyper;
+extern crate serde;
+extern crate serde_json;
+
+#[macro_use]
+extern crate serde_derive;
+
 pub mod primitives;
 pub mod sparse_merkle_tree;
 pub mod balance_tree;
