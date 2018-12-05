@@ -355,8 +355,6 @@ fn main() {
         tmp_cirtuit_params.write(& mut f).expect("Unable to write proving key");
     }
 
-
-
     use std::io::{BufReader};
 
     let f_r = File::open("pk.key").expect("Unable to open file");
