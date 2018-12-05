@@ -223,3 +223,61 @@ fn test_abi() {
         r
     }).wait();
 }
+
+use reqwest::header::{CONTENT_TYPE};
+use std::collections::HashMap;
+
+#[derive(Serialize, Deserialize, Debug)]
+struct InfuraRequest {
+    jsonrpc:    &'static str,
+    method:     &'static str,
+    params:     Vec<&'static str>,
+    id:         &'static str,
+}
+
+fn query_params() -> Result<(), reqwest::Error> {
+
+    let infura_id = env::var("INFURA_PROJECT_ID").expect("`INFURA_PROJECT_ID` env var must be set");
+
+    let map = InfuraRequest {
+        jsonrpc:    "2.0",
+        method:     "eth_getTransactionCount",
+        params:     vec!("0xc94770007dda54cF92009BFF0dE90c06F603a09f", "latest"),
+        id:         "1",
+    };
+
+    // let mut map = HashMap::new();
+    // map.insert("jsonrpc", "2.0");
+    // map.insert("method", "eth_getTransactionCount");
+    // map.insert("params", vec!("0xc94770007dda54cF92009BFF0dE90c06F603a09f", "latest"));
+    // map.insert("id", "1");
+
+    let client = reqwest::Client::new();
+    let url = format!("https://mainnet.infura.io/v3/{}", infura_id);
+    let res = client.post(url.as_str())
+        .header(CONTENT_TYPE, "application/json")
+        .json(&map)
+        .send()?;
+
+    println!("{:?}", res);
+    Ok(())
+}
+
+#[test]
+fn test_infura() {
+
+
+    let r = query_params();
+
+/*    let body = {
+        reqwest::get(format!(r#"curl https://mainnet.infura.io/v3/{} \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"jsonrpc":"2.0","method":"eth_getTransactionCount","params": ["0xc94770007dda54cF92009BFF0dE90c06F603a09f", "latest"],"id":1}'"#, 
+            infura_id)).unwrap()
+            .text().unwrap()
+    };
+*/
+
+    println!("body = {:?}", r);
+}
