@@ -1,9 +1,14 @@
+use std::env;
+use std::str::FromStr;
+
 use rustc_hex::FromHex;
 
-use web3::futures::{Future, Stream};
+use web3::futures::{Future};
 use web3::contract::{Contract, Options, CallFuture};
 use web3::types::{Address, U256, H256, U128, Bytes};
 use web3::transports::{EventLoopHandle, Http};
+
+use ethkey::{Secret, KeyPair};
 
 pub struct Client {
     event_loop: EventLoopHandle,
@@ -26,11 +31,28 @@ pub const PROD_PLASMA: ABI = (
     include_str!("../../contracts/bin/contracts_Plasma_sol_Plasma.bin"),
 );
 
+// enum Mode {
+//     Infura(usize),
+//     Local
+// }
+
 // all methods are blocking and panic on error for now
 impl Client {
 
     pub fn new(contract_abi: ABI) -> Self {
-        // TODO: check env vars to decide local/testnet/live
+
+        // let mode = match env::var("ETH_NETWORK") {
+        //     Ok(ref net) if net == "mainnet" => Mode::Infura(1),
+        //     Ok(ref net) if net == "rinkeby" => Mode::Infura(4),
+        //     Ok(ref net) if net == "ropsten" => Mode::Infura(43),
+        //     Ok(ref net) if net == "kovan"   => Mode::Infura(42),
+        //     _ => Mode::Local,
+        // };
+        // match mode {
+        //     Mode::Local => Self::new_local(contract_abi),
+        //     Mode::Infura(_) => Self::new_infura(contract_abi),
+        // }
+
         Self::new_local(contract_abi)
     }
 
@@ -42,28 +64,38 @@ impl Client {
         let accounts = web3.eth().accounts().wait().unwrap();
         let my_account = accounts[0];
 
-        // Get the contract bytecode for instance from Solidity compiler
-        let bytecode: Vec<u8> = contract_abi.1.from_hex().unwrap();
+        let contract = if let Ok(addr) = env::var("CONTRACT_ADDR") {
+             let contract_address = addr.parse().unwrap();
+             Contract::from_json(
+                 web3.eth(),
+                 contract_address,
+                 contract_abi.0,
+             ).unwrap()
+        } else {
+            // Get the contract bytecode for instance from Solidity compiler
+            let bytecode: Vec<u8> = contract_abi.1.from_hex().unwrap();
 
-        // Deploying a contract
-        let contract = Contract::deploy(web3.eth(), contract_abi.0)
-            .unwrap()
-            .confirmations(0)
-            .options(Options::with(|opt| {
-                opt.gas = Some(7000_000.into())
-            }))
-            .execute(bytecode, (), my_account,
-            )
-            .expect("Correct parameters are passed to the constructor.")
-            .wait()
-            .unwrap();
-        
+            // Deploying a contract
+            Contract::deploy(web3.eth(), contract_abi.0)
+                .unwrap()
+                .confirmations(0)
+                .options(Options::with(|opt| {
+                    opt.gas = Some(6000_000.into())
+                }))
+                .execute(bytecode, (), my_account,
+                )
+                .expect("Correct parameters are passed to the constructor.")
+                .wait()
+                .unwrap()
+        };
+
         //println!("contract: {:?}", contract);
  
         Self{event_loop, web3, contract, my_account}
     }
 
-    fn new_testnet() -> Self {
+    fn new_infura(contract_abi: ABI) -> Self {
+
         unimplemented!()
 
         // TODO: change to infura
@@ -87,7 +119,7 @@ impl Client {
         block_num: U32, 
         total_fees: U128, 
         tx_data_packed: Vec<u8>, 
-        new_root: H256) -> Result<H256, web3::contract::Error>
+        new_root: H256) -> impl Future<Item = H256, Error = web3::contract::Error>
     {
         self.contract
             .call("commitBlock", 
@@ -99,14 +131,14 @@ impl Client {
             .then(|tx| {
                 println!("got tx: {:?}", tx);
                 tx
-            }).wait()
+            })
     }
 
     /// Returns tx hash
     pub fn verify_block(
         &self, 
         block_num: U32, 
-        proof: [U256; 8]) -> Result<H256, web3::contract::Error>
+        proof: [U256; 8]) -> impl Future<Item = H256, Error = web3::contract::Error>
     {
         self.contract
             .call("verifyBlock", 
@@ -118,7 +150,16 @@ impl Client {
             .then(|tx| {
                 println!("got tx: {:?}", tx);
                 tx
-            }).wait()
+            })
+    }
+
+    pub fn sign(&self) {
+        const SECRET: &str = "17d08f5fe8c77af811caa0c9a187e668ce3b74a99acc3f6d976f075f16ae0911";
+        let secret = Secret::from_str(SECRET).unwrap();
+        let keypair = KeyPair::from_secret(secret).unwrap();
+
+        println!("{:?}", keypair.address());
+        //self.web3.eth().
     }
 }
 
@@ -135,7 +176,15 @@ fn test_web3() {
     let proof: [U256; 8] = [U256::zero(); 8];
 
     println!("committing block...");
-    assert!(client.commit_block(block_num, total_fees, tx_data_packed, new_root).is_ok());
+    assert!(client.commit_block(block_num, total_fees, tx_data_packed, new_root).wait().is_ok());
     println!("verifying block...");
-    assert!(client.verify_block(block_num, proof).is_ok());
+    assert!(client.verify_block(block_num, proof).wait().is_ok());
+}
+
+#[test]
+fn test_sign() {
+
+    let client = Client::new(TEST_PLASMA_ALWAYS_VERIFY);
+    client.sign();
+
 }
