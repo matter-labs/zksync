@@ -3,3 +3,4 @@ pub mod prover;
 pub mod baby_prover;
 pub mod server;
 pub mod web;
+pub mod eth;

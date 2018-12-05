@@ -7,7 +7,7 @@ use super::plasma_state;
 use super::super::circuit::plasma_constants;
 
 use super::super::sparse_merkle_tree::{parallel_smt, pedersen_hasher::PedersenHasher};
-use super::super::eth;
+use super::eth;
 
 type Account = plasma_state::Account<Bn256>;
 type Block = plasma_state::Block<Bn256>;

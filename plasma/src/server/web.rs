@@ -12,32 +12,6 @@ use hyper::{Body, Chunk, Client, Method, Request, Response, Server, StatusCode, 
 /// and extend with more types. Advanced users could switch to `Either`.
 type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
 
-
-// // Convert to uppercase before sending back to client.
-// (&Method::POST, "/echo/uppercase") => {
-//     let mapping = req.into_body().map(|chunk| {
-//         chunk
-//             .iter()
-//             .map(|byte| byte.to_ascii_uppercase())
-//             .collect::<Vec<u8>>()
-//     });
-
-//     *response.body_mut() = Body::wrap_stream(mapping);
-// }
-
-// // Reverse the entire body before sending back to the client.
-// //
-// // Since we don't know the end yet, we can't simply stream
-// // the chunks as they arrive. So, this returns a different
-// // future, waiting on concatenating the full body, so that
-// // it can be reversed. Only then can we return a `Response`.
-// (&Method::POST, "/echo/reversed") => {
-//     let reversed = req.into_body().concat2().map(move |chunk| {
-//         let body = chunk.iter().rev().cloned().collect::<Vec<u8>>();
-//         *response.body_mut() = Body::from(body);
-//         response
-//     });
-
 #[derive(Serialize, Deserialize, Debug)]
 struct Params {
     username: String,
