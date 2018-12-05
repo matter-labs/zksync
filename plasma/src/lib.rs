@@ -15,6 +15,7 @@ extern crate futures_cpupool;
 extern crate crossbeam;
 extern crate crossbeam_utils;
 extern crate rayon;
+extern crate tokio;
 
 extern crate ethereum_types;
 extern crate ethabi;

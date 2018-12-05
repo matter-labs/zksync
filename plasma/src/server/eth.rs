@@ -10,7 +10,7 @@ use web3::transports::{EventLoopHandle, Http};
 
 use ethkey::{Secret, KeyPair};
 
-pub struct Client {
+pub struct ETHClient {
     event_loop: EventLoopHandle,
     web3:       web3::Web3<Http>,
     contract:   Contract<Http>,
@@ -37,7 +37,7 @@ pub const PROD_PLASMA: ABI = (
 // }
 
 // all methods are blocking and panic on error for now
-impl Client {
+impl ETHClient {
 
     pub fn new(contract_abi: ABI) -> Self {
 
@@ -91,7 +91,7 @@ impl Client {
 
         //println!("contract: {:?}", contract);
  
-        Self{event_loop, web3, contract, my_account}
+        ETHClient{event_loop, web3, contract, my_account}
     }
 
     fn new_infura(contract_abi: ABI) -> Self {
