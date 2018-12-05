@@ -7,7 +7,8 @@ use super::plasma_state;
 use super::super::circuit::plasma_constants;
 
 use super::super::sparse_merkle_tree::{parallel_smt, pedersen_hasher::PedersenHasher};
-use super::eth;
+
+use super::{eth, eth::ETHClient, account_manager::AccountManager};
 
 type Account = plasma_state::Account<Bn256>;
 type Block = plasma_state::Block<Bn256>;
@@ -27,9 +28,9 @@ pub struct PlasmaServer {
     root_hash:    Fr,
 
     /// ETH web3 client
-    eth:          eth::Client,
+    eth:          ETHClient,
 
-    // TODO: add web server
+    account_manager: AccountManager,
 }
 
 impl plasma_state::State<Bn256> for PlasmaServer {
@@ -52,8 +53,10 @@ impl PlasmaServer {
     /// Create new plasma server
     pub fn new() -> Self {
 
-        // This is blocking and requires active ETH node
-        let eth = eth::Client::new(eth::PROD_PLASMA);
+        // This is blocking and requires an active ETH node
+        let eth = ETHClient::new(eth::PROD_PLASMA);
+
+        let account_manager = AccountManager::new();
 
         let mut balance_tree = ParallelBalanceTree::new(*plasma_constants::BALANCE_TREE_DEPTH);
 
@@ -64,9 +67,12 @@ impl PlasmaServer {
 
         Self{
             block_number: 0, // we start with block zero
-            eth, 
             balance_tree,
             root_hash,
+
+            // services
+            eth, 
+            account_manager
         }
     }
 
