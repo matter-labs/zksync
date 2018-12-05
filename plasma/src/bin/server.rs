@@ -10,7 +10,7 @@ use plasma::server::account_manager::AccountManager;
 fn main() {
     println!("starting the server");
     tokio::run(lazy( || {
-        let man = AccountManager::new();
+        let _acc_man = AccountManager::new();
         future::ok(())
     }));
 }

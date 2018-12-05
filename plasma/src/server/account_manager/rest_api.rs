@@ -9,22 +9,28 @@ use hyper::rt::{Future, Stream};
 use hyper::service::service_fn;
 use hyper::{Body, Chunk, Client, Method, Request, Response, Server, StatusCode, header};
 
-use super::account_manager::{APICall, AccountManager};
+use super::account_manager::{APICall, AccountHandler};
 
-pub struct APIServer {
-    handler: Arc<AccountManager>
+// pub trait APIHandler<C> {
+//     fn handle(call: C);
+// }
+
+pub struct APIServer 
+//    where H: APIHandler<_> + Send + Sync + 'static
+{
+    handler: Arc<AccountHandler>
 }
 
 type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
 
-impl APIServer {
+impl APIServer
+//    where H: APIHandler<C> + Send + Sync + 'static
+{
 
     /// Create web server and start listening in a separate thread with thread-pool for incoming connections
-    pub fn new(handler: &Arc<AccountManager>) -> Self {
-        let this = Self{
-            handler: Arc::clone(handler)
-        };
-
+    pub fn new(handler: Arc<AccountHandler>) -> Self {
+        let this = Self{ handler };
+        
         let handler = Arc::clone(&this.handler);
 
         let server = future::lazy(move || {
@@ -53,7 +59,7 @@ impl APIServer {
  
     }
 
-    fn router(req: Request<Body>, handler: Arc<AccountManager>) -> BoxFut {
+    fn router(req: Request<Body>, handler: Arc<AccountHandler>) -> BoxFut {
         let mut response = Response::builder()
                         .header(header::CONTENT_TYPE, "application/json")
                         .body(Body::empty())
