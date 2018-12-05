@@ -59,6 +59,7 @@ impl APIServer {
                         .body(Body::empty())
                         .unwrap();
 
+        println!("new req {:?}", &req);
         match (req.method(), req.uri().path()) {
 
             (&Method::GET, "/phony") => {
@@ -160,11 +161,11 @@ fn test_web_srv() {
 
     //let rt = Runtime::new().unwrap();
         
-    tokio::run(lazy( || {
-        let man = AccountManager::new();
-        std::thread::sleep(std::time::Duration::from_secs(9999));
-        future::ok(())
-    }));
+    // tokio::run(lazy( || {
+    //     let man = AccountManager::new();
+    //     std::thread::sleep(std::time::Duration::from_secs(9999));
+    //     future::ok(())
+    // }));
 
     // let addr = ([127, 0, 0, 1], 3000).into();
 
