@@ -1,11 +1,11 @@
 use std::env;
 use std::str::FromStr;
 
-use rustc_hex::FromHex;
+use rustc_hex::{FromHex};
 
 use web3::futures::{Future};
 use web3::contract::{Contract, Options, CallFuture};
-use web3::types::{Address, U256, H256, U128, Bytes};
+use web3::types::{Address, U256, H160, H256, U128, Bytes};
 use web3::transports::{EventLoopHandle, Http};
 
 pub struct ETHClient {
@@ -192,7 +192,7 @@ fn test_abi() {
     let c = ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap();
     let f = c.function("commitBlock").unwrap();
     
-    let block_num: u64 = 77;
+    let block_num: U32 = 0;
     let total_fees: U128 = U128::from_dec_str("200").unwrap();
     let tx_data_packed: Vec<u8> = vec![];
     let new_root: H256 = H256::from_str("a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0").unwrap();
@@ -200,19 +200,26 @@ fn test_abi() {
     let data = f.encode_input( &(block_num, total_fees, tx_data_packed, new_root).into_tokens() ).unwrap();
 
     let tx = RawTransaction{
-        nonce:      U256::from_dec_str("2").unwrap(),
-        to:         None,
-        value:      U256::from_dec_str("1000000").unwrap(),
-        gas_price:  U256::from_dec_str("10000000000").unwrap(),
-        gas:        U256::from_dec_str("10000000").unwrap(),
+        nonce:      U256::from_dec_str("3").unwrap(),
+        to:         Some(H160::from_str("78630527A240340Ce9ba25f0e3CBA815afB4D138").unwrap()),
+        value:      U256::from_dec_str("0").unwrap(),
+        gas_price:  U256::from_dec_str("9000000000").unwrap(),
+        gas:        U256::from_dec_str("1000000").unwrap(),
         data:       data.clone(),
     };
 
-    let pkey = H256::from_str("a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0").unwrap();
+    let pkey = H256::from_str("90fc60c0a06f4fc50153f240f8715a72cbb9e92465c40aee843e0faceba92136").unwrap();
     let sig = tx.sign(&pkey);
 
     println!("data: {:?}", data);
     println!("tx: {:?}", tx);
-    println!("sig: {:?}", sig);
+    println!("sig: {:?}", hex::encode(&sig));
 
+    let (event_loop, transport) = Http::new("http://localhost:8545").unwrap();
+    let web3 = web3::Web3::new(transport);
+
+    web3.eth().send_raw_transaction(Bytes::from(sig)).then(|r| {
+        println!("{:#?}", r); 
+        r
+    }).wait();
 }
