@@ -94,6 +94,7 @@ fn test_run_server() {
     ::std::env::set_var("RUST_LOG", "actix_web=info");
     let sys = actix::System::new("ws-example");
 
+    // here we should insert default accounts into the tree
     let tree = BabyBalanceTree::new(24);
     let root = tree.root_hash();
     let keys_map = HashMap::<u32,PrivateKey<Bn256>>::new();
@@ -144,7 +145,9 @@ fn test_run_server() {
             tx_for_proofs.send(full_proof);
         }
     });
-    
+
+    // TODO: take rs_for_tx_data and re_for_proofs and use it in separate loop for ethereum commitments
+
     //move is necessary to give closure below ownership
     server::new(move || {
         App::with_state(AppState {
