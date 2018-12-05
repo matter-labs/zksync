@@ -1,9 +1,14 @@
+use std::env;
+use std::str::FromStr;
+
 use rustc_hex::FromHex;
 
 use web3::futures::{Future, Stream};
 use web3::contract::{Contract, Options, CallFuture};
 use web3::types::{Address, U256, H256, U128, Bytes};
 use web3::transports::{EventLoopHandle, Http};
+
+use ethkey::{Secret, KeyPair};
 
 pub struct Client {
     event_loop: EventLoopHandle,
@@ -26,12 +31,28 @@ pub const PROD_PLASMA: ABI = (
     include_str!("../../contracts/bin/contracts_Plasma_sol_Plasma.bin"),
 );
 
+enum Mode {
+    Infura(usize),
+    Local
+}
+
 // all methods are blocking and panic on error for now
 impl Client {
 
     pub fn new(contract_abi: ABI) -> Self {
-        // TODO: check env vars to decide local/testnet/live
-        Self::new_local(contract_abi)
+
+        let mode = match env::var("ETH_NETWORK") {
+            Ok(ref net) if net == "mainnet" => Mode::Infura(1),
+            Ok(ref net) if net == "rinkeby" => Mode::Infura(4),
+            Ok(ref net) if net == "ropsten" => Mode::Infura(43),
+            Ok(ref net) if net == "kovan"   => Mode::Infura(42),
+            _ => Mode::Local,
+        };
+
+        match mode {
+            Local => Self::new_local(contract_abi),
+            Infura => Self::new_infura(contract_abi),
+        }
     }
 
     fn new_local(contract_abi: ABI) -> Self {
@@ -58,12 +79,21 @@ impl Client {
             .wait()
             .unwrap();
         
+        // if not deploying: read contract addr from env var
+        // let contract_address = "664d79b5c0C762c83eBd0d1D1D5B048C0b53Ab58".parse().unwrap();
+        // let contract = Contract::from_json(
+        //     web3.eth(),
+        //     contract_address,
+        //     include_bytes!("../../contracts/build/bin/contracts_Plasma_sol_Plasma.abi"),
+        // ).unwrap();
+
         //println!("contract: {:?}", contract);
  
         Self{event_loop, web3, contract, my_account}
     }
 
-    fn new_testnet() -> Self {
+    fn new_infura(contract_abi: ABI) -> Self {
+
         unimplemented!()
 
         // TODO: change to infura
@@ -120,6 +150,15 @@ impl Client {
                 tx
             }).wait()
     }
+
+    pub fn sign(&self) {
+        const SECRET: &str = "17d08f5fe8c77af811caa0c9a187e668ce3b74a99acc3f6d976f075f16ae0911";
+        let secret = Secret::from_str(SECRET).unwrap();
+        let keypair = KeyPair::from_secret(secret).unwrap();
+
+        println!("{}", keypair.address().hex());
+        //self.web3.eth().
+    }
 }
 
 #[test]
@@ -138,4 +177,12 @@ fn test_web3() {
     assert!(client.commit_block(block_num, total_fees, tx_data_packed, new_root).is_ok());
     println!("verifying block...");
     assert!(client.verify_block(block_num, proof).is_ok());
+}
+
+#[test]
+fn test_sign() {
+
+    let client = Client::new(TEST_PLASMA_ALWAYS_VERIFY);
+    client.sign();
+
 }
