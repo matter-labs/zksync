@@ -112,6 +112,8 @@ impl PlasmaStateKeeper{
                 return_channel.send(false);
                 return;
             }
+
+            // Will make a well-formed Tx by convering to field elements and making a signature
         }
 
         if self.current_batch.len() == self.batch_size {
