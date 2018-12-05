@@ -8,8 +8,6 @@ use web3::contract::{Contract, Options, CallFuture};
 use web3::types::{Address, U256, H256, U128, Bytes};
 use web3::transports::{EventLoopHandle, Http};
 
-use ethkey::{Secret, KeyPair};
-
 pub struct ETHClient {
     event_loop: EventLoopHandle,
     web3:       web3::Web3<Http>,
@@ -154,11 +152,7 @@ impl ETHClient {
     }
 
     pub fn sign(&self) {
-        const SECRET: &str = "17d08f5fe8c77af811caa0c9a187e668ce3b74a99acc3f6d976f075f16ae0911";
-        let secret = Secret::from_str(SECRET).unwrap();
-        let keypair = KeyPair::from_secret(secret).unwrap();
 
-        println!("{:?}", keypair.address());
         //self.web3.eth().
     }
 }
@@ -166,7 +160,7 @@ impl ETHClient {
 #[test]
 fn test_web3() {
 
-    let client = Client::new(TEST_PLASMA_ALWAYS_VERIFY);
+    let client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
 
     let block_num: u64 = 0;
     let total_fees: U128 = U128::from_dec_str("0").unwrap();
@@ -184,7 +178,41 @@ fn test_web3() {
 #[test]
 fn test_sign() {
 
-    let client = Client::new(TEST_PLASMA_ALWAYS_VERIFY);
+    let client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
     client.sign();
+
+}
+
+use ethereum_tx_sign::RawTransaction;
+
+use web3::contract::tokens::Tokenize;
+
+#[test]
+fn test_abi() {
+    let c = ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap();
+    let f = c.function("commitBlock").unwrap();
+    
+    let block_num: u64 = 77;
+    let total_fees: U128 = U128::from_dec_str("200").unwrap();
+    let tx_data_packed: Vec<u8> = vec![];
+    let new_root: H256 = H256::from_str("a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0").unwrap();
+
+    let data = f.encode_input( &(block_num, total_fees, tx_data_packed, new_root).into_tokens() ).unwrap();
+
+    let tx = RawTransaction{
+        nonce:      U256::from_dec_str("2").unwrap(),
+        to:         None,
+        value:      U256::from_dec_str("1000000").unwrap(),
+        gas_price:  U256::from_dec_str("10000000000").unwrap(),
+        gas:        U256::from_dec_str("10000000").unwrap(),
+        data:       data.clone(),
+    };
+
+    let pkey = H256::from_str("a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0").unwrap();
+    let sig = tx.sign(&pkey);
+
+    println!("data: {:?}", data);
+    println!("tx: {:?}", tx);
+    println!("sig: {:?}", sig);
 
 }

@@ -19,9 +19,9 @@ extern crate tokio;
 
 extern crate ethereum_types;
 extern crate ethabi;
-extern crate ethkey;
 extern crate rustc_hex;
 extern crate web3;
+extern crate ethereum_tx_sign;
 
 extern crate hyper;
 extern crate serde;
