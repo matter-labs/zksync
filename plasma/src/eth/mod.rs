@@ -31,28 +31,29 @@ pub const PROD_PLASMA: ABI = (
     include_str!("../../contracts/bin/contracts_Plasma_sol_Plasma.bin"),
 );
 
-enum Mode {
-    Infura(usize),
-    Local
-}
+// enum Mode {
+//     Infura(usize),
+//     Local
+// }
 
 // all methods are blocking and panic on error for now
 impl Client {
 
     pub fn new(contract_abi: ABI) -> Self {
 
-        let mode = match env::var("ETH_NETWORK") {
-            Ok(ref net) if net == "mainnet" => Mode::Infura(1),
-            Ok(ref net) if net == "rinkeby" => Mode::Infura(4),
-            Ok(ref net) if net == "ropsten" => Mode::Infura(43),
-            Ok(ref net) if net == "kovan"   => Mode::Infura(42),
-            _ => Mode::Local,
-        };
+        // let mode = match env::var("ETH_NETWORK") {
+        //     Ok(ref net) if net == "mainnet" => Mode::Infura(1),
+        //     Ok(ref net) if net == "rinkeby" => Mode::Infura(4),
+        //     Ok(ref net) if net == "ropsten" => Mode::Infura(43),
+        //     Ok(ref net) if net == "kovan"   => Mode::Infura(42),
+        //     _ => Mode::Local,
+        // };
+        // match mode {
+        //     Mode::Local => Self::new_local(contract_abi),
+        //     Mode::Infura(_) => Self::new_infura(contract_abi),
+        // }
 
-        match mode {
-            Local => Self::new_local(contract_abi),
-            Infura => Self::new_infura(contract_abi),
-        }
+        Self::new_local(contract_abi)
     }
 
     fn new_local(contract_abi: ABI) -> Self {
@@ -63,29 +64,30 @@ impl Client {
         let accounts = web3.eth().accounts().wait().unwrap();
         let my_account = accounts[0];
 
-        // Get the contract bytecode for instance from Solidity compiler
-        let bytecode: Vec<u8> = contract_abi.1.from_hex().unwrap();
+        let contract = if let Ok(addr) = env::var("CONTRACT_ADDR") {
+             let contract_address = addr.parse().unwrap();
+             Contract::from_json(
+                 web3.eth(),
+                 contract_address,
+                 contract_abi.0,
+             ).unwrap()
+        } else {
+            // Get the contract bytecode for instance from Solidity compiler
+            let bytecode: Vec<u8> = contract_abi.1.from_hex().unwrap();
 
-        // Deploying a contract
-        let contract = Contract::deploy(web3.eth(), contract_abi.0)
-            .unwrap()
-            .confirmations(0)
-            .options(Options::with(|opt| {
-                opt.gas = Some(6000_000.into())
-            }))
-            .execute(bytecode, (), my_account,
-            )
-            .expect("Correct parameters are passed to the constructor.")
-            .wait()
-            .unwrap();
-        
-        // if not deploying: read contract addr from env var
-        // let contract_address = "664d79b5c0C762c83eBd0d1D1D5B048C0b53Ab58".parse().unwrap();
-        // let contract = Contract::from_json(
-        //     web3.eth(),
-        //     contract_address,
-        //     include_bytes!("../../contracts/build/bin/contracts_Plasma_sol_Plasma.abi"),
-        // ).unwrap();
+            // Deploying a contract
+            Contract::deploy(web3.eth(), contract_abi.0)
+                .unwrap()
+                .confirmations(0)
+                .options(Options::with(|opt| {
+                    opt.gas = Some(6000_000.into())
+                }))
+                .execute(bytecode, (), my_account,
+                )
+                .expect("Correct parameters are passed to the constructor.")
+                .wait()
+                .unwrap()
+        };
 
         //println!("contract: {:?}", contract);
  
@@ -156,7 +158,7 @@ impl Client {
         let secret = Secret::from_str(SECRET).unwrap();
         let keypair = KeyPair::from_secret(secret).unwrap();
 
-        println!("{}", keypair.address().hex());
+        println!("{:?}", keypair.address());
         //self.web3.eth().
     }
 }
