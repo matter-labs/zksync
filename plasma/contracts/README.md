@@ -23,3 +23,12 @@ This will start ganache with 7M gas limit:
 ```
 yarn ganache
 ```
+
+## Deploying to Rinkeby testnet
+
+export MNEMONIC="<your metamask HD mnemonic>"
+export INFURA_PROJECT_ID=<infura_projec_id>
+
+```
+yarn truffle migrate --rinkeby
+```

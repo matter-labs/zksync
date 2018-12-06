@@ -31,6 +31,10 @@ reqwest = "0.9.5"
 actix = "0.7.7"
 actix-web = "0.7.14"
 
+rlp = "0.3.0"
+tiny-keccak = "1.4.2"
+secp256k1 = "0.11.1"
+
 [dependencies.pairing]
 path = "../pairing"
 

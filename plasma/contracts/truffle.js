@@ -12,6 +12,8 @@
  *   },
  */
 
+var HDWalletProvider = require("truffle-hdwallet-provider");
+
 module.exports = {
   // See <http://truffleframework.com/docs/advanced/configuration>
   // to customize your Truffle configuration!
@@ -23,10 +25,28 @@ module.exports = {
 
     networks: {
         // truffle test --network dev
-        dev: {
-          host: "127.0.0.1",
-          port: 8545,
-          network_id: "*" // match any network
+        // dev: {
+        //   host: "127.0.0.1",
+        //   port: 8545,
+        //   network_id: "*" // match any network
+        // },
+
+      rinkeby:{
+        network_id: 4,
+        provider: function() { 
+          let url = `https://rinkeby.infura.io/${process.env.INFURA_PROJECT_ID}`
+          let mnemonic = process.env.MNEMONIC
+          return new HDWalletProvider(mnemonic, url) 
+        },
+      },
+
+      ropsten:{
+        network_id: 3,
+        provider: function() { 
+          let url = `https://ropsten.infura.io/${process.env.INFURA_PROJECT_ID}`
+          let mnemonic = process.env.MNEMONIC
+          return new HDWalletProvider(mnemonic, url) 
+        },
       },
 
     }
