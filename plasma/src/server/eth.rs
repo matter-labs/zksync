@@ -421,7 +421,7 @@ use self::secp256k1::key::SecretKey;
 use self::secp256k1::Message;
 use self::secp256k1::Secp256k1;
 
-const CHAIN_ID: u8 = 4;
+const CHAIN_ID: u8 = 4; // TODO: change this, hardcode for rinkeby
 
 /// Description of a Transaction, pending or in the chain.
 #[derive(Debug, Default, Clone, PartialEq, Deserialize, Serialize)]
