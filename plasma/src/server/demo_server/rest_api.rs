@@ -1,4 +1,4 @@
-#![cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
 extern crate actix;
 extern crate actix_web;
