@@ -235,7 +235,7 @@ struct InfuraRequest {
     id:         &'static str,
 }
 
-fn query_params() -> Result<(), reqwest::Error> {
+fn query_params() -> Result<(), Box<std::error::Error>> {
 
     let infura_id = env::var("INFURA_PROJECT_ID").expect("`INFURA_PROJECT_ID` env var must be set");
 
@@ -257,9 +257,14 @@ fn query_params() -> Result<(), reqwest::Error> {
     let res = client.post(url.as_str())
         .header(CONTENT_TYPE, "application/json")
         .json(&map)
-        .send()?;
+        .send()?
+        .json()?;
+    
+    let r: HashMap<String, String> = res;
 
-    println!("{:?}", res);
+    let count = u32::from_str_radix(&r["result"].as_str()[2..], 16)?;
+
+    println!("{:?}, {}", r, count);
     Ok(())
 }
 
