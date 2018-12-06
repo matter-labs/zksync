@@ -55,7 +55,6 @@ impl<E: Engine, G: Group<E>> EvaluationDomain<E, G> {
 
         let coeffs_len = coeffs.len();
 
-
         // m is a size of domain where Z polynomial does NOT vanish
         // in normal domain Z is in a form of (X-1)(X-2)...(X-N)
         let mut m = 1;
