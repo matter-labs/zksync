@@ -226,16 +226,31 @@ fn test_abi() {
 
 use reqwest::header::{CONTENT_TYPE};
 use std::collections::HashMap;
+use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 type Result<T> = std::result::Result<T, Box<std::error::Error>>;
 
 #[derive(Serialize, Debug)]
-struct InfuraRequest<'a> {
+struct InfuraRequest<'a, P: Serialize> {
     jsonrpc:    &'a str,
     method:     &'a str,
-    params:     &'a[&'a str],
+    params:     &'a P,
     id:         &'a str,
+}
+
+#[derive(Deserialize, Debug)]
+struct InfuraError {
+    code:       i64,
+    message:    String,
+}
+
+#[derive(Deserialize, Debug)]
+struct InfuraResponse {
+    jsonrpc:    String,
+    id:         String,
+    error:      Option<InfuraError>,
+    result:     Option<String>,
 }
 
 struct Infura {
@@ -248,8 +263,7 @@ impl Infura {
         Self{url: format!(r#"https://mainnet.infura.io/v3/{}"#, project_id)}
     }
 
-    fn post<O>(&self, method: &str, params: &[&str]) -> Result<O> 
-        where O: DeserializeOwned
+    fn post<P: Serialize>(&self, method: &str, params: &P) -> Result<String>
     {
         let client = reqwest::Client::new();
 
@@ -260,26 +274,59 @@ impl Infura {
             params,
         };
 
-        client.post(self.url.as_str())
+        let r = client.post(self.url.as_str())
+            .header(CONTENT_TYPE, "application/json")
+            .json(&request)
+            .build()?;
+
+        println!("{:?}", r.body().unwrap());
+
+        let response: Result<InfuraResponse> = client.post(self.url.as_str())
             .header(CONTENT_TYPE, "application/json")
             .json(&request)
             .send()?
             .json()
-            .map_err(|e| From::from(e))
+            .map_err(|e| From::from(e));
+
+        let r = response?;
+
+        if let Some(result) = r.result {
+            Ok(result)
+        } else {
+            Err(r.error
+                .map( |e| From::from(e.message) )
+                .unwrap_or(From::from("no result in the response body")) )
+        }
+    }
+
+    /// Get current gas price
+    pub fn get_gas_price(&self) -> Result<U256> {
+        let empty: [u8; 0] = [];
+        let result = self.post("eth_gasPrice", &empty)?;
+
+        // TODO: code below is ugly, find or implement "0x" strings parser
+        if !result.starts_with("0x") { return Err(From::from("invalid result")) }
+        Ok(U256::from_str(&result.as_str()[2..])?)
     }
 
     /// Get nonce for an address
-    pub fn get_nonce(&self, addr: &str) -> Result<u32> {
-        let params = vec!(addr, "latest");
-        let response: HashMap<String, String> = self.post("eth_getTransactionCount", params.as_slice())?;
-        let result = response.get("result").ok_or("no result")?;
+    pub fn get_nonce(&self, addr: &str) -> Result<U256> {
+        let result = self.post("eth_getTransactionCount", &[addr, "latest"])?;
+
         // TODO: code below is ugly, find or implement "0x" strings parser
         if !result.starts_with("0x") { return Err(From::from("invalid result")) }
-        Ok(u32::from_str_radix(&result.as_str()[2..], 16)?)
+        Ok(U256::from_str(&result.as_str()[2..])?)
     }
 
-    pub fn submit_tx() -> Result<H256> {
-        unimplemented!()
+    pub fn send_raw_tx(&self, tx: &str) -> Result<H256> {
+        let result = self.post("eth_sendRawTransaction", &[tx])?;
+
+        println!("{:?}", result);
+
+        // TODO: code below is ugly, find or implement "0x" strings parser
+        if !result.starts_with("0x") { return Err(From::from("invalid result")) }
+        println!("{}", result);
+        Ok(H256::from_str(&result.as_str()[2..])?)
     }
 }
 
@@ -288,7 +335,15 @@ impl Infura {
 fn test_infura() {
     let proj_id = env::var("INFURA_PROJECT_ID").expect("`INFURA_PROJECT_ID` env var must be set");
     let infura = Infura::new(proj_id.as_str());
+
     let r = infura.get_nonce("0xc94770007dda54cF92009BFF0dE90c06F603a09f");
     assert!(r.is_ok());
-    assert_eq!(r.unwrap(), 147); // TODO: pick a stable address
+    assert_eq!(r.unwrap(), U256::from(147)); // TODO: pick a stable address
+
+    let tx_hash = infura.send_raw_tx("0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675");
+    println!("submitted tx: {:#?}", tx_hash);
+
+    let gas_price = infura.get_gas_price();
+    println!("gas price: {:#?}", gas_price);
+
 }
