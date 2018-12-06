@@ -13,21 +13,26 @@ use std::sync::mpsc;
 use std::time;
 
 use super::super::prover::Prover;
+use rand::{SeedableRng, Rng, XorShiftRng};
 
-use web3::types::{U256, Bytes};
+use web3::types::{U256, Bytes, U128, H256};
 
 use std::collections::HashMap;
 use ff::{Field, PrimeField};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
+use sapling_crypto::jubjub::{FixedGenerators};
+use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 
 use super::state_keeper::{TxInfo, PlasmaStateKeeper};
 
-use pairing::bn256::Bn256;
+use pairing::bn256::{Bn256, Fr};
 use super::super::plasma_state::{Block};
-use super::super::super::balance_tree::BabyBalanceTree;
+use super::super::super::balance_tree::{BabyBalanceTree, BabyLeaf};
+use super::super::super::circuit::{plasma_constants};
 
 use super::super::super::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum, field_element_to_u32};
 
+use super::super::eth::{ETHClient, PROD_PLASMA};
 
 use self::actix_web::{
     error, http, middleware, server, App, AsyncResponder, Error, HttpMessage,
@@ -84,6 +89,10 @@ fn send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
 
 #[test]
 fn test_run_server() {
+    run();
+}
+
+pub fn run() {
     // create channel to accept deserialized requests for new transacitons
 
     let (tx_for_transactions, rx_for_transactions) = mpsc::channel::<(TxInfo, mpsc::Sender<bool>)>();
@@ -94,10 +103,52 @@ fn test_run_server() {
     ::std::env::set_var("RUST_LOG", "actix_web=info");
     let sys = actix::System::new("ws-example");
 
+    println!("Creating ETH client");
+
+    let eth_client = ETHClient::new(PROD_PLASMA);
+
+    println!("Creating default state");
+
     // here we should insert default accounts into the tree
-    let tree = BabyBalanceTree::new(24);
+    let tree_depth = *plasma_constants::BALANCE_TREE_DEPTH as u32;
+    let mut tree = BabyBalanceTree::new(tree_depth);
+
+    let number_of_accounts = 100;
+
+    let mut keys_map = HashMap::<u32,PrivateKey<Bn256>>::new();
+    {
+        let mut_tree = & mut tree;
+        let p_g = FixedGenerators::SpendingKeyGenerator;
+        let params = &AltJubjubBn256::new();
+        let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+
+        let default_balance_string = "1000000";
+
+        for i in 0..number_of_accounts {
+            let leaf_number : u32 = i;
+
+            let sk = PrivateKey::<Bn256>(rng.gen());
+            let pk = PublicKey::from_private(&sk, p_g, params);
+            let (x, y) = pk.0.into_xy();
+
+            keys_map.insert(i, sk);
+
+            let leaf = BabyLeaf {
+                balance:    Fr::from_str(default_balance_string).unwrap(),
+                nonce:      Fr::zero(),
+                pub_x:      x,
+                pub_y:      y,
+            };
+
+            mut_tree.insert(leaf_number, leaf.clone());
+        }
+
+    }
+
     let root = tree.root_hash();
-    let keys_map = HashMap::<u32,PrivateKey<Bn256>>::new();
+
+    println!("Inserted {} accounts with balances, root hash = {}", number_of_accounts, root);
+
     let mut keeper = PlasmaStateKeeper {
         balance_tree: tree,
         block_number: 0,
@@ -130,7 +181,7 @@ fn test_run_server() {
                 let new_root = block.new_root_hash.clone();
                 let block_number = block.block_number;
                 let tx_data = BabyProver::encode_transactions(&block).unwrap();
-                let tx_data_bytes = Bytes::from(tx_data);
+                let tx_data_bytes = tx_data;
                 let incomplete_proof = EthereumProof {
                     groth_proof: [U256::from(0); 8],
                     new_root: serialize_fe_for_ethereum(new_root),
@@ -146,7 +197,44 @@ fn test_run_server() {
         }
     });
 
-    // TODO: take rs_for_tx_data and re_for_proofs and use it in separate loop for ethereum commitments
+    let committer_handle = thread::spawn(move || {
+        loop {
+            {
+                let message = rx_for_tx_data.try_recv();
+                if message.is_ok() {
+                    println!("Got transaction data");
+                    let commitment = message.unwrap();
+                    let block_number = commitment.block_number.as_u64();
+                    let total_fees = U128::from(commitment.total_fees);
+                    let tx_data_packed = commitment.public_data;
+                    let new_root: H256 = H256::from(commitment.new_root);
+                    println!("Will try to commit");
+                    println!("Public data = {}", hex::encode(tx_data_packed.clone()));
+                    let hash = eth_client.commit_block(block_number, total_fees, tx_data_packed, new_root); 
+                    println!("Commitment tx hash = {}", hash.unwrap());
+                    continue;
+                }
+            }
+            {
+                let message = rx_for_proofs.try_recv();
+                if message.is_ok() {
+                    println!("Got proof");
+                    let proof = message.unwrap();
+                    let block_number = proof.block_number.as_u64();
+                    let proof = proof.groth_proof;
+
+                    println!("Will try to prove commit");
+                    for i in 0..8 {
+                        println!("Proof element {} = {}", i, proof[i]);
+                    }
+                    let hash = eth_client.verify_block(block_number, proof); 
+                    println!("Proving tx hash = {}", hash.unwrap());
+                    continue;
+                }
+            }
+            thread::sleep(time::Duration::from_millis(10));
+        }
+    });
 
     //move is necessary to give closure below ownership
     server::new(move || {

@@ -357,7 +357,6 @@ fn main() {
     let tmp_cirtuit_params = generate_random_parameters(instance_for_generation, rng).unwrap();
     println!("setup generated in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);
 
-
     use std::fs::File;
     use std::io::{BufWriter, Write};
     {
@@ -375,7 +374,7 @@ fn main() {
     let initial_root_string = format!("{}", BabyBalanceTree::new(tree_depth).root_hash().into_repr());
     let contract_content = generate_vk_contract(&circuit_params.vk, initial_root_string.as_ref(), tree_depth);
 
-    let f_cont = File::create("vk.sol").expect("Unable to create file");
+    let f_cont = File::create("VerificationKeys.sol").expect("Unable to create file");
     let mut f_cont = BufWriter::new(f_cont);
     f_cont.write_all(contract_content.as_bytes()).expect("Unable to write contract");
     
@@ -407,7 +406,7 @@ fn generate_vk_contract<E: Engine>(vk: &VerifyingKey<E>, initial_root: &str, tre
         r#"
 // This contract is generated programmatically
 
-pragma solidity ^0.5.0;
+pragma solidity ^0.4.24;
 
 
 // Hardcoded constants to avoid accessing store

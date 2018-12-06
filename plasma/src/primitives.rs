@@ -65,8 +65,12 @@ pub fn field_element_to_u128<P: PrimeField>(fr: P) -> u128 {
 pub fn serialize_g1_for_ethereum(point: <Bn256 as Engine>::G1Affine) -> (U256, U256) {
         let uncompressed = point.into_uncompressed();
 
-        let x = U256::from_big_endian(& uncompressed.as_ref()[0..32]);
-        let y = U256::from_big_endian(& uncompressed.as_ref()[32..64]);
+        let uncompressed_slice = uncompressed.as_ref();
+
+        // bellman serializes points as big endian and in the form x, y
+        // ethereum expects the same order in memory
+        let x = U256::from_big_endian(& uncompressed_slice[0..32]);
+        let y = U256::from_big_endian(& uncompressed_slice[32..64]);
 
         (x, y)
 }
@@ -74,12 +78,16 @@ pub fn serialize_g1_for_ethereum(point: <Bn256 as Engine>::G1Affine) -> (U256, U
 pub fn serialize_g2_for_ethereum(point: <Bn256 as Engine>::G2Affine) -> ((U256, U256), (U256, U256)) {
         let uncompressed = point.into_uncompressed();
 
-        let x_0 = U256::from_big_endian(& uncompressed.as_ref()[0..32]);
-        let x_1 = U256::from_big_endian(& uncompressed.as_ref()[32..64]);
-        let y_0 = U256::from_big_endian(& uncompressed.as_ref()[64..92]);
-        let y_1 = U256::from_big_endian(& uncompressed.as_ref()[92..128]);
+        let uncompressed_slice = uncompressed.as_ref();
 
-        ((x_0, x_1), (y_0, y_1))
+        // bellman serializes points as big endian and in the form x1*u, x0, y1*u, y0
+        // ethereum expects the same order in memory
+        let x_1 = U256::from_big_endian(& uncompressed_slice[0..32]);
+        let x_0 = U256::from_big_endian(& uncompressed_slice[32..64]);
+        let y_1 = U256::from_big_endian(& uncompressed_slice[64..96]);
+        let y_0 = U256::from_big_endian(& uncompressed_slice[96..128]);
+
+        ((x_1, x_0), (y_1, y_0))
 }
 
 pub fn serialize_fe_for_ethereum(field_element: <Bn256 as ScalarEngine>::Fr) -> U256 {

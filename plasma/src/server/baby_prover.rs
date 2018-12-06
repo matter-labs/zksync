@@ -70,7 +70,7 @@ pub struct EthereumProof {
     pub new_root: U256,
     pub block_number: U256,
     pub total_fees: U256,
-    pub public_data: Bytes,
+    pub public_data: Vec<u8>,
 }
 
 #[derive(Debug)]
@@ -134,6 +134,17 @@ impl BabyProver {
 
         let jubjub_params = AltJubjubBn256::new();
 
+        println!("Verificaiton key alpha g1 == {}", params.vk.alpha_g1);
+        println!("Verificaiton key beta g2 == {}", params.vk.beta_g2);
+        println!("Verificaiton key gamma g2 == {}", params.vk.gamma_g2);
+        println!("Verificaiton key delta g2 == {}", params.vk.delta_g2);
+
+        let ic_keys = params.vk.ic.clone();
+
+        for (i, ic) in ic_keys.into_iter().enumerate() {
+            println!("Verificaiton key for input {} == {}", i, ic);
+        }
+
         Ok(Self{
             batch_size: TX_BATCH_SIZE,
             accounts_tree: tree,
@@ -176,7 +187,7 @@ impl Prover<Bn256> for BabyProver {
 
         let block_number = serialize_fe_for_ethereum(proof.block_number);
 
-        let public_data = Bytes::from(proof.public_data.clone());
+        let public_data = proof.public_data.clone();
 
         let p = EthereumProof{
             groth_proof: [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y],
@@ -234,13 +245,21 @@ impl Prover<Bn256> for BabyProver {
                 return Err(BabyProverErr::InvalidSender);
             }
             
-            let parsed_transfer_amount = parse_float_to_u128(BitIterator::new(tx.amount.into_repr()).collect(), 
+            let mut amount_bits: Vec<bool> = BitIterator::new(tx.amount.into_repr()).collect();
+            amount_bits.reverse();
+            amount_bits.truncate(*plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH);
+
+            let parsed_transfer_amount = parse_float_to_u128(amount_bits, 
                 *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH,
                 *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH,
                 10
             );
 
-            let parsed_fee = parse_float_to_u128(BitIterator::new(tx.fee.into_repr()).collect(), 
+            let mut fee_bits: Vec<bool>  = BitIterator::new(tx.fee.into_repr()).collect();
+            fee_bits.reverse();
+            fee_bits.truncate(*plasma_constants::FEE_EXPONENT_BIT_WIDTH + *plasma_constants::FEE_MANTISSA_BIT_WIDTH);
+
+            let parsed_fee = parse_float_to_u128(fee_bits, 
                 *plasma_constants::FEE_EXPONENT_BIT_WIDTH,
                 *plasma_constants::FEE_MANTISSA_BIT_WIDTH,
                 10
@@ -360,8 +379,10 @@ impl Prover<Bn256> for BabyProver {
 
         let mut repr = Fr::zero().into_repr();
         repr.read_be(&hash_result[..]).expect("pack hash as field element");
-
+        
         let public_data_commitment = Fr::from_repr(repr).unwrap();
+
+        println!("Preparing proof for old root = {}, new root = {}, public data commitment = {}", initial_root, final_root, public_data_commitment);
 
         let instance = Update {
             params: &self.jubjub_params,
@@ -375,7 +396,7 @@ impl Prover<Bn256> for BabyProver {
         };
 
         let mut rng = OsRng::new().unwrap();
-
+        println!("Prover has started to work");
         let proof = create_random_proof(instance, &self.parameters, & mut rng);
         if proof.is_err() {
             return Err(BabyProverErr::Unknown);
@@ -390,6 +411,7 @@ impl Prover<Bn256> for BabyProver {
         if !success {
             return Err(BabyProverErr::Unknown);
         }
+        println!("Proof generation is complete");
 
         let full_proof = FullBabyProof{
             proof: p,

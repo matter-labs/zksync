@@ -54,13 +54,14 @@ fn expect_env(name: &'static str) -> String {
 impl ETHClient {
 
     pub fn new(contract_abi: ABI) -> Self {
-        
+
+        // expect_env("PRIVATE_KEY")
         Self{
             web3_url:       env::var("WEB3_URL").unwrap_or("http://localhost:8545".to_string()),
-            private_key:    H256::from_str(&expect_env("PRIVATE_KEY")).unwrap(),
-            contract_addr:  H160::from_str(&expect_env("CONTRACT_ADDR")).unwrap(),
-            sender_account: expect_env("SENDER_ACCOUNT"),
-            chain_id:       u8::from_str(&expect_env("CHAIN_ID")).unwrap(),
+            private_key:    H256::from_str(&env::var("PRIVATE_KEY").unwrap_or("aa8564af9bef22f581e99125d1829b76c45d08e4f6f0b74d586911f4318b6776".to_string())).unwrap(),
+            contract_addr:  H160::from_str(&env::var("CONTRACT_ADDR").unwrap_or("616e08c733fe20e99bf70c5088635694d5e25c54".to_string())).unwrap(),
+            sender_account: env::var("SENDER_ACCOUNT").unwrap_or("e5d0efb4756bd5cdd4b5140d3d2e08ca7e6cf644".to_string()),
+            chain_id:       u8::from_str(&env::var("CHAIN_ID").unwrap_or("4".to_string())).unwrap(),
             contract:       ethabi::Contract::load(contract_abi.0).unwrap(),
             reqwest_client: reqwest::Client::new(),
         }
@@ -82,12 +83,13 @@ impl ETHClient {
             to:         Some(self.contract_addr.clone()),
             value:      U256::zero(),
             gas_price,
-            gas:        U256::from(300_000),
+            gas:        U256::from(3_000_000),
             data:       data,
         };
         let signed = tx.sign(&self.private_key);
-
-        self.send_raw_tx(&format!("0x{}", hex::encode(signed)))
+        let raw_tx_hex = format!("0x{}", hex::encode(signed));
+        // println!("Raw transaction = {}", raw_tx_hex);
+        self.send_raw_tx(&raw_tx_hex)
     }
 
     /// Returns tx hash
