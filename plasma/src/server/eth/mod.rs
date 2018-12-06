@@ -186,7 +186,7 @@ fn test_eth() {
 
     let client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
 
-    let block_num: u64 = 0;
+    let block_num: u64 = 1;
     let total_fees: U128 = U128::from_dec_str("0").unwrap();
     let tx_data_packed: Vec<u8> = vec![];
     let new_root: H256 = H256::zero();
@@ -195,11 +195,15 @@ fn test_eth() {
 
     println!("committing block...");
     let r = client.commit_block(block_num, total_fees, tx_data_packed, new_root);
-    println!("{:?}", &r);
-    assert!(r.is_ok());
+    match r {
+        Err(e) => println!("{:#?}", e),
+        Ok(hash) => println!("https://rinkeby.etherscan.io/tx/{:?}", hash),
+    };
 
     println!("verifying block...");
     let r = client.verify_block(block_num, proof);
-    println!("{:?}", &r);
-    assert!(r.is_ok());
+    match r {
+        Err(e) => println!("{:#?}", e),
+        Ok(hash) => println!("https://rinkeby.etherscan.io/tx/{:?}", hash),
+    };
 }
