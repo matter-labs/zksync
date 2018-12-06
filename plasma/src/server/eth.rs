@@ -226,53 +226,97 @@ fn test_abi() {
 
 use reqwest::header::{CONTENT_TYPE};
 use std::collections::HashMap;
+//use serde::{Serialize, DeserializeOwned};
+use serde::de::DeserializeOwned;
 
-#[derive(Serialize, Deserialize, Debug)]
-struct InfuraRequest {
-    jsonrpc:    &'static str,
-    method:     &'static str,
-    params:     Vec<&'static str>,
-    id:         &'static str,
+type Result<T> = std::result::Result<T, Box<std::error::Error>>;
+
+#[derive(Serialize, Debug)]
+struct InfuraRequest<'a> {
+    jsonrpc:    &'a str,
+    method:     &'a str,
+    params:     &'a[&'a str],
+    id:         &'a str,
 }
 
-fn query_params() -> Result<(), Box<std::error::Error>> {
+struct Infura {
+    url: String,
+}
 
-    let infura_id = env::var("INFURA_PROJECT_ID").expect("`INFURA_PROJECT_ID` env var must be set");
+impl Infura {
 
-    let map = InfuraRequest {
-        jsonrpc:    "2.0",
-        method:     "eth_getTransactionCount",
-        params:     vec!("0xc94770007dda54cF92009BFF0dE90c06F603a09f", "latest"),
-        id:         "1",
-    };
+    pub fn new(project_id: &str) -> Self {
+        Self{url: format!(r#"https://mainnet.infura.io/v3/{}"#, project_id)}
+    }
 
-    // let mut map = HashMap::new();
-    // map.insert("jsonrpc", "2.0");
-    // map.insert("method", "eth_getTransactionCount");
-    // map.insert("params", vec!("0xc94770007dda54cF92009BFF0dE90c06F603a09f", "latest"));
-    // map.insert("id", "1");
+    fn post<O>(&self, method: &str, params: &[&str]) -> Result<O> 
+        where O: DeserializeOwned
+    {
+        let client = reqwest::Client::new();
 
-    let client = reqwest::Client::new();
-    let url = format!("https://mainnet.infura.io/v3/{}", infura_id);
-    let res = client.post(url.as_str())
-        .header(CONTENT_TYPE, "application/json")
-        .json(&map)
-        .send()?
-        .json()?;
+        let request = InfuraRequest {
+            jsonrpc:    "2.0",
+            id:         "1",
+            method,
+            params,
+        };
+
+        client.post(self.url.as_str())
+            .header(CONTENT_TYPE, "application/json")
+            .json(&request)
+            .send()?
+            .json()
+            .map_err(|e| From::from(e))
+    }
+
+    pub fn getTransactionCount(&self, addr: &str) -> Result<u32> {
+        let params = vec!(addr, "latest");
+        let response: HashMap<String, String> = self.post("eth_getTransactionCount", params.as_slice())?;
+        let result = response.get("result").ok_or("no result")?;
+        // TODO: code below is ugly, find or implement "0x" strings parser
+        if !result.starts_with("0x") { return Err(From::from("invalid result")) }
+        Ok(u32::from_str_radix(&result.as_str()[2..], 16)?)
+    }
+}
+
+// fn query_params() -> Result<()> {
+
+//     let infura_id = env::var("INFURA_PROJECT_ID").expect("`INFURA_PROJECT_ID` env var must be set");
+
+//     let map = InfuraRequest {
+//         jsonrpc:    "2.0",
+//         method:     "eth_getTransactionCount",
+//         params:     vec!("0xc94770007dda54cF92009BFF0dE90c06F603a09f", "latest").as_sl,
+//         id:         "1",
+//     };
+
+//     // let mut map = HashMap::new();
+//     // map.insert("jsonrpc", "2.0");
+//     // map.insert("method", "eth_getTransactionCount");
+//     // map.insert("params", vec!("0xc94770007dda54cF92009BFF0dE90c06F603a09f", "latest"));
+//     // map.insert("id", "1");
+
+//     let client = reqwest::Client::new();
+//     let url = format!("https://mainnet.infura.io/v3/{}", infura_id);
+//     let res = client.post(url.as_str())
+//         .header(CONTENT_TYPE, "application/json")
+//         .json(&map)
+//         .send()?
+//         .json()?;
     
-    let r: HashMap<String, String> = res;
+//     let r: HashMap<String, String> = res;
 
-    let count = u32::from_str_radix(&r["result"].as_str()[2..], 16)?;
+//     let count = u32::from_str_radix(&r["result"].as_str()[2..], 16)?;
 
-    println!("{:?}, {}", r, count);
-    Ok(())
-}
+//     println!("{:?}, {}", r, count);
+//     Ok(())
+// }
 
 #[test]
 fn test_infura() {
 
 
-    let r = query_params();
+//    let r = query_params();
 
 /*    let body = {
         reqwest::get(format!(r#"curl https://mainnet.infura.io/v3/{} \
@@ -284,5 +328,8 @@ fn test_infura() {
     };
 */
 
+    let proj_id = env::var("INFURA_PROJECT_ID").expect("`INFURA_PROJECT_ID` env var must be set");
+    let infura = Infura::new(proj_id.as_str());
+    let r = infura.getTransactionCount("0xc94770007dda54cF92009BFF0dE90c06F603a09f");
     println!("body = {:?}", r);
 }
