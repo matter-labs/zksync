@@ -1,6 +1,9 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 #![allow(dead_code)]
+#![allow(unused_must_use)]
+#![allow(unused_assignments)]
+
 extern crate bellman;
 extern crate pairing;
 extern crate rand;
@@ -26,6 +29,7 @@ extern crate ethereum_tx_sign;
 extern crate hyper;
 extern crate serde;
 extern crate serde_json;
+extern crate reqwest;
 
 #[macro_use]
 extern crate serde_derive;

@@ -3695,6 +3695,10 @@ trim@0.0.1:
   version "0.0.1"
   resolved "https://registry.yarnpkg.com/trim/-/trim-0.0.1.tgz#5858547f6b290757ee95cccc666fb50084c460dd"
 
+truffle-hdwallet-provider@^1.0.0-web3one.1:
+  version "1.0.0-web3one.1"
+  resolved "https://registry.yarnpkg.com/truffle-hdwallet-provider/-/truffle-hdwallet-provider-1.0.0-web3one.1.tgz#89fbdb74a13156112b5c7e1c4b8f0e03a360b867"
+
 truffle@5.0.0-beta.2:
   version "5.0.0-beta.2"
   resolved "https://registry.yarnpkg.com/truffle/-/truffle-5.0.0-beta.2.tgz#691db3870d2ff4b99c4e02b31e88092309178e6e"
