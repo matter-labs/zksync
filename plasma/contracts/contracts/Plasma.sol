@@ -11,8 +11,6 @@ contract PlasmaStub is VerificationKeys {
     event BlockCommitted(uint32 indexed blockNumber);
     event BlockVerified(uint32 indexed blockNumber);
 
-    event DebugBool(bool indexed b);
-
     enum Circuit {
         DEPOSIT,
         UPDATE,
@@ -75,7 +73,6 @@ contract PlasmaStub is VerificationKeys {
         require(blockNumber == totalVerified, "may only verify next block");
         Block memory committed = blocks[blockNumber];
         bool verification_success = verifyUpdateProof(proof, lastVerifiedRoot, committed.newRoot, committed.finalHash);
-        emit DebugBool(verification_success);
         require(verification_success, "invalid proof");
 
         emit BlockCommitted(totalVerified);
@@ -86,7 +83,7 @@ contract PlasmaStub is VerificationKeys {
         balance[committed.prover] += committed.totalFees;
     }
 
-    function verifyUpdateProof(uint256[8] memory, bytes32, bytes32, bytes32) internal returns (bool valid);
+    function verifyUpdateProof(uint256[8] memory, bytes32, bytes32, bytes32) internal view returns (bool valid);
 
 }
 
@@ -94,10 +91,8 @@ contract PlasmaStub is VerificationKeys {
 contract Plasma is PlasmaStub, Verifier {
     // Implementation
 
-    event DebugEvent(uint256 indexed a);
-
     function verifyUpdateProof(uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
-        internal returns (bool valid)
+        internal view returns (bool valid)
     {
         uint256 mask = (~uint256(0)) >> 3;
         uint256[14] memory vk;
@@ -107,9 +102,6 @@ contract Plasma is PlasmaStub, Verifier {
         inputs[0] = uint256(oldRoot);
         inputs[1] = uint256(newRoot);
         inputs[2] = uint256(finalHash) & mask;
-        emit DebugEvent(inputs[0]);
-        emit DebugEvent(inputs[1]);
-        emit DebugEvent(inputs[2]);
         return Verify(vk, gammaABC, proof, inputs);
     }
 
@@ -117,7 +109,7 @@ contract Plasma is PlasmaStub, Verifier {
 
 contract PlasmaTest is PlasmaStub, Verifier {
     function verifyUpdateProof(uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
-        internal returns (bool valid)
+        internal view returns (bool valid)
     {
         // always approve for test
         return true;

@@ -365,7 +365,7 @@ fn main() {
         public_data_commitment: Some(public_data_commitment),
         block_number: Some(Fr::one()),
         total_fee: Some(total_fees),
-        transactions: witnesses,
+        transactions: witnesses.clone(),
     };
 
     println!("preparing a prover");
@@ -380,5 +380,4 @@ fn main() {
 
     let success = verify_proof(&pvk, &proof, &[initial_root, final_root, public_data_commitment]).unwrap();
     assert!(success);
-
 }

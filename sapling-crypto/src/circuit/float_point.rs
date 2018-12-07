@@ -300,3 +300,23 @@ fn test_encoding() {
         assert!(dec/integer <= 1u128);
     }
 }
+
+#[test]
+fn test_encoding_powers_of_two() {
+    use rand::{SeedableRng, Rng, XorShiftRng};
+    let mut rng = XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+
+    let mantissa_length = 11;
+
+    for i in 0..mantissa_length {
+        let mantissa = 1u128 << i;
+        let encoding = convert_to_float(mantissa, 5, mantissa_length, 10).unwrap();
+        for (j, bit) in encoding.into_iter().enumerate() {
+            if j != 5 + i  {
+                assert!(!bit);
+            } else {
+                assert!(bit);
+            }
+        }
+    }
+}

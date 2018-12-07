@@ -3,7 +3,7 @@ use super::super::super::balance_tree::BabyBalanceTree;
 use super::super::super::primitives::{field_element_to_u32, field_element_to_u128};
 use pairing::bn256::{Bn256, Fr};
 use sapling_crypto::jubjub::{JubjubEngine, edwards, Unknown, FixedGenerators};
-use sapling_crypto::circuit::float_point::{convert_to_float};
+use sapling_crypto::circuit::float_point::{convert_to_float, parse_float_to_u128};
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 use super::super::super::circuit::plasma_constants;
 use super::super::super::circuit::baby_plasma::{TransactionSignature};
@@ -11,7 +11,7 @@ use super::super::super::circuit::utils::{le_bit_vector_into_field_element};
 use std::sync::mpsc;
 use std::{thread, time};
 use std::collections::HashMap;
-use ff::{Field, PrimeField};
+use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
 use rand::{OsRng, Rng};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 use super::super::plasma_state::{Block};
@@ -36,8 +36,8 @@ pub struct PlasmaStateKeeper {
     /// Current block number
     pub block_number: u32,
 
-    /// Cache of the current root hash
-    pub root_hash:    Fr,
+    // /// Cache of the current root hash
+    // pub root_hash:    Fr,
 
     /// channel to receive signed and verified transactions to apply
     pub transactions_channel: mpsc::Receiver<(TxInfo, mpsc::Sender<bool>)>,
@@ -66,7 +66,7 @@ impl State<Bn256> for PlasmaStateKeeper {
     }
 
     fn root_hash (&self) -> Fr {
-        self.root_hash.clone()
+        self.balance_tree.root_hash().clone()
     }
 }
 
@@ -106,16 +106,16 @@ impl PlasmaStateKeeper{
 
             // let mut items = tree.items;
 
-            let current_account_state = tree.items.get(&from);
-            if current_account_state.is_none() {
+            let current_sender_state = tree.items.get(&from);
+            if current_sender_state.is_none() {
                 return_channel.send(false);
                 return;
             }
 
-            let mut current_account_state = current_account_state.unwrap().clone();
+            let mut current_sender_state = current_sender_state.unwrap().clone();
 
-            let current_balance = current_account_state.balance;
-            let current_nonce = current_account_state.nonce;
+            let current_balance = current_sender_state.balance;
+            let current_nonce = current_sender_state.nonce;
 
             let balance_as_u128 = field_element_to_u128(current_balance);
             let nonce_as_u32 = field_element_to_u32(current_nonce);
@@ -140,8 +140,13 @@ impl PlasmaStateKeeper{
                 return_channel.send(false);
                 return;
             }
+            
+            // encoded bit are big endian by default!
+            let encoded_amount_bits_unwrapped = encoded_amount_bits.unwrap();
 
-            let encoded_amount: Fr = le_bit_vector_into_field_element(&encoded_amount_bits.unwrap());
+            let encoded_amount: Fr = le_bit_vector_into_field_element(&encoded_amount_bits_unwrapped);
+
+            // encoded fee is zero for now
             let encoded_fee = Fr::zero();
 
             // Will make a well-formed Tx by convering to field elements and making a signature
@@ -171,7 +176,6 @@ impl PlasmaStateKeeper{
 
             tx.sign(sk, p_g, &params, & mut rng);
 
-
             let current_recipient_state = tree.items.get(&to);
             if current_recipient_state.is_none() {
                 return_channel.send(false);
@@ -181,15 +185,26 @@ impl PlasmaStateKeeper{
             let mut current_recipient_state = current_recipient_state.unwrap().clone();
 
             let transfer_amount_as_field_element = Fr::from_str(&transaction.amount.to_string()).unwrap();
-            current_account_state.balance.sub_assign(&transfer_amount_as_field_element);
-            current_account_state.nonce.add_assign(&Fr::one());
 
+            // println!("Old sender account state:");
+            // println!("Balance = {}", current_sender_state.balance);
+            // println!("Nonce = {}", current_sender_state.nonce);
+            // println!("Old recipient account state:");
+            // println!("Balance = {}", current_recipient_state.balance);
+            // println!("Nonce = {}", current_recipient_state.nonce);
+            // println!("transfer_amount_as_field_element = {}", transfer_amount_as_field_element);
+            // subtract from sender's balance
+            current_sender_state.balance.sub_assign(&transfer_amount_as_field_element);
+            // bump nonce
+            current_sender_state.nonce.add_assign(&Fr::one());
+
+            // add amount to recipient
             current_recipient_state.balance.add_assign(&transfer_amount_as_field_element);
 
             self.current_batch.push(tx);
 
-            new_sender_leaf = Some(current_account_state.clone());
-            new_recipient_leaf = Some(current_account_state.clone());
+            new_sender_leaf = Some(current_sender_state.clone());
+            new_recipient_leaf = Some(current_recipient_state.clone());
 
         }
 
@@ -197,6 +212,10 @@ impl PlasmaStateKeeper{
         self.balance_tree.insert(to, new_recipient_leaf.unwrap());
 
         println!("Accepted transaction");
+
+        let new_root = self.root_hash();
+
+        println!("Intermediate root after the transaction application = {}", new_root);
 
         if self.current_batch.len() == self.batch_size {
             {

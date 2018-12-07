@@ -43,6 +43,7 @@ pub struct ETHClient {
     contract:       ethabi::Contract,
     reqwest_client: reqwest::Client,       
     chain_id:       u8,
+    nonce:          U256
 }
 
 fn expect_env(name: &'static str) -> String {
@@ -64,17 +65,30 @@ impl ETHClient {
             chain_id:       u8::from_str(&env::var("CHAIN_ID").unwrap_or("4".to_string())).unwrap(),
             contract:       ethabi::Contract::load(contract_abi.0).unwrap(),
             reqwest_client: reqwest::Client::new(),
+            nonce:          U256::zero(),
         }
     }
 
-    fn call<P: Tokenize>(&self, method: &str, params: P) -> Result<H256> {
+    pub fn get_first_nonce(& mut self) {
+        let nonce = self.get_nonce(&format!("0x{}", &self.sender_account)).unwrap();
+        println!("Starting with nonce = {}", nonce);
+        self.nonce = nonce;
+    }
+
+    fn call<P: Tokenize>(&mut self, method: &str, params: P) -> Result<H256> {
 
         let f = self.contract.function(method).unwrap();
         let data = f.encode_input( &params.into_tokens() ).unwrap();
 
         // fetch current nonce and gas_price
         let gas_price = self.get_gas_price()?;
-        let nonce = self.get_nonce(&format!("0x{}", &self.sender_account))?;
+        // let nonce = self.get_nonce(&format!("0x{}", &self.sender_account))?;
+        let nonce = self.nonce.clone();
+        let mut new_nonce = self.nonce;
+        new_nonce = new_nonce + U256::one();
+        self.nonce = new_nonce;
+
+        println!("Sending with nonce = {}", nonce);
 
         // form and sign tx
         let tx = signer::RawTransaction {
@@ -94,7 +108,7 @@ impl ETHClient {
 
     /// Returns tx hash
     pub fn commit_block(
-        &self, 
+        & mut self, 
         block_num: U32, 
         total_fees: U128, 
         tx_data_packed: Vec<u8>, 
@@ -105,7 +119,7 @@ impl ETHClient {
 
     /// Returns tx hash
     pub fn verify_block(
-        &self, 
+        & mut self, 
         block_num: U32, 
         proof: [U256; 8]) -> Result<H256>
     {

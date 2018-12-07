@@ -134,16 +134,16 @@ impl BabyProver {
 
         let jubjub_params = AltJubjubBn256::new();
 
-        println!("Verificaiton key alpha g1 == {}", params.vk.alpha_g1);
-        println!("Verificaiton key beta g2 == {}", params.vk.beta_g2);
-        println!("Verificaiton key gamma g2 == {}", params.vk.gamma_g2);
-        println!("Verificaiton key delta g2 == {}", params.vk.delta_g2);
+        // println!("Verificaiton key alpha g1 == {}", params.vk.alpha_g1);
+        // println!("Verificaiton key beta g2 == {}", params.vk.beta_g2);
+        // println!("Verificaiton key gamma g2 == {}", params.vk.gamma_g2);
+        // println!("Verificaiton key delta g2 == {}", params.vk.delta_g2);
 
-        let ic_keys = params.vk.ic.clone();
+        // let ic_keys = params.vk.ic.clone();
 
-        for (i, ic) in ic_keys.into_iter().enumerate() {
-            println!("Verificaiton key for input {} == {}", i, ic);
-        }
+        // for (i, ic) in ic_keys.into_iter().enumerate() {
+        //     println!("Verificaiton key for input {} == {}", i, ic);
+        // }
 
         Ok(Self{
             batch_size: TX_BATCH_SIZE,
@@ -216,6 +216,8 @@ impl Prover<Bn256> for BabyProver {
     // Apply transactions to the state while also making a witness for proof, then calculate proof
     fn apply_and_prove(&mut self, block: &Block<Bn256>) -> Result<Self::Proof, Self::Err> {
         let block_number = block.block_number;
+        let block_final_root = block.new_root_hash.clone();
+
         let public_data: Vec<u8> = BabyProver::encode_transactions(block).unwrap();
 
         let transactions = &block.transactions;
@@ -245,9 +247,19 @@ impl Prover<Bn256> for BabyProver {
                 return Err(BabyProverErr::InvalidSender);
             }
             
+            // this is LE bits encoding of the transaction amount
             let mut amount_bits: Vec<bool> = BitIterator::new(tx.amount.into_repr()).collect();
             amount_bits.reverse();
             amount_bits.truncate(*plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH);
+
+            for b in amount_bits.clone().into_iter() {
+                if b {
+                    print!("1");
+                } else {
+                    print!("0");
+                }
+            }
+            print!("\n");
 
             let parsed_transfer_amount = parse_float_to_u128(amount_bits, 
                 *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH,
@@ -255,6 +267,7 @@ impl Prover<Bn256> for BabyProver {
                 10
             );
 
+            // this is LE bits encoding of the transaction fee
             let mut fee_bits: Vec<bool>  = BitIterator::new(tx.fee.into_repr()).collect();
             fee_bits.reverse();
             fee_bits.truncate(*plasma_constants::FEE_EXPONENT_BIT_WIDTH + *plasma_constants::FEE_MANTISSA_BIT_WIDTH);
@@ -269,7 +282,10 @@ impl Prover<Bn256> for BabyProver {
                 return Err(BabyProverErr::InvalidAmountEncoding);
             }
 
-            let transfer_amount_as_field_element = Fr::from_str(&parsed_transfer_amount.unwrap().to_string()).unwrap();
+            let unwrapped_transfer_amount = parsed_transfer_amount.unwrap();
+            println!("In prover parsed transfer amount = {}", unwrapped_transfer_amount);
+
+            let transfer_amount_as_field_element = Fr::from_str(&unwrapped_transfer_amount.to_string()).unwrap();
             let fee_as_field_element = Fr::from_str(&parsed_fee.unwrap().to_string()).unwrap();
 
             let path_from : Vec<Option<(Fr, bool)>> = tree.merkle_path(sender_leaf_number).into_iter().map(|e| Some(e)).collect();
@@ -287,6 +303,8 @@ impl Prover<Bn256> for BabyProver {
 
             let mut updated_sender_leaf = sender_leaf.unwrap().clone();
             let mut updated_recipient_leaf = recipient_leaf.unwrap().clone();
+
+            println!("In prover transaction amount = {}", transfer_amount_as_field_element);
 
             updated_sender_leaf.balance.sub_assign(&transfer_amount_as_field_element);
             updated_sender_leaf.balance.sub_assign(&fee_as_field_element);
@@ -322,6 +340,9 @@ impl Prover<Bn256> for BabyProver {
 
                 witnesses.push(Some(witness));
             }
+
+            let intermediate_root = tree.root_hash();
+            println!("Intermediate root = {}", intermediate_root);
         }
 
         let block_number = Fr::from_str(&block_number.to_string()).unwrap();
@@ -329,6 +350,12 @@ impl Prover<Bn256> for BabyProver {
         let final_root = self.accounts_tree.root_hash();
 
         if initial_root == final_root {
+            return Err(BabyProverErr::Unknown);
+        }
+
+        println!("Prover final root = {}, final root from state keeper = {}", final_root, block_final_root);
+
+        if block_final_root != final_root {
             return Err(BabyProverErr::Unknown);
         }
 

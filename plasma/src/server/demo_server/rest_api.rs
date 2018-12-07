@@ -26,7 +26,7 @@ use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 use super::state_keeper::{TxInfo, PlasmaStateKeeper};
 
 use pairing::bn256::{Bn256, Fr};
-use super::super::plasma_state::{Block};
+use super::super::plasma_state::{Block, State};
 use super::super::super::balance_tree::{BabyBalanceTree, BabyLeaf};
 use super::super::super::circuit::{plasma_constants};
 
@@ -54,8 +54,6 @@ struct TransactionRequest {
 struct TransactionResponse {
     accepted: bool,
 }
-
-// static STATE_KEEPER_TX: &AppState = &AppState{state_keeper_tx: None};
 
 // singleton to keep info about channels required for Http server
 #[derive(Clone)]
@@ -105,7 +103,8 @@ pub fn run() {
 
     println!("Creating ETH client");
 
-    let eth_client = ETHClient::new(PROD_PLASMA);
+    let mut eth_client = ETHClient::new(PROD_PLASMA);
+    eth_client.get_first_nonce();
 
     println!("Creating default state");
 
@@ -145,20 +144,21 @@ pub fn run() {
 
     }
 
-    let root = tree.root_hash();
-
-    println!("Inserted {} accounts with balances, root hash = {}", number_of_accounts, root);
-
     let mut keeper = PlasmaStateKeeper {
         balance_tree: tree,
         block_number: 0,
-        root_hash:    root,
+        // root_hash:    root,
         transactions_channel: rx_for_transactions,
         batch_channel: tx_for_blocks.clone(),
         batch_size : 8,
         current_batch: vec![],
         private_keys: keys_map
     };
+
+    let root = keeper.root_hash();
+
+    println!("Created state keeper with  {} accounts with balances, root hash = {}", number_of_accounts, root);
+
 
     let mut prover = BabyProver::create(&keeper).unwrap();
 
@@ -179,6 +179,7 @@ pub fn run() {
             println!("Got batch!");
             {
                 let new_root = block.new_root_hash.clone();
+                println!("Commiting to new root = {}", new_root);
                 let block_number = block.block_number;
                 let tx_data = BabyProver::encode_transactions(&block).unwrap();
                 let tx_data_bytes = tx_data;
@@ -224,9 +225,9 @@ pub fn run() {
                     let proof = proof.groth_proof;
 
                     println!("Will try to prove commit");
-                    for i in 0..8 {
-                        println!("Proof element {} = {}", i, proof[i]);
-                    }
+                    // for i in 0..8 {
+                    //     println!("Proof element {} = {}", i, proof[i]);
+                    // }
                     let hash = eth_client.verify_block(block_number, proof); 
                     println!("Proving tx hash = {}", hash.unwrap());
                     continue;
