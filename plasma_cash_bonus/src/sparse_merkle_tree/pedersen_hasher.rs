@@ -23,10 +23,13 @@ impl<E: JubjubEngine> Hasher<E::Fr> for PedersenHasher<E> {
     }
 
     fn compress(&self, lhs: &E::Fr, rhs: &E::Fr, i: usize) -> E::Fr {
+        // println!("For level {} xl = {}", i, lhs.clone());
+        // println!("For level {} xr = {}", i, rhs.clone());
         let lhs = BitIteratorLe::new(lhs.into_repr()).take(E::Fr::NUM_BITS as usize);
         let rhs = BitIteratorLe::new(rhs.into_repr()).take(E::Fr::NUM_BITS as usize);
         let input = lhs.chain(rhs);
         let hash = baby_pedersen_hash::<E, _>(Personalization::MerkleTree(i), input, &self.params).into_xy().0;
+        // println!("Current level hash = {}", hash);
 
         hash
     }
