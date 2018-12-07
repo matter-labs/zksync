@@ -36,9 +36,6 @@ pub struct PlasmaStateKeeper {
     /// Current block number
     pub block_number: u32,
 
-    // /// Cache of the current root hash
-    // pub root_hash:    Fr,
-
     /// channel to receive signed and verified transactions to apply
     pub transactions_channel: mpsc::Receiver<(TxInfo, mpsc::Sender<bool>)>,
 
@@ -229,6 +226,7 @@ impl PlasmaStateKeeper{
                 self.batch_channel.send(block);
             }
             self.current_batch = Vec::with_capacity(self.batch_size);
+            self.block_number += 1;
         }
         return_channel.send(true);
     }

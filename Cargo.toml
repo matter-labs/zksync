@@ -6,4 +6,5 @@ members = [
     "sapling-crypto",
     "bellman-demo",
     "plasma",
+    "plasma_cash_bonus",
 ]

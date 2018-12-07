@@ -1,8 +1,9 @@
-// prefilled root
-// bytes32 constant EMPTY_TREE_ROOT = 0x0a4a8a376264cf0603af6916e662020a4d73ec5eb538e9879e2546c7d64ec289;
+// prefilled root for 1000 accs
+// bytes32 constant EMPTY_TREE_ROOT = 0x09d809ed651bf1f19906bd7c170e1736176d3fbb2053e702dbbc2a8eed3e929f;
 
 // empty root for 24
 // bytes32 constant EMPTY_TREE_ROOT = 0x1d3843a9bbf376e57b3eca393198d7211882f6f2a76a53730243e2a1a519d92a;
+
 
 // This contract is generated programmatically
 
@@ -13,35 +14,35 @@ pragma solidity ^0.4.24;
 contract VerificationKeys {
 
     // For tree depth 24
-    bytes32 constant EMPTY_TREE_ROOT = 0x0a4a8a376264cf0603af6916e662020a4d73ec5eb538e9879e2546c7d64ec289;
+    bytes32 constant EMPTY_TREE_ROOT = 0x09d809ed651bf1f19906bd7c170e1736176d3fbb2053e702dbbc2a8eed3e929f;
 
     function getVkUpdateCircuit() internal pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {
 
         
-        vk[0] = 0x0821db8fd226d32f376069634e5fae7584404751c54a2dc078d21815cd29ebdc;
-        vk[1] = 0x24df5675fb25b1d3ebe887a6a9fb9a5e9333405f0946eba634ffeff7f1a3b046;
-        vk[2] = 0x179f489f59ee02e5d181fcfae7477aed918c6ff464d5b27bf67afeca1c907d34;
-        vk[3] = 0x27f998f4e12dad86fb293917dc868cadcbbc2e92e4e14f55aa4f9957bc0acaff;
-        vk[4] = 0x1ba333df83d312f57059afc19bb90248c29f27198e9987cec0fa3ef0c646892c;
-        vk[5] = 0x21433e2731aa26820ad40aafb000ba5d6edfd9411a0308765cc6716d018f0750;
-        vk[6] = 0x0baaf0e2a8b730ac65ff246865b7e95c70ab3a3300b48f6647d81ccf8c07bf3b;
-        vk[7] = 0x270e5254676dfc8228ea52f14ae31f08529cb671dc25f679f54b361da05f7e6e;
-        vk[8] = 0x0a2a651ae4a401fc1d1b869c580a149cc799909a8e0e91f809ead8e5fecb40d6;
-        vk[9] = 0x09ccbedfa42a77886d4aaf05b93b53ca993c2b2fd74d384f701ff6a36336c82a;
-        vk[10] = 0x0801eb631bfaf0f787b056f8a2e60963a3d6f233867a621e17dad42ddc341888;
-        vk[11] = 0x24693a927e6e1fe5537b09daf38bf5c50363e433c2cbdde62f39b0ad1c81f975;
-        vk[12] = 0x12a3f2caf69178478bbce88def317ca2d5c3d33c1c92b5ea8773649f3ef9a4a1;
-        vk[13] = 0x1089cb7f92d00c54fada2741606dad66a97dffc009fb471d7cd80fecc7e8aaff;
+        vk[0] = 0x205689185631ff0d863a6f2da0d54da86eea23a7a8fc0b337f05dbdd022155e0;
+        vk[1] = 0x23737e95ecc03889595f13d69d687a52eaf474cc7be053f0c5917c197fda6c57;
+        vk[2] = 0x0580df889d6f7acb4dd7fc570e594693ed3b924ee1493ed08aa391145a2263f0;
+        vk[3] = 0x23fa74c49362b2850d16b4caa4707fa23ca51cfc3642b6a83216276ead50a72b;
+        vk[4] = 0x2279bb8162ff17c860ac0a44102fd93f04bda949daf9bba71d4a468669a529a2;
+        vk[5] = 0x091cb662fd6e8330be410f91a0acb0e2527abca51ba828186c82df0841882677;
+        vk[6] = 0x2b396d204de97ce0cfe7789b1082a4093ee99a6896f19fb897acdf71fa59d60e;
+        vk[7] = 0x01f179302f8406d0996125f28327c1dce851c66feadbba2e996e8fd07daeef93;
+        vk[8] = 0x09b4e2b7eb9afac2032548bb263fa6682e5dfe9ec87945cf9672a61d560fd8e4;
+        vk[9] = 0x169b674db5165c17b0bea4dbae7aafe311d99663d3c632b42d60d210613b99b5;
+        vk[10] = 0x0a1aa950839e7904d0c33ce72b23893402678dfe1aada5ad60178f2afe71fcdc;
+        vk[11] = 0x04dea62d9770d36f621a6464cb084f41550703e533a9c9039fccacc779acc5f9;
+        vk[12] = 0x2a0422ecea1055497501a7b980d7e06141769f227d8c3d1b6496bfabec371007;
+        vk[13] = 0x1da6bd0a86cc0f3da9d3f1b0da18fddbf40d9122f28177a65114049f744f83da;
 
         gammaABC = new uint256[](8);
-        gammaABC[0] = 0x0c89c064b964706f01748636b1558d97b09fc305c192ad2ca014497878cd6603;
-        gammaABC[1] = 0x12c3568a1a1c2ba24202e99926017455406ce28e0327f83ccd284151b52cf93e;
-        gammaABC[2] = 0x0c5a08c8d16c4d87fbc2c92a25b9d249baa2fa4cb5bbbd3dffca19d11109abd6;
-        gammaABC[3] = 0x1e7224763f1fbf54e9decefeff303bf565cac1f3b16237ef7412234ef4284bb8;
-        gammaABC[4] = 0x213f0c597b57cb4b2a4cc2b7c49946125c8817a51686d0ab12fa46d807df7943;
-        gammaABC[5] = 0x2d9c9b677740042182c6bde86f55745cd2b607753ac808ad42f51f73e5045747;
-        gammaABC[6] = 0x1d70f763fdfb0a5b555e9794030dacb43d6cc3b8d7ec5aeb3acfa81cd460cfb2;
-        gammaABC[7] = 0x20fd53f5d95aba2349f63cbdb47ede913af2e5d36f1a50f162c280b6d131e72c;
+        gammaABC[0] = 0x0e4fc75aceed5ae90a59c80e09008930afcb2355bb5e924e56a6587e96b66b1f;
+        gammaABC[1] = 0x272058762f1b6f03c8344ba4f8b83bdcf0d1f04ca6158c6ccb199716a586e01d;
+        gammaABC[2] = 0x285cf2fe591f05a420b758264de59e4e2abe113f1ef91f224226844edff2014f;
+        gammaABC[3] = 0x2c897ce90f715d81669847f76ce49ab9f76b3ae038efd17c79969fca04fbac6f;
+        gammaABC[4] = 0x08030e083f89114e47beccbffa56bc128a18d8d1dab053bc985b7691d53f7340;
+        gammaABC[5] = 0x01e3e96f8008b8de47cd4d7631dea90e1703273dc98ee91d7d47b49e18aa7aae;
+        gammaABC[6] = 0x1f818ee7c3861156ee48a2f537cd324d77f9bde750cbccdb9433798ba8aa9af2;
+        gammaABC[7] = 0x253e138c1535c273286f20e0a1b33159f017d0041f82fe84a8f80094821f55ba;
 
 
     }

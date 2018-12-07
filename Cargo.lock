@@ -1373,6 +1373,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "plasma_cash_bonus"
+version = "0.1.0"
+dependencies = [
+ "bellman 0.1.0",
+ "ff 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num-bigint 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pairing 0.14.2",
+ "rand 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sapling-crypto 0.0.1",
+ "time 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "proc-macro-hack"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

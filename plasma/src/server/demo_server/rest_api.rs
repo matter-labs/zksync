@@ -35,8 +35,18 @@ use super::super::super::primitives::{serialize_g1_for_ethereum, serialize_g2_fo
 use super::super::eth::{ETHClient, PROD_PLASMA};
 
 use self::actix_web::{
-    error, http, middleware, server, App, AsyncResponder, Error, HttpMessage,
-    HttpRequest, HttpResponse, Json,
+    error, 
+    middleware, 
+    server, 
+    App, 
+    AsyncResponder, 
+    Error, 
+    HttpMessage,
+    HttpRequest, 
+    HttpResponse, 
+    Json,     
+    middleware::cors::Cors,
+    http::{header, Method},
 };
 
 use futures::{Future, Stream};
@@ -73,7 +83,7 @@ fn send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
                 amount: val.amount,
                 fee: 0,
                 nonce: 0,
-                good_until_block: 0
+                good_until_block: 100
             };
             state_tx.send((info, tx.clone()));
             let result = rx.recv();
@@ -112,7 +122,7 @@ pub fn run() {
     let tree_depth = *plasma_constants::BALANCE_TREE_DEPTH as u32;
     let mut tree = BabyBalanceTree::new(tree_depth);
 
-    let number_of_accounts = 100;
+    let number_of_accounts = 1000;
 
     let mut keys_map = HashMap::<u32,PrivateKey<Bn256>>::new();
     {
@@ -146,11 +156,11 @@ pub fn run() {
 
     let mut keeper = PlasmaStateKeeper {
         balance_tree: tree,
-        block_number: 0,
+        block_number: 1,
         // root_hash:    root,
         transactions_channel: rx_for_transactions,
         batch_channel: tx_for_blocks.clone(),
-        batch_size : 8,
+        batch_size : 32,
         current_batch: vec![],
         private_keys: keys_map
     };
@@ -244,8 +254,22 @@ pub fn run() {
     }.clone()) // <- create app with shared state
             // enable logger
             .middleware(middleware::Logger::default())
-            // register simple handler, handle all methods
-            .resource("/send", |r| r.method(http::Method::POST).f(send_transaction))
+            // enable CORS
+            .configure(|app| {
+                Cors::for_app(app)
+                    // .allowed_origin("*")
+                    .send_wildcard()
+                    // .allowed_methods(vec!["GET", "POST", "OPTIONS"])
+                    // .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
+                    // .allowed_header(header::CONTENT_TYPE)
+                    .max_age(3600)
+                    .resource("/send", |r| {
+                        r.method(Method::POST).f(send_transaction);
+                        r.method(Method::OPTIONS).f(|_| HttpResponse::Ok());
+                        r.method(Method::GET).f(|_| HttpResponse::Ok());
+                    })
+                    .register()
+            })
     }).bind("127.0.0.1:8080")
     .unwrap()
     .shutdown_timeout(1)

@@ -47,13 +47,13 @@ contract PlasmaStub is VerificationKeys {
     }
     
     function commitBlock(uint32 blockNumber, uint128 totalFees, bytes memory txDataPacked, bytes32 newRoot) public {
-        require(blockNumber == totalCommitted, "may only commit next block");
+        require(blockNumber == totalCommitted + 1, "may only commit next block");
 
         bytes32 finalHash = createPublicDataCommitment(blockNumber, totalFees, txDataPacked);
 
         // // TODO: need a strategy to avoid front-running msg.sender
-        blocks[totalCommitted] = Block(Circuit.UPDATE, totalFees, newRoot, finalHash, msg.sender, uint32(now + DEADLINE));
-        emit BlockCommitted(totalCommitted);
+        blocks[blockNumber] = Block(Circuit.UPDATE, totalFees, newRoot, finalHash, msg.sender, uint32(block.timestamp + DEADLINE));
+        emit BlockCommitted(blockNumber);
         totalCommitted++;
     }
 
@@ -70,12 +70,12 @@ contract PlasmaStub is VerificationKeys {
 
     function verifyBlock(uint32 blockNumber, uint256[8] memory proof) public {
         require(totalVerified < totalCommitted, "no committed block to verify");
-        require(blockNumber == totalVerified, "may only verify next block");
+        require(blockNumber == totalVerified + 1, "may only verify next block");
         Block memory committed = blocks[blockNumber];
         bool verification_success = verifyUpdateProof(proof, lastVerifiedRoot, committed.newRoot, committed.finalHash);
         require(verification_success, "invalid proof");
 
-        emit BlockCommitted(totalVerified);
+        emit BlockVerified(blockNumber);
         totalVerified++;
         lastVerifiedRoot = committed.newRoot;
 

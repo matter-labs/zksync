@@ -59,6 +59,7 @@ impl fmt::Display for BabyProverErr {
 
 pub struct BabyProver {
     pub batch_size: usize,
+    pub block_number: u32,
     pub accounts_tree: balance_tree::BabyBalanceTree,
     pub parameters: BabyParameters,
     pub jubjub_params: AltJubjubBn256,
@@ -85,7 +86,7 @@ pub struct FullBabyProof {
 type BabyProof = Proof<Bn256>;
 type BabyParameters = Parameters<Bn256>;
 
-const TX_BATCH_SIZE: usize = 8;
+const TX_BATCH_SIZE: usize = 32;
 
 impl BabyProver {
     pub fn create(initial_state: &State<Bn256>) ->
@@ -147,6 +148,7 @@ impl BabyProver {
 
         Ok(Self{
             batch_size: TX_BATCH_SIZE,
+            block_number: 1,
             accounts_tree: tree,
             parameters: params,
             jubjub_params: jubjub_params
@@ -216,6 +218,9 @@ impl Prover<Bn256> for BabyProver {
     // Apply transactions to the state while also making a witness for proof, then calculate proof
     fn apply_and_prove(&mut self, block: &Block<Bn256>) -> Result<Self::Proof, Self::Err> {
         let block_number = block.block_number;
+        if block_number != self.block_number {
+            return Err(BabyProverErr::Unknown);
+        }
         let block_final_root = block.new_root_hash.clone();
 
         let public_data: Vec<u8> = BabyProver::encode_transactions(block).unwrap();
@@ -358,6 +363,8 @@ impl Prover<Bn256> for BabyProver {
         if block_final_root != final_root {
             return Err(BabyProverErr::Unknown);
         }
+
+        self.block_number += 1;
 
         let mut public_data_initial_bits = vec![];
 
