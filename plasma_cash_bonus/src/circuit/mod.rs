@@ -25,14 +25,6 @@ use sapling_crypto::circuit::{
     float_point,
 };
 
-use balance_tree;
+use transaction_tree;
 
-pub mod plasma_constants;
-pub mod non-inclusion;
-pub mod utils;
-
-use self::baby_plasma::{
-    TransactionSignature,
-};
-
-mod notebook;
+pub mod non_inclusion;

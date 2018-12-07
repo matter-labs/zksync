@@ -18,7 +18,6 @@ impl<E: JubjubEngine> Hasher<E::Fr> for PedersenHasher<E> {
 
     fn hash_bits<I: IntoIterator<Item=bool>>(&self, input: I) -> E::Fr {
         let hash = baby_pedersen_hash::<E, _>(Personalization::NoteCommitment, input, &self.params).into_xy().0;
-        // print!("Leaf hash = {}\n", hash.clone());
 
         hash
     }
@@ -27,7 +26,9 @@ impl<E: JubjubEngine> Hasher<E::Fr> for PedersenHasher<E> {
         let lhs = BitIteratorLe::new(lhs.into_repr()).take(E::Fr::NUM_BITS as usize);
         let rhs = BitIteratorLe::new(rhs.into_repr()).take(E::Fr::NUM_BITS as usize);
         let input = lhs.chain(rhs);
-        baby_pedersen_hash::<E, _>(Personalization::MerkleTree(i), input, &self.params).into_xy().0
+        let hash = baby_pedersen_hash::<E, _>(Personalization::MerkleTree(i), input, &self.params).into_xy().0;
+
+        hash
     }
 
 }

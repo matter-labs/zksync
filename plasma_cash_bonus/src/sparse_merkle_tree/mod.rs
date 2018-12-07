@@ -1,7 +1,5 @@
 // Sparse Merkle tree with flexible hashing strategy
 
-pub mod alt_smt;
-pub mod parallel_smt;
 pub mod hasher;
 pub mod pedersen_hasher;
 

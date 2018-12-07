@@ -15,3 +15,4 @@ extern crate crypto;
 pub mod sparse_merkle_tree;
 pub mod transaction_tree;
 pub mod circuit;
+pub mod primitives;
