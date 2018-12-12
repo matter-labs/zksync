@@ -2,7 +2,6 @@ use pairing::bn256::{Bn256, Fr};
 use sapling_crypto::jubjub::{edwards, Unknown, FixedGenerators};
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 
-use crate::models::state::{State};
 use crate::primitives::{field_element_to_u32, field_element_to_u128};
 use crate::circuit::utils::{le_bit_vector_into_field_element};
 use std::sync::mpsc;
@@ -12,17 +11,14 @@ use ff::{Field, PrimeField};
 use rand::{OsRng};
 use sapling_crypto::eddsa::{PrivateKey};
 
-use crate::models::baby_models::{Block, Account, Tx, AccountTree, TransactionSignature};
+use crate::models::baby_models::{Block, Account, Tx, AccountTree, TransactionSignature, PlasmaState};
 use crate::models::tx::TxUnpacked;
 
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
 
-    /// Accounts stored in a sparse Merkle tree
-    pub balance_tree: AccountTree,
-
-    /// Current block number
-    pub block_number: u32,
+    /// Current plasma state
+    pub state: PlasmaState,
 
     /// channel to receive signed and verified transactions to apply
     pub transactions_channel: mpsc::Receiver<(TxUnpacked, mpsc::Sender<bool>)>,
@@ -36,26 +32,12 @@ pub struct PlasmaStateKeeper {
     // Accumulated transactions
     pub current_batch: Vec<Tx>,
 
+    // TODO: remove
     // Keep private keys in memory
     pub private_keys: HashMap<u32, PrivateKey<Bn256>>
 }
 
-impl State<Bn256> for PlasmaStateKeeper {
-
-    fn get_accounts(&self) -> Vec<(u32, Account)> {
-        self.balance_tree.items.iter().map(|a| (*a.0 as u32, a.1.clone()) ).collect()
-    }
-
-    fn block_number(&self) -> u32 {
-        self.block_number
-    }
-
-    fn root_hash (&self) -> Fr {
-        self.balance_tree.root_hash().clone()
-    }
-}
-
-impl PlasmaStateKeeper{
+impl PlasmaStateKeeper {
 
     pub fn run(& mut self) {
         loop {
@@ -83,7 +65,7 @@ impl PlasmaStateKeeper{
 
         // verify correctness
 
-        let mut from = self.balance_tree.items.get(&transaction.from).ok_or(())?.clone();
+        let mut from = self.state.balance_tree.items.get(&transaction.from).ok_or(())?.clone();
         if field_element_to_u128(from.balance) < transaction.amount { return Err(()); }
         // TODO: check nonce: assert field_element_to_u32(from.nonce) == transaction.nonce
 
@@ -91,7 +73,7 @@ impl PlasmaStateKeeper{
 
         let mut transaction = transaction.clone();
         transaction.nonce = field_element_to_u32(from.nonce);
-        transaction.good_until_block = self.block_number;
+        transaction.good_until_block = self.state.block_number;
         let mut tx = Tx::try_from(&transaction)?;
 
         let sk = self.private_keys.get(&transaction.from).unwrap();
@@ -99,14 +81,14 @@ impl PlasmaStateKeeper{
 
         // update state
 
-        let mut to = self.balance_tree.items.get(&transaction.to).ok_or(())?.clone();
+        let mut to = self.state.balance_tree.items.get(&transaction.to).ok_or(())?.clone();
         let amount = Fr::from_str(&transaction.amount.to_string()).unwrap();
         from.balance.sub_assign(&amount);
         // TODO: subtract fee
         from.nonce.add_assign(&Fr::one());  // from.nonce++
         to.balance.add_assign(&amount);     // to.balance += amount
-        self.balance_tree.insert(transaction.from, from);
-        self.balance_tree.insert(transaction.to, to);
+        self.state.balance_tree.insert(transaction.from, from);
+        self.state.balance_tree.insert(transaction.to, to);
 
         // push for processing
 
@@ -121,16 +103,16 @@ impl PlasmaStateKeeper{
     fn process_batch(&mut self) {
 
         let batch = &self.current_batch;
-        let new_root = self.root_hash();
+        let new_root = self.state.root_hash();
         let block = Block {
-            block_number:   self.block_number,
+            block_number:   self.state.block_number,
             transactions:   batch.to_vec(),
             new_root_hash:  new_root,
         };
         self.batch_channel.send(block);
 
         self.current_batch = Vec::with_capacity(self.batch_size);
-        self.block_number += 1;
+        self.state.block_number += 1;
     }
 
 }

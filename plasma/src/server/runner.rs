@@ -11,13 +11,12 @@ use sapling_crypto::jubjub::{FixedGenerators};
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 use pairing::bn256::{Bn256, Fr};
 
-use crate::models::baby_models::{Account, AccountTree, Block};
+use crate::models::baby_models::{Account, AccountTree, Block, PlasmaState};
 use super::prover::{BabyProver, EthereumProof};
 use super::state_keeper::{PlasmaStateKeeper};
 use super::rest_api::start_api_server;
 
 use crate::models::tx::TxUnpacked;
-use crate::models::state::{State};
 use crate::primitives::serialize_fe_for_ethereum;
 use crate::eth_client::{ETHClient, PROD_PLASMA};
 use crate::models::params;
@@ -79,8 +78,10 @@ pub fn run() {
     }
 
     let mut keeper = PlasmaStateKeeper {
-        balance_tree: tree,
-        block_number: 1,
+        state: PlasmaState{
+            balance_tree: tree,
+            block_number: 1,
+        },
         transactions_channel: rx_for_transactions,
         batch_channel: tx_for_blocks.clone(),
         batch_size : 32,
@@ -88,11 +89,11 @@ pub fn run() {
         private_keys: keys_map
     };
 
-    let root = keeper.root_hash();
+    let root = keeper.state.root_hash();
 
     println!("Created state keeper with  {} accounts with balances, root hash = {}", number_of_accounts, root);
 
-    let mut prover = BabyProver::create(&keeper).unwrap();
+    let mut prover = BabyProver::create(&keeper.state).unwrap();
 
     // spawn a thread with a state processor
 
@@ -172,5 +173,4 @@ pub fn run() {
     start_api_server(tx_for_transactions);
     
     let _ = sys.run();
-    // state_handle.join();
 }

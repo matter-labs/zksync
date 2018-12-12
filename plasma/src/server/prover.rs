@@ -13,8 +13,7 @@ use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
 
 use crate::models::params;
-use crate::models::state::State;
-use crate::models::baby_models::{AccountTree, Block};
+use crate::models::baby_models::{AccountTree, Block, PlasmaState};
 
 use super::config::TX_BATCH_SIZE;
 
@@ -89,7 +88,7 @@ pub struct FullBabyProof {
 }
 
 impl BabyProver {
-    pub fn create(initial_state: &State<Bn256>) ->
+    pub fn create(initial_state: &PlasmaState) ->
         Result<BabyProver, BabyProverErr>
     {
         use std::fs::File;
