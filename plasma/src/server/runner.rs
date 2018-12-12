@@ -16,7 +16,7 @@ use pairing::bn256::{Bn256, Fr};
 use super::baby_models::{Account, AccountTree, Block};
 use super::prover::{BabyProver, EthereumProof};
 use super::state_keeper::{TxInfo, PlasmaStateKeeper};
-use super::rest_api::start_web_server;
+use super::rest_api::start_api_server;
 
 use crate::models::state::{State};
 use crate::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum, field_element_to_u32};
@@ -171,7 +171,7 @@ pub fn run() {
         }
     });
 
-    start_web_server(tx_for_transactions);
+    start_api_server(tx_for_transactions);
     
     let _ = sys.run();
     // state_handle.join();

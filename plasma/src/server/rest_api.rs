@@ -80,7 +80,7 @@ pub fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item =
         .responder()
 }
 
-pub fn start_web_server(tx_for_transactions: mpsc::Sender<(TxInfo, mpsc::Sender<bool>)>) {
+pub fn start_api_server(tx_for_transactions: mpsc::Sender<(TxInfo, mpsc::Sender<bool>)>) {
     //move is necessary to give closure below ownership
     server::new(move || {
         App::with_state(AppState {
