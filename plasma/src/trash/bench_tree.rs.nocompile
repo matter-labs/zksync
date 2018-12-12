@@ -24,7 +24,7 @@ fn main() {
 
     let rng = &mut XorShiftRng::from_seed([0x5dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
     let mut leafs = Vec::with_capacity(n_inserts * rounds);
-    let rand_leaf = |_| BabyLeaf {
+    let rand_leaf = |_| Account {
         balance:    Fr::rand(rng),
         nonce:      Fr::rand(rng),
         pub_x:      Fr::rand(rng),
@@ -39,7 +39,7 @@ fn main() {
     let total = rounds * n_inserts;
     println!("running {} rounds of {} updates each (total {} updates):", rounds, n_inserts, total);
 
-    let mut tree = BabyBalanceTree::new(height as u32);
+    let mut tree = AccountTree::new(height as u32);
     let mut v1 = Vec::new();
     let capacity = tree.capacity() as usize;
 
@@ -56,7 +56,7 @@ fn main() {
     let duration = (precise_time_ns() - start) as f64 / 1_000_000_000.0;
     println!("done in {} s @ {} TPS", duration, total as f64 / duration);
 
-    type BTree = parallel_smt::SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
+    type BTree = parallel_smt::SparseMerkleTree<Account, Fr, BabyPedersenHasher>;
 
     let mut tree = BTree::new(height);
     let mut v2 = Vec::new();

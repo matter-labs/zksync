@@ -37,10 +37,10 @@ fn bench_tree_update_100_batched(b: &mut Bencher) {
 
 fn bench_balance_tree_update(b: &mut Bencher, n_inserts: usize) {
     let rng = &mut thread_rng();
-    let mut tree = BabyBalanceTree::new(24);
+    let mut tree = AccountTree::new(24);
     let capacity = tree.capacity();
     let mut leafs = Vec::with_capacity(n_inserts);
-    leafs.extend((0..n_inserts).map(|_| BabyLeaf {
+    leafs.extend((0..n_inserts).map(|_| Account {
         balance:    Fr::rand(rng),
         nonce:      Fr::rand(rng),
         pub_x:      Fr::rand(rng),
@@ -58,13 +58,13 @@ fn bench_balance_tree_update(b: &mut Bencher, n_inserts: usize) {
 
 fn bench_batched_smt(b: &mut Bencher, n_inserts: usize) {
 
-    type BabyBalanceTree = parallel_smt::SparseMerkleTree<BabyLeaf, Fr, BabyPedersenHasher>;
+    type AccountTree = parallel_smt::SparseMerkleTree<Account, Fr, BabyPedersenHasher>;
 
     let rng = &mut thread_rng();
-    let mut tree = BabyBalanceTree::new(24);
+    let mut tree = AccountTree::new(24);
     let capacity = tree.capacity();
     let mut leafs = Vec::with_capacity(n_inserts);
-    leafs.extend((0..n_inserts).map(|_| BabyLeaf {
+    leafs.extend((0..n_inserts).map(|_| Account {
         balance:    Fr::rand(rng),
         nonce:      Fr::rand(rng),
         pub_x:      Fr::rand(rng),

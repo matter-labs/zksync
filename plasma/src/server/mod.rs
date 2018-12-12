@@ -1,5 +1,6 @@
-pub mod plasma_state;
-pub mod prover;
-pub mod baby_prover;
-pub mod eth;
-pub mod demo_server;
+pub mod rest_api;
+pub mod baby_models;
+
+mod state_keeper;
+mod prover;
+mod params;

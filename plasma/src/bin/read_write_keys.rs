@@ -16,7 +16,7 @@ use pairing::{Engine};
 use rand::{SeedableRng, Rng, XorShiftRng};
 use sapling_crypto::circuit::test::*;
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
-use plasma::balance_tree::{BabyBalanceTree, BabyLeaf};
+use plasma::server::baby_models::{AccountTree, Account};
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
 use std::collections::HashMap;
@@ -46,7 +46,7 @@ use sapling_crypto::eddsa::{
 };
 
 use plasma::circuit::utils::*;
-use plasma::circuit::plasma_constants;
+use plasma::models::params;
 use plasma::circuit::transfer::transaction::{Transaction};
 use plasma::circuit::transfer::circuit::{TransactionWitness, Transfer};
 use sapling_crypto::circuit::float_point::{convert_to_float};
@@ -57,13 +57,13 @@ fn main() {
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &AltJubjubBn256::new();
     let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
-    let tree_depth = *plasma_constants::BALANCE_TREE_DEPTH as u32;
+    let tree_depth = params::BALANCE_TREE_DEPTH as u32;
 
     let capacity: u32 = 1 << tree_depth;
 
     let mut existing_accounts: Vec<(u32, PrivateKey<Bn256>, PublicKey<Bn256>)> = vec![];
 
-    let mut tree = BabyBalanceTree::new(tree_depth);
+    let mut tree = AccountTree::new(tree_depth);
 
     let number_of_accounts = 1000;
 
@@ -88,7 +88,7 @@ fn main() {
 
         existing_accounts.push((leaf_number, sk, pk));
 
-        let leaf = BabyLeaf {
+        let leaf = Account {
             balance:    Fr::from_str(default_balance_string).unwrap(),
             nonce:      Fr::zero(),
             pub_x:      x,
@@ -111,8 +111,8 @@ fn main() {
 
     let transfer_amount_bits = convert_to_float(
         transfer_amount,
-        *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH,
+        params::AMOUNT_EXPONENT_BIT_WIDTH,
+        params::AMOUNT_MANTISSA_BIT_WIDTH,
         10
     ).unwrap();
 
@@ -122,8 +122,8 @@ fn main() {
 
     let fee_bits = convert_to_float(
         fee_amount,
-        *plasma_constants::FEE_EXPONENT_BIT_WIDTH,
-        *plasma_constants::FEE_MANTISSA_BIT_WIDTH,
+        params::FEE_EXPONENT_BIT_WIDTH,
+        params::FEE_MANTISSA_BIT_WIDTH,
         10
     ).unwrap();
 
@@ -146,7 +146,7 @@ fn main() {
         let sender_leaf_number = sender_account_info.0;
         let recipient_leaf_number = recipient_account_info.0;
 
-        let mut items = tree.items.clone();
+        let items = tree.items.clone();
 
         let sender_leaf = items.get(&sender_leaf_number).unwrap().clone();        
         let recipient_leaf = items.get(&recipient_leaf_number).unwrap().clone();
@@ -180,8 +180,8 @@ fn main() {
 
         assert!(transaction.signature.is_some());
 
-        assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-        assert!(tree.verify_proof(recipient_leaf_number, recipient_leaf.clone(), tree.merkle_path(recipient_leaf_number)));
+        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+        //assert!(tree.verify_proof(recipient_leaf_number, recipient_leaf.clone(), tree.merkle_path(recipient_leaf_number)));
 
         // println!("Sender: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", sender_leaf.balance, sender_leaf.nonce, sender_leaf.pub_x, sender_leaf.pub_y);
         // println!("Recipient: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", recipient_leaf.balance, recipient_leaf.nonce, recipient_leaf.pub_x, recipient_leaf.pub_y);
@@ -204,8 +204,8 @@ fn main() {
         tree.insert(sender_leaf_number, updated_sender_leaf.clone());
         tree.insert(recipient_leaf_number, updated_recipient_leaf.clone());
 
-        assert!(tree.verify_proof(sender_leaf_number, updated_sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-        assert!(tree.verify_proof(recipient_leaf_number, updated_recipient_leaf.clone(), tree.merkle_path(recipient_leaf_number)));
+        //assert!(tree.verify_proof(sender_leaf_number, updated_sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+        //assert!(tree.verify_proof(recipient_leaf_number, updated_recipient_leaf.clone(), tree.merkle_path(recipient_leaf_number)));
 
 
         let public_data = transaction.public_data_into_bits();
@@ -235,7 +235,7 @@ fn main() {
 
     let final_root = tree.root_hash();
 
-    let final_root_string = format!("{}", BabyBalanceTree::new(tree_depth).root_hash().into_repr());
+    let final_root_string = format!("{}", AccountTree::new(tree_depth).root_hash().into_repr());
 
     println!("Final root = {}", final_root_string);
 
@@ -353,12 +353,12 @@ fn main() {
     };
 
     let empty_witness = TransactionWitness {
-        auth_path_from: vec![None; *plasma_constants::BALANCE_TREE_DEPTH],
+        auth_path_from: vec![None; params::BALANCE_TREE_DEPTH],
         balance_from: None,
         nonce_from: None,
         pub_x_from: None,
         pub_y_from: None,
-        auth_path_to: vec![None; *plasma_constants::BALANCE_TREE_DEPTH],
+        auth_path_to: vec![None; params::BALANCE_TREE_DEPTH],
         balance_to: None,
         nonce_to: None,
         pub_x_to: None,
@@ -395,7 +395,7 @@ fn main() {
     let mut r = BufReader::new(f_r);
     let circuit_params = bellman::groth16::Parameters::read(& mut r, true).expect("Unable to read proving key");
 
-    let initial_root_string = format!("{}", BabyBalanceTree::new(tree_depth).root_hash().into_repr());
+    let initial_root_string = format!("{}", AccountTree::new(tree_depth).root_hash().into_repr());
     let contract_content = generate_vk_contract(&circuit_params.vk, initial_root_string.as_ref(), tree_depth);
 
     let f_cont = File::create("VerificationKeys.sol").expect("Unable to create file");

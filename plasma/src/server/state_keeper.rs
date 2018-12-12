@@ -1,20 +1,21 @@
-use super::super::plasma_state::{State, Account, Tx};
-use super::super::super::balance_tree::BabyBalanceTree;
-use super::super::super::primitives::{field_element_to_u32, field_element_to_u128};
 use pairing::bn256::{Bn256, Fr};
 use sapling_crypto::jubjub::{JubjubEngine, edwards, Unknown, FixedGenerators};
 use sapling_crypto::circuit::float_point::{convert_to_float, parse_float_to_u128};
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
-use super::super::super::circuit::plasma_constants;
-use super::super::super::circuit::transfer::transaction::{TransactionSignature};
-use super::super::super::circuit::utils::{le_bit_vector_into_field_element};
+
+use crate::models::params;
+use crate::models::state::{State};
+use crate::primitives::{field_element_to_u32, field_element_to_u128};
+use crate::circuit::transfer::transaction::{TransactionSignature};
+use crate::circuit::utils::{le_bit_vector_into_field_element};
 use std::sync::mpsc;
 use std::{thread, time};
 use std::collections::HashMap;
 use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
 use rand::{OsRng, Rng};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
-use super::super::plasma_state::{Block};
+
+use super::baby_models::{Block, Account, Tx, AccountTree};
 
 #[derive(Debug, Clone)]
 pub struct TxInfo{
@@ -30,8 +31,7 @@ pub struct TxInfo{
 pub struct PlasmaStateKeeper {
 
     /// Accounts stored in a sparse Merkle tree
-    pub balance_tree: BabyBalanceTree,
-    // balance_tree: ParallelBalanceTree,
+    pub balance_tree: AccountTree,
 
     /// Current block number
     pub block_number: u32,
@@ -40,13 +40,13 @@ pub struct PlasmaStateKeeper {
     pub transactions_channel: mpsc::Receiver<(TxInfo, mpsc::Sender<bool>)>,
 
     // outgoing channel
-    pub batch_channel: mpsc::Sender<Block<Bn256>>,
+    pub batch_channel: mpsc::Sender<Block>,
 
     // Batch size
-    pub batch_size : usize,
+    pub batch_size: usize,
 
     // Accumulated transactions
-    pub current_batch: Vec<Tx<Bn256>>,
+    pub current_batch: Vec<Tx>,
 
     // Keep private keys in memory
     pub private_keys: HashMap<u32, PrivateKey<Bn256>>
@@ -54,7 +54,7 @@ pub struct PlasmaStateKeeper {
 
 impl State<Bn256> for PlasmaStateKeeper {
 
-    fn get_accounts(&self) -> Vec<(u32, Account<Bn256>)> {
+    fn get_accounts(&self) -> Vec<(u32, Account)> {
         self.balance_tree.items.iter().map(|a| (*a.0 as u32, a.1.clone()) ).collect()
     }
 
@@ -128,8 +128,8 @@ impl PlasmaStateKeeper{
             }
 
             let encoded_amount_bits = convert_to_float(transaction.amount,
-                *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH, 
-                *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH, 
+                params::AMOUNT_EXPONENT_BIT_WIDTH, 
+                params::AMOUNT_MANTISSA_BIT_WIDTH, 
                 10
             );
 
@@ -218,7 +218,7 @@ impl PlasmaStateKeeper{
             {
                 let batch = &self.current_batch;
                 let new_root = self.root_hash();
-                let block: Block<Bn256> = Block {
+                let block = Block {
                     block_number:   self.block_number,
                     transactions:   batch.to_vec(),
                     new_root_hash:  new_root,

@@ -11,28 +11,21 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::mpsc;
 use std::time;
-
-use super::super::prover::Prover;
 use rand::{SeedableRng, Rng, XorShiftRng};
-
 use web3::types::{U256, Bytes, U128, H256};
-
 use std::collections::HashMap;
 use ff::{Field, PrimeField};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 use sapling_crypto::jubjub::{FixedGenerators};
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
-
 use super::state_keeper::{TxInfo, PlasmaStateKeeper};
-
 use pairing::bn256::{Bn256, Fr};
-use super::super::plasma_state::{Block, State};
-use super::super::super::balance_tree::{BabyBalanceTree, BabyLeaf};
-use super::super::super::circuit::{plasma_constants};
-
-use super::super::super::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum, field_element_to_u32};
-
-use super::super::eth::{ETHClient, PROD_PLASMA};
+use crate::models::state::{State};
+use super::baby_models::{Account, AccountTree, Block};
+use crate::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum, field_element_to_u32};
+use crate::eth_client::{ETHClient, PROD_PLASMA};
+use super::prover::{BabyProver, EthereumProof};
+use crate::models::params;
 
 use self::actix_web::{
     error, 
@@ -50,8 +43,6 @@ use self::actix_web::{
 };
 
 use futures::{Future, Stream};
-
-use super::super::baby_prover::{BabyProver, EthereumProof};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct TransactionRequest {
@@ -104,7 +95,7 @@ pub fn run() {
     // create channel to accept deserialized requests for new transacitons
 
     let (tx_for_transactions, rx_for_transactions) = mpsc::channel::<(TxInfo, mpsc::Sender<bool>)>();
-    let (tx_for_blocks, rx_for_blocks) = mpsc::channel::<Block<Bn256>>();
+    let (tx_for_blocks, rx_for_blocks) = mpsc::channel::<Block>();
     let (tx_for_proofs, rx_for_proofs) = mpsc::channel::<EthereumProof>();
     let (tx_for_tx_data, rx_for_tx_data) = mpsc::channel::<EthereumProof>();
 
@@ -119,12 +110,12 @@ pub fn run() {
     println!("Creating default state");
 
     // here we should insert default accounts into the tree
-    let tree_depth = *plasma_constants::BALANCE_TREE_DEPTH as u32;
-    let mut tree = BabyBalanceTree::new(tree_depth);
+    let tree_depth = params::BALANCE_TREE_DEPTH as u32;
+    let mut tree = AccountTree::new(tree_depth);
 
     let number_of_accounts = 1000;
 
-    let mut keys_map = HashMap::<u32,PrivateKey<Bn256>>::new();
+    let mut keys_map = HashMap::<u32, PrivateKey<Bn256>>::new();
     {
         let mut_tree = & mut tree;
         let p_g = FixedGenerators::SpendingKeyGenerator;
@@ -142,7 +133,7 @@ pub fn run() {
 
             keys_map.insert(i, sk);
 
-            let leaf = BabyLeaf {
+            let leaf = Account {
                 balance:    Fr::from_str(default_balance_string).unwrap(),
                 nonce:      Fr::zero(),
                 pub_x:      x,

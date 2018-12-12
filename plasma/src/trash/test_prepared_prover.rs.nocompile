@@ -12,18 +12,26 @@ use time::PreciseTime;
 
 use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
 use pairing::bn256::*;
+use pairing::{Engine};
 use rand::{SeedableRng, Rng, XorShiftRng};
+use sapling_crypto::circuit::test::*;
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
-use plasma::balance_tree::{BabyBalanceTree, BabyLeaf};
+use plasma::prover::baby_models::{AccountTree, Account};
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
 use std::collections::HashMap;
+use hex::encode;
+
+use bellman::{
+    Circuit,
+};
 
 use bellman::groth16::{
-    create_random_proof, 
+    prepare_prover,
     generate_random_parameters, 
     prepare_verifying_key, 
     verify_proof,
+    PreparedProver,
 };
 
 use sapling_crypto::jubjub::{
@@ -36,27 +44,25 @@ use sapling_crypto::eddsa::{
 };
 
 use plasma::circuit::utils::*;
-use plasma::circuit::plasma_constants;
+use crate::models::params;
 use plasma::circuit::baby_plasma::{Transaction, TransactionWitness, Update};
 use sapling_crypto::circuit::float_point::{convert_to_float};
 
-const TXES_TO_TEST: usize = 1600;
+const TXES_TO_TEST: usize = 16;
 
 fn main() {
-    println!("Will try to make a proof for {} transactons", TXES_TO_TEST);
-
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &AltJubjubBn256::new();
     let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
-    let tree_depth = *plasma_constants::BALANCE_TREE_DEPTH as u32;
+    let tree_depth = params::BALANCE_TREE_DEPTH as u32;
 
     let capacity: u32 = 1 << tree_depth;
 
     let mut existing_accounts: Vec<(u32, PrivateKey<Bn256>, PublicKey<Bn256>)> = vec![];
 
-    let mut tree = BabyBalanceTree::new(tree_depth);
+    let mut tree = AccountTree::new(tree_depth);
 
-    let number_of_accounts = 10000;
+    let number_of_accounts = 1000;
 
     let mut existing_account_hm = HashMap::<u32, bool>::new();
 
@@ -79,7 +85,7 @@ fn main() {
 
         existing_accounts.push((leaf_number, sk, pk));
 
-        let leaf = BabyLeaf {
+        let leaf = Account {
             balance:    Fr::from_str(default_balance_string).unwrap(),
             nonce:      Fr::zero(),
             pub_x:      x,
@@ -102,8 +108,8 @@ fn main() {
 
     let transfer_amount_bits = convert_to_float(
         transfer_amount,
-        *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH,
+        params::AMOUNT_EXPONENT_BIT_WIDTH,
+        params::AMOUNT_MANTISSA_BIT_WIDTH,
         10
     ).unwrap();
 
@@ -113,8 +119,8 @@ fn main() {
 
     let fee_bits = convert_to_float(
         fee_amount,
-        *plasma_constants::FEE_EXPONENT_BIT_WIDTH,
-        *plasma_constants::FEE_MANTISSA_BIT_WIDTH,
+        params::FEE_EXPONENT_BIT_WIDTH,
+        params::FEE_MANTISSA_BIT_WIDTH,
         10
     ).unwrap();
 
@@ -171,8 +177,8 @@ fn main() {
 
         assert!(transaction.signature.is_some());
 
-        assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-        assert!(tree.verify_proof(recipient_leaf_number, recipient_leaf.clone(), tree.merkle_path(recipient_leaf_number)));
+        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+        //assert!(tree.verify_proof(recipient_leaf_number, recipient_leaf.clone(), tree.merkle_path(recipient_leaf_number)));
 
         // println!("Sender: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", sender_leaf.balance, sender_leaf.nonce, sender_leaf.pub_x, sender_leaf.pub_y);
         // println!("Recipient: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", recipient_leaf.balance, recipient_leaf.nonce, recipient_leaf.pub_x, recipient_leaf.pub_y);
@@ -195,8 +201,8 @@ fn main() {
         tree.insert(sender_leaf_number, updated_sender_leaf.clone());
         tree.insert(recipient_leaf_number, updated_recipient_leaf.clone());
 
-        assert!(tree.verify_proof(sender_leaf_number, updated_sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-        assert!(tree.verify_proof(recipient_leaf_number, updated_recipient_leaf.clone(), tree.merkle_path(recipient_leaf_number)));
+        //assert!(tree.verify_proof(sender_leaf_number, updated_sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+        //assert!(tree.verify_proof(recipient_leaf_number, updated_recipient_leaf.clone(), tree.merkle_path(recipient_leaf_number)));
 
 
         let public_data = transaction.public_data_into_bits();
@@ -222,7 +228,13 @@ fn main() {
 
     let block_number = Fr::one();
 
+    println!("Block number = {}", block_number.into_repr());
+
     let final_root = tree.root_hash();
+
+    let final_root_string = format!("{}", AccountTree::new(tree_depth).root_hash().into_repr());
+
+    println!("Final root = {}", final_root_string);
 
     let mut public_data_initial_bits = vec![];
 
@@ -254,11 +266,11 @@ fn main() {
     {    
         let packed_transaction_data_bytes = be_bit_vector_into_bytes(&public_data_vector);
 
-        println!("Public data size for Ethereum smart contract call = {}", packed_transaction_data_bytes.len());
-
         let mut next_round_hash_bytes = vec![];
         next_round_hash_bytes.extend(hash_result.iter());
-        next_round_hash_bytes.extend(packed_transaction_data_bytes);
+        next_round_hash_bytes.extend(packed_transaction_data_bytes.clone());
+
+        println!("Public data = {}", encode(packed_transaction_data_bytes));
 
         let mut h = Sha256::new();
 
@@ -278,41 +290,43 @@ fn main() {
 
     let public_data_commitment = Fr::from_repr(repr).unwrap();
 
-    // print!("Final data commitment as field element = {}\n", public_data_commitment);
+    println!("Total fees = {}", total_fees.into_repr());
 
-    // let instance_for_test_cs = Update {
-    //     params: params,
-    //     number_of_transactions: TXES_TO_TEST,
-    //     old_root: Some(initial_root),
-    //     new_root: Some(final_root),
-    //     public_data_commitment: Some(public_data_commitment),
-    //     block_number: Some(Fr::one()),
-    //     total_fee: Some(total_fees),
-    //     transactions: witnesses.clone(),
-    // };
+    print!("Final data commitment as field element = {}\n", public_data_commitment);
 
-    // {
-    //     let mut cs = TestConstraintSystem::new();
+    let instance_for_test_cs = Update {
+        params: params,
+        number_of_transactions: TXES_TO_TEST,
+        old_root: Some(initial_root),
+        new_root: Some(final_root),
+        public_data_commitment: Some(public_data_commitment),
+        block_number: Some(Fr::one()),
+        total_fee: Some(total_fees),
+        transactions: witnesses.clone(),
+    };
 
-    //     instance_for_test_cs.synthesize(&mut cs).unwrap();
+    {
+        let mut cs = TestConstraintSystem::new();
 
-    //     println!("Total of {} constraints", cs.num_constraints());
-    //     println!("{} constraints per TX for {} transactions", cs.num_constraints() / TXES_TO_TEST, TXES_TO_TEST);
+        instance_for_test_cs.synthesize(&mut cs).unwrap();
 
-    //     assert_eq!(cs.num_inputs(), 4);
+        println!("Total of {} constraints", cs.num_constraints());
+        println!("{} constraints per TX for {} transactions", cs.num_constraints() / TXES_TO_TEST, TXES_TO_TEST);
 
-    //     assert_eq!(cs.get_input(0, "ONE"), Fr::one());
-    //     assert_eq!(cs.get_input(1, "old root input/input variable"), initial_root);
-    //     assert_eq!(cs.get_input(2, "new root input/input variable"), final_root);
-    //     assert_eq!(cs.get_input(3, "rolling hash input/input variable"), public_data_commitment);
+        assert_eq!(cs.num_inputs(), 4);
 
-    //     // let err = cs.which_is_unsatisfied();
-    //     // if err.is_some() {
-    //     //     panic!("ERROR satisfying in {}\n", err.unwrap());
-    //     // } else {
-    //     //     println!("Test constraint system is satisfied");
-    //     // }
-    // }
+        assert_eq!(cs.get_input(0, "ONE"), Fr::one());
+        assert_eq!(cs.get_input(1, "old root input/input variable"), initial_root);
+        assert_eq!(cs.get_input(2, "new root input/input variable"), final_root);
+        assert_eq!(cs.get_input(3, "rolling hash input/input variable"), public_data_commitment);
+
+        // let err = cs.which_is_unsatisfied();
+        // if err.is_some() {
+        //     panic!("ERROR satisfying in {}\n", err.unwrap());
+        // } else {
+        //     println!("Test constraint system is satisfied");
+        // }
+    }
 
     let instance_for_generation = Update {
         params: params,
@@ -324,6 +338,17 @@ fn main() {
         total_fee: Some(total_fees),
         transactions: witnesses.clone(),
     };
+
+    // let instance_for_generation: Update<Bn256> = Update {
+    //     params: params,
+    //     number_of_transactions: TXES_TO_TEST,
+    //     old_root: None,
+    //     new_root: None,
+    //     public_data_commitment: None,
+    //     block_number: None,
+    //     total_fee: None,
+    //     transactions: vec![None; TXES_TO_TEST],
+    // };
 
     println!("generating setup...");
     let start = PreciseTime::now();
@@ -340,15 +365,19 @@ fn main() {
         public_data_commitment: Some(public_data_commitment),
         block_number: Some(Fr::one()),
         total_fee: Some(total_fees),
-        transactions: witnesses,
+        transactions: witnesses.clone(),
     };
+
+    println!("preparing a prover");
+    let start_prep = PreciseTime::now();
+    let prepared_prover: PreparedProver<Bn256> = prepare_prover(instance_for_proof).unwrap();
+    println!("prover preparation in {} s", start_prep.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);
 
     println!("creating proof...");
     let start = PreciseTime::now();
-    let proof = create_random_proof(instance_for_proof, &circuit_params, rng).unwrap();
+    let proof = prepared_prover.create_random_proof(&circuit_params, rng).unwrap();
     println!("proof created in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);
 
     let success = verify_proof(&pvk, &proof, &[initial_root, final_root, public_data_commitment]).unwrap();
     assert!(success);
-
 }

@@ -1,4 +1,8 @@
 use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
+use web3::types::U256;
+use ff::{ScalarEngine};
+use pairing::{Engine, CurveAffine};
+use pairing::bn256::{Bn256, G1Uncompressed, G2Uncompressed};
 
 // TODO: replace Vec with Iterator?
 
@@ -24,11 +28,6 @@ impl<Fr: PrimeField> GetBitsFixed for Fr {
         r
     }
 }
-
-use web3::types::U256;
-use ff::{ScalarEngine};
-use pairing::{Engine, CurveAffine};
-use pairing::bn256::{Bn256, G1Uncompressed, G2Uncompressed};
 
 pub fn field_element_to_u32<P: PrimeField>(fr: P) -> u32 {
     let mut iterator: Vec<bool> = BitIterator::new(fr.into_repr()).collect();

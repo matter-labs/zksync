@@ -10,7 +10,7 @@ use crate::primitives::{GetBits, GetBitsFixed};
 use crate::sparse_merkle_tree;
 use crate::sparse_merkle_tree::parallel_smt;
 use crate::sparse_merkle_tree::pedersen_hasher::PedersenHasher;
-use crate::circuit::plasma_constants;
+use crate::models::params;
 
 #[derive(Debug, Clone)]
 pub struct Leaf<E: JubjubEngine> {
@@ -23,10 +23,10 @@ pub struct Leaf<E: JubjubEngine> {
 impl<E: JubjubEngine> GetBits for Leaf<E> {
     fn get_bits_le(&self) -> Vec<bool> {
         let mut leaf_content = Vec::new();
-        leaf_content.extend(self.balance.get_bits_le_fixed(*plasma_constants::BALANCE_BIT_WIDTH));
-        leaf_content.extend(self.nonce.get_bits_le_fixed(*plasma_constants::NONCE_BIT_WIDTH));
-        leaf_content.extend(self.pub_x.get_bits_le_fixed(*plasma_constants::FR_BIT_WIDTH));
-        leaf_content.extend(self.pub_y.get_bits_le_fixed(*plasma_constants::FR_BIT_WIDTH));
+        leaf_content.extend(self.balance.get_bits_le_fixed(params::BALANCE_BIT_WIDTH));
+        leaf_content.extend(self.nonce.get_bits_le_fixed(params::NONCE_BIT_WIDTH));
+        leaf_content.extend(self.pub_x.get_bits_le_fixed(params::FR_BIT_WIDTH));
+        leaf_content.extend(self.pub_y.get_bits_le_fixed(params::FR_BIT_WIDTH));
         leaf_content
     }
 }
@@ -44,11 +44,11 @@ impl<E: JubjubEngine> Default for Leaf<E> {
 
 // code below is for testing
 
-pub type BabyLeaf = Leaf<Bn256>;
-pub type BabyBalanceTree = sparse_merkle_tree::SparseMerkleTree<BabyLeaf, Fr, PedersenHasher<Bn256>>;
+pub type Account = Leaf<Bn256>;
+pub type AccountTree = sparse_merkle_tree::SparseMerkleTree<Account, Fr, PedersenHasher<Bn256>>;
 
-impl BabyBalanceTree {
-    pub fn verify_proof(&self, index: u32, item: BabyLeaf, proof: Vec<(Fr, bool)>) -> bool {
+impl AccountTree {
+    pub fn verify_proof(&self, index: u32, item: Account, proof: Vec<(Fr, bool)>) -> bool {
         use crate::sparse_merkle_tree::hasher::Hasher;
         
         assert!(index < self.capacity());
@@ -84,8 +84,8 @@ mod tests {
 
     #[test]
     fn test_balance_tree() {
-        let mut tree = BabyBalanceTree::new(3);
-        let leaf = BabyLeaf {
+        let mut tree = AccountTree::new(3);
+        let leaf = Account {
             balance:    Fr::zero(),
             nonce:      Fr::one(),
             pub_x:      Fr::one(),
