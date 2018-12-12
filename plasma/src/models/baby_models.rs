@@ -1,9 +1,11 @@
 use pairing::bn256::{Bn256, Fr};
-use bellman::groth16::{Parameters, Proof};
 use crate::merkle_tree::{SparseMerkleTree, PedersenHasher};
-use crate::models;
+use crate::models::*;
 
-pub type Account = models::account::Account<Bn256>;
-pub type AccountTree = SparseMerkleTree<Account, Fr, PedersenHasher<Bn256>>;
-pub type Tx = models::tx::Tx<Bn256>;
-pub type Block = models::block::Block<Bn256>;
+type CurveUsed = Bn256;
+type FrUsed = Fr;
+
+pub type Account = account::Account<CurveUsed>;
+pub type AccountTree = SparseMerkleTree<Account, FrUsed, PedersenHasher<CurveUsed>>;
+pub type Tx = tx::Tx<CurveUsed>;
+pub type Block = block::Block<CurveUsed>;
