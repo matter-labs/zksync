@@ -48,8 +48,7 @@ impl ETHClient {
 
     pub fn new(contract_abi: ABI) -> Self {
 
-        // expect_env("PRIVATE_KEY")
-        Self{
+        let mut this = Self{
             web3_url:       env::var("WEB3_URL").unwrap_or("http://localhost:8545".to_string()),
             private_key:    H256::from_str(&env::var("PRIVATE_KEY").unwrap_or("aa8564af9bef22f581e99125d1829b76c45d08e4f6f0b74d586911f4318b6776".to_string())).unwrap(),
             contract_addr:  H160::from_str(&env::var("CONTRACT_ADDR").unwrap_or("616e08c733fe20e99bf70c5088635694d5e25c54".to_string())).unwrap(),
@@ -58,13 +57,13 @@ impl ETHClient {
             contract:       ethabi::Contract::load(contract_abi.0).unwrap(),
             reqwest_client: reqwest::Client::new(),
             nonce:          U256::zero(),
-        }
-    }
+        };
 
-    pub fn get_first_nonce(& mut self) {
-        let nonce = self.get_nonce(&format!("0x{}", &self.sender_account)).unwrap();
-        println!("Starting with nonce = {}", nonce);
-        self.nonce = nonce;
+        // TODO: review nonce handling
+        this.nonce = this.get_nonce(&format!("0x{}", &this.sender_account)).unwrap();
+        println!("Starting with nonce = {}", this.nonce);
+
+        this
     }
 
     fn call<P: Tokenize>(&mut self, method: &str, params: P) -> Result<H256> {
