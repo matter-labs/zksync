@@ -15,7 +15,7 @@ use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, pre
 
 use crate::models::params;
 use crate::models::state::State;
-use super::baby_models::{Account, AccountTree, Block};
+use crate::models::baby_models::{Account, AccountTree, Block};
 
 use super::config::TX_BATCH_SIZE;
 

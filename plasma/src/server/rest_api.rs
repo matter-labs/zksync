@@ -15,7 +15,7 @@ use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 use super::state_keeper::{TxInfo, PlasmaStateKeeper};
 use pairing::bn256::{Bn256, Fr};
 use crate::models::state::{State};
-use super::baby_models::{Account, AccountTree, Block};
+use crate::models::baby_models::{Account, AccountTree, Block};
 use crate::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum, field_element_to_u32};
 use crate::eth_client::{ETHClient, PROD_PLASMA};
 use super::prover::{BabyProver, EthereumProof};

@@ -15,7 +15,7 @@ use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
 use rand::{OsRng, Rng};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 
-use super::baby_models::{Block, Account, Tx, AccountTree};
+use crate::models::baby_models::{Block, Account, Tx, AccountTree};
 
 #[derive(Debug, Clone)]
 pub struct TxInfo{

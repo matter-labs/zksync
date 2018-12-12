@@ -1286,7 +1286,7 @@ fn test_transfer_circuit_with_witness() {
     use rand::{SeedableRng, Rng, XorShiftRng, Rand};
     use sapling_crypto::circuit::test::*;
     use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
-    use crate::server::baby_models::{AccountTree, Account};
+    use crate::models::baby_models::{AccountTree, Account};
     use crypto::sha2::Sha256;
     use crypto::digest::Digest;
     use crate::circuit::utils::be_bit_vector_into_bytes;
