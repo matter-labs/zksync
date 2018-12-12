@@ -109,6 +109,7 @@ impl BabyProver {
 
         println!("Copying states to balance tree");
 
+        // TODO: replace with .clone() by moving PedersenHasher to static context
         let mut tree = AccountTree::new(params::BALANCE_TREE_DEPTH as u32);
         {
             let iter = initial_state.get_accounts().into_iter();
