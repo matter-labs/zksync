@@ -48,7 +48,7 @@ impl PlasmaStateKeeper {
             }
             let (tx, return_channel) = message.unwrap();
             println!("Got transaction!");
-            let r = self.handle_tx_request(&tx);
+            let r = self.handle_tx(&tx);
             return_channel.send(r.is_ok());
         }
     }
@@ -61,16 +61,11 @@ impl PlasmaStateKeeper {
         tx.sign(sk, p_g, &params, &mut rng);
     }
 
-    fn handle_tx_request(&mut self, transaction: &TxUnpacked) -> Result<(), ()> {
-
-        // verify correctness
-
-        let mut from = self.state.balance_tree.items.get(&transaction.from).ok_or(())?.clone();
-        if field_element_to_u128(from.balance) < transaction.amount { return Err(()); }
-        // TODO: check nonce: assert field_element_to_u32(from.nonce) == transaction.nonce
+    fn handle_tx(&mut self, transaction: &TxUnpacked) -> Result<(), ()> {
 
         // augument and sign transaction (for demo only; TODO: remove this!)
 
+        let from = self.state.balance_tree.items.get(&transaction.from).ok_or(())?.clone();
         let mut transaction = transaction.clone();
         transaction.nonce = field_element_to_u32(from.nonce);
         transaction.good_until_block = self.state.block_number;
@@ -79,16 +74,9 @@ impl PlasmaStateKeeper {
         let sk = self.private_keys.get(&transaction.from).unwrap();
         Self::sign_tx(&mut tx, sk);
 
-        // update state
+        // update state with verification
 
-        let mut to = self.state.balance_tree.items.get(&transaction.to).ok_or(())?.clone();
-        let amount = Fr::from_str(&transaction.amount.to_string()).unwrap();
-        from.balance.sub_assign(&amount);
-        // TODO: subtract fee
-        from.nonce.add_assign(&Fr::one());  // from.nonce++
-        to.balance.add_assign(&amount);     // to.balance += amount
-        self.state.balance_tree.insert(transaction.from, from);
-        self.state.balance_tree.insert(transaction.to, to);
+        self.state.apply(transaction)?;
 
         // push for processing
 
