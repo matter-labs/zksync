@@ -11,7 +11,7 @@ use sapling_crypto::jubjub::{FixedGenerators};
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 use pairing::bn256::{Bn256, Fr};
 
-use crate::models::baby_models::{Account, AccountTree, Block, PlasmaState};
+use crate::models::plasma_models::{Account, AccountTree, Block, PlasmaState};
 use super::prover::{BabyProver, EthereumProof};
 use super::state_keeper::{PlasmaStateKeeper};
 use super::rest_api::start_api_server;

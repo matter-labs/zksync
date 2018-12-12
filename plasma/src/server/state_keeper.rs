@@ -11,7 +11,7 @@ use ff::{Field, PrimeField};
 use rand::{OsRng};
 use sapling_crypto::eddsa::{PrivateKey};
 
-use crate::models::baby_models::{Block, Account, Tx, AccountTree, TransactionSignature, PlasmaState};
+use crate::models::plasma_models::{Block, Account, Tx, AccountTree, TransactionSignature, PlasmaState};
 use crate::models::tx::TxUnpacked;
 
 /// Coordinator of tx processing and generation of proofs

@@ -13,7 +13,7 @@ use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
 
 use crate::models::params;
-use crate::models::baby_models::{AccountTree, Block, PlasmaState};
+use crate::models::plasma_models::{AccountTree, Block, PlasmaState};
 
 use super::config::TX_BATCH_SIZE;
 
