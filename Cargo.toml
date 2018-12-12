@@ -5,6 +5,6 @@ members = [
     "bellman",
     "sapling-crypto",
     "bellman-demo",
-    "plasma-winter",
-    "poweroftau"
+    "plasma",
+    "powersoftau"
 ]
