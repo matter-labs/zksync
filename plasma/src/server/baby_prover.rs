@@ -257,15 +257,6 @@ impl Prover<Bn256> for BabyProver {
             amount_bits.reverse();
             amount_bits.truncate(*plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH);
 
-            for b in amount_bits.clone().into_iter() {
-                if b {
-                    print!("1");
-                } else {
-                    print!("0");
-                }
-            }
-            print!("\n");
-
             let parsed_transfer_amount = parse_float_to_u128(amount_bits, 
                 *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH,
                 *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH,

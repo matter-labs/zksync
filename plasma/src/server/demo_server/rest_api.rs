@@ -169,7 +169,6 @@ pub fn run() {
 
     println!("Created state keeper with  {} accounts with balances, root hash = {}", number_of_accounts, root);
 
-
     let mut prover = BabyProver::create(&keeper).unwrap();
 
     // spawn a thread with a state processor
