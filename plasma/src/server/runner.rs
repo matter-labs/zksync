@@ -18,7 +18,6 @@ pub fn run() {
     let (tx_for_transactions, rx_for_transactions) = channel::<(TxUnpacked, Sender<bool>)>();
     let (tx_for_blocks, rx_for_blocks) = channel::<Block>();
     let (tx_for_proofs, rx_for_proofs) = channel::<EthereumProof>();
-    let (tx_for_tx_data, rx_for_tx_data) = channel::<EthereumProof>();
 
     let mut keeper = PlasmaStateKeeper::new();
     let mut prover = BabyProver::create(&keeper.state).unwrap();
