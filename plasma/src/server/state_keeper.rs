@@ -6,7 +6,6 @@ use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 use crate::models::params;
 use crate::models::state::{State};
 use crate::primitives::{field_element_to_u32, field_element_to_u128};
-use crate::models::tx::TransactionSignature;
 use crate::circuit::utils::{le_bit_vector_into_field_element};
 use std::sync::mpsc;
 use std::{thread, time};
@@ -15,7 +14,7 @@ use ff::{Field, PrimeField};
 use rand::{OsRng};
 use sapling_crypto::eddsa::{PrivateKey};
 
-use crate::models::baby_models::{Block, Account, Tx, AccountTree};
+use crate::models::baby_models::{Block, Account, Tx, AccountTree, TransactionSignature};
 
 #[derive(Debug, Clone)]
 pub struct TxInfo{
@@ -78,157 +77,103 @@ impl PlasmaStateKeeper{
             }
             let (tx, return_channel) = message.unwrap();
             println!("Got transaction!");
-            self.apply_transaction(tx, return_channel);
+            let r = self.handle_tx_request(&tx);
+            return_channel.send(r.is_ok());
         }
     }
 
-    fn apply_transaction(& mut self, transaction: TxInfo, return_channel: mpsc::Sender<bool>) {
-        {
-            if transaction.good_until_block < self.block_number() {
-                return_channel.send(true);
-                return;
-            }
+    fn empty_signature() -> TransactionSignature {
+        let empty_point: edwards::Point<Bn256, Unknown> = edwards::Point::zero();
+        TransactionSignature{
+            r: empty_point,
+            s: Fr::zero()
         }
+    }
 
-        let mut new_sender_leaf = None;
-        let mut new_recipient_leaf = None;
+    // TODO: use nonce and good_until from transaction!
+    fn pack_tx(transaction: &TxInfo, nonce: Fr, good_until: u32) -> Result<Tx, ()> {
 
-        let from = transaction.from;
-        let to = transaction.to;
+        let encoded_amount_bits = convert_to_float(
+            transaction.amount,
+            params::AMOUNT_EXPONENT_BIT_WIDTH, 
+            params::AMOUNT_MANTISSA_BIT_WIDTH, 
+            10
+        ).map_err(|_| ())?;
+        let encoded_amount: Fr = le_bit_vector_into_field_element(&encoded_amount_bits);
 
-        {
-            let block_number = self.block_number;
+        // encoded fee is zero for now
+        let encoded_fee = Fr::zero();
 
-            let tree = & mut self.balance_tree;
+        // Will make a well-formed Tx by convering to field elements and making a signature
+        let tx = Tx {
+            from:               Fr::from_str(&transaction.from.to_string()).unwrap(),
+            to:                 Fr::from_str(&transaction.to.to_string()).unwrap(),
+            amount:             encoded_amount,
+            fee:                encoded_fee,
+            nonce:              nonce,
+            good_until_block:   Fr::from_str(&transaction.good_until_block.to_string()).unwrap(),
+            signature:          Self::empty_signature(),
+        };
 
-            // let mut items = tree.items;
+        Ok(tx)
+    }
 
-            let current_sender_state = tree.items.get(&from);
-            if current_sender_state.is_none() {
-                return_channel.send(false);
-                return;
-            }
+    fn sign_tx(tx: &mut Tx, sk: &PrivateKey<Bn256>) {
+        // TODO: move static params to constructor!
+        let params = &AltJubjubBn256::new();
+        let p_g = FixedGenerators::SpendingKeyGenerator;
+        let mut rng = OsRng::new().unwrap();
+        tx.sign(sk, p_g, &params, &mut rng);
+    }
 
-            let mut current_sender_state = current_sender_state.unwrap().clone();
+    fn handle_tx_request(&mut self, transaction: &TxInfo) -> Result<(), ()> {
+    
+        // verify correctness
 
-            let current_balance = current_sender_state.balance;
-            let current_nonce = current_sender_state.nonce;
+        let mut from = self.balance_tree.items.get(&transaction.from).ok_or(())?.clone();
+        if field_element_to_u128(from.balance) < transaction.amount { return Err(()); }
+        // TODO: check nonce: assert field_element_to_u32(from.nonce) == transaction.nonce
 
-            let balance_as_u128 = field_element_to_u128(current_balance);
-            let nonce_as_u32 = field_element_to_u32(current_nonce);
+        // sign tx (for demo only; TODO: remove this)
 
-            // if transaction.nonce != nonce_as_u32 {
-            //     return_channel.send(false);
-            //     return;
-            // }
+        let mut tx = Self::pack_tx(&transaction, from.nonce, self.block_number)?;
+        let sk = self.private_keys.get(&transaction.from).unwrap();
+        Self::sign_tx(&mut tx, sk);
 
-            if balance_as_u128 < transaction.amount {
-                return_channel.send(false);
-                return;
-            }
+        // update state
 
-            let encoded_amount_bits = convert_to_float(transaction.amount,
-                params::AMOUNT_EXPONENT_BIT_WIDTH, 
-                params::AMOUNT_MANTISSA_BIT_WIDTH, 
-                10
-            );
+        let mut to = self.balance_tree.items.get(&transaction.to).ok_or(())?.clone();
+        let amount = Fr::from_str(&transaction.amount.to_string()).unwrap();
+        from.balance.sub_assign(&amount);
+        // TODO: subtract fee
+        from.nonce.add_assign(&Fr::one());  // from.nonce++
+        to.balance.add_assign(&amount);     // to.balance += amount
+        self.balance_tree.insert(transaction.from, from);
+        self.balance_tree.insert(transaction.to, to);
 
-            if encoded_amount_bits.is_err() {
-                return_channel.send(false);
-                return;
-            }
-            
-            // encoded bit are big endian by default!
-            let encoded_amount_bits_unwrapped = encoded_amount_bits.unwrap();
+        // push for processing
 
-            let encoded_amount: Fr = le_bit_vector_into_field_element(&encoded_amount_bits_unwrapped);
-
-            // encoded fee is zero for now
-            let encoded_fee = Fr::zero();
-
-            // Will make a well-formed Tx by convering to field elements and making a signature
-
-            let empty_point: edwards::Point<Bn256, Unknown> = edwards::Point::zero();
-
-            let empty_signature = TransactionSignature{
-                r: empty_point,
-                s: Fr::zero()
-            };
-
-            let mut tx = Tx{
-                from:               Fr::from_str(&from.to_string()).unwrap(),
-                to:                 Fr::from_str(&to.to_string()).unwrap(),
-                amount:             encoded_amount,
-                fee:                encoded_fee,
-                nonce:              current_nonce,
-                good_until_block:   Fr::from_str(&block_number.to_string()).unwrap(),
-                signature:          empty_signature,
-            };
-
-            let params = &AltJubjubBn256::new();
-            let p_g = FixedGenerators::SpendingKeyGenerator;
-            let mut rng = OsRng::new().unwrap();
-
-            let sk = self.private_keys.get(& from).unwrap();
-
-            tx.sign(sk, p_g, &params, & mut rng);
-
-            let current_recipient_state = tree.items.get(&to);
-            if current_recipient_state.is_none() {
-                return_channel.send(false);
-                return;
-            }
-
-            let mut current_recipient_state = current_recipient_state.unwrap().clone();
-
-            let transfer_amount_as_field_element = Fr::from_str(&transaction.amount.to_string()).unwrap();
-
-            // println!("Old sender account state:");
-            // println!("Balance = {}", current_sender_state.balance);
-            // println!("Nonce = {}", current_sender_state.nonce);
-            // println!("Old recipient account state:");
-            // println!("Balance = {}", current_recipient_state.balance);
-            // println!("Nonce = {}", current_recipient_state.nonce);
-            // println!("transfer_amount_as_field_element = {}", transfer_amount_as_field_element);
-            // subtract from sender's balance
-            current_sender_state.balance.sub_assign(&transfer_amount_as_field_element);
-            // bump nonce
-            current_sender_state.nonce.add_assign(&Fr::one());
-
-            // add amount to recipient
-            current_recipient_state.balance.add_assign(&transfer_amount_as_field_element);
-
-            self.current_batch.push(tx);
-
-            new_sender_leaf = Some(current_sender_state.clone());
-            new_recipient_leaf = Some(current_recipient_state.clone());
-
-        }
-
-        self.balance_tree.insert(from, new_sender_leaf.unwrap());
-        self.balance_tree.insert(to, new_recipient_leaf.unwrap());
-
-        println!("Accepted transaction");
-
-        let new_root = self.root_hash();
-
-        println!("Intermediate root after the transaction application = {}", new_root);
-
+        self.current_batch.push(tx);
         if self.current_batch.len() == self.batch_size {
-            {
-                let batch = &self.current_batch;
-                let new_root = self.root_hash();
-                let block = Block {
-                    block_number:   self.block_number,
-                    transactions:   batch.to_vec(),
-                    new_root_hash:  new_root,
-                };
-                self.batch_channel.send(block);
-            }
-            self.current_batch = Vec::with_capacity(self.batch_size);
-            self.block_number += 1;
+            self.process_batch()
         }
-        return_channel.send(true);
+
+        Ok(())
+    }
+
+    fn process_batch(&mut self) {
+        
+        let batch = &self.current_batch;
+        let new_root = self.root_hash();
+        let block = Block {
+            block_number:   self.block_number,
+            transactions:   batch.to_vec(),
+            new_root_hash:  new_root,
+        };
+        self.batch_channel.send(block);
+
+        self.current_batch = Vec::with_capacity(self.batch_size);
+        self.block_number += 1;
     }
 
 }

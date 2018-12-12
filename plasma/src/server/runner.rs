@@ -80,7 +80,6 @@ pub fn run() {
     let mut keeper = PlasmaStateKeeper {
         balance_tree: tree,
         block_number: 1,
-        // root_hash:    root,
         transactions_channel: rx_for_transactions,
         batch_channel: tx_for_blocks.clone(),
         batch_size : 32,
