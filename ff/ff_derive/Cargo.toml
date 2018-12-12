@@ -1,0 +1,20 @@
+[package]
+name = "ff_derive"
+version = "0.3.0"
+authors = ["Sean Bowe <ewillbefull@gmail.com>"]
+description = "Procedural macro library used to build custom prime field implementations"
+documentation = "https://docs.rs/ff/"
+homepage = "https://github.com/ebfull/ff"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/ebfull/ff"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+num-bigint = "0.2"
+num-traits = "0.2"
+num-integer = "0.1"
+proc-macro2 = "0.4"
+quote = "0.6"
+syn = "0.14"
