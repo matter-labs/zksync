@@ -4,8 +4,13 @@ use ff::{PrimeField, PrimeFieldRepr, BitIterator};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 use sapling_crypto::jubjub::{FixedGenerators, Unknown, edwards, JubjubParams};
 use crate::models::params;
-use super::super::circuit::transfer::transaction::{TransactionSignature};
 use super::super::circuit::utils::{le_bit_vector_into_field_element};
+
+#[derive(Clone)]
+pub struct TransactionSignature<E: JubjubEngine> {
+    pub r: edwards::Point<E, Unknown>,
+    pub s: E::Fr,
+}
 
 #[derive(Clone)]
 pub struct Tx<E: JubjubEngine> {

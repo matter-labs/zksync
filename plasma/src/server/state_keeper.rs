@@ -6,7 +6,7 @@ use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 use crate::models::params;
 use crate::models::state::{State};
 use crate::primitives::{field_element_to_u32, field_element_to_u128};
-use crate::circuit::transfer::transaction::{TransactionSignature};
+use crate::models::tx::TransactionSignature;
 use crate::circuit::utils::{le_bit_vector_into_field_element};
 use std::sync::mpsc;
 use std::{thread, time};

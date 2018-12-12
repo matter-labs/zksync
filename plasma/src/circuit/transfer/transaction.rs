@@ -36,16 +36,10 @@ use sapling_crypto::eddsa::{
     PublicKey
 };
 
-use crate::models::params;
+use crate::models::{params, tx::TransactionSignature};
 use crate::circuit::utils::le_bit_vector_into_field_element;
 
 // This is transaction data
-
-#[derive(Clone)]
-pub struct TransactionSignature<E: JubjubEngine> {
-    pub r: edwards::Point<E, Unknown>,
-    pub s: E::Fr,
-}
 
 #[derive(Clone)]
 pub struct Transaction<E: JubjubEngine> {
