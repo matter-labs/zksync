@@ -63,6 +63,10 @@ pub fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item =
 }
 
 pub fn start_api_server(tx_for_transactions: mpsc::Sender<(TxUnpacked, mpsc::Sender<bool>)>) {
+
+    ::std::env::set_var("RUST_LOG", "actix_web=info");
+    let sys = actix::System::new("ws-example");
+
     //move is necessary to give closure below ownership
     server::new(move || {
         App::with_state(AppState {
@@ -92,4 +96,5 @@ pub fn start_api_server(tx_for_transactions: mpsc::Sender<(TxUnpacked, mpsc::Sen
     .start();
 
     println!("Started http server: 127.0.0.1:8080");
+    let _ = sys.run();
 }

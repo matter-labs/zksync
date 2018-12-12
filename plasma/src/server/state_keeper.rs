@@ -9,10 +9,13 @@ use std::{thread, time};
 use std::collections::HashMap;
 use ff::{Field, PrimeField};
 use rand::{OsRng};
-use sapling_crypto::eddsa::{PrivateKey};
+use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 
 use crate::models::plasma_models::{Block, Account, Tx, AccountTree, TransactionSignature, PlasmaState};
 use crate::models::tx::TxUnpacked;
+
+use crate::models::params;
+use rand::{SeedableRng, Rng, XorShiftRng};
 
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
@@ -38,6 +41,59 @@ pub struct PlasmaStateKeeper {
 }
 
 impl PlasmaStateKeeper {
+
+    pub fn new(rx_for_transactions: mpsc::Receiver<(TxUnpacked, mpsc::Sender<bool>)>, tx_for_blocks: mpsc::Sender<Block>) -> Self {
+
+        // here we should insert default accounts into the tree
+        let tree_depth = params::BALANCE_TREE_DEPTH as u32;
+        let mut balance_tree = AccountTree::new(tree_depth);
+
+        let number_of_accounts = 1000;
+
+        let mut keys_map = HashMap::<u32, PrivateKey<Bn256>>::new();
+            
+        let p_g = FixedGenerators::SpendingKeyGenerator;
+        let params = &AltJubjubBn256::new();
+        let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+
+        let default_balance_string = "1000000";
+
+        for i in 0..number_of_accounts {
+            let leaf_number: u32 = i;
+
+            let sk = PrivateKey::<Bn256>(rng.gen());
+            let pk = PublicKey::from_private(&sk, p_g, params);
+            let (x, y) = pk.0.into_xy();
+
+            keys_map.insert(i, sk);
+
+            let leaf = Account {
+                balance:    Fr::from_str(default_balance_string).unwrap(),
+                nonce:      Fr::zero(),
+                pub_x:      x,
+                pub_y:      y,
+            };
+
+            balance_tree.insert(leaf_number, leaf.clone());
+        };
+
+        let keeper = PlasmaStateKeeper {
+            state: PlasmaState{
+                balance_tree,
+                block_number: 1,
+            },
+            transactions_channel: rx_for_transactions,
+            batch_channel: tx_for_blocks.clone(),
+            batch_size : 32,
+            current_batch: vec![],
+            private_keys: keys_map
+        };
+
+        let root = keeper.state.root_hash();
+        println!("Created state keeper with  {} accounts with balances, root hash = {}", number_of_accounts, root);
+
+        keeper
+    }
 
     pub fn run(& mut self) {
         loop {

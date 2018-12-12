@@ -2,13 +2,11 @@ use std::thread;
 use std::sync::mpsc;
 use std::time;
 use std::collections::HashMap;
-use rand::{SeedableRng, Rng, XorShiftRng};
 
 use web3::types::{U256, U128, H256};
 use ff::{Field, PrimeField};
-use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 use sapling_crypto::jubjub::{FixedGenerators};
-use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
+
 use pairing::bn256::{Bn256, Fr};
 
 use crate::models::plasma_models::{Account, AccountTree, Block, PlasmaState};
@@ -19,8 +17,6 @@ use super::rest_api::start_api_server;
 use crate::models::tx::TxUnpacked;
 use crate::primitives::serialize_fe_for_ethereum;
 use crate::eth_client::{ETHClient, PROD_PLASMA};
-use crate::models::params;
-
 
 
 pub fn run() {
@@ -31,68 +27,10 @@ pub fn run() {
     let (tx_for_proofs, rx_for_proofs) = mpsc::channel::<EthereumProof>();
     let (tx_for_tx_data, rx_for_tx_data) = mpsc::channel::<EthereumProof>();
 
-    ::std::env::set_var("RUST_LOG", "actix_web=info");
-    let sys = actix::System::new("ws-example");
-
-    println!("Creating ETH client");
-
     let mut eth_client = ETHClient::new(PROD_PLASMA);
     eth_client.get_first_nonce();
 
-    println!("Creating default state");
-
-    // here we should insert default accounts into the tree
-    let tree_depth = params::BALANCE_TREE_DEPTH as u32;
-    let mut tree = AccountTree::new(tree_depth);
-
-    let number_of_accounts = 1000;
-
-    let mut keys_map = HashMap::<u32, PrivateKey<Bn256>>::new();
-    {
-        let mut_tree = & mut tree;
-        let p_g = FixedGenerators::SpendingKeyGenerator;
-        let params = &AltJubjubBn256::new();
-        let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
-
-        let default_balance_string = "1000000";
-
-        for i in 0..number_of_accounts {
-            let leaf_number : u32 = i;
-
-            let sk = PrivateKey::<Bn256>(rng.gen());
-            let pk = PublicKey::from_private(&sk, p_g, params);
-            let (x, y) = pk.0.into_xy();
-
-            keys_map.insert(i, sk);
-
-            let leaf = Account {
-                balance:    Fr::from_str(default_balance_string).unwrap(),
-                nonce:      Fr::zero(),
-                pub_x:      x,
-                pub_y:      y,
-            };
-
-            mut_tree.insert(leaf_number, leaf.clone());
-        }
-
-    }
-
-    let mut keeper = PlasmaStateKeeper {
-        state: PlasmaState{
-            balance_tree: tree,
-            block_number: 1,
-        },
-        transactions_channel: rx_for_transactions,
-        batch_channel: tx_for_blocks.clone(),
-        batch_size : 32,
-        current_batch: vec![],
-        private_keys: keys_map
-    };
-
-    let root = keeper.state.root_hash();
-
-    println!("Created state keeper with  {} accounts with balances, root hash = {}", number_of_accounts, root);
-
+    let mut keeper = PlasmaStateKeeper::new(rx_for_transactions, tx_for_blocks);
     let mut prover = BabyProver::create(&keeper.state).unwrap();
 
     // spawn a thread with a state processor
@@ -171,6 +109,4 @@ pub fn run() {
     });
 
     start_api_server(tx_for_transactions);
-    
-    let _ = sys.run();
 }
