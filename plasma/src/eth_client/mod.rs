@@ -1,11 +1,6 @@
 mod signer;
 
-use rustc_hex::{FromHex};
-use web3::futures::{Future};
-use web3::contract::{Contract, Options, CallFuture};
-
 use reqwest::header::{CONTENT_TYPE};
-use std::collections::HashMap;
 
 use web3::contract::tokens::Tokenize;
 //use web3::types::{Address, U256, H160, H256, U128};
@@ -14,10 +9,7 @@ use web3::contract::tokens::Tokenize;
 use std::env;
 use std::str::FromStr;
 
-use serde::Serialize;
-use serde::de::DeserializeOwned;
-
-use ethereum_types::{Address, U256, H160, H256, U128};
+use ethereum_types::{U256, H160, H256, U128};
 
 type Result<T> = std::result::Result<T, Box<std::error::Error>>;
 

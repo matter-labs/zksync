@@ -1,11 +1,10 @@
 // Pedersen hash implementation of the Hasher trait
 
-use ff::{Field, PrimeField, PrimeFieldRepr};
-use rand::{Rand, thread_rng};
+use ff::PrimeField;
 use sapling_crypto::pedersen_hash::{baby_pedersen_hash, Personalization};
 
 use pairing::bn256::Bn256;
-use sapling_crypto::alt_babyjubjub::{JubjubEngine, AltJubjubBn256, edwards::Point, PrimeOrder};
+use sapling_crypto::alt_babyjubjub::{JubjubEngine, AltJubjubBn256};
 
 use super::super::primitives::BitIteratorLe;
 use super::hasher::Hasher;

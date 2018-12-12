@@ -5,7 +5,6 @@ use std::fmt::Debug;
 use std::collections::HashMap;
 use super::hasher::Hasher;
 use super::super::primitives::GetBits;
-use ff::{PrimeField};
 
 // Tree of depth 0 should contain ONE element that is also a root
 // Tree of depth 1 should contain TWO elements

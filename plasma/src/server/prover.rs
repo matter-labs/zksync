@@ -1,12 +1,11 @@
 use std::error::Error;
 use std::fmt;
-use rand::{OsRng, Rng};
+use rand::{OsRng};
 
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
 
 use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
-use pairing::CurveAffine;
 use pairing::bn256::{Bn256, Fr};
 use sapling_crypto::circuit::float_point::parse_float_to_u128;
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
@@ -15,7 +14,7 @@ use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, pre
 
 use crate::models::params;
 use crate::models::state::State;
-use crate::models::baby_models::{Account, AccountTree, Block};
+use crate::models::baby_models::{AccountTree, Block};
 
 use super::config::TX_BATCH_SIZE;
 
@@ -24,7 +23,7 @@ use super::super::circuit::transfer::transaction::{Transaction};
 use super::super::circuit::transfer::circuit::{Transfer, TransactionWitness};
 use super::super::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum, field_element_to_u32};
 
-use web3::types::{U256, Bytes};
+use web3::types::{U256};
 
 type BabyProof = Proof<Bn256>;
 type BabyParameters = Parameters<Bn256>;

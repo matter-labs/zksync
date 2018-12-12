@@ -1,8 +1,8 @@
-use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
+use ff::{PrimeField, PrimeFieldRepr, BitIterator};
 use web3::types::U256;
 use ff::{ScalarEngine};
 use pairing::{Engine, CurveAffine};
-use pairing::bn256::{Bn256, G1Uncompressed, G2Uncompressed};
+use pairing::bn256::{Bn256};
 
 // TODO: replace Vec with Iterator?
 

@@ -1,12 +1,10 @@
 use std::thread;
-use std::sync::Arc;
-use std::sync::Mutex;
 use std::sync::mpsc;
 use std::time;
 use std::collections::HashMap;
 use rand::{SeedableRng, Rng, XorShiftRng};
 
-use web3::types::{U256, Bytes, U128, H256};
+use web3::types::{U256, U128, H256};
 use ff::{Field, PrimeField};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 use sapling_crypto::jubjub::{FixedGenerators};
@@ -19,7 +17,7 @@ use super::state_keeper::{TxInfo, PlasmaStateKeeper};
 use super::rest_api::start_api_server;
 
 use crate::models::state::{State};
-use crate::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum, field_element_to_u32};
+use crate::primitives::serialize_fe_for_ethereum;
 use crate::eth_client::{ETHClient, PROD_PLASMA};
 use crate::models::params;
 

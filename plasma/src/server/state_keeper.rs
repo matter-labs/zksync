@@ -1,6 +1,6 @@
 use pairing::bn256::{Bn256, Fr};
-use sapling_crypto::jubjub::{JubjubEngine, edwards, Unknown, FixedGenerators};
-use sapling_crypto::circuit::float_point::{convert_to_float, parse_float_to_u128};
+use sapling_crypto::jubjub::{edwards, Unknown, FixedGenerators};
+use sapling_crypto::circuit::float_point::{convert_to_float};
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 
 use crate::models::params;
@@ -11,9 +11,9 @@ use crate::circuit::utils::{le_bit_vector_into_field_element};
 use std::sync::mpsc;
 use std::{thread, time};
 use std::collections::HashMap;
-use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
-use rand::{OsRng, Rng};
-use sapling_crypto::eddsa::{PrivateKey, PublicKey};
+use ff::{Field, PrimeField};
+use rand::{OsRng};
+use sapling_crypto::eddsa::{PrivateKey};
 
 use crate::models::baby_models::{Block, Account, Tx, AccountTree};
 

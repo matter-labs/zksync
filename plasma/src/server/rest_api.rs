@@ -1,28 +1,9 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
-use std::thread;
-use std::sync::Arc;
-use std::sync::Mutex;
 use std::sync::mpsc;
-use std::time;
-use rand::{SeedableRng, Rng, XorShiftRng};
-use web3::types::{U256, Bytes, U128, H256};
-use std::collections::HashMap;
-use ff::{Field, PrimeField};
-use sapling_crypto::eddsa::{PrivateKey, PublicKey};
-use sapling_crypto::jubjub::{FixedGenerators};
-use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
-use super::state_keeper::{TxInfo, PlasmaStateKeeper};
-use pairing::bn256::{Bn256, Fr};
-use crate::models::state::{State};
-use crate::models::baby_models::{Account, AccountTree, Block};
-use crate::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum, field_element_to_u32};
-use crate::eth_client::{ETHClient, PROD_PLASMA};
-use super::prover::{BabyProver, EthereumProof};
-use crate::models::params;
+use super::state_keeper::TxInfo;
 
 use actix_web::{
-    error, 
     middleware, 
     server, 
     App, 
@@ -31,12 +12,11 @@ use actix_web::{
     HttpMessage,
     HttpRequest, 
     HttpResponse, 
-    Json,     
     middleware::cors::Cors,
-    http::{header, Method},
+    http::Method,
 };
 
-use futures::{Future, Stream};
+use futures::Future;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct TransactionRequest {

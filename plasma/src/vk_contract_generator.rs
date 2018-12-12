@@ -1,11 +1,7 @@
 // Library to generate a EVM verifier contract
 
-use bellman::{Circuit, ConstraintSystem, SynthesisError};
-use ff::{Field, PrimeField};
-use pairing::{Engine, CurveAffine, EncodedPoint};
+use pairing::{Engine, CurveAffine};
 use bellman::groth16;
-use pairing::bn256::{Bn256, Fr};
-use std::fmt;
 
 fn unpack<T: CurveAffine>(t: &T) -> Vec<String>
 {

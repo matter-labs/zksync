@@ -1,4 +1,4 @@
-use ff::{PrimeField, PrimeFieldRepr, BitIterator};
+use ff::{PrimeField, BitIterator};
 use sapling_crypto::jubjub::{JubjubEngine};
 
 pub fn le_bit_vector_into_field_element<P: PrimeField>

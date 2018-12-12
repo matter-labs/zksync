@@ -1,12 +1,6 @@
-use std::collections::{hash_map, HashMap};
 use sapling_crypto::alt_babyjubjub::{JubjubEngine};
-use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
-use sapling_crypto::eddsa::{PrivateKey, PublicKey};
-use sapling_crypto::jubjub::{FixedGenerators, Unknown, edwards, JubjubParams};
+use ff::{Field};
 use crate::models::params;
-use crate::models::tx::TransactionSignature;
-use crate::circuit::utils::{le_bit_vector_into_field_element};
-
 use crate::primitives::{GetBits, GetBitsFixed};
 
 #[derive(Debug, Clone)]
