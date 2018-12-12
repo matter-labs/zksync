@@ -31,12 +31,16 @@ extern crate serde;
 extern crate serde_json;
 extern crate reqwest;
 
+extern crate actix;
+extern crate actix_web;
+
 #[macro_use]
 extern crate serde_derive;
 
 pub mod primitives;
-pub mod sparse_merkle_tree;
-pub mod balance_tree;
+pub mod merkle_tree;
 pub mod circuit;
 pub mod vk_contract_generator;
 pub mod server;
+pub mod eth_client;
+pub mod models;

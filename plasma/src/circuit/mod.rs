@@ -25,10 +25,7 @@ use sapling_crypto::circuit::{
     float_point,
 };
 
-use crate::balance_tree;
-
 pub mod transfer;
 pub mod deposit;
 pub mod exit;
-pub mod plasma_constants;
 pub mod utils;

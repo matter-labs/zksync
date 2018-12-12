@@ -1,11 +1,6 @@
-pub mod signer;
-
-use rustc_hex::{FromHex};
-use web3::futures::{Future};
-use web3::contract::{Contract, Options, CallFuture};
+mod signer;
 
 use reqwest::header::{CONTENT_TYPE};
-use std::collections::HashMap;
 
 use web3::contract::tokens::Tokenize;
 //use web3::types::{Address, U256, H160, H256, U128};
@@ -14,10 +9,7 @@ use web3::contract::tokens::Tokenize;
 use std::env;
 use std::str::FromStr;
 
-use serde::Serialize;
-use serde::de::DeserializeOwned;
-
-use ethereum_types::{Address, U256, H160, H256, U128};
+use ethereum_types::{U256, H160, H256, U128};
 
 type Result<T> = std::result::Result<T, Box<std::error::Error>>;
 
@@ -26,13 +18,13 @@ pub type U32 = u64; // because missing in web3::types; u64 is fine since only us
 type ABI = (&'static [u8], &'static str);
 
 pub const TEST_PLASMA_ALWAYS_VERIFY: ABI = (
-    include_bytes!("../../../contracts/bin/contracts_Plasma_sol_PlasmaTest.abi"),
-    include_str!("../../../contracts/bin/contracts_Plasma_sol_PlasmaTest.bin"),
+    include_bytes!("../../contracts/bin/contracts_Plasma_sol_PlasmaTest.abi"),
+    include_str!("../../contracts/bin/contracts_Plasma_sol_PlasmaTest.bin"),
 );
 
 pub const PROD_PLASMA: ABI = (
-    include_bytes!("../../../contracts/bin/contracts_Plasma_sol_Plasma.abi"),
-    include_str!("../../../contracts/bin/contracts_Plasma_sol_Plasma.bin"),
+    include_bytes!("../../contracts/bin/contracts_Plasma_sol_Plasma.abi"),
+    include_str!("../../contracts/bin/contracts_Plasma_sol_Plasma.bin"),
 );
 
 pub struct ETHClient {
@@ -56,8 +48,7 @@ impl ETHClient {
 
     pub fn new(contract_abi: ABI) -> Self {
 
-        // expect_env("PRIVATE_KEY")
-        Self{
+        let mut this = Self{
             web3_url:       env::var("WEB3_URL").unwrap_or("http://localhost:8545".to_string()),
             private_key:    H256::from_str(&env::var("PRIVATE_KEY").unwrap_or("aa8564af9bef22f581e99125d1829b76c45d08e4f6f0b74d586911f4318b6776".to_string())).unwrap(),
             contract_addr:  H160::from_str(&env::var("CONTRACT_ADDR").unwrap_or("616e08c733fe20e99bf70c5088635694d5e25c54".to_string())).unwrap(),
@@ -66,13 +57,13 @@ impl ETHClient {
             contract:       ethabi::Contract::load(contract_abi.0).unwrap(),
             reqwest_client: reqwest::Client::new(),
             nonce:          U256::zero(),
-        }
-    }
+        };
 
-    pub fn get_first_nonce(& mut self) {
-        let nonce = self.get_nonce(&format!("0x{}", &self.sender_account)).unwrap();
-        println!("Starting with nonce = {}", nonce);
-        self.nonce = nonce;
+        // TODO: review nonce handling
+        this.nonce = this.get_nonce(&format!("0x{}", &this.sender_account)).unwrap();
+        println!("Starting with nonce = {}", this.nonce);
+
+        this
     }
 
     fn call<P: Tokenize>(&mut self, method: &str, params: P) -> Result<H256> {

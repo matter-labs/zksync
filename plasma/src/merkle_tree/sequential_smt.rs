@@ -1,14 +1,10 @@
 // Sparse Merkle tree with flexible hashing strategy
 
-pub mod parallel_smt;
-pub mod hasher;
-pub mod pedersen_hasher;
 
 use std::fmt::Debug;
 use std::collections::HashMap;
-use self::hasher::Hasher;
-use super::primitives::GetBits;
-use ff::{PrimeField};
+use super::hasher::Hasher;
+use super::super::primitives::GetBits;
 
 // Tree of depth 0 should contain ONE element that is also a root
 // Tree of depth 1 should contain TWO elements
@@ -208,6 +204,7 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
     pub fn root_hash(&self) -> Hash {
         self.get_hash((0, 0))
     }
+
 }
 
 #[cfg(test)]

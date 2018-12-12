@@ -39,7 +39,7 @@ use sapling_crypto::eddsa::{
 
 use sapling_crypto::alt_babyjubjub::*;
 
-use crate::circuit::plasma_constants;
+use crate::models::params;
 use crate::circuit::utils::{le_bit_vector_into_field_element};
 
 // This is an exit request
@@ -61,13 +61,13 @@ impl<E: JubjubEngine> ExitRequest<E> {
         // - compressed public key
         let mut from: Vec<bool> = BitIterator::new(self.from.clone().unwrap().into_repr()).collect();
         from.reverse();
-        from.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
+        from.truncate(params::BALANCE_TREE_DEPTH);
         // reverse again to have BE as in Ethereum native types
         from.reverse();
 
         let mut amount: Vec<bool> = BitIterator::new(self.amount.clone().unwrap().into_repr()).collect();
         amount.reverse();
-        amount.truncate(*plasma_constants::BALANCE_BIT_WIDTH);
+        amount.truncate(params::BALANCE_BIT_WIDTH);
         // reverse again to have BE as in Ethereum native types
         amount.reverse();
 

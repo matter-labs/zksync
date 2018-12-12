@@ -25,7 +25,5 @@ use sapling_crypto::circuit::{
     float_point,
 };
 
-use crate::balance_tree;
-
 pub mod circuit;
 pub mod transaction;

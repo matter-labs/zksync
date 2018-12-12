@@ -1,39 +1,85 @@
-use std::collections::{hash_map, HashMap};
-
 use sapling_crypto::alt_babyjubjub::{JubjubEngine};
-
-use ff::{PrimeField, PrimeFieldRepr, BitIterator};
-
-use super::super::circuit::plasma_constants;
-use super::super::balance_tree;
-use super::super::circuit::transfer::transaction::{TransactionSignature};
+use ff::{Field, PrimeField, BitIterator};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
-use sapling_crypto::jubjub::{
-    FixedGenerators,
-    Unknown,
-    edwards,
-    JubjubParams
-};
-
+use sapling_crypto::jubjub::{FixedGenerators, Unknown, edwards};
+use crate::models::params;
 use super::super::circuit::utils::{le_bit_vector_into_field_element};
+use sapling_crypto::circuit::float_point::{convert_to_float}; // TODO: move to primitives
 
-pub type Account<E> = balance_tree::Leaf<E>;
-
-pub trait State<E: JubjubEngine> {  
-    fn get_accounts(&self) -> Vec<(u32, Account<E>)>;
-    fn block_number(&self) -> u32;
-    fn root_hash(&self) -> E::Fr;
+#[derive(Clone)]
+pub struct TransactionSignature<E: JubjubEngine> {
+    pub r: edwards::Point<E, Unknown>,
+    pub s: E::Fr,
 }
 
+impl<E: JubjubEngine> TransactionSignature<E> {
+    pub fn empty() -> Self {
+        let empty_point: edwards::Point<E, Unknown> = edwards::Point::zero();
+        Self{
+            r: empty_point,
+            s: E::Fr::zero()
+        }
+    }
+}
+
+/// Packed transaction data
 #[derive(Clone)]
 pub struct Tx<E: JubjubEngine> {
     pub from:               E::Fr,
     pub to:                 E::Fr,
-    pub amount:             E::Fr,
-    pub fee:                E::Fr,
+    pub amount:             E::Fr, // packed, TODO: document it here
+    pub fee:                E::Fr, // packed
     pub nonce:              E::Fr,
     pub good_until_block:   E::Fr,
     pub signature:          TransactionSignature<E>,
+}
+
+/// Unpacked transaction data
+#[derive(Debug, Clone)]
+pub struct TxUnpacked{
+    pub from:               u32,
+    pub to:                 u32,
+    pub amount:             u128,
+    pub fee:                u128,
+    pub nonce:              u32,
+    pub good_until_block:   u32,
+
+    pub sig_r:              String,
+    pub sig_s:              String,
+}
+
+impl<E: JubjubEngine> Tx<E> {
+
+    // TODO: introduce errors if necessary
+    pub fn try_from(transaction: &TxUnpacked) -> Result<Self, ()> {
+
+        let encoded_amount_bits = convert_to_float(
+            transaction.amount,
+            params::AMOUNT_EXPONENT_BIT_WIDTH, 
+            params::AMOUNT_MANTISSA_BIT_WIDTH, 
+            10
+        ).map_err(|_| ())?;
+        let encoded_amount: E::Fr = le_bit_vector_into_field_element(&encoded_amount_bits);
+
+        // TODO: encode fee
+        let encoded_fee = E::Fr::zero();
+
+        let tx = Self {
+            // TODO: these conversions are ugly and inefficient, replace with idiomatic std::convert::From trait
+            from:               E::Fr::from_str(&transaction.from.to_string()).unwrap(),
+            to:                 E::Fr::from_str(&transaction.to.to_string()).unwrap(),
+            amount:             encoded_amount,
+            fee:                encoded_fee,
+            nonce:              E::Fr::from_str(&transaction.good_until_block.to_string()).unwrap(),
+            good_until_block:   E::Fr::from_str(&transaction.good_until_block.to_string()).unwrap(),
+
+            // TODO: decode signature
+            signature:          TransactionSignature::empty(),
+        };
+
+        Ok(tx)
+    }
+
 }
 
 impl <E: JubjubEngine> Tx<E> {
@@ -47,16 +93,16 @@ impl <E: JubjubEngine> Tx<E> {
         // - fee
         let mut from: Vec<bool> = BitIterator::new(self.from.into_repr()).collect();
         from.reverse();
-        from.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
+        from.truncate(params::BALANCE_TREE_DEPTH);
         let mut to: Vec<bool> = BitIterator::new(self.to.into_repr()).collect();
         to.reverse();
-        to.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
+        to.truncate(params::BALANCE_TREE_DEPTH);
         let mut amount: Vec<bool> = BitIterator::new(self.amount.into_repr()).collect();
         amount.reverse();
-        amount.truncate(*plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH);
+        amount.truncate(params::AMOUNT_EXPONENT_BIT_WIDTH + params::AMOUNT_MANTISSA_BIT_WIDTH);
         let mut fee: Vec<bool> = BitIterator::new(self.fee.into_repr()).collect();
         fee.reverse();
-        fee.truncate(*plasma_constants::FEE_EXPONENT_BIT_WIDTH + *plasma_constants::FEE_MANTISSA_BIT_WIDTH);
+        fee.truncate(params::FEE_EXPONENT_BIT_WIDTH + params::FEE_MANTISSA_BIT_WIDTH);
         
         let mut packed: Vec<bool> = vec![];
         packed.extend(from.into_iter());
@@ -79,10 +125,10 @@ impl <E: JubjubEngine> Tx<E> {
         // - good_until_block
         let mut nonce: Vec<bool> = BitIterator::new(self.nonce.into_repr()).collect();
         nonce.reverse();
-        nonce.truncate(*plasma_constants::NONCE_BIT_WIDTH);
+        nonce.truncate(params::NONCE_BIT_WIDTH);
         let mut good_until_block: Vec<bool> = BitIterator::new(self.good_until_block.into_repr()).collect();
         good_until_block.reverse();
-        good_until_block.truncate(*plasma_constants::BLOCK_NUMBER_BIT_WIDTH);
+        good_until_block.truncate(params::BLOCK_NUMBER_BIT_WIDTH);
         let mut packed: Vec<bool> = vec![];
         
         packed.extend(self.public_data_into_bits().into_iter());
@@ -125,14 +171,14 @@ impl <E: JubjubEngine> Tx<E> {
 
         let message_bytes = self.data_as_bytes();
 
-        let max_message_len = *plasma_constants::BALANCE_TREE_DEPTH 
-                        + *plasma_constants::BALANCE_TREE_DEPTH 
-                        + *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH 
-                        + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH
-                        + *plasma_constants::FEE_EXPONENT_BIT_WIDTH
-                        + *plasma_constants::FEE_MANTISSA_BIT_WIDTH
-                        + *plasma_constants::NONCE_BIT_WIDTH
-                        + *plasma_constants::BLOCK_NUMBER_BIT_WIDTH;
+        let max_message_len = params::BALANCE_TREE_DEPTH 
+                        + params::BALANCE_TREE_DEPTH 
+                        + params::AMOUNT_EXPONENT_BIT_WIDTH 
+                        + params::AMOUNT_MANTISSA_BIT_WIDTH
+                        + params::FEE_EXPONENT_BIT_WIDTH
+                        + params::FEE_MANTISSA_BIT_WIDTH
+                        + params::NONCE_BIT_WIDTH
+                        + params::BLOCK_NUMBER_BIT_WIDTH;
         
         let signature = private_key.sign_raw_message(
             &message_bytes, 
@@ -165,10 +211,4 @@ impl <E: JubjubEngine> Tx<E> {
         self.signature = converted_signature;
 
     }
-}
-
-pub struct Block<E: JubjubEngine> {
-    pub block_number:   u32,
-    pub transactions:   Vec<Tx<E>>,
-    pub new_root_hash:  E::Fr,
 }
