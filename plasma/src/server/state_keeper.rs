@@ -89,13 +89,8 @@ impl PlasmaStateKeeper {
     }
 
     pub fn run(& mut self, rx_for_transactions: mpsc::Receiver<(TxUnpacked, mpsc::Sender<bool>)>, tx_for_blocks: mpsc::Sender<Block>) {
-        loop {
-            let message = rx_for_transactions.try_recv();
-            if message.is_err() {
-                thread::sleep(time::Duration::from_millis(10));
-                continue;
-            }
-            let (tx, return_channel) = message.unwrap();
+        for (tx, return_channel) in rx_for_transactions {
+
             println!("Got transaction!");
             let r = self.handle_tx(&tx);
             return_channel.send(r.is_ok());
