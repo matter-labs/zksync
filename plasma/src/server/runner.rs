@@ -30,13 +30,13 @@ pub fn run() {
     let mut eth_client = ETHClient::new(PROD_PLASMA);
     eth_client.get_first_nonce();
 
-    let mut keeper = PlasmaStateKeeper::new(rx_for_transactions, tx_for_blocks);
+    let mut keeper = PlasmaStateKeeper::new();
     let mut prover = BabyProver::create(&keeper.state).unwrap();
 
     // spawn a thread with a state processor
 
     let state_handle = thread::spawn(move || {
-        keeper.run();
+        keeper.run(rx_for_transactions, tx_for_blocks);
     });
 
     let prover_handle = thread::spawn(move || {

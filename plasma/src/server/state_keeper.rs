@@ -16,18 +16,13 @@ use crate::models::tx::TxUnpacked;
 
 use crate::models::params;
 use rand::{SeedableRng, Rng, XorShiftRng};
+use super::config;
 
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
 
     /// Current plasma state
     pub state: PlasmaState,
-
-    /// channel to receive signed and verified transactions to apply
-    pub transactions_channel: mpsc::Receiver<(TxUnpacked, mpsc::Sender<bool>)>,
-
-    // outgoing channel
-    pub batch_channel: mpsc::Sender<Block>,
 
     // Batch size
     pub batch_size: usize,
@@ -42,7 +37,7 @@ pub struct PlasmaStateKeeper {
 
 impl PlasmaStateKeeper {
 
-    pub fn new(rx_for_transactions: mpsc::Receiver<(TxUnpacked, mpsc::Sender<bool>)>, tx_for_blocks: mpsc::Sender<Block>) -> Self {
+    pub fn new() -> Self {
 
         // here we should insert default accounts into the tree
         let tree_depth = params::BALANCE_TREE_DEPTH as u32;
@@ -82,9 +77,7 @@ impl PlasmaStateKeeper {
                 balance_tree,
                 block_number: 1,
             },
-            transactions_channel: rx_for_transactions,
-            batch_channel: tx_for_blocks.clone(),
-            batch_size : 32,
+            batch_size : config::TX_BATCH_SIZE,
             current_batch: vec![],
             private_keys: keys_map
         };
@@ -95,9 +88,9 @@ impl PlasmaStateKeeper {
         keeper
     }
 
-    pub fn run(& mut self) {
+    pub fn run(& mut self, rx_for_transactions: mpsc::Receiver<(TxUnpacked, mpsc::Sender<bool>)>, tx_for_blocks: mpsc::Sender<Block>) {
         loop {
-            let message = self.transactions_channel.try_recv();
+            let message = rx_for_transactions.try_recv();
             if message.is_err() {
                 thread::sleep(time::Duration::from_millis(10));
                 continue;
@@ -106,6 +99,10 @@ impl PlasmaStateKeeper {
             println!("Got transaction!");
             let r = self.handle_tx(&tx);
             return_channel.send(r.is_ok());
+
+            if self.current_batch.len() == self.batch_size {
+                self.process_batch(&tx_for_blocks)
+            }
         }
     }
 
@@ -137,15 +134,10 @@ impl PlasmaStateKeeper {
         // push for processing
 
         self.current_batch.push(tx);
-        if self.current_batch.len() == self.batch_size {
-            self.process_batch()
-        }
-
         Ok(())
     }
 
-    fn process_batch(&mut self) {
-
+    fn process_batch(&mut self, tx_for_blocks: &mpsc::Sender<Block>) {
         let batch = &self.current_batch;
         let new_root = self.state.root_hash();
         let block = Block {
@@ -153,7 +145,7 @@ impl PlasmaStateKeeper {
             transactions:   batch.to_vec(),
             new_root_hash:  new_root,
         };
-        self.batch_channel.send(block);
+        tx_for_blocks.send(block);
 
         self.current_batch = Vec::with_capacity(self.batch_size);
         self.state.block_number += 1;
