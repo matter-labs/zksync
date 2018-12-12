@@ -62,7 +62,7 @@ pub fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item =
         .responder()
 }
 
-pub fn start_api_server(tx_for_transactions: mpsc::Sender<(TxUnpacked, mpsc::Sender<bool>)>) {
+pub fn run_api_server(tx_for_transactions: mpsc::Sender<(TxUnpacked, mpsc::Sender<bool>)>) {
 
     ::std::env::set_var("RUST_LOG", "actix_web=info");
     let sys = actix::System::new("ws-example");

@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use rand::{OsRng};
+use std::sync::{mpsc:: {self, Sender, Receiver}};
 
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
@@ -16,6 +17,8 @@ use crate::models::params;
 use crate::models::plasma_models::{AccountTree, Block, PlasmaState};
 
 use super::config::TX_BATCH_SIZE;
+
+use super::committer::EthereumProof;
 
 use super::super::circuit::utils::be_bit_vector_into_bytes;
 use super::super::circuit::transfer::transaction::{Transaction};
@@ -69,15 +72,6 @@ pub struct BabyProver {
     pub jubjub_params: AltJubjubBn256,
 }
 
-#[derive(Debug, Clone)]
-pub struct EthereumProof {
-    pub groth_proof: [U256; 8],
-    pub new_root: U256,
-    pub block_number: U256,
-    pub total_fees: U256,
-    pub public_data: Vec<u8>,
-}
-
 #[derive(Debug)]
 pub struct FullBabyProof {
     proof: BabyProof,
@@ -88,9 +82,8 @@ pub struct FullBabyProof {
 }
 
 impl BabyProver {
-    pub fn create(initial_state: &PlasmaState) ->
-        Result<BabyProver, BabyProverErr>
-    {
+
+    pub fn create(initial_state: &PlasmaState) -> Result<BabyProver, BabyProverErr> {
         use std::fs::File;
         use std::io::{BufReader};
 
@@ -446,6 +439,36 @@ impl BabyProver {
         };
 
         Ok(full_proof)
+    }
+
+    pub fn run(
+            &mut self,
+            rx_for_blocks: mpsc::Receiver<Block>, 
+            tx_for_tx_data: mpsc::Sender<EthereumProof>,
+            tx_for_proofs: mpsc::Sender<EthereumProof>
+        ) 
+    {
+        for block in rx_for_blocks {
+            println!("Got batch!");
+
+            let new_root = block.new_root_hash.clone();
+            println!("Commiting to new root = {}", new_root);
+            let block_number = block.block_number;
+            let tx_data = BabyProver::encode_transactions(&block).unwrap();
+            let tx_data_bytes = tx_data;
+            let incomplete_proof = EthereumProof {
+                groth_proof: [U256::from(0); 8],
+                new_root: serialize_fe_for_ethereum(new_root),
+                block_number: U256::from(block_number),
+                total_fees: U256::from(0),
+                public_data: tx_data_bytes,
+            };
+            tx_for_tx_data.send(incomplete_proof);
+
+            let proof = self.apply_and_prove(&block).unwrap();
+            let full_proof = BabyProver::encode_proof(&proof).unwrap();
+            tx_for_proofs.send(full_proof);
+        }        
     }
     
 }
