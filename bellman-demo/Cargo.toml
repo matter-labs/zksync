@@ -6,10 +6,11 @@ version = "0.1.0"
 rand = "0.4"
 ff = { version = "0.4", features = ["derive"] }
 hex = "0.3.2"
+pairing = { path = "../pairing" }
 bellman = { path = "../bellman" }
 sapling-crypto = { path = "../sapling-crypto" }
 time = "0.1"
 num-bigint = "0.2"
+#pairing = { git = 'https://github.com/matterinc/pairing' }
+#bellman = { git = 'https://github.com/matterinc/bellman' }
 
-[dependencies.pairing]
-path = "../pairing"

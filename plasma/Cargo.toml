@@ -36,11 +36,12 @@ rlp = "0.3.0"
 tiny-keccak = "1.4.2"
 secp256k1 = "0.11.1"
 
-pairing = { git = 'https://github.com/matterinc/pairing' }
-#sapling-crypto = { git = 'https://github.com/matterinc/sapling-crypto' }
-bellman = { git = 'https://github.com/matterinc/bellman' }
+pairing = { path = "../pairing" }
+bellman = { path = "../bellman" }
+sapling-crypto = { path = "../sapling-crypto" }
 
-[dependencies.sapling-crypto]
-path = "../sapling-crypto"
+#pairing = { git = 'https://github.com/matterinc/pairing' }
+#sapling-crypto = { git = 'https://github.com/matterinc/sapling-crypto' }
+#bellman = { git = 'https://github.com/matterinc/bellman' }
 
 
