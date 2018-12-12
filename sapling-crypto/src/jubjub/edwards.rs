@@ -163,6 +163,17 @@ impl<E: JubjubEngine> Point<E, Unknown> {
         }
     }
 
+    // compress point into single E::Fr and a sign bit
+    pub fn compress_into_y(&self) -> (E::Fr, bool)
+    {
+        // Given a y on the curve, read the x sign and leave y coordinate only
+        // Important - normalize from extended coordinates
+        let (x, y) = self.into_xy();
+        let sign = x.into_repr().is_odd();
+
+        (y, sign)
+    }
+
     /// This guarantees the point is in the prime order subgroup
     #[must_use]
     pub fn mul_by_cofactor(&self, params: &E::Params) -> Point<E, PrimeOrder>

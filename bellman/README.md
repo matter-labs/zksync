@@ -1,6 +1,6 @@
-# bellman [![Crates.io](https://img.shields.io/crates/v/bellman.svg)](https://crates.io/crates/bellman) #
-
-This is a research project being built for [Zcash](https://z.cash/).
+# bellman "Community edition"
+ 
+Originally developed for ZCash, with extensions from us to make it a little more pleasant. Uses our "community edition" pairing for Ethereum's BN256 curve.
 
 ## License
 

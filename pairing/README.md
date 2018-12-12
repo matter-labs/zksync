@@ -1,4 +1,6 @@
-# pairing [![Crates.io](https://img.shields.io/crates/v/pairing.svg)](https://crates.io/crates/pairing) #
+# pairing "community edition"
+
+Originally developed by ZCash, with extensions from us to make it a little more pleasant. 
 
 This is a Rust crate for using pairing-friendly elliptic curves. Currently, only the [BLS12-381](https://z.cash/blog/new-snark-curve.html) and BN256 curves are implemented.
 

@@ -1,12 +1,12 @@
 [package]
-authors = ["Sean Bowe <ewillbefull@gmail.com>"]
+authors = ["Sean Bowe <ewillbefull@gmail.com>", "Alex Vlasov <alex.m.vlasov@gmail.com>"]
 description = "zk-SNARK library"
-documentation = "https://github.com/ebfull/bellman"
-homepage = "https://github.com/ebfull/bellman"
+documentation = "https://github.com/matterinc/bellman"
+homepage = "https://github.com/matterinc/bellman"
 license = "MIT/Apache-2.0"
 name = "bellman"
-repository = "https://github.com/ebfull/bellman"
-version = "0.1.0"
+repository = "https://github.com/matterinc/bellman"
+version = "0.1.1"
 
 [dependencies]
 rand = "0.4"
@@ -15,14 +15,11 @@ futures = "0.1"
 futures-cpupool = "0.1"
 num_cpus = "1"
 crossbeam = "0.3"
-#pairing = "0.14"
+pairing = { git = 'https://github.com/matterinc/pairing' }
 byteorder = "1"
 ff = { version = "0.4", features = ["derive"] }
 pbr = "1.0.1"
 time = "0.1"
-
-[dependencies.pairing]
-path = "../pairing"
 
 [features]
 default = []

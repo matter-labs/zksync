@@ -622,4 +622,16 @@ mod baby_tests {
             assert!(!rvk.verify_for_raw_message(msg2, &sig1, p_g, params, max_message_size));
         }
     }
+
+    #[test]
+    fn get_generator_for_signatures() {
+        let rng = &mut thread_rng();
+        let p_g = FixedGenerators::SpendingKeyGenerator;
+        let params = &AltJubjubBn256::new();
+        let s = <Bn256 as JubjubEngine>::Fs::one();
+        let sk = PrivateKey::<Bn256>(s);
+        let vk = PublicKey::from_private(&sk, p_g, params);
+        let (x, y) = vk.0.into_xy();
+        println!("Public generator x = {}, y = {}", x, y);
+    }
 }

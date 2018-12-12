@@ -15,6 +15,7 @@ pub mod multipack;
 pub mod sha256;
 pub mod baby_eddsa;
 pub mod float_point;
+// pub mod shark_mimc;
 
 pub mod sapling;
 pub mod sprout;

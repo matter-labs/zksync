@@ -1,10 +1,10 @@
-# sapling-crypto
+# sapling-crypto "Community edition"
 
-This repository contains a (work-in-progress) implementation of Zcash's "Sapling" cryptography.
+This repository contains an original implementation of Zcash's "Sapling" cryptography with extensions from us for Ethereum curves and some sugar functions.
 
 ## Security Warnings
 
-This library is currently under development and has not been reviewed.
+This library is under development and has not been reviewed.
 
 ## License
 
