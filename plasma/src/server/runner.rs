@@ -24,21 +24,24 @@ pub fn run() {
 
     // spawn threads for different processes
 
-    // applies incoming transactions to the state
+    // runs the server which will handling incoming REST API requests
+    // tx requests are forwarded to state keeper
+    thread::spawn(move || {  
+        run_api_server(tx_for_transactions);
+    });
+
+    // applies incoming transactions to the state and adds them to the batch basket
+    // once the basket is full, the new block is passed to the prover to generate proof
     thread::spawn(move || {
         keeper.run(rx_for_transactions, tx_for_blocks);
     });
 
-    // generates proofs 
+    // takes the block to prove, encodes its data for ethereum and passes it to the committer
+    // then the proof is generated and also passed to committer
     thread::spawn(move || {
         prover.run(rx_for_blocks, tx_for_proofs);
     });
 
-    // hanldes eth operations: commit and verify blocks
-    thread::spawn(move || {
-        run_committer(rx_for_proofs);
-    });
-
-    // runs the server which will handling incoming REST API requests
-    run_api_server(tx_for_transactions);
+    // hanldes eth operations: submits eth transactions to commit and verify blocks
+    run_committer(rx_for_proofs);
 }
