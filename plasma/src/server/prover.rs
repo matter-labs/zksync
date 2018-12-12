@@ -18,7 +18,7 @@ use crate::models::plasma_models::{AccountTree, Block, PlasmaState};
 
 use super::config::TX_BATCH_SIZE;
 
-use super::committer::EthereumProof;
+use super::committer::{self, EthereumProof};
 
 use super::super::circuit::utils::be_bit_vector_into_bytes;
 use super::super::circuit::transfer::transaction::{Transaction};
@@ -183,13 +183,10 @@ impl BabyProver {
 
         let public_data = proof.public_data.clone();
 
-        let p = EthereumProof{
+        let p = EthereumProof::Proof(committer::Proof{
             groth_proof: [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y],
-            new_root: new_root,
             block_number: block_number,
-            total_fees: total_fees,
-            public_data: public_data,
-        };
+        });
 
         Ok(p)
     }
@@ -444,7 +441,6 @@ impl BabyProver {
     pub fn run(
             &mut self,
             rx_for_blocks: mpsc::Receiver<Block>, 
-            tx_for_tx_data: mpsc::Sender<EthereumProof>,
             tx_for_proofs: mpsc::Sender<EthereumProof>
         ) 
     {
@@ -456,14 +452,13 @@ impl BabyProver {
             let block_number = block.block_number;
             let tx_data = BabyProver::encode_transactions(&block).unwrap();
             let tx_data_bytes = tx_data;
-            let incomplete_proof = EthereumProof {
-                groth_proof: [U256::from(0); 8],
+            let incomplete_proof = EthereumProof::Commitment(committer::Commitment{
                 new_root: serialize_fe_for_ethereum(new_root),
                 block_number: U256::from(block_number),
                 total_fees: U256::from(0),
                 public_data: tx_data_bytes,
-            };
-            tx_for_tx_data.send(incomplete_proof);
+            });
+            tx_for_proofs.send(incomplete_proof);
 
             let proof = self.apply_and_prove(&block).unwrap();
             let full_proof = BabyProver::encode_proof(&proof).unwrap();

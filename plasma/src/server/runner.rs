@@ -32,12 +32,12 @@ pub fn run() {
 
     // generates proofs 
     thread::spawn(move || {
-        prover.run(rx_for_blocks, tx_for_tx_data, tx_for_proofs);
+        prover.run(rx_for_blocks, tx_for_proofs);
     });
 
     // hanldes eth operations: commit and verify blocks
     thread::spawn(move || {
-        run_committer(rx_for_tx_data, rx_for_proofs);
+        run_committer(rx_for_proofs);
     });
 
     // runs the server which will handling incoming REST API requests
