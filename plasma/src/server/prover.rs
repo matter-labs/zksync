@@ -17,7 +17,7 @@ use crate::models::params;
 use crate::models::state::State;
 use super::baby_models::{Account, AccountTree, Block};
 
-use super::params::TX_BATCH_SIZE;
+use super::config::TX_BATCH_SIZE;
 
 use super::super::circuit::utils::be_bit_vector_into_bytes;
 use super::super::circuit::transfer::transaction::{Transaction};
