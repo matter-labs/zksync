@@ -1,9 +1,7 @@
 use pairing::bn256::{Bn256, Fr};
 use sapling_crypto::jubjub::{edwards, Unknown, FixedGenerators};
-use sapling_crypto::circuit::float_point::{convert_to_float};
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 
-use crate::models::params;
 use crate::models::state::{State};
 use crate::primitives::{field_element_to_u32, field_element_to_u128};
 use crate::circuit::utils::{le_bit_vector_into_field_element};
@@ -15,16 +13,7 @@ use rand::{OsRng};
 use sapling_crypto::eddsa::{PrivateKey};
 
 use crate::models::baby_models::{Block, Account, Tx, AccountTree, TransactionSignature};
-
-#[derive(Debug, Clone)]
-pub struct TxInfo{
-    pub from: u32,
-    pub to: u32,
-    pub amount: u128,
-    pub fee: u128,
-    pub nonce: u32,
-    pub good_until_block: u32
-}
+use crate::models::tx::TxUnpacked;
 
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
@@ -36,7 +25,7 @@ pub struct PlasmaStateKeeper {
     pub block_number: u32,
 
     /// channel to receive signed and verified transactions to apply
-    pub transactions_channel: mpsc::Receiver<(TxInfo, mpsc::Sender<bool>)>,
+    pub transactions_channel: mpsc::Receiver<(TxUnpacked, mpsc::Sender<bool>)>,
 
     // outgoing channel
     pub batch_channel: mpsc::Sender<Block>,
@@ -82,61 +71,29 @@ impl PlasmaStateKeeper{
         }
     }
 
-    fn empty_signature() -> TransactionSignature {
-        let empty_point: edwards::Point<Bn256, Unknown> = edwards::Point::zero();
-        TransactionSignature{
-            r: empty_point,
-            s: Fr::zero()
-        }
-    }
-
-    // TODO: use nonce and good_until from transaction!
-    fn pack_tx(transaction: &TxInfo, nonce: Fr, good_until: u32) -> Result<Tx, ()> {
-
-        let encoded_amount_bits = convert_to_float(
-            transaction.amount,
-            params::AMOUNT_EXPONENT_BIT_WIDTH, 
-            params::AMOUNT_MANTISSA_BIT_WIDTH, 
-            10
-        ).map_err(|_| ())?;
-        let encoded_amount: Fr = le_bit_vector_into_field_element(&encoded_amount_bits);
-
-        // encoded fee is zero for now
-        let encoded_fee = Fr::zero();
-
-        // Will make a well-formed Tx by convering to field elements and making a signature
-        let tx = Tx {
-            from:               Fr::from_str(&transaction.from.to_string()).unwrap(),
-            to:                 Fr::from_str(&transaction.to.to_string()).unwrap(),
-            amount:             encoded_amount,
-            fee:                encoded_fee,
-            nonce:              nonce,
-            good_until_block:   Fr::from_str(&transaction.good_until_block.to_string()).unwrap(),
-            signature:          Self::empty_signature(),
-        };
-
-        Ok(tx)
-    }
-
+    // TODO: remove this function when done with demo
     fn sign_tx(tx: &mut Tx, sk: &PrivateKey<Bn256>) {
-        // TODO: move static params to constructor!
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let mut rng = OsRng::new().unwrap();
         tx.sign(sk, p_g, &params, &mut rng);
     }
 
-    fn handle_tx_request(&mut self, transaction: &TxInfo) -> Result<(), ()> {
-    
+    fn handle_tx_request(&mut self, transaction: &TxUnpacked) -> Result<(), ()> {
+
         // verify correctness
 
         let mut from = self.balance_tree.items.get(&transaction.from).ok_or(())?.clone();
         if field_element_to_u128(from.balance) < transaction.amount { return Err(()); }
         // TODO: check nonce: assert field_element_to_u32(from.nonce) == transaction.nonce
 
-        // sign tx (for demo only; TODO: remove this)
+        // augument and sign transaction (for demo only; TODO: remove this!)
 
-        let mut tx = Self::pack_tx(&transaction, from.nonce, self.block_number)?;
+        let mut transaction = transaction.clone();
+        transaction.nonce = field_element_to_u32(from.nonce);
+        transaction.good_until_block = self.block_number;
+        let mut tx = Tx::try_from(&transaction)?;
+
         let sk = self.private_keys.get(&transaction.from).unwrap();
         Self::sign_tx(&mut tx, sk);
 
@@ -162,7 +119,7 @@ impl PlasmaStateKeeper{
     }
 
     fn process_batch(&mut self) {
-        
+
         let batch = &self.current_batch;
         let new_root = self.root_hash();
         let block = Block {

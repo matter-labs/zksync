@@ -1,9 +1,10 @@
 use sapling_crypto::alt_babyjubjub::{JubjubEngine};
-use ff::{PrimeField, BitIterator};
+use ff::{Field, PrimeField, BitIterator};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 use sapling_crypto::jubjub::{FixedGenerators, Unknown, edwards};
 use crate::models::params;
 use super::super::circuit::utils::{le_bit_vector_into_field_element};
+use sapling_crypto::circuit::float_point::{convert_to_float}; // TODO: move to primitives
 
 #[derive(Clone)]
 pub struct TransactionSignature<E: JubjubEngine> {
@@ -11,15 +12,74 @@ pub struct TransactionSignature<E: JubjubEngine> {
     pub s: E::Fr,
 }
 
+impl<E: JubjubEngine> TransactionSignature<E> {
+    pub fn empty() -> Self {
+        let empty_point: edwards::Point<E, Unknown> = edwards::Point::zero();
+        Self{
+            r: empty_point,
+            s: E::Fr::zero()
+        }
+    }
+}
+
+/// Packed transaction data
 #[derive(Clone)]
 pub struct Tx<E: JubjubEngine> {
     pub from:               E::Fr,
     pub to:                 E::Fr,
-    pub amount:             E::Fr,
-    pub fee:                E::Fr,
+    pub amount:             E::Fr, // packed, TODO: document it here
+    pub fee:                E::Fr, // packed
     pub nonce:              E::Fr,
     pub good_until_block:   E::Fr,
     pub signature:          TransactionSignature<E>,
+}
+
+/// Unpacked transaction data
+#[derive(Debug, Clone)]
+pub struct TxUnpacked{
+    pub from:               u32,
+    pub to:                 u32,
+    pub amount:             u128,
+    pub fee:                u128,
+    pub nonce:              u32,
+    pub good_until_block:   u32,
+
+    pub sig_r:              String,
+    pub sig_s:              String,
+}
+
+impl<E: JubjubEngine> Tx<E> {
+
+    // TODO: introduce errors if necessary
+    pub fn try_from(transaction: &TxUnpacked) -> Result<Self, ()> {
+
+        let encoded_amount_bits = convert_to_float(
+            transaction.amount,
+            params::AMOUNT_EXPONENT_BIT_WIDTH, 
+            params::AMOUNT_MANTISSA_BIT_WIDTH, 
+            10
+        ).map_err(|_| ())?;
+        let encoded_amount: E::Fr = le_bit_vector_into_field_element(&encoded_amount_bits);
+
+        // TODO: encode fee
+        let encoded_fee = E::Fr::zero();
+
+        let tx = Self {
+            // TODO: these conversions are ugly and inefficient, replace with idiomatic std::convert::From trait
+            from:               E::Fr::from_str(&transaction.from.to_string()).unwrap(),
+            to:                 E::Fr::from_str(&transaction.to.to_string()).unwrap(),
+            amount:             encoded_amount,
+            fee:                encoded_fee,
+            nonce:              E::Fr::from_str(&transaction.good_until_block.to_string()).unwrap(),
+            good_until_block:   E::Fr::from_str(&transaction.good_until_block.to_string()).unwrap(),
+
+            // TODO: decode signature
+            signature:          TransactionSignature::empty(),
+        };
+
+        Ok(tx)
+    }
+
 }
 
 impl <E: JubjubEngine> Tx<E> {

@@ -13,9 +13,10 @@ use pairing::bn256::{Bn256, Fr};
 
 use crate::models::baby_models::{Account, AccountTree, Block};
 use super::prover::{BabyProver, EthereumProof};
-use super::state_keeper::{TxInfo, PlasmaStateKeeper};
+use super::state_keeper::{PlasmaStateKeeper};
 use super::rest_api::start_api_server;
 
+use crate::models::tx::TxUnpacked;
 use crate::models::state::{State};
 use crate::primitives::serialize_fe_for_ethereum;
 use crate::eth_client::{ETHClient, PROD_PLASMA};
@@ -26,7 +27,7 @@ use crate::models::params;
 pub fn run() {
     // create channel to accept deserialized requests for new transacitons
 
-    let (tx_for_transactions, rx_for_transactions) = mpsc::channel::<(TxInfo, mpsc::Sender<bool>)>();
+    let (tx_for_transactions, rx_for_transactions) = mpsc::channel::<(TxUnpacked, mpsc::Sender<bool>)>();
     let (tx_for_blocks, rx_for_blocks) = mpsc::channel::<Block>();
     let (tx_for_proofs, rx_for_proofs) = mpsc::channel::<EthereumProof>();
     let (tx_for_tx_data, rx_for_tx_data) = mpsc::channel::<EthereumProof>();

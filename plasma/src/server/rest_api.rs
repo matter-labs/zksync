@@ -1,7 +1,7 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
 use std::sync::mpsc;
-use super::state_keeper::TxInfo;
+use crate::models::tx::TxUnpacked;
 
 use actix_web::{
     middleware, 
@@ -33,7 +33,7 @@ struct TransactionResponse {
 // singleton to keep info about channels required for Http server
 #[derive(Clone)]
 pub struct AppState {
-    state_keeper_tx: mpsc::Sender<(TxInfo, mpsc::Sender<bool>)>,
+    state_keeper_tx: mpsc::Sender<(TxUnpacked, mpsc::Sender<bool>)>,
 }
 
 pub fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
@@ -42,13 +42,15 @@ pub fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item =
         .from_err()  // convert all errors into `Error`
         .and_then(move |val: TransactionRequest| {
             let (tx, rx) = mpsc::channel::<bool>();
-            let info = TxInfo {
+            let info = TxUnpacked {
                 from: val.from,
                 to: val.to,
                 amount: val.amount,
                 fee: 0,
                 nonce: 0,
-                good_until_block: 100
+                good_until_block: 100,
+                sig_r: "".to_owned(),
+                sig_s: "".to_owned(),
             };
             state_tx.send((info, tx.clone()));
             let result = rx.recv();
@@ -60,7 +62,7 @@ pub fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item =
         .responder()
 }
 
-pub fn start_api_server(tx_for_transactions: mpsc::Sender<(TxInfo, mpsc::Sender<bool>)>) {
+pub fn start_api_server(tx_for_transactions: mpsc::Sender<(TxUnpacked, mpsc::Sender<bool>)>) {
     //move is necessary to give closure below ownership
     server::new(move || {
         App::with_state(AppState {
