@@ -20,6 +20,12 @@ pub type DepositBlock = block::Block<DepositRequest, Engine>;
 pub type ExitRequest = exit::ExitRequest<Engine>;
 pub type ExitBlock = block::Block<ExitRequest, Engine>;
 
+pub enum Block {
+    Tx(TxBlock),
+    Deposit(DepositBlock),
+    Exit(ExitBlock)
+}
+
 pub struct PlasmaState {
 
     /// Accounts stored in a sparse Merkle tree

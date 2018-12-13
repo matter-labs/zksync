@@ -14,11 +14,11 @@ use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
 
 use crate::models::params;
-use crate::models::plasma_models::{AccountTree, TxBlock, PlasmaState};
+use crate::models::plasma_models::{AccountTree, TxBlock, Block, PlasmaState};
 
 use super::config::TX_BATCH_SIZE;
 
-use super::committer::{self, EthereumProof};
+use super::committer::{self, EncodedProof};
 
 use super::super::circuit::utils::be_bit_vector_into_bytes;
 use super::super::circuit::transfer::transaction::{Transaction};
@@ -29,6 +29,12 @@ use web3::types::{U256};
 
 type BabyProof = Proof<Bn256>;
 type BabyParameters = Parameters<Bn256>;
+
+pub struct ProofRequest {
+    block: Block,
+    //TODO: in future, add for parallelism: 
+    //state: PlasmaState,
+}
 
 #[derive(Debug)]
 pub enum BabyProverErr {
@@ -150,7 +156,6 @@ impl BabyProver {
 }
 
 type Err = BabyProverErr;
-type EncodedProof = EthereumProof;
 
 impl BabyProver {
 
@@ -183,10 +188,10 @@ impl BabyProver {
 
         let public_data = proof.public_data.clone();
 
-        let p = EthereumProof::Proof(committer::Proof{
+        let p = EncodedProof{
             groth_proof: [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y],
             block_number: block_number,
-        });
+        };
 
         Ok(p)
     }
@@ -440,29 +445,21 @@ impl BabyProver {
 
     pub fn run(
             &mut self,
-            rx_for_blocks: mpsc::Receiver<TxBlock>, 
-            tx_for_proofs: mpsc::Sender<EthereumProof>
+            rx_for_blocks: mpsc::Receiver<ProofRequest>, 
+            tx_for_proofs: mpsc::Sender<EncodedProof>
         ) 
     {
-        for block in rx_for_blocks {
-            println!("Got batch!");
+        for req in rx_for_blocks {
+            println!("Got request for proof");
 
-            let new_root = block.new_root_hash.clone();
-            println!("Commiting to new root = {}", new_root);
-            let block_number = block.block_number;
-            let tx_data = BabyProver::encode_transactions(&block).unwrap();
-            let tx_data_bytes = tx_data;
-            let incomplete_proof = EthereumProof::Commitment(committer::Commitment{
-                new_root: serialize_fe_for_ethereum(new_root),
-                block_number: U256::from(block_number),
-                total_fees: U256::from(0),
-                public_data: tx_data_bytes,
-            });
-            tx_for_proofs.send(incomplete_proof);
-
-            let proof = self.apply_and_prove(&block).unwrap();
-            let full_proof = BabyProver::encode_proof(&proof).unwrap();
-            tx_for_proofs.send(full_proof);
+            match req.block {
+                Block::Tx(block) => {
+                    let proof = self.apply_and_prove(&block).unwrap();
+                    let full_proof = BabyProver::encode_proof(&proof).unwrap();
+                    tx_for_proofs.send(full_proof);
+                },
+                _ => unimplemented!(),
+            }
         }        
     }
     

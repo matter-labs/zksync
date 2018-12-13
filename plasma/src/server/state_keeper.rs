@@ -4,31 +4,27 @@ use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 
 use crate::primitives::{field_element_to_u32, field_element_to_u128};
 use crate::circuit::utils::{le_bit_vector_into_field_element};
-use std::sync::mpsc;
 use std::{thread, time};
 use std::collections::HashMap;
 use ff::{Field, PrimeField};
 use rand::{OsRng};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 
-use crate::models::plasma_models::{TxBlock, Account, Tx, AccountTree, TransactionSignature, PlasmaState};
+use crate::models::plasma_models::{Block, TxBlock, Account, Tx, AccountTree, TransactionSignature, PlasmaState};
 use crate::models::tx::TxUnpacked;
+use super::prover::ProofRequest;
+use super::committer::Commitment;
 
 use crate::models::params;
 use rand::{SeedableRng, Rng, XorShiftRng};
-use super::config;
+
+use std::sync::mpsc::{Sender, Receiver};
 
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
 
     /// Current plasma state
     pub state: PlasmaState,
-
-    // Batch size
-    pub batch_size: usize,
-
-    // Accumulated transactions
-    pub current_batch: Vec<Tx>,
 
     // TODO: remove
     // Keep private keys in memory
@@ -77,8 +73,6 @@ impl PlasmaStateKeeper {
                 balance_tree,
                 block_number: 1,
             },
-            batch_size : config::TX_BATCH_SIZE,
-            current_batch: vec![],
             private_keys: keys_map
         };
 
@@ -88,28 +82,33 @@ impl PlasmaStateKeeper {
         keeper
     }
 
-    pub fn run(& mut self, rx_for_transactions: mpsc::Receiver<(TxUnpacked, mpsc::Sender<bool>)>, tx_for_blocks: mpsc::Sender<TxBlock>) {
-        for (tx, return_channel) in rx_for_transactions {
+    pub fn run(&mut self, 
+        rx_for_blocks: Receiver<Block>, 
+        tx_for_commitments: Sender<Commitment>,
+        tx_for_proof_requests: Sender<ProofRequest>)
+    {
+        // get block
+        // block.number = self.state.block_number += 1;
+        // block.new_root = self.state.root_hash();
 
-            println!("Got transaction!");
-            let r = self.handle_tx(&tx);
-            return_channel.send(r.is_ok());
+        // update state with verification
+        // for tx in block: self.state.apply(transaction)?;
 
-            if self.current_batch.len() == self.batch_size {
-                self.process_batch(&tx_for_blocks)
-            }
-        }
+            // let new_root = block.new_root_hash.clone();
+            // println!("Commiting to new root = {}", new_root);
+            // let block_number = block.block_number;
+            // let tx_data = BabyProver::encode_transactions(&block).unwrap();
+            // let tx_data_bytes = tx_data;
+            // let incomplete_proof = EthereumProof::Commitment(committer::Commitment{
+            //     new_root: serialize_fe_for_ethereum(new_root),
+            //     block_number: U256::from(block_number),
+            //     total_fees: U256::from(0),
+            //     public_data: tx_data_bytes,
+            // });
+            // tx_for_proofs.send(incomplete_proof);
     }
 
-    // TODO: remove this function when done with demo
-    fn sign_tx(tx: &mut Tx, sk: &PrivateKey<Bn256>) {
-        let params = &AltJubjubBn256::new();
-        let p_g = FixedGenerators::SpendingKeyGenerator;
-        let mut rng = OsRng::new().unwrap();
-        tx.sign(sk, p_g, &params, &mut rng);
-    }
-
-    fn handle_tx(&mut self, transaction: &TxUnpacked) -> Result<(), ()> {
+    fn apply_tx(&mut self, transaction: &TxUnpacked) -> Result<(), ()> {
 
         // augument and sign transaction (for demo only; TODO: remove this!)
 
@@ -125,25 +124,15 @@ impl PlasmaStateKeeper {
         // update state with verification
 
         self.state.apply(transaction)?;
-
-        // push for processing
-
-        self.current_batch.push(tx);
         Ok(())
     }
 
-    fn process_batch(&mut self, tx_for_blocks: &mpsc::Sender<TxBlock>) {
-        let batch = &self.current_batch;
-        let new_root = self.state.root_hash();
-        let block = TxBlock {
-            block_number:   self.state.block_number,
-            transactions:   batch.to_vec(),
-            new_root_hash:  new_root,
-        };
-        tx_for_blocks.send(block);
-
-        self.current_batch = Vec::with_capacity(self.batch_size);
-        self.state.block_number += 1;
+    // TODO: remove this function when done with demo
+    fn sign_tx(tx: &mut Tx, sk: &PrivateKey<Bn256>) {
+        let params = &AltJubjubBn256::new();
+        let p_g = FixedGenerators::SpendingKeyGenerator;
+        let mut rng = OsRng::new().unwrap();
+        tx.sign(sk, p_g, &params, &mut rng);
     }
 
 }
