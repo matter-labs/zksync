@@ -1,5 +1,6 @@
 use std::sync::mpsc::Sender;
 use crate::models::plasma_models::{Block};
+use super::state_keeper::BlockProcessingRequest;
 
 pub struct EthWatch {
 
@@ -11,7 +12,7 @@ impl EthWatch {
         Self{}
     }
 
-    pub fn run(&mut self, tx_for_blocks: Sender<Block>) {
+    pub fn run(&mut self, tx_for_blocks: Sender<BlockProcessingRequest>) {
 
     }
 

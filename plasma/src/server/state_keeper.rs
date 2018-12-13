@@ -20,6 +20,20 @@ use rand::{SeedableRng, Rng, XorShiftRng};
 
 use std::sync::mpsc::{Sender, Receiver};
 
+pub enum BlockSource {
+    // MemPool will provide a channel to return result of block processing
+    // In case of error, block is returned with invalid transactions removed
+    MemPool(Sender<Result<(),TxBlock>>),
+
+    // EthWatch doesn't need a result channel because block must always be processed
+    EthWatch,
+
+    // Same for unprocessed blocks from storage
+    Storage,
+}
+
+pub struct BlockProcessingRequest(pub Block, pub BlockSource);
+
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
 
@@ -83,7 +97,7 @@ impl PlasmaStateKeeper {
     }
 
     pub fn run(&mut self, 
-        rx_for_blocks: Receiver<Block>, 
+        rx_for_blocks: Receiver<BlockProcessingRequest>, 
         tx_for_commitments: Sender<Commitment>,
         tx_for_proof_requests: Sender<ProofRequest>)
     {

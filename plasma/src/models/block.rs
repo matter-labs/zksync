@@ -9,10 +9,10 @@ pub struct Block<T: Sized, E: JubjubEngine> {
 
 impl<T: Sized, E: JubjubEngine> Block<T, E> {
 
-    pub fn with(transactions: Vec<T>) -> Self {
+    pub fn empty() -> Self {
         Self{
             block_number:   0,
-            transactions,
+            transactions: vec![],
             new_root_hash:  E::Fr::zero(),
         }
     }

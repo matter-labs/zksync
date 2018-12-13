@@ -2,7 +2,7 @@ use std::thread;
 use std::sync::mpsc::{channel, Sender};
 
 use super::prover::{BabyProver, ProofRequest};
-use super::state_keeper::PlasmaStateKeeper;
+use super::state_keeper::{PlasmaStateKeeper, BlockProcessingRequest};
 use super::rest_api::run_api_server;
 use super::committer::{self, Commitment, EncodedProof};
 use super::mem_pool::MemPool;
@@ -18,7 +18,7 @@ pub fn run() {
     // create channel to accept deserialized requests for new transacitons
 
     let (tx_for_tx, rx_for_tx) = channel::<TxUnpacked>();
-    let (tx_for_blocks, rx_for_blocks) = channel::<Block>();
+    let (tx_for_blocks, rx_for_blocks) = channel::<BlockProcessingRequest>();
     let (tx_for_proof_requests, rx_for_proof_requests) = channel::<ProofRequest>();
     let (tx_for_commitments, rx_for_commitments) = channel::<Commitment>();
     let (tx_for_proofs, rx_for_proofs) = channel::<EncodedProof>();
