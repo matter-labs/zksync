@@ -1,17 +1,21 @@
 use ff::{Field, PrimeField};
-use pairing::bn256::{Bn256, Fr};
+use pairing::bn256;
 use crate::merkle_tree::{SparseMerkleTree, PedersenHasher};
 use crate::primitives::{field_element_to_u32, field_element_to_u128};
 use crate::models::*;
 
-type CurveUsed = Bn256;
-type FrUsed = Fr;
+type Engine = bn256::Bn256;
+type Fr = bn256::Fr;
 
-pub type Account = account::Account<CurveUsed>;
-pub type AccountTree = SparseMerkleTree<Account, FrUsed, PedersenHasher<CurveUsed>>;
-pub type Tx = tx::Tx<CurveUsed>;
-pub type Block = block::Block<CurveUsed>;
-pub type TransactionSignature = tx::TransactionSignature<CurveUsed>;
+pub type Account = account::Account<Engine>;
+pub type AccountTree = SparseMerkleTree<Account, Fr, PedersenHasher<Engine>>;
+
+pub type TransactionSignature = tx::TransactionSignature<Engine>;
+pub type Tx = tx::Tx<Engine>;
+pub type TxBlock = tx::Block<Engine>;
+
+pub type DepositRequest = deposit::DepositRequest<Engine>;
+pub type ExitRequest = exit::ExitRequest<Engine>;
 
 pub struct PlasmaState {
 

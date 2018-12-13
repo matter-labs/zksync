@@ -14,7 +14,7 @@ use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
 
 use crate::models::params;
-use crate::models::plasma_models::{AccountTree, Block, PlasmaState};
+use crate::models::plasma_models::{AccountTree, TxBlock, PlasmaState};
 
 use super::config::TX_BATCH_SIZE;
 
@@ -192,7 +192,7 @@ impl BabyProver {
     }
 
     // Takes public data from transactions for further commitment to Ethereum
-    pub fn encode_transactions(block: &Block) -> Result<Vec<u8>, Err> {
+    pub fn encode_transactions(block: &TxBlock) -> Result<Vec<u8>, Err> {
         let mut encoding : Vec<u8> = vec![];
         let transactions = &block.transactions;
 
@@ -205,7 +205,7 @@ impl BabyProver {
     }
 
     // Apply transactions to the state while also making a witness for proof, then calculate proof
-    pub fn apply_and_prove(&mut self, block: &Block) -> Result<FullBabyProof, Err> {
+    pub fn apply_and_prove(&mut self, block: &TxBlock) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.block_number {
             return Err(BabyProverErr::Unknown);
@@ -440,7 +440,7 @@ impl BabyProver {
 
     pub fn run(
             &mut self,
-            rx_for_blocks: mpsc::Receiver<Block>, 
+            rx_for_blocks: mpsc::Receiver<TxBlock>, 
             tx_for_proofs: mpsc::Sender<EthereumProof>
         ) 
     {

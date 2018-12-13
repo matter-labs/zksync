@@ -1,5 +1,8 @@
 pub mod account;
 pub mod tx;
-pub mod block;
+pub mod deposit;
+pub mod exit;
+
 pub mod params;
+
 pub mod plasma_models;

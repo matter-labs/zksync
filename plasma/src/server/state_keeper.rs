@@ -11,7 +11,7 @@ use ff::{Field, PrimeField};
 use rand::{OsRng};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 
-use crate::models::plasma_models::{Block, Account, Tx, AccountTree, TransactionSignature, PlasmaState};
+use crate::models::plasma_models::{TxBlock, Account, Tx, AccountTree, TransactionSignature, PlasmaState};
 use crate::models::tx::TxUnpacked;
 
 use crate::models::params;
@@ -88,7 +88,7 @@ impl PlasmaStateKeeper {
         keeper
     }
 
-    pub fn run(& mut self, rx_for_transactions: mpsc::Receiver<(TxUnpacked, mpsc::Sender<bool>)>, tx_for_blocks: mpsc::Sender<Block>) {
+    pub fn run(& mut self, rx_for_transactions: mpsc::Receiver<(TxUnpacked, mpsc::Sender<bool>)>, tx_for_blocks: mpsc::Sender<TxBlock>) {
         for (tx, return_channel) in rx_for_transactions {
 
             println!("Got transaction!");
@@ -132,10 +132,10 @@ impl PlasmaStateKeeper {
         Ok(())
     }
 
-    fn process_batch(&mut self, tx_for_blocks: &mpsc::Sender<Block>) {
+    fn process_batch(&mut self, tx_for_blocks: &mpsc::Sender<TxBlock>) {
         let batch = &self.current_batch;
         let new_root = self.state.root_hash();
-        let block = Block {
+        let block = TxBlock {
             block_number:   self.state.block_number,
             transactions:   batch.to_vec(),
             new_root_hash:  new_root,

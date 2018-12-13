@@ -11,17 +11,6 @@ pub struct TransactionSignature<E: JubjubEngine> {
     pub r: edwards::Point<E, Unknown>,
     pub s: E::Fr,
 }
-
-impl<E: JubjubEngine> TransactionSignature<E> {
-    pub fn empty() -> Self {
-        let empty_point: edwards::Point<E, Unknown> = edwards::Point::zero();
-        Self{
-            r: empty_point,
-            s: E::Fr::zero()
-        }
-    }
-}
-
 /// Packed transaction data
 #[derive(Clone)]
 pub struct Tx<E: JubjubEngine> {
@@ -44,8 +33,25 @@ pub struct TxUnpacked{
     pub nonce:              u32,
     pub good_until_block:   u32,
 
-    pub sig_r:              String,
+    pub sig_r:              String, // r.x
     pub sig_s:              String,
+}
+
+pub struct Block<E: JubjubEngine> {
+    pub block_number:   u32,
+    pub transactions:   Vec<Tx<E>>,
+    pub new_root_hash:  E::Fr,
+}
+
+
+impl<E: JubjubEngine> TransactionSignature<E> {
+    pub fn empty() -> Self {
+        let empty_point: edwards::Point<E, Unknown> = edwards::Point::zero();
+        Self{
+            r: empty_point,
+            s: E::Fr::zero()
+        }
+    }
 }
 
 impl<E: JubjubEngine> Tx<E> {
