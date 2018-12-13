@@ -21,7 +21,7 @@ pub fn run() {
     let (tx_for_blocks, rx_for_blocks) = channel::<BlockProcessingRequest>();
     let (tx_for_proof_requests, rx_for_proof_requests) = channel::<Block>();
     let (tx_for_commitments, rx_for_commitments) = channel::<TxBlock>();
-    let (tx_for_proofs, rx_for_proofs) = channel::<EncodedProof>();
+    let (tx_for_proofs, rx_for_proofs) = channel::<BlockProof>();
 
     let mut mem_pool = MemPool::new();
     let mut state_keeper = PlasmaStateKeeper::new();

@@ -18,7 +18,7 @@ use crate::models::plasma_models::{AccountTree, TxBlock, Block, PlasmaState};
 
 use super::config::TX_BATCH_SIZE;
 
-use super::committer::{self, EncodedProof};
+use super::committer::{self, EncodedProof, BlockProof};
 
 use super::super::circuit::utils::be_bit_vector_into_bytes;
 use super::super::circuit::transfer::transaction::{Transaction};
@@ -185,7 +185,6 @@ impl BabyProver {
         let p = EncodedProof{
             groth_proof: [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y],
             block_number: block_number,
-            accounts: vec![] // TODO: add
         };
 
         Ok(p)
@@ -441,7 +440,7 @@ impl BabyProver {
     pub fn run(
             &mut self,
             rx_for_blocks: mpsc::Receiver<Block>, 
-            tx_for_proofs: mpsc::Sender<EncodedProof>
+            tx_for_proofs: mpsc::Sender<BlockProof>
         ) 
     {
         for block in rx_for_blocks {
@@ -451,7 +450,8 @@ impl BabyProver {
                 Block::Tx(block) => {
                     let proof = self.apply_and_prove(&block).unwrap();
                     let full_proof = BabyProver::encode_proof(&proof).unwrap();
-                    tx_for_proofs.send(full_proof);
+                    let accounts = vec![]; // TODO: pass updated states of affected accounts
+                    tx_for_proofs.send(BlockProof(full_proof, accounts));
                 },
                 _ => unimplemented!(),
             }

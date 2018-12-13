@@ -19,10 +19,9 @@ pub struct Commitment {
 pub struct EncodedProof {
     pub groth_proof: [U256; 8],
     pub block_number: U256,
-
-    // affected accounts for db update
-    pub accounts: Vec<(u32, Account)>,
 }
+
+pub struct BlockProof(pub EncodedProof, pub Vec<(u32, Account)>);
 
 #[derive(Debug, Clone)]
 pub enum EthereumTx {
@@ -84,11 +83,14 @@ pub fn run_commitment_pipeline(rx_for_commitments: Receiver<TxBlock>, tx_for_eth
     }
 }
 
-pub fn run_proof_pipeline(rx_for_proofs: Receiver<EncodedProof>, tx_for_eth: Sender<EthereumTx>) {
+pub fn run_proof_pipeline(rx_for_proofs: Receiver<BlockProof>, tx_for_eth: Sender<EthereumTx>) {
 
-    for proof in rx_for_proofs {
-        // TODO: synchronously update accounts in storage
-        // use proof.accounts
+    for msg in rx_for_proofs {
+
+        let BlockProof(proof, accounts) = msg;
+
+        // TODO: synchronously commit proof and update accounts in storage
+        // use proof, accounts
 
         tx_for_eth.send(EthereumTx::Proof(proof));
     }
