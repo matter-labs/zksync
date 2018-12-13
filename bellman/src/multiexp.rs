@@ -46,7 +46,7 @@ impl<G: CurveAffine> SourceBuilder<G> for (Arc<Vec<G>>, usize) {
 impl<G: CurveAffine> Source<G> for (Arc<Vec<G>>, usize) {
     fn add_assign_mixed(&mut self, to: &mut <G as CurveAffine>::Projective) -> Result<(), SynthesisError> {
         if self.0.len() <= self.1 {
-            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "expected more bases from source").into());
+            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "expected more bases when adding from source").into());
         }
 
         if self.0[self.1].is_zero() {
@@ -62,7 +62,7 @@ impl<G: CurveAffine> Source<G> for (Arc<Vec<G>>, usize) {
 
     fn skip(&mut self, amt: usize) -> Result<(), SynthesisError> {
         if self.0.len() <= self.1 {
-            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "expected more bases from source").into());
+            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "expected more bases skipping from source").into());
         }
 
         self.1 += amt;

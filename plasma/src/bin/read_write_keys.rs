@@ -51,7 +51,7 @@ use plasma::circuit::transfer::transaction::{Transaction};
 use plasma::circuit::transfer::circuit::{TransactionWitness, Transfer};
 use sapling_crypto::circuit::float_point::{convert_to_float};
 
-const TXES_TO_TEST: usize = 32;
+const TXES_TO_TEST: usize = 1;
 
 fn main() {
     let p_g = FixedGenerators::SpendingKeyGenerator;

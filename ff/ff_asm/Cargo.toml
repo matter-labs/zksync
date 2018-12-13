@@ -1,0 +1,17 @@
+[package]
+name = "ff_asm"
+version = "0.0.1"
+authors = ["Alex Vlasov <alex.m.vlasov@gmail.com>"]
+description = "Manual assembly and SIMD implementation for particular size finite fields"
+documentation = "https://docs.rs/ff/"
+homepage = "https://github.com/matterinc/ff"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/matterinc/ff"
+
+[dependencies]
+num-bigint = "0.2"
+num-traits = "0.2"
+num-integer = "0.1"
+rand = "0.4"
+packed_simd = {git = 'https://github.com/rust-lang-nursery/packed_simd'}
+stdsimd = { git = "https://github.com/rust-lang-nursery/stdsimd.git" }
