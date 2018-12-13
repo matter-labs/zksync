@@ -1,3 +1,5 @@
+use crate::models::plasma_models::Tx;
+
 table! {
     account (id) {
         id -> Int4,
@@ -11,10 +13,9 @@ table! {
 table! {
     block (block_number) {
         block_number -> Int4,
-        tx_type -> Op_type,
         created_at -> Timestamp,
         root_hash -> Nullable<Numeric>,
-        transactions -> Array<Tx>,
+        //transactions -> Array<Tx>,
     }
 }
 

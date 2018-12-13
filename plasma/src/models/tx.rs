@@ -24,7 +24,7 @@ pub struct Tx<E: JubjubEngine> {
 }
 
 /// Unpacked transaction data
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Queryable)]
 pub struct TxUnpacked{
     pub from:               u32,
     pub to:                 u32,

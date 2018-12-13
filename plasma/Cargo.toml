@@ -40,6 +40,9 @@ pairing = { path = "../pairing" }
 bellman = { path = "../bellman" }
 sapling-crypto = { path = "../sapling-crypto" }
 
+diesel = { version = "1.0.0", features = ["postgres"] }
+dotenv = "0.9.0"
+
 #pairing = { git = 'https://github.com/matterinc/pairing' }
 #sapling-crypto = { git = 'https://github.com/matterinc/sapling-crypto' }
 #bellman = { git = 'https://github.com/matterinc/bellman' }
