@@ -1,1 +1,7 @@
--- This file should undo anything in `up.sql`
+DROP TYPE op_type CASCADE;
+
+DROP TYPE tx CASCADE;
+
+DROP TABLE block CASCADE;
+
+DROP TABLE account CASCADE;
