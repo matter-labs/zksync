@@ -1,14 +1,14 @@
 use std::thread;
 use std::sync::mpsc::{channel, Sender};
 
-use super::prover::{BabyProver, ProofRequest};
+use super::prover::{BabyProver};
 use super::state_keeper::{PlasmaStateKeeper, BlockProcessingRequest};
 use super::rest_api::run_api_server;
 use super::committer::{self, Commitment, EncodedProof};
 use super::mem_pool::MemPool;
 use super::eth_watch::EthWatch;
 
-use crate::models::plasma_models::Block;
+use crate::models::plasma_models::{Block, TxBlock};
 
 use crate::models::tx::TxUnpacked;
 use crate::primitives::serialize_fe_for_ethereum;
@@ -19,8 +19,8 @@ pub fn run() {
 
     let (tx_for_tx, rx_for_tx) = channel::<TxUnpacked>();
     let (tx_for_blocks, rx_for_blocks) = channel::<BlockProcessingRequest>();
-    let (tx_for_proof_requests, rx_for_proof_requests) = channel::<ProofRequest>();
-    let (tx_for_commitments, rx_for_commitments) = channel::<Commitment>();
+    let (tx_for_proof_requests, rx_for_proof_requests) = channel::<Block>();
+    let (tx_for_commitments, rx_for_commitments) = channel::<TxBlock>();
     let (tx_for_proofs, rx_for_proofs) = channel::<EncodedProof>();
 
     let mut mem_pool = MemPool::new();
@@ -59,7 +59,6 @@ pub fn run() {
         committer::run_commitment_pipeline(rx_for_commitments, tx_for_eth.clone());
     });
 
-    thread::spawn(move || {
-        committer::run_proof_pipeline(rx_for_proofs, tx_for_eth2);
-    });
+    // no thread::spawn for the last processor
+    committer::run_proof_pipeline(rx_for_proofs, tx_for_eth2);
 }

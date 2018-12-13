@@ -1,6 +1,7 @@
 use ff::Field;
 use sapling_crypto::jubjub::JubjubEngine;
 
+#[derive(Clone)]
 pub struct Block<T: Sized, E: JubjubEngine> {
     pub block_number:   u32,
     pub transactions:   Vec<T>,

@@ -30,12 +30,6 @@ use web3::types::{U256};
 type BabyProof = Proof<Bn256>;
 type BabyParameters = Parameters<Bn256>;
 
-pub struct ProofRequest {
-    block: Block,
-    //TODO: in future, add for parallelism: 
-    //state: PlasmaState,
-}
-
 #[derive(Debug)]
 pub enum BabyProverErr {
     Unknown,
@@ -445,14 +439,14 @@ impl BabyProver {
 
     pub fn run(
             &mut self,
-            rx_for_blocks: mpsc::Receiver<ProofRequest>, 
+            rx_for_blocks: mpsc::Receiver<Block>, 
             tx_for_proofs: mpsc::Sender<EncodedProof>
         ) 
     {
-        for req in rx_for_blocks {
+        for block in rx_for_blocks {
             println!("Got request for proof");
 
-            match req.block {
+            match block {
                 Block::Tx(block) => {
                     let proof = self.apply_and_prove(&block).unwrap();
                     let full_proof = BabyProver::encode_proof(&proof).unwrap();

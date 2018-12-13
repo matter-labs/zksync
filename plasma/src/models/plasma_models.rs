@@ -20,6 +20,7 @@ pub type DepositBlock = block::Block<DepositRequest, Engine>;
 pub type ExitRequest = exit::ExitRequest<Engine>;
 pub type ExitBlock = block::Block<ExitRequest, Engine>;
 
+#[derive(Clone)]
 pub enum Block {
     Tx(TxBlock),
     Deposit(DepositBlock),

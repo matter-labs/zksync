@@ -12,7 +12,6 @@ use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 
 use crate::models::plasma_models::{Block, TxBlock, Account, Tx, AccountTree, TransactionSignature, PlasmaState};
 use crate::models::tx::TxUnpacked;
-use super::prover::ProofRequest;
 use super::committer::Commitment;
 
 use crate::models::params;
@@ -47,14 +46,9 @@ pub struct PlasmaStateKeeper {
 
 impl PlasmaStateKeeper {
 
-    pub fn new() -> Self {
-
-        // here we should insert default accounts into the tree
-        let tree_depth = params::BALANCE_TREE_DEPTH as u32;
-        let mut balance_tree = AccountTree::new(tree_depth);
+    fn generate_demo_accounts(mut balance_tree: AccountTree) -> (AccountTree, HashMap<u32, PrivateKey<Bn256>>) {
 
         let number_of_accounts = 1000;
-
         let mut keys_map = HashMap::<u32, PrivateKey<Bn256>>::new();
             
         let p_g = FixedGenerators::SpendingKeyGenerator;
@@ -82,6 +76,18 @@ impl PlasmaStateKeeper {
             balance_tree.insert(leaf_number, leaf.clone());
         };
 
+        println!("Generated {} accounts with balances", number_of_accounts);
+        (balance_tree, keys_map)
+    }
+
+    pub fn new() -> Self {
+
+        // here we should insert default accounts into the tree
+        let tree_depth = params::BALANCE_TREE_DEPTH as u32;
+        let balance_tree = AccountTree::new(tree_depth);
+
+        let (balance_tree, keys_map) = Self::generate_demo_accounts(balance_tree);
+
         let keeper = PlasmaStateKeeper {
             state: PlasmaState{
                 balance_tree,
@@ -91,16 +97,42 @@ impl PlasmaStateKeeper {
         };
 
         let root = keeper.state.root_hash();
-        println!("Created state keeper with  {} accounts with balances, root hash = {}", number_of_accounts, root);
+        println!("Created state keeper, root hash = {}", root);
 
         keeper
     }
 
     pub fn run(&mut self, 
         rx_for_blocks: Receiver<BlockProcessingRequest>, 
-        tx_for_commitments: Sender<Commitment>,
-        tx_for_proof_requests: Sender<ProofRequest>)
+        tx_for_commitments: Sender<TxBlock>,
+        tx_for_proof_requests: Sender<Block>)
     {
+
+        for req in rx_for_blocks {
+            let BlockProcessingRequest(block, source) = req;
+            match block {
+                Block::Deposit(_) => unimplemented!(),
+                Block::Exit(_) => unimplemented!(),
+                Block::Tx(mut block) => {
+                    let applied = self.apply_block_tx(&mut block);
+                    let r = if applied.is_ok() {
+                        tx_for_commitments.send(block.clone());
+                        tx_for_proof_requests.send(Block::Tx(block));
+                        Ok(())
+                    } else {
+                        Err(block)
+                    };
+                    if let BlockSource::MemPool(sender) = source {
+                        // send result back to mempool
+                        sender.send(r);
+                    }
+                },
+            }   
+        }
+    }
+
+    fn apply_block_tx(&mut self, block: &mut TxBlock) -> Result<(), ()> {
+
         // get block
         // block.number = self.state.block_number += 1;
         // block.new_root = self.state.root_hash();
@@ -108,18 +140,7 @@ impl PlasmaStateKeeper {
         // update state with verification
         // for tx in block: self.state.apply(transaction)?;
 
-            // let new_root = block.new_root_hash.clone();
-            // println!("Commiting to new root = {}", new_root);
-            // let block_number = block.block_number;
-            // let tx_data = BabyProver::encode_transactions(&block).unwrap();
-            // let tx_data_bytes = tx_data;
-            // let incomplete_proof = EthereumProof::Commitment(committer::Commitment{
-            //     new_root: serialize_fe_for_ethereum(new_root),
-            //     block_number: U256::from(block_number),
-            //     total_fees: U256::from(0),
-            //     public_data: tx_data_bytes,
-            // });
-            // tx_for_proofs.send(incomplete_proof);
+        Ok(())
     }
 
     fn apply_tx(&mut self, transaction: &TxUnpacked) -> Result<(), ()> {
