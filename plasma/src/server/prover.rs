@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use rand::{OsRng};
-use std::sync::{mpsc:: {self, Sender, Receiver}};
+use std::sync::mpsc::{self, Sender, Receiver};
 
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
@@ -185,6 +185,7 @@ impl BabyProver {
         let p = EncodedProof{
             groth_proof: [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y],
             block_number: block_number,
+            accounts: unimplemented!() // TODO: add
         };
 
         Ok(p)
