@@ -47,22 +47,27 @@ impl PlasmaState {
         self.balance_tree.root_hash().clone()
     }
 
-    pub fn apply(&mut self, transaction: tx::TxUnpacked) -> Result<(), ()> {
+    pub fn apply(&mut self, transaction: &Tx) -> Result<(), ()> {
 
-        let mut from = self.balance_tree.items.get(&transaction.from).ok_or(())?.clone();
-        if field_element_to_u128(from.balance) < transaction.amount { return Err(()); }
+        let from_account = field_element_to_u32(transaction.from);
+        let mut from = self.balance_tree.items.get(&from_account).ok_or(())?.clone();
+
+        // TODO: compare balances correctly!!!
+        if field_element_to_u128(from.balance) < field_element_to_u128(transaction.amount) { return Err(()); }
+
         // TODO: check nonce: assert field_element_to_u32(from.nonce) == transaction.nonce
 
         // update state
 
-        let mut to = self.balance_tree.items.get(&transaction.to).ok_or(())?.clone();
+        let to_account = field_element_to_u32(transaction.to);
+        let mut to = self.balance_tree.items.get(&to_account).ok_or(())?.clone();
         let amount = Fr::from_str(&transaction.amount.to_string()).unwrap();
         from.balance.sub_assign(&amount);
         // TODO: subtract fee
         from.nonce.add_assign(&Fr::one());  // from.nonce++
         to.balance.add_assign(&amount);     // to.balance += amount
-        self.balance_tree.insert(transaction.from, from);
-        self.balance_tree.insert(transaction.to, to);
+        self.balance_tree.insert(from_account, from);
+        self.balance_tree.insert(to_account, to);
 
         Ok(())
     }

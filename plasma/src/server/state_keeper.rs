@@ -18,6 +18,7 @@ use crate::models::params;
 use rand::{SeedableRng, Rng, XorShiftRng};
 
 use std::sync::mpsc::{Sender, Receiver};
+use fnv::FnvHashMap;
 
 pub enum BlockSource {
     // MemPool will provide a channel to return result of block processing
@@ -46,6 +47,7 @@ pub struct PlasmaStateKeeper {
 
 impl PlasmaStateKeeper {
 
+    // TODO: remove this function when done with demo
     fn generate_demo_accounts(mut balance_tree: AccountTree) -> (AccountTree, HashMap<u32, PrivateKey<Bn256>>) {
 
         let number_of_accounts = 1000;
@@ -107,7 +109,6 @@ impl PlasmaStateKeeper {
         tx_for_commitments: Sender<TxBlock>,
         tx_for_proof_requests: Sender<Block>)
     {
-
         for req in rx_for_blocks {
             let BlockProcessingRequest(block, source) = req;
             match block {
@@ -131,35 +132,64 @@ impl PlasmaStateKeeper {
         }
     }
 
+    fn account(&self, index: u32) -> Account {
+        self.state.balance_tree.items.get(&index).unwrap().clone()
+    }
+
     fn apply_block_tx(&mut self, block: &mut TxBlock) -> Result<(), ()> {
 
-        // get block
-        // block.number = self.state.block_number += 1;
-        // block.new_root = self.state.root_hash();
+        block.block_number = self.state.block_number;
 
         // update state with verification
         // for tx in block: self.state.apply(transaction)?;
 
+        let transactions: Vec<Tx> = block.transactions.clone()
+            .into_iter()
+            .map(|tx| self.augument_and_sign(tx))
+            .collect();
+
+        let mut save_state = FnvHashMap::<u32, Account>::default();
+
+        let transactions: Vec<Tx> = transactions
+            .into_iter()
+            .filter(|tx| {
+
+                // save state
+                let from_idx = field_element_to_u32(tx.from);
+                let from = self.account(from_idx);
+                save_state.insert(from_idx, from);
+                let to_idx = field_element_to_u32(tx.to);
+                let to = self.account(to_idx);
+                save_state.insert(to_idx, to);
+
+                self.state.apply(&tx).is_ok()
+            })
+            .collect();
+        
+        if transactions.len() != block.transactions.len() {
+            // some transactions were rejected, revert state
+            for (k,v) in save_state.into_iter() {
+                // TODO: add tree.insert_existing() for performance
+                self.state.balance_tree.insert(k, v);
+            }
+        }
+            
+        block.new_root_hash = self.state.root_hash();
+        self.state.block_number += 1;
         Ok(())
     }
 
-    fn apply_tx(&mut self, transaction: &TxUnpacked) -> Result<(), ()> {
+    // augument and sign transaction (for demo only; TODO: remove this!)
+    fn augument_and_sign(&self, mut transaction: Tx) -> Tx {
+        let from_account = field_element_to_u32(transaction.from);
+        let from = self.state.balance_tree.items.get(&from_account).unwrap().clone();
+        let mut tx = transaction.clone();
+        transaction.nonce = from.nonce;
+        transaction.good_until_block = Fr::from_str(&self.state.block_number.to_string()).unwrap();;
 
-        // augument and sign transaction (for demo only; TODO: remove this!)
-
-        let from = self.state.balance_tree.items.get(&transaction.from).ok_or(())?.clone();
-        let mut transaction = transaction.clone();
-        transaction.nonce = field_element_to_u32(from.nonce);
-        transaction.good_until_block = self.state.block_number;
-        let mut tx = Tx::try_from(&transaction)?;
-
-        let sk = self.private_keys.get(&transaction.from).unwrap();
+        let sk = self.private_keys.get(&from_account).unwrap();
         Self::sign_tx(&mut tx, sk);
-
-        // update state with verification
-
-        self.state.apply(transaction)?;
-        Ok(())
+        tx
     }
 
     // TODO: remove this function when done with demo
