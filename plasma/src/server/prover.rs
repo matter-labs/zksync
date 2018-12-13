@@ -185,7 +185,7 @@ impl BabyProver {
         let p = EncodedProof{
             groth_proof: [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y],
             block_number: block_number,
-            accounts: unimplemented!() // TODO: add
+            accounts: vec![] // TODO: add
         };
 
         Ok(p)
