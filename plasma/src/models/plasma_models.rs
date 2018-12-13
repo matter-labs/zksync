@@ -12,10 +12,13 @@ pub type AccountTree = SparseMerkleTree<Account, Fr, PedersenHasher<Engine>>;
 
 pub type TransactionSignature = tx::TransactionSignature<Engine>;
 pub type Tx = tx::Tx<Engine>;
-pub type TxBlock = tx::Block<Engine>;
+pub type TxBlock = block::Block<Tx, Engine>;
 
 pub type DepositRequest = deposit::DepositRequest<Engine>;
+pub type DepositBlock = block::Block<DepositRequest, Engine>;
+
 pub type ExitRequest = exit::ExitRequest<Engine>;
+pub type ExitBlock = block::Block<ExitRequest, Engine>;
 
 pub struct PlasmaState {
 

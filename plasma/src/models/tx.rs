@@ -37,12 +37,6 @@ pub struct TxUnpacked{
     pub sig_s:              String,
 }
 
-pub struct Block<E: JubjubEngine> {
-    pub block_number:   u32,
-    pub transactions:   Vec<Tx<E>>,
-    pub new_root_hash:  E::Fr,
-}
-
 
 impl<E: JubjubEngine> TransactionSignature<E> {
     pub fn empty() -> Self {
