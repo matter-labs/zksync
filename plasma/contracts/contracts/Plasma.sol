@@ -77,13 +77,27 @@ contract PlasmaStub is VerificationKeys {
         return uint256(value) * 1000000000000;
     }
 
-    function commitTransferBlock(uint32 blockNumber, uint128 totalFees, bytes memory txDataPacked, bytes32 newRoot) public operator_only {
+    function commitTransferBlock(
+        uint32 blockNumber, 
+        uint128 totalFees, 
+        bytes memory txDataPacked, 
+        bytes32 newRoot
+    ) 
+    public 
+    operator_only 
+    {
         require(blockNumber == totalCommitted + 1, "may only commit next block");
 
         // create now commitments and write to storage
         bytes32 publicDataCommitment = createPublicDataCommitmentForTransfer(blockNumber, totalFees, txDataPacked);
 
-        blocks[blockNumber] = Block(uint8(Circuit.TRANSFER), uint64(block.timestamp + DEADLINE), totalFees, newRoot, publicDataCommitment, msg.sender);
+        blocks[blockNumber] = Block(
+            uint8(Circuit.TRANSFER), 
+            uint64(block.timestamp + DEADLINE), 
+            totalFees, newRoot, 
+            publicDataCommitment, 
+            msg.sender
+        );
         emit BlockCommitted(blockNumber);
         totalCommitted++;
     }
@@ -349,7 +363,13 @@ contract PlasmaDepositor is Plasma {
         batch.timestamp = uint64(block.timestamp);
 
         // do actual verification
-        bool verification_success = verifyProof(Circuit.DEPOSIT, proof, lastVerifiedRoot, committed.newRoot, committed.publicDataCommitment);
+        bool verification_success = verifyProof(
+            Circuit.DEPOSIT,
+            proof, 
+            lastVerifiedRoot, 
+            committed.newRoot, 
+            committed.publicDataCommitment
+        );
         require(verification_success, "invalid proof");
 
         emit BlockVerified(blockNumber);
@@ -569,7 +589,13 @@ contract PlasmaExitor is PlasmaDepositor {
         uint128 batchFee = batch.batchFee;
         // do actual verification
 
-        bool verification_success = verifyProof(Circuit.WITHDRAWAL, proof, lastVerifiedRoot, committed.newRoot, committed.publicDataCommitment);
+        bool verification_success = verifyProof(
+            Circuit.WITHDRAWAL, 
+            proof, 
+            lastVerifiedRoot, 
+            committed.newRoot, 
+            committed.publicDataCommitment
+        );
         require(verification_success, "invalid proof");
 
         emit BlockVerified(blockNumber);
