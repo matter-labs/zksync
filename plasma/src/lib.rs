@@ -42,6 +42,7 @@ extern crate serde_derive;
 #[macro_use]
 extern crate diesel;
 extern crate dotenv;
+extern crate bigdecimal;
 
 pub mod primitives;
 pub mod merkle_tree;

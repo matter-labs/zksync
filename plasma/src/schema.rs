@@ -1,25 +1,15 @@
-use crate::models::plasma_models::Tx;
-
 table! {
-    account (id) {
+    use diesel::sql_types::*;
+    use crate::models::plasma_sql::sql_types::*;
+
+    accounts (id) {
         id -> Int4,
         last_block_number -> Nullable<Int4>,
-        nonce -> Nullable<Int8>,
-        amount -> Nullable<Numeric>,
+        nonce -> Int4,
+        balance -> Numeric,
         pub_x -> Nullable<Numeric>,
+        pub_y -> Nullable<Numeric>,
     }
 }
 
-table! {
-    block (block_number) {
-        block_number -> Int4,
-        created_at -> Timestamp,
-        root_hash -> Nullable<Numeric>,
-        //transactions -> Array<Tx>,
-    }
-}
 
-allow_tables_to_appear_in_same_query!(
-    account,
-    block,
-);

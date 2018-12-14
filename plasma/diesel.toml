@@ -3,3 +3,6 @@
 
 [print_schema]
 file = "src/schema.rs"
+
+# Import Plasma-specific SQL types
+import_types = ["diesel::sql_types::*", "crate::models::plasma_sql::sql_types::*"]

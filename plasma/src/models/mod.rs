@@ -6,3 +6,4 @@ pub mod block;
 
 pub mod params;
 pub mod plasma_models;
+pub mod plasma_sql;

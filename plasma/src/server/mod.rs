@@ -7,3 +7,4 @@ mod committer;
 mod config;
 mod mem_pool;
 mod eth_watch;
+mod storage;

@@ -4,7 +4,7 @@ use std::sync::mpsc::{channel, Sender};
 use super::prover::{BabyProver};
 use super::state_keeper::{PlasmaStateKeeper, BlockProcessingRequest};
 use super::rest_api::run_api_server;
-use super::committer::{self, Commitment, EncodedProof};
+use super::committer::{self, Commitment, BlockProof};
 use super::mem_pool::MemPool;
 use super::eth_watch::EthWatch;
 
