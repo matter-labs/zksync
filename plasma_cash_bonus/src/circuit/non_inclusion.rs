@@ -282,12 +282,23 @@ impl<'a, E: JubjubEngine> Circuit<E> for NonInclusion<'a, E> {
                 // Direction bit determines if the current subtree is the "right" leaf at this
                 // depth of the tree.
 
+                // allocate an empty leaf variable. For some reason empty_levels[i] is not included in the witness
                 let empty_leaf = num::AllocatedNum::alloc(
                     cs.namespace(|| "reallocate empty leaf"),
                     || {
                         Ok(*empty_levels[i].get_value().get()?)
                     }
                 )?;
+
+                // constraint the allocated empty leaf
+                // this looks like some strange behavior, because reading from empty_levels should already
+                // yeild a variable, bit it does not work in proved with lazy evaluations
+                cs.enforce(
+                    || "enforce allocated empty elaf",
+                    |lc| lc + empty_leaf.get_variable(),
+                    |lc| lc + CS::one(),
+                    |lc| lc + empty_levels[i].get_variable()
+                );
 
                 let current_chosen = num::AllocatedNum::conditionally_select(
                     cs.namespace(|| "conditional select of empty or not leaf hash"),
