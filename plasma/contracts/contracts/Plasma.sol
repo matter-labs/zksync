@@ -204,7 +204,7 @@ contract PlasmaDepositor is Plasma {
     }
 
     event LogDepositRequest(uint256 indexed batchNumber, uint24 indexed accountID, uint256 indexed publicKey, uint128 amount);
-
+    event LogCancelDepositRequest(uint256 indexed batchNumber, uint24 indexed accountID);
     // use first N accounts for technological purposes
     uint24 constant operatorsAccounts = 16;
     uint24 public nextAccountToRegister = operatorsAccounts;
@@ -273,6 +273,7 @@ contract PlasmaDepositor is Plasma {
         DepositRequest storage request = depositRequests[currentBatch][accountID];
         uint128 depositAmount = request.amount;
         require(depositAmount > 0, "trying to cancel an empty deposit");
+        emit LogCancelDepositRequest(currentBatch, accountID);
         delete depositRequests[currentBatch][accountID]; // refund gas
         totalDepositRequests--;
         msg.sender.transfer(scale_from(depositAmount));
@@ -468,6 +469,7 @@ contract PlasmaExitor is PlasmaDepositor {
     }
 
     event LogExitRequest(uint256 indexed batchNumber, uint24 indexed accountID);
+    event LogCancelExitRequest(uint256 indexed batchNumber, uint24 indexed accountID);
 
     function exit(uint128 maxFee) 
     public 
@@ -500,6 +502,7 @@ contract PlasmaExitor is PlasmaDepositor {
         require(accountID != 0, "trying to cancel a deposit for non-existing account");
         uint256 currentBatch = totalExitRequests/EXIT_BATCH_SIZE;
         require(exitRequests[currentBatch][accountID], "exit request should exist");
+        emit LogCancelExitRequest(currentBatch, accountID);
         delete exitRequests[currentBatch][accountID];
         totalExitRequests--;
     }
