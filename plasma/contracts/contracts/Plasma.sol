@@ -340,7 +340,7 @@ contract PlasmaDepositor is Plasma {
         require(blockNumber == totalVerified + 1, "may only verify next block");
         require(batchNumber == lastVerifiedDepositBatch, "must verify batches in order");
 
-        Block memory committed = blocks[blockNumber];
+        Block storage committed = blocks[blockNumber];
         require(committed.circuit == uint8(Circuit.DEPOSIT), "trying to prove the invalid circuit for this block number");
 
         DepositBatch storage batch = depositBatches[batchNumber];
@@ -358,6 +358,7 @@ contract PlasmaDepositor is Plasma {
         lastVerifiedRoot = committed.newRoot;
 
         uint128 totalFees = clearDepositBatch(batchNumber, accoundIDs);
+        committed.totalFees = totalFees;
         balances[committed.prover] += totalFees;
         // process the block information
     }
@@ -557,7 +558,7 @@ contract PlasmaExitor is PlasmaDepositor {
         require(batchNumber == lastVerifiedExitBatch, "trying to prove batch out of order");
         bytes32 publicDataCommitment = createPublicDataCommitmentForExit(blockNumber, txDataPacked);
 
-        Block memory committed = blocks[blockNumber];
+        Block storage committed = blocks[blockNumber];
         require(committed.circuit == uint8(Circuit.WITHDRAWAL), "trying to prove the invalid circuit for this block number");
         require(committed.publicDataCommitment == publicDataCommitment, "public data is different with a committment");
 
@@ -577,6 +578,7 @@ contract PlasmaExitor is PlasmaDepositor {
         lastVerifiedRoot = committed.newRoot;
 
         uint128 totalFees = processExitBlockData(batchNumber, batchFee, accoundIDs, txDataPacked);
+        committed.totalFees = totalFees;
         balances[committed.prover] += totalFees;
         // process the block information
     }
