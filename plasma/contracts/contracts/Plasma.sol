@@ -31,7 +31,7 @@ contract PlasmaStub is VerificationKeys {
     mapping (uint32 => Block) public blocks;
     // Only some addresses can send proofs
     mapping (address => bool) public operators;
-    // Some dividends distribution
+    // Fee collection accounting
     mapping (address => uint256) public balances;
 
     struct Account {
@@ -52,8 +52,12 @@ contract PlasmaStub is VerificationKeys {
     bytes32 public lastVerifiedRoot;
     uint64 public constant MAX_DELAY = 1 days;
 
-    modifier operator_only() {
+    modifier active_only() {
         require(!stopped, "contract should not be globally stopped");
+        _;
+    }
+
+    modifier operator_only() {
         require(operators[msg.sender] == true, "sender should be one of the operators");
         _;
     }
