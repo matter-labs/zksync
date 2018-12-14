@@ -3,7 +3,7 @@ use ff::{Field};
 use crate::models::params;
 use crate::primitives::{GetBits, GetBitsFixed};
 
-#[derive(Debug, Clone, Queryable)]
+#[derive(Debug, Clone, Queryable, Serialize, Deserialize)]
 pub struct Account<E: JubjubEngine> {
     pub balance:    E::Fr,
     pub nonce:      E::Fr,
