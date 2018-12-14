@@ -447,7 +447,7 @@ contract PlasmaDepositor is Plasma {
 
 }
 
-contract PlasmaExitor is PlasmaDepositor {
+contract PlasmaExitor is Plasma {
 
     uint256 constant EXIT_BATCH_SIZE = 32;
     uint256 totalExitRequests; 
@@ -486,7 +486,7 @@ contract PlasmaExitor is PlasmaDepositor {
         // write aux info about the batch
         ExitBatch storage batch = exitBatches[currentBatch];
         if (batch.timestamp == 0) {
-            batch.state = uint8(DepositBatchState.CREATED);
+            batch.state = uint8(ExitBatchState.CREATED);
         }
         batch.timestamp = uint64(block.timestamp);
         batch.batchFee = currentExitBatchFee;
@@ -572,7 +572,7 @@ contract PlasmaExitor is PlasmaDepositor {
     // but not on commitment
     function verifyExitBlock(
         uint256 batchNumber, 
-        uint24[DEPOSIT_BATCH_SIZE] memory accoundIDs, 
+        uint24[EXIT_BATCH_SIZE] memory accoundIDs, 
         uint32 blockNumber, 
         bytes memory txDataPacked, 
         uint256[8] memory proof
@@ -591,7 +591,7 @@ contract PlasmaExitor is PlasmaDepositor {
 
         ExitBatch storage batch = exitBatches[batchNumber];
         require(batch.blockNumber == blockNumber, "block number in referencing invalid batch number");
-        batch.state = uint8(DepositBatchState.VERIFIED);
+        batch.state = uint8(ExitBatchState.VERIFIED);
         batch.timestamp = uint64(block.timestamp);
         uint128 batchFee = batch.batchFee;
         // do actual verification
@@ -620,7 +620,7 @@ contract PlasmaExitor is PlasmaDepositor {
     function processExitBlockData(
         uint256 batchNumber, 
         uint128 batchFee, 
-        uint24[DEPOSIT_BATCH_SIZE] memory accountIDs, 
+        uint24[EXIT_BATCH_SIZE] memory accountIDs, 
         bytes memory txData
     ) 
     internal 
@@ -653,3 +653,5 @@ contract PlasmaExitor is PlasmaDepositor {
         }
     }
 }
+
+contract PlasmaContract is PlasmaDepositor, PlasmaExitor {}
