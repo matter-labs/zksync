@@ -81,6 +81,39 @@ contract PlasmaStub is VerificationKeys {
         return uint256(value) * 1000000000000;
     }
 
+    // stubs
+    // verification
+    function verifyProof(Circuit, uint256[8] memory, bytes32, bytes32, bytes32) internal view returns (bool valid);
+}
+
+contract Plasma is PlasmaStub, Verifier {
+    // Implementation
+
+    function verifyProof(Circuit circuitType, uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
+        internal view returns (bool valid)
+    {
+        uint256 mask = (~uint256(0)) >> 3;
+        uint256[14] memory vk;
+        uint256[] memory gammaABC;
+        if (circuitType == Circuit.DEPOSIT) {
+            (vk, gammaABC) = getVkDepositCircuit();
+        } else if (circuitType == Circuit.TRANSFER) {
+            (vk, gammaABC) = getVkTransferCircuit();
+        } else if (circuitType == Circuit.WITHDRAWAL) {
+            (vk, gammaABC) = getVkExitCircuit();
+        } else {
+            return false;
+        }
+        uint256[] memory inputs = new uint256[](3);
+        inputs[0] = uint256(oldRoot);
+        inputs[1] = uint256(newRoot);
+        inputs[2] = uint256(finalHash) & mask;
+        return Verify(vk, gammaABC, proof, inputs);
+    }
+
+}
+
+contract PlasmaTransactor is Plasma {
     function commitTransferBlock(
         uint32 blockNumber, 
         uint128 totalFees, 
@@ -132,50 +165,6 @@ contract PlasmaStub is VerificationKeys {
         
         return finalHash;
     }
-
-    // pure functions to calculate commitment formats
-    function createPublicDataCommitmentForExit(uint32 blockNumber, bytes memory txDataPacked)
-    public 
-    pure
-    returns (bytes32 h) {
-
-        bytes32 initialHash = sha256(abi.encodePacked(uint256(blockNumber)));
-        bytes32 finalHash = sha256(abi.encodePacked(initialHash, txDataPacked));
-        
-        return finalHash;
-    }
-
-    // stubs
-    // verification
-    function verifyProof(Circuit, uint256[8] memory, bytes32, bytes32, bytes32) internal view returns (bool valid);
-}
-
-
-contract Plasma is PlasmaStub, Verifier {
-    // Implementation
-
-    function verifyProof(Circuit circuitType, uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
-        internal view returns (bool valid)
-    {
-        uint256 mask = (~uint256(0)) >> 3;
-        uint256[14] memory vk;
-        uint256[] memory gammaABC;
-        if (circuitType == Circuit.DEPOSIT) {
-            (vk, gammaABC) = getVkDepositCircuit();
-        } else if (circuitType == Circuit.TRANSFER) {
-            (vk, gammaABC) = getVkTransferCircuit();
-        } else if (circuitType == Circuit.WITHDRAWAL) {
-            (vk, gammaABC) = getVkExitCircuit();
-        } else {
-            return false;
-        }
-        uint256[] memory inputs = new uint256[](3);
-        inputs[0] = uint256(oldRoot);
-        inputs[1] = uint256(newRoot);
-        inputs[2] = uint256(finalHash) & mask;
-        return Verify(vk, gammaABC, proof, inputs);
-    }
-
 }
 
 contract PlasmaDepositor is Plasma {
@@ -654,4 +643,4 @@ contract PlasmaExitor is Plasma {
     }
 }
 
-contract PlasmaContract is PlasmaDepositor, PlasmaExitor {}
+contract PlasmaContract is PlasmaDepositor, PlasmaExitor, PlasmaTransactor {}
