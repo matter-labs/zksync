@@ -32,36 +32,18 @@ pub struct Account {
     // sig_r               numeric(80),
     // sig_s               numeric(80)
 
-// table! {
-//     use diesel::sql_types::*;
-//     use super::PgTx;
-//     blocks (block_number) {
-//         block_number -> Int4,
-//         transactions -> Array<PgTx>,
-//     }
-// }
 
 pub mod sql_types {
 
+    // Here we're declaring all custom types we create in postgres, to be used by schema.rs
+
+    #[derive(SqlType)]
+    #[postgres(type_name = "tx")]
+    pub struct Tx;
 }
 
-#[derive(SqlType)]
-#[postgres(type_name = "tx")]
-pub struct PgTx;
-
-table! {
-    use diesel::sql_types::*;
-    use super::PgTx;
-    use crate::models::plasma_sql::sql_types::*;
-
-    blocks (block_number) {
-        block_number -> Int4,
-        transactions -> Array<PgTx>,
-    }
-}    
-
 #[derive(Debug, PartialEq, FromSqlRow, AsExpression)]
-#[sql_type = "PgTx"]
+#[sql_type = "crate::models::plasma_sql::sql_types::Tx"]
 pub struct Tx {
     pub account_id: i32,
 }
