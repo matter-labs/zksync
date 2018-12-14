@@ -1,5 +1,5 @@
-use crate::models::plasma_sql::{Account};
-use crate::schema::accounts;
+use crate::models::plasma_sql::*;
+use crate::schema::*;
 
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
@@ -47,17 +47,16 @@ impl StateStorage {
 fn storage_test() {
     let conn = establish_connection();
 
-    // let a = Account{
-    //     id:                 0,
-    //     balance:            20,
-    //     nonce:              0,
-    //     last_block_number:  1,
-    //     pub_x:              "10".to_owned(),
-    //     pub_y:              "10".to_owned(), 
-    // };
+    use serde_json::json;
 
-    // diesel::insert_into(accounts::table)
-    //     .values(&a)
-    //     .get_result(&conn)
-    //     .expect("Error saving account");
+    let b = Block {
+        block_number:   2,
+        block_data:     json!(1),
+    };
+
+    let rows_inserted = diesel::insert_into(blocks::table)
+        .values(&b)
+        .execute(&conn)
+        .expect("Error saving account");
+    println!("{:?}", rows_inserted);
 }

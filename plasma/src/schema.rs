@@ -1,7 +1,4 @@
 table! {
-    use diesel::sql_types::*;
-    use crate::models::plasma_sql::sql_types::*;
-
     accounts (id) {
         id -> Int4,
         last_block_number -> Nullable<Int4>,
@@ -13,12 +10,9 @@ table! {
 }
 
 table! {
-    use diesel::sql_types::*;
-    use crate::models::plasma_sql::sql_types::*;
-
     blocks (block_number) {
         block_number -> Int4,
-        transactions -> Array<Tx>,
+        block_data -> Json,
     }
 }
 

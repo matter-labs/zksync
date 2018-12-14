@@ -1,16 +1,18 @@
 use bigdecimal::BigDecimal;
-//use diesel::sql_types::*;
 use diesel::backend::Backend;
 use diesel::deserialize::{self, FromSql};
-use diesel::serialize::{self, ToSql, Output};
+use diesel::pg::Pg;
+use diesel::serialize::{self, IsNull, Output, ToSql};
+use diesel::sql_types::{Integer, Record, Text};
 use std::io;
+use std::io::Write;
 
 use crate::schema::*;
 use diesel::prelude::*;
 
+use serde_json::value::Value;
 
-#[derive(Insertable, Queryable, Debug)]
-#[table_name="accounts"]
+
 pub struct Account {
     pub id:                 i32,            //u32,
     pub last_block_number:  Option<i32>,    //u32,
@@ -33,27 +35,17 @@ pub struct Account {
     // sig_s               numeric(80)
 
 
-pub mod sql_types {
 
-    // Here we're declaring all custom types we create in postgres, to be used by schema.rs
-
-    #[derive(SqlType)]
-    #[postgres(type_name = "tx")]
-    pub struct Tx;
-}
-
-#[derive(Debug, PartialEq, FromSqlRow, AsExpression)]
-#[sql_type = "crate::models::plasma_sql::sql_types::Tx"]
 pub struct Tx {
     pub account_id: i32,
 }
+
 
 #[derive(Insertable, Queryable)]
 #[table_name="blocks"]
 pub struct Block {
     pub block_number:   i32,
-    pub transactions:   Vec<Tx>,
-    //pub new_root_hash:  E::Fr,
+    pub block_data:     Value,
 }
 
 
