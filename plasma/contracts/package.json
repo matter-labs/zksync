@@ -4,7 +4,14 @@
   "license": "GPL-3.0-only",
   "devDependencies": {},
   "dependencies": {
+    "bn.js": "^4.11.8",
+    "brorand": "^1.1.0",
+    "elliptic": "^6.4.1",
     "ganache-cli": "^6.2.3",
+    "hash.js": "^1.1.7",
+    "hmac-drbg": "^1.0.1",
+    "minimalistic-assert": "^1.0.1",
+    "minimalistic-crypto-utils": "^1.0.1",
     "solc": "^0.4.25",
     "truffle": "5.0.0-beta.2",
     "truffle-hdwallet-provider": "^1.0.0-web3one.1"
