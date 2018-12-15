@@ -50,14 +50,6 @@ impl<'de> Visitor<'de> for FrVisitor {
     where
         E: de::Error,
     {
-        /*if value.starts_with("0x") {
-            let buf = hex::decode(&value[2..]).map_err(|_| E::custom(format!("could not decode hex: {}", value)))?;
-            let mut repr = <Fr as PrimeField>::Repr::default();
-            repr.read_be(&buf[..]).map_err(|e| E::custom(format!("invalid length of {}: {}", value, &e)))?;
-            Fr::from_repr(repr).map_err(|e| E::custom(format!("could not convert into prime field: {}: {}", value, &e)))
-        } else {
-            Err(E::custom(format!("hex value must start with 0x, got: {}", value)))
-        }*/
         Fr::from_hex(value).map_err(|e| E::custom(e))
     }
 
@@ -74,29 +66,11 @@ impl<'de> serde::Deserialize<'de> for Fr {
 
 #[test]
 fn test_fr_serialize() {
-/*
-    let value = &Fr::one();
-    let mut buf: Vec<u8> = vec![];
-    value.into_repr().write_be(&mut buf).unwrap();
-    println!("{}", hex::encode(&buf));
-*/
     assert_eq!(Fr::one().to_hex(), "0000000000000000000000000000000000000000000000000000000000000001");
 }
 
 #[test]
 fn test_fr_deserialize() {
-/*
-    let s: &str = "00000000000000000000000000000000000000000000000000000000000000a7";
-    let buf = hex::decode(&s).unwrap();
-    
-    let mut repr = <Fr as PrimeField>::Repr::default();
-    repr.read_be(&buf[..]).unwrap();
-    println!("{:?}", repr);
-
-    let fr = Fr::from_repr(repr).unwrap();
-    println!("{:?}", fr.into_repr());
-*/
-    
     let json = r#""0x0000000000000000000000000000000000000000000000000000000000000001""#;
     let fr: Fr = serde_json::from_str(json).unwrap();
     assert_eq!(fr, Fr::one());
