@@ -109,6 +109,7 @@ contract PlasmaDepositor is Plasma {
         uint24 accountID = ethereumAddressToAccountID[msg.sender];
         require(accountID != 0, "trying to cancel a deposit for non-existing account");
         uint256 currentBatch = totalDepositRequests/DEPOSIT_BATCH_SIZE;
+        uint256 requestsInThisBatch = totalDepositRequests * DEPOSIT_BATCH_SIZE;
         DepositBatch storage batch = depositBatches[currentBatch];
         // this check is most likely excessive, 
         require(batch.state == uint8(DepositBatchState.CREATED), "canceling is only allowed for batches that are not yet committed");
@@ -121,7 +122,11 @@ contract PlasmaDepositor is Plasma {
         depositAmount += batch.batchFee;
         // log and clear the storage
         emit LogCancelDepositRequest(currentBatch, accountID);
-        delete depositRequests[currentBatch][accountID]; // refund gas
+        // if the first request in a batch is canceled - clear it to stop the countdown
+        if (requestsInThisBatch == 0) { 
+            delete depositBatches[currentBatch];
+        }
+        delete depositRequests[currentBatch][accountID];
         totalDepositRequests--;
 
         msg.sender.transfer(scaleFromPlasmaUnitsIntoWei(depositAmount));

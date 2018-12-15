@@ -40,12 +40,13 @@ contract PlasmaExitor is Plasma {
         uint256 currentBatch = totalExitRequests/EXIT_BATCH_SIZE;
         // write aux info about the batch
         ExitBatch storage batch = exitBatches[currentBatch];
+        // batch countdown start from the first request
         if (batch.timestamp == 0) {
             batch.state = uint8(ExitBatchState.CREATED);
+            batch.timestamp = uint64(block.timestamp);
+            batch.batchFee = currentExitBatchFee;
         }
-        batch.timestamp = uint64(block.timestamp);
-        batch.batchFee = currentExitBatchFee;
-
+        
         exitRequests[currentBatch][accountID] = true;
 
         totalExitRequests++;
@@ -60,10 +61,16 @@ contract PlasmaExitor is Plasma {
         uint24 accountID = ethereumAddressToAccountID[msg.sender];
         require(accountID != 0, "trying to cancel a deposit for non-existing account");
         uint256 currentBatch = totalExitRequests/EXIT_BATCH_SIZE;
+        uint256 requestsInThisBatch = totalExitRequests * EXIT_BATCH_SIZE;
         require(exitRequests[currentBatch][accountID], "exit request should exist");
         emit LogCancelExitRequest(currentBatch, accountID);
+        // if the first request in a batch is canceled - clear it to stop the countdown
+        if (requestsInThisBatch == 0) {
+            delete exitBatches[currentBatch];
+        }
         delete exitRequests[currentBatch][accountID];
         totalExitRequests--;
+
     }
 
     function startNextExitBatch(uint128 newBatchFee)
