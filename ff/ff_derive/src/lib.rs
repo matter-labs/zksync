@@ -7,7 +7,6 @@ extern crate syn;
 extern crate quote;
 
 extern crate serde_derive;
-extern crate serde_hex;
 
 extern crate num_bigint;
 extern crate num_integer;
