@@ -124,8 +124,6 @@ fn fetch_attr(name: &str, attrs: &[syn::Attribute]) -> Option<String> {
 fn prime_field_repr_impl(repr: &syn::Ident, limbs: usize) -> proc_macro2::TokenStream {
     quote! {
 
-        //use serde_hex::{SerHex, StrictPfx};
-
         #[derive(Copy, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
         pub struct #repr(
             //#[serde(with = "SerHex::<StrictPfx>")]
@@ -909,6 +907,7 @@ fn prime_field_impl(
             fn root_of_unity() -> Self {
                 #name(ROOT_OF_UNITY)
             }
+
         }
 
         impl ::ff::Field for #name {
@@ -1067,6 +1066,19 @@ fn prime_field_impl(
                 #montgomery_impl
 
                 self.reduce();
+            }
+
+            pub fn to_hex(&self) -> String {
+                let mut buf: Vec<u8> = vec![];
+                self.into_repr().write_be(&mut buf).unwrap();
+                hex::encode(&buf)
+            }
+
+            pub fn from_hex(value: &str) -> Result<#name, String> {
+                let buf = hex::decode(&value).map_err(|_| format!("could not decode hex: {}", value))?;
+                let mut repr = #repr::default();
+                repr.read_be(&buf[..]).map_err(|e| format!("invalid length of {}: {}", value, &e))?;
+                #name::from_repr(repr).map_err(|e| format!("could not convert into prime field: {}: {}", value, &e))
             }
         }
     }
