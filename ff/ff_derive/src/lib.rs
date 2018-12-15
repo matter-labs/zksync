@@ -1075,9 +1075,14 @@ fn prime_field_impl(
             }
 
             pub fn from_hex(value: &str) -> Result<#name, String> {
-                let buf = hex::decode(&value).map_err(|_| format!("could not decode hex: {}", value))?;
+                let value = if value.starts_with("0x") { &value[2..] } else { value };
+                if value.len() % 2 != 0 {return Err(format!("hex length must be even for full byte encoding: {}", value))}
+                let mut buf = hex::decode(&value).map_err(|_| format!("could not decode hex: {}", value))?;
+                buf.reverse();
+                buf.resize(#limbs * 8, 0);
+                println!("size = {}, buf = {:?}", buf.len(), buf);
                 let mut repr = #repr::default();
-                repr.read_be(&buf[..]).map_err(|e| format!("invalid length of {}: {}", value, &e))?;
+                repr.read_le(&buf[..]).map_err(|e| format!("could not read {}: {}", value, &e))?;
                 #name::from_repr(repr).map_err(|e| format!("could not convert into prime field: {}: {}", value, &e))
             }
         }
@@ -1108,11 +1113,7 @@ fn prime_field_impl(
             where
                 E: de::Error,
             {
-                if value.starts_with("0x") {
-                    #name::from_hex(&value[2..]).map_err(|e| E::custom(e))
-                } else {
-                    Err(E::custom(format!("hex value must start with 0x, got: {}", value)))
-                }  
+                #name::from_hex(&value[2..]).map_err(|e| E::custom(e))
             }
         }
 

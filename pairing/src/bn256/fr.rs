@@ -14,6 +14,18 @@ fn test_to_hex() {
 fn test_fr_from_hex() {
     let fr = Fr::from_hex("0000000000000000000000000000000000000000000000000000000000000001").unwrap();
     assert_eq!(fr, Fr::one());
+
+    let fr = Fr::from_hex("0x0000000000000000000000000000000000000000000000000000000000000001").unwrap();
+    assert_eq!(fr, Fr::one());
+
+    let fr = Fr::from_hex("0x01").unwrap();
+    assert_eq!(fr, Fr::one());
+
+    let fr = Fr::from_hex("0x00").unwrap();
+    assert_eq!(fr, Fr::zero());
+
+    let fr = Fr::from_hex("00").unwrap();
+    assert_eq!(fr, Fr::zero());
 }
 
 #[test]
