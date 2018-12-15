@@ -125,7 +125,7 @@ fn fetch_attr(name: &str, attrs: &[syn::Attribute]) -> Option<String> {
 fn prime_field_repr_impl(repr: &syn::Ident, limbs: usize) -> proc_macro2::TokenStream {
     quote! {
 
-        use serde_hex::{SerHex, StrictPfx};
+        //use serde_hex::{SerHex, StrictPfx};
 
         #[derive(Copy, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
         pub struct #repr(

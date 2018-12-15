@@ -15,8 +15,8 @@ extern crate byteorder;
 extern crate ff;
 extern crate rand;
 
+extern crate hex;
 extern crate serde;
-extern crate serde_hex;
 #[macro_use]
 extern crate serde_derive;
 
