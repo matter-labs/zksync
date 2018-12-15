@@ -21,7 +21,7 @@ byteorder = "1"
 ff = { path = "../ff", features = ["derive"] }
 serde = "1.0.80"
 serde_derive = "1.0.80"
-serde-hex = { git = "https://github.com/gluk64/serde-hex" }
+serde_json = "1.0.33"
 hex = "0.3.2"
 
 [features]
