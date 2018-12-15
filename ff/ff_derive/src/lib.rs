@@ -1081,5 +1081,48 @@ fn prime_field_impl(
                 #name::from_repr(repr).map_err(|e| format!("could not convert into prime field: {}: {}", value, &e))
             }
         }
+
+        impl serde::Serialize for #name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_str(&format!("0x{}", &self.to_hex()))
+            }
+        }
+
+        use std::fmt;
+
+        use serde::de::{self, Visitor};
+
+        struct FrVisitor;
+
+        impl<'de> Visitor<'de> for FrVisitor {
+            type Value = #name;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a hex string with prefix: 0x012ab...")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                if value.starts_with("0x") {
+                    #name::from_hex(&value[2..]).map_err(|e| E::custom(e))
+                } else {
+                    Err(E::custom(format!("hex value must start with 0x, got: {}", value)))
+                }  
+            }
+        }
+
+        impl<'de> serde::Deserialize<'de> for #name {
+            fn deserialize<D>(deserializer: D) -> Result<#name, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                deserializer.deserialize_str(FrVisitor)
+            }
+        }
     }
 }
