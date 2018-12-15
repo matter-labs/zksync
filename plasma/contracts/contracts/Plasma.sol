@@ -51,6 +51,7 @@ contract PlasmaStub is VerificationKeys {
     uint32 public totalVerified;
     bytes32 public lastVerifiedRoot;
     uint64 public constant MAX_DELAY = 1 days;
+    uint256 public constant DENOMINATOR = 1000000000000;
 
     modifier active_only() {
         require(!stopped, "contract should not be globally stopped");
@@ -63,22 +64,23 @@ contract PlasmaStub is VerificationKeys {
     }
 
     // unit normalization functions
-    function scale_into(uint256 value)
+    function scaleIntoPlasmaUnitsFromWei(uint256 value)
     internal
     pure
     returns (uint128) {
-        require(value % 1000000000000 == 0, "amount has higher precision than possible");
-        uint256 scaled = value / 1000000000000;
+        uint256 den = DENOMINATOR;
+        require(value % den == 0, "amount has higher precision than possible");
+        uint256 scaled = value / den;
         require(scaled < uint256(1) << 128, "deposit amount is too high");
         return uint128(scaled);
     }
 
 
-    function scale_from(uint128 value)
+    function scaleFromPlasmaUnitsIntoWei(uint128 value)
     internal
     pure
     returns (uint256) {
-        return uint256(value) * 1000000000000;
+        return uint256(value) * DENOMINATOR;
     }
 
     // stubs

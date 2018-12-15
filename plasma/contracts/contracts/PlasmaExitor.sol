@@ -204,7 +204,7 @@ contract PlasmaExitor is Plasma {
             accountOwner = accounts[accountIDs[i]].owner;
             scaledAmount = uint128(chunk << 24 >> 128);
             scaledAmount -= batchFee;
-            accountOwner.transfer(scale_from(scaledAmount));
+            accountOwner.transfer(scaleFromPlasmaUnitsIntoWei(scaledAmount));
         }
     }
 }

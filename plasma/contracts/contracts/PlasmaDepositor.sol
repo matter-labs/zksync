@@ -51,9 +51,7 @@ contract PlasmaDepositor is Plasma {
     function deposit(uint256[2] memory publicKey, uint128 maxFee) 
     public 
     payable {
-        require(maxFee <= currentDepositBatchFee, "deposit fee is less than required");
-        uint128 scaledValue = scale_into(msg.value);
-        require(scaledValue > currentDepositBatchFee, "deposit amount should cover the fee");
+        // only registed an account or do the lookup
         uint24 accountID = ethereumAddressToAccountID[msg.sender];
         if (accountID == 0) {
             // register new account
@@ -66,18 +64,31 @@ contract PlasmaDepositor is Plasma {
             // bump accounts counter
             nextAccountToRegister += 1;
         }
+        depositInto(accountID, maxFee);
+    }
+
+    function depositInto(uint24 accountID, uint128 maxFee) 
+    public 
+    payable 
+    {
+        require(maxFee <= currentDepositBatchFee, "deposit fee is less than required");
+        uint128 scaledValue = scaleIntoPlasmaUnitsFromWei(msg.value);
+        require(scaledValue > currentDepositBatchFee, "deposit amount should cover the fee");
+        require(accountID < nextAccountToRegister, "for now only allow to deposit into non-empty accounts");
         // read account info
-        Account memory accountInformation = accounts[nextAccountToRegister];
+        Account memory accountInformation = accounts[accountID];
 
         // work with a deposit
         uint256 currentBatch = totalDepositRequests/DEPOSIT_BATCH_SIZE;
         // write aux info about the batch
         DepositBatch storage batch = depositBatches[currentBatch];
+        // amount of time for an operator to process a batch is counted
+        // from the first deposit in the batch
         if (batch.timestamp == 0) {
             batch.state = uint8(DepositBatchState.CREATED);
+            batch.timestamp = uint64(block.timestamp);
+            batch.batchFee = currentDepositBatchFee;
         }
-        batch.timestamp = uint64(block.timestamp);
-        batch.batchFee = currentDepositBatchFee;
         scaledValue -= currentDepositBatchFee;
         // get request in this batch for this account
         DepositRequest storage request = depositRequests[currentBatch][accountID];
@@ -98,13 +109,22 @@ contract PlasmaDepositor is Plasma {
         uint24 accountID = ethereumAddressToAccountID[msg.sender];
         require(accountID != 0, "trying to cancel a deposit for non-existing account");
         uint256 currentBatch = totalDepositRequests/DEPOSIT_BATCH_SIZE;
+        DepositBatch storage batch = depositBatches[currentBatch];
+        // this check is most likely excessive, 
+        require(batch.state == uint8(DepositBatchState.CREATED), "canceling is only allowed for batches that are not yet committed");
+    
         DepositRequest storage request = depositRequests[currentBatch][accountID];
         uint128 depositAmount = request.amount;
         require(depositAmount > 0, "trying to cancel an empty deposit");
+
+        // add a batch fee that was previously subtracted
+        depositAmount += batch.batchFee;
+        // log and clear the storage
         emit LogCancelDepositRequest(currentBatch, accountID);
         delete depositRequests[currentBatch][accountID]; // refund gas
         totalDepositRequests--;
-        msg.sender.transfer(scale_from(depositAmount));
+
+        msg.sender.transfer(scaleFromPlasmaUnitsIntoWei(depositAmount));
     }
 
     function startNextDepositBatch(uint128 newBatchFee)
@@ -138,7 +158,6 @@ contract PlasmaDepositor is Plasma {
         uint256 batchNumber,
         uint24[DEPOSIT_BATCH_SIZE] memory accoundIDs,
         uint32 blockNumber, 
-        bytes memory txDataPacked, 
         bytes32 newRoot
     ) 
     public 
@@ -151,8 +170,9 @@ contract PlasmaDepositor is Plasma {
         batch.state = uint8(DepositBatchState.COMMITTED);
         batch.blockNumber = blockNumber;
         batch.timestamp = uint64(block.timestamp);
-        
-        processDepositBlockData(batchNumber, accoundIDs, txDataPacked);
+
+        // pack the public data using information that it's already on-chain
+        bytes memory txDataPacked = processDepositBlockData(batchNumber, accoundIDs);
         
         // create now commitments and write to storage
         bytes32 publicDataCommitment = createPublicDataCommitmentForDeposit(blockNumber, txDataPacked);
@@ -213,31 +233,36 @@ contract PlasmaDepositor is Plasma {
     }
 
     // transaction data is trivial: 3 bytes of in-plasma address, 16 bytes of amount and 32 bytes of public key
-    function processDepositBlockData(uint256 batchNumber, uint24[DEPOSIT_BATCH_SIZE] memory accountIDs, bytes memory txData) 
+    function processDepositBlockData(uint256 batchNumber, uint24[DEPOSIT_BATCH_SIZE] memory accountIDs) 
     internal 
     view
+    returns (bytes memory txData)
     {
+        txData = new bytes(DEPOSIT_BATCH_SIZE * 51);
         uint256 chunk;
+        uint128 requestAmount;
         uint256 publicKey;
         uint256 pointer = 32;
         for (uint256 i = 0; i < DEPOSIT_BATCH_SIZE; i++) { 
             // this is a cheap way to ensure that all requests are unique, without O(n) MSTORE
             // it also automatically guarantees that all requests requests from the batch have been executed
             require(i == 0 || accountIDs[i] == 0 || accountIDs[i] > accountIDs[i-1], "accountID are not properly ordered");
+            requestAmount = depositRequests[batchNumber][accountIDs[i]].amount;
+            publicKey = accounts[accountIDs[i]].publicKey;
+            // put address and amount into the top bits of the chunk
+            // address || amount || 0000...0000
+            chunk = ((uint256(accountIDs[i]) << 128) + uint256(requestAmount)) << 104;
+            // and store it into place
             assembly {
-                chunk := mload(add(txData, pointer))
+                mstore(add(txData, pointer), chunk)
             }
             pointer += 19;
             assembly {
-                publicKey := mload(add(txData, pointer))
+                mstore(add(txData, pointer), publicKey)
             }
             pointer += 32;
-            require(accountIDs[i] == chunk >> 232, "invalid account ID in commitment");
-            DepositRequest memory request = depositRequests[batchNumber][accountIDs[i]];
-            require(request.amount == chunk << 24 >> 128, "invalid request amount in commitment");
-            Account memory accountInfo = accounts[accountIDs[i]];
-            require(accountInfo.publicKey == publicKey, "invalid public key in commitment");
         }
+        return txData;
     }
 
     // transaction data is trivial: 3 bytes of in-plasma address and 16 bytes of amount
