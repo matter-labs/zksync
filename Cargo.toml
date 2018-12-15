@@ -1,6 +1,8 @@
 [workspace]
 
 members = [
+    "ff",
+    "ff/ff_derive",
     "pairing",
     "bellman",
     "sapling-crypto",

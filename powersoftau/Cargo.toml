@@ -19,7 +19,7 @@ typenum = "1.9.0"
 byteorder = "1.1.0"
 hex-literal = "0.1"
 rust-crypto = "0.2"
-ff = { version = "0.4", features = ["derive"] }
+ff = { path = "../ff", features = ["derive"] }
 pairing = { path = "../pairing", features = ["expose-arith"]}
 bellman = { path = "../bellman" }
 

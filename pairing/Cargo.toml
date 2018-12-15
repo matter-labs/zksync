@@ -18,7 +18,10 @@ repository = "https://github.com/matterinc/pairing"
 [dependencies]
 rand = "0.4"
 byteorder = "1"
-ff = { version = "0.4", features = ["derive"] }
+ff = { path = "../ff", features = ["derive"] }
+serde = "1.0.80"
+serde_derive = "1.0.80"
+serde-hex = { git = "https://github.com/gluk64/serde-hex" }
 
 [features]
 unstable-features = ["expose-arith"]

@@ -18,3 +18,6 @@ num-integer = "0.1"
 proc-macro2 = "0.4"
 quote = "0.6"
 syn = "0.14"
+
+serde_derive = "1.0.80"
+serde-hex = { git = "https://github.com/gluk64/serde-hex" }

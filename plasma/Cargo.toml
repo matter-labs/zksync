@@ -10,7 +10,7 @@ authors = [
 
 [dependencies]
 rand = "0.4"
-ff = { version = "0.4", features = ["derive"] }
+ff = { path = "../ff", features = ["derive"] }
 hex = "0.3.2"
 time = "0.1"
 num-bigint = "0.2"

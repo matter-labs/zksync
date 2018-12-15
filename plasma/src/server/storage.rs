@@ -86,10 +86,21 @@ fn storage_test() {
         sig_s:           "0".to_string(),
     };
 
-    let v = serde_json::to_value(tx).unwrap();
+    let v = serde_json::to_value(a).unwrap();
 
-    let b = Block {
-        block_number:   3,
+    use diesel::prelude::*;
+    use crate::schema::*;
+    use serde_json::value::Value;
+
+    #[derive(Insertable)]
+    #[table_name="blocks"]
+    pub struct NewBlock {
+        pub block_number:   Option<i32>,
+        pub block_data:     Value,
+    }
+
+    let b = NewBlock {
+        block_number:   None,
         block_data:     v,
     };
 

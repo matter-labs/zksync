@@ -6,6 +6,9 @@ extern crate syn;
 #[macro_use]
 extern crate quote;
 
+extern crate serde_derive;
+extern crate serde_hex;
+
 extern crate num_bigint;
 extern crate num_integer;
 extern crate num_traits;
@@ -121,8 +124,14 @@ fn fetch_attr(name: &str, attrs: &[syn::Attribute]) -> Option<String> {
 // Implement PrimeFieldRepr for the wrapped ident `repr` with `limbs` limbs.
 fn prime_field_repr_impl(repr: &syn::Ident, limbs: usize) -> proc_macro2::TokenStream {
     quote! {
-        #[derive(Copy, Clone, PartialEq, Eq, Default)]
-        pub struct #repr(pub [u64; #limbs]);
+
+        use serde_hex::{SerHex, StrictPfx};
+
+        #[derive(Copy, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+        pub struct #repr(
+            #[serde(with = "SerHex::<StrictPfx>")]
+            pub [u64; #limbs]
+        );
 
         impl ::std::fmt::Debug for #repr
         {

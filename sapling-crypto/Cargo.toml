@@ -12,7 +12,7 @@ version = "0.0.2"
 rand = "0.4"
 digest = "0.7"
 byteorder = "1"
-ff = { version = "0.4", features = ["derive"] }
+ff = { path = "../ff", features = ["derive"] }
 pairing = { path = "../pairing", features = ["expose-arith"]}
 bellman = { path = "../bellman" }
 
