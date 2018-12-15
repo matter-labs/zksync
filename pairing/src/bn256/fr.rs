@@ -65,8 +65,21 @@ impl<'de> serde::Deserialize<'de> for Fr {
 }
 
 #[test]
-fn test_fr_serialize() {
+fn test_to_hex() {
     assert_eq!(Fr::one().to_hex(), "0000000000000000000000000000000000000000000000000000000000000001");
+}
+
+#[test]
+fn test_fr_from_hex() {
+    let fr = Fr::from_hex("0000000000000000000000000000000000000000000000000000000000000001").unwrap();
+    assert_eq!(fr, Fr::one());
+}
+
+#[test]
+fn test_fr_serialize() {
+    assert_eq!(
+        serde_json::to_string(&Fr::one()).unwrap(), 
+        r#""0x0000000000000000000000000000000000000000000000000000000000000001""#);
 }
 
 #[test]
