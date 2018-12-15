@@ -61,6 +61,9 @@ fn storage_test() {
         pub_y: Fr::one(),
     };
 
+    println!("a = {:#?}", &a);
+
+
     #[derive(Serialize, Deserialize)]
     pub struct TxUnpacked{
         pub from:               u32,
@@ -109,4 +112,24 @@ fn storage_test() {
         .execute(&conn)
         .expect("Error saving account");
     println!("{:?}", rows_inserted);
+
+    #[derive(Queryable, Debug)]
+    pub struct Block {
+        pub block_number:   i32,
+        pub block_data:     Value,
+    }
+
+    {
+        use crate::schema::blocks::dsl::*;
+
+        let results = blocks
+            //.limit(5)
+            .load::<Block>(&conn)
+            .expect("Error loading posts");
+
+        println!("{:#?}", results);
+
+        let a: Account = serde_json::from_value(results[results.len()-1].block_data.clone()).unwrap();
+        println!("a = {:#?}", &a);
+    }
 }

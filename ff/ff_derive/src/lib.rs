@@ -129,7 +129,7 @@ fn prime_field_repr_impl(repr: &syn::Ident, limbs: usize) -> proc_macro2::TokenS
 
         #[derive(Copy, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
         pub struct #repr(
-            #[serde(with = "SerHex::<StrictPfx>")]
+            //#[serde(with = "SerHex::<StrictPfx>")]
             pub [u64; #limbs]
         );
 
