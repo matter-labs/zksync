@@ -52,7 +52,7 @@ fn storage_test() {
     use crate::models::plasma_models::Account;
 
     use ff::{Field, PrimeField};
-    use pairing::bn256::Fr;
+    use pairing::bn256::{Bn256, Fr};
 
     let a = Account {
         balance: Fr::one(),
@@ -89,47 +89,97 @@ fn storage_test() {
         sig_s:           "0".to_string(),
     };
 
-    let v = serde_json::to_value(a).unwrap();
+    use crate::models::tx::{self, TransactionSignature};
 
-    use diesel::prelude::*;
-    use crate::schema::*;
-    use serde_json::value::Value;
+    use sapling_crypto::alt_babyjubjub::{JubjubEngine};
 
-    #[derive(Insertable)]
-    #[table_name="blocks"]
-    pub struct NewBlock {
-        pub block_number:   Option<i32>,
-        pub block_data:     Value,
+    #[derive(Serialize, Deserialize)]
+    pub struct Point<E: JubjubEngine, Subgroup> {
+        x: E::Fr,
+        y: E::Fr,
+        t: E::Fr,
+        z: E::Fr,
+
+        #[serde(skip)]
+        #[serde(bound = "")]
+        _marker: std::marker::PhantomData<Subgroup>
     }
 
-    let b = NewBlock {
-        block_number:   None,
-        block_data:     v,
+    #[derive(Serialize, Deserialize)]
+    pub struct Tx<E: JubjubEngine> {
+        pub from:               E::Fr,
+        pub to:                 E::Fr,
+        pub amount:             E::Fr, // packed, TODO: document it here
+        pub fee:                E::Fr, // packed
+        pub nonce:              E::Fr,
+        pub good_until_block:   E::Fr,
+        //pub signature:          TransactionSignature<E>,
+
+        #[serde(bound = "")]
+        pub point:              Point<E, sapling_crypto::jubjub::Unknown>,
+    }
+
+    let tx2 = tx::Tx::<Bn256> {
+        from:               Fr::zero(),
+        to:                 Fr::zero(),
+        amount:             Fr::zero(), // packed, TODO: document it here
+        fee:                Fr::zero(), // packed
+        nonce:              Fr::zero(),
+        good_until_block:   Fr::zero(),
+        signature:          TransactionSignature::empty(),
+
+        // point:              Point{
+        //     x: Fr::zero(),
+        //     y: Fr::zero(),
+        //     t: Fr::zero(),
+        //     z: Fr::zero(),
+        //     _marker: std::marker::PhantomData
+        // },
+
+        //_marker: std::marker::PhantomData,
     };
 
-    let rows_inserted = diesel::insert_into(blocks::table)
-        .values(&b)
-        .execute(&conn)
-        .expect("Error saving account");
-    println!("{:?}", rows_inserted);
+    let v = serde_json::to_value(tx2).unwrap();
 
-    #[derive(Queryable, Debug)]
-    pub struct Block {
-        pub block_number:   i32,
-        pub block_data:     Value,
-    }
+    // use diesel::prelude::*;
+    // use crate::schema::*;
+    // use serde_json::value::Value;
 
-    {
-        use crate::schema::blocks::dsl::*;
+    // #[derive(Insertable)]
+    // #[table_name="blocks"]
+    // pub struct NewBlock {
+    //     pub block_number:   Option<i32>,
+    //     pub block_data:     Value,
+    // }
 
-        let results = blocks
-            //.limit(5)
-            .load::<Block>(&conn)
-            .expect("Error loading posts");
+    // let b = NewBlock {
+    //     block_number:   None,
+    //     block_data:     v,
+    // };
 
-        println!("{:#?}", results);
+    // let rows_inserted = diesel::insert_into(blocks::table)
+    //     .values(&b)
+    //     .execute(&conn)
+    //     .expect("Error saving account");
+    // println!("{:?}", rows_inserted);
 
-        let a: Account = serde_json::from_value(results[results.len()-1].block_data.clone()).unwrap();
-        println!("a = {:#?}", &a);
-    }
+    // #[derive(Queryable, Debug)]
+    // pub struct Block {
+    //     pub block_number:   i32,
+    //     pub block_data:     Value,
+    // }
+
+    // {
+    //     use crate::schema::blocks::dsl::*;
+
+    //     let results = blocks
+    //         //.limit(5)
+    //         .load::<Block>(&conn)
+    //         .expect("Error loading posts");
+
+    //     println!("{:#?}", results);
+
+    //     let a: Account = serde_json::from_value(results[results.len()-1].block_data.clone()).unwrap();
+    //     println!("a = {:#?}", &a);
+    // }
 }

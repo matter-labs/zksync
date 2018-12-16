@@ -6,13 +6,14 @@ use crate::models::params;
 use super::super::circuit::utils::{le_bit_vector_into_field_element};
 use sapling_crypto::circuit::float_point::{convert_to_float}; // TODO: move to primitives
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct TransactionSignature<E: JubjubEngine> {
+    #[serde(bound = "")]
     pub r: edwards::Point<E, Unknown>,
     pub s: E::Fr,
 }
 /// Packed transaction data
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Tx<E: JubjubEngine> {
     pub from:               E::Fr,
     pub to:                 E::Fr,
@@ -20,6 +21,8 @@ pub struct Tx<E: JubjubEngine> {
     pub fee:                E::Fr, // packed
     pub nonce:              E::Fr,
     pub good_until_block:   E::Fr,
+
+    #[serde(bound = "")]
     pub signature:          TransactionSignature<E>,
 }
 
