@@ -18,6 +18,13 @@ contract PlasmaStub is VerificationKeys {
         WITHDRAWAL
     }
 
+    enum AccountState {
+        NOT_REGISTERED,
+        REGISTERED,
+        PENDING_EXIT
+        // there is no EXITED state, cause we remove an account all together
+    }
+
     struct Block {
         uint8 circuit;
         uint64  deadline;
@@ -35,6 +42,8 @@ contract PlasmaStub is VerificationKeys {
     mapping (address => uint256) public balances;
 
     struct Account {
+        uint8 state;
+        uint32 exitBatchNumber;
         address owner;
         uint256 publicKey;
     }
@@ -47,8 +56,8 @@ contract PlasmaStub is VerificationKeys {
 
     // Public information for users
     bool public stopped;
-    uint32 public totalCommitted;
-    uint32 public totalVerified;
+    uint32 public lastCommittedBlockNumber;
+    uint32 public lastVerifiedBlockNumber;
     bytes32 public lastVerifiedRoot;
     uint64 public constant MAX_DELAY = 1 days;
     uint256 public constant DENOMINATOR = 1000000000000;

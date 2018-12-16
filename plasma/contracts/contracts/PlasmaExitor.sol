@@ -2,6 +2,8 @@ pragma solidity ^0.4.24;
 
 import {Plasma} from "./Plasma.sol";
 
+// this procedure is a one-time full exit with a removal 
+// of the public key from the tree
 contract PlasmaExitor is Plasma {
 
     uint256 constant EXIT_BATCH_SIZE = 32;
@@ -10,8 +12,7 @@ contract PlasmaExitor is Plasma {
     uint256 lastVerifiedExitBatch;
     uint128 currentExitBatchFee; 
 
-    // batch number => (plasma address => exit flag)
-    mapping (uint256 => mapping (uint24 => bool)) public exitRequests;
+    // batches for complete exits
     mapping (uint256 => ExitBatch) public exitBatches;
 
     enum ExitBatchState {
@@ -30,10 +31,12 @@ contract PlasmaExitor is Plasma {
     event LogExitRequest(uint256 indexed batchNumber, uint24 indexed accountID);
     event LogCancelExitRequest(uint256 indexed batchNumber, uint24 indexed accountID);
 
-    function exit(uint128 maxFee) 
+    function exit() 
     public 
+    payable
     {
-        require(maxFee <= currentExitBatchFee, "deposit fee is less than required");
+        uint128 userFee = scaleIntoPlasmaUnitsFromWei(msg.value);
+        require(userFee >= currentExitBatchFee, "exit fee should be more than required by the operator");
         uint24 accountID = ethereumAddressToAccountID[msg.sender];
         require(accountID != 0, "empty accounts can not exit");
 
@@ -46,31 +49,42 @@ contract PlasmaExitor is Plasma {
             batch.timestamp = uint64(block.timestamp);
             batch.batchFee = currentExitBatchFee;
         }
-        
-        exitRequests[currentBatch][accountID] = true;
+
+        Account storage account = accounts[accountID];
+        require(account.state == uint8(AccountState.REGISTERED), "only accounts that are registered and not pending exit can exit");
+        account.state = uint8(AccountState.PENDING_EXIT);
+        account.exitBatchNumber = uint32(currentBatch);
 
         totalExitRequests++;
 
         emit LogExitRequest(currentBatch, accountID);
     }
 
-    // allow users to cancel a deposit if the work on the next proof is not yet started
+    // allow users to cancel an exit if the work on the next proof is not yet started
     function cancelExit()
     public
     {
         uint24 accountID = ethereumAddressToAccountID[msg.sender];
         require(accountID != 0, "trying to cancel a deposit for non-existing account");
         uint256 currentBatch = totalExitRequests/EXIT_BATCH_SIZE;
-        uint256 requestsInThisBatch = totalExitRequests * EXIT_BATCH_SIZE;
-        require(exitRequests[currentBatch][accountID], "exit request should exist");
-        emit LogCancelExitRequest(currentBatch, accountID);
+        uint256 requestsInThisBatch = totalExitRequests % EXIT_BATCH_SIZE;
+
         // if the first request in a batch is canceled - clear it to stop the countdown
         if (requestsInThisBatch == 0) {
             delete exitBatches[currentBatch];
         }
-        delete exitRequests[currentBatch][accountID];
+
+        Account storage account = accounts[accountID];
+        require(account.state == uint8(AccountState.PENDING_EXIT), "can only cancel exits for accounts that are pending exit");
+        require(account.exitBatchNumber == uint32(currentBatch), "can not cancel an exit in the batch that was already accepted");
+        account.state = uint8(AccountState.REGISTERED);
+        account.exitBatchNumber = 0;
+
+        emit LogCancelExitRequest(currentBatch, accountID);
+
         totalExitRequests--;
 
+        // TODO may be return an fee that was collected
     }
 
     function startNextExitBatch(uint128 newBatchFee)
@@ -82,7 +96,11 @@ contract PlasmaExitor is Plasma {
         if (inTheCurrentBatch != 0) {
             totalExitRequests = (currentBatch + 1) * EXIT_BATCH_SIZE;
         }
-        currentExitBatchFee = newBatchFee;
+        // operator can not increase a fee to process an exit,
+        // otherwise he could prevent exits
+        if (newBatchFee < currentExitBatchFee) {
+            currentExitBatchFee = newBatchFee;
+        }
     }
 
     // pure function to calculate commitment formats
@@ -109,7 +127,7 @@ contract PlasmaExitor is Plasma {
     public 
     operator_only 
     {
-        require(blockNumber == totalCommitted + 1, "may only commit next block");
+        require(blockNumber == lastCommittedBlockNumber + 1, "may only commit next block");
         require(batchNumber == lastCommittedExitBatch, "trying to commit batch out of order");
         
         ExitBatch storage batch = exitBatches[batchNumber];
@@ -126,7 +144,7 @@ contract PlasmaExitor is Plasma {
             msg.sender
         );
         emit BlockCommitted(blockNumber);
-        totalCommitted++;
+        lastCommittedBlockNumber++;
         lastCommittedExitBatch++;
     }
 
@@ -142,8 +160,8 @@ contract PlasmaExitor is Plasma {
     public 
     operator_only 
     {
-        require(totalVerified < totalCommitted, "no committed block to verify");
-        require(blockNumber == totalVerified + 1, "may only verify next block");
+        require(lastVerifiedBlockNumber < lastCommittedBlockNumber, "no committed block to verify");
+        require(blockNumber == lastVerifiedBlockNumber + 1, "may only verify next block");
         require(batchNumber == lastVerifiedExitBatch, "trying to prove batch out of order");
         bytes32 publicDataCommitment = createPublicDataCommitmentForExit(blockNumber, txDataPacked);
 
@@ -155,7 +173,6 @@ contract PlasmaExitor is Plasma {
         require(batch.blockNumber == blockNumber, "block number in referencing invalid batch number");
         batch.state = uint8(ExitBatchState.VERIFIED);
         batch.timestamp = uint64(block.timestamp);
-        uint128 batchFee = batch.batchFee;
         // do actual verification
 
         bool verification_success = verifyProof(
@@ -168,25 +185,21 @@ contract PlasmaExitor is Plasma {
         require(verification_success, "invalid proof");
 
         emit BlockVerified(blockNumber);
-        totalVerified++;
+        lastVerifiedBlockNumber++;
         lastVerifiedExitBatch++;
         lastVerifiedRoot = committed.newRoot;
 
-        uint128 totalFees = processExitBlockData(batchNumber, batchFee, accoundIDs, txDataPacked);
-        committed.totalFees = totalFees;
-        balances[committed.prover] += totalFees;
         // process the block information
+        processExitBlockData(batchNumber, accoundIDs, txDataPacked);
     }
 
     // transaction data is trivial: 3 bytes of in-plasma address, 16 bytes of amount
     function processExitBlockData(
         uint256 batchNumber, 
-        uint128 batchFee, 
         uint24[EXIT_BATCH_SIZE] memory accountIDs, 
         bytes memory txData
     ) 
     internal 
-    returns (uint128 totalFees)
     {
         uint256 chunk;
         uint256 pointer = 32;
@@ -205,12 +218,15 @@ contract PlasmaExitor is Plasma {
             pointer += 19;
             
             require(accountIDs[i] == chunk >> 232, "invalid account ID in commitment");
-            require(exitRequests[batchNumber][accountIDs[i]], "there was not such exit request");
-            delete exitRequests[batchNumber][accountIDs[i]];
-            totalFees += batchFee;
+            Account storage account = accounts[accountIDs[i]];
+            require(account.state == uint8(AccountState.PENDING_EXIT), "there was not such exit request");
+            require(account.exitBatchNumber == uint32(batchNumber), "account was registered for exit in another batch");
+
             accountOwner = accounts[accountIDs[i]].owner;
             scaledAmount = uint128(chunk << 24 >> 128);
-            scaledAmount -= batchFee;
+
+            delete accounts[accountIDs[i]];
+
             accountOwner.transfer(scaleFromPlasmaUnitsIntoWei(scaledAmount));
         }
     }

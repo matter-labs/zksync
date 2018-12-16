@@ -34,17 +34,23 @@ contract PlasmaDepositor is Plasma {
     event LogDepositRequest(uint256 indexed batchNumber, uint24 indexed accountID, uint256 indexed publicKey, uint128 amount);
     event LogCancelDepositRequest(uint256 indexed batchNumber, uint24 indexed accountID);
     // use first N accounts for technological purposes
-    uint24 constant operatorsAccounts = 16;
+    uint24 constant operatorsAccounts = 4;
     uint24 public nextAccountToRegister = operatorsAccounts;
 
     // create technological accounts for an operator. 
-    constructor(uint256[operatorsAccounts] memory defaultPublicKeys) public {
+    constructor(uint256[operatorsAccounts - 1] memory defaultPublicKeys) public {
         lastVerifiedRoot = EMPTY_TREE_ROOT;
         operators[msg.sender] = true;
-        for (uint24 i = 0; i < operatorsAccounts; i++) {
-            Account storage acc = accounts[i];
-            acc.owner = msg.sender;
-            acc.publicKey = defaultPublicKeys[i];
+        // account number 0 is NEVER registered
+        Account memory freshAccount;
+        for (uint24 i = 1; i <= operatorsAccounts; i++) {
+            freshAccount = Account(
+                uint8(AccountState.REGISTERED),
+                0,
+                msg.sender,
+                defaultPublicKeys[i-1]
+            );
+            accounts[i] = freshAccount;
         }
     }
 
@@ -57,10 +63,14 @@ contract PlasmaDepositor is Plasma {
             // register new account
             uint256 packedKey = packAndValidatePublicKey(publicKey);
             ethereumAddressToAccountID[msg.sender] = nextAccountToRegister;
-            Account storage freshAccount = accounts[nextAccountToRegister];
-            freshAccount.owner = msg.sender;
-            freshAccount.publicKey = packedKey;
+            Account memory freshAccount = Account(
+                uint8(AccountState.REGISTERED),
+                0,
+                msg.sender,
+                packedKey
+            );
             accountID = nextAccountToRegister;
+            accounts[accountID] = freshAccount;
             // bump accounts counter
             nextAccountToRegister += 1;
         }
@@ -71,6 +81,8 @@ contract PlasmaDepositor is Plasma {
     public 
     payable 
     {
+        // this comparison is to avoid frontrunning between user
+        // and the operator
         require(maxFee <= currentDepositBatchFee, "deposit fee is less than required");
         uint128 scaledValue = scaleIntoPlasmaUnitsFromWei(msg.value);
         require(scaledValue > currentDepositBatchFee, "deposit amount should cover the fee");
@@ -109,7 +121,7 @@ contract PlasmaDepositor is Plasma {
         uint24 accountID = ethereumAddressToAccountID[msg.sender];
         require(accountID != 0, "trying to cancel a deposit for non-existing account");
         uint256 currentBatch = totalDepositRequests/DEPOSIT_BATCH_SIZE;
-        uint256 requestsInThisBatch = totalDepositRequests * DEPOSIT_BATCH_SIZE;
+        uint256 requestsInThisBatch = totalDepositRequests % DEPOSIT_BATCH_SIZE;
         DepositBatch storage batch = depositBatches[currentBatch];
         // this check is most likely excessive, 
         require(batch.state == uint8(DepositBatchState.CREATED), "canceling is only allowed for batches that are not yet committed");
@@ -168,7 +180,7 @@ contract PlasmaDepositor is Plasma {
     public 
     operator_only 
     {
-        require(blockNumber == totalCommitted + 1, "may only commit next block");
+        require(blockNumber == lastCommittedBlockNumber + 1, "may only commit next block");
         require(batchNumber == lastCommittedDepositBatch, "trying to commit batch out of order");
         
         DepositBatch storage batch = depositBatches[batchNumber];
@@ -191,7 +203,7 @@ contract PlasmaDepositor is Plasma {
             msg.sender
         );
         emit BlockCommitted(blockNumber);
-        totalCommitted++;
+        lastCommittedBlockNumber++;
         lastCommittedDepositBatch++;
     }
 
@@ -204,8 +216,8 @@ contract PlasmaDepositor is Plasma {
     public 
     operator_only 
     {
-        require(totalVerified < totalCommitted, "no committed block to verify");
-        require(blockNumber == totalVerified + 1, "may only verify next block");
+        require(lastVerifiedBlockNumber < lastCommittedBlockNumber, "no committed block to verify");
+        require(blockNumber == lastVerifiedBlockNumber + 1, "may only verify next block");
         require(batchNumber == lastVerifiedDepositBatch, "must verify batches in order");
 
         Block storage committed = blocks[blockNumber];
@@ -227,7 +239,7 @@ contract PlasmaDepositor is Plasma {
         require(verification_success, "invalid proof");
 
         emit BlockVerified(blockNumber);
-        totalVerified++;
+        lastVerifiedBlockNumber++;
         lastVerifiedDepositBatch++;
         lastVerifiedRoot = committed.newRoot;
 
