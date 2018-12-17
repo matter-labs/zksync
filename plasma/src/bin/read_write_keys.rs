@@ -211,17 +211,25 @@ fn main() {
         let public_data = transaction.public_data_into_bits();
         public_data_vector.extend(public_data.into_iter());
 
+        let leaf_witness_from = LeafWitness {
+            balance: Some(sender_leaf.balance),
+            nonce: Some(sender_leaf.nonce),
+            pub_x: Some(sender_leaf.pub_x),
+            pub_y: Some(sender_leaf.pub_y),
+        };
+
+        let leaf_witness_to = LeafWitness {
+            balance: Some(recipient_leaf.balance),
+            nonce: Some(recipient_leaf.nonce),
+            pub_x: Some(recipient_leaf.pub_x),
+            pub_y: Some(recipient_leaf.pub_y),
+        };
+
         let transaction_witness = TransactionWitness {
+            leaf_from: leaf_witness_from,
             auth_path_from: path_from,
-            balance_from: Some(sender_leaf.balance),
-            nonce_from: Some(sender_leaf.nonce),
-            pub_x_from: Some(sender_leaf.pub_x),
-            pub_y_from: Some(sender_leaf.pub_y),
+            leaf_to: leaf_witness_to,
             auth_path_to: path_to,
-            balance_to: Some(recipient_leaf.balance),
-            nonce_to: Some(recipient_leaf.nonce),
-            pub_x_to: Some(recipient_leaf.pub_x),
-            pub_y_to: Some(recipient_leaf.pub_y)
         };
 
         let witness = (transaction.clone(), transaction_witness);
@@ -331,17 +339,6 @@ fn main() {
         }
     }
 
-    // let instance_for_generation = Update {
-    //     params: params,
-    //     number_of_transactions: TXES_TO_TEST,
-    //     old_root: Some(initial_root),
-    //     new_root: Some(final_root),
-    //     public_data_commitment: Some(public_data_commitment),
-    //     block_number: Some(Fr::one()),
-    //     total_fee: Some(total_fees),
-    //     transactions: witnesses.clone(),
-    // };
-
     let empty_transaction = Transaction {
         from: None,
         to: None,
@@ -352,17 +349,18 @@ fn main() {
         signature: None
     };
 
+    let empty_leaf_witness = LeafWitness {
+        balance: None,
+        nonce: None,
+        pub_x: None,
+        pub_y: None,
+    };
+
     let empty_witness = TransactionWitness {
+        leaf_from: empty_leaf_witness.clone(),
         auth_path_from: vec![None; *plasma_constants::BALANCE_TREE_DEPTH],
-        balance_from: None,
-        nonce_from: None,
-        pub_x_from: None,
-        pub_y_from: None,
+        leaf_to: empty_leaf_witness
         auth_path_to: vec![None; *plasma_constants::BALANCE_TREE_DEPTH],
-        balance_to: None,
-        nonce_to: None,
-        pub_x_to: None,
-        pub_y_to: None
     };
 
     let instance_for_generation: Transfer<Bn256> = Transfer {
@@ -373,7 +371,7 @@ fn main() {
         public_data_commitment: None,
         block_number: None,
         total_fee: None,
-        transactions: vec![Some( (empty_transaction, empty_witness) ); TXES_TO_TEST],
+        transactions: vec![(empty_transaction, empty_witness); TXES_TO_TEST],
     };
 
     println!("generating setup...");

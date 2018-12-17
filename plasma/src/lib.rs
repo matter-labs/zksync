@@ -39,4 +39,4 @@ pub mod sparse_merkle_tree;
 pub mod balance_tree;
 pub mod circuit;
 pub mod vk_contract_generator;
-pub mod server;
+// pub mod server;
