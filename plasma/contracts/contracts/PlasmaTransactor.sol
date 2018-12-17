@@ -30,11 +30,12 @@ contract PlasmaTransactor is Plasma {
             msg.sender
         );
         emit BlockCommitted(blockNumber);
+        parsePartialExitsBlock(blockNumber, txDataPacked);
         lastCommittedBlockNumber++;
     }
 
     function verifyTransferBlock(uint32 blockNumber, uint256[8] memory proof) public operator_only {
-        require(lastCommittedBlockNumber < lastVerifiedBlockNumber, "no committed block to verify");
+        require(lastVerifiedBlockNumber < lastCommittedBlockNumber, "no committed block to verify");
         require(blockNumber == lastVerifiedBlockNumber + 1, "may only verify next block");
         Block memory committed = blocks[blockNumber];
         require(committed.circuit == uint8(Circuit.TRANSFER), "trying to prove the invalid circuit for this block number");

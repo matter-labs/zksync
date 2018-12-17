@@ -48,10 +48,10 @@ use sapling_crypto::eddsa::{
 use plasma::circuit::utils::*;
 use plasma::circuit::plasma_constants;
 use plasma::circuit::transfer::transaction::{Transaction};
-use plasma::circuit::transfer::circuit::{TransactionWitness, Transfer};
+use plasma::circuit::transfer::circuit::{TransactionWitness, Transfer, LeafWitness};
 use sapling_crypto::circuit::float_point::{convert_to_float};
 
-const TXES_TO_TEST: usize = 1;
+const TXES_TO_TEST: usize = 128;
 
 fn main() {
     let p_g = FixedGenerators::SpendingKeyGenerator;
@@ -104,7 +104,7 @@ fn main() {
 
     let initial_root = tree.root_hash();
 
-    let mut witnesses: Vec<Option<(Transaction<Bn256>, TransactionWitness<Bn256>)>> = vec![];
+    let mut witnesses: Vec<(Transaction<Bn256>, TransactionWitness<Bn256>)> = vec![];
     let mut public_data_vector: Vec<bool> = vec![];
 
     let transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
@@ -234,7 +234,7 @@ fn main() {
 
         let witness = (transaction.clone(), transaction_witness);
 
-        witnesses.push(Some(witness));
+        witnesses.push(witness);
     }
 
     let block_number = Fr::one();
@@ -359,7 +359,7 @@ fn main() {
     let empty_witness = TransactionWitness {
         leaf_from: empty_leaf_witness.clone(),
         auth_path_from: vec![None; *plasma_constants::BALANCE_TREE_DEPTH],
-        leaf_to: empty_leaf_witness
+        leaf_to: empty_leaf_witness,
         auth_path_to: vec![None; *plasma_constants::BALANCE_TREE_DEPTH],
     };
 

@@ -23,13 +23,13 @@ const babyJubjubParams = {
 
 const altBabyJubjub = new elliptic.curve.edwards(babyJubjubParams);
 
-function sign(message, priveteKey, curve) {
+function sign(message, privateKey, curve) {
     const r = (new BN(elliptic.rand(32), 16, "be")).umod(curve.n);
     var R = curve.g.mul(r);
     if (R.isInfinity()) {
         throw Error("R is infinity")
     }
-    var s_ = (new BN(message, 16, "be")).mul(priveteKey);
+    var s_ = (new BN(message, 16, "be")).mul(privateKey);
     var S = r.add(s_).umod(curve.n);
     return { R: R, S: S};
   };
@@ -134,6 +134,95 @@ function integerToFloat(
     return encoding.toBuffer("be", (exp_bits + mantissa_bits)/8);
 }
 
+function packBnLe(bn, numBits) {
+    let bin = bn.toString(2);
+    assert(bin.length <= numBits)
+    bin = bin.padStart(numBits, "0");
+    bin = bin.reverse();
+    let newBN = new BN(bin, 2);
+    let buff = newBN.toArrayLike(Buffer, "be");
+    if (buff.length < numBits / 8) {
+        buff = Buffer.concat([buff, Buffer.alloc(numBits / 8 - buff.length)])
+    }
+    return buff;
+}
+
+function serializeTransaction(tx) {
+    const {from, to, amount, fee, nonce, maxBlock} = tx;
+    assert(from.bitLength() <= 24);
+    assert(to.bitLength() <= 24);
+    assert(amount.bitLength() <= 128);
+    assert(fee.bitLength() <= 128);
+    assert(nonce.bitLength() <= 32);
+    assert(maxBlock.bitLength() <= 32);
+
+    const components = [];
+    components.push(packBnLe(from, 3));
+    components.push(packBnLe(to, 3));
+    let amountFloatBytes = integerToFloat(amount, 5, 11, 10);
+    components.push(amountFloatBytes);
+    let feeFloatBytes = integerToFloat(fee, 5, 3, 10);
+    components.push(feeFloatBytes);
+    components.push(packBnLe(nonce, 4));
+    components.push(packBnLe(maxBlock, 4));
+
+    let serialized = Buffer.concat(components);
+
+    let newAmount = floatToInteger(amountFloatBytes, 5, 11, 10);
+    let newFee = floatToInteger(feeFloatBytes, 5, 3, 10);
+
+    return {
+        bytes: serialized,
+        amount: newAmount,
+        fee: newFee
+    }
+}
+
+function getPublicData(tx) {
+    const {from, to, amount, fee} = tx;
+    assert(from.bitLength() <= 24);
+    assert(to.bitLength() <= 24);
+    assert(amount.bitLength() <= 128);
+    assert(fee.bitLength() <= 128);
+
+    const components = [];
+    components.push(from.toBuffer("be", 3));
+    components.push(to.toBuffer("be", 3));
+    let amountFloatBytes = integerToFloat(amount, 5, 11, 10);
+    components.push(amountFloatBytes);
+    let feeFloatBytes = integerToFloat(fee, 5, 3, 10);
+    components.push(feeFloatBytes);
+
+    let serialized = Buffer.concat(components);
+    let newAmount = floatToInteger(amountFloatBytes, 5, 11, 10);
+    let newFee = floatToInteger(feeFloatBytes, 5, 3, 10);
+
+    return {
+        bytes: serialized,
+        amount: newAmount,
+        fee: newFee
+    }
+}
+
+function parsePublicData(bytes) {
+    assert(bytes.length % 9 === 0);
+    const results = [];
+    for (let i = 0; i < bytes.length/9; i++) {
+        const slice = bytes.slice(9*i, 9*i + 9);
+        const res = parseSlice(slice);
+        results.push(res);
+    }
+    return results;
+}
+
+function parseSlice(slice) {
+    const from = new BN(slice.slice(0, 3), 16, "be");
+    const to = new BN(slice.slice(3, 6), 16, "be");
+    const amount = floatToInteger(slice.slice(6, 8), 5, 11, 10)
+    const fee = floatToInteger(slice.slice(8, 9), 5, 3, 10)
+    return {from, to, amount, fee};
+}
+
 
 function main() {
     const sk = (new BN(elliptic.rand(32), 16, "be")).umod(altBabyJubjub.n);
@@ -157,7 +246,33 @@ function main() {
     assert(decoded.lte(someInt));
     console.log("encoded-decoded = " + decoded.toString(10));
     console.log("original = " + someInt.toString(10));
-
 }
 
-main();
+function newKey() {
+    const sk = (new BN(elliptic.rand(32), 16, "be")).umod(altBabyJubjub.n);
+    const pub = altBabyJubjub.g.mul(sk);
+    let y = pub.getY();
+    const x = pub.getX();
+    const x_parity = x.testn(0);
+    let y_packed = y;
+    if (x_parity) {
+        y_packed = y_packed + ((new BN(1)).ushln(255))
+    }
+    return {
+        privateKey: sk,
+        publicKey: {x: x, y: y},
+        packedPublicKey: y_packed
+    };
+}
+
+module.exports = {
+    sign,
+    verify,
+    floatToInteger,
+    integerToFloat,
+    serializeSignature,
+    serializeTransaction,
+    parseSignature,
+    newKey,
+    getPublicData
+}

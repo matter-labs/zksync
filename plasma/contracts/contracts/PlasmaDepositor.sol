@@ -10,6 +10,8 @@ contract PlasmaDepositor is Plasma {
     uint256 lastVerifiedDepositBatch;
     uint128 currentDepositBatchFee; // deposit request fee scaled units
 
+    uint24 public nextAccountToRegister;
+
     // batch number => (plasma address => deposit information)
     mapping (uint256 => mapping (uint24 => DepositRequest)) public depositRequests;
     mapping (uint256 => DepositBatch) public depositBatches;
@@ -33,27 +35,7 @@ contract PlasmaDepositor is Plasma {
 
     event LogDepositRequest(uint256 indexed batchNumber, uint24 indexed accountID, uint256 indexed publicKey, uint128 amount);
     event LogCancelDepositRequest(uint256 indexed batchNumber, uint24 indexed accountID);
-    // use first N accounts for technological purposes
-    uint24 constant operatorsAccounts = 4;
-    uint24 public nextAccountToRegister = operatorsAccounts;
-
-    // create technological accounts for an operator. 
-    constructor(uint256[operatorsAccounts - 1] memory defaultPublicKeys) public {
-        lastVerifiedRoot = EMPTY_TREE_ROOT;
-        operators[msg.sender] = true;
-        // account number 0 is NEVER registered
-        Account memory freshAccount;
-        for (uint24 i = 1; i <= operatorsAccounts; i++) {
-            freshAccount = Account(
-                uint8(AccountState.REGISTERED),
-                0,
-                msg.sender,
-                defaultPublicKeys[i-1]
-            );
-            accounts[i] = freshAccount;
-        }
-    }
-
+    
     function deposit(uint256[2] memory publicKey, uint128 maxFee) 
     public 
     payable {
