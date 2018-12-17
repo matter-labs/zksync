@@ -25,16 +25,3 @@ pub const SIGNATURE_R_Y_BIT_WIDTH : &'static usize = &256;
 
 // Fr element encoding 
 pub const FR_BIT_WIDTH : &'static usize = &256;
-
-// // Total public data length
-// pub PUBLIC_DATA_BIT_LENGTH: &'static usize = &(2*BALANCE_TREE_DEPTH 
-//                                                     + AMOUNT_EXPONENT_BIT_WIDTH 
-//                                                     + AMOUNT_MANTISSA_BIT_WIDTH
-//                                                     + FEE_EXPONENT_BIT_WIDTH
-//                                                     + FEE_MANTISSA_BIT_WIDTH);
-
-// // Total private data length
-// pub PRIVATE_DATA_BIT_LENGTH: &'static usize = &(NONCE_BIT_WIDTH 
-//                                                     + SIGNATURE_S_BIT_WIDTH 
-//                                                     + SIGNATURE_R_X_BIT_WIDTH
-//                                                     + SIGNATURE_R_Y_BIT_WIDTH);

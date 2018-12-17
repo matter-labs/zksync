@@ -32,3 +32,4 @@ pub mod deposit;
 pub mod exit;
 pub mod plasma_constants;
 pub mod utils;
+pub mod leaf;

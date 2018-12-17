@@ -37,17 +37,9 @@ use sapling_crypto::eddsa::{
 };
 
 use super::super::plasma_constants;
-use crate::circuit::utils::le_bit_vector_into_field_element;
-use super::transaction::{Transaction};
-
-#[derive(Clone)]
-pub struct LeafWitness<E: JubjubEngine> {
-    pub balance: Option<E::Fr>,
-    pub nonce: Option<E::Fr>,
-    // x coordinate is supplied and parity is constrained
-    pub pub_x: Option<E::Fr>,
-    pub pub_y: Option<E::Fr>,
-}
+use super::super::leaf::{LeafWitness, LeafContent, make_leaf_content};
+use crate::circuit::utils::{le_bit_vector_into_field_element, allocate_audit_path, append_packed_public_key};
+use super::transaction::{Transaction, TransactionContent};
 
 #[derive(Clone)]
 pub struct TransactionWitness<E: JubjubEngine> {
@@ -353,27 +345,6 @@ fn find_common_prefix<E, CS>(
     Ok(mask_bools)
 }
 
-fn allocate_audit_path<E, CS> (
-    mut cs: CS,
-    audit_path: Vec<Option<E::Fr>>,
-) -> Result<Vec<AllocatedNum<E>>, SynthesisError> 
-    where E: JubjubEngine,
-          CS: ConstraintSystem<E>
-{
-    let mut allocated = vec![];
-    for (i, e) in audit_path.into_iter().enumerate() {
-        let path_element = num::AllocatedNum::alloc(
-            cs.namespace(|| format!("path element{}", i)),
-            || {
-                Ok(*e.get()?)
-            }
-        )?;
-        allocated.push(path_element);
-    }
-
-    Ok(allocated)
-}
-
 fn find_intersection_point<E, CS> (
     mut cs: CS,
     from_path_bits: Vec<boolean::Boolean>,
@@ -465,121 +436,6 @@ fn find_intersection_point<E, CS> (
     intersection_point_bits.reverse();
     
     Ok(intersection_point_bits)
-}
-
-struct LeafContent<E: JubjubEngine> {
-    leaf_bits: Vec<boolean::Boolean>,
-    // value: AllocatedNum<E>,
-    value_bits: Vec<boolean::Boolean>,
-    // nonce: AllocatedNum<E>,
-    nonce_bits: Vec<boolean::Boolean>,
-    pub_x: AllocatedNum<E>,
-    pub_y: AllocatedNum<E>,
-    pub_x_bit: Vec<boolean::Boolean>,
-    pub_y_bits: Vec<boolean::Boolean>,
-}
-
-struct TransactionContent<E: JubjubEngine> {
-    amount_bits: Vec<boolean::Boolean>,
-    fee_bits: Vec<boolean::Boolean>,
-    good_until_block:AllocatedNum<E>
-}
-
-fn make_leaf_content<E, CS> (
-    mut cs: CS,
-    witness: LeafWitness<E>
-) -> Result<LeafContent<E>, SynthesisError>
-    where E: JubjubEngine,
-          CS: ConstraintSystem<E>
-{
-    let mut leaf_bits = vec![];
-
-    let value = AllocatedNum::alloc(
-        cs.namespace(|| "allocate leaf value witness"),
-        || {
-            Ok(*witness.balance.get()?)
-        }
-    )?;
-
-    let mut value_bits = value.into_bits_le(
-        cs.namespace(|| "value bits")
-    )?;
-
-    value_bits.truncate(*plasma_constants::BALANCE_BIT_WIDTH);
-    leaf_bits.extend(value_bits.clone());
-
-    let nonce = AllocatedNum::alloc(
-        cs.namespace(|| "allocate leaf nonce witness"),
-        || {
-            Ok(*witness.nonce.get()?)
-        }
-    )?;
-
-    let mut nonce_bits = nonce.into_bits_le(
-        cs.namespace(|| "nonce bits")
-    )?;
-
-    nonce_bits.truncate(*plasma_constants::NONCE_BIT_WIDTH);
-    leaf_bits.extend(nonce_bits.clone());
-
-    // we allocate (witness) public X and Y to use them also later for signature check
-
-    let pub_x = AllocatedNum::alloc(
-        cs.namespace(|| "allocate public key x witness"),
-        || {
-            Ok(*witness.pub_x.get()?)
-        }
-    )?;
-
-    let pub_y = AllocatedNum::alloc(
-        cs.namespace(|| "allcoate public key y witness"),
-        || {
-            Ok(*witness.pub_y.get()?)
-        }
-    )?;
-
-    let mut pub_x_bit = pub_x.into_bits_le(
-        cs.namespace(|| "pub_x bits")
-    )?;
-    // leave only the parity bit
-    pub_x_bit.truncate(1);
-
-    let mut pub_y_bits = pub_y.into_bits_le(
-        cs.namespace(|| "pub_y bits")
-    )?;
-    pub_y_bits.resize(*plasma_constants::FR_BIT_WIDTH - 1, boolean::Boolean::Constant(false));
-
-    append_packed_public_key(& mut leaf_bits, pub_x_bit.clone(), pub_y_bits.clone());
-
-    // leaf_bits.extend(pub_y_bits);
-    // leaf_bits.extend(pub_x_bit);
-
-    assert_eq!(leaf_bits.len(), *plasma_constants::BALANCE_BIT_WIDTH 
-                                + *plasma_constants::NONCE_BIT_WIDTH
-                                + *plasma_constants::FR_BIT_WIDTH
-    );
-
-    Ok(LeafContent {
-        leaf_bits: leaf_bits,
-        value_bits: value_bits,
-        nonce_bits: nonce_bits,
-        pub_x: pub_x,
-        pub_y: pub_y,
-        pub_x_bit: pub_x_bit,
-        pub_y_bits: pub_y_bits
-    })
-}
-
-fn append_packed_public_key(
-    content: & mut Vec<boolean::Boolean>,
-    x_bits: Vec<boolean::Boolean>,
-    y_bits: Vec<boolean::Boolean>,
-) 
-{
-    assert_eq!(*plasma_constants::FR_BIT_WIDTH - 1, y_bits.len());
-    assert_eq!(1, x_bits.len());
-    content.extend(y_bits);
-    content.extend(x_bits);
 }
 
 fn check_message_signature<E, CS>(

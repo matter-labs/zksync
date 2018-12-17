@@ -48,7 +48,8 @@ use sapling_crypto::eddsa::{
 use plasma::circuit::utils::*;
 use plasma::circuit::plasma_constants;
 use plasma::circuit::transfer::transaction::{Transaction};
-use plasma::circuit::transfer::circuit::{TransactionWitness, Transfer, LeafWitness};
+use plasma::circuit::leaf::{LeafWitness};
+use plasma::circuit::transfer::circuit::{TransactionWitness, Transfer};
 use sapling_crypto::circuit::float_point::{convert_to_float};
 
 const TXES_TO_TEST: usize = 128;

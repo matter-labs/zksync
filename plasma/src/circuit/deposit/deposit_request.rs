@@ -66,6 +66,7 @@ impl<E: JubjubEngine> DepositRequest<E> {
         order_check.eq(&Point::zero())
     }
 
+    // this function returns public data in Ethereum compatible format
     pub fn public_data_into_bits(
         &self
     ) -> Vec<bool> {

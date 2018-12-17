@@ -37,7 +37,7 @@ use sapling_crypto::eddsa::{
 };
 
 use super::super::plasma_constants;
-use crate::circuit::utils::le_bit_vector_into_field_element;
+use crate::circuit::utils::{le_bit_vector_into_field_element, allocate_audit_path, append_packed_public_key};
 
 // This is transaction data
 
@@ -56,6 +56,12 @@ pub struct Transaction<E: JubjubEngine> {
     pub nonce: Option<E::Fr>,
     pub good_until_block: Option<E::Fr>,
     pub signature: Option<TransactionSignature<E>>
+}
+
+pub struct TransactionContent<E: JubjubEngine> {
+    pub amount_bits: Vec<boolean::Boolean>,
+    pub fee_bits: Vec<boolean::Boolean>,
+    pub good_until_block:AllocatedNum<E>
 }
 
 
