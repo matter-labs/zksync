@@ -358,23 +358,10 @@ fn main() {
     };
 
     let empty_witness = TransactionWitness {
-<<<<<<< HEAD
-        auth_path_from: vec![None; params::BALANCE_TREE_DEPTH],
-        balance_from: None,
-        nonce_from: None,
-        pub_x_from: None,
-        pub_y_from: None,
-        auth_path_to: vec![None; params::BALANCE_TREE_DEPTH],
-        balance_to: None,
-        nonce_to: None,
-        pub_x_to: None,
-        pub_y_to: None
-=======
         leaf_from: empty_leaf_witness.clone(),
         auth_path_from: vec![None; *plasma_constants::BALANCE_TREE_DEPTH],
         leaf_to: empty_leaf_witness,
         auth_path_to: vec![None; *plasma_constants::BALANCE_TREE_DEPTH],
->>>>>>> more_ff
     };
 
     let instance_for_generation: Transfer<Bn256> = Transfer {

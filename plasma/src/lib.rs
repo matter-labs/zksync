@@ -52,12 +52,8 @@ pub mod primitives;
 pub mod merkle_tree;
 pub mod circuit;
 pub mod vk_contract_generator;
-<<<<<<< HEAD
 pub mod server;
 pub mod eth_client;
 pub mod models;
 
 pub mod schema;
-=======
-// pub mod server;
->>>>>>> more_ff

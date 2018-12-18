@@ -23,26 +23,11 @@ pub struct Leaf<E: JubjubEngine> {
 impl<E: JubjubEngine> GetBits for Leaf<E> {
     fn get_bits_le(&self) -> Vec<bool> {
         let mut leaf_content = Vec::new();
-<<<<<<< HEAD:plasma/to_fix/account_tree.rs
-        leaf_content.extend(self.balance.get_bits_le_fixed(params::BALANCE_BIT_WIDTH));
-        leaf_content.extend(self.nonce.get_bits_le_fixed(params::NONCE_BIT_WIDTH));
-        leaf_content.extend(self.pub_x.get_bits_le_fixed(params::FR_BIT_WIDTH));
-        leaf_content.extend(self.pub_y.get_bits_le_fixed(params::FR_BIT_WIDTH));
-=======
         leaf_content.extend(self.balance.get_bits_le_fixed(*plasma_constants::BALANCE_BIT_WIDTH));
         leaf_content.extend(self.nonce.get_bits_le_fixed(*plasma_constants::NONCE_BIT_WIDTH));
         leaf_content.extend(self.pub_y.get_bits_le_fixed(*plasma_constants::FR_BIT_WIDTH - 1));
         leaf_content.extend(self.pub_x.get_bits_le_fixed(1));
-        // for b in leaf_content.clone() {
-        //     if b {
-        //         print!("1");
-        //     } else {
-        //         print!("0");
-        //     }
-        // }
-        // print!("\n");
 
->>>>>>> more_ff:plasma/src/balance_tree/mod.rs
         leaf_content
     }
 }

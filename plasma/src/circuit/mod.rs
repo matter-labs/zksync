@@ -28,10 +28,6 @@ use sapling_crypto::circuit::{
 pub mod transfer;
 pub mod deposit;
 pub mod exit;
-<<<<<<< HEAD
-pub mod utils;
-=======
 pub mod plasma_constants;
 pub mod utils;
 pub mod leaf;
->>>>>>> more_ff

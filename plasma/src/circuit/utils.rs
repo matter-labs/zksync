@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-use ff::{PrimeField, BitIterator};
-=======
 use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
->>>>>>> more_ff
 use sapling_crypto::jubjub::{JubjubEngine};
 use bellman::{ConstraintSystem, SynthesisError};
 
