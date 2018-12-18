@@ -15,7 +15,7 @@ contract PlasmaStub is VerificationKeys {
     enum Circuit {
         DEPOSIT,
         TRANSFER,
-        WITHDRAWAL
+        EXIT
     }
 
     enum AccountState {
@@ -110,7 +110,7 @@ contract Plasma is PlasmaStub, Verifier {
             (vk, gammaABC) = getVkDepositCircuit();
         } else if (circuitType == Circuit.TRANSFER) {
             (vk, gammaABC) = getVkTransferCircuit();
-        } else if (circuitType == Circuit.WITHDRAWAL) {
+        } else if (circuitType == Circuit.EXIT) {
             (vk, gammaABC) = getVkExitCircuit();
         } else {
             return false;

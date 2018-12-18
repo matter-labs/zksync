@@ -136,7 +136,7 @@ contract PlasmaExitor is Plasma {
         batch.timestamp = uint64(block.timestamp);
                 
         blocks[blockNumber] = Block(
-            uint8(Circuit.WITHDRAWAL), 
+            uint8(Circuit.EXIT), 
             uint64(block.timestamp + MAX_DELAY), 
             0, 
             newRoot, 
@@ -166,7 +166,7 @@ contract PlasmaExitor is Plasma {
         bytes32 publicDataCommitment = createPublicDataCommitmentForExit(blockNumber, txDataPacked);
 
         Block storage committed = blocks[blockNumber];
-        require(committed.circuit == uint8(Circuit.WITHDRAWAL), "trying to prove the invalid circuit for this block number");
+        require(committed.circuit == uint8(Circuit.EXIT), "trying to prove the invalid circuit for this block number");
         require(committed.publicDataCommitment == publicDataCommitment, "public data is different with a committment");
 
         ExitBatch storage batch = exitBatches[batchNumber];
@@ -176,7 +176,7 @@ contract PlasmaExitor is Plasma {
         // do actual verification
 
         bool verification_success = verifyProof(
-            Circuit.WITHDRAWAL, 
+            Circuit.EXIT, 
             proof, 
             lastVerifiedRoot, 
             committed.newRoot, 
