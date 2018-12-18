@@ -36,8 +36,13 @@ use sapling_crypto::eddsa::{
     PublicKey
 };
 
+<<<<<<< HEAD
 use crate::models::{params, circuit::sig::TransactionSignature};
 use crate::circuit::utils::le_bit_vector_into_field_element;
+=======
+use super::super::plasma_constants;
+use crate::circuit::utils::{le_bit_vector_into_field_element, allocate_audit_path, append_packed_public_key};
+>>>>>>> more_ff
 
 // This is transaction data
 
@@ -52,8 +57,15 @@ pub struct Transaction<E: JubjubEngine> {
     pub signature: Option<TransactionSignature<E>>
 }
 
+pub struct TransactionContent<E: JubjubEngine> {
+    pub amount_bits: Vec<boolean::Boolean>,
+    pub fee_bits: Vec<boolean::Boolean>,
+    pub good_until_block:AllocatedNum<E>
+}
+
 
 impl <E: JubjubEngine> Transaction<E> {
+    // this function returns public transaction data in Ethereum compatible format
     pub fn public_data_into_bits(
         &self
     ) -> Vec<bool> {
@@ -64,10 +76,21 @@ impl <E: JubjubEngine> Transaction<E> {
         // - fee
         let mut from: Vec<bool> = BitIterator::new(self.from.clone().unwrap().into_repr()).collect();
         from.reverse();
+<<<<<<< HEAD
         from.truncate(params::BALANCE_TREE_DEPTH);
         let mut to: Vec<bool> = BitIterator::new(self.to.clone().unwrap().into_repr()).collect();
         to.reverse();
         to.truncate(params::BALANCE_TREE_DEPTH);
+=======
+        from.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
+        // reverse again cause from and to are the only two fields that are kept BE
+        from.reverse();
+        let mut to: Vec<bool> = BitIterator::new(self.to.clone().unwrap().into_repr()).collect();
+        to.reverse();
+        to.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
+        // reverse again cause from and to are the only two fields that are kept BE
+        to.reverse();
+>>>>>>> more_ff
         let mut amount: Vec<bool> = BitIterator::new(self.amount.clone().unwrap().into_repr()).collect();
         amount.reverse();
         amount.truncate(params::AMOUNT_EXPONENT_BIT_WIDTH + params::AMOUNT_MANTISSA_BIT_WIDTH);
@@ -84,6 +107,8 @@ impl <E: JubjubEngine> Transaction<E> {
         packed
     }
 
+    // this function returns data to make a transaction signature
+    // in a format that is later used in zkSNARK
     pub fn data_for_signature_into_bits(
         &self
     ) -> Vec<bool> {
@@ -94,15 +119,47 @@ impl <E: JubjubEngine> Transaction<E> {
         // - fee
         // - nonce
         // - good_until_block
+
+        // in data for signature and for latter use in SNARKs everything is LE!
+
+        // LE from
+        let mut from: Vec<bool> = BitIterator::new(self.from.clone().unwrap().into_repr()).collect();
+        from.reverse();
+        from.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
+        // LE to
+        let mut to: Vec<bool> = BitIterator::new(self.to.clone().unwrap().into_repr()).collect();
+        to.reverse();
+        to.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
+        // amount is encoded as float
+        let mut amount: Vec<bool> = BitIterator::new(self.amount.clone().unwrap().into_repr()).collect();
+        amount.reverse();
+        amount.truncate(*plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH);
+        // same for fee
+        let mut fee: Vec<bool> = BitIterator::new(self.fee.clone().unwrap().into_repr()).collect();
+        fee.reverse();
+        fee.truncate(*plasma_constants::FEE_EXPONENT_BIT_WIDTH + *plasma_constants::FEE_MANTISSA_BIT_WIDTH); 
+        // nonce is LE encoded
         let mut nonce: Vec<bool> = BitIterator::new(self.nonce.clone().unwrap().into_repr()).collect();
         nonce.reverse();
+<<<<<<< HEAD
         nonce.truncate(params::NONCE_BIT_WIDTH);
         let mut good_until_block: Vec<bool> = BitIterator::new(self.good_until_block.clone().unwrap().into_repr()).collect();
         good_until_block.reverse();
         good_until_block.truncate(params::BLOCK_NUMBER_BIT_WIDTH);
+=======
+        nonce.truncate(*plasma_constants::NONCE_BIT_WIDTH);
+        // LE good until block #
+        let mut good_until_block: Vec<bool> = BitIterator::new(self.good_until_block.clone().unwrap().into_repr()).collect();
+        good_until_block.reverse();
+        good_until_block.truncate(*plasma_constants::BLOCK_NUMBER_BIT_WIDTH);
+
+>>>>>>> more_ff
         let mut packed: Vec<bool> = vec![];
-        
-        packed.extend(self.public_data_into_bits().into_iter());
+
+        packed.extend(from.into_iter());
+        packed.extend(to.into_iter());
+        packed.extend(amount.into_iter());
+        packed.extend(fee.into_iter());
         packed.extend(nonce.into_iter());
         packed.extend(good_until_block.into_iter());
 

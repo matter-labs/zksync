@@ -8,5 +8,6 @@ members = [
     "sapling-crypto",
     "bellman-demo",
     "plasma",
-    "powersoftau"
+    "powersoftau",
+    "plasma_cash_bonus"
 ]

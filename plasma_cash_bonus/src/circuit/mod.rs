@@ -25,13 +25,6 @@ use sapling_crypto::circuit::{
     float_point,
 };
 
-pub mod transfer;
-pub mod deposit;
-pub mod exit;
-<<<<<<< HEAD
-pub mod utils;
-=======
-pub mod plasma_constants;
-pub mod utils;
-pub mod leaf;
->>>>>>> more_ff
+use crate::transaction_tree;
+
+pub mod non_inclusion;

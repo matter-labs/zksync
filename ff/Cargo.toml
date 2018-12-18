@@ -12,7 +12,9 @@ repository = "https://github.com/ebfull/ff"
 byteorder = "1"
 rand = "0.4"
 ff_derive = { version = "0.3.0", path = "ff_derive", optional = true }
+ff_asm = { version = "0.0.1", path = "ff_asm", optional = true }
 
 [features]
 default = []
 derive = ["ff_derive"]
+asm = ["ff_asm"]

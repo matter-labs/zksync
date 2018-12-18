@@ -48,6 +48,7 @@ use crate::circuit::utils::{le_bit_vector_into_field_element};
 pub struct ExitRequest<E: JubjubEngine> {
     pub from: Option<E::Fr>,
     // keep an amount in request for ease of public data serialization
+    // it's NOT USED in a zkSNARK
     pub amount: Option<E::Fr>,
 }
 

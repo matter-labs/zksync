@@ -3,6 +3,7 @@ pragma solidity ^0.4.24;
 import "./Verifier.sol";
 import "./VerificationKeys.sol";
 
+// Single operator mode
 
 contract PlasmaStub is VerificationKeys {
 
@@ -13,106 +14,112 @@ contract PlasmaStub is VerificationKeys {
 
     enum Circuit {
         DEPOSIT,
-        UPDATE,
-        WITHDRAWAL
+        TRANSFER,
+        EXIT
+    }
+
+    enum AccountState {
+        NOT_REGISTERED,
+        REGISTERED,
+        PENDING_EXIT
+        // there is no EXITED state, cause we remove an account all together
     }
 
     struct Block {
-        Circuit circuit;
-
+        uint8 circuit;
+        uint64  deadline;
         uint128 totalFees;
         bytes32 newRoot;
-        bytes32 finalHash;
-
-        // TODO: Everybody should be able to provide proof and collect fees when deadline is crossed
+        bytes32 publicDataCommitment;
         address prover;
-        uint32  deadline;
     }
-
-    bytes32 public lastVerifiedRoot;
 
     // Key is block number
     mapping (uint32 => Block) public blocks;
+    // Only some addresses can send proofs
+    mapping (address => bool) public operators;
+    // Fee collection accounting
+    mapping (address => uint256) public balances;
 
-    uint32 public totalCommitted;
-    uint32 public totalVerified;
-
-    // Balances for distributing fees to provers
-    mapping (address => uint256) public balance;
-
-    // Public API
-
-    constructor() public {
-        lastVerifiedRoot = EMPTY_TREE_ROOT;
-    }
-    
-    function commitBlock(uint32 blockNumber, uint128 totalFees, bytes memory txDataPacked, bytes32 newRoot) public {
-        require(blockNumber == totalCommitted + 1, "may only commit next block");
-
-        bytes32 finalHash = createPublicDataCommitment(blockNumber, totalFees, txDataPacked);
-
-        // // TODO: need a strategy to avoid front-running msg.sender
-        blocks[blockNumber] = Block(Circuit.UPDATE, totalFees, newRoot, finalHash, msg.sender, uint32(block.timestamp + DEADLINE));
-        emit BlockCommitted(blockNumber);
-        totalCommitted++;
+    struct Account {
+        uint8 state;
+        uint32 exitBatchNumber;
+        address owner;
+        uint256 publicKey;
     }
 
-    function createPublicDataCommitment(uint32 blockNumber, uint128 totalFees, bytes memory txDataPacked)
-    public 
+    // one Ethereum address should have one account
+    mapping (address => uint24) public ethereumAddressToAccountID;
+
+    // Plasma account => general information
+    mapping (uint24 => Account) public accounts;
+
+    // Public information for users
+    bool public stopped;
+    uint32 public lastCommittedBlockNumber;
+    uint32 public lastVerifiedBlockNumber;
+    bytes32 public lastVerifiedRoot;
+    uint64 public constant MAX_DELAY = 1 days;
+    uint256 public constant DENOMINATOR = 1000000000000;
+
+    modifier active_only() {
+        require(!stopped, "contract should not be globally stopped");
+        _;
+    }
+
+    modifier operator_only() {
+        require(operators[msg.sender] == true, "sender should be one of the operators");
+        _;
+    }
+
+    // unit normalization functions
+    function scaleIntoPlasmaUnitsFromWei(uint256 value)
+    internal
     pure
-    returns (bytes32 h) {
-
-        bytes32 initialHash = sha256(abi.encodePacked(uint256(blockNumber), uint256(totalFees)));
-        bytes32 finalHash = sha256(abi.encodePacked(initialHash, txDataPacked));
-        
-        return finalHash;
+    returns (uint128) {
+        uint256 den = DENOMINATOR;
+        require(value % den == 0, "amount has higher precision than possible");
+        uint256 scaled = value / den;
+        require(scaled < uint256(1) << 128, "deposit amount is too high");
+        return uint128(scaled);
     }
 
-    function verifyBlock(uint32 blockNumber, uint256[8] memory proof) public {
-        require(totalVerified < totalCommitted, "no committed block to verify");
-        require(blockNumber == totalVerified + 1, "may only verify next block");
-        Block memory committed = blocks[blockNumber];
-        bool verification_success = verifyUpdateProof(proof, lastVerifiedRoot, committed.newRoot, committed.finalHash);
-        require(verification_success, "invalid proof");
 
-        emit BlockVerified(blockNumber);
-        totalVerified++;
-        lastVerifiedRoot = committed.newRoot;
-
-        // TODO: how to deal with deadline? Penalties?
-        balance[committed.prover] += committed.totalFees;
+    function scaleFromPlasmaUnitsIntoWei(uint128 value)
+    internal
+    pure
+    returns (uint256) {
+        return uint256(value) * DENOMINATOR;
     }
 
-    function verifyUpdateProof(uint256[8] memory, bytes32, bytes32, bytes32) internal view returns (bool valid);
-
+    // stubs
+    // verification
+    function verifyProof(Circuit, uint256[8] memory, bytes32, bytes32, bytes32) internal view returns (bool valid);
 }
-
 
 contract Plasma is PlasmaStub, Verifier {
     // Implementation
 
-    function verifyUpdateProof(uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
+    function verifyProof(Circuit circuitType, uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
         internal view returns (bool valid)
     {
         uint256 mask = (~uint256(0)) >> 3;
         uint256[14] memory vk;
         uint256[] memory gammaABC;
-        (vk, gammaABC) = getVkUpdateCircuit();
+        if (circuitType == Circuit.DEPOSIT) {
+            (vk, gammaABC) = getVkDepositCircuit();
+        } else if (circuitType == Circuit.TRANSFER) {
+            (vk, gammaABC) = getVkTransferCircuit();
+        } else if (circuitType == Circuit.EXIT) {
+            (vk, gammaABC) = getVkExitCircuit();
+        } else {
+            return false;
+        }
         uint256[] memory inputs = new uint256[](3);
         inputs[0] = uint256(oldRoot);
         inputs[1] = uint256(newRoot);
         inputs[2] = uint256(finalHash) & mask;
         return Verify(vk, gammaABC, proof, inputs);
-    }
-
-}
-
-contract PlasmaTest is PlasmaStub, Verifier {
-    function verifyUpdateProof(uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
-        internal view returns (bool valid)
-    {
-        // always approve for test
-        return true;
     }
 
 }

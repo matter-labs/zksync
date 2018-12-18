@@ -227,11 +227,10 @@ pub fn generate_parameters<E, C>(
         );
     }
 
+    if verbose {eprintln!("Making {} powers of tau", assembly.num_constraints)};
     // Create bases for blind evaluation of polynomials at tau
     let powers_of_tau = vec![Scalar::<E>(E::Fr::zero()); assembly.num_constraints];
     let mut powers_of_tau = EvaluationDomain::from_coeffs(powers_of_tau)?;
-
-    if verbose {eprintln!("assembly.num_constraints: {}", assembly.num_constraints)};
 
     // Compute G1 window table
     let mut g1_wnaf = Wnaf::new();
@@ -326,9 +325,11 @@ pub fn generate_parameters<E, C>(
 
     if verbose {eprintln!("using inverse FFT to convert powers of tau to Lagrange coefficients...")};
     let start = PreciseTime::now();
+
     // Use inverse FFT to convert powers of tau to Lagrange coefficients
     powers_of_tau.ifft(&worker);
     let powers_of_tau = powers_of_tau.into_coeffs();
+
     if verbose {eprintln!("powers of tau stage 2 done in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0)};
 
     let mut a = vec![E::G1::zero(); assembly.num_inputs + assembly.num_aux];
@@ -339,6 +340,7 @@ pub fn generate_parameters<E, C>(
 
     if verbose {eprintln!("evaluating polynomials...")};
     let start = PreciseTime::now();
+
     fn eval<E: Engine>(
         // wNAF window tables
         g1_wnaf: &Wnaf<usize, &[E::G1], &mut Vec<i64>>,
@@ -368,6 +370,7 @@ pub fn generate_parameters<E, C>(
         // Worker
         worker: &Worker
     )
+
     {
         let verbose = verbose_flag();
 
@@ -525,6 +528,8 @@ pub fn generate_parameters<E, C>(
         delta_g2: g2.mul(delta).into_affine(),
         ic: ic.into_iter().map(|e| e.into_affine()).collect()
     };
+
+    println!("Has generated {} points", a.len());
 
     Ok(Parameters {
         vk: vk,
