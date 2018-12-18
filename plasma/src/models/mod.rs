@@ -16,7 +16,14 @@ type Engine = bn256::Bn256;
 type Fr = bn256::Fr;
 
 pub type FieldBytes = Fr;
-pub type TxSignature = Vec<u8>; // 3 field elements
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct TxSignature{
+    pub r_x:    Fr,
+    pub r_y:    Fr,
+    pub s:      Fr,
+}
+
 pub type AccountTree = SparseMerkleTree<Account, Fr, PedersenHasher<Engine>>;
 
 pub type TransferBlock = block::Block<TransferTx>;

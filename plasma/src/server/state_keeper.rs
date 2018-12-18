@@ -10,10 +10,9 @@ use ff::{Field, PrimeField};
 use rand::{OsRng};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 
-use crate::models::{Block, TransferBlock, Account, TransferTx, AccountTree, TxSignature, PlasmaState};
+use crate::models::{self, params, Block, TransferBlock, Account, TransferTx, AccountTree, TxSignature, PlasmaState};
 use super::committer::Commitment;
 
-use crate::models::params;
 use rand::{SeedableRng, Rng, XorShiftRng};
 
 use std::sync::mpsc::{Sender, Receiver};
@@ -194,8 +193,15 @@ impl PlasmaStateKeeper {
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let mut rng = OsRng::new().unwrap();
 
-        unimplemented!()
-        //tx.sign(sk, p_g, &params, &mut rng);
+        let mut tx_fr = models::circuit::TransferTx::try_from(tx).unwrap();
+        tx_fr.sign(sk, p_g, &params, &mut rng);
+
+        let (x, y) = tx_fr.signature.r.into_xy();
+        tx.signature = TxSignature{
+            r_x:    x,
+            r_y:    y,
+            s:      tx_fr.signature.s,
+        }
     }
 
 }

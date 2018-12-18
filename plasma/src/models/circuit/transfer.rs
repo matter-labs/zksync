@@ -48,7 +48,7 @@ impl<E: JubjubEngine> Tx<E> {
             good_until_block:   E::Fr::from_str(&transaction.good_until_block.to_string()).unwrap(),
 
             // TODO: decode signature
-            signature:          TransactionSignature::empty(),
+            signature:          TransactionSignature::try_from(transaction.signature.clone())?,
         };
 
         Ok(tx)

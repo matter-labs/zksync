@@ -10,8 +10,6 @@ pub struct TransferTx{
     pub fee:                u128,
     pub nonce:              u32,
     pub good_until_block:   u32,
-
-    #[serde(with = "serde_bytes")]
     pub signature:          TxSignature,
 }
 

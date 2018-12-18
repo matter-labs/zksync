@@ -23,3 +23,19 @@ impl<E: JubjubEngine> TransactionSignature<E> {
         }
     }
 }
+
+impl<E: JubjubEngine> TransactionSignature<E> {
+    pub fn try_from(sig: crate::models::TxSignature) -> Result<Self, String> {
+        unimplemented!()
+        // Self{
+        //     r:  edwards::Point{
+        //             x: E::Fr::from_str(&sig.r_x.to_string()).unwrap(),
+        //             y: E::Fr::from_str(&sig.r_y.to_string()).unwrap(),
+        //             t: E::Fr::zero(),
+        //             z: E::Fr::zero(),
+        //             _marker: std::marker::PhantomData,
+        //         },
+        //     s:  E::Fr::from_str(&sig.s.to_string()).unwrap(),
+        // }
+    }
+}

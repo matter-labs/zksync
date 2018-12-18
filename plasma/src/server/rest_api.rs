@@ -18,7 +18,6 @@ use actix_web::{
 
 use futures::Future;
 
-// TODO: when sig is verified, use TxUnpacked directly instead
 #[derive(Debug, Serialize, Deserialize)]
 struct TransactionRequest {
     from: u32,
