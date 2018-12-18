@@ -36,16 +36,10 @@ use sapling_crypto::eddsa::{
     PublicKey
 };
 
-<<<<<<< HEAD
-use crate::models::params;
-use crate::circuit::utils::le_bit_vector_into_field_element;
-use super::transaction::{Transaction};
-=======
 use super::super::plasma_constants;
 use super::super::leaf::{LeafWitness, LeafContent, make_leaf_content};
 use crate::circuit::utils::{le_bit_vector_into_field_element, allocate_audit_path, append_packed_public_key, count_number_of_ones};
 use super::transaction::{Transaction, TransactionContent};
->>>>>>> more_ff
 
 #[derive(Clone)]
 pub struct TransactionWitness<E: JubjubEngine> {
@@ -361,229 +355,6 @@ fn find_intersection_point<E, CS> (
     where E: JubjubEngine,
           CS: ConstraintSystem<E>
 {
-<<<<<<< HEAD
-    // Calculate leaf value commitment
-
-    let mut leaf_content = vec![];
-
-    let value_from_allocated = AllocatedNum::alloc(
-        cs.namespace(|| "allocate value from"),
-        || {
-            let tx_witness = &transaction.get()?.1;
-            Ok(*tx_witness.balance_from.clone().get()?)
-        }
-    )?;
-
-    let mut value_content_from = value_from_allocated.into_bits_le(
-        cs.namespace(|| "unpack from leaf value")
-    )?;
-
-    value_content_from.truncate(params::BALANCE_BIT_WIDTH);
-    leaf_content.extend(value_content_from.clone());
-
-    let nonce_from_allocated = AllocatedNum::alloc(
-        cs.namespace(|| "allocate nonce from"),
-        || {
-            let tx_witness = &transaction.get()?.1;
-            Ok(*tx_witness.nonce_from.clone().get()?)
-        }
-    )?;
-
-    let mut nonce_content_from = nonce_from_allocated.into_bits_le(
-        cs.namespace(|| "from leaf nonce bits")
-    )?;
-
-    nonce_content_from.truncate(params::NONCE_BIT_WIDTH);
-    leaf_content.extend(nonce_content_from.clone());
-
-    // we allocate (witness) public X and Y to use them also later for signature check
-
-    let sender_pk_x = AllocatedNum::alloc(
-        cs.namespace(|| "sender public key x"),
-        || {
-            let tx_witness = &transaction.get()?.1;
-            Ok(*tx_witness.pub_x_from.get()?)
-        }
-    )?;
-
-    let sender_pk_y = AllocatedNum::alloc(
-        cs.namespace(|| "sender public key y"),
-        || {
-            let tx_witness = &transaction.get()?.1;
-            Ok(*tx_witness.pub_y_from.get()?)
-        }
-    )?;
-
-    let mut pub_x_content_from = sender_pk_x.into_bits_le(
-        cs.namespace(|| "from leaf pub_x bits")
-    )?;
-    pub_x_content_from.resize(params::FR_BIT_WIDTH, boolean::Boolean::Constant(false));
-
-    leaf_content.extend(pub_x_content_from.clone());
-
-    let mut pub_y_content_from = sender_pk_y.into_bits_le(
-        cs.namespace(|| "from leaf pub_y bits")
-    )?;
-    pub_y_content_from.resize(params::FR_BIT_WIDTH, boolean::Boolean::Constant(false));
-
-    leaf_content.extend(pub_y_content_from.clone());
-
-    assert_eq!(leaf_content.len(), params::BALANCE_BIT_WIDTH 
-                                + params::NONCE_BIT_WIDTH
-                                + 2 * (params::FR_BIT_WIDTH)
-    );
-
-    // Compute the hash of the from leaf
-    let mut from_leaf_hash = pedersen_hash::pedersen_hash(
-        cs.namespace(|| "from leaf content hash"),
-        pedersen_hash::Personalization::NoteCommitment,
-        &leaf_content,
-        params
-    )?;
-
-    // Constraint that "from" field in transaction is 
-    // equal to the merkle proof path
-
-    let from_address_allocated = AllocatedNum::alloc(
-        cs.namespace(|| "sender address"),
-        || {
-            let tx = &transaction.get()?.0;
-            Ok(*tx.from.get()?)
-        }
-    )?;
-
-    let mut from_path_bits = from_address_allocated.into_bits_le(
-        cs.namespace(|| "sender address bit decomposition")
-    )?;
-
-    from_path_bits.truncate(params::BALANCE_TREE_DEPTH);
-
-    // This is an injective encoding, as cur is a
-    // point in the prime order subgroup.
-    let mut cur_from = from_leaf_hash.get_x().clone();
-
-    let audit_path_from = transaction.get()?.1.clone().auth_path_from;
-    // Ascend the merkle tree authentication path
-    for (i, (e, direction_bit)) in audit_path_from.clone().into_iter().zip(from_path_bits.clone().into_iter()).enumerate() {
-        let cs = &mut cs.namespace(|| format!("from merkle tree hash {}", i));
-
-        // "direction_bit" determines if the current subtree
-        // is the "right" leaf at this depth of the tree.
-
-        // Witness the authentication path element adjacent
-        // at this depth.
-        let path_element = num::AllocatedNum::alloc(
-            cs.namespace(|| "path element"),
-            || {
-                Ok(*e.get()?)
-            }
-        )?;
-
-        // Swap the two if the current subtree is on the right
-        let (xl, xr) = num::AllocatedNum::conditionally_reverse(
-            cs.namespace(|| "conditional reversal of preimage"),
-            &cur_from,
-            &path_element,
-            &direction_bit
-        )?;
-
-        // We don't need to be strict, because the function is
-        // collision-resistant. If the prover witnesses a congruency,
-        // they will be unable to find an authentication path in the
-        // tree with high probability.
-        let mut preimage = vec![];
-        preimage.extend(xl.into_bits_le(cs.namespace(|| "xl into bits"))?);
-        preimage.extend(xr.into_bits_le(cs.namespace(|| "xr into bits"))?);
-
-        // Compute the new subtree value
-        cur_from = pedersen_hash::pedersen_hash(
-            cs.namespace(|| "computation of pedersen hash"),
-            pedersen_hash::Personalization::MerkleTree(i),
-            &preimage,
-            params
-        )?.get_x().clone(); // Injective encoding
-
-    }
-
-    // enforce old root before update
-    cs.enforce(
-        || "enforce correct old root for from leaf",
-        |lc| lc + cur_from.get_variable(),
-        |lc| lc + CS::one(),
-        |lc| lc + old_root.get_variable()
-    );
-
-    // Do the same for "to" leaf
-
-    leaf_content = vec![];
-
-    let value_to_allocated = AllocatedNum::alloc(
-        cs.namespace(|| "allocate value to"),
-        || {
-            let tx_witness = &transaction.get()?.1;
-            Ok(*tx_witness.balance_to.clone().get()?)
-        }
-    )?;
-
-    let mut value_content_to = value_to_allocated.into_bits_le(
-        cs.namespace(|| "unpack to leaf value")
-    )?;
-
-    value_content_to.truncate(params::BALANCE_BIT_WIDTH);
-    leaf_content.extend(value_content_to.clone());
-
-    let nonce_to_allocated = AllocatedNum::alloc(
-        cs.namespace(|| "allocate nonce to"),
-        || {
-            let tx_witness = &transaction.get()?.1;
-            Ok(*tx_witness.nonce_to.clone().get()?)
-        }
-    )?;
-
-    let mut nonce_content_to = nonce_to_allocated.into_bits_le(
-        cs.namespace(|| "unpack to leaf nonce")
-    )?;
-
-    nonce_content_to.truncate(params::NONCE_BIT_WIDTH);
-    leaf_content.extend(nonce_content_to.clone());
-
-    // recipient public keys
-
-    let recipient_pk_x = AllocatedNum::alloc(
-        cs.namespace(|| "recipient public key x"),
-        || {
-            let tx_witness = &transaction.get()?.1;
-            Ok(*tx_witness.pub_x_to.get()?)
-        }
-    )?;
-
-    let recipient_pk_y = AllocatedNum::alloc(
-        cs.namespace(|| "recipient public key y"),
-        || {
-            let tx_witness = &transaction.get()?.1;
-            Ok(*tx_witness.pub_y_to.get()?)
-        }
-    )?;
-
-    let mut pub_x_content_to = recipient_pk_x.into_bits_le(
-        cs.namespace(|| "to leaf pub_x bits")
-    )?;
-
-    pub_x_content_to.resize(params::FR_BIT_WIDTH, boolean::Boolean::Constant(false));
-    leaf_content.extend(pub_x_content_to.clone());
-    
-    let mut pub_y_content_to = recipient_pk_y.into_bits_le(
-        cs.namespace(|| "to leaf pub_y bits")
-    )?;
-
-    pub_y_content_to.resize(params::FR_BIT_WIDTH, boolean::Boolean::Constant(false));
-    leaf_content.extend(pub_y_content_to.clone());
-
-    assert_eq!(leaf_content.len(), params::BALANCE_BIT_WIDTH 
-                                + params::NONCE_BIT_WIDTH
-                                + 2 * (params::FR_BIT_WIDTH)
-    );
-=======
 // Intersection point is the only element required in outside scope
     let mut intersection_point_lc = Num::<E>::zero();
 
@@ -593,7 +364,6 @@ fn find_intersection_point<E, CS> (
     let mut bitmap_path_to = to_path_bits.clone();
     bitmap_path_to.reverse();
 
->>>>>>> more_ff
 
     let common_prefix = find_common_prefix(
         cs.namespace(|| "common prefix search"), 
@@ -601,79 +371,6 @@ fn find_intersection_point<E, CS> (
         &bitmap_path_to
     )?;
 
-<<<<<<< HEAD
-    // Constraint that "to" field in transaction is 
-    // equal to the merkle proof path
-
-    let to_address_allocated = AllocatedNum::alloc(
-        cs.namespace(|| "recipient address"),
-        || {
-            let tx = &transaction.get()?.0;
-            Ok(*tx.to.get()?)
-        }
-    )?;
-
-    let mut to_path_bits = to_address_allocated.into_bits_le(
-        cs.namespace(|| "recipient address bit decomposition")
-    )?;
-
-    to_path_bits.truncate(params::BALANCE_TREE_DEPTH);
-
-    // This is an injective encoding, as cur is a
-    // point in the prime order subgroup.
-    let mut cur_to = to_leaf_hash.get_x().clone();
-
-    let audit_path_to = transaction.get()?.1.clone().auth_path_to;
-    // Ascend the merkle tree authentication path
-    for (i, (e, direction_bit)) in audit_path_to.clone().into_iter().zip(to_path_bits.clone().into_iter()).enumerate() {
-        let cs = &mut cs.namespace(|| format!("to merkle tree hash {}", i));
-
-        // "direction_bit" determines if the current subtree 
-        //is the "right" leaf at this depth of the tree.
-        
-        // Witness the authentication path element adjacent
-        // at this depth.
-        let path_element = num::AllocatedNum::alloc(
-            cs.namespace(|| "path element"),
-            || {
-                Ok(*e.get()?)
-            }
-        )?;
-
-        // Swap the two if the current subtree is on the right
-        let (xl, xr) = num::AllocatedNum::conditionally_reverse(
-            cs.namespace(|| "conditional reversal of preimage"),
-            &cur_to,
-            &path_element,
-            &direction_bit
-        )?;
-
-        // We don't need to be strict, because the function is
-        // collision-resistant. If the prover witnesses a congruency,
-        // they will be unable to find an authentication path in the
-        // tree with high probability.
-        let mut preimage = vec![];
-        preimage.extend(xl.into_bits_le(cs.namespace(|| "xl into bits"))?);
-        preimage.extend(xr.into_bits_le(cs.namespace(|| "xr into bits"))?);
-
-        // Compute the new subtree value
-        cur_to = pedersen_hash::pedersen_hash(
-            cs.namespace(|| "computation of pedersen hash"),
-            pedersen_hash::Personalization::MerkleTree(i),
-            &preimage,
-            params
-        )?.get_x().clone(); // Injective encoding
-    }
-
-    // enforce old root before update
-    cs.enforce(
-        || "enforce correct old root for to leaf",
-        |lc| lc + cur_to.get_variable(),
-        |lc| lc + CS::one(),
-        |lc| lc + old_root.get_variable()
-    );
-=======
->>>>>>> more_ff
 
     let common_prefix_iter = common_prefix.clone().into_iter();
     // Common prefix is found, not we enforce equality of 
@@ -1084,29 +781,17 @@ fn apply_transaction<E, CS>(
 
     let amount = parse_with_exponent_le(
         cs.namespace(|| "parse amount"),
-<<<<<<< HEAD
-        &amount_bits,
-        params::AMOUNT_EXPONENT_BIT_WIDTH,
-        params::AMOUNT_MANTISSA_BIT_WIDTH,
-=======
         &transaction_content.amount_bits,
         *plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH,
         *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH,
->>>>>>> more_ff
         10
     )?;
 
     let fee = parse_with_exponent_le(
         cs.namespace(|| "parse fee"),
-<<<<<<< HEAD
-        &fee_bits,
-        params::FEE_EXPONENT_BIT_WIDTH,
-        params::FEE_MANTISSA_BIT_WIDTH,
-=======
         &transaction_content.fee_bits,
         *plasma_constants::FEE_EXPONENT_BIT_WIDTH,
         *plasma_constants::FEE_MANTISSA_BIT_WIDTH,
->>>>>>> more_ff
         10
     )?;
 
@@ -1319,12 +1004,7 @@ fn apply_transaction<E, CS>(
             cs.namespace(|| "from leaf updated amount bits")
         )?;
 
-<<<<<<< HEAD
-
-        value_content.truncate(params::BALANCE_BIT_WIDTH);
-=======
         value_content.truncate(*plasma_constants::BALANCE_BIT_WIDTH);
->>>>>>> more_ff
         leaf_content.extend(value_content.clone());
 
         let mut nonce_content = new_nonce.into_bits_le(
@@ -1337,15 +1017,9 @@ fn apply_transaction<E, CS>(
         // keep public keys
         append_packed_public_key(& mut leaf_content, leaf_from.pub_x_bit, leaf_from.pub_y_bits);
 
-<<<<<<< HEAD
-        assert_eq!(leaf_content.len(), params::BALANCE_BIT_WIDTH 
-                                    + params::NONCE_BIT_WIDTH
-                                    + 2 * (params::FR_BIT_WIDTH)
-=======
         assert_eq!(leaf_content.len(), *plasma_constants::BALANCE_BIT_WIDTH 
                                     + *plasma_constants::NONCE_BIT_WIDTH
                                     + *plasma_constants::FR_BIT_WIDTH
->>>>>>> more_ff
         );
 
         // Compute the hash of the from leaf
@@ -1368,27 +1042,16 @@ fn apply_transaction<E, CS>(
             cs.namespace(|| "to leaf updated amount bits")
         )?;
 
-<<<<<<< HEAD
-        value_content.truncate(params::BALANCE_BIT_WIDTH);
-        leaf_content.extend(value_content.clone());
-=======
         value_content.truncate(*plasma_constants::BALANCE_BIT_WIDTH);
         leaf_content.extend(value_content);
->>>>>>> more_ff
 
         // everything else remains the same
         leaf_content.extend(leaf_to.nonce_bits);
         append_packed_public_key(& mut leaf_content, leaf_to.pub_x_bit, leaf_to.pub_y_bits);
 
-<<<<<<< HEAD
-        assert_eq!(leaf_content.len(), params::BALANCE_BIT_WIDTH 
-                                    + params::NONCE_BIT_WIDTH
-                                    + 2 * (params::FR_BIT_WIDTH)
-=======
         assert_eq!(leaf_content.len(), *plasma_constants::BALANCE_BIT_WIDTH 
                                     + *plasma_constants::NONCE_BIT_WIDTH
                                     + *plasma_constants::FR_BIT_WIDTH
->>>>>>> more_ff
         );
 
 
@@ -1402,20 +1065,6 @@ fn apply_transaction<E, CS>(
 
     }
 
-<<<<<<< HEAD
-    // Intersection point into bits to use for root recalculation
-    let mut intersection_point_bits = intersection_point.into_bits_le(
-        cs.namespace(|| "unpack intersection")
-    )?;
-
-    // truncating guarantees that even if the common prefix coincides everywhere
-    // up to the last bit, it can still be properly used in next actions
-    intersection_point_bits.truncate(params::BALANCE_TREE_DEPTH);
-    // reverse cause bits here are counted from root, and later we need from the leaf
-    intersection_point_bits.reverse();
-
-=======
->>>>>>> more_ff
     // First assemble new leafs
     let mut cur_from = from_leaf_hash.get_x().clone();
     let mut cur_to = to_leaf_hash.get_x().clone();
@@ -1730,16 +1379,11 @@ fn test_transfer_circuit_with_witness() {
         tree.insert(sender_leaf_number, updated_sender_leaf.clone());
         tree.insert(recipient_leaf_number, updated_recipient_leaf.clone());
 
-<<<<<<< HEAD
-        //assert!(tree.verify_proof(sender_leaf_number, updated_sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-        //assert!(tree.verify_proof(recipient_leaf_number, updated_recipient_leaf.clone(), tree.merkle_path(recipient_leaf_number)));
-=======
         print!("Final sender leaf hash is {}\n", tree.get_hash((tree_depth, sender_leaf_number)));
         print!("Final recipient leaf hash is {}\n", tree.get_hash((tree_depth, recipient_leaf_number)));
 
         assert!(tree.verify_proof(sender_leaf_number, updated_sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
         assert!(tree.verify_proof(recipient_leaf_number, updated_recipient_leaf.clone(), tree.merkle_path(recipient_leaf_number)));
->>>>>>> more_ff
 
         let new_root = tree.root_hash();
 

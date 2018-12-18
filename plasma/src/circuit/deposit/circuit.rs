@@ -36,14 +36,9 @@ use sapling_crypto::eddsa::{
     PublicKey
 };
 
-<<<<<<< HEAD
-use crate::models::params;
-use crate::circuit::utils::le_bit_vector_into_field_element;
-=======
 use crate::circuit::plasma_constants;
 use super::super::leaf::{LeafWitness, LeafContent, make_leaf_content};
 use crate::circuit::utils::{le_bit_vector_into_field_element, allocate_audit_path, append_packed_public_key};
->>>>>>> more_ff
 use super::deposit_request::{DepositRequest};
 
 #[derive(Clone)]
@@ -228,68 +223,6 @@ fn apply_request<E, CS>(
         witness.clone().leaf
     )?;
 
-<<<<<<< HEAD
-    let mut balance_content_from = balance_from.into_bits_le(
-        cs.namespace(|| "unpack from leaf value")
-    )?;
-
-    balance_content_from.truncate(params::BALANCE_BIT_WIDTH);
-    leaf_content.extend(balance_content_from.clone());
-
-    let nonce_from_allocated = AllocatedNum::alloc(
-        cs.namespace(|| "allocate nonce from"),
-        || {
-            let tx_witness = &transaction.get()?.1;
-            Ok(*tx_witness.nonce.clone().get()?)
-        }
-    )?;
-
-    let mut nonce_content_from = nonce_from_allocated.into_bits_le(
-        cs.namespace(|| "from leaf nonce bits")
-    )?;
-
-    nonce_content_from.truncate(params::NONCE_BIT_WIDTH);
-    leaf_content.extend(nonce_content_from.clone());
-
-    // we allocate (witness) public X and Y to expose leaf content
-
-    let sender_pk_x = AllocatedNum::alloc(
-        cs.namespace(|| "sender public key x"),
-        || {
-            let tx_witness = &transaction.get()?.1;
-            Ok(*tx_witness.pub_x.get()?)
-        }
-    )?;
-
-    let sender_pk_y = AllocatedNum::alloc(
-        cs.namespace(|| "sender public key y"),
-        || {
-            let tx_witness = &transaction.get()?.1;
-            Ok(*tx_witness.pub_y.get()?)
-        }
-    )?;
-
-    let mut pub_x_content_from = sender_pk_x.into_bits_le(
-        cs.namespace(|| "from leaf pub_x bits")
-    )?;
-    pub_x_content_from.resize(params::FR_BIT_WIDTH, boolean::Boolean::Constant(false));
-
-    leaf_content.extend(pub_x_content_from.clone());
-
-    let mut pub_y_content_from = sender_pk_y.into_bits_le(
-        cs.namespace(|| "from leaf pub_y bits")
-    )?;
-    pub_y_content_from.resize(params::FR_BIT_WIDTH, boolean::Boolean::Constant(false));
-
-    leaf_content.extend(pub_y_content_from.clone());
-
-    assert_eq!(leaf_content.len(), params::BALANCE_BIT_WIDTH 
-                                + params::NONCE_BIT_WIDTH
-                                + 2 * (params::FR_BIT_WIDTH)
-    );
-
-=======
->>>>>>> more_ff
     // Compute the hash of the from leaf
     let mut leaf_hash = pedersen_hash::pedersen_hash(
         cs.namespace(|| "leaf content hash"),
@@ -312,15 +245,7 @@ fn apply_request<E, CS>(
         cs.namespace(|| "into address bit decomposition")
     )?;
 
-<<<<<<< HEAD
-    from_path_bits.truncate(params::BALANCE_TREE_DEPTH);
-
-    // This is an injective encoding, as cur is a
-    // point in the prime order subgroup.
-    let mut cur_from = from_leaf_hash.get_x().clone();
-=======
     path_bits.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
->>>>>>> more_ff
 
     let audit_path = allocate_audit_path(
         cs.namespace(|| "allocate audit path"), 
@@ -556,37 +481,18 @@ fn apply_request<E, CS>(
             cs.namespace(|| "from leaf updated amount bits")
         )?;
 
-<<<<<<< HEAD
-        value_content.truncate(params::BALANCE_BIT_WIDTH);
-        leaf_content.extend(value_content);
-=======
         value_content.truncate(*plasma_constants::BALANCE_BIT_WIDTH);
         leaf_content.extend(value_content.clone());
->>>>>>> more_ff
 
         leaf_content.extend(leaf.nonce_bits.clone());
 
         // update public keys
 
-<<<<<<< HEAD
-        let mut padded_pub_x = pub_x_content_new.clone();
-        padded_pub_x.resize(params::FR_BIT_WIDTH, boolean::Boolean::Constant(false));
-        leaf_content.extend(padded_pub_x);
-
-        let mut padded_pub_y = pub_y_content_new.clone();
-        padded_pub_y.resize(params::FR_BIT_WIDTH, boolean::Boolean::Constant(false));
-        leaf_content.extend(padded_pub_y);
-
-        assert_eq!(leaf_content.len(), params::BALANCE_BIT_WIDTH 
-                                    + params::NONCE_BIT_WIDTH
-                                    + 2 * (params::FR_BIT_WIDTH));
-=======
         append_packed_public_key(& mut leaf_content, pub_x_content_new.clone(), pub_y_content_new.clone());
 
         assert_eq!(leaf_content.len(), *plasma_constants::BALANCE_BIT_WIDTH 
                                     + *plasma_constants::NONCE_BIT_WIDTH
                                     + *plasma_constants::FR_BIT_WIDTH);
->>>>>>> more_ff
 
         // Compute the hash of the from leaf
         leaf_hash = pedersen_hash::pedersen_hash(
@@ -647,17 +553,6 @@ fn apply_request<E, CS>(
     amount_bits_be.reverse();
     public_data.extend(amount_bits_be);
 
-<<<<<<< HEAD
-    let mut pub_y_bits_be = pub_y_content_new.clone();
-    assert!(pub_y_bits_be.len() <= params::FR_BIT_WIDTH - 1);
-    pub_y_bits_be.resize(params::FR_BIT_WIDTH - 1, boolean::Boolean::Constant(false));
-    { 
-        let x_is_odd_bit = pub_x_content_new[0].clone();
-        pub_y_bits_be.push(x_is_odd_bit);
-    }
-    pub_y_bits_be.reverse();
-    public_data.extend(pub_y_bits_be);
-=======
     let mut pub_bits_be = pub_y_content_new.clone();
     assert_eq!(pub_bits_be.len(), *plasma_constants::FR_BIT_WIDTH - 1);
 
@@ -666,7 +561,6 @@ fn apply_request<E, CS>(
 
     pub_bits_be.reverse();
     public_data.extend(pub_bits_be);
->>>>>>> more_ff
 
     assert_eq!(public_data.len(), params::BALANCE_TREE_DEPTH 
                                     + params::BALANCE_BIT_WIDTH
