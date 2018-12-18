@@ -294,7 +294,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for NonInclusion<'a, E> {
                 // this looks like some strange behavior, because reading from empty_levels should already
                 // yeild a variable, bit it does not work in proved with lazy evaluations
                 cs.enforce(
-                    || "enforce allocated empty elaf",
+                    || "enforce allocated empty leaf",
                     |lc| lc + empty_leaf.get_variable(),
                     |lc| lc + CS::one(),
                     |lc| lc + empty_levels[i].get_variable()

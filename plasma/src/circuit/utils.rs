@@ -1,12 +1,42 @@
-use ff::{PrimeField, PrimeFieldRepr, BitIterator};
+use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
 use sapling_crypto::jubjub::{JubjubEngine};
 use bellman::{ConstraintSystem, SynthesisError};
+
 use super::Assignment;
 use super::boolean;
 use super::num::{AllocatedNum, Num};
 use super::float_point::{parse_with_exponent_le, convert_to_float};
 use super::baby_eddsa::EddsaSignature;
 use super::plasma_constants;
+
+
+// count a number of non-zero bits in a bit decomposition
+pub fn count_number_of_ones<E, CS>(
+        mut cs: CS,
+        a: &[boolean::Boolean]
+    ) -> Result<AllocatedNum<E>, SynthesisError>
+        where E: JubjubEngine,
+        CS: ConstraintSystem<E>
+{
+    let mut counter = Num::zero();
+    for bit in a.iter() {
+        counter = counter.add_bool_with_coeff(CS::one(), &bit, E::Fr::one());
+    }
+
+    let result = AllocatedNum::alloc(
+        cs.namespace(|| "number of zeroes number"), 
+        || Ok(*counter.get_value().get()?)
+    )?;
+
+    cs.enforce(
+        || "pack number of ones",
+        |lc| lc + result.get_variable(),
+        |lc| lc + CS::one(),
+        |_| counter.lc(E::Fr::one())
+    );
+
+    Ok(result)
+}
 
 pub fn allocate_audit_path<E, CS> (
     mut cs: CS,

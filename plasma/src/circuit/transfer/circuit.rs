@@ -38,7 +38,7 @@ use sapling_crypto::eddsa::{
 
 use super::super::plasma_constants;
 use super::super::leaf::{LeafWitness, LeafContent, make_leaf_content};
-use crate::circuit::utils::{le_bit_vector_into_field_element, allocate_audit_path, append_packed_public_key};
+use crate::circuit::utils::{le_bit_vector_into_field_element, allocate_audit_path, append_packed_public_key, count_number_of_ones};
 use super::transaction::{Transaction, TransactionContent};
 
 #[derive(Clone)]
@@ -402,6 +402,7 @@ fn find_intersection_point<E, CS> (
         );
         coeff.double();
     }
+
     // and add one
     intersection_point_lc = intersection_point_lc.add_bool_with_coeff(
         CS::one(), 
@@ -880,9 +881,56 @@ fn apply_transaction<E, CS>(
         |lc| lc + new_balance_from.get_variable() + fee.get_variable() + amount.get_variable()
     );
 
+    // let number_of_bits_in_recipient = count_number_of_ones(
+    //     cs.namespace(|| "number of non-zero bits in recipient address"),
+    //     &from_path_bits
+    // )?;
+
+    let recipient_is_zero = AllocatedNum::alloc(
+        cs.namespace(|| "recipient is zero"),
+        || {
+            let to = *to_address_allocated.clone().get_value().get()?;
+            if to == E::Fr::zero() {
+                return Ok(E::Fr::one());
+            }
+            Ok(E::Fr::zero())
+        }
+    )?;
+
+    // enforce that recipient_is_zero is actually a boolean
+    // a * (1-a) == 0
+    cs.enforce(
+        || "enforce recipient_is_zero is either zero or one",
+        |lc| lc + recipient_is_zero.get_variable(),
+        |lc| lc + CS::one() - recipient_is_zero.get_variable(),
+        |lc| lc
+    );
+
+
+    // we have to enforce that recipient_is_zero = 1 
+    // if and only if to == 0
+    // b * a = 0
+    // either b is zero or a is zero
+    // in our case b = recipient_is_zero = 1 or 0
+    // a can be anything
+    cs.enforce(
+        || "enforce recipient_is_zero is one only if recipient is zero",
+        |lc| lc + recipient_is_zero.get_variable(),
+        |lc| lc + to_address_allocated.get_variable(),
+        |lc| lc
+    );
+
+    // Ok, now a tricky part for an account zero having a special meaning
+    // If to == 0 then balance of to is not increased
+
     let new_balance_to = AllocatedNum::alloc(
         cs.namespace(|| "new balance to"),
         || {
+            let to = *to_address_allocated.clone().get_value().get()?;
+            if to == E::Fr::zero() {
+                return Ok(E::Fr::zero());
+            }
+
             let transfer_amount_value = amount.clone().get_value().get()?.clone();
             let old_balance_to_value = old_balance_to.clone().get_value().get()?.clone();
 
@@ -899,12 +947,16 @@ fn apply_transaction<E, CS>(
         *plasma_constants::BALANCE_BIT_WIDTH
     )?;
 
-    // enforce increase of balance
+    // enforce increase of balance with a special case of to == 0
+    // that's trivial with a previous constraints
+    // (a + b) * (1 - is_zero) = c
+    // if is_zero == 1 -> c == 0
+    // if is_zero == 0 -> a + b = c
     cs.enforce(
         || "enforce recipients's balance increased",
-        |lc| lc + new_balance_to.get_variable(),
-        |lc| lc + CS::one(),
-        |lc| lc + old_balance_to.get_variable() + amount.get_variable()
+        |lc| lc + old_balance_to.get_variable() + amount.get_variable(),
+        |lc| lc + CS::one() - recipient_is_zero.get_variable(),
+        |lc| lc + new_balance_to.get_variable()
     );
 
     let new_nonce = AllocatedNum::alloc(
