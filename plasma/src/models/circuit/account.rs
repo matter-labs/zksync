@@ -27,8 +27,9 @@ impl<E: JubjubEngine> GetBits for Account<E> {
         let mut leaf_content = Vec::new();
         leaf_content.extend(self.balance.get_bits_le_fixed(params::BALANCE_BIT_WIDTH));
         leaf_content.extend(self.nonce.get_bits_le_fixed(params::NONCE_BIT_WIDTH));
-        leaf_content.extend(self.pub_x.get_bits_le_fixed(params::FR_BIT_WIDTH));
-        leaf_content.extend(self.pub_y.get_bits_le_fixed(params::FR_BIT_WIDTH));
+        leaf_content.extend(self.pub_y.get_bits_le_fixed(params::FR_BIT_WIDTH - 1));
+        leaf_content.extend(self.pub_x.get_bits_le_fixed(1));
+
         leaf_content
     }
 }

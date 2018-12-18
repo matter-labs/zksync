@@ -587,8 +587,8 @@ fn test_deposit_in_empty_leaf() {
     use rand::{SeedableRng, Rng, XorShiftRng, Rand};
     use sapling_crypto::circuit::test::*;
     use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
-    // use crate::models::circuit::{AccountTree, Account};
-    use super::super::account_tree::{AccountTree, Account};
+    use crate::models::circuit::{AccountTree, Account};
+    // use super::super::account_tree::{AccountTree, Account};
     use crypto::sha2::Sha256;
     use crypto::digest::Digest;
     use crate::circuit::utils::{encode_fs_into_fr, be_bit_vector_into_bytes};
@@ -756,8 +756,8 @@ fn test_deposit_into_existing_leaf() {
     use rand::{SeedableRng, Rng, XorShiftRng, Rand};
     use sapling_crypto::circuit::test::*;
     use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
-    // use crate::models::circuit::{AccountTree, Account};
-    use super::super::account_tree::{AccountTree, Account};
+    use crate::models::circuit::{AccountTree, Account};
+    // use super::super::account_tree::{AccountTree, Account};
     use crypto::sha2::Sha256;
     use crypto::digest::Digest;
     use crate::circuit::utils::{encode_fs_into_fr, be_bit_vector_into_bytes};
