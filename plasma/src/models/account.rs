@@ -14,27 +14,16 @@ pub struct Account {
 
 impl GetBits for Account {
     fn get_bits_le(&self) -> Vec<bool> {
-        let mut leaf_content = Vec::new();
 
-        // TODO: implement and test
-        unimplemented!();
+        circuit::Account::<Engine>::from(self.clone()).get_bits_le()
+        
+        // TODO: make more efficient:
 
+        // let mut leaf_content = Vec::new();
         // leaf_content.extend(self.balance.get_bits_le_fixed(params::BALANCE_BIT_WIDTH));
         // leaf_content.extend(self.nonce.get_bits_le_fixed(params::NONCE_BIT_WIDTH));
         // leaf_content.extend(self.pub_x.get_bits_le_fixed(params::FR_BIT_WIDTH));
         // leaf_content.extend(self.pub_y.get_bits_le_fixed(params::FR_BIT_WIDTH));
-        
-        leaf_content
+        // leaf_content
     }
 }
-
-// impl std::convert::Into<circuit::Account<Engine>> for Account {
-//     fn into(self) -> circuit::Account<Engine> {
-//         self::circuit::Account::<Engine>{
-//             balance:    Fr::from(self.balance),
-//             nonce:      Fr::from(self.nonce),
-//             pub_x:      self.pub_x,
-//             pub_y:      self.pub_y,
-//         }
-//     }
-// }

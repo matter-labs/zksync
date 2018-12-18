@@ -35,15 +35,13 @@ impl<E: JubjubEngine> GetBits for Account<E> {
 
 impl<E: JubjubEngine> std::convert::From<crate::models::Account> for Account<E> {
 
-    // TODO: introduce errors if necessary
     fn from(a: crate::models::Account) -> Self {
-        unimplemented!()
-        // Self{
-        //     balance:    E::Fr::from_str(&a.balance.to_string()).unwrap(),
-        //     nonce:      E::Fr::from_str(&a.nonce.to_string()).unwrap(),
-        //     pub_x:      E::Fr::from_hex(a.pub_x.to_hex()),
-        //     pub_y:      E::Fr::from_hex(a.pub_y.to_hex()),
-        // }
+        Self{
+            balance:    E::Fr::from_str(&a.balance.to_string()).unwrap(),
+            nonce:      E::Fr::from_str(&a.nonce.to_string()).unwrap(),
+            pub_x:      E::Fr::from_str(&a.pub_x.into_repr().to_string()).unwrap(),
+            pub_y:      E::Fr::from_str(&a.pub_y.into_repr().to_string()).unwrap(),
+        }
     }
 
 }
