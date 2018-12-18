@@ -37,8 +37,7 @@ pub struct AppState {
 }
 
 fn verify_sig(tx: &TransferTx) -> bool {
-    // TODO: implement
-    true
+    tx.verify_sig()
 }
 
 fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
