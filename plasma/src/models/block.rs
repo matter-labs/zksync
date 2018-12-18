@@ -1,9 +1,8 @@
-use sapling_crypto::alt_babyjubjub::{JubjubEngine};
+use super::FieldBytes;
 
-use super::tx::Tx;
-
-pub struct Block<E: JubjubEngine> {
+#[derive(Clone, SmartDefault)]
+pub struct Block<T: Sized> {
     pub block_number:   u32,
-    pub transactions:   Vec<Tx<E>>,
-    pub new_root_hash:  E::Fr,
+    pub transactions:   Vec<T>,
+    pub new_root_hash:  FieldBytes,
 }

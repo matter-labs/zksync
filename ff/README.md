@@ -25,7 +25,7 @@ First, enable the `derive` crate feature:
 
 ```toml
 [dependencies]
-ff = { version = "0.4", features = ["derive"] }
+ff = { path = "../ff", features = ["derive"] }
 ```
 
 And then use the macro like so:

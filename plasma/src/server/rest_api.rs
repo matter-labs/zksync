@@ -1,7 +1,7 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
 use std::sync::mpsc;
-use crate::models::tx::TxUnpacked;
+use crate::models::TransferTx;
 
 use actix_web::{
     middleware, 
@@ -33,36 +33,41 @@ struct TransactionResponse {
 // singleton to keep info about channels required for Http server
 #[derive(Clone)]
 pub struct AppState {
-    state_keeper_tx: mpsc::Sender<(TxUnpacked, mpsc::Sender<bool>)>,
+    tx_for_tx: mpsc::Sender<TransferTx>,
 }
 
-pub fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
-    let state_tx = req.state().state_keeper_tx.clone();
+fn verify_sig(tx: &TransferTx) -> bool {
+    tx.verify_sig()
+}
+
+fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+    let tx_for_tx = req.state().tx_for_tx.clone();
     req.json()
-        .from_err()  // convert all errors into `Error`
-        .and_then(move |val: TransactionRequest| {
-            let (tx, rx) = mpsc::channel::<bool>();
-            let info = TxUnpacked {
-                from: val.from,
-                to: val.to,
-                amount: val.amount,
-                fee: 0,
-                nonce: 0,
-                good_until_block: 100,
-                sig_r: "".to_owned(),
-                sig_s: "".to_owned(),
-            };
-            state_tx.send((info, tx.clone()));
-            let result = rx.recv();
+        .from_err() // convert all errors into `Error`
+        .and_then(move |tx: TransferTx| {
+            // let tx = TransferTx {
+            //     from: val.from,
+            //     to: val.to,
+            //     amount: val.amount,
+            //     fee: 0,
+            //     nonce: 0,
+            //     good_until_block: 100,
+            //     sig_r: "".to_owned(),
+            //     sig_s: "".to_owned(),
+            // };
+            let accepted = verify_sig(&tx);
+            if accepted {
+                tx_for_tx.send(tx); // pass to mem_pool
+            }
             let resp = TransactionResponse{
-                accepted: result.unwrap()
+                accepted
             };
-            Ok(HttpResponse::Ok().json(resp))  // <- send response
+            Ok(HttpResponse::Ok().json(resp))
         })
         .responder()
 }
 
-pub fn run_api_server(tx_for_transactions: mpsc::Sender<(TxUnpacked, mpsc::Sender<bool>)>) {
+pub fn run_api_server(tx_for_tx: mpsc::Sender<TransferTx>) {
 
     ::std::env::set_var("RUST_LOG", "actix_web=info");
     let sys = actix::System::new("ws-example");
@@ -70,18 +75,14 @@ pub fn run_api_server(tx_for_transactions: mpsc::Sender<(TxUnpacked, mpsc::Sende
     //move is necessary to give closure below ownership
     server::new(move || {
         App::with_state(AppState {
-            state_keeper_tx: tx_for_transactions.clone()
+            tx_for_tx: tx_for_tx.clone()
         }.clone()) // <- create app with shared state
             // enable logger
             .middleware(middleware::Logger::default())
             // enable CORS
             .configure(|app| {
                 Cors::for_app(app)
-                    // .allowed_origin("*")
                     .send_wildcard()
-                    // .allowed_methods(vec!["GET", "POST", "OPTIONS"])
-                    // .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
-                    // .allowed_header(header::CONTENT_TYPE)
                     .max_age(3600)
                     .resource("/send", |r| {
                         r.method(Method::POST).f(handle_send_transaction);

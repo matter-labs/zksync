@@ -6,6 +6,8 @@ extern crate syn;
 #[macro_use]
 extern crate quote;
 
+extern crate serde_derive;
+
 extern crate num_bigint;
 extern crate num_integer;
 extern crate num_traits;
@@ -121,8 +123,12 @@ fn fetch_attr(name: &str, attrs: &[syn::Attribute]) -> Option<String> {
 // Implement PrimeFieldRepr for the wrapped ident `repr` with `limbs` limbs.
 fn prime_field_repr_impl(repr: &syn::Ident, limbs: usize) -> proc_macro2::TokenStream {
     quote! {
-        #[derive(Copy, Clone, PartialEq, Eq, Default)]
-        pub struct #repr(pub [u64; #limbs]);
+
+        #[derive(Copy, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+        pub struct #repr(
+            //#[serde(with = "SerHex::<StrictPfx>")]
+            pub [u64; #limbs]
+        );
 
         impl ::std::fmt::Debug for #repr
         {
@@ -901,6 +907,7 @@ fn prime_field_impl(
             fn root_of_unity() -> Self {
                 #name(ROOT_OF_UNITY)
             }
+
         }
 
         impl ::ff::Field for #name {
@@ -1029,6 +1036,12 @@ fn prime_field_impl(
             }
         }
 
+        impl std::default::Default for #name {
+            fn default() -> Self {
+                Self::zero()
+            }
+        }
+
         impl #name {
             /// Determines if the element is really in the field. This is only used
             /// internally.
@@ -1059,6 +1072,63 @@ fn prime_field_impl(
                 #montgomery_impl
 
                 self.reduce();
+            }
+
+            pub fn to_hex(&self) -> String {
+                let mut buf: Vec<u8> = vec![];
+                self.into_repr().write_be(&mut buf).unwrap();
+                hex::encode(&buf)
+            }
+
+            pub fn from_hex(value: &str) -> Result<#name, String> {
+                let value = if value.starts_with("0x") { &value[2..] } else { value };
+                if value.len() % 2 != 0 {return Err(format!("hex length must be even for full byte encoding: {}", value))}
+                let mut buf = hex::decode(&value).map_err(|_| format!("could not decode hex: {}", value))?;
+                buf.reverse();
+                buf.resize(#limbs * 8, 0);
+                println!("size = {}, buf = {:?}", buf.len(), buf);
+                let mut repr = #repr::default();
+                repr.read_le(&buf[..]).map_err(|e| format!("could not read {}: {}", value, &e))?;
+                #name::from_repr(repr).map_err(|e| format!("could not convert into prime field: {}: {}", value, &e))
+            }
+        }
+
+        impl serde::Serialize for #name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_str(&format!("0x{}", &self.to_hex()))
+            }
+        }
+
+        use std::fmt;
+
+        use serde::de::{self, Visitor};
+
+        struct FrVisitor;
+
+        impl<'de> Visitor<'de> for FrVisitor {
+            type Value = #name;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a hex string with prefix: 0x012ab...")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                #name::from_hex(&value[2..]).map_err(|e| E::custom(e))
+            }
+        }
+
+        impl<'de> serde::Deserialize<'de> for #name {
+            fn deserialize<D>(deserializer: D) -> Result<#name, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                deserializer.deserialize_str(FrVisitor)
             }
         }
     }

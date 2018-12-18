@@ -304,7 +304,7 @@ fn test_encoding() {
 #[test]
 fn test_encoding_powers_of_two() {
     use rand::{SeedableRng, Rng, XorShiftRng};
-    let mut rng = XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+    let rng = XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
     let mantissa_length = 11;
 

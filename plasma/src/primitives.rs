@@ -18,6 +18,7 @@ pub trait GetBitsFixed {
     fn get_bits_le_fixed(&self, n: usize) -> Vec<bool>;
 }
 
+
 impl<Fr: PrimeField> GetBitsFixed for Fr {
 
     fn get_bits_le_fixed(&self, n: usize) -> Vec<bool> {
@@ -92,8 +93,7 @@ pub fn serialize_g2_for_ethereum(point: <Bn256 as Engine>::G2Affine) -> ((U256, 
 pub fn serialize_fe_for_ethereum(field_element: <Bn256 as ScalarEngine>::Fr) -> U256 {
         let mut be_bytes = [0u8; 32];
         field_element.into_repr().write_be(& mut be_bytes[..]).expect("get new root BE bytes");
-        let u256 = U256::from_big_endian(&be_bytes[..]);
-        
+        let u256 = U256::from_big_endian(&be_bytes[..]);     
         u256
 }
 

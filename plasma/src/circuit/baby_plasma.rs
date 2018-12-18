@@ -35,7 +35,7 @@ use sapling_crypto::eddsa::{
     PublicKey
 };
 
-use crate::models::{params, tx::TransactionSignature};
+use crate::models::{params, circuit::signature::TransactionSignature};
 use super::baby_eddsa::EddsaSignature;
 use super::utils::*;
 

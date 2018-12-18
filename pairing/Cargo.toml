@@ -18,7 +18,11 @@ repository = "https://github.com/matterinc/pairing"
 [dependencies]
 rand = "0.4"
 byteorder = "1"
-ff = { version = "0.4", features = ["derive"] }
+ff = { path = "../ff", features = ["derive"] }
+serde = "1.0.80"
+serde_derive = "1.0.80"
+serde_json = "1.0.33"
+hex = "0.3.2"
 
 [features]
 unstable-features = ["expose-arith"]

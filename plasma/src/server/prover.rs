@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use rand::{OsRng};
-use std::sync::{mpsc:: {self, Sender, Receiver}};
+use std::sync::mpsc::{self, Sender, Receiver};
 
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
@@ -13,12 +13,12 @@ use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
 
-use crate::models::params;
-use crate::models::plasma_models::{AccountTree, Block, PlasmaState};
+use crate::models::{self, params, TransferBlock, Block, PlasmaState};
+use crate::models::circuit::{Account, AccountTree};
 
 use super::config::TX_BATCH_SIZE;
 
-use super::committer::{self, EthereumProof};
+use super::committer::{self, EncodedProof, BlockProof};
 
 use super::super::circuit::utils::be_bit_vector_into_bytes;
 use super::super::circuit::transfer::transaction::{Transaction};
@@ -37,6 +37,7 @@ pub enum BabyProverErr {
     InvalidFeeEncoding,
     InvalidSender,
     InvalidRecipient,
+    InvalidTransaction(String),
     IoError(std::io::Error)
 }
 
@@ -48,6 +49,7 @@ impl Error for BabyProverErr {
             BabyProverErr::InvalidFeeEncoding => "transfer fee is malformed or too large",
             BabyProverErr::InvalidSender => "sender account is unknown",
             BabyProverErr::InvalidRecipient => "recipient account is unknown",
+            BabyProverErr::InvalidTransaction(_) => "invalid tx data",
             BabyProverErr::IoError(_) => "encountered an I/O error",
         }
     }
@@ -109,7 +111,7 @@ impl BabyProver {
 
             for e in iter {
                 let acc_number = e.0;
-                let leaf_copy = e.1.clone();
+                let leaf_copy = Account::from(e.1.clone());
                 tree.insert(acc_number, leaf_copy);
             }
         }
@@ -150,7 +152,6 @@ impl BabyProver {
 }
 
 type Err = BabyProverErr;
-type EncodedProof = EthereumProof;
 
 impl BabyProver {
 
@@ -183,20 +184,21 @@ impl BabyProver {
 
         let public_data = proof.public_data.clone();
 
-        let p = EthereumProof::Proof(committer::Proof{
+        let p = EncodedProof{
             groth_proof: [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y],
             block_number: block_number,
-        });
+        };
 
         Ok(p)
     }
 
     // Takes public data from transactions for further commitment to Ethereum
-    pub fn encode_transactions(block: &Block) -> Result<Vec<u8>, Err> {
+    pub fn encode_transactions(block: &TransferBlock) -> Result<Vec<u8>, Err> {
         let mut encoding : Vec<u8> = vec![];
         let transactions = &block.transactions;
 
         for tx in transactions {
+            let tx = models::circuit::TransferTx::try_from(tx).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
             let tx_bits = tx.public_data_into_bits();
             let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
             encoding.extend(tx_encoding.into_iter());
@@ -205,7 +207,7 @@ impl BabyProver {
     }
 
     // Apply transactions to the state while also making a witness for proof, then calculate proof
-    pub fn apply_and_prove(&mut self, block: &Block) -> Result<FullBabyProof, Err> {
+    pub fn apply_and_prove(&mut self, block: &TransferBlock) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.block_number {
             return Err(BabyProverErr::Unknown);
@@ -228,6 +230,7 @@ impl BabyProver {
         let initial_root = self.accounts_tree.root_hash();
 
         for tx in transactions {
+            let tx = models::circuit::TransferTx::try_from(tx).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
             let sender_leaf_number = field_element_to_u32(tx.from);
             let recipient_leaf_number = field_element_to_u32(tx.to);
 
@@ -441,28 +444,21 @@ impl BabyProver {
     pub fn run(
             &mut self,
             rx_for_blocks: mpsc::Receiver<Block>, 
-            tx_for_proofs: mpsc::Sender<EthereumProof>
+            tx_for_proofs: mpsc::Sender<BlockProof>
         ) 
     {
         for block in rx_for_blocks {
-            println!("Got batch!");
+            println!("Got request for proof");
 
-            let new_root = block.new_root_hash.clone();
-            println!("Commiting to new root = {}", new_root);
-            let block_number = block.block_number;
-            let tx_data = BabyProver::encode_transactions(&block).unwrap();
-            let tx_data_bytes = tx_data;
-            let incomplete_proof = EthereumProof::Commitment(committer::Commitment{
-                new_root: serialize_fe_for_ethereum(new_root),
-                block_number: U256::from(block_number),
-                total_fees: U256::from(0),
-                public_data: tx_data_bytes,
-            });
-            tx_for_proofs.send(incomplete_proof);
-
-            let proof = self.apply_and_prove(&block).unwrap();
-            let full_proof = BabyProver::encode_proof(&proof).unwrap();
-            tx_for_proofs.send(full_proof);
+            match block {
+                Block::Transfer(block) => {
+                    let proof = self.apply_and_prove(&block).unwrap();
+                    let full_proof = BabyProver::encode_proof(&proof).unwrap();
+                    let accounts = vec![]; // TODO: pass updated states of affected accounts
+                    tx_for_proofs.send(BlockProof(full_proof, accounts));
+                },
+                _ => unimplemented!(),
+            }
         }        
     }
     
