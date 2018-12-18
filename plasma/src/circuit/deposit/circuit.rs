@@ -36,7 +36,7 @@ use sapling_crypto::eddsa::{
     PublicKey
 };
 
-use crate::circuit::plasma_constants;
+use crate::models::params as plasma_constants;
 use super::super::leaf::{LeafWitness, LeafContent, make_leaf_content};
 use crate::circuit::utils::{le_bit_vector_into_field_element, allocate_audit_path, append_packed_public_key};
 use super::deposit_request::{DepositRequest};
@@ -159,7 +159,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Deposit<'a, E> {
             cs.namespace(|| "unpack block number for hashing")
         )?;
 
-        block_number_bits.resize(params::FR_BIT_WIDTH, boolean::Boolean::Constant(false));
+        block_number_bits.resize(plasma_constants::FR_BIT_WIDTH, boolean::Boolean::Constant(false));
         block_number_bits.reverse();
         initial_hash_data.extend(block_number_bits.into_iter());
 
@@ -245,7 +245,7 @@ fn apply_request<E, CS>(
         cs.namespace(|| "into address bit decomposition")
     )?;
 
-    path_bits.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
+    path_bits.truncate(plasma_constants::BALANCE_TREE_DEPTH);
 
     let audit_path = allocate_audit_path(
         cs.namespace(|| "allocate audit path"), 
@@ -430,7 +430,7 @@ fn apply_request<E, CS>(
     let mut amount_bits = amount.into_bits_le(
         cs.namespace(|| "decompose deposit amount bits")
     )?;
-    amount_bits.truncate(params::BALANCE_BIT_WIDTH);
+    amount_bits.truncate(plasma_constants::BALANCE_BIT_WIDTH);
 
     let new_balance = AllocatedNum::alloc(
         cs.namespace(|| "new balance from"),
@@ -447,7 +447,7 @@ fn apply_request<E, CS>(
     // constraint no overflow
     new_balance.limit_number_of_bits(
         cs.namespace(|| "limit number of bits for new balance from"),
-        params::BALANCE_BIT_WIDTH
+        plasma_constants::BALANCE_BIT_WIDTH
     )?;
 
     // enforce increase of balance
@@ -468,7 +468,7 @@ fn apply_request<E, CS>(
     let mut pub_y_content_new = updated_pk.get_y().into_bits_le(
         cs.namespace(|| "updated pub_y bits")
     )?;
-    pub_y_content_new.resize(*plasma_constants::FR_BIT_WIDTH - 1, boolean::Boolean::Constant(false));
+    pub_y_content_new.resize(plasma_constants::FR_BIT_WIDTH - 1, boolean::Boolean::Constant(false));
 
     // make leaf
     {
@@ -481,7 +481,7 @@ fn apply_request<E, CS>(
             cs.namespace(|| "from leaf updated amount bits")
         )?;
 
-        value_content.truncate(*plasma_constants::BALANCE_BIT_WIDTH);
+        value_content.truncate(plasma_constants::BALANCE_BIT_WIDTH);
         leaf_content.extend(value_content.clone());
 
         leaf_content.extend(leaf.nonce_bits.clone());
@@ -490,9 +490,9 @@ fn apply_request<E, CS>(
 
         append_packed_public_key(& mut leaf_content, pub_x_content_new.clone(), pub_y_content_new.clone());
 
-        assert_eq!(leaf_content.len(), *plasma_constants::BALANCE_BIT_WIDTH 
-                                    + *plasma_constants::NONCE_BIT_WIDTH
-                                    + *plasma_constants::FR_BIT_WIDTH);
+        assert_eq!(leaf_content.len(), plasma_constants::BALANCE_BIT_WIDTH 
+                                    + plasma_constants::NONCE_BIT_WIDTH
+                                    + plasma_constants::FR_BIT_WIDTH);
 
         // Compute the hash of the from leaf
         leaf_hash = pedersen_hash::pedersen_hash(
@@ -554,7 +554,7 @@ fn apply_request<E, CS>(
     public_data.extend(amount_bits_be);
 
     let mut pub_bits_be = pub_y_content_new.clone();
-    assert_eq!(pub_bits_be.len(), *plasma_constants::FR_BIT_WIDTH - 1);
+    assert_eq!(pub_bits_be.len(), plasma_constants::FR_BIT_WIDTH - 1);
 
     assert_eq!(pub_x_content_new.len(), 1);
     pub_bits_be.extend(pub_x_content_new);
@@ -562,9 +562,9 @@ fn apply_request<E, CS>(
     pub_bits_be.reverse();
     public_data.extend(pub_bits_be);
 
-    assert_eq!(public_data.len(), params::BALANCE_TREE_DEPTH 
-                                    + params::BALANCE_BIT_WIDTH
-                                    + params::FR_BIT_WIDTH);
+    assert_eq!(public_data.len(), plasma_constants::BALANCE_TREE_DEPTH 
+                                    + plasma_constants::BALANCE_BIT_WIDTH
+                                    + plasma_constants::FR_BIT_WIDTH);
 
     Ok((cur, public_data))
 }
@@ -587,7 +587,8 @@ fn test_deposit_in_empty_leaf() {
     use rand::{SeedableRng, Rng, XorShiftRng, Rand};
     use sapling_crypto::circuit::test::*;
     use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
-    use crate::models::circuit::{AccountTree, Account};
+    // use crate::models::circuit::{AccountTree, Account};
+    use super::super::account_tree::{AccountTree, Account};
     use crypto::sha2::Sha256;
     use crypto::digest::Digest;
     use crate::circuit::utils::{encode_fs_into_fr, be_bit_vector_into_bytes};
@@ -599,13 +600,13 @@ fn test_deposit_in_empty_leaf() {
 
     let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
-    let tree_depth = params::BALANCE_TREE_DEPTH as u32;
+    let tree_depth = plasma_constants::BALANCE_TREE_DEPTH as u32;
     let mut tree = AccountTree::new(tree_depth);
     let initial_root = tree.root_hash();
     print!("Initial root = {}\n", initial_root);
 
     let capacity = tree.capacity();
-    assert_eq!(capacity, 1 << params::BALANCE_TREE_DEPTH);
+    assert_eq!(capacity, 1 << plasma_constants::BALANCE_TREE_DEPTH);
 
     let sender_sk = PrivateKey::<Bn256>(rng.gen());
     let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
@@ -755,7 +756,8 @@ fn test_deposit_into_existing_leaf() {
     use rand::{SeedableRng, Rng, XorShiftRng, Rand};
     use sapling_crypto::circuit::test::*;
     use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
-    use crate::models::circuit::{AccountTree, Account};
+    // use crate::models::circuit::{AccountTree, Account};
+    use super::super::account_tree::{AccountTree, Account};
     use crypto::sha2::Sha256;
     use crypto::digest::Digest;
     use crate::circuit::utils::{encode_fs_into_fr, be_bit_vector_into_bytes};
@@ -767,11 +769,11 @@ fn test_deposit_into_existing_leaf() {
 
     let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
-    let tree_depth = params::BALANCE_TREE_DEPTH as u32;
+    let tree_depth = plasma_constants::BALANCE_TREE_DEPTH as u32;
     let mut tree = AccountTree::new(tree_depth);
 
     let capacity = tree.capacity();
-    assert_eq!(capacity, 1 << params::BALANCE_TREE_DEPTH);
+    assert_eq!(capacity, 1 << plasma_constants::BALANCE_TREE_DEPTH);
 
     let sender_sk = PrivateKey::<Bn256>(rng.gen());
     let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);

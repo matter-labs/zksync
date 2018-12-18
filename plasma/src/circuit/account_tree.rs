@@ -7,10 +7,9 @@ use pairing::bn256::{Bn256, Fr};
 use sapling_crypto::alt_babyjubjub::{JubjubEngine, AltJubjubBn256, edwards::Point, PrimeOrder};
 
 use crate::primitives::{GetBits, GetBitsFixed};
-use crate::sparse_merkle_tree;
-use crate::sparse_merkle_tree::parallel_smt;
-use crate::sparse_merkle_tree::pedersen_hasher::PedersenHasher;
-use crate::models::params;
+use crate::merkle_tree::SparseMerkleTree;
+use crate::merkle_tree::PedersenHasher;
+use crate::models::params as plasma_constants;
 
 #[derive(Debug, Clone)]
 pub struct Leaf<E: JubjubEngine> {
@@ -23,9 +22,9 @@ pub struct Leaf<E: JubjubEngine> {
 impl<E: JubjubEngine> GetBits for Leaf<E> {
     fn get_bits_le(&self) -> Vec<bool> {
         let mut leaf_content = Vec::new();
-        leaf_content.extend(self.balance.get_bits_le_fixed(*plasma_constants::BALANCE_BIT_WIDTH));
-        leaf_content.extend(self.nonce.get_bits_le_fixed(*plasma_constants::NONCE_BIT_WIDTH));
-        leaf_content.extend(self.pub_y.get_bits_le_fixed(*plasma_constants::FR_BIT_WIDTH - 1));
+        leaf_content.extend(self.balance.get_bits_le_fixed(plasma_constants::BALANCE_BIT_WIDTH));
+        leaf_content.extend(self.nonce.get_bits_le_fixed(plasma_constants::NONCE_BIT_WIDTH));
+        leaf_content.extend(self.pub_y.get_bits_le_fixed(plasma_constants::FR_BIT_WIDTH - 1));
         leaf_content.extend(self.pub_x.get_bits_le_fixed(1));
 
         leaf_content
@@ -46,11 +45,11 @@ impl<E: JubjubEngine> Default for Leaf<E> {
 // code below is for testing
 
 pub type Account = Leaf<Bn256>;
-pub type AccountTree = sparse_merkle_tree::SparseMerkleTree<Account, Fr, PedersenHasher<Bn256>>;
+pub type AccountTree = SparseMerkleTree<Account, Fr, PedersenHasher<Bn256>>;
 
 impl AccountTree {
     pub fn verify_proof(&self, index: u32, item: Account, proof: Vec<(Fr, bool)>) -> bool {
-        use crate::sparse_merkle_tree::hasher::Hasher;
+        use crate::merkle_tree::hasher::Hasher;
         
         assert!(index < self.capacity());
         let item_bits = item.get_bits_le();
@@ -66,7 +65,6 @@ impl AccountTree {
                 // current is left
                 hash = self.hasher.compress(&hash, &e.0, i);
             }
-            // print!("This level hash is {}\n", hash);
         }
 
         if proof_index != index {

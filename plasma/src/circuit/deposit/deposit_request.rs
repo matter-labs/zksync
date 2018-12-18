@@ -39,7 +39,7 @@ use sapling_crypto::eddsa::{
 
 use sapling_crypto::alt_babyjubjub::*;
 
-use crate::models::params;
+use crate::models::params as plasma_constants;
 use crate::circuit::utils::{le_bit_vector_into_field_element};
 
 // This is deposit request
@@ -76,13 +76,13 @@ impl<E: JubjubEngine> DepositRequest<E> {
         // - compressed public key
         let mut into: Vec<bool> = BitIterator::new(self.into.clone().unwrap().into_repr()).collect();
         into.reverse();
-        into.truncate(params::BALANCE_TREE_DEPTH);
+        into.truncate(plasma_constants::BALANCE_TREE_DEPTH);
         // reverse again to have BE as in Ethereum native types
         into.reverse();
 
         let mut amount: Vec<bool> = BitIterator::new(self.amount.clone().unwrap().into_repr()).collect();
         amount.reverse();
-        amount.truncate(params::BALANCE_BIT_WIDTH);
+        amount.truncate(plasma_constants::BALANCE_BIT_WIDTH);
         // reverse again to have BE as in Ethereum native types
         amount.reverse();
 
@@ -91,7 +91,7 @@ impl<E: JubjubEngine> DepositRequest<E> {
         let mut y_bits: Vec<bool> = BitIterator::new(y.into_repr()).collect();
         y_bits.reverse();
         y_bits.truncate(E::Fr::NUM_BITS as usize);
-        y_bits.resize(params::FR_BIT_WIDTH - 1, false);
+        y_bits.resize(plasma_constants::FR_BIT_WIDTH - 1, false);
         // push sign bit
         y_bits.push(sign_bit);
         // reverse again to have BE as in Ethereum native types

@@ -8,8 +8,8 @@ use super::boolean;
 use super::num::{AllocatedNum, Num};
 use super::float_point::{parse_with_exponent_le, convert_to_float};
 use super::baby_eddsa::EddsaSignature;
-use super::plasma_constants;
 
+use crate::models::params as plasma_constants;
 use crate::circuit::utils::{le_bit_vector_into_field_element, allocate_audit_path, append_packed_public_key};
 
 #[derive(Clone)]
@@ -53,7 +53,7 @@ pub fn make_leaf_content<E, CS> (
         cs.namespace(|| "value bits")
     )?;
 
-    value_bits.truncate(*plasma_constants::BALANCE_BIT_WIDTH);
+    value_bits.truncate(plasma_constants::BALANCE_BIT_WIDTH);
     leaf_bits.extend(value_bits.clone());
 
     let nonce = AllocatedNum::alloc(
@@ -67,7 +67,7 @@ pub fn make_leaf_content<E, CS> (
         cs.namespace(|| "nonce bits")
     )?;
 
-    nonce_bits.truncate(*plasma_constants::NONCE_BIT_WIDTH);
+    nonce_bits.truncate(plasma_constants::NONCE_BIT_WIDTH);
     leaf_bits.extend(nonce_bits.clone());
 
     // we allocate (witness) public X and Y to use them also later for signature check
@@ -95,16 +95,16 @@ pub fn make_leaf_content<E, CS> (
     let mut pub_y_bits = pub_y.into_bits_le(
         cs.namespace(|| "pub_y bits")
     )?;
-    pub_y_bits.resize(*plasma_constants::FR_BIT_WIDTH - 1, boolean::Boolean::Constant(false));
+    pub_y_bits.resize(plasma_constants::FR_BIT_WIDTH - 1, boolean::Boolean::Constant(false));
 
     append_packed_public_key(& mut leaf_bits, pub_x_bit.clone(), pub_y_bits.clone());
 
     // leaf_bits.extend(pub_y_bits);
     // leaf_bits.extend(pub_x_bit);
 
-    assert_eq!(leaf_bits.len(), *plasma_constants::BALANCE_BIT_WIDTH 
-                                + *plasma_constants::NONCE_BIT_WIDTH
-                                + *plasma_constants::FR_BIT_WIDTH
+    assert_eq!(leaf_bits.len(), plasma_constants::BALANCE_BIT_WIDTH 
+                                + plasma_constants::NONCE_BIT_WIDTH
+                                + plasma_constants::FR_BIT_WIDTH
     );
 
     Ok(LeafContent {

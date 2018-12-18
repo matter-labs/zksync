@@ -7,8 +7,8 @@ use super::boolean;
 use super::num::{AllocatedNum, Num};
 use super::float_point::{parse_with_exponent_le, convert_to_float};
 use super::baby_eddsa::EddsaSignature;
-use super::plasma_constants;
 
+use crate::models::params as plasma_constants;
 
 // count a number of non-zero bits in a bit decomposition
 pub fn count_number_of_ones<E, CS>(
@@ -65,7 +65,7 @@ pub fn append_packed_public_key(
     y_bits: Vec<boolean::Boolean>,
 ) 
 {
-    assert_eq!(*plasma_constants::FR_BIT_WIDTH - 1, y_bits.len());
+    assert_eq!(plasma_constants::FR_BIT_WIDTH - 1, y_bits.len());
     assert_eq!(1, x_bits.len());
     content.extend(y_bits);
     content.extend(x_bits);

@@ -36,7 +36,7 @@ use sapling_crypto::eddsa::{
     PublicKey
 };
 
-use crate::circuit::plasma_constants;
+use crate::models::params as plasma_constants;
 use super::super::leaf::{LeafWitness, LeafContent, make_leaf_content};
 use crate::circuit::utils::{le_bit_vector_into_field_element, allocate_audit_path, append_packed_public_key};
 use super::exit_request::{ExitRequest};
@@ -208,7 +208,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Exit<'a, E> {
             cs.namespace(|| "unpack block number for hashing")
         )?;
 
-        block_number_bits.resize(params::FR_BIT_WIDTH, boolean::Boolean::Constant(false));
+        block_number_bits.resize(plasma_constants::FR_BIT_WIDTH, boolean::Boolean::Constant(false));
         block_number_bits.reverse();
         initial_hash_data.extend(block_number_bits.into_iter());
 
@@ -295,7 +295,7 @@ fn apply_request<E, CS>(
         cs.namespace(|| "address bit decomposition")
     )?;
 
-    path_bits.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
+    path_bits.truncate(plasma_constants::BALANCE_TREE_DEPTH);
 
     let audit_path = allocate_audit_path(
         cs.namespace(|| "allocate audit path"), 
@@ -404,8 +404,8 @@ fn apply_request<E, CS>(
     amount_bits_be.reverse();
     public_data.extend(amount_bits_be);
 
-    assert_eq!(public_data.len(), params::BALANCE_TREE_DEPTH 
-                                    + params::BALANCE_BIT_WIDTH);
+    assert_eq!(public_data.len(), plasma_constants::BALANCE_TREE_DEPTH 
+                                    + plasma_constants::BALANCE_BIT_WIDTH);
 
     Ok((cur, public_data))
 }
@@ -428,7 +428,8 @@ fn test_exit_from_existing_leaf() {
     use rand::{SeedableRng, Rng, XorShiftRng, Rand};
     use sapling_crypto::circuit::test::*;
     use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
-    use crate::models::circuit::{AccountTree, Account};
+    // use crate::models::circuit::{AccountTree, Account};
+    use super::super::account_tree::{AccountTree, Account};
     use crypto::sha2::Sha256;
     use crypto::digest::Digest;
     use crate::circuit::utils::{encode_fs_into_fr, be_bit_vector_into_bytes};
@@ -440,11 +441,11 @@ fn test_exit_from_existing_leaf() {
 
     let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
-    let tree_depth = params::BALANCE_TREE_DEPTH as u32;
+    let tree_depth = plasma_constants::BALANCE_TREE_DEPTH as u32;
     let mut tree = AccountTree::new(tree_depth);
 
     let capacity = tree.capacity();
-    assert_eq!(capacity, 1 << params::BALANCE_TREE_DEPTH);
+    assert_eq!(capacity, 1 << plasma_constants::BALANCE_TREE_DEPTH);
 
     let sender_sk = PrivateKey::<Bn256>(rng.gen());
     let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
@@ -505,7 +506,7 @@ fn test_exit_from_existing_leaf() {
         auth_path: path_from,
     };
 
-    let emptied_leaf = BabyLeaf {
+    let emptied_leaf = Account {
             balance:    Fr::zero(),
             nonce:      Fr::zero(),
             pub_x:      Fr::zero(),

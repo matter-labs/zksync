@@ -1,6 +1,6 @@
-mod pedersen_hasher;
-mod sequential_smt;
-mod hasher;
+pub mod pedersen_hasher;
+pub mod sequential_smt;
+pub mod hasher;
 
 pub type SparseMerkleTree<T, H, HH> = sequential_smt::SparseMerkleTree<T, H, HH>;
 pub type PedersenHasher<T> = pedersen_hasher::PedersenHasher<T>;

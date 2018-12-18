@@ -36,9 +36,10 @@ use sapling_crypto::eddsa::{
     PublicKey
 };
 
-use super::super::plasma_constants;
+use crate::models::params as plasma_constants;
 use crate::circuit::utils::{le_bit_vector_into_field_element, allocate_audit_path, append_packed_public_key};
 
+use crate::models::circuit::sig::{TransactionSignature};
 // This is transaction data
 
 #[derive(Clone)]
@@ -71,20 +72,20 @@ impl <E: JubjubEngine> Transaction<E> {
         // - fee
         let mut from: Vec<bool> = BitIterator::new(self.from.clone().unwrap().into_repr()).collect();
         from.reverse();
-        from.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
+        from.truncate(plasma_constants::BALANCE_TREE_DEPTH);
         // reverse again cause from and to are the only two fields that are kept BE
         from.reverse();
         let mut to: Vec<bool> = BitIterator::new(self.to.clone().unwrap().into_repr()).collect();
         to.reverse();
-        to.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
+        to.truncate(plasma_constants::BALANCE_TREE_DEPTH);
         // reverse again cause from and to are the only two fields that are kept BE
         to.reverse();
         let mut amount: Vec<bool> = BitIterator::new(self.amount.clone().unwrap().into_repr()).collect();
         amount.reverse();
-        amount.truncate(params::AMOUNT_EXPONENT_BIT_WIDTH + params::AMOUNT_MANTISSA_BIT_WIDTH);
+        amount.truncate(plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH + plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH);
         let mut fee: Vec<bool> = BitIterator::new(self.fee.clone().unwrap().into_repr()).collect();
         fee.reverse();
-        fee.truncate(params::FEE_EXPONENT_BIT_WIDTH + params::FEE_MANTISSA_BIT_WIDTH);
+        fee.truncate(plasma_constants::FEE_EXPONENT_BIT_WIDTH + plasma_constants::FEE_MANTISSA_BIT_WIDTH);
         
         let mut packed: Vec<bool> = vec![];
         packed.extend(from.into_iter());
@@ -113,27 +114,27 @@ impl <E: JubjubEngine> Transaction<E> {
         // LE from
         let mut from: Vec<bool> = BitIterator::new(self.from.clone().unwrap().into_repr()).collect();
         from.reverse();
-        from.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
+        from.truncate(plasma_constants::BALANCE_TREE_DEPTH);
         // LE to
         let mut to: Vec<bool> = BitIterator::new(self.to.clone().unwrap().into_repr()).collect();
         to.reverse();
-        to.truncate(*plasma_constants::BALANCE_TREE_DEPTH);
+        to.truncate(plasma_constants::BALANCE_TREE_DEPTH);
         // amount is encoded as float
         let mut amount: Vec<bool> = BitIterator::new(self.amount.clone().unwrap().into_repr()).collect();
         amount.reverse();
-        amount.truncate(*plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH + *plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH);
+        amount.truncate(plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH + plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH);
         // same for fee
         let mut fee: Vec<bool> = BitIterator::new(self.fee.clone().unwrap().into_repr()).collect();
         fee.reverse();
-        fee.truncate(*plasma_constants::FEE_EXPONENT_BIT_WIDTH + *plasma_constants::FEE_MANTISSA_BIT_WIDTH); 
+        fee.truncate(plasma_constants::FEE_EXPONENT_BIT_WIDTH + plasma_constants::FEE_MANTISSA_BIT_WIDTH); 
         // nonce is LE encoded
         let mut nonce: Vec<bool> = BitIterator::new(self.nonce.clone().unwrap().into_repr()).collect();
         nonce.reverse();
-        nonce.truncate(*plasma_constants::NONCE_BIT_WIDTH);
+        nonce.truncate(plasma_constants::NONCE_BIT_WIDTH);
         // LE good until block #
         let mut good_until_block: Vec<bool> = BitIterator::new(self.good_until_block.clone().unwrap().into_repr()).collect();
         good_until_block.reverse();
-        good_until_block.truncate(*plasma_constants::BLOCK_NUMBER_BIT_WIDTH);
+        good_until_block.truncate(plasma_constants::BLOCK_NUMBER_BIT_WIDTH);
 
         let mut packed: Vec<bool> = vec![];
 
@@ -180,14 +181,14 @@ impl <E: JubjubEngine> Transaction<E> {
 
         let message_bytes = self.data_as_bytes();
 
-        let max_message_len = params::BALANCE_TREE_DEPTH 
-                        + params::BALANCE_TREE_DEPTH 
-                        + params::AMOUNT_EXPONENT_BIT_WIDTH 
-                        + params::AMOUNT_MANTISSA_BIT_WIDTH
-                        + params::FEE_EXPONENT_BIT_WIDTH
-                        + params::FEE_MANTISSA_BIT_WIDTH
-                        + params::NONCE_BIT_WIDTH
-                        + params::BLOCK_NUMBER_BIT_WIDTH;
+        let max_message_len = plasma_constants::BALANCE_TREE_DEPTH 
+                        + plasma_constants::BALANCE_TREE_DEPTH 
+                        + plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH 
+                        + plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH
+                        + plasma_constants::FEE_EXPONENT_BIT_WIDTH
+                        + plasma_constants::FEE_MANTISSA_BIT_WIDTH
+                        + plasma_constants::NONCE_BIT_WIDTH
+                        + plasma_constants::BLOCK_NUMBER_BIT_WIDTH;
         
         let signature = private_key.sign_raw_message(
             &message_bytes, 

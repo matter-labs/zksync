@@ -46,7 +46,7 @@ use sapling_crypto::eddsa::{
 };
 
 use plasma::circuit::utils::*;
-use plasma::models::params;
+use plasma::models::params as plasma_constants;
 use plasma::circuit::transfer::transaction::{Transaction};
 use plasma::circuit::leaf::{LeafWitness};
 use plasma::circuit::transfer::circuit::{TransactionWitness, Transfer};
@@ -58,7 +58,7 @@ fn main() {
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &AltJubjubBn256::new();
     let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
-    let tree_depth = params::BALANCE_TREE_DEPTH as u32;
+    let tree_depth = plasma_constants::BALANCE_TREE_DEPTH as u32;
 
     let capacity: u32 = 1 << tree_depth;
 
@@ -112,8 +112,8 @@ fn main() {
 
     let transfer_amount_bits = convert_to_float(
         transfer_amount,
-        params::AMOUNT_EXPONENT_BIT_WIDTH,
-        params::AMOUNT_MANTISSA_BIT_WIDTH,
+        plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+        plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH,
         10
     ).unwrap();
 
@@ -123,8 +123,8 @@ fn main() {
 
     let fee_bits = convert_to_float(
         fee_amount,
-        params::FEE_EXPONENT_BIT_WIDTH,
-        params::FEE_MANTISSA_BIT_WIDTH,
+        plasma_constants::FEE_EXPONENT_BIT_WIDTH,
+        plasma_constants::FEE_MANTISSA_BIT_WIDTH,
         10
     ).unwrap();
 
@@ -359,9 +359,9 @@ fn main() {
 
     let empty_witness = TransactionWitness {
         leaf_from: empty_leaf_witness.clone(),
-        auth_path_from: vec![None; *plasma_constants::BALANCE_TREE_DEPTH],
+        auth_path_from: vec![None; plasma_constants::BALANCE_TREE_DEPTH],
         leaf_to: empty_leaf_witness,
-        auth_path_to: vec![None; *plasma_constants::BALANCE_TREE_DEPTH],
+        auth_path_to: vec![None; plasma_constants::BALANCE_TREE_DEPTH],
     };
 
     let instance_for_generation: Transfer<Bn256> = Transfer {

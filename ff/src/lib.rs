@@ -10,8 +10,8 @@ extern crate ff_derive;
 #[cfg(feature = "derive")]
 pub use ff_derive::*;
 
-#[cfg(feature = "asm")]
-pub use ff_asm::*;
+// #[cfg(feature = "asm")]
+// pub use ff_asm::*;
 
 use std::error::Error;
 use std::fmt;
