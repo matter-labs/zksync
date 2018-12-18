@@ -16,7 +16,7 @@ use pairing::{Engine};
 use rand::{SeedableRng, Rng, XorShiftRng};
 use sapling_crypto::circuit::test::*;
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
-use plasma::models::plasma_models::{AccountTree, Account};
+use plasma::models::circuit::{AccountTree, Account};
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
 use std::collections::HashMap;

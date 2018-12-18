@@ -1,7 +1,7 @@
 use std::sync::mpsc::{channel, Sender, Receiver};
 use crate::eth_client::{ETHClient, PROD_PLASMA};
 use web3::types::{U256, U128, H256};
-use crate::models::plasma_models::{TxBlock, Account};
+use crate::models::{TransferBlock, Account};
 use super::prover::BabyProver;
 
 use crate::primitives::{serialize_fe_for_ethereum};
@@ -61,7 +61,7 @@ pub fn run_eth_sender() -> Sender<EthereumTx> {
     tx_for_eth
 }
 
-pub fn run_commitment_pipeline(rx_for_commitments: Receiver<TxBlock>, tx_for_eth: Sender<EthereumTx>) {
+pub fn run_commitment_pipeline(rx_for_commitments: Receiver<TransferBlock>, tx_for_eth: Sender<EthereumTx>) {
 
     for block in rx_for_commitments {
         

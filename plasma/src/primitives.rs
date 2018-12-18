@@ -18,6 +18,7 @@ pub trait GetBitsFixed {
     fn get_bits_le_fixed(&self, n: usize) -> Vec<bool>;
 }
 
+
 impl<Fr: PrimeField> GetBitsFixed for Fr {
 
     fn get_bits_le_fixed(&self, n: usize) -> Vec<bool> {

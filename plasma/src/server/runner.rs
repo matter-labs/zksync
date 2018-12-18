@@ -8,19 +8,18 @@ use super::committer::{self, Commitment, BlockProof};
 use super::mem_pool::MemPool;
 use super::eth_watch::EthWatch;
 
-use crate::models::plasma_models::{Block, TxBlock};
+use crate::models::{Block, TransferBlock, TransferTx};
 
-use crate::models::tx::TxUnpacked;
 use crate::primitives::serialize_fe_for_ethereum;
 
 pub fn run() {
 
     // create channel to accept deserialized requests for new transacitons
 
-    let (tx_for_tx, rx_for_tx) = channel::<TxUnpacked>();
+    let (tx_for_tx, rx_for_tx) = channel::<TransferTx>();
     let (tx_for_blocks, rx_for_blocks) = channel::<BlockProcessingRequest>();
     let (tx_for_proof_requests, rx_for_proof_requests) = channel::<Block>();
-    let (tx_for_commitments, rx_for_commitments) = channel::<TxBlock>();
+    let (tx_for_commitments, rx_for_commitments) = channel::<TransferBlock>();
     let (tx_for_proofs, rx_for_proofs) = channel::<BlockProof>();
 
     let mut mem_pool = MemPool::new();

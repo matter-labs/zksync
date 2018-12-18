@@ -1,5 +1,5 @@
 use std::sync::mpsc::Sender;
-use crate::models::plasma_models::{Block};
+use crate::models::{Block};
 use super::state_keeper::BlockProcessingRequest;
 
 pub struct EthWatch {

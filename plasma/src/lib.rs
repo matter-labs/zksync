@@ -38,11 +38,15 @@ extern crate actix_web;
 
 #[macro_use]
 extern crate serde_derive;
+extern crate serde_bytes;
 
 #[macro_use]
 extern crate diesel;
 extern crate dotenv;
 extern crate bigdecimal;
+
+#[macro_use]
+extern crate smart_default;
 
 pub mod primitives;
 pub mod merkle_tree;

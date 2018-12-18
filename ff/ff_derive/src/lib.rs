@@ -1036,6 +1036,12 @@ fn prime_field_impl(
             }
         }
 
+        impl std::default::Default for #name {
+            fn default() -> Self {
+                Self::zero()
+            }
+        }
+
         impl #name {
             /// Determines if the element is really in the field. This is only used
             /// internally.

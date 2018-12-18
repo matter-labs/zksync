@@ -1,59 +1,62 @@
-use ff::{
-    PrimeField,
-    Field,
-    BitIterator,
-    PrimeFieldRepr
-};
+use sapling_crypto::alt_babyjubjub::{JubjubEngine};
+use ff::{Field, PrimeField, BitIterator};
+use sapling_crypto::eddsa::{PrivateKey, PublicKey};
+use sapling_crypto::jubjub::{FixedGenerators, Unknown, edwards};
+use crate::models::params;
+use crate::circuit::utils::{le_bit_vector_into_field_element};
+use sapling_crypto::circuit::float_point::{convert_to_float}; // TODO: move to primitives
 
-use bellman::{
-    SynthesisError,
-    ConstraintSystem,
-    Circuit
-};
+use super::sig::TransactionSignature;
 
-use sapling_crypto::jubjub::{
-    JubjubEngine,
-    FixedGenerators,
-    Unknown,
-    edwards,
-    JubjubParams
-};
+/// Packed transaction data
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Tx<E: JubjubEngine> {
+    pub from:               E::Fr,
+    pub to:                 E::Fr,
+    pub amount:             E::Fr, // packed, TODO: document it here
+    pub fee:                E::Fr, // packed
+    pub nonce:              E::Fr,
+    pub good_until_block:   E::Fr,
 
-use super::Assignment;
-use super::boolean;
-use super::ecc;
-use super::pedersen_hash;
-use super::sha256;
-use super::num;
-use super::multipack;
-use super::num::{AllocatedNum, Num};
-use super::float_point::{parse_with_exponent_le, convert_to_float};
-use super::baby_eddsa::EddsaSignature;
-
-use sapling_crypto::eddsa::{
-    Signature,
-    PrivateKey,
-    PublicKey
-};
-
-use crate::models::{params, circuit::sig::TransactionSignature};
-use crate::circuit::utils::le_bit_vector_into_field_element;
-
-// This is transaction data
-
-#[derive(Clone)]
-pub struct Transaction<E: JubjubEngine> {
-    pub from: Option<E::Fr>,
-    pub to: Option<E::Fr>,
-    pub amount: Option<E::Fr>,
-    pub fee: Option<E::Fr>,
-    pub nonce: Option<E::Fr>,
-    pub good_until_block: Option<E::Fr>,
-    pub signature: Option<TransactionSignature<E>>
+    #[serde(bound = "")]
+    pub signature:          TransactionSignature<E>,
 }
 
+impl<E: JubjubEngine> Tx<E> {
 
-impl <E: JubjubEngine> Transaction<E> {
+    // TODO: introduce errors if necessary
+    pub fn try_from(transaction: &crate::models::TransferTx) -> Result<Self, String> {
+
+        let encoded_amount_bits = convert_to_float(
+            transaction.amount,
+            params::AMOUNT_EXPONENT_BIT_WIDTH, 
+            params::AMOUNT_MANTISSA_BIT_WIDTH, 
+            10
+        ).map_err(|e| format!("wrong amount encoding: {}", e.to_string()))?;
+        let encoded_amount: E::Fr = le_bit_vector_into_field_element(&encoded_amount_bits);
+
+        // TODO: encode fee
+        let encoded_fee = E::Fr::zero();
+
+        let tx = Self {
+            // TODO: these conversions are ugly and inefficient, replace with idiomatic std::convert::From trait
+            from:               E::Fr::from_str(&transaction.from.to_string()).unwrap(),
+            to:                 E::Fr::from_str(&transaction.to.to_string()).unwrap(),
+            amount:             encoded_amount,
+            fee:                encoded_fee,
+            nonce:              E::Fr::from_str(&transaction.good_until_block.to_string()).unwrap(),
+            good_until_block:   E::Fr::from_str(&transaction.good_until_block.to_string()).unwrap(),
+
+            // TODO: decode signature
+            signature:          TransactionSignature::empty(),
+        };
+
+        Ok(tx)
+    }
+
+}
+
+impl <E: JubjubEngine> Tx<E> {
     pub fn public_data_into_bits(
         &self
     ) -> Vec<bool> {
@@ -62,16 +65,16 @@ impl <E: JubjubEngine> Transaction<E> {
         // - to
         // - amount
         // - fee
-        let mut from: Vec<bool> = BitIterator::new(self.from.clone().unwrap().into_repr()).collect();
+        let mut from: Vec<bool> = BitIterator::new(self.from.into_repr()).collect();
         from.reverse();
         from.truncate(params::BALANCE_TREE_DEPTH);
-        let mut to: Vec<bool> = BitIterator::new(self.to.clone().unwrap().into_repr()).collect();
+        let mut to: Vec<bool> = BitIterator::new(self.to.into_repr()).collect();
         to.reverse();
         to.truncate(params::BALANCE_TREE_DEPTH);
-        let mut amount: Vec<bool> = BitIterator::new(self.amount.clone().unwrap().into_repr()).collect();
+        let mut amount: Vec<bool> = BitIterator::new(self.amount.into_repr()).collect();
         amount.reverse();
         amount.truncate(params::AMOUNT_EXPONENT_BIT_WIDTH + params::AMOUNT_MANTISSA_BIT_WIDTH);
-        let mut fee: Vec<bool> = BitIterator::new(self.fee.clone().unwrap().into_repr()).collect();
+        let mut fee: Vec<bool> = BitIterator::new(self.fee.into_repr()).collect();
         fee.reverse();
         fee.truncate(params::FEE_EXPONENT_BIT_WIDTH + params::FEE_MANTISSA_BIT_WIDTH);
         
@@ -94,10 +97,10 @@ impl <E: JubjubEngine> Transaction<E> {
         // - fee
         // - nonce
         // - good_until_block
-        let mut nonce: Vec<bool> = BitIterator::new(self.nonce.clone().unwrap().into_repr()).collect();
+        let mut nonce: Vec<bool> = BitIterator::new(self.nonce.into_repr()).collect();
         nonce.reverse();
         nonce.truncate(params::NONCE_BIT_WIDTH);
-        let mut good_until_block: Vec<bool> = BitIterator::new(self.good_until_block.clone().unwrap().into_repr()).collect();
+        let mut good_until_block: Vec<bool> = BitIterator::new(self.good_until_block.into_repr()).collect();
         good_until_block.reverse();
         good_until_block.truncate(params::BLOCK_NUMBER_BIT_WIDTH);
         let mut packed: Vec<bool> = vec![];
@@ -174,18 +177,12 @@ impl <E: JubjubEngine> Transaction<E> {
 
         let sigs_converted = le_bit_vector_into_field_element(&sigs_le_bits);
 
-        // let mut sigs_bytes = [0u8; 32];
-        // signature.s.into_repr().write_le(& mut sigs_bytes[..]).expect("get LE bytes of signature S");
-        // let mut sigs_repr = E::Fr::zero().into_repr();
-        // sigs_repr.read_le(&sigs_bytes[..]).expect("interpret S as field element representation");
-        // let sigs_converted = E::Fr::from_repr(sigs_repr).unwrap();
-
         let converted_signature = TransactionSignature {
             r: signature.r,
             s: sigs_converted
         };
 
-        self.signature = Some(converted_signature);
+        self.signature = converted_signature;
 
     }
 }

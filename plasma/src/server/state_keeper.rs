@@ -10,8 +10,7 @@ use ff::{Field, PrimeField};
 use rand::{OsRng};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 
-use crate::models::plasma_models::{Block, TxBlock, Account, Tx, AccountTree, TransactionSignature, PlasmaState};
-use crate::models::tx::TxUnpacked;
+use crate::models::{Block, TransferBlock, Account, TransferTx, AccountTree, TxSignature, PlasmaState};
 use super::committer::Commitment;
 
 use crate::models::params;
@@ -23,7 +22,7 @@ use fnv::FnvHashMap;
 pub enum BlockSource {
     // MemPool will provide a channel to return result of block processing
     // In case of error, block is returned with invalid transactions removed
-    MemPool(Sender<Result<(),TxBlock>>),
+    MemPool(Sender<Result<(),TransferBlock>>),
 
     // EthWatch doesn't need a result channel because block must always be processed
     EthWatch,
@@ -57,7 +56,7 @@ impl PlasmaStateKeeper {
         let params = &AltJubjubBn256::new();
         let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
-        let default_balance_string = "1000000";
+        let default_balance = 1000000;
 
         for i in 0..number_of_accounts {
             let leaf_number: u32 = i;
@@ -69,8 +68,8 @@ impl PlasmaStateKeeper {
             keys_map.insert(i, sk);
 
             let leaf = Account {
-                balance:    Fr::from_str(default_balance_string).unwrap(),
-                nonce:      Fr::zero(),
+                balance:    default_balance,
+                nonce:      0,
                 pub_x:      x,
                 pub_y:      y,
             };
@@ -106,7 +105,7 @@ impl PlasmaStateKeeper {
 
     pub fn run(&mut self, 
         rx_for_blocks: Receiver<BlockProcessingRequest>, 
-        tx_for_commitments: Sender<TxBlock>,
+        tx_for_commitments: Sender<TransferBlock>,
         tx_for_proof_requests: Sender<Block>)
     {
         for req in rx_for_blocks {
@@ -114,11 +113,11 @@ impl PlasmaStateKeeper {
             match block {
                 Block::Deposit(_) => unimplemented!(),
                 Block::Exit(_) => unimplemented!(),
-                Block::Tx(mut block) => {
+                Block::Transfer(mut block) => {
                     let applied = self.apply_block_tx(&mut block);
                     let r = if applied.is_ok() {
                         tx_for_commitments.send(block.clone());
-                        tx_for_proof_requests.send(Block::Tx(block));
+                        tx_for_proof_requests.send(Block::Transfer(block));
                         Ok(())
                     } else {
                         Err(block)
@@ -136,31 +135,29 @@ impl PlasmaStateKeeper {
         self.state.balance_tree.items.get(&index).unwrap().clone()
     }
 
-    fn apply_block_tx(&mut self, block: &mut TxBlock) -> Result<(), ()> {
+    fn apply_block_tx(&mut self, block: &mut TransferBlock) -> Result<(), ()> {
 
         block.block_number = self.state.block_number;
 
         // update state with verification
         // for tx in block: self.state.apply(transaction)?;
 
-        let transactions: Vec<Tx> = block.transactions.clone()
+        let transactions: Vec<TransferTx> = block.transactions.clone()
             .into_iter()
             .map(|tx| self.augument_and_sign(tx))
             .collect();
 
         let mut save_state = FnvHashMap::<u32, Account>::default();
 
-        let transactions: Vec<Tx> = transactions
+        let transactions: Vec<TransferTx> = transactions
             .into_iter()
             .filter(|tx| {
 
                 // save state
-                let from_idx = field_element_to_u32(tx.from);
-                let from = self.account(from_idx);
-                save_state.insert(from_idx, from);
-                let to_idx = field_element_to_u32(tx.to);
-                let to = self.account(to_idx);
-                save_state.insert(to_idx, to);
+                let from = self.account(tx.from);
+                save_state.insert(tx.from, from);
+                let to = self.account(tx.to);
+                save_state.insert(tx.to, to);
 
                 self.state.apply(&tx).is_ok()
             })
@@ -180,24 +177,25 @@ impl PlasmaStateKeeper {
     }
 
     // augument and sign transaction (for demo only; TODO: remove this!)
-    fn augument_and_sign(&self, mut transaction: Tx) -> Tx {
-        let from_account = field_element_to_u32(transaction.from);
-        let from = self.state.balance_tree.items.get(&from_account).unwrap().clone();
-        let mut tx = transaction.clone();
-        transaction.nonce = from.nonce;
-        transaction.good_until_block = Fr::from_str(&self.state.block_number.to_string()).unwrap();;
+    fn augument_and_sign(&self, mut tx: TransferTx) -> TransferTx {
 
-        let sk = self.private_keys.get(&from_account).unwrap();
+        let from = self.state.balance_tree.items.get(&tx.from).unwrap().clone();
+        tx.nonce = from.nonce;
+        tx.good_until_block = self.state.block_number;
+
+        let sk = self.private_keys.get(&tx.from).unwrap();
         Self::sign_tx(&mut tx, sk);
         tx
     }
 
     // TODO: remove this function when done with demo
-    fn sign_tx(tx: &mut Tx, sk: &PrivateKey<Bn256>) {
+    fn sign_tx(tx: &mut TransferTx, sk: &PrivateKey<Bn256>) {
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let mut rng = OsRng::new().unwrap();
-        tx.sign(sk, p_g, &params, &mut rng);
+
+        unimplemented!()
+        //tx.sign(sk, p_g, &params, &mut rng);
     }
 
 }

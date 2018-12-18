@@ -46,3 +46,8 @@ fn test_fr_deserialize() {
 fn test_roots_of_unity() {
     assert_eq!(Fr::S, 28);
 }
+
+#[test]
+fn test_default() {
+    assert_eq!(Fr::default(), Fr::zero());
+}

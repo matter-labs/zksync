@@ -1,34 +1,40 @@
-use sapling_crypto::alt_babyjubjub::{JubjubEngine};
-use ff::{Field};
-use crate::models::params;
 use crate::primitives::{GetBits, GetBitsFixed};
+use bigdecimal::BigDecimal;
+use super::circuit;
 
-#[derive(Debug, Clone, Queryable, Serialize, Deserialize)]
-pub struct Account<E: JubjubEngine> {
-    pub balance:    E::Fr,
-    pub nonce:      E::Fr,
-    pub pub_x:      E::Fr,
-    pub pub_y:      E::Fr,
+use super::{Engine, Fr, FieldBytes};
+
+#[derive(Debug, Clone, Default, Queryable, Serialize, Deserialize)]
+pub struct Account {
+    pub balance:    u128,
+    pub nonce:      u32,
+    pub pub_x:      FieldBytes,
+    pub pub_y:      FieldBytes,
 }
 
-impl<E: JubjubEngine> GetBits for Account<E> {
+impl GetBits for Account {
     fn get_bits_le(&self) -> Vec<bool> {
         let mut leaf_content = Vec::new();
-        leaf_content.extend(self.balance.get_bits_le_fixed(params::BALANCE_BIT_WIDTH));
-        leaf_content.extend(self.nonce.get_bits_le_fixed(params::NONCE_BIT_WIDTH));
-        leaf_content.extend(self.pub_x.get_bits_le_fixed(params::FR_BIT_WIDTH));
-        leaf_content.extend(self.pub_y.get_bits_le_fixed(params::FR_BIT_WIDTH));
+
+        // TODO: implement and test
+        unimplemented!();
+
+        // leaf_content.extend(self.balance.get_bits_le_fixed(params::BALANCE_BIT_WIDTH));
+        // leaf_content.extend(self.nonce.get_bits_le_fixed(params::NONCE_BIT_WIDTH));
+        // leaf_content.extend(self.pub_x.get_bits_le_fixed(params::FR_BIT_WIDTH));
+        // leaf_content.extend(self.pub_y.get_bits_le_fixed(params::FR_BIT_WIDTH));
+        
         leaf_content
     }
 }
 
-impl<E: JubjubEngine> Default for Account<E> {
-    fn default() -> Self{
-        Self {
-            balance:    E::Fr::zero(),
-            nonce:      E::Fr::zero(),
-            pub_x:      E::Fr::zero(),
-            pub_y:      E::Fr::zero(),
-        }
-    }
-}
+// impl std::convert::Into<circuit::Account<Engine>> for Account {
+//     fn into(self) -> circuit::Account<Engine> {
+//         self::circuit::Account::<Engine>{
+//             balance:    Fr::from(self.balance),
+//             nonce:      Fr::from(self.nonce),
+//             pub_x:      self.pub_x,
+//             pub_y:      self.pub_y,
+//         }
+//     }
+// }

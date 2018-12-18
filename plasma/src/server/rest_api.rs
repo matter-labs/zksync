@@ -1,7 +1,7 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
 use std::sync::mpsc;
-use crate::models::tx::TxUnpacked;
+use crate::models::TransferTx;
 
 use actix_web::{
     middleware, 
@@ -34,10 +34,10 @@ struct TransactionResponse {
 // singleton to keep info about channels required for Http server
 #[derive(Clone)]
 pub struct AppState {
-    tx_for_tx: mpsc::Sender<TxUnpacked>,
+    tx_for_tx: mpsc::Sender<TransferTx>,
 }
 
-fn verify_sig(tx: &TxUnpacked) -> bool {
+fn verify_sig(tx: &TransferTx) -> bool {
     // TODO: implement
     true
 }
@@ -46,17 +46,17 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
     let tx_for_tx = req.state().tx_for_tx.clone();
     req.json()
         .from_err() // convert all errors into `Error`
-        .and_then(move |val: TransactionRequest| {
-            let tx = TxUnpacked {
-                from: val.from,
-                to: val.to,
-                amount: val.amount,
-                fee: 0,
-                nonce: 0,
-                good_until_block: 100,
-                sig_r: "".to_owned(),
-                sig_s: "".to_owned(),
-            };
+        .and_then(move |tx: TransferTx| {
+            // let tx = TransferTx {
+            //     from: val.from,
+            //     to: val.to,
+            //     amount: val.amount,
+            //     fee: 0,
+            //     nonce: 0,
+            //     good_until_block: 100,
+            //     sig_r: "".to_owned(),
+            //     sig_s: "".to_owned(),
+            // };
             let accepted = verify_sig(&tx);
             if accepted {
                 tx_for_tx.send(tx); // pass to mem_pool
@@ -69,7 +69,7 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
         .responder()
 }
 
-pub fn run_api_server(tx_for_tx: mpsc::Sender<TxUnpacked>) {
+pub fn run_api_server(tx_for_tx: mpsc::Sender<TransferTx>) {
 
     ::std::env::set_var("RUST_LOG", "actix_web=info");
     let sys = actix::System::new("ws-example");
