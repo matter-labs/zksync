@@ -17,6 +17,7 @@ use rand::{SeedableRng, Rng, XorShiftRng};
 
 use std::sync::mpsc::{Sender, Receiver};
 use fnv::FnvHashMap;
+use bigdecimal::BigDecimal;
 
 pub enum BlockSource {
     // MemPool will provide a channel to return result of block processing
@@ -55,7 +56,7 @@ impl PlasmaStateKeeper {
         let params = &AltJubjubBn256::new();
         let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
-        let default_balance = 1000000;
+        let default_balance = BigDecimal::from(1000000);
 
         for i in 0..number_of_accounts {
             let leaf_number: u32 = i;
@@ -67,7 +68,7 @@ impl PlasmaStateKeeper {
             keys_map.insert(i, sk);
 
             let leaf = Account {
-                balance:    default_balance,
+                balance:    default_balance.clone(),
                 nonce:      0,
                 pub_x:      x,
                 pub_y:      y,
@@ -82,10 +83,13 @@ impl PlasmaStateKeeper {
 
     pub fn new() -> Self {
 
+        println!("constructing state keeper instance");
+
         // here we should insert default accounts into the tree
         let tree_depth = params::BALANCE_TREE_DEPTH as u32;
         let balance_tree = AccountTree::new(tree_depth);
 
+        println!("generating demo accounts");
         let (balance_tree, keys_map) = Self::generate_demo_accounts(balance_tree);
 
         let keeper = PlasmaStateKeeper {
@@ -97,7 +101,7 @@ impl PlasmaStateKeeper {
         };
 
         let root = keeper.state.root_hash();
-        println!("Created state keeper, root hash = {}", root);
+        println!("created state keeper, root hash = {}", root);
 
         keeper
     }

@@ -30,6 +30,8 @@ pub fn run() {
     // spawn threads for different processes
     // see https://docs.google.com/drawings/d/16UeYq7cuZnpkyMWGrgDAbmlaGviN2baY1w1y745Me70/edit?usp=sharing
 
+    println!("starting actors");
+
     thread::spawn(move || {
         run_api_server(tx_for_tx);
     });

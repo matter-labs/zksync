@@ -6,7 +6,7 @@ use super::{Engine, Fr, FieldBytes};
 
 #[derive(Debug, Clone, Default, Queryable, Serialize, Deserialize)]
 pub struct Account {
-    pub balance:    u128,
+    pub balance:    BigDecimal,
     pub nonce:      u32,
     pub pub_x:      FieldBytes,
     pub pub_y:      FieldBytes,
@@ -26,4 +26,10 @@ impl GetBits for Account {
         // leaf_content.extend(self.pub_y.get_bits_le_fixed(params::FR_BIT_WIDTH));
         // leaf_content
     }
+}
+
+#[test]
+fn test_default_account() {
+    let a = Account::default();
+    let bits = a.get_bits_le();
 }

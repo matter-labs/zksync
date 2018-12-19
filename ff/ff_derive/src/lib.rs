@@ -1086,7 +1086,6 @@ fn prime_field_impl(
                 let mut buf = hex::decode(&value).map_err(|_| format!("could not decode hex: {}", value))?;
                 buf.reverse();
                 buf.resize(#limbs * 8, 0);
-                println!("size = {}, buf = {:?}", buf.len(), buf);
                 let mut repr = #repr::default();
                 repr.read_le(&buf[..]).map_err(|e| format!("could not read {}: {}", value, &e))?;
                 #name::from_repr(repr).map_err(|e| format!("could not convert into prime field: {}: {}", value, &e))

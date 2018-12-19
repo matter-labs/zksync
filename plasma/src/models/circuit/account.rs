@@ -14,10 +14,10 @@ pub struct Account<E: JubjubEngine> {
 impl<E: JubjubEngine> std::default::Default for Account<E> {
     fn default() -> Self{
         Self{
-            balance: E::Fr::zero(),
-            nonce: E::Fr::zero(),
-            pub_x: E::Fr::zero(),
-            pub_y: E::Fr::zero(),
+            balance:    E::Fr::zero(),
+            nonce:      E::Fr::zero(),
+            pub_x:      E::Fr::zero(),
+            pub_y:      E::Fr::zero(),
         }
     }
 }
@@ -34,14 +34,17 @@ impl<E: JubjubEngine> GetBits for Account<E> {
     }
 }
 
-impl<E: JubjubEngine> std::convert::From<crate::models::Account> for Account<E> {
+// TODO: this is ugly; the correct way is to introduce Serialize/Deserialize interface into JubjubEngine::Fr
+// this requires deduplication of JubjubEngines
+impl std::convert::From<crate::models::Account> for Account<pairing::bn256::Bn256> {
 
     fn from(a: crate::models::Account) -> Self {
+        use pairing::bn256::Fr;
         Self{
-            balance:    E::Fr::from_str(&a.balance.to_string()).unwrap(),
-            nonce:      E::Fr::from_str(&a.nonce.to_string()).unwrap(),
-            pub_x:      E::Fr::from_str(&a.pub_x.into_repr().to_string()).unwrap(),
-            pub_y:      E::Fr::from_str(&a.pub_y.into_repr().to_string()).unwrap(),
+            balance:    Fr::from_str(&a.balance.to_string()).unwrap(),
+            nonce:      Fr::from_str(&a.nonce.to_string()).unwrap(),
+            pub_x:      Fr::from_hex(&a.pub_x.to_hex()).unwrap(),
+            pub_y:      Fr::from_hex(&a.pub_y.to_hex()).unwrap(),
         }
     }
 

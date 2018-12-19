@@ -436,7 +436,7 @@ use std::env;
 fn verbose_flag() -> bool {
     unsafe {
         if VERBOSE_SWITCH < 0 {
-            VERBOSE_SWITCH = FromStr::from_str(&env::var("BELLMAN_VERBOSE").unwrap_or(String::new())).unwrap_or(0);
+            VERBOSE_SWITCH = FromStr::from_str(&env::var("BELLMAN_VERBOSE").unwrap_or(String::new())).unwrap_or(1);
         }
         match VERBOSE_SWITCH {
             1 => true,
