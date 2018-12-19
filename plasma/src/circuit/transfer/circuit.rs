@@ -37,7 +37,8 @@ use sapling_crypto::eddsa::{
 };
 
 use crate::models::params as plasma_constants;
-use super::super::leaf::{LeafWitness, LeafContent, make_leaf_content};
+pub use super::super::leaf::LeafWitness;
+use super::super::leaf::{LeafContent, make_leaf_content};
 use crate::circuit::utils::{le_bit_vector_into_field_element, allocate_audit_path, append_packed_public_key, count_number_of_ones};
 use super::transaction::{Transaction, TransactionContent};
 use crate::models::circuit::sig::TransactionSignature;

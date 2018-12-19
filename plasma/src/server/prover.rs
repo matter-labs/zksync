@@ -22,7 +22,7 @@ use super::committer::{self, EncodedProof, BlockProof};
 
 use super::super::circuit::utils::be_bit_vector_into_bytes;
 use super::super::circuit::transfer::transaction::{Transaction};
-use super::super::circuit::transfer::circuit::{Transfer, TransactionWitness};
+use super::super::circuit::transfer::circuit::{Transfer, TransactionWitness, LeafWitness};
 use super::super::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum, field_element_to_u32};
 
 use web3::types::{U256};
@@ -223,7 +223,7 @@ impl BabyProver {
             return Err(BabyProverErr::Unknown);
         }
 
-        let mut witnesses: Vec<Option<(Transaction<Bn256>, TransactionWitness<Bn256>)>> = vec![];
+        let mut witnesses: Vec<(Transaction<Bn256>, TransactionWitness<Bn256>)> = vec![];
 
         let mut total_fees = Fr::zero();
 
@@ -311,22 +311,26 @@ impl BabyProver {
 
                 let recipient_leaf = recipient_leaf.unwrap();
 
-                let transaction_witness = TransactionWitness {
-                    auth_path_from: path_from,
-                    balance_from: Some(sender_leaf.balance),
-                    nonce_from: Some(sender_leaf.nonce),
-                    pub_x_from: Some(sender_leaf.pub_x),
-                    pub_y_from: Some(sender_leaf.pub_y),
-                    auth_path_to: path_to,
-                    balance_to: Some(recipient_leaf.balance),
-                    nonce_to: Some(recipient_leaf.nonce),
-                    pub_x_to: Some(recipient_leaf.pub_x),
-                    pub_y_to: Some(recipient_leaf.pub_y)
+                let transaction_witness = TransactionWitness::<Bn256>{
+                    auth_path_from:     path_from,
+                    leaf_from:          LeafWitness::<Bn256>{
+                                            balance:    Some(sender_leaf.balance),
+                                            nonce:      Some(sender_leaf.nonce),
+                                            pub_x:      Some(sender_leaf.pub_x),
+                                            pub_y:      Some(sender_leaf.pub_y),
+                                        },
+                    auth_path_to:       path_to,
+                    leaf_to:            LeafWitness::<Bn256>{
+                                            balance:    Some(recipient_leaf.balance),
+                                            nonce:      Some(recipient_leaf.nonce),
+                                            pub_x:      Some(recipient_leaf.pub_x),
+                                            pub_y:      Some(recipient_leaf.pub_y),
+                                        },                                        
                 };
 
                 let witness = (transaction.clone(), transaction_witness);
 
-                witnesses.push(Some(witness));
+                witnesses.push(witness);
             }
 
             let intermediate_root = tree.root_hash();
