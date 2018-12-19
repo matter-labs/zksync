@@ -24,18 +24,3 @@ impl<E: JubjubEngine> TransactionSignature<E> {
         }
     }
 }
-
-impl<E: JubjubEngine> TransactionSignature<E> {
-    pub fn try_from(
-        sig: crate::models::tx::TxSignature,
-        params: &E::Params
-    ) -> Result<Self, String> {
-        let r = edwards::Point::from_xy(sig.r_x, sig.r_y, params).expect("make R point");
-        let s = sig.s;
-        
-        Ok(Self{
-            r: r,
-            s: s,
-        })
-    }
-}

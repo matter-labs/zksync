@@ -210,7 +210,7 @@ impl PlasmaStateKeeper {
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let mut rng = OsRng::new().unwrap();
 
-        let mut tx_fr = models::circuit::TransferTx::try_from(tx, &params::JUBJUB_PARAMS).unwrap();
+        let mut tx_fr = models::circuit::TransferTx::try_from(tx).unwrap();
         tx_fr.sign(sk, p_g, &params::JUBJUB_PARAMS, &mut rng);
 
         let (x, y) = tx_fr.signature.r.into_xy();

@@ -42,14 +42,11 @@ impl std::convert::From<crate::models::Account> for Account<pairing::bn256::Bn25
         use pairing::bn256::Fr;
         use crate::primitives::{unpack_edwards_point};
 
-        let public_key = unpack_edwards_point::<pairing::bn256::Bn256>(a.public_key, &params::JUBJUB_PARAMS).unwrap();
-        let (x, y) = public_key.into_xy();
-
         Self{
             balance:    Fr::from_str(&a.balance.to_string()).unwrap(),
             nonce:      Fr::from_str(&a.nonce.to_string()).unwrap(),
-            pub_x:      x,
-            pub_y:      y,
+            pub_x:      a.public_key_x,
+            pub_y:      a.public_key_y,
         }
     }
 

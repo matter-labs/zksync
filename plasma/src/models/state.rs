@@ -2,6 +2,7 @@ use bigdecimal::BigDecimal;
 use super::*;
 use crate::primitives::{unpack_edwards_point};
 use crate::models::params;
+use sapling_crypto::jubjub::{edwards, Unknown};
 
 pub struct PlasmaState {
 
@@ -24,14 +25,17 @@ impl PlasmaState {
         if item.is_none() {
             return None;
         }
-
-        let unpacked = unpack_edwards_point::<pairing::bn256::Bn256>(item.unwrap().public_key, &params::JUBJUB_PARAMS);
-
-        if unpacked.is_err() {
+        let acc = item.unwrap();
+        let point = edwards::Point::<Engine, Unknown>::from_xy(
+            acc.public_key_x, 
+            acc.public_key_y, 
+            &params::JUBJUB_PARAMS
+        );
+        if point.is_none() {
             return None;
         }
 
-        let pk = sapling_crypto::eddsa::PublicKey::<pairing::bn256::Bn256>(unpacked.unwrap());
+        let pk = sapling_crypto::eddsa::PublicKey::<Engine>(point.unwrap());
 
         Some(pk)
     }

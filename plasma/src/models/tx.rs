@@ -1,7 +1,7 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
 use crate::primitives::{get_bits_le_fixed_u128, pack_bits_into_bytes};
 use pairing::bn256::{Bn256};
-use sapling_crypto::jubjub::{JubjubEngine, JubjubParams, FixedGenerators, edwards};
+use sapling_crypto::jubjub::{JubjubEngine, JubjubParams, FixedGenerators, edwards, Unknown};
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 use sapling_crypto::circuit::float_point::{convert_to_float};
 use sapling_crypto::eddsa::{self, Signature};
@@ -10,7 +10,8 @@ use super::PublicKey;
 use crate::models::params;
 use ff::{Field, PrimeField, PrimeFieldRepr};
 use super::{Fr, Engine};
-use crate::circuit::utils::{encode_fr_into_fs};
+use crate::circuit::utils::{encode_fr_into_fs, le_bit_vector_into_field_element};
+use crate::models::circuit::transfer::{Tx};
 
 /// Unpacked transaction data
 #[derive(Clone, Serialize, Deserialize)]
@@ -111,12 +112,61 @@ impl TxSignature{
     )
     -> Result<Signature<Engine>, String>
     {
-        let r = edwards::Point::from_xy(self.r_x, self.r_y, &params::JUBJUB_PARAMS).expect("make point from X and Y");
-        let s = encode_fr_into_fs(self.s);
+        let r = edwards::Point::<Engine, Unknown>::from_xy(self.r_x, self.r_y, &params::JUBJUB_PARAMS).expect("make point from X and Y");
+        let s: <Engine as JubjubEngine>::Fs = encode_fr_into_fs::<Engine>(self.s);
 
         Ok(Signature::<Engine> {
             r: r,
             s: s
         })
     }
+}
+
+impl TransactionSignature<Engine> {
+    pub fn try_from(
+        sig: crate::models::tx::TxSignature
+    ) -> Result<Self, String> {
+        let r = edwards::Point::<Engine, Unknown>::from_xy(sig.r_x, sig.r_y, &params::JUBJUB_PARAMS).expect("make R point");
+        let s = sig.s;
+        
+        Ok(Self{
+            r: r,
+            s: s,
+        })
+    }
+}
+
+impl Tx<Engine> {
+
+    // TODO: introduce errors if necessary
+    pub fn try_from(transaction: &crate::models::TransferTx) -> Result<Self, String> {
+
+        use bigdecimal::ToPrimitive;
+        let encoded_amount_bits = convert_to_float(
+            transaction.amount.to_u128().unwrap(), // TODO: use big decimal in convert_to_float() instead
+            params::AMOUNT_EXPONENT_BIT_WIDTH, 
+            params::AMOUNT_MANTISSA_BIT_WIDTH, 
+            10
+        ).map_err(|e| format!("wrong amount encoding: {}", e.to_string()))?;
+        let encoded_amount: Fr = le_bit_vector_into_field_element(&encoded_amount_bits);
+
+        // TODO: encode fee
+        let encoded_fee = Fr::zero();
+
+        let tx = Self {
+            // TODO: these conversions are ugly and inefficient, replace with idiomatic std::convert::From trait
+            from:               Fr::from_str(&transaction.from.to_string()).unwrap(),
+            to:                 Fr::from_str(&transaction.to.to_string()).unwrap(),
+            amount:             encoded_amount,
+            fee:                encoded_fee,
+            nonce:              Fr::from_str(&transaction.good_until_block.to_string()).unwrap(),
+            good_until_block:   Fr::from_str(&transaction.good_until_block.to_string()).unwrap(),
+
+            // TODO: decode signature
+            signature:          TransactionSignature::try_from(transaction.signature.clone())?,
+        };
+
+        Ok(tx)
+    }
+
 }
