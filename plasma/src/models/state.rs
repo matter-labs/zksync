@@ -1,5 +1,7 @@
 use bigdecimal::BigDecimal;
 use super::*;
+use crate::primitives::{unpack_edwards_point};
+use crate::models::params;
 
 pub struct PlasmaState {
 
@@ -18,10 +20,20 @@ impl PlasmaState {
     }
 
     pub fn get_pub_key(&self, account_id: u32) -> Option<PublicKey> {
-        self.balance_tree.items.get(&account_id).map(|a| {
-            //PublicKey::
-            unimplemented!()
-        })
+        let item = self.balance_tree.items.get(&account_id);
+        if item.is_none() {
+            return None;
+        }
+
+        let unpacked = unpack_edwards_point::<pairing::bn256::Bn256>(item.unwrap().public_key, &params::JUBJUB_PARAMS);
+
+        if unpacked.is_err() {
+            return None;
+        }
+
+        let pk = sapling_crypto::eddsa::PublicKey::<pairing::bn256::Bn256>(unpacked.unwrap());
+
+        Some(pk)
     }
 
     pub fn root_hash (&self) -> FieldBytes {
