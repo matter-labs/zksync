@@ -6,10 +6,10 @@ Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 
 - Generate a proving key
 ```
-   cargo run --release --bin read_write_keys.rs
+   cargo run --release --bin read_write_keys
 ```
 
-It will generate a `VerificationKeys.sol` and proving key `pk.key` in a root folder.
+It will generate a `VerificationKeys.sol` and proving key `pk.key` in the root folder.
 
 - Copy `VerificationKeys.sol` into the `./contracts/contracts/` with replacement
 
