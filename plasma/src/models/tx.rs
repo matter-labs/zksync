@@ -26,7 +26,7 @@ pub struct TransferTx {
 
     /// If present, it means that the signature has been verified against this key
     #[serde(skip)]
-    pub cached_public_key:  Option<PublicKey>,       
+    pub cached_pub_key:     Option<PublicKey>,       
 }
 
 impl TransferTx {
