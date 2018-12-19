@@ -60,7 +60,7 @@ impl TransferTx {
 
     pub fn verify_sig(
             &self, 
-            public_key: PublicKey
+            public_key: &PublicKey
         ) -> bool {
         let message_bits = self.message_bits();
         let as_bytes = pack_bits_into_bytes(message_bits);
