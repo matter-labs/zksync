@@ -23,3 +23,9 @@ pub const SIGNATURE_R_Y_BIT_WIDTH: usize = 256;
 
 // Fr element encoding 
 pub const FR_BIT_WIDTH: usize = 256;
+
+use pairing::bn256::{Bn256};
+use sapling_crypto::jubjub::{JubjubEngine, JubjubParams};
+use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
+
+pub static JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
