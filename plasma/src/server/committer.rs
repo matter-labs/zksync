@@ -4,6 +4,7 @@ use web3::types::{U256, U128, H256};
 use crate::models::{Block, TransferBlock, Account};
 use super::prover::BabyProver;
 use super::storage::StorageConnection;
+use serde_json::{to_value, value::Value};
 
 use crate::primitives::{serialize_fe_for_ethereum};
 
@@ -16,7 +17,7 @@ pub struct Commitment {
     pub public_data: Vec<u8>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EncodedProof {
     pub groth_proof: [U256; 8],
     pub block_number: U256,
@@ -93,7 +94,7 @@ pub fn run_commitment_pipeline(rx_for_commitments: Receiver<Block>, tx_for_eth: 
         };
         
         // synchronously commit block to storage
-        storage.store_block(block.block_number as i32, &block);
+        let r = storage.store_block(block.block_number as i32, &to_value(&block).unwrap()).expect("database failed");
 
         let new_root = block.new_root_hash.clone();
         println!("Commiting to new root = {}", new_root);
@@ -112,12 +113,15 @@ pub fn run_commitment_pipeline(rx_for_commitments: Receiver<Block>, tx_for_eth: 
 
 pub fn run_proof_pipeline(rx_for_proofs: Receiver<BlockProof>, tx_for_eth: Sender<EthereumTx>) {
 
+    let storage = StorageConnection::new();
     for msg in rx_for_proofs {
 
         let BlockProof(proof, accounts) = msg;
 
-        // TODO: synchronously commit proof and update accounts in storage
-        // use proof, accounts
+        // synchronously commit proof and update accounts in storage
+        let block_number: i32 = 0; // TODO: convert from proof.block_number
+        storage.store_proof(block_number, &to_value(&proof).unwrap());
+        storage.update_accounts(accounts);
 
         tx_for_eth.send(EthereumTx::Proof(proof));
     }

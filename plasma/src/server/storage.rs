@@ -27,16 +27,18 @@ pub struct StorageConnection {
     conn: PgConnection
 }
 
+// TODO: what can go wrong and how to hanlde db save errors?
+
 impl StorageConnection {
 
-    /// creates connection pool
+    /// creates a single db connection; it's safe to create multiple instances of StorageConnection
     pub fn new() -> Self {
         Self{
             conn: establish_connection()
         }
     }
 
-    pub fn store_block(&self, block_number: i32, block: &TransferBlock) -> QueryResult<usize> {
+    pub fn store_block(&self, block_number: i32, block: &Value) -> QueryResult<usize> {
         let block = SQLBlock{
             block_number:   Some(block_number),
             block_data:     to_value(block).unwrap(),
@@ -46,9 +48,15 @@ impl StorageConnection {
             .execute(&self.conn)
     }
 
-    // pub fn update_state(state: &PlasmaState) {
+    pub fn store_proof(&self, block_number: i32, block: &Value) -> QueryResult<usize> {
+        unimplemented!()
+        // save proof...
+    }
 
-    // }
+    pub fn update_accounts(&self, accounts: Vec<(u32, Account)>) -> QueryResult<usize> {
+        unimplemented!()
+        // update state...
+    }
 
     // /// returns stream of accounts
     // pub fn load_state() {
