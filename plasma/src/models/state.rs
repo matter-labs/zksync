@@ -36,7 +36,7 @@ impl PlasmaState {
         Some(pk)
     }
 
-    pub fn root_hash (&self) -> FieldBytes {
+    pub fn root_hash (&self) -> Fr {
         self.balance_tree.root_hash().clone()
     }
 

@@ -68,7 +68,7 @@ impl PlasmaStateKeeper {
 
             let sk = PrivateKey::<Bn256>(rng.gen());
             let pk = PublicKey::from_private(&sk, p_g, params);
-            // let (x, y) = pk.0.into_xy();
+            let (x, y) = pk.0.into_xy();
 
             keys_map.insert(i, sk);
 
@@ -77,7 +77,8 @@ impl PlasmaStateKeeper {
             let leaf = Account {
                 balance:    default_balance.clone(),
                 nonce:      0,
-                public_key: serialized_public_key,
+                public_key_x: x,
+                public_key_y: y,
             };
 
             balance_tree.insert(leaf_number, leaf.clone());

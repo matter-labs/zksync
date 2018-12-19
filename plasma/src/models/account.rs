@@ -2,13 +2,14 @@ use crate::primitives::{GetBits, GetBitsFixed};
 use bigdecimal::BigDecimal;
 use super::circuit;
 
-use super::{Engine, Fr, FieldBytes};
+use super::{Engine, Fr};
 
 #[derive(Debug, Clone, Default, Queryable, Serialize, Deserialize)]
 pub struct Account {
     pub balance:    BigDecimal,
     pub nonce:      u32,
-    pub public_key: [u8; 32],
+    pub public_key_x: Fr,
+    pub public_key_y: Fr,
 }
 
 impl GetBits for Account {

@@ -16,8 +16,6 @@ pub use self::state::PlasmaState;
 type Engine = bn256::Bn256;
 type Fr = bn256::Fr;
 
-pub type FieldBytes = Fr;
-
 pub type AccountTree = SparseMerkleTree<Account, Fr, PedersenHasher<Engine>>;
 
 pub type TransferBlock = block::Block<TransferTx>;

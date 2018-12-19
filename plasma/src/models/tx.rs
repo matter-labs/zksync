@@ -9,6 +9,8 @@ use crate::models::circuit::sig::TransactionSignature;
 use super::PublicKey;
 use crate::models::params;
 use ff::{Field, PrimeField, PrimeFieldRepr};
+use super::{Fr, Engine};
+use crate::circuit::utils::{encode_fr_into_fs};
 
 /// Unpacked transaction data
 #[derive(Clone, Serialize, Deserialize)]
@@ -57,7 +59,7 @@ impl TransferTx {
         ) -> bool {
         let message_bits = self.message_bits();
         let as_bytes = pack_bits_into_bytes(message_bits);
-        let signature = self.signature.to_jubjub_eddsa(&*params::JUBJUB_PARAMS).expect("should parse signature");
+        let signature = self.signature.to_jubjub_eddsa().expect("should parse signature");
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let valid = public_key.verify_for_raw_message(
             &as_bytes, 
@@ -86,59 +88,34 @@ pub struct ExitTx{
 // TxSignature uses only native Rust types
 #[derive(Clone, Serialize, Deserialize)]
 pub struct TxSignature{
-    pub r_compressed:    [u8; 32], // top bit is a sign
-    pub s:               [u8; 32],
+    pub r_x: Fr,
+    pub r_y: Fr,
+    pub s: Fr,
 }
 
 impl TxSignature{
-    pub fn try_from<E: JubjubEngine>(
-        signature: TransactionSignature<E>,
+    pub fn try_from(
+        signature: TransactionSignature<Engine>,
     ) -> Result<Self, String> {
-        let mut tmp = TxSignature{
-            r_compressed: [0u8; 32],
-            s: [0u8; 32]
-        };
-        let (y, sign) = signature.r.compress_into_y();
-        y.into_repr().write_be(& mut tmp.r_compressed[..]).expect("write y");
-        if sign {
-            tmp.r_compressed[0] |= 0x80
-        }
+        let (x, y) = signature.r.into_xy();
 
-        signature.s.into_repr().write_be(& mut tmp.s[..]).expect("write s");
-
-        Ok(tmp)
+        Ok(Self{
+            r_x: x,
+            r_y: y,
+            s: signature.s
+        })
     }
 
-    pub fn to_jubjub_eddsa<E: JubjubEngine>(
-        &self, 
-        params: &E::Params
+    pub fn to_jubjub_eddsa(
+        &self
     )
-    -> Result<Signature<E>, String>
+    -> Result<Signature<Engine>, String>
     {
-        // TxSignature has S and R in compressed form serialized as BE
-        let x_sign = self.r_compressed[0] & 0x80 > 0;
-        let mut tmp = self.r_compressed.clone();
-        tmp[0] &= 0x7f; // strip the top bit
+        let r = edwards::Point::from_xy(self.r_x, self.r_y, &params::JUBJUB_PARAMS).expect("make point from X and Y");
+        let s = encode_fr_into_fs(self.s);
 
-        // read from byte array
-        let mut y_repr = E::Fr::zero().into_repr();
-        y_repr.read_be(&tmp[..]).expect("read R_y as field element");
-
-        let mut s_repr = E::Fs::zero().into_repr();
-        s_repr.read_be(&self.s[..]).expect("read S as field element");
-
-        let y = E::Fr::from_repr(y_repr).expect("make y from representation");
-
-        // here we convert it to field elements for all further uses
-        let r = edwards::Point::get_for_y(y, x_sign, params);
-        if r.is_none() {
-            return Err("Invalid R point".to_string());
-        }
-
-        let s = E::Fs::from_repr(s_repr).expect("make s from representation");
-
-        Ok(Signature {
-            r: r.unwrap(),
+        Ok(Signature::<Engine> {
+            r: r,
             s: s
         })
     }

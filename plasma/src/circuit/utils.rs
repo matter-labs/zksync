@@ -167,3 +167,14 @@ pub fn encode_fs_into_fr<E: JubjubEngine>(input: E::Fs)
 
     converted
 }
+
+pub fn encode_fr_into_fs<E: JubjubEngine>(input: E::Fr)
+    -> E::Fs 
+{
+    let mut fr_le_bits: Vec<bool> = BitIterator::new(input.into_repr()).collect();
+    fr_le_bits.reverse();
+
+    let converted = le_bit_vector_into_field_element::<E::Fs>(&fr_le_bits);
+
+    converted
+}
