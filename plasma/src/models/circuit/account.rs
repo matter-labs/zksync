@@ -39,8 +39,13 @@ impl<E: JubjubEngine> GetBits for Account<E> {
 impl std::convert::From<crate::models::Account> for Account<pairing::bn256::Bn256> {
 
     fn from(a: crate::models::Account) -> Self {
-        let v = serde_json::to_value(&a).unwrap();
-        serde_json::from_value(v).unwrap()
+        use pairing::bn256::Fr;
+        Self{
+            balance:    Fr::from_str(&a.balance.to_string()).unwrap(),
+            nonce:      Fr::from_str(&a.nonce.to_string()).unwrap(),
+            pub_x:      Fr::from_hex(&a.pub_x.to_hex()).unwrap(),
+            pub_y:      Fr::from_hex(&a.pub_y.to_hex()).unwrap(),
+        }
     }
 
 }

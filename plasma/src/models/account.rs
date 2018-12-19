@@ -31,27 +31,5 @@ impl GetBits for Account {
 #[test]
 fn test_default_account() {
     let a = Account::default();
-    println!("{:?}", a);
-
-    use ff::PrimeField;
-    println!("{:?}", &a.balance.to_string());
-    println!("{:?}", &a.nonce.to_string());
-    println!("{:?}", &a.pub_x.into_repr().to_string());
-    println!("{:?}", &a.pub_y.into_repr().to_string());
-
-    let i: u128 = 5;
-    let v = serde_json::to_value(&i);
-    println!("vi = {:?}", &v);
-
-    let v = serde_json::to_value(&a);
-    println!("v = {:?}", &v);
-
-    let d: circuit::Account<Engine> = serde_json::from_value(v.unwrap()).unwrap();
-    println!("d = {:?}", &d);
-
-    let ca = circuit::Account::<Engine>::from(a.clone());
-    println!("ca = {:?}", ca);
-
     let bits = a.get_bits_le();
-    println!("{:?}", bits);
 }
