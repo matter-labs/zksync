@@ -1,3 +1,4 @@
+use bigdecimal::BigDecimal;
 use super::*;
 
 pub struct PlasmaState {
@@ -31,13 +32,13 @@ impl PlasmaState {
         // update state
 
         let mut to = self.balance_tree.items.get(&tx.to).ok_or(())?.clone();
-        from.balance -= tx.amount;
+        from.balance -= &tx.amount;
         
         // TODO: subtract fee
 
         from.nonce += 1;
         
-        to.balance += tx.amount;
+        to.balance += &tx.amount;
 
         self.balance_tree.insert(tx.from, from);
         self.balance_tree.insert(tx.to, to);

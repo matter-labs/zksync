@@ -27,8 +27,9 @@ impl<E: JubjubEngine> Tx<E> {
     // TODO: introduce errors if necessary
     pub fn try_from(transaction: &crate::models::TransferTx) -> Result<Self, String> {
 
+        use bigdecimal::ToPrimitive;
         let encoded_amount_bits = convert_to_float(
-            transaction.amount,
+            transaction.amount.to_u128().unwrap(), // TODO: use big decimal in convert_to_float() instead
             params::AMOUNT_EXPONENT_BIT_WIDTH, 
             params::AMOUNT_MANTISSA_BIT_WIDTH, 
             10
