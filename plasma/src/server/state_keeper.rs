@@ -201,11 +201,7 @@ impl PlasmaStateKeeper {
         tx_fr.sign(sk, p_g, &params::JUBJUB_PARAMS, &mut rng);
 
         let (x, y) = tx_fr.signature.r.into_xy();
-        tx.signature = TxSignature{
-            r_x:    x,
-            r_y:    y,
-            s:      tx_fr.signature.s,
-        }
+        tx.signature = TxSignature::try_from(tx_fr.signature).expect("serialize signature");
     }
 
 }

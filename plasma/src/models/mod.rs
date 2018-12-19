@@ -10,6 +10,7 @@ use pairing::bn256;
 use crate::merkle_tree::{SparseMerkleTree, PedersenHasher};
 use sapling_crypto::jubjub::{JubjubEngine, JubjubParams, edwards};
 use sapling_crypto::eddsa::{Signature};
+use crate::models::circuit::sig::TransactionSignature;
 
 pub use self::account::Account;
 pub use self::tx::{TransferTx, DepositTx, ExitTx};
@@ -28,6 +29,24 @@ pub struct TxSignature{
 }
 
 impl TxSignature{
+    pub fn try_from<E: JubjubEngine>(
+        signature: TransactionSignature<E>,
+    ) -> Result<Self, String> {
+        let mut tmp = TxSignature{
+            r_compressed: [0u8; 32],
+            s: [0u8; 32]
+        };
+        let (y, sign) = signature.r.compress_into_y();
+        y.into_repr().write_be(& mut tmp.r_compressed[..]).expect("write y");
+        if sign {
+            tmp.r_compressed[0] |= 0x80
+        }
+
+        signature.s.into_repr().write_be(& mut tmp.s[..]).expect("write s");
+
+        Ok(tmp)
+    }
+
     pub fn to_jubjub_eddsa<E: JubjubEngine>(
         &self, 
         params: &E::Params
