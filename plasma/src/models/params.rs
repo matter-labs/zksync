@@ -28,4 +28,4 @@ use pairing::bn256::{Bn256};
 use sapling_crypto::jubjub::{JubjubEngine, JubjubParams};
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 
-pub static JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
+pub static JUBJUB_PARAMS: <Bn256 as JubjubEngine>::Params = AltJubjubBn256::new();

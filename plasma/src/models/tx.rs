@@ -1,7 +1,9 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
 use super::TxSignature;
 use crate::primitives::{get_bits_le_fixed_u128, pack_bits_into_bytes};
+use pairing::bn256::{Bn256};
 use sapling_crypto::jubjub::{JubjubEngine, JubjubParams, FixedGenerators};
+use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 use sapling_crypto::circuit::float_point::{convert_to_float};
 use sapling_crypto::eddsa::{PublicKey};
 use crate::models::params;
@@ -47,20 +49,19 @@ impl TransferTx {
         r
     }
 
-    pub fn verify_sig<E: JubjubEngine>(
+    pub fn verify_sig(
             &self, 
-            public_key: PublicKey<E>, 
-            p_g: FixedGenerators,
-            params: &E::Params) -> bool {
+            public_key: PublicKey<Bn256>
+        ) -> bool {
         let message_bits = self.message_bits();
         let as_bytes = pack_bits_into_bytes(message_bits);
-        let signature = self.signature.to_jubjub_eddsa(params).expect("should parse signature");
-
+        let signature = self.signature.to_jubjub_eddsa(&params::JUBJUB_PARAMS).expect("should parse signature");
+        let p_g = FixedGenerators::SpendingKeyGenerator;
         let valid = public_key.verify_for_raw_message(
             &as_bytes, 
             &signature, 
             p_g, 
-            params, 
+            &params::JUBJUB_PARAMS, 
             16
         );
 

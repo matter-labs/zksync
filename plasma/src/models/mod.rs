@@ -28,7 +28,10 @@ pub struct TxSignature{
 }
 
 impl TxSignature{
-    pub fn to_jubjub_eddsa<E: JubjubEngine>(&self, params: &E::Params)
+    pub fn to_jubjub_eddsa<E: JubjubEngine>(
+        &self, 
+        params: &E::Params
+    )
     -> Result<Signature<E>, String>
     {
         // TxSignature has S and R in compressed form serialized as BE
