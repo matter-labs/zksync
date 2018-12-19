@@ -274,7 +274,7 @@ fn apply_request<E, CS>(
     )?;
 
     // Compute the hash of the from leaf
-    let mut leaf_hash = pedersen_hash::pedersen_hash(
+    let leaf_hash = pedersen_hash::pedersen_hash(
         cs.namespace(|| "leaf content hash"),
         pedersen_hash::Personalization::NoteCommitment,
         &leaf.leaf_bits,
