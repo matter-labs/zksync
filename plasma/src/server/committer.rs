@@ -1,8 +1,9 @@
 use std::sync::mpsc::{channel, Sender, Receiver};
 use crate::eth_client::{ETHClient, PROD_PLASMA};
 use web3::types::{U256, U128, H256};
-use crate::models::{Block, DepositBlock, ExitBlock, TransferBlock, Account};
+use crate::models::{Block, TransferBlock, Account};
 use super::prover::BabyProver;
+use super::storage::StorageConnection;
 
 use crate::primitives::{serialize_fe_for_ethereum};
 
@@ -63,6 +64,7 @@ pub fn run_eth_sender() -> Sender<EthereumTx> {
 
 pub fn run_commitment_pipeline(rx_for_commitments: Receiver<Block>, tx_for_eth: Sender<EthereumTx>) {
 
+    let storage = StorageConnection::new();
     for block in rx_for_commitments {
         let commitment = {
             match block {
@@ -90,9 +92,21 @@ pub fn run_commitment_pipeline(rx_for_commitments: Receiver<Block>, tx_for_eth: 
             }
         };
         
-        // TODO: synchronously commit block to storage
-        // use block itself
-        tx_for_eth.send(EthereumTx::Commitment(commitment));
+        // synchronously commit block to storage
+        storage.store_block(block.block_number as i32, &block);
+
+        let new_root = block.new_root_hash.clone();
+        println!("Commiting to new root = {}", new_root);
+        let block_number = block.block_number;
+        let tx_data = BabyProver::encode_transactions(&block).unwrap();
+        let tx_data_bytes = tx_data;
+        let comittment = Commitment{
+            new_root:       serialize_fe_for_ethereum(new_root),
+            block_number:   U256::from(block_number),
+            total_fees:     U256::from(0),
+            public_data:    tx_data_bytes,
+        };
+        tx_for_eth.send(EthereumTx::Commitment(comittment));
     }
 }
 

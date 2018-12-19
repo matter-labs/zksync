@@ -23,7 +23,7 @@ pub struct SQLBlock {
     pub block_data:     Value,
 }
 
-struct StorageConnection {
+pub struct StorageConnection {
     conn: PgConnection
 }
 
@@ -36,7 +36,7 @@ impl StorageConnection {
         }
     }
 
-    pub fn store_block(&self, block_number: i32, block: &Block) -> QueryResult<usize> {
+    pub fn store_block(&self, block_number: i32, block: &TransferBlock) -> QueryResult<usize> {
         let block = SQLBlock{
             block_number:   Some(block_number),
             block_data:     to_value(block).unwrap(),
