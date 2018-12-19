@@ -44,7 +44,7 @@ impl PlasmaState {
         self.balance_tree.root_hash().clone()
     }
 
-    pub fn apply(&mut self, tx: &TransferTx) -> Result<(), ()> {
+    pub fn apply_transfer(&mut self, tx: &TransferTx) -> Result<(), ()> {
 
         let mut from = self.balance_tree.items.get(&tx.from).ok_or(())?.clone();
 
@@ -60,13 +60,47 @@ impl PlasmaState {
         // TODO: subtract fee
 
         from.nonce += 1;
-        
-        to.balance += &tx.amount;
+        if tx.to != 0 {
+            to.balance += &tx.amount;
+        }
 
         self.balance_tree.insert(tx.from, from);
         self.balance_tree.insert(tx.to, to);
 
         Ok(())
+    }
+
+    pub fn apply_deposit(&mut self, tx: &DepositTx) -> Result<(), ()> {
+
+        let existing_acc = self.balance_tree.items.get(&tx.account);
+
+        if existing_acc.is_none() {
+            let mut acc = Account::default();
+            let tx = tx.clone();
+            acc.public_key_x = tx.pub_x;
+            acc.public_key_y = tx.pub_y;
+            acc.balance = tx.amount;
+            self.balance_tree.insert(tx.account, acc);
+        } else {
+            let mut acc = existing_acc.unwrap().clone();
+            acc.balance += &tx.amount;
+            self.balance_tree.insert(tx.account, acc);
+        }
+
+        Ok(())
+    }
+
+    pub fn apply_exit(&mut self, tx: &ExitTx) -> Result<ExitTx, ()> {
+
+        let acc = self.balance_tree.items.get(&tx.account).ok_or(())?.clone();
+
+        let mut agumented_tx = tx.clone();
+
+        agumented_tx.amount = acc.balance;
+
+        self.balance_tree.delete(tx.account);
+
+        Ok(agumented_tx)
     }
 
 }

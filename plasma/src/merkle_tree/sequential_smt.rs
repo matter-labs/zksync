@@ -84,19 +84,8 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
         let hash_index = (self.tree_depth, index);
 
         let item_bits = item.get_bits_le();
-        // for b in item_bits.clone() {
-        //     if b {
-        //         print!("1");
-        //     } else {
-        //         print!("0");
-        //     }
-        // }
-        // print!("\n");
-        let hash = self.hasher.hash_bits(item_bits);
-        // print!("Inserting at index {}\n", index);
-        // print!("Packed into index {}, {}\n", hash_index.0, hash_index.1);
 
-        //println!("hash [{}] = {:?}", (1 << hash_index.0) + hash_index.1, &hash);
+        let hash = self.hasher.hash_bits(item_bits);
 
         self.hashes.insert(hash_index.pack(), hash);
 
@@ -104,13 +93,37 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
 
         let mut next_level = (hash_index.0, hash_index.1);
 
-        // print!("Have updated index {}, {}, will cascade\n", next_level.0, next_level.1);
         for _ in 0..next_level.0 {
             next_level = (next_level.0 - 1, next_level.1 >> 1);
             self.update_hash(next_level);
 
         }
-        // print!("Have updated up to {}, {}\n", next_level.0, next_level.1);
+
+        assert_eq!(next_level.0, 0);
+    }
+
+    pub fn delete(&mut self, index: ItemIndex) {
+        assert!(index < self.capacity());
+        let hash_index = (self.tree_depth, index);
+
+        let item = T::default();
+
+        let item_bits = item.get_bits_le();
+
+        let hash = self.hasher.hash_bits(item_bits);
+
+        self.hashes.insert(hash_index.pack(), hash);
+
+        self.items.insert(index, item);
+
+        let mut next_level = (hash_index.0, hash_index.1);
+
+        for _ in 0..next_level.0 {
+            next_level = (next_level.0 - 1, next_level.1 >> 1);
+            self.update_hash(next_level);
+
+        }
+        
         assert_eq!(next_level.0, 0);
     }
 

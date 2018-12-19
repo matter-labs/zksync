@@ -10,7 +10,21 @@ use ff::{Field, PrimeField};
 use rand::{OsRng};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 
-use crate::models::{self, params, Block, TransferBlock, Account, TransferTx, AccountTree, TxSignature, PlasmaState};
+use crate::models::{self, 
+    params, 
+    Block, 
+    TransferBlock, 
+    DepositBlock, 
+    ExitBlock, 
+    Account, 
+    TransferTx, 
+    DepositTx,
+    ExitTx,
+    AccountTree, 
+    TxSignature, 
+    PlasmaState
+};
+
 use super::committer::Commitment;
 
 use rand::{SeedableRng, Rng, XorShiftRng};
@@ -115,19 +129,39 @@ impl PlasmaStateKeeper {
 
     pub fn run(&mut self, 
         rx_for_blocks: Receiver<StateProcessingRequest>, 
-        tx_for_commitments: Sender<TransferBlock>,
+        tx_for_commitments: Sender<Block>,
         tx_for_proof_requests: Sender<Block>)
     {
         for req in rx_for_blocks {
             match req {
                 StateProcessingRequest::ApplyBlock(block, source) => {
                     match block {
-                        Block::Deposit(_) => unimplemented!(),
-                        Block::Exit(_) => unimplemented!(),
+                        Block::Deposit(mut block) => {
+                            let applied = self.apply_deposit_block(&mut block);
+                            let r = if applied.is_ok() {
+                                tx_for_commitments.send(Block::Deposit(block.clone()));
+                                tx_for_proof_requests.send(Block::Deposit(block));
+                                Ok(())
+                            } else {
+                                Err(block)
+                            };
+                            // can not send back anywhere due to Ethereum contract being immutable
+                        },
+                        Block::Exit(mut block) => {
+                            let applied = self.apply_exit_block(&mut block);
+                            let r = if applied.is_ok() {
+                                tx_for_commitments.send(Block::Exit(block.clone()));
+                                tx_for_proof_requests.send(Block::Exit(block));
+                                Ok(())
+                            } else {
+                                Err(block)
+                            };
+                            // can not send back anywhere due to Ethereum contract being immutable
+                        },
                         Block::Transfer(mut block) => {
                             let applied = self.apply_transfer_block(&mut block);
                             let r = if applied.is_ok() {
-                                tx_for_commitments.send(block.clone());
+                                tx_for_commitments.send(Block::Transfer(block.clone()));
                                 tx_for_proof_requests.send(Block::Transfer(block));
                                 Ok(())
                             } else {
@@ -175,7 +209,7 @@ impl PlasmaStateKeeper {
                 let to = self.account(tx.to);
                 save_state.insert(tx.to, to);
 
-                self.state.apply(&tx).is_ok()
+                self.state.apply_transfer(&tx).is_ok()
             })
             .collect();
         
@@ -191,6 +225,86 @@ impl PlasmaStateKeeper {
         self.state.block_number += 1;
         Ok(())
     }
+
+    fn apply_deposit_block(&mut self, block: &mut DepositBlock) -> Result<(), ()> {
+
+        block.block_number = self.state.block_number;
+
+        // update state with verification
+        // for tx in block: self.state.apply(transaction)?;
+
+        let transactions: Vec<DepositTx> = block.transactions.clone();
+
+        let mut save_state = FnvHashMap::<u32, Account>::default();
+
+        let transactions: Vec<DepositTx> = transactions
+            .into_iter()
+            .filter(|tx| {
+
+                // save state
+                let acc = self.account(tx.account);
+                save_state.insert(tx.account, acc);
+
+                self.state.apply_deposit(&tx).is_ok()
+            })
+            .collect();
+        
+        if transactions.len() != block.transactions.len() {
+            // some transactions were rejected, revert state
+            for (k,v) in save_state.into_iter() {
+                // TODO: add tree.insert_existing() for performance
+                self.state.balance_tree.insert(k, v);
+            }
+        }
+            
+        block.new_root_hash = self.state.root_hash();
+        self.state.block_number += 1;
+        Ok(())
+    }
+
+    fn apply_exit_block(&mut self, block: &mut ExitBlock) -> Result<(), ()> {
+
+        block.block_number = self.state.block_number;
+
+        // update state with verification
+        // for tx in block: self.state.apply(transaction)?;
+
+        let transactions: Vec<ExitTx> = block.transactions.clone();
+
+        let mut save_state = FnvHashMap::<u32, Account>::default();
+
+        let transactions: Vec<ExitTx> = transactions
+            .into_iter()
+            .map(|tx| {
+
+                // save state
+                let acc = self.account(tx.account);
+                save_state.insert(tx.account, acc);
+
+                self.state.apply_exit(&tx)
+            })
+            .filter(|tx| {
+                tx.is_ok()
+            })
+            .map(|tx| {
+                tx.unwrap()
+            })
+            .collect();
+        
+        if transactions.len() != block.transactions.len() {
+            // some transactions were rejected, revert state
+            for (k,v) in save_state.into_iter() {
+                // TODO: add tree.insert_existing() for performance
+                self.state.balance_tree.insert(k, v);
+            }
+        }
+            
+        block.new_root_hash = self.state.root_hash();
+        block.transactions = transactions;
+        self.state.block_number += 1;
+        Ok(())
+    }
+
 
     // augument and sign transaction (for demo only; TODO: remove this!)
     fn augument_and_sign(&self, mut tx: TransferTx) -> TransferTx {

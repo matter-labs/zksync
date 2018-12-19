@@ -78,6 +78,8 @@ impl TransferTx {
 pub struct DepositTx{
     pub account:            u32,
     pub amount:             BigDecimal,
+    pub pub_x:              Fr,
+    pub pub_y:              Fr,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

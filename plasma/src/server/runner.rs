@@ -19,7 +19,7 @@ pub fn run() {
     let (tx_for_tx, rx_for_tx) = channel::<TransferTx>();
     let (tx_for_blocks, rx_for_blocks) = channel::<StateProcessingRequest>();
     let (tx_for_proof_requests, rx_for_proof_requests) = channel::<Block>();
-    let (tx_for_commitments, rx_for_commitments) = channel::<TransferBlock>();
+    let (tx_for_commitments, rx_for_commitments) = channel::<Block>();
     let (tx_for_proofs, rx_for_proofs) = channel::<BlockProof>();
 
     let mut mem_pool = MemPool::new();

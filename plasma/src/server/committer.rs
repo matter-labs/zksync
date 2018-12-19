@@ -1,7 +1,7 @@
 use std::sync::mpsc::{channel, Sender, Receiver};
 use crate::eth_client::{ETHClient, PROD_PLASMA};
 use web3::types::{U256, U128, H256};
-use crate::models::{TransferBlock, Account};
+use crate::models::{Block, DepositBlock, ExitBlock, TransferBlock, Account};
 use super::prover::BabyProver;
 
 use crate::primitives::{serialize_fe_for_ethereum};
@@ -61,25 +61,38 @@ pub fn run_eth_sender() -> Sender<EthereumTx> {
     tx_for_eth
 }
 
-pub fn run_commitment_pipeline(rx_for_commitments: Receiver<TransferBlock>, tx_for_eth: Sender<EthereumTx>) {
+pub fn run_commitment_pipeline(rx_for_commitments: Receiver<Block>, tx_for_eth: Sender<EthereumTx>) {
 
     for block in rx_for_commitments {
+        let commitment = {
+            match block {
+                Block::Deposit(mut block) => {
+                    unimplemented!()
+                },
+                Block::Exit(mut block) => {
+                    unimplemented!()
+                },
+                Block::Transfer(mut block) => {
+                    let new_root = block.new_root_hash.clone();
+                    println!("Commiting to new root = {}", new_root);
+                    let block_number = block.block_number;
+                    let tx_data = BabyProver::encode_transfer_transactions(&block).unwrap();
+                    let tx_data_bytes = tx_data;
+                    let commitment = Commitment{
+                        new_root:       serialize_fe_for_ethereum(new_root),
+                        block_number:   U256::from(block_number),
+                        total_fees:     U256::from(0),
+                        public_data:    tx_data_bytes,
+                    };
+
+                    commitment
+                }
+            }
+        };
         
         // TODO: synchronously commit block to storage
         // use block itself
-
-        let new_root = block.new_root_hash.clone();
-        println!("Commiting to new root = {}", new_root);
-        let block_number = block.block_number;
-        let tx_data = BabyProver::encode_transactions(&block).unwrap();
-        let tx_data_bytes = tx_data;
-        let comittment = Commitment{
-            new_root:       serialize_fe_for_ethereum(new_root),
-            block_number:   U256::from(block_number),
-            total_fees:     U256::from(0),
-            public_data:    tx_data_bytes,
-        };
-        tx_for_eth.send(EthereumTx::Commitment(comittment));
+        tx_for_eth.send(EthereumTx::Commitment(commitment));
     }
 }
 

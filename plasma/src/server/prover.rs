@@ -193,8 +193,24 @@ impl BabyProver {
     }
 
     // Takes public data from transactions for further commitment to Ethereum
-    pub fn encode_transactions(block: &TransferBlock) -> Result<Vec<u8>, Err> {
-        let mut encoding : Vec<u8> = vec![];
+    pub fn encode_transactions(block: Block) -> Result<Vec<u8>, Err> {
+
+        match block {
+            Block::Deposit(block) => {
+                unimplemented!()
+            },
+            Block::Exit(block) => {
+                unimplemented!()
+            },
+            Block::Transfer(block) => {
+                return Self::encode_transfer_transactions(&block);
+            },
+        }
+    }
+
+    pub fn encode_transfer_transactions(block: &TransferBlock) -> Result<Vec<u8>, Err> {
+        let mut encoding: Vec<u8> = vec![];
+        
         let transactions = &block.transactions;
 
         for tx in transactions {
@@ -203,18 +219,33 @@ impl BabyProver {
             let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
             encoding.extend(tx_encoding.into_iter());
         }
+
         Ok(encoding)
     }
 
+    pub fn apply_and_prove(&mut self, block: Block) -> Result<FullBabyProof, Err> {
+        match block {
+            Block::Deposit(block) => {
+                unimplemented!()
+            },
+            Block::Exit(block) => {
+                unimplemented!()
+            },
+            Block::Transfer(block) => {
+                return self.apply_and_prove_transfer(&block);
+            },
+        }
+    }
+
     // Apply transactions to the state while also making a witness for proof, then calculate proof
-    pub fn apply_and_prove(&mut self, block: &TransferBlock) -> Result<FullBabyProof, Err> {
+    pub fn apply_and_prove_transfer(&mut self, block: &TransferBlock) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.block_number {
             return Err(BabyProverErr::Unknown);
         }
         let block_final_root = block.new_root_hash.clone();
 
-        let public_data: Vec<u8> = BabyProver::encode_transactions(block).unwrap();
+        let public_data: Vec<u8> = BabyProver::encode_transfer_transactions(block).unwrap();
 
         let transactions = &block.transactions;
         let num_txes = transactions.len();
@@ -454,15 +485,20 @@ impl BabyProver {
         for block in rx_for_blocks {
             println!("Got request for proof");
 
-            match block {
-                Block::Transfer(block) => {
-                    let proof = self.apply_and_prove(&block).unwrap();
-                    let full_proof = BabyProver::encode_proof(&proof).unwrap();
-                    let accounts = vec![]; // TODO: pass updated states of affected accounts
-                    tx_for_proofs.send(BlockProof(full_proof, accounts));
-                },
-                _ => unimplemented!(),
-            }
+            let proof = self.apply_and_prove(block).unwrap();
+            let full_proof = BabyProver::encode_proof(&proof).unwrap();
+            let accounts = vec![]; // TODO: pass updated states of affected accounts
+            tx_for_proofs.send(BlockProof(full_proof, accounts));
+
+            // match block {
+            //     Block::Transfer(block) => {
+            //         let proof = self.apply_and_prove(&block).unwrap();
+            //         let full_proof = BabyProver::encode_proof(&proof).unwrap();
+            //         let accounts = vec![]; // TODO: pass updated states of affected accounts
+            //         tx_for_proofs.send(BlockProof(full_proof, accounts));
+            //     },
+            //     _ => unimplemented!(),
+            // }
         }        
     }
     
