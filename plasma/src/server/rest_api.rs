@@ -36,26 +36,12 @@ pub struct AppState {
     tx_for_tx: mpsc::Sender<TransferTx>,
 }
 
-fn verify_sig(tx: &TransferTx) -> bool {
-    tx.verify_sig()
-}
-
 fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let tx_for_tx = req.state().tx_for_tx.clone();
     req.json()
         .from_err() // convert all errors into `Error`
         .and_then(move |tx: TransferTx| {
-            // let tx = TransferTx {
-            //     from: val.from,
-            //     to: val.to,
-            //     amount: val.amount,
-            //     fee: 0,
-            //     nonce: 0,
-            //     good_until_block: 100,
-            //     sig_r: "".to_owned(),
-            //     sig_s: "".to_owned(),
-            // };
-            let accepted = verify_sig(&tx);
+            let accepted = true; // TODO: tx.verify_sig(&pub_key);
             if accepted {
                 tx_for_tx.send(tx); // pass to mem_pool
             }

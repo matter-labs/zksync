@@ -48,6 +48,9 @@ extern crate bigdecimal;
 #[macro_use]
 extern crate smart_default;
 
+#[macro_use]
+extern crate lazy_static;
+
 pub mod primitives;
 pub mod merkle_tree;
 pub mod circuit;

@@ -35,10 +35,10 @@ impl<E: JubjubEngine> TransactionSignature<E> {
         tmp[0] &= 0x7f; // strip the top bit
 
         // read from byte arrays
-        let y_repr = E::Fr::zero().into_repr();
+        let mut y_repr = E::Fr::zero().into_repr();
         y_repr.read_be(&tmp[..]).expect("read R_y as field element");
 
-        let s_repr = E::Fr::zero().into_repr();
+        let mut s_repr = E::Fr::zero().into_repr();
         s_repr.read_be(&sig.s[..]).expect("read S as field element");
 
         let y = E::Fr::from_repr(y_repr).expect("make y from representation");

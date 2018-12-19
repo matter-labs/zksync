@@ -55,7 +55,7 @@ impl TransferTx {
         ) -> bool {
         let message_bits = self.message_bits();
         let as_bytes = pack_bits_into_bytes(message_bits);
-        let signature = self.signature.to_jubjub_eddsa(&params::JUBJUB_PARAMS).expect("should parse signature");
+        let signature = self.signature.to_jubjub_eddsa(&*params::JUBJUB_PARAMS).expect("should parse signature");
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let valid = public_key.verify_for_raw_message(
             &as_bytes, 
