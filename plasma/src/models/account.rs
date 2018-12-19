@@ -8,8 +8,7 @@ use super::{Engine, Fr, FieldBytes};
 pub struct Account {
     pub balance:    BigDecimal,
     pub nonce:      u32,
-    pub pub_x:      FieldBytes,
-    pub pub_y:      FieldBytes,
+    pub public_key: [u8; 32],
 }
 
 impl GetBits for Account {

@@ -2,7 +2,7 @@ use pairing::bn256::{Bn256, Fr};
 use sapling_crypto::jubjub::{edwards, Unknown, FixedGenerators};
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 
-use crate::primitives::{field_element_to_u32, field_element_to_u128};
+use crate::primitives::{field_element_to_u32, field_element_to_u128, pack_edwards_point};
 use crate::circuit::utils::{le_bit_vector_into_field_element};
 use std::{thread, time};
 use std::collections::HashMap;
@@ -68,15 +68,16 @@ impl PlasmaStateKeeper {
 
             let sk = PrivateKey::<Bn256>(rng.gen());
             let pk = PublicKey::from_private(&sk, p_g, params);
-            let (x, y) = pk.0.into_xy();
+            // let (x, y) = pk.0.into_xy();
 
             keys_map.insert(i, sk);
+
+            let serialized_public_key = pack_edwards_point(pk.0).unwrap();
 
             let leaf = Account {
                 balance:    default_balance.clone(),
                 nonce:      0,
-                pub_x:      x,
-                pub_y:      y,
+                public_key: serialized_public_key,
             };
 
             balance_tree.insert(leaf_number, leaf.clone());

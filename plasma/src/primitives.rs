@@ -1,9 +1,10 @@
-use ff::{PrimeField, PrimeFieldRepr, BitIterator};
+use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
 use web3::types::U256;
 use ff::{ScalarEngine};
 use pairing::{Engine, CurveAffine};
 use pairing::bn256::{Bn256};
 use bigdecimal::{BigDecimal, ToPrimitive};
+use sapling_crypto::jubjub::{JubjubEngine, JubjubParams, edwards, Unknown};
 
 // TODO: replace Vec with Iterator?
 
@@ -83,38 +84,74 @@ pub fn field_element_to_u128<P: PrimeField>(fr: P) -> u128 {
 }
 
 pub fn serialize_g1_for_ethereum(point: <Bn256 as Engine>::G1Affine) -> (U256, U256) {
-        let uncompressed = point.into_uncompressed();
+    let uncompressed = point.into_uncompressed();
 
-        let uncompressed_slice = uncompressed.as_ref();
+    let uncompressed_slice = uncompressed.as_ref();
 
-        // bellman serializes points as big endian and in the form x, y
-        // ethereum expects the same order in memory
-        let x = U256::from_big_endian(& uncompressed_slice[0..32]);
-        let y = U256::from_big_endian(& uncompressed_slice[32..64]);
+    // bellman serializes points as big endian and in the form x, y
+    // ethereum expects the same order in memory
+    let x = U256::from_big_endian(& uncompressed_slice[0..32]);
+    let y = U256::from_big_endian(& uncompressed_slice[32..64]);
 
-        (x, y)
+    (x, y)
 }
 
 pub fn serialize_g2_for_ethereum(point: <Bn256 as Engine>::G2Affine) -> ((U256, U256), (U256, U256)) {
-        let uncompressed = point.into_uncompressed();
+    let uncompressed = point.into_uncompressed();
 
-        let uncompressed_slice = uncompressed.as_ref();
+    let uncompressed_slice = uncompressed.as_ref();
 
-        // bellman serializes points as big endian and in the form x1*u, x0, y1*u, y0
-        // ethereum expects the same order in memory
-        let x_1 = U256::from_big_endian(& uncompressed_slice[0..32]);
-        let x_0 = U256::from_big_endian(& uncompressed_slice[32..64]);
-        let y_1 = U256::from_big_endian(& uncompressed_slice[64..96]);
-        let y_0 = U256::from_big_endian(& uncompressed_slice[96..128]);
+    // bellman serializes points as big endian and in the form x1*u, x0, y1*u, y0
+    // ethereum expects the same order in memory
+    let x_1 = U256::from_big_endian(& uncompressed_slice[0..32]);
+    let x_0 = U256::from_big_endian(& uncompressed_slice[32..64]);
+    let y_1 = U256::from_big_endian(& uncompressed_slice[64..96]);
+    let y_0 = U256::from_big_endian(& uncompressed_slice[96..128]);
 
-        ((x_1, x_0), (y_1, y_0))
+    ((x_1, x_0), (y_1, y_0))
 }
 
 pub fn serialize_fe_for_ethereum(field_element: <Bn256 as ScalarEngine>::Fr) -> U256 {
-        let mut be_bytes = [0u8; 32];
-        field_element.into_repr().write_be(& mut be_bytes[..]).expect("get new root BE bytes");
-        let u256 = U256::from_big_endian(&be_bytes[..]);     
-        u256
+    let mut be_bytes = [0u8; 32];
+    field_element.into_repr().write_be(& mut be_bytes[..]).expect("get new root BE bytes");
+    let u256 = U256::from_big_endian(&be_bytes[..]);     
+    u256
+}
+
+pub fn unpack_edwards_point<E: JubjubEngine>(serialized: [u8; 32], params: & E::Params)
+    -> Result<edwards::Point<E, Unknown>, String> 
+{
+    // TxSignature has S and R in compressed form serialized as BE
+    let x_sign = serialized[0] & 0x80 > 0;
+    let mut tmp = serialized.clone();
+    tmp[0] &= 0x7f; // strip the top bit
+
+    // read from byte array
+    let mut y_repr = E::Fr::zero().into_repr();
+    y_repr.read_be(&tmp[..]).expect("read R_y as field element");
+
+    let y = E::Fr::from_repr(y_repr).expect("make y from representation");
+
+    // here we convert it to field elements for all further uses
+    let r = edwards::Point::get_for_y(y, x_sign, params);
+    if r.is_none() {
+        return Err("Invalid R point".to_string());
+    }
+
+    Ok(r.unwrap())
+}
+
+pub fn pack_edwards_point<E: JubjubEngine>(point: edwards::Point<E, Unknown>)
+    -> Result<[u8; 32], String> 
+{   
+    let mut tmp = [0u8; 32];
+    let (y, sign) = point.compress_into_y();
+    y.into_repr().write_be(& mut tmp[..]).expect("write y");
+    if sign {
+        tmp[0] |= 0x80
+    }
+
+    Ok(tmp)
 }
 
 #[test]
