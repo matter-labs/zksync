@@ -119,7 +119,7 @@ pub fn run_proof_pipeline(rx_for_proofs: Receiver<BlockProof>, tx_for_eth: Sende
         let BlockProof(proof, accounts) = msg;
 
         // synchronously commit proof and update accounts in storage
-        let block_number: i32 = 0; // TODO: convert from proof.block_number
+        let block_number: i32 = proof.block_number.as_u32() as i32;
         storage.store_proof(block_number, &to_value(&proof).unwrap());
         storage.update_accounts(accounts);
 
