@@ -3,6 +3,7 @@ use web3::types::U256;
 use ff::{ScalarEngine};
 use pairing::{Engine, CurveAffine};
 use pairing::bn256::{Bn256};
+use bigdecimal::{BigDecimal, ToPrimitive};
 
 // TODO: replace Vec with Iterator?
 
@@ -18,19 +19,25 @@ pub trait GetBitsFixed {
     fn get_bits_le_fixed(&self, n: usize) -> Vec<bool>;
 }
 
-pub fn get_bits_le_fixed(num: u128, n: usize) -> Vec<bool> {
-        let mut r: Vec<bool> = Vec::with_capacity(n);
-        let it_end = if n > 128 { 128 } else { n };
-        let mut tmp = num;
-        for i in 0..it_end {
-            let bit = tmp & 1u128 > 0;
-            r.push(bit);
-            tmp >>= 1;
-        }
-        r.resize(n, false);
-
-        r
+pub fn get_bits_le_fixed_u128(num: u128, n: usize) -> Vec<bool> {
+    let mut r: Vec<bool> = Vec::with_capacity(n);
+    let it_end = if n > 128 { 128 } else { n };
+    let mut tmp = num;
+    for i in 0..it_end {
+        let bit = tmp & 1u128 > 0;
+        r.push(bit);
+        tmp >>= 1;
     }
+    r.resize(n, false);
+
+    r
+}
+
+pub fn get_bits_le_fixed_big_decimal(num: BigDecimal, n: usize) -> Vec<bool> {
+    let as_u128 = num.to_u128().unwrap();
+    
+    get_bits_le_fixed_u128(as_u128, n)
+}
 
 impl<Fr: PrimeField> GetBitsFixed for Fr {
 
