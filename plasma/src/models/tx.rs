@@ -23,6 +23,10 @@ pub struct TransferTx {
     pub nonce:              u32,
     pub good_until_block:   u32,
     pub signature:          TxSignature,
+
+    /// If present, it means that the signature has been verified against this key
+    #[serde(skip)]
+    pub cached_public_key:  Option<PublicKey>,       
 }
 
 impl TransferTx {
