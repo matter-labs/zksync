@@ -3,6 +3,7 @@ use web3::types::U256;
 use ff::{ScalarEngine};
 use pairing::{Engine, CurveAffine};
 use pairing::bn256::{Bn256};
+use bigdecimal::{BigDecimal, ToPrimitive};
 
 // TODO: replace Vec with Iterator?
 
@@ -18,6 +19,25 @@ pub trait GetBitsFixed {
     fn get_bits_le_fixed(&self, n: usize) -> Vec<bool>;
 }
 
+pub fn get_bits_le_fixed_u128(num: u128, n: usize) -> Vec<bool> {
+    let mut r: Vec<bool> = Vec::with_capacity(n);
+    let it_end = if n > 128 { 128 } else { n };
+    let mut tmp = num;
+    for i in 0..it_end {
+        let bit = tmp & 1u128 > 0;
+        r.push(bit);
+        tmp >>= 1;
+    }
+    r.resize(n, false);
+
+    r
+}
+
+pub fn get_bits_le_fixed_big_decimal(num: BigDecimal, n: usize) -> Vec<bool> {
+    let as_u128 = num.to_u128().unwrap();
+    
+    get_bits_le_fixed_u128(as_u128, n)
+}
 
 impl<Fr: PrimeField> GetBitsFixed for Fr {
 
@@ -142,6 +162,28 @@ impl<E: AsRef<[u64]>> Iterator for BitIteratorLe<E> {
             Some(self.t.as_ref()[part] & (1 << bit) > 0)
         }
     }
+}
+
+pub fn pack_bits_into_bytes(
+    bits: Vec<bool>
+) -> Vec<u8> {
+    assert_eq!(bits.len() % 8, 0);
+    let mut message_bytes: Vec<u8> = vec![];
+
+    let byte_chunks = bits.chunks(8);
+    for byte_chunk in byte_chunks
+    {
+        let mut byte = 0u8;
+        for (i, bit) in byte_chunk.into_iter().enumerate()
+        {
+            if *bit {
+                byte |= 1 << i;
+            }
+        }
+        message_bytes.push(byte);
+    }
+
+    message_bytes
 }
 
 #[test]
