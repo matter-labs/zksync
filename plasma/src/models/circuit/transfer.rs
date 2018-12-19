@@ -25,7 +25,7 @@ pub struct Tx<E: JubjubEngine> {
 impl<E: JubjubEngine> Tx<E> {
 
     // TODO: introduce errors if necessary
-    pub fn try_from(transaction: &crate::models::TransferTx) -> Result<Self, String> {
+    pub fn try_from(transaction: &crate::models::TransferTx, params: &E::Params) -> Result<Self, String> {
 
         use bigdecimal::ToPrimitive;
         let encoded_amount_bits = convert_to_float(
@@ -49,7 +49,7 @@ impl<E: JubjubEngine> Tx<E> {
             good_until_block:   E::Fr::from_str(&transaction.good_until_block.to_string()).unwrap(),
 
             // TODO: decode signature
-            signature:          TransactionSignature::try_from(transaction.signature.clone())?,
+            signature:          TransactionSignature::try_from(transaction.signature.clone(), params)?,
         };
 
         Ok(tx)

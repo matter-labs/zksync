@@ -193,12 +193,12 @@ impl PlasmaStateKeeper {
 
     // TODO: remove this function when done with demo
     fn sign_tx(tx: &mut TransferTx, sk: &PrivateKey<Bn256>) {
-        let params = &AltJubjubBn256::new();
+        // let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let mut rng = OsRng::new().unwrap();
 
-        let mut tx_fr = models::circuit::TransferTx::try_from(tx).unwrap();
-        tx_fr.sign(sk, p_g, &params, &mut rng);
+        let mut tx_fr = models::circuit::TransferTx::try_from(tx, &params::JUBJUB_PARAMS).unwrap();
+        tx_fr.sign(sk, p_g, &params::JUBJUB_PARAMS, &mut rng);
 
         let (x, y) = tx_fr.signature.r.into_xy();
         tx.signature = TxSignature{

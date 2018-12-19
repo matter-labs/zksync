@@ -198,7 +198,7 @@ impl BabyProver {
         let transactions = &block.transactions;
 
         for tx in transactions {
-            let tx = models::circuit::TransferTx::try_from(tx).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
+            let tx = models::circuit::TransferTx::try_from(tx, &params::JUBJUB_PARAMS).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
             let tx_bits = tx.public_data_into_bits();
             let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
             encoding.extend(tx_encoding.into_iter());
@@ -230,7 +230,7 @@ impl BabyProver {
         let initial_root = self.accounts_tree.root_hash();
 
         for tx in transactions {
-            let tx = models::circuit::TransferTx::try_from(tx).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
+            let tx = models::circuit::TransferTx::try_from(tx, &params::JUBJUB_PARAMS).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
             let sender_leaf_number = field_element_to_u32(tx.from);
             let recipient_leaf_number = field_element_to_u32(tx.to);
 
