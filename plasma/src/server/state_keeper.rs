@@ -31,7 +31,12 @@ pub enum BlockSource {
     Storage,
 }
 
-pub struct BlockProcessingRequest(pub Block, pub BlockSource);
+//pub struct StateProcessingRequest(pub Block, pub BlockSource);
+
+pub enum StateProcessingRequest{
+    ApplyBlock(Block, BlockSource),
+    GetPubKey(u32, Sender<Option<models::PublicKey>>),
+}
 
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
@@ -107,30 +112,36 @@ impl PlasmaStateKeeper {
     }
 
     pub fn run(&mut self, 
-        rx_for_blocks: Receiver<BlockProcessingRequest>, 
+        rx_for_blocks: Receiver<StateProcessingRequest>, 
         tx_for_commitments: Sender<TransferBlock>,
         tx_for_proof_requests: Sender<Block>)
     {
         for req in rx_for_blocks {
-            let BlockProcessingRequest(block, source) = req;
-            match block {
-                Block::Deposit(_) => unimplemented!(),
-                Block::Exit(_) => unimplemented!(),
-                Block::Transfer(mut block) => {
-                    let applied = self.apply_block_tx(&mut block);
-                    let r = if applied.is_ok() {
-                        tx_for_commitments.send(block.clone());
-                        tx_for_proof_requests.send(Block::Transfer(block));
-                        Ok(())
-                    } else {
-                        Err(block)
-                    };
-                    if let BlockSource::MemPool(sender) = source {
-                        // send result back to mempool
-                        sender.send(r);
+            match req {
+                StateProcessingRequest::ApplyBlock(block, source) => {
+                    match block {
+                        Block::Deposit(_) => unimplemented!(),
+                        Block::Exit(_) => unimplemented!(),
+                        Block::Transfer(mut block) => {
+                            let applied = self.apply_transfer_block(&mut block);
+                            let r = if applied.is_ok() {
+                                tx_for_commitments.send(block.clone());
+                                tx_for_proof_requests.send(Block::Transfer(block));
+                                Ok(())
+                            } else {
+                                Err(block)
+                            };
+                            if let BlockSource::MemPool(sender) = source {
+                                // send result back to mempool
+                                sender.send(r);
+                            }
+                        },
                     }
                 },
-            }   
+                StateProcessingRequest::GetPubKey(account_id, sender) => {
+                    sender.send(self.state.get_pub_key(account_id));
+                },
+            }
         }
     }
 
@@ -138,7 +149,7 @@ impl PlasmaStateKeeper {
         self.state.balance_tree.items.get(&index).unwrap().clone()
     }
 
-    fn apply_block_tx(&mut self, block: &mut TransferBlock) -> Result<(), ()> {
+    fn apply_transfer_block(&mut self, block: &mut TransferBlock) -> Result<(), ()> {
 
         block.block_number = self.state.block_number;
 

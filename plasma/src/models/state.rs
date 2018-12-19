@@ -17,6 +17,13 @@ impl PlasmaState {
         self.balance_tree.items.iter().map(|a| (*a.0 as u32, a.1.clone()) ).collect()
     }
 
+    pub fn get_pub_key(&self, account_id: u32) -> Option<PublicKey> {
+        self.balance_tree.items.get(&account_id).map(|a| {
+            //PublicKey::
+            unimplemented!()
+        })
+    }
+
     pub fn root_hash (&self) -> FieldBytes {
         self.balance_tree.root_hash().clone()
     }
