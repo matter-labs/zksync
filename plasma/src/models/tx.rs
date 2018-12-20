@@ -197,3 +197,21 @@ impl DepositRequest<Engine> {
     }
 
 }
+
+impl ExitRequest<Engine> {
+
+    // TODO: introduce errors if necessary
+    pub fn try_from(request: &crate::models::ExitTx) -> Result<Self, String> {
+
+        use bigdecimal::ToPrimitive;
+
+        let req = Self {
+            // TODO: these conversions are ugly and inefficient, replace with idiomatic std::convert::From trait
+            from:               Fr::from_str(&request.account.to_string()).unwrap(),
+            amount:             Fr::zero(),
+        };
+
+        Ok(req)
+    }
+
+}

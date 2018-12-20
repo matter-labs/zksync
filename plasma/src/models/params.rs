@@ -24,8 +24,17 @@ pub const SIGNATURE_R_Y_BIT_WIDTH: usize = 256;
 // Fr element encoding 
 pub const FR_BIT_WIDTH: usize = 256;
 
+// this account does NOT have a public key, so can not spend
+// but it does not prevent an exit snark to work properly
+pub const SPECIAL_ACCOUNT_EXIT: u32 = 0;
+
+// This account does have a proper public key, and a set of deposit requests
+// to this account virtually padded by the smart-contract
+pub const SPECIAL_ACCOUNT_DEPOSIT: u32 = 1;
+
 use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
 
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
 }
+

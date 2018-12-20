@@ -7,10 +7,10 @@ use crypto::sha2::Sha256;
 use crypto::digest::Digest;
 
 use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
-use pairing::bn256::{Bn256, Fr};
+use crate::models::{Engine, Fr};
 use sapling_crypto::circuit::float_point::parse_float_to_u128;
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
-use sapling_crypto::jubjub::{edwards, Unknown};
+use sapling_crypto::jubjub::{JubjubEngine, JubjubParams, edwards, Unknown};
 
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
 
@@ -37,8 +37,21 @@ use crate::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, se
 
 use web3::types::{U256};
 
-type BabyProof = Proof<Bn256>;
-type BabyParameters = Parameters<Bn256>;
+pub struct Prover<E:JubjubEngine> {
+    pub transfer_batch_size: usize,
+    pub deposit_batch_size: usize,
+    pub exit_batch_size: usize,
+    pub block_number: u32,
+    pub accounts_tree: AccountTree,
+    pub transfer_parameters: BabyParameters,
+    pub deposit_parameters: BabyParameters,
+    pub exit_parameters: BabyParameters,
+    pub jubjub_params: E::Params,
+}
+
+pub type BabyProof = Proof<Engine>;
+pub type BabyParameters = Parameters<Engine>;
+pub type BabyProver = Prover<Engine>;
 
 #[derive(Debug)]
 pub enum BabyProverErr {
@@ -74,18 +87,6 @@ impl fmt::Display for BabyProverErr {
             write!(f, "{}", self.description())
         }
     }
-}
-
-pub struct BabyProver {
-    pub transfer_batch_size: usize,
-    pub deposit_batch_size: usize,
-    pub exit_batch_size: usize,
-    pub block_number: u32,
-    pub accounts_tree: AccountTree,
-    pub transfer_parameters: BabyParameters,
-    pub deposit_parameters: BabyParameters,
-    pub exit_parameters: BabyParameters,
-    pub jubjub_params: AltJubjubBn256,
 }
 
 #[derive(Debug)]
@@ -238,24 +239,42 @@ impl BabyProver {
     }
 
     pub fn encode_deposit_transactions(block: &DepositBlock) -> Result<Vec<u8>, Err> {
-        let mut encoding: Vec<u8> = vec![];
+        return Ok(vec![]);
+        // let mut encoding: Vec<u8> = vec![];
         
-        let transactions = &block.transactions;
+        // let transactions = &block.transactions;
 
-        for tx in transactions {
-            let tx = models::circuit::DepositRequest::try_from(tx).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
-            let tx_bits = tx.public_data_into_bits();
-            let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
-            encoding.extend(tx_encoding.into_iter());
-        }
+        // for tx in transactions {
+        //     let tx = models::circuit::DepositRequest::try_from(tx).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
+        //     let tx_bits = tx.public_data_into_bits();
+        //     let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
+        //     encoding.extend(tx_encoding.into_iter());
+        // }
 
-        Ok(encoding)
+        // Ok(encoding)
+    }
+
+    // this method is different, it actually reads the state 
+    pub fn encode_exit_transactions(block: &ExitBlock) -> Result<Vec<u8>, Err> {
+        return Ok(vec![]);
+        // let mut encoding: Vec<u8> = vec![];
+        
+        // let transactions = &block.transactions;
+
+        // for tx in transactions {
+        //     let tx = models::circuit::ExitRequest::try_from(tx).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
+        //     let tx_bits = tx.public_data_into_bits();
+        //     let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
+        //     encoding.extend(tx_encoding.into_iter());
+        // }
+
+        // Ok(encoding)
     }
 
     pub fn apply_and_prove(&mut self, block: Block) -> Result<FullBabyProof, Err> {
         match block {
             Block::Deposit(block) => {
-                unimplemented!()
+                return self.apply_and_prove_deposit(&block);
             },
             Block::Exit(block) => {
                 unimplemented!()
@@ -283,7 +302,7 @@ impl BabyProver {
             return Err(BabyProverErr::Unknown);
         }
 
-        let mut witnesses: Vec<(Transaction<Bn256>, TransactionWitness<Bn256>)> = vec![];
+        let mut witnesses: Vec<(Transaction<Engine>, TransactionWitness<Engine>)> = vec![];
 
         let mut total_fees = Fr::zero();
 
@@ -366,16 +385,16 @@ impl BabyProver {
 
                 let recipient_leaf = recipient_leaf.unwrap();
 
-                let transaction_witness = TransactionWitness::<Bn256>{
+                let transaction_witness = TransactionWitness::<Engine>{
                     auth_path_from:     path_from,
-                    leaf_from:          LeafWitness::<Bn256>{
+                    leaf_from:          LeafWitness::<Engine>{
                                             balance:    Some(sender_leaf.balance),
                                             nonce:      Some(sender_leaf.nonce),
                                             pub_x:      Some(sender_leaf.pub_x),
                                             pub_y:      Some(sender_leaf.pub_y),
                                         },
                     auth_path_to:       path_to,
-                    leaf_to:            LeafWitness::<Bn256>{
+                    leaf_to:            LeafWitness::<Engine>{
                                             balance:    Some(recipient_leaf.balance),
                                             nonce:      Some(recipient_leaf.nonce),
                                             pub_x:      Some(recipient_leaf.pub_x),
@@ -495,7 +514,7 @@ impl BabyProver {
         Ok(full_proof)
     }
 
-    // Apply transactions to the state while also making a witness for proof, then calculate proof
+    // TODO: sort accounts!
     pub fn apply_and_prove_deposit(&mut self, block: &DepositBlock) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.block_number {
@@ -512,7 +531,7 @@ impl BabyProver {
             return Err(BabyProverErr::Unknown);
         }
 
-        let mut witnesses: Vec<(DepositRequest<Bn256>, DepositWitness<Bn256>)> = vec![];
+        let mut witnesses: Vec<(DepositRequest<Engine>, DepositWitness<Engine>)> = vec![];
 
         let initial_root = self.accounts_tree.root_hash();
 
@@ -560,9 +579,9 @@ impl BabyProver {
             tree.insert(into_leaf_number, new_leaf.clone());
 
             {
-                let deposit_witness = DepositWitness::<Bn256>{
+                let deposit_witness = DepositWitness::<Engine>{
                     auth_path:     path,
-                    leaf:          LeafWitness::<Bn256>{
+                    leaf:          LeafWitness::<Engine>{
                                         balance:    Some(old_leaf.balance),
                                         nonce:      Some(old_leaf.nonce),
                                         pub_x:      Some(old_leaf.pub_x),
@@ -660,6 +679,184 @@ impl BabyProver {
         let p = proof.unwrap();
 
         let pvk = prepare_verifying_key(&self.deposit_parameters.vk);
+
+        let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]).unwrap();
+        
+        if !success {
+            return Err(BabyProverErr::Unknown);
+        }
+        println!("Proof generation is complete");
+
+        let full_proof = FullBabyProof{
+            proof: p,
+            inputs: [initial_root, final_root, public_data_commitment],
+            total_fees: Fr::zero(),
+            block_number: block_number,
+            public_data: public_data, // it's effectively zero
+        };
+
+        Ok(full_proof)
+    }
+
+    // TODO: sort accounts!
+    pub fn apply_and_prove_exit(&mut self, block: &ExitBlock) -> Result<FullBabyProof, Err> {
+        let block_number = block.block_number;
+        if block_number != self.block_number {
+            return Err(BabyProverErr::Unknown);
+        }
+        let block_final_root = block.new_root_hash.clone();
+
+        let transactions = &block.transactions;
+        let num_txes = transactions.len();
+
+        if num_txes != self.deposit_batch_size {
+            return Err(BabyProverErr::Unknown);
+        }
+
+        let mut witnesses: Vec<(ExitRequest<Engine>, ExitWitness<Engine>)> = vec![];
+
+        let initial_root = self.accounts_tree.root_hash();
+
+        // we also need to create public data cause we need info from state
+        let mut public_data: Vec<u8> = vec![];
+
+        for tx in transactions {
+            let tx = models::circuit::ExitRequest::try_from(tx).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
+            
+            let from_leaf_number = field_element_to_u32(tx.from);
+            
+            let tree = &mut self.accounts_tree;
+            let items = tree.items.clone();
+
+            let existing_leaf = items.get(&from_leaf_number);
+
+            if existing_leaf.is_none() {
+                return Err(BabyProverErr::Unknown);
+            }
+
+            let old_leaf = existing_leaf.unwrap();
+
+            let new_leaf = Account::default();
+
+            let path: Vec<Option<Fr>> = tree.merkle_path(from_leaf_number).into_iter().map(|e| Some(e.0)).collect();
+
+            let request = ExitRequest {
+                from: Fr::from_str(&from_leaf_number.to_string()),
+                amount: Some(old_leaf.balance),
+            };
+
+            // we have the leaf info, so add it to the public data
+            let tx_bits = request.public_data_into_bits();
+            let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
+            public_data.extend(tx_encoding.into_iter());
+
+            tree.insert(from_leaf_number, new_leaf.clone());
+
+            {
+                let deposit_witness = ExitWitness::<Engine>{
+                    auth_path:     path,
+                    leaf:          LeafWitness::<Engine>{
+                                        balance:    Some(old_leaf.balance),
+                                        nonce:      Some(old_leaf.nonce),
+                                        pub_x:      Some(old_leaf.pub_x),
+                                        pub_y:      Some(old_leaf.pub_y),
+                                    },                     
+                };
+
+                let witness = (request.clone(), deposit_witness);
+
+                witnesses.push(witness);
+            }
+        }
+
+        let block_number = Fr::from_str(&block_number.to_string()).unwrap();
+
+        let final_root = self.accounts_tree.root_hash();
+
+        if initial_root == final_root {
+            return Err(BabyProverErr::Unknown);
+        }
+
+        println!("Prover final root = {}, final root from state keeper = {}", final_root, block_final_root);
+
+        if block_final_root != final_root {
+            return Err(BabyProverErr::Unknown);
+        }
+
+        self.block_number += 1;
+
+        let mut public_data_initial_bits = vec![];
+
+        // these two are BE encodings because an iterator is BE. This is also an Ethereum standard behavior
+
+        let block_number_bits: Vec<bool> = BitIterator::new(block_number.into_repr()).collect();
+        for _ in 0..256-block_number_bits.len() {
+            public_data_initial_bits.push(false);
+        }
+        public_data_initial_bits.extend(block_number_bits.into_iter());
+
+        assert_eq!(public_data_initial_bits.len(), 256);
+
+        let mut h = Sha256::new();
+
+        let bytes_to_hash = be_bit_vector_into_bytes(&public_data_initial_bits);
+
+        h.input(&bytes_to_hash);
+
+        let mut hash_result = [0u8; 32];
+        h.result(&mut hash_result[..]);
+
+        {    
+            let packed_transaction_data_bytes = public_data.clone();
+        
+            let mut next_round_hash_bytes = vec![];
+            next_round_hash_bytes.extend(hash_result.iter());
+            next_round_hash_bytes.extend(packed_transaction_data_bytes);
+
+            let mut h = Sha256::new();
+
+            h.input(&next_round_hash_bytes);
+
+            h.result(&mut hash_result[..]);
+        }
+
+        // clip to fit into field element
+
+        hash_result[0] &= 0x1f; // temporary solution
+
+        let mut repr = Fr::zero().into_repr();
+        repr.read_be(&hash_result[..]).expect("pack hash as field element");
+        
+        let public_data_commitment = Fr::from_repr(repr).unwrap();
+
+        let empty_leaf_witness = LeafWitness::<Engine> {
+            balance:    Some(Fr::zero()),
+            nonce:      Some(Fr::zero()),
+            pub_x:      Some(Fr::zero()),
+            pub_y:      Some(Fr::zero()),
+        };
+
+        let instance = Exit {
+            params: &self.jubjub_params,
+            number_of_exits: num_txes,
+            old_root: Some(initial_root),
+            new_root: Some(final_root),
+            public_data_commitment: Some(public_data_commitment),
+            empty_leaf_witness: empty_leaf_witness,
+            block_number: Some(block_number),
+            requests: witnesses.clone(),
+        };
+
+        let mut rng = OsRng::new().unwrap();
+        println!("Prover has started to work");
+        let proof = create_random_proof(instance, &self.exit_parameters, & mut rng);
+        if proof.is_err() {
+            return Err(BabyProverErr::Unknown);
+        }
+
+        let p = proof.unwrap();
+
+        let pvk = prepare_verifying_key(&self.exit_parameters.vk);
 
         let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]).unwrap();
         

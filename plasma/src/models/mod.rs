@@ -13,8 +13,8 @@ pub use self::account::Account;
 pub use self::tx::{TransferTx, DepositTx, ExitTx, TxSignature};
 pub use self::state::PlasmaState;
 
-type Engine = bn256::Bn256;
-type Fr = bn256::Fr;
+pub type Engine = bn256::Bn256;
+pub type Fr = bn256::Fr;
 
 pub type AccountTree = SparseMerkleTree<Account, Fr, PedersenHasher<Engine>>;
 
