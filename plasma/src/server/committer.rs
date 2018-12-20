@@ -66,13 +66,13 @@ pub fn run_commitment_pipeline(rx_for_commitments: Receiver<Block>, tx_for_eth: 
     for block in rx_for_commitments {
         let commitment = {
             match block {
-                Block::Deposit(mut block) => {
+                Block::Deposit(block) => {
                     unimplemented!()
                 },
-                Block::Exit(mut block) => {
+                Block::Exit(block) => {
                     unimplemented!()
                 },
-                Block::Transfer(mut block) => {
+                Block::Transfer(block) => {
                     let new_root = block.new_root_hash.clone();
                     println!("Commiting to new root = {}", new_root);
                     let block_number = block.block_number;

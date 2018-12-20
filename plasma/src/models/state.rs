@@ -49,9 +49,9 @@ impl PlasmaState {
         let mut from = self.balance_tree.items.get(&tx.from).ok_or(())?.clone();
 
         // TODO: take from `from` instead and uncomment below
-        //let pub_key = self.get_pub_key(tx.from).unwrap();
-        //let verified_against = tx.cached_pub_key.ok_or(())?;
-        //if pub_key != verified_against { return Err(()); }
+        let pub_key = self.get_pub_key(tx.from).unwrap();
+        let verified_against = tx.cached_pub_key.as_ref().ok_or(())?;
+        if pub_key.0 != verified_against.0 { return Err(()); }
 
         if from.balance < tx.amount { return Err(()); }
         if from.nonce != tx.nonce { return Err(()); }
