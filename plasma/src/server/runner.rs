@@ -17,7 +17,7 @@ pub fn run() {
     // create channel to accept deserialized requests for new transacitons
 
     let (tx_for_tx, rx_for_tx) = channel::<TransferTx>();
-    let (tx_for_blocks, rx_for_blocks) = channel::<StateProcessingRequest>();
+    let (tx_for_state, rx_for_state) = channel::<StateProcessingRequest>();
     let (tx_for_proof_requests, rx_for_proof_requests) = channel::<Block>();
     let (tx_for_commitments, rx_for_commitments) = channel::<Block>();
     let (tx_for_proofs, rx_for_proofs) = channel::<BlockProof>();
@@ -32,21 +32,22 @@ pub fn run() {
 
     println!("starting actors");
 
+    let tx_for_state_copy = tx_for_state.clone();
     thread::spawn(move || {
-        run_api_server(tx_for_tx);
+        run_api_server(tx_for_tx, tx_for_state_copy);
     });
 
-    let tx_for_blocks2 = tx_for_blocks.clone();
+    let tx_for_state_copy = tx_for_state.clone();
     thread::spawn(move || {  
-        mem_pool.run(rx_for_tx, tx_for_blocks2);
+        mem_pool.run(rx_for_tx, tx_for_state_copy);
     });
 
     thread::spawn(move || {  
-        eth_watch.run(tx_for_blocks);
+        eth_watch.run(tx_for_state);
     });
 
     thread::spawn(move || {
-        state_keeper.run(rx_for_blocks, tx_for_commitments, tx_for_proof_requests);
+        state_keeper.run(rx_for_state, tx_for_commitments, tx_for_proof_requests);
     });
 
     thread::spawn(move || {

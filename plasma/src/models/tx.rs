@@ -23,6 +23,10 @@ pub struct TransferTx {
     pub nonce:              u32,
     pub good_until_block:   u32,
     pub signature:          TxSignature,
+
+    /// If present, it means that the signature has been verified against this key
+    #[serde(skip)]
+    pub cached_pub_key:     Option<PublicKey>,       
 }
 
 impl TransferTx {
@@ -56,7 +60,7 @@ impl TransferTx {
 
     pub fn verify_sig(
             &self, 
-            public_key: PublicKey
+            public_key: &PublicKey
         ) -> bool {
         let message_bits = self.message_bits();
         let as_bytes = pack_bits_into_bytes(message_bits);
