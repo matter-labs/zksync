@@ -192,22 +192,6 @@ impl BabyProver {
         Ok(p)
     }
 
-    // Takes public data from transactions for further commitment to Ethereum
-    pub fn encode_transactions(block: Block) -> Result<Vec<u8>, Err> {
-
-        match block {
-            Block::Deposit(block) => {
-                unimplemented!()
-            },
-            Block::Exit(block) => {
-                unimplemented!()
-            },
-            Block::Transfer(block) => {
-                return Self::encode_transfer_transactions(&block);
-            },
-        }
-    }
-
     pub fn encode_transfer_transactions(block: &TransferBlock) -> Result<Vec<u8>, Err> {
         let mut encoding: Vec<u8> = vec![];
         

@@ -129,39 +129,33 @@ impl PlasmaStateKeeper {
 
     pub fn run(&mut self, 
         rx_for_blocks: Receiver<StateProcessingRequest>, 
-        tx_for_commitments: Sender<Block>,
+        tx_for_commitments: Sender<TransferBlock>,
         tx_for_proof_requests: Sender<Block>)
     {
         for req in rx_for_blocks {
             match req {
                 StateProcessingRequest::ApplyBlock(block, source) => {
-                    match block {
+                    let applied = match block {
                         Block::Deposit(mut block) => {
                             let applied = self.apply_deposit_block(&mut block);
-                            let r = if applied.is_ok() {
-                                tx_for_commitments.send(Block::Deposit(block.clone()));
+                            if applied.is_ok() {
+                                //tx_for_commitments.send(Block::Deposit(block.clone()));
                                 tx_for_proof_requests.send(Block::Deposit(block));
-                                Ok(())
-                            } else {
-                                Err(block)
                             };
                             // can not send back anywhere due to Ethereum contract being immutable
                         },
                         Block::Exit(mut block) => {
                             let applied = self.apply_exit_block(&mut block);
-                            let r = if applied.is_ok() {
-                                tx_for_commitments.send(Block::Exit(block.clone()));
+                            if applied.is_ok() {
+                                //tx_for_commitments.send(Block::Exit(block.clone()));
                                 tx_for_proof_requests.send(Block::Exit(block));
-                                Ok(())
-                            } else {
-                                Err(block)
                             };
                             // can not send back anywhere due to Ethereum contract being immutable
                         },
                         Block::Transfer(mut block) => {
                             let applied = self.apply_transfer_block(&mut block);
                             let r = if applied.is_ok() {
-                                tx_for_commitments.send(Block::Transfer(block.clone()));
+                                tx_for_commitments.send(block.clone());
                                 tx_for_proof_requests.send(Block::Transfer(block));
                                 Ok(())
                             } else {
@@ -172,7 +166,7 @@ impl PlasmaStateKeeper {
                                 sender.send(r);
                             }
                         },
-                    }
+                    };
                 },
                 StateProcessingRequest::GetPubKey(account_id, sender) => {
                     sender.send(self.state.get_pub_key(account_id));
