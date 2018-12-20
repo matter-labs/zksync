@@ -4,11 +4,11 @@ import {Plasma} from "./Plasma.sol";
 
 contract PlasmaDepositor is Plasma {
 
-    uint256 constant DEPOSIT_BATCH_SIZE = 32;
-    uint256 totalDepositRequests; // enumerates total number of deposit, starting from 0
-    uint256 lastCommittedDepositBatch;
-    uint256 lastVerifiedDepositBatch;
-    uint128 currentDepositBatchFee; // deposit request fee scaled units
+    uint256 constant DEPOSIT_BATCH_SIZE = 1;
+    uint256 public totalDepositRequests; // enumerates total number of deposit, starting from 0
+    uint256 public lastCommittedDepositBatch;
+    uint256 public lastVerifiedDepositBatch;
+    uint128 public currentDepositBatchFee; // deposit request fee scaled units
 
     uint24 public nextAccountToRegister;
 
@@ -73,7 +73,7 @@ contract PlasmaDepositor is Plasma {
         Account memory accountInformation = accounts[accountID];
 
         // work with a deposit
-        uint256 currentBatch = totalDepositRequests/DEPOSIT_BATCH_SIZE;
+        uint256 currentBatch = totalDepositRequests / DEPOSIT_BATCH_SIZE;
         // write aux info about the batch
         DepositBatch storage batch = depositBatches[currentBatch];
         // amount of time for an operator to process a batch is counted

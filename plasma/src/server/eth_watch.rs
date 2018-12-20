@@ -10,7 +10,7 @@ use crate::models::{Block};
 use super::state_keeper::StateProcessingRequest;
 
 use std::time;
-use rustc_hex::FromHex;
+use rustc_hex::{FromHex, ToHex};
 use web3::contract::{Contract, Options};
 use web3::futures::{Future, Stream};
 use web3::types::{Address, U256, H160, H256, U128, FilterBuilder, BlockNumber};
@@ -18,13 +18,13 @@ use web3::types::{Address, U256, H160, H256, U128, FilterBuilder, BlockNumber};
 type ABI = (&'static [u8], &'static str);
 
 pub const TEST_PLASMA_ALWAYS_VERIFY: ABI = (
-    include_bytes!("../../contracts/bin/contracts_Plasma_sol_PlasmaTest.abi"),
-    include_str!("../../contracts/bin/contracts_Plasma_sol_PlasmaTest.bin"),
+    include_bytes!("../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.abi"),
+    include_str!("../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.bin"),
 );
 
 pub const PROD_PLASMA: ABI = (
-    include_bytes!("../../contracts/bin/contracts_Plasma_sol_Plasma.abi"),
-    include_str!("../../contracts/bin/contracts_Plasma_sol_Plasma.bin"),
+    include_bytes!("../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.abi"),
+    include_str!("../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.bin"),
 );
 
 pub struct EthWatch {
@@ -56,11 +56,11 @@ impl EthWatch {
     pub fn new(start_from_block: u64, lag: u64) -> Self {
 
         let this = Self{
-            last_processed_block: start_from_block - 1,
+            last_processed_block: start_from_block,
             blocks_lag: lag,
             web3_url:       env::var("WEB3_URL").unwrap_or("http://localhost:8545".to_string()),
-            contract_addr:  H160::from_str(&env::var("CONTRACT_ADDR").unwrap_or("616e08c733fe20e99bf70c5088635694d5e25c54".to_string())).unwrap(),
-            contract:       ethabi::Contract::load(PROD_PLASMA.0).unwrap(),
+            contract_addr:  H160::from_str(&env::var("CONTRACT_ADDR").unwrap_or("657f6104c70a6E9e4783C2288D3a90008D0E9d58".to_string())).unwrap(),
+            contract:       ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap(),
             last_deposit_batch_timestamp: time::Instant::now(),
             last_exit_batch_timestamp: time::Instant::now(),
             batch_accumulation_duration: time::Duration::from_secs(300),
@@ -68,7 +68,7 @@ impl EthWatch {
             last_exit_batch: U256::from(0),
             current_deposit_batch_fee: U128::from(0),
             current_exit_batch_fee: U128::from(0),
-            deposit_batch_size: U256::from(0),
+            deposit_batch_size: U256::from(1),
             exit_batch_size: U256::from(0),
         };
 
@@ -92,10 +92,12 @@ impl EthWatch {
 
 
         loop {
+            std::thread::sleep(time::Duration::from_secs(1));
             let last_block_number = web3.eth().block_number().wait();
             if last_block_number.is_err() {
                 continue
             }
+            println!("Last block number = {}", last_block_number.clone().unwrap().as_u64());
             if last_block_number.unwrap().as_u64() == self.last_processed_block + self.blocks_lag {
                 continue
             }
@@ -123,19 +125,29 @@ impl EthWatch {
         contract: &Contract<T>)
     -> Result<(), ()>
     {
+        println!("Checking for state for block {}", block_number);
         let total_deposit_requests_result: Result<U256, _> = contract.query("totalDepositRequests", (), None, Options::default(), Some(BlockNumber::Number(block_number))).wait();
 
         if total_deposit_requests_result.is_err() {
+            println!("Error getting total deposit requets {}", total_deposit_requests_result.err().unwrap());
             return Err(());
         }
 
-        let batch_number = total_deposit_requests_result.unwrap()/ self.deposit_batch_size;
+        println!("Checking a batch number");
+
+        let total_deposit_requests = total_deposit_requests_result.unwrap();
+
+        println!("Total deposit requests = {}", total_deposit_requests);
+
+        let batch_number = total_deposit_requests / self.deposit_batch_size;
+
+        println!("Batch number = {}", batch_number.clone());
 
         if batch_number == self.last_deposit_batch {
             if time::Instant::now() >= self.last_deposit_batch_timestamp + self.batch_accumulation_duration {
                 // TODO: bump batch number or leave it for another service
             } else {
-                return Err(());
+                return Ok(());
             }
         }
 
@@ -145,28 +157,46 @@ impl EthWatch {
         // event LogDepositRequest(uint256 indexed batchNumber, uint24 indexed accountID, uint256 indexed publicKey, uint128 amount);
 
         let deposits_filter = FilterBuilder::default()
-                    .address(vec![contract.address()])
+                    // .address(vec![contract.address()])
                     .topics(
                         Some(vec![deposit_event_topic]),
-                        Some(vec![H256::from(batch_number)]),
+                        Some(vec![H256::from(self.last_deposit_batch.clone())]),
                         None,
                         None,
                     )
                     .build();
 
-        let deposit_events_filter_result = web3.eth_filter().create_logs_filter(deposits_filter).wait();
+        let deposit_events_filter_result = web3.eth().logs(deposits_filter).wait();
 
         if deposit_events_filter_result.is_err() {
+            println!("Error getting total deposit requets {}", deposit_events_filter_result.err().unwrap());
             return Err(());
         }
 
-        let deposit_events = deposit_events_filter_result.unwrap().logs().wait();
+        let deposit_events = deposit_events_filter_result.unwrap();
+
+        println!("Events in this block = {}", deposit_events.len());
 
         for deposit in deposit_events {
-            println!("Deposit = {}", deposit[0].topics[0]);
+            let data_bytes: Vec<u8> = deposit.data.0;
+            let account_id = U256::from(deposit.topics[2]);
+            let public_key = U256::from(deposit.topics[3]);
+            let deposit_amount = U256::from_big_endian(&data_bytes);
+            println!("Deposit from {:x}, key {:x}, amount {:x}", account_id, public_key, deposit_amount);
         }
+
+        self.last_deposit_batch = self.last_deposit_batch + U256::from(1);
 
         Ok(())
     }
 
+}
+
+#[test]
+fn test_eth_watcher() {
+
+    let mut client = EthWatch::new(0, 0);
+    let (tx_for_state, rx_for_state) = std::sync::mpsc::channel::<StateProcessingRequest>();
+
+    client.run(tx_for_state);
 }

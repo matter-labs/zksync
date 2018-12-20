@@ -18,13 +18,13 @@ pub type U32 = u64; // because missing in web3::types; u64 is fine since only us
 type ABI = (&'static [u8], &'static str);
 
 pub const TEST_PLASMA_ALWAYS_VERIFY: ABI = (
-    include_bytes!("../../contracts/bin/contracts_Plasma_sol_PlasmaTest.abi"),
-    include_str!("../../contracts/bin/contracts_Plasma_sol_PlasmaTest.bin"),
+    include_bytes!("../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.abi"),
+    include_str!("../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.bin"),
 );
 
 pub const PROD_PLASMA: ABI = (
-    include_bytes!("../../contracts/bin/contracts_Plasma_sol_Plasma.abi"),
-    include_str!("../../contracts/bin/contracts_Plasma_sol_Plasma.bin"),
+    include_bytes!("../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.abi"),
+    include_str!("../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.bin"),
 );
 
 pub struct ETHClient {

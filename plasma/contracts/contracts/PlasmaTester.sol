@@ -5,6 +5,8 @@ import {PlasmaDepositor} from "./PlasmaDepositor.sol";
 import {PlasmaExitor} from "./PlasmaExitor.sol";
 
 contract PlasmaTester is PlasmaDepositor, PlasmaExitor, PlasmaTransactor {
+    uint256 constant DEPOSIT_BATCH_SIZE = 1;
+
     uint24 constant operatorsAccounts = 4;
     uint24 public nextAccountToRegister = operatorsAccounts;
 
