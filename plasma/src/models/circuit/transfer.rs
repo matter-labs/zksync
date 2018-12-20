@@ -41,6 +41,7 @@ impl <E: JubjubEngine> Tx<E> {
         to.reverse();
         to.truncate(params::BALANCE_TREE_DEPTH);
         to.reverse();
+        
         let mut amount: Vec<bool> = BitIterator::new(self.amount.into_repr()).collect();
         amount.reverse();
         amount.truncate(params::AMOUNT_EXPONENT_BIT_WIDTH + params::AMOUNT_MANTISSA_BIT_WIDTH);

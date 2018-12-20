@@ -883,11 +883,6 @@ fn apply_transaction<E, CS>(
         |lc| lc + new_balance_from.get_variable() + fee.get_variable() + amount.get_variable()
     );
 
-    // let number_of_bits_in_recipient = count_number_of_ones(
-    //     cs.namespace(|| "number of non-zero bits in recipient address"),
-    //     &from_path_bits
-    // )?;
-
     let recipient_is_zero = AllocatedNum::alloc(
         cs.namespace(|| "recipient is zero"),
         || {
@@ -920,6 +915,14 @@ fn apply_transaction<E, CS>(
         |lc| lc + recipient_is_zero.get_variable(),
         |lc| lc + to_address_allocated.get_variable(),
         |lc| lc
+    );
+
+    // if to == 0 recipient_is_zero must not be zero
+    cs.enforce(
+        || "enforce recipient_is_zero is not zero when to is zero",
+        |lc| lc + to_address_allocated.get_variable() + recipient_is_zero.get_variable(),
+        |lc| lc + CS::one() - recipient_is_zero.get_variable(),
+        |lc| lc + to_address_allocated.get_variable()
     );
 
     // Ok, now a tricky part for an account zero having a special meaning
