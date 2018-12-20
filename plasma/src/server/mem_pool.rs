@@ -15,7 +15,7 @@ impl MemPool {
 
     pub fn new() -> Self {
         Self{
-            batch_size : config::TX_BATCH_SIZE,
+            batch_size : config::TRANSFER_BATCH_SIZE,
             current_block: TransferBlock::default(),
         }
     }

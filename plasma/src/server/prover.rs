@@ -10,20 +10,30 @@ use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
 use pairing::bn256::{Bn256, Fr};
 use sapling_crypto::circuit::float_point::parse_float_to_u128;
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
+use sapling_crypto::jubjub::{edwards, Unknown};
 
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
 
-use crate::models::{self, params, TransferBlock, Block, PlasmaState};
+use crate::models::{self, params, TransferBlock, DepositBlock, ExitBlock, Block, PlasmaState};
 use crate::models::circuit::{Account, AccountTree};
 
-use super::config::TX_BATCH_SIZE;
+use super::config::{TRANSFER_BATCH_SIZE, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE};
 
 use super::committer::{self, EncodedProof, BlockProof};
 
-use super::super::circuit::utils::be_bit_vector_into_bytes;
-use super::super::circuit::transfer::transaction::{Transaction};
-use super::super::circuit::transfer::circuit::{Transfer, TransactionWitness, LeafWitness};
-use super::super::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum, field_element_to_u32};
+use crate::circuit::utils::be_bit_vector_into_bytes;
+use crate::circuit::transfer::transaction::{Transaction};
+use crate::circuit::leaf::{LeafWitness};
+use crate::circuit::deposit::deposit_request::{DepositRequest};
+use crate::circuit::deposit::circuit::{Deposit, DepositWitness};
+use crate::circuit::exit::exit_request::{ExitRequest};
+use crate::circuit::exit::circuit::{Exit, ExitWitness};
+
+use crate::circuit::transfer::circuit::{
+    Transfer, 
+    TransactionWitness};
+
+use crate::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum, field_element_to_u32};
 
 use web3::types::{U256};
 
@@ -67,10 +77,14 @@ impl fmt::Display for BabyProverErr {
 }
 
 pub struct BabyProver {
-    pub batch_size: usize,
+    pub transfer_batch_size: usize,
+    pub deposit_batch_size: usize,
+    pub exit_batch_size: usize,
     pub block_number: u32,
     pub accounts_tree: AccountTree,
-    pub parameters: BabyParameters,
+    pub transfer_parameters: BabyParameters,
+    pub deposit_parameters: BabyParameters,
+    pub exit_parameters: BabyParameters,
     pub jubjub_params: AltJubjubBn256,
 }
 
@@ -83,24 +97,49 @@ pub struct FullBabyProof {
     public_data: Vec<u8>,
 }
 
+fn read_parameters(file_name: &str) -> Result<BabyParameters, BabyProverErr> {
+    use std::fs::File;
+    use std::io::{BufReader};
+
+    let f_r = File::open("transfer_pk.key");   
+    if f_r.is_err() {
+        return Err(BabyProverErr::IoError(f_r.err().unwrap()));
+    }
+    let mut r = BufReader::new(f_r.unwrap());
+    let circuit_params = BabyParameters::read(& mut r, true);
+
+    if circuit_params.is_err() {
+        return Err(BabyProverErr::IoError(circuit_params.err().unwrap()));
+    }
+
+    Ok(circuit_params.unwrap())
+}
+
 impl BabyProver {
 
     pub fn create(initial_state: &PlasmaState) -> Result<BabyProver, BabyProverErr> {
-        use std::fs::File;
-        use std::io::{BufReader};
-
         println!("Reading proving key, may take a while");
 
-        let f_r = File::open("pk.key");
-        if f_r.is_err() {
-            return Err(BabyProverErr::IoError(f_r.err().unwrap()));
+        let transfer_circuit_params = read_parameters("transfer_pk.key");
+        if transfer_circuit_params.is_err() {
+            return Err(transfer_circuit_params.err().unwrap());
         }
-        let mut r = BufReader::new(f_r.unwrap());
-        let circuit_params = BabyParameters::read(& mut r, true);
 
-        if circuit_params.is_err() {
-            return Err(BabyProverErr::IoError(circuit_params.err().unwrap()));
+        println!("Done reading transfer key");
+
+        let deposit_circuit_params = read_parameters("deposit_pk.key");
+        if deposit_circuit_params.is_err() {
+            return Err(deposit_circuit_params.err().unwrap());
         }
+
+        println!("Done reading deposit key");
+
+        let exit_circuit_params = read_parameters("exit_pk.key");
+        if exit_circuit_params.is_err() {
+            return Err(exit_circuit_params.err().unwrap());
+        }
+
+        println!("Done reading exit key");
 
         println!("Copying states to balance tree");
 
@@ -126,26 +165,17 @@ impl BabyProver {
             return Err(BabyProverErr::Unknown);
         }
 
-        let parameters = circuit_params.unwrap();
-
         let jubjub_params = AltJubjubBn256::new();
 
-        // println!("Verificaiton key alpha g1 == {}", params.vk.alpha_g1);
-        // println!("Verificaiton key beta g2 == {}", params.vk.beta_g2);
-        // println!("Verificaiton key gamma g2 == {}", params.vk.gamma_g2);
-        // println!("Verificaiton key delta g2 == {}", params.vk.delta_g2);
-
-        // let ic_keys = params.vk.ic.clone();
-
-        // for (i, ic) in ic_keys.into_iter().enumerate() {
-        //     println!("Verificaiton key for input {} == {}", i, ic);
-        // }
-
         Ok(Self{
-            batch_size: TX_BATCH_SIZE,
+            transfer_batch_size: TRANSFER_BATCH_SIZE,
+            deposit_batch_size: DEPOSIT_BATCH_SIZE,
+            exit_batch_size: EXIT_BATCH_SIZE,
             block_number: 1,
             accounts_tree: tree,
-            parameters,
+            transfer_parameters: transfer_circuit_params.unwrap(),
+            deposit_parameters: deposit_circuit_params.unwrap(),
+            exit_parameters: exit_circuit_params.unwrap(),
             jubjub_params: jubjub_params
         })
     }
@@ -207,6 +237,21 @@ impl BabyProver {
         Ok(encoding)
     }
 
+    pub fn encode_deposit_transactions(block: &DepositBlock) -> Result<Vec<u8>, Err> {
+        let mut encoding: Vec<u8> = vec![];
+        
+        let transactions = &block.transactions;
+
+        for tx in transactions {
+            let tx = models::circuit::DepositRequest::try_from(tx).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
+            let tx_bits = tx.public_data_into_bits();
+            let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
+            encoding.extend(tx_encoding.into_iter());
+        }
+
+        Ok(encoding)
+    }
+
     pub fn apply_and_prove(&mut self, block: Block) -> Result<FullBabyProof, Err> {
         match block {
             Block::Deposit(block) => {
@@ -234,7 +279,7 @@ impl BabyProver {
         let transactions = &block.transactions;
         let num_txes = transactions.len();
 
-        if num_txes != self.batch_size {
+        if num_txes != self.transfer_batch_size {
             return Err(BabyProverErr::Unknown);
         }
 
@@ -285,10 +330,7 @@ impl BabyProver {
                 return Err(BabyProverErr::InvalidAmountEncoding);
             }
 
-            let unwrapped_transfer_amount = parsed_transfer_amount.unwrap();
-            println!("In prover parsed transfer amount = {}", unwrapped_transfer_amount);
-
-            let transfer_amount_as_field_element = Fr::from_str(&unwrapped_transfer_amount.to_string()).unwrap();
+            let transfer_amount_as_field_element = Fr::from_str(&parsed_transfer_amount.unwrap().to_string()).unwrap();
             let fee_as_field_element = Fr::from_str(&parsed_fee.unwrap().to_string()).unwrap();
 
             let path_from : Vec<Option<Fr>> = tree.merkle_path(sender_leaf_number).into_iter().map(|e| Some(e.0)).collect();
@@ -306,8 +348,6 @@ impl BabyProver {
 
             let mut updated_sender_leaf = sender_leaf.unwrap().clone();
             let mut updated_recipient_leaf = recipient_leaf.unwrap().clone();
-
-            println!("In prover transaction amount = {}", transfer_amount_as_field_element);
 
             updated_sender_leaf.balance.sub_assign(&transfer_amount_as_field_element);
             updated_sender_leaf.balance.sub_assign(&fee_as_field_element);
@@ -347,9 +387,6 @@ impl BabyProver {
 
                 witnesses.push(witness);
             }
-
-            let intermediate_root = tree.root_hash();
-            println!("Intermediate root = {}", intermediate_root);
         }
 
         let block_number = Fr::from_str(&block_number.to_string()).unwrap();
@@ -418,8 +455,6 @@ impl BabyProver {
         
         let public_data_commitment = Fr::from_repr(repr).unwrap();
 
-        println!("Preparing proof for old root = {}, new root = {}, public data commitment = {}", initial_root, final_root, public_data_commitment);
-
         let instance = Transfer {
             params: &self.jubjub_params,
             number_of_transactions: num_txes,
@@ -433,14 +468,14 @@ impl BabyProver {
 
         let mut rng = OsRng::new().unwrap();
         println!("Prover has started to work");
-        let proof = create_random_proof(instance, &self.parameters, & mut rng);
+        let proof = create_random_proof(instance, &self.transfer_parameters, & mut rng);
         if proof.is_err() {
             return Err(BabyProverErr::Unknown);
         }
 
         let p = proof.unwrap();
 
-        let pvk = prepare_verifying_key(&self.parameters.vk);
+        let pvk = prepare_verifying_key(&self.transfer_parameters.vk);
 
         let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]).unwrap();
         
@@ -453,6 +488,190 @@ impl BabyProver {
             proof: p,
             inputs: [initial_root, final_root, public_data_commitment],
             total_fees: total_fees,
+            block_number: block_number,
+            public_data: public_data,
+        };
+
+        Ok(full_proof)
+    }
+
+    // Apply transactions to the state while also making a witness for proof, then calculate proof
+    pub fn apply_and_prove_deposit(&mut self, block: &DepositBlock) -> Result<FullBabyProof, Err> {
+        let block_number = block.block_number;
+        if block_number != self.block_number {
+            return Err(BabyProverErr::Unknown);
+        }
+        let block_final_root = block.new_root_hash.clone();
+
+        let public_data: Vec<u8> = BabyProver::encode_deposit_transactions(block).unwrap();
+
+        let transactions = &block.transactions;
+        let num_txes = transactions.len();
+
+        if num_txes != self.deposit_batch_size {
+            return Err(BabyProverErr::Unknown);
+        }
+
+        let mut witnesses: Vec<(DepositRequest<Bn256>, DepositWitness<Bn256>)> = vec![];
+
+        let initial_root = self.accounts_tree.root_hash();
+
+        for tx in transactions {
+            let tx = models::circuit::DepositRequest::try_from(tx).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
+            
+            let into_leaf_number = field_element_to_u32(tx.into);
+            
+            let tree = &mut self.accounts_tree;
+            let items = tree.items.clone();
+
+            let existing_leaf = items.get(&into_leaf_number);
+            let mut leaf_is_empty = true;
+
+            let (old_leaf, new_leaf) = if existing_leaf.is_none() {
+                let mut new_leaf = Account::default();
+                new_leaf.balance = tx.amount.clone();
+                new_leaf.pub_x = tx.pub_x;
+                new_leaf.pub_y = tx.pub_y;
+
+                (Account::default(), new_leaf)
+            } else {
+                let old_leaf = existing_leaf.unwrap().clone();
+                let mut new_leaf = old_leaf.clone();
+                new_leaf.balance.add_assign(&tx.amount);
+                leaf_is_empty = false;
+
+                (old_leaf, new_leaf)
+            };
+
+            let path: Vec<Option<Fr>> = tree.merkle_path(into_leaf_number).into_iter().map(|e| Some(e.0)).collect();
+
+            let public_key = edwards::Point::from_xy(new_leaf.pub_x.clone(), new_leaf.pub_y.clone(), &self.jubjub_params);
+
+            if public_key.is_none() {
+                return Err(BabyProverErr::Unknown);
+            }
+
+            let request = DepositRequest {
+                into: Fr::from_str(&into_leaf_number.to_string()),
+                amount: Some(tx.amount),
+                public_key: public_key
+            };
+
+            tree.insert(into_leaf_number, new_leaf.clone());
+
+            {
+                let deposit_witness = DepositWitness::<Bn256>{
+                    auth_path:     path,
+                    leaf:          LeafWitness::<Bn256>{
+                                        balance:    Some(old_leaf.balance),
+                                        nonce:      Some(old_leaf.nonce),
+                                        pub_x:      Some(old_leaf.pub_x),
+                                        pub_y:      Some(old_leaf.pub_y),
+                                    },          
+
+                    leaf_is_empty: Some(leaf_is_empty),
+                    new_pub_x: Some(new_leaf.pub_x),
+                    new_pub_y: Some(new_leaf.pub_y),                     
+                };
+
+                let witness = (request.clone(), deposit_witness);
+
+                witnesses.push(witness);
+            }
+        }
+
+        let block_number = Fr::from_str(&block_number.to_string()).unwrap();
+
+        let final_root = self.accounts_tree.root_hash();
+
+        if initial_root == final_root {
+            return Err(BabyProverErr::Unknown);
+        }
+
+        println!("Prover final root = {}, final root from state keeper = {}", final_root, block_final_root);
+
+        if block_final_root != final_root {
+            return Err(BabyProverErr::Unknown);
+        }
+
+        self.block_number += 1;
+
+        let mut public_data_initial_bits = vec![];
+
+        // these two are BE encodings because an iterator is BE. This is also an Ethereum standard behavior
+
+        let block_number_bits: Vec<bool> = BitIterator::new(block_number.into_repr()).collect();
+        for _ in 0..256-block_number_bits.len() {
+            public_data_initial_bits.push(false);
+        }
+        public_data_initial_bits.extend(block_number_bits.into_iter());
+
+        assert_eq!(public_data_initial_bits.len(), 256);
+
+        let mut h = Sha256::new();
+
+        let bytes_to_hash = be_bit_vector_into_bytes(&public_data_initial_bits);
+
+        h.input(&bytes_to_hash);
+
+        let mut hash_result = [0u8; 32];
+        h.result(&mut hash_result[..]);
+
+        {    
+            let packed_transaction_data_bytes = public_data.clone();
+
+            let mut next_round_hash_bytes = vec![];
+            next_round_hash_bytes.extend(hash_result.iter());
+            next_round_hash_bytes.extend(packed_transaction_data_bytes);
+
+            let mut h = Sha256::new();
+
+            h.input(&next_round_hash_bytes);
+
+            h.result(&mut hash_result[..]);
+        }
+
+        // clip to fit into field element
+
+        hash_result[0] &= 0x1f; // temporary solution
+
+        let mut repr = Fr::zero().into_repr();
+        repr.read_be(&hash_result[..]).expect("pack hash as field element");
+        
+        let public_data_commitment = Fr::from_repr(repr).unwrap();
+
+        let instance = Deposit {
+            params: &self.jubjub_params,
+            number_of_deposits: num_txes,
+            old_root: Some(initial_root),
+            new_root: Some(final_root),
+            public_data_commitment: Some(public_data_commitment),
+            block_number: Some(block_number),
+            requests: witnesses.clone(),
+        };
+
+        let mut rng = OsRng::new().unwrap();
+        println!("Prover has started to work");
+        let proof = create_random_proof(instance, &self.deposit_parameters, & mut rng);
+        if proof.is_err() {
+            return Err(BabyProverErr::Unknown);
+        }
+
+        let p = proof.unwrap();
+
+        let pvk = prepare_verifying_key(&self.deposit_parameters.vk);
+
+        let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]).unwrap();
+        
+        if !success {
+            return Err(BabyProverErr::Unknown);
+        }
+        println!("Proof generation is complete");
+
+        let full_proof = FullBabyProof{
+            proof: p,
+            inputs: [initial_root, final_root, public_data_commitment],
+            total_fees: Fr::zero(),
             block_number: block_number,
             public_data: public_data,
         };

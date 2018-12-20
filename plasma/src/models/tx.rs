@@ -12,6 +12,8 @@ use ff::{Field, PrimeField, PrimeFieldRepr};
 use super::{Fr, Engine};
 use crate::circuit::utils::{encode_fr_into_fs, le_bit_vector_into_field_element};
 use crate::models::circuit::transfer::{Tx};
+use crate::models::circuit::deposit::{DepositRequest};
+use crate::models::circuit::exit::{ExitRequest};
 
 /// Unpacked transaction data
 #[derive(Clone, Serialize, Deserialize)]
@@ -92,7 +94,6 @@ pub struct ExitTx{
     pub amount:             BigDecimal,
 }
 
-// TxSignature uses only native Rust types
 #[derive(Clone, Serialize, Deserialize)]
 pub struct TxSignature{
     pub r_x: Fr,
@@ -173,6 +174,26 @@ impl Tx<Engine> {
         };
 
         Ok(tx)
+    }
+
+}
+
+impl DepositRequest<Engine> {
+
+    // TODO: introduce errors if necessary
+    pub fn try_from(request: &crate::models::DepositTx) -> Result<Self, String> {
+
+        use bigdecimal::ToPrimitive;
+
+        let req = Self {
+            // TODO: these conversions are ugly and inefficient, replace with idiomatic std::convert::From trait
+            into:               Fr::from_str(&request.account.to_string()).unwrap(),
+            amount:             Fr::from_str(&request.amount.to_string()).unwrap(),
+            pub_x:              request.pub_x.clone(),
+            pub_y:              request.pub_y.clone()
+        };
+
+        Ok(req)
     }
 
 }
