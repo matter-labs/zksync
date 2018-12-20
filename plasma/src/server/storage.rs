@@ -5,8 +5,9 @@ use diesel::prelude::*;
 use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use std::env;
+use serde_json::{to_value, value::Value};
 
-pub fn establish_connection() -> PgConnection {
+fn establish_connection() -> PgConnection {
     dotenv().ok();
 
     let database_url = env::var("DATABASE_URL")
@@ -15,26 +16,47 @@ pub fn establish_connection() -> PgConnection {
         .expect(&format!("Error connecting to {}", database_url))
 }
 
-struct StateStorage {
-
+#[derive(Insertable, Queryable)]
+#[table_name="blocks"]
+pub struct SQLBlock {
+    pub block_number:   Option<i32>,
+    pub block_data:     Value,
 }
 
-impl StateStorage {
+pub struct StorageConnection {
+    conn: PgConnection
+}
 
-    /// creates connection pool
+// TODO: what can go wrong and how to hanlde db save errors?
+
+impl StorageConnection {
+
+    /// creates a single db connection; it's safe to create multiple instances of StorageConnection
     pub fn new() -> Self {
-        Self{}
+        Self{
+            conn: establish_connection()
+        }
     }
 
-    // /// returns promise
-    // pub fn commit_block(block: &Block) {
+    pub fn store_block(&self, block_number: i32, block: &Value) -> QueryResult<usize> {
+        let block = SQLBlock{
+            block_number:   Some(block_number),
+            block_data:     to_value(block).unwrap(),
+        };
+        diesel::insert_into(blocks::table)
+            .values(&block)
+            .execute(&self.conn)
+    }
 
-    // }
+    pub fn store_proof(&self, block_number: i32, block: &Value) -> QueryResult<usize> {
+        unimplemented!()
+        // save proof...
+    }
 
-    // /// returns promise
-    // pub fn update_state(state: &PlasmaState) {
-
-    // }
+    pub fn update_accounts(&self, accounts: Vec<(u32, Account)>) -> QueryResult<usize> {
+        unimplemented!()
+        // update state...
+    }
 
     // /// returns stream of accounts
     // pub fn load_state() {

@@ -21,9 +21,10 @@ pub type AccountTree = SparseMerkleTree<Account, Fr, PedersenHasher<Engine>>;
 pub type TransferBlock = block::Block<TransferTx>;
 pub type DepositBlock = block::Block<DepositTx>;
 pub type ExitBlock = block::Block<ExitTx>;
+
 pub type PublicKey = eddsa::PublicKey<Engine>;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum Block {
     Transfer(TransferBlock),
     Deposit(DepositBlock),
