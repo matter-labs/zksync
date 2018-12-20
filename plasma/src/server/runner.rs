@@ -25,7 +25,7 @@ pub fn run() {
     let mut mem_pool = MemPool::new();
     let mut state_keeper = PlasmaStateKeeper::new();
     let mut prover = BabyProver::create(&state_keeper.state).unwrap();
-    let mut eth_watch = EthWatch::new();
+    let mut eth_watch = EthWatch::new(0, 0);
 
     // spawn threads for different processes
     // see https://docs.google.com/drawings/d/16UeYq7cuZnpkyMWGrgDAbmlaGviN2baY1w1y745Me70/edit?usp=sharing

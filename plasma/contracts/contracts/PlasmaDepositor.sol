@@ -126,7 +126,7 @@ contract PlasmaDepositor is Plasma {
         msg.sender.transfer(scaleFromPlasmaUnitsIntoWei(depositAmount));
     }
 
-    function startNextDepositBatch(uint128 newBatchFee)
+    function startNextDepositBatch()
     public
     operator_only()
     {
@@ -134,8 +134,21 @@ contract PlasmaDepositor is Plasma {
         uint256 inTheCurrentBatch = totalDepositRequests % DEPOSIT_BATCH_SIZE;
         if (inTheCurrentBatch != 0) {
             totalDepositRequests = (currentBatch + 1) * DEPOSIT_BATCH_SIZE;
+        } else {
+            revert("it's not necessary to bump the batch number");
         }
-        currentDepositBatchFee = newBatchFee;
+ 
+    }
+
+    function changeDepositBatchFee(uint128 newBatchFee)
+    public
+    operator_only()
+    {
+        if (currentDepositBatchFee != newBatchFee) {
+            currentDepositBatchFee = newBatchFee;
+        } else {
+            revert("fee adjustment makes no sense");
+        } 
     }
 
     // pure function to calculate commitment formats

@@ -87,7 +87,8 @@ contract PlasmaExitor is Plasma {
         // TODO may be return an fee that was collected
     }
 
-    function startNextExitBatch(uint128 newBatchFee)
+    // this does not work in multi-operator mode
+    function startNextExitBatch()
     public
     operator_only()
     {
@@ -95,11 +96,23 @@ contract PlasmaExitor is Plasma {
         uint256 inTheCurrentBatch = totalExitRequests % EXIT_BATCH_SIZE;
         if (inTheCurrentBatch != 0) {
             totalExitRequests = (currentBatch + 1) * EXIT_BATCH_SIZE;
+        } else {
+            revert("it's not necessary to bump the batch number");
         }
-        // operator can not increase a fee to process an exit,
-        // otherwise he could prevent exits
+    }
+
+    // this does not work in multi-operator mode
+    function changeExitBatchFee(uint128 newBatchFee)
+    public
+    operator_only()
+    {
+        if (currentExitBatchFee == 0) {
+            revert("fee is already at minimum");
+        }
         if (newBatchFee < currentExitBatchFee) {
             currentExitBatchFee = newBatchFee;
+        } else {
+            revert("can not increase an exit fee");
         }
     }
 
