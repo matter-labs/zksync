@@ -4,11 +4,13 @@ import {Plasma} from "./Plasma.sol";
 
 contract PlasmaDepositor is Plasma {
 
-    uint256 constant DEPOSIT_BATCH_SIZE = 1;
+    uint256 public constant DEPOSIT_BATCH_SIZE = 1;
     uint256 public totalDepositRequests; // enumerates total number of deposit, starting from 0
     uint256 public lastCommittedDepositBatch;
     uint256 public lastVerifiedDepositBatch;
     uint128 public currentDepositBatchFee; // deposit request fee scaled units
+
+    uint24 public constant SPECIAL_ACCOUNT_DEPOSITS = 1;
 
     uint24 public nextAccountToRegister;
 
@@ -28,6 +30,7 @@ contract PlasmaDepositor is Plasma {
 
     struct DepositBatch {
         uint8 state;
+        uint24 numRequests;
         uint32 blockNumber;
         uint64 timestamp;
         uint128 batchFee;
@@ -80,6 +83,7 @@ contract PlasmaDepositor is Plasma {
         // from the first deposit in the batch
         if (batch.timestamp == 0) {
             batch.state = uint8(DepositBatchState.CREATED);
+            batch.numRequests = uint24(0);
             batch.timestamp = uint64(block.timestamp);
             batch.batchFee = currentDepositBatchFee;
         }
@@ -89,6 +93,7 @@ contract PlasmaDepositor is Plasma {
         
         if(request.amount == 0) {
             // this is a new request in this batch
+            batch.numRequests++;
             totalDepositRequests++;
         }
         request.amount += scaledValue;
@@ -122,6 +127,7 @@ contract PlasmaDepositor is Plasma {
         }
         delete depositRequests[currentBatch][accountID];
         totalDepositRequests--;
+        batch.numRequests--;
 
         msg.sender.transfer(scaleFromPlasmaUnitsIntoWei(depositAmount));
     }
@@ -255,15 +261,20 @@ contract PlasmaDepositor is Plasma {
         uint128 requestAmount;
         uint256 publicKey;
         uint256 pointer = 32;
-        for (uint256 i = 0; i < DEPOSIT_BATCH_SIZE; i++) { 
+        uint24 specialAccountID = SPECIAL_ACCOUNT_DEPOSITS;
+        uint256 numRequestsInBatch = uint256(depositBatches[batchNumber].numRequests);
+        uint24 id;
+        for (uint256 i = 0; i < numRequestsInBatch; i++) { 
             // this is a cheap way to ensure that all requests are unique, without O(n) MSTORE
             // it also automatically guarantees that all requests requests from the batch have been executed
-            require(i == 0 || accountIDs[i] == 0 || accountIDs[i] > accountIDs[i-1], "accountID are not properly ordered");
-            requestAmount = depositRequests[batchNumber][accountIDs[i]].amount;
-            publicKey = accounts[accountIDs[i]].publicKey;
+            require(i == 0 || accountIDs[i] > accountIDs[i-1], "accountID are not properly ordered");
+            id = accountIDs[i];
+            require(id != specialAccountID, "batch should contain non-padding accounts first");
+            requestAmount = depositRequests[batchNumber][id].amount;
+            publicKey = accounts[id].publicKey;
             // put address and amount into the top bits of the chunk
             // address || amount || 0000...0000
-            chunk = ((uint256(accountIDs[i]) << 128) + uint256(requestAmount)) << 104;
+            chunk = ((uint256(id) << 128) + uint256(requestAmount)) << 104;
             // and store it into place
             assembly {
                 mstore(add(txData, pointer), chunk)
@@ -274,6 +285,22 @@ contract PlasmaDepositor is Plasma {
             }
             pointer += 32;
         }
+        chunk = uint256(specialAccountID) << 232;
+        publicKey = accounts[specialAccountID].publicKey;
+
+        for (i = numRequestsInBatch; i < DEPOSIT_BATCH_SIZE; i++) { 
+            id = accountIDs[i];
+            require(id == specialAccountID, "padding should be done with special account number");
+            assembly {
+                mstore(add(txData, pointer), chunk)
+            }
+            pointer += 19;
+            assembly {
+                mstore(add(txData, pointer), publicKey)
+            }
+            pointer += 32;
+        }
+
         return txData;
     }
 
