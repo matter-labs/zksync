@@ -240,7 +240,7 @@ impl EthWatch {
                 let account_id = U256::from(event.topics[2]);
                 let public_key = U256::from(event.topics[3]);
                 let deposit_amount = U256::from_big_endian(&data_bytes);
-                println!("Deposit from {:x}, key {:x}, amount {:x}", account_id, public_key, deposit_amount);
+                println!("Deposit from {:x}, key {:x}, amount {}", account_id, public_key, deposit_amount);
                 let existing_record = this_batch.get(&account_id);
                 if existing_record.is_none() {
                     this_batch.insert(account_id, (deposit_amount, public_key));
