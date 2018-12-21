@@ -256,7 +256,7 @@ function newKey() {
     const x_parity = x.testn(0);
     let y_packed = y;
     if (x_parity) {
-        y_packed = y_packed + ((new BN(1)).ushln(255))
+        y_packed = y_packed.add(((new BN(1)).ushln(255)));
     }
     return {
         privateKey: sk,

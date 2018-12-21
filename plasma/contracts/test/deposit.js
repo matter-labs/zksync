@@ -62,8 +62,11 @@ contract('Plasma', async (accounts) => {
 
     it('do a deposit', async () => {
         try {
-            let x = new BN("2ef3f9b423a2c8c74e9803958f6c320e854a1c1c06cd5cc8fd221dc052d76df7", 16);
-            let y = new BN("05a01167ea785d3f784224644a68e4067532c815f5f6d57d984b5c0e9c6c94b7", 16);
+            let key = transactionLib.newKey();
+            let {x, y} = key.publicKey;
+
+            console.log("Public key = " + x.toString(16) + ", " + y.toString(16));
+            console.log("Compressed key = " + key.packedPublicKey.toString(16));
 
             let result = await contract.deposit([x, y], 0, {from: account, value: "1000000000000000000"});
             console.log(result);

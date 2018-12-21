@@ -14,6 +14,10 @@ contract PlasmaDepositor is Plasma {
 
     uint24 public nextAccountToRegister;
 
+    // some ideas for optimization of the deposit request information storage:
+    // store in a mapping: 20k gas to add, 5k to update a record + 5k to update the global counter per batch
+    // store in an array: 20k + 5k gas to add, 5k to update + up to DEPOSIT_BATCH_SIZE * SLOAD
+
     // batch number => (plasma address => deposit information)
     mapping (uint256 => mapping (uint24 => DepositRequest)) public depositRequests;
     mapping (uint256 => DepositBatch) public depositBatches;
@@ -329,7 +333,7 @@ contract PlasmaDepositor is Plasma {
     pure
     returns(uint256 packed) {
         // group check + packing
-        packed = publicKey[1] | ((publicKey[0] & 1) << 255);
+        packed = publicKey[1] + ((publicKey[0] & 1) << 255);
         return packed;
     }
 
