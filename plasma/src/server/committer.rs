@@ -58,26 +58,26 @@ pub fn start_eth_sender() -> Sender<(Operation, TxMeta)> {
                 Operation::Commit{block_number, new_root, block_data, accounts} => {
                     match block_data {
                         Transfer{total_fees, public_data} =>
-                            eth_client.call("commitTransferBlock", addr, nonce, 
+                            eth_client.call("commitTransferBlock", meta 
                                 (block_number, total_fees, public_data, new_root)),
                         Deposit{batch_number} =>
-                            eth_client.call("commitDepositBlock", addr, nonce, 
+                            eth_client.call("commitDepositBlock", meta 
                                 (block_number, batch_number, accounts.get_keys())),
                         Exit{batch_number} =>
-                            eth_client.call("commitExitBlock", addr, nonce, 
+                            eth_client.call("commitExitBlock", meta 
                                 (block_number, batch_number, accounts.get_keys())),
                     }
                 },
                 Operation::Verify{block_number, proof, block_data, accounts} => {
                     match block_data {
                         Transfer{total_fees, public_data} =>
-                            eth_client.call("verifyTransferBlock", addr, nonce, 
+                            eth_client.call("verifyTransferBlock", meta 
                                 (block_number, proof)),
                         Deposit{batch_number} =>
-                            eth_client.call("verifyDepositBlock", addr, nonce, 
+                            eth_client.call("verifyDepositBlock", meta 
                                 (block_number, batch_number, accounts.get_keys()),
                         Exit{batch_number} =>
-                            eth_client.call("verifyExitBlock", addr, nonce, 
+                            eth_client.call("verifyExitBlock", meta 
                                 (block_number, batch_number, accounts.get_keys()),
                     }
                 },
@@ -98,15 +98,15 @@ pub fn run_committer(rx_for_ops: Receiver<Operation>, tx_for_eth: Sender<(Operat
         // persist in storage first
         
         // TODO: with postgres transaction
-        let meta = storage.commit_op(&op);
-        match tx.op {
+        let (addr, nonce) = storage.commit_op(&op).unwrap();
+        match op {
             Commit{block_number, _, _, accounts_updated} => storage.commit_state_update(block_number, &accounts_updated),
             Verify{block_number, _, _, _} => storage.apply_state_update(block_number),
             _ => {},
         }
 
         // submit to eth
-        tx_for_eth.send((tx, meta));
+        tx_for_eth.send((tx, TxMeta{addr, nonce}));
     }
 }
 

@@ -63,7 +63,8 @@ impl StorageConnection {
                 data:   to_value(op).unwrap(),
             })
             // TODO: fetch and map to return addr and nonce
-            .execute(&self.conn)
+            .execute(&self.conn);
+            unimplemented!();
     }
 
     pub fn commit_state_update(&self, block_number: u32, accounts_updated: AccountMap) -> QueryResult<()> {
