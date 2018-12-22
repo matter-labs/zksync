@@ -15,9 +15,10 @@ CREATE TABLE accounts (
 );
 
 CREATE TABLE account_updates (
-    account_id      integer not null primary key,
-    block_number    integer not null primary key,
-    data            json not null
+    account_id      integer not null,
+    block_number    integer not null,
+    data            json not null,
+    PRIMARY KEY (account_id, block_number)
 );
 
 CREATE INDEX account_updates_block_index ON account_updates (block_number);
