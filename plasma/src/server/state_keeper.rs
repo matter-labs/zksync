@@ -13,6 +13,7 @@ use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 use crate::models::*;
 
 use super::committer::Operation;
+use super::prover::BabyProver;
 
 use rand::{SeedableRng, Rng, XorShiftRng};
 
@@ -124,37 +125,38 @@ impl PlasmaStateKeeper {
                 match req {
                     StateProcessingRequest::ApplyBlock(block, source) => {
                         let applied = match block {
-                            Block::Deposit(mut block) => {
-                                let applied = self.apply_deposit_block(&mut block);
-                                if applied.is_ok() {
-                                    //tx_for_commitments.send(Block::Deposit(block.clone()));
-                                    tx_for_proof_requests.send(Block::Deposit(block));
-                                };
-                                // can not send back anywhere due to Ethereum contract being immutable
-                            },
-                            Block::Exit(mut block) => {
-                                let applied = self.apply_exit_block(&mut block);
-                                if applied.is_ok() {
-                                    //tx_for_commitments.send(Block::Exit(block.clone()));
-                                    tx_for_proof_requests.send(Block::Exit(block));
-                                };
-                                // can not send back anywhere due to Ethereum contract being immutable
-                            },
-                            Block::Transfer(mut block) => {
-                                let applied = self.apply_transfer_block(&mut block);
-                                let r = if applied.is_ok() {
-                                    tx_for_commitments.send(block.clone());
-                                    tx_for_proof_requests.send(Block::Transfer(block));
-                                    Ok(())
-                                } else {
-                                    Err(block)
-                                };
-                                if let BlockSource::MemPool(sender) = source {
-                                    // send result back to mempool
-                                    sender.send(r);
-                                }
-                            },
+                            Block::Deposit(mut block) => self.apply_deposit_block(&mut block),
+                            Block::Exit(mut block) => self.apply_exit_block(&mut block),
+                            Block::Transfer(mut block) => elf.apply_transfer_block(&mut block),
                         };
+
+                        let result = match applied {
+                            Ok(new_root, block_data, accounts_updated) => {
+
+                                self.state.block_number += 1;
+
+                                // make commitment
+                                let op = Operation::Commit{
+                                    block_number:   self.state.block_number,
+                                    new_root,
+                                    block_data,
+                                    accounts_updated,
+                                };
+                                tx_for_commitments.send(block.clone());
+
+                                // start making proof
+                                tx_for_proof_requests.send(block);
+
+                                Ok(())
+                            },
+                            Err(_) => Err(block),
+                        };
+
+                        if let BlockSource::MemPool(sender) = source {
+                            // send result back to mempool
+                            sender.send(result);
+                        }
+
                     },
                     StateProcessingRequest::GetPubKey(account_id, sender) => {
                         sender.send(self.state.get_pub_key(account_id));
@@ -168,7 +170,7 @@ impl PlasmaStateKeeper {
         self.state.balance_tree.items.get(&index).unwrap().clone()
     }
 
-    fn apply_transfer_block(&mut self, block: &mut TransferBlock) -> Result<(), ()> {
+    fn apply_transfer_block(&mut self, block: &mut TransferBlock) -> Result<(H256, EthBlockData, AccountMap), ()> {
 
         block.block_number = self.state.block_number;
 
@@ -181,18 +183,22 @@ impl PlasmaStateKeeper {
             .collect();
 
         let mut save_state = FnvHashMap::<u32, Account>::default();
+        let mut updated_accounts = FnvHashMap::<u32, Account>::default();
 
         let transactions: Vec<TransferTx> = transactions
             .into_iter()
             .filter(|tx| {
 
                 // save state
-                let from = self.account(tx.from);
-                save_state.insert(tx.from, from);
-                let to = self.account(tx.to);
-                save_state.insert(tx.to, to);
+                save_state.insert(tx.from, self.account(tx.from));
+                save_state.insert(tx.to, self.account(tx.to));
 
                 self.state.apply_transfer(&tx).is_ok()
+
+                // updated state
+                updated_accounts.insert(tx.from, self.account(tx.from));
+                updated_accounts.insert(tx.to, self.account(tx.to));
+
             })
             .collect();
         
@@ -202,14 +208,20 @@ impl PlasmaStateKeeper {
                 // TODO: add tree.insert_existing() for performance
                 self.state.balance_tree.insert(k, v);
             }
+
+            return Err(());
         }
             
         block.new_root_hash = self.state.root_hash();
-        self.state.block_number += 1;
-        Ok(())
+
+        let eth_block_data = EthBlockData::TransferBlock{
+            total_fees:     U128::zero(), // TODO: count
+            public_data:    BabyProver::encode_transfer_transactions(&block),
+        };
+        Ok(H256::from(block.new_root_hash), eth_block_data, updated_accounts);
     }
 
-    fn apply_deposit_block(&mut self, block: &mut DepositBlock) -> Result<(), ()> {
+    fn apply_deposit_block(&mut self, block: &mut DepositBlock) -> Result<(H256, EthBlockData, AccountMap), ()> {
 
         block.block_number = self.state.block_number;
 
@@ -245,7 +257,7 @@ impl PlasmaStateKeeper {
         Ok(())
     }
 
-    fn apply_exit_block(&mut self, block: &mut ExitBlock) -> Result<(), ()> {
+    fn apply_exit_block(&mut self, block: &mut ExitBlock) -> Result<(H256, EthBlockData, AccountMap), ()> {
 
         block.block_number = self.state.block_number;
 
