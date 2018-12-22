@@ -4,7 +4,7 @@ use std::sync::mpsc::{channel, Sender};
 use super::prover::{BabyProver};
 use super::state_keeper::{PlasmaStateKeeper, StateProcessingRequest};
 use super::rest_api::run_api_server;
-use super::committer::{self, Commitment, BlockProof};
+use super::committer::{self, Operation};
 use super::mem_pool::MemPool;
 use super::eth_watch::EthWatch;
 
@@ -19,8 +19,7 @@ pub fn run() {
     let (tx_for_tx, rx_for_tx) = channel::<TransferTx>();
     let (tx_for_state, rx_for_state) = channel::<StateProcessingRequest>();
     let (tx_for_proof_requests, rx_for_proof_requests) = channel::<Block>();
-    let (tx_for_commitments, rx_for_commitments) = channel::<TransferBlock>();
-    let (tx_for_proofs, rx_for_proofs) = channel::<BlockProof>();
+    let (tx_for_ops, rx_for_ops) = channel::<Operation>();
 
     let mut mem_pool = MemPool::new();
     let mut state_keeper = PlasmaStateKeeper::new();
@@ -32,35 +31,13 @@ pub fn run() {
 
     println!("starting actors");
 
-    let tx_for_state_copy = tx_for_state.clone();
-    thread::spawn(move || {
-        run_api_server(tx_for_tx, tx_for_state_copy);
-    });
+    start_api_server(tx_for_tx, tx_for_state.clone());
+    mem_pool.start(rx_for_tx, tx_for_state.clone());
+    eth_watch.start(tx_for_state);
+    
+    state_keeper.start(rx_for_state, tx_for_ops.clone(), tx_for_proof_requests);
+    prover.start(rx_for_proof_requests, tx_for_ops);
 
-    let tx_for_state_copy = tx_for_state.clone();
-    thread::spawn(move || {  
-        mem_pool.run(rx_for_tx, tx_for_state_copy);
-    });
-
-    thread::spawn(move || {  
-        eth_watch.run(tx_for_state);
-    });
-
-    thread::spawn(move || {
-        state_keeper.run(rx_for_state, tx_for_commitments, tx_for_proof_requests);
-    });
-
-    thread::spawn(move || {
-        prover.run(rx_for_proof_requests, tx_for_proofs);
-    });
-
-    let tx_for_eth = committer::run_eth_sender();
-    let tx_for_eth2 = tx_for_eth.clone();
-
-    thread::spawn(move || {
-        committer::run_commitment_pipeline(rx_for_commitments, tx_for_eth.clone());
-    });
-
-    // no thread::spawn for the last processor
-    committer::run_proof_pipeline(rx_for_proofs, tx_for_eth2);
+    let tx_for_eth = committer::start_eth_sender();
+    committer::run_committer(rx_for_commitments, tx_for_eth);
 }

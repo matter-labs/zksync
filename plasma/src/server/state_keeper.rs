@@ -10,22 +10,9 @@ use ff::{Field, PrimeField};
 use rand::{OsRng};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 
-use crate::models::{self, 
-    params, 
-    Block, 
-    TransferBlock, 
-    DepositBlock, 
-    ExitBlock, 
-    Account, 
-    TransferTx, 
-    DepositTx,
-    ExitTx,
-    AccountTree, 
-    TxSignature, 
-    PlasmaState
-};
+use crate::models::*;
 
-use super::committer::Commitment;
+use super::committer::Operation;
 
 use rand::{SeedableRng, Rng, XorShiftRng};
 
@@ -127,52 +114,54 @@ impl PlasmaStateKeeper {
         keeper
     }
 
-    pub fn run(&mut self, 
+    pub fn start(&mut self, 
         rx_for_blocks: Receiver<StateProcessingRequest>, 
-        tx_for_commitments: Sender<TransferBlock>,
+        tx_for_commitments: Sender<Operation>,
         tx_for_proof_requests: Sender<Block>)
     {
-        for req in rx_for_blocks {
-            match req {
-                StateProcessingRequest::ApplyBlock(block, source) => {
-                    let applied = match block {
-                        Block::Deposit(mut block) => {
-                            let applied = self.apply_deposit_block(&mut block);
-                            if applied.is_ok() {
-                                //tx_for_commitments.send(Block::Deposit(block.clone()));
-                                tx_for_proof_requests.send(Block::Deposit(block));
-                            };
-                            // can not send back anywhere due to Ethereum contract being immutable
-                        },
-                        Block::Exit(mut block) => {
-                            let applied = self.apply_exit_block(&mut block);
-                            if applied.is_ok() {
-                                //tx_for_commitments.send(Block::Exit(block.clone()));
-                                tx_for_proof_requests.send(Block::Exit(block));
-                            };
-                            // can not send back anywhere due to Ethereum contract being immutable
-                        },
-                        Block::Transfer(mut block) => {
-                            let applied = self.apply_transfer_block(&mut block);
-                            let r = if applied.is_ok() {
-                                tx_for_commitments.send(block.clone());
-                                tx_for_proof_requests.send(Block::Transfer(block));
-                                Ok(())
-                            } else {
-                                Err(block)
-                            };
-                            if let BlockSource::MemPool(sender) = source {
-                                // send result back to mempool
-                                sender.send(r);
-                            }
-                        },
-                    };
-                },
-                StateProcessingRequest::GetPubKey(account_id, sender) => {
-                    sender.send(self.state.get_pub_key(account_id));
-                },
+        thread::spawn(move || {  
+            for req in rx_for_blocks {
+                match req {
+                    StateProcessingRequest::ApplyBlock(block, source) => {
+                        let applied = match block {
+                            Block::Deposit(mut block) => {
+                                let applied = self.apply_deposit_block(&mut block);
+                                if applied.is_ok() {
+                                    //tx_for_commitments.send(Block::Deposit(block.clone()));
+                                    tx_for_proof_requests.send(Block::Deposit(block));
+                                };
+                                // can not send back anywhere due to Ethereum contract being immutable
+                            },
+                            Block::Exit(mut block) => {
+                                let applied = self.apply_exit_block(&mut block);
+                                if applied.is_ok() {
+                                    //tx_for_commitments.send(Block::Exit(block.clone()));
+                                    tx_for_proof_requests.send(Block::Exit(block));
+                                };
+                                // can not send back anywhere due to Ethereum contract being immutable
+                            },
+                            Block::Transfer(mut block) => {
+                                let applied = self.apply_transfer_block(&mut block);
+                                let r = if applied.is_ok() {
+                                    tx_for_commitments.send(block.clone());
+                                    tx_for_proof_requests.send(Block::Transfer(block));
+                                    Ok(())
+                                } else {
+                                    Err(block)
+                                };
+                                if let BlockSource::MemPool(sender) = source {
+                                    // send result back to mempool
+                                    sender.send(r);
+                                }
+                            },
+                        };
+                    },
+                    StateProcessingRequest::GetPubKey(account_id, sender) => {
+                        sender.send(self.state.get_pub_key(account_id));
+                    },
+                }
             }
-        }
+        });
     }
 
     fn account(&self, index: u32) -> Account {

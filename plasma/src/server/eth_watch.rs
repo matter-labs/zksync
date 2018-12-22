@@ -88,39 +88,40 @@ impl EthWatch {
     /// - check if the last deposit batch number is equal to the one in contract
     /// - if it's larger - collect events and send for processing
     /// - if it's not bumped but a timeout is past due - may be try to send the transaction that bumps it
-    pub fn run(&mut self, tx_for_blocks: Sender<StateProcessingRequest>) {
-        let (_eloop, transport) = web3::transports::Http::new(&self.web3_url).unwrap();
-        let web3 = web3::Web3::new(transport);
-        // let mut eloop = tokio_core::reactor::Core::new().unwrap();
-        // let web3 = web3::Web3::new(web3::transports::Http::with_event_loop("http://localhost:8545", &eloop.handle(), 1).unwrap());
-        let contract = Contract::new(web3.eth(), self.contract_addr.clone(), self.contract.clone());
+    pub fn start(&mut self, tx_for_blocks: Sender<StateProcessingRequest>) {
+        thread::spawn(move || {  
+            let (_eloop, transport) = web3::transports::Http::new(&self.web3_url).unwrap();
+            let web3 = web3::Web3::new(transport);
+            // let mut eloop = tokio_core::reactor::Core::new().unwrap();
+            // let web3 = web3::Web3::new(web3::transports::Http::with_event_loop("http://localhost:8545", &eloop.handle(), 1).unwrap());
+            let contract = Contract::new(web3.eth(), self.contract_addr.clone(), self.contract.clone());
 
+            loop {
+                std::thread::sleep(time::Duration::from_secs(1));
+                let last_block_number = web3.eth().block_number().wait();
+                if last_block_number.is_err() {
+                    continue
+                }
+                println!("Last block number = {}", last_block_number.clone().unwrap().as_u64());
+                if last_block_number.unwrap().as_u64() == self.last_processed_block + self.blocks_lag {
+                    continue
+                }
 
-        loop {
-            std::thread::sleep(time::Duration::from_secs(1));
-            let last_block_number = web3.eth().block_number().wait();
-            if last_block_number.is_err() {
-                continue
+                let block_number = self.last_processed_block + self.blocks_lag + 1;
+
+                let deposits_result = self.process_deposits(block_number, &tx_for_blocks, &web3, &contract);
+                if deposits_result.is_err() {
+                    continue
+                }
+            
+                self.last_processed_block += 1;
             }
-            println!("Last block number = {}", last_block_number.clone().unwrap().as_u64());
-            if last_block_number.unwrap().as_u64() == self.last_processed_block + self.blocks_lag {
-                continue
-            }
 
-            let block_number = self.last_processed_block + self.blocks_lag + 1;
-
-            let deposits_result = self.process_deposits(block_number, &tx_for_blocks, &web3, &contract);
-            if deposits_result.is_err() {
-                continue
-            }
-           
-            self.last_processed_block += 1;
-        }
-
-        // TODO: watch chain events
-        // on new deposit or exit blocks => pass them via tx_for_blocks
-        // on new tx blocks do nothing for now; later we can use them to sync multiple 
-        // servers (in which case we only use them to update current state)
+            // TODO: watch chain events
+            // on new deposit or exit blocks => pass them via tx_for_blocks
+            // on new tx blocks do nothing for now; later we can use them to sync multiple 
+            // servers (in which case we only use them to update current state)
+        });
     }
 
     fn process_deposits<T: web3::Transport>(& mut self, 

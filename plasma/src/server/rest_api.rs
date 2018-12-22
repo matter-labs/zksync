@@ -66,7 +66,7 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
         .responder()
 }
 
-pub fn run_api_server(tx_for_tx:    mpsc::Sender<TransferTx>, 
+pub fn start_api_server(tx_for_tx:    mpsc::Sender<TransferTx>, 
                       tx_for_state: mpsc::Sender<StateProcessingRequest>) {
 
     ::std::env::set_var("RUST_LOG", "actix_web=info");
@@ -98,5 +98,7 @@ pub fn run_api_server(tx_for_tx:    mpsc::Sender<TransferTx>,
     .start();
 
     println!("Started http server: 127.0.0.1:8080");
-    let _ = sys.run();
+    thread::spawn(move || {
+        sys.run();
+    });
 }

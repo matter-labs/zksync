@@ -19,7 +19,7 @@ use crate::models::circuit::{Account, AccountTree};
 
 use super::config::{TRANSFER_BATCH_SIZE, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE};
 
-use super::committer::{self, EncodedProof, BlockProof};
+use super::committer::{self, EncodedProof, EthBlockData};
 
 use crate::circuit::utils::be_bit_vector_into_bytes;
 use crate::circuit::transfer::transaction::{Transaction};
@@ -215,10 +215,12 @@ impl BabyProver {
 
         let public_data = proof.public_data.clone();
 
-        let p = EncodedProof{
-            groth_proof: [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y],
-            block_number: block_number,
-        };
+        let p = [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y];
+
+        // EncodedProof{
+        //     groth_proof: [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y],
+        //     //block_number: block_number,
+        // };
 
         Ok(p)
     }
@@ -869,37 +871,31 @@ impl BabyProver {
             proof: p,
             inputs: [initial_root, final_root, public_data_commitment],
             total_fees: Fr::zero(),
-            block_number: block_number,
-            public_data: public_data,
+            block_number,
+            public_data,
         };
 
         Ok(full_proof)
     }
 
-    pub fn run(
+    pub fn start(
             &mut self,
             rx_for_blocks: mpsc::Receiver<Block>, 
-            tx_for_proofs: mpsc::Sender<BlockProof>
+            tx_for_ops: mpsc::Sender<Operation>
         ) 
     {
-        for block in rx_for_blocks {
-            println!("Got request for proof");
-
-            let proof = self.apply_and_prove(block).unwrap();
-            let full_proof = BabyProver::encode_proof(&proof).unwrap();
-            let accounts = vec![]; // TODO: pass updated states of affected accounts
-            tx_for_proofs.send(BlockProof(full_proof, accounts));
-
-            // match block {
-            //     Block::Transfer(block) => {
-            //         let proof = self.apply_and_prove(&block).unwrap();
-            //         let full_proof = BabyProver::encode_proof(&proof).unwrap();
-            //         let accounts = vec![]; // TODO: pass updated states of affected accounts
-            //         tx_for_proofs.send(BlockProof(full_proof, accounts));
-            //     },
-            //     _ => unimplemented!(),
-            // }
-        }        
+        thread::spawn(move || {
+            for block in rx_for_blocks {
+                println!("Got request for proof");
+                let proof = self.apply_and_prove(block).unwrap();
+                tx_for_proofs.send(Operation::Verify{
+                    block_number: proof.block_number,
+                    block_data: unimplemented!(), // TODO: pass EthBlockData::...
+                    encoded_proof: Self::encode_proof(&proof).unwrap(),
+                    accounts: unimplemented!(), // passn AccountMap: new state of affected accounts
+                });
+            }
+        });
     }
     
 }

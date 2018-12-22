@@ -27,6 +27,12 @@ pub const PROD_PLASMA: ABI = (
     include_str!("../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.bin"),
 );
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TxMeta{
+    addr:       String,
+    nonce:      u64,
+}
+
 pub struct ETHClient {
     private_key:    H256,
     contract_addr:  H160,
@@ -66,7 +72,7 @@ impl ETHClient {
         this
     }
 
-    fn call<P: Tokenize>(&mut self, method: &str, params: P) -> Result<H256> {
+    pub fn call<P: Tokenize>(&mut self, method: &str, meta: TxMeta, params: P) -> Result<H256> {
 
         let f = self.contract.function(method).unwrap();
         let data = f.encode_input( &params.into_tokens() ).unwrap();
@@ -74,6 +80,8 @@ impl ETHClient {
         // fetch current nonce and gas_price
         let gas_price = self.get_gas_price()?;
         // let nonce = self.get_nonce(&format!("0x{}", &self.sender_account))?;
+
+        // TODO: use meta instead
         let nonce = self.nonce.clone();
         let mut new_nonce = self.nonce;
         new_nonce = new_nonce + U256::one();
@@ -91,6 +99,9 @@ impl ETHClient {
             gas:        U256::from(3_000_000),
             data:       data,
         };
+
+        // TODO: use meta to pick the signing key
+
         let signed = tx.sign(&self.private_key);
         let raw_tx_hex = format!("0x{}", hex::encode(signed));
         // println!("Raw transaction = {}", raw_tx_hex);
@@ -98,24 +109,24 @@ impl ETHClient {
     }
 
     /// Returns tx hash
-    pub fn commit_block(
-        & mut self, 
-        block_num: U32, 
-        total_fees: U128, 
-        tx_data_packed: Vec<u8>, 
-        new_root: H256) -> Result<H256>
-    {
-        self.call("commitBlock", (block_num, total_fees, tx_data_packed, new_root))
-    }
+    // pub fn commit_block(
+    //     & mut self, 
+    //     block_num: U32, 
+    //     total_fees: U128, 
+    //     tx_data_packed: Vec<u8>, 
+    //     new_root: H256) -> Result<H256>
+    // {
+    //     self.call("commitBlock", (block_num, total_fees, tx_data_packed, new_root))
+    // }
 
-    /// Returns tx hash
-    pub fn verify_block(
-        & mut self, 
-        block_num: U32, 
-        proof: [U256; 8]) -> Result<H256>
-    {
-        self.call("verifyBlock", (block_num, proof))
-    }
+    // /// Returns tx hash
+    // pub fn verify_block(
+    //     & mut self, 
+    //     block_num: U32, 
+    //     proof: [U256; 8]) -> Result<H256>
+    // {
+    //     self.call("verifyBlock", (block_num, proof))
+    // }
 
     fn post(&self, method: &str, params: &[&str]) -> Result<String>
     {

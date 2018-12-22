@@ -7,24 +7,34 @@ use dotenv::dotenv;
 use std::env;
 use serde_json::{to_value, value::Value};
 
-fn establish_connection() -> PgConnection {
-    dotenv().ok();
-
-    let database_url = env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set");
-    PgConnection::establish(&database_url)
-        .expect(&format!("Error connecting to {}", database_url))
-}
-
-#[derive(Insertable, Queryable)]
-#[table_name="blocks"]
-pub struct SQLBlock {
-    pub block_number:   Option<i32>,
-    pub block_data:     Value,
-}
+use committer::Operation;
 
 pub struct StorageConnection {
     conn: PgConnection
+}
+
+#[derive(Insertable, Queryable)]
+#[table_name="accounts"]
+struct Account {
+    pub id:     i32,
+    pub data:   Value,
+}
+
+#[derive(Insertable, Queryable)]
+#[table_name="account_updates"]
+struct AccountUpdate {
+    pub account_id:     i32,
+    pub data:           Value,
+    pub block_number:   i32,
+}
+
+#[derive(Insertable, Queryable)]
+#[table_name="operations"]
+struct Operation {
+    pub id:     Option<i32>,
+    pub data:   Value,
+    pub addr:   String,
+    pub nonce:  i32,
 }
 
 // TODO: what can go wrong and how to hanlde db save errors?
@@ -34,34 +44,59 @@ impl StorageConnection {
     /// creates a single db connection; it's safe to create multiple instances of StorageConnection
     pub fn new() -> Self {
         Self{
-            conn: establish_connection()
+            conn: Self::establish_connection()
         }
     }
 
-    pub fn store_block(&self, block_number: i32, block: &Value) -> QueryResult<usize> {
-        let block = SQLBlock{
-            block_number:   Some(block_number),
-            block_data:     to_value(block).unwrap(),
-        };
-        diesel::insert_into(blocks::table)
-            .values(&block)
+    fn establish_connection() -> PgConnection {
+        dotenv().ok();
+        let database_url = env::var("DATABASE_URL")
+            .expect("DATABASE_URL must be set");
+        PgConnection::establish(&database_url)
+            .expect(&format!("Error connecting to {}", database_url))
+    }
+
+    pub fn commit_op(&self, op: &Operation) -> QueryResult<(String, i32)> {
+        diesel::insert_into(operations::table)
+            .values(&Operation{
+                id:     None,
+                data:   to_value(op).unwrap(),
+            })
+            // TODO: fetch and map to return addr and nonce
             .execute(&self.conn)
     }
 
-    pub fn store_proof(&self, block_number: i32, block: &Value) -> QueryResult<usize> {
-        unimplemented!()
-        // save proof...
+    pub fn commit_state_update(&self, block_number: u32, accounts_updated: AccountMap) -> QueryResult<()> {
+        for (account_id, a) in accounts_updated.enumerate() {
+            diesel::insert_into(account_updates::table)
+                .values(&AccountUpdate{
+                    account_id,
+                    block_number,
+                    data: to_value(a).unwrap(),
+                })
+                .execute(&self.conn)
+                .expect("database must be functional")
+        }
+        Ok(())
     }
 
-    pub fn update_accounts(&self, accounts: Vec<(u32, Account)>) -> QueryResult<usize> {
-        unimplemented!()
-        // update state...
+    pub fn apply_state_update(&self, block_number: u32) -> QueryResult<()> {
+        // TODO: UPDATE accounts a FROM account_updates u 
+        // SET a.data = u.data, a.updated_at = now()
+        // WHERE a.id = u.id AND u.block_number = :block_number
+        Ok(())
     }
 
-    // /// returns stream of accounts
-    // pub fn load_state() {
+    // TODO: return stream instead
+    pub fn load_verified_state() -> AccountMap {
+        // TODO: complex select from accounts and account_updates
+        HashMap::new()
+    }
 
-    // }
+    pub fn load_pendings_ops(last_committed_block: u32, last_verified_block: u32) -> Vec<Operation> {
+        // TODO: conditional select
+        vec![]
+    }
 
 }
 

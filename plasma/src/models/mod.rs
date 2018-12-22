@@ -24,6 +24,8 @@ pub type ExitBlock = block::Block<ExitTx>;
 
 pub type PublicKey = eddsa::PublicKey<Engine>;
 
+type AccountMap = HashMap<u32, Account>;
+
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Block {
     Transfer(TransferBlock),

@@ -1,2 +1,0 @@
-DROP TABLE accounts CASCADE;
-DROP TABLE blocks CASCADE;
