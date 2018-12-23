@@ -1,4 +1,4 @@
-use crate::models::*;
+use plasma::models::*;
 use crate::schema::*;
 
 use diesel::prelude::*;
@@ -125,7 +125,7 @@ fn storage_test() {
 
     // use serde_json::{self, json};
 
-    // use crate::models::Account;
+    // use plasma::models::Account;
 
     // use ff::{Field, PrimeField};
     // use pairing::bn256::{Bn256, Fr};
@@ -165,7 +165,7 @@ fn storage_test() {
     //     sig_s:           "0".to_string(),
     // };
 
-    // use crate::models::tx::{self, TxSignature};
+    // use plasma::models::tx::{self, TxSignature};
 
     // use sapling_crypto::alt_babyjubjub::{JubjubEngine};
 

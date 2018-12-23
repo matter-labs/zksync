@@ -1,7 +1,7 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
 use std::sync::mpsc;
-use crate::models::{TransferTx, PublicKey};
+use plasma::models::{TransferTx, PublicKey};
 use super::state_keeper::StateProcessingRequest;
 
 use actix_web::{

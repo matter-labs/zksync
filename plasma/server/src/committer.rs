@@ -1,11 +1,11 @@
 use std::sync::mpsc::{channel, Sender, Receiver};
-use crate::eth_client::{ETHClient, TxMeta, PROD_PLASMA};
+use plasma::eth_client::{ETHClient, TxMeta, PROD_PLASMA};
 use web3::types::{U256, U128, H256};
-use crate::models::{Block, TransferBlock, Account, BatchNumber, AccountMap};
+use plasma::models::{Block, TransferBlock, Account, BatchNumber, AccountMap};
 use super::prover::BabyProver;
 use super::storage::StorageConnection;
 use serde_json::{to_value, value::Value};
-use crate::primitives::{serialize_fe_for_ethereum};
+use plasma::primitives::{serialize_fe_for_ethereum};
 
 //#[derive(Debug, Clone, Serialize, Deserialize)]
 pub type EncodedProof = [U256; 8];

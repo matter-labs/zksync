@@ -2,8 +2,8 @@ use pairing::bn256::{Bn256, Fr};
 use sapling_crypto::jubjub::{edwards, Unknown, FixedGenerators};
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 
-use crate::primitives::{field_element_to_u32, field_element_to_u128, pack_edwards_point};
-use crate::circuit::utils::{le_bit_vector_into_field_element};
+use plasma::primitives::{field_element_to_u32, field_element_to_u128, pack_edwards_point};
+use plasma::circuit::utils::{le_bit_vector_into_field_element};
 use std::{thread, time};
 use std::collections::HashMap;
 use ff::{Field, PrimeField};
@@ -12,7 +12,7 @@ use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 use web3::types::{U128, H256};
 use std::str::FromStr;
 
-use crate::models::{self, *};
+use plasma::models::{self, *};
 
 use super::committer::{Operation, EthBlockData};
 use super::prover::BabyProver;

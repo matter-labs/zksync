@@ -7,33 +7,33 @@ use crypto::sha2::Sha256;
 use crypto::digest::Digest;
 
 use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
-use crate::models::{Engine, Fr};
+use plasma::models::{Engine, Fr};
 use sapling_crypto::circuit::float_point::parse_float_to_u128;
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 use sapling_crypto::jubjub::{JubjubEngine, JubjubParams, edwards, Unknown};
 
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
 
-use crate::models::{self, params, TransferBlock, DepositBlock, ExitBlock, Block, PlasmaState, AccountMap};
-use crate::models::circuit::{Account, AccountTree};
+use plasma::models::{self, params, TransferBlock, DepositBlock, ExitBlock, Block, PlasmaState, AccountMap};
+use plasma::models::circuit::{Account, AccountTree};
 
 use super::config::{TRANSFER_BATCH_SIZE, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE};
 
 use super::committer::{self, EncodedProof, Operation, EthBlockData};
 
-use crate::circuit::utils::be_bit_vector_into_bytes;
-use crate::circuit::transfer::transaction::{Transaction};
-use crate::circuit::leaf::{LeafWitness};
-use crate::circuit::deposit::deposit_request::{DepositRequest};
-use crate::circuit::deposit::circuit::{Deposit, DepositWitness};
-use crate::circuit::exit::exit_request::{ExitRequest};
-use crate::circuit::exit::circuit::{Exit, ExitWitness};
+use plasma::circuit::utils::be_bit_vector_into_bytes;
+use plasma::circuit::transfer::transaction::{Transaction};
+use plasma::circuit::leaf::{LeafWitness};
+use plasma::circuit::deposit::deposit_request::{DepositRequest};
+use plasma::circuit::deposit::circuit::{Deposit, DepositWitness};
+use plasma::circuit::exit::exit_request::{ExitRequest};
+use plasma::circuit::exit::circuit::{Exit, ExitWitness};
 
-use crate::circuit::transfer::circuit::{
+use plasma::circuit::transfer::circuit::{
     Transfer, 
     TransactionWitness};
 
-use crate::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum, field_element_to_u32};
+use plasma::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum, field_element_to_u32};
 
 use web3::types::{U256};
 
