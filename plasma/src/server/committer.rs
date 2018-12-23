@@ -58,8 +58,11 @@ fn keys_sorted(accounts_updated: AccountMap) -> Vec<u64> {
 
 pub fn start_eth_sender() -> Sender<(Operation, TxMeta)> {
     let (tx_for_eth, rx_for_eth) = channel();
+    let mut eth_client = ETHClient::new(PROD_PLASMA);
+
+    load_pendings_ops(&eth_client, &tx_for_eth);
+
     std::thread::spawn(move || {
-        let mut eth_client = ETHClient::new(PROD_PLASMA);
         for (op, meta) in rx_for_eth {
             println!("Operation requested: {:?}", &op);
             let tx = match op {
@@ -96,6 +99,22 @@ pub fn start_eth_sender() -> Sender<(Operation, TxMeta)> {
         }
     });
     tx_for_eth
+}
+
+pub fn load_pendings_ops(eth_client: &ETHClient, tx_for_eth: &Sender<(Operation, TxMeta)>) {
+    
+    let storage = StorageConnection::new();
+
+    // execute pending transactions
+    let current_nonce = eth_client.get_nonce(&eth_client.default_account()).unwrap();
+    let ops = storage.load_pendings_ops(current_nonce.as_u32());
+    for pending_op in ops {
+        let op = serde_json::from_value(pending_op.data).unwrap();
+        tx_for_eth.send((op, TxMeta{
+            addr:   pending_op.addr, 
+            nonce:  pending_op.nonce as u32,
+        }));
+    }
 }
 
 pub fn run_committer(rx_for_ops: Receiver<Operation>, tx_for_eth: Sender<(Operation, TxMeta)>) {

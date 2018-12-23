@@ -72,6 +72,10 @@ impl ETHClient {
         this
     }
 
+    pub fn default_account(&self) -> String {
+        format!("0x{}", self.sender_account)
+    }
+
     pub fn call<P: Tokenize>(&mut self, method: &str, meta: TxMeta, params: P) -> Result<H256> {
 
         let f = self.contract.function(method).unwrap();

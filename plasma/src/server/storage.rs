@@ -88,12 +88,12 @@ impl StorageConnection {
     }
 
     // TODO: return stream instead
-    pub fn load_verified_state() -> AccountMap {
+    pub fn load_verified_state(&self) -> AccountMap {
         // TODO: complex select from accounts and account_updates
         AccountMap::default()
     }
 
-    pub fn load_pendings_ops(last_committed_block: u32, last_verified_block: u32) -> Vec<Operation> {
+    pub fn load_pendings_ops(&self, current_nonce: u32) -> Vec<Operation> {
         // TODO: conditional select
         vec![]
     }
