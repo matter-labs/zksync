@@ -16,6 +16,7 @@ use crate::models::{self, *};
 
 use super::committer::{Operation, EthBlockData};
 use super::prover::BabyProver;
+use super::storage::StorageConnection;
 
 use rand::{SeedableRng, Rng, XorShiftRng};
 
@@ -48,7 +49,7 @@ pub struct PlasmaStateKeeper {
 impl PlasmaStateKeeper {
 
     // TODO: remove this function when done with demo
-    fn generate_demo_accounts(mut balance_tree: AccountTree) -> (AccountTree, HashMap<u32, PrivateKey<Bn256>>) {
+    fn generate_demo_accounts(balance_tree: &mut AccountTree) -> HashMap<u32, PrivateKey<Bn256>> {
 
         let number_of_accounts = 1000;
         let mut keys_map = HashMap::<u32, PrivateKey<Bn256>>::new();
@@ -81,7 +82,7 @@ impl PlasmaStateKeeper {
         };
 
         println!("Generated {} accounts with balances", number_of_accounts);
-        (balance_tree, keys_map)
+        keys_map
     }
 
     pub fn new() -> Self {
@@ -90,10 +91,16 @@ impl PlasmaStateKeeper {
 
         // here we should insert default accounts into the tree
         let tree_depth = params::BALANCE_TREE_DEPTH as u32;
-        let balance_tree = AccountTree::new(tree_depth);
+        let mut balance_tree = AccountTree::new(tree_depth);
 
         println!("generating demo accounts");
-        let (balance_tree, keys_map) = Self::generate_demo_accounts(balance_tree);
+        let keys_map = Self::generate_demo_accounts(&mut balance_tree);
+
+        let storage = StorageConnection::new();
+        let initial_state = storage.load_verified_state();
+        for (id, account) in initial_state {
+            balance_tree.insert(id, account);
+        }
 
         let keeper = PlasmaStateKeeper {
             state: PlasmaState{
@@ -267,7 +274,7 @@ pub fn start_state_keeper(mut sk: PlasmaStateKeeper,
     tx_for_commitments: Sender<Operation>,
     tx_for_proof_requests: Sender<(u32, Block, EthBlockData, AccountMap)>)
 {
-    thread::spawn(move || {  
+    thread::spawn(move || {
         sk.run(rx_for_blocks, tx_for_commitments, tx_for_proof_requests)
     });
 }
