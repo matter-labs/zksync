@@ -35,7 +35,7 @@ impl MemPool {
         // send the current block to state_keeper
         let block = std::mem::replace(&mut self.current_block, TransferBlock::default());
         let (tx, rx) = channel();
-        let request = StateProcessingRequest::ApplyBlock(Block::Transfer(block), BlockSource::MemPool(tx));
+        let request = StateProcessingRequest::ApplyBlock(Block::Transfer(block), Some(tx));
         tx_for_blocks.send(request);
 
         // now wait for state_keeper to return a result
@@ -43,7 +43,9 @@ impl MemPool {
 
         if let Err(block_purged) = result {
             // out block is returned purged
-            self.current_block = block_purged;
+            if let Block::Transfer(block) = block_purged {
+                self.current_block = block;
+            }
         };
     }
 }

@@ -6,7 +6,6 @@ use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use std::env;
 use serde_json::{to_value, value::Value};
-use super::committer;
 
 pub struct StorageConnection {
     conn: PgConnection
@@ -27,13 +26,19 @@ struct AccountUpdate {
     pub block_number:   i32,
 }
 
-#[derive(Insertable, Queryable)]
+#[derive(Insertable)]
 #[table_name="operations"]
-struct Operation {
-    pub id:     Option<i32>,
+struct NewOperation {
     pub data:   Value,
-    pub addr:   Option<String>,
-    pub nonce:  Option<i32>,
+}
+
+#[derive(Queryable)]
+pub struct Operation {
+    pub id:         i32,
+    pub data:       Value,
+    pub addr:       String,
+    pub nonce:      i32,
+    pub created_at: std::time::SystemTime,
 }
 
 // TODO: what can go wrong and how to hanlde db save errors?
@@ -55,17 +60,10 @@ impl StorageConnection {
             .expect(&format!("Error connecting to {}", database_url))
     }
 
-    pub fn commit_op(&self, op: &committer::Operation) -> QueryResult<(String, u32)> {
+    pub fn commit_op(&self, data: Value) -> QueryResult<Operation> {
         diesel::insert_into(operations::table)
-            .values(&Operation{
-                id:     None,
-                data:   to_value(op).unwrap(),
-                addr:   None, // will be generated in the database
-                nonce:  None, // will be generated in the database
-            })
-            // TODO: fetch and map to return addr and nonce
-            .execute(&self.conn);
-            unimplemented!();
+            .values(&NewOperation{ data })
+            .get_result(&self.conn)
     }
 
     pub fn commit_state_update(&self, block_number: u32, accounts_updated: &AccountMap) -> QueryResult<()> {
@@ -95,7 +93,7 @@ impl StorageConnection {
         AccountMap::default()
     }
 
-    pub fn load_pendings_ops(last_committed_block: u32, last_verified_block: u32) -> Vec<(committer::Operation, String, u32)> {
+    pub fn load_pendings_ops(last_committed_block: u32, last_verified_block: u32) -> Vec<Operation> {
         // TODO: conditional select
         vec![]
     }

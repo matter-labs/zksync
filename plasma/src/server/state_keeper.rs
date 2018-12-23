@@ -23,17 +23,9 @@ use std::sync::mpsc::{Sender, Receiver};
 use fnv::FnvHashMap;
 use bigdecimal::BigDecimal;
 
-pub enum BlockSource {
-    // MemPool will provide a channel to return result of block processing
-    // In case of error, block is returned with invalid transactions removed
-    MemPool(Sender<Result<(),TransferBlock>>),
-
-    // EthWatch doesn't need a result channel because block must always be processed
-    EthWatch,
-
-    // Same for unprocessed blocks from storage
-    Storage,
-}   
+// MemPool will provide a channel to return result of block processing
+// In case of error, block is returned with invalid transactions removed
+pub type BlockSource = Option<Sender<Result<(),Block>>>;
 
 //pub struct StateProcessingRequest(pub Block, pub BlockSource);
 
@@ -124,36 +116,34 @@ impl PlasmaStateKeeper {
     {
         for req in rx_for_blocks {
             match req {
-                StateProcessingRequest::ApplyBlock(block, source) => {
-                    let applied = match block {
-                        Block::Transfer(mut block) => self.apply_transfer_block(&mut block),
-                        Block::Deposit(mut block, batch_number) => self.apply_deposit_block(&mut block, batch_number),
-                        Block::Exit(mut block, batch_number) => self.apply_exit_block(&mut block, batch_number),
+                StateProcessingRequest::ApplyBlock(mut block, source) => {
+                    let applied = match &mut block {
+                        &mut Block::Transfer(ref mut block) => self.apply_transfer_block(block),
+                        &mut Block::Deposit(ref mut block, batch_number) => self.apply_deposit_block(block, batch_number),
+                        &mut Block::Exit(ref mut block, batch_number) => self.apply_exit_block(block, batch_number),
                     };
+                    let result = match applied {
+                        Ok((new_root, block_data, accounts_updated)) => {
+                            self.state.block_number += 1;
 
-                    if let Ok((new_root, block_data, accounts_updated)) = applied {
-                        self.state.block_number += 1;
+                            // make commitment
+                            let op = Operation::Commit{
+                                block_number:   self.state.block_number,
+                                new_root,
+                                block_data: block_data.clone(),
+                                accounts_updated: accounts_updated.clone(),
+                            };
+                            tx_for_commitments.send(op);
 
-                        // make commitment
-                        let op = Operation::Commit{
-                            block_number:   self.state.block_number,
-                            new_root,
-                            block_data,
-                            accounts_updated: accounts_updated.clone(),
-                        };
-                        tx_for_commitments.send(op);
-
-                        // start making proof
-                        tx_for_proof_requests.send((self.state.block_number, block, block_data, accounts_updated));
+                            // start making proof
+                            tx_for_proof_requests.send((self.state.block_number, block, block_data, accounts_updated));
+                            Ok(())
+                        },
+                        Err(_) => Err(block),
                     };
-
-                    if let BlockSource::MemPool(sender) = source {
-                        if let Block::Transfer(block) = block {
-                            // send result back to mempool
-                            sender.send(applied.map(|_| ()).map_err(|_| block));
-                        }
+                    if let Some(sender) = source {
+                        sender.send(result);
                     }
-
                 },
                 StateProcessingRequest::GetPubKey(account_id, sender) => {
                     sender.send(self.state.get_pub_key(account_id));
@@ -213,8 +203,11 @@ impl PlasmaStateKeeper {
     fn apply_deposit_block(&mut self, block: &mut DepositBlock, batch_number: BatchNumber) -> Result<(H256, EthBlockData, AccountMap), ()> {
 
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
-        for tx in block.transactions {
+        for tx in block.transactions.iter() {
             self.state.apply_deposit(&tx);
+
+            // collect updated state
+            updated_accounts.insert(tx.account, self.account(tx.account));
         }
             
         block.block_number = self.state.block_number;
@@ -227,8 +220,11 @@ impl PlasmaStateKeeper {
     fn apply_exit_block(&mut self, block: &mut ExitBlock, batch_number: BatchNumber) -> Result<(H256, EthBlockData, AccountMap), ()> {
 
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
-        for tx in block.transactions {
+        for tx in block.transactions.iter() {
             self.state.apply_exit(&tx);
+
+            // collect updated state
+            updated_accounts.insert(tx.account, self.account(tx.account));
         }
             
         block.block_number = self.state.block_number;

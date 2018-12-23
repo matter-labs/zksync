@@ -300,7 +300,7 @@ impl EthWatch {
             transactions: all_deposits,
             new_root_hash: Fr::zero(),
         };
-        let request = StateProcessingRequest::ApplyBlock(Block::Deposit(block, batch_number.as_u32()), BlockSource::EthWatch);
+        let request = StateProcessingRequest::ApplyBlock(Block::Deposit(block, batch_number.as_u32()), None);
 
         println!("Sending request");
 

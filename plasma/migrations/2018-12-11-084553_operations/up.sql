@@ -1,6 +1,5 @@
 CREATE TABLE operations (
     id              serial primary key,
-    block_number    integer not null,
     data            jsonb not null,
     addr            text not null,
     nonce           serial not null,

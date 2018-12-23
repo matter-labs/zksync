@@ -16,7 +16,6 @@ table! {
 table! {
     operations (id) {
         id -> Int4,
-        block_number -> Int4,
         data -> Jsonb,
         addr -> Text,
         nonce -> Int4,

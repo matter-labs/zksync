@@ -105,7 +105,7 @@ pub fn run_committer(rx_for_ops: Receiver<Operation>, tx_for_eth: Sender<(Operat
         // persist in storage first
         
         // TODO: with postgres transaction
-        let (addr, nonce) = storage.commit_op(&op).unwrap();
+        let committed_op = storage.commit_op(serde_json::to_value(&op).unwrap()).expect("db must be functional");
         match &op {
             Operation::Commit{block_number, new_root, block_data, accounts_updated} => 
                 storage.commit_state_update(*block_number, accounts_updated),
@@ -115,7 +115,10 @@ pub fn run_committer(rx_for_ops: Receiver<Operation>, tx_for_eth: Sender<(Operat
         };
 
         // submit to eth
-        tx_for_eth.send((op, TxMeta{addr, nonce}));
+        tx_for_eth.send((op, TxMeta{
+            addr:   committed_op.addr, 
+            nonce:  committed_op.nonce as u32,
+        }));
     }
 }
 
