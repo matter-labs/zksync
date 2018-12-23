@@ -1,5 +1,5 @@
 use std::sync::mpsc::{channel, Sender, Receiver};
-use crate::models::{TransferTx, TransferBlock, Block};
+use plasma::models::{TransferTx, TransferBlock, Block};
 use super::state_keeper::{StateProcessingRequest, BlockSource};
 use super::config;
 

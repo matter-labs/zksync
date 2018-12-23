@@ -1,16 +1,16 @@
 [package]
-name = "plasma"
-version = "0.1.1"
-edition = "2018"
-
-authors = [
-    "Alex Gluchowski <alex@gluchowski.net>",
-    "Alex Vlasov <alex.m.vlasov@gmail.com>"
-]
+name = "server"
+version = "0.0.1"
 
 [dependencies]
+plasma = { path = ".." }
+
+ff = { path = "../../ff", features = ["derive"] }
+pairing = { path = "../../pairing" }
+bellman = { path = "../../bellman" }
+sapling-crypto = { path = "../../sapling-crypto" }
+
 rand = "0.4"
-ff = { path = "../ff", features = ["derive"] }
 hex = "0.3.2"
 time = "0.1"
 num-bigint = "0.2"
@@ -43,17 +43,8 @@ rlp = "0.3.0"
 tiny-keccak = "1.4.2"
 secp256k1 = "0.11.1"
 
-pairing = { path = "../pairing" }
-bellman = { path = "../bellman" }
-sapling-crypto = { path = "../sapling-crypto" }
-
 diesel = { version = "1.3.3", features = ["postgres", "serde_json"] }
 bigdecimal = { version = "0.0.11", features = ["serde"]}
 dotenv = "0.9.0"
 
 lazy_static = "1.2.0"
-
-#pairing = { git = 'https://github.com/matterinc/pairing' }
-#sapling-crypto = { git = 'https://github.com/matterinc/sapling-crypto' }
-#bellman = { git = 'https://github.com/matterinc/bellman' }
-

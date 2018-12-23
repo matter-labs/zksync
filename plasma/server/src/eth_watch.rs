@@ -9,9 +9,9 @@ use std::str::FromStr;
 use std::collections::HashMap;
 use std::sync::mpsc::Sender;
 use super::state_keeper::{StateProcessingRequest, BlockSource};
-use crate::models::{Block, DepositBlock, DepositTx, Engine, Fr};
+use plasma::models::{Block, DepositBlock, DepositTx, Engine, Fr};
 use bigdecimal::{Num, BigDecimal, FromPrimitive, ToPrimitive};
-use crate::models::params;
+use plasma::models::params;
 
 use std::time;
 use rustc_hex::{FromHex, ToHex};
@@ -234,33 +234,31 @@ impl EthWatch {
 
         for event in all_events {
             let topic = event.topics[0];
-            if topic == deposit_event_topic {
-                let data_bytes: Vec<u8> = event.data.0;
-                let account_id = U256::from(event.topics[2]);
-                let public_key = U256::from(event.topics[3]);
-                let deposit_amount = U256::from_big_endian(&data_bytes);
-                println!("Deposit from {:x}, key {:x}, amount {}", account_id, public_key, deposit_amount);
-                let existing_record = this_batch.get(&account_id);
-                if existing_record.is_none() {
-                    this_batch.insert(account_id, (deposit_amount, public_key));
-                } else {
-                    let record = existing_record.unwrap().clone();
-                    let mut existing_balance = record.0;
-                    existing_balance = existing_balance + deposit_amount;
-                    this_batch.insert(account_id, (existing_balance, record.1));
-                }
-                continue;
-            } else if topic == deposit_canceled_topic {
-                let account_id = U256::from(event.topics[2]);
-                let existing_record = this_batch.get(&account_id);
-                if existing_record.is_none() {
-                    return Err(());
-                }
-                this_batch.remove(&account_id);
-                continue;
+            match () {
+                () if topic == deposit_event_topic => {
+                    let data_bytes: Vec<u8> = event.data.0;
+                    let account_id = U256::from(event.topics[2]);
+                    let public_key = U256::from(event.topics[3]);
+                    let deposit_amount = U256::from_big_endian(&data_bytes);
+                    println!("Deposit from {:x}, key {:x}, amount {}", account_id, public_key, deposit_amount);
+                    let existing_record = this_batch.get(&account_id).map(|&v| v.clone());
+                    if let Some(record) = existing_record {
+                        let mut existing_balance = record.0;
+                        existing_balance = existing_balance + deposit_amount;
+                        this_batch.insert(account_id, (existing_balance, record.1));
+                    } else {
+                        this_batch.insert(account_id, (deposit_amount, public_key));
+                    }
+                    continue;
+                },
+                () if topic == deposit_canceled_topic => {
+                    let account_id = U256::from(event.topics[2]);
+                    let existing_record = this_batch.get(&account_id).map(|&v| v.clone()).ok_or(())?;
+                    this_batch.remove(&account_id);
+                    continue;
+                },
+                _ => return Err(()),
             }
-
-            return Err(());
         }
         println!("Got batch");
 

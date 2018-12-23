@@ -5,6 +5,20 @@
 #![allow(unused_assignments)]
 #![allow(proc_macro_derive_resolution_fallback)]
 
+pub mod runner;
+
+mod rest_api;
+mod state_keeper;
+mod prover;
+mod committer;
+mod config;
+mod mem_pool;
+mod eth_watch;
+mod storage;
+mod schema;
+
+extern crate plasma;
+
 extern crate bellman;
 extern crate pairing;
 extern crate rand;
@@ -49,10 +63,3 @@ extern crate smart_default;
 
 #[macro_use]
 extern crate lazy_static;
-
-pub mod primitives;
-pub mod merkle_tree;
-pub mod circuit;
-pub mod vk_contract_generator;
-pub mod eth_client;
-pub mod models;

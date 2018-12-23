@@ -8,9 +8,9 @@ use super::committer::{self, Operation};
 use super::mem_pool::{MemPool, start_mem_pool};
 use super::eth_watch::{EthWatch, start_eth_watch};
 
-use crate::models::{Block, TransferBlock, TransferTx};
+use plasma::models::{Block, TransferBlock, TransferTx};
 
-use crate::primitives::serialize_fe_for_ethereum;
+use plasma::primitives::serialize_fe_for_ethereum;
 
 pub fn run() {
 
