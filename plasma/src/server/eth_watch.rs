@@ -95,7 +95,6 @@ impl EthWatch {
         // let web3 = web3::Web3::new(web3::transports::Http::with_event_loop("http://localhost:8545", &eloop.handle(), 1).unwrap());
         let contract = Contract::new(web3.eth(), self.contract_addr.clone(), self.contract.clone());
 
-
         loop {
             std::thread::sleep(time::Duration::from_secs(1));
             let last_block_number = web3.eth().block_number().wait();
@@ -113,7 +112,7 @@ impl EthWatch {
             if deposits_result.is_err() {
                 continue
             }
-           
+        
             self.last_processed_block += 1;
         }
 
@@ -301,7 +300,7 @@ impl EthWatch {
             transactions: all_deposits,
             new_root_hash: Fr::zero(),
         };
-        let request = StateProcessingRequest::ApplyBlock(Block::Deposit(block), BlockSource::EthWatch);
+        let request = StateProcessingRequest::ApplyBlock(Block::Deposit(block, batch_number.as_u32()), None);
 
         println!("Sending request");
 
@@ -317,6 +316,12 @@ impl EthWatch {
         Ok(())
     }
 
+}
+
+pub fn start_eth_watch(mut eth_watch: EthWatch, tx_for_blocks: Sender<StateProcessingRequest>) {
+    std::thread::spawn(move || {
+        eth_watch.run(tx_for_blocks);
+    });
 }
 
 #[test]
