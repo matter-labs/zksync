@@ -20,16 +20,14 @@ impl MemPool {
         }
     }
 
-    pub fn start(&mut self, rx_for_tx: Receiver<TransferTx>, tx_for_blocks: Sender<StateProcessingRequest>) {
-        thread::spawn(move || {  
-            for tx in rx_for_tx {            
-                println!("adding tx to mem pool");
-                self.current_block.transactions.push(tx);
-                if self.current_block.transactions.len() == self.batch_size {
-                    self.process_batch(&tx_for_blocks)
-                }
+    fn run(&mut self, rx_for_tx: Receiver<TransferTx>, tx_for_blocks: Sender<StateProcessingRequest>) {
+        for tx in rx_for_tx {            
+            println!("adding tx to mem pool");
+            self.current_block.transactions.push(tx);
+            if self.current_block.transactions.len() == self.batch_size {
+                self.process_batch(&tx_for_blocks)
             }
-        });
+        }
     }
 
     fn process_batch(&mut self, tx_for_blocks: &Sender<StateProcessingRequest>) {
@@ -48,4 +46,10 @@ impl MemPool {
             self.current_block = block_purged;
         };
     }
+}
+
+pub fn start_mem_pool(mem_pool: MemPool, rx_for_tx: Receiver<TransferTx>, tx_for_blocks: Sender<StateProcessingRequest>) {
+        std::thread::spawn(move || {  
+            mem_pool.run(rx_for_tx, tx_for_blocks);
+        });
 }

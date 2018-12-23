@@ -6,8 +6,7 @@ use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use std::env;
 use serde_json::{to_value, value::Value};
-
-use committer::Operation;
+use super::committer;
 
 pub struct StorageConnection {
     conn: PgConnection
@@ -33,8 +32,8 @@ struct AccountUpdate {
 struct Operation {
     pub id:     Option<i32>,
     pub data:   Value,
-    pub addr:   String,
-    pub nonce:  i32,
+    pub addr:   Option<String>,
+    pub nonce:  Option<i32>,
 }
 
 // TODO: what can go wrong and how to hanlde db save errors?
@@ -56,11 +55,13 @@ impl StorageConnection {
             .expect(&format!("Error connecting to {}", database_url))
     }
 
-    pub fn commit_op(&self, op: &Operation) -> QueryResult<(String, i32)> {
+    pub fn commit_op(&self, op: &committer::Operation) -> QueryResult<(String, u32)> {
         diesel::insert_into(operations::table)
             .values(&Operation{
                 id:     None,
                 data:   to_value(op).unwrap(),
+                addr:   None, // will be generated in the database
+                nonce:  None, // will be generated in the database
             })
             // TODO: fetch and map to return addr and nonce
             .execute(&self.conn);
@@ -68,15 +69,15 @@ impl StorageConnection {
     }
 
     pub fn commit_state_update(&self, block_number: u32, accounts_updated: AccountMap) -> QueryResult<()> {
-        for (account_id, a) in accounts_updated.enumerate() {
+        for (&account_id, a) in accounts_updated.iter() {
             diesel::insert_into(account_updates::table)
                 .values(&AccountUpdate{
-                    account_id,
-                    block_number,
-                    data: to_value(a).unwrap(),
+                    account_id:     account_id as i32,
+                    block_number:   block_number as i32,
+                    data:           to_value(a).unwrap(),
                 })
                 .execute(&self.conn)
-                .expect("database must be functional")
+                .expect("database must be functional");
         }
         Ok(())
     }
@@ -91,7 +92,7 @@ impl StorageConnection {
     // TODO: return stream instead
     pub fn load_verified_state() -> AccountMap {
         // TODO: complex select from accounts and account_updates
-        HashMap::new()
+        std::collections::HashMap::new()
     }
 
     pub fn load_pendings_ops(last_committed_block: u32, last_verified_block: u32) -> Vec<Operation> {
@@ -103,14 +104,14 @@ impl StorageConnection {
 
 #[test]
 fn storage_test() {
-    let conn = establish_connection();
+    // let conn = establish_connection();
 
-    use serde_json::{self, json};
+    // use serde_json::{self, json};
 
-    use crate::models::Account;
+    // use crate::models::Account;
 
-    use ff::{Field, PrimeField};
-    use pairing::bn256::{Bn256, Fr};
+    // use ff::{Field, PrimeField};
+    // use pairing::bn256::{Bn256, Fr};
 
     // let a = Account {
     //     balance: Fr::one(),

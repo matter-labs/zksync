@@ -69,36 +69,36 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
 pub fn start_api_server(tx_for_tx:    mpsc::Sender<TransferTx>, 
                       tx_for_state: mpsc::Sender<StateProcessingRequest>) {
 
-    ::std::env::set_var("RUST_LOG", "actix_web=info");
-    let sys = actix::System::new("ws-example");
+    std::thread::spawn(move || {
+        ::std::env::set_var("RUST_LOG", "actix_web=info");
+        let sys = actix::System::new("ws-example");
 
-    //move is necessary to give closure below ownership
-    server::new(move || {
-        App::with_state(AppState {
-            tx_for_tx: tx_for_tx.clone(),
-            tx_for_state: tx_for_state.clone(),
-        }.clone()) // <- create app with shared state
-            // enable logger
-            .middleware(middleware::Logger::default())
-            // enable CORS
-            .configure(|app| {
-                Cors::for_app(app)
-                    .send_wildcard()
-                    .max_age(3600)
-                    .resource("/send", |r| {
-                        r.method(Method::POST).f(handle_send_transaction);
-                        r.method(Method::OPTIONS).f(|_| HttpResponse::Ok());
-                        r.method(Method::GET).f(|_| HttpResponse::Ok());
-                    })
-                    .register()
-            })
-    }).bind("127.0.0.1:8080")
-    .unwrap()
-    .shutdown_timeout(1)
-    .start();
+        //move is necessary to give closure below ownership
+        server::new(move || {
+            App::with_state(AppState {
+                tx_for_tx: tx_for_tx.clone(),
+                tx_for_state: tx_for_state.clone(),
+            }.clone()) // <- create app with shared state
+                // enable logger
+                .middleware(middleware::Logger::default())
+                // enable CORS
+                .configure(|app| {
+                    Cors::for_app(app)
+                        .send_wildcard()
+                        .max_age(3600)
+                        .resource("/send", |r| {
+                            r.method(Method::POST).f(handle_send_transaction);
+                            r.method(Method::OPTIONS).f(|_| HttpResponse::Ok());
+                            r.method(Method::GET).f(|_| HttpResponse::Ok());
+                        })
+                        .register()
+                })
+        }).bind("127.0.0.1:8080")
+        .unwrap()
+        .shutdown_timeout(1)
+        .start();
 
-    println!("Started http server: 127.0.0.1:8080");
-    thread::spawn(move || {
+        println!("Started http server: 127.0.0.1:8080");
         sys.run();
     });
 }

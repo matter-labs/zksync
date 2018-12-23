@@ -30,7 +30,7 @@ pub const PROD_PLASMA: ABI = (
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxMeta{
     addr:       String,
-    nonce:      u64,
+    nonce:      u32,
 }
 
 pub struct ETHClient {
@@ -202,26 +202,26 @@ fn from_0x<Out>(s: &str) -> Result<Out>
 #[test]
 fn test_eth() {
 
-    let mut client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
+    // let mut client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
 
-    let block_num: u64 = 1;
-    let total_fees: U128 = U128::from_dec_str("0").unwrap();
-    let tx_data_packed: Vec<u8> = vec![];
-    let new_root: H256 = H256::zero();
+    // let block_num: u64 = 1;
+    // let total_fees: U128 = U128::from_dec_str("0").unwrap();
+    // let tx_data_packed: Vec<u8> = vec![];
+    // let new_root: H256 = H256::zero();
 
-    let proof: [U256; 8] = [U256::zero(); 8];
+    // let proof: [U256; 8] = [U256::zero(); 8];
 
-    println!("committing block...");
-    let r = client.commit_block(block_num, total_fees, tx_data_packed, new_root);
-    match r {
-        Err(e) => println!("{:#?}", e),
-        Ok(hash) => println!("https://rinkeby.etherscan.io/tx/{:?}", hash),
-    };
+    // println!("committing block...");
+    // let r = client.commit_block(block_num, total_fees, tx_data_packed, new_root);
+    // match r {
+    //     Err(e) => println!("{:#?}", e),
+    //     Ok(hash) => println!("https://rinkeby.etherscan.io/tx/{:?}", hash),
+    // };
 
-    println!("verifying block...");
-    let r = client.verify_block(block_num, proof);
-    match r {
-        Err(e) => println!("{:#?}", e),
-        Ok(hash) => println!("https://rinkeby.etherscan.io/tx/{:?}", hash),
-    };
+    // println!("verifying block...");
+    // let r = client.verify_block(block_num, proof);
+    // match r {
+    //     Err(e) => println!("{:#?}", e),
+    //     Ok(hash) => println!("https://rinkeby.etherscan.io/tx/{:?}", hash),
+    // };
 }

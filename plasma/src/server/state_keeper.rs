@@ -31,7 +31,7 @@ pub enum BlockSource {
 
     // Same for unprocessed blocks from storage
     Storage,
-}
+}   
 
 //pub struct StateProcessingRequest(pub Block, pub BlockSource);
 
@@ -121,49 +121,57 @@ impl PlasmaStateKeeper {
         tx_for_proof_requests: Sender<Block>)
     {
         thread::spawn(move || {  
-            for req in rx_for_blocks {
-                match req {
-                    StateProcessingRequest::ApplyBlock(block, source) => {
-                        let applied = match block {
-                            Block::Deposit(mut block) => self.apply_deposit_block(&mut block),
-                            Block::Exit(mut block) => self.apply_exit_block(&mut block),
-                            Block::Transfer(mut block) => elf.apply_transfer_block(&mut block),
-                        };
-
-                        let result = match applied {
-                            Ok(new_root, block_data, accounts_updated) => {
-
-                                self.state.block_number += 1;
-
-                                // make commitment
-                                let op = Operation::Commit{
-                                    block_number:   self.state.block_number,
-                                    new_root,
-                                    block_data,
-                                    accounts_updated,
-                                };
-                                tx_for_commitments.send(block.clone());
-
-                                // start making proof
-                                tx_for_proof_requests.send(block);
-
-                                Ok(())
-                            },
-                            Err(_) => Err(block),
-                        };
-
-                        if let BlockSource::MemPool(sender) = source {
-                            // send result back to mempool
-                            sender.send(result);
-                        }
-
-                    },
-                    StateProcessingRequest::GetPubKey(account_id, sender) => {
-                        sender.send(self.state.get_pub_key(account_id));
-                    },
-                }
-            }
+            self.run(rx_for_blocks, tx_for_commitments, tx_for_proof_requests)
         });
+    }
+
+    fn run(&mut self, 
+        rx_for_blocks: Receiver<StateProcessingRequest>, 
+        tx_for_commitments: Sender<Operation>,
+        tx_for_proof_requests: Sender<Block>)
+    {
+        for req in rx_for_blocks {
+            match req {
+                StateProcessingRequest::ApplyBlock(block, source) => {
+                    let applied = match block {
+                        Block::Deposit(mut block) => self.apply_deposit_block(&mut block),
+                        Block::Exit(mut block, batch_number) => self.apply_exit_block(&mut block, batch_number),
+                        Block::Transfer(mut block, batch_number) => elf.apply_transfer_block(&mut block, batch_number),
+                    };
+
+                    let result = match applied {
+                        Ok(new_root, block_data, accounts_updated) => {
+
+                            self.state.block_number += 1;
+
+                            // make commitment
+                            let op = Operation::Commit{
+                                block_number:   self.state.block_number,
+                                new_root,
+                                block_data,
+                                accounts_updated,
+                            };
+                            tx_for_commitments.send(block.clone());
+
+                            // start making proof
+                            tx_for_proof_requests.send(block);
+
+                            Ok(())
+                        },
+                        Err(_) => Err(block),
+                    };
+
+                    if let BlockSource::MemPool(sender) = source {
+                        // send result back to mempool
+                        sender.send(result);
+                    }
+
+                },
+                StateProcessingRequest::GetPubKey(account_id, sender) => {
+                    sender.send(self.state.get_pub_key(account_id));
+                },
+            }
+        }
     }
 
     fn account(&self, index: u32) -> Account {
@@ -171,11 +179,6 @@ impl PlasmaStateKeeper {
     }
 
     fn apply_transfer_block(&mut self, block: &mut TransferBlock) -> Result<(H256, EthBlockData, AccountMap), ()> {
-
-        block.block_number = self.state.block_number;
-
-        // update state with verification
-        // for tx in block: self.state.apply(transaction)?;
 
         let transactions: Vec<TransferTx> = block.transactions.clone()
             .into_iter()
@@ -188,7 +191,6 @@ impl PlasmaStateKeeper {
         let transactions: Vec<TransferTx> = transactions
             .into_iter()
             .filter(|tx| {
-
                 // save state
                 save_state.insert(tx.from, self.account(tx.from));
                 save_state.insert(tx.to, self.account(tx.to));
@@ -198,7 +200,6 @@ impl PlasmaStateKeeper {
                 // updated state
                 updated_accounts.insert(tx.from, self.account(tx.from));
                 updated_accounts.insert(tx.to, self.account(tx.to));
-
             })
             .collect();
         
@@ -208,25 +209,20 @@ impl PlasmaStateKeeper {
                 // TODO: add tree.insert_existing() for performance
                 self.state.balance_tree.insert(k, v);
             }
-
             return Err(());
         }
             
+        block.block_number = self.state.block_number;
         block.new_root_hash = self.state.root_hash();
 
         let eth_block_data = EthBlockData::TransferBlock{
-            total_fees:     U128::zero(), // TODO: count
+            total_fees:     U128::zero(), // TODO: count fees
             public_data:    BabyProver::encode_transfer_transactions(&block),
         };
         Ok(H256::from(block.new_root_hash), eth_block_data, updated_accounts);
     }
 
-    fn apply_deposit_block(&mut self, block: &mut DepositBlock) -> Result<(H256, EthBlockData, AccountMap), ()> {
-
-        block.block_number = self.state.block_number;
-
-        // update state with verification
-        // for tx in block: self.state.apply(transaction)?;
+    fn apply_deposit_block(&mut self, block: &mut DepositBlock, batch_number: BatchNumber) -> Result<(H256, EthBlockData, AccountMap), ()> {
 
         let transactions: Vec<DepositTx> = block.transactions.clone();
 
@@ -252,12 +248,14 @@ impl PlasmaStateKeeper {
             }
         }
             
+        block.block_number = self.state.block_number;
         block.new_root_hash = self.state.root_hash();
-        self.state.block_number += 1;
-        Ok(())
+
+        let eth_block_data = EthBlockData::DepositBlock{ batch_number };
+        Ok(H256::from(block.new_root_hash), eth_block_data, updated_accounts)
     }
 
-    fn apply_exit_block(&mut self, block: &mut ExitBlock) -> Result<(H256, EthBlockData, AccountMap), ()> {
+    fn apply_exit_block(&mut self, block: &mut ExitBlock, batch_number: BatchNumber) -> Result<(H256, EthBlockData, AccountMap), ()> {
 
         block.block_number = self.state.block_number;
 
