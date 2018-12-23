@@ -120,7 +120,7 @@ impl PlasmaStateKeeper {
     fn run(&mut self, 
         rx_for_blocks: Receiver<StateProcessingRequest>, 
         tx_for_commitments: Sender<Operation>,
-        tx_for_proof_requests: Sender<Block>)
+        tx_for_proof_requests: Sender<(u32, Block, EthBlockData, AccountMap)>)
     {
         for req in rx_for_blocks {
             match req {
@@ -139,12 +139,12 @@ impl PlasmaStateKeeper {
                             block_number:   self.state.block_number,
                             new_root,
                             block_data,
-                            accounts_updated,
+                            accounts_updated: accounts_updated.clone(),
                         };
                         tx_for_commitments.send(op);
 
                         // start making proof
-                        tx_for_proof_requests.send(block);
+                        tx_for_proof_requests.send((self.state.block_number, block, block_data, accounts_updated));
                     };
 
                     if let BlockSource::MemPool(sender) = source {
@@ -269,7 +269,7 @@ impl PlasmaStateKeeper {
 pub fn start_state_keeper(sk: PlasmaStateKeeper, 
     rx_for_blocks: Receiver<StateProcessingRequest>, 
     tx_for_commitments: Sender<Operation>,
-    tx_for_proof_requests: Sender<Block>)
+    tx_for_proof_requests: Sender<(u32, Block, EthBlockData, AccountMap)>)
 {
     thread::spawn(move || {  
         sk.run(rx_for_blocks, tx_for_commitments, tx_for_proof_requests)

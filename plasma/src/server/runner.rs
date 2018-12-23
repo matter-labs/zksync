@@ -1,7 +1,7 @@
 use std::thread;
 use std::sync::mpsc::{channel, Sender};
 
-use super::prover::{BabyProver};
+use super::prover::{BabyProver, start_prover};
 use super::state_keeper::{PlasmaStateKeeper, StateProcessingRequest, start_state_keeper};
 use super::rest_api::start_api_server;
 use super::committer::{self, Operation};
@@ -16,10 +16,10 @@ pub fn run() {
 
     // create channel to accept deserialized requests for new transacitons
 
-    let (tx_for_tx, rx_for_tx) = channel::<TransferTx>();
-    let (tx_for_state, rx_for_state) = channel::<StateProcessingRequest>();
-    let (tx_for_proof_requests, rx_for_proof_requests) = channel::<Block>();
-    let (tx_for_ops, rx_for_ops) = channel::<Operation>();
+    let (tx_for_tx, rx_for_tx) = channel();
+    let (tx_for_state, rx_for_state) = channel();
+    let (tx_for_proof_requests, rx_for_proof_requests) = channel();
+    let (tx_for_ops, rx_for_ops) = channel();
 
     let mut mem_pool = MemPool::new();
     let mut state_keeper = PlasmaStateKeeper::new();
@@ -36,7 +36,7 @@ pub fn run() {
     start_eth_watch(eth_watch, tx_for_state);
     
     start_state_keeper(state_keeper, rx_for_state, tx_for_ops.clone(), tx_for_proof_requests);
-    prover.start(rx_for_proof_requests, tx_for_ops);
+    start_prover(prover, rx_for_proof_requests, tx_for_ops);
 
     let tx_for_eth = committer::start_eth_sender();
     committer::run_committer(rx_for_ops, tx_for_eth);

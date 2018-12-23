@@ -14,12 +14,12 @@ use sapling_crypto::jubjub::{JubjubEngine, JubjubParams, edwards, Unknown};
 
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
 
-use crate::models::{self, params, TransferBlock, DepositBlock, ExitBlock, Block, PlasmaState};
+use crate::models::{self, params, TransferBlock, DepositBlock, ExitBlock, Block, PlasmaState, AccountMap};
 use crate::models::circuit::{Account, AccountTree};
 
 use super::config::{TRANSFER_BATCH_SIZE, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE};
 
-use super::committer::{self, EncodedProof, EthBlockData};
+use super::committer::{self, EncodedProof, Operation, EthBlockData};
 
 use crate::circuit::utils::be_bit_vector_into_bytes;
 use crate::circuit::transfer::transaction::{Transaction};
@@ -275,10 +275,10 @@ impl BabyProver {
 
     pub fn apply_and_prove(&mut self, block: Block) -> Result<FullBabyProof, Err> {
         match block {
-            Block::Deposit(block) => {
+            Block::Deposit(block, batch_number) => {
                 return self.apply_and_prove_deposit(&block);
             },
-            Block::Exit(block) => {
+            Block::Exit(block, batch_number) => {
                 unimplemented!()
             },
             Block::Transfer(block) => {
@@ -878,24 +878,32 @@ impl BabyProver {
         Ok(full_proof)
     }
 
-    pub fn start(
+    fn run(
             &mut self,
-            rx_for_blocks: mpsc::Receiver<Block>, 
+            rx_for_blocks: mpsc::Receiver<(u32, Block, EthBlockData, AccountMap)>, 
             tx_for_ops: mpsc::Sender<Operation>
         ) 
     {
-        thread::spawn(move || {
-            for block in rx_for_blocks {
-                println!("Got request for proof");
-                let proof = self.apply_and_prove(block).unwrap();
-                tx_for_proofs.send(Operation::Verify{
-                    block_number: proof.block_number,
-                    block_data: unimplemented!(), // TODO: pass EthBlockData::...
-                    encoded_proof: Self::encode_proof(&proof).unwrap(),
-                    accounts: unimplemented!(), // passn AccountMap: new state of affected accounts
-                });
-            }
-        });
+        for (block_number, block, block_data, accounts_updated) in rx_for_blocks {
+            println!("Got request for proof");
+            let proof = self.apply_and_prove(block).unwrap();
+            tx_for_ops.send(Operation::Verify{
+                block_number,
+                proof:              Self::encode_proof(&proof).unwrap(),
+                block_data,         
+                accounts_updated,
+            });
+        }
     }
-    
+}
+
+pub fn start_prover(
+        prover: BabyProver,
+        rx_for_blocks: mpsc::Receiver<(u32, Block, EthBlockData, AccountMap)>, 
+        tx_for_ops: mpsc::Sender<Operation>
+    ) 
+{
+    std::thread::spawn(move || {
+        prover.run(rx_for_blocks, tx_for_ops)
+    });
 }
