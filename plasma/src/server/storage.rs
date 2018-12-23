@@ -92,7 +92,7 @@ impl StorageConnection {
     // TODO: return stream instead
     pub fn load_verified_state() -> AccountMap {
         // TODO: complex select from accounts and account_updates
-        std::collections::HashMap::new()
+        AccountMap::default()
     }
 
     pub fn load_pendings_ops(last_committed_block: u32, last_verified_block: u32) -> Vec<Operation> {

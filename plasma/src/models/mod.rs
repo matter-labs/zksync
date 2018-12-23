@@ -24,7 +24,7 @@ pub type ExitBlock = block::Block<ExitTx>;
 
 pub type PublicKey = eddsa::PublicKey<Engine>;
 
-pub type AccountMap = std::collections::HashMap<u32, Account>;
+pub type AccountMap = fnv::FnvHashMap<u32, Account>;
 pub type BatchNumber = u32;
 
 #[derive(Clone, Serialize, Deserialize)]

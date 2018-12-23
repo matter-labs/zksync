@@ -9,10 +9,12 @@ use std::collections::HashMap;
 use ff::{Field, PrimeField};
 use rand::{OsRng};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
+use web3::types::{U128, H256};
+use std::str::FromStr;
 
-use crate::models::*;
+use crate::models::{self, *};
 
-use super::committer::Operation;
+use super::committer::{Operation, EthBlockData};
 use super::prover::BabyProver;
 
 use rand::{SeedableRng, Rng, XorShiftRng};
@@ -115,16 +117,6 @@ impl PlasmaStateKeeper {
         keeper
     }
 
-    pub fn start(&mut self, 
-        rx_for_blocks: Receiver<StateProcessingRequest>, 
-        tx_for_commitments: Sender<Operation>,
-        tx_for_proof_requests: Sender<Block>)
-    {
-        thread::spawn(move || {  
-            self.run(rx_for_blocks, tx_for_commitments, tx_for_proof_requests)
-        });
-    }
-
     fn run(&mut self, 
         rx_for_blocks: Receiver<StateProcessingRequest>, 
         tx_for_commitments: Sender<Operation>,
@@ -134,36 +126,32 @@ impl PlasmaStateKeeper {
             match req {
                 StateProcessingRequest::ApplyBlock(block, source) => {
                     let applied = match block {
-                        Block::Deposit(mut block) => self.apply_deposit_block(&mut block),
+                        Block::Transfer(mut block) => self.apply_transfer_block(&mut block),
+                        Block::Deposit(mut block, batch_number) => self.apply_deposit_block(&mut block, batch_number),
                         Block::Exit(mut block, batch_number) => self.apply_exit_block(&mut block, batch_number),
-                        Block::Transfer(mut block, batch_number) => elf.apply_transfer_block(&mut block, batch_number),
                     };
 
-                    let result = match applied {
-                        Ok(new_root, block_data, accounts_updated) => {
+                    if let Ok((new_root, block_data, accounts_updated)) = applied {
+                        self.state.block_number += 1;
 
-                            self.state.block_number += 1;
+                        // make commitment
+                        let op = Operation::Commit{
+                            block_number:   self.state.block_number,
+                            new_root,
+                            block_data,
+                            accounts_updated,
+                        };
+                        tx_for_commitments.send(op);
 
-                            // make commitment
-                            let op = Operation::Commit{
-                                block_number:   self.state.block_number,
-                                new_root,
-                                block_data,
-                                accounts_updated,
-                            };
-                            tx_for_commitments.send(block.clone());
-
-                            // start making proof
-                            tx_for_proof_requests.send(block);
-
-                            Ok(())
-                        },
-                        Err(_) => Err(block),
+                        // start making proof
+                        tx_for_proof_requests.send(block);
                     };
 
                     if let BlockSource::MemPool(sender) = source {
-                        // send result back to mempool
-                        sender.send(result);
+                        if let Block::Transfer(block) = block {
+                            // send result back to mempool
+                            sender.send(applied.map(|_| ()).map_err(|_| block));
+                        }
                     }
 
                 },
@@ -184,7 +172,6 @@ impl PlasmaStateKeeper {
             .into_iter()
             .map(|tx| self.augument_and_sign(tx))
             .collect();
-
         let mut save_state = FnvHashMap::<u32, Account>::default();
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
 
@@ -194,12 +181,13 @@ impl PlasmaStateKeeper {
                 // save state
                 save_state.insert(tx.from, self.account(tx.from));
                 save_state.insert(tx.to, self.account(tx.to));
-
                 self.state.apply_transfer(&tx).is_ok()
-
-                // updated state
+            })
+            .map(|tx| {
+                // collect updated state
                 updated_accounts.insert(tx.from, self.account(tx.from));
                 updated_accounts.insert(tx.to, self.account(tx.to));
+                tx
             })
             .collect();
         
@@ -215,87 +203,39 @@ impl PlasmaStateKeeper {
         block.block_number = self.state.block_number;
         block.new_root_hash = self.state.root_hash();
 
-        let eth_block_data = EthBlockData::TransferBlock{
+        let eth_block_data = EthBlockData::Transfer{
             total_fees:     U128::zero(), // TODO: count fees
-            public_data:    BabyProver::encode_transfer_transactions(&block),
+            public_data:    BabyProver::encode_transfer_transactions(&block).unwrap(),
         };
-        Ok(H256::from(block.new_root_hash), eth_block_data, updated_accounts);
+        Ok((H256::from_str(&block.new_root_hash.to_string()).unwrap(), eth_block_data, updated_accounts))
     }
 
     fn apply_deposit_block(&mut self, block: &mut DepositBlock, batch_number: BatchNumber) -> Result<(H256, EthBlockData, AccountMap), ()> {
 
-        let transactions: Vec<DepositTx> = block.transactions.clone();
-
-        let mut save_state = FnvHashMap::<u32, Account>::default();
-
-        let transactions: Vec<DepositTx> = transactions
-            .into_iter()
-            .filter(|tx| {
-
-                // save state
-                let acc = self.account(tx.account);
-                save_state.insert(tx.account, acc);
-
-                self.state.apply_deposit(&tx).is_ok()
-            })
-            .collect();
-        
-        if transactions.len() != block.transactions.len() {
-            // some transactions were rejected, revert state
-            for (k,v) in save_state.into_iter() {
-                // TODO: add tree.insert_existing() for performance
-                self.state.balance_tree.insert(k, v);
-            }
+        let mut updated_accounts = FnvHashMap::<u32, Account>::default();
+        for tx in block.transactions {
+            self.state.apply_deposit(&tx);
         }
             
         block.block_number = self.state.block_number;
         block.new_root_hash = self.state.root_hash();
 
-        let eth_block_data = EthBlockData::DepositBlock{ batch_number };
-        Ok(H256::from(block.new_root_hash), eth_block_data, updated_accounts)
+        let eth_block_data = EthBlockData::Deposit{ batch_number };
+        Ok((H256::from_str(&block.new_root_hash.to_string()).unwrap(), eth_block_data, updated_accounts))
     }
 
     fn apply_exit_block(&mut self, block: &mut ExitBlock, batch_number: BatchNumber) -> Result<(H256, EthBlockData, AccountMap), ()> {
 
-        block.block_number = self.state.block_number;
-
-        // update state with verification
-        // for tx in block: self.state.apply(transaction)?;
-
-        let transactions: Vec<ExitTx> = block.transactions.clone();
-
-        let mut save_state = FnvHashMap::<u32, Account>::default();
-
-        let transactions: Vec<ExitTx> = transactions
-            .into_iter()
-            .map(|tx| {
-
-                // save state
-                let acc = self.account(tx.account);
-                save_state.insert(tx.account, acc);
-
-                self.state.apply_exit(&tx)
-            })
-            .filter(|tx| {
-                tx.is_ok()
-            })
-            .map(|tx| {
-                tx.unwrap()
-            })
-            .collect();
-        
-        if transactions.len() != block.transactions.len() {
-            // some transactions were rejected, revert state
-            for (k,v) in save_state.into_iter() {
-                // TODO: add tree.insert_existing() for performance
-                self.state.balance_tree.insert(k, v);
-            }
+        let mut updated_accounts = FnvHashMap::<u32, Account>::default();
+        for tx in block.transactions {
+            self.state.apply_exit(&tx);
         }
             
+        block.block_number = self.state.block_number;
         block.new_root_hash = self.state.root_hash();
-        block.transactions = transactions;
-        self.state.block_number += 1;
-        Ok(())
+
+        let eth_block_data = EthBlockData::Deposit{ batch_number };
+        Ok((H256::from_str(&block.new_root_hash.to_string()).unwrap(), eth_block_data, updated_accounts))
     }
 
 
@@ -324,4 +264,14 @@ impl PlasmaStateKeeper {
         tx.signature = TxSignature::try_from(tx_fr.signature).expect("serialize signature");
     }
 
+}
+
+pub fn start_state_keeper(sk: PlasmaStateKeeper, 
+    rx_for_blocks: Receiver<StateProcessingRequest>, 
+    tx_for_commitments: Sender<Operation>,
+    tx_for_proof_requests: Sender<Block>)
+{
+    thread::spawn(move || {  
+        sk.run(rx_for_blocks, tx_for_commitments, tx_for_proof_requests)
+    });
 }

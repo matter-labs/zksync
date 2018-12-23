@@ -2,7 +2,7 @@ use std::thread;
 use std::sync::mpsc::{channel, Sender};
 
 use super::prover::{BabyProver};
-use super::state_keeper::{PlasmaStateKeeper, StateProcessingRequest};
+use super::state_keeper::{PlasmaStateKeeper, StateProcessingRequest, start_state_keeper};
 use super::rest_api::start_api_server;
 use super::committer::{self, Operation};
 use super::mem_pool::{MemPool, start_mem_pool};
@@ -35,7 +35,7 @@ pub fn run() {
     start_mem_pool(mem_pool, rx_for_tx, tx_for_state.clone());
     start_eth_watch(eth_watch, tx_for_state);
     
-    state_keeper.start(rx_for_state, tx_for_ops.clone(), tx_for_proof_requests);
+    start_state_keeper(state_keeper, rx_for_state, tx_for_ops.clone(), tx_for_proof_requests);
     prover.start(rx_for_proof_requests, tx_for_ops);
 
     let tx_for_eth = committer::start_eth_sender();
