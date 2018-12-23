@@ -29,8 +29,8 @@ pub const PROD_PLASMA: ABI = (
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxMeta{
-    addr:       String,
-    nonce:      u32,
+    pub addr:   String,
+    pub nonce:  u32,
 }
 
 pub struct ETHClient {

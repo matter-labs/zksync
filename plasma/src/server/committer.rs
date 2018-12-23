@@ -48,6 +48,14 @@ pub enum Operation {
     // ...
 }
 
+fn keys_sorted(accounts_updated: AccountMap) -> Vec<u64> {
+    let mut acc: Vec<u64> = accounts_updated.keys()
+        .map(|&k| k as u64)
+        .collect();
+    acc.sort();
+    acc
+} 
+
 pub fn start_eth_sender() -> Sender<(Operation, TxMeta)> {
     let (tx_for_eth, rx_for_eth) = channel();
     std::thread::spawn(move || {
@@ -59,30 +67,29 @@ pub fn start_eth_sender() -> Sender<(Operation, TxMeta)> {
                     match block_data {
                         EthBlockData::Transfer{total_fees, public_data} =>
                             eth_client.call("commitTransferBlock", meta, 
-                                (block_number, total_fees, public_data, new_root)),
+                                (block_number as u64, total_fees, public_data, new_root)),
                         EthBlockData::Deposit{batch_number} =>
                             eth_client.call("commitDepositBlock", meta,
-                                (block_number, batch_number, accounts_updated.keys())),
+                                (block_number as u64, batch_number as u64, keys_sorted(accounts_updated))),
                         EthBlockData::Exit{batch_number} =>
                             eth_client.call("commitExitBlock", meta,
-                                (block_number, batch_number, accounts_updated.keys())),
+                                (block_number as u64, batch_number as u64, keys_sorted(accounts_updated))),
                     }
                 },
                 Operation::Verify{block_number, proof, block_data, accounts_updated} => {
                     match block_data {
                         EthBlockData::Transfer{total_fees, public_data} =>
                             eth_client.call("verifyTransferBlock", meta,
-                                (block_number, proof)),
+                                (block_number as u64, proof)),
                         EthBlockData::Deposit{batch_number} =>
                             eth_client.call("verifyDepositBlock", meta,
-                                (block_number, batch_number, accounts_updated.keys()),
+                                (block_number as u64, batch_number as u64, keys_sorted(accounts_updated))),
                         EthBlockData::Exit{batch_number} =>
                             eth_client.call("verifyExitBlock", meta,
-                                (block_number, batch_number, accounts_updated.keys()),
+                                (block_number as u64, batch_number as u64, keys_sorted(accounts_updated))),
                     }
                 },
-                StartDepositBatch => unimplemented!(),
-                StartExitBatch => unimplemented!(),
+                _ => unimplemented!(),
             };
             // TODO: process tx sending failure
             println!("Commitment tx hash = {}", tx.unwrap());
@@ -99,11 +106,11 @@ pub fn run_committer(rx_for_ops: Receiver<Operation>, tx_for_eth: Sender<(Operat
         
         // TODO: with postgres transaction
         let (addr, nonce) = storage.commit_op(&op).unwrap();
-        match op {
+        match &op {
             Operation::Commit{block_number, new_root, block_data, accounts_updated} => 
-                storage.commit_state_update(block_number, accounts_updated),
+                storage.commit_state_update(*block_number, accounts_updated),
             Operation::Verify{block_number, proof, block_data, accounts_updated} => 
-                storage.apply_state_update(block_number),
+                storage.apply_state_update(*block_number),
             _ => unimplemented!(),
         };
 

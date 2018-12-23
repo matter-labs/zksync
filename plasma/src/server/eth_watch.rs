@@ -318,7 +318,7 @@ impl EthWatch {
 
 }
 
-pub fn start_eth_watch(eth_watch: EthWatch, tx_for_blocks: Sender<StateProcessingRequest>) {
+pub fn start_eth_watch(mut eth_watch: EthWatch, tx_for_blocks: Sender<StateProcessingRequest>) {
     std::thread::spawn(move || {
         eth_watch.run(tx_for_blocks);
     });

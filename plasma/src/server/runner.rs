@@ -21,10 +21,10 @@ pub fn run() {
     let (tx_for_proof_requests, rx_for_proof_requests) = channel();
     let (tx_for_ops, rx_for_ops) = channel();
 
-    let mut mem_pool = MemPool::new();
-    let mut state_keeper = PlasmaStateKeeper::new();
-    let mut prover = BabyProver::create(&state_keeper.state).unwrap();
-    let mut eth_watch = EthWatch::new(0, 0);
+    let mem_pool = MemPool::new();
+    let state_keeper = PlasmaStateKeeper::new();
+    let prover = BabyProver::create(&state_keeper.state).unwrap();
+    let eth_watch = EthWatch::new(0, 0);
 
     // spawn threads for different processes
     // see https://docs.google.com/drawings/d/16UeYq7cuZnpkyMWGrgDAbmlaGviN2baY1w1y745Me70/edit?usp=sharing

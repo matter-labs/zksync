@@ -68,7 +68,7 @@ impl StorageConnection {
             unimplemented!();
     }
 
-    pub fn commit_state_update(&self, block_number: u32, accounts_updated: AccountMap) -> QueryResult<()> {
+    pub fn commit_state_update(&self, block_number: u32, accounts_updated: &AccountMap) -> QueryResult<()> {
         for (&account_id, a) in accounts_updated.iter() {
             diesel::insert_into(account_updates::table)
                 .values(&AccountUpdate{
@@ -95,7 +95,7 @@ impl StorageConnection {
         AccountMap::default()
     }
 
-    pub fn load_pendings_ops(last_committed_block: u32, last_verified_block: u32) -> Vec<Operation> {
+    pub fn load_pendings_ops(last_committed_block: u32, last_verified_block: u32) -> Vec<(committer::Operation, String, u32)> {
         // TODO: conditional select
         vec![]
     }

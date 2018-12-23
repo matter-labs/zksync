@@ -898,7 +898,7 @@ impl BabyProver {
 }
 
 pub fn start_prover(
-        prover: BabyProver,
+        mut prover: BabyProver,
         rx_for_blocks: mpsc::Receiver<(u32, Block, EthBlockData, AccountMap)>, 
         tx_for_ops: mpsc::Sender<Operation>
     ) 

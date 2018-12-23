@@ -181,13 +181,13 @@ impl PlasmaStateKeeper {
                 // save state
                 save_state.insert(tx.from, self.account(tx.from));
                 save_state.insert(tx.to, self.account(tx.to));
-                self.state.apply_transfer(&tx).is_ok()
-            })
-            .map(|tx| {
+                let r = self.state.apply_transfer(&tx).is_ok();
+
                 // collect updated state
                 updated_accounts.insert(tx.from, self.account(tx.from));
                 updated_accounts.insert(tx.to, self.account(tx.to));
-                tx
+
+                r                
             })
             .collect();
         
@@ -266,7 +266,7 @@ impl PlasmaStateKeeper {
 
 }
 
-pub fn start_state_keeper(sk: PlasmaStateKeeper, 
+pub fn start_state_keeper(mut sk: PlasmaStateKeeper, 
     rx_for_blocks: Receiver<StateProcessingRequest>, 
     tx_for_commitments: Sender<Operation>,
     tx_for_proof_requests: Sender<(u32, Block, EthBlockData, AccountMap)>)
