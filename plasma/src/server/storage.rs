@@ -86,7 +86,6 @@ impl StorageConnection {
         Ok(())
     }
 
-    // TODO: return stream instead
     pub fn load_verified_state(&self) -> AccountMap {
         let accounts: Vec<Account> = 
             // TODO: complex select from accounts and account_updates
@@ -103,8 +102,11 @@ impl StorageConnection {
     }
 
     pub fn load_pendings_ops(&self, current_nonce: u32) -> Vec<Operation> {
-        // TODO: conditional select
-        vec![]
+        use crate::schema::operations::dsl::*;
+        operations
+            .filter(nonce.gt(current_nonce as i32)) // WHERE nonce > current_nonce
+            .load(&self.conn)
+            .expect("db is expected to be functional at sever startup")
     }
 
 }
