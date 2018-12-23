@@ -86,10 +86,18 @@ impl StorageConnection {
         Ok(())
     }
 
-    pub fn load_verified_state(&self) -> AccountMap {
+    pub fn load_committed_state(&self) -> AccountMap {
+
+        // TODO: with transaction
+        
+        let last_verified_block = 0; // TODO: load from db
+
+        // TODO: select basis from accounts, 
+        // but newer state from account_updates for all updates after the last committed block
+        const SELECT: &str = "SELECT * FROM accounts";
+
         let accounts: Vec<Account> = 
-            // TODO: complex select from accounts and account_updates
-            diesel::sql_query("SELECT * FROM accounts")
+            diesel::sql_query(SELECT)
                 .load(&self.conn)
                 .expect("db is expected to be functional at sever startup");
 

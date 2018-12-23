@@ -97,7 +97,7 @@ impl PlasmaStateKeeper {
         let keys_map = Self::generate_demo_accounts(&mut balance_tree);
 
         let storage = StorageConnection::new();
-        let initial_state = storage.load_verified_state();
+        let initial_state = storage.load_committed_state();
         for (id, account) in initial_state {
             balance_tree.insert(id, account);
         }
