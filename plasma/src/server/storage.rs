@@ -6,12 +6,13 @@ use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use std::env;
 use serde_json::{to_value, value::Value};
+use std::collections::HashMap;
 
 pub struct StorageConnection {
     conn: PgConnection
 }
 
-#[derive(Insertable, Queryable)]
+#[derive(Insertable, QueryableByName)]
 #[table_name="accounts"]
 struct Account {
     pub id:     i32,
@@ -40,8 +41,6 @@ pub struct Operation {
     pub nonce:      i32,
     pub created_at: std::time::SystemTime,
 }
-
-// TODO: what can go wrong and how to hanlde db save errors?
 
 impl StorageConnection {
 
@@ -89,8 +88,18 @@ impl StorageConnection {
 
     // TODO: return stream instead
     pub fn load_verified_state(&self) -> AccountMap {
-        // TODO: complex select from accounts and account_updates
-        AccountMap::default()
+        let accounts: Vec<Account> = 
+            // TODO: complex select from accounts and account_updates
+            diesel::sql_query("SELECT * FROM accounts")
+                .load(&self.conn)
+                .expect("db is expected to be functional at sever startup");
+
+        let mut result = AccountMap::default();
+        result.extend(accounts.into_iter().map(|a| (
+                a.id as u32, 
+                serde_json::from_value(a.data).unwrap()
+            )));
+        result
     }
 
     pub fn load_pendings_ops(&self, current_nonce: u32) -> Vec<Operation> {
