@@ -57,7 +57,7 @@ pub fn hardcode_vk<E: Engine>(vk: &groth16::VerifyingKey<E>) -> String {
     out
 }
 
-pub fn generate_vk_contract<E: Engine>(vk: &groth16::VerifyingKey<E>, contract_name: String) -> String {
+pub fn generate_vk_contract<E: Engine>(vk: &groth16::VerifyingKey<E>, contract_name: String, function_name: String) -> String {
     format!(
         r#"
 // This contract is generated programmatically
@@ -68,7 +68,7 @@ pragma solidity ^0.4.24;
 // Hardcoded constants to avoid accessing store
 contract {contract_name} {{
 
-    function getVkUpdateCircuit() internal pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {{
+    function {function_name}() internal pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {{
 
         {vk}
 
@@ -78,5 +78,6 @@ contract {contract_name} {{
 "#,
         vk = hardcode_vk(&vk),
         contract_name = contract_name,
+        function_name = function_name,
     )
 }

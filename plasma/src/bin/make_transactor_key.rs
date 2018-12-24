@@ -28,7 +28,8 @@ use plasma::circuit::transfer::circuit::{TransactionWitness, Transfer};
 const TRANSFER_BATCH_SIZE: usize = 8;
 const FILENAME: &str = "transfer_pk.key";
 const CONTRACT_FILENAME: &str = "TransferVerificationKey.sol";
-const CONTRACT_NAME: &str =  "TransferVerificationKey";
+const CONTRACT_NAME: &str = "TransferVerificationKey";
+const CONTRACT_FUNCTION_NAME: &str = "getVkTransferCircuit";
 
 fn main() {
     // let p_g = FixedGenerators::SpendingKeyGenerator;
@@ -90,7 +91,7 @@ fn main() {
     let mut r = BufReader::new(f_r);
     let circuit_params = bellman::groth16::Parameters::<Bn256>::read(& mut r, true).expect("Unable to read proving key");
 
-    let contract_content = generate_vk_contract(&circuit_params.vk, CONTRACT_NAME.to_string());
+    let contract_content = generate_vk_contract(&circuit_params.vk, CONTRACT_NAME.to_string(), CONTRACT_FUNCTION_NAME.to_string());
 
     let f_cont = File::create(CONTRACT_FILENAME).expect("Unable to create file");
     let mut f_cont = BufWriter::new(f_cont);

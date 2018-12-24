@@ -28,7 +28,8 @@ use plasma::circuit::deposit::circuit::{Deposit, DepositWitness};
 const DEPOSIT_BATCH_SIZE: usize = 1;
 const FILENAME: &str = "deposit_pk.key";
 const CONTRACT_FILENAME: &str = "DepositVerificationKey.sol";
-const CONTRACT_NAME: &str =  "DepositVerificationKey";
+const CONTRACT_NAME: &str = "DepositVerificationKey";
+const CONTRACT_FUNCTION_NAME: &str = "getVkDepositCircuit";
 
 fn main() {
     // let p_g = FixedGenerators::SpendingKeyGenerator;
@@ -86,7 +87,7 @@ fn main() {
     let mut r = BufReader::new(f_r);
     let circuit_params = bellman::groth16::Parameters::<Bn256>::read(& mut r, true).expect("Unable to read proving key");
 
-    let contract_content = generate_vk_contract(&circuit_params.vk, CONTRACT_NAME.to_string());
+    let contract_content = generate_vk_contract(&circuit_params.vk, CONTRACT_NAME.to_string(), CONTRACT_FUNCTION_NAME.to_string());
 
     let f_cont = File::create(CONTRACT_FILENAME).expect("Unable to create file");
     let mut f_cont = BufWriter::new(f_cont);
