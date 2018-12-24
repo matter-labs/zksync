@@ -1,12 +1,9 @@
-use pairing::bn256::{Bn256, Fr};
-use sapling_crypto::jubjub::{edwards, Unknown, FixedGenerators};
+use pairing::bn256::{Bn256};
+use sapling_crypto::jubjub::{FixedGenerators};
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 
-use plasma::primitives::{field_element_to_u32, field_element_to_u128, pack_edwards_point};
-use plasma::circuit::utils::{le_bit_vector_into_field_element};
-use std::{thread, time};
+use std::{thread};
 use std::collections::HashMap;
-use ff::{Field, PrimeField};
 use rand::{OsRng};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 use web3::types::{U128, H256};
@@ -69,7 +66,7 @@ impl PlasmaStateKeeper {
 
             keys_map.insert(i, sk);
 
-            let serialized_public_key = pack_edwards_point(pk.0).unwrap();
+            //let serialized_public_key = pack_edwards_point(pk.0).unwrap();
 
             let leaf = Account {
                 balance:    default_balance.clone(),
@@ -140,20 +137,20 @@ impl PlasmaStateKeeper {
                                 block_data: block_data.clone(),
                                 accounts_updated: accounts_updated.clone(),
                             };
-                            tx_for_commitments.send(op);
+                            tx_for_commitments.send(op).expect("queue must work");
 
                             // start making proof
-                            tx_for_proof_requests.send((self.state.block_number, block, block_data, accounts_updated));
+                            tx_for_proof_requests.send((self.state.block_number, block, block_data, accounts_updated)).expect("queue must work");
                             Ok(())
                         },
                         Err(_) => Err(block),
                     };
                     if let Some(sender) = source {
-                        sender.send(result);
+                        sender.send(result).expect("queue must work");
                     }
                 },
                 StateProcessingRequest::GetPubKey(account_id, sender) => {
-                    sender.send(self.state.get_pub_key(account_id));
+                    sender.send(self.state.get_pub_key(account_id)).expect("queue must work");
                 },
             }
         }
@@ -211,7 +208,7 @@ impl PlasmaStateKeeper {
 
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
         for tx in block.transactions.iter() {
-            self.state.apply_deposit(&tx);
+            self.state.apply_deposit(&tx).expect("queue must work");
 
             // collect updated state
             updated_accounts.insert(tx.account, self.account(tx.account));
@@ -228,7 +225,7 @@ impl PlasmaStateKeeper {
 
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
         for tx in block.transactions.iter() {
-            self.state.apply_exit(&tx);
+            self.state.apply_exit(&tx).expect("queue must work");
 
             // collect updated state
             updated_accounts.insert(tx.account, self.account(tx.account));
@@ -262,8 +259,6 @@ impl PlasmaStateKeeper {
 
         let mut tx_fr = models::circuit::TransferTx::try_from(tx).unwrap();
         tx_fr.sign(sk, p_g, &params::JUBJUB_PARAMS, &mut rng);
-
-        let (x, y) = tx_fr.signature.r.into_xy();
         tx.signature = TxSignature::try_from(tx_fr.signature).expect("serialize signature");
     }
 
