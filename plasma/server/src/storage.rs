@@ -166,13 +166,13 @@ fn test_store_state() {
     conn.conn.begin_test_transaction().unwrap();
 
     // uncomment below for debugging to generate initial state
-    // use diesel::RunQueryDsl;
-    // diesel::sql_query("delete from accounts")
-    //    .execute(&conn.conn)
-    //    .expect("must work");
-    // diesel::sql_query("delete from account_updates")
-    //    .execute(&conn.conn)
-    //    .expect("must work");
+    use diesel::RunQueryDsl;
+    diesel::sql_query("delete from accounts")
+       .execute(&conn.conn)
+       .expect("must work");
+    diesel::sql_query("delete from account_updates")
+       .execute(&conn.conn)
+       .expect("must work");
 
     let mut accounts = fnv::FnvHashMap::default();
     let acc = |balance| { 
@@ -203,11 +203,18 @@ fn test_store_state() {
     let state = load_verified_state(&conn);
     assert_eq!(
         state.into_iter().collect::<Vec<(u32, models::Account)>>(), 
-        accounts.into_iter().collect::<Vec<(u32, models::Account)>>());
-
+        accounts.clone().into_iter().collect::<Vec<(u32, models::Account)>>());
 
     // commit second state update
-    // ...
+    println!("second");
+    let mut accounts2 = fnv::FnvHashMap::default();
+    accounts2.insert(2, acc(2));
+    accounts2.insert(4, acc(4));
+    conn.commit_state_update(2, &accounts2).unwrap();
+
+    assert_eq!(load_verified_state(&conn).len(), 3);
+    assert_eq!(conn.load_committed_state().len(), 4);
+
 }
 
 }
