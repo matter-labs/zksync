@@ -1,6 +1,6 @@
 use std::sync::mpsc::{channel, Sender, Receiver};
 use plasma::models::{TransferTx, TransferBlock, Block};
-use super::state_keeper::{StateProcessingRequest};
+use super::models::StateProcessingRequest;
 use super::config;
 
 pub struct MemPool {

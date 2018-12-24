@@ -33,7 +33,7 @@ struct NewOperation {
 }
 
 #[derive(Queryable)]
-pub struct Operation {
+pub struct EthOperation {
     pub id:         i32,
     pub data:       Value,
     pub addr:       String,
@@ -58,7 +58,7 @@ impl StorageConnection {
             .expect(&format!("Error connecting to {}", database_url))
     }
 
-    pub fn commit_op(&self, data: Value) -> QueryResult<Operation> {
+    pub fn commit_op(&self, data: Value) -> QueryResult<EthOperation> {
         diesel::insert_into(operations::table)
             .values(&NewOperation{ data })
             .get_result(&self.conn)
@@ -108,7 +108,7 @@ impl StorageConnection {
         result
     }
 
-    pub fn load_pendings_ops(&self, current_nonce: u32) -> Vec<Operation> {
+    pub fn load_pendings_ops(&self, current_nonce: u32) -> Vec<EthOperation> {
         use crate::schema::operations::dsl::*;
         operations
             .filter(nonce.gt(current_nonce as i32)) // WHERE nonce > current_nonce

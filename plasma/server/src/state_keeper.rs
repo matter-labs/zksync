@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 use plasma::models::{self, *};
 
-use super::committer::{Operation, EthBlockData};
+use super::models::{EthOperation, EthBlockData};
 use super::prover::BabyProver;
 use super::storage::StorageConnection;
 
@@ -21,16 +21,7 @@ use std::sync::mpsc::{Sender, Receiver};
 use fnv::FnvHashMap;
 use bigdecimal::BigDecimal;
 
-// MemPool will provide a channel to return result of block processing
-// In case of error, block is returned with invalid transactions removed
-pub type BlockSource = Option<Sender<Result<(),Block>>>;
-
-//pub struct StateProcessingRequest(pub Block, pub BlockSource);
-
-pub enum StateProcessingRequest{
-    ApplyBlock(Block, BlockSource),
-    GetPubKey(u32, Sender<Option<models::PublicKey>>),
-}
+use super::models::StateProcessingRequest;
 
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
@@ -115,7 +106,7 @@ impl PlasmaStateKeeper {
 
     fn run(&mut self, 
         rx_for_blocks: Receiver<StateProcessingRequest>, 
-        tx_for_commitments: Sender<Operation>,
+        tx_for_commitments: Sender<EthOperation>,
         tx_for_proof_requests: Sender<(u32, Block, EthBlockData, AccountMap)>)
     {
         for req in rx_for_blocks {
@@ -131,7 +122,7 @@ impl PlasmaStateKeeper {
                             self.state.block_number += 1;
 
                             // make commitment
-                            let op = Operation::Commit{
+                            let op = EthOperation::Commit{
                                 block_number:   self.state.block_number,
                                 new_root,
                                 block_data: block_data.clone(),
@@ -266,7 +257,7 @@ impl PlasmaStateKeeper {
 
 pub fn start_state_keeper(mut sk: PlasmaStateKeeper, 
     rx_for_blocks: Receiver<StateProcessingRequest>, 
-    tx_for_commitments: Sender<Operation>,
+    tx_for_commitments: Sender<EthOperation>,
     tx_for_proof_requests: Sender<(u32, Block, EthBlockData, AccountMap)>)
 {
     thread::spawn(move || {
