@@ -51,7 +51,7 @@ impl MemPool {
 }
 
 pub fn start_mem_pool(mut mem_pool: MemPool, rx_for_tx: Receiver<TransferTx>, tx_for_blocks: Sender<StateProcessingRequest>) {
-        std::thread::spawn(move || {  
+        std::thread::Builder::new().name("mem_pool".to_string()).spawn(move || {  
             mem_pool.run(rx_for_tx, tx_for_blocks);
         });
 }

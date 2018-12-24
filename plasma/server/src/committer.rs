@@ -18,7 +18,7 @@ pub fn start_eth_sender() -> Sender<(EthOperation, TxMeta)> {
 
     load_pendings_ops(&eth_client, &tx_for_eth);
 
-    std::thread::spawn(move || {
+    std::thread::Builder::new().name("eth_sender".to_string()).spawn(move || {
         for (op, meta) in rx_for_eth {
             println!("EthOperation requested: {:?}", &op);
             let tx = match op {

@@ -17,6 +17,7 @@ use web3::contract::{Contract, Options};
 use web3::futures::{Future};
 use web3::types::{U256, H160, H256, U128, FilterBuilder, BlockNumber};
 use sapling_crypto::jubjub::{edwards, Unknown};
+use super::config;
 
 type ABI = (&'static [u8], &'static str);
 
@@ -36,15 +37,8 @@ pub struct EthWatch {
     contract_addr:  H160,
     web3_url:       String,
     contract:       ethabi::Contract,
-    // deposit_requests: Vec<(H160, U128)>,
-    // exit_requests: Vec<H160>,
-    last_deposit_batch_timestamp: time::Instant,
-    last_exit_batch_timestamp: time::Instant,
-    batch_accumulation_duration: time::Duration,
     last_deposit_batch: U256,
     last_exit_batch: U256,
-    current_deposit_batch_fee: U128,
-    current_exit_batch_fee: U128,
     deposit_batch_size: U256,
     exit_batch_size: U256,
 }
@@ -58,22 +52,27 @@ impl EthWatch {
 
     pub fn new(start_from_block: u64, lag: u64) -> Self {
 
+        let start_candidate = env::var("FROM_BLOCK");
+        let mut start = start_from_block;
+        if let Ok(candidate) = start_candidate {
+            if let Ok(starting_block_u64) = candidate.parse::<u64>() {
+                start = starting_block_u64;
+            }
+        }
+
         let this = Self{
-            last_processed_block: start_from_block,
+            last_processed_block: start,
             blocks_lag: lag,
             web3_url:       env::var("WEB3_URL").unwrap_or("http://localhost:8545".to_string()),
             contract_addr:  H160::from_str(&env::var("CONTRACT_ADDR").unwrap_or("4169D71D56563eA9FDE76D92185bEB7aa1Da6fB8".to_string())).unwrap(),
             contract:       ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap(),
-            last_deposit_batch_timestamp: time::Instant::now(),
-            last_exit_batch_timestamp: time::Instant::now(),
-            batch_accumulation_duration: time::Duration::from_secs(300),
             last_deposit_batch: U256::from(0),
             last_exit_batch: U256::from(0),
-            current_deposit_batch_fee: U128::from(0),
-            current_exit_batch_fee: U128::from(0),
-            deposit_batch_size: U256::from(1),
-            exit_batch_size: U256::from(1),
+            deposit_batch_size: U256::from(config::DEPOSIT_BATCH_SIZE),
+            exit_batch_size: U256::from(config::EXIT_BATCH_SIZE),
         };
+
+
 
         // TODO read the deposit and exit batch to start
 
@@ -493,7 +492,7 @@ impl EthWatch {
 }
 
 pub fn start_eth_watch(mut eth_watch: EthWatch, tx_for_blocks: Sender<StateProcessingRequest>) {
-    std::thread::spawn(move || {
+    std::thread::Builder::new().name("eth_watch".to_string()).spawn(move || {
         eth_watch.run(tx_for_blocks);
     });
 }

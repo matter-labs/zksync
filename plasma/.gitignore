@@ -4,3 +4,4 @@
 *.key
 *.sol
 start_demo.sh
+.env

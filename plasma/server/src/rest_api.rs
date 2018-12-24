@@ -69,7 +69,7 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
 pub fn start_api_server(tx_for_tx:    mpsc::Sender<TransferTx>, 
                       tx_for_state: mpsc::Sender<StateProcessingRequest>) {
 
-    std::thread::spawn(move || {
+    std::thread::Builder::new().name("api_server".to_string()).spawn(move || {
         ::std::env::set_var("RUST_LOG", "actix_web=info");
         let sys = actix::System::new("ws-example");
 

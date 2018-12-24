@@ -81,8 +81,10 @@ impl PlasmaStateKeeper {
         let tree_depth = params::BALANCE_TREE_DEPTH as u32;
         let mut balance_tree = AccountTree::new(tree_depth);
 
-        println!("generating demo accounts");
-        let keys_map = Self::generate_demo_accounts(&mut balance_tree);
+        // println!("generating demo accounts");
+        // let keys_map = Self::generate_demo_accounts(&mut balance_tree);
+
+        let keys_map: HashMap<u32, PrivateKey<Bn256>> = HashMap::new();
 
         let storage = StorageConnection::new();
         let initial_state = storage.load_committed_state();

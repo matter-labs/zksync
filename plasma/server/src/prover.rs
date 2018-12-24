@@ -277,7 +277,7 @@ impl BabyProver {
                 return self.apply_and_prove_deposit(&block);
             },
             Block::Exit(block, batch_number) => {
-                unimplemented!()
+                return self.apply_and_prove_exit(&block);
             },
             Block::Transfer(block) => {
                 return self.apply_and_prove_transfer(&block);
