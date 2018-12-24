@@ -9,6 +9,7 @@ table! {
 table! {
     accounts (id) {
         id -> Int4,
+        last_block -> Int4,
         data -> Json,
     }
 }

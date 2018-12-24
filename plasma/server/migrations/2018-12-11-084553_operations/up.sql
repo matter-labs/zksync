@@ -6,12 +6,13 @@ CREATE TABLE operations (
     created_at      timestamp not null default now()
 );
 
--- TODO: CREATE INDEX op_type_index ON operations (data.type); 
-
 CREATE TABLE accounts (
-    id          integer not null primary key,
-    data        json not null
+    id              integer not null primary key,
+    last_block      integer not null,
+    data            json not null
 );
+
+CREATE INDEX accounts_block_index ON accounts (last_block);
 
 CREATE TABLE account_updates (
     account_id      integer not null,
