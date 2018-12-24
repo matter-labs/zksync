@@ -2,65 +2,11 @@ pragma solidity ^0.4.24;
 
 import "./Verifier.sol";
 import "./VerificationKeys.sol";
+import "./PlasmaStorage.sol";
 
 // Single operator mode
 
-contract PlasmaStub is VerificationKeys {
-
-    uint32 constant DEADLINE = 3600; // seconds, to define
-
-    event BlockCommitted(uint32 indexed blockNumber);
-    event BlockVerified(uint32 indexed blockNumber);
-
-    enum Circuit {
-        DEPOSIT,
-        TRANSFER,
-        EXIT
-    }
-
-    enum AccountState {
-        NOT_REGISTERED,
-        REGISTERED,
-        PENDING_EXIT
-        // there is no EXITED state, cause we remove an account all together
-    }
-
-    struct Block {
-        uint8 circuit;
-        uint64  deadline;
-        uint128 totalFees;
-        bytes32 newRoot;
-        bytes32 publicDataCommitment;
-        address prover;
-    }
-
-    // Key is block number
-    mapping (uint32 => Block) public blocks;
-    // Only some addresses can send proofs
-    mapping (address => bool) public operators;
-    // Fee collection accounting
-    mapping (address => uint256) public balances;
-
-    struct Account {
-        uint8 state;
-        uint32 exitBatchNumber;
-        address owner;
-        uint256 publicKey;
-    }
-
-    // one Ethereum address should have one account
-    mapping (address => uint24) public ethereumAddressToAccountID;
-
-    // Plasma account => general information
-    mapping (uint24 => Account) public accounts;
-
-    // Public information for users
-    bool public stopped;
-    uint32 public lastCommittedBlockNumber;
-    uint32 public lastVerifiedBlockNumber;
-    bytes32 public lastVerifiedRoot;
-    uint64 public constant MAX_DELAY = 1 days;
-    uint256 public constant DENOMINATOR = 1000000000000;
+contract PlasmaStub is VerificationKeys, PlasmaStorage {
 
     modifier active_only() {
         require(!stopped, "contract should not be globally stopped");

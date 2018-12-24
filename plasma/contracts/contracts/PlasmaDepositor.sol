@@ -4,45 +4,6 @@ import {Plasma} from "./Plasma.sol";
 
 contract PlasmaDepositor is Plasma {
 
-    uint256 public constant DEPOSIT_BATCH_SIZE = 1;
-    uint256 public totalDepositRequests; // enumerates total number of deposit, starting from 0
-    uint256 public lastCommittedDepositBatch;
-    uint256 public lastVerifiedDepositBatch;
-    uint128 public currentDepositBatchFee; // deposit request fee scaled units
-
-    uint24 public constant SPECIAL_ACCOUNT_DEPOSITS = 1;
-
-    uint24 public nextAccountToRegister;
-
-    // some ideas for optimization of the deposit request information storage:
-    // store in a mapping: 20k gas to add, 5k to update a record + 5k to update the global counter per batch
-    // store in an array: 20k + 5k gas to add, 5k to update + up to DEPOSIT_BATCH_SIZE * SLOAD
-
-    // batch number => (plasma address => deposit information)
-    mapping (uint256 => mapping (uint24 => DepositRequest)) public depositRequests;
-    mapping (uint256 => DepositBatch) public depositBatches;
-
-    struct DepositRequest {
-        uint128 amount;
-    }
-
-    enum DepositBatchState {
-        CREATED,
-        COMMITTED,
-        VERIFIED
-    }
-
-    struct DepositBatch {
-        uint8 state;
-        uint24 numRequests;
-        uint32 blockNumber;
-        uint64 timestamp;
-        uint128 batchFee;
-    }
-
-    event LogDepositRequest(uint256 indexed batchNumber, uint24 indexed accountID, uint256 indexed publicKey, uint128 amount);
-    event LogCancelDepositRequest(uint256 indexed batchNumber, uint24 indexed accountID);
-    
     function deposit(uint256[2] memory publicKey, uint128 maxFee) 
     public 
     payable {
@@ -335,6 +296,20 @@ contract PlasmaDepositor is Plasma {
         // group check + packing
         packed = publicKey[1] + ((publicKey[0] & 1) << 255);
         return packed;
+    }
+
+    function () external payable {
+        address callee = transactor;
+        assembly {
+            let memoryPointer := mload(0x40)
+            calldatacopy(memoryPointer, 0, calldatasize)
+            let newFreeMemoryPointer := add(memoryPointer, calldatasize)
+            mstore(0x40, newFreeMemoryPointer)
+            let retVal := delegatecall(sub(gas, 2000), callee, memoryPointer, calldatasize, newFreeMemoryPointer, 0x40)
+            let retDataSize := returndatasize
+            returndatacopy(newFreeMemoryPointer, 0, retDataSize)
+            switch retVal case 0 { revert(0,0) } default { return(newFreeMemoryPointer, retDataSize) }
+        }
     }
 
 }

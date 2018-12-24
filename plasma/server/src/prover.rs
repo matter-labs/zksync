@@ -100,7 +100,7 @@ fn read_parameters(file_name: &str) -> Result<BabyParameters, BabyProverErr> {
     use std::fs::File;
     use std::io::{BufReader};
 
-    let f_r = File::open("transfer_pk.key");   
+    let f_r = File::open(file_name);
     if f_r.is_err() {
         return Err(BabyProverErr::IoError(f_r.err().unwrap()));
     }

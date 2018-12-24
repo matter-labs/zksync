@@ -6,31 +6,6 @@ import {Plasma} from "./Plasma.sol";
 // of the public key from the tree
 contract PlasmaExitor is Plasma {
 
-    uint256 constant EXIT_BATCH_SIZE = 32;
-    uint256 totalExitRequests; 
-    uint256 lastCommittedExitBatch;
-    uint256 lastVerifiedExitBatch;
-    uint128 currentExitBatchFee; 
-
-    // batches for complete exits
-    mapping (uint256 => ExitBatch) public exitBatches;
-
-    enum ExitBatchState {
-        CREATED,
-        COMMITTED,
-        VERIFIED
-    }
-
-    struct ExitBatch {
-        uint8 state;
-        uint32 blockNumber;
-        uint64 timestamp;
-        uint128 batchFee;
-    }
-
-    event LogExitRequest(uint256 indexed batchNumber, uint24 indexed accountID);
-    event LogCancelExitRequest(uint256 indexed batchNumber, uint24 indexed accountID);
-
     function exit() 
     public 
     payable

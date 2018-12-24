@@ -4,10 +4,6 @@ import {Plasma} from "./Plasma.sol";
 
 contract PlasmaTransactor is Plasma {
 
-    uint256 constant TRANSFER_BLOCK_SIZE = 128;
-
-    mapping (uint32 => mapping (uint24 => uint128)) public partialExits;
-
     function commitTransferBlock(
         uint32 blockNumber, 
         uint128 totalFees, 
@@ -150,5 +146,19 @@ contract PlasmaTransactor is Plasma {
         delete partialExits[blockNumber][accountID];
         uint256 amountInWei = scaleFromPlasmaUnitsIntoWei(balance);
         msg.sender.transfer(amountInWei);
+    }
+
+    function () external payable {
+        address callee = exitor;
+        assembly {
+            let memoryPointer := mload(0x40)
+            calldatacopy(memoryPointer, 0, calldatasize)
+            let newFreeMemoryPointer := add(memoryPointer, calldatasize)
+            mstore(0x40, newFreeMemoryPointer)
+            let retVal := delegatecall(sub(gas, 2000), callee, memoryPointer, calldatasize, newFreeMemoryPointer, 0x40)
+            let retDataSize := returndatasize
+            returndatacopy(newFreeMemoryPointer, 0, retDataSize)
+            switch retVal case 0 { revert(0,0) } default { return(newFreeMemoryPointer, retDataSize) }
+        }
     }
 }
