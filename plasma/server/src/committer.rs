@@ -80,14 +80,7 @@ pub fn run_committer(rx_for_ops: Receiver<EthOperation>, tx_for_eth: Sender<(Eth
         // persist in storage first
         
         // TODO: with postgres transaction
-        let committed_op = storage.commit_op(serde_json::to_value(&op).unwrap()).expect("db must be functional");
-        match &op {
-            EthOperation::Commit{block_number, new_root: _, block_data: _, accounts_updated} => 
-                storage.commit_state_update(*block_number, accounts_updated).expect("db must be functional"),
-            EthOperation::Verify{block_number, proof: _, block_data: _, accounts_updated: _} => 
-                storage.apply_state_update(*block_number).expect("db must be functional"),
-            _ => unimplemented!(),
-        };
+        let committed_op = storage.commit_op(&op).expect("db must be functional");
 
         // submit to eth
         tx_for_eth.send((op, TxMeta{
