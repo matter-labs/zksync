@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::Sender;
 use super::models::{StateProcessingRequest};
 use plasma::models::{Block, DepositBlock, DepositTx, Engine, Fr, ExitBlock, ExitTx};
-use bigdecimal::{Num, BigDecimal, ToPrimitive};
+use bigdecimal::{Num, BigDecimal};
 use plasma::models::params;
 
 use std::time;
@@ -166,7 +166,9 @@ impl EthWatch {
         // event LogDepositRequest(uint256 indexed batchNumber, uint24 indexed accountID, uint256 indexed publicKey, uint128 amount);
 
         let deposits_filter = FilterBuilder::default()
-                    // .address(vec![contract.address()])
+                    .address(vec![contract.address()])
+                    .from_block(BlockNumber::Earliest)
+                    .to_block(BlockNumber::Number(block_number))
                     .topics(
                         Some(vec![deposit_event_topic]),
                         Some(vec![H256::from(self.last_deposit_batch.clone())]),
@@ -176,7 +178,9 @@ impl EthWatch {
                     .build();
 
         let cancels_filter = FilterBuilder::default()
-            // .address(vec![contract.address()])
+            .address(vec![contract.address()])
+            .from_block(BlockNumber::Earliest)
+            .to_block(BlockNumber::Number(block_number))
             .topics(
                 Some(vec![deposit_canceled_topic]),
                 Some(vec![H256::from(self.last_deposit_batch.clone())]),
@@ -357,7 +361,9 @@ impl EthWatch {
         // event LogDepositRequest(uint256 indexed batchNumber, uint24 indexed accountID, uint256 indexed publicKey, uint128 amount);
 
         let exits_filter = FilterBuilder::default()
-                    // .address(vec![contract.address()])
+                    .address(vec![contract.address()])
+                    .from_block(BlockNumber::Earliest)
+                    .to_block(BlockNumber::Number(block_number))
                     .topics(
                         Some(vec![exit_event_topic]),
                         Some(vec![H256::from(self.last_exit_batch.clone())]),
@@ -367,7 +373,9 @@ impl EthWatch {
                     .build();
 
         let cancels_filter = FilterBuilder::default()
-            // .address(vec![contract.address()])
+            .address(vec![contract.address()])
+            .from_block(BlockNumber::Earliest)
+            .to_block(BlockNumber::Number(block_number))
             .topics(
                 Some(vec![exit_canceled_topic]),
                 Some(vec![H256::from(self.last_exit_batch.clone())]),
@@ -494,7 +502,7 @@ pub fn start_eth_watch(mut eth_watch: EthWatch, tx_for_blocks: Sender<StateProce
 fn test_eth_watcher() {
 
     let mut client = EthWatch::new(3, 0);
-    let (tx_for_state, rx_for_state) = std::sync::mpsc::channel::<StateProcessingRequest>();
+    let (tx_for_state, rx) = std::sync::mpsc::channel::<StateProcessingRequest>();
 
     client.run(tx_for_state);
 }
