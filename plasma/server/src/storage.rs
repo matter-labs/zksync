@@ -4,6 +4,7 @@ use super::models::{EthOperation, StoredOperation};
 
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
+use diesel::sql_types::Integer;
 use dotenv::dotenv;
 use std::env;
 use serde_json::{to_value, value::Value};
@@ -39,6 +40,14 @@ impl StorageConnection {
     pub fn new() -> Self {
         Self{
             conn: Self::establish_connection()
+        }
+    }
+
+    fn for_test() -> Self {
+        let conn = Self::establish_connection();
+        conn.begin_test_transaction().unwrap();
+        Self{
+            conn
         }
     }
 
@@ -80,11 +89,16 @@ impl StorageConnection {
         Ok(())
     }
 
-    fn apply_state_update(&self, _block_number: u32) -> QueryResult<()> {
-        // TODO: UPDATE accounts a FROM account_updates u 
-        // SET a.data = u.data, a.updated_at = now()
-        // WHERE a.id = u.id AND u.block_number = :block_number
-        Ok(())
+    fn apply_state_update(&self, block_number: u32) -> QueryResult<()> {
+        let update = format!("
+            INSERT INTO accounts (id, data)
+            SELECT account_id AS id, data FROM account_updates
+            WHERE account_updates.block_number = {}
+            ON CONFLICT (id) 
+            DO UPDATE SET data = EXCLUDED.data", block_number);
+        diesel::sql_query(update.as_str())
+            .execute(&self.conn)
+            .map(|_|())
     }
 
     pub fn load_committed_state(&self) -> AccountMap {
@@ -118,145 +132,46 @@ impl StorageConnection {
 
 }
 
+#[cfg(test)]
+mod test {
+
 #[test]
-fn storage_test() {
-    // let conn = establish_connection();
+fn test_store_state() {
 
-    // use serde_json::{self, json};
+    use plasma::models;
+    use bigdecimal::BigDecimal;
+    
+    let conn = super::StorageConnection::new();
 
-    // use plasma::models::Account;
+    use diesel::RunQueryDsl;
+    diesel::sql_query("delete from accounts")
+        .execute(&conn.conn)
+        .expect("must work");
+    diesel::sql_query("delete from account_updates")
+        .execute(&conn.conn)
+        .expect("must work");
 
-    // use ff::{Field, PrimeField};
-    // use pairing::bn256::{Bn256, Fr};
+    let mut accounts = fnv::FnvHashMap::default();
+    let acc = |balance| { 
+        let mut a = models::Account::default(); 
+        a.balance = BigDecimal::from(balance);
+        a
+    };
 
-    // let a = Account {
-    //     balance: Fr::one(),
-    //     nonce: Fr::one(),
-    //     pub_x: Fr::one(),
-    //     pub_y: Fr::one(),
-    // };
+    accounts.insert(1, acc(1));
+    accounts.insert(2, acc(2));
 
-    // println!("a = {:#?}", &a);
+    conn.commit_state_update(1, &accounts).unwrap();
 
+    let state = conn.load_committed_state();
+    assert_eq!(state.keys().len(), 0);
 
-    // #[derive(Serialize, Deserialize)]
-    // pub struct TxUnpacked{
-    //     pub from:               u32,
-    //     pub to:                 u32,
-    //     pub amount:             u32,
-    //     pub fee:                u32,
-    //     pub nonce:              u32,
-    //     pub good_until_block:   u32,
+    conn.apply_state_update(1).expect("update must work");
+    
+    let state = conn.load_committed_state();
+    assert_eq!(
+        state.into_iter().collect::<Vec<(u32, models::Account)>>(), 
+        accounts.into_iter().collect::<Vec<(u32, models::Account)>>());
+}
 
-    //     pub sig_r:              String, // r.x
-    //     pub sig_s:              String,
-    // }
-
-    // let tx = TxUnpacked{
-    //     from:            0,
-    //     to:              0,
-    //     amount:          0,
-    //     fee:             0,
-    //     nonce:           0,
-    //     good_until_block:0,
-
-    //     sig_r:           "0".to_string(),
-    //     sig_s:           "0".to_string(),
-    // };
-
-    // use plasma::models::tx::{self, TxSignature};
-
-    // use sapling_crypto::alt_babyjubjub::{JubjubEngine};
-
-    // #[derive(Serialize, Deserialize)]
-    // pub struct Point<E: JubjubEngine, Subgroup> {
-    //     x: E::Fr,
-    //     y: E::Fr,
-    //     t: E::Fr,
-    //     z: E::Fr,
-
-    //     #[serde(skip)]
-    //     #[serde(bound = "")]
-    //     _marker: std::marker::PhantomData<Subgroup>
-    // }
-
-    // #[derive(Serialize, Deserialize)]
-    // pub struct Tx<E: JubjubEngine> {
-    //     pub from:               E::Fr,
-    //     pub to:                 E::Fr,
-    //     pub amount:             E::Fr, // packed, TODO: document it here
-    //     pub fee:                E::Fr, // packed
-    //     pub nonce:              E::Fr,
-    //     pub good_until_block:   E::Fr,
-    //     //pub signature:          TransactionSignature<E>,
-
-    //     #[serde(bound = "")]
-    //     pub point:              Point<E, sapling_crypto::jubjub::Unknown>,
-    // }
-
-    // let tx2 = tx::Tx::<Bn256> {
-    //     from:               Fr::zero(),
-    //     to:                 Fr::zero(),
-    //     amount:             Fr::zero(), // packed, TODO: document it here
-    //     fee:                Fr::zero(), // packed
-    //     nonce:              Fr::zero(),
-    //     good_until_block:   Fr::zero(),
-    //     signature:          TransactionSignature::empty(),
-
-    //     // point:              Point{
-    //     //     x: Fr::zero(),
-    //     //     y: Fr::zero(),
-    //     //     t: Fr::zero(),
-    //     //     z: Fr::zero(),
-    //     //     _marker: std::marker::PhantomData
-    //     // },
-
-    //     //_marker: std::marker::PhantomData,
-    // };
-
-    // let v = serde_json::to_value(tx2).unwrap();
-
-    // println!("{}", v.to_string());
-
-    // // use diesel::prelude::*;
-    // // use crate::schema::*;
-    // // use serde_json::value::Value;
-
-    // // #[derive(Insertable)]
-    // // #[table_name="blocks"]
-    // // pub struct NewBlock {
-    // //     pub block_number:   Option<i32>,
-    // //     pub block_data:     Value,
-    // // }
-
-    // // let b = NewBlock {
-    // //     block_number:   None,
-    // //     block_data:     v,
-    // // };
-
-    // // let rows_inserted = diesel::insert_into(blocks::table)
-    // //     .values(&b)
-    // //     .execute(&conn)
-    // //     .expect("Error saving account");
-    // // println!("{:?}", rows_inserted);
-
-    // // #[derive(Queryable, Debug)]
-    // // pub struct Block {
-    // //     pub block_number:   i32,
-    // //     pub block_data:     Value,
-    // // }
-
-    // // {
-    // //     use crate::schema::blocks::dsl::*;
-
-    // //     let results = blocks
-    // //         //.limit(5)
-    // //         .load::<Block>(&conn)
-    // //         .expect("Error loading posts");
-
-    // //     println!("{:#?}", results);
-
-    // //     let a: Account = serde_json::from_value(results[results.len()-1].block_data.clone()).unwrap();
-    // //     println!("a = {:#?}", &a);
-    // // }
 }
