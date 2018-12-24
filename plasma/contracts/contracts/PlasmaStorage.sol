@@ -7,7 +7,7 @@ pragma solidity ^0.4.24;
 contract PlasmaStorage {
 
     // For tree depth 24
-    bytes32 constant EMPTY_TREE_ROOT = 0x1d3843a9bbf376e57b3eca393198d7211882f6f2a76a53730243e2a1a519d92a;
+    bytes32 constant EMPTY_TREE_ROOT = 0x003f7e15e4de3453fe13e11fb4b007f1fce6a5b0f0353b3b8208910143aaa2f7;
 
     // Plasma itself
 

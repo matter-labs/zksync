@@ -32,6 +32,7 @@ struct AccountUpdate {
 #[derive(Insertable)]
 #[table_name="operations"]
 struct NewOperation {
+    pub addr:   String,
     pub data:   Value,
 }
 
@@ -61,9 +62,8 @@ impl StorageConnection {
                     self.apply_state_update(*block_number)?,
                 _ => unimplemented!(),
             };
-
             diesel::insert_into(operations::table)
-                .values(&NewOperation{ data: serde_json::to_value(&op).unwrap() })
+                .values(&NewOperation{ addr: "0x0".to_string(), data: serde_json::to_value(&op).unwrap() })
                 .get_result(&self.conn)
         })
     }
@@ -77,7 +77,7 @@ impl StorageConnection {
                     data:           to_value(a).unwrap(),
                 })
                 .execute(&self.conn)
-                .expect("database must be functional");
+                .expect("must insert into the account updates table");
         }
         Ok(())
     }

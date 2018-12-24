@@ -74,8 +74,8 @@ impl ETHClient {
 
     pub fn call<P: Tokenize>(&mut self, method: &str, _meta: TxMeta, params: P) -> Result<H256> {
 
-        let f = self.contract.function(method).unwrap();
-        let data = f.encode_input( &params.into_tokens() ).unwrap();
+        let f = self.contract.function(method).expect("failed to get function parameters");
+        let data = f.encode_input( &params.into_tokens() ).expect("failed to encode parameters");
 
         // fetch current nonce and gas_price
         let gas_price = self.get_gas_price()?;
@@ -225,3 +225,17 @@ fn test_eth() {
     //     Ok(hash) => println!("https://rinkeby.etherscan.io/tx/{:?}", hash),
     // };
 }
+
+#[test]
+fn test_encoding() {
+    let contract = ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap();
+    let f = contract.function("commitDepositBlock").expect("failed to get function");
+    let inputs = &f.inputs;
+    for i in inputs {
+        println!("{} = {}", i.name, i.kind);
+    }
+    let params = (U256::from(0), [0u64; 1], 1u64, H256::zero());
+    let data = f.encode_input( &params.into_tokens() ).expect("failed to encode parameters");
+}
+
+

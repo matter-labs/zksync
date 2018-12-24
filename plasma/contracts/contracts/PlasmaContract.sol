@@ -25,9 +25,8 @@ contract PlasmaContract is PlasmaDepositor {
     //     exitor = _exitor;
     // }
 
-    uint24 public nextAccountToRegister = 2;
-
     constructor(address _transactor, address _exitor) public {
+        nextAccountToRegister = 2;
         lastVerifiedRoot = EMPTY_TREE_ROOT;
         operators[msg.sender] = true;
         transactor = _transactor;

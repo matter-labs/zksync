@@ -73,7 +73,6 @@ impl PlasmaState {
     }
 
     pub fn apply_deposit(&mut self, tx: &DepositTx) -> Result<(), ()> {
-
         let existing_acc = self.balance_tree.items.get(&tx.account);
 
         if existing_acc.is_none() {
@@ -88,7 +87,6 @@ impl PlasmaState {
             acc.balance += &tx.amount;
             self.balance_tree.insert(tx.account, acc);
         }
-
         Ok(())
     }
 

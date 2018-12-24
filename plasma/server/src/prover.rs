@@ -1,3 +1,5 @@
+extern crate rustc_hex;
+
 use std::error::Error;
 use std::fmt;
 use rand::{OsRng};
@@ -11,6 +13,8 @@ use plasma::models::{Engine, Fr};
 use sapling_crypto::circuit::float_point::parse_float_to_u128;
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 use sapling_crypto::jubjub::{JubjubEngine, edwards};
+
+use self::rustc_hex::ToHex;
 
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
 
@@ -205,13 +209,13 @@ impl BabyProver {
 
         let (c_x, c_y) = serialize_g1_for_ethereum(proof.proof.c);
 
-        let new_root = serialize_fe_for_ethereum(proof.inputs[1]);
+        // let new_root = serialize_fe_for_ethereum(proof.inputs[1]);
 
-        let total_fees = serialize_fe_for_ethereum(proof.total_fees);
+        // let total_fees = serialize_fe_for_ethereum(proof.total_fees);
 
-        let block_number = serialize_fe_for_ethereum(proof.block_number);
+        // let block_number = serialize_fe_for_ethereum(proof.block_number);
 
-        let public_data = proof.public_data.clone();
+        // let public_data = proof.public_data.clone();
 
         let p = [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y];
 
@@ -239,36 +243,35 @@ impl BabyProver {
     }
 
     pub fn encode_deposit_transactions(block: &DepositBlock) -> Result<Vec<u8>, Err> {
-        return Ok(vec![]);
-        // let mut encoding: Vec<u8> = vec![];
+        let mut encoding: Vec<u8> = vec![];
         
-        // let transactions = &block.transactions;
+        let transactions = &block.transactions;
 
-        // for tx in transactions {
-        //     let tx = models::circuit::DepositRequest::try_from(tx).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
-        //     let tx_bits = tx.public_data_into_bits();
-        //     let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
-        //     encoding.extend(tx_encoding.into_iter());
-        // }
+        for tx in transactions {
+            let tx = models::circuit::DepositRequest::try_from(tx).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
+            let tx_bits = tx.public_data_into_bits();
+            let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
+            encoding.extend(tx_encoding.into_iter());
+        }
 
-        // Ok(encoding)
+        Ok(encoding)
     }
 
     // this method is different, it actually reads the state 
     pub fn encode_exit_transactions(block: &ExitBlock) -> Result<Vec<u8>, Err> {
-        return Ok(vec![]);
-        // let mut encoding: Vec<u8> = vec![];
+        // return Ok(vec![]);
+        let mut encoding: Vec<u8> = vec![];
         
-        // let transactions = &block.transactions;
+        let transactions = &block.transactions;
 
-        // for tx in transactions {
-        //     let tx = models::circuit::ExitRequest::try_from(tx).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
-        //     let tx_bits = tx.public_data_into_bits();
-        //     let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
-        //     encoding.extend(tx_encoding.into_iter());
-        // }
+        for tx in transactions {
+            let tx = models::circuit::ExitRequest::try_from(tx).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
+            let tx_bits = tx.public_data_into_bits();
+            let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
+            encoding.extend(tx_encoding.into_iter());
+        }
 
-        // Ok(encoding)
+        Ok(encoding)
     }
 
     pub fn apply_and_prove(&mut self, block: Block) -> Result<FullBabyProof, Err> {
@@ -486,7 +489,7 @@ impl BabyProver {
         };
 
         let mut rng = OsRng::new().unwrap();
-        println!("Prover has started to work");
+        println!("Prover has started to work transfer");
         let proof = create_random_proof(instance, &self.transfer_parameters, & mut rng);
         if proof.is_err() {
             return Err(BabyProverErr::Unknown);
@@ -518,6 +521,7 @@ impl BabyProver {
     pub fn apply_and_prove_deposit(&mut self, block: &DepositBlock) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.block_number {
+            println!("Proof request is for block {}, while prover state is block {}", block_number, self.block_number);
             return Err(BabyProverErr::Unknown);
         }
         let block_final_root = block.new_root_hash.clone();
@@ -638,6 +642,8 @@ impl BabyProver {
 
         {    
             let packed_transaction_data_bytes = public_data.clone();
+            let hex: String = packed_transaction_data_bytes.clone().to_hex();
+            println!("Packed deposit information data = {}", hex);
 
             let mut next_round_hash_bytes = vec![];
             next_round_hash_bytes.extend(hash_result.iter());
@@ -670,7 +676,7 @@ impl BabyProver {
         };
 
         let mut rng = OsRng::new().unwrap();
-        println!("Prover has started to work");
+        println!("Prover has started to work deposits");
         let proof = create_random_proof(instance, &self.deposit_parameters, & mut rng);
         if proof.is_err() {
             return Err(BabyProverErr::Unknown);
@@ -680,9 +686,11 @@ impl BabyProver {
 
         let pvk = prepare_verifying_key(&self.deposit_parameters.vk);
 
-        let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]).unwrap();
+        println!("Made a proof for initial root = {}, final root = {}, public data = {}", initial_root, final_root, public_data_commitment.clone().to_hex());
+        let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]);
         
-        if !success {
+        if success.is_err() || success.unwrap() == false {
+            println!("Proof is invalid!");
             return Err(BabyProverErr::Unknown);
         }
         println!("Proof generation is complete");
@@ -848,7 +856,7 @@ impl BabyProver {
         };
 
         let mut rng = OsRng::new().unwrap();
-        println!("Prover has started to work");
+        println!("Prover has started to work on exits");
         let proof = create_random_proof(instance, &self.exit_parameters, & mut rng);
         if proof.is_err() {
             return Err(BabyProverErr::Unknown);
@@ -901,7 +909,7 @@ pub fn start_prover(
         tx_for_ops: mpsc::Sender<EthOperation>
     ) 
 {
-    std::thread::spawn(move || {
+    std::thread::Builder::new().name("prover".to_string()).spawn(move || {
         prover.run(rx_for_blocks, tx_for_ops)
     });
 }

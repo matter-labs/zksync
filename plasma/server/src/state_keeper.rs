@@ -6,7 +6,7 @@ use std::{thread};
 use std::collections::HashMap;
 use rand::{OsRng};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
-use web3::types::{U128, H256};
+use web3::types::{U128, H256, U256};
 use std::str::FromStr;
 
 use plasma::models::{self, *};
@@ -121,8 +121,6 @@ impl PlasmaStateKeeper {
                     };
                     let result = match applied {
                         Ok((new_root, block_data, accounts_updated)) => {
-                            self.state.block_number += 1;
-
                             // make commitment
                             let op = EthOperation::Commit{
                                 block_number:   self.state.block_number,
@@ -130,10 +128,15 @@ impl PlasmaStateKeeper {
                                 block_data: block_data.clone(),
                                 accounts_updated: accounts_updated.clone(),
                             };
+
                             tx_for_commitments.send(op).expect("queue must work");
 
                             // start making proof
                             tx_for_proof_requests.send((self.state.block_number, block, block_data, accounts_updated)).expect("queue must work");
+                            
+                            // bump current block number as we've made one
+                            self.state.block_number += 1;
+
                             Ok(())
                         },
                         Err(_) => Err(block),
@@ -154,7 +157,7 @@ impl PlasmaStateKeeper {
     }
 
     fn apply_transfer_block(&mut self, block: &mut TransferBlock) -> Result<(H256, EthBlockData, AccountMap), ()> {
-
+        use ff::{PrimeField, PrimeFieldRepr};
         let transactions: Vec<TransferTx> = block.transactions.clone()
             .into_iter()
             .map(|tx| self.augument_and_sign(tx))
@@ -194,11 +197,14 @@ impl PlasmaStateKeeper {
             total_fees:     U128::zero(), // TODO: count fees
             public_data:    BabyProver::encode_transfer_transactions(&block).unwrap(),
         };
-        Ok((H256::from_str(&block.new_root_hash.to_string()).unwrap(), eth_block_data, updated_accounts))
+        let mut be_bytes: Vec<u8> = vec![];
+        &block.new_root_hash.clone().into_repr().write_be(& mut be_bytes);
+        let root = H256::from(U256::from_big_endian(&be_bytes));
+        Ok((root, eth_block_data, updated_accounts))
     }
 
     fn apply_deposit_block(&mut self, block: &mut DepositBlock, batch_number: BatchNumber) -> Result<(H256, EthBlockData, AccountMap), ()> {
-
+        use ff::{PrimeField, PrimeFieldRepr};
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
         for tx in block.transactions.iter() {
             self.state.apply_deposit(&tx).expect("queue must work");
@@ -211,11 +217,14 @@ impl PlasmaStateKeeper {
         block.new_root_hash = self.state.root_hash();
 
         let eth_block_data = EthBlockData::Deposit{ batch_number };
-        Ok((H256::from_str(&block.new_root_hash.to_string()).unwrap(), eth_block_data, updated_accounts))
+        let mut be_bytes: Vec<u8> = vec![];
+        &block.new_root_hash.clone().into_repr().write_be(& mut be_bytes);
+        let root = H256::from(U256::from_big_endian(&be_bytes));
+        Ok((root, eth_block_data, updated_accounts))
     }
 
     fn apply_exit_block(&mut self, block: &mut ExitBlock, batch_number: BatchNumber) -> Result<(H256, EthBlockData, AccountMap), ()> {
-
+        use ff::{PrimeField, PrimeFieldRepr};
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
         for tx in block.transactions.iter() {
             self.state.apply_exit(&tx).expect("queue must work");
@@ -228,7 +237,10 @@ impl PlasmaStateKeeper {
         block.new_root_hash = self.state.root_hash();
 
         let eth_block_data = EthBlockData::Deposit{ batch_number };
-        Ok((H256::from_str(&block.new_root_hash.to_string()).unwrap(), eth_block_data, updated_accounts))
+        let mut be_bytes: Vec<u8> = vec![];
+        &block.new_root_hash.clone().into_repr().write_be(& mut be_bytes);
+        let root = H256::from(U256::from_big_endian(&be_bytes));
+        Ok((root, eth_block_data, updated_accounts))
     }
 
 
@@ -262,7 +274,7 @@ pub fn start_state_keeper(mut sk: PlasmaStateKeeper,
     tx_for_commitments: Sender<EthOperation>,
     tx_for_proof_requests: Sender<(u32, Block, EthBlockData, AccountMap)>)
 {
-    thread::spawn(move || {
+    std::thread::Builder::new().name("state_keeper".to_string()).spawn(move || {
         sk.run(rx_for_blocks, tx_for_commitments, tx_for_proof_requests)
     });
 }

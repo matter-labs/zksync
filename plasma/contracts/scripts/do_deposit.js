@@ -10,9 +10,9 @@ const BN = require("bn.js");
 // const rpcEndpoint = "http://127.0.0.1:8545";
 // const contractAddress = "0x4169D71D56563eA9FDE76D92185bEB7aa1Da6fB8";
 const rpcEndpoint = "https://rinkeby.infura.io/48beda66075e41bda8b124c6a48fdfa0";
-const contractAddress = "0xe8D0E0c58857f5bb83Ee8ccE2D42f144Bb7263aC";
-// rinkeby 0xe8D0E0c58857f5bb83Ee8ccE2D42f144Bb7263aC
-const privateKey = "0xaf355f2914da0ea0361a5f93ca4224f60ae6a00d648e63f8fdebacc26e5a06f3";
+const contractAddress = "0x008A662a145302bbbe31fa992433b4F4E992946f";
+
+const privateKey = "0x12B7678FF12FE8574AB74FFD23B5B0980B64D84345F9D637C2096CA0EF587806";
 
 async function depositInto(acccountString, amountString) {
     let provider = new ethers.providers.JsonRpcProvider(rpcEndpoint);

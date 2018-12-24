@@ -9,9 +9,9 @@ const BN = require("bn.js");
 // const contractAddress = "0x4169D71D56563eA9FDE76D92185bEB7aa1Da6fB8";
 
 const rpcEndpoint = "https://rinkeby.infura.io/48beda66075e41bda8b124c6a48fdfa0";
-const contractAddress = "0xF8814577CdC0B9Ce7987C02a787efD1ac3bfF40d";
+const contractAddress = "0x008a662a145302bbbe31fa992433b4f4e992946f";
 
-async function getLogs(batchNumberString) {
+async function getState() {
     let provider = new ethers.providers.JsonRpcProvider(rpcEndpoint);
 
     let contract = new ethers.Contract(contractAddress, abi_string, provider);
@@ -20,25 +20,26 @@ async function getLogs(batchNumberString) {
     console.log("Total deposits happened = " + totalDepositRequests.toString(10));
     const totalBatches = totalDepositRequests.div(depositBatchSize);
     console.log("Current batch = " + totalBatches.toString(10));
-    for (let i = 0; i < totalBatches.toNumber(); i++) {
-        console.log("Trying to get all logs for deposit batch " + i);
-        let filter = contract.filters.LogDepositRequest("0x" + (new BN(i)).toString(16), null, null);
-        // need to explicitly set block range
-        let fullFilter = {
-            fromBlock: 1,
-            toBlock: 'latest',
-            address: filter.address,
-            topics: filter.topics
-        };
-        let events = await provider.getLogs(fullFilter);
-        console.log(JSON.stringify(events));
-    }
+
+    const lastCommited = await contract.lastCommittedBlockNumber();
+    console.log("Last committed block = " + lastCommited.toString(10));
+
+    const lastVerified = await contract.lastVerifiedBlockNumber();
+    console.log("Last verified block = " + lastVerified.toString(10));
+
+    const lastVerifiedRoot = await contract.lastVerifiedRoot();
+    console.log("Last verified root = " + lastVerifiedRoot.toString(16));
+
+    const lastCommittedDepositBatch = await contract.lastCommittedDepositBatch();
+    console.log("Last committed deposit batch = " + lastCommittedDepositBatch.toString(10));
+
+    const lastVerifiedDepositBatch = await contract.lastVerifiedDepositBatch();
+    console.log("Last verified deposit batch = " + lastVerifiedDepositBatch.toString(10));
+
 }
 
 async function run() {
-    const args = process.argv.slice(2);
-    const batchNumber = args[0];
-    await getLogs(batchNumber);
+    await getState();
 }
 
 run().then()

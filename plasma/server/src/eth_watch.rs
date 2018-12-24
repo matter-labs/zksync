@@ -140,16 +140,9 @@ impl EthWatch {
             return Err(());
         }
 
-        println!("Checking a batch number");
-
         let total_deposit_requests = total_deposit_requests_result.unwrap();
 
-        println!("Total deposit requests = {}", total_deposit_requests);
-
         let batch_number = total_deposit_requests / self.deposit_batch_size;
-
-        println!("Batch number = {}", batch_number.clone());
-        println!("Last processed batch number = {}", self.last_deposit_batch);
 
         if batch_number == self.last_deposit_batch {
             // this watcher is not responsible for bumping a batch number
@@ -199,9 +192,6 @@ impl EthWatch {
         let deposit_events = deposit_events_filter_result.unwrap();
         let cancel_events = cancel_events_filter_result.unwrap();
 
-        println!("Deposits in batch {} = {}", self.last_deposit_batch, deposit_events.len());
-        println!("Cancels in batch {} = {}", self.last_deposit_batch, cancel_events.len());
-
         // now we have to merge and apply
         let mut all_events = vec![];
         all_events.extend(deposit_events.into_iter());
@@ -244,7 +234,6 @@ impl EthWatch {
                     let account_id = U256::from(event.topics[2]);
                     let public_key = U256::from(event.topics[3]);
                     let deposit_amount = U256::from_big_endian(&data_bytes);
-                    println!("Deposit from {:x}, key {:x}, amount {}", account_id, public_key, deposit_amount);
                     let existing_record = this_batch.get(&account_id).map(|&v| v.clone());
                     if let Some(record) = existing_record {
                         let mut existing_balance = record.0;
@@ -264,7 +253,6 @@ impl EthWatch {
                 _ => return Err(()),
             }
         }
-        println!("Got batch");
 
         let mut all_deposits = vec![];
         for (k, v) in this_batch.iter() {
@@ -277,12 +265,10 @@ impl EthWatch {
             fe_repr.read_be(public_key_bytes.as_slice()).expect("read public key point");
             let y = Fr::from_repr(fe_repr);
             if y.is_err() {
-                println!("Can not read public key y");
                 return Err(());
             }
             let public_key_point = edwards::Point::<Engine, Unknown>::get_for_y(y.unwrap(), x_sign, &params::JUBJUB_PARAMS);
             if public_key_point.is_none() {
-                println!("Public key is invalid");
                 return Err(());
             }
 
@@ -302,14 +288,11 @@ impl EthWatch {
             transactions: all_deposits,
             new_root_hash: Fr::zero(),
         };
-        let request = StateProcessingRequest::ApplyBlock(Block::Deposit(block, batch_number.as_u32()), None);
-
-        println!("Sending request");
+        let request = StateProcessingRequest::ApplyBlock(Block::Deposit(block, self.last_deposit_batch.as_u32()), None);
 
         let send_result = channel.send(request);
 
         if send_result.is_err() {
-            println!("Couldn't send for processing");
             return Err(());
         }
 
@@ -335,16 +318,9 @@ impl EthWatch {
             return Err(());
         }
 
-        println!("Checking a batch number");
-
         let total_requests = total_requests_result.unwrap();
 
-        println!("Total exit requests = {}", total_requests);
-
         let batch_number = total_requests / self.exit_batch_size;
-
-        println!("Batch number = {}", batch_number.clone());
-        println!("Last processed batch number = {}", self.last_exit_batch);
 
         if batch_number == self.last_exit_batch {
             // this watcher is not responsible for bumping a batch number
@@ -393,9 +369,6 @@ impl EthWatch {
 
         let exit_events = exit_events_filter_result.unwrap();
         let cancel_events = cancel_events_filter_result.unwrap();
-
-        println!("Exits in this block = {}", exit_events.len());
-        println!("Cancels in this block = {}", cancel_events.len());
 
         // now we have to merge and apply
         let mut all_events = vec![];
@@ -455,7 +428,6 @@ impl EthWatch {
                 _ => return Err(()),
             }
         }
-        println!("Got batch");
 
         let mut all_exits = vec![];
         for k in this_batch.iter() {
@@ -473,9 +445,7 @@ impl EthWatch {
             transactions: all_exits,
             new_root_hash: Fr::zero(),
         };
-        let request = StateProcessingRequest::ApplyBlock(Block::Exit(block, batch_number.as_u32()), None);
-
-        println!("Sending request");
+        let request = StateProcessingRequest::ApplyBlock(Block::Exit(block, self.last_exit_batch.as_u32()), None);
 
         let send_result = channel.send(request);
 
