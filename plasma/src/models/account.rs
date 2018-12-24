@@ -1,4 +1,4 @@
-use crate::primitives::{GetBits, GetBitsFixed};
+use crate::primitives::{GetBits};
 use bigdecimal::BigDecimal;
 use super::circuit;
 
@@ -31,5 +31,5 @@ impl GetBits for Account {
 #[test]
 fn test_default_account() {
     let a = Account::default();
-    let bits = a.get_bits_le();
+    a.get_bits_le();
 }

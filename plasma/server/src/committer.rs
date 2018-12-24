@@ -1,23 +1,18 @@
 use std::sync::mpsc::{channel, Sender, Receiver};
 use plasma::eth_client::{ETHClient, TxMeta, PROD_PLASMA};
 use web3::types::{U256, U128, H256};
-use plasma::models::{Block, TransferBlock, Account, BatchNumber, AccountMap};
-use super::prover::BabyProver;
+use plasma::models::{BatchNumber, AccountMap};
 use super::storage::StorageConnection;
-use serde_json::{to_value, value::Value};
-use plasma::primitives::{serialize_fe_for_ethereum};
 
 //#[derive(Debug, Clone, Serialize, Deserialize)]
 pub type EncodedProof = [U256; 8];
-
-pub struct BlockProof(pub EncodedProof, pub Vec<(u32, Account)>);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum EthBlockData {
     Transfer{
         total_fees:     U128,
-        
+
         #[serde(with = "serde_bytes")]
         public_data:    Vec<u8>,
     },
@@ -82,7 +77,7 @@ pub fn start_eth_sender() -> Sender<(Operation, TxMeta)> {
                 },
                 Operation::Verify{block_number, proof, block_data, accounts_updated} => {
                     match block_data {
-                        EthBlockData::Transfer{total_fees, public_data} =>
+                        EthBlockData::Transfer{total_fees: _, public_data: _} =>
                             eth_client.call("verifyTransferBlock", meta,
                                 (block_number as u64, proof)),
                         EthBlockData::Deposit{batch_number} =>
@@ -114,7 +109,7 @@ pub fn load_pendings_ops(eth_client: &ETHClient, tx_for_eth: &Sender<(Operation,
         tx_for_eth.send((op, TxMeta{
             addr:   pending_op.addr, 
             nonce:  pending_op.nonce as u32,
-        }));
+        })).expect("queue must work");
     }
 }
 
@@ -127,10 +122,10 @@ pub fn run_committer(rx_for_ops: Receiver<Operation>, tx_for_eth: Sender<(Operat
         // TODO: with postgres transaction
         let committed_op = storage.commit_op(serde_json::to_value(&op).unwrap()).expect("db must be functional");
         match &op {
-            Operation::Commit{block_number, new_root, block_data, accounts_updated} => 
-                storage.commit_state_update(*block_number, accounts_updated),
-            Operation::Verify{block_number, proof, block_data, accounts_updated} => 
-                storage.apply_state_update(*block_number),
+            Operation::Commit{block_number, new_root: _, block_data: _, accounts_updated} => 
+                storage.commit_state_update(*block_number, accounts_updated).expect("db must be functional"),
+            Operation::Verify{block_number, proof: _, block_data: _, accounts_updated: _} => 
+                storage.apply_state_update(*block_number).expect("db must be functional"),
             _ => unimplemented!(),
         };
 
@@ -138,7 +133,7 @@ pub fn run_committer(rx_for_ops: Receiver<Operation>, tx_for_eth: Sender<(Operat
         tx_for_eth.send((op, TxMeta{
             addr:   committed_op.addr, 
             nonce:  committed_op.nonce as u32,
-        }));
+        })).expect("queue must work");
     }
 }
 

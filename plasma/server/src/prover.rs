@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use rand::{OsRng};
-use std::sync::mpsc::{self, Sender, Receiver};
+use std::sync::mpsc;
 
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
@@ -10,7 +10,7 @@ use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
 use plasma::models::{Engine, Fr};
 use sapling_crypto::circuit::float_point::parse_float_to_u128;
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
-use sapling_crypto::jubjub::{JubjubEngine, JubjubParams, edwards, Unknown};
+use sapling_crypto::jubjub::{JubjubEngine, edwards};
 
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
 
@@ -19,7 +19,7 @@ use plasma::models::circuit::{Account, AccountTree};
 
 use super::config::{TRANSFER_BATCH_SIZE, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE};
 
-use super::committer::{self, EncodedProof, Operation, EthBlockData};
+use super::committer::{EncodedProof, Operation, EthBlockData};
 
 use plasma::circuit::utils::be_bit_vector_into_bytes;
 use plasma::circuit::transfer::transaction::{Transaction};
@@ -34,8 +34,6 @@ use plasma::circuit::transfer::circuit::{
     TransactionWitness};
 
 use plasma::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum, field_element_to_u32};
-
-use web3::types::{U256};
 
 pub struct Prover<E:JubjubEngine> {
     pub transfer_batch_size: usize,
@@ -892,7 +890,7 @@ impl BabyProver {
                 proof:              Self::encode_proof(&proof).unwrap(),
                 block_data,         
                 accounts_updated,
-            });
+            }).expect("queue must work");
         }
     }
 }

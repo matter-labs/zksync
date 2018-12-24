@@ -6,7 +6,6 @@ use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use std::env;
 use serde_json::{to_value, value::Value};
-use std::collections::HashMap;
 
 pub struct StorageConnection {
     conn: PgConnection
@@ -79,7 +78,7 @@ impl StorageConnection {
         Ok(())
     }
 
-    pub fn apply_state_update(&self, block_number: u32) -> QueryResult<()> {
+    pub fn apply_state_update(&self, _block_number: u32) -> QueryResult<()> {
         // TODO: UPDATE accounts a FROM account_updates u 
         // SET a.data = u.data, a.updated_at = now()
         // WHERE a.id = u.id AND u.block_number = :block_number
@@ -90,7 +89,7 @@ impl StorageConnection {
 
         // TODO: with transaction
         
-        let last_verified_block = 0; // TODO: load from db
+        let _last_verified_block = 0; // TODO: load from db
 
         // TODO: select basis from accounts, 
         // but newer state from account_updates for all updates after the last committed block

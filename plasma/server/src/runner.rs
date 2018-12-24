@@ -1,16 +1,11 @@
-use std::thread;
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::{channel};
 
 use super::prover::{BabyProver, start_prover};
-use super::state_keeper::{PlasmaStateKeeper, StateProcessingRequest, start_state_keeper};
+use super::state_keeper::{PlasmaStateKeeper, start_state_keeper};
 use super::rest_api::start_api_server;
-use super::committer::{self, Operation};
+use super::committer;
 use super::mem_pool::{MemPool, start_mem_pool};
 use super::eth_watch::{EthWatch, start_eth_watch};
-
-use plasma::models::{Block, TransferBlock, TransferTx};
-
-use plasma::primitives::serialize_fe_for_ethereum;
 
 pub fn run() {
 

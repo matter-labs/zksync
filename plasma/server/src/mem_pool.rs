@@ -1,6 +1,6 @@
 use std::sync::mpsc::{channel, Sender, Receiver};
 use plasma::models::{TransferTx, TransferBlock, Block};
-use super::state_keeper::{StateProcessingRequest, BlockSource};
+use super::state_keeper::{StateProcessingRequest};
 use super::config;
 
 pub struct MemPool {
@@ -36,7 +36,7 @@ impl MemPool {
         let block = std::mem::replace(&mut self.current_block, TransferBlock::default());
         let (tx, rx) = channel();
         let request = StateProcessingRequest::ApplyBlock(Block::Transfer(block), Some(tx));
-        tx_for_blocks.send(request);
+        tx_for_blocks.send(request).expect("queue must work");
 
         // now wait for state_keeper to return a result
         let result = rx.recv().unwrap();

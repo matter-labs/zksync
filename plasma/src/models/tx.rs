@@ -1,14 +1,12 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
 use crate::primitives::{get_bits_le_fixed_u128, pack_bits_into_bytes};
-use pairing::bn256::{Bn256};
-use sapling_crypto::jubjub::{JubjubEngine, JubjubParams, FixedGenerators, edwards, Unknown};
-use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
+use sapling_crypto::jubjub::{JubjubEngine, FixedGenerators, edwards, Unknown};
 use sapling_crypto::circuit::float_point::{convert_to_float};
-use sapling_crypto::eddsa::{self, Signature};
+use sapling_crypto::eddsa::{Signature};
 use crate::models::circuit::sig::TransactionSignature;
 use super::PublicKey;
 use crate::models::params;
-use ff::{Field, PrimeField, PrimeFieldRepr};
+use ff::{Field, PrimeField};
 use super::{Fr, Engine};
 use crate::circuit::utils::{encode_fr_into_fs, le_bit_vector_into_field_element};
 use crate::models::circuit::transfer::{Tx};
@@ -183,8 +181,6 @@ impl DepositRequest<Engine> {
     // TODO: introduce errors if necessary
     pub fn try_from(request: &crate::models::DepositTx) -> Result<Self, String> {
 
-        use bigdecimal::ToPrimitive;
-
         let req = Self {
             // TODO: these conversions are ugly and inefficient, replace with idiomatic std::convert::From trait
             into:               Fr::from_str(&request.account.to_string()).unwrap(),
@@ -202,8 +198,6 @@ impl ExitRequest<Engine> {
 
     // TODO: introduce errors if necessary
     pub fn try_from(request: &crate::models::ExitTx) -> Result<Self, String> {
-
-        use bigdecimal::ToPrimitive;
 
         let req = Self {
             // TODO: these conversions are ugly and inefficient, replace with idiomatic std::convert::From trait

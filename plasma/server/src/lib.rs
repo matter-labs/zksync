@@ -1,8 +1,4 @@
-#![allow(unused_imports)]
-#![allow(unused_variables)]
-#![allow(dead_code)]
-#![allow(unused_must_use)]
-#![allow(unused_assignments)]
+
 #![allow(proc_macro_derive_resolution_fallback)]
 
 pub mod runner;

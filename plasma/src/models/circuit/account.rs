@@ -40,7 +40,6 @@ impl std::convert::From<crate::models::Account> for Account<pairing::bn256::Bn25
 
     fn from(a: crate::models::Account) -> Self {
         use pairing::bn256::Fr;
-        use crate::primitives::{unpack_edwards_point};
 
         Self{
             balance:    Fr::from_str(&a.balance.to_string()).unwrap(),

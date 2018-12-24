@@ -3,10 +3,10 @@
 use pairing::{Engine, CurveAffine};
 use bellman::{groth16};
 
-fn unpack<T: CurveAffine>(t: &T) -> Vec<String>
-{
-    t.into_uncompressed().as_ref().chunks(32).map(|c| "0x".to_owned() + &hex::encode(c)).collect()
-}
+// fn unpack<T: CurveAffine>(t: &T) -> Vec<String>
+// {
+//     t.into_uncompressed().as_ref().chunks(32).map(|c| "0x".to_owned() + &hex::encode(c)).collect()
+// }
 
 fn unpack_g1<E: Engine>(point: & E::G1Affine) -> Vec<String> {
     let uncompressed = point.into_uncompressed();
