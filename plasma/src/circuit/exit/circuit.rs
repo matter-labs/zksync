@@ -410,17 +410,6 @@ fn apply_request<E, CS>(
     Ok((cur, public_data))
 }
 
-fn print_boolean_vector(vector: &[boolean::Boolean]) {
-    for b in vector {
-        if b.get_value().unwrap() {
-            print!("1");
-        } else {
-            print!("0");
-        }
-    }
-    print!("\n");
-}
-
 #[test]
 fn test_exit_from_existing_leaf() {
     use ff::{Field, BitIterator};

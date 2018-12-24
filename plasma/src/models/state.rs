@@ -1,6 +1,4 @@
-use bigdecimal::BigDecimal;
 use super::*;
-use crate::primitives::{unpack_edwards_point};
 use crate::models::params;
 use sapling_crypto::jubjub::{edwards, Unknown};
 

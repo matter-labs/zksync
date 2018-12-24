@@ -569,17 +569,6 @@ fn apply_request<E, CS>(
     Ok((cur, public_data))
 }
 
-fn print_boolean_vector(vector: &[boolean::Boolean]) {
-    for b in vector {
-        if b.get_value().unwrap() {
-            print!("1");
-        } else {
-            print!("0");
-        }
-    }
-    print!("\n");
-}
-
 #[test]
 fn test_deposit_in_empty_leaf() {
     use ff::{Field, BitIterator};

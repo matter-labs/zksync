@@ -1205,17 +1205,6 @@ fn test_bits_into_fr(){
     print!("{}\n", fe);
 }
 
-fn print_boolean_vector(vector: &[boolean::Boolean]) {
-    for b in vector {
-        if b.get_value().unwrap() {
-            print!("1");
-        } else {
-            print!("0");
-        }
-    }
-    print!("\n");
-}
-
 #[test]
 fn test_transfer_circuit_with_witness() {
     use ff::{Field};

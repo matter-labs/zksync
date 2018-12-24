@@ -4,7 +4,7 @@ use ff::{ScalarEngine};
 use pairing::{Engine, CurveAffine};
 use pairing::bn256::{Bn256};
 use bigdecimal::{BigDecimal, ToPrimitive};
-use sapling_crypto::jubjub::{JubjubEngine, JubjubParams, edwards, Unknown};
+use sapling_crypto::jubjub::{JubjubEngine, edwards, Unknown};
 
 // TODO: replace Vec with Iterator?
 
@@ -24,7 +24,7 @@ pub fn get_bits_le_fixed_u128(num: u128, n: usize) -> Vec<bool> {
     let mut r: Vec<bool> = Vec::with_capacity(n);
     let it_end = if n > 128 { 128 } else { n };
     let mut tmp = num;
-    for i in 0..it_end {
+    for _ in 0..it_end {
         let bit = tmp & 1u128 > 0;
         r.push(bit);
         tmp >>= 1;

@@ -181,7 +181,7 @@ impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
         assert!(index < self.capacity());
         let mut hash_index = (self.tree_depth, index);
 
-        (0..self.tree_depth).rev().map(|level| {
+        (0..self.tree_depth).rev().map(|_level| {
             let dir = (hash_index.1 & 1) > 0;
             let proof_index = (hash_index.0, hash_index.1 ^ 1);
             let hash = self.get_hash(proof_index);
