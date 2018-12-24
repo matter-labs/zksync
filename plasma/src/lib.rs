@@ -29,21 +29,11 @@ extern crate ethereum_tx_sign;
 
 extern crate hyper;
 extern crate serde;
-extern crate serde_json;
 extern crate reqwest;
-
-extern crate actix;
-extern crate actix_web;
 
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_bytes;
-
-#[macro_use]
-extern crate diesel;
-extern crate dotenv;
 extern crate bigdecimal;
-
 #[macro_use]
 extern crate smart_default;
 
