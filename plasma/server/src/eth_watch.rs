@@ -8,7 +8,7 @@ use std::str::FromStr;
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::Sender;
 use super::state_keeper::{StateProcessingRequest};
-use plasma::models::{Block, DepositBlock, DepositTx, Engine, Fr};
+use plasma::models::{Block, DepositBlock, DepositTx, ExitTx, ExitBlock, Engine, Fr};
 use bigdecimal::{Num, BigDecimal};
 use plasma::models::params;
 
