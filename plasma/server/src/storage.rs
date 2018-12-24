@@ -1,5 +1,6 @@
 use plasma::models::*;
 use crate::schema::*;
+use super::models::{EthOperation, StoredOperation};
 
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
@@ -32,15 +33,6 @@ struct NewOperation {
     pub data:   Value,
 }
 
-#[derive(Queryable)]
-pub struct EthOperation {
-    pub id:         i32,
-    pub data:       Value,
-    pub addr:       String,
-    pub nonce:      i32,
-    pub created_at: std::time::SystemTime,
-}
-
 impl StorageConnection {
 
     /// creates a single db connection; it's safe to create multiple instances of StorageConnection
@@ -58,13 +50,23 @@ impl StorageConnection {
             .expect(&format!("Error connecting to {}", database_url))
     }
 
-    pub fn commit_op(&self, data: Value) -> QueryResult<EthOperation> {
-        diesel::insert_into(operations::table)
-            .values(&NewOperation{ data })
-            .get_result(&self.conn)
+    pub fn commit_op(&self, op: &EthOperation) -> QueryResult<StoredOperation> {
+        self.conn.transaction(|| {
+            match &op {
+                EthOperation::Commit{block_number, new_root: _, block_data: _, accounts_updated} => 
+                    self.commit_state_update(*block_number, accounts_updated)?,
+                EthOperation::Verify{block_number, proof: _, block_data: _, accounts_updated: _} => 
+                    self.apply_state_update(*block_number)?,
+                _ => unimplemented!(),
+            };
+
+            diesel::insert_into(operations::table)
+                .values(&NewOperation{ data: serde_json::to_value(&op).unwrap() })
+                .get_result(&self.conn)
+        })
     }
 
-    pub fn commit_state_update(&self, block_number: u32, accounts_updated: &AccountMap) -> QueryResult<()> {
+    fn commit_state_update(&self, block_number: u32, accounts_updated: &AccountMap) -> QueryResult<()> {
         for (&account_id, a) in accounts_updated.iter() {
             diesel::insert_into(account_updates::table)
                 .values(&AccountUpdate{
@@ -78,7 +80,7 @@ impl StorageConnection {
         Ok(())
     }
 
-    pub fn apply_state_update(&self, _block_number: u32) -> QueryResult<()> {
+    fn apply_state_update(&self, _block_number: u32) -> QueryResult<()> {
         // TODO: UPDATE accounts a FROM account_updates u 
         // SET a.data = u.data, a.updated_at = now()
         // WHERE a.id = u.id AND u.block_number = :block_number
@@ -87,9 +89,7 @@ impl StorageConnection {
 
     pub fn load_committed_state(&self) -> AccountMap {
 
-        // TODO: with transaction
-        
-        let _last_verified_block = 0; // TODO: load from db
+        // let _last_verified_block = 0; // TODO: load from db or do in the select?
 
         // TODO: select basis from accounts, 
         // but newer state from account_updates for all updates after the last committed block
@@ -108,7 +108,7 @@ impl StorageConnection {
         result
     }
 
-    pub fn load_pendings_ops(&self, current_nonce: u32) -> Vec<EthOperation> {
+    pub fn load_pendings_ops(&self, current_nonce: u32) -> Vec<StoredOperation> {
         use crate::schema::operations::dsl::*;
         operations
             .filter(nonce.gt(current_nonce as i32)) // WHERE nonce > current_nonce
