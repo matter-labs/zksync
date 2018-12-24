@@ -43,14 +43,6 @@ impl StorageConnection {
         }
     }
 
-    fn for_test() -> Self {
-        let conn = Self::establish_connection();
-        conn.begin_test_transaction().unwrap();
-        Self{
-            conn
-        }
-    }
-
     fn establish_connection() -> PgConnection {
         dotenv().ok();
         let database_url = env::var("DATABASE_URL")
@@ -135,21 +127,41 @@ impl StorageConnection {
 #[cfg(test)]
 mod test {
 
+use diesel::prelude::*;
+use plasma::models::{self, AccountMap};
+
+fn load_verified_state(conn: &super::StorageConnection) -> AccountMap {
+    let accounts: Vec<super::Account> = 
+        diesel::sql_query("SELECT * FROM accounts")
+            .load(&conn.conn)
+            .expect("db is expected to be functional at sever startup");
+
+    let mut result = AccountMap::default();
+    result.extend(accounts.into_iter().map(|a| (
+            a.id as u32, 
+            serde_json::from_value(a.data).unwrap()
+        )));
+    result
+}
+
 #[test]
 fn test_store_state() {
 
-    use plasma::models;
     use bigdecimal::BigDecimal;
     
     let conn = super::StorageConnection::new();
 
-    use diesel::RunQueryDsl;
-    diesel::sql_query("delete from accounts")
-        .execute(&conn.conn)
-        .expect("must work");
-    diesel::sql_query("delete from account_updates")
-        .execute(&conn.conn)
-        .expect("must work");
+    use diesel::Connection;
+    // this will revert db after test
+    conn.conn.begin_test_transaction().unwrap();
+
+    //use diesel::RunQueryDsl;
+    //diesel::sql_query("delete from accounts")
+    //    .execute(&conn.conn)
+    //    .expect("must work");
+    //diesel::sql_query("delete from account_updates")
+    //    .execute(&conn.conn)
+    //    .expect("must work");
 
     let mut accounts = fnv::FnvHashMap::default();
     let acc = |balance| { 
@@ -158,17 +170,20 @@ fn test_store_state() {
         a
     };
 
+    // commit test update
     accounts.insert(1, acc(1));
     accounts.insert(2, acc(2));
-
     conn.commit_state_update(1, &accounts).unwrap();
 
+    let state = load_verified_state(&conn);
+    assert_eq!(state.len(), 0);
+    
     let state = conn.load_committed_state();
     assert_eq!(state.keys().len(), 0);
 
     conn.apply_state_update(1).expect("update must work");
     
-    let state = conn.load_committed_state();
+    let state = load_verified_state(&conn);
     assert_eq!(
         state.into_iter().collect::<Vec<(u32, models::Account)>>(), 
         accounts.into_iter().collect::<Vec<(u32, models::Account)>>());
