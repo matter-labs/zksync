@@ -48,6 +48,7 @@ use crate::circuit::utils::{le_bit_vector_into_field_element};
 pub struct DepositRequest<E: JubjubEngine> {
     pub into: Option<E::Fr>,
     pub amount: Option<E::Fr>,
+    // here it's only for ease of data encoding
     pub public_key: Option<edwards::Point<E, Unknown>>
 }
 

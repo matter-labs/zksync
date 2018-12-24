@@ -231,7 +231,7 @@ fn apply_request<E, CS>(
         params
     )?;
 
-    // Constraint that "int" field in transaction is 
+    // Constraint that "into" field in transaction is 
     // equal to the merkle proof path
 
     let address_allocated = AllocatedNum::alloc(
@@ -312,7 +312,7 @@ fn apply_request<E, CS>(
     let leaf_is_empty = boolean::Boolean::from(
         boolean::AllocatedBit::alloc(
             cs.namespace(|| "Allocate leaf is empty"),
-            Some(*witness.leaf_is_empty.get()?)
+            witness.leaf_is_empty
         )?
     );
 
@@ -366,6 +366,7 @@ fn apply_request<E, CS>(
             Ok(*witness.new_pub_y.get()?)
         }
     )?;
+
 
     // if leaf is empty - use witness, other wise use existing
     let leaf_pk_x = num::AllocatedNum::conditionally_select(
