@@ -178,11 +178,16 @@ fn test_store_state() {
     let state = load_verified_state(&conn);
     assert_eq!(state.len(), 0);
     
+    // committed state must be computed from updates
     let state = conn.load_committed_state();
-    assert_eq!(state.keys().len(), 0);
+        assert_eq!(
+        state.into_iter().collect::<Vec<(u32, models::Account)>>(), 
+        accounts.clone().into_iter().collect::<Vec<(u32, models::Account)>>());
 
+    // now apply commitment
     conn.apply_state_update(1).expect("update must work");
     
+    // verified state must be equal the commitment
     let state = load_verified_state(&conn);
     assert_eq!(
         state.into_iter().collect::<Vec<(u32, models::Account)>>(), 
