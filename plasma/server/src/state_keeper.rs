@@ -153,15 +153,19 @@ impl PlasmaStateKeeper {
     }
 
     fn account(&self, index: u32) -> Account {
-        self.state.balance_tree.items.get(&index).unwrap().clone()
+        if let Some(existing) = self.state.balance_tree.items.get(&index) {
+            return existing.clone();
+        }
+
+        Account::default()
     }
 
     fn apply_transfer_block(&mut self, block: &mut TransferBlock) -> Result<(H256, EthBlockData, AccountMap), ()> {
         use ff::{PrimeField, PrimeFieldRepr};
-        let transactions: Vec<TransferTx> = block.transactions.clone()
-            .into_iter()
-            .map(|tx| self.augument_and_sign(tx))
-            .collect();
+        let transactions: Vec<TransferTx> = block.transactions.clone();
+            // .into_iter()
+            // .map(|tx| self.augument_and_sign(tx))
+            // .collect();
         let mut save_state = FnvHashMap::<u32, Account>::default();
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
 
@@ -187,6 +191,7 @@ impl PlasmaStateKeeper {
                 // TODO: add tree.insert_existing() for performance
                 self.state.balance_tree.insert(k, v);
             }
+            println!("Revert the state");
             return Err(());
         }
             
@@ -200,6 +205,7 @@ impl PlasmaStateKeeper {
         let mut be_bytes: Vec<u8> = vec![];
         &block.new_root_hash.clone().into_repr().write_be(& mut be_bytes);
         let root = H256::from(U256::from_big_endian(&be_bytes));
+        println!("Block was assembled");
         Ok((root, eth_block_data, updated_accounts))
     }
 

@@ -189,13 +189,10 @@ impl <E: JubjubEngine>EddsaSignature<E> {
         )?;
 
         let mut h: Vec<Boolean> = vec![];
-        let to_append = 256 - message.len();
-
         h.extend(message.iter().cloned());
-        for _ in 0..to_append {
-            h.push(Boolean::Constant(false));
-        }
-        assert!(h.len() == 256);
+        h.resize(256, Boolean::Constant(false));
+
+        assert_eq!(h.len(), 256);
         
         let pk_mul_hash = self.pk.mul(
             cs.namespace(|| "Calculate h*PK"), 

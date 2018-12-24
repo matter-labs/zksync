@@ -4,6 +4,7 @@
   "license": "GPL-3.0-only",
   "devDependencies": {},
   "dependencies": {
+    "axios": "^0.18.0",
     "bn.js": "^4.11.8",
     "brorand": "^1.1.0",
     "elliptic": "^6.4.1",

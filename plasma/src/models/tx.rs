@@ -12,6 +12,7 @@ use crate::circuit::utils::{encode_fr_into_fs, le_bit_vector_into_field_element}
 use crate::models::circuit::transfer::{Tx};
 use crate::models::circuit::deposit::{DepositRequest};
 use crate::models::circuit::exit::{ExitRequest};
+use rustc_hex::ToHex;
 
 /// Unpacked transaction data
 #[derive(Clone, Serialize, Deserialize)]
@@ -63,7 +64,10 @@ impl TransferTx {
             public_key: &PublicKey
         ) -> bool {
         let message_bits = self.message_bits();
+        assert_eq!(message_bits.len() % 8, 0);
         let as_bytes = pack_bits_into_bytes(message_bits);
+        let hex: String = as_bytes.clone().to_hex();
+        println!("Transaction bytes = {}", hex);
         let signature = self.signature.to_jubjub_eddsa().expect("should parse signature");
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let valid = public_key.verify_for_raw_message(
@@ -71,7 +75,7 @@ impl TransferTx {
             &signature, 
             p_g, 
             &params::JUBJUB_PARAMS, 
-            16
+            30
         );
 
         valid

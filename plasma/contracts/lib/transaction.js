@@ -37,6 +37,7 @@ function sign(message, privateKey, curve) {
 function verify(message, signature, publicKey, curve) {
     var key = publicKey;
     var h = new BN(message, 16, "be");
+    console.log("C = " + h.toString(16));
     var SG = curve.g.mul(signature.S);
     var RplusAh = signature.R.add(key.mul(h));
     return RplusAh.eq(SG);
@@ -45,8 +46,9 @@ function verify(message, signature, publicKey, curve) {
 function serializeSignature(signature) {
     const R_X = signature.R.getX();
     const R_Y = signature.R.getY();
+    let r_coords = [R_X.toString(16), R_Y.toString(16)]
     return {
-        R: [R_X.toString(16), R_Y.toString(16)],
+        R: r_coords,
         S: signature.S.toString(16)
     };
 }
@@ -75,7 +77,6 @@ function floatToInteger(
         if (floatHolder.testn(totalBits - i)) {
             exponent = exponent.add(exp_power_of_to);
         }
-        // console.log(exponent.toString(10));
         exp_power_of_to = exp_power_of_to.mul(two);
     }
     exponent = expBase.pow(exponent);
@@ -85,7 +86,6 @@ function floatToInteger(
         if (floatHolder.testn(totalBits - exp_bits - i)) {
             mantissa = mantissa.add(mantissa_power_of_to);
         }
-        // console.log(mantissa.toString(10));
         mantissa_power_of_to = mantissa_power_of_to.mul(two);
     }
     return exponent.mul(mantissa);
@@ -122,15 +122,12 @@ function integerToFloat(
         if (exponent.testn(i)) {
             encoding.bincn(totalBits - i);
         }
-        // console.log(encoding.toString(2))
     }
     for (let i = 0; i < mantissa_bits; i++) {
         if (mantissa.testn(i)) {
             encoding.bincn(totalBits - exp_bits - i);
         }
-        // console.log(encoding.toString(2))
     }
-    // console.log(encoding.toString(2))
     return encoding.toBuffer("be", (exp_bits + mantissa_bits)/8);
 }
 
@@ -138,7 +135,9 @@ function packBnLe(bn, numBits) {
     let bin = bn.toString(2);
     assert(bin.length <= numBits)
     bin = bin.padStart(numBits, "0");
+    bin = bin.split("");
     bin = bin.reverse();
+    bin = bin.join("");
     let newBN = new BN(bin, 2);
     let buff = newBN.toArrayLike(Buffer, "be");
     if (buff.length < numBits / 8) {
@@ -147,24 +146,37 @@ function packBnLe(bn, numBits) {
     return buff;
 }
 
+function reverseByte(b) {
+
+}
+
 function serializeTransaction(tx) {
-    const {from, to, amount, fee, nonce, maxBlock} = tx;
+    const {from, to, amount, fee, nonce, good_until_block} = tx;
     assert(from.bitLength() <= 24);
     assert(to.bitLength() <= 24);
     assert(amount.bitLength() <= 128);
     assert(fee.bitLength() <= 128);
     assert(nonce.bitLength() <= 32);
-    assert(maxBlock.bitLength() <= 32);
+    assert(good_until_block.bitLength() <= 32);
 
-    const components = [];
-    components.push(packBnLe(from, 3));
-    components.push(packBnLe(to, 3));
+    // const components = [];
+    // components.push(packBnLe(from, 24));
+    // components.push(packBnLe(to, 24));
     let amountFloatBytes = integerToFloat(amount, 5, 11, 10);
-    components.push(amountFloatBytes);
+    // components.push(amountFloatBytes);
     let feeFloatBytes = integerToFloat(fee, 5, 3, 10);
-    components.push(feeFloatBytes);
-    components.push(packBnLe(nonce, 4));
-    components.push(packBnLe(maxBlock, 4));
+    // components.push(feeFloatBytes);
+    // components.push(packBnLe(nonce, 32));
+    // components.push(packBnLe(good_until_block, 32));
+
+    const components = [
+        good_until_block.toBuffer("be", 4),
+        nonce.toBuffer("be", 4),
+        packBnLe(new BN(feeFloatBytes, 16, "be"), 8),
+        packBnLe(new BN(amountFloatBytes, 16, "be"), 16),
+        to.toBuffer("be", 3),
+        from.toBuffer("be", 3)
+    ];
 
     let serialized = Buffer.concat(components);
 
@@ -173,8 +185,12 @@ function serializeTransaction(tx) {
 
     return {
         bytes: serialized,
+        from: from,
+        to: to,
         amount: newAmount,
-        fee: newFee
+        fee: newFee,
+        nonce: nonce,
+        good_until_block: good_until_block
     }
 }
 
@@ -221,6 +237,65 @@ function parseSlice(slice) {
     const amount = floatToInteger(slice.slice(6, 8), 5, 11, 10)
     const fee = floatToInteger(slice.slice(8, 9), 5, 3, 10)
     return {from, to, amount, fee};
+}
+
+function toApiForm(tx, sig) {
+    // expected by API server
+    // pub from:               u32,
+    // pub to:                 u32,
+    // pub amount:             BigDecimal,
+    // pub fee:                BigDecimal,
+    // pub nonce:              u32,
+    // pub good_until_block:   u32,
+    // pub signature:          TxSignature,
+
+    // pub struct TxSignature{
+    //     pub r_x: Fr,
+    //     pub r_y: Fr,
+    //     pub s: Fr,
+    // }
+
+    let serializedSignature = serializeSignature(sig);
+    let [r_x, r_y] = serializedSignature.R;
+    let signature = {
+        r_x: "0x" + r_x.padStart(64, "0"), 
+        r_y: "0x" + r_y.padStart(64, "0"),
+        s: "0x" + serializedSignature.S.padStart(64, "0")
+    };
+
+    let txForApi = {
+        from: tx.from.toNumber(),
+        to: tx.to.toNumber(),
+        amount: tx.amount.toString(10),
+        fee: tx.fee.toString(10),
+        nonce: tx.nonce.toNumber(),
+        good_until_block: tx.good_until_block.toNumber(),
+        signature: signature
+    }
+
+    return txForApi;
+
+}
+
+function createTransaction(from, to, amount, fee, nonce, good_until_block, privateKey) {
+    let tx = {
+        from: new BN(from),
+        to: new BN(to),
+        amount: new BN(amount),
+        fee: new BN(fee),
+        nonce: new BN(nonce),
+        good_until_block: new BN(good_until_block)
+    };
+    const serializedTx = serializeTransaction(tx);
+    const message = serializedTx.bytes;
+    console.log("Message hex = " + message.toString("hex"));
+    const signature = sign(message, privateKey, altBabyJubjub);
+    const pub = altBabyJubjub.g.mul(privateKey);
+    const isValid = verify(message, signature, pub, altBabyJubjub);
+    assert(isValid);
+    console.log("Public = " + pub.getX().toString(16) + ", " + pub.getY().toString(16));
+    const apiForm = toApiForm(serializedTx, signature);
+    return apiForm;
 }
 
 
@@ -274,5 +349,7 @@ module.exports = {
     serializeTransaction,
     parseSignature,
     newKey,
-    getPublicData
+    getPublicData,
+    parsePublicData,
+    createTransaction
 }

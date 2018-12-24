@@ -51,12 +51,24 @@ impl PlasmaState {
         let verified_against = tx.cached_pub_key.as_ref().ok_or(())?;
         if pub_key.0 != verified_against.0 { return Err(()); }
 
-        if from.balance < tx.amount { return Err(()); }
-        if from.nonce != tx.nonce { return Err(()); }
+        if from.balance < tx.amount { 
+            println!("Insufficient balance");
+            return Err(()); 
+        }
+        if from.nonce != tx.nonce { 
+            println!("Nonce does not match");
+            return Err(()); 
+        }
 
         // update state
 
-        let mut to = self.balance_tree.items.get(&tx.to).ok_or(())?.clone();
+        // allow to send to non-existing accounts
+        // let mut to = self.balance_tree.items.get(&tx.to).ok_or(())?.clone();
+        
+        let mut to = Account::default();
+        if let Some(existing_to) = self.balance_tree.items.get(&tx.to) {
+            to = existing_to.clone();
+        }
         from.balance -= &tx.amount;
         
         // TODO: subtract fee

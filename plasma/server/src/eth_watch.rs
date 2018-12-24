@@ -60,7 +60,7 @@ impl EthWatch {
             }
         }
 
-        let this = Self{
+        let mut this = Self {
             last_processed_block: start,
             blocks_lag: lag,
             web3_url:       env::var("WEB3_URL").unwrap_or("http://localhost:8545".to_string()),
@@ -72,9 +72,19 @@ impl EthWatch {
             exit_batch_size: U256::from(config::EXIT_BATCH_SIZE),
         };
 
+        let (_eloop, transport) = web3::transports::Http::new(&this.web3_url).unwrap();
+        let web3 = web3::Web3::new(transport);
+        let contract = Contract::new(web3.eth(), this.contract_addr.clone(), this.contract.clone());
 
+        let last_deposit_batch_result: Result<U256, _> = contract.query("lastCommittedDepositBatch", (), None, Options::default(), Some(BlockNumber::Latest)).wait();
+        let last_exit_batch_result: Result<U256, _> = contract.query("lastCommittedExitBatch", (), None, Options::default(), Some(BlockNumber::Latest)).wait();
 
-        // TODO read the deposit and exit batch to start
+        if last_deposit_batch_result.is_err() || last_exit_batch_result.is_err() {
+            panic!("Can not get initial batch numbers");
+        }
+
+        this.last_deposit_batch = last_deposit_batch_result.unwrap();
+        this.last_exit_batch = last_exit_batch_result.unwrap();
 
         this
     }
@@ -98,7 +108,7 @@ impl EthWatch {
             if last_block_number.is_err() {
                 continue
             }
-            println!("Last block number = {}", last_block_number.clone().unwrap().as_u64());
+
             if last_block_number.unwrap().as_u64() == self.last_processed_block + self.blocks_lag {
                 continue
             }
@@ -131,8 +141,7 @@ impl EthWatch {
         contract: &Contract<T>)
     -> Result<(), ()>
     {
-        println!("Processing deposits");
-        println!("Checking for state for block {}", block_number);
+        println!("Processing deposits for block {}", block_number);
         let total_deposit_requests_result: Result<U256, _> = contract.query("totalDepositRequests", (), None, Options::default(), Some(BlockNumber::Number(block_number))).wait();
 
         if total_deposit_requests_result.is_err() {
@@ -144,7 +153,7 @@ impl EthWatch {
 
         let batch_number = total_deposit_requests / self.deposit_batch_size;
 
-        if batch_number == self.last_deposit_batch {
+        if batch_number <= self.last_deposit_batch {
             // this watcher is not responsible for bumping a batch number
             return Ok(());
         }
@@ -309,8 +318,7 @@ impl EthWatch {
     -> Result<(), ()>
     {
         use bigdecimal::Zero;
-        println!("Processing exits");
-        println!("Checking for state for block {}", block_number);
+        println!("Processing exits for block {}", block_number);
         let total_requests_result: Result<U256, _> = contract.query("totalExitRequests", (), None, Options::default(), Some(BlockNumber::Number(block_number))).wait();
 
         if total_requests_result.is_err() {
@@ -322,7 +330,7 @@ impl EthWatch {
 
         let batch_number = total_requests / self.exit_batch_size;
 
-        if batch_number == self.last_exit_batch {
+        if batch_number <= self.last_exit_batch {
             // this watcher is not responsible for bumping a batch number
             return Ok(());
         }
