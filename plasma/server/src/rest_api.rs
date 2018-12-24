@@ -2,7 +2,7 @@
 
 use std::sync::mpsc;
 use plasma::models::{TransferTx, PublicKey};
-use super::state_keeper::StateProcessingRequest;
+use super::models::StateProcessingRequest;
 
 use actix_web::{
     middleware, 
