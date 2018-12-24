@@ -5,10 +5,10 @@ use ff::{Field, PrimeField, PrimeFieldRepr};
 
 use std::env;
 use std::str::FromStr;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::Sender;
 use super::state_keeper::{StateProcessingRequest};
-use plasma::models::{Block, DepositBlock, DepositTx, Engine, Fr};
+use plasma::models::{Block, DepositBlock, DepositTx, ExitTx, ExitBlock, Engine, Fr};
 use bigdecimal::{Num, BigDecimal};
 use plasma::models::params;
 
@@ -147,11 +147,8 @@ impl EthWatch {
         println!("Last processed batch number = {}", self.last_deposit_batch);
 
         if batch_number == self.last_deposit_batch {
-            if time::Instant::now() >= self.last_deposit_batch_timestamp + self.batch_accumulation_duration {
-                // TODO: bump batch number or leave it for another service
-            } else {
-                return Ok(());
-            }
+            // this watcher is not responsible for bumping a batch number
+            return Ok(());
         }
 
         let deposit_event = self.contract.event("LogDepositRequest").unwrap().clone();
@@ -307,6 +304,172 @@ impl EthWatch {
         }
 
         self.last_deposit_batch = self.last_deposit_batch + U256::from(1);
+
+        Ok(())
+    }
+
+    fn process_exits<T: web3::Transport>(& mut self, 
+        block_number: u64, 
+        channel: &Sender<StateProcessingRequest>,
+        web3: &web3::Web3<T>,
+        contract: &Contract<T>)
+    -> Result<(), ()>
+    {
+        use bigdecimal::Zero;
+        println!("Checking for state for block {}", block_number);
+        let total_requests_result: Result<U256, _> = contract.query("totalExitRequests", (), None, Options::default(), Some(BlockNumber::Number(block_number))).wait();
+
+        if total_requests_result.is_err() {
+            println!("Error getting total exit requests {}", total_requests_result.err().unwrap());
+            return Err(());
+        }
+
+        println!("Checking a batch number");
+
+        let total_requests = total_requests_result.unwrap();
+
+        println!("Total exit requests = {}", total_requests);
+
+        let batch_number = total_requests / self.exit_batch_size;
+
+        println!("Batch number = {}", batch_number.clone());
+        println!("Last processed batch number = {}", self.last_exit_batch);
+
+        if batch_number == self.last_exit_batch {
+            // this watcher is not responsible for bumping a batch number
+            return Ok(());
+        }
+
+        let exit_event = self.contract.event("LogExitRequest").unwrap().clone();
+        let exit_event_topic = exit_event.signature();
+
+        let exit_canceled_event = self.contract.event("LogCancelExitRequest").unwrap().clone();
+        let exit_canceled_topic = exit_canceled_event.signature();
+
+        // event LogDepositRequest(uint256 indexed batchNumber, uint24 indexed accountID, uint256 indexed publicKey, uint128 amount);
+
+        let exits_filter = FilterBuilder::default()
+                    // .address(vec![contract.address()])
+                    .topics(
+                        Some(vec![exit_event_topic]),
+                        Some(vec![H256::from(self.last_exit_batch.clone())]),
+                        None,
+                        None,
+                    )
+                    .build();
+
+        let cancels_filter = FilterBuilder::default()
+            // .address(vec![contract.address()])
+            .topics(
+                Some(vec![exit_canceled_topic]),
+                Some(vec![H256::from(self.last_exit_batch.clone())]),
+                None,
+                None,
+            )
+            .build();
+
+        let exit_events_filter_result = web3.eth().logs(exits_filter).wait();
+        let cancel_events_filter_result = web3.eth().logs(cancels_filter).wait();
+
+        if exit_events_filter_result.is_err() || cancel_events_filter_result.is_err() {
+            println!("Error getting filter results");
+            return Err(());
+        }
+
+        let exit_events = exit_events_filter_result.unwrap();
+        let cancel_events = cancel_events_filter_result.unwrap();
+
+        println!("Exits in this block = {}", exit_events.len());
+        println!("Cancels in this block = {}", cancel_events.len());
+
+        // now we have to merge and apply
+        let mut all_events = vec![];
+        all_events.extend(exit_events.into_iter());
+        all_events.extend(cancel_events.into_iter());
+
+        all_events = all_events.into_iter().filter(|el| el.is_removed() == false).collect();
+
+        // sort by index
+
+        all_events.sort_by(|l, r| {
+            let l_block = l.block_number.unwrap();
+            let r_block = r.block_number.unwrap();
+
+            if l_block > r_block {
+                return std::cmp::Ordering::Greater;
+            } else if l_block < r_block {
+                return std::cmp::Ordering::Less;
+            }
+
+            let l_index = l.log_index.unwrap();
+            let r_index = r.log_index.unwrap();
+            if l_index > r_index {
+                return std::cmp::Ordering::Greater;
+            } else if l_index < r_index {
+                return std::cmp::Ordering::Less;
+            }
+
+            panic!("Logs can not have same indexes");
+        }        
+        );
+
+        // hashmap accoundID => (balance, public_key)
+        let mut this_batch: HashSet<U256> = HashSet::new();
+
+        for event in all_events {
+            let topic = event.topics[0];
+            match () {
+                () if topic == exit_event_topic => {
+                    let account_id = U256::from(event.topics[1]);
+                    println!("Exit from {:x}", account_id);
+                    let existing_record = this_batch.get(&account_id).map(|&v| v.clone());
+                    if let Some(record) = existing_record {
+                        // double exit should not be possible due to SC
+                        return Err(());
+                    } else {
+                        this_batch.insert(account_id);
+                    }
+                    continue;
+                },
+                () if topic == exit_canceled_topic => {
+                    let account_id = U256::from(event.topics[1]);
+                    let existing_record = this_batch.get(&account_id).map(|&v| v.clone()).ok_or(())?;
+                    this_batch.remove(&account_id);
+                    continue;
+                },
+                _ => return Err(()),
+            }
+        }
+        println!("Got batch");
+
+        let mut all_exits = vec![];
+        for k in this_batch.iter() {
+            println!("Exit from account {:x}", k);
+
+            let tx: ExitTx = ExitTx {
+                account: k.as_u32(),
+                amount:  BigDecimal::zero(),
+            };
+            all_exits.push(tx);
+        }
+
+        let block = ExitBlock {
+            block_number: 0,
+            transactions: all_exits,
+            new_root_hash: Fr::zero(),
+        };
+        let request = StateProcessingRequest::ApplyBlock(Block::Exit(block, batch_number.as_u32()), None);
+
+        println!("Sending request");
+
+        let send_result = channel.send(request);
+
+        if send_result.is_err() {
+            println!("Couldn't send for processing");
+            return Err(());
+        }
+
+        self.last_exit_batch = self.last_exit_batch + U256::from(1);
 
         Ok(())
     }
