@@ -1,4 +1,5 @@
 extern crate rustc_hex;
+// extern crate tokio_core;
 extern crate web3;
 
 use ff::{Field, PrimeField, PrimeFieldRepr};
@@ -7,15 +8,16 @@ use std::env;
 use std::str::FromStr;
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::Sender;
-use super::models::StateProcessingRequest;
-use plasma::models::{Block, DepositBlock, DepositTx, ExitTx, ExitBlock, Engine, Fr};
-use bigdecimal::{Num, BigDecimal};
+use super::state_keeper::{StateProcessingRequest, BlockSource};
+use plasma::models::{Block, DepositBlock, DepositTx, Engine, Fr, ExitBlock, ExitTx};
+use bigdecimal::{Num, BigDecimal, FromPrimitive, ToPrimitive};
 use plasma::models::params;
 
 use std::time;
+use rustc_hex::{FromHex, ToHex};
 use web3::contract::{Contract, Options};
-use web3::futures::{Future};
-use web3::types::{U256, H160, H256, U128, FilterBuilder, BlockNumber};
+use web3::futures::{Future, Stream};
+use web3::types::{Address, U256, H160, H256, U128, FilterBuilder, BlockNumber};
 use sapling_crypto::jubjub::{edwards, Unknown};
 
 type ABI = (&'static [u8], &'static str);
@@ -254,6 +256,7 @@ impl EthWatch {
                 },
                 () if topic == deposit_canceled_topic => {
                     let account_id = U256::from(event.topics[2]);
+                    let existing_record = this_batch.get(&account_id).map(|&v| v.clone()).ok_or(())?;
                     this_batch.remove(&account_id);
                     continue;
                 },
