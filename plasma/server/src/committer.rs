@@ -78,11 +78,9 @@ pub fn run_committer(rx_for_ops: Receiver<EthOperation>, tx_for_eth: Sender<(Eth
     let storage = StorageConnection::new();
     for op in rx_for_ops {
         // persist in storage first
-        
-        // TODO: with postgres transaction
         let committed_op = storage.commit_op(&op).expect("db must be functional");
 
-        // submit to eth
+        // then submit to eth
         tx_for_eth.send((op, TxMeta{
             addr:   committed_op.addr, 
             nonce:  committed_op.nonce as u32,

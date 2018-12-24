@@ -1,6 +1,6 @@
 # Plasma Server
 
-## Install for testing
+## Setup for testing
 
 - Install postgres locally
 - Install diesel-cli:
