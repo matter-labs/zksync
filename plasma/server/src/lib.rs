@@ -1,12 +1,9 @@
-#![allow(unused_imports)]
-#![allow(unused_variables)]
-#![allow(dead_code)]
-#![allow(unused_must_use)]
-#![allow(unused_assignments)]
+
 #![allow(proc_macro_derive_resolution_fallback)]
 
 pub mod runner;
 
+mod models;
 mod rest_api;
 mod state_keeper;
 mod prover;
@@ -29,22 +26,11 @@ extern crate crypto;
 extern crate fnv;
 
 extern crate futures;
-extern crate futures_cpupool;
-extern crate crossbeam;
-extern crate crossbeam_utils;
-extern crate rayon;
-extern crate tokio;
-
-extern crate ethereum_types;
-extern crate ethabi;
-extern crate rustc_hex;
 extern crate web3;
-extern crate ethereum_tx_sign;
 
 extern crate hyper;
 extern crate serde;
 extern crate serde_json;
-extern crate reqwest;
 
 extern crate actix;
 extern crate actix_web;
@@ -57,9 +43,3 @@ extern crate serde_bytes;
 extern crate diesel;
 extern crate dotenv;
 extern crate bigdecimal;
-
-#[macro_use]
-extern crate smart_default;
-
-#[macro_use]
-extern crate lazy_static;

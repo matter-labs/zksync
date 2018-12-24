@@ -1,12 +1,9 @@
-use pairing::bn256::{Bn256, Fr};
-use sapling_crypto::jubjub::{edwards, Unknown, FixedGenerators};
+use pairing::bn256::{Bn256};
+use sapling_crypto::jubjub::{FixedGenerators};
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 
-use plasma::primitives::{field_element_to_u32, field_element_to_u128, pack_edwards_point};
-use plasma::circuit::utils::{le_bit_vector_into_field_element};
-use std::{thread, time};
+use std::{thread};
 use std::collections::HashMap;
-use ff::{Field, PrimeField};
 use rand::{OsRng};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 use web3::types::{U128, H256};
@@ -14,7 +11,7 @@ use std::str::FromStr;
 
 use plasma::models::{self, *};
 
-use super::committer::{Operation, EthBlockData};
+use super::models::{EthOperation, EthBlockData};
 use super::prover::BabyProver;
 use super::storage::StorageConnection;
 
@@ -24,16 +21,7 @@ use std::sync::mpsc::{Sender, Receiver};
 use fnv::FnvHashMap;
 use bigdecimal::BigDecimal;
 
-// MemPool will provide a channel to return result of block processing
-// In case of error, block is returned with invalid transactions removed
-pub type BlockSource = Option<Sender<Result<(),Block>>>;
-
-//pub struct StateProcessingRequest(pub Block, pub BlockSource);
-
-pub enum StateProcessingRequest{
-    ApplyBlock(Block, BlockSource),
-    GetPubKey(u32, Sender<Option<models::PublicKey>>),
-}
+use super::models::StateProcessingRequest;
 
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
@@ -69,7 +57,7 @@ impl PlasmaStateKeeper {
 
             keys_map.insert(i, sk);
 
-            let serialized_public_key = pack_edwards_point(pk.0).unwrap();
+            //let serialized_public_key = pack_edwards_point(pk.0).unwrap();
 
             let leaf = Account {
                 balance:    default_balance.clone(),
@@ -118,7 +106,7 @@ impl PlasmaStateKeeper {
 
     fn run(&mut self, 
         rx_for_blocks: Receiver<StateProcessingRequest>, 
-        tx_for_commitments: Sender<Operation>,
+        tx_for_commitments: Sender<EthOperation>,
         tx_for_proof_requests: Sender<(u32, Block, EthBlockData, AccountMap)>)
     {
         for req in rx_for_blocks {
@@ -134,26 +122,26 @@ impl PlasmaStateKeeper {
                             self.state.block_number += 1;
 
                             // make commitment
-                            let op = Operation::Commit{
+                            let op = EthOperation::Commit{
                                 block_number:   self.state.block_number,
                                 new_root,
                                 block_data: block_data.clone(),
                                 accounts_updated: accounts_updated.clone(),
                             };
-                            tx_for_commitments.send(op);
+                            tx_for_commitments.send(op).expect("queue must work");
 
                             // start making proof
-                            tx_for_proof_requests.send((self.state.block_number, block, block_data, accounts_updated));
+                            tx_for_proof_requests.send((self.state.block_number, block, block_data, accounts_updated)).expect("queue must work");
                             Ok(())
                         },
                         Err(_) => Err(block),
                     };
                     if let Some(sender) = source {
-                        sender.send(result);
+                        sender.send(result).expect("queue must work");
                     }
                 },
                 StateProcessingRequest::GetPubKey(account_id, sender) => {
-                    sender.send(self.state.get_pub_key(account_id));
+                    sender.send(self.state.get_pub_key(account_id)).expect("queue must work");
                 },
             }
         }
@@ -211,7 +199,7 @@ impl PlasmaStateKeeper {
 
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
         for tx in block.transactions.iter() {
-            self.state.apply_deposit(&tx);
+            self.state.apply_deposit(&tx).expect("queue must work");
 
             // collect updated state
             updated_accounts.insert(tx.account, self.account(tx.account));
@@ -228,7 +216,7 @@ impl PlasmaStateKeeper {
 
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
         for tx in block.transactions.iter() {
-            self.state.apply_exit(&tx);
+            self.state.apply_exit(&tx).expect("queue must work");
 
             // collect updated state
             updated_accounts.insert(tx.account, self.account(tx.account));
@@ -262,8 +250,6 @@ impl PlasmaStateKeeper {
 
         let mut tx_fr = models::circuit::TransferTx::try_from(tx).unwrap();
         tx_fr.sign(sk, p_g, &params::JUBJUB_PARAMS, &mut rng);
-
-        let (x, y) = tx_fr.signature.r.into_xy();
         tx.signature = TxSignature::try_from(tx_fr.signature).expect("serialize signature");
     }
 
@@ -271,7 +257,7 @@ impl PlasmaStateKeeper {
 
 pub fn start_state_keeper(mut sk: PlasmaStateKeeper, 
     rx_for_blocks: Receiver<StateProcessingRequest>, 
-    tx_for_commitments: Sender<Operation>,
+    tx_for_commitments: Sender<EthOperation>,
     tx_for_proof_requests: Sender<(u32, Block, EthBlockData, AccountMap)>)
 {
     thread::spawn(move || {

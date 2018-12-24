@@ -1,6 +1,5 @@
 use ff::{PrimeField, BitIterator};
 use sapling_crypto::jubjub::JubjubEngine;
-use sapling_crypto::eddsa::PublicKey;
 use crate::models::params;
 
 #[derive(Clone)]

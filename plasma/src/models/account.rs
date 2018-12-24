@@ -1,10 +1,10 @@
-use crate::primitives::{GetBits, GetBitsFixed};
+use crate::primitives::{GetBits};
 use bigdecimal::BigDecimal;
 use super::circuit;
 
 use super::{Engine, Fr};
 
-#[derive(Debug, Clone, Default, Queryable, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Account {
     pub balance:    BigDecimal,
     pub nonce:      u32,
@@ -31,5 +31,5 @@ impl GetBits for Account {
 #[test]
 fn test_default_account() {
     let a = Account::default();
-    let bits = a.get_bits_le();
+    a.get_bits_le();
 }

@@ -2,7 +2,7 @@
 
 use std::sync::mpsc;
 use plasma::models::{TransferTx, PublicKey};
-use super::state_keeper::StateProcessingRequest;
+use super::models::StateProcessingRequest;
 
 use actix_web::{
     middleware, 
@@ -48,7 +48,7 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
             // TODO: the code below will block the current thread; switch to futures instead
             let (key_tx, key_rx) = mpsc::channel();
             let request = StateProcessingRequest::GetPubKey(tx.from, key_tx);
-            tx_for_state.send(request);
+            tx_for_state.send(request).expect("queue must work");
             // now wait for state_keeper to return a result
             let pub_key: Option<PublicKey> = key_rx.recv().unwrap();
                         
@@ -56,7 +56,7 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
             if accepted {
                 let mut tx = tx.clone();
                 tx.cached_pub_key = pub_key;
-                tx_for_tx.send(tx); // pass to mem_pool
+                tx_for_tx.send(tx).expect("queue must work"); // pass to mem_pool
             }
             let resp = TransactionResponse{
                 accepted

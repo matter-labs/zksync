@@ -9,7 +9,7 @@ use web3::contract::tokens::Tokenize;
 use std::env;
 use std::str::FromStr;
 
-use ethereum_types::{U256, H160, H256, U128};
+use ethereum_types::{U256, H160, H256};
 
 type Result<T> = std::result::Result<T, Box<std::error::Error>>;
 
@@ -44,10 +44,6 @@ pub struct ETHClient {
     nonce:          U256
 }
 
-fn expect_env(name: &'static str) -> String {
-    env::var(name).expect(&format!("`{}` env var must be set", name))
-}
-
 /// ETH client for Plasma contract
 /// All methods are blocking for now
 impl ETHClient {
@@ -76,7 +72,7 @@ impl ETHClient {
         format!("0x{}", self.sender_account)
     }
 
-    pub fn call<P: Tokenize>(&mut self, method: &str, meta: TxMeta, params: P) -> Result<H256> {
+    pub fn call<P: Tokenize>(&mut self, method: &str, _meta: TxMeta, params: P) -> Result<H256> {
 
         let f = self.contract.function(method).unwrap();
         let data = f.encode_input( &params.into_tokens() ).unwrap();
