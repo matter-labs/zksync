@@ -14,7 +14,6 @@ use bigdecimal::{Num, BigDecimal, FromPrimitive, ToPrimitive};
 use plasma::models::params;
 
 use std::time;
-use rustc_hex::{FromHex, ToHex};
 use web3::contract::{Contract, Options};
 use web3::futures::{Future, Stream};
 use web3::types::{Address, U256, H160, H256, U128, FilterBuilder, BlockNumber};

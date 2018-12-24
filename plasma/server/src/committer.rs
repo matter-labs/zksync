@@ -17,7 +17,8 @@ pub struct BlockProof(pub EncodedProof, pub Vec<(u32, Account)>);
 pub enum EthBlockData {
     Transfer{
         total_fees:     U128,
-        // TODO: with serde bytes
+        
+        #[serde(with = "serde_bytes")]
         public_data:    Vec<u8>,
     },
     Deposit{

@@ -4,7 +4,7 @@ use super::circuit;
 
 use super::{Engine, Fr};
 
-#[derive(Debug, Clone, Default, Queryable, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Account {
     pub balance:    BigDecimal,
     pub nonce:      u32,
