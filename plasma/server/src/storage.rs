@@ -16,8 +16,9 @@ pub struct StorageConnection {
 #[derive(Insertable, QueryableByName)]
 #[table_name="accounts"]
 struct Account {
-    pub id:     i32,
-    pub data:   Value,
+    pub id:         i32,
+    pub last_block: i32,
+    pub data:       Value,
 }
 
 #[derive(Insertable, Queryable)]
@@ -37,7 +38,7 @@ struct NewOperation {
 impl StorageConnection {
 
     /// creates a single db connection; it's safe to create multiple instances of StorageConnection
-    pub fn new() -> Self {
+   pub fn new() -> Self {
         Self{
             conn: Self::establish_connection()
         }
@@ -83,11 +84,15 @@ impl StorageConnection {
 
     fn apply_state_update(&self, block_number: u32) -> QueryResult<()> {
         let update = format!("
-            INSERT INTO accounts (id, data)
-            SELECT account_id AS id, data FROM account_updates
+            INSERT INTO accounts (id, last_block, data)
+            SELECT 
+                account_id AS id, 
+                block_number as last_block, 
+                data FROM account_updates
             WHERE account_updates.block_number = {}
             ON CONFLICT (id) 
-            DO UPDATE SET data = EXCLUDED.data", block_number);
+            DO UPDATE 
+            SET data = EXCLUDED.data", block_number);
         diesel::sql_query(update.as_str())
             .execute(&self.conn)
             .map(|_|())
@@ -95,11 +100,16 @@ impl StorageConnection {
 
     pub fn load_committed_state(&self) -> AccountMap {
 
-        // let _last_verified_block = 0; // TODO: load from db or do in the select?
-
-        // TODO: select basis from accounts, 
-        // but newer state from account_updates for all updates after the last committed block
-        const SELECT: &str = "SELECT * FROM accounts";
+        // select basis from accounts and join newer state from account_updates for all updates after the last committed block
+        const SELECT: &str = "
+        SELECT 
+            COALESCE(id, u.account_id) AS id,
+            COALESCE(u.block_number, a.last_block) AS last_block,   
+            COALESCE(u.data, a.data) AS data   
+        FROM accounts a
+        FULL JOIN account_updates u 
+        ON a.id = u.account_id 
+        AND u.block_number > (SELECT COALESCE(max(last_block), 0) FROM accounts)";
 
         let accounts: Vec<Account> = 
             diesel::sql_query(SELECT)
@@ -155,11 +165,12 @@ fn test_store_state() {
     // this will revert db after test
     conn.conn.begin_test_transaction().unwrap();
 
-    //use diesel::RunQueryDsl;
-    //diesel::sql_query("delete from accounts")
+    // uncomment below for debugging to generate initial state
+    // use diesel::RunQueryDsl;
+    // diesel::sql_query("delete from accounts")
     //    .execute(&conn.conn)
     //    .expect("must work");
-    //diesel::sql_query("delete from account_updates")
+    // diesel::sql_query("delete from account_updates")
     //    .execute(&conn.conn)
     //    .expect("must work");
 
@@ -170,9 +181,10 @@ fn test_store_state() {
         a
     };
 
-    // commit test update
+    // commit initial state update
     accounts.insert(1, acc(1));
     accounts.insert(2, acc(2));
+    accounts.insert(3, acc(3));
     conn.commit_state_update(1, &accounts).unwrap();
 
     let state = load_verified_state(&conn);
@@ -192,6 +204,10 @@ fn test_store_state() {
     assert_eq!(
         state.into_iter().collect::<Vec<(u32, models::Account)>>(), 
         accounts.into_iter().collect::<Vec<(u32, models::Account)>>());
+
+
+    // commit second state update
+    // ...
 }
 
 }
