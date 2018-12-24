@@ -11,7 +11,7 @@ contract PlasmaStorage {
 
     // Plasma itself
 
-    uint32 constant DEADLINE = 3600; // seconds, to define
+    uint256 public constant DEADLINE = 3600;
 
     event BlockCommitted(uint32 indexed blockNumber);
     event BlockVerified(uint32 indexed blockNumber);
@@ -109,18 +109,17 @@ contract PlasmaStorage {
 
     // Transfers
 
-    uint256 constant TRANSFER_BLOCK_SIZE = 128;
+    uint256 public constant TRANSFER_BLOCK_SIZE = 128;
 
     mapping (uint32 => mapping (uint24 => uint128)) public partialExits;
-
 
     // Exits 
 
     uint256 constant EXIT_BATCH_SIZE = 1;
-    uint256 totalExitRequests; 
-    uint256 lastCommittedExitBatch;
-    uint256 lastVerifiedExitBatch;
-    uint128 currentExitBatchFee; 
+    uint256 public totalExitRequests; 
+    uint256 public lastCommittedExitBatch;
+    uint256 public lastVerifiedExitBatch;
+    uint128 public currentExitBatchFee; 
 
     uint24 public constant SPECIAL_ACCOUNT_EXITS = 0;
 

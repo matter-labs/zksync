@@ -64,7 +64,7 @@ impl EthWatch {
             last_processed_block: start_from_block,
             blocks_lag: lag,
             web3_url:       env::var("WEB3_URL").unwrap_or("http://localhost:8545".to_string()),
-            contract_addr:  H160::from_str(&env::var("CONTRACT_ADDR").unwrap_or("3DA3851520A15F7a1D60Ac059b705B26f59Ed634".to_string())).unwrap(),
+            contract_addr:  H160::from_str(&env::var("CONTRACT_ADDR").unwrap_or("4169D71D56563eA9FDE76D92185bEB7aa1Da6fB8".to_string())).unwrap(),
             contract:       ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap(),
             last_deposit_batch_timestamp: time::Instant::now(),
             last_exit_batch_timestamp: time::Instant::now(),
@@ -74,7 +74,7 @@ impl EthWatch {
             current_deposit_batch_fee: U128::from(0),
             current_exit_batch_fee: U128::from(0),
             deposit_batch_size: U256::from(1),
-            exit_batch_size: U256::from(0),
+            exit_batch_size: U256::from(1),
         };
 
         // TODO read the deposit and exit batch to start
@@ -108,6 +108,11 @@ impl EthWatch {
 
             let block_number = self.last_processed_block + self.blocks_lag + 1;
 
+            let exits_result = self.process_exits(block_number, &tx_for_blocks, &web3, &contract);
+            if exits_result.is_err() {
+                continue
+            }
+
             let deposits_result = self.process_deposits(block_number, &tx_for_blocks, &web3, &contract);
             if deposits_result.is_err() {
                 continue
@@ -129,6 +134,7 @@ impl EthWatch {
         contract: &Contract<T>)
     -> Result<(), ()>
     {
+        println!("Processing deposits");
         println!("Checking for state for block {}", block_number);
         let total_deposit_requests_result: Result<U256, _> = contract.query("totalDepositRequests", (), None, Options::default(), Some(BlockNumber::Number(block_number))).wait();
 
@@ -192,8 +198,8 @@ impl EthWatch {
         let deposit_events = deposit_events_filter_result.unwrap();
         let cancel_events = cancel_events_filter_result.unwrap();
 
-        println!("Deposits in this block = {}", deposit_events.len());
-        println!("Cancels in this block = {}", cancel_events.len());
+        println!("Deposits in batch {} = {}", self.last_deposit_batch, deposit_events.len());
+        println!("Cancels in batch {} = {}", self.last_deposit_batch, cancel_events.len());
 
         // now we have to merge and apply
         let mut all_events = vec![];
@@ -319,6 +325,7 @@ impl EthWatch {
     -> Result<(), ()>
     {
         use bigdecimal::Zero;
+        println!("Processing exits");
         println!("Checking for state for block {}", block_number);
         let total_requests_result: Result<U256, _> = contract.query("totalExitRequests", (), None, Options::default(), Some(BlockNumber::Number(block_number))).wait();
 
@@ -488,7 +495,7 @@ pub fn start_eth_watch(mut eth_watch: EthWatch, tx_for_blocks: Sender<StateProce
 #[test]
 fn test_eth_watcher() {
 
-    let mut client = EthWatch::new(0, 0);
+    let mut client = EthWatch::new(3, 0);
     let (tx_for_state, rx_for_state) = std::sync::mpsc::channel::<StateProcessingRequest>();
 
     client.run(tx_for_state);

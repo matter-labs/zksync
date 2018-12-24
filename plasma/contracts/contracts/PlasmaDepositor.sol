@@ -56,7 +56,7 @@ contract PlasmaDepositor is Plasma {
         // get request in this batch for this account
         DepositRequest storage request = depositRequests[currentBatch][accountID];
         
-        if(request.amount == 0) {
+        if (request.amount == 0) {
             // this is a new request in this batch
             batch.numRequests++;
             totalDepositRequests++;
