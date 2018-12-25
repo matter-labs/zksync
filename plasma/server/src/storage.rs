@@ -124,7 +124,7 @@ impl StorageConnection {
     }
 
     pub fn reset_op_config(&self, addr: &str, nonce: u32) -> QueryResult<()> {
-        diesel::sql_query("DELETE FROM operations").execute(&self.conn)?;
+        diesel::sql_query(format!("DELETE FROM operations WHERE nonce >= {}", nonce as i32).as_str()).execute(&self.conn)?;
         diesel::sql_query(format!("UPDATE op_config SET addr = '{}', next_nonce = {}", addr, nonce as i32).as_str())
             .execute(&self.conn)
             .map(|_|())
