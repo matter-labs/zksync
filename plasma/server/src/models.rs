@@ -48,7 +48,7 @@ pub enum EthOperation {
     // ...
 }
 
-#[derive(Queryable)]
+#[derive(Debug, Queryable)]
 pub struct StoredOperation {
     pub id:         i32,
     pub data:       serde_json::Value,

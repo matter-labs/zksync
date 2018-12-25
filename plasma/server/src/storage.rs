@@ -127,7 +127,7 @@ impl StorageConnection {
     pub fn load_pendings_ops(&self, current_nonce: u32) -> Vec<StoredOperation> {
         use crate::schema::operations::dsl::*;
         operations
-            .filter(nonce.gt(current_nonce as i32)) // WHERE nonce > current_nonce
+            .filter(nonce.ge(current_nonce as i32)) // WHERE nonce >= current_nonce
             .load(&self.conn)
             .expect("db is expected to be functional at sever startup")
     }
@@ -139,6 +139,9 @@ mod test {
 
 use diesel::prelude::*;
 use plasma::models::{self, AccountMap};
+use diesel::Connection;
+use bigdecimal::BigDecimal;
+use diesel::RunQueryDsl;
 
 fn load_verified_state(conn: &super::StorageConnection) -> AccountMap {
     let accounts: Vec<super::Account> = 
@@ -156,17 +159,11 @@ fn load_verified_state(conn: &super::StorageConnection) -> AccountMap {
 
 #[test]
 fn test_store_state() {
-
-    use bigdecimal::BigDecimal;
     
     let conn = super::StorageConnection::new();
-
-    use diesel::Connection;
-    // this will revert db after test
-    conn.conn.begin_test_transaction().unwrap();
+    conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
 
     // uncomment below for debugging to generate initial state
-    use diesel::RunQueryDsl;
     diesel::sql_query("delete from accounts")
        .execute(&conn.conn)
        .expect("must work");
@@ -215,6 +212,42 @@ fn test_store_state() {
     assert_eq!(load_verified_state(&conn).len(), 3);
     assert_eq!(conn.load_committed_state().len(), 4);
 
+}
+
+use crate::models::{EthOperation, EthBlockData};
+use web3::types::{U256, H256};
+
+#[test]
+fn test_store_ops() {
+
+    let conn = super::StorageConnection::new();
+    conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
+
+    let commit = conn.commit_op(&EthOperation::Commit{
+        block_number:       1, 
+        new_root:           H256::zero(), 
+        block_data:         EthBlockData::Deposit{batch_number: 0}, 
+        accounts_updated:   fnv::FnvHashMap::default()
+    }).unwrap();
+
+    let verify = conn.commit_op(&EthOperation::Verify{
+        block_number:       1, 
+        proof:              [U256::zero(); 8], 
+        block_data:         EthBlockData::Deposit{batch_number: 0}, 
+        accounts_updated:   fnv::FnvHashMap::default()
+    }).unwrap();
+
+    let pending = conn.load_pendings_ops(0);
+    assert_eq!(pending.len(), 2);
+    assert_eq!(pending[0].nonce, 0);
+    assert_eq!(pending[1].nonce, 1);
+
+    let pending = conn.load_pendings_ops(1);
+    assert_eq!(pending.len(), 1);
+    assert_eq!(pending[0].nonce, 1);
+
+    let pending = conn.load_pendings_ops(2);
+    assert_eq!(pending.len(), 0);
 }
 
 }

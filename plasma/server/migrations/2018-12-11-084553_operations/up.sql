@@ -1,8 +1,31 @@
+CREATE TABLE op_config(
+    addr        text primary key,
+    next_nonce  integer
+);
+INSERT INTO op_config VALUES ('0x0', 0);
+CREATE RULE noins_op_config AS ON INSERT TO op_config DO NOTHING;
+CREATE RULE nodel_op_config AS ON DELETE TO op_config DO NOTHING;
+
+CREATE OR REPLACE FUNCTION op_config_next_nonce() RETURNS integer AS
+$$
+BEGIN
+    UPDATE op_config SET next_nonce = next_nonce + 1;
+    RETURN (SELECT next_nonce - 1 from op_config);
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION op_config_addr() RETURNS text AS
+$$
+BEGIN
+    RETURN (SELECT addr from op_config);
+END;
+$$ LANGUAGE 'plpgsql';
+
 CREATE TABLE operations (
     id              serial primary key,
     data            jsonb not null,
-    addr            text not null,
-    nonce           serial not null,
+    addr            text not null default op_config_addr(),
+    nonce           integer not null default op_config_next_nonce(),
     created_at      timestamp not null default now()
 );
 
@@ -22,3 +45,4 @@ CREATE TABLE account_updates (
 );
 
 CREATE INDEX account_updates_block_index ON account_updates (block_number);
+
