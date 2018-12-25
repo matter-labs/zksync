@@ -108,8 +108,9 @@ contract PlasmaExitor is Plasma {
     
     function commitExitBlock(
         uint256 batchNumber,
+        uint24[EXIT_BATCH_SIZE] memory accoundIDs, 
         uint32 blockNumber, 
-        bytes32 publicDataCommitment,
+        bytes memory txDataPacked, 
         bytes32 newRoot
     ) 
     public 
@@ -123,6 +124,8 @@ contract PlasmaExitor is Plasma {
         batch.blockNumber = blockNumber;
         batch.timestamp = uint64(block.timestamp);
                 
+        bytes32 publicDataCommitment = createPublicDataCommitmentForExit(blockNumber, txDataPacked);
+
         blocks[blockNumber] = Block(
             uint8(Circuit.EXIT), 
             uint64(block.timestamp + MAX_DELAY), 
@@ -134,15 +137,16 @@ contract PlasmaExitor is Plasma {
         emit BlockCommitted(blockNumber);
         lastCommittedBlockNumber++;
         lastCommittedExitBatch++;
+
+        // process the block information
+        processExitBlockData(batchNumber, blockNumber, accoundIDs, txDataPacked);
     }
 
     // exit block is special - to avoid storge writes an exit data is sent on verification,
     // but not on commitment
     function verifyExitBlock(
         uint256 batchNumber, 
-        uint24[EXIT_BATCH_SIZE] memory accoundIDs, 
         uint32 blockNumber, 
-        bytes memory txDataPacked, 
         uint256[8] memory proof
     ) 
     public 
@@ -151,11 +155,9 @@ contract PlasmaExitor is Plasma {
         require(lastVerifiedBlockNumber < lastCommittedBlockNumber, "no committed block to verify");
         require(blockNumber == lastVerifiedBlockNumber + 1, "may only verify next block");
         require(batchNumber == lastVerifiedExitBatch, "trying to prove batch out of order");
-        bytes32 publicDataCommitment = createPublicDataCommitmentForExit(blockNumber, txDataPacked);
 
         Block storage committed = blocks[blockNumber];
         require(committed.circuit == uint8(Circuit.EXIT), "trying to prove the invalid circuit for this block number");
-        require(committed.publicDataCommitment == publicDataCommitment, "public data is different with a committment");
 
         ExitBatch storage batch = exitBatches[batchNumber];
         require(batch.blockNumber == blockNumber, "block number in referencing invalid batch number");
@@ -176,14 +178,13 @@ contract PlasmaExitor is Plasma {
         lastVerifiedBlockNumber++;
         lastVerifiedExitBatch++;
         lastVerifiedRoot = committed.newRoot;
-
-        // process the block information
-        processExitBlockData(batchNumber, accoundIDs, txDataPacked);
     }
 
     // transaction data is trivial: 3 bytes of in-plasma address, 16 bytes of amount
+    // same a for partial exits - write to storage, so users can pull the balances later
     function processExitBlockData(
         uint256 batchNumber, 
+        uint32 blockNumber,
         uint24[EXIT_BATCH_SIZE] memory accountIDs, 
         bytes memory txData
     ) 
@@ -212,10 +213,26 @@ contract PlasmaExitor is Plasma {
 
             accountOwner = accounts[accountIDs[i]].owner;
             scaledAmount = uint128(chunk << 24 >> 128);
-
-            delete accounts[accountIDs[i]];
+            fullExits[blockNumber][accountIDs[i]] = scaledAmount;
 
             accountOwner.transfer(scaleFromPlasmaUnitsIntoWei(scaledAmount));
         }
+    }
+
+    function withdrawFullExitBalance(
+        uint32 blockNumber
+    )
+    public
+    {
+        uint24 accountID = ethereumAddressToAccountID[msg.sender];
+        require(accountID != 0, "trying to access a non-existent account");
+        require(blockNumber <= lastVerifiedBlockNumber, "can only process exits from verified blocks");
+        uint128 balance = fullExits[blockNumber][accountID];
+        require(balance != 0, "nothing to exit");
+        delete fullExits[blockNumber][accountID];
+        uint256 amountInWei = scaleFromPlasmaUnitsIntoWei(balance);
+        delete accounts[accountID];
+        delete ethereumAddressToAccountID[msg.sender];
+        msg.sender.transfer(amountInWei);
     }
 }

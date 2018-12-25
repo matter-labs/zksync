@@ -110,7 +110,7 @@ contract PlasmaStorage {
     // Transfers
 
     uint256 public constant TRANSFER_BLOCK_SIZE = 128;
-
+    // mapping block number => account => balance
     mapping (uint32 => mapping (uint24 => uint128)) public partialExits;
 
     // Exits 
@@ -125,6 +125,8 @@ contract PlasmaStorage {
 
     // batches for complete exits
     mapping (uint256 => ExitBatch) public exitBatches;
+    // mapping block number => account => balance
+    mapping (uint32 => mapping (uint24 => uint128)) public fullExits;
 
     enum ExitBatchState {
         CREATED,
