@@ -23,7 +23,7 @@ use plasma::models::circuit::{Account, AccountTree};
 
 use super::config::{TRANSFER_BATCH_SIZE, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE};
 
-use super::models::{EncodedProof, EthOperation, EthBlockData};
+use super::models::{EncodedProof, Operation, Action, EthBlockData};
 
 use plasma::circuit::utils::be_bit_vector_into_bytes;
 use plasma::circuit::transfer::transaction::{Transaction};
@@ -900,15 +900,17 @@ impl BabyProver {
     fn run(
             &mut self,
             rx_for_blocks: mpsc::Receiver<(u32, Block, EthBlockData, AccountMap)>, 
-            tx_for_ops: mpsc::Sender<EthOperation>
+            tx_for_ops: mpsc::Sender<Operation>
         ) 
     {
         for (block_number, block, block_data, accounts_updated) in rx_for_blocks {
             println!("Got request for proof");
             let proof = self.apply_and_prove(block).unwrap();
-            tx_for_ops.send(EthOperation::Verify{
+            tx_for_ops.send(Operation{
+                action: Action::Verify{
+                    proof: Self::encode_proof(&proof).unwrap(),
+                },
                 block_number,
-                proof:              Self::encode_proof(&proof).unwrap(),
                 block_data,         
                 accounts_updated,
             }).expect("queue must work");
@@ -919,7 +921,7 @@ impl BabyProver {
 pub fn start_prover(
         mut prover: BabyProver,
         rx_for_blocks: mpsc::Receiver<(u32, Block, EthBlockData, AccountMap)>, 
-        tx_for_ops: mpsc::Sender<EthOperation>
+        tx_for_ops: mpsc::Sender<Operation>
     ) 
 {
     std::thread::Builder::new().name("prover".to_string()).spawn(move || {

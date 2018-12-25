@@ -30,9 +30,9 @@ pub fn run() {
     start_mem_pool(mem_pool, rx_for_tx, tx_for_state.clone());
     start_eth_watch(eth_watch, tx_for_state);
     
-    start_state_keeper(state_keeper, rx_for_state, tx_for_ops.clone(), tx_for_proof_requests);
+    start_state_keeper(state_keeper, rx_for_state, tx_for_ops.clone());
     start_prover(prover, rx_for_proof_requests, tx_for_ops);
 
     let tx_for_eth = committer::start_eth_sender();
-    committer::run_committer(rx_for_ops, tx_for_eth);
+    committer::run_committer(rx_for_ops, tx_for_eth, tx_for_proof_requests);
 }
