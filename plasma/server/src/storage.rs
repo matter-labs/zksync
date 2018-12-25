@@ -32,8 +32,8 @@ struct AccountUpdate {
 #[derive(Insertable)]
 #[table_name="operations"]
 struct NewOperation {
-    pub addr:   String,
-    pub data:   Value,
+    pub data:           Value,
+    pub block_number:   i32,
 }
 
 impl StorageConnection {
@@ -63,7 +63,10 @@ impl StorageConnection {
                 _ => unimplemented!(),
             };
             diesel::insert_into(operations::table)
-                .values(&NewOperation{ addr: "0x0".to_string(), data: serde_json::to_value(&op).unwrap() })
+                .values(&NewOperation{ 
+                    block_number:   op.block_number as i32,
+                    data:           serde_json::to_value(&op).unwrap(), 
+                })
                 .get_result(&self.conn)
         })
     }

@@ -50,9 +50,10 @@ pub struct Operation {
 
 #[derive(Debug, Queryable)]
 pub struct StoredOperation {
-    pub id:         i32,
-    pub data:       serde_json::Value,
-    pub addr:       String,
-    pub nonce:      i32,
-    pub created_at: std::time::SystemTime,
+    pub id:             i32,
+    pub data:           serde_json::Value,
+    pub addr:           String,
+    pub nonce:          i32,
+    pub block_number:   i32,
+    pub created_at:     std::time::SystemTime,
 }

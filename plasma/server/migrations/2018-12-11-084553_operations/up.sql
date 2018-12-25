@@ -26,6 +26,7 @@ CREATE TABLE operations (
     data            jsonb not null,
     addr            text not null default op_config_addr(),
     nonce           integer not null default op_config_next_nonce(),
+    block_number    integer not null,
     created_at      timestamp not null default now()
 );
 
