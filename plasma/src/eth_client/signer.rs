@@ -29,6 +29,19 @@ pub struct RawTransaction {
     pub data: Vec<u8>
 }
 
+fn find_first_nonzero(vector: & Vec<u8>) -> usize {
+    let mut result: usize = 0;
+    for el in vector {
+        if *el == 0 {
+            result += 1;
+        } else {
+            break;
+        }
+    }
+
+    result
+}
+
 impl RawTransaction {
     /// Signs and returns the RLP-encoded transaction
     pub fn sign(&self, private_key: &H256) -> Vec<u8> {
@@ -38,8 +51,18 @@ impl RawTransaction {
         tx.begin_unbounded_list();
         self.encode(&mut tx);
         tx.append(&sig.v); 
-        tx.append(&sig.r); 
-        tx.append(&sig.s); 
+        let r_start = find_first_nonzero(&sig.r);
+        println!("R has {} leading zeroes", r_start);
+        let r = &sig.r.clone()[r_start..];
+        tx.append(&r); 
+        let s_start = find_first_nonzero(&sig.s);
+        println!("S has {} leading zeroes", s_start);
+        let s = &sig.s.clone()[s_start..];
+        tx.append(&s); 
+        
+        // tx.append(&sig.r);
+        // tx.append(&sig.s);
+
         tx.complete_unbounded_list();
         tx.out()
     }
