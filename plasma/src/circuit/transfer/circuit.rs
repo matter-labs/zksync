@@ -234,9 +234,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for Transfer<'a, E> {
         total_fees_bits.reverse();
         initial_hash_data.extend(total_fees_bits.into_iter());
 
-        // println!("Initial hash data");
-        // print_boolean_vector(&initial_hash_data);
-
         assert_eq!(initial_hash_data.len(), 512);
 
         let mut hash_block = sha256::sha256(
@@ -247,9 +244,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for Transfer<'a, E> {
         let mut pack_bits = vec![];
         pack_bits.extend(hash_block);
         pack_bits.extend(public_data_vector.into_iter());
-
-        // println!("Packed public data");
-        // print_boolean_vector(&pack_bits);
 
         hash_block = sha256::sha256(
             cs.namespace(|| "hash public data"),

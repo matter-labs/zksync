@@ -461,8 +461,8 @@ impl BabyProver {
 
         let bytes_to_hash = be_bit_vector_into_bytes(&public_data_initial_bits);
 
-        let hex_block_and_fee: String = bytes_to_hash.clone().to_hex();
-        println!("Packed initial hash information = {}", hex_block_and_fee);
+        // let hex_block_and_fee: String = bytes_to_hash.clone().to_hex();
+        // println!("Packed initial hash information = {}", hex_block_and_fee);
 
         h.input(&bytes_to_hash);
 
@@ -472,8 +472,8 @@ impl BabyProver {
         {    
             let packed_transaction_data_bytes = public_data.clone();
 
-            let hex: String = packed_transaction_data_bytes.clone().to_hex();
-            println!("Packed transfers information data = {}", hex);
+            // let hex: String = packed_transaction_data_bytes.clone().to_hex();
+            // println!("Packed transfers information data = {}", hex);
 
             let mut next_round_hash_bytes = vec![];
             next_round_hash_bytes.extend(hash_result.iter());
