@@ -34,6 +34,7 @@ struct AccountUpdate {
 struct NewOperation {
     pub data:           Value,
     pub block_number:   i32,
+    pub action_type:    String,
 }
 
 impl StorageConnection {
@@ -54,6 +55,7 @@ impl StorageConnection {
     }
 
     pub fn commit_op(&self, op: &Operation) -> QueryResult<StoredOperation> {
+
         self.conn.transaction(|| {
             match &op.action {
                 Action::Commit{block: _, new_root: _} => 
@@ -65,6 +67,7 @@ impl StorageConnection {
             diesel::insert_into(operations::table)
                 .values(&NewOperation{ 
                     block_number:   op.block_number as i32,
+                    action_type:    op.action.to_string(),
                     data:           serde_json::to_value(&op).unwrap(), 
                 })
                 .get_result(&self.conn)
@@ -146,9 +149,17 @@ impl StorageConnection {
     }
 
     pub fn load_pendings_proof_reqs(&self) -> QueryResult<Vec<StoredOperation>> {
-        use crate::schema::operations::dsl::*;
-        operations
-            //.filter(nonce.ge(current_nonce as i32)) // WHERE nonce >= current_nonce
+
+        const SELECT: &str = "
+        SELECT * FROM operations
+        WHERE action_type = 'Commit'
+        AND block_number > (
+            SELECT COALESCE(max(block_number), 0)  
+            FROM operations 
+            WHERE action_type = 'Verify'
+        )";
+
+        diesel::sql_query(SELECT)
             .load(&self.conn)
     }
 
@@ -239,11 +250,10 @@ use crate::models::{Operation, EthBlockData, Action};
 use web3::types::{U256, H256};
 
 #[test]
-fn test_store_ops() {
+fn test_store_txs() {
 
     let conn = super::StorageConnection::new();
     conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
-
     conn.reset_op_config("0x0", 0).unwrap();
 
     let commit = conn.commit_op(&Operation{
@@ -275,6 +285,39 @@ fn test_store_ops() {
     assert_eq!(pending[0].nonce, 1);
 
     let pending = conn.load_pendings_txs(2).unwrap();
+    assert_eq!(pending.len(), 0);
+}
+
+#[test]
+fn test_store_proof_reqs() {
+
+    let conn = super::StorageConnection::new();
+    conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
+    conn.reset_op_config("0x0", 0).unwrap();
+
+    let commit = conn.commit_op(&Operation{
+        action: Action::Commit{
+            new_root:   H256::zero(), 
+            block:      Some(Block::Deposit(DepositBlock::default(), 1)),
+        },
+        block_number:       1, 
+        block_data:         EthBlockData::Deposit{batch_number: 1}, 
+        accounts_updated:   fnv::FnvHashMap::default()
+    }).unwrap();
+
+    let pending = conn.load_pendings_proof_reqs().unwrap();
+    assert_eq!(pending.len(), 1);
+
+    let verify = conn.commit_op(&Operation{
+        action: Action::Verify{
+            proof: [U256::zero(); 8], 
+        },
+        block_number:       1, 
+        block_data:         EthBlockData::Deposit{batch_number: 0}, 
+        accounts_updated:   fnv::FnvHashMap::default()
+    }).unwrap();
+
+    let pending = conn.load_pendings_proof_reqs().unwrap();
     assert_eq!(pending.len(), 0);
 }
 
