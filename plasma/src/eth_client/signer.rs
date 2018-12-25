@@ -52,14 +52,12 @@ impl RawTransaction {
         self.encode(&mut tx);
         tx.append(&sig.v); 
         let r_start = find_first_nonzero(&sig.r);
-        println!("R has {} leading zeroes", r_start);
         let r = &sig.r.clone()[r_start..];
         tx.append(&r); 
         let s_start = find_first_nonzero(&sig.s);
-        println!("S has {} leading zeroes", s_start);
         let s = &sig.s.clone()[s_start..];
         tx.append(&s); 
-        
+
         // tx.append(&sig.r);
         // tx.append(&sig.s);
 

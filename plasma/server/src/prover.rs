@@ -316,14 +316,21 @@ impl BabyProver {
             let sender_leaf_number = field_element_to_u32(tx.from);
             let recipient_leaf_number = field_element_to_u32(tx.to);
 
+            let empty_account = Account::default();
+
             let tree = &mut self.accounts_tree;
             let items = tree.items.clone();
 
             let sender_leaf = items.get(&sender_leaf_number);
-            let recipient_leaf = items.get(&recipient_leaf_number);
+            let mut recipient_leaf = items.get(&recipient_leaf_number);
 
-            if sender_leaf.is_none() || recipient_leaf.is_none() {
+            if sender_leaf.is_none() {
                 return Err(BabyProverErr::InvalidSender);
+            }
+
+            // allow transfers to empty accounts
+            if recipient_leaf.is_none() {
+                recipient_leaf = Some(&empty_account);
             }
             
             // this is LE bits encoding of the transaction amount
@@ -457,6 +464,9 @@ impl BabyProver {
         {    
             let packed_transaction_data_bytes = public_data.clone();
 
+            let hex: String = packed_transaction_data_bytes.clone().to_hex();
+            println!("Packed transfers information data = {}", hex);
+
             let mut next_round_hash_bytes = vec![];
             next_round_hash_bytes.extend(hash_result.iter());
             next_round_hash_bytes.extend(packed_transaction_data_bytes);
@@ -499,11 +509,14 @@ impl BabyProver {
 
         let pvk = prepare_verifying_key(&self.transfer_parameters.vk);
 
-        let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]).unwrap();
+        println!("Made a proof for initial root = {}, final root = {}, public data = {}", initial_root, final_root, public_data_commitment.clone().to_hex());
+        let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]);
         
-        if !success {
+        if success.is_err() || success.unwrap() == false {
+            println!("Proof is invalid!");
             return Err(BabyProverErr::Unknown);
         }
+        
         println!("Proof generation is complete");
 
         let full_proof = FullBabyProof{

@@ -12,8 +12,8 @@ const BATCH_SIZE = 8;
 
 const from = 2;
 const to = 3;
-const privateKey = new BN("50406c30749509234d4ddb7987a34382dc9620ee9b8d6ee59b8973ccb3e747b", 16);
-const startingNonce = 0;
+const privateKey = new BN("27f703eb6f356a0457255559fecbbde0a79fd2aa370f58dc713d47e58470692", 16);
+const startingNonce = 8;
 const good_until_block = 100;
 const amount = 100;
 const fee = 0;

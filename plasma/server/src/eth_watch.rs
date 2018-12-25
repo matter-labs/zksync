@@ -85,6 +85,9 @@ impl EthWatch {
 
         this.last_deposit_batch = last_deposit_batch_result.unwrap();
         this.last_exit_batch = last_exit_batch_result.unwrap();
+        println!("Monitoring contract {:x}", this.contract_addr);
+        println!("Starting from deposit batch {}", this.last_deposit_batch);
+        println!("Starting from exit batch {}", this.last_exit_batch);
 
         this
     }
