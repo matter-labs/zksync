@@ -13,8 +13,9 @@ const rpcEndpoint = "https://rinkeby.infura.io/48beda66075e41bda8b124c6a48fdfa0"
 const contractAddress = "0x2A8BadcC3d128d814AaEA66a89a6ba3e101D1761";
 
 const privateKey = "0x12B7678FF12FE8574AB74FFD23B5B0980B64D84345F9D637C2096CA0EF587806";
+const blockNumber = 2;
 
-async function depositInto(acccountString, amountString) {
+async function partialWithdraw() {
     let provider = new ethers.providers.JsonRpcProvider(rpcEndpoint);
     let walletWithProvider = new ethers.Wallet(privateKey, provider);
     if (process.env.MNEMONIC !== undefined) {
@@ -27,33 +28,17 @@ async function depositInto(acccountString, amountString) {
     let contract = new ethers.Contract(contractAddress, abi_string, walletWithProvider);
     const existingID = await contract.ethereumAddressToAccountID(senderAddress);
     console.log("This ethereum account has an id = " + existingID.toString(10));
-    const transactor = await contract.transactor();
-    console.log("Transactor address  = " + transactor);
-    const exitor = await contract.exitor();
-    console.log("Exitor address = " + exitor);
-    const nextAccountToRegister = await contract.nextAccountToRegister();
-    console.log("Registering account = " + nextAccountToRegister.toString(10));
-    const newKey = transactionLib.newKey();
-    console.log("Plasma private key = " + newKey.privateKey.toString(16));
-    let {x, y} = newKey.publicKey;
-    x = "0x" + x.toString(16);
-    y = "0x" + y.toString(16);
-    const txAmount = ethers.utils.parseEther("0.001");
-    console.log("Tx amount in wei = " + txAmount.toString(10));
-    const tx = await contract.deposit([x, y], 0, {value: txAmount});
+    const balanceForWithdraw = await contract.partialExits(blockNumber, existingID);
+    console.log("Balance for partial exit = " + balanceForWithdraw.toString(10));
+    const lastVerifiedBlockNumber = await contract.lastVerifiedBlockNumber();
+    console.log("Last verified block = " + lastVerifiedBlockNumber);
+    const tx = await contract.withdrawPartialExitBalance(blockNumber);
     console.log("Result = ", tx.hash);
     const result = await tx.wait();
-    const totalDepositRequests = await contract.totalDepositRequests();
-    console.log("Total deposits = " + totalDepositRequests.toString(10));
-    const totalExitRequests = await contract.totalExitRequests();
-    console.log("Total exits = " + totalExitRequests.toString(10));
 }
 
 async function run() {
-    const args = process.argv.slice(2);
-    const account = args[0];
-    const amount = args[1];
-    await depositInto(account, amount);
+    await partialWithdraw();
 }
 
 run().then()

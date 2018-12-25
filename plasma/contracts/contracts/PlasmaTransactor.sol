@@ -96,7 +96,7 @@ contract PlasmaTransactor is Plasma {
                 floatValue = uint16((chunk << 48) >> 240);
 
                 scaledAmount = parseFloat(floatValue);
-                partialExits[blockNumber][from] = scaledAmount;
+                partialExits[blockNumber][from] += scaledAmount;
             }
         }
     }

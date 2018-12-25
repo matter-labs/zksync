@@ -105,13 +105,18 @@ function integerToFloat(
     let power = integer.div(maxMantissa);
     const exponentBase = new BN(exp_base);
     let exponent = new BN(0);
-    while (power.gt(exponentBase)) {
-        power = power.div(exponentBase);
-        exponent = exponent.addn(1);
+    if (integer.lte((new BN(exp_base)))) {
+        exponent = new BN(0);
+    } else {
+        while (power.gt(exponentBase)) {
+            power = power.div(exponentBase);
+            exponent = exponent.addn(1);
+        }
+        if (maxMantissa.mul(exponentBase.pow(exponent)).lt(integer)) {
+            exponent = exponent.addn(1);
+        }
     }
-    if (maxMantissa.mul(exponentBase.pow(exponent)).lt(integer)) {
-        exponent = exponent.addn(1);
-    }
+    
     power = exponentBase.pow(exponent);
     let mantissa = integer.div(power);
     // pack
@@ -181,6 +186,7 @@ function serializeTransaction(tx) {
     let serialized = Buffer.concat(components);
 
     let newAmount = floatToInteger(amountFloatBytes, 5, 11, 10);
+    console.log("Reparsed amount = " + newAmount.toString(10));
     let newFee = floatToInteger(feeFloatBytes, 5, 3, 10);
 
     return {

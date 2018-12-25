@@ -12,10 +12,10 @@ const BATCH_SIZE = 8;
 
 const from = 2;
 const to = 3;
-const privateKey = new BN("27f703eb6f356a0457255559fecbbde0a79fd2aa370f58dc713d47e58470692", 16);
-const startingNonce = 8;
+const privateKey = new BN("197bcd0e123b1a683f39b1704be9140e27e25903e19edfd332ccf16bbf27256", 16);
+const startingNonce = 0;
 const good_until_block = 100;
-const amount = 100;
+const amount = 11;
 const fee = 0;
 
 const endpoint = "http://127.0.0.1:8080/send"

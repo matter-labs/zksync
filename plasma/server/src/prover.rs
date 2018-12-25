@@ -16,6 +16,8 @@ use sapling_crypto::jubjub::{JubjubEngine, edwards};
 
 use self::rustc_hex::ToHex;
 
+
+
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
 
 use plasma::models::{self, params, TransferBlock, DepositBlock, ExitBlock, Block, PlasmaState, AccountMap};
@@ -160,7 +162,9 @@ impl BabyProver {
 
         let root = tree.root_hash();
 
-        println!("Root hash is {}", root);
+        let state_block_number = initial_state.block_number;
+
+        println!("Root hash is {} for block {}", root, state_block_number);
 
         let supplied_root = initial_state.root_hash();
 
@@ -174,7 +178,7 @@ impl BabyProver {
             transfer_batch_size: TRANSFER_BATCH_SIZE,
             deposit_batch_size: DEPOSIT_BATCH_SIZE,
             exit_batch_size: EXIT_BATCH_SIZE,
-            block_number: 1,
+            block_number: state_block_number,
             accounts_tree: tree,
             transfer_parameters: transfer_circuit_params.unwrap(),
             deposit_parameters: deposit_circuit_params.unwrap(),
@@ -292,6 +296,7 @@ impl BabyProver {
     pub fn apply_and_prove_transfer(&mut self, block: &TransferBlock) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.block_number {
+            println!("Proof request is for block {}, while prover state is block {}", block_number, self.block_number);
             return Err(BabyProverErr::Unknown);
         }
         let block_final_root = block.new_root_hash.clone();
@@ -456,6 +461,9 @@ impl BabyProver {
 
         let bytes_to_hash = be_bit_vector_into_bytes(&public_data_initial_bits);
 
+        let hex_block_and_fee: String = bytes_to_hash.clone().to_hex();
+        println!("Packed initial hash information = {}", hex_block_and_fee);
+
         h.input(&bytes_to_hash);
 
         let mut hash_result = [0u8; 32];
@@ -498,6 +506,36 @@ impl BabyProver {
             transactions: witnesses.clone(),
         };
 
+        // {
+        //     let inst = Transfer {
+        //         params: &self.jubjub_params,
+        //         number_of_transactions: num_txes,
+        //         old_root: Some(initial_root),
+        //         new_root: Some(final_root),
+        //         public_data_commitment: Some(public_data_commitment),
+        //         block_number: Some(block_number),
+        //         total_fee: Some(total_fees),
+        //         transactions: witnesses.clone(),
+        //     };
+
+        //     use sapling_crypto::circuit::test::*;
+        //     use bellman::Circuit;
+        //     let mut cs = TestConstraintSystem::<Engine>::new();
+        //     inst.synthesize(&mut cs).unwrap();
+
+        //     print!("{}\n", cs.find_unconstrained());
+
+        //     print!("{}\n", cs.num_constraints());
+
+        //     assert_eq!(cs.num_inputs(), 4);
+
+        //     let err = cs.which_is_unsatisfied();
+        //     if err.is_some() {
+        //         panic!("ERROR satisfying in {}\n", err.unwrap());
+        //     }
+        //     println!("CS is satisfied!");
+        // }
+
         let mut rng = OsRng::new().unwrap();
         println!("Prover has started to work transfer");
         let proof = create_random_proof(instance, &self.transfer_parameters, & mut rng);
@@ -511,9 +549,12 @@ impl BabyProver {
 
         println!("Made a proof for initial root = {}, final root = {}, public data = {}", initial_root, final_root, public_data_commitment.clone().to_hex());
         let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]);
-        
-        if success.is_err() || success.unwrap() == false {
-            println!("Proof is invalid!");
+        if success.is_err() {
+            println!("Proof is generation failed with error {}", success.err().unwrap());
+            return Err(BabyProverErr::Unknown);
+        }
+        if success.unwrap() == false {
+            println!("Proof is invalid");
             return Err(BabyProverErr::Unknown);
         }
         

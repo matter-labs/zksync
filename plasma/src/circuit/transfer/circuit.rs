@@ -25,23 +25,15 @@ use super::ecc;
 use super::pedersen_hash;
 use super::sha256;
 use super::num;
-use super::multipack;
 use super::num::{AllocatedNum, Num};
 use super::float_point::{parse_with_exponent_le, convert_to_float};
 use super::baby_eddsa::EddsaSignature;
 
-use sapling_crypto::eddsa::{
-    Signature,
-    PrivateKey,
-    PublicKey
-};
-
 use crate::models::params as plasma_constants;
 pub use super::super::leaf::LeafWitness;
 use super::super::leaf::{LeafContent, make_leaf_content};
-use crate::circuit::utils::{le_bit_vector_into_field_element, allocate_audit_path, append_packed_public_key, count_number_of_ones};
+use crate::circuit::utils::{le_bit_vector_into_field_element, allocate_audit_path, append_packed_public_key};
 use super::transaction::{Transaction, TransactionContent};
-use crate::models::circuit::sig::TransactionSignature;
 
 #[derive(Clone)]
 pub struct TransactionWitness<E: JubjubEngine> {
@@ -242,6 +234,9 @@ impl<'a, E: JubjubEngine> Circuit<E> for Transfer<'a, E> {
         total_fees_bits.reverse();
         initial_hash_data.extend(total_fees_bits.into_iter());
 
+        // println!("Initial hash data");
+        // print_boolean_vector(&initial_hash_data);
+
         assert_eq!(initial_hash_data.len(), 512);
 
         let mut hash_block = sha256::sha256(
@@ -249,23 +244,12 @@ impl<'a, E: JubjubEngine> Circuit<E> for Transfer<'a, E> {
             &initial_hash_data
         )?;
 
-        // // now we do a "dense packing", i.e. take 256 / public_data.len() items 
-        // // and push them into the second half of sha256 block
-
-        // let public_data_size = params::BALANCE_TREE_DEPTH 
-        //                             + params::BALANCE_TREE_DEPTH
-        //                             + params::AMOUNT_EXPONENT_BIT_WIDTH
-        //                             + params::AMOUNT_MANTISSA_BIT_WIDTH
-        //                             + params::FEE_EXPONENT_BIT_WIDTH
-        //                             + params::FEE_MANTISSA_BIT_WIDTH;
-
-
-        // // pad with zeroes up to the block size
-        // let required_padding = 256 - (public_data_vector.len() % public_data_size);
-
         let mut pack_bits = vec![];
         pack_bits.extend(hash_block);
         pack_bits.extend(public_data_vector.into_iter());
+
+        // println!("Packed public data");
+        // print_boolean_vector(&pack_bits);
 
         hash_block = sha256::sha256(
             cs.namespace(|| "hash public data"),
@@ -366,19 +350,22 @@ fn find_intersection_point<E, CS> (
     let mut bitmap_path_to = to_path_bits.clone();
     bitmap_path_to.reverse();
 
-
     let common_prefix = find_common_prefix(
         cs.namespace(|| "common prefix search"), 
         &bitmap_path_from,
         &bitmap_path_to
     )?;
 
+    // common prefix is reversed because it's enumerated from the root, while
+    // audit path is from the leafs
 
-    let common_prefix_iter = common_prefix.clone().into_iter();
+    let mut common_prefix_reversed = common_prefix.clone();
+    common_prefix_reversed.reverse();
+
     // Common prefix is found, not we enforce equality of 
     // audit path elements on a common prefix
 
-    for (i, bitmask_bit) in common_prefix_iter.enumerate()
+    for (i, bitmask_bit) in common_prefix_reversed.into_iter().enumerate()
     {
         let path_element_from = &audit_path_from[i];
         let path_element_to = &audit_path_to[i];
@@ -1191,6 +1178,18 @@ fn apply_transaction<E, CS>(
     Ok((cur_from, fee, transaction_content.good_until_block, public_data))
 }
 
+
+fn print_boolean_vector(vector: &[boolean::Boolean]) {
+    for b in vector {
+        if b.get_value().unwrap() {
+            print!("1");
+        } else {
+            print!("0");
+        }
+    }
+    print!("\n");
+}
+
 #[test]
 fn test_bits_into_fr(){
     use ff::{PrimeField};
@@ -1205,8 +1204,11 @@ fn test_bits_into_fr(){
     print!("{}\n", fe);
 }
 
+
+
 #[test]
 fn test_transfer_circuit_with_witness() {
+    use sapling_crypto::eddsa::{PrivateKey, PublicKey, Signature};
     use ff::{Field};
     use pairing::bn256::*;
     use rand::{SeedableRng, Rng, XorShiftRng, Rand};
