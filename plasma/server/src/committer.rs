@@ -31,8 +31,22 @@ fn keys_sorted(accounts_updated: AccountMap) -> Vec<u64> {
 pub fn start_eth_sender() -> Sender<(EthOperation, TxMeta)> {
     let (tx_for_eth, rx_for_eth) = channel();
     let mut eth_client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
+    let current_nonce = eth_client.get_nonce(&eth_client.default_account()).unwrap();
+    let storage = StorageConnection::new();
 
-    load_pendings_ops(&eth_client, &tx_for_eth);
+    // TODO: this is for test only, introduce a production switch (as we can not rely on debug/release mode because performance is required for circuits)
+    let addr = std::env::var("SENDER_ACCOUNT").unwrap_or("e5d0efb4756bd5cdd4b5140d3d2e08ca7e6cf644".to_string());
+    storage.reset_op_config(&addr, current_nonce.as_u32());
+
+    // execute pending transactions
+    let ops = storage.load_pendings_ops(current_nonce.as_u32()).expect("db must be functional");
+    for pending_op in ops {
+        let op = serde_json::from_value(pending_op.data).unwrap();
+        tx_for_eth.send((op, TxMeta{
+            addr:   pending_op.addr, 
+            nonce:  pending_op.nonce as u32,
+        })).expect("queue must work");
+    }
 
     std::thread::Builder::new().name("eth_sender".to_string()).spawn(move || {
         for (op, meta) in rx_for_eth {
@@ -105,7 +119,7 @@ pub fn load_pendings_ops(eth_client: &ETHClient, tx_for_eth: &Sender<(EthOperati
 
     // execute pending transactions
     let current_nonce = eth_client.get_nonce(&eth_client.default_account()).unwrap();
-    let ops = storage.load_pendings_ops(current_nonce.as_u32());
+    let ops = storage.load_pendings_ops(current_nonce.as_u32()).expect("db must be functional");
     for pending_op in ops {
         let op = serde_json::from_value(pending_op.data).unwrap();
         tx_for_eth.send((op, TxMeta{

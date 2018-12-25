@@ -72,27 +72,25 @@ impl ETHClient {
         format!("0x{}", self.sender_account)
     }
 
-    pub fn call<P: Tokenize>(&mut self, method: &str, _meta: TxMeta, params: P) -> Result<H256> {
+    pub fn call<P: Tokenize>(&mut self, method: &str, meta: TxMeta, params: P) -> Result<H256> {
 
         let f = self.contract.function(method).expect("failed to get function parameters");
         let data = f.encode_input( &params.into_tokens() ).expect("failed to encode parameters");
 
         // fetch current nonce and gas_price
         let gas_price = self.get_gas_price()?;
-        // let nonce = self.get_nonce(&format!("0x{}", &self.sender_account))?;
 
-        // TODO: use meta instead
-        let nonce = self.nonce.clone();
-        let mut new_nonce = self.nonce;
-        new_nonce = new_nonce + U256::one();
-        self.nonce = new_nonce;
+        // let nonce = self.nonce.clone();
+        // let mut new_nonce = self.nonce;
+        // new_nonce = new_nonce + U256::one();
+        // self.nonce = new_nonce;
 
-        println!("Sending with nonce = {}", nonce);
+        println!("Sending with nonce = {}", meta.nonce);
 
         // form and sign tx
         let tx = signer::RawTransaction {
             chain_id:   self.chain_id,
-            nonce,
+            nonce:      U256::from(meta.nonce),
             to:         Some(self.contract_addr.clone()),
             value:      U256::zero(),
             gas_price,
@@ -100,11 +98,9 @@ impl ETHClient {
             data:       data,
         };
 
-        // TODO: use meta to pick the signing key
-
+        // TODO: use meta.addr to pick the signing key
         let signed = tx.sign(&self.private_key);
         let raw_tx_hex = format!("0x{}", hex::encode(signed));
-        // println!("Raw transaction = {}", raw_tx_hex);
         self.send_raw_tx(&raw_tx_hex)
     }
 
