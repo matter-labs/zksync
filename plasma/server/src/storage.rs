@@ -98,7 +98,7 @@ impl StorageConnection {
             .map(|_|())
     }
 
-    pub fn load_committed_state(&self) -> QueryResult<AccountMap> {
+    pub fn load_committed_state(&self) -> QueryResult<(u32, AccountMap)> {
 
         // select basis from accounts and join newer state from account_updates for all updates after the last committed block
         const SELECT: &str = "
@@ -115,11 +115,12 @@ impl StorageConnection {
             .load(&self.conn)
             .map(|accounts: Vec<Account>| {
                 let mut result = AccountMap::default();
+                let last_block = accounts.iter().map(|a| a.last_block).max().unwrap() as u32;
                 result.extend(accounts.into_iter().map(|a| (
                         a.id as u32, 
                         serde_json::from_value(a.data).unwrap()
                     )));
-                result
+                (last_block, result)
             })
     }
 
@@ -192,8 +193,9 @@ fn test_store_state() {
     assert_eq!(state.len(), 0);
     
     // committed state must be computed from updates
-    let state = conn.load_committed_state().unwrap();
-        assert_eq!(
+    let (last_block, state) = conn.load_committed_state().unwrap();
+    assert_eq!(last_block, 1);
+    assert_eq!(
         state.into_iter().collect::<Vec<(u32, models::Account)>>(), 
         accounts.clone().into_iter().collect::<Vec<(u32, models::Account)>>());
 
@@ -214,7 +216,7 @@ fn test_store_state() {
     conn.commit_state_update(2, &accounts2).unwrap();
 
     assert_eq!(load_verified_state(&conn).unwrap().len(), 3);
-    assert_eq!(conn.load_committed_state().unwrap().len(), 4);
+    assert_eq!(conn.load_committed_state().unwrap().1.len(), 4);
 
 }
 
