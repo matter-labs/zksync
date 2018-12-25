@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 use plasma::models::{self, *};
 
-use super::models::{EthOperation, EthBlockData};
+use super::models::{Operation, Action, EthBlockData};
 use super::prover::BabyProver;
 use super::storage::StorageConnection;
 
@@ -108,8 +108,8 @@ impl PlasmaStateKeeper {
 
     fn run(&mut self, 
         rx_for_blocks: Receiver<StateProcessingRequest>, 
-        tx_for_commitments: Sender<EthOperation>,
-        tx_for_proof_requests: Sender<(u32, Block, EthBlockData, AccountMap)>)
+        tx_for_commitments: Sender<Operation>,
+    )
     {
         for req in rx_for_blocks {
             match req {
@@ -121,19 +121,16 @@ impl PlasmaStateKeeper {
                     };
                     let result = match applied {
                         Ok((new_root, block_data, accounts_updated)) => {
-                            // make commitment
-                            let op = EthOperation::Commit{
+                            // send commitment tx to eth
+                            let op = Operation{
+                                action:         Action::Commit{new_root, block: Some(block)},
                                 block_number:   self.state.block_number,
-                                new_root,
-                                block_data: block_data.clone(),
-                                accounts_updated: accounts_updated.clone(),
+                                block_data,
+                                accounts_updated,
                             };
 
                             tx_for_commitments.send(op).expect("queue must work");
 
-                            // start making proof
-                            tx_for_proof_requests.send((self.state.block_number, block, block_data, accounts_updated)).expect("queue must work");
-                            
                             // bump current block number as we've made one
                             self.state.block_number += 1;
 
@@ -277,10 +274,9 @@ impl PlasmaStateKeeper {
 
 pub fn start_state_keeper(mut sk: PlasmaStateKeeper, 
     rx_for_blocks: Receiver<StateProcessingRequest>, 
-    tx_for_commitments: Sender<EthOperation>,
-    tx_for_proof_requests: Sender<(u32, Block, EthBlockData, AccountMap)>)
-{
+    tx_for_commitments: Sender<Operation>,
+) {
     std::thread::Builder::new().name("state_keeper".to_string()).spawn(move || {
-        sk.run(rx_for_blocks, tx_for_commitments, tx_for_proof_requests)
+        sk.run(rx_for_blocks, tx_for_commitments)
     });
 }

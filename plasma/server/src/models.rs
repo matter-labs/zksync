@@ -28,24 +28,24 @@ pub enum EthBlockData {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub enum EthOperation {
+pub enum Action {
     Commit{
-        block_number:       u32, 
-        new_root:           H256, 
-        block_data:         EthBlockData,
-        accounts_updated:   AccountMap,
+        new_root:   H256,
+        block:      Option<Block>,
     },
     Verify{
-        block_number:       u32, 
-        proof:              EncodedProof, 
-        block_data:         EthBlockData,
-        accounts_updated:   AccountMap,
+        proof:      EncodedProof, 
     },
-    StartDepositBatch,
-    StartExitBatch,
-    // ...
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Operation {
+    pub action:             Action,
+    pub block_number:       u32, 
+    pub block_data:         EthBlockData,
+    pub accounts_updated:   AccountMap,
 }
 
 #[derive(Debug, Queryable)]

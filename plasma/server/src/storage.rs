@@ -1,6 +1,6 @@
 use plasma::models::*;
 use crate::schema::*;
-use super::models::{EthOperation, StoredOperation};
+use super::models::{Operation, Action, StoredOperation};
 
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
@@ -53,13 +53,13 @@ impl StorageConnection {
             .expect(&format!("Error connecting to {}", database_url))
     }
 
-    pub fn commit_op(&self, op: &EthOperation) -> QueryResult<StoredOperation> {
+    pub fn commit_op(&self, op: &Operation) -> QueryResult<StoredOperation> {
         self.conn.transaction(|| {
-            match &op {
-                EthOperation::Commit{block_number, new_root: _, block_data: _, accounts_updated} => 
-                    self.commit_state_update(*block_number, accounts_updated)?,
-                EthOperation::Verify{block_number, proof: _, block_data: _, accounts_updated: _} => 
-                    self.apply_state_update(*block_number)?,
+            match &op.action {
+                Action::Commit{block: _, new_root: _} => 
+                    self.commit_state_update(op.block_number, &op.accounts_updated)?,
+                Action::Verify{proof: _} => 
+                    self.apply_state_update(op.block_number)?,
                 _ => unimplemented!(),
             };
             diesel::insert_into(operations::table)
@@ -224,7 +224,8 @@ fn test_store_state() {
 
 }
 
-use crate::models::{EthOperation, EthBlockData};
+use plasma::models::{Block, DepositBlock};
+use crate::models::{Operation, EthBlockData, Action};
 use web3::types::{U256, H256};
 
 #[test]
@@ -235,16 +236,21 @@ fn test_store_ops() {
 
     conn.reset_op_config("0x0", 0).unwrap();
 
-    let commit = conn.commit_op(&EthOperation::Commit{
+    let commit = conn.commit_op(&Operation{
+        action: Action::Commit{
+            new_root:   H256::zero(), 
+            block:      None,
+        },
         block_number:       1, 
-        new_root:           H256::zero(), 
         block_data:         EthBlockData::Deposit{batch_number: 0}, 
         accounts_updated:   fnv::FnvHashMap::default()
     }).unwrap();
 
-    let verify = conn.commit_op(&EthOperation::Verify{
+    let verify = conn.commit_op(&Operation{
+        action: Action::Verify{
+            proof: [U256::zero(); 8], 
+        },
         block_number:       1, 
-        proof:              [U256::zero(); 8], 
         block_data:         EthBlockData::Deposit{batch_number: 0}, 
         accounts_updated:   fnv::FnvHashMap::default()
     }).unwrap();
