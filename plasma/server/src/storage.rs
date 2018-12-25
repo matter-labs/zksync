@@ -115,7 +115,11 @@ impl StorageConnection {
             .load(&self.conn)
             .map(|accounts: Vec<Account>| {
                 let mut result = AccountMap::default();
-                let last_block = accounts.iter().map(|a| a.last_block).max().unwrap() as u32;
+                let mut last_block = 1u32;
+                let last_block_from_db = accounts.iter().map(|a| a.last_block).max();
+                if let Some(block_number) = last_block_from_db {
+                    last_block = block_number as u32;
+                }
                 result.extend(accounts.into_iter().map(|a| (
                         a.id as u32, 
                         serde_json::from_value(a.data).unwrap()
