@@ -18,11 +18,14 @@
     "minimalistic-crypto-utils": "^1.0.1",
     "solc": "^0.4.25",
     "truffle": "^5.0.0",
-    "truffle-hdwallet-provider": "^1.0.0-web3one.1"
+    "truffle-hdwallet-provider": "^1.0.0-web3one.1",
+    "web3": "^1.0.0-beta.37"
   },
   "scripts": {
     "build": "solcjs -o bin --bin --abi contracts/*.sol",
     "migrate": "truffle migrate --reset --network dev",
-    "ganache": "ganache-cli -l 7000000 -i 4 -m \"cliff flag flag fence mesh quarter coyote mechanic cash draw remain priority\" "
+    
+    "ganache": "ganache-cli -l 7000000 -i 4 -m \"cliff flag flag fence mesh quarter coyote mechanic cash draw remain priority\" ",
+    "geth": "node setup-geth.js 2& geth --rpc --rpcapi \"eth,net,web3,personal\" --dev"
   }
 }

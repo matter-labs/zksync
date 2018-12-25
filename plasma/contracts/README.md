@@ -16,6 +16,12 @@ IMPORTANT! Generated `.abi` and `.bin` files are fed to cargo to build module `p
 
 So you need to rebuild the code on every change (to be automated soon).
 
+## Local testing with `geth`
+
+```
+yarn run geth
+```
+
 ## Local testing with `ganache-cli`
 
 Start ganache (the command below will start with 7M gas limit, chain 4 (simulating rinkeby) and predefined mnemonic):
