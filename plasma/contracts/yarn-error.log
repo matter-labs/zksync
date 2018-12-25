@@ -1,5 +1,5 @@
 Arguments: 
-  /usr/local/Cellar/node/10.9.0/bin/node /usr/local/Cellar/yarn/1.9.4/libexec/bin/yarn.js deploy-dev
+  /usr/local/Cellar/node/10.9.0/bin/node /usr/local/Cellar/yarn/1.9.4/libexec/bin/yarn.js run geth
 
 PATH: 
   /Users/alex/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
@@ -8,19 +8,18 @@ Yarn version:
   1.9.4
 
 Node version: 
-  8.12.0
+  11.4.0
 
 Platform: 
   darwin x64
 
 Trace: 
-  SyntaxError: /Users/alex/src/zk_stuff/plasma/contracts/package.json: Unexpected string in JSON at position 297
+  SyntaxError: /Users/alex/src/shamatar/zk_stuff/plasma/contracts/package.json: Unexpected token } in JSON at position 961
       at JSON.parse (<anonymous>)
       at /usr/local/Cellar/yarn/1.9.4/libexec/lib/cli.js:1130:59
       at Generator.next (<anonymous>)
       at step (/usr/local/Cellar/yarn/1.9.4/libexec/lib/cli.js:92:30)
       at /usr/local/Cellar/yarn/1.9.4/libexec/lib/cli.js:103:13
-      at <anonymous>
 
 npm manifest: 
   {
@@ -29,13 +28,30 @@ npm manifest:
     "license": "GPL-3.0-only",
     "devDependencies": {},
     "dependencies": {
+      "axios": "^0.18.0",
+      "bn.js": "^4.11.8",
+      "brorand": "^1.1.0",
+      "elliptic": "^6.4.1",
+      "ethereumjs-util": "^6.0.0",
+      "ethers": "^4.0.20",
+      "ethjs": "^0.4.0",
       "ganache-cli": "^6.2.3",
+      "hash.js": "^1.1.7",
+      "hmac-drbg": "^1.0.1",
+      "minimalistic-assert": "^1.0.1",
+      "minimalistic-crypto-utils": "^1.0.1",
       "solc": "^0.4.25",
-      "truffle": "5.0.0-beta.2"
+      "truffle": "^5.0.0",
+      "truffle-hdwallet-provider": "^1.0.0-web3one.1",
+      "web3": "^1.0.0-beta.37"
     },
     "scripts": {
-      "build": "solcjs -o build/bin --bin --abi contracts/*.sol"
-      "deploy-dev": "truffle migrate --network dev"
+      "build": "solcjs -o bin --bin --abi contracts/*.sol",
+      "migrate": "truffle migrate --reset --network dev",
+      
+      "ganache": "ganache-cli -l 7000000 -i 4 -m \"cliff flag flag fence mesh quarter coyote mechanic cash draw remain priority\" ",
+  
+      "geth": "node setup-geth.js 3& geth --rpc --rpcapi \"eth,net,web3,personal\" --dev",
     }
   }
 
@@ -3739,6 +3755,10 @@ Lockfile:
   trim@0.0.1:
     version "0.0.1"
     resolved "https://registry.yarnpkg.com/trim/-/trim-0.0.1.tgz#5858547f6b290757ee95cccc666fb50084c460dd"
+  
+  truffle-hdwallet-provider@^1.0.0-web3one.1:
+    version "1.0.0-web3one.1"
+    resolved "https://registry.yarnpkg.com/truffle-hdwallet-provider/-/truffle-hdwallet-provider-1.0.0-web3one.1.tgz#89fbdb74a13156112b5c7e1c4b8f0e03a360b867"
   
   truffle@5.0.0-beta.2:
     version "5.0.0-beta.2"
