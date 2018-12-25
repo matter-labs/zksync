@@ -15,6 +15,13 @@ table! {
 }
 
 table! {
+    op_config (addr) {
+        addr -> Text,
+        next_nonce -> Nullable<Int4>,
+    }
+}
+
+table! {
     operations (id) {
         id -> Int4,
         data -> Jsonb,
@@ -27,5 +34,6 @@ table! {
 allow_tables_to_appear_in_same_query!(
     account_updates,
     accounts,
+    op_config,
     operations,
 );

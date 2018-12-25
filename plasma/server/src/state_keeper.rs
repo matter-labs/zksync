@@ -87,7 +87,7 @@ impl PlasmaStateKeeper {
         let keys_map: HashMap<u32, PrivateKey<Bn256>> = HashMap::new();
 
         let storage = StorageConnection::new();
-        let initial_state = storage.load_committed_state();
+        let (last_committed_block, initial_state) = storage.load_committed_state().expect("db must be functional");
         for (id, account) in initial_state {
             balance_tree.insert(id, account);
         }
@@ -95,7 +95,7 @@ impl PlasmaStateKeeper {
         let keeper = PlasmaStateKeeper {
             state: PlasmaState{
                 balance_tree,
-                block_number: 1,
+                block_number: last_committed_block,
             },
             private_keys: keys_map
         };
