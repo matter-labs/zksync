@@ -43,7 +43,7 @@ pub fn start_eth_sender() -> Sender<(Operation, TxMeta)> {
     storage.reset_op_config(&addr, current_nonce.as_u32());
 
     // execute pending transactions
-    let ops = storage.load_pendings_ops(current_nonce.as_u32()).expect("db must be functional");
+    let ops = storage.load_pendings_txs(current_nonce.as_u32()).expect("db must be functional");
     for pending_op in ops {
         let op = serde_json::from_value(pending_op.data).unwrap();
         tx_for_eth.send((op, TxMeta{
@@ -129,14 +129,23 @@ pub fn run_committer(
 ) {
 
     let storage = StorageConnection::new();
+
+    // request unverified proofs
+    let ops = storage.load_pendings_proof_reqs().expect("db must be functional");
+    for pending_op in ops {
+        let op: Operation = serde_json::from_value(pending_op.data).unwrap();
+        if let Action::Commit{block, new_root: _} = op.action {
+            tx_for_proof_requests.send((op.block_number, block.unwrap(), op.block_data.clone(), op.accounts_updated.clone())).expect("queue must work");
+        }
+    }
+
     for mut op in rx_for_ops {
         // persist in storage first
         let committed_op = storage.commit_op(&op).expect("db must be functional");
 
         if let Action::Commit{ref mut block, new_root: _} = op.action {
-            // TODO: send to prover
-            //tx_for_proof_requests.send(op).expect("queue must work");
-            tx_for_proof_requests.send((op.block_number, block.take().unwrap(), op.block_data.clone(), op.accounts_updated.clone())).expect("queue must work");
+            tx_for_proof_requests.send((op.block_number, block.take().unwrap(), op.block_data.clone(), op.accounts_updated.clone()))
+                .expect("queue must work");
         }
 
         // then submit to eth

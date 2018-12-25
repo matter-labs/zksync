@@ -135,10 +135,17 @@ impl StorageConnection {
             .map(|_|())
     }
 
-    pub fn load_pendings_ops(&self, current_nonce: u32) -> QueryResult<Vec<StoredOperation>> {
+    pub fn load_pendings_txs(&self, current_nonce: u32) -> QueryResult<Vec<StoredOperation>> {
         use crate::schema::operations::dsl::*;
         operations
             .filter(nonce.ge(current_nonce as i32)) // WHERE nonce >= current_nonce
+            .load(&self.conn)
+    }
+
+    pub fn load_pendings_proof_reqs(&self) -> QueryResult<Vec<StoredOperation>> {
+        use crate::schema::operations::dsl::*;
+        operations
+            //.filter(nonce.ge(current_nonce as i32)) // WHERE nonce >= current_nonce
             .load(&self.conn)
     }
 
@@ -255,16 +262,16 @@ fn test_store_ops() {
         accounts_updated:   fnv::FnvHashMap::default()
     }).unwrap();
 
-    let pending = conn.load_pendings_ops(0).unwrap();
+    let pending = conn.load_pendings_txs(0).unwrap();
     assert_eq!(pending.len(), 2);
     assert_eq!(pending[0].nonce, 0);
     assert_eq!(pending[1].nonce, 1);
 
-    let pending = conn.load_pendings_ops(1).unwrap();
+    let pending = conn.load_pendings_txs(1).unwrap();
     assert_eq!(pending.len(), 1);
     assert_eq!(pending[0].nonce, 1);
 
-    let pending = conn.load_pendings_ops(2).unwrap();
+    let pending = conn.load_pendings_txs(2).unwrap();
     assert_eq!(pending.len(), 0);
 }
 
