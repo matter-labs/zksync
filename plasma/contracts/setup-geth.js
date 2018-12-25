@@ -1,5 +1,8 @@
 async function setup() {
 
+    let args = process.argv.slice(2)
+    await new Promise(resolve => setTimeout(resolve, args[0]*1000 || 0))
+
     let Web3 = require('web3')
     let web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"))
     let eth = web3.eth

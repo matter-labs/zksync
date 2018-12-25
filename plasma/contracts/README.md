@@ -20,7 +20,6 @@ So you need to rebuild the code on every change (to be automated soon).
 
 ```
 yarn run geth
-yarn run setup-geth
 ```
 
 ## Local testing with `ganache-cli`
