@@ -20,6 +20,9 @@ async function setup() {
         'f5f17d35eb238908b3ec3462dcf4ad8e8d84ec09c0d1587e3f5feb8a95686baa',
         '5abaea8f281af348587a83c05af384865507d22e111cbc865b1d2be94db84b46',
         'e7b69a24a4154712874791698682acb865884f45cacc1e2100310c23b95fa781',        
+
+        // from run.sh
+        '12B7678FF12FE8574AB74FFD23B5B0980B64D84345F9D637C2096CA0EF587806',
     ]
 
     let prefunded = (await personal.getAccounts())[0]

@@ -13,6 +13,10 @@
 
 This will create database 'plasma' (db url is set in [.env](.env) file) with our schema.
 
+- To reset migrations, run
+
+```diesel migration redo```
+
 - Run test to make sure everything works:
 
 ```cargo test --lib -- --nocapture test_store_state```
