@@ -21,7 +21,8 @@ contract PlasmaTransactor is Plasma {
         blocks[blockNumber] = Block(
             uint8(Circuit.TRANSFER), 
             uint64(block.timestamp + DEADLINE), 
-            totalFees, newRoot, 
+            totalFees, 
+            newRoot, 
             publicDataCommitment, 
             msg.sender
         );
