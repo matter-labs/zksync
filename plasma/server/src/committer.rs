@@ -124,7 +124,7 @@ pub fn start_eth_sender() -> Sender<(Operation, TxMeta)> {
                             //     uint256[8] memory proof
                             // ) 
                             eth_client.call("verifyExitBlock", meta,
-                                (op.block_number as u64, batch_number as u64, proof)),
+                                (batch_number as u64, op.block_number as u64, proof)),
                     }
                 },
                 _ => unimplemented!(),

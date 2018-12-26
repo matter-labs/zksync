@@ -7,11 +7,12 @@ const transactionLib = require("../lib/transaction");
 const ethUtils = require("ethereumjs-util");
 const BN = require("bn.js");
 
-// const rpcEndpoint = "http://127.0.0.1:8545";
-// const contractAddress = "0x4169D71D56563eA9FDE76D92185bEB7aa1Da6fB8";
-const rpcEndpoint = "https://rinkeby.infura.io/48beda66075e41bda8b124c6a48fdfa0";
-const contractAddress = "0xc8Fb1dB63839bF901De0725F2E2e5960F9f8AC82";
+// const rpcEndpoint = process.env.WEB3_URL;
+// const contractAddress = process.env.CONTRACT_ADDRESS;
+// const privateKey = process.env.PRIVATE_KEY;
 
+const rpcEndpoint = "https://rinkeby.infura.io/48beda66075e41bda8b124c6a48fdfa0";
+const contractAddress = "0x3a0768b1302357033c83E4808D1C3F69f270c463";
 const privateKey = "0x12B7678FF12FE8574AB74FFD23B5B0980B64D84345F9D637C2096CA0EF587806";
 
 async function depositInto(acccountString, amountString) {

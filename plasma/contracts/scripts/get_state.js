@@ -9,7 +9,7 @@ const BN = require("bn.js");
 // const contractAddress = "0x4169D71D56563eA9FDE76D92185bEB7aa1Da6fB8";
 
 const rpcEndpoint = "https://rinkeby.infura.io/48beda66075e41bda8b124c6a48fdfa0";
-const contractAddress = "0xc8Fb1dB63839bF901De0725F2E2e5960F9f8AC82";
+const contractAddress = "0x3a0768b1302357033c83E4808D1C3F69f270c463";
 
 const blockNumber = 2;
 
@@ -42,6 +42,9 @@ async function getState() {
     console.log(JSON.stringify(block));
     console.log("Block data commitment = " + block.publicDataCommitment);
     console.log("Block type = " + block.circuit);
+
+    const batch = await contract.exitBatches(0);
+    console.log(JSON.stringify(batch));
 
 }
 

@@ -10,7 +10,7 @@ const BN = require("bn.js");
 // const rpcEndpoint = "http://127.0.0.1:8545";
 // const contractAddress = "0x4169D71D56563eA9FDE76D92185bEB7aa1Da6fB8";
 const rpcEndpoint = "https://rinkeby.infura.io/48beda66075e41bda8b124c6a48fdfa0";
-const contractAddress = "0x8F1F1bE9469c06630bcC1FAc8c455E5D715f3949";
+const contractAddress = "0x3a0768b1302357033c83E4808D1C3F69f270c463";
 
 const privateKey = "0x12B7678FF12FE8574AB74FFD23B5B0980B64D84345F9D637C2096CA0EF587806";
 const blockNumber = 2;
@@ -32,9 +32,9 @@ async function fullWithdraw() {
     console.log("Balance for full exit = " + balanceForWithdraw.toString(10));
     const lastVerifiedBlockNumber = await contract.lastVerifiedBlockNumber();
     console.log("Last verified block = " + lastVerifiedBlockNumber);
-    // const tx = await contract.withdrawFullExitBalance(blockNumber);
-    // console.log("Result = ", tx.hash);
-    // const result = await tx.wait();
+    const tx = await contract.withdrawFullExitBalance(blockNumber);
+    console.log("Result = ", tx.hash);
+    const result = await tx.wait();
 }
 
 async function run() {
