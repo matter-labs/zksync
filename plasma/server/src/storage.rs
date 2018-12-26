@@ -98,7 +98,7 @@ impl StorageConnection {
             WHERE account_updates.block_number = {}
             ON CONFLICT (id) 
             DO UPDATE 
-            SET data = EXCLUDED.data", block_number);
+            SET data = EXCLUDED.data, last_block = EXCLUDED.last_block", block_number);
         diesel::sql_query(update.as_str())
             .execute(&self.conn)
             .map(|_|())
@@ -234,7 +234,6 @@ fn test_store_state() {
         accounts.clone().into_iter().collect::<Vec<(u32, models::Account)>>());
 
     // commit second state update
-    println!("second");
     let mut accounts2 = fnv::FnvHashMap::default();
     accounts2.insert(2, acc(2));
     accounts2.insert(4, acc(4));
