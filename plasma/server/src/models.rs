@@ -26,6 +26,9 @@ pub enum EthBlockData {
     },
     Exit{
         batch_number:   BatchNumber,
+
+        #[serde(with = "serde_bytes")]
+        public_data:    Vec<u8>,
     },
 }
 

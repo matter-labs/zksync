@@ -419,8 +419,7 @@ impl EthWatch {
             let topic = event.topics[0];
             match () {
                 () if topic == exit_event_topic => {
-                    let account_id = U256::from(event.topics[1]);
-                    println!("Exit from {:x}", account_id);
+                    let account_id = U256::from(event.topics[2]);
                     let existing_record = this_batch.get(&account_id).map(|&v| v.clone());
                     if let Some(record) = existing_record {
                         // double exit should not be possible due to SC
@@ -431,7 +430,7 @@ impl EthWatch {
                     continue;
                 },
                 () if topic == exit_canceled_topic => {
-                    let account_id = U256::from(event.topics[1]);
+                    let account_id = U256::from(event.topics[2]);
                     let existing_record = this_batch.get(&account_id).map(|&v| v.clone()).ok_or(())?;
                     this_batch.remove(&account_id);
                     continue;

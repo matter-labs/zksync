@@ -76,6 +76,7 @@ impl StorageConnection {
 
     fn commit_state_update(&self, block_number: u32, accounts_updated: &AccountMap) -> QueryResult<()> {
         for (&account_id, a) in accounts_updated.iter() {
+            println!("Committing state update for account {} in block {}", account_id, block_number);
             diesel::insert_into(account_updates::table)
                 .values(&AccountUpdate{
                     account_id:     account_id as i32,
@@ -121,7 +122,7 @@ impl StorageConnection {
             .load(&self.conn)
             .map(|accounts: Vec<Account>| {
                 let mut result = AccountMap::default();
-                let mut last_block = 1u32;
+                let mut last_block = 0u32;
                 let last_block_from_db = accounts.iter().map(|a| a.last_block).max();
                 if let Some(block_number) = last_block_from_db {
                     last_block = block_number as u32;

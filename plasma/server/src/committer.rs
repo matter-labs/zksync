@@ -20,6 +20,20 @@ fn sorted_and_padded_for_deposits(accounts_updated: AccountMap) -> [u64; config:
     tmp
 }
 
+fn sorted_and_padded_for_exits(accounts_updated: AccountMap) -> [u64; config::EXIT_BATCH_SIZE] {
+    let mut tmp = [params::SPECIAL_ACCOUNT_EXIT as u64; config::EXIT_BATCH_SIZE];
+    let mut acc: Vec<u64> = accounts_updated.keys()
+        .map(|&k| k as u64)
+        .collect();
+    acc.sort();
+
+    for (i, a) in acc.into_iter().enumerate() {
+        tmp[i] = a;
+    }
+
+    tmp
+}
+
 fn keys_sorted(accounts_updated: AccountMap) -> Vec<u64> {
     let mut acc: Vec<u64> = accounts_updated.keys()
         .map(|&k| k as u64)
@@ -73,17 +87,18 @@ pub fn start_eth_sender() -> Sender<(Operation, TxMeta)> {
                             eth_client.call("commitDepositBlock", meta,
                                 (U256::from(batch_number), sorted_and_padded_for_deposits(op.accounts_updated), op.block_number as u64, new_root)),
 
-                        EthBlockData::Exit{batch_number} =>
+                        EthBlockData::Exit{batch_number, public_data} =>
                             // function commitExitBlock(
-                            //     uint256 batchNumber,
-                            //     uint32 blockNumber, 
-                            //     bytes32 publicDataCommitment,
-                            //     bytes32 newRoot
-                            // ) 
+                            //         uint256 batchNumber,
+                            //         uint24[EXIT_BATCH_SIZE] memory accoundIDs, 
+                            //         uint32 blockNumber, 
+                            //         bytes memory txDataPacked, 
+                            //         bytes32 newRoot
+                            //     ) 
 
                             // TODO: fix zero H256, it should contait valid precommitment for an exit block
                             eth_client.call("commitExitBlock", meta,
-                                (U256::from(batch_number), op.block_number as u64, H256::zero(), new_root)),
+                                (U256::from(batch_number), sorted_and_padded_for_exits(op.accounts_updated), op.block_number as u64, public_data, new_root)),
                     }
                 },
                 Action::Verify{proof} => {
@@ -102,9 +117,14 @@ pub fn start_eth_sender() -> Sender<(Operation, TxMeta)> {
                             eth_client.call("verifyDepositBlock", meta,
                                 (U256::from(batch_number), sorted_and_padded_for_deposits(op.accounts_updated), op.block_number as u64, proof)),
 
-                        EthBlockData::Exit{batch_number} =>
+                        EthBlockData::Exit{batch_number, public_data: _} =>
+                            // function verifyExitBlock(
+                            //     uint256 batchNumber, 
+                            //     uint32 blockNumber, 
+                            //     uint256[8] memory proof
+                            // ) 
                             eth_client.call("verifyExitBlock", meta,
-                                (op.block_number as u64, batch_number as u64, keys_sorted(op.accounts_updated))),
+                                (op.block_number as u64, batch_number as u64, proof)),
                     }
                 },
                 _ => unimplemented!(),

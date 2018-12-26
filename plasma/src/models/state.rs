@@ -108,6 +108,8 @@ impl PlasmaState {
 
         let mut agumented_tx = tx.clone();
 
+        println!("Adding account balance to ExitTx, value = {}", acc.balance);
+
         agumented_tx.amount = acc.balance;
 
         self.balance_tree.delete(tx.account);

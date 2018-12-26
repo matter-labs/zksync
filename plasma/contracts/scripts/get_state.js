@@ -9,7 +9,9 @@ const BN = require("bn.js");
 // const contractAddress = "0x4169D71D56563eA9FDE76D92185bEB7aa1Da6fB8";
 
 const rpcEndpoint = "https://rinkeby.infura.io/48beda66075e41bda8b124c6a48fdfa0";
-const contractAddress = "0x008a662a145302bbbe31fa992433b4f4e992946f";
+const contractAddress = "0x2A8BadcC3d128d814AaEA66a89a6ba3e101D1761";
+
+const blockNumber = 3;
 
 async function getState() {
     let provider = new ethers.providers.JsonRpcProvider(rpcEndpoint);
@@ -35,6 +37,10 @@ async function getState() {
 
     const lastVerifiedDepositBatch = await contract.lastVerifiedDepositBatch();
     console.log("Last verified deposit batch = " + lastVerifiedDepositBatch.toString(10));
+
+    const block = await contract.blocks(blockNumber);
+    console.log(JSON.stringify(block));
+    console.log("Block data commitment = " + block.publicDataCommitment);
 
 }
 

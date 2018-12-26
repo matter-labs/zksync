@@ -14,7 +14,7 @@ const contractAddress = "0xb02781d70AF1eEd595737437020BbA4afCc771e8";
 
 const privateKey = "0x12B7678FF12FE8574AB74FFD23B5B0980B64D84345F9D637C2096CA0EF587806";
 
-async function depositInto(acccountString, amountString) {
+async function exit() {
     let provider = new ethers.providers.JsonRpcProvider(rpcEndpoint);
     let walletWithProvider = new ethers.Wallet(privateKey, provider);
     if (process.env.MNEMONIC !== undefined) {
@@ -31,16 +31,7 @@ async function depositInto(acccountString, amountString) {
     console.log("Transactor address  = " + transactor);
     const exitor = await contract.exitor();
     console.log("Exitor address = " + exitor);
-    const nextAccountToRegister = await contract.nextAccountToRegister();
-    console.log("Registering account = " + nextAccountToRegister.toString(10));
-    const newKey = transactionLib.newKey();
-    console.log("Plasma private key = " + newKey.privateKey.toString(16));
-    let {x, y} = newKey.publicKey;
-    x = "0x" + x.toString(16);
-    y = "0x" + y.toString(16);
-    const txAmount = ethers.utils.parseEther("0.001");
-    console.log("Tx amount in wei = " + txAmount.toString(10));
-    const tx = await contract.deposit([x, y], 0, {value: txAmount});
+    const tx = await contract.exit();
     console.log("Result = ", tx.hash);
     const result = await tx.wait();
     const totalDepositRequests = await contract.totalDepositRequests();
@@ -50,10 +41,7 @@ async function depositInto(acccountString, amountString) {
 }
 
 async function run() {
-    const args = process.argv.slice(2);
-    const account = args[0];
-    const amount = args[1];
-    await depositInto(account, amount);
+    await exit();
 }
 
 run().then()

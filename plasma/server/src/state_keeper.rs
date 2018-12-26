@@ -88,14 +88,16 @@ impl PlasmaStateKeeper {
 
         let storage = StorageConnection::new();
         let (last_committed_block, initial_state) = storage.load_committed_state().expect("db must be functional");
+        println!("Last committed block to before the start of state keeper = {}", last_committed_block);
         for (id, account) in initial_state {
             balance_tree.insert(id, account);
         }
 
+        // Keeper starts with the NEXT block
         let keeper = PlasmaStateKeeper {
             state: PlasmaState{
                 balance_tree,
-                block_number: last_committed_block,
+                block_number: last_committed_block + 1,
             },
             private_keys: keys_map
         };
@@ -226,20 +228,26 @@ impl PlasmaStateKeeper {
         Ok((root, eth_block_data, updated_accounts))
     }
 
+    // prover MUST read old balances and mutate the block data
     fn apply_exit_block(&mut self, block: &mut ExitBlock, batch_number: BatchNumber) -> Result<(H256, EthBlockData, AccountMap), ()> {
         use ff::{PrimeField, PrimeFieldRepr};
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
+        let mut augmented_txes = vec![];
         for tx in block.transactions.iter() {
-            self.state.apply_exit(&tx).expect("queue must work");
-
+            let augmented_tx = self.state.apply_exit(&tx).expect("queue must work");
+            augmented_txes.push(augmented_tx);
             // collect updated state
             updated_accounts.insert(tx.account, self.account(tx.account));
         }
             
         block.block_number = self.state.block_number;
         block.new_root_hash = self.state.root_hash();
+        block.transactions = augmented_txes;
 
-        let eth_block_data = EthBlockData::Deposit{ batch_number };
+        let eth_block_data = EthBlockData::Exit{ 
+            batch_number,
+            public_data: BabyProver::encode_exit_transactions(&block).unwrap(), 
+        };
         let mut be_bytes: Vec<u8> = vec![];
         &block.new_root_hash.clone().into_repr().write_be(& mut be_bytes);
         let root = H256::from(U256::from_big_endian(&be_bytes));

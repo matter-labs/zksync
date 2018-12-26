@@ -164,7 +164,7 @@ impl BabyProver {
 
         let state_block_number = initial_state.block_number;
 
-        println!("Root hash is {} for block {}", root, state_block_number);
+        println!("Initial root hash is {} for block {}", root, state_block_number);
 
         let supplied_root = initial_state.root_hash();
 
@@ -263,7 +263,6 @@ impl BabyProver {
 
     // this method is different, it actually reads the state 
     pub fn encode_exit_transactions(block: &ExitBlock) -> Result<Vec<u8>, Err> {
-        // return Ok(vec![]);
         let mut encoding: Vec<u8> = vec![];
         
         let transactions = &block.transactions;
@@ -550,7 +549,7 @@ impl BabyProver {
         println!("Made a proof for initial root = {}, final root = {}, public data = {}", initial_root, final_root, public_data_commitment.clone().to_hex());
         let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]);
         if success.is_err() {
-            println!("Proof is generation failed with error {}", success.err().unwrap());
+            println!("Proof is verification failed with error {}", success.err().unwrap());
             return Err(BabyProverErr::Unknown);
         }
         if success.unwrap() == false {
@@ -743,8 +742,12 @@ impl BabyProver {
         println!("Made a proof for initial root = {}, final root = {}, public data = {}", initial_root, final_root, public_data_commitment.clone().to_hex());
         let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]);
         
-        if success.is_err() || success.unwrap() == false {
-            println!("Proof is invalid!");
+        if success.is_err() {
+            println!("Proof is verification failed with error {}", success.err().unwrap());
+            return Err(BabyProverErr::Unknown);
+        }
+        if success.unwrap() == false {
+            println!("Proof is invalid");
             return Err(BabyProverErr::Unknown);
         }
         println!("Proof generation is complete");
@@ -760,7 +763,6 @@ impl BabyProver {
         Ok(full_proof)
     }
 
-    // TODO: sort accounts!
     pub fn apply_and_prove_exit(&mut self, block: &ExitBlock) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.block_number {
@@ -920,9 +922,15 @@ impl BabyProver {
 
         let pvk = prepare_verifying_key(&self.exit_parameters.vk);
 
-        let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]).unwrap();
+        println!("Made a proof for initial root = {}, final root = {}, public data = {}", initial_root, final_root, public_data_commitment.clone().to_hex());
+        let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]);
         
-        if !success {
+        if success.is_err() {
+            println!("Proof is verification failed with error {}", success.err().unwrap());
+            return Err(BabyProverErr::Unknown);
+        }
+        if success.unwrap() == false {
+            println!("Proof is invalid");
             return Err(BabyProverErr::Unknown);
         }
         println!("Proof generation is complete");
