@@ -10,7 +10,7 @@ const BN = require("bn.js");
 // const rpcEndpoint = "http://127.0.0.1:8545";
 // const contractAddress = "0x4169D71D56563eA9FDE76D92185bEB7aa1Da6fB8";
 const rpcEndpoint = "https://rinkeby.infura.io/48beda66075e41bda8b124c6a48fdfa0";
-const contractAddress = "0xb02781d70AF1eEd595737437020BbA4afCc771e8";
+const contractAddress = "0xc8Fb1dB63839bF901De0725F2E2e5960F9f8AC82";
 
 const privateKey = "0x12B7678FF12FE8574AB74FFD23B5B0980B64D84345F9D637C2096CA0EF587806";
 

@@ -35,7 +35,13 @@ contract PlasmaTransactor is Plasma {
         require(blockNumber == lastVerifiedBlockNumber + 1, "may only verify next block");
         Block memory committed = blocks[blockNumber];
         require(committed.circuit == uint8(Circuit.TRANSFER), "trying to prove the invalid circuit for this block number");
-        bool verification_success = verifyProof(Circuit.TRANSFER, proof, lastVerifiedRoot, committed.newRoot, committed.publicDataCommitment);
+        bool verification_success = verifyProof(
+            Circuit.TRANSFER, 
+            proof, 
+            lastVerifiedRoot, 
+            committed.newRoot, 
+            committed.publicDataCommitment
+        );
         require(verification_success, "invalid proof");
 
         emit BlockVerified(blockNumber);

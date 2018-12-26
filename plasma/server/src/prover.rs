@@ -16,8 +16,6 @@ use sapling_crypto::jubjub::{JubjubEngine, edwards};
 
 use self::rustc_hex::ToHex;
 
-
-
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
 
 use plasma::models::{self, params, TransferBlock, DepositBlock, ExitBlock, Block, PlasmaState, AccountMap};
@@ -269,10 +267,17 @@ impl BabyProver {
 
         for tx in transactions {
             let tx = models::circuit::ExitRequest::try_from(tx).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
+            if (tx.amount == Fr::zero()) {
+                println!("Trying to exit a zero balance");
+            }
             let tx_bits = tx.public_data_into_bits();
             let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
             encoding.extend(tx_encoding.into_iter());
         }
+
+        let public_data_hex: String = encoding.clone().to_hex();
+
+        println!("Final encoding = {}", public_data_hex);
 
         Ok(encoding)
     }
@@ -688,15 +693,22 @@ impl BabyProver {
 
         let bytes_to_hash = be_bit_vector_into_bytes(&public_data_initial_bits);
 
+        let hex_block_and_fee: String = bytes_to_hash.clone().to_hex();
+        println!("Packed initial hash information in deposit = {}", hex_block_and_fee);
+
         h.input(&bytes_to_hash);
 
         let mut hash_result = [0u8; 32];
         h.result(&mut hash_result[..]);
 
+        let initial_hash: String = hash_result.clone().to_hex();
+        println!("Block number hash in deposit = {}", initial_hash);
+
         {    
             let packed_transaction_data_bytes = public_data.clone();
+
             let hex: String = packed_transaction_data_bytes.clone().to_hex();
-            println!("Packed deposit information data = {}", hex);
+            println!("Packed deposit information data in deposit = {}", hex);
 
             let mut next_round_hash_bytes = vec![];
             next_round_hash_bytes.extend(hash_result.iter());
@@ -739,7 +751,7 @@ impl BabyProver {
 
         let pvk = prepare_verifying_key(&self.deposit_parameters.vk);
 
-        println!("Made a proof for initial root = {}, final root = {}, public data = {}", initial_root, final_root, public_data_commitment.clone().to_hex());
+        println!("Made an deposit proof for initial root = {}, final root = {}, public data = {}", initial_root, final_root, public_data_commitment.clone().to_hex());
         let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]);
         
         if success.is_err() {
@@ -757,7 +769,7 @@ impl BabyProver {
             inputs: [initial_root, final_root, public_data_commitment],
             total_fees: Fr::zero(),
             block_number: block_number,
-            public_data: public_data, // it's effectively zero
+            public_data: public_data,
         };
 
         Ok(full_proof)
@@ -865,17 +877,29 @@ impl BabyProver {
 
         let bytes_to_hash = be_bit_vector_into_bytes(&public_data_initial_bits);
 
+        let hex_block_and_fee: String = bytes_to_hash.clone().to_hex();
+        println!("Packed initial hash information in exit = {}", hex_block_and_fee);
+
         h.input(&bytes_to_hash);
 
         let mut hash_result = [0u8; 32];
         h.result(&mut hash_result[..]);
 
+        let initial_hash: String = hash_result.clone().to_hex();
+        println!("Block number hash in exit = {}", initial_hash);
+
         {    
             let packed_transaction_data_bytes = public_data.clone();
+
+            let hex: String = packed_transaction_data_bytes.clone().to_hex();
+            println!("Packed transfers information data in exit= {}", hex);
         
             let mut next_round_hash_bytes = vec![];
             next_round_hash_bytes.extend(hash_result.iter());
             next_round_hash_bytes.extend(packed_transaction_data_bytes);
+
+            let hex_full: String = next_round_hash_bytes.clone().to_hex();
+            println!("Final hashable information data in exit= {}", hex_full);
 
             let mut h = Sha256::new();
 
@@ -885,6 +909,9 @@ impl BabyProver {
         }
 
         // clip to fit into field element
+
+        let final_hash_hex: String = hash_result.clone().to_hex();
+        println!("Full public data commitment = {}", final_hash_hex);
 
         hash_result[0] &= 0x1f; // temporary solution
 
@@ -922,7 +949,7 @@ impl BabyProver {
 
         let pvk = prepare_verifying_key(&self.exit_parameters.vk);
 
-        println!("Made a proof for initial root = {}, final root = {}, public data = {}", initial_root, final_root, public_data_commitment.clone().to_hex());
+        println!("Made an exit proof for initial root = {}, final root = {}, public data = {}", initial_root, final_root, public_data_commitment.clone().to_hex());
         let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]);
         
         if success.is_err() {
@@ -977,3 +1004,18 @@ pub fn start_prover(
         prover.run(rx_for_blocks, tx_for_ops)
     });
 }
+
+// #[test]
+
+// fn test_exit_encoding() {
+//     extern crate BigDecimal;
+//     use plasma::models::ExitTx;
+//     use self::BigDecimal::from_primitive;
+//     let exit_tx = ExitTx {
+//         account: 2,
+//         amount: BigDecimal::from(1000),
+//     }
+//     let exitBlock = ExitBlock {
+
+//     }
+// }

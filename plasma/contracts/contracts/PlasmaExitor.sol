@@ -215,7 +215,7 @@ contract PlasmaExitor is Plasma {
             scaledAmount = uint128(chunk << 24 >> 128);
             fullExits[blockNumber][accountIDs[i]] = scaledAmount;
 
-            accountOwner.transfer(scaleFromPlasmaUnitsIntoWei(scaledAmount));
+            // accountOwner.transfer(scaleFromPlasmaUnitsIntoWei(scaledAmount));
         }
     }
 

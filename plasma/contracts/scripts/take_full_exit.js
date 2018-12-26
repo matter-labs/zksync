@@ -10,11 +10,12 @@ const BN = require("bn.js");
 // const rpcEndpoint = "http://127.0.0.1:8545";
 // const contractAddress = "0x4169D71D56563eA9FDE76D92185bEB7aa1Da6fB8";
 const rpcEndpoint = "https://rinkeby.infura.io/48beda66075e41bda8b124c6a48fdfa0";
-const contractAddress = "0xc8Fb1dB63839bF901De0725F2E2e5960F9f8AC82";
+const contractAddress = "0x8F1F1bE9469c06630bcC1FAc8c455E5D715f3949";
 
 const privateKey = "0x12B7678FF12FE8574AB74FFD23B5B0980B64D84345F9D637C2096CA0EF587806";
+const blockNumber = 2;
 
-async function exit() {
+async function fullWithdraw() {
     let provider = new ethers.providers.JsonRpcProvider(rpcEndpoint);
     let walletWithProvider = new ethers.Wallet(privateKey, provider);
     if (process.env.MNEMONIC !== undefined) {
@@ -27,21 +28,17 @@ async function exit() {
     let contract = new ethers.Contract(contractAddress, abi_string, walletWithProvider);
     const existingID = await contract.ethereumAddressToAccountID(senderAddress);
     console.log("This ethereum account has an id = " + existingID.toString(10));
-    const transactor = await contract.transactor();
-    console.log("Transactor address  = " + transactor);
-    const exitor = await contract.exitor();
-    console.log("Exitor address = " + exitor);
-    const tx = await contract.exit();
-    console.log("Result = ", tx.hash);
-    const result = await tx.wait();
-    const totalDepositRequests = await contract.totalDepositRequests();
-    console.log("Total deposits = " + totalDepositRequests.toString(10));
-    const totalExitRequests = await contract.totalExitRequests();
-    console.log("Total exits = " + totalExitRequests.toString(10));
+    const balanceForWithdraw = await contract.fullExits(blockNumber, existingID);
+    console.log("Balance for full exit = " + balanceForWithdraw.toString(10));
+    const lastVerifiedBlockNumber = await contract.lastVerifiedBlockNumber();
+    console.log("Last verified block = " + lastVerifiedBlockNumber);
+    // const tx = await contract.withdrawFullExitBalance(blockNumber);
+    // console.log("Result = ", tx.hash);
+    // const result = await tx.wait();
 }
 
 async function run() {
-    await exit();
+    await fullWithdraw();
 }
 
 run().then()
