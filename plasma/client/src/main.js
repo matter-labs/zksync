@@ -4,7 +4,7 @@ import "bootstrap/dist/css/bootstrap.min.css"
 import "bootstrap-vue/dist/bootstrap-vue.css"
 
 import store from './store'
-import { ethers } from 'ethers'
+import Eth from 'ethjs'
 
 import Router from 'vue-router'
 import App from './App.vue'
@@ -31,22 +31,19 @@ window.app = new Vue({
         store
     }),
     async created() {
-
         // read store.account from local storage?
-
         if (typeof window.ethereum !== 'undefined') {
-            this.store.web3 = new ethers.providers.Web3Provider(web3.currentProvider)
-            let accounts = await ethereum.enable()
-            if (store.account !== accounts[0]) {
-                // switching accounts
-                store.account = accounts[0]
-                this.$router.push('/login')
-            }
+            window.eth = this.store.eth = new Eth(web3.currentProvider)
+        }
+        if (!store.account) {
+            this.$router.push('/login')
         }
     },
     render: h => h(App)
 })
 
+// debug utils
+window.store = store
 window.p = {
     // promise printer for debugging in console
     set p(promise) {
