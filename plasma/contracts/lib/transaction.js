@@ -306,6 +306,11 @@ function createTransaction(from, to, amount, fee, nonce, good_until_block, priva
 
 
 function main() {
+    for (let i = 0; i < 20; i++) {
+        let bn = new BN(i);
+        let enc = integerToFloat(bn, 5, 11, 10);
+        console.log(enc.toString("hex"));
+    }
     const sk = (new BN(elliptic.rand(32), 16, "be")).umod(altBabyJubjub.n);
     const pub = altBabyJubjub.g.mul(sk);
     const message = elliptic.rand(16);
@@ -345,6 +350,8 @@ function newKey() {
         packedPublicKey: y_packed
     };
 }
+
+// main();
 
 module.exports = {
     sign,
