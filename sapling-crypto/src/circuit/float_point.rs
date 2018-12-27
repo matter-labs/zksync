@@ -127,31 +127,37 @@ pub fn convert_to_float(
     if integer > (max_mantissa * max_exponent) {
         return Err(SynthesisError::Unsatisfiable)
     }
-    // always try best precision
-    let exponent_guess = integer / max_mantissa;
-    let mut exponent_temp = exponent_guess;
+
     let mut exponent: usize = 0;
-    loop {
-        if exponent_temp < exponent_base {
-            break
+    let mut mantissa = integer;
+
+    if integer > max_mantissa {
+    // always try best precision
+        let exponent_guess = integer / max_mantissa;
+        let mut exponent_temp = exponent_guess;
+
+        loop {
+            if exponent_temp < exponent_base {
+                break
+            }
+            exponent_temp = exponent_temp / exponent_base;
+            exponent += 1;
         }
-        exponent_temp = exponent_temp / exponent_base;
-        exponent += 1;
+
+        exponent_temp = 1u128;
+        for _ in 0..exponent 
+        {
+            exponent_temp = exponent_temp * exponent_base;
+        }    
+
+        if exponent_temp * max_mantissa < integer 
+        {
+            exponent += 1;
+            exponent_temp = exponent_temp * exponent_base;
+        }
+
+        mantissa = integer / exponent_temp;
     }
-
-    exponent_temp = 1u128;
-    for _ in 0..exponent 
-    {
-        exponent_temp = exponent_temp * exponent_base;
-    }    
-
-    if exponent_temp * max_mantissa < integer 
-    {
-        exponent += 1;
-        exponent_temp = exponent_temp * exponent_base;
-    }
-
-    let mantissa = integer / exponent_temp;
 
     // encode into bits. First bits of mantissa in LE order
 
@@ -318,5 +324,25 @@ fn test_encoding_powers_of_two() {
                 assert!(bit);
             }
         }
+    }
+}
+
+#[test]
+fn test_encoding_small_numbers() {
+    use rand::{SeedableRng, Rng, XorShiftRng};
+    let rng = XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+
+    let mantissa_length = 11;
+
+    for i in 0..20 {
+        let encoding = convert_to_float(i as u128, 5, 11, 10).unwrap();
+        for bit in encoding.into_iter(){
+            if bit {
+                print!("1");
+            } else {
+                print!("0")
+            }
+        }
+        print!("\n");
     }
 }

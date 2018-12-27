@@ -37,6 +37,18 @@ struct NewOperation {
     pub action_type:    String,
 }
 
+
+#[derive(Debug, QueryableByName)]
+pub struct BatchNumber {
+    #[sql_type="Integer"]
+    pub batch_number: i32,
+}
+
+// #[derive(Queryable)]
+// struct MaxCommittedDepositBatch {
+//     pub batch_number:   Integer,
+// }
+
 impl StorageConnection {
 
     /// creates a single db connection; it's safe to create multiple instances of StorageConnection
@@ -162,6 +174,38 @@ impl StorageConnection {
 
         diesel::sql_query(SELECT)
             .load(&self.conn)
+    }
+
+    pub fn load_last_committed_deposit_batch(&self) -> i32 {
+        const SELECT: &str = "
+        SELECT COALESCE(max((data->'block_data'->>'batch_number')::int), -1) as batch_number FROM operations 
+        WHERE data->'action'->>'type' = 'Commit' 
+        AND data->'block_data'->>'type' = 'Deposit'
+        ";
+
+        let result = diesel::sql_query(SELECT)
+            .load::<BatchNumber>(&self.conn)
+            .expect("should load last committed deposit batch");
+
+        let last_committed = result.get(0).expect("should never return an empty array");
+        
+        last_committed.batch_number
+    }
+
+    pub fn load_last_committed_exit_batch(&self) -> i32 {
+        const SELECT: &str = "
+        SELECT COALESCE(max((data->'block_data'->>'batch_number')::int), -1) as batch_number FROM operations 
+        WHERE data->'action'->>'type' = 'Commit' 
+        AND data->'block_data'->>'type' = 'Exit'
+        ";
+
+        let result = diesel::sql_query(SELECT)
+            .load::<BatchNumber>(&self.conn)
+            .expect("should load last committed exit batch");
+
+        let last_committed = result.get(0).expect("should never return an empty array");
+        
+        last_committed.batch_number
     }
 
 }

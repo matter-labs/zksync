@@ -105,7 +105,7 @@ function integerToFloat(
     let power = integer.div(maxMantissa);
     const exponentBase = new BN(exp_base);
     let exponent = new BN(0);
-    if (integer.lte((new BN(exp_base)))) {
+    if (integer.lte((new BN(maxMantissa)))) {
         exponent = new BN(0);
     } else {
         while (power.gt(exponentBase)) {
