@@ -1,4 +1,5 @@
 <template>
+<b-container id="login">
     <b-jumbotron bg-variant="light" border-variant="dark">
     <template slot="header">
         Plasma Wallet
@@ -10,6 +11,7 @@
     <b-btn v-if="ethereumSupported" variant="success" size="lg" @click="login">Login with Metamask</b-btn>
     <p v-else style="color: red">Ethereum support is not detected. Please use an Ethereum-compatible browser, e.g. install <a href="https://metamask.io">Metamask</a>.</p>
     </b-jumbotron>
+</b-container>
 </template>
 
 <script>
@@ -44,3 +46,19 @@ export default {
     },
 }
 </script>
+
+<style>
+#login {
+    font-family: 'Avenir', Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-align: center;
+    color: #2c3e50;
+    margin-top: 60px;
+}
+
+h1, h2 {
+    font-weight: normal;
+}
+
+</style>
