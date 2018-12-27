@@ -1,6 +1,8 @@
 const elliptic = require('elliptic');
 const BN = require("bn.js");
 const assert = require("assert");
+const Buffer = require('buffer/').Buffer  // note: the trailing slash is important!
+
 //! `Fr modulus = 21888242871839275222246405745257275088548364400416034343698204186575808495617`
 //! 
 //! It takes the form `-x^2 + y^2 = 1 + dx^2y^2` with
@@ -133,7 +135,10 @@ function integerToFloat(
             encoding.bincn(totalBits - exp_bits - i);
         }
     }
-    return encoding.toBuffer("be", (exp_bits + mantissa_bits)/8);
+    console.log(encoding.toString())
+    console.log(exp_bits, mantissa_bits)
+    console.log((exp_bits + mantissa_bits)/8)
+    return encoding.toArrayLike(Buffer, "be", (exp_bits + mantissa_bits)/8)
 }
 
 function packBnLe(bn, numBits) {
@@ -175,12 +180,12 @@ function serializeTransaction(tx) {
     // components.push(packBnLe(good_until_block, 32));
 
     const components = [
-        good_until_block.toBuffer("be", 4),
-        nonce.toBuffer("be", 4),
+        good_until_block.toArrayLike(Buffer, "be", 4),
+        nonce.toArrayLike(Buffer, "be", 4),
         packBnLe(new BN(feeFloatBytes, 16, "be"), 8),
         packBnLe(new BN(amountFloatBytes, 16, "be"), 16),
-        to.toBuffer("be", 3),
-        from.toBuffer("be", 3)
+        to.toArrayLike(Buffer, "be", 3),
+        from.toArrayLike(Buffer, "be", 3)
     ];
 
     let serialized = Buffer.concat(components);
@@ -208,8 +213,8 @@ function getPublicData(tx) {
     assert(fee.bitLength() <= 128);
 
     const components = [];
-    components.push(from.toBuffer("be", 3));
-    components.push(to.toBuffer("be", 3));
+    components.push(from.toArrayLike(Buffer, "be", 3));
+    components.push(to.toArrayLike(Buffer, "be", 3));
     let amountFloatBytes = integerToFloat(amount, 5, 11, 10);
     components.push(amountFloatBytes);
     let feeFloatBytes = integerToFloat(fee, 5, 3, 10);
@@ -318,7 +323,7 @@ function main() {
     assert(isValidParsed);
 
     // exp = 1, mantissa = 1 => 10
-    // const floatBytes = (new BN("1000010000000000", 2)).toBuffer();
+    // const floatBytes = (new BN("1000010000000000", 2)).toArrayLike(Buffer, );
     // const integer = floatToInteger(floatBytes, 5, 11, 10);
     // assert(integer.toString(10) === "10");
     const someInt = new BN("1234556678")

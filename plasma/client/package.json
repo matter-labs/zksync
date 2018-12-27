@@ -14,6 +14,7 @@
     "bn.js": "^4.11.8",
     "bootstrap": "^4.0.0-beta.2",
     "bootstrap-vue": "^1.2.0",
+    "buffer": "^5.2.1",
     "ethjs": "^0.4.0",
     "ethjs-util": "^0.1.6",
     "popper.js": "^1.12.9",

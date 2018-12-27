@@ -21,18 +21,22 @@
         <b-row>
             <b-col sm="8" order="2">
                 <b-card title="Transfer in Plasma" class="mb-4">
-                    <b-row class="mb-3">
+                    <b-alert show dismissible variant="success" fade :show="countdown" @dismissed="countdown=0" class="mt-2">
+                        {{result}}
+                    </b-alert>
+                    <b-row class="mb-3 mt-4">
                         <b-col sm="2"><label for="transferToInput">To:</label></b-col>
-                        <b-col sm="10"><b-form-input id="transferToInput" type="text" v-model="transferAmount" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input></b-col>
+                        <b-col sm="10"><b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input></b-col>
                     </b-row>
                     <b-row class="mb-3">
                         <b-col sm="2"><label for="transferAmountInput">Amount:</label></b-col>
-                        <b-col sm="4"><b-form-input id="transferAmountInput" type="number" placeholder="7.50"></b-form-input></b-col>
+                        <b-col sm="4"><b-form-input id="transferAmountInput" placeholder="7.50" v-model="transferAmount"></b-form-input></b-col>
                     </b-row>
-                    <b-btn variant="outline-primary" @click="tx=2">Submit transaction</b-btn>
-                    <b-alert show dismissible variant="success" fade :show="tx" @dismissed="tx=null" class="mt-2">
-                        Submitted successfully
-                    </b-alert>
+                    <b-row class="mb-3">
+                        <b-col sm="2"><label for="transferNonceInput">Nonce:</label></b-col>
+                        <b-col sm="4"><b-form-input id="transferNonceInput" placeholder="7.50" v-model="transferNonce"></b-form-input></b-col>
+                    </b-row>
+                    <b-btn  class="float-right" variant="outline-primary" @click="transfer">Submit transaction</b-btn>
                 </b-card>
             </b-col>
             <b-col sm="4" class="mb-5" order="1">
@@ -91,6 +95,8 @@ import store from './store'
 import {BN} from 'bn.js'
 import Eth from 'ethjs'
 import axios from 'axios'
+import ethUtil from 'ethjs-util'
+import transactionLib from '../../contracts/lib/transaction.js'
 
 const baseUrl = 'http://188.166.33.159:8080'
 
@@ -100,8 +106,9 @@ export default {
         store,
         tx:             null,
 
-        transferTo:     null,
-        transferAmount: null,
+        transferTo:     '0x6394b37Cf80A7358b38068f0CA4760ad49983a1B',
+        transferAmount: '0.001',
+        transferNonce:  0,
 
         depositAmount:  null,
 
@@ -109,6 +116,8 @@ export default {
         withdrawAmount: null,
 
         updateInterval: null,
+        countdown:      0,
+        result:         null
     }),
     created() {
         this.updateAccountInfo()
@@ -134,8 +143,42 @@ export default {
             this.$refs.withdrawModal.hide()
             console.log('withdraw', this.withdrawAll ? 'all' : this.withdrawAmount)
         },
-        transfer() {
-            console.log('transfer to', this.transferTo, this.transferAmount)
+        alert(msg) {
+            this.result = msg
+            this.countdown = 8
+        },
+        async transfer() {
+            console.log('initiating transfer to', this.transferTo, this.transferAmount)
+
+            const from = store.account.plasma.id
+
+            if(!ethUtil.isHexString(this.transferTo)) {
+                this.alert('to is not a hex string')
+                return  
+            }
+            const to = (await contract.ethereumAddressToAccountID(this.transferTo))[0].toNumber()
+            if(0 === to) {
+                this.alert('recepient not found')
+                return
+            }
+
+            const privateKey = store.account.plasma.key.privateKey
+            const nonce = this.transferNonce //store.account.plasma.nonce;
+            const good_until_block = 100;
+            const amount = Eth.toWei(this.transferAmount, 'ether').div(new BN('1000000000000')).toNumber();
+            const fee = 0;
+
+            console.log(from, to, amount, fee, nonce, good_until_block, privateKey)
+
+            const apiForm = transactionLib.createTransaction(from, to, amount, fee, nonce, good_until_block, privateKey);
+            console.log(JSON.stringify(apiForm));
+            const result = await axios({
+                method:     'post',
+                url:        baseUrl + '/send',
+                data:       apiForm
+            });
+            console.log(JSON.stringify(result.data));
+            this.alert(result.data)
         },
         async updateAccountInfo() {
             try {
@@ -148,7 +191,7 @@ export default {
                 if(id>0) {
                     const result = await axios({
                         method: 'get',
-                        url: baseUrl + '/account/' + id,
+                        url:    baseUrl + '/account/' + id,
                     });
                     let balance = new BN(result.data.balance).mul(new BN('1000000000000'))
                     store.account.plasma.balance = Eth.fromWei(balance, 'ether')

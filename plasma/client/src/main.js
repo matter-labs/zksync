@@ -47,6 +47,9 @@ window.app = new Vue({
 })
 
 // debug utils
+
+window.BN = require('bn.js')
+window.Buffer = require('buffer/').Buffer
 window.store = store
 window.p = {
     // promise printer for debugging in console
