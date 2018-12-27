@@ -23,7 +23,7 @@
                 <b-card title="Transfer in Plasma" class="mb-4">
                     <b-row class="mb-3">
                         <b-col sm="2"><label for="transferToInput">To:</label></b-col>
-                        <b-col sm="10"><b-form-input id="transferToInput" type="text"  placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input></b-col>
+                        <b-col sm="10"><b-form-input id="transferToInput" type="text" v-model="transferAmount" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input></b-col>
                     </b-row>
                     <b-row class="mb-3">
                         <b-col sm="2"><label for="transferAmountInput">Amount:</label></b-col>
@@ -68,7 +68,7 @@
 
     <b-modal ref="depositModal" id="depositModal" title="Deposit" hide-footer>
         <label for="depositAmountInput">Amount:</label>
-        <b-form-input id="depositAmountInput" type="number" placeholder="7.50"></b-form-input>
+        <b-form-input id="depositAmountInput" type="number" placeholder="7.50" v-model="depositAmount"></b-form-input>
         <b-btn variant="primary" @click="deposit" class="mt-4 float-right">Deposit</b-btn>
     </b-modal>
 
@@ -78,7 +78,7 @@
             aria-controls="flavours">Withdraw all funds</b-form-checkbox>
         <div v-if="!withdrawAll">
             <label for="withdrawAmountInput">Amount:</label>
-            <b-form-input id="withdrawAmountInput" type="number" placeholder="7.50"></b-form-input>
+            <b-form-input id="withdrawAmountInput" type="number" placeholder="7.50" v-model="withdrawAmount"></b-form-input>
         </div>
         <b-btn variant="primary" @click="withdraw" class="mt-4 float-right">Withdraw</b-btn>
     </b-modal>
@@ -88,7 +88,8 @@
 <script>
 
 import store from './store'
-import BN from 'bn.js'
+import {BN} from 'bn.js'
+import Eth from 'ethjs'
 
 export default {
     name: 'wallet',
@@ -110,7 +111,15 @@ export default {
     methods: {
         deposit() {
             this.$refs.depositModal.hide()
+            let pub = store.account.plasma.key.publicKey
+            let maxFee = new BN()
+
             console.log('deposit', this.depositAmount)
+            let value = Eth.toWei(this.depositAmount, 'ether')
+            let from = store.account.address
+            console.log('deposit', value, from)
+
+            contract.deposit([pub.x, pub.y], maxFee, { value, from })
         },
         withdraw() {
             this.$refs.withdrawModal.hide()
