@@ -78,7 +78,8 @@ impl ETHClient {
         let data = f.encode_input( &params.into_tokens() ).expect("failed to encode parameters");
 
         // fetch current nonce and gas_price
-        let gas_price = self.get_gas_price()?;
+        let mut gas_price = self.get_gas_price()?;
+        gas_price = gas_price * U256::from(2);
 
         // let nonce = self.nonce.clone();
         // let mut new_nonce = self.nonce;
