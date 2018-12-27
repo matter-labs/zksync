@@ -35,7 +35,7 @@ window.app = new Vue({
         if (typeof window.ethereum !== 'undefined') {
             window.eth = this.store.eth = new Eth(web3.currentProvider)
         }
-        if (!store.account) {
+        if (!store.account.address) {
             this.$router.push('/login')
         }
     },

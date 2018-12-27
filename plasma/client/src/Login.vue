@@ -37,7 +37,7 @@ export default {
                 console.log('with', account)
                 let sig = await eth.personal_sign(ethUtil.fromUtf8(new Buffer('Login to Plasma Wallet')), account)
                 console.log(sig)
-                store.account = account
+                store.account.address = account
                 this.$parent.$router.push('/wallet')
             } catch (e) {
                 console.log('login failed: ', e)

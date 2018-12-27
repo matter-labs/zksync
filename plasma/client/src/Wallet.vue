@@ -11,7 +11,7 @@
             </b-navbar-nav>
             <!-- Right aligned nav items -->
             <b-navbar-nav class="ml-auto">
-                <b-nav-item right>{{ store.account }}</b-nav-item>
+                <b-nav-item right>{{ store.account.address }}</b-nav-item>
             </b-navbar-nav>
         </b-collapse>
     </b-container>
@@ -19,26 +19,45 @@
     <br>
     <b-container class="bv-example-row">
         <b-row>
-            <b-col sm="8" class="mb-4">
-                <b-card header="Your account">
+            <b-col sm="8" order="2">
+                <b-card title="Your account" class="mb-4">
                     <b-form>
-                        <b-form-input v-model="store.account" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
+                        <b-form-input v-model="store.account.address" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                     </b-form>
                 </b-card>
+                <b-card title="Transfer in Plasma" class="mb-4">
+                        <b-row class="mb-3">
+                            <b-col sm="2"><label for="to">To:</label></b-col>
+                            <b-col sm="10"><b-form-input id="to" type="text"  placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input></b-col>
+                        </b-row>
+                        <b-row class="mb-3">
+                            <b-col sm="2"><label for="amount">Amount:</label></b-col>
+                            <b-col sm="4"><b-form-input id="amount" type="number" placeholder="7.50"></b-form-input></b-col>
+                        </b-row>
+                        <b-btn variant="outline-primary">Submit transaction</b-btn>
+                </b-card>
             </b-col>
-            <b-col sm="4" class="mb-4">
-                <b-card header="Account info">
-                    <b-row>
-                        <b-col>Balance:</b-col> <b-col>0 ETH</b-col>
+            <b-col sm="4" class="mb-4" order="1">
+                <b-card title="Account info">
+                    <b-card class="mb-3">
+                        <p class="mb-2"><strong>Mainchain</strong></p>
+                        <b-row>
+                            <b-col>Balance:</b-col> <b-col>0 ETH</b-col>
+                        </b-row>
+                    </b-card>
+                    <b-row class="mb-0 mt-0">
+                        <b-col sm class="mb-2"><b-btn variant="outline-primary" class="w-100">&#x21E9; Deposit</b-btn></b-col>
+                        <b-col sm class="mb-2"><b-btn variant="outline-primary" class="w-100">Withdraw &#x21E7;</b-btn></b-col>
                     </b-row>
-                    <b-row>                    
-                        <b-col>Nonce:</b-col> <b-col>0</b-col>
-                    </b-row>
-                    <br>
-                    <b-row>
-                        <b-col sm class="mb-2"><b-btn variant="outline-secondary" class="w-100">Deposit</b-btn></b-col>
-                        <b-col sm class="mb-2"><b-btn variant="outline-secondary" class="w-100">Withdraw</b-btn></b-col>
-                    </b-row>
+                    <b-card class="mt-2">
+                        <p class="mb-2"><strong>Plasma</strong></p>
+                        <b-row>
+                            <b-col>Balance:</b-col> <b-col>0 ETH</b-col>
+                        </b-row>
+                        <b-row>                    
+                            <b-col>Nonce:</b-col> <b-col>0</b-col>
+                        </b-row>
+                    </b-card>
                 </b-card>
             </b-col>
         </b-row>
