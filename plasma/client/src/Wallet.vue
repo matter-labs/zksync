@@ -88,6 +88,7 @@
 <script>
 
 import store from './store'
+import BN from 'bn.js'
 
 export default {
     name: 'wallet',
@@ -103,6 +104,9 @@ export default {
         withdrawAll:    true,
         withdrawAmount: null,
     }),
+    created() {
+        this.updateAccountInfo()
+    },
     methods: {
         deposit() {
             this.$refs.depositModal.hide()
@@ -114,6 +118,13 @@ export default {
         },
         transfer() {
             console.log('transfer to', this.transferTo, this.transferAmount)
+        },
+        async updateAccountInfo() {
+            try {
+                store.account.plasma.id = (await contract.ethereumAddressToAccountID(store.account.address)).toNumber()
+            } catch (err) {
+                console.log('status update failed: ', err)
+            }
         },
     },
 }

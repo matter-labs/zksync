@@ -18,6 +18,7 @@
 
 import store from './store'
 import ethUtil from 'ethjs-util'
+import txlib from '../contracts/lib/transaction.js'
 
 export default {
     name: 'login',
