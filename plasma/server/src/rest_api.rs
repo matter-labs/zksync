@@ -32,6 +32,11 @@ struct TransactionResponse {
     accepted: bool,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct AccountError {
+    error: String,
+}
+
 // singleton to keep info about channels required for Http server
 #[derive(Clone)]
 pub struct AppState {
@@ -74,18 +79,18 @@ fn handle_get_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let tx_for_state = req.state().tx_for_state.clone();
     let account_id_string = req.match_info().get("id");
     if account_id_string.is_none() {
-        return Ok(HttpResponse::build(StatusCode::NOT_FOUND).finish());
+        return Ok(HttpResponse::Ok().json(AccountError{error:"invalid parameters".to_string()}));
     }
     let account_id = account_id_string.unwrap().parse::<u32>();
     if account_id.is_err(){
-        return Ok(HttpResponse::build(StatusCode::NOT_FOUND).finish());
+        return Ok(HttpResponse::Ok().json(AccountError{error:"invalid account_id".to_string()}));
     }
     let (acc_tx, acc_rx) = mpsc::channel();
     let request = StateProcessingRequest::GetLatestState(account_id.unwrap(), acc_tx);
     tx_for_state.send(request).expect("queue must work");
     let account_info: Option<Account> = acc_rx.recv().unwrap();
     if account_info.is_none() {
-        return Ok(HttpResponse::build(StatusCode::NOT_FOUND).finish());
+        return Ok(HttpResponse::Ok().json(AccountError{error:"non-existing account".to_string()}));
     }
 
     Ok(HttpResponse::Ok().json(account_info.unwrap()))
