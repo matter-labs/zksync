@@ -14,7 +14,8 @@
     "bootstrap-vue": "^1.2.0",
     "ethers": "^4.0.20",
     "popper.js": "^1.12.9",
-    "vue": "^2.5.3"
+    "vue": "^2.5.3",
+    "vue-router": "^3.0.2"
   },
   "devDependencies": {
     "babel-core": "^6.26.0",
