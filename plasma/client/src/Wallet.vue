@@ -20,11 +20,6 @@
     <b-container class="bv-example-row">
         <b-row>
             <b-col sm="8" order="2">
-                <b-card title="Your account" class="mb-4">
-                    <b-form>
-                        <b-form-input v-model="store.account.address" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
-                    </b-form>
-                </b-card>
                 <b-card title="Transfer in Plasma" class="mb-4">
                         <b-row class="mb-3">
                             <b-col sm="2"><label for="to">To:</label></b-col>
@@ -37,12 +32,15 @@
                         <b-btn variant="outline-primary">Submit transaction</b-btn>
                 </b-card>
             </b-col>
-            <b-col sm="4" class="mb-4" order="1">
+            <b-col sm="4" class="mb-5" order="1">
                 <b-card title="Account info">
                     <b-card class="mb-3">
                         <p class="mb-2"><strong>Mainchain</strong></p>
-                        <b-row>
-                            <b-col>Balance:</b-col> <b-col>0 ETH</b-col>
+
+                        <label for="addr">Address:</label>
+                        <b-form-input id="addr" v-model="store.account.address" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
+                        <b-row class="mt-2">
+                            <b-col cols="4">Balance:</b-col> <b-col>{{store.account.balance}} ETH</b-col>
                         </b-row>
                     </b-card>
                     <b-row class="mb-0 mt-0">
@@ -51,11 +49,13 @@
                     </b-row>
                     <b-card class="mt-2">
                         <p class="mb-2"><strong>Plasma</strong></p>
-                        <b-row>
-                            <b-col>Balance:</b-col> <b-col>0 ETH</b-col>
+                        <label for="acc_id">Account ID:</label>
+                        <b-form-input id="acc_id" v-model="store.account.plasma.id" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
+                        <b-row class="mt-2">
+                            <b-col cols="4">Balance:</b-col> <b-col>{{store.account.plasma.balance}} ETH</b-col>
                         </b-row>
                         <b-row>                    
-                            <b-col>Nonce:</b-col> <b-col>0</b-col>
+                            <b-col cols="4">Nonce:</b-col> <b-col>{{store.account.plasma.nonce}}</b-col>
                         </b-row>
                     </b-card>
                 </b-card>

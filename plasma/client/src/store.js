@@ -3,10 +3,13 @@ const store = {
 
     account: {
         address:    null,
-        id:         null,
-        balance:    0,
-        nonce:      0,
-        pub_key:    null,
+        balance:    4,
+        plasma: {
+            id:         77,
+            balance:    2,
+            nonce:      1,
+            pub_key:    null,
+        }
     }
 }
 
