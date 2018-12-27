@@ -7,6 +7,10 @@ license = "MIT/Apache-2.0"
 name = "sapling-crypto"
 repository = "https://github.com/matterinc/sapling-crypto"
 version = "0.0.2"
+
+[lib]
+name = "ios_snarks"
+crate-type = ["staticlib", "cdylib"]
  
 [dependencies]
 rand = "0.4"
