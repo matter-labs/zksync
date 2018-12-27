@@ -21,15 +21,18 @@
         <b-row>
             <b-col sm="8" order="2">
                 <b-card title="Transfer in Plasma" class="mb-4">
-                        <b-row class="mb-3">
-                            <b-col sm="2"><label for="to">To:</label></b-col>
-                            <b-col sm="10"><b-form-input id="to" type="text"  placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input></b-col>
-                        </b-row>
-                        <b-row class="mb-3">
-                            <b-col sm="2"><label for="amount">Amount:</label></b-col>
-                            <b-col sm="4"><b-form-input id="amount" type="number" placeholder="7.50"></b-form-input></b-col>
-                        </b-row>
-                        <b-btn variant="outline-primary">Submit transaction</b-btn>
+                    <b-row class="mb-3">
+                        <b-col sm="2"><label for="to">To:</label></b-col>
+                        <b-col sm="10"><b-form-input id="to" type="text"  placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input></b-col>
+                    </b-row>
+                    <b-row class="mb-3">
+                        <b-col sm="2"><label for="amount">Amount:</label></b-col>
+                        <b-col sm="4"><b-form-input id="amount" type="number" placeholder="7.50"></b-form-input></b-col>
+                    </b-row>
+                    <b-btn variant="outline-primary" @click="tx=2">Submit transaction</b-btn>
+                    <b-alert show dismissible variant="success" fade :show="tx" @dismissed="tx=null" class="mt-2">
+                        Submitted successfully
+                    </b-alert>
                 </b-card>
             </b-col>
             <b-col sm="4" class="mb-5" order="1">
@@ -71,7 +74,10 @@ import store from './store'
 
 export default {
     name: 'wallet',
-    data: () => ({ store }),
+    data: () => ({ 
+        store,
+        tx: 1
+    }),
     methods: {
     },
 }
