@@ -85,19 +85,13 @@ impl <E: JubjubEngine>EddsaSignature<E> {
             cs.namespace(|| "Serialize R_X"), self.r.get_x().get_value()
         )?;
 
-        let mut to_append = 256 - r_x_serialized.len();
         hash_bits.extend(r_x_serialized.into_iter());
-        for _ in 0..to_append {
-            hash_bits.push(Boolean::Constant(false));
-        }
+        hash_bits.resize(256, Boolean::Constant(false));
 
-        to_append = 256 - message.len();
         hash_bits.extend(message.iter().cloned());
-        for _ in 0..to_append {
-            hash_bits.push(Boolean::Constant(false));
-        }
+        hash_bits.resize(512, Boolean::Constant(false));
 
-        assert!(hash_bits.len() == 512);
+        assert_eq!(hash_bits.len(), 512);
 
         let h = blake2s(
             cs.namespace(|| "Calculate EdDSA hash"),

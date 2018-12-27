@@ -84,19 +84,20 @@ impl EthWatch {
         this.last_deposit_batch = U256::from(expecting_deposit_batch);
         this.last_exit_batch = U256::from(expecting_exit_batch);
 
-        let (_eloop, transport) = web3::transports::Http::new(&this.web3_url).unwrap();
-        let web3 = web3::Web3::new(transport);
-        let contract = Contract::new(web3.eth(), this.contract_addr.clone(), this.contract.clone());
+        // let (_eloop, transport) = web3::transports::Http::new(&this.web3_url).unwrap();
+        // let web3 = web3::Web3::new(transport);
+        // let contract = Contract::new(web3.eth(), this.contract_addr.clone(), this.contract.clone());
 
-        let last_deposit_batch_result: Result<U256, _> = contract.query("lastCommittedDepositBatch", (), None, Options::default(), Some(BlockNumber::Latest)).wait();
-        let last_exit_batch_result: Result<U256, _> = contract.query("lastCommittedExitBatch", (), None, Options::default(), Some(BlockNumber::Latest)).wait();
+        // let last_deposit_batch_result: Result<U256, _> = contract.query("lastCommittedDepositBatch", (), None, Options::default(), Some(BlockNumber::Latest)).wait();
+        // let last_exit_batch_result: Result<U256, _> = contract.query("lastCommittedExitBatch", (), None, Options::default(), Some(BlockNumber::Latest)).wait();
 
-        if last_deposit_batch_result.is_err() || last_exit_batch_result.is_err() {
-            panic!("Can not get initial batch numbers");
-        }
+        // if last_deposit_batch_result.is_err() || last_exit_batch_result.is_err() {
+        //     panic!("Can not get initial batch numbers");
+        // }
 
-        this.last_deposit_batch = last_deposit_batch_result.unwrap();
-        this.last_exit_batch = last_exit_batch_result.unwrap();
+        // this.last_deposit_batch = last_deposit_batch_result.unwrap();
+        // this.last_exit_batch = last_exit_batch_result.unwrap();
+        
         println!("Monitoring contract {:x}", this.contract_addr);
         println!("Starting from deposit batch {}", this.last_deposit_batch);
         println!("Starting from exit batch {}", this.last_exit_batch);
@@ -143,7 +144,6 @@ impl EthWatch {
             self.last_processed_block += 1;
         }
 
-        // TODO: watch chain events
         // on new deposit or exit blocks => pass them via tx_for_blocks
         // on new tx blocks do nothing for now; later we can use them to sync multiple 
         // servers (in which case we only use them to update current state)

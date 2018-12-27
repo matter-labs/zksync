@@ -118,6 +118,9 @@ fn read_parameters(file_name: &str) -> Result<BabyParameters, BabyProverErr> {
     Ok(circuit_params.unwrap())
 }
 
+// IMPORTANT: prover does NOT care about some ordering of the transactions, so blocks supplied here MUST be ordered
+// for the application layer
+
 impl BabyProver {
 
     pub fn create(initial_state: &PlasmaState) -> Result<BabyProver, BabyProverErr> {
@@ -246,6 +249,8 @@ impl BabyProver {
 
     pub fn encode_deposit_transactions(block: &DepositBlock) -> Result<Vec<u8>, Err> {
         let mut encoding: Vec<u8> = vec![];
+
+        // let sorted_block = sorted_deposit_block(&block);
         
         let transactions = &block.transactions;
 
@@ -262,7 +267,7 @@ impl BabyProver {
     // this method is different, it actually reads the state 
     pub fn encode_exit_transactions(block: &ExitBlock) -> Result<Vec<u8>, Err> {
         let mut encoding: Vec<u8> = vec![];
-        
+                
         let transactions = &block.transactions;
 
         for tx in transactions {
@@ -275,9 +280,8 @@ impl BabyProver {
             encoding.extend(tx_encoding.into_iter());
         }
 
-        let public_data_hex: String = encoding.clone().to_hex();
-
-        println!("Final encoding = {}", public_data_hex);
+        // let public_data_hex: String = encoding.clone().to_hex();
+        // println!("Final encoding = {}", public_data_hex);
 
         Ok(encoding)
     }
@@ -575,7 +579,7 @@ impl BabyProver {
         Ok(full_proof)
     }
 
-    // TODO: sort accounts!
+    // expects accounts in block to be sorted already
     pub fn apply_and_prove_deposit(&mut self, block: &DepositBlock) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.block_number {
@@ -775,9 +779,11 @@ impl BabyProver {
         Ok(full_proof)
     }
 
+    // expects accounts in block to be sorted already
     pub fn apply_and_prove_exit(&mut self, block: &ExitBlock) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.block_number {
+            println!("Proof request is for block {}, while prover state is block {}", block_number, self.block_number);
             return Err(BabyProverErr::Unknown);
         }
         let block_final_root = block.new_root_hash.clone();
@@ -877,29 +883,29 @@ impl BabyProver {
 
         let bytes_to_hash = be_bit_vector_into_bytes(&public_data_initial_bits);
 
-        let hex_block_and_fee: String = bytes_to_hash.clone().to_hex();
-        println!("Packed initial hash information in exit = {}", hex_block_and_fee);
+        // let hex_block_and_fee: String = bytes_to_hash.clone().to_hex();
+        // println!("Packed initial hash information in exit = {}", hex_block_and_fee);
 
         h.input(&bytes_to_hash);
 
         let mut hash_result = [0u8; 32];
         h.result(&mut hash_result[..]);
 
-        let initial_hash: String = hash_result.clone().to_hex();
-        println!("Block number hash in exit = {}", initial_hash);
+        // let initial_hash: String = hash_result.clone().to_hex();
+        // println!("Block number hash in exit = {}", initial_hash);
 
         {    
             let packed_transaction_data_bytes = public_data.clone();
 
-            let hex: String = packed_transaction_data_bytes.clone().to_hex();
-            println!("Packed transfers information data in exit= {}", hex);
+            // let hex: String = packed_transaction_data_bytes.clone().to_hex();
+            // println!("Packed transfers information data in exit= {}", hex);
         
             let mut next_round_hash_bytes = vec![];
             next_round_hash_bytes.extend(hash_result.iter());
             next_round_hash_bytes.extend(packed_transaction_data_bytes);
 
-            let hex_full: String = next_round_hash_bytes.clone().to_hex();
-            println!("Final hashable information data in exit= {}", hex_full);
+            // let hex_full: String = next_round_hash_bytes.clone().to_hex();
+            // println!("Final hashable information data in exit= {}", hex_full);
 
             let mut h = Sha256::new();
 
@@ -910,8 +916,8 @@ impl BabyProver {
 
         // clip to fit into field element
 
-        let final_hash_hex: String = hash_result.clone().to_hex();
-        println!("Full public data commitment = {}", final_hash_hex);
+        // let final_hash_hex: String = hash_result.clone().to_hex();
+        // println!("Full public data commitment = {}", final_hash_hex);
 
         hash_result[0] &= 0x1f; // temporary solution
 
@@ -980,7 +986,6 @@ impl BabyProver {
         ) 
     {
         for (block_number, block, block_data, accounts_updated) in rx_for_blocks {
-            println!("Got request for proof");
             let proof = self.apply_and_prove(block).unwrap();
             tx_for_ops.send(Operation{
                 action: Action::Verify{

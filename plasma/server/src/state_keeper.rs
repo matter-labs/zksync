@@ -29,49 +29,49 @@ pub struct PlasmaStateKeeper {
     /// Current plasma state
     pub state: PlasmaState,
 
-    // TODO: remove
-    // Keep private keys in memory
-    pub private_keys: HashMap<u32, PrivateKey<Bn256>>
+    // // TODO: remove
+    // // Keep private keys in memory
+    // pub private_keys: HashMap<u32, PrivateKey<Bn256>>
 }
 
 impl PlasmaStateKeeper {
 
-    // TODO: remove this function when done with demo
-    fn generate_demo_accounts(balance_tree: &mut AccountTree) -> HashMap<u32, PrivateKey<Bn256>> {
+    // // TODO: remove this function when done with demo
+    // fn generate_demo_accounts(balance_tree: &mut AccountTree) -> HashMap<u32, PrivateKey<Bn256>> {
 
-        let number_of_accounts = 1000;
-        let mut keys_map = HashMap::<u32, PrivateKey<Bn256>>::new();
+    //     let number_of_accounts = 1000;
+    //     let mut keys_map = HashMap::<u32, PrivateKey<Bn256>>::new();
             
-        let p_g = FixedGenerators::SpendingKeyGenerator;
-        let params = &AltJubjubBn256::new();
-        let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+    //     let p_g = FixedGenerators::SpendingKeyGenerator;
+    //     let params = &AltJubjubBn256::new();
+    //     let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
-        let default_balance = BigDecimal::from(1000000);
+    //     let default_balance = BigDecimal::from(1000000);
 
-        for i in 0..number_of_accounts {
-            let leaf_number: u32 = i;
+    //     for i in 0..number_of_accounts {
+    //         let leaf_number: u32 = i;
 
-            let sk = PrivateKey::<Bn256>(rng.gen());
-            let pk = PublicKey::from_private(&sk, p_g, params);
-            let (x, y) = pk.0.into_xy();
+    //         let sk = PrivateKey::<Bn256>(rng.gen());
+    //         let pk = PublicKey::from_private(&sk, p_g, params);
+    //         let (x, y) = pk.0.into_xy();
 
-            keys_map.insert(i, sk);
+    //         keys_map.insert(i, sk);
 
-            //let serialized_public_key = pack_edwards_point(pk.0).unwrap();
+    //         //let serialized_public_key = pack_edwards_point(pk.0).unwrap();
 
-            let leaf = Account {
-                balance:    default_balance.clone(),
-                nonce:      0,
-                public_key_x: x,
-                public_key_y: y,
-            };
+    //         let leaf = Account {
+    //             balance:    default_balance.clone(),
+    //             nonce:      0,
+    //             public_key_x: x,
+    //             public_key_y: y,
+    //         };
 
-            balance_tree.insert(leaf_number, leaf.clone());
-        };
+    //         balance_tree.insert(leaf_number, leaf.clone());
+    //     };
 
-        println!("Generated {} accounts with balances", number_of_accounts);
-        keys_map
-    }
+    //     println!("Generated {} accounts with balances", number_of_accounts);
+    //     keys_map
+    // }
 
     pub fn new() -> Self {
 
@@ -84,7 +84,7 @@ impl PlasmaStateKeeper {
         // println!("generating demo accounts");
         // let keys_map = Self::generate_demo_accounts(&mut balance_tree);
 
-        let keys_map: HashMap<u32, PrivateKey<Bn256>> = HashMap::new();
+        // let keys_map: HashMap<u32, PrivateKey<Bn256>> = HashMap::new();
 
         let storage = StorageConnection::new();
         let (last_committed_block, initial_state) = storage.load_committed_state().expect("db must be functional");
@@ -99,7 +99,7 @@ impl PlasmaStateKeeper {
                 balance_tree,
                 block_number: last_committed_block + 1,
             },
-            private_keys: keys_map
+            // private_keys: keys_map
         };
 
         let root = keeper.state.root_hash();
@@ -159,8 +159,39 @@ impl PlasmaStateKeeper {
         Account::default()
     }
 
+    fn sort_deposit_block(block: &mut DepositBlock) {
+        let mut txes = block.transactions.clone();
+        txes.sort_by(|l, r| {
+            if l.account < r.account {
+                return std::cmp::Ordering::Less;
+            } else if r.account > l.account {
+                return std::cmp::Ordering::Greater;
+            }
+
+            std::cmp::Ordering::Equal
+        });
+
+        block.transactions = txes;
+    }
+
+    fn sort_exit_block(block: &mut ExitBlock){
+        let mut txes = block.transactions.clone();
+        txes.sort_by(|l, r| {
+            if l.account < r.account {
+                return std::cmp::Ordering::Less;
+            } else if r.account > l.account {
+                return std::cmp::Ordering::Greater;
+            }
+
+            std::cmp::Ordering::Equal
+        });
+
+        block.transactions = txes;
+    }
+
     fn apply_transfer_block(&mut self, block: &mut TransferBlock) -> Result<(H256, EthBlockData, AccountMap), ()> {
         use ff::{PrimeField, PrimeFieldRepr};
+        use bigdecimal::{ToPrimitive};
         let transactions: Vec<TransferTx> = block.transactions.clone();
             // .into_iter()
             // .map(|tx| self.augument_and_sign(tx))
@@ -194,11 +225,16 @@ impl PlasmaStateKeeper {
             return Err(());
         }
             
+        let mut total_fees = 0u128;
+        for tx in transactions {
+            total_fees += tx.fee.to_u128().expect("fee should not overflow u128");
+        }
+
         block.block_number = self.state.block_number;
         block.new_root_hash = self.state.root_hash();
 
         let eth_block_data = EthBlockData::Transfer{
-            total_fees:     U128::zero(), // TODO: count fees
+            total_fees:     U128::from_dec_str(&total_fees.to_string()).expect("fee should fit into U128 Ethereum type"), 
             public_data:    BabyProver::encode_transfer_transactions(&block).unwrap(),
         };
         let mut be_bytes: Vec<u8> = vec![];
@@ -210,6 +246,9 @@ impl PlasmaStateKeeper {
 
     fn apply_deposit_block(&mut self, block: &mut DepositBlock, batch_number: BatchNumber) -> Result<(H256, EthBlockData, AccountMap), ()> {
         use ff::{PrimeField, PrimeFieldRepr};
+
+        Self::sort_deposit_block(block);
+
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
         for tx in block.transactions.iter() {
             self.state.apply_deposit(&tx).expect("queue must work");
@@ -231,6 +270,9 @@ impl PlasmaStateKeeper {
     // prover MUST read old balances and mutate the block data
     fn apply_exit_block(&mut self, block: &mut ExitBlock, batch_number: BatchNumber) -> Result<(H256, EthBlockData, AccountMap), ()> {
         use ff::{PrimeField, PrimeFieldRepr};
+        
+        Self::sort_exit_block(block);
+
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
         let mut augmented_txes = vec![];
         for tx in block.transactions.iter() {
@@ -255,28 +297,28 @@ impl PlasmaStateKeeper {
     }
 
 
-    // augument and sign transaction (for demo only; TODO: remove this!)
-    fn augument_and_sign(&self, mut tx: TransferTx) -> TransferTx {
+    // // augument and sign transaction (for demo only; TODO: remove this!)
+    // fn augument_and_sign(&self, mut tx: TransferTx) -> TransferTx {
 
-        let from = self.state.balance_tree.items.get(&tx.from).unwrap().clone();
-        tx.nonce = from.nonce;
-        tx.good_until_block = self.state.block_number;
+    //     let from = self.state.balance_tree.items.get(&tx.from).unwrap().clone();
+    //     tx.nonce = from.nonce;
+    //     tx.good_until_block = self.state.block_number;
 
-        let sk = self.private_keys.get(&tx.from).unwrap();
-        Self::sign_tx(&mut tx, sk);
-        tx
-    }
+    //     let sk = self.private_keys.get(&tx.from).unwrap();
+    //     Self::sign_tx(&mut tx, sk);
+    //     tx
+    // }
 
-    // TODO: remove this function when done with demo
-    fn sign_tx(tx: &mut TransferTx, sk: &PrivateKey<Bn256>) {
-        // let params = &AltJubjubBn256::new();
-        let p_g = FixedGenerators::SpendingKeyGenerator;
-        let mut rng = OsRng::new().unwrap();
+    // // TODO: remove this function when done with demo
+    // fn sign_tx(tx: &mut TransferTx, sk: &PrivateKey<Bn256>) {
+    //     // let params = &AltJubjubBn256::new();
+    //     let p_g = FixedGenerators::SpendingKeyGenerator;
+    //     let mut rng = OsRng::new().unwrap();
 
-        let mut tx_fr = models::circuit::TransferTx::try_from(tx).unwrap();
-        tx_fr.sign(sk, p_g, &params::JUBJUB_PARAMS, &mut rng);
-        tx.signature = TxSignature::try_from(tx_fr.signature).expect("serialize signature");
-    }
+    //     let mut tx_fr = models::circuit::TransferTx::try_from(tx).unwrap();
+    //     tx_fr.sign(sk, p_g, &params::JUBJUB_PARAMS, &mut rng);
+    //     tx.signature = TxSignature::try_from(tx_fr.signature).expect("serialize signature");
+    // }
 
 }
 

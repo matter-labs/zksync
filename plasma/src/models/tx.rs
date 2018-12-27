@@ -159,8 +159,13 @@ impl Tx<Engine> {
         ).map_err(|e| format!("wrong amount encoding: {}", e.to_string()))?;
         let encoded_amount: Fr = le_bit_vector_into_field_element(&encoded_amount_bits);
 
-        // TODO: encode fee
-        let encoded_fee = Fr::zero();
+        let encoded_fee_bits = convert_to_float(
+            transaction.fee.to_u128().unwrap(), 
+            params::FEE_EXPONENT_BIT_WIDTH, 
+            params::FEE_MANTISSA_BIT_WIDTH, 
+            10
+        ).map_err(|e| format!("wrong fee encoding: {}", e.to_string()))?;
+        let encoded_fee: Fr = le_bit_vector_into_field_element(&encoded_fee_bits);
 
         let tx = Self {
             // TODO: these conversions are ugly and inefficient, replace with idiomatic std::convert::From trait
@@ -171,7 +176,6 @@ impl Tx<Engine> {
             nonce:              Fr::from_str(&transaction.good_until_block.to_string()).unwrap(),
             good_until_block:   Fr::from_str(&transaction.good_until_block.to_string()).unwrap(),
 
-            // TODO: decode signature
             signature:          TransactionSignature::try_from(transaction.signature.clone())?,
         };
 

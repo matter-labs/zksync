@@ -1,7 +1,7 @@
 use pairing::{
     Engine,
 };
-// TODO fix CS for baby jubjub for a != -1
+
 use ff::{Field};
 
 use bellman::{

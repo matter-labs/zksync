@@ -96,7 +96,6 @@ pub fn start_eth_sender() -> Sender<(Operation, TxMeta)> {
                             //         bytes32 newRoot
                             //     ) 
 
-                            // TODO: fix zero H256, it should contait valid precommitment for an exit block
                             eth_client.call("commitExitBlock", meta,
                                 (U256::from(batch_number), sorted_and_padded_for_exits(op.accounts_updated), op.block_number as u64, public_data, new_root)),
                     }
