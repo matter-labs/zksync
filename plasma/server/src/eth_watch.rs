@@ -19,6 +19,8 @@ use web3::types::{U256, H160, H256, U128, FilterBuilder, BlockNumber};
 use sapling_crypto::jubjub::{edwards, Unknown};
 use super::config;
 
+use super::storage::StorageConnection;
+
 type ABI = (&'static [u8], &'static str);
 
 pub const TEST_PLASMA_ALWAYS_VERIFY: ABI = (
@@ -71,6 +73,16 @@ impl EthWatch {
             deposit_batch_size: U256::from(config::DEPOSIT_BATCH_SIZE),
             exit_batch_size: U256::from(config::EXIT_BATCH_SIZE),
         };
+
+        let storage = StorageConnection::new();
+        let last_committed_deposit = storage.load_last_committed_deposit_batch();
+        let last_committed_exit = storage.load_last_committed_exit_batch();
+
+        let expecting_deposit_batch = (last_committed_deposit + 1) as u32;
+        let expecting_exit_batch = (last_committed_exit + 1) as u32;
+
+        this.last_deposit_batch = U256::from(expecting_deposit_batch);
+        this.last_exit_batch = U256::from(expecting_exit_batch);
 
         let (_eloop, transport) = web3::transports::Http::new(&this.web3_url).unwrap();
         let web3 = web3::Web3::new(transport);
