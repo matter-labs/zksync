@@ -329,8 +329,8 @@ function main() {
     console.log("original = " + someInt.toString(10));
 }
 
-function newKey() {
-    const sk = (new BN(elliptic.rand(32), 16, "be")).umod(altBabyJubjub.n);
+function newKey(seed) {
+    const sk = (new BN(seed || elliptic.rand(32), 16, "be")).umod(altBabyJubjub.n);
     const pub = altBabyJubjub.g.mul(sk);
     let y = pub.getY();
     const x = pub.getX();

@@ -6,7 +6,7 @@ const store = {
             id:         null,
             balance:    2,
             nonce:      1,
-            pub_key:    null,
+            key:        null,
         }
     }
 }

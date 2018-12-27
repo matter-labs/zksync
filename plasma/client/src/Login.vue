@@ -18,7 +18,7 @@
 
 import store from './store'
 import ethUtil from 'ethjs-util'
-import txlib from '../contracts/lib/transaction.js'
+import {newKey} from '../../contracts/lib/transaction.js'
 
 export default {
     name: 'login',
@@ -39,6 +39,11 @@ export default {
                 let sig = await eth.personal_sign(ethUtil.fromUtf8(new Buffer('Login to Plasma Wallet')), account)
                 console.log(sig)
                 store.account.address = account
+
+                // TODO: hash sig!!!
+                store.account.plasma.key = newKey(sig)
+                console.log(store.account.plasma.key)
+
                 this.$parent.$router.push('/wallet')
             } catch (e) {
                 console.log('login failed: ', e)

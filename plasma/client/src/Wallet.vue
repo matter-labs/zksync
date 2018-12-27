@@ -121,7 +121,8 @@ export default {
         },
         async updateAccountInfo() {
             try {
-                store.account.plasma.id = (await contract.ethereumAddressToAccountID(store.account.address)).toNumber()
+                let r = await contract.ethereumAddressToAccountID(store.account.address)
+                store.account.plasma.id = r[0].toNumber()
             } catch (err) {
                 console.log('status update failed: ', err)
             }
