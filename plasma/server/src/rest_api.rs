@@ -1,7 +1,7 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
 use std::sync::mpsc;
-use plasma::models::{TransferTx, PublicKey};
+use plasma::models::{TransferTx, PublicKey, Account};
 use super::models::StateProcessingRequest;
 
 use actix_web::{
@@ -15,6 +15,7 @@ use actix_web::{
     HttpResponse, 
     middleware::cors::Cors,
     http::Method,
+    http::StatusCode,
 };
 
 use futures::Future;
@@ -66,6 +67,30 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
         .responder()
 }
 
+use actix_web::Result as ActixResult;
+
+fn handle_get_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    let tx_for_tx = req.state().tx_for_tx.clone();
+    let tx_for_state = req.state().tx_for_state.clone();
+    let account_id_string = req.match_info().get("id");
+    if account_id_string.is_none() {
+        return Ok(HttpResponse::build(StatusCode::NOT_FOUND).finish());
+    }
+    let account_id = account_id_string.unwrap().parse::<u32>();
+    if account_id.is_err(){
+        return Ok(HttpResponse::build(StatusCode::NOT_FOUND).finish());
+    }
+    let (acc_tx, acc_rx) = mpsc::channel();
+    let request = StateProcessingRequest::GetLatestState(account_id.unwrap(), acc_tx);
+    tx_for_state.send(request).expect("queue must work");
+    let account_info: Option<Account> = acc_rx.recv().unwrap();
+    if account_info.is_none() {
+        return Ok(HttpResponse::build(StatusCode::NOT_FOUND).finish());
+    }
+
+    Ok(HttpResponse::Ok().json(account_info.unwrap()))
+}
+
 pub fn start_api_server(tx_for_tx:    mpsc::Sender<TransferTx>, 
                       tx_for_state: mpsc::Sender<StateProcessingRequest>) {
 
@@ -90,6 +115,11 @@ pub fn start_api_server(tx_for_tx:    mpsc::Sender<TransferTx>,
                             r.method(Method::POST).f(handle_send_transaction);
                             r.method(Method::OPTIONS).f(|_| HttpResponse::Ok());
                             r.method(Method::GET).f(|_| HttpResponse::Ok());
+                        })
+                        .resource("/account/{id}", |r| {
+                            r.method(Method::POST).f(|_| HttpResponse::Ok());
+                            r.method(Method::OPTIONS).f(|_| HttpResponse::Ok());
+                            r.method(Method::GET).f(handle_get_state);
                         })
                         .register()
                 })

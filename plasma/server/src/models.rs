@@ -1,5 +1,5 @@
 use web3::types::{U256, U128, H256};
-use plasma::models::{BatchNumber, AccountMap, Block, PublicKey};
+use plasma::models::{BatchNumber, AccountMap, Block, PublicKey, Account};
 use std::sync::mpsc::{Sender};
 use crate::schema::*;
 
@@ -8,6 +8,7 @@ use crate::schema::*;
 pub enum StateProcessingRequest{
     ApplyBlock(Block, Option<Sender<Result<(),Block>>>), // return result, sending block back
     GetPubKey(u32, Sender<Option<PublicKey>>),   // return public key if found
+    GetLatestState(u32, Sender<Option<Account>>), // return account state
 }
 
 pub type EncodedProof = [U256; 8];
