@@ -1,5 +1,11 @@
 {
   "presets": [
     ["env", { "modules": false }]
+  ],
+  "plugins": [
+    ["transform-runtime", {
+      "polyfill": false,
+      "regenerator": true
+    }]
   ]
 }
