@@ -7,6 +7,8 @@ import store from './store'
 import ABI from './contract'
 import Eth from 'ethjs'
 
+window.Eth = Eth
+
 import Router from 'vue-router'
 import App from './App.vue'
 import Login from './Login.vue'

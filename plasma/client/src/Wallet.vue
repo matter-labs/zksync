@@ -90,6 +90,9 @@
 import store from './store'
 import {BN} from 'bn.js'
 import Eth from 'ethjs'
+import axios from 'axios'
+
+const baseUrl = 'http://188.166.33.159:8080'
 
 export default {
     name: 'wallet',
@@ -104,9 +107,15 @@ export default {
 
         withdrawAll:    true,
         withdrawAmount: null,
+
+        updateInterval: null,
     }),
     created() {
         this.updateAccountInfo()
+        this.updateInterval = setInterval(() => this.updateAccountInfo(), 1000)
+    },
+    destroyed() {
+        clearInterval(this.updateInterval)
     },
     methods: {
         deposit() {
@@ -130,8 +139,22 @@ export default {
         },
         async updateAccountInfo() {
             try {
-                let r = await contract.ethereumAddressToAccountID(store.account.address)
-                store.account.plasma.id = r[0].toNumber()
+                let balance = (await eth.getBalance(store.account.address)).toString()
+                store.account.balance = Eth.fromWei(balance, 'ether')
+
+                let id = (await contract.ethereumAddressToAccountID(store.account.address))[0].toNumber()
+                store.account.plasma.id = id
+
+                if(id>0) {
+                    const result = await axios({
+                        method: 'get',
+                        url: baseUrl + '/account/' + id,
+                    });
+                    let balance = new BN(result.data.balance).mul(new BN('1000000000000'))
+                    store.account.plasma.balance = Eth.fromWei(balance, 'ether')
+                    store.account.plasma.nonce = result.data.nonce
+                }
+
             } catch (err) {
                 console.log('status update failed: ', err)
             }
