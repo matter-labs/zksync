@@ -1,6 +1,4 @@
 const store = {
-    web3: null,
-
     account: {
         address:    null,
         balance:    4,

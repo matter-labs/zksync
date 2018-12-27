@@ -93,7 +93,7 @@ export default {
     name: 'wallet',
     data: () => ({ 
         store,
-        tx: 1,
+        tx:             null,
 
         transferTo:     null,
         transferAmount: null,

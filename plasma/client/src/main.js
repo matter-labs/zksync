@@ -4,6 +4,7 @@ import "bootstrap/dist/css/bootstrap.min.css"
 import "bootstrap-vue/dist/bootstrap-vue.css"
 
 import store from './store'
+import ABI from './contract'
 import Eth from 'ethjs'
 
 import Router from 'vue-router'
@@ -33,7 +34,8 @@ window.app = new Vue({
     async created() {
         // read store.account from local storage?
         if (typeof window.ethereum !== 'undefined') {
-            window.eth = this.store.eth = new Eth(web3.currentProvider)
+            window.eth = new Eth(web3.currentProvider)
+            window.contract = eth.contract(ABI).at('0xeafed7de64fd5ad36145ea7f81e2a11b907d5b17')
         }
         if (!store.account.address) {
             this.$router.push('/login')
