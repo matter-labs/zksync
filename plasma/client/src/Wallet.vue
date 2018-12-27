@@ -22,12 +22,12 @@
             <b-col sm="8" order="2">
                 <b-card title="Transfer in Plasma" class="mb-4">
                     <b-row class="mb-3">
-                        <b-col sm="2"><label for="to">To:</label></b-col>
-                        <b-col sm="10"><b-form-input id="to" type="text"  placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input></b-col>
+                        <b-col sm="2"><label for="transferToInput">To:</label></b-col>
+                        <b-col sm="10"><b-form-input id="transferToInput" type="text"  placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input></b-col>
                     </b-row>
                     <b-row class="mb-3">
-                        <b-col sm="2"><label for="amount">Amount:</label></b-col>
-                        <b-col sm="4"><b-form-input id="amount" type="number" placeholder="7.50"></b-form-input></b-col>
+                        <b-col sm="2"><label for="transferAmountInput">Amount:</label></b-col>
+                        <b-col sm="4"><b-form-input id="transferAmountInput" type="number" placeholder="7.50"></b-form-input></b-col>
                     </b-row>
                     <b-btn variant="outline-primary" @click="tx=2">Submit transaction</b-btn>
                     <b-alert show dismissible variant="success" fade :show="tx" @dismissed="tx=null" class="mt-2">
@@ -47,8 +47,8 @@
                         </b-row>
                     </b-card>
                     <b-row class="mb-0 mt-0">
-                        <b-col sm class="mb-2"><b-btn variant="outline-primary" class="w-100">&#x21E9; Deposit</b-btn></b-col>
-                        <b-col sm class="mb-2"><b-btn variant="outline-primary" class="w-100">Withdraw &#x21E7;</b-btn></b-col>
+                        <b-col sm class="mb-2"><b-btn variant="outline-primary" class="w-100" v-b-modal.depositModal>&#x21E9; Deposit</b-btn></b-col>
+                        <b-col sm class="mb-2"><b-btn variant="outline-primary" class="w-100" v-b-modal.withdrawModal>Withdraw &#x21E7;</b-btn></b-col>
                     </b-row>
                     <b-card class="mt-2">
                         <p class="mb-2"><strong>Plasma</strong></p>
@@ -65,6 +65,23 @@
             </b-col>
         </b-row>
     </b-container>
+
+    <b-modal ref="depositModal" id="depositModal" title="Deposit" hide-footer>
+        <label for="depositAmountInput">Amount:</label>
+        <b-form-input id="depositAmountInput" type="number" placeholder="7.50"></b-form-input>
+        <b-btn variant="primary" @click="deposit" class="mt-4 float-right">Deposit</b-btn>
+    </b-modal>
+
+    <b-modal ref="withdrawModal" id="withdrawModal" title="Withdrawal" hide-footer>
+        <b-form-checkbox plain v-model="withdrawAll" 
+            aria-describedby="flavours"
+            aria-controls="flavours">Withdraw all funds</b-form-checkbox>
+        <div v-if="!withdrawAll">
+            <label for="withdrawAmountInput">Amount:</label>
+            <b-form-input id="withdrawAmountInput" type="number" placeholder="7.50"></b-form-input>
+        </div>
+        <b-btn variant="primary" @click="withdraw" class="mt-4 float-right">Withdraw</b-btn>
+    </b-modal>
 </div>
 </template>
 
@@ -76,9 +93,28 @@ export default {
     name: 'wallet',
     data: () => ({ 
         store,
-        tx: 1
+        tx: 1,
+
+        transferTo:     null,
+        transferAmount: null,
+
+        depositAmount:  null,
+
+        withdrawAll:    true,
+        withdrawAmount: null,
     }),
     methods: {
+        deposit() {
+            this.$refs.depositModal.hide()
+            console.log('deposit', this.depositAmount)
+        },
+        withdraw() {
+            this.$refs.withdrawModal.hide()
+            console.log('withdraw', this.withdrawAll ? 'all' : this.withdrawAmount)
+        },
+        transfer() {
+            console.log('transfer to', this.transferTo, this.transferAmount)
+        },
     },
 }
 </script>
