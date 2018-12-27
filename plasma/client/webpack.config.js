@@ -48,7 +48,9 @@ module.exports = {
   },
   devServer: {
     historyApiFallback: true,
-    noInfo: true
+    noInfo: true,
+    compress: true,
+    disableHostCheck: true   // That solved it
   },
   performance: {
     hints: false
