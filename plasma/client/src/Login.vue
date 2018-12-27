@@ -28,7 +28,9 @@ export default {
                 console.log('login')
                 let account = ethereum.selectedAddress
                 if (!account) {
-                    account = (await ethereum.enable()) [0]
+                    console.log('enable')
+                    await ethereum.enable()
+                    account = ethereum.selectedAddress
                 }
                 console.log('with', account)
                 let sig = await eth.personal_sign(ethUtil.fromUtf8(new Buffer('Login to Plasma Wallet')), account)
