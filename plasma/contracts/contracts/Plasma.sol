@@ -20,7 +20,7 @@ contract PlasmaStub is VerificationKeys, PlasmaStorage {
 
     // unit normalization functions
     function scaleIntoPlasmaUnitsFromWei(uint256 value)
-    internal
+    public
     pure
     returns (uint128) {
         uint256 den = DENOMINATOR;
@@ -32,7 +32,7 @@ contract PlasmaStub is VerificationKeys, PlasmaStorage {
 
 
     function scaleFromPlasmaUnitsIntoWei(uint128 value)
-    internal
+    public
     pure
     returns (uint256) {
         return uint256(value) * DENOMINATOR;

@@ -10,7 +10,7 @@ version = "0.0.2"
 
 [lib]
 name = "ios_snarks"
-crate-type = ["staticlib", "cdylib"]
+crate-type = ["staticlib"]
  
 [dependencies]
 rand = "0.4"
