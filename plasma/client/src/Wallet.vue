@@ -19,27 +19,27 @@
     <br>
     <b-container class="bv-example-row">
         <b-row>
-            <b-col sm="8" order="2">
+            <b-col sm="6" order="2" class="col-xl-8 col-lg-7 col-md-6 col-sm-12">
                 <b-card title="Transfer in Plasma" class="mb-4">
                     <b-alert show dismissible variant="success" fade :show="countdown" @dismissed="countdown=0" class="mt-2">
                         {{result}}
                     </b-alert>
                     <b-row class="mb-3 mt-4">
-                        <b-col sm="2"><label for="transferToInput">To:</label></b-col>
-                        <b-col sm="10"><b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input></b-col>
+                        <b-col sm="3" class="col-lg-2"><label for="transferToInput">To:</label></b-col>
+                        <b-col sm="9" class="col-lg-10"><b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input></b-col>
                     </b-row>
                     <b-row class="mb-3">
-                        <b-col sm="2"><label for="transferAmountInput">Amount:</label></b-col>
-                        <b-col sm="4"><b-form-input id="transferAmountInput" placeholder="7.50" v-model="transferAmount"></b-form-input></b-col>
+                        <b-col sm="3" class="col-lg-2"><label for="transferAmountInput">Amount:</label></b-col>
+                        <b-col sm="9" class="col-lg-10"><b-form-input id="transferAmountInput" placeholder="7.50" v-model="transferAmount"></b-form-input></b-col>
                     </b-row>
                     <b-row class="mb-3">
-                        <b-col sm="2"><label for="transferNonceInput">Nonce:</label></b-col>
-                        <b-col sm="4"><b-form-input id="transferNonceInput" placeholder="7.50" v-model="transferNonce"></b-form-input></b-col>
+                        <b-col sm="3" class="col-lg-2"><label for="transferNonceInput">Nonce:</label></b-col>
+                        <b-col sm="9" class="col-lg-10"><b-form-input id="transferNonceInput" placeholder="7.50" v-model="transferNonce"></b-form-input></b-col>
                     </b-row>
                     <b-btn  class="float-right" variant="outline-primary" @click="transfer">Submit transaction</b-btn>
                 </b-card>
             </b-col>
-            <b-col sm="4" class="mb-5" order="1">
+            <b-col sm="6" class="col-xl-4 col-lg-5 col-md-6 col-sm-12 mb-5" order="1">
                 <b-card title="Account info">
                     <b-card class="mb-3">
                         <p class="mb-2"><strong>Mainchain</strong></p>
