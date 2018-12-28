@@ -69,12 +69,12 @@ impl EthWatch {
         dotenv().ok();
 
         let mut start = start_from_block;
-        if let Ok(starting_block_from_env) = u64_from_environment("FROM_BLOCK") {
+        if let Some(starting_block_from_env) = u64_from_environment("FROM_BLOCK") {
             start = starting_block_from_env;
         }
 
         let mut delay = lag;
-        if let Ok(delay_from_env) = u64_from_environment("BLOCK_DELAY") {
+        if let Some(delay_from_env) = u64_from_environment("BLOCK_DELAY") {
             delay = delay_from_env;
         }
 
