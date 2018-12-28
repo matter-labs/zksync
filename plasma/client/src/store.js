@@ -1,11 +1,11 @@
 const store = {
     account: {
         address:    null,
-        balance:    4,
+        balance:    null,
         plasma: {
             id:         null,
-            balance:    2,
-            nonce:      1,
+            balance:    null,
+            nonce:      null,
             key:        null,
         }
     }
