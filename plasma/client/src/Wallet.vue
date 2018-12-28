@@ -136,15 +136,13 @@ import axios from 'axios'
 import ethUtil from 'ethjs-util'
 import transactionLib from '../../contracts/lib/transaction.js'
 
-window.eu = ethUtil
-
 const baseUrl = 'https://api.plasma-winter.io'
 
 export default {
     name: 'wallet',
     data: () => ({ 
         nonce:          0,
-        transferTo:     '0x6394b37Cf80A7358b38068f0CA4760ad49983a1B',
+        transferTo:     '',
         transferAmount: '0.001',
         depositAmount:  null,
         withdrawAmount: null,
