@@ -18,7 +18,7 @@ pub fn run() {
 
     let mem_pool = MemPool::new();
     let state_keeper = PlasmaStateKeeper::new();
-    let prover = BabyProver::create(&state_keeper.state).unwrap();
+    let prover = BabyProver::create().unwrap();
     let eth_watch = EthWatch::new(0, 0);
 
     // spawn threads for different processes

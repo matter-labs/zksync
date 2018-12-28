@@ -14,6 +14,18 @@ pub struct PlasmaState {
 
 impl PlasmaState {
     
+    pub fn new(accounts: AccountMap, current_block: u32) -> Self {
+        let tree_depth = params::BALANCE_TREE_DEPTH as u32;
+        let mut balance_tree = AccountTree::new(tree_depth);
+        for (id, account) in accounts {
+            balance_tree.insert(id, account);
+        }
+        Self{
+            balance_tree,
+            block_number: current_block,
+        }
+    }
+
     pub fn get_accounts(&self) -> Vec<(u32, Account)> {
         self.balance_tree.items.iter().map(|a| (*a.0 as u32, a.1.clone()) ).collect()
     }

@@ -78,29 +78,13 @@ impl PlasmaStateKeeper {
         println!("constructing state keeper instance");
 
         // here we should insert default accounts into the tree
-        let tree_depth = params::BALANCE_TREE_DEPTH as u32;
-        let mut balance_tree = AccountTree::new(tree_depth);
-
-        // println!("generating demo accounts");
-        // let keys_map = Self::generate_demo_accounts(&mut balance_tree);
-
-        // let keys_map: HashMap<u32, PrivateKey<Bn256>> = HashMap::new();
-
         let storage = StorageConnection::new();
-        let (last_committed_block, initial_state) = storage.load_committed_state().expect("db must be functional");
-        println!("Last committed block to before the start of state keeper = {}", last_committed_block);
-        for (id, account) in initial_state {
-            balance_tree.insert(id, account);
-        }
+        let (last_block, accounts) = storage.load_committed_state().expect("db must be functional");
+        let state = PlasmaState::new(accounts, last_block + 1);
 
+        println!("Last committed block to before the start of state keeper = {}", last_block);
         // Keeper starts with the NEXT block
-        let keeper = PlasmaStateKeeper {
-            state: PlasmaState{
-                balance_tree,
-                block_number: last_committed_block + 1,
-            },
-            // private_keys: keys_map
-        };
+        let keeper = PlasmaStateKeeper { state };
 
         let root = keeper.state.root_hash();
         println!("created state keeper, root hash = {}", root);

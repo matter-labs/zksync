@@ -117,9 +117,8 @@ impl StorageConnection {
             .map(|_|())
     }
 
-    pub fn load_committed_state(&self) -> QueryResult<(u32, AccountMap)> {
 
-        // select basis from accounts and join newer state from account_updates for all updates after the last committed block
+    pub fn load_committed_state(&self) -> QueryResult<(u32, AccountMap)> {
         const SELECT: &str = "
         SELECT 
             COALESCE(id, u.account_id) AS id,
@@ -130,15 +129,19 @@ impl StorageConnection {
         ON a.id = u.account_id 
         AND u.block_number > (SELECT COALESCE(max(last_block), 0) FROM accounts)";
 
-        diesel::sql_query(SELECT)
+        self.load_state(SELECT)
+    }
+
+    pub fn load_verified_state(&self) -> QueryResult<(u32, AccountMap)> {
+        self.load_state("SELECT * FROM accounts a")
+    }
+
+    fn load_state(&self, sql: &str) -> QueryResult<(u32, AccountMap)> {
+        diesel::sql_query(sql)
             .load(&self.conn)
             .map(|accounts: Vec<Account>| {
                 let mut result = AccountMap::default();
-                let mut last_block = 0u32;
-                let last_block_from_db = accounts.iter().map(|a| a.last_block).max();
-                if let Some(block_number) = last_block_from_db {
-                    last_block = block_number as u32;
-                }
+                let last_block = accounts.iter().map(|a| a.last_block as u32).max().unwrap_or(0);
                 result.extend(accounts.into_iter().map(|a| (
                         a.id as u32, 
                         serde_json::from_value(a.data).unwrap()

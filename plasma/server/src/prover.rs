@@ -24,6 +24,7 @@ use plasma::models::circuit::{Account, AccountTree};
 use super::config::{TRANSFER_BATCH_SIZE, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE};
 
 use super::models::{EncodedProof, Operation, Action, EthBlockData};
+use super::storage::StorageConnection;
 
 use plasma::circuit::utils::be_bit_vector_into_bytes;
 use plasma::circuit::transfer::transaction::{Transaction};
@@ -123,7 +124,12 @@ fn read_parameters(file_name: &str) -> Result<BabyParameters, BabyProverErr> {
 
 impl BabyProver {
 
-    pub fn create(initial_state: &PlasmaState) -> Result<BabyProver, BabyProverErr> {
+    pub fn create() -> Result<BabyProver, BabyProverErr> {
+
+        let storage = StorageConnection::new();
+        let (last_block, accounts) = storage.load_verified_state().expect("db must be functional");
+        let initial_state = PlasmaState::new(accounts, last_block + 1);
+
         println!("Reading proving key, may take a while");
 
         let transfer_circuit_params = read_parameters("transfer_pk.key");
