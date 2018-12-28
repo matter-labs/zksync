@@ -402,8 +402,10 @@ impl BabyProver {
 
             updated_sender_leaf.nonce.add_assign(&Fr::one());
 
-            updated_recipient_leaf.balance.add_assign(&transfer_amount_as_field_element);
-
+            if recipient_leaf_number != 0 {
+                updated_recipient_leaf.balance.add_assign(&transfer_amount_as_field_element);
+            }
+            
             total_fees.add_assign(&fee_as_field_element);
 
             tree.insert(sender_leaf_number, updated_sender_leaf.clone());
