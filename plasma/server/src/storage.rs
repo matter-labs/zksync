@@ -5,6 +5,7 @@ use super::models::{Operation, Action, StoredOperation};
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
 use diesel::sql_types::Integer;
+use diesel::result::Error;
 use dotenv::dotenv;
 use std::env;
 use serde_json::{to_value, value::Value};
@@ -74,7 +75,6 @@ impl StorageConnection {
                     self.commit_state_update(op.block_number, &op.accounts_updated)?,
                 Action::Verify{proof: _} => 
                     self.apply_state_update(op.block_number)?,
-                _ => unimplemented!(),
             };
             diesel::insert_into(operations::table)
                 .values(&NewOperation{ 
@@ -89,14 +89,17 @@ impl StorageConnection {
     fn commit_state_update(&self, block_number: u32, accounts_updated: &AccountMap) -> QueryResult<()> {
         for (&account_id, a) in accounts_updated.iter() {
             println!("Committing state update for account {} in block {}", account_id, block_number);
-            diesel::insert_into(account_updates::table)
+            let inserted = diesel::insert_into(account_updates::table)
                 .values(&AccountUpdate{
                     account_id:     account_id as i32,
                     block_number:   block_number as i32,
                     data:           to_value(a).unwrap(),
                 })
-                .execute(&self.conn)
-                .expect("must insert into the account updates table");
+                .execute(&self.conn)?;
+            if 0 == inserted {
+                eprintln!("Error: could not commit all state updates!");
+                return Err(Error::RollbackTransaction)
+            }
         }
         Ok(())
     }
@@ -222,19 +225,6 @@ use diesel::Connection;
 use bigdecimal::BigDecimal;
 use diesel::RunQueryDsl;
 
-fn load_verified_state(conn: &super::StorageConnection) -> QueryResult<AccountMap> {
-    diesel::sql_query("SELECT * FROM accounts")
-        .load(&conn.conn)
-        .map(|accounts: Vec<super::Account>| {
-            let mut result = AccountMap::default();
-            result.extend(accounts.into_iter().map(|a| (
-                    a.id as u32, 
-                    serde_json::from_value(a.data).unwrap()
-                )));
-            result
-        })
-}
-
 #[test]
 fn test_store_state() {
     
@@ -262,7 +252,7 @@ fn test_store_state() {
     accounts.insert(3, acc(3));
     conn.commit_state_update(1, &accounts).unwrap();
 
-    let state = load_verified_state(&conn).unwrap();
+    let (_, state) = conn.load_verified_state().unwrap();
     assert_eq!(state.len(), 0);
     
     // committed state must be computed from updates
@@ -276,7 +266,7 @@ fn test_store_state() {
     conn.apply_state_update(1).expect("update must work");
     
     // verified state must be equal the commitment
-    let state = load_verified_state(&conn).unwrap();
+    let (_, state) = conn.load_verified_state().unwrap();
     assert_eq!(
         state.into_iter().collect::<Vec<(u32, models::Account)>>(), 
         accounts.clone().into_iter().collect::<Vec<(u32, models::Account)>>());
@@ -287,7 +277,7 @@ fn test_store_state() {
     accounts2.insert(4, acc(4));
     conn.commit_state_update(2, &accounts2).unwrap();
 
-    assert_eq!(load_verified_state(&conn).unwrap().len(), 3);
+    assert_eq!(conn.load_verified_state().unwrap().1.len(), 3);
     assert_eq!(conn.load_committed_state().unwrap().1.len(), 4);
 
 }
@@ -300,9 +290,18 @@ use web3::types::{U256, H256};
 fn test_store_txs() {
 
     let conn = super::StorageConnection::new();
-    conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
+    //conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
     conn.reset_op_config("0x0", 0).unwrap();
 
+    let mut accounts = fnv::FnvHashMap::default();
+    let acc = |balance| { 
+        let mut a = models::Account::default(); 
+        a.balance = BigDecimal::from(balance);
+        a
+    };
+
+    accounts.insert(3, acc(1));
+    accounts.insert(5, acc(2));
     let commit = conn.commit_op(&Operation{
         action: Action::Commit{
             new_root:   H256::zero(), 
@@ -310,7 +309,7 @@ fn test_store_txs() {
         },
         block_number:       1, 
         block_data:         EthBlockData::Deposit{batch_number: 0}, 
-        accounts_updated:   fnv::FnvHashMap::default()
+        accounts_updated:   accounts.clone()
     }).unwrap();
 
     let verify = conn.commit_op(&Operation{
@@ -319,7 +318,7 @@ fn test_store_txs() {
         },
         block_number:       1, 
         block_data:         EthBlockData::Deposit{batch_number: 0}, 
-        accounts_updated:   fnv::FnvHashMap::default()
+        accounts_updated:   accounts.clone()
     }).unwrap();
 
     let pending = conn.load_pendings_txs(0).unwrap();
