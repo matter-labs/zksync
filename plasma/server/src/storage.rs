@@ -123,14 +123,18 @@ impl StorageConnection {
 
     pub fn load_committed_state(&self) -> QueryResult<(u32, AccountMap)> {
         const SELECT: &str = "
-        SELECT 
-            COALESCE(id, u.account_id) AS id,
-            COALESCE(u.block_number, a.last_block) AS last_block,   
-            COALESCE(u.data, a.data) AS data   
-        FROM accounts a
-        FULL JOIN account_updates u 
-        ON a.id = u.account_id 
-        AND u.block_number > (SELECT COALESCE(max(last_block), 0) FROM accounts)";
+        WITH upd AS (
+            WITH s AS (
+                SELECT account_id as id, max(block_number) as last_block 
+                FROM account_updates u 
+                WHERE u.block_number > (SELECT COALESCE(max(last_block), 0) FROM accounts) GROUP BY account_id
+            ) 
+            SELECT u.account_id AS id, u.block_number AS last_block, u.data FROM s, account_updates u WHERE s.id = u.account_id AND u.block_number = s.last_block
+        )
+        SELECT a.id, COALESCE(u.last_block, a.last_block) AS last_block, COALESCE (u.data, a.data) AS data
+        FROM upd u
+        FULL JOIN accounts a ON a.id = u.id
+        ORDER BY id";
 
         self.load_state(SELECT)
     }
