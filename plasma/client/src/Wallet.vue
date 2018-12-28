@@ -18,12 +18,12 @@
     </b-navbar>
     <br>
     <b-container class="bv-example-row">
+        <b-alert show dismissible :variant="alertType" fade :show="countdown" @dismissed="countdown=0" class="mt-2">
+            {{result}}
+        </b-alert>
         <b-row>
             <b-col sm="6" order="2" class="col-xl-8 col-lg-7 col-md-6 col-sm-12">
                 <b-card title="Transfer in Plasma" class="mb-4 d-flex">
-                    <b-alert show dismissible variant="success" fade :show="countdown" @dismissed="countdown=0" class="mt-2">
-                        {{result}}
-                    </b-alert>
                     <label for="transferToInput">To:</label>
                     <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input>
                     <label for="transferAmountInput" class="mt-4">Amount</label>
@@ -151,6 +151,7 @@ export default {
 
         updateTimer:    0,
         countdown:      0,
+        alertType:      null,
         result:         null
     }),
     created() {
@@ -191,13 +192,14 @@ export default {
         }
     },
     methods: {
-        deposit() {
+        async deposit() {
             this.$refs.depositModal.hide()
             let pub = store.account.plasma.key.publicKey
             let maxFee = new BN()
             let value = Eth.toWei(this.depositAmount, 'ether')
             let from = store.account.address
-            contract.deposit([pub.x, pub.y], maxFee, { value, from })
+            let hash = await contract.deposit([pub.x, pub.y], maxFee, { value, from })
+            this.alert('Deposit initiated, tx: ' + hash, 'success')
         },
         async withdrawSome() {
             this.$refs.withdrawModal.hide()
@@ -206,15 +208,17 @@ export default {
         async withdrawAll() {
             this.$refs.withdrawModal.hide()
             console.log('full withdraw')
-            await contract.exit()
-            this.alert('full withdrawal initiated')
+            let from = store.account.address
+            let hash = await contract.exit({ from })
+            this.alert('Full exit initiated, tx: ' + hash, 'success')
         },
-        alert(msg) {
+        alert(msg, alertType) {
             this.result = msg
-            this.countdown = 8
+            this.countdown = 30
+            this.alertType = alertType || 'danger'
         },
         async transfer() {
-            if(!ethUtil.isHexString(to)) {
+            if(!ethUtil.isHexString(this.transferTo)) {
                 this.alert('to is not a hex string')
                 return  
             }
@@ -246,8 +250,12 @@ export default {
                 url:        baseUrl + '/send',
                 data:       apiForm
             });
-            console.log(JSON.stringify(result.data));
-            this.alert(result.data)
+            if(result.data.accepted) {
+                this.alert(`Transaction with nonce #${this.nonce} accepted`, 'success')
+                this.nonce++
+            } else  {
+                this.alert(`Transaction rejected!`)
+            }
         },
         async updateAccountInfo() {
             let newData = {}
