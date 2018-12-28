@@ -186,7 +186,7 @@ pub fn start_api_server(tx_for_tx:    mpsc::Sender<TransferTx>,
                         .resource("/details", |r| {
                             r.method(Method::POST).f(|_| HttpResponse::Ok());
                             r.method(Method::OPTIONS).f(|_| HttpResponse::Ok());
-                            r.method(Method::GET).f(handle_get_state);
+                            r.method(Method::GET).f(handle_get_details);
                         })
                         .register()
                 })
