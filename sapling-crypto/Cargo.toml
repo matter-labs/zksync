@@ -9,8 +9,7 @@ repository = "https://github.com/matterinc/sapling-crypto"
 version = "0.0.2"
 
 [lib]
-name = "ios_snarks"
-crate-type = ["staticlib"]
+crate-type = ["lib", "staticlib"]
  
 [dependencies]
 rand = "0.4"

@@ -82,6 +82,7 @@ impl TransferTx {
     }
 
     pub fn validate(&self) -> bool {
+        use bigdecimal::Zero;
         if self.from == self.to {
             return false;
         }
