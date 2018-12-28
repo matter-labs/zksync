@@ -141,6 +141,7 @@ contract PlasmaStorage {
     event LogCancelExitRequest(uint256 indexed batchNumber, uint24 indexed accountID);
 
     event LogExit(address indexed ethereumAddress, uint32 indexed blockNumber);
+    event LogCompleteExit(address indexed ethereumAddress, uint32 indexed blockNumber, uint24 accountID);
 
     // mapping ethereum address => block number => balance
     mapping (address => mapping (uint32 => uint128)) public exitAmounts;

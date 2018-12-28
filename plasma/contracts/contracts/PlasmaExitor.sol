@@ -216,12 +216,11 @@ contract PlasmaExitor is Plasma {
 
             exitAmounts[accountOwner][blockNumber] = scaledAmount;
             account.state = uint8(AccountState.UNCONFIRMED_EXIT);
-            emit LogExit(accountOwner, blockNumber);
+            emit LogCompleteExit(accountOwner, blockNumber, accountIDs[i]);
 
         }
     }
 
-    
     function withdrawUserBalance(
         uint32 blockNumber
     )
@@ -239,7 +238,7 @@ contract PlasmaExitor is Plasma {
                 ExitBatch storage batch = exitBatches[batchNumber];
                 if (blockNumber == batch.blockNumber) {
                     balance = exitAmounts[msg.sender][blockNumber];
-                    
+
                     delete accounts[accountID];
                     delete ethereumAddressToAccountID[msg.sender];
                     delete exitAmounts[msg.sender][blockNumber];
