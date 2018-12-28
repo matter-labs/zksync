@@ -25,8 +25,8 @@ contract PlasmaStorage {
     enum AccountState {
         NOT_REGISTERED,
         REGISTERED,
-        PENDING_EXIT
-        // there is no EXITED state, cause we remove an account all together
+        PENDING_EXIT,
+        UNCONFIRMED_EXIT
     }
 
     struct Block {
@@ -110,8 +110,6 @@ contract PlasmaStorage {
     // Transfers
 
     uint256 public constant TRANSFER_BLOCK_SIZE = 128;
-    // mapping block number => account => balance
-    mapping (uint32 => mapping (uint24 => uint128)) public partialExits;
 
     // Exits 
 
@@ -125,8 +123,6 @@ contract PlasmaStorage {
 
     // batches for complete exits
     mapping (uint256 => ExitBatch) public exitBatches;
-    // mapping block number => account => balance
-    mapping (uint32 => mapping (uint24 => uint128)) public fullExits;
 
     enum ExitBatchState {
         CREATED,
@@ -144,6 +140,10 @@ contract PlasmaStorage {
     event LogExitRequest(uint256 indexed batchNumber, uint24 indexed accountID);
     event LogCancelExitRequest(uint256 indexed batchNumber, uint24 indexed accountID);
 
+    event LogExit(address indexed ethereumAddress, uint32 indexed blockNumber);
+
+    // mapping ethereum address => block number => balance
+    mapping (address => mapping (uint32 => uint128)) public exitAmounts;
     // Delegates chain
     address public transactor;
     address public exitor;

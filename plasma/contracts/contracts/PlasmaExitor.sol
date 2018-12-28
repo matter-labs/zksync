@@ -200,7 +200,7 @@ contract PlasmaExitor is Plasma {
             if (accountIDs[i] == 0) {
                 continue;
             }
-            require(i == 0 || accountIDs[i] > accountIDs[i-1], "accountID are not properly ordered");
+            require(i == 0 || accountIDs[i] > accountIDs[i-1], "accountIDs are not properly ordered");
             assembly {
                 chunk := mload(add(txData, pointer))
             }
@@ -208,31 +208,55 @@ contract PlasmaExitor is Plasma {
             
             require(accountIDs[i] == chunk >> 232, "invalid account ID in commitment");
             Account storage account = accounts[accountIDs[i]];
-            require(account.state == uint8(AccountState.PENDING_EXIT), "there was not such exit request");
+            require(account.state == uint8(AccountState.PENDING_EXIT), "there was no such exit request");
             require(account.exitBatchNumber == uint32(batchNumber), "account was registered for exit in another batch");
 
             accountOwner = accounts[accountIDs[i]].owner;
             scaledAmount = uint128(chunk << 24 >> 128);
-            fullExits[blockNumber][accountIDs[i]] = scaledAmount;
 
-            // accountOwner.transfer(scaleFromPlasmaUnitsIntoWei(scaledAmount));
+            exitAmounts[accountOwner][blockNumber] = scaledAmount;
+            account.state = uint8(AccountState.UNCONFIRMED_EXIT);
+            emit LogExit(accountOwner, blockNumber);
+
         }
     }
 
-    function withdrawFullExitBalance(
+    
+    function withdrawUserBalance(
         uint32 blockNumber
     )
     public
     {
-        uint24 accountID = ethereumAddressToAccountID[msg.sender];
-        require(accountID != 0, "trying to access a non-existent account");
         require(blockNumber <= lastVerifiedBlockNumber, "can only process exits from verified blocks");
-        uint128 balance = fullExits[blockNumber][accountID];
+        uint24 accountID = ethereumAddressToAccountID[msg.sender];
+        uint128 balance;
+        uint256 amountInWei;
+        if (accountID != 0) {
+            // user either didn't fully exit or didn't take full exit balance yet
+            Account storage account = accounts[accountID];
+            if (account.state == uint8(AccountState.UNCONFIRMED_EXIT)) {
+                uint256 batchNumber = account.exitBatchNumber;
+                ExitBatch storage batch = exitBatches[batchNumber];
+                if (blockNumber == batch.blockNumber) {
+                    balance = exitAmounts[msg.sender][blockNumber];
+                    
+                    delete accounts[accountID];
+                    delete ethereumAddressToAccountID[msg.sender];
+                    delete exitAmounts[msg.sender][blockNumber];
+
+                    amountInWei = scaleFromPlasmaUnitsIntoWei(balance);
+                    msg.sender.transfer(amountInWei);
+                    return;
+                }
+            }
+        }
+        // user account information is already deleted or it's not the block number where a full exit has happened
+        // we require a non-zero balance in this case cause chain cleanup is not required
+        balance = exitAmounts[msg.sender][blockNumber];
         require(balance != 0, "nothing to exit");
-        delete fullExits[blockNumber][accountID];
-        uint256 amountInWei = scaleFromPlasmaUnitsIntoWei(balance);
-        delete accounts[accountID];
-        delete ethereumAddressToAccountID[msg.sender];
+        delete exitAmounts[msg.sender][blockNumber];
+        amountInWei = scaleFromPlasmaUnitsIntoWei(balance);
         msg.sender.transfer(amountInWei);
     }
+
 }
