@@ -22,7 +22,7 @@ struct Account {
     pub data:       Value,
 }
 
-#[derive(Insertable, Queryable)]
+#[derive(Insertable, Queryable, QueryableByName)]
 #[table_name="account_updates"]
 struct AccountUpdate {
     pub account_id:     i32,
@@ -222,11 +222,12 @@ impl StorageConnection {
         let last = self.get_last_committed_block();
 
         let query = format!("
-        SELECT * from account_updates WHERE account_id = {} AND block_number = {}
+        SELECT * from account_updates WHERE account_id = {} AND block_number <= {}
+        ORDER BY block_number DESC LIMIT 1
         ", account_id, last);
 
         let result = diesel::sql_query(query)
-            .load::<Account>(&self.conn)
+            .load::<AccountUpdate>(&self.conn)
             .expect("should load last committed state for account");
 
         if let Some(acc) = result.get(0) {
@@ -241,11 +242,12 @@ impl StorageConnection {
         let last = self.get_last_verified_block();
 
         let query = format!("
-        SELECT * from account_updates WHERE account_id = {} AND block_number = {}
+        SELECT * from account_updates WHERE account_id = {} AND block_number <= {}
+        ORDER BY block_number DESC LIMIT 1
         ", account_id, last);
 
         let result = diesel::sql_query(query)
-            .load::<Account>(&self.conn)
+            .load::<AccountUpdate>(&self.conn)
             .expect("should load last verified state for account");
 
         if let Some(acc) = result.get(0) {
@@ -438,6 +440,14 @@ fn test_store_proof_reqs() {
 
     let pending = conn.load_pendings_proof_reqs().unwrap();
     assert_eq!(pending.len(), 0);
+}
+
+#[test]
+fn test_get_last_committed_block() {
+
+    let conn = super::StorageConnection::new();
+    let last = conn.get_last_verified_block();
+    println!("Last verified = {}", last);
 }
 
 }
