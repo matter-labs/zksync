@@ -40,9 +40,9 @@ struct NewOperation {
 
 
 #[derive(Debug, QueryableByName)]
-pub struct BatchNumber {
+pub struct IntegerNumber {
     #[sql_type="Integer"]
-    pub batch_number: i32,
+    pub integer_value: i32,
 }
 
 // #[derive(Queryable)]
@@ -188,34 +188,103 @@ impl StorageConnection {
 
     pub fn load_last_committed_deposit_batch(&self) -> i32 {
         const SELECT: &str = "
-        SELECT COALESCE(max((data->'block_data'->>'batch_number')::int), -1) as batch_number FROM operations 
+        SELECT COALESCE(max((data->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
         WHERE data->'action'->>'type' = 'Commit' 
         AND data->'block_data'->>'type' = 'Deposit'
         ";
 
         let result = diesel::sql_query(SELECT)
-            .load::<BatchNumber>(&self.conn)
+            .load::<IntegerNumber>(&self.conn)
             .expect("should load last committed deposit batch");
 
         let last_committed = result.get(0).expect("should never return an empty array");
         
-        last_committed.batch_number
+        last_committed.integer_value
     }
 
     pub fn load_last_committed_exit_batch(&self) -> i32 {
         const SELECT: &str = "
-        SELECT COALESCE(max((data->'block_data'->>'batch_number')::int), -1) as batch_number FROM operations 
+        SELECT COALESCE(max((data->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
         WHERE data->'action'->>'type' = 'Commit' 
         AND data->'block_data'->>'type' = 'Exit'
         ";
 
         let result = diesel::sql_query(SELECT)
-            .load::<BatchNumber>(&self.conn)
+            .load::<IntegerNumber>(&self.conn)
             .expect("should load last committed exit batch");
 
         let last_committed = result.get(0).expect("should never return an empty array");
         
-        last_committed.batch_number
+        last_committed.integer_value
+    }
+
+    pub fn last_committed_state_for_account(&self, account_id: u32) -> Option<plasma::models::Account> {
+        let last = self.get_last_committed_block();
+
+        let query = format!("
+        SELECT * from account_updates WHERE account_id = {} AND block_number = {}
+        ", account_id, last);
+
+        let result = diesel::sql_query(query)
+            .load::<Account>(&self.conn)
+            .expect("should load last committed state for account");
+
+        if let Some(acc) = result.get(0) {
+            let converted = serde_json::from_value(acc.data.clone()).unwrap();
+            return Some(converted);
+        }
+
+        None
+    }
+
+    pub fn last_verified_state_for_account(&self, account_id: u32) -> Option<plasma::models::Account> {
+        let last = self.get_last_verified_block();
+
+        let query = format!("
+        SELECT * from account_updates WHERE account_id = {} AND block_number = {}
+        ", account_id, last);
+
+        let result = diesel::sql_query(query)
+            .load::<Account>(&self.conn)
+            .expect("should load last verified state for account");
+
+        if let Some(acc) = result.get(0) {
+            let converted = serde_json::from_value(acc.data.clone()).unwrap();
+            return Some(converted);
+        }
+
+        None
+    }
+
+    pub fn get_last_committed_block(&self) -> i32 {
+        const SELECT: &str = "
+        SELECT COALESCE(max((data->>'block_number')::int), 0) as integer_value FROM operations 
+        WHERE data->'action'->>'type' = 'Commit'
+        ";
+
+        let result = diesel::sql_query(SELECT)
+            .load::<IntegerNumber>(&self.conn)
+            .expect("should load last committed exit batch");
+
+        let last = result.get(0).expect("should never return an empty array");
+        
+        last.integer_value
+    }
+
+
+    pub fn get_last_verified_block(&self) -> i32 {
+        const SELECT: &str = "
+        SELECT COALESCE(max((data->>'block_number')::int), 0) as integer_value FROM operations 
+        WHERE data->'action'->>'type' = 'Verify'
+        ";
+
+        let result = diesel::sql_query(SELECT)
+            .load::<IntegerNumber>(&self.conn)
+            .expect("should load last committed exit batch");
+
+        let last = result.get(0).expect("should never return an empty array");
+        
+        last.integer_value
     }
 
 }
