@@ -87,6 +87,7 @@ contract PlasmaTransactor is Plasma {
         uint24 from;
         uint128 scaledAmount;
         uint16 floatValue;
+        address userAddress;
         // there is no check for a length of the public data because it's not provable if broken
         // unless sha256 collision is found
         for (uint256 i = 0; i < txDataPacked.length / 9; i++) { 
@@ -101,9 +102,14 @@ contract PlasmaTransactor is Plasma {
                     continue;
                 }
                 floatValue = uint16((chunk << 48) >> 240);
+                userAddress = accounts[from].owner;
+                if (userAddress == address(0)) {
+                    continue;
+                }
 
                 scaledAmount = parseFloat(floatValue);
-                partialExits[blockNumber][from] += scaledAmount;
+                exitAmounts[userAddress][blockNumber] += scaledAmount;
+                emit LogExit(userAddress, blockNumber);
             }
         }
     }
@@ -137,22 +143,6 @@ contract PlasmaTransactor is Plasma {
             powerOfTwo = powerOfTwo * 2;
         }
         return exponent * mantissa;
-    }
-
-
-    function withdrawPartialExitBalance(
-        uint32 blockNumber
-    )
-    public
-    {
-        uint24 accountID = ethereumAddressToAccountID[msg.sender];
-        require(accountID != 0, "trying to access a non-existent account");
-        require(blockNumber <= lastVerifiedBlockNumber, "can only process exits from verified blocks");
-        uint128 balance = partialExits[blockNumber][accountID];
-        require(balance != 0, "nothing to exit");
-        delete partialExits[blockNumber][accountID];
-        uint256 amountInWei = scaleFromPlasmaUnitsIntoWei(balance);
-        msg.sender.transfer(amountInWei);
     }
 
     function () external payable {

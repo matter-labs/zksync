@@ -6,7 +6,9 @@ contract PlasmaDepositor is Plasma {
 
     function deposit(uint256[2] memory publicKey, uint128 maxFee) 
     public 
-    payable {
+    payable 
+    active_only()
+    {
         // only registed an account or do the lookup
         uint24 accountID = ethereumAddressToAccountID[msg.sender];
         if (accountID == 0) {
@@ -30,6 +32,7 @@ contract PlasmaDepositor is Plasma {
     function depositInto(uint24 accountID, uint128 maxFee) 
     public 
     payable 
+    active_only()
     {
         // this comparison is to avoid frontrunning between user
         // and the operator
@@ -39,6 +42,7 @@ contract PlasmaDepositor is Plasma {
         require(accountID < nextAccountToRegister, "for now only allow to deposit into non-empty accounts");
         // read account info
         Account memory accountInformation = accounts[accountID];
+        require(accountInformation.state == uint8(AccountState.REGISTERED), "can only deposit into registered account");
 
         // work with a deposit
         uint256 currentBatch = totalDepositRequests / DEPOSIT_BATCH_SIZE;
@@ -99,6 +103,7 @@ contract PlasmaDepositor is Plasma {
 
     function startNextDepositBatch()
     public
+    active_only()
     operator_only()
     {
         uint256 currentBatch = totalDepositRequests/DEPOSIT_BATCH_SIZE;
@@ -113,6 +118,7 @@ contract PlasmaDepositor is Plasma {
 
     function changeDepositBatchFee(uint128 newBatchFee)
     public
+    active_only()
     operator_only()
     {
         if (currentDepositBatchFee != newBatchFee) {
@@ -143,8 +149,9 @@ contract PlasmaDepositor is Plasma {
         uint32 blockNumber, 
         bytes32 newRoot
     ) 
-    public 
-    operator_only 
+    public
+    active_only()
+    operator_only()
     {
         require(blockNumber == lastCommittedBlockNumber + 1, "may only commit next block");
         require(batchNumber == lastCommittedDepositBatch, "trying to commit batch out of order");
@@ -180,7 +187,8 @@ contract PlasmaDepositor is Plasma {
         uint256[8] memory proof
     ) 
     public 
-    operator_only 
+    active_only()
+    operator_only()
     {
         require(lastVerifiedBlockNumber < lastCommittedBlockNumber, "no committed block to verify");
         require(blockNumber == lastVerifiedBlockNumber + 1, "may only verify next block");
