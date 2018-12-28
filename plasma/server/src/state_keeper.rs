@@ -188,33 +188,42 @@ impl PlasmaStateKeeper {
             // .into_iter()
             // .map(|tx| self.augument_and_sign(tx))
             // .collect();
-        let mut save_state = FnvHashMap::<u32, Account>::default();
+        let mut saved_state = FnvHashMap::<u32, Account>::default();
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
+
+        // TODO: this assert is for test, remove in production
+        let root_hash = self.state.root_hash();
+
+        // save state before applying transactions
+        for tx in transactions.iter() {
+            saved_state.insert(tx.from, self.account(tx.from));
+            saved_state.insert(tx.to, self.account(tx.to));
+        }
 
         let transactions: Vec<TransferTx> = transactions
             .into_iter()
-            .filter(|tx| {
-                // save state
-                save_state.insert(tx.from, self.account(tx.from));
-                save_state.insert(tx.to, self.account(tx.to));
-                let r = self.state.apply_transfer(&tx).is_ok();
-
-                // collect updated state
-                updated_accounts.insert(tx.from, self.account(tx.from));
-                updated_accounts.insert(tx.to, self.account(tx.to));
-
-                r                
-            })
+            .filter(|tx| self.state.apply_transfer(&tx).is_ok())
             .collect();
         
         if transactions.len() != block.transactions.len() {
             // some transactions were rejected, revert state
-            for (k,v) in save_state.into_iter() {
+            println!("reverting the state");
+
+            for (k,v) in saved_state.into_iter() {
                 // TODO: add tree.insert_existing() for performance
                 self.state.balance_tree.insert(k, v);
             }
-            println!("Revert the state");
+
+            // TODO: this assert is for test, remove in production
+            assert_eq!(root_hash, self.state.root_hash());
+
             return Err(());
+        }
+
+        // collect updated state
+        for tx in transactions.iter() {
+            updated_accounts.insert(tx.from, self.account(tx.from));
+            updated_accounts.insert(tx.to, self.account(tx.to));
         }
             
         let mut total_fees = 0u128;
