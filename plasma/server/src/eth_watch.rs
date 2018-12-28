@@ -34,6 +34,16 @@ pub const PROD_PLASMA: ABI = (
     include_str!("../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.bin"),
 );
 
+
+fn u64_from_environment(name: &str) -> Option<u64> {
+    let candidate = env::var(name);
+    if let Ok(candidate_string) = candidate {
+        return candidate_string.parse::<u64>();
+    }
+
+    None
+}
+
 pub struct EthWatch {
     last_processed_block: u64,
     blocks_lag: u64,
@@ -56,21 +66,14 @@ impl EthWatch {
     pub fn new(start_from_block: u64, lag: u64) -> Self {
         dotenv().ok();
 
-        let start_candidate = env::var("FROM_BLOCK");
         let mut start = start_from_block;
-        if let Ok(candidate) = start_candidate {
-            if let Ok(starting_block_u64) = candidate.parse::<u64>() {
-                start = starting_block_u64;
-            }
+        if let Ok(starting_block_from_env) = u64_from_environment("FROM_BLOCK") {
+            start = starting_block_from_env;
         }
 
-        let delay_candidate = env::var("BLOCK_DELAY");
-
         let mut delay = lag;
-        if let Ok(candidate) = delay_candidate {
-            if let Ok(delay_u64) = candidate.parse::<u64>() {
-                delay = delay_u64;
-            }
+        if let Ok(delay_from_env) = u64_from_environment("BLOCK_DELAY") {
+            delay = delay_from_env;
         }
 
         let mut this = Self {
