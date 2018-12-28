@@ -20,6 +20,9 @@ use actix_web::{
 
 use futures::Future;
 
+use std::env;
+use dotenv;
+
 #[derive(Debug, Serialize, Deserialize)]
 struct TransactionRequest {
     from: u32,
@@ -98,10 +101,17 @@ fn handle_get_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
 
 pub fn start_api_server(tx_for_tx:    mpsc::Sender<TransferTx>, 
                       tx_for_state: mpsc::Sender<StateProcessingRequest>) {
+    
+    dotenv().ok();
+
+    let address = env::var("BIND_TO").unwrap_or("127.0.0.1");
+    let port = env::var("PORT").unwrap_or("8080");
+
 
     std::thread::Builder::new().name("api_server".to_string()).spawn(move || {
         ::std::env::set_var("RUST_LOG", "actix_web=info");
         let sys = actix::System::new("ws-example");
+        let server_config = format!("{}:{}", address, port);
 
         //move is necessary to give closure below ownership
         server::new(move || {
@@ -128,12 +138,12 @@ pub fn start_api_server(tx_for_tx:    mpsc::Sender<TransferTx>,
                         })
                         .register()
                 })
-        }).bind("127.0.0.1:8080")
+        }).bind(&server_config)
         .unwrap()
         .shutdown_timeout(1)
         .start();
 
-        println!("Started http server: 127.0.0.1:8080");
+        println!("Started http server: {}", server_config);
         sys.run();
     });
 }

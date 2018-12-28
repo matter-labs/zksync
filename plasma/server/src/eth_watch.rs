@@ -11,6 +11,7 @@ use super::models::{StateProcessingRequest};
 use plasma::models::{Block, DepositBlock, DepositTx, Engine, Fr, ExitBlock, ExitTx};
 use bigdecimal::{Num, BigDecimal};
 use plasma::models::params;
+use dotenv;
 
 use std::time;
 use web3::contract::{Contract, Options};
@@ -53,6 +54,7 @@ pub struct EthWatch {
 impl EthWatch {
 
     pub fn new(start_from_block: u64, lag: u64) -> Self {
+        dotenv().ok();
 
         let start_candidate = env::var("FROM_BLOCK");
         let mut start = start_from_block;
@@ -62,9 +64,18 @@ impl EthWatch {
             }
         }
 
+        let delay_candidate = env::var("BLOCK_DELAY");
+
+        let mut delay = lag;
+        if let Ok(candidate) = delay_candidate {
+            if let Ok(delay_u64) = candidate.parse::<u64>() {
+                delay = delay_u64;
+            }
+        }
+
         let mut this = Self {
             last_processed_block: start,
-            blocks_lag: lag,
+            blocks_lag: delay,
             web3_url:       env::var("WEB3_URL").unwrap_or("http://localhost:8545".to_string()),
             contract_addr:  H160::from_str(&env::var("CONTRACT_ADDR").unwrap_or("4169D71D56563eA9FDE76D92185bEB7aa1Da6fB8".to_string())).unwrap(),
             contract:       ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap(),

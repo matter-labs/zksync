@@ -48,6 +48,10 @@ impl MemPool {
             }
         };
     }
+
+    fn get_latest_nonce(&self, address: u32) -> Option<u32> {
+        None
+    }
 }
 
 pub fn start_mem_pool(mut mem_pool: MemPool, rx_for_tx: Receiver<TransferTx>, tx_for_blocks: Sender<StateProcessingRequest>) {
