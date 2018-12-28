@@ -21,7 +21,7 @@ use actix_web::{
 use futures::Future;
 
 use std::env;
-use dotenv;
+use dotenv::dotenv;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct TransactionRequest {
@@ -63,7 +63,7 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
             let valid = tx.validate();
             if !valid {
                 let resp = TransactionResponse{
-                    false
+                    accepted: false,
                 };
                 return Ok(HttpResponse::Ok().json(resp));
             }
@@ -111,8 +111,8 @@ pub fn start_api_server(tx_for_tx:    mpsc::Sender<TransferTx>,
     
     dotenv().ok();
 
-    let address = env::var("BIND_TO").unwrap_or("127.0.0.1");
-    let port = env::var("PORT").unwrap_or("8080");
+    let address = env::var("BIND_TO").unwrap_or("127.0.0.1".to_string());
+    let port = env::var("PORT").unwrap_or("8080".to_string());
 
 
     std::thread::Builder::new().name("api_server".to_string()).spawn(move || {

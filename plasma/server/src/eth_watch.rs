@@ -11,7 +11,7 @@ use super::models::{StateProcessingRequest};
 use plasma::models::{Block, DepositBlock, DepositTx, Engine, Fr, ExitBlock, ExitTx};
 use bigdecimal::{Num, BigDecimal};
 use plasma::models::params;
-use dotenv;
+use dotenv::dotenv;
 
 use std::time;
 use web3::contract::{Contract, Options};
@@ -38,7 +38,9 @@ pub const PROD_PLASMA: ABI = (
 fn u64_from_environment(name: &str) -> Option<u64> {
     let candidate = env::var(name);
     if let Ok(candidate_string) = candidate {
-        return candidate_string.parse::<u64>();
+        if let Ok(as_u64) = candidate_string.parse::<u64>() {
+            return Some(as_u64);
+        }
     }
 
     None
