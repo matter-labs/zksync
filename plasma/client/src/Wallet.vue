@@ -138,7 +138,7 @@ import transactionLib from '../../contracts/lib/transaction.js'
 
 window.eu = ethUtil
 
-const baseUrl = 'http://188.166.33.159:8080'
+const baseUrl = 'https://api.plasma-winter.io'
 
 export default {
     name: 'wallet',
