@@ -37,7 +37,7 @@ window.app = new Vue({
         // read store.account from local storage?
         if (typeof window.ethereum !== 'undefined') {
             window.eth = new Eth(web3.currentProvider)
-            window.contract = eth.contract(ABI).at('0xeafed7de64fd5ad36145ea7f81e2a11b907d5b17')
+            window.contract = eth.contract(ABI).at('0x17Fc594b619B975DF43BdC56103747c3ed6f5653')
         }
         if (!store.account.address) {
             this.$router.push('/login')

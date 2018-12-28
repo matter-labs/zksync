@@ -184,10 +184,6 @@ impl PlasmaStateKeeper {
     fn apply_transfer_block(&mut self, block: &mut TransferBlock) -> Result<(H256, EthBlockData, AccountMap), ()> {
         use ff::{PrimeField, PrimeFieldRepr};
         use bigdecimal::{ToPrimitive};
-        let transactions: Vec<TransferTx> = block.transactions.clone();
-            // .into_iter()
-            // .map(|tx| self.augument_and_sign(tx))
-            // .collect();
         let mut saved_state = FnvHashMap::<u32, Account>::default();
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
 
@@ -195,12 +191,12 @@ impl PlasmaStateKeeper {
         let root_hash = self.state.root_hash();
 
         // save state before applying transactions
-        for tx in transactions.iter() {
+        for tx in block.transactions.iter() {
             saved_state.insert(tx.from, self.account(tx.from));
             saved_state.insert(tx.to, self.account(tx.to));
         }
 
-        let transactions: Vec<TransferTx> = transactions
+        let transactions: Vec<TransferTx> = block.transactions.clone()
             .into_iter()
             .filter(|tx| self.state.apply_transfer(&tx).is_ok())
             .collect();
@@ -213,6 +209,8 @@ impl PlasmaStateKeeper {
                 // TODO: add tree.insert_existing() for performance
                 self.state.balance_tree.insert(k, v);
             }
+
+            block.transactions = transactions;
 
             // TODO: this assert is for test, remove in production
             assert_eq!(root_hash, self.state.root_hash());
