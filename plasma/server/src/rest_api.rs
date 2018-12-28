@@ -60,7 +60,14 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
             tx_for_state.send(request).expect("queue must work");
             // now wait for state_keeper to return a result
             let pub_key: Option<PublicKey> = key_rx.recv().unwrap();
-            
+            let valid = tx.validate();
+            if !valid {
+                let resp = TransactionResponse{
+                    false
+                };
+                return Ok(HttpResponse::Ok().json(resp));
+            }
+
             let accepted = pub_key.as_ref().map(|pk| tx.verify_sig(pk) ).unwrap_or(false);
             if accepted {
                 let mut tx = tx.clone();

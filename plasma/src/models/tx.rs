@@ -80,6 +80,14 @@ impl TransferTx {
 
         valid
     }
+
+    pub fn validate(&self) -> bool {
+        if self.from == self.to {
+            return false;
+        }
+
+        true
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
