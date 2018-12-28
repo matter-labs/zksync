@@ -304,7 +304,7 @@ impl BabyProver {
     pub fn apply_and_prove_transfer(&mut self, block: &TransferBlock) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.block_number {
-            println!("Proof request is for block {}, while prover state is block {}", block_number, self.block_number);
+            println!("Transfer proof request is for block {}, while prover state is block {}", block_number, self.block_number);
             return Err(BabyProverErr::Unknown);
         }
         let block_final_root = block.new_root_hash.clone();
@@ -583,7 +583,7 @@ impl BabyProver {
     pub fn apply_and_prove_deposit(&mut self, block: &DepositBlock) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.block_number {
-            println!("Proof request is for block {}, while prover state is block {}", block_number, self.block_number);
+            println!("Deposit proof request is for block {}, while prover state is block {}", block_number, self.block_number);
             return Err(BabyProverErr::Unknown);
         }
         let block_final_root = block.new_root_hash.clone();
@@ -783,7 +783,7 @@ impl BabyProver {
     pub fn apply_and_prove_exit(&mut self, block: &ExitBlock) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.block_number {
-            println!("Proof request is for block {}, while prover state is block {}", block_number, self.block_number);
+            println!("Exit proof request is for block {}, while prover state is block {}", block_number, self.block_number);
             return Err(BabyProverErr::Unknown);
         }
         let block_final_root = block.new_root_hash.clone();
