@@ -33,7 +33,7 @@ contract PlasmaDepositor is Plasma {
     {
         // this comparison is to avoid frontrunning between user
         // and the operator
-        require(maxFee <= currentDepositBatchFee, "deposit fee is less than required");
+        require(maxFee >= currentDepositBatchFee, "deposit fee is less than required");
         uint128 scaledValue = scaleIntoPlasmaUnitsFromWei(msg.value);
         require(scaledValue > currentDepositBatchFee, "deposit amount should cover the fee");
         require(accountID < nextAccountToRegister, "for now only allow to deposit into non-empty accounts");
