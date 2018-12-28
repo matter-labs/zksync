@@ -85,6 +85,9 @@ impl TransferTx {
         if self.from == self.to {
             return false;
         }
+        if self.amount == BigDecimal::zero() {
+            return false;
+        }
 
         true
     }
