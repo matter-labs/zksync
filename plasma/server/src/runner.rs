@@ -4,7 +4,7 @@ use super::prover::{BabyProver, start_prover};
 use super::state_keeper::{PlasmaStateKeeper, start_state_keeper};
 use super::rest_api::start_api_server;
 use super::committer;
-use super::mem_pool::{MemPool, start_mem_pool};
+use super::mem_pool::{MemPool, start_mem_pool, MempoolRequest};
 use super::eth_watch::{EthWatch, start_eth_watch};
 
 pub fn run() {

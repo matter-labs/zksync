@@ -4,6 +4,7 @@ use std::sync::mpsc;
 use plasma::models::{TransferTx, PublicKey, Account};
 use super::models::StateProcessingRequest;
 use super::storage::{StorageConnection};
+use super::mem_pool::{MempoolRequest};
 
 use actix_web::{
     middleware, 
@@ -51,6 +52,7 @@ struct DetailsResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct AccountDetailsResponse {
+    pending_nonce: Option<u32>,
     pending: Option<Account>,
     verified: Option<Account>,
     committed: Option<Account>,
@@ -59,13 +61,13 @@ struct AccountDetailsResponse {
 // singleton to keep info about channels required for Http server
 #[derive(Clone)]
 pub struct AppState {
-    tx_for_tx: mpsc::Sender<TransferTx>,
+    tx_to_mempool: mpsc::Sender<MempoolRequest>,
     tx_for_state: mpsc::Sender<StateProcessingRequest>,
     contract_address: String,
 }
 
 fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
-    let tx_for_tx = req.state().tx_for_tx.clone();
+    let tx_to_mempool = req.state().tx_to_mempool.clone();
     let tx_for_state = req.state().tx_for_state.clone();
     req.json()
         .from_err() // convert all errors into `Error`
@@ -89,7 +91,7 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
             if accepted {
                 let mut tx = tx.clone();
                 tx.cached_pub_key = pub_key;
-                tx_for_tx.send(tx).expect("must send transaction to mempool from rest api"); // pass to mem_pool
+                tx_to_mempool.send(MempoolRequest::AddTransaction(tx)).expect("must send transaction to mempool from rest api"); // pass to mem_pool
             }
             let resp = TransactionResponse{
                 accepted
@@ -102,6 +104,7 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
 use actix_web::Result as ActixResult;
 
 fn handle_get_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    let tx_to_mempool = req.state().tx_to_mempool.clone();
     let tx_for_state = req.state().tx_for_state.clone();
     let storage = StorageConnection::new();
 
@@ -126,7 +129,12 @@ fn handle_get_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let committed = storage.last_committed_state_for_account(account_id_u32).expect("last_committed_state_for_account: db must work");
     let verified = storage.last_verified_state_for_account(account_id_u32).expect("last_verified_state_for_account: db must work");
 
+    let (nonce_tx, nonce_rx) = mpsc::channel();
+    tx_to_mempool.send(MempoolRequest::GetPendingNonce(account_id_u32, nonce_tx)).expect("must send request for a pending nonce to mempool");
+    let pending_nonce = nonce_rx.recv_timeout(std::time::Duration::from_millis(100)).expect("must get pending nonce in time");
+
     let response = AccountDetailsResponse {
+        pending_nonce: pending_nonce,
         pending: account_info,
         verified: verified,
         committed: committed,
@@ -143,7 +151,7 @@ fn handle_get_details(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> 
     }))
 }
 
-pub fn start_api_server(tx_for_tx:    mpsc::Sender<TransferTx>, 
+pub fn start_api_server(tx_to_mempool: mpsc::Sender<MempoolRequest>, 
                       tx_for_state: mpsc::Sender<StateProcessingRequest>) {
     
     dotenv().ok();
@@ -161,7 +169,7 @@ pub fn start_api_server(tx_for_tx:    mpsc::Sender<TransferTx>,
         //move is necessary to give closure below ownership
         server::new(move || {
             App::with_state(AppState {
-                tx_for_tx: tx_for_tx.clone(),
+                tx_to_mempool: tx_to_mempool.clone(),
                 tx_for_state: tx_for_state.clone(),
                 contract_address: contract_address.clone(),
             }.clone()) // <- create app with shared state

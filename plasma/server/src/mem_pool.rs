@@ -3,7 +3,6 @@ use plasma::models::{TransferTx, TransferBlock, Block};
 use super::models::StateProcessingRequest;
 use super::config;
 
-
 extern crate im;
 use self::im::ordset::{OrdSet};
 
@@ -82,6 +81,12 @@ impl PartialEq for PoolRecord {
 impl Eq for PoolRecord {}
 
 
+pub enum MempoolRequest {
+    AddTransaction(TransferTx),
+    GetPendingNonce(u32, Sender<Option<u32>>)
+}
+
+
 impl MemPool {
 
     pub fn new() -> Self {
@@ -93,20 +98,23 @@ impl MemPool {
         }
     }
 
-    fn run(&mut self, rx_for_tx: Receiver<TransferTx>, tx_for_blocks: Sender<StateProcessingRequest>) {
-        for tx in rx_for_tx {            
-            println!("adding tx to mem pool");
-            let add_result = self.add_transaction(tx);
-            if add_result.is_err() {
-                println!("Error adding transaction to mempool: {}", add_result.err().unwrap());
-            }
-            // self.current_block.transactions.push(tx);
-            // if self.current_block.transactions.len() == self.batch_size {
-            //     self.process_batch(&tx_for_blocks)
-            // }
-            println!("Mempool queue length = {}", self.queue.len());
-            if self.queue.len() >= self.batch_size {
-                self.process_batch(&tx_for_blocks)
+    fn run(&mut self, rx_for_requests: Receiver<MempoolRequest>, tx_for_blocks: Sender<StateProcessingRequest>) {
+        for req in rx_for_requests {            
+            match req {
+                MempoolRequest::AddTransaction(tx) => {
+                    println!("adding tx to mem pool");
+                    let add_result = self.add_transaction(tx);
+                    if add_result.is_err() {
+                        println!("Error adding transaction to mempool: {}", add_result.err().unwrap());
+                    }
+                    println!("Mempool queue length = {}", self.queue.len());
+                    if self.queue.len() >= self.batch_size {
+                        self.process_batch(&tx_for_blocks)
+                    }
+                },
+                MempoolRequest::GetPendingNonce(account_id, channel) => {
+                    self.get_pending_nonce(account_id, channel);
+                },
             }
         }
     }
@@ -260,28 +268,29 @@ impl MemPool {
         return;
     }
 
-    pub fn get_pending_nonce(&self, account_id: u32) -> Option<u32> {
+    pub fn get_pending_nonce(&self, account_id: u32, channel: Sender<Option<u32>>) {
         match self.per_account_info.get(&account_id) {
             Some(ordered_set) => {
                 {
                     let max = ordered_set.get_max();
                     if let Some(max_tx_nonce) = max {
                         let current_max_nonce = max_tx_nonce.nonce;
-                        return Some(current_max_nonce);
+                        channel.send(Some(current_max_nonce));
+                        return;
                     }
                 }
             },
             None => {},
         }
 
-        None
+        channel.send(None);
     }
 
 }
 
-pub fn start_mem_pool(mut mem_pool: MemPool, rx_for_tx: Receiver<TransferTx>, tx_for_blocks: Sender<StateProcessingRequest>) {
+pub fn start_mem_pool(mut mem_pool: MemPool, rx_for_requests: Receiver<MempoolRequest>, tx_for_blocks: Sender<StateProcessingRequest>) {
         std::thread::Builder::new().name("mem_pool".to_string()).spawn(move || {  
-            mem_pool.run(rx_for_tx, tx_for_blocks);
+            mem_pool.run(rx_for_requests, tx_for_blocks);
         });
 }
 
