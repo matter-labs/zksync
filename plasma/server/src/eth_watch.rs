@@ -91,8 +91,8 @@ impl EthWatch {
         };
 
         let storage = StorageConnection::new();
-        let last_committed_deposit = storage.load_last_committed_deposit_batch();
-        let last_committed_exit = storage.load_last_committed_exit_batch();
+        let last_committed_deposit = storage.load_last_committed_deposit_batch().expect("load_last_committed_deposit_batch: db must work");
+        let last_committed_exit = storage.load_last_committed_exit_batch().expect("load_last_committed_exit_batch: db must work");
 
         let expecting_deposit_batch = (last_committed_deposit + 1) as u32;
         let expecting_exit_batch = (last_committed_exit + 1) as u32;

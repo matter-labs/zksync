@@ -124,8 +124,8 @@ fn handle_get_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
         return Ok(HttpResponse::Ok().json(AccountError{error:"non-existing account".to_string()}));
     }
 
-    let committed = storage.last_committed_state_for_account(account_id_u32);
-    let verified = storage.last_verified_state_for_account(account_id_u32);
+    let committed = storage.last_committed_state_for_account(account_id_u32).expect("last_committed_state_for_account: db must work");
+    let verified = storage.last_verified_state_for_account(account_id_u32).expect("last_verified_state_for_account: db must work");
 
     let response = AccountDetailsResponse {
         pending: account_info,

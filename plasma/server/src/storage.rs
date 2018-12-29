@@ -14,7 +14,7 @@ pub struct StorageConnection {
     conn: PgConnection
 }
 
-#[derive(Insertable, QueryableByName)]
+#[derive(Insertable, QueryableByName, Queryable)]
 #[table_name="accounts"]
 struct Account {
     pub id:         i32,
@@ -131,7 +131,7 @@ impl StorageConnection {
             ) 
             SELECT u.account_id AS id, u.block_number AS last_block, u.data FROM s, account_updates u WHERE s.id = u.account_id AND u.block_number = s.last_block
         )
-        SELECT a.id, COALESCE(u.last_block, a.last_block) AS last_block, COALESCE (u.data, a.data) AS data
+        SELECT COALESCE(u.id, a.id) AS id, COALESCE(u.last_block, a.last_block) AS last_block, COALESCE (u.data, a.data) AS data
         FROM upd u
         FULL JOIN accounts a ON a.id = u.id
         ORDER BY id";
@@ -143,8 +143,8 @@ impl StorageConnection {
         self.load_state("SELECT * FROM accounts a")
     }
 
-    fn load_state(&self, sql: &str) -> QueryResult<(u32, AccountMap)> {
-        diesel::sql_query(sql)
+    fn load_state(&self, query: &str) -> QueryResult<(u32, AccountMap)> {
+        let r = diesel::sql_query(query)
             .load(&self.conn)
             .map(|accounts: Vec<Account>| {
                 let mut result = AccountMap::default();
@@ -154,7 +154,8 @@ impl StorageConnection {
                         serde_json::from_value(a.data).unwrap()
                     )));
                 (last_block, result)
-            })
+            });
+        r
     }
 
     pub fn reset_op_config(&self, addr: &str, nonce: u32) -> QueryResult<()> {
@@ -181,121 +182,64 @@ impl StorageConnection {
     }
 
     pub fn load_pendings_proof_reqs(&self) -> QueryResult<Vec<StoredOperation>> {
-
-        const SELECT: &str = "
-        SELECT * FROM operations
-        WHERE action_type = 'Commit'
-        AND block_number > (
-            SELECT COALESCE(max(block_number), 0)  
-            FROM operations 
-            WHERE action_type = 'Verify'
-        )";
-
-        diesel::sql_query(SELECT)
-            .load(&self.conn)
+        diesel::sql_query("
+            SELECT * FROM operations
+            WHERE action_type = 'Commit'
+            AND block_number > (
+                SELECT COALESCE(max(block_number), 0)  
+                FROM operations 
+                WHERE action_type = 'Verify'
+            )
+        ").load(&self.conn)
     }
 
-    pub fn load_last_committed_deposit_batch(&self) -> i32 {
-        const SELECT: &str = "
-        SELECT COALESCE(max((data->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
-        WHERE data->'action'->>'type' = 'Commit' 
-        AND data->'block_data'->>'type' = 'Deposit'
-        ";
-
-        let result = diesel::sql_query(SELECT)
-            .load::<IntegerNumber>(&self.conn)
-            .expect("should load last committed deposit batch");
-
-        let last_committed = result.get(0).expect("should never return an empty array");
-        
-        last_committed.integer_value
+    fn load_number(&self, query: &str) -> QueryResult<i32> {
+        diesel::sql_query(query)
+            .get_result::<IntegerNumber>(&self.conn)
+            .map(|r| r.integer_value)
     }
 
-    pub fn load_last_committed_exit_batch(&self) -> i32 {
-        const SELECT: &str = "
-        SELECT COALESCE(max((data->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
-        WHERE data->'action'->>'type' = 'Commit' 
-        AND data->'block_data'->>'type' = 'Exit'
-        ";
-
-        let result = diesel::sql_query(SELECT)
-            .load::<IntegerNumber>(&self.conn)
-            .expect("should load last committed exit batch");
-
-        let last_committed = result.get(0).expect("should never return an empty array");
-        
-        last_committed.integer_value
+    pub fn load_last_committed_deposit_batch(&self) -> QueryResult<i32> {
+        self.load_number("
+            SELECT COALESCE(max((data->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
+            WHERE data->'action'->>'type' = 'Commit' 
+            AND data->'block_data'->>'type' = 'Deposit'
+        ")
     }
 
-    pub fn last_committed_state_for_account(&self, account_id: u32) -> Option<plasma::models::Account> {
-        let last = self.get_last_committed_block();
+    pub fn load_last_committed_exit_batch(&self) -> QueryResult<i32> {
+        self.load_number("
+            SELECT COALESCE(max((data->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
+            WHERE data->'action'->>'type' = 'Commit' 
+            AND data->'block_data'->>'type' = 'Exit'
+        ")
+    }
 
+    pub fn last_committed_state_for_account(&self, account_id: u32) -> QueryResult<Option<plasma::models::Account>> {
         let query = format!("
-        SELECT * from account_updates WHERE account_id = {} AND block_number <= {}
-        ORDER BY block_number DESC LIMIT 1
-        ", account_id, last);
-
-        let result = diesel::sql_query(query)
-            .load::<AccountUpdate>(&self.conn)
-            .expect("should load last committed state for account");
-
-        if let Some(acc) = result.get(0) {
-            let converted = serde_json::from_value(acc.data.clone()).unwrap();
-            return Some(converted);
-        }
-
-        None
+            SELECT account_id AS id, block_number AS last_block, data
+            FROM account_updates WHERE account_id = {}
+            ORDER BY block_number DESC LIMIT 1
+        ", account_id);
+        let r = diesel::sql_query(query)
+            .get_result(&self.conn)
+            .optional()?;
+        Ok( r.map(|acc: Account| serde_json::from_value(acc.data).unwrap()) )
     }
 
-    pub fn last_verified_state_for_account(&self, account_id: u32) -> Option<plasma::models::Account> {
-        let last = self.get_last_verified_block();
-
-        let query = format!("
-        SELECT * from account_updates WHERE account_id = {} AND block_number <= {}
-        ORDER BY block_number DESC LIMIT 1
-        ", account_id, last);
-
-        let result = diesel::sql_query(query)
-            .load::<AccountUpdate>(&self.conn)
-            .expect("should load last verified state for account");
-
-        if let Some(acc) = result.get(0) {
-            let converted = serde_json::from_value(acc.data.clone()).unwrap();
-            return Some(converted);
-        }
-
-        None
+    pub fn last_verified_state_for_account(&self, account_id: u32) -> QueryResult<Option<plasma::models::Account>> {
+        let r = diesel::sql_query("SELECT * FROM accounts")
+            .get_result(&self.conn)
+            .optional()?;
+        Ok( r.map(|acc: Account| serde_json::from_value(acc.data).unwrap()) )
     }
 
-    pub fn get_last_committed_block(&self) -> i32 {
-        const SELECT: &str = "
-        SELECT COALESCE(max((data->>'block_number')::int), 0) as integer_value FROM operations 
-        WHERE data->'action'->>'type' = 'Commit'
-        ";
-
-        let result = diesel::sql_query(SELECT)
-            .load::<IntegerNumber>(&self.conn)
-            .expect("should load last committed exit batch");
-
-        let last = result.get(0).expect("should never return an empty array");
-        
-        last.integer_value
+    pub fn get_last_committed_block(&self) -> QueryResult<i32> {
+        self.load_number("SELECT COALESCE(max(block_number), 0) AS integer_value FROM account_updates")
     }
 
-
-    pub fn get_last_verified_block(&self) -> i32 {
-        const SELECT: &str = "
-        SELECT COALESCE(max((data->>'block_number')::int), 0) as integer_value FROM operations 
-        WHERE data->'action'->>'type' = 'Verify'
-        ";
-
-        let result = diesel::sql_query(SELECT)
-            .load::<IntegerNumber>(&self.conn)
-            .expect("should load last committed exit batch");
-
-        let last = result.get(0).expect("should never return an empty array");
-        
-        last.integer_value
+    pub fn get_last_verified_block(&self) -> QueryResult<i32> {
+        self.load_number("SELECT COALESCE(max(last_block), 0) AS integer_value FROM accounts")
     }
 
 }
@@ -396,6 +340,9 @@ fn test_store_txs() {
         accounts_updated:   accounts.clone()
     }).unwrap();
 
+    assert_eq!(conn.last_verified_state_for_account(5).unwrap(), None);
+    assert_eq!(conn.last_committed_state_for_account(5).unwrap().unwrap().balance, BigDecimal::from(2));
+
     let verify = conn.commit_op(&Operation{
         action: Action::Verify{
             proof: [U256::zero(); 8], 
@@ -404,6 +351,9 @@ fn test_store_txs() {
         block_data:         EthBlockData::Deposit{batch_number: 0}, 
         accounts_updated:   accounts.clone()
     }).unwrap();
+
+    assert_eq!(conn.last_verified_state_for_account(5).unwrap().unwrap().balance, BigDecimal::from(2));
+    assert_eq!(conn.last_committed_state_for_account(5).unwrap().unwrap().balance, BigDecimal::from(2));
 
     let pending = conn.load_pendings_txs(0).unwrap();
     assert_eq!(pending.len(), 2);
@@ -452,11 +402,16 @@ fn test_store_proof_reqs() {
 }
 
 #[test]
-fn test_get_last_committed_block() {
-
+fn test_storage_helpers() {
     let conn = super::StorageConnection::new();
-    let last = conn.get_last_verified_block();
-    println!("Last verified = {}", last);
+
+    assert_eq!(-1, conn.load_last_committed_deposit_batch().unwrap());
+    assert_eq!(-1, conn.load_last_committed_exit_batch().unwrap());
+    assert_eq!(0, conn.get_last_committed_block().unwrap());
+    assert_eq!(0, conn.get_last_verified_block().unwrap());
+
+    assert_eq!(conn.last_committed_state_for_account(9999).unwrap(), None);
+    assert_eq!(conn.last_verified_state_for_account(9999).unwrap(), None);
 }
 
 }
