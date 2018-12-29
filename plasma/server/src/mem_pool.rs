@@ -39,6 +39,7 @@ pub struct MemPool {
 #[derive(Clone)]
 struct PoolRecord {
     fee: u128,
+    nonce: u32,
     account_id: u32,
 }
 
@@ -63,7 +64,10 @@ impl PartialOrd for PoolRecord {
 
 impl PartialEq for PoolRecord {
     fn eq(&self, other: &Self) -> bool {
-        self.fee == other.fee && self.account_id == other.account_id
+        // should check an equality here, but this is in principle a free replacement mechanism
+        self.account_id == other.account_id && 
+        self.nonce == other.nonce &&
+        self.fee > other.fee
     }
 }
 
@@ -105,7 +109,8 @@ impl MemPool {
         let from = transaction.from;
         match self.per_account_info.get_mut(&from) {
             Some(ordered_set) => {
-                {
+                {   
+                    println!("Accoutn {} already has a corresponding pool", from);
                     let existing_length = ordered_set.len();
                     if existing_length >= MAX_TRANSACTIONS_PER_ACCOUNT {
                         return Err("Too many transaction for this account".to_string());
@@ -119,11 +124,13 @@ impl MemPool {
                     }
                 }
                 let fee = transaction.fee.clone();
+                let nonce = transaction.nonce;
                 ordered_set.insert(transaction);
                 self.queue.insert(PoolRecord{
                     fee: fee.to_u128().expect("fee must fit into 128 bits"),
+                    nonce: nonce,
                     account_id: from
-                });
+                }).expect("must insert a new pool record");
 
                 return Ok(());
             },
@@ -133,10 +140,12 @@ impl MemPool {
         {
             let mut ordered_set = OrdSet::new();
             let fee = transaction.fee.clone();
+            let nonce = transaction.nonce;
             ordered_set.insert(transaction);
             self.per_account_info.insert(from, ordered_set);
             self.queue.insert(PoolRecord{
                 fee: fee.to_u128().expect("fee must fit into 128 bits"),
+                nonce: nonce,
                 account_id: from
             });
         }
