@@ -151,7 +151,7 @@ const baseUrl = 'https://api.plasma-winter.io'
 export default {
     name: 'wallet',
     data: () => ({ 
-        nonce:          0,
+        nonce:          null,
         transferTo:     '',
         transferAmount: '0.001',
         depositAmount:  null,
@@ -310,6 +310,8 @@ export default {
                     store.account.plasma.balance = newData.plasmaBalance
                     store.account.plasma.pending.balance = newData.plasmaPendingBalance
                     store.account.plasma.pending.nonce = newData.plasmaPendingNonce
+
+                    if(null === this.nonce) this.nonce = store.account.plasma.pending.nonce
                 }
                 
                 this.updateTimer = setTimeout(() => this.updateAccountInfo(), 1000)

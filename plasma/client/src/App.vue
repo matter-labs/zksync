@@ -9,3 +9,9 @@ export default {
 }
 </script>
 
+<style>
+input::placeholder {
+    color: lightgrey !important;
+    font-style: italic !important;
+}
+</style>
