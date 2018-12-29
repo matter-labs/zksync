@@ -36,7 +36,7 @@ pub struct MemPool {
     queue: OrdSet<PoolRecord>
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct PoolRecord {
     fee: u128,
     nonce: u32,
@@ -64,10 +64,13 @@ impl PartialOrd for PoolRecord {
 
 impl PartialEq for PoolRecord {
     fn eq(&self, other: &Self) -> bool {
-        // should check an equality here, but this is in principle a free replacement mechanism
-        self.account_id == other.account_id && 
-        self.nonce == other.nonce &&
-        self.fee > other.fee
+        if self.account_id != other.account_id ||
+            self.nonce != other.nonce {
+                return false;
+            }
+        println!("old fee = {}, new fee = {}", self.fee, other.fee);
+
+        self.fee < other.fee
     }
 }
 
@@ -126,11 +129,13 @@ impl MemPool {
                 let fee = transaction.fee.clone();
                 let nonce = transaction.nonce;
                 ordered_set.insert(transaction);
-                self.queue.insert(PoolRecord{
+                let pool_record = PoolRecord{
                     fee: fee.to_u128().expect("fee must fit into 128 bits"),
                     nonce: nonce,
                     account_id: from
-                }).expect("must insert a new pool record");
+                };
+                println!("Inserting pool record {:?}", pool_record);
+                self.queue.insert(pool_record).expect("must insert a new pool record");
 
                 return Ok(());
             },
@@ -143,11 +148,14 @@ impl MemPool {
             let nonce = transaction.nonce;
             ordered_set.insert(transaction);
             self.per_account_info.insert(from, ordered_set);
-            self.queue.insert(PoolRecord{
+            let pool_record = PoolRecord{
                 fee: fee.to_u128().expect("fee must fit into 128 bits"),
                 nonce: nonce,
                 account_id: from
-            });
+            };
+            println!("Inserting pool record {:?}", pool_record);
+            self.queue.insert(pool_record).expect("must insert a new pool record");
+
         }
 
         Ok(())
