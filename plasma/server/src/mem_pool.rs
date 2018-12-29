@@ -90,6 +90,7 @@ impl MemPool {
             // if self.current_block.transactions.len() == self.batch_size {
             //     self.process_batch(&tx_for_blocks)
             // }
+            println!("Mempool queue length = {}", self.queue.len());
             if self.queue.len() >= self.batch_size {
                 self.process_batch(&tx_for_blocks)
             }
@@ -157,8 +158,10 @@ impl MemPool {
     // }
 
     fn process_batch(&mut self, tx_for_blocks: &Sender<StateProcessingRequest>) {
+        println!("Will attempt to make a new block");
 
         if self.queue.len() < self.batch_size {
+            println!("Queue length is not enough for a new block");
             return;
         }
 
@@ -178,6 +181,7 @@ impl MemPool {
                 new_block.transactions.push(transaction);
 
                 if new_block.transactions.len() == self.batch_size {
+                    println!("Has chosen enough transactions from the queue");
                     let (tx, rx) = channel();
                     let request = StateProcessingRequest::ApplyBlock(Block::Transfer(new_block.clone()), Some(tx));
                     tx_for_blocks.send(request).expect("must send block processing request");
@@ -196,19 +200,22 @@ impl MemPool {
                 }
             }
             else {
-                // we did NOT assemble a block over max attempts, revert globally
-                for removed_item in removed_items {
-                    let (pool_item, transaction) = removed_item;
-                    let account_id = pool_item.account_id;
-                    self.queue.insert(pool_item);
-                    self.per_account_info.get_mut(&account_id)
-                        .expect("account info set must exit at revert")
-                        .insert(transaction)
-                        .expect("inserting transaction back must work");
-                }
-                return;
+                break;
             }
         }
+
+        // we did NOT assemble a block over max attempts, revert globally
+        println("Reverting a mempool");
+        for removed_item in removed_items {
+            let (pool_item, transaction) = removed_item;
+            let account_id = pool_item.account_id;
+            self.queue.insert(pool_item);
+            self.per_account_info.get_mut(&account_id)
+                .expect("account info set must exit at revert")
+                .insert(transaction)
+                .expect("inserting transaction back must work");
+        }
+        return;
     }
 
     pub fn get_pending_nonce(&self, account_id: u32) -> Option<u32> {
