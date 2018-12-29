@@ -262,8 +262,7 @@ impl MemPool {
             self.queue.insert(pool_item);
             self.per_account_info.get_mut(&account_id)
                 .expect("account info set must exit at revert")
-                .insert(transaction)
-                .expect("inserting transaction back must work");
+                .insert(transaction);
         }
         return;
     }
