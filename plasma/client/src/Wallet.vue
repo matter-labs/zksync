@@ -27,7 +27,7 @@
                     <label for="transferToInput">To:</label>
                     <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input>
                     <label for="transferAmountInput" class="mt-4">Amount</label>
-                            (max <a href="#" @click="transferAmount=store.account.plasma.balance">{{store.account.plasma.balance || 0}}</a> ETH):
+                            (max <a href="#" @click="transferAmount=store.account.plasma.pending.balance">{{store.account.plasma.pending.balance || 0}}</a> ETH):
                     <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
                     <label for="transferNonceInput" class="mt-4">Nonce:</label>
                     <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
@@ -85,15 +85,26 @@
                             <label for="acc_id">Account ID:</label>
                             <b-form-input id="acc_id" v-model="store.account.plasma.id" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                             <b-row class="mt-2">
-                                <b-col cols="6">Balance:</b-col> 
-                                <b-col>{{store.account.plasma.balance || 0}} ETH</b-col>
+                                <b-col cols="6">Verified balance:</b-col> 
+                                <b-col>{{store.account.plasma.verified.balance || 0}} ETH</b-col>
+                                <b-col cols="6">Verified nonce:</b-col> 
+                                <b-col>{{store.account.plasma.verified.nonce || 0}}</b-col>
                             </b-row>
-                            <b-row class="mt-2" v-if="store.account.plasma.pending.balance !== store.account.plasma.balance" style="color: grey">
-                                <b-col cols="6">Pending:</b-col> 
-                                <b-col>{{store.account.plasma.pending.balance || 0}} ETH</span></b-col>
+                            <b-row class="mt-2">
+                                <b-col cols="6">Committed balance:</b-col> 
+                                <b-col>{{store.account.plasma.committed.balance || 0}} ETH</b-col>
+                                <b-col cols="6">Committed nonce:</b-col> 
+                                <b-col>{{store.account.plasma.committed.nonce || 0}}</b-col>
+                            </b-row>
+                            <!-- <b-row class="mt-2" v-if="store.account.plasma.pending.balance !== store.account.plasma.committed" style="color: grey"> -->
+                            <b-row class="mt-2">
+                                <b-col cols="6">Pending balance:</b-col> 
+                                <b-col>{{store.account.plasma.pending.balance || 0}} ETH</b-col>
+                                <b-col cols="6">Pending nonce:</b-col> 
+                                <b-col>{{store.account.plasma.pending.nonce || 0}}</b-col>
                             </b-row>
                             <b-row class="mt-2">                    
-                                <b-col cols="6">Pending nonce:</b-col> <b-col>{{store.account.plasma.pending.nonce}}</b-col>
+                                <b-col cols="6">Max mempool nonce:</b-col> <b-col>{{store.account.plasma.pending_nonce || 0}}</b-col>
                             </b-row>
                         </div>
                     </b-card>
@@ -118,7 +129,7 @@
         <b-tabs pills card>
             <b-tab title="Partial withdrawal" active>
                 <label for="withdrawAmountInput" class="mt-4">Amount</label>
-                    (max <a href="#" @click="withdrawAmount=store.account.plasma.balance">{{store.account.plasma.balance}}</a> ETH):
+                    (max <a href="#" @click="withdrawAmount=store.account.plasma.verified.balance">{{store.account.plasma.verified.balance}}</a> ETH):
                 <b-form-input id="withdrawAmountInput" type="number" placeholder="7.50" v-model="withdrawAmount"></b-form-input>
                 <label for="transferNonceInput" class="mt-4">Nonce:</label>
                 <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
@@ -188,7 +199,7 @@ export default {
         store: () => store,
         contractAddress: () => window.contractAddress,
         depositProblem() {
-            if(!(store.account.balance > 0)) return "empty balance in the mainchain account"
+            if(!(Number(store.account.balance) > 0)) return "empty balance in the mainchain account"
         },
         doDepositProblem() {
             if(this.depositProblem) return this.depositProblem
@@ -197,22 +208,22 @@ export default {
                 + this.depositAmount + " > " + store.account.balance
         }, 
         withdrawProblem() {
-            if(!(store.account.plasma.balance > 0)) return "empty balance in the Plasma account"
+            if(!(Number(store.account.plasma.pending.balance) > 0)) return "empty balance in the Plasma account"
         },
         doWithdrawProblem() {
             if(this.depositProblem) return this.depositProblem
-            if(Number(this.withdrawAmount) > Number(store.account.plasma.balance)) return "specified amount exceeds Plasma balance"
-            if(Number(this.nonce) < Number(store.account.plasma.nonce)) return "nonce must be greater then confirmed in Plasma: got " 
-                + this.nonce + ", expected >= " + store.account.plasma.nonce
+            if(Number(this.withdrawAmount) > Number(store.account.plasma.pending.balance)) return "specified amount exceeds Plasma balance"
+            if(Number(this.nonce) < Number(store.account.plasma.pending_nonce)) return "nonce must be greater then confirmed in Plasma: got " 
+                + this.nonce + ", expected >= " + store.account.plasma.pending_nonce
         },
         transferProblem() {
             if(!store.account.plasma.id) return "no Plasma account exists yet"
-            if(!(store.account.plasma.balance > 0)) return "Plasma account has empty balance"
+            if(!(store.account.plasma.pending.balance > 0)) return "Plasma account has empty balance"
             if(!ethUtil.isHexString(this.transferTo)) return "`To` is not a valid ethereum address: " + this.transferTo
             if(!(this.transferAmount > 0)) return "positive amount required, e.g. 100.55"
-            if(Number(this.transferAmount) > Number(store.account.plasma.balance)) return "specified amount exceeds Plasma balance"
-            if(Number(this.nonce) < Number(store.account.plasma.nonce)) return "nonce must be greater then confirmed in Plasma: got " 
-                + this.nonce + ", expected >= " + store.account.plasma.nonce
+            if(Number(this.transferAmount) > Number(store.account.plasma.pending.balance)) return "specified amount exceeds Plasma balance"
+            if(Number(this.nonce) < Number(store.account.plasma.pending_nonce)) return "nonce must be greater then confirmed in Plasma: got " 
+                + this.nonce + ", expected >= " + store.account.plasma.pending_nonce
         }
     },
     methods: {
@@ -282,7 +293,7 @@ export default {
                     })
                 if(!new_nonce_result.error) {
                     let new_nonce = new_nonce_result.data.pending_nonce
-                    this.nonce = new_nonce + 1
+                    this.nonce = new_nonce
                 } else {
                     console.log('could not fetch data from server: ', new_nonce_result.error)
                 }
@@ -291,9 +302,36 @@ export default {
                 this.alert(`Transaction rejected!`)
             }
         },
+        parseResultIntoState(accountInfoResult) {
+            if (accountInfoResult.error) {
+                console.log(accountInfoResult.error)
+                return
+            }
+            let newData = {}
+            newData.plasma = accountInfoResult.data
+            let verified = {}
+            verified.balance = Eth.fromWei(new BN(newData.plasma.verified.balance).mul(new BN('1000000000000')), 'ether')
+            verified.nonce = newData.plasma.verified.nonce
+
+            let committed = {}
+            committed.balance = Eth.fromWei(new BN(newData.plasma.committed.balance).mul(new BN('1000000000000')), 'ether')
+            committed.nonce = newData.plasma.committed.nonce
+
+            let pending = {}
+            pending.balance = Eth.fromWei(new BN(newData.plasma.pending.balance).mul(new BN('1000000000000')), 'ether')
+            pending.nonce = newData.plasma.pending.nonce
+
+            newData.pending_nonce = newData.plasma.pending_nonce
+            newData.verified = verified
+            newData.committed = committed
+            newData.pending = pending
+
+            return newData
+        },
         async updateAccountInfo() {
             let newData = {}
             let timer = this.updateTimer
+            let plasmaData = {}
             try {
                 newData.address = ethereum.selectedAddress
                 let balance = (await eth.getBalance(newData.address)).toString()
@@ -306,13 +344,7 @@ export default {
                         url:    baseUrl + '/account/' + id,
                     })
                     if(!result.error) {
-                        newData.plasma = result.data
-                        newData.plasmaBalance = Eth.fromWei(new BN(newData.plasma.verified.balance).mul(new BN('1000000000000')), 'ether')
-                        newData.plasmaPendingBalance = Eth.fromWei(new BN(newData.plasma.pending.balance).mul(new BN('1000000000000')), 'ether')
-                        newData.plasmaPendingNonce = newData.plasma.pending.nonce
-                        if (newData.plasma.pending_nonce > newData.plasmaPendingNonce) {
-                            newData.plasmaPendingNonce = newData.plasma.pending_nonce
-                        }
+                        plasmaData = this.parseResultIntoState(result)
                     } else {
                         console.log('could not fetch data from server: ', result.error)
                     }
@@ -327,14 +359,15 @@ export default {
                 store.account.plasma.id = newData.plasmaId
 
                 if(store.account.plasma.id) {
-                    store.account.plasma.balance = newData.plasmaBalance
-                    store.account.plasma.pending.balance = newData.plasmaPendingBalance
-                    store.account.plasma.pending.nonce = newData.plasmaPendingNonce
+                    store.account.plasma.verified = plasmaData.verified
+                    store.account.plasma.committed = plasmaData.committed
+                    store.account.plasma.pending = plasmaData.pending
+                    store.account.plasma.pending_nonce = plasmaData.pending_nonce
 
                     if(null === this.nonce) this.nonce = store.account.plasma.pending.nonce
                     if (store.account.plasma.pending_nonce > this.nonce) {
-                            this.nonce = store.account.plasma.pending_nonce
-                        }
+                        this.nonce = store.account.plasma.pending_nonce
+                    }
                 }
                 
                 this.updateTimer = setTimeout(() => this.updateAccountInfo(), 1000)

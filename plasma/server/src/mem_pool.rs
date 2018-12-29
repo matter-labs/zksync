@@ -274,8 +274,8 @@ impl MemPool {
                 {
                     let max = ordered_set.get_max();
                     if let Some(max_tx_nonce) = max {
-                        let current_max_nonce = max_tx_nonce.nonce;
-                        channel.send(Some(current_max_nonce));
+                        let next_nonce = max_tx_nonce.nonce + 1;
+                        channel.send(Some(next_nonce));
                         return;
                     }
                 }
