@@ -158,8 +158,17 @@ impl StorageConnection {
     }
 
     pub fn reset_op_config(&self, addr: &str, nonce: u32) -> QueryResult<()> {
-        diesel::sql_query(format!("DELETE FROM operations WHERE nonce >= {}", nonce as i32).as_str()).execute(&self.conn)?;
-        diesel::sql_query(format!("UPDATE op_config SET addr = '{}', next_nonce = {}", addr, nonce as i32).as_str())
+        diesel::sql_query(format!("
+            UPDATE op_config 
+            SET addr = '{addr}', next_nonce = s.next_nonce
+            FROM (
+                SELECT max(max_nonce) AS next_nonce
+                FROM (
+                    SELECT max(nonce) AS max_nonce 
+                    FROM operations WHERE addr = '{addr}' 
+                    UNION SELECT {nonce} AS max_nonce
+                ) t
+            ) s", addr = addr, nonce = nonce as i32).as_str())
             .execute(&self.conn)
             .map(|_|())
     }
@@ -365,7 +374,7 @@ use web3::types::{U256, H256};
 fn test_store_txs() {
 
     let conn = super::StorageConnection::new();
-    //conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
+    conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
     conn.reset_op_config("0x0", 0).unwrap();
 
     let mut accounts = fnv::FnvHashMap::default();
