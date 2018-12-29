@@ -42,6 +42,7 @@ export default {
                 store.account.address = account
 
                 let hash = keccak256(sig)
+                console.log('hash', hash)
                 store.account.plasma.key = newKey(hash)
                 console.log(store.account.plasma.key)
 

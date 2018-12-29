@@ -156,7 +156,7 @@ export default {
         alertType:      null,
         result:         null
     }),
-    created() {
+    async created() {
         console.log('start')
         this.updateAccountInfo()
         window.t = this
@@ -264,23 +264,33 @@ export default {
             let newData = {}
             let timer = this.updateTimer
             try {
-                newData.address = ethereum.selectedAddress
 
+                if (!window.contractAddress) {
+                    let result = await axios({
+                        method: 'get',
+                        url:    baseUrl + '/details',
+                    })
+                    console.log('result', result)
+                    window.contractAddress = result.data.address
+                }
+
+                newData.address = ethereum.selectedAddress
                 let balance = (await eth.getBalance(newData.address)).toString()
                 newData.balance = Eth.fromWei(balance, 'ether')
-
                 let id = (await contract.ethereumAddressToAccountID(newData.address))[0].toNumber()
                 newData.plasmaId = id
-
                 if(id>0) {
-                    const result = await axios({
+                    let result = await axios({
                         method: 'get',
                         url:    baseUrl + '/account/' + id,
-                    });
-                    // todo - use get multiplier from the smart-contract
-                    let balance = new BN(result.data.pending.balance).mul(new BN('1000000000000'))
-                    newData.plasmaBalance = Eth.fromWei(balance, 'ether')
-                    newData.plasmaNonce = result.data.pending.nonce
+                    })
+                    if(!result.error) {
+                        newData.plasma = result.data
+                        newData.plasmaBalance = Eth.fromWei(new BN(newData.plasma.verified.balance).mul(new BN('1000000000000')), 'ether')
+                        newData.plasmaNonce = newData.plasma.pending.nonce
+                    } else {
+                        console.log('could not fetch data from server: ', result.error)
+                    }
                 }
             } catch (err) {
                 //console.log('status update failed: ', err)
@@ -288,9 +298,15 @@ export default {
             if(timer === this.updateTimer) { // if this handler is still valid
                 store.account.address = newData.address
                 store.account.balance = newData.balance
+
                 store.account.plasma.id = newData.plasmaId
-                store.account.plasma.balance = newData.plasmaBalance
-                store.account.plasma.nonce = newData.plasmaNonce
+
+                if(store.account.plasma.id) {
+                    console.log('newData.plasma', newData.plasma)
+                    store.account.plasma.balance = newData.plasmaBalance
+                    store.account.plasma.nonce = newData.plasmaNonce
+                }
+                
                 this.updateTimer = setTimeout(() => this.updateAccountInfo(), 1000)
             }
         },
