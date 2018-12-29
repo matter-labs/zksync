@@ -76,7 +76,7 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
             let request = StateProcessingRequest::GetPubKey(tx.from, key_tx);
             tx_for_state.send(request).expect("must send a new transaction to queue");
             // now wait for state_keeper to return a result
-            let pub_key: Option<PublicKey> = key_rx.recv().expect("must get public key back");
+            let pub_key: Option<PublicKey> = key_rx.recv_timeout(std::time::Duration::from_millis(100)).expect("must get public key back");
             let valid = tx.validate();
             if !valid {
                 let resp = TransactionResponse{
@@ -118,7 +118,7 @@ fn handle_get_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let account_id_u32 = account_id.unwrap();
     let request = StateProcessingRequest::GetLatestState(account_id_u32, acc_tx);
     tx_for_state.send(request).expect("must send a request for an account state");
-    let account_info: Option<Account> = acc_rx.recv().expect("must get account info back");
+    let account_info: Option<Account> = acc_rx.recv_timeout(std::time::Duration::from_millis(100)).expect("must get account info back");
     if account_info.is_none() {
         return Ok(HttpResponse::Ok().json(AccountError{error:"non-existing account".to_string()}));
     }

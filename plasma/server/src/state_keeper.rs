@@ -129,15 +129,18 @@ impl PlasmaStateKeeper {
                     }
                 },
                 StateProcessingRequest::GetPubKey(account_id, sender) => {
-                    sender.send(self.state.get_pub_key(account_id)).expect("must send request for a public key");
+                    sender.send(self.state.get_pub_key(account_id));
+                    // .expect("must send request for a public key");
                 },
                 StateProcessingRequest::GetLatestState(account_id, sender) => {
                     let pk = self.state.get_pub_key(account_id);
                     if pk.is_none() {
-                        sender.send(None).expect("queue to return state processing request must work");
+                        sender.send(None);
+                        // .expect("queue to return state processing request must work");
                     }
                     let account = self.account(account_id);
-                    sender.send(Some(account)).expect("queue to return state processing request must work");
+                    sender.send(Some(account));
+                        // .expect("queue to return state processing request must work");
                 }
             }
         }
