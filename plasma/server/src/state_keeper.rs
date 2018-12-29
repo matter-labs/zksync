@@ -287,7 +287,7 @@ impl PlasmaStateKeeper {
 
         let eth_block_data = EthBlockData::Exit{ 
             batch_number,
-            public_data: BabyProver::encode_exit_transactions(&block).expect("must encode exit block information");
+            public_data: BabyProver::encode_exit_transactions(&block).expect("must encode exit block information")
         };
         let mut be_bytes: Vec<u8> = vec![];
         &block.new_root_hash.clone().into_repr().write_be(& mut be_bytes);
