@@ -79,14 +79,15 @@
                         <label for="acc_id">Account ID:</label>
                         <b-form-input id="acc_id" v-model="store.account.plasma.id" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                         <b-row class="mt-2">
-                            <b-col cols="4">Balance:</b-col> 
-                            <b-col>
-                                {{store.account.plasma.balance || 0}} ETH 
-                                <span v-if="store.account.plasma.pending.balance" style="color: grey">({{store.account.plasma.pending.balance || 0}} ETH)</span>
-                            </b-col>
+                            <b-col cols="6">Balance:</b-col> 
+                            <b-col>{{store.account.plasma.balance || 0}} ETH</b-col>
                         </b-row>
-                        <b-row>                    
-                            <b-col cols="4">Pending nonce:</b-col> <b-col>{{store.account.plasma.pending.nonce}}</b-col>
+                        <b-row class="mt-2" v-if="store.account.plasma.pending.balance" style="color: grey">
+                            <b-col cols="6">Pending:</b-col> 
+                            <b-col>{{store.account.plasma.pending.balance || 0}} ETH</span></b-col>
+                        </b-row>
+                        <b-row class="mt-2">                    
+                            <b-col cols="6">Pending nonce:</b-col> <b-col>{{store.account.plasma.pending.nonce}}</b-col>
                         </b-row>
                     </b-card>
                 </b-card>
