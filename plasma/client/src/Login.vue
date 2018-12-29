@@ -19,6 +19,7 @@
 import store from './store'
 import ethUtil from 'ethjs-util'
 import {newKey} from '../../contracts/lib/transaction.js'
+import {keccak256} from 'js-sha3'
 
 export default {
     name: 'login',
@@ -40,8 +41,8 @@ export default {
                 console.log(sig)
                 store.account.address = account
 
-                // TODO: hash sig!!!
-                store.account.plasma.key = newKey(sig)
+                let hash = keccak256(sig)
+                store.account.plasma.key = newKey(hash)
                 console.log(store.account.plasma.key)
 
                 this.$parent.$router.push('/wallet')
