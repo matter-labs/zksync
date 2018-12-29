@@ -156,7 +156,7 @@ export default {
         alertType:      null,
         result:         null
     }),
-    async created() {
+    created() {
         console.log('start')
         this.updateAccountInfo()
         window.t = this
