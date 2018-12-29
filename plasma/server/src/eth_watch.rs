@@ -141,23 +141,26 @@ impl EthWatch {
                 continue
             }
 
-            if last_block_number.unwrap().as_u64() == self.last_processed_block + self.blocks_lag {
+            let last_ethereum_block = last_block_number.unwrap().as_u64();
+
+            if  last_ethereum_block == self.last_processed_block + self.blocks_lag {
                 continue
             }
 
-            let block_number = self.last_processed_block + self.blocks_lag + 1;
+            let block_number = last_ethereum_block - self.blocks_lag;
+
+            // process deposits BEFORE exits for a rare case of deposit + full exit in the same block
+            let deposits_result = self.process_deposits(block_number, &tx_for_blocks, &web3, &contract);
+            if deposits_result.is_err() {
+                continue
+            }
 
             let exits_result = self.process_exits(block_number, &tx_for_blocks, &web3, &contract);
             if exits_result.is_err() {
                 continue
             }
-
-            let deposits_result = self.process_deposits(block_number, &tx_for_blocks, &web3, &contract);
-            if deposits_result.is_err() {
-                continue
-            }
         
-            self.last_processed_block += 1;
+            self.last_processed_block = last_ethereum_block - self.blocks_lag;
         }
 
         // on new deposit or exit blocks => pass them via tx_for_blocks
@@ -182,13 +185,39 @@ impl EthWatch {
 
         let total_deposit_requests = total_deposit_requests_result.unwrap();
 
-        let batch_number = total_deposit_requests / self.deposit_batch_size;
+        let max_batch_number = total_deposit_requests / self.deposit_batch_size;
 
-        if batch_number <= self.last_deposit_batch {
+        if max_batch_number <= self.last_deposit_batch {
             // this watcher is not responsible for bumping a batch number
             return Ok(());
         }
 
+        let form_batch_number = (self.last_deposit_batch + U256::from(1)).as_u64();
+        let to_batch_number = (max_batch_number + U256::from(1)).as_u64();
+
+        for batch_number in form_batch_number..to_batch_number {
+            let res = self.process_single_deposit_batch(
+                batch_number, 
+                channel, 
+                web3,
+                contract
+            );
+            if res.is_err() {
+                return res;
+            }
+            self.last_deposit_batch = self.last_deposit_batch + U256::from(1);
+        }
+
+        Ok(())
+    }
+
+    fn process_single_deposit_batch<T: web3::Transport>(
+        & mut self, 
+        batch_number: u64,
+        channel: &Sender<StateProcessingRequest>,
+        web3: &web3::Web3<T>,
+        contract: &Contract<T>)
+    -> Result<(), ()> {
         let deposit_event = self.contract.event("LogDepositRequest").unwrap().clone();
         let deposit_event_topic = deposit_event.signature();
 
@@ -200,7 +229,7 @@ impl EthWatch {
         let deposits_filter = FilterBuilder::default()
                     .address(vec![contract.address()])
                     .from_block(BlockNumber::Earliest)
-                    .to_block(BlockNumber::Number(block_number))
+                    .to_block(BlockNumber::Latest)
                     .topics(
                         Some(vec![deposit_event_topic]),
                         Some(vec![H256::from(self.last_deposit_batch.clone())]),
@@ -212,7 +241,7 @@ impl EthWatch {
         let cancels_filter = FilterBuilder::default()
             .address(vec![contract.address()])
             .from_block(BlockNumber::Earliest)
-            .to_block(BlockNumber::Number(block_number))
+            .to_block(BlockNumber::Latest)
             .topics(
                 Some(vec![deposit_canceled_topic]),
                 Some(vec![H256::from(self.last_deposit_batch.clone())]),
@@ -336,9 +365,8 @@ impl EthWatch {
             return Err(());
         }
 
-        self.last_deposit_batch = self.last_deposit_batch + U256::from(1);
-
         Ok(())
+
     }
 
     fn process_exits<T: web3::Transport>(& mut self, 
@@ -359,12 +387,41 @@ impl EthWatch {
 
         let total_requests = total_requests_result.unwrap();
 
-        let batch_number = total_requests / self.exit_batch_size;
+        let max_batch_number = total_requests / self.exit_batch_size;
 
-        if batch_number <= self.last_exit_batch {
+        if max_batch_number <= self.last_exit_batch {
             // this watcher is not responsible for bumping a batch number
             return Ok(());
         }
+
+        let form_batch_number = (self.last_exit_batch + U256::from(1)).as_u64();
+        let to_batch_number = (max_batch_number + U256::from(1)).as_u64();
+
+        for batch_number in form_batch_number..to_batch_number {
+            let res = self.process_single_exit_batch(
+                batch_number, 
+                channel, 
+                web3,
+                contract
+            );
+            if res.is_err() {
+                return res;
+            }
+            self.last_exit_batch = self.last_exit_batch + U256::from(1);
+        }
+
+        Ok(())
+    }
+
+    fn process_single_exit_batch<T: web3::Transport>(
+        & mut self, 
+        batch_number: u64, 
+        channel: &Sender<StateProcessingRequest>,
+        web3: &web3::Web3<T>,
+        contract: &Contract<T>)
+    -> Result<(), ()>
+    {
+        use bigdecimal::Zero;
 
         let exit_event = self.contract.event("LogExitRequest").unwrap().clone();
         let exit_event_topic = exit_event.signature();
@@ -377,7 +434,7 @@ impl EthWatch {
         let exits_filter = FilterBuilder::default()
                     .address(vec![contract.address()])
                     .from_block(BlockNumber::Earliest)
-                    .to_block(BlockNumber::Number(block_number))
+                    .to_block(BlockNumber::Latest)
                     .topics(
                         Some(vec![exit_event_topic]),
                         Some(vec![H256::from(self.last_exit_batch.clone())]),
@@ -389,7 +446,7 @@ impl EthWatch {
         let cancels_filter = FilterBuilder::default()
             .address(vec![contract.address()])
             .from_block(BlockNumber::Earliest)
-            .to_block(BlockNumber::Number(block_number))
+            .to_block(BlockNumber::Latest)
             .topics(
                 Some(vec![exit_canceled_topic]),
                 Some(vec![H256::from(self.last_exit_batch.clone())]),
@@ -491,8 +548,6 @@ impl EthWatch {
             println!("Couldn't send for processing");
             return Err(());
         }
-
-        self.last_exit_batch = self.last_exit_batch + U256::from(1);
 
         Ok(())
     }
