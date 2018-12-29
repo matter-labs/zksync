@@ -64,13 +64,7 @@ impl PartialOrd for PoolRecord {
 
 impl PartialEq for PoolRecord {
     fn eq(&self, other: &Self) -> bool {
-        if self.account_id != other.account_id ||
-            self.nonce != other.nonce {
-                return false;
-            }
-        println!("old fee = {}, new fee = {}", self.fee, other.fee);
-
-        self.fee < other.fee
+        return self.account_id == other.account_id && self.nonce == other.nonce
     }
 }
 
@@ -135,8 +129,13 @@ impl MemPool {
                     account_id: from
                 };
                 println!("Inserting pool record {:?}", pool_record);
-                if let Some(replaced_value) = self.queue.insert(pool_record) {
+                if let Some(replaced_value) = self.queue.insert(pool_record.clone()) {
                     println!("Has replaced {:?}", replaced_value);
+                    if replaced_value.nonce == pool_record.nonce && 
+                        replaced_value.fee > pool_record.fee 
+                        {
+                            self.queue.insert(replaced_value);
+                        }
                 }
 
                 return Ok(());
@@ -156,8 +155,13 @@ impl MemPool {
                 account_id: from
             };
             println!("Inserting pool record {:?}", pool_record);
-            if let Some(replaced_value) = self.queue.insert(pool_record) {
+            if let Some(replaced_value) = self.queue.insert(pool_record.clone()) {
                 println!("Has replaced {:?}", replaced_value);
+                if replaced_value.nonce == pool_record.nonce && 
+                    replaced_value.fee > pool_record.fee 
+                    {
+                        self.queue.insert(replaced_value);
+                    }
             }
 
         }
