@@ -76,19 +76,26 @@
                         <p class="mb-2"><strong>Plasma</strong>
                             (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+contractAddress"
                             target="blanc">contract</a>)</p>
-                        <label for="acc_id">Account ID:</label>
-                        <b-form-input id="acc_id" v-model="store.account.plasma.id" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
-                        <b-row class="mt-2">
-                            <b-col cols="6">Balance:</b-col> 
-                            <b-col>{{store.account.plasma.balance || 0}} ETH</b-col>
-                        </b-row>
-                        <b-row class="mt-2" v-if="store.account.plasma.pending.balance" style="color: grey">
-                            <b-col cols="6">Pending:</b-col> 
-                            <b-col>{{store.account.plasma.pending.balance || 0}} ETH</span></b-col>
-                        </b-row>
-                        <b-row class="mt-2">                    
-                            <b-col cols="6">Pending nonce:</b-col> <b-col>{{store.account.plasma.pending.nonce}}</b-col>
-                        </b-row>
+
+                        <img src="./assets/loading.gif" width="100em" v-if="store.account.plasma.id===undefined">
+                        <div v-if="store.account.plasma.id === 0">
+                            <p>No account yet</p>
+                        </div>
+                        <div v-if="store.account.plasma.id > 0">
+                            <label for="acc_id">Account ID:</label>
+                            <b-form-input id="acc_id" v-model="store.account.plasma.id" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
+                            <b-row class="mt-2">
+                                <b-col cols="6">Balance:</b-col> 
+                                <b-col>{{store.account.plasma.balance || 0}} ETH</b-col>
+                            </b-row>
+                            <b-row class="mt-2" v-if="store.account.plasma.pending.balance" style="color: grey">
+                                <b-col cols="6">Pending:</b-col> 
+                                <b-col>{{store.account.plasma.pending.balance || 0}} ETH</span></b-col>
+                            </b-row>
+                            <b-row class="mt-2">                    
+                                <b-col cols="6">Pending nonce:</b-col> <b-col>{{store.account.plasma.pending.nonce}}</b-col>
+                            </b-row>
+                        </div>
                     </b-card>
                 </b-card>
             </b-col>
