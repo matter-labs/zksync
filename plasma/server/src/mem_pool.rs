@@ -47,12 +47,23 @@ use std::cmp::{Ord, PartialEq, PartialOrd, Eq, Ordering};
 
 impl Ord for PoolRecord {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.fee < other.fee {
-            return Ordering::Greater;
-        } else if self.fee < other.fee {
-            return Ordering::Less;
+        if self.account_id == other.account_id && self.nonce == other.nonce {
+            // replace by a new nonce, handle fee on another level
+            return Ordering::Equal;
+        } else if self.account_id == other.account_id {
+            if self.nonce < other.nonce {
+                return Ordering::Less;
+            } else {
+                return Ordering::Greater;
+            }
         }
-        Ordering::Equal
+
+        if self.fee >= other.fee {
+            // sort by fee by default
+            return Ordering::Less;
+        } else {
+            return Ordering::Greater;
+        }
     }
 }
 
@@ -272,4 +283,26 @@ pub fn start_mem_pool(mut mem_pool: MemPool, rx_for_tx: Receiver<TransferTx>, tx
         std::thread::Builder::new().name("mem_pool".to_string()).spawn(move || {  
             mem_pool.run(rx_for_tx, tx_for_blocks);
         });
+}
+
+
+#[test] 
+fn test_set_insert() {
+    let pool_record_0 = PoolRecord {
+        fee: 0u128,
+        nonce: 0,
+        account_id: 2
+    };
+
+    let pool_record_1 = PoolRecord {
+        fee: 0u128,
+        nonce: 1,
+        account_id: 2
+    };
+
+    let mut set = OrdSet::new();
+    let r0 = set.insert(pool_record_0);
+    let r1 = set.insert(pool_record_1);
+    let len = set.len();
+    assert_eq!(len, 2);
 }
