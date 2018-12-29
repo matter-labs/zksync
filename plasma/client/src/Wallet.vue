@@ -44,7 +44,9 @@
                 <b-card title="Account info">
                     <b-card class="mb-3">
                         <p class="mb-2"><strong>Mainchain</strong></p>
-                        <label for="addr">Address:</label>
+                        <label for="addr">Address</label> 
+                            (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+store.account.address"
+                                target="blanc">block explorer</a>):
                         <b-form-input id="addr" v-model="store.account.address" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                         <b-row class="mt-2">
                             <b-col cols="4">Balance:</b-col> <b-col>{{store.account.balance}} ETH</b-col>
@@ -71,7 +73,9 @@
                         </b-col>
                     </b-row>
                     <b-card class="mt-2">
-                        <p class="mb-2"><strong>Plasma</strong></p>
+                        <p class="mb-2"><strong>Plasma</strong>
+                            (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+contractAddress"
+                            target="blanc">contract</a>)</p>
                         <label for="acc_id">Account ID:</label>
                         <b-form-input id="acc_id" v-model="store.account.plasma.id" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                         <b-row class="mt-2">
@@ -160,7 +164,8 @@ export default {
     destroyed() {
     },
     computed: {
-        store() { return store },
+        store: () => store,
+        contractAddress: () => window.contractAddress,
         depositProblem() {
             if(!(store.account.balance > 0)) return "empty balance in the mainchain account"
         },
