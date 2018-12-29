@@ -79,10 +79,14 @@
                         <label for="acc_id">Account ID:</label>
                         <b-form-input id="acc_id" v-model="store.account.plasma.id" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                         <b-row class="mt-2">
-                            <b-col cols="4">Balance:</b-col> <b-col>{{store.account.plasma.balance || 0}} ETH</b-col>
+                            <b-col cols="4">Balance:</b-col> 
+                            <b-col>
+                                {{store.account.plasma.balance || 0}} ETH 
+                                <span v-if="store.account.plasma.pending.balance" style="color: grey">({{store.account.plasma.pending.balance || 0}} ETH)</span>
+                            </b-col>
                         </b-row>
                         <b-row>                    
-                            <b-col cols="4">Nonce:</b-col> <b-col>{{store.account.plasma.nonce}}</b-col>
+                            <b-col cols="4">Pending nonce:</b-col> <b-col>{{store.account.plasma.pending.nonce}}</b-col>
                         </b-row>
                     </b-card>
                 </b-card>
@@ -286,7 +290,8 @@ export default {
                     if(!result.error) {
                         newData.plasma = result.data
                         newData.plasmaBalance = Eth.fromWei(new BN(newData.plasma.verified.balance).mul(new BN('1000000000000')), 'ether')
-                        newData.plasmaNonce = newData.plasma.pending.nonce
+                        newData.plasmaPendingBalance = Eth.fromWei(new BN(newData.plasma.pending.balance).mul(new BN('1000000000000')), 'ether')
+                        newData.plasmaPendingNonce = newData.plasma.pending.nonce
                     } else {
                         console.log('could not fetch data from server: ', result.error)
                     }
@@ -301,9 +306,9 @@ export default {
                 store.account.plasma.id = newData.plasmaId
 
                 if(store.account.plasma.id) {
-                    console.log('newData.plasma', newData.plasma)
                     store.account.plasma.balance = newData.plasmaBalance
-                    store.account.plasma.nonce = newData.plasmaNonce
+                    store.account.plasma.pending.balance = newData.plasmaPendingBalance
+                    store.account.plasma.pending.nonce = newData.plasmaPendingNonce
                 }
                 
                 this.updateTimer = setTimeout(() => this.updateAccountInfo(), 1000)

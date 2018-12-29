@@ -4,9 +4,15 @@ const store = {
         balance:    null,
         plasma: {
             id:         null,
+
+            // verified
             balance:    null,
-            nonce:      null,
             key:        null,
+
+            pending: {
+                balance: null,
+                nonce:   null
+            }
         }
     }
 }
