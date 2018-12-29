@@ -135,7 +135,9 @@ impl MemPool {
                     account_id: from
                 };
                 println!("Inserting pool record {:?}", pool_record);
-                self.queue.insert(pool_record).expect("must insert a new pool record");
+                if let Some(replaced_value) = self.queue.insert(pool_record) {
+                    println!("Has replaced {:?}", replaced_value);
+                }
 
                 return Ok(());
             },
@@ -154,7 +156,9 @@ impl MemPool {
                 account_id: from
             };
             println!("Inserting pool record {:?}", pool_record);
-            self.queue.insert(pool_record).expect("must insert a new pool record");
+            if let Some(replaced_value) = self.queue.insert(pool_record) {
+                println!("Has replaced {:?}", replaced_value);
+            }
 
         }
 
