@@ -33,6 +33,8 @@ serde_bytes = "0.10.4"
 r2d2 = "0.8.3"
 r2d2_postgres = "0.14.0"
 
+im = "12.2.0"
+
 actix = "0.7.7"
 actix-web = "0.7.14"
 

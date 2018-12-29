@@ -6,13 +6,15 @@ use sapling_crypto::eddsa::{Signature};
 use crate::models::circuit::sig::TransactionSignature;
 use super::PublicKey;
 use crate::models::params;
-use ff::{Field, PrimeField};
+use ff::{PrimeField};
 use super::{Fr, Engine};
 use crate::circuit::utils::{encode_fr_into_fs, le_bit_vector_into_field_element};
 use crate::models::circuit::transfer::{Tx};
 use crate::models::circuit::deposit::{DepositRequest};
 use crate::models::circuit::exit::{ExitRequest};
 use rustc_hex::ToHex;
+
+use std::cmp::{Ord, PartialEq, PartialOrd, Eq, Ordering};
 
 /// Unpacked transaction data
 #[derive(Clone, Serialize, Deserialize)]
@@ -29,6 +31,26 @@ pub struct TransferTx {
     #[serde(skip)]
     pub cached_pub_key:     Option<PublicKey>,       
 }
+
+impl Ord for TransferTx {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.nonce.cmp(&other.nonce)
+    }
+}
+
+impl PartialOrd for TransferTx {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for TransferTx {
+    fn eq(&self, other: &Self) -> bool {
+        self.nonce == other.nonce
+    }
+}
+
+impl Eq for TransferTx {}
 
 impl TransferTx {
     pub fn message_bits(&self) -> Vec<bool> {
