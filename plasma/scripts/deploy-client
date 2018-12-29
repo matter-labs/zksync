@@ -1,0 +1,13 @@
+#!/bin/bash
+
+SRC=~/src/shamatar/zk_stuff/plasma/client
+DST=~/src/gluk64.github.io/
+
+cd $SRC
+yarn run build
+cp index.html $DST
+cp dist/* $DST/dist
+cd $DST
+git add -A
+git commit -m "deploy"
+git push --force
