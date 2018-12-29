@@ -74,7 +74,7 @@
                     </b-row>
                     <b-card class="mt-2">
                         <p class="mb-2"><strong>Plasma</strong>
-                            (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+contractAddress"
+                            (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+store.contractAddress"
                             target="blanc">contract</a>)</p>
 
                         <img src="./assets/loading.gif" width="100em" v-if="store.account.plasma.id===undefined">
@@ -190,6 +190,7 @@ export default {
             url:    baseUrl + '/details',
         })
         if(!result.data) throw "Can not load contract address"
+        store.contractAddress = result.data.address
         window.contractAddress = result.data.address
         window.contract = eth.contract(ABI).at(window.contractAddress)
     },
@@ -321,10 +322,15 @@ export default {
             pending.balance = Eth.fromWei(new BN(newData.plasma.pending.balance).mul(new BN('1000000000000')), 'ether')
             pending.nonce = newData.plasma.pending.nonce
 
-            newData.pending_nonce = newData.plasma.pending_nonce
             newData.verified = verified
             newData.committed = committed
             newData.pending = pending
+
+            if (newData.plasma.pending_nonce !== undefined && newData.plasma.pending_nonce > newData.pending.nonce) {
+                newData.pending_nonce = newData.plasma.pending_nonce
+            } else {
+                newData.pending_nonce = newData.pending.nonce
+            }
 
             return newData
         },
