@@ -104,7 +104,7 @@
                                 <b-col>{{store.account.plasma.pending.nonce || 0}}</b-col>
                             </b-row>
                             <b-row class="mt-2">                    
-                                <b-col cols="6">Max mempool nonce:</b-col> <b-col>{{store.account.plasma.pending_nonce || 0}}</b-col>
+                                <b-col cols="6">Next nonce from mempool:</b-col> <b-col>{{store.account.plasma.pending_nonce || 0}}</b-col>
                             </b-row>
                         </div>
                     </b-card>
