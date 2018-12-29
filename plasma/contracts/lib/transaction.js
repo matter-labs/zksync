@@ -48,7 +48,7 @@ function verify(message, signature, publicKey, curve) {
 function serializeSignature(signature) {
     const R_X = signature.R.getX();
     const R_Y = signature.R.getY();
-    let r_coords = [R_X.toString(16), R_Y.toString(16)]
+    const r_coords = [R_X.toString(16), R_Y.toString(16)];
     return {
         R: r_coords,
         S: signature.S.toString(16)
@@ -61,13 +61,7 @@ function parseSignature(obj, curve) {
     return {R: R, S: S};
 }
 
-function floatToInteger(
-    floatBytes,
-    exp_bits,
-    mantissa_bits,
-    exp_base
-)
-{
+function floatToInteger(floatBytes, exp_bits, mantissa_bits, exp_base) {
     assert(floatBytes.length*8 == (exp_bits + mantissa_bits));
     const floatHolder = new BN(floatBytes, 16, "be"); // keep bit order
     const totalBits = floatBytes.length*8 - 1; // starts from zero
@@ -93,13 +87,7 @@ function floatToInteger(
     return exponent.mul(mantissa);
 }
 
-function integerToFloat(
-    integer,
-    exp_bits,
-    mantissa_bits,
-    exp_base
-)
-{
+function integerToFloat(integer, exp_bits, mantissa_bits, exp_base) {
     const maxMantissa = (new BN(1)).ushln(mantissa_bits).subn(1);
     const maxExponent = (new BN(exp_base)).pow((new BN(1)).ushln(exp_bits).subn(1));
     assert(integer.lte(maxMantissa.mul(maxExponent)));

@@ -277,9 +277,10 @@ export default {
                         method: 'get',
                         url:    baseUrl + '/account/' + id,
                     });
-                    let balance = new BN(result.data.balance).mul(new BN('1000000000000'))
+                    // todo - use get multiplier from the smart-contract
+                    let balance = new BN(result.data.pending.balance).mul(new BN('1000000000000'))
                     newData.plasmaBalance = Eth.fromWei(balance, 'ether')
-                    newData.plasmaNonce = result.data.nonce
+                    newData.plasmaNonce = result.data.pending.nonce
                 }
             } catch (err) {
                 //console.log('status update failed: ', err)
