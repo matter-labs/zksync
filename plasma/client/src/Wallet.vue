@@ -96,8 +96,8 @@
                                 <b-col cols="6">Committed nonce:</b-col> 
                                 <b-col>{{store.account.plasma.committed.nonce || 0}}</b-col>
                             </b-row>
-                            <!-- <b-row class="mt-2" v-if="store.account.plasma.pending.balance !== store.account.plasma.committed" style="color: grey"> -->
-                            <b-row class="mt-2">
+                            <b-row class="mt-2" v-if="store.account.plasma.pending.balance !== store.account.plasma.committed.balance" style="color: grey">
+                            <!-- <b-row class="mt-2"> -->
                                 <b-col cols="6">Pending balance:</b-col> 
                                 <b-col>{{store.account.plasma.pending.balance || 0}} ETH</b-col>
                                 <b-col cols="6">Pending nonce:</b-col> 
