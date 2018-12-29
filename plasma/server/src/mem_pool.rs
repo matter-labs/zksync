@@ -20,6 +20,8 @@ use std::collections::HashMap;
 /// - this structure is efficient logically, but not cache-friendly, so should be changed in a future
 /// while preserving public functions signatures
 
+const MAX_TRANSACTIONS_PER_ACCOUNT: usize = 128;
+
 pub struct MemPool {
     // Batch size
     pub batch_size: usize,
@@ -104,6 +106,10 @@ impl MemPool {
         match self.per_account_info.get_mut(&from) {
             Some(ordered_set) => {
                 {
+                    let existing_length = ordered_set.len();
+                    if existing_length >= MAX_TRANSACTIONS_PER_ACCOUNT {
+                        return Err("Too many transaction for this account".to_string());
+                    }
                     let max = ordered_set.get_max();
                     if let Some(max_tx_nonce) = max {
                         let current_max_nonce = max_tx_nonce.nonce;
@@ -205,7 +211,7 @@ impl MemPool {
         }
 
         // we did NOT assemble a block over max attempts, revert globally
-        println("Reverting a mempool");
+        println!("Reverting a mempool");
         for removed_item in removed_items {
             let (pool_item, transaction) = removed_item;
             let account_id = pool_item.account_id;
