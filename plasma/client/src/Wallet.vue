@@ -276,7 +276,17 @@ export default {
             });
             if(result.data.accepted) {
                 this.alert(`Transaction with nonce #${this.nonce} accepted`, 'success')
-                this.nonce++
+                let new_nonce_result = await axios({
+                        method: 'get',
+                        url:    baseUrl + '/account/' + from,
+                    })
+                if(!new_nonce_result.error) {
+                    let new_nonce = new_nonce_result.data.pending_nonce
+                    this.nonce = new_nonce + 1
+                } else {
+                    console.log('could not fetch data from server: ', new_nonce_result.error)
+                }
+                // this.nonce++
             } else  {
                 this.alert(`Transaction rejected!`)
             }
@@ -300,6 +310,9 @@ export default {
                         newData.plasmaBalance = Eth.fromWei(new BN(newData.plasma.verified.balance).mul(new BN('1000000000000')), 'ether')
                         newData.plasmaPendingBalance = Eth.fromWei(new BN(newData.plasma.pending.balance).mul(new BN('1000000000000')), 'ether')
                         newData.plasmaPendingNonce = newData.plasma.pending.nonce
+                        if (newData.plasma.pending_nonce > newData.plasmaPendingNonce) {
+                            newData.plasmaPendingNonce = newData.plasma.pending_nonce
+                        }
                     } else {
                         console.log('could not fetch data from server: ', result.error)
                     }
@@ -319,6 +332,9 @@ export default {
                     store.account.plasma.pending.nonce = newData.plasmaPendingNonce
 
                     if(null === this.nonce) this.nonce = store.account.plasma.pending.nonce
+                    if (store.account.plasma.pending_nonce > this.nonce) {
+                            this.nonce = store.account.plasma.pending_nonce
+                        }
                 }
                 
                 this.updateTimer = setTimeout(() => this.updateAccountInfo(), 1000)
