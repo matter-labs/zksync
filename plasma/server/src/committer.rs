@@ -63,7 +63,7 @@ pub fn start_eth_sender() -> Sender<(Operation, TxMeta)> {
         tx_for_eth.send((op, TxMeta{
             addr:   pending_op.addr, 
             nonce:  pending_op.nonce as u32,
-        })).expect("queue must work");
+        })).expect("must send a request for ethereum transaction for pending operations");
     }
 
     std::thread::Builder::new().name("eth_sender".to_string()).spawn(move || {
@@ -154,7 +154,7 @@ pub fn run_committer(
     for pending_op in ops {
         let op: Operation = serde_json::from_value(pending_op.data).unwrap();
         if let Action::Commit{block, new_root: _} = op.action {
-            tx_for_proof_requests.send((op.block_number, block.unwrap(), op.block_data.clone(), op.accounts_updated.clone())).expect("queue must work");
+            tx_for_proof_requests.send((op.block_number, block.unwrap(), op.block_data.clone(), op.accounts_updated.clone())).expect("must send a proof request for pending operations");
         }
     }
 
@@ -164,14 +164,14 @@ pub fn run_committer(
 
         if let Action::Commit{ref mut block, new_root: _} = op.action {
             tx_for_proof_requests.send((op.block_number, block.take().unwrap(), op.block_data.clone(), op.accounts_updated.clone()))
-                .expect("queue must work");
+                .expect("must send a proof request");
         }
 
         // then submit to eth
         tx_for_eth.send((op, TxMeta{
             addr:   committed_op.addr, 
             nonce:  committed_op.nonce as u32,
-        })).expect("queue must work");
+        })).expect("must send an operation for commitment to ethereum");
 
     }
 }

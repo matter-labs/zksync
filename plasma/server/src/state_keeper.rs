@@ -115,7 +115,7 @@ impl PlasmaStateKeeper {
                                 accounts_updated,
                             };
 
-                            tx_for_commitments.send(op).expect("queue must work");
+                            tx_for_commitments.send(op).expect("must send new operation for commitment");
 
                             // bump current block number as we've made one
                             self.state.block_number += 1;
@@ -125,11 +125,11 @@ impl PlasmaStateKeeper {
                         Err(_) => Err(block),
                     };
                     if let Some(sender) = source {
-                        sender.send(result).expect("queue must work");
+                        sender.send(result).expect("must send back block processing result");
                     }
                 },
                 StateProcessingRequest::GetPubKey(account_id, sender) => {
-                    sender.send(self.state.get_pub_key(account_id)).expect("queue must work");
+                    sender.send(self.state.get_pub_key(account_id)).expect("must send request for a public key");
                 },
                 StateProcessingRequest::GetLatestState(account_id, sender) => {
                     let pk = self.state.get_pub_key(account_id);
@@ -250,7 +250,7 @@ impl PlasmaStateKeeper {
 
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
         for tx in block.transactions.iter() {
-            self.state.apply_deposit(&tx).expect("queue must work");
+            self.state.apply_deposit(&tx).expect("must apply deposit transaction");
 
             // collect updated state
             updated_accounts.insert(tx.account, self.account(tx.account));
@@ -275,7 +275,7 @@ impl PlasmaStateKeeper {
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
         let mut augmented_txes = vec![];
         for tx in block.transactions.iter() {
-            let augmented_tx = self.state.apply_exit(&tx).expect("queue must work");
+            let augmented_tx = self.state.apply_exit(&tx).expect("must augment exit transaction information");
             augmented_txes.push(augmented_tx);
             // collect updated state
             updated_accounts.insert(tx.account, self.account(tx.account));
@@ -287,7 +287,7 @@ impl PlasmaStateKeeper {
 
         let eth_block_data = EthBlockData::Exit{ 
             batch_number,
-            public_data: BabyProver::encode_exit_transactions(&block).unwrap(), 
+            public_data: BabyProver::encode_exit_transactions(&block).expect("must encode exit block information");
         };
         let mut be_bytes: Vec<u8> = vec![];
         &block.new_root_hash.clone().into_repr().write_be(& mut be_bytes);

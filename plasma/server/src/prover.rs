@@ -1002,7 +1002,7 @@ impl BabyProver {
                 block_number,
                 block_data,         
                 accounts_updated,
-            }).expect("queue must work");
+            }).expect("must send an operation from prover for commitment");
         }
     }
 }

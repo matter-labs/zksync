@@ -74,7 +74,7 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
             // TODO: the code below will block the current thread; switch to futures instead
             let (key_tx, key_rx) = mpsc::channel();
             let request = StateProcessingRequest::GetPubKey(tx.from, key_tx);
-            tx_for_state.send(request).expect("queue must work");
+            tx_for_state.send(request).expect("must send a new transaction to queue");
             // now wait for state_keeper to return a result
             let pub_key: Option<PublicKey> = key_rx.recv().expect("must get public key back");
             let valid = tx.validate();
@@ -89,7 +89,7 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
             if accepted {
                 let mut tx = tx.clone();
                 tx.cached_pub_key = pub_key;
-                tx_for_tx.send(tx).expect("queue must work"); // pass to mem_pool
+                tx_for_tx.send(tx).expect("must send transaction to mempool from rest api"); // pass to mem_pool
             }
             let resp = TransactionResponse{
                 accepted
@@ -117,7 +117,7 @@ fn handle_get_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let (acc_tx, acc_rx) = mpsc::channel();
     let account_id_u32 = account_id.unwrap();
     let request = StateProcessingRequest::GetLatestState(account_id_u32, acc_tx);
-    tx_for_state.send(request).expect("queue must work");
+    tx_for_state.send(request).expect("must send a request for an account state");
     let account_info: Option<Account> = acc_rx.recv().expect("must get account info back");
     if account_info.is_none() {
         return Ok(HttpResponse::Ok().json(AccountError{error:"non-existing account".to_string()}));

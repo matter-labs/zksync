@@ -36,10 +36,10 @@ impl MemPool {
         let block = std::mem::replace(&mut self.current_block, TransferBlock::default());
         let (tx, rx) = channel();
         let request = StateProcessingRequest::ApplyBlock(Block::Transfer(block), Some(tx));
-        tx_for_blocks.send(request).expect("queue must work");
+        tx_for_blocks.send(request).expect("must send block processing request");
 
         // now wait for state_keeper to return a result
-        let result = rx.recv().unwrap();
+        let result = rx.recv().expect("must receive answer for block processing request");
 
         if let Err(block_purged) = result {
             // out block is returned purged
