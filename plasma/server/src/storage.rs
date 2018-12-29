@@ -228,10 +228,11 @@ impl StorageConnection {
     }
 
     pub fn last_verified_state_for_account(&self, account_id: u32) -> QueryResult<Option<plasma::models::Account>> {
-        let r = diesel::sql_query("SELECT * FROM accounts")
-            .get_result(&self.conn)
-            .optional()?;
-        Ok( r.map(|acc: Account| serde_json::from_value(acc.data).unwrap()) )
+        use crate::schema::accounts::dsl::*;
+        let mut r = accounts
+            .filter(id.eq(account_id as i32))
+            .load(&self.conn)?;
+        Ok( r.pop().map(|acc: Account| serde_json::from_value(acc.data).unwrap()) )
     }
 
     pub fn get_last_committed_block(&self) -> QueryResult<i32> {
@@ -330,6 +331,8 @@ fn test_store_txs() {
 
     accounts.insert(3, acc(1));
     accounts.insert(5, acc(2));
+    accounts.insert(7, acc(3));
+    accounts.insert(8, acc(4));
     let commit = conn.commit_op(&Operation{
         action: Action::Commit{
             new_root:   H256::zero(), 
@@ -352,8 +355,8 @@ fn test_store_txs() {
         accounts_updated:   accounts.clone()
     }).unwrap();
 
-    assert_eq!(conn.last_verified_state_for_account(5).unwrap().unwrap().balance, BigDecimal::from(2));
-    assert_eq!(conn.last_committed_state_for_account(5).unwrap().unwrap().balance, BigDecimal::from(2));
+    assert_eq!(conn.last_verified_state_for_account(7).unwrap().unwrap().balance, BigDecimal::from(3));
+    assert_eq!(conn.last_committed_state_for_account(7).unwrap().unwrap().balance, BigDecimal::from(3));
 
     let pending = conn.load_pendings_txs(0).unwrap();
     assert_eq!(pending.len(), 2);
