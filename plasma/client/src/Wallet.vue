@@ -139,6 +139,7 @@ import Eth from 'ethjs'
 import axios from 'axios'
 import ethUtil from 'ethjs-util'
 import transactionLib from '../../contracts/lib/transaction.js'
+import ABI from './contract'
 
 const baseUrl = 'https://api.plasma-winter.io'
 
@@ -156,10 +157,18 @@ export default {
         alertType:      null,
         result:         null
     }),
-    created() {
+    async created() {
         console.log('start')
         this.updateAccountInfo()
         window.t = this
+
+        let result = await axios({
+            method: 'get',
+            url:    baseUrl + '/details',
+        })
+        if(!result.data) throw "Can not load contract address"
+        window.contractAddress = result.data.address
+        window.contract = eth.contract(ABI).at(window.contractAddress)
     },
     destroyed() {
     },
@@ -264,16 +273,6 @@ export default {
             let newData = {}
             let timer = this.updateTimer
             try {
-
-                if (!window.contractAddress) {
-                    let result = await axios({
-                        method: 'get',
-                        url:    baseUrl + '/details',
-                    })
-                    console.log('result', result)
-                    window.contractAddress = result.data.address
-                }
-
                 newData.address = ethereum.selectedAddress
                 let balance = (await eth.getBalance(newData.address)).toString()
                 newData.balance = Eth.fromWei(balance, 'ether')

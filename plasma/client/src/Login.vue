@@ -38,12 +38,12 @@ export default {
                 }
                 console.log('with', account)
                 let sig = await eth.personal_sign(ethUtil.fromUtf8(new Buffer('Login to Plasma Wallet')), account)
-                console.log(sig)
+                console.log('sig', sig)
                 store.account.address = account
 
                 let hash = keccak256(sig)
                 console.log('hash', hash)
-                store.account.plasma.key = newKey(hash)
+                store.account.plasma.key = newKey(sig)
                 console.log(store.account.plasma.key)
 
                 this.$parent.$router.push('/wallet')
