@@ -104,7 +104,7 @@
                             </b-row>
                             <b-row class="mt-2">                    
                                 <b-col cols="8">Latest nonce:</b-col> 
-                                <b-col>Ξ{{store.account.plasma.committed.nonce || 0}}</b-col>
+                                <b-col>{{store.account.plasma.committed.nonce || 0}}</b-col>
                             </b-row>
                             <b-row class="mt-2" style="color: grey" v-if="store.account.plasma.pending.nonce !== store.account.plasma.committed.nonce">
                                 <b-col cols="8">Next nonce:</b-col> <b-col>{{store.account.plasma.pending.nonce || store.account.plasma.committed.nonce || 0}}</b-col>
