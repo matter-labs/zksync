@@ -111,21 +111,25 @@ contract PlasmaTransactor is Plasma {
                 ExitLeaf memory newLeaf;
                 if (account.exitListTail == 0) {
                     // create a fresh list that is both head and tail
-                    newLeaf = ExitLeaf(blockNumber, scaledAmount);
+                    newLeaf = ExitLeaf(0, scaledAmount);
                     exitLeafs[account.owner][blockNumber] = newLeaf;
                     account.exitListTail = blockNumber;
-                } else if (account.exitListTail == blockNumber) {
-                    // to exits in the same block, happens
-                    ExitLeaf storage thisExitLeaf = exitLeafs[account.owner][account.exitListTail];
-                    thisExitLeaf.amount += scaledAmount;
                 } else {
-                    // previous tail is somewhere in the past
-                    ExitLeaf storage previousExitLeaf = exitLeafs[account.owner][account.exitListTail];
-                    newLeaf = ExitLeaf(blockNumber, scaledAmount);
-                    previousExitLeaf.nextID = blockNumber;
+                    // such global "else" is intentional, otherwise account.exitListTail == blockNumber will
+                    // happen after the assignment above
+                    if (account.exitListTail == blockNumber) {
+                        // to exits in the same block, happens
+                        ExitLeaf storage thisExitLeaf = exitLeafs[account.owner][account.exitListTail];
+                        thisExitLeaf.amount += scaledAmount;
+                    } else {
+                        // previous tail is somewhere in the past
+                        ExitLeaf storage previousExitLeaf = exitLeafs[account.owner][account.exitListTail];
+                        newLeaf = ExitLeaf(0, scaledAmount);
+                        previousExitLeaf.nextID = blockNumber;
 
-                    exitLeafs[account.owner][blockNumber] = newLeaf;
-                    account.exitListTail = blockNumber;
+                        exitLeafs[account.owner][blockNumber] = newLeaf;
+                        account.exitListTail = blockNumber;
+                    }
                 }
 
                 // if there was no head - point to here

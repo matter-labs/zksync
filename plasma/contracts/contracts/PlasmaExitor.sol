@@ -194,6 +194,7 @@ contract PlasmaExitor is Plasma {
         uint256 pointer = 32;
         address accountOwner;
         uint128 scaledAmount;
+        uint32 tail;
         for (uint256 i = 0; i < EXIT_BATCH_SIZE; i++) { 
             // this is a cheap way to ensure that all requests are unique, without O(n) MSTORE
             // it also automatically guarantees that all requests requests from the batch have been executed
@@ -213,21 +214,19 @@ contract PlasmaExitor is Plasma {
 
             // accountOwner = accounts[accountIDs[i]].owner;
             scaledAmount = uint128(chunk << 24 >> 128);
-
-            // ExitLeaf storage previousExitLeaf = exitLeafs[account.owner][account.exitListTail];
-
-            
+   
             ExitLeaf memory newLeaf;
-            if (account.exitListTail == 0) {
+            tail = account.exitListTail;
+            if (tail == 0) {
                 // create a fresh list that is both head and tail
-                newLeaf = ExitLeaf(blockNumber, scaledAmount);
+                newLeaf = ExitLeaf(0, scaledAmount);
                 exitLeafs[account.owner][blockNumber] = newLeaf;
                 account.exitListTail = blockNumber;
             } else {
                 // previous tail is somewhere in the past
-                ExitLeaf storage previousExitLeaf = exitLeafs[account.owner][account.exitListTail];
+                ExitLeaf storage previousExitLeaf = exitLeafs[account.owner][tail];
 
-                newLeaf = ExitLeaf(blockNumber, scaledAmount);
+                newLeaf = ExitLeaf(0, scaledAmount);
                 previousExitLeaf.nextID = blockNumber;
 
                 exitLeafs[account.owner][blockNumber] = newLeaf;
@@ -238,8 +237,6 @@ contract PlasmaExitor is Plasma {
             if (account.exitListHead == 0) {
                 account.exitListHead = blockNumber;
             }
-
-            account.exitListTail = blockNumber;
 
             // exitAmounts[accountOwner][blockNumber] = scaledAmount;
             account.state = uint8(AccountState.UNCONFIRMED_EXIT);

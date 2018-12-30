@@ -19,9 +19,11 @@ contract PlasmaTester is PlasmaDepositor, PlasmaExitor, PlasmaTransactor {
         for (uint24 i = 1; i < operatorsAccounts; i++) {
             freshAccount = Account(
                 uint8(AccountState.REGISTERED),
-                0,
+                uint32(0),
                 msg.sender,
-                defaultPublicKeys[i-1]
+                defaultPublicKeys[i-1],
+                uint32(0),
+                uint32(0)
             );
             accounts[i] = freshAccount;
         }

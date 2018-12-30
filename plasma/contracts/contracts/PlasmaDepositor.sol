@@ -18,11 +18,11 @@ contract PlasmaDepositor is Plasma {
             ethereumAddressToAccountID[msg.sender] = nextAccountToRegister;
             Account memory freshAccount = Account(
                 uint8(AccountState.REGISTERED),
-                0,
-                0,
-                0,
+                uint32(0),
                 msg.sender,
-                packedKey
+                packedKey,
+                uint32(0),
+                uint32(0)
             );
             accountID = nextAccountToRegister;
             accounts[accountID] = freshAccount;

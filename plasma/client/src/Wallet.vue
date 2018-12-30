@@ -169,6 +169,7 @@ import transactionLib from '../../contracts/lib/transaction.js'
 import ABI from './contract'
 
 const baseUrl = 'https://api.plasma-winter.io'
+const maxExitEntries = 32;
 
 export default {
     name: 'wallet',
@@ -199,6 +200,8 @@ export default {
 
         window.contract = contract
 
+        window.ethersContract = new ethers.Contract(window.contractAddress, ABI, window.ethersProvider);
+
         this.updateAccountInfo()
         window.t = this
     },
@@ -223,8 +226,8 @@ export default {
         doWithdrawProblem() {
             if(this.depositProblem) return this.depositProblem
             if(Number(this.withdrawAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Plasma balance"
-            if(Number(this.nonce) < Number(store.account.plasma.pending.nonce)) return "nonce must be greater then confirmed in Plasma: got " 
-                + this.nonce + ", expected >= " + store.account.plasma.pending.nonce
+            if(Number(this.nonce) < Number(store.account.plasma.committed.nonce)) return "nonce must be greater then confirmed in Plasma: got " 
+                + this.nonce + ", expected >= " + store.account.plasma.committed.nonce
         },
         transferProblem() {
             if(!store.account.plasma.id) return "no Plasma account exists yet"
@@ -233,7 +236,7 @@ export default {
             if(!(this.transferAmount > 0)) return "positive amount required, e.g. 100.55"
             if(Number(this.transferAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Plasma balance"
             if(Number(this.nonce) < Number(store.account.plasma.committed.nonce)) return "nonce must be greater then confirmed in Plasma: got " 
-                + this.nonce + ", expected >= " + store.account.plasma.pending.nonce
+                + this.nonce + ", expected >= " + store.account.plasma.committed.nonce
         },
         pendingWithdraw: () => Number(store.account.onchain.balance) > 0,
     },
@@ -266,12 +269,8 @@ export default {
             try {
                 // for now - one by one
                 let from = store.account.address
-                let allBlockNumbers = store.account.onchain.completeWithdrawArgs;
-                if (allBlockNumbers.length > 0) {
-                    await contract.withdrawUserBalance(allBlockNumbers[0], {from})
-                }
-                // in a future just do
-                // await contract.withdrawUserBalance(allBlockNumbers, {from})
+                let maxIterations = store.account.onchain.completeWithdrawArgs;
+                await contract.withdrawUserBalance(maxIterations, {from})
                 this.updateAccountInfo();
             } catch(err) {
                 this.alert('Exit request failed: ' + err)
@@ -368,53 +367,91 @@ export default {
             return this.parseStateResult(result.data)
         },
         async loadEvents(address, closing) {
-            let contractForLogs = new ethers.Contract(window.contractAddress, ABI, window.ethersProvider)
-            let partialsFilter = contractForLogs.filters.LogExit(address, null)
 
-            let fullFilter = {
-                fromBlock: 1,
-                toBlock: 'latest',
-                address: partialsFilter.address,
-                topics: partialsFilter.topics
-            }
+            // let id = await ethersContract.ethereumAddressToAccountID(address);
+            // if (id === 0) {
+            //     return {blocks: [], pendingBalance: Eth.fromWei(new BN(0), 'ether')}
+            // }
+            // let accountInfo = await ethersContract.accounts(id);
+   
+            // if (accountInfo.exitListHead.toNumber() === 0) {
+            //     return {blocks: [], pendingBalance: Eth.fromWei(new BN(0), 'ether')}
+            // }
 
-            let events = await ethersProvider.getLogs(fullFilter)
+            // return {blocks: nonEmptyBlocks, pendingBalance}
 
-            if(closing) {
-                let completeExitsFilter = contractForLogs.filters.LogCompleteExit(address, null)
+            // let partialsFilter = contractForLogs.filters.LogExit(address, null)
 
-                fullFilter = {
-                    fromBlock: 1,
-                    toBlock: 'latest',
-                    address: completeExitsFilter.address,
-                    topics: completeExitsFilter.topics
-                }
+            // let fullFilter = {
+            //     fromBlock: 1,
+            //     toBlock: 'latest',
+            //     address: partialsFilter.address,
+            //     topics: partialsFilter.topics
+            // }
 
-                let completeExitEvents = await ethersProvider.getLogs(fullFilter)
+            // let events = await ethersProvider.getLogs(fullFilter)
 
-                for (let i = 0; i < completeExitEvents; i++) {
-                    events.push(completeExitEvents[i]);
-                }
-            }
+            // if(closing) {
+            //     let completeExitsFilter = contractForLogs.filters.LogCompleteExit(address, null)
+
+            //     fullFilter = {
+            //         fromBlock: 1,
+            //         toBlock: 'latest',
+            //         address: completeExitsFilter.address,
+            //         topics: completeExitsFilter.topics
+            //     }
+
+            //     let completeExitEvents = await ethersProvider.getLogs(fullFilter)
+
+            //     for (let i = 0; i < completeExitEvents; i++) {
+            //         events.push(completeExitEvents[i]);
+            //     }
+            // }
+
+            // const multiplier = new BN('1000000000000')
+            // let finalBalance = new BN(0)
+            // const nonEmptyBlocks = [];
+
+            // for (let i = 0; i < events.length; i++) {
+            //     let ev = events[i];
+            //     let blockNumber = ethers.utils.bigNumberify(ev.topics[2]);
+            //     let amount = (await contract.exitLeafs(address, blockNumber))[0];
+            //     if (!amount.eq(new BN(0))) {
+            //         let convertedBlockNumber = new BN(blockNumber.toString(10))
+            //         nonEmptyBlocks.push(convertedBlockNumber);
+            //         finalBalance = finalBalance.add(amount)
+            //     }
+            // }
 
             const multiplier = new BN('1000000000000')
-            let finalBalance = new BN(0)
-            const nonEmptyBlocks = [];
+            let finalBalance = new BN(0);
 
-            for (let i = 0; i < events.length; i++) {
-                let ev = events[i];
-                let blockNumber = ethers.utils.bigNumberify(ev.topics[2]);
-                let amount = (await contract.exitAmounts(address, blockNumber))[0];
-                if (!amount.eq(new BN(0))) {
-                    let convertedBlockNumber = new BN(blockNumber.toString(10))
-                    nonEmptyBlocks.push(convertedBlockNumber);
-                    finalBalance = finalBalance.add(amount)
+            let id = (await contract.ethereumAddressToAccountID(address))[0].toNumber();
+            if (id === 0) {
+                return {blocks: 0, pendingBalance: Eth.fromWei(new BN(0), 'ether')}
+            }
+            let accountInfo = await contract.accounts(id);
+   
+            if (accountInfo.exitListHead.toNumber() === 0) {
+                // no entries
+                return {blocks: 0, pendingBalance: Eth.fromWei(new BN(0), 'ether')}
+            }
+
+            let head = accountInfo.exitListHead;
+            let entries = 0;
+            for (let i = 0; i < maxExitEntries; i ++) {
+                let entry = await contract.exitLeafs(address, head);
+                finalBalance = finalBalance.add(entry.amount);
+                entries = i + 1;
+                if (entry.nextID.toNumber() === 0) {
+                    break
+                } else {
+                    head = entry.nextID;
                 }
             }
 
             let pendingBalance = Eth.fromWei(finalBalance.mul(multiplier), 'ether')
-
-            return {blocks: nonEmptyBlocks, pendingBalance}
+            return {blocks: entries, pendingBalance}
         },
         async updateAccountInfo() {
             let newData = {}
@@ -430,9 +467,11 @@ export default {
                 if( id !== store.account.plasma.id ) store.account.plasma.id = null // display loading.gif
 
                 let accountState = await contract.accounts(id);
-                //plasmaData.closing = accountState.state.toNumber() > 1;
 
-                let{blocks, pendingBalance} = await this.loadEvents(newData.address, plasmaData.closing)
+                // let accountState = await ethersContract.accounts(id);
+                plasmaData.closing = accountState.state.toNumber() > 1;
+
+                let {blocks, pendingBalance} = await this.loadEvents(newData.address, plasmaData.closing)
                 onchain.completeWithdrawArgs = blocks
                 onchain.balance = pendingBalance
 

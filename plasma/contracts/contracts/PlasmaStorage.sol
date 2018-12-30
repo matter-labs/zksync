@@ -47,11 +47,11 @@ contract PlasmaStorage {
 
     struct Account {
         uint8 state;
-        uint32 exitListHead;
-        uint32 exitListTail;
         uint32 exitBatchNumber;
         address owner;
         uint256 publicKey;
+        uint32 exitListHead;
+        uint32 exitListTail;
     }
 
     // one Ethereum address should have one account
