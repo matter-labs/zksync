@@ -27,7 +27,7 @@
                     <label for="transferToInput">To:</label>
                     <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input>
                     <label for="transferAmountInput" class="mt-4">Amount</label>
-                            (max <a href="#" @click="transferAmount=store.account.plasma.pending.balance">{{store.account.plasma.pending.balance || 0}}</a> Ξ):
+                            (max Ξ<a href="#" @click="transferAmount=store.account.plasma.pending.balance">{{store.account.plasma.pending.balance || 0}}</a>):
                     <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
                     <label for="transferNonceInput" class="mt-4">Nonce:</label>
                     <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
@@ -50,7 +50,7 @@
                                 target="blanc">block explorer</a>):
                         <b-form-input id="addr" v-model="store.account.address" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                         <b-row class="mt-2">
-                            <b-col cols="4">Balance:</b-col> <b-col>{{store.account.balance}} Ξ</b-col>
+                            <b-col cols="4">Balance:</b-col> <b-col>Ξ{{store.account.balance}}</b-col>
                         </b-row>
                     </b-card>
                     <b-row class="mb-0 mt-0">
@@ -87,20 +87,20 @@
                             <b-form-input id="acc_id" v-model="store.account.plasma.id" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                             <b-row class="mt-2">
                                 <b-col cols="8">Verified balance:</b-col> 
-                                <b-col>{{store.account.plasma.verified.balance || 0}} Ξ</b-col>
+                                <b-col>Ξ{{store.account.plasma.verified.balance || 0}}</b-col>
                                 <b-col cols="8">Verified nonce:</b-col> 
                                 <b-col>{{store.account.plasma.verified.nonce || 0}}</b-col>
                             </b-row>
                             <b-row class="mt-2">
                                 <b-col cols="8">Committed balance:</b-col> 
-                                <b-col>{{store.account.plasma.committed.balance || 0}} Ξ</b-col>
+                                <b-col>Ξ{{store.account.plasma.committed.balance || 0}}</b-col>
                                 <b-col cols="8">Committed nonce:</b-col> 
                                 <b-col>{{store.account.plasma.committed.nonce || 0}}</b-col>
                             </b-row>
                             <b-row class="mt-2" v-if="store.account.plasma.pending.balance !== store.account.plasma.committed.balance" style="color: grey">
                             <!-- <b-row class="mt-2"> -->
                                 <b-col cols="8">Pending balance:</b-col> 
-                                <b-col>{{store.account.plasma.pending.balance || 0}} Ξ</b-col>
+                                <b-col>Ξ{{store.account.plasma.pending.balance || 0}}</b-col>
                                 <b-col cols="8">Pending nonce:</b-col> 
                                 <b-col>{{store.account.plasma.pending.nonce || 0}}</b-col>
                             </b-row>
@@ -116,7 +116,7 @@
 
     <b-modal ref="depositModal" id="depositModal" title="Deposit" hide-footer>
         <label for="depositAmountInput">Amount</label> 
-            (max <a href="#" @click="depositAmount=store.account.balance">{{store.account.balance}}</a> Ξ):
+            (max Ξ<a href="#" @click="depositAmount=store.account.balance">{{store.account.balance}}</a>):
         <b-form-input id="depositAmountInput" type="number" placeholder="7.50" v-model="depositAmount"></b-form-input>
         <div id="doDepositBtn" class="mt-4 float-right">
             <b-btn variant="primary" @click="deposit" :disabled="!!doDepositProblem">Deposit</b-btn>
@@ -130,7 +130,7 @@
         <b-tabs pills card>
             <b-tab title="Partial withdrawal" active>
                 <label for="withdrawAmountInput" class="mt-4">Amount</label>
-                    (max <a href="#" @click="withdrawAmount=store.account.plasma.verified.balance">{{store.account.plasma.verified.balance}}</a> Ξ):
+                    (max Ξ<a href="#" @click="withdrawAmount=store.account.plasma.verified.balance">{{store.account.plasma.verified.balance}}</a>):
                 <b-form-input id="withdrawAmountInput" type="number" placeholder="7.50" v-model="withdrawAmount"></b-form-input>
                 <label for="transferNonceInput" class="mt-4">Nonce:</label>
                 <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
