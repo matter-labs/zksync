@@ -56,7 +56,7 @@
                            <b-col cols="6">Pending:</b-col> <b-col>Ξ{{store.account.onchain.balance}}</b-col>
                         </b-row>
                         <b-row class="mt-2 mx-auto">
-                            <b-btn variant="primary" @click="completeWithdraw">Withdraw pending</b-btn>
+                            <b-btn variant="primary" @click="completeWithdraw">Complete withdrawal</b-btn>
                         </b-row>
                     </b-card>
                     <b-row class="mb-0 mt-0">
@@ -102,7 +102,7 @@
                                 <b-col cols="8">Committed balance:</b-col> 
                                 <b-col>Ξ{{store.account.plasma.committed.balance || 0}}</b-col>
                             </b-row>
-                            <b-row class="mt-2" v-if="store.account.plasma.pending.balance !== store.account.plasma.committed.balance" style="color: grey">
+                            <b-row class="mt-2" v-if="store.account.plasma.committed.balance !== store.account.plasma.committed.balance" style="color: grey">
                             <!-- <b-row class="mt-2"> -->
                                 <b-col cols="8">Next nonce:</b-col> 
                                 <b-col>{{store.account.plasma.pending.nonce || 0}}</b-col>
@@ -145,7 +145,7 @@
                 </b-tooltip>
             </b-tab>
             <b-tab title="Full exit" class="mb-4">
-                <p>This will close your account and withdraw all money from it</p>
+                <p>This will close your account and withdraw all money from it.</p>
                 <div id="doExitBtn" class="mt-4 float-right">
                     <b-btn variant="danger" :disabled="!!withdrawProblem" @click="withdrawAll">Close & withdraw</b-btn>
                 </div>
@@ -215,20 +215,20 @@ export default {
                 + this.depositAmount + " > " + store.account.balance
         }, 
         withdrawProblem() {
-            if(!(Number(store.account.plasma.pending.balance) > 0)) return "empty balance in the Plasma account"
+            if(!(Number(store.account.plasma.committed.balance) > 0)) return "empty balance in the Plasma account"
         },
         doWithdrawProblem() {
             if(this.depositProblem) return this.depositProblem
-            if(Number(this.withdrawAmount) > Number(store.account.plasma.pending.balance)) return "specified amount exceeds Plasma balance"
+            if(Number(this.withdrawAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Plasma balance"
             if(Number(this.nonce) < Number(store.account.plasma.pending.nonce)) return "nonce must be greater then confirmed in Plasma: got " 
                 + this.nonce + ", expected >= " + store.account.plasma.pending.nonce
         },
         transferProblem() {
             if(!store.account.plasma.id) return "no Plasma account exists yet"
-            if(!(store.account.plasma.pending.balance > 0)) return "Plasma account has empty balance"
+            if(!(store.account.plasma.committed.balance > 0)) return "Plasma account has empty balance"
             if(!ethUtil.isHexString(this.transferTo)) return "`To` is not a valid ethereum address: " + this.transferTo
             if(!(this.transferAmount > 0)) return "positive amount required, e.g. 100.55"
-            if(Number(this.transferAmount) > Number(store.account.plasma.pending.balance)) return "specified amount exceeds Plasma balance"
+            if(Number(this.transferAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Plasma balance"
             if(Number(this.nonce) < Number(store.account.plasma.pending.nonce)) return "nonce must be greater then confirmed in Plasma: got " 
                 + this.nonce + ", expected >= " + store.account.plasma.pending.nonce
         }
@@ -323,9 +323,8 @@ export default {
         parseStateResult(data) {
             data.verified.balance = Eth.fromWei(new BN(data.verified.balance).mul(new BN('1000000000000')), 'ether')
             data.committed.balance = Eth.fromWei(new BN(data.committed.balance).mul(new BN('1000000000000')), 'ether')
-            data.pending.balance = Eth.fromWei(new BN(data.pending.balance).mul(new BN('1000000000000')), 'ether')
+            // TODO: remove when server updated
             if (Number(data.pending_nonce) > Number(data.pending.nonce)) {
-                // TODO: remove when server updated
                 data.pending.nonce = data.pending_nonce
             }
             return data

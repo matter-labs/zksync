@@ -4,15 +4,15 @@ const store = {
         // ethereum part
         address:    null,
         balance:    null,
+        onchain:    {
+            balance:    null,
+        },
         plasma: {
             id:         null,
-
+            closing:    false,
             key:        null,
-
-            onchain:    null,
             pending_nonce: null,
             pending: {
-                balance: null,
                 nonce:   null
             },
             committed: {
