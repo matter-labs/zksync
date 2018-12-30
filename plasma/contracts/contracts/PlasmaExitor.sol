@@ -222,40 +222,50 @@ contract PlasmaExitor is Plasma {
     }
 
     function withdrawUserBalance(
-        uint32 blockNumber
+        uint32[] blockNumbers
     )
     public
     {
-        require(blockNumber <= lastVerifiedBlockNumber, "can only process exits from verified blocks");
-        uint24 accountID = ethereumAddressToAccountID[msg.sender];
-        uint128 balance;
-        uint256 amountInWei;
-        if (accountID != 0) {
-            // user either didn't fully exit or didn't take full exit balance yet
-            Account storage account = accounts[accountID];
-            if (account.state == uint8(AccountState.UNCONFIRMED_EXIT)) {
-                uint256 batchNumber = account.exitBatchNumber;
-                ExitBatch storage batch = exitBatches[batchNumber];
-                if (blockNumber == batch.blockNumber) {
-                    balance = exitAmounts[msg.sender][blockNumber];
+        require(blockNumbers.length > 0, "requires non-empty set");
+        uint256 totalAmountInWei;
+        uint32 blockNumber;
+        for (uint256 i = 0; i < blockNumbers.length; i++) {
+            blockNumber = blockNumbers[i]; 
 
-                    delete accounts[accountID];
-                    delete ethereumAddressToAccountID[msg.sender];
-                    delete exitAmounts[msg.sender][blockNumber];
+            require(blockNumber <= lastVerifiedBlockNumber, "can only process exits from verified blocks");
+            uint24 accountID = ethereumAddressToAccountID[msg.sender];
+            uint128 balance;
+            uint256 amountInWei;
+            if (accountID != 0) {
+                // user either didn't fully exit or didn't take full exit balance yet
+                Account storage account = accounts[accountID];
+                if (account.state == uint8(AccountState.UNCONFIRMED_EXIT)) {
+                    uint256 batchNumber = account.exitBatchNumber;
+                    ExitBatch storage batch = exitBatches[batchNumber];
+                    if (blockNumber == batch.blockNumber) {
+                        balance = exitAmounts[msg.sender][blockNumber];
 
-                    amountInWei = scaleFromPlasmaUnitsIntoWei(balance);
-                    msg.sender.transfer(amountInWei);
-                    return;
+                        delete accounts[accountID];
+                        delete ethereumAddressToAccountID[msg.sender];
+                        delete exitAmounts[msg.sender][blockNumber];
+
+                        amountInWei = scaleFromPlasmaUnitsIntoWei(balance);
+                        totalAmountInWei += amountInWei;
+                        continue;
+                    }
                 }
             }
+            // user account information is already deleted or it's not the block number where a full exit has happened
+            // we require a non-zero balance in this case cause chain cleanup is not required
+            balance = exitAmounts[msg.sender][blockNumber];
+
+            require(balance != 0, "nothing to exit");
+            delete exitAmounts[msg.sender][blockNumber];
+
+            amountInWei = scaleFromPlasmaUnitsIntoWei(balance);
+            totalAmountInWei += amountInWei;
         }
-        // user account information is already deleted or it's not the block number where a full exit has happened
-        // we require a non-zero balance in this case cause chain cleanup is not required
-        balance = exitAmounts[msg.sender][blockNumber];
-        require(balance != 0, "nothing to exit");
-        delete exitAmounts[msg.sender][blockNumber];
-        amountInWei = scaleFromPlasmaUnitsIntoWei(balance);
-        msg.sender.transfer(amountInWei);
+        msg.sender.transfer(totalAmountInWei);
     }
 
 }

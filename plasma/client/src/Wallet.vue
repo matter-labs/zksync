@@ -269,7 +269,7 @@ export default {
                 // await contract.withdrawUserBalance(allBlockNumbers, {from})
                 this.updateAccountInfo();
             } catch(err) {
-                this.alert('Status update failed: ' + err)
+                this.alert('Exit request failed: ' + err)
             }
         },
         alert(msg, alertType) {
