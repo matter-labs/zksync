@@ -422,7 +422,7 @@ export default {
             let plasmaData = {}
             let onchain = {}
             try {
-                newData.address = ethereum.selectedAddress
+                newData.address = window.ethereum ? ethereum.selectedAddress : (await eth.accounts())[0]
                 let balance = (await eth.getBalance(newData.address)).toString(10)
                 newData.balance = Eth.fromWei(new BN(balance), 'ether')
                 let id = (await contract.ethereumAddressToAccountID(newData.address))[0].toNumber();
