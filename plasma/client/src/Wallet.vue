@@ -32,10 +32,10 @@
                     <label for="transferNonceInput" class="mt-4">Nonce:</label>
                     <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
                     <div id="transferBtn" class="float-right">
-                        <img v-if="transferPending" style="margin-right: 1em" src="./assets/loading.gif" width="100em">
+                        <img v-if="transferPending" style="margin-right: 1.5em" src="./assets/loading.gif" width="100em">
                         <b-btn v-else class="mt-4" variant="outline-primary" @click="transfer" :disabled="!!transferProblem">Submit transaction</b-btn>
                     </div>
-                    <b-tooltip target="transferBtn" :disabled="!transferProblem" triggers="hover">
+                    <b-tooltip target="transferBtn" :disabled="transferPending || !transferProblem" triggers="hover">
                         Transfer not possible: {{ transferProblem }}
                     </b-tooltip>
                 </b-card>
@@ -240,8 +240,13 @@ export default {
             this.alert('Deposit initiated, tx: ' + hash, 'success')
         },
         async withdrawSome() {
-            this.$refs.withdrawModal.hide()
-            this.plasmaTransfer(0, this.withdrawAmount)
+            try {
+                this.transferPending = true
+                this.$refs.withdrawModal.hide()
+                await this.plasmaTransfer(0, this.withdrawAmount)
+            } finally {
+                this.transferPending = false
+            }
         },
         async withdrawAll() {
             this.$refs.withdrawModal.hide()
@@ -255,17 +260,17 @@ export default {
             this.alertType = alertType || 'danger'
         },
         async transfer() {
-            if(!ethUtil.isHexString(this.transferTo)) {
-                this.alert('to is not a hex string')
-                return  
-            }
-            const to = (await contract.ethereumAddressToAccountID(this.transferTo))[0].toNumber()
-            if(0 === to) {
-                this.alert('recepient not found')
-                return
-            }
-            this.transferPending = true
             try {
+            this.transferPending = true
+                if(!ethUtil.isHexString(this.transferTo)) {
+                    this.alert('to is not a hex string')
+                    return  
+                }
+                const to = (await contract.ethereumAddressToAccountID(this.transferTo))[0].toNumber()
+                if(0 === to) {
+                    this.alert('recepient not found')
+                    return
+                }
                 await this.plasmaTransfer(to, this.transferAmount)
             } finally {
                 this.transferPending = false
