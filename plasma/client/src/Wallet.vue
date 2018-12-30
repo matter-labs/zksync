@@ -52,11 +52,11 @@
                         <b-row class="mt-2">
                             <b-col cols="6">Balance:</b-col> <b-col>Ξ{{store.account.balance}}</b-col>
                         </b-row>
-                        <b-row class="mt-2" style="color: grey">
+                        <b-row class="mt-2" style="color: grey" v-if="pendingWithdraw">
                            <b-col cols="6">Pending:</b-col> <b-col>Ξ{{store.account.onchain.balance}}</b-col>
                         </b-row>
-                        <b-row class="mt-2 mx-auto">
-                            <b-btn variant="primary" @click="completeWithdraw">Complete withdrawal</b-btn>
+                        <b-row class="mt-2 mx-auto" v-if="pendingWithdraw">
+                            <b-btn variant="primary" class="mt-2 mx-auto" @click="completeWithdraw">Complete withdrawal</b-btn>                            
                         </b-row>
                     </b-card>
                     <b-row class="mb-0 mt-0">
@@ -162,7 +162,7 @@
 import store from './store'
 import {BN} from 'bn.js'
 import Eth from 'ethjs'
-// import {ethers} from 'ethers'
+import {ethers} from 'ethers'
 import axios from 'axios'
 import ethUtil from 'ethjs-util'
 import transactionLib from '../../contracts/lib/transaction.js'
@@ -234,7 +234,8 @@ export default {
             if(Number(this.transferAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Plasma balance"
             if(Number(this.nonce) < Number(store.account.plasma.committed.nonce)) return "nonce must be greater then confirmed in Plasma: got " 
                 + this.nonce + ", expected >= " + store.account.plasma.pending.nonce
-        }
+        },
+        pendingWithdraw: () => Number(store.account.onchain.balance) > 0,
     },
     methods: {
         async deposit() {
