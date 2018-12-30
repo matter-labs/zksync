@@ -53,10 +53,10 @@
                             <b-col cols="6">Balance:</b-col> <b-col>Ξ{{store.account.balance}}</b-col>
                         </b-row>
                         <b-row class="mt-2" style="color: grey">
-                           <b-col cols="6">From Plasma:</b-col> <b-col>Ξ{{store.account.onchain.balance}}</b-col>
+                           <b-col cols="6">Pending:</b-col> <b-col>Ξ{{store.account.onchain.balance}}</b-col>
                         </b-row>
                         <b-row class="mt-2 mx-auto">
-                            <b-btn variant="primary" @click="completeWithdraw">Complete withdrawal</b-btn>
+                            <b-btn variant="primary" @click="completeWithdraw">Withdraw pending</b-btn>
                         </b-row>
                     </b-card>
                     <b-row class="mb-0 mt-0">
@@ -89,7 +89,7 @@
                             <p>No account yet.</p>
                         </div>
                         <div v-if="store.account.plasma.closing">
-                            <p>Pending closing account, please complete exit.</p>
+                            <p>Closing account: please complete pending withdrawal.</p>
                         </div>
                         <div v-if="store.account.plasma.id > 0 && !store.account.plasma.closing">
                             <label for="acc_id">Account ID:</label>
@@ -97,20 +97,14 @@
                             <b-row class="mt-2">
                                 <b-col cols="8">Verified balance:</b-col> 
                                 <b-col>Ξ{{store.account.plasma.verified.balance || 0}}</b-col>
-                                <b-col cols="8">Verified nonce:</b-col> 
-                                <b-col>{{store.account.plasma.verified.nonce || 0}}</b-col>
                             </b-row>
-                            <b-row class="mt-2">
+                            <b-row class="mt-2" style="color: grey" v-if="store.account.plasma.verified.balance != store.account.plasma.committed.balance">
                                 <b-col cols="8">Committed balance:</b-col> 
                                 <b-col>Ξ{{store.account.plasma.committed.balance || 0}}</b-col>
-                                <b-col cols="8">Committed nonce:</b-col> 
-                                <b-col>{{store.account.plasma.committed.nonce || 0}}</b-col>
                             </b-row>
                             <b-row class="mt-2" v-if="store.account.plasma.pending.balance !== store.account.plasma.committed.balance" style="color: grey">
                             <!-- <b-row class="mt-2"> -->
-                                <b-col cols="8">Pending balance:</b-col> 
-                                <b-col>Ξ{{store.account.plasma.pending.balance || 0}}</b-col>
-                                <b-col cols="8">Pending nonce:</b-col> 
+                                <b-col cols="8">Next nonce:</b-col> 
                                 <b-col>{{store.account.plasma.pending.nonce || 0}}</b-col>
                             </b-row>
                             <b-row class="mt-2">                    
