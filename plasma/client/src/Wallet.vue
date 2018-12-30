@@ -3,7 +3,7 @@
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
         <b-navbar-toggle target="nav_collapse"></b-navbar-toggle>
-        <b-navbar-brand>Plasma Wallet</b-navbar-brand>
+        <b-navbar-brand>Plasma Wallet <span style="font-size: 0.4em">ALPHA</span></b-navbar-brand>
         <b-collapse is-nav id="nav_collapse">
             <b-navbar-nav>
                 <b-nav-item href="#" active>Account</b-nav-item>

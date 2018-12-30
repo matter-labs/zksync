@@ -2,7 +2,7 @@
 <b-container id="login">
     <b-jumbotron bg-variant="light" border-variant="dark">
     <template slot="header">
-        Plasma Wallet
+        Plasma Wallet <span style="font-size: 0.3em"><strong>ALPHA</strong></span>
     </template>
     <template slot="lead">
         Plasma on SNARKs has arrived
