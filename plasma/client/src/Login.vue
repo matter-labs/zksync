@@ -24,12 +24,12 @@ import {keccak256} from 'js-sha3'
 export default {
     name: 'login',
     computed: {
-        ethereumSupported: () => typeof window.ethereum !== 'undefined'
+        ethereumSupported: () => typeof window.web3 !== 'undefined'
     },
     methods: {
         async login() {
             try {
-                let account = ethereum.selectedAddress
+                let account = ethereum.selectedAddress || web3.accounts && web3.accounts[0]
                 if (!account) {
                     await ethereum.enable()
                     account = ethereum.selectedAddress

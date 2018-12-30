@@ -36,7 +36,7 @@ window.app = new Vue({
     }),
     async created() {
         // read store.account from local storage?
-        if (typeof window.ethereum !== 'undefined') {
+        if (typeof window.web3 !== 'undefined') {
             window.eth = new Eth(web3.currentProvider)
             window.ethersProvider = new ethers.providers.Web3Provider(web3.currentProvider)
         }
