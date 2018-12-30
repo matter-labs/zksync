@@ -6,12 +6,29 @@ use diesel::prelude::*;
 use diesel::pg::PgConnection;
 use diesel::sql_types::Integer;
 use diesel::result::Error;
+use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use dotenv::dotenv;
 use std::env;
 use serde_json::{to_value, value::Value};
 
-pub struct StorageConnection {
-    conn: PgConnection
+#[derive(Clone)]
+pub struct ConnectionPool {
+    pub pool: Pool<ConnectionManager<PgConnection>>, 
+}
+
+impl ConnectionPool {
+    pub fn new() -> Self {
+        dotenv().ok();
+        let database_url = env::var("DATABASE_URL")
+            .expect("DATABASE_URL must be set");
+
+        let manager = ConnectionManager::<PgConnection>::new(database_url);
+        let pool = Pool::builder().build(manager).expect("Failed to create connection pool");
+        
+        Self {
+            pool
+        }
+    }
 }
 
 #[derive(Insertable, QueryableByName, Queryable)]
@@ -45,26 +62,17 @@ pub struct IntegerNumber {
     pub integer_value: i32,
 }
 
-// #[derive(Queryable)]
-// struct MaxCommittedDepositBatch {
-//     pub batch_number:   Integer,
-// }
 
-impl StorageConnection {
+pub struct StorageProcessor {
+    conn:  PooledConnection<ConnectionManager<PgConnection>>,
+}
 
-    /// creates a single db connection; it's safe to create multiple instances of StorageConnection
-   pub fn new() -> Self {
-        Self{
-            conn: Self::establish_connection()
+impl StorageProcessor {
+
+    pub fn from_connection(conn: PooledConnection<ConnectionManager<PgConnection>>) -> Self {
+        Self {
+            conn: conn
         }
-    }
-
-    fn establish_connection() -> PgConnection {
-        dotenv().ok();
-        let database_url = env::var("DATABASE_URL")
-            .expect("DATABASE_URL must be set");
-        PgConnection::establish(&database_url)
-            .expect(&format!("Error connecting to {}", database_url))
     }
 
     pub fn commit_op(&self, op: &Operation) -> QueryResult<StoredOperation> {
@@ -317,8 +325,9 @@ use web3::types::{U256, H256};
 
 #[test]
 fn test_store_txs() {
+    let pool = super::ConnectionPool::new();
 
-    let conn = super::StorageConnection::new();
+    let conn = super::StorageProcessor::from_connection(pool.pool.get().unwrap());
     conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
     conn.reset_op_config("0x0", 0).unwrap();
 
@@ -373,8 +382,10 @@ fn test_store_txs() {
 
 #[test]
 fn test_store_proof_reqs() {
+    let pool = super::ConnectionPool::new();
 
-    let conn = super::StorageConnection::new();
+    let conn = super::StorageProcessor::from_connection(pool.pool.get().unwrap());
+
     conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
     conn.reset_op_config("0x0", 0).unwrap();
 
@@ -406,7 +417,9 @@ fn test_store_proof_reqs() {
 
 #[test]
 fn test_storage_helpers() {
-    let conn = super::StorageConnection::new();
+    let pool = super::ConnectionPool::new();
+
+    let conn = super::StorageProcessor::from_connection(pool.pool.get().unwrap());
 
     assert_eq!(-1, conn.load_last_committed_deposit_batch().unwrap());
     assert_eq!(-1, conn.load_last_committed_exit_batch().unwrap());

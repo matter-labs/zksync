@@ -13,7 +13,7 @@ use plasma::models::{self, *};
 
 use super::models::{Operation, Action, EthBlockData};
 use super::prover::BabyProver;
-use super::storage::StorageConnection;
+use super::storage::{ConnectionPool, StorageProcessor};
 
 use rand::{SeedableRng, Rng, XorShiftRng};
 
@@ -29,62 +29,27 @@ pub struct PlasmaStateKeeper {
     /// Current plasma state
     pub state: PlasmaState,
 
-    // // TODO: remove
-    // // Keep private keys in memory
-    // pub private_keys: HashMap<u32, PrivateKey<Bn256>>
+    /// Connection pool for processing
+    connection_pool: ConnectionPool
+
 }
 
 impl PlasmaStateKeeper {
 
-    // // TODO: remove this function when done with demo
-    // fn generate_demo_accounts(balance_tree: &mut AccountTree) -> HashMap<u32, PrivateKey<Bn256>> {
-
-    //     let number_of_accounts = 1000;
-    //     let mut keys_map = HashMap::<u32, PrivateKey<Bn256>>::new();
-            
-    //     let p_g = FixedGenerators::SpendingKeyGenerator;
-    //     let params = &AltJubjubBn256::new();
-    //     let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
-
-    //     let default_balance = BigDecimal::from(1000000);
-
-    //     for i in 0..number_of_accounts {
-    //         let leaf_number: u32 = i;
-
-    //         let sk = PrivateKey::<Bn256>(rng.gen());
-    //         let pk = PublicKey::from_private(&sk, p_g, params);
-    //         let (x, y) = pk.0.into_xy();
-
-    //         keys_map.insert(i, sk);
-
-    //         //let serialized_public_key = pack_edwards_point(pk.0).unwrap();
-
-    //         let leaf = Account {
-    //             balance:    default_balance.clone(),
-    //             nonce:      0,
-    //             public_key_x: x,
-    //             public_key_y: y,
-    //         };
-
-    //         balance_tree.insert(leaf_number, leaf.clone());
-    //     };
-
-    //     println!("Generated {} accounts with balances", number_of_accounts);
-    //     keys_map
-    // }
-
-    pub fn new() -> Self {
+    pub fn new(pool: ConnectionPool) -> Self {
 
         println!("constructing state keeper instance");
 
         // here we should insert default accounts into the tree
-        let storage = StorageConnection::new();
+        let connection = pool.pool.get().expect("state keeper must connect to db");
+        let storage = StorageProcessor::from_connection(connection);
+        
         let (last_block, accounts) = storage.load_committed_state().expect("db must be functional");
         let state = PlasmaState::new(accounts, last_block + 1);
 
         println!("Last committed block to before the start of state keeper = {}", last_block);
         // Keeper starts with the NEXT block
-        let keeper = PlasmaStateKeeper { state };
+        let keeper = PlasmaStateKeeper { state, connection_pool: pool };
 
         let root = keeper.state.root_hash();
         println!("created state keeper, root hash = {}", root);

@@ -20,7 +20,7 @@ use web3::types::{U256, H160, H256, U128, FilterBuilder, BlockNumber};
 use sapling_crypto::jubjub::{edwards, Unknown};
 use super::config;
 
-use super::storage::StorageConnection;
+use super::storage::{ConnectionPool, StorageProcessor};
 
 type ABI = (&'static [u8], &'static str);
 
@@ -56,6 +56,7 @@ pub struct EthWatch {
     last_exit_batch: U256,
     deposit_batch_size: U256,
     exit_batch_size: U256,
+    connection_pool: ConnectionPool
 }
 
 /// Watcher will accumulate requests for deposit and exits in internal memory 
@@ -65,7 +66,7 @@ pub struct EthWatch {
 /// Functionality to change deposit and exit fees will not be implemented for now
 impl EthWatch {
 
-    pub fn new(start_from_block: u64, lag: u64) -> Self {
+    pub fn new(start_from_block: u64, lag: u64, pool: ConnectionPool) -> Self {
         dotenv().ok();
 
         let mut start = start_from_block;
@@ -88,9 +89,11 @@ impl EthWatch {
             last_exit_batch: U256::from(0),
             deposit_batch_size: U256::from(config::DEPOSIT_BATCH_SIZE),
             exit_batch_size: U256::from(config::EXIT_BATCH_SIZE),
+            connection_pool: pool,
         };
 
-        let storage = StorageConnection::new();
+        let connection = this.connection_pool.pool.get().expect("committer must connect to db");
+        let storage = StorageProcessor::from_connection(connection);
         let last_committed_deposit = storage.load_last_committed_deposit_batch().expect("load_last_committed_deposit_batch: db must work");
         let last_committed_exit = storage.load_last_committed_exit_batch().expect("load_last_committed_exit_batch: db must work");
 
@@ -99,20 +102,6 @@ impl EthWatch {
 
         this.last_deposit_batch = U256::from(expecting_deposit_batch);
         this.last_exit_batch = U256::from(expecting_exit_batch);
-
-        // let (_eloop, transport) = web3::transports::Http::new(&this.web3_url).unwrap();
-        // let web3 = web3::Web3::new(transport);
-        // let contract = Contract::new(web3.eth(), this.contract_addr.clone(), this.contract.clone());
-
-        // let last_deposit_batch_result: Result<U256, _> = contract.query("lastCommittedDepositBatch", (), None, Options::default(), Some(BlockNumber::Latest)).wait();
-        // let last_exit_batch_result: Result<U256, _> = contract.query("lastCommittedExitBatch", (), None, Options::default(), Some(BlockNumber::Latest)).wait();
-
-        // if last_deposit_batch_result.is_err() || last_exit_batch_result.is_err() {
-        //     panic!("Can not get initial batch numbers");
-        // }
-
-        // this.last_deposit_batch = last_deposit_batch_result.unwrap();
-        // this.last_exit_batch = last_exit_batch_result.unwrap();
         
         println!("Monitoring contract {:x}", this.contract_addr);
         println!("Starting from deposit batch {}", this.last_deposit_batch);

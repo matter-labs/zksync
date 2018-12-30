@@ -3,7 +3,7 @@
 use std::sync::mpsc;
 use plasma::models::{TransferTx, PublicKey, Account};
 use super::models::StateProcessingRequest;
-use super::storage::{StorageConnection};
+use super::storage::{ConnectionPool, StorageProcessor};
 use super::mem_pool::{MempoolRequest};
 
 use actix_web::{
@@ -24,9 +24,6 @@ use futures::Future;
 
 use std::env;
 use dotenv::dotenv;
-
-extern crate r2d2;
-extern crate r2d2_postgres;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct TransactionRequest {
@@ -64,6 +61,7 @@ pub struct AppState {
     tx_to_mempool: mpsc::Sender<MempoolRequest>,
     tx_for_state: mpsc::Sender<StateProcessingRequest>,
     contract_address: String,
+    connection_pool: ConnectionPool
 }
 
 fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
@@ -106,7 +104,14 @@ use actix_web::Result as ActixResult;
 fn handle_get_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let tx_to_mempool = req.state().tx_to_mempool.clone();
     let tx_for_state = req.state().tx_for_state.clone();
-    let storage = StorageConnection::new();
+    let pool = req.state().connection_pool.clone();
+
+    let connection = pool.pool.get();
+    if connection.is_err() {
+        return Ok(HttpResponse::Ok().json(AccountError{error:"rate limit".to_string()}));
+    }
+
+    let storage = StorageProcessor::from_connection(connection.unwrap());
 
     // check that something like this exists in state keeper's memory at all
     let account_id_string = req.match_info().get("id");
@@ -152,14 +157,15 @@ fn handle_get_details(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> 
 }
 
 pub fn start_api_server(tx_to_mempool: mpsc::Sender<MempoolRequest>, 
-                      tx_for_state: mpsc::Sender<StateProcessingRequest>) {
+                      tx_for_state: mpsc::Sender<StateProcessingRequest>,
+                      connection_pool: ConnectionPool) {
     
     dotenv().ok();
 
     let address = env::var("BIND_TO").unwrap_or("127.0.0.1".to_string());
     let port = env::var("PORT").unwrap_or("8080".to_string());
-
     let contract_address = env::var("CONTRACT_ADDR").unwrap();
+
 
     std::thread::Builder::new().name("api_server".to_string()).spawn(move || {
         ::std::env::set_var("RUST_LOG", "actix_web=info");
@@ -172,6 +178,7 @@ pub fn start_api_server(tx_to_mempool: mpsc::Sender<MempoolRequest>,
                 tx_to_mempool: tx_to_mempool.clone(),
                 tx_for_state: tx_for_state.clone(),
                 contract_address: contract_address.clone(),
+                connection_pool: connection_pool.clone(),
             }.clone()) // <- create app with shared state
                 // enable logger
                 .middleware(middleware::Logger::default())

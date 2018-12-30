@@ -24,7 +24,7 @@ use plasma::models::circuit::{Account, AccountTree};
 use super::config::{TRANSFER_BATCH_SIZE, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE};
 
 use super::models::{EncodedProof, Operation, Action, EthBlockData};
-use super::storage::StorageConnection;
+use super::storage::{ConnectionPool, StorageProcessor};
 
 use plasma::circuit::utils::be_bit_vector_into_bytes;
 use plasma::circuit::transfer::transaction::{Transaction};
@@ -124,9 +124,16 @@ fn read_parameters(file_name: &str) -> Result<BabyParameters, BabyProverErr> {
 
 impl BabyProver {
 
-    pub fn create() -> Result<BabyProver, BabyProverErr> {
+    pub fn create(pool: ConnectionPool) -> Result<BabyProver, BabyProverErr> {
 
-        let storage = StorageConnection::new();
+        let connection = pool.pool.get();
+        if connection.is_err() {
+            println!("No connection to database");
+            return Err(BabyProverErr::Unknown);
+        }
+
+        let storage = StorageProcessor::from_connection(connection.unwrap());
+
         let (last_block, accounts) = storage.load_verified_state().expect("db must be functional");
         let initial_state = PlasmaState::new(accounts, last_block + 1);
 

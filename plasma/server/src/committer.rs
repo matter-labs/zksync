@@ -1,7 +1,7 @@
 use std::sync::mpsc::{channel, Sender, Receiver};
 use plasma::eth_client::{ETHClient, TxMeta, TEST_PLASMA_ALWAYS_VERIFY};
 use plasma::models::{Block, AccountMap, params};
-use super::storage::StorageConnection;
+use super::storage::{ConnectionPool, StorageProcessor};
 use super::models::*;
 use web3::types::{U256, H256};
 use super::config;
@@ -46,11 +46,13 @@ struct EthOperation{
 
 }
 
-pub fn start_eth_sender() -> Sender<(Operation, TxMeta)> {
+pub fn start_eth_sender(pool: ConnectionPool) -> Sender<(Operation, TxMeta)> {
     let (tx_for_eth, rx_for_eth) = channel::<(Operation, TxMeta)>();
     let mut eth_client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
     let current_nonce = eth_client.get_nonce(&eth_client.default_account()).unwrap();
-    let storage = StorageConnection::new();
+
+    let connection = pool.pool.get().expect("committer must connect to db");
+    let storage = StorageProcessor::from_connection(connection);
 
     // TODO: this is for test only, introduce a production switch (as we can not rely on debug/release mode because performance is required for circuits)
     let addr = std::env::var("SENDER_ACCOUNT").unwrap_or("e5d0efb4756bd5cdd4b5140d3d2e08ca7e6cf644".to_string());
@@ -138,29 +140,37 @@ pub fn start_eth_sender() -> Sender<(Operation, TxMeta)> {
 
         }
     });
+
     tx_for_eth
 }
 
 pub fn run_committer(
     rx_for_ops: Receiver<Operation>, 
     tx_for_eth: Sender<(Operation, TxMeta)>,
-    tx_for_proof_requests: Sender<(u32, Block, EthBlockData, AccountMap)>
+    tx_for_proof_requests: Sender<(u32, Block, EthBlockData, AccountMap)>,
+    pool: ConnectionPool,
 ) {
 
-    let storage = StorageConnection::new();
+    // scope is to avoid manual dropping of established storage
+    {
+        let connection = pool.pool.get().expect("committer must connect to db");
+        let storage = StorageProcessor::from_connection(connection);
 
-    // request unverified proofs
-    let ops = storage.load_pendings_proof_reqs().expect("db must be functional");
-    for pending_op in ops {
-        let op: Operation = serde_json::from_value(pending_op.data).unwrap();
-        if let Action::Commit{block, new_root: _} = op.action {
-            tx_for_proof_requests.send((op.block_number, block.unwrap(), op.block_data.clone(), op.accounts_updated.clone())).expect("must send a proof request for pending operations");
+        // request unverified proofs
+        let ops = storage.load_pendings_proof_reqs().expect("committer must load pending ops from db");
+        for pending_op in ops {
+            let op: Operation = serde_json::from_value(pending_op.data).unwrap();
+            if let Action::Commit{block, new_root: _} = op.action {
+                tx_for_proof_requests.send((op.block_number, block.unwrap(), op.block_data.clone(), op.accounts_updated.clone())).expect("must send a proof request for pending operations");
+            }
         }
     }
 
     for mut op in rx_for_ops {
         // persist in storage first
-        let committed_op = storage.commit_op(&op).expect("db must be functional");
+        let connection = pool.pool.get().expect("committer must connect to db");
+        let storage = StorageProcessor::from_connection(connection);
+        let committed_op = storage.commit_op(&op).expect("committer must commit the op into db");
 
         if let Action::Commit{ref mut block, new_root: _} = op.action {
             tx_for_proof_requests.send((op.block_number, block.take().unwrap(), op.block_data.clone(), op.accounts_updated.clone()))
