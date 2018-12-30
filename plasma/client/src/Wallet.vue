@@ -103,7 +103,7 @@
                                 <b-col>Ξ{{store.account.plasma.committed.balance || 0}}</b-col>
                             </b-row>
                             <b-row class="mt-2">                    
-                                <b-col cols="8">Next nonce:</b-col> <b-col>{{store.account.plasma.pending.nonce || 0}}</b-col>
+                                <b-col cols="8">Next nonce:</b-col> <b-col>{{store.account.plasma.pending_nonce || store.account.plasma.pending.nonce || 0}}</b-col>
                             </b-row>
                         </div>
                     </b-card>
@@ -450,6 +450,9 @@ export default {
                     if(store.account.plasma.pending.nonce) {
                         if (store.account.plasma.pending.nonce > Number(this.nonce)) {
                             this.nonce = store.account.plasma.pending.nonce
+                        }
+                        if (store.account.plasma.pending_nonce > Number(this.nonce)) {
+                            this.nonce = store.account.plasma.pending_nonce
                         }
                     }
                 }
