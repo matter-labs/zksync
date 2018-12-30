@@ -99,16 +99,11 @@
                                 <b-col>Ξ{{store.account.plasma.verified.balance || 0}}</b-col>
                             </b-row>
                             <b-row class="mt-2" style="color: grey" v-if="store.account.plasma.verified.balance != store.account.plasma.committed.balance">
-                                <b-col cols="8">Committed balance:</b-col> 
+                                <b-col cols="8">Pending balance:</b-col> 
                                 <b-col>Ξ{{store.account.plasma.committed.balance || 0}}</b-col>
                             </b-row>
-                            <b-row class="mt-2" v-if="store.account.plasma.committed.balance !== store.account.plasma.committed.balance" style="color: grey">
-                            <!-- <b-row class="mt-2"> -->
-                                <b-col cols="8">Next nonce:</b-col> 
-                                <b-col>{{store.account.plasma.pending.nonce || 0}}</b-col>
-                            </b-row>
                             <b-row class="mt-2">                    
-                                <b-col cols="8">Mempool nonce:</b-col> <b-col>{{store.account.plasma.pending.nonce || 0}}</b-col>
+                                <b-col cols="8">Next nonce:</b-col> <b-col>{{store.account.plasma.pending.nonce || 0}}</b-col>
                             </b-row>
                         </div>
                     </b-card>
