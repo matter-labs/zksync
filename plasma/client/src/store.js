@@ -5,7 +5,7 @@ const store = {
         address:    null,
         balance:    null,
         onchain:    {
-            isClosing: false,
+            //isClosing: false,
             balance:    null,
             completeWithdrawArgs: [],
         },

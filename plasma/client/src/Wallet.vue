@@ -88,8 +88,8 @@
                         <div v-if="store.account.plasma.id === 0">
                             <p>No account yet.</p>
                         </div>
-                        <div v-if="store.account.plasma.closing">
-                            <p>Closing account: please complete pending withdrawal.</p>
+                        <div v-if="store.account.plasma.id > 0 && store.account.plasma.closing">
+                            <p>Closing account #{{store.account.plasma.id}}: please complete pending withdrawal.</p>
                         </div>
                         <div v-if="store.account.plasma.id > 0 && !store.account.plasma.closing">
                             <label for="acc_id">Account ID:</label>
@@ -367,6 +367,55 @@ export default {
             }
             return this.parseStateResult(result.data)
         },
+        async loadEvents(address, closing) {
+            let contractForLogs = new ethers.Contract(window.contractAddress, ABI, window.ethersProvider)
+            let partialsFilter = contractForLogs.filters.LogExit(address, null)
+
+            let fullFilter = {
+                fromBlock: 1,
+                toBlock: 'latest',
+                address: partialsFilter.address,
+                topics: partialsFilter.topics
+            }
+
+            let events = await ethersProvider.getLogs(fullFilter)
+
+            if(closing) {
+                let completeExitsFilter = contractForLogs.filters.LogCompleteExit(address, null)
+
+                fullFilter = {
+                    fromBlock: 1,
+                    toBlock: 'latest',
+                    address: completeExitsFilter.address,
+                    topics: completeExitsFilter.topics
+                }
+
+                let completeExitEvents = await ethersProvider.getLogs(fullFilter)
+
+                for (let i = 0; i < completeExitEvents; i++) {
+                    events.push(completeExitEvents[i]);
+                }
+            }
+
+            const multiplier = new BN('1000000000000')
+            let finalBalance = new BN(0)
+            const nonEmptyBlocks = [];
+
+            for (let i = 0; i < events.length; i++) {
+                let ev = events[i];
+                let blockNumber = ethers.utils.bigNumberify(ev.topics[2]);
+                let amount = (await contract.exitAmounts(address, blockNumber))[0];
+                if (!amount.eq(new BN(0))) {
+                    let convertedBlockNumber = new BN(blockNumber.toString(10))
+                    nonEmptyBlocks.push(convertedBlockNumber);
+                    finalBalance = finalBalance.add(amount)
+                }
+            }
+
+            let pendingBalance = Eth.fromWei(finalBalance.mul(multiplier), 'ether')
+
+            return {blocks: nonEmptyBlocks, pendingBalance}
+        },
         async updateAccountInfo() {
             let newData = {}
             let timer = this.updateTimer
@@ -381,53 +430,11 @@ export default {
                 if( id !== store.account.plasma.id ) store.account.plasma.id = null // display loading.gif
 
                 let accountState = await contract.accounts(id);
-                let isClosing = accountState.state.toNumber() > 1;
-                onchain.isClosing = true;
+                //plasmaData.closing = accountState.state.toNumber() > 1;
 
-                let contractForLogs = new ethers.Contract(window.contractAddress, ABI, window.ethersProvider)
-                let partialsFilter = contractForLogs.filters.LogExit(newData.address, null)
-
-                let fullFilter = {
-                    fromBlock: 1,
-                    toBlock: 'latest',
-                    address: partialsFilter.address,
-                    topics: partialsFilter.topics
-                }
-
-                let events = await ethersProvider.getLogs(fullFilter)
-
-                let completeExitsFilter = contractForLogs.filters.LogCompleteExit(newData.address, null)
-
-                fullFilter = {
-                    fromBlock: 1,
-                    toBlock: 'latest',
-                    address: completeExitsFilter.address,
-                    topics: completeExitsFilter.topics
-                }
-
-                let completeExitEvents = await ethersProvider.getLogs(fullFilter)
-
-                for (let i = 0; i < completeExitEvents; i++) {
-                    events.push(completeExitEvents[i]);
-                }
-
-                const multiplier = new BN('1000000000000')
-                let finalBalance = new BN(0)
-                const nonEmptyBlocks = [];
-
-                for (let i = 0; i < events.length; i++) {
-                    let ev = events[i];
-                    let blockNumber = ethers.utils.bigNumberify(ev.topics[2]);
-                    let amount = (await contract.exitAmounts(newData.address, blockNumber))[0];
-                    if (!amount.eq(new BN(0))) {
-                        let convertedBlockNumber = new BN(blockNumber.toString(10))
-                        nonEmptyBlocks.push(convertedBlockNumber);
-                        finalBalance = finalBalance.add(amount)
-                    }
-                }
-
-                onchain.balance = Eth.fromWei(finalBalance.mul(multiplier), 'ether')
-                onchain.completeWithdrawArgs = nonEmptyBlocks
+                let{blocks, pendingBalance} = await this.loadEvents(newData.address, plasmaData.closing)
+                onchain.completeWithdrawArgs = blocks
+                onchain.balance = pendingBalance
 
                 newData.plasmaId = id
                 if(id > 0) {
