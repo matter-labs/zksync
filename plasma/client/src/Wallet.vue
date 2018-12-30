@@ -103,7 +103,11 @@
                                 <b-col>Ξ{{store.account.plasma.committed.balance || 0}}</b-col>
                             </b-row>
                             <b-row class="mt-2">                    
-                                <b-col cols="8">Next nonce:</b-col> <b-col>{{store.account.plasma.pending_nonce || store.account.plasma.pending.nonce || 0}}</b-col>
+                                <b-col cols="8">Latest nonce:</b-col> 
+                                <b-col>Ξ{{store.account.plasma.committed.nonce || 0}}</b-col>
+                            </b-row>
+                            <b-row class="mt-2" style="color: grey" v-if="store.account.plasma.pending.nonce !== store.account.plasma.committed.nonce">
+                                <b-col cols="8">Next nonce:</b-col> <b-col>{{store.account.plasma.pending.nonce || store.account.plasma.committed.nonce || 0}}</b-col>
                             </b-row>
                         </div>
                     </b-card>
@@ -228,7 +232,7 @@ export default {
             if(!ethUtil.isHexString(this.transferTo)) return "`To` is not a valid ethereum address: " + this.transferTo
             if(!(this.transferAmount > 0)) return "positive amount required, e.g. 100.55"
             if(Number(this.transferAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Plasma balance"
-            if(Number(this.nonce) < Number(store.account.plasma.pending.nonce)) return "nonce must be greater then confirmed in Plasma: got " 
+            if(Number(this.nonce) < Number(store.account.plasma.committed.nonce)) return "nonce must be greater then confirmed in Plasma: got " 
                 + this.nonce + ", expected >= " + store.account.plasma.pending.nonce
         }
     },
@@ -448,12 +452,15 @@ export default {
                     store.account.plasma.pending = plasmaData.pending || {}
 
                     if(store.account.plasma.pending.nonce) {
-                        if (store.account.plasma.pending.nonce > Number(this.nonce)) {
+                        if (this.nonce === null) {
                             this.nonce = store.account.plasma.pending.nonce
                         }
-                        if (store.account.plasma.pending_nonce > Number(this.nonce)) {
-                            this.nonce = store.account.plasma.pending_nonce
-                        }
+                        // if (store.account.plasma.pending.nonce > Number(this.nonce)) {
+                        //     this.nonce = store.account.plasma.pending.nonce
+                        // }
+                        // if (store.account.plasma.pending_nonce > Number(this.nonce)) {
+                        //     this.nonce = store.account.plasma.pending_nonce
+                        // }
                     }
                 }
                 this.updateTimer = setTimeout(() => this.updateAccountInfo(), 1000)
