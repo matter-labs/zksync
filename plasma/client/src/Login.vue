@@ -29,26 +29,23 @@ export default {
     methods: {
         async login() {
             try {
-                console.log('login')
                 let account = ethereum.selectedAddress
                 if (!account) {
-                    console.log('enable')
                     await ethereum.enable()
                     account = ethereum.selectedAddress
                 }
-                console.log('with', account)
+                console.log('Logging in with', account)
                 let sig = await eth.personal_sign(ethUtil.fromUtf8(new Buffer('Login to Plasma Wallet')), account)
-                console.log('sig', sig)
                 store.account.address = account
 
                 let hash = keccak256(sig)
-                console.log('hash', hash)
                 store.account.plasma.key = newKey(sig)
                 console.log(store.account.plasma.key)
 
                 this.$parent.$router.push('/wallet')
             } catch (e) {
-                console.log('login failed: ', e)
+                // TODO: replace with alert
+                console.log('Login failed: ', e)
             }
         }
     },
