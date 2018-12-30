@@ -5,7 +5,9 @@ import "bootstrap-vue/dist/bootstrap-vue.css"
 
 import store from './store'
 import Eth from 'ethjs'
+import {ethers} from 'ethers'
 
+window.ethers = ethers;
 window.Eth = Eth
 
 import Router from 'vue-router'
@@ -36,6 +38,7 @@ window.app = new Vue({
         // read store.account from local storage?
         if (typeof window.ethereum !== 'undefined') {
             window.eth = new Eth(web3.currentProvider)
+            window.ethersProvider = new ethers.providers.Web3Provider(web3.currentProvider)
         }
         if (!store.account.address) {
             this.$router.push('/login')

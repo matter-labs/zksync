@@ -5,6 +5,7 @@ const store = {
         address:    null,
         balance:    null,
         onchain:    {
+            isClosing: false,
             balance:    null,
         },
         plasma: {
