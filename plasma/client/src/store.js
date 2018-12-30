@@ -9,6 +9,7 @@ const store = {
 
             key:        null,
 
+            onchain:    null,
             pending_nonce: null,
             pending: {
                 balance: null,

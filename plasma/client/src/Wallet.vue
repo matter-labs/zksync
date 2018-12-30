@@ -27,7 +27,7 @@
                     <label for="transferToInput">To:</label>
                     <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input>
                     <label for="transferAmountInput" class="mt-4">Amount</label>
-                            (max Ξ<a href="#" @click="transferAmount=store.account.plasma.pending.balance">{{store.account.plasma.pending.balance || 0}}</a>):
+                            (max Ξ<a href="#" @click="transferAmount=store.account.plasma.committed.balance">{{store.account.plasma.committed.balance || 0}}</a>):
                     <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
                     <label for="transferNonceInput" class="mt-4">Nonce:</label>
                     <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
@@ -50,7 +50,13 @@
                                 target="blanc">block explorer</a>):
                         <b-form-input id="addr" v-model="store.account.address" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                         <b-row class="mt-2">
-                            <b-col cols="4">Balance:</b-col> <b-col>Ξ{{store.account.balance}}</b-col>
+                            <b-col cols="6">Balance:</b-col> <b-col>Ξ{{store.account.balance}}</b-col>
+                        </b-row>
+                        <b-row class="mt-2" style="color: grey">
+                           <b-col cols="6">From Plasma:</b-col> <b-col>Ξ{{store.account.onchain.balance}}</b-col>
+                        </b-row>
+                        <b-row class="mt-2 mx-auto">
+                            <b-btn variant="primary" @click="completeWithdraw">Complete withdrawal</b-btn>
                         </b-row>
                     </b-card>
                     <b-row class="mb-0 mt-0">
@@ -258,6 +264,10 @@ export default {
             let hash = await contract.exit({ from })
             this.alert('Full exit initiated, tx: ' + hash, 'success')
         },
+        async completeWithdraw() {
+            // TODO AV: complete any type of withdrawal
+            // await contract. ...(store.account.onchain.completeWithdrawArgs)
+        },
         alert(msg, alertType) {
             this.result = msg
             this.countdown = 30
@@ -321,7 +331,7 @@ export default {
             data.committed.balance = Eth.fromWei(new BN(data.committed.balance).mul(new BN('1000000000000')), 'ether')
             data.pending.balance = Eth.fromWei(new BN(data.pending.balance).mul(new BN('1000000000000')), 'ether')
             if (Number(data.pending_nonce) > Number(data.pending.nonce)) {
-                // QUESTION: AV, why pendig_nonce at all?
+                // TODO: remove when server updated
                 data.pending.nonce = data.pending_nonce
             }
             return data
@@ -347,6 +357,7 @@ export default {
             let newData = {}
             let timer = this.updateTimer
             let plasmaData = {}
+            let onchain = {}
             try {
                 newData.address = ethereum.selectedAddress
                 let balance = (await eth.getBalance(newData.address)).toString()
@@ -354,6 +365,12 @@ export default {
                 let id = (await contract.ethereumAddressToAccountID(newData.address))[0].toNumber()
 
                 if( id !== store.account.plasma.id ) store.account.plasma.id = null // display loading.gif
+
+                onchain.account = await contract.accounts(id)
+
+                // TODO AV: read events and fill values below:
+                onchain.balance = 5 // available to complete withdraw
+                onchain.completeWithdrawArgs = {} // arguments to use in this.completeWithdraw()
 
                 newData.plasmaId = id
                 if(id > 0) {
@@ -365,6 +382,8 @@ export default {
             if(timer === this.updateTimer) { // if this handler is still valid
                 store.account.address = newData.address
                 store.account.balance = newData.balance
+
+                store.account.onchain = onchain
 
                 store.account.plasma.id = newData.plasmaId
                 store.account.plasma.closing = plasmaData.closing
@@ -388,3 +407,9 @@ export default {
     },
 }
 </script>
+
+<style>
+.pending {
+    color: green!important;
+}
+</style>
