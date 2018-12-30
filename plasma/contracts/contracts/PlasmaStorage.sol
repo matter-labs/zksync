@@ -47,6 +47,8 @@ contract PlasmaStorage {
 
     struct Account {
         uint8 state;
+        uint32 exitListHead;
+        uint32 exitListTail;
         uint32 exitBatchNumber;
         address owner;
         uint256 publicKey;
@@ -143,8 +145,15 @@ contract PlasmaStorage {
     event LogExit(address indexed ethereumAddress, uint32 indexed blockNumber);
     event LogCompleteExit(address indexed ethereumAddress, uint32 indexed blockNumber, uint24 accountID);
 
+    struct ExitLeaf {
+        uint32 nextID;
+        uint128 amount;
+    }
+
+    mapping (address => mapping (uint32 => ExitLeaf)) public exitLeafs;
+
     // mapping ethereum address => block number => balance
-    mapping (address => mapping (uint32 => uint128)) public exitAmounts;
+    // mapping (address => mapping (uint32 => uint128)) public exitAmounts;
     // Delegates chain
     address public transactor;
     address public exitor;

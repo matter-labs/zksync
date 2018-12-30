@@ -18,22 +18,22 @@ pragma solidity ^0.4.24;
 
 
 // TODO: should consider Montgommery ladder here
-contract TwistedEdwards {
-    EdwardsPoint public generator;
+library TwistedEdwards {
+    // EdwardsPoint public generator;
 
     struct EdwardsPoint {
         uint256 x;
         uint256 y;
     }
 
-    constructor (
-        uint256[2] memory _generator
-    ) public {
-        require(_generator[0] < getPrimeFieldSize(), "Generator X is not in the field");
-        require(_generator[1] < getPrimeFieldSize(), "Generator Y is not in the field");
-        // TODO: Check generator order
-        generator = EdwardsPoint (_generator[0], _generator[1]);
-    }
+    // constructor (
+    //     uint256[2] memory _generator
+    // ) public {
+    //     require(_generator[0] < getPrimeFieldSize(), "Generator X is not in the field");
+    //     require(_generator[1] < getPrimeFieldSize(), "Generator Y is not in the field");
+    //     // TODO: Check generator order
+    //     generator = EdwardsPoint (_generator[0], _generator[1]);
+    // }
 
     function getA()
     internal
@@ -241,7 +241,7 @@ contract TwistedEdwards {
     function isCorrectGroup(
         uint256[2] memory point
     )
-    public
+    internal
     pure
     returns (bool)
     {
@@ -253,7 +253,7 @@ contract TwistedEdwards {
         uint256 d,
         uint256[2] memory point
     )
-    public
+    internal
     pure
     returns (uint256[2] memory result)
     {
@@ -266,7 +266,7 @@ contract TwistedEdwards {
     function checkOnCurve(
         uint256[2] memory point
     )
-    public
+    internal
     pure
     returns (bool) {
         EdwardsPoint memory P = EdwardsPoint(point[0], point[1]);

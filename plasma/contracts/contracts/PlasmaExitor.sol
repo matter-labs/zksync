@@ -211,60 +211,146 @@ contract PlasmaExitor is Plasma {
             require(account.state == uint8(AccountState.PENDING_EXIT), "there was no such exit request");
             require(account.exitBatchNumber == uint32(batchNumber), "account was registered for exit in another batch");
 
-            accountOwner = accounts[accountIDs[i]].owner;
+            // accountOwner = accounts[accountIDs[i]].owner;
             scaledAmount = uint128(chunk << 24 >> 128);
 
-            exitAmounts[accountOwner][blockNumber] = scaledAmount;
-            account.state = uint8(AccountState.UNCONFIRMED_EXIT);
-            emit LogCompleteExit(accountOwner, blockNumber, accountIDs[i]);
+            // ExitLeaf storage previousExitLeaf = exitLeafs[account.owner][account.exitListTail];
 
+            
+            ExitLeaf memory newLeaf;
+            if (account.exitListTail == 0) {
+                // create a fresh list that is both head and tail
+                newLeaf = ExitLeaf(blockNumber, scaledAmount);
+                exitLeafs[account.owner][blockNumber] = newLeaf;
+                account.exitListTail = blockNumber;
+            } else {
+                // previous tail is somewhere in the past
+                ExitLeaf storage previousExitLeaf = exitLeafs[account.owner][account.exitListTail];
+
+                newLeaf = ExitLeaf(blockNumber, scaledAmount);
+                previousExitLeaf.nextID = blockNumber;
+
+                exitLeafs[account.owner][blockNumber] = newLeaf;
+                account.exitListTail = blockNumber;
+            }
+
+            // if there was no head - point to here
+            if (account.exitListHead == 0) {
+                account.exitListHead = blockNumber;
+            }
+
+            account.exitListTail = blockNumber;
+
+            // exitAmounts[accountOwner][blockNumber] = scaledAmount;
+            account.state = uint8(AccountState.UNCONFIRMED_EXIT);
+
+            emit LogCompleteExit(accountOwner, blockNumber, accountIDs[i]);
         }
     }
 
+    // function withdrawUserBalance(
+    //     uint32[] blockNumbers
+    // )
+    // public
+    // {
+    //     require(blockNumbers.length > 0, "requires non-empty set");
+    //     uint256 totalAmountInWei;
+    //     uint32 blockNumber;
+    //     for (uint256 i = 0; i < blockNumbers.length; i++) {
+    //         blockNumber = blockNumbers[i]; 
+
+    //         require(blockNumber <= lastVerifiedBlockNumber, "can only process exits from verified blocks");
+    //         uint24 accountID = ethereumAddressToAccountID[msg.sender];
+    //         uint128 balance;
+    //         uint256 amountInWei;
+    //         if (accountID != 0) {
+    //             // user either didn't fully exit or didn't take full exit balance yet
+    //             Account storage account = accounts[accountID];
+    //             if (account.state == uint8(AccountState.UNCONFIRMED_EXIT)) {
+    //                 uint256 batchNumber = account.exitBatchNumber;
+    //                 ExitBatch storage batch = exitBatches[batchNumber];
+    //                 if (blockNumber == batch.blockNumber) {
+    //                     balance = exitAmounts[msg.sender][blockNumber];
+
+    //                     delete accounts[accountID];
+    //                     delete ethereumAddressToAccountID[msg.sender];
+    //                     delete exitAmounts[msg.sender][blockNumber];
+
+    //                     amountInWei = scaleFromPlasmaUnitsIntoWei(balance);
+    //                     totalAmountInWei += amountInWei;
+    //                     continue;
+    //                 }
+    //             }
+    //         }
+    //         // user account information is already deleted or it's not the block number where a full exit has happened
+    //         // we require a non-zero balance in this case cause chain cleanup is not required
+    //         balance = exitAmounts[msg.sender][blockNumber];
+
+    //         require(balance != 0, "nothing to exit");
+    //         delete exitAmounts[msg.sender][blockNumber];
+
+    //         amountInWei = scaleFromPlasmaUnitsIntoWei(balance);
+    //         totalAmountInWei += amountInWei;
+    //     }
+    //     msg.sender.transfer(totalAmountInWei);
+    // }
+
     function withdrawUserBalance(
-        uint32[] blockNumbers
+        uint256 iterationsLimit
     )
     public
     {
-        require(blockNumbers.length > 0, "requires non-empty set");
+        require(iterationsLimit > 0, "must iterate");
         uint256 totalAmountInWei;
-        uint32 blockNumber;
-        for (uint256 i = 0; i < blockNumbers.length; i++) {
-            blockNumber = blockNumbers[i]; 
+        uint256 amountInWei;
+        uint24 accountID = ethereumAddressToAccountID[msg.sender];
+        require(accountID != 0, "this should not happen as exiting happens one by one until the complete one");
+        Account storage account = accounts[accountID];
 
-            require(blockNumber <= lastVerifiedBlockNumber, "can only process exits from verified blocks");
-            uint24 accountID = ethereumAddressToAccountID[msg.sender];
-            uint128 balance;
-            uint256 amountInWei;
-            if (accountID != 0) {
-                // user either didn't fully exit or didn't take full exit balance yet
-                Account storage account = accounts[accountID];
-                if (account.state == uint8(AccountState.UNCONFIRMED_EXIT)) {
-                    uint256 batchNumber = account.exitBatchNumber;
-                    ExitBatch storage batch = exitBatches[batchNumber];
-                    if (blockNumber == batch.blockNumber) {
-                        balance = exitAmounts[msg.sender][blockNumber];
+        uint32 currentHead = account.exitListHead;
+        uint32 nextHead = currentHead;
 
-                        delete accounts[accountID];
-                        delete ethereumAddressToAccountID[msg.sender];
-                        delete exitAmounts[msg.sender][blockNumber];
-
-                        amountInWei = scaleFromPlasmaUnitsIntoWei(balance);
-                        totalAmountInWei += amountInWei;
-                        continue;
-                    }
+        for (uint256 i = 0; i < iterationsLimit; i++) {
+            if (currentHead > lastVerifiedBlockNumber) {
+                if (i == 0) {
+                    revert("nothing to process");
+                } else {
+                    return;
                 }
             }
-            // user account information is already deleted or it's not the block number where a full exit has happened
-            // we require a non-zero balance in this case cause chain cleanup is not required
-            balance = exitAmounts[msg.sender][blockNumber];
+            ExitLeaf storage leaf = exitLeafs[msg.sender][currentHead];
 
-            require(balance != 0, "nothing to exit");
-            delete exitAmounts[msg.sender][blockNumber];
-
-            amountInWei = scaleFromPlasmaUnitsIntoWei(balance);
+            amountInWei = scaleFromPlasmaUnitsIntoWei(leaf.amount);
             totalAmountInWei += amountInWei;
+
+            // no matter if the next leafID is empty or not we can assign it
+
+            nextHead = leaf.nextID;
+            delete exitLeafs[msg.sender][currentHead];
+
+            if (nextHead == 0 && account.state == uint8(AccountState.UNCONFIRMED_EXIT)) {
+                // there is no next element AND account is exiting, so it must be the complete exit leaf
+                uint256 batchNumber = account.exitBatchNumber;
+                ExitBatch storage batch = exitBatches[batchNumber];
+                require(currentHead == batch.blockNumber, "last item in the list should match the complete exit block");
+                delete accounts[accountID];
+                delete ethereumAddressToAccountID[msg.sender];
+            }
+
+            if (nextHead == 0) {
+                // this is an end of the list
+                break;
+            } else {
+                currentHead = nextHead;
+            }
+
         }
+
+        account.exitListHead = nextHead;
+        if (nextHead == 0) {
+            account.exitListTail = 0;
+        }
+
         msg.sender.transfer(totalAmountInWei);
     }
 

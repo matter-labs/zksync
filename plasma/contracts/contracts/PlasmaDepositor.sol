@@ -1,9 +1,10 @@
 pragma solidity ^0.4.24;
 
 import {Plasma} from "./Plasma.sol";
+import {TwistedEdwards} from "./TwistedEdwards.sol";
 
 contract PlasmaDepositor is Plasma {
-
+    
     function deposit(uint256[2] memory publicKey, uint128 maxFee) 
     public 
     payable 
@@ -17,6 +18,8 @@ contract PlasmaDepositor is Plasma {
             ethereumAddressToAccountID[msg.sender] = nextAccountToRegister;
             Account memory freshAccount = Account(
                 uint8(AccountState.REGISTERED),
+                0,
+                0,
                 0,
                 msg.sender,
                 packedKey
@@ -301,6 +304,7 @@ contract PlasmaDepositor is Plasma {
     public
     pure
     returns(uint256 packed) {
+        require(TwistedEdwards.checkOnCurve(publicKey), "public key must be on the curve");
         // group check + packing
         packed = publicKey[1] + ((publicKey[0] & 1) << 255);
         return packed;

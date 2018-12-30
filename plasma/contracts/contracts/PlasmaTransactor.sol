@@ -87,7 +87,6 @@ contract PlasmaTransactor is Plasma {
         uint24 from;
         uint128 scaledAmount;
         uint16 floatValue;
-        address userAddress;
         // there is no check for a length of the public data because it's not provable if broken
         // unless sha256 collision is found
         for (uint256 i = 0; i < txDataPacked.length / 9; i++) { 
@@ -102,14 +101,40 @@ contract PlasmaTransactor is Plasma {
                     continue;
                 }
                 floatValue = uint16((chunk << 48) >> 240);
-                userAddress = accounts[from].owner;
-                if (userAddress == address(0)) {
+                Account storage account = accounts[from];
+                if (account.owner == address(0)) {
                     continue;
                 }
 
                 scaledAmount = parseFloat(floatValue);
-                exitAmounts[userAddress][blockNumber] += scaledAmount;
-                emit LogExit(userAddress, blockNumber);
+
+                ExitLeaf memory newLeaf;
+                if (account.exitListTail == 0) {
+                    // create a fresh list that is both head and tail
+                    newLeaf = ExitLeaf(blockNumber, scaledAmount);
+                    exitLeafs[account.owner][blockNumber] = newLeaf;
+                    account.exitListTail = blockNumber;
+                } else if (account.exitListTail == blockNumber) {
+                    // to exits in the same block, happens
+                    ExitLeaf storage thisExitLeaf = exitLeafs[account.owner][account.exitListTail];
+                    thisExitLeaf.amount += scaledAmount;
+                } else {
+                    // previous tail is somewhere in the past
+                    ExitLeaf storage previousExitLeaf = exitLeafs[account.owner][account.exitListTail];
+                    newLeaf = ExitLeaf(blockNumber, scaledAmount);
+                    previousExitLeaf.nextID = blockNumber;
+
+                    exitLeafs[account.owner][blockNumber] = newLeaf;
+                    account.exitListTail = blockNumber;
+                }
+
+                // if there was no head - point to here
+                if (account.exitListHead == 0) {
+                    account.exitListHead = blockNumber;
+                }
+
+                // exitAmounts[userAddress][blockNumber] += scaledAmount;
+                emit LogExit(account.owner, blockNumber);
             }
         }
     }
