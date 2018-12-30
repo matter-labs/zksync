@@ -31,8 +31,9 @@
                     <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
                     <label for="transferNonceInput" class="mt-4">Nonce:</label>
                     <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
-                    <div id="transferBtn" class="float-right mt-4">
-                        <b-btn variant="outline-primary" @click="transfer" :disabled="!!transferProblem">Submit transaction</b-btn>
+                    <div id="transferBtn" class="float-right">
+                        <img v-if="transferPending" style="margin-right: 1em" src="./assets/loading.gif" width="100em">
+                        <b-btn v-else class="mt-4" variant="outline-primary" @click="transfer" :disabled="!!transferProblem">Submit transaction</b-btn>
                     </div>
                     <b-tooltip target="transferBtn" :disabled="!transferProblem" triggers="hover">
                         Transfer not possible: {{ transferProblem }}
@@ -169,16 +170,17 @@ const baseUrl = 'https://api.plasma-winter.io'
 export default {
     name: 'wallet',
     data: () => ({ 
-        nonce:          null,
-        transferTo:     '',
-        transferAmount: '0.001',
-        depositAmount:  null,
-        withdrawAmount: null,
+        nonce:              null,
+        transferTo:         '',
+        transferAmount:     '0.001',
+        transferPending:    false,
+        depositAmount:      null,
+        withdrawAmount:     null,
 
-        updateTimer:    0,
-        countdown:      0,
-        alertType:      null,
-        result:         null
+        updateTimer:        0,
+        countdown:          0,
+        alertType:          null,
+        result:             null
     }),
     async created() {
         console.log('start')
@@ -262,7 +264,12 @@ export default {
                 this.alert('recepient not found')
                 return
             }
-            this.plasmaTransfer(to, this.transferAmount)
+            this.transferPending = true
+            try {
+                await this.plasmaTransfer(to, this.transferAmount)
+            } finally {
+                this.transferPending = false
+            }
         },
         async plasmaTransfer(to, amount) {
             console.log('initiating transfer to', to, amount)
