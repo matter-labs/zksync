@@ -64,6 +64,14 @@ impl PlasmaStateKeeper {
     {
         for req in rx_for_blocks {
             match req {
+                StateProcessingRequest::ApplyTransferBlock(mut block, sender) => {
+                    let block = Block::Transfer();
+                    let applied = self.apply_transfer_block(block);
+                    let let Ok((new_root, block_data, accounts_updated)) = applied {
+                        self.commit_block(new_root, block_data, accounts_updated);
+                    }
+                    sender.send(result).expect("must send back block processing result");
+                },
                 StateProcessingRequest::ApplyBlock(mut block, source) => {
                     let applied = match &mut block {
                         &mut Block::Transfer(ref mut block) => self.apply_transfer_block(block),
@@ -94,18 +102,19 @@ impl PlasmaStateKeeper {
                     }
                 },
                 StateProcessingRequest::GetPubKey(account_id, sender) => {
-                    sender.send(self.state.get_pub_key(account_id));
+                    let r = sender.send(self.state.get_pub_key(account_id));
                     // .expect("must send request for a public key");
+                    if let Err(err) = r {
+                        println!("GetPubKey: Error sending msg: {:?}", err);
+                    } 
                 },
                 StateProcessingRequest::GetLatestState(account_id, sender) => {
-                    let pk = self.state.get_pub_key(account_id);
-                    if pk.is_none() {
-                        sender.send(None);
-                        // .expect("queue to return state processing request must work");
-                    }
-                    let account = self.account(account_id);
-                    sender.send(Some(account));
-                        // .expect("queue to return state processing request must work");
+                    let account = self.state.balance_tree.items.get(&account_id);
+                    let r = sender.send(None);
+                    // .expect("queue to return state processing request must work");
+                    if let Err(err) = r {
+                        println!("GetLatestState: Error sending msg: {:?}", err);
+                    } 
                 }
             }
         }
