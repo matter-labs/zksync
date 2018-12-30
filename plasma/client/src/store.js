@@ -7,6 +7,7 @@ const store = {
         onchain:    {
             isClosing: false,
             balance:    null,
+            completeWithdrawArgs: [],
         },
         plasma: {
             id:         null,

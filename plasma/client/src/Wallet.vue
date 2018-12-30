@@ -158,7 +158,7 @@
 import store from './store'
 import {BN} from 'bn.js'
 import Eth from 'ethjs'
-import {ethers} from 'ethers'
+// import {ethers} from 'ethers'
 import axios from 'axios'
 import ethUtil from 'ethjs-util'
 import transactionLib from '../../contracts/lib/transaction.js'
@@ -191,7 +191,7 @@ export default {
         store.contractAddress = result.data.address
         window.contractAddress = result.data.address
 
-        let contract = new ethers.Contract(window.contractAddress, ABI, window.ethersProvider)
+        let contract = window.eth.contract(ABI).at(window.contractAddress);
 
         window.contract = contract
 
@@ -237,7 +237,7 @@ export default {
             this.$refs.depositModal.hide()
             let pub = store.account.plasma.key.publicKey
             let maxFee = new BN(0)
-            let value = utils.parseUnits(this.depositAmount, 'ether')
+            let value = Eth.toWei(this.depositAmount, 'ether')
             let from = store.account.address
             let hash = await contract.deposit([pub.x, pub.y], maxFee, { value, from })
             this.alert('Deposit initiated, tx: ' + hash, 'success')
@@ -258,8 +258,19 @@ export default {
             this.alert('Full exit initiated, tx: ' + hash, 'success')
         },
         async completeWithdraw() {
-            // TODO AV: complete any type of withdrawal
-            // await contract. ...(store.account.onchain.completeWithdrawArgs)
+            try {
+                // for now - one by one
+                let from = store.account.address
+                let allBlockNumbers = store.account.onchain.completeWithdrawArgs;
+                if (allBlockNumbers.length > 0) {
+                    await contract.withdrawUserBalance(allBlockNumbers[0], {from})
+                }
+                // in a future just do
+                // await contract.withdrawUserBalance(allBlockNumbers, {from})
+                this.updateAccountInfo();
+            } catch(err) {
+                this.alert('Status update failed: ' + err)
+            }
         },
         alert(msg, alertType) {
             this.result = msg
@@ -273,7 +284,7 @@ export default {
                     this.alert('to is not a hex string')
                     return  
                 }
-                const to = await contract.ethereumAddressToAccountID(this.transferTo)
+                const to = (await contract.ethereumAddressToAccountID(this.transferTo))[0].toNumber()
                 if(0 === to) {
                     this.alert('recepient not found')
                     return
@@ -288,7 +299,7 @@ export default {
 
             const from = store.account.plasma.id
 
-            amount = utils.parseUnits(amount, 'ether').div(new BN('1000000000000')).toNumber();
+            amount = Eth.toWei(amount, 'ether').div(new BN('1000000000000')).toNumber();
 
             const privateKey = store.account.plasma.key.privateKey
             const nonce = this.nonce //store.account.plasma.nonce;
@@ -325,9 +336,9 @@ export default {
             } else {
                 data.closing = false
             }
-            const multiplier = ethers.utils.bigNumberify('1000000000000')
-            data.verified.balance = ethers.utils.formatUnits(ethers.utils.bigNumberify(data.verified.balance).mul(multiplier), 'ether')
-            data.committed.balance = ethers.utils.formatUnits(ethers.utils.bigNumberify(data.committed.balance).mul(multiplier), 'ether')
+            const multiplier = new BN('1000000000000')
+            data.verified.balance = Eth.fromWei((new BN(data.verified.balance)).mul(multiplier), 'ether')
+            data.committed.balance = Eth.fromWei((new BN(data.committed.balance)).mul(multiplier), 'ether')
             // TODO: remove when server updated
             if (Number(data.pending_nonce) > Number(data.pending.nonce)) {
                 data.pending.nonce = data.pending_nonce
@@ -358,17 +369,18 @@ export default {
             let onchain = {}
             try {
                 newData.address = ethereum.selectedAddress
-                let balance = (await ethersProvider.getBalance(newData.address)).toString(10)
-                newData.balance = ethers.utils.formatUnits(ethers.utils.bigNumberify(balance), 'ether')
-                let id = await contract.ethereumAddressToAccountID(newData.address);
+                let balance = (await eth.getBalance(newData.address)).toString(10)
+                newData.balance = Eth.fromWei(new BN(balance), 'ether')
+                let id = (await contract.ethereumAddressToAccountID(newData.address))[0].toNumber();
 
                 if( id !== store.account.plasma.id ) store.account.plasma.id = null // display loading.gif
 
                 let accountState = await contract.accounts(id);
-                let isClosing = accountState.state > 1;
+                let isClosing = accountState.state.toNumber() > 1;
                 onchain.isClosing = true;
 
-                let partialsFilter = contract.filters.LogExit(newData.address, null)
+                let contractForLogs = new ethers.Contract(window.contractAddress, ABI, window.ethersProvider)
+                let partialsFilter = contractForLogs.filters.LogExit(newData.address, null)
 
                 let fullFilter = {
                     fromBlock: 1,
@@ -379,7 +391,7 @@ export default {
 
                 let events = await ethersProvider.getLogs(fullFilter)
 
-                let completeExitsFilter = contract.filters.LogCompleteExit(newData.address, null)
+                let completeExitsFilter = contractForLogs.filters.LogCompleteExit(newData.address, null)
 
                 fullFilter = {
                     fromBlock: 1,
@@ -394,21 +406,22 @@ export default {
                     events.push(completeExitEvents[i]);
                 }
 
-                const multiplier = ethers.utils.bigNumberify('1000000000000')
-                let finalBalance = ethers.utils.bigNumberify(0)
+                const multiplier = new BN('1000000000000')
+                let finalBalance = new BN(0)
                 const nonEmptyBlocks = [];
 
                 for (let i = 0; i < events.length; i++) {
                     let ev = events[i];
                     let blockNumber = ethers.utils.bigNumberify(ev.topics[2]);
-                    let amount = await contract.exitAmounts(newData.address, blockNumber);
-                    if (!amount.isZero()) {
-                        nonEmptyBlocks.push(blockNumber);
+                    let amount = (await contract.exitAmounts(newData.address, blockNumber))[0];
+                    if (!amount.eq(new BN(0))) {
+                        let convertedBlockNumber = new BN(blockNumber.toString(10))
+                        nonEmptyBlocks.push(convertedBlockNumber);
                         finalBalance = finalBalance.add(amount)
                     }
                 }
 
-                onchain.balance = ethers.utils.formatUnits(finalBalance.mul(multiplier), 'ether')
+                onchain.balance = Eth.fromWei(finalBalance.mul(multiplier), 'ether')
                 onchain.completeWithdrawArgs = nonEmptyBlocks
 
                 newData.plasmaId = id
