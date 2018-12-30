@@ -985,6 +985,11 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "indexmap"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
@@ -1545,6 +1550,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "priority-queue"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "indexmap 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "proc-macro-hack"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2056,8 +2069,15 @@ dependencies = [
  "hyper 0.12.16 (registry+https://github.com/rust-lang/crates.io-index)",
  "im 12.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-bigint 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num-traits 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "pairing 0.15.0",
  "plasma 0.1.1",
+<<<<<<< HEAD
+=======
+ "priority-queue 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "r2d2 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "r2d2_postgres 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
+>>>>>>> mempool, first iteration
  "rand 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-hex 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2841,6 +2861,7 @@ dependencies = [
 "checksum hyper-tls 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "32cd73f14ad370d3b4d4b7dce08f69b81536c82e39fcc89731930fe5788cd661"
 "checksum idna 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "38f09e0f0b1fb55fdee1f17470ad800da77af5186a1a76c026b679358b7e844e"
 "checksum im 12.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ae9c7f9bb8aee47fc16d535a705f7867a9fc83bb822e5e1043bb98e77ffeed3c"
+"checksum indexmap 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7164c96d6e18ccc3ce43f3dedac996c21a220670a106c275b96ad92110401362"
 "checksum indexmap 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7e81a7c05f79578dbc15793d8b619db9ba32b4577003ef3af1a91c416798c58d"
 "checksum iovec 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "dbe6e417e7d0975db6512b90796e8ce223145ac4e33c377e4a42882a0e88bb08"
 "checksum ipconfig 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "08f7eadeaf4b52700de180d147c4805f199854600b36faa963d91114827b2ffc"
@@ -2896,6 +2917,7 @@ dependencies = [
 "checksum phf_shared 0.7.23 (registry+https://github.com/rust-lang/crates.io-index)" = "b539898d22d4273ded07f64a05737649dc69095d92cb87c7097ec68e3f150b93"
 "checksum pkg-config 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)" = "676e8eb2b1b4c9043511a9b7bea0915320d7e502b0a079fb03f9635a5252b18c"
 "checksum pq-sys 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "6ac25eee5a0582f45a67e837e350d784e7003bd29a5f460796772061ca49ffda"
+"checksum priority-queue 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "41196e93c8f2e2b41768adadabfcbe9a6296980503ced7c904392e796e1f08ab"
 "checksum proc-macro-hack 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2c725b36c99df7af7bf9324e9c999b9e37d92c8f8caf106d82e1d7953218d2d8"
 "checksum proc-macro-hack-impl 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2b753ad9ed99dd8efeaa7d2fb8453c8f6bc3e54b97966d35f1bc77ca6865254a"
 "checksum proc-macro2 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)" = "1b06e2f335f48d24442b35a19df506a835fb3547bc3c06ef27340da9acf5cae7"

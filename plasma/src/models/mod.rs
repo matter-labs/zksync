@@ -25,7 +25,10 @@ pub type ExitBlock = block::Block<ExitTx>;
 pub type PublicKey = eddsa::PublicKey<Engine>;
 
 pub type AccountMap = fnv::FnvHashMap<u32, Account>;
+
 pub type BatchNumber = u32;
+pub type AccountId= u32;
+pub type Nonce = u32;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Block {
