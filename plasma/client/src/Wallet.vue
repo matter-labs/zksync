@@ -80,9 +80,12 @@
 
                         <img src="./assets/loading.gif" width="100em" v-if="store.account.plasma.id === null">
                         <div v-if="store.account.plasma.id === 0">
-                            <p>No account yet</p>
+                            <p>No account yet.</p>
                         </div>
-                        <div v-if="store.account.plasma.id > 0">
+                        <div v-if="store.account.plasma.closing">
+                            <p>Pending closing account, please complete exit.</p>
+                        </div>
+                        <div v-if="store.account.plasma.id > 0 && !store.account.plasma.closing">
                             <label for="acc_id">Account ID:</label>
                             <b-form-input id="acc_id" v-model="store.account.plasma.id" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                             <b-row class="mt-2">
@@ -202,6 +205,7 @@ export default {
         store: () => store,
         contractAddress: () => window.contractAddress,
         depositProblem() {
+            if(store.account.plasma.closing) return "pending closing account, please complete exit first"
             if(!(Number(store.account.balance) > 0)) return "empty balance in the mainchain account"
         },
         doDepositProblem() {
@@ -313,18 +317,13 @@ export default {
             }
         },
         parseStateResult(data) {
-
-            //console.log('data', data)
-
             data.verified.balance = Eth.fromWei(new BN(data.verified.balance).mul(new BN('1000000000000')), 'ether')
             data.committed.balance = Eth.fromWei(new BN(data.committed.balance).mul(new BN('1000000000000')), 'ether')
             data.pending.balance = Eth.fromWei(new BN(data.pending.balance).mul(new BN('1000000000000')), 'ether')
-
             if (Number(data.pending_nonce) > Number(data.pending.nonce)) {
                 // QUESTION: AV, why pendig_nonce at all?
                 data.pending.nonce = data.pending_nonce
             }
-
             return data
         },
         async getPlasmaInfo(accountId) {
@@ -336,13 +335,15 @@ export default {
             if(result.status !== 200) {
                 throw `Could not load data for account ${accountId}: ${result.error}`
             }
+            if(result.data.error === 'non-existing account') {
+                return { closing: true }
+            }
             if(result.data.error) {
                 throw `Getting data for account ${accountId} failed: ${result.data.error}`
             }
             return this.parseStateResult(result.data)
         },
         async updateAccountInfo() {
-            //console.log('updateAccountInfo')
             let newData = {}
             let timer = this.updateTimer
             let plasmaData = {}
@@ -360,13 +361,13 @@ export default {
                 }
             } catch (err) {
                 this.alert('Status update failed: ' + err)
-                //console.log('Status update failed: ' + err)
             }
             if(timer === this.updateTimer) { // if this handler is still valid
                 store.account.address = newData.address
                 store.account.balance = newData.balance
 
                 store.account.plasma.id = newData.plasmaId
+                store.account.plasma.closing = plasmaData.closing
 
                 if(store.account.plasma.id) {
 
