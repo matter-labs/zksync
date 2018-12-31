@@ -224,10 +224,15 @@ impl MemPool {
         // take ownership of queue back
         self.queue = queue;
 
-        if let Err((valid, invalid)) = result {
-            println!("creating transfer block failed: {} transactions rejected, {} going back to queue", invalid.len(), valid.len());
-            self.queue.batch_insert(valid)
-            // TODO: remove invalid transactions from db
+        match result {
+            Ok((applied, block_number)) => {
+                // TODO: how to deal with block number in the db?
+            },
+            Err((valid, invalid)) => {
+                println!("creating transfer block failed: {} transactions rejected, {} going back to queue", invalid.len(), valid.len());
+                self.queue.batch_insert(valid)
+                // TODO: remove invalid transactions from db
+            },
         };
     }
 

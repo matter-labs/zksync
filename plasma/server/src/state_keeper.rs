@@ -89,8 +89,8 @@ impl PlasmaStateKeeper {
                     let result = self.create_transfer_block(do_padding, &mut queue);
                     match result {
                         Ok((block, applied_block, applied_transactions)) => {
+                            sender.send(( queue, Ok(( applied_transactions, block.block_number )) )).expect("must send back block processing result");
                             self.commit_block(&tx_for_commitments, Block::Transfer(block), applied_block);
-                            sender.send(( queue, Ok(applied_transactions) )).expect("must send back block processing result");
                         },
                         Err((applied, rejected)) => {
                             sender.send(( queue, Err((applied, rejected)) )).expect("must send back block processing result");

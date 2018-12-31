@@ -9,7 +9,7 @@ use super::mem_pool::TxQueue;
 pub type AppliedTransactions = Vec<TransferTx>;
 pub type RejectedTransactions = Vec<TransferTx>;
 
-type TransferBlockResult = Result<AppliedTransactions, (AppliedTransactions, RejectedTransactions)>;
+type TransferBlockResult = Result<(AppliedTransactions, BlockNumber), (AppliedTransactions, RejectedTransactions)>;
 
 pub enum StateProcessingRequest{
     CreateTransferBlock(TxQueue, bool, Sender<(TxQueue, TransferBlockResult)>),
