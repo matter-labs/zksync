@@ -196,6 +196,8 @@ impl MemPool {
                 return Err(format!("Too many transactions in the queue for this account"))
             }
 
+            // TODO: replace existing tx if fee is higher
+
             let pending_nonce = queue.pending_nonce();
             if transaction.nonce != pending_nonce {
                 return Err(format!("Nonce is out of sequence: expected {}, got {}", pending_nonce, transaction.nonce))
@@ -226,7 +228,7 @@ impl MemPool {
 
         match result {
             Ok((applied, block_number)) => {
-                // TODO: probably we don't deal with this here. Seal applied transactions in committer instead.
+                // TODO: remove applied, block_number, wait here for committer instead
             },
             Err((valid, invalid)) => {
                 println!("creating transfer block failed: {} transactions rejected, {} going back to queue", invalid.len(), valid.len());
