@@ -1,7 +1,7 @@
 use std::sync::{Arc, mpsc::{channel, Sender, Receiver}};
 use plasma::models::{TransferTx, TransferBlock, Block, AccountId, Nonce};
 use fnv::FnvHashMap;
-use super::models::{StateProcessingRequest, TransferBlockIter};
+use super::models::{StateProcessingRequest, AppliedTransactions, RejectedTransactions};
 use super::config;
 use priority_queue::PriorityQueue;
 use bigdecimal::BigDecimal;
@@ -18,11 +18,11 @@ struct AccountTxQueue {
 
 pub type TxResult<T> = std::result::Result<T, String>;
 
-/// AccountTxQueue is expected to always contain at least one tx!
 impl AccountTxQueue {
 
-    pub fn min_nonce(&self) -> Nonce {
-        self.queue.get_min().unwrap().0
+    /// Returns true if new item added
+    pub fn insert(&mut self, tx: TransferTx) -> bool {
+        self.queue.insert(tx.nonce, tx).is_none()
     }
 
     pub fn pending_nonce(&self) -> Nonce {
@@ -34,24 +34,29 @@ impl AccountTxQueue {
         next_nonce
     }
 
-    pub fn next_fee(&self) -> BigDecimal {
-        self.queue.values().next().cloned().unwrap().fee
+    pub fn next_fee(&self) -> Option<BigDecimal> {
+        self.queue.values().next().map(|v| v.fee.clone())
     }
 
-    /// Returns true if new item added
-    pub fn insert(&mut self, tx: TransferTx) -> bool {
-        self.queue.insert(tx.nonce, tx).is_none()
-    }
+    pub fn pop(&mut self, expected_nonce: Nonce) -> (RejectedTransactions, Option<TransferTx>) {
 
-    pub fn pop_next(&mut self) -> TransferTx {
-        let (tx, queue) = self.queue.without_min();
-        self.queue = queue;
-        tx.unwrap()
+        let (lesser, tx, greater) = self.queue.split_lookup(&expected_nonce);
+        let mut rejected: RejectedTransactions = lesser.into_iter().map(|(k,v)| v).collect();
+
+        if tx.is_some() {
+            self.queue = greater;
+        } else {
+            self.queue = OrdMap::new();
+            rejected.extend(greater.into_iter().map(|(k,v)| v));
+        }
+
+        (rejected, tx)
     }
 
     pub fn len(&self) -> usize {
         self.queue.len()
     } 
+
 }
 
 #[derive(Default)]
@@ -59,6 +64,35 @@ pub struct TxQueue {
     queues: FnvHashMap<AccountId, AccountTxQueue>,
     order:  PriorityQueue<AccountId, BigDecimal>,
     len:    usize,
+}
+
+// For state_keeper::create_transfer_block()
+impl TxQueue {
+
+    pub fn peek_next(&self) -> Option<AccountId> {
+        self.order.peek().map(|(&id, _)| id)
+    }
+
+    /// next() must be called immediately after peek_next(), so that the queue for account_id exists
+    pub fn next(&mut self, account_id: AccountId, next_nonce: Nonce) -> (RejectedTransactions, Option<TransferTx>) {
+        assert_eq!(account_id, self.peek_next().unwrap());
+        let (rejected, tx, next_fee) = {
+            let queue = self.queues.get_mut(&account_id).unwrap();
+            let (rejected, tx) = queue.pop(account_id);
+            let ejected = rejected.len() + if tx.is_some() {1} else {0};
+            self.len -= ejected;
+            (rejected, tx, queue.next_fee())
+        };
+        if let Some(next_fee) = next_fee {
+            // update priority
+            self.order.change_priority(&account_id, next_fee);
+        } else {
+            // remove empty queue
+            self.order.pop();
+            self.queues.remove(&account_id);
+        }
+        (rejected, tx)
+    }
 }
 
 impl TxQueue {
@@ -77,31 +111,14 @@ impl TxQueue {
         if queue.insert(tx) {
             self.len += 1;
         }
-        self.order.change_priority(&from, queue.next_fee());
+        self.order.change_priority(&from, queue.next_fee().unwrap());
     }
 
     pub fn batch_insert(&mut self, list: Vec<TransferTx>) {
-        // TODO: optimize
+        // TODO: optimize performance: group by accounts, then update order once per account
         for tx in list.into_iter() {
             self.insert(tx);
         }
-    }
-
-    fn pop_next(&mut self) -> Option<TransferTx> {
-        let next_account = self.order.peek().map(|(&account_id, _)| account_id);
-        next_account.map(|account_id| {
-            let (tx, emptied) = {
-                let queue = self.queues.get_mut(&account_id).unwrap();
-                let tx = queue.pop_next();
-                self.len -= 1;
-                (tx, queue.len() == 0)
-            };
-            if emptied {
-                self.order.pop();
-                self.queues.remove(&account_id);
-            }
-            tx
-        })
     }
 
     fn pending_nonce(&self, account_id: AccountId) -> Option<Nonce> {
@@ -110,17 +127,6 @@ impl TxQueue {
 
     fn len(&self) -> usize {
         self.len
-    }
-}
-
-impl TransferBlockIter for TxQueue {
-
-    fn peek_next(&self) -> Option<AccountId> {
-        unimplemented!()
-    }
-
-    fn next(&mut self, account_id: AccountId, next_nonce: Nonce) -> Option<TransferTx> {
-        unimplemented!()
     }
 }
 
@@ -164,7 +170,8 @@ impl MemPool {
                 },
                 MempoolRequest::ProcessBatch => {
                     self.batch_requested = false;
-                    self.process_batch(&tx_for_blocks);
+                    let do_padding = false; // TODO: use when neccessary
+                    self.process_batch(do_padding, &tx_for_blocks);
                 },
                 MempoolRequest::GetPendingNonce(account_id, channel) => {
                     channel.send(self.queue.pending_nonce(account_id));
@@ -192,14 +199,15 @@ impl MemPool {
         Ok(())
     }
 
-    fn process_batch(&mut self, tx_for_blocks: &Sender<StateProcessingRequest>) {
+    fn process_batch(&mut self, do_padding: bool, tx_for_blocks: &Sender<StateProcessingRequest>) {
 
         // send request to state_keeper
         let (tx, rx) = channel();
 
         // move ownership of queue to the state_keeper thread 
         let queue = std::mem::replace(&mut self.queue, TxQueue::default());
-        let request = StateProcessingRequest::ApplyTransferBlock(queue, tx);
+
+        let request = StateProcessingRequest::CreateTransferBlock(queue, do_padding, tx);
         tx_for_blocks.send(request).expect("must send block processing request");
 
         // now wait for state_keeper to return a result
@@ -209,6 +217,7 @@ impl MemPool {
         self.queue = queue;
 
         if let Err((valid, invalid)) = result {
+            println!("creating transfer block failed: {} transactions rejected, {} going back to queue", invalid.len(), valid.len());
             self.queue.batch_insert(valid)
             // TODO: remove invalid transactions from db
         };

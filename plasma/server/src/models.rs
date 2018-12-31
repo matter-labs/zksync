@@ -11,14 +11,9 @@ pub type RejectedTransactions = Vec<TransferTx>;
 
 type TransferBlockResult = Result<AppliedTransactions, (AppliedTransactions, RejectedTransactions)>;
 
-pub trait TransferBlockIter: Send + Sync {
-    fn peek_next(&self) -> Option<AccountId>;
-    fn next(&mut self, account_id: AccountId, next_nonce: Nonce) -> Option<TransferTx>;
-}
-
 pub enum StateProcessingRequest{
-    ApplyTransferBlock(TxQueue, Sender<(TxQueue, TransferBlockResult)>),
-    ApplyBlock(Block, Option<Sender<Result<(),Block>>>), // return result, sending block back
+    CreateTransferBlock(TxQueue, bool, Sender<(TxQueue, TransferBlockResult)>),
+    ApplyBlock(Block),
     GetPubKey(u32, Sender<Option<PublicKey>>),   // return public key if found
     GetLatestState(u32, Sender<Option<Account>>), // return account state
 }

@@ -346,7 +346,7 @@ impl EthWatch {
             transactions: all_deposits,
             new_root_hash: Fr::zero(),
         };
-        let request = StateProcessingRequest::ApplyBlock(Block::Deposit(block, self.last_deposit_batch.as_u32()), None);
+        let request = StateProcessingRequest::ApplyBlock(Block::Deposit(block, self.last_deposit_batch.as_u32()));
 
         let send_result = channel.send(request);
 
@@ -529,7 +529,7 @@ impl EthWatch {
             transactions: all_exits,
             new_root_hash: Fr::zero(),
         };
-        let request = StateProcessingRequest::ApplyBlock(Block::Exit(block, self.last_exit_batch.as_u32()), None);
+        let request = StateProcessingRequest::ApplyBlock(Block::Exit(block, self.last_exit_batch.as_u32()));
 
         let send_result = channel.send(request);
 
