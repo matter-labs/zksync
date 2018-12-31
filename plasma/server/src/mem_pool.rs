@@ -25,6 +25,10 @@ impl AccountTxQueue {
         self.queue.insert(tx.nonce, tx).is_none()
     }
 
+    pub fn get_fee(&self, nonce: Nonce) -> Option<BigDecimal> {
+        self.queue.get(&nonce).map(|v| v.fee.clone())
+    }
+
     fn min_nonce(&self) -> Nonce {
         self.queue.get_min().map(|(k,_)| *k).unwrap_or(0)
     }
@@ -196,11 +200,16 @@ impl MemPool {
                 return Err(format!("Too many transactions in the queue for this account"))
             }
 
-            // TODO: replace existing tx if fee is higher
-
-            let pending_nonce = queue.pending_nonce();
-            if transaction.nonce != pending_nonce {
-                return Err(format!("Nonce is out of sequence: expected {}, got {}", pending_nonce, transaction.nonce))
+            if let Some(existing_fee) = queue.get_fee(transaction.nonce) {
+                if existing_fee < transaction.fee {
+                    return Err(format!("Transaction for nonce {} already in the pool with higher fee {} (new fee is {})", 
+                        transaction.nonce, existing_fee, transaction.fee))
+                }
+            } else {
+                let pending_nonce = queue.pending_nonce();
+                if transaction.nonce != pending_nonce {
+                    return Err(format!("Nonce is out of sequence: expected {}, got {}", pending_nonce, transaction.nonce))
+                }
             }
         }
 
@@ -270,24 +279,29 @@ mod test {
 #[test] 
 fn test_account_tx_queue() {
 
-    let mut queue = AccountTxQueue::default();
+    let mut q = AccountTxQueue::default();
 
-    assert_eq!(queue.pending_nonce(), 0);
-    assert_eq!(queue.next_fee(), None);
+    assert_eq!(q.pending_nonce(), 0);
+    assert_eq!(q.next_fee(), None);
 
-    assert_eq!(queue.insert(test::tx(1, 5, 20)), true);
-    assert_eq!(queue.len(), 1);
-    assert_eq!(queue.insert(test::tx(1, 5, 20)), false);
-    assert_eq!(queue.len(), 1);
-    assert_eq!(queue.next_fee().unwrap(), BigDecimal::from(20));
+    assert_eq!(q.insert(test::tx(1, 5, 20)), true);
+    assert_eq!(q.len(), 1);
+    assert_eq!(q.insert(test::tx(1, 5, 20)), false);
+    assert_eq!(q.len(), 1);
+    assert_eq!(q.next_fee().unwrap(), BigDecimal::from(20));
 
-    assert_eq!(queue.pending_nonce(), 6);
+    assert_eq!(q.pending_nonce(), 6);
 
-    assert_eq!(queue.insert(test::tx(1, 7, 40)), true);
-    assert_eq!(queue.len(), 2);
-    assert_eq!(queue.next_fee().unwrap(), BigDecimal::from(20));
+    assert_eq!(q.insert(test::tx(1, 7, 40)), true);
+    assert_eq!(q.len(), 2);
+    assert_eq!(q.next_fee().unwrap(), BigDecimal::from(20));
 
-    let mut q = queue.clone();
+    assert_eq!(q.get_fee(7).unwrap(), BigDecimal::from(40));
+    assert_eq!(q.get_fee(5).unwrap(), BigDecimal::from(20));
+
+    let _q = q;
+
+    let mut q = _q.clone();
     let (rejected, tx) = q.pop(5);
     assert_eq!(rejected.len(), 0); 
     assert_eq!(tx.unwrap().nonce, 5); 
@@ -295,27 +309,32 @@ fn test_account_tx_queue() {
     assert_eq!(q.next_fee().unwrap(), BigDecimal::from(40));
     assert_eq!(q.pending_nonce(), 8);
 
-    let mut q = queue.clone();
+    let mut q = _q.clone();
+
+    assert_eq!(q.insert(test::tx(1, 5, 60)), false);
+    assert_eq!(q.get_fee(5).unwrap(), BigDecimal::from(60));
+
+    let mut q = _q.clone();
     let (rejected, tx) = q.pop(6);
     assert_eq!(rejected.len(), 2); 
     assert_eq!(tx.is_none(), true);
     assert_eq!(q.len(), 0);
     assert_eq!(q.next_fee(), None);
 
-    let mut q = queue.clone();
+    let mut q = _q.clone();
     let (rejected, tx) = q.pop(7);
     assert_eq!(rejected.len(), 1); 
     assert_eq!(tx, None);
     assert_eq!(q.len(), 1);
     assert_eq!(q.pending_nonce(), 8);
 
-    let mut q = queue.clone();
+    let mut q = _q.clone();
     let (rejected, tx) = q.pop(8);
     assert_eq!(rejected.len(), 2); 
     assert_eq!(tx.is_none(), true);
     assert_eq!(q.pending_nonce(), 0);
 
-    let mut q = queue.clone();
+    let mut q = _q.clone();
     assert_eq!(q.insert(test::tx(1, 6, 40)), true);
     let (rejected, tx) = q.pop(6);
     assert_eq!(rejected.len(), 1); 
