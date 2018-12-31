@@ -11,7 +11,7 @@ use std::borrow::BorrowMut;
 
 const MAX_TRANSACTIONS_PER_ACCOUNT: usize = 128;
 
-#[derive(Default, Clone)]
+#[derive(Default, Debug, Clone)]
 struct AccountTxQueue {
     pub queue: OrdMap<Nonce, TransferTx>,
 }
@@ -25,8 +25,12 @@ impl AccountTxQueue {
         self.queue.insert(tx.nonce, tx).is_none()
     }
 
+    fn min_nonce(&self) -> Nonce {
+        self.queue.get_min().map(|(k,_)| *k).unwrap_or(0)
+    }
+
     pub fn pending_nonce(&self) -> Nonce {
-        let mut next_nonce = self.queue.get_min().map(|(k,_)| *k).unwrap_or(0);
+        let mut next_nonce = self.min_nonce();
         for nonce in self.queue.keys() {
             if next_nonce != *nonce { break }
             next_nonce += 1;
@@ -40,11 +44,15 @@ impl AccountTxQueue {
 
     pub fn pop(&mut self, expected_nonce: Nonce) -> (RejectedTransactions, Option<TransferTx>) {
 
-        let (lesser, tx, greater) = self.queue.split_lookup(&expected_nonce);
+        let exact_match = self.min_nonce() == expected_nonce;
+        let (lesser, mut tx, greater) = self.queue.split_lookup(&expected_nonce);
         let mut rejected: RejectedTransactions = lesser.into_iter().map(|(k,v)| v).collect();
-
         if tx.is_some() {
             self.queue = greater;
+            if !exact_match {
+                // put it back for this loop cycle, because we need to update priority queue first: maybe it's not the highest fee
+                self.queue.insert(expected_nonce, tx.take().unwrap());
+            }
         } else {
             self.queue = OrdMap::new();
             rejected.extend(greater.into_iter().map(|(k,v)| v));
@@ -59,7 +67,7 @@ impl AccountTxQueue {
 
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub struct TxQueue {
     queues: FnvHashMap<AccountId, AccountTxQueue>,
     order:  PriorityQueue<AccountId, BigDecimal>,
@@ -78,7 +86,7 @@ impl TxQueue {
         assert_eq!(account_id, self.peek_next().unwrap());
         let (rejected, tx, next_fee) = {
             let queue = self.queues.get_mut(&account_id).unwrap();
-            let (rejected, tx) = queue.pop(account_id);
+            let (rejected, tx) = queue.pop(next_nonce);
             let ejected = rejected.len() + if tx.is_some() {1} else {0};
             self.len -= ejected;
             (rejected, tx, queue.next_fee())
@@ -114,7 +122,7 @@ impl TxQueue {
         self.order.change_priority(&from, queue.next_fee().unwrap());
     }
 
-    pub fn batch_insert(&mut self, list: Vec<TransferTx>) {
+    fn batch_insert(&mut self, list: Vec<TransferTx>) {
         // TODO: optimize performance: group by accounts, then update order once per account
         for tx in list.into_iter() {
             self.insert(tx);
@@ -266,7 +274,6 @@ fn test_account_tx_queue() {
     assert_eq!(queue.len(), 1);
     assert_eq!(queue.next_fee().unwrap(), BigDecimal::from(20));
 
-    //println!("{:?}", queue.queue.keys().iter());
     assert_eq!(queue.pending_nonce(), 6);
 
     assert_eq!(queue.insert(test::tx(1, 7, 40)), true);
@@ -291,10 +298,9 @@ fn test_account_tx_queue() {
     let mut q = queue.clone();
     let (rejected, tx) = q.pop(7);
     assert_eq!(rejected.len(), 1); 
-    assert_eq!(tx.unwrap().nonce, 7);
-    assert_eq!(q.len(), 0);
-    assert_eq!(q.next_fee(), None);
-    assert_eq!(q.pending_nonce(), 0);
+    assert_eq!(tx, None);
+    assert_eq!(q.len(), 1);
+    assert_eq!(q.pending_nonce(), 8);
 
     let mut q = queue.clone();
     let (rejected, tx) = q.pop(8);
@@ -306,9 +312,68 @@ fn test_account_tx_queue() {
     assert_eq!(q.insert(test::tx(1, 6, 40)), true);
     let (rejected, tx) = q.pop(6);
     assert_eq!(rejected.len(), 1); 
+    assert_eq!(tx, None);
+
+    let (rejected, tx) = q.pop(6);
+    assert_eq!(rejected.len(), 0); 
     assert_eq!(tx.unwrap().nonce, 6);
     assert_eq!(q.len(), 1);
     assert_eq!(q.next_fee().unwrap(), BigDecimal::from(40));
     assert_eq!(q.pending_nonce(), 8);
 
+}
+
+#[test] 
+fn test_tx_queue() {
+    let mut q = TxQueue::default();
+    assert_eq!(q.peek_next(), None);
+
+    q.insert(test::tx(1, 5, 20));
+    assert_eq!(q.len(), 1);
+    assert_eq!(q.peek_next().unwrap(), 1);
+
+    q.insert(test::tx(2, 0, 40));
+    assert_eq!(q.len(), 2);
+    assert_eq!(q.peek_next().unwrap(), 2);
+
+    q.insert(test::tx(1, 6, 50));
+    assert_eq!(q.len(), 3);
+    assert_eq!(q.peek_next().unwrap(), 2);
+
+    q.insert(test::tx(1, 5, 50));
+    assert_eq!(q.len(), 3);
+    assert_eq!(q.peek_next().unwrap(), 1);
+
+    let _q = q;
+
+    let mut q = _q.clone();
+    let (rejected, tx) = q.next(1, 5);
+    assert_eq!(rejected.len(), 0);
+    assert_eq!(tx.as_ref().unwrap().from, 1);
+    assert_eq!(tx.as_ref().unwrap().nonce, 5);
+    assert_eq!(tx.as_ref().unwrap().fee, BigDecimal::from(50));
+    assert_eq!(q.len(), 2);
+    assert_eq!(q.peek_next().unwrap(), 1);
+
+    let mut q = _q.clone();
+    let (rejected, tx) = q.next(1, 6);
+    assert_eq!(rejected.len(), 1);
+    assert_eq!(tx, None);
+    assert_eq!(q.len(), 2);
+    assert_eq!(q.peek_next().unwrap(), 1);
+
+    let (rejected, tx) = q.next(1, 6);
+    assert_eq!(rejected.len(), 0);
+    assert_eq!(tx.as_ref().unwrap().from, 1);
+    assert_eq!(tx.as_ref().unwrap().nonce, 6);
+    assert_eq!(tx.as_ref().unwrap().fee, BigDecimal::from(50));
+    assert_eq!(q.len(), 1);
+    assert_eq!(q.peek_next().unwrap(), 2);
+
+    let (rejected, tx) = q.next(2, 0);
+    assert_eq!(rejected.len(), 0);
+    assert_eq!(tx.as_ref().unwrap().from, 2);
+    assert_eq!(tx.as_ref().unwrap().nonce, 0);
+    assert_eq!(q.len(), 0);
+    assert_eq!(q.peek_next(), None);
 }

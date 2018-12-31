@@ -32,6 +32,12 @@ pub struct TransferTx {
     pub cached_pub_key:     Option<PublicKey>,       
 }
 
+impl std::fmt::Debug for TransferTx {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "tx{{ from: {}, to: {}, nonce: {}, amount: {} }}", self.from, self.to, self.nonce, self.amount)
+    }
+}
+
 impl Ord for TransferTx {
     fn cmp(&self, other: &Self) -> Ordering {
         self.nonce.cmp(&other.nonce)
