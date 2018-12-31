@@ -17,7 +17,7 @@ use rustc_hex::ToHex;
 use std::cmp::{Ord, PartialEq, PartialOrd, Eq, Ordering};
 
 /// Unpacked transaction data
-#[derive(Clone, Copy, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct TransferTx {
     pub from:               u32,
     pub to:                 u32,
@@ -130,7 +130,7 @@ pub struct ExitTx{
     pub amount:             BigDecimal,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct TxSignature{
     pub r_x: Fr,
     pub r_y: Fr,

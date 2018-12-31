@@ -11,7 +11,7 @@ use std::borrow::BorrowMut;
 
 const MAX_TRANSACTIONS_PER_ACCOUNT: usize = 128;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct AccountTxQueue {
     pub queue: OrdMap<Nonce, TransferTx>,
 }
@@ -26,10 +26,10 @@ impl AccountTxQueue {
     }
 
     pub fn pending_nonce(&self) -> Nonce {
-        let mut next_nonce = 0;
+        let mut next_nonce = self.queue.get_min().map(|(k,_)| *k).unwrap_or(0);
         for nonce in self.queue.keys() {
             if next_nonce != *nonce { break }
-            next_nonce = nonce + 1;
+            next_nonce += 1;
         }
         next_nonce
     }
@@ -236,7 +236,79 @@ pub fn start_mem_pool(mut mem_pool: MemPool,
 }
 
 
+#[cfg(test)]
+mod test {
+
+    use plasma::models::*;
+    use bigdecimal::BigDecimal;
+
+    pub fn tx(from: AccountId, nonce: u32,  fee: u32) -> TransferTx {
+        let mut tx = TransferTx::default();
+        tx.from = from;
+        tx.nonce = nonce;
+        tx.fee = BigDecimal::from(fee);
+        tx
+    }
+
+}
+
 #[test] 
-fn test_mempool() {
+fn test_account_tx_queue() {
+
+    let mut queue = AccountTxQueue::default();
+
+    assert_eq!(queue.pending_nonce(), 0);
+    assert_eq!(queue.next_fee(), None);
+
+    assert_eq!(queue.insert(test::tx(1, 5, 20)), true);
+    assert_eq!(queue.len(), 1);
+    assert_eq!(queue.insert(test::tx(1, 5, 20)), false);
+    assert_eq!(queue.len(), 1);
+    assert_eq!(queue.next_fee().unwrap(), BigDecimal::from(20));
+
+    //println!("{:?}", queue.queue.keys().iter());
+    assert_eq!(queue.pending_nonce(), 6);
+
+    assert_eq!(queue.insert(test::tx(1, 7, 40)), true);
+    assert_eq!(queue.len(), 2);
+    assert_eq!(queue.next_fee().unwrap(), BigDecimal::from(20));
+
+    let mut q = queue.clone();
+    let (rejected, tx) = q.pop(5);
+    assert_eq!(rejected.len(), 0); 
+    assert_eq!(tx.unwrap().nonce, 5); 
+    assert_eq!(q.len(), 1);
+    assert_eq!(q.next_fee().unwrap(), BigDecimal::from(40));
+    assert_eq!(q.pending_nonce(), 8);
+
+    let mut q = queue.clone();
+    let (rejected, tx) = q.pop(6);
+    assert_eq!(rejected.len(), 2); 
+    assert_eq!(tx.is_none(), true);
+    assert_eq!(q.len(), 0);
+    assert_eq!(q.next_fee(), None);
+
+    let mut q = queue.clone();
+    let (rejected, tx) = q.pop(7);
+    assert_eq!(rejected.len(), 1); 
+    assert_eq!(tx.unwrap().nonce, 7);
+    assert_eq!(q.len(), 0);
+    assert_eq!(q.next_fee(), None);
+    assert_eq!(q.pending_nonce(), 0);
+
+    let mut q = queue.clone();
+    let (rejected, tx) = q.pop(8);
+    assert_eq!(rejected.len(), 2); 
+    assert_eq!(tx.is_none(), true);
+    assert_eq!(q.pending_nonce(), 0);
+
+    let mut q = queue.clone();
+    assert_eq!(q.insert(test::tx(1, 6, 40)), true);
+    let (rejected, tx) = q.pop(6);
+    assert_eq!(rejected.len(), 1); 
+    assert_eq!(tx.unwrap().nonce, 6);
+    assert_eq!(q.len(), 1);
+    assert_eq!(q.next_fee().unwrap(), BigDecimal::from(40));
+    assert_eq!(q.pending_nonce(), 8);
 
 }
