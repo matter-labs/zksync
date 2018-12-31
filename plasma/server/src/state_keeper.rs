@@ -64,17 +64,17 @@ impl PlasmaStateKeeper {
     {
         for req in rx_for_blocks {
             match req {
-                StateProcessingRequest::ApplyTransferBlock(mut block, sender) => {
-                    let block = Block::Transfer();
-                    let applied = self.apply_transfer_block(block);
-                    let let Ok((new_root, block_data, accounts_updated)) = applied {
-                        self.commit_block(new_root, block_data, accounts_updated);
-                    }
-                    sender.send(result).expect("must send back block processing result");
+                StateProcessingRequest::ApplyTransferBlock(iter, sender) => {
+                    // let block = Block::Transfer(TransferBlock::default());
+                    // let applied = self.apply_transfer_block(block);
+                    // let let Ok((new_root, block_data, accounts_updated)) = applied {
+                    //     self.commit_block(new_root, block_data, accounts_updated);
+                    // }
+                    // sender.send(result).expect("must send back block processing result");
                 },
                 StateProcessingRequest::ApplyBlock(mut block, source) => {
                     let applied = match &mut block {
-                        &mut Block::Transfer(ref mut block) => self.apply_transfer_block(block),
+                        &mut Block::Transfer(ref mut block) => panic!("Transfer blocks must be handled in ApplyTransferBlock"),
                         &mut Block::Deposit(ref mut block, batch_number) => self.apply_deposit_block(block, batch_number),
                         &mut Block::Exit(ref mut block, batch_number) => self.apply_exit_block(block, batch_number),
                     };

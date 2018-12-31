@@ -1,11 +1,23 @@
 use web3::types::{U256, U128, H256};
-use plasma::models::{BatchNumber, AccountMap, Block, PublicKey, Account};
+use plasma::models::*;
 use std::sync::mpsc::{Sender};
+use std::sync::Arc;
 use crate::schema::*;
 
-// MemPool will provide a channel to return result of block processing
-// In case of error, block is returned with invalid transactions removed
+use super::mem_pool::TxQueue;
+
+pub type AppliedTransactions = Vec<TransferTx>;
+pub type RejectedTransactions = Vec<TransferTx>;
+
+type TransferBlockResult = Result<AppliedTransactions, (AppliedTransactions, RejectedTransactions)>;
+
+pub trait TransferBlockIter: Send + Sync {
+    fn peek_next(&self) -> Option<AccountId>;
+    fn next(&mut self, account_id: AccountId, next_nonce: Nonce) -> Option<TransferTx>;
+}
+
 pub enum StateProcessingRequest{
+    ApplyTransferBlock(TxQueue, Sender<(TxQueue, TransferBlockResult)>),
     ApplyBlock(Block, Option<Sender<Result<(),Block>>>), // return result, sending block back
     GetPubKey(u32, Sender<Option<PublicKey>>),   // return public key if found
     GetLatestState(u32, Sender<Option<Account>>), // return account state

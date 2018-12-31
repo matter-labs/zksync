@@ -17,7 +17,7 @@ use rustc_hex::ToHex;
 use std::cmp::{Ord, PartialEq, PartialOrd, Eq, Ordering};
 
 /// Unpacked transaction data
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct TransferTx {
     pub from:               u32,
     pub to:                 u32,
