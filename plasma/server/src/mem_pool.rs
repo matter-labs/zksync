@@ -226,7 +226,7 @@ impl MemPool {
 
         match result {
             Ok((applied, block_number)) => {
-                // TODO: how to deal with block number in the db?
+                // TODO: probably we don't deal with this here. Seal applied transactions in committer instead.
             },
             Err((valid, invalid)) => {
                 println!("creating transfer block failed: {} transactions rejected, {} going back to queue", invalid.len(), valid.len());
