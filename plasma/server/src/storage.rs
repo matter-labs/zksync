@@ -265,7 +265,9 @@ use diesel::RunQueryDsl;
 #[test]
 fn test_store_state() {
     
-    let conn = super::StorageConnection::new();
+    let pool = super::ConnectionPool::new();
+
+    let conn = super::StorageProcessor::from_connection(pool.pool.get().unwrap());
     conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
 
     // uncomment below for debugging to generate initial state

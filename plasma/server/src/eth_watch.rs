@@ -548,12 +548,3 @@ pub fn start_eth_watch(mut eth_watch: EthWatch, tx_for_blocks: Sender<StateProce
         eth_watch.run(tx_for_blocks);
     });
 }
-
-#[test]
-fn test_eth_watcher() {
-
-    let mut client = EthWatch::new(3, 0);
-    let (tx_for_state, rx) = std::sync::mpsc::channel::<StateProcessingRequest>();
-
-    client.run(tx_for_state);
-}

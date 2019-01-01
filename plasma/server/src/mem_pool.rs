@@ -201,7 +201,7 @@ impl MemPool {
             }
 
             if let Some(existing_fee) = queue.get_fee(transaction.nonce) {
-                if existing_fee < transaction.fee {
+                if existing_fee > transaction.fee {
                     return Err(format!("Transaction for nonce {} already in the pool with higher fee {} (new fee is {})", 
                         transaction.nonce, existing_fee, transaction.fee))
                 }
