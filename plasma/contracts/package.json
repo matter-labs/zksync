@@ -26,7 +26,7 @@
     "migrate": "truffle migrate --reset --network dev",
     
     "ganache":        "ganache-cli -l 7000000 -i 4 -m \"cliff flag flag fence mesh quarter coyote mechanic cash draw remain priority\" ",
-    "start-geth":     "geth --networkid 4 --rpc --rpcapi \"eth,net,web3,personal\" --dev",
+    "start-geth":     "geth --networkid 400 --rpc --rpcapi \"eth,net,web3,personal\" --dev --miner.gastarget 8000000",
     "deploy-local":   "truffle migrate --reset --network dev",
     "geth":           "node setup-geth.js 2& yarn start-geth",
     "geth-deployed":  "(sleep 2 && node setup-geth.js && yarn deploy-local)& yarn start-geth"

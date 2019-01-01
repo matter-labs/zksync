@@ -2072,12 +2072,7 @@ dependencies = [
  "num-traits 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "pairing 0.15.0",
  "plasma 0.1.1",
-<<<<<<< HEAD
-=======
  "priority-queue 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "r2d2 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "r2d2_postgres 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
->>>>>>> mempool, first iteration
  "rand 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-hex 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
