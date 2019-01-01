@@ -10,6 +10,9 @@ async function setup() {
 
     // might be useful: process.env.PRIVATE_KEY
     let pkeys = [
+        // from run.sh: 0xb4aaffeAAcb27098d9545A3C0e36924Af9EeDfe0
+        '12B7678FF12FE8574AB74FFD23B5B0980B64D84345F9D637C2096CA0EF587806',
+
         '93e1b31cd700c582995dba7bfcca8e9b03effa1e54168f73f618d44e2e730e9c',
         'aa8564af9bef22f581e99125d1829b76c45d08e4f6f0b74d586911f4318b6776',
         'd9ade5186d09f523773611fe31f16f8e7b75ff57d4879dfe38cef5125eeb3885',
@@ -20,9 +23,6 @@ async function setup() {
         'f5f17d35eb238908b3ec3462dcf4ad8e8d84ec09c0d1587e3f5feb8a95686baa',
         '5abaea8f281af348587a83c05af384865507d22e111cbc865b1d2be94db84b46',
         'e7b69a24a4154712874791698682acb865884f45cacc1e2100310c23b95fa781',        
-
-        // from run.sh: 0xb4aaffeAAcb27098d9545A3C0e36924Af9EeDfe0
-        '12B7678FF12FE8574AB74FFD23B5B0980B64D84345F9D637C2096CA0EF587806',
     ]
 
     let prefunded = (await personal.getAccounts())[0]
