@@ -21,7 +21,7 @@ async function setup() {
         '5abaea8f281af348587a83c05af384865507d22e111cbc865b1d2be94db84b46',
         'e7b69a24a4154712874791698682acb865884f45cacc1e2100310c23b95fa781',        
 
-        // from run.sh
+        // from run.sh: 0xb4aaffeAAcb27098d9545A3C0e36924Af9EeDfe0
         '12B7678FF12FE8574AB74FFD23B5B0980B64D84345F9D637C2096CA0EF587806',
     ]
 
