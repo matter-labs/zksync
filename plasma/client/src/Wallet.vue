@@ -208,7 +208,7 @@ export default {
     destroyed() {
     },
     computed: {
-        baseUrl: () => web3.version.network === '4' ? 'https://api.plasma-winter.io' : 'http://localhost:8080',
+        baseUrl: () => web3.version.network === '4' ? 'https://api.plasma-winter.io' : 'http://localhost:80',
         store: () => store,
         contractAddress: () => window.contractAddress,
         depositProblem() {

@@ -25,10 +25,27 @@ async function setup() {
         'e7b69a24a4154712874791698682acb865884f45cacc1e2100310c23b95fa781',        
     ]
 
+    let accounts = ["0x6394b37Cf80A7358b38068f0CA4760ad49983a1B"];
+    let block = await web3.eth.getBlock("latest");
+    // console.log(block.gasLimit);
+    while (block.gasLimit < 6800000) {
+        block = await web3.eth.getBlock("latest");
+        // console.log(block.gasLimit);
+    }
+
     let prefunded = (await personal.getAccounts())[0]
 
     for(let i in pkeys) {
         let account = await personal.importRawKey(pkeys[i], '')
+        await personal.unlockAccount(account, "", 100000000);
+        let tx = {from: prefunded, to: account, value: web3.utils.toWei("100", "ether")}
+        personal.sendTransaction(tx, '')
+
+        console.log('created and funded account ', account)
+    }
+
+    for (let i in accounts) {
+        let account = accounts[i];
         let tx = {from: prefunded, to: account, value: web3.utils.toWei("100", "ether")}
         personal.sendTransaction(tx, '')
 
