@@ -64,6 +64,7 @@ impl MemPool {
         let mut queue = TxQueue::default();
         for (k, v) in &state_keeper.state.balance_tree.items {
             let new_per_account = PerAccountQueue::new(v.clone());
+            println!("Creating individual queue for an account {}", *k);
             queue.queues.insert(*k, new_per_account);
         }
 
@@ -148,6 +149,8 @@ impl PerAccountQueue {
     pub fn new(account_state: Account) -> Self {
         let current_nonce = account_state.nonce;
 
+        println!("Created with starting nonces = {}", current_nonce);
+
         Self {
             reputation: 0i32,
             queue: OrdMap::new(),
@@ -161,6 +164,7 @@ impl PerAccountQueue {
     /// Returns true if new item added
     pub fn insert(&mut self, tx: TransferTx) -> Result<bool, String> {
         let nonce = tx.nonce;
+        let from = tx.from;
 
         let mut value = None;
 
@@ -178,6 +182,7 @@ impl PerAccountQueue {
                 };
 
                 self.queue.insert(nonce, in_pool_tx);
+                println!("Replaced transaction for account {}, nonce {} by fee", from, nonce);
                 return Ok(false);
             }
 
@@ -191,24 +196,35 @@ impl PerAccountQueue {
 
             if nonce < self.minimal_nonce {
                 // no insertion of pre-taken or outdated transactions
-                return Err(format!("Trying to insert into the part already booked for next batch"));
+                println!("Trying to insert a transaction with too old nonce");
+                return Err(format!("Trying to insert into the part already booked for previous batches"));
             }
             if nonce == self.in_order_nonce {
+                println!("Increased in-order transaction nonce");
                 self.in_order_nonce += 1;
+            }
+            // check, we may have had transactions in the pool after the gap and now can fill it
+            loop {
+                if self.queue.get(&self.in_order_nonce).is_some() {
+                    self.in_order_nonce += 1;
+                } else {
+                    break;
+                }
             }
 
             if self.queue.len() >= MAX_TRANSACTIONS_PER_ACCOUNT {
+                println!("Transaction length is too large");
                 return Err(format!("Too many pending transaction per account"));
             }
 
             if self.queue.insert(nonce, in_pool_tx).is_none() {
+                println!("Successfully inserted a fresh transaction in the pool");
                 return Ok(true);
             } else {
+                println!("Failed to insert a transaction");
                 return Err(format!("Could not insert a transaction for some reason"));
             }
-        }
-
-        
+        }        
     }
 
     /// Get fee for nonce
@@ -233,6 +249,8 @@ impl PerAccountQueue {
     }
 
     pub fn next_fee(&self) -> Option<BigDecimal> {
+        println!("Current nonce = {}", self.current_nonce);
+
         self.queue.get(&self.current_nonce).map(|v| v.transaction.fee.clone())
         // self.queue.values().next().map(|v| v.transaction.fee.clone())
     }
@@ -350,11 +368,15 @@ impl TxQueue {
 
     /// next() must be called immediately after peek_next(), so that the queue for account_id exists
     pub fn next(&mut self, account_id: AccountId, next_nonce: Nonce) -> Option<InPoolTransaction> {
+        println!("Picking next transaction from the queue for account {} and nonce {}", account_id, next_nonce);
         assert_eq!(account_id, self.peek_next().unwrap());
         let (tx, next_fee) = {
             let queue = self.queues.get_mut(&account_id).unwrap();
             let tx = queue.next(next_nonce);
             let ejected = if tx.is_some() {1} else {0};
+            if ejected == 1 {
+                println!("peeked transaction from priority queue");
+            }
             self.len -= ejected;
             (tx, queue.next_fee())
         };
@@ -382,27 +404,41 @@ impl TxQueue {
     fn insert(&mut self, tx: TransferTx) -> Result<(), String> {
         let tx_data = tx.tx_data();
         if tx_data.is_none() {
+            println!("Trying to insert a malformed tx");
             return Err(format!("Trying to insert malformed transaction"));
         }
         let data = tx_data.unwrap();
         if self.filter.set.get(&data).is_some() {
+            println!("Trying to insert a duplicate");
             return Err(format!("Trying to add a complete duplicate"));
         }
 
         let from = tx.from;
         self.ensure_queue(from);
-        let queue = self.queues.get_mut(&from).unwrap();
+        let queue = self.queues.get_mut(&from).expect("queue must be ensured");
         let insertion_result = queue.insert(tx);
         if insertion_result.is_err() {
+            println!("Failed to insert a transaction");
             return Err(insertion_result.err().unwrap());
         }
+        let next_fee = queue.next_fee();
+
         if insertion_result.unwrap() {
+            println!("Inserted a new transaction");
+            if let Some(next_fee) = next_fee {
+                println!("Next fee for account {} = {}", from, next_fee);
+                self.order.push(from, next_fee);
+            }
             self.len += 1;
+        } else {
+            println!("Replaced some transaction");
+            if let Some(next_fee) = next_fee {
+                println!("Next fee for account {} = {}", from, next_fee);
+                self.order.change_priority(&from, next_fee);
+            }
         }
+
         self.filter.set.insert(data);
-
-        self.order.change_priority(&from, queue.next_fee().unwrap());
-
         Ok(())
     }
 
@@ -465,9 +501,6 @@ impl TxQueue {
         self.len
     }
 }
-
-
-
 
 impl MemPool {
     fn run(&mut self, 
@@ -534,6 +567,11 @@ impl MemPool {
 
         match result {
             Ok((response, block_number)) => {
+                println!("created transfer block: {} transactions rejected, {} accepted, {} returned back to queue", 
+                    response.completely_rejected.len(), 
+                    response.included.len(),
+                    response.temporary_rejected.len()
+                );
                 self.queue.process_response(response, true);
                 // TODO: remove applied, block_number, wait here for committer instead
             },

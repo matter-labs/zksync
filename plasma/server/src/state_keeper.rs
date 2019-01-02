@@ -115,8 +115,8 @@ impl PlasmaStateKeeper {
                     } 
                 },
                 StateProcessingRequest::GetLatestState(account_id, sender) => {
-                    let account = self.state.balance_tree.items.get(&account_id);
-                    let r = sender.send(None);
+                    let account = self.state.balance_tree.items.get(&account_id).cloned();
+                    let r = sender.send(account);
                     // .expect("queue to return state processing request must work");
                     if let Err(err) = r {
                         println!("GetLatestState: Error sending msg: {:?}", err);
@@ -183,7 +183,10 @@ impl PlasmaStateKeeper {
         while applied_transactions.len() < config::TRANSFER_BATCH_SIZE {
 
             let next_from = queue.peek_next();
-            if next_from.is_none() { break; }
+            if next_from.is_none() {
+                println!("no next from the pool"); 
+                break; 
+            }
             let next_from = next_from.unwrap();
 
             let from = self.account(next_from);
@@ -191,6 +194,7 @@ impl PlasmaStateKeeper {
             // rejected_transactions.append(&mut rejected);
 
             if let Some(pool_tx) = queue.next(next_from, from.nonce) {
+                println!("There is some transaction");
                 let tx = pool_tx.transaction.clone();
                 // save state before applying transactions
                 let to = self.account(tx.to);
@@ -202,6 +206,7 @@ impl PlasmaStateKeeper {
                 let appication_result = self.state.apply_transfer(&tx);
                 match appication_result {
                     Ok(()) => {
+                        println!("accepted transaction for account {}, nonce {}", tx.from, tx.nonce);
                         applied_transactions.push(tx);
                         response.included.push(pool_tx);
                     },
@@ -210,9 +215,11 @@ impl PlasmaStateKeeper {
                         self.state.balance_tree.insert(tx.to, to);
                         match error_type {
                             TransferApplicationError::InsufficientBalance => {
+                                println!("insufficient balance");
                                 response.temporary_rejected.push(pool_tx);
                             },
                             TransferApplicationError::NonceIsTooHigh => {
+                                println!("nonce is too high");
                                 response.temporary_rejected.push(pool_tx);
                             },
                             _ => {
