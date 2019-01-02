@@ -21,7 +21,7 @@ use super::config;
 use rand::{SeedableRng, Rng, XorShiftRng};
 
 use std::sync::mpsc::{Sender, Receiver};
-use fnv::FnvHashMap;
+use fnv::{FnvHashMap, FnvHashSet};
 use bigdecimal::{BigDecimal, ToPrimitive};
 use ff::{PrimeField, PrimeFieldRepr};
 
@@ -178,6 +178,7 @@ impl PlasmaStateKeeper {
             valid_but_not_included: Vec::new(),
             temporary_rejected: Vec::new(),
             completely_rejected: Vec::new(),
+            affected_accounts: FnvHashSet::default(),
         };
 
         while applied_transactions.len() < config::TRANSFER_BATCH_SIZE {
@@ -209,10 +210,12 @@ impl PlasmaStateKeeper {
                         println!("accepted transaction for account {}, nonce {}", tx.from, tx.nonce);
                         applied_transactions.push(tx);
                         response.included.push(pool_tx);
+                        response.affected_accounts.insert(next_from);
                     },
                     Err(error_type) => {
                         self.state.balance_tree.insert(tx.from, from);
                         self.state.balance_tree.insert(tx.to, to);
+                        response.affected_accounts.insert(next_from);
                         match error_type {
                             TransferApplicationError::InsufficientBalance => {
                                 println!("insufficient balance");
@@ -227,7 +230,6 @@ impl PlasmaStateKeeper {
                             }
                         };
                     },
-
                 }
             }
         }

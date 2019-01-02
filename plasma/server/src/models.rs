@@ -3,6 +3,7 @@ use plasma::models::*;
 use std::sync::mpsc::{Sender};
 use std::sync::Arc;
 use crate::schema::*;
+use fnv::{FnvHashSet};
 
 use super::mem_pool::TxQueue;
 
@@ -40,6 +41,7 @@ pub struct BlockAssemblyResponse{
     pub valid_but_not_included: Vec<InPoolTransaction>,
     pub temporary_rejected: Vec<InPoolTransaction>,
     pub completely_rejected: Vec<InPoolTransaction>,
+    pub affected_accounts: FnvHashSet<u32>,
 }
 
 pub type EncodedProof = [U256; 8];

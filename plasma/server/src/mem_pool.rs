@@ -130,7 +130,7 @@ struct PerAccountQueue {
     // the last taken nonce
     current_nonce: Nonce,
     // max nonce that has no gaps before it
-    in_order_nonce: Nonce,
+    next_nonce_without_gaps: Nonce,
 }
 
 pub trait NonceClient {
@@ -157,7 +157,7 @@ impl PerAccountQueue {
             pointer: 0,
             minimal_nonce: current_nonce,
             current_nonce: current_nonce,
-            in_order_nonce: current_nonce,
+            next_nonce_without_gaps: current_nonce,
         }
     }
 
@@ -199,22 +199,30 @@ impl PerAccountQueue {
                 println!("Trying to insert a transaction with too old nonce");
                 return Err(format!("Trying to insert into the part already booked for previous batches"));
             }
-            if nonce == self.in_order_nonce {
-                println!("Increased in-order transaction nonce");
-                self.in_order_nonce += 1;
-            }
-            // check, we may have had transactions in the pool after the gap and now can fill it
-            loop {
-                if self.queue.get(&self.in_order_nonce).is_some() {
-                    self.in_order_nonce += 1;
-                } else {
-                    break;
-                }
-            }
-
+            
             if self.queue.len() >= MAX_TRANSACTIONS_PER_ACCOUNT {
                 println!("Transaction length is too large");
                 return Err(format!("Too many pending transaction per account"));
+            }
+
+            if nonce == self.next_nonce_without_gaps {
+                println!("Increased in-order transaction nonce");
+                self.next_nonce_without_gaps += 1;
+                println!("New nonce without gaps = {}", self.next_nonce_without_gaps);
+                // check, we may have had transactions in the pool after the gap and now can fill it
+                loop {
+                    if self.queue.get(&self.next_nonce_without_gaps).is_some() {
+                        self.next_nonce_without_gaps += 1;
+                        println!("New nonce without gaps = {}", self.next_nonce_without_gaps);
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            if nonce > self.minimal_nonce + (MAX_TRANSACTIONS_PER_ACCOUNT / 2) as u32 {
+                println!("Inserting this far into the future is pointless");
+                return Err(format!("Inserting nonce too far into the future"));
             }
 
             if self.queue.insert(nonce, in_pool_tx).is_none() {
@@ -245,7 +253,7 @@ impl PerAccountQueue {
 
     /// Get next expected nonce without gaps
     fn next_nonce(&self) -> Nonce {
-        self.in_order_nonce
+        self.next_nonce_without_gaps
     }
 
     pub fn next_fee(&self) -> Option<BigDecimal> {
@@ -257,24 +265,22 @@ impl PerAccountQueue {
 
     // take an item from the queue. Move the queue pointer to this nonce value and do nothing else
     pub fn next(&mut self, expected_nonce: Nonce) -> Option<InPoolTransaction> {
-        if self.in_order_nonce >= expected_nonce {
-            // there were no gaps before, so it's allowed to take
-
-            if self.current_nonce != expected_nonce {
-                // can not take not the next one
-                return None;
-            }
-            // we've may be taken some transactions from the per-account pool already, so give the next one
-            if let Some(tx) = self.queue.get(&self.current_nonce) {
-                self.current_nonce += 1;
-                self.pointer += 1;
-                return Some(tx.clone());
-            }
-
+        if expected_nonce >= self.next_nonce_without_gaps {
             return None;
         }
+        // there were no gaps before, so it's allowed to take
 
-        // it's not allowed to take nonce with gaps
+        if self.current_nonce != expected_nonce {
+            // can not take not the next one
+            return None;
+        }
+        // we've may be taken some transactions from the per-account pool already, so give the next one
+        if let Some(tx) = self.queue.get(&self.current_nonce) {
+            self.current_nonce += 1;
+            self.pointer += 1;
+            return Some(tx.clone());
+        }
+
         None
     }
 
@@ -282,6 +288,7 @@ impl PerAccountQueue {
     pub fn reorganize(&mut self, reason: TransactionPickerResponse) {
         match reason {
             TransactionPickerResponse::Included(transaction) => {
+                println!("Removing included transaction form the pool");
                 // all calls here are expected to be ordered by nonce
                 let nonce = transaction.transaction.nonce;
                 if nonce != self.minimal_nonce {
@@ -295,8 +302,14 @@ impl PerAccountQueue {
                 self.minimal_nonce += 1;
             },
             TransactionPickerResponse::ValidButNotIncluded(transaction) => {
+                println!("Returning transaction to the pool without prejustice");
+                let old_length = self.queue.len();
                 let nonce = transaction.transaction.nonce;
+                println!("Current nonce = {}", self.current_nonce);
+                println!("Returned nonce = {}", nonce);
                 if nonce > self.current_nonce {
+                    // no action is required
+                    println!("Returned transaction is with the nonce higher than the current, do nothing");
                     return;
                 }
                 if nonce < self.minimal_nonce {
@@ -306,18 +319,24 @@ impl PerAccountQueue {
                 // make this nonce current
                 // change pointer
                 // don't change the minimal
+                println!("Old pointer = {}", self.pointer);
                 let new_pointer = self.pointer + nonce - self.current_nonce;
+                println!("New pointer = {}", new_pointer);
                 // move pointer backwards
                 self.current_nonce = nonce; 
-                self.queue = self.queue.skip( (self.pointer - new_pointer) as usize);
                 self.pointer = new_pointer;
+                let new_length = self.queue.len();
+                assert_eq!(old_length, new_length);
+                // no actions about the queue
 
             },
             TransactionPickerResponse::TemporaryRejected(transaction) => {
                 // don't need to check for a first item, just check how far from the begining transactions
                 // were rejected and if any one of those should be pushed out from the pool - just purge the rest too
+                println!("Returning transaction to the pool with penalties");
                 if transaction.timestamp + transaction.lifetime <= std::time::Instant::now() {
-                    let mut nonce = transaction.transaction.nonce;
+                    // this transaction is dead, so purge it
+                    let  nonce = transaction.transaction.nonce;
                     if nonce > self.current_nonce {
                         // do nothing, it was purged already, 
                         return;
@@ -325,23 +344,46 @@ impl PerAccountQueue {
                     if nonce < self.minimal_nonce {
                         panic!("Account queue is in inconsistent state!");
                     }
-                    nonce -= 1;
                     // one nonce is already dead, so purge everything after
                     let distance = self.pointer + nonce - self.current_nonce;
-                    self.queue = self.queue.take(distance as usize);
+                    self.queue.remove(&nonce);
                     self.pointer = distance;
                     self.current_nonce = nonce;
+                    if self.next_nonce_without_gaps >= nonce + 1 {
+                        self.next_nonce_without_gaps = nonce;
+                    }
+                } else {
+                    let nonce = transaction.transaction.nonce;
+                    if nonce < self.minimal_nonce {
+                        panic!("Account queue is in inconsistent state!");
+                    }
+                    if self.queue.get(&nonce).is_some() {
+                        self.queue.insert(nonce, transaction);
+                    }
+                    if nonce > self.current_nonce {
+                        // do nothing, it was purged already, 
+                        return;
+                    }
+                    println!("Old pointer = {}", self.pointer);
+                    let new_pointer = self.pointer + nonce - self.current_nonce;
+                    println!("New pointer = {}", new_pointer);
+                    // move pointer backwards
+                    self.current_nonce = nonce; 
+                    self.pointer = new_pointer;
+                    // no actions about the queue
                 }
             },
             TransactionPickerResponse::RejectedCompletely(transaction) => {
+                println!("Removing transaction from the pool due to rejection");
                 // just delete this one and all after
                 let mut nonce = transaction.transaction.nonce;
+                if nonce < self.minimal_nonce {
+                    panic!("Account queue is in inconsistent state!");
+                }
+                self.queue.remove(&nonce);
                 if nonce > self.current_nonce {
                     // do nothing, it was purged already, 
                     return;
-                }
-                if nonce < self.minimal_nonce {
-                    panic!("Account queue is in inconsistent state!");
                 }
                 nonce -= 1;
                 // one nonce is already dead, so purge everything after
@@ -354,7 +396,8 @@ impl PerAccountQueue {
     }
 
     pub fn len(&self) -> usize {
-        self.queue.len()
+        (self.next_nonce_without_gaps - self.minimal_nonce) as usize
+        // self.queue.len()
     } 
 
 }
@@ -369,6 +412,9 @@ impl TxQueue {
     /// next() must be called immediately after peek_next(), so that the queue for account_id exists
     pub fn next(&mut self, account_id: AccountId, next_nonce: Nonce) -> Option<InPoolTransaction> {
         println!("Picking next transaction from the queue for account {} and nonce {}", account_id, next_nonce);
+        if self.peek_next().is_none() {
+            return None;
+        }
         assert_eq!(account_id, self.peek_next().unwrap());
         let (tx, next_fee) = {
             let queue = self.queues.get_mut(&account_id).unwrap();
@@ -382,7 +428,8 @@ impl TxQueue {
         };
         if let Some(next_fee) = next_fee {
             // update priority
-            self.order.change_priority(&account_id, next_fee);
+            // pushing a duplicate is equivalent to update
+            self.order.push(account_id, next_fee);
         } else {
             // remove current account from the queue
             self.order.pop();
@@ -416,6 +463,7 @@ impl TxQueue {
         let from = tx.from;
         self.ensure_queue(from);
         let queue = self.queues.get_mut(&from).expect("queue must be ensured");
+        let old_length = queue.len();
         let insertion_result = queue.insert(tx);
         if insertion_result.is_err() {
             println!("Failed to insert a transaction");
@@ -429,22 +477,35 @@ impl TxQueue {
                 println!("Next fee for account {} = {}", from, next_fee);
                 self.order.push(from, next_fee);
             }
-            self.len += 1;
         } else {
             println!("Replaced some transaction");
             if let Some(next_fee) = next_fee {
                 println!("Next fee for account {} = {}", from, next_fee);
-                self.order.change_priority(&from, next_fee);
+                self.order.push(from, next_fee);
             }
         }
 
         self.filter.set.insert(data);
+        let new_length = queue.len();
+        println!("Inserted something into the queue, old len = {}, new len = {}", old_length, new_length);
+
+        self.len += new_length;
+        self.len -= old_length;
+
         Ok(())
     }
 
     fn process_response(&mut self, response: BlockAssemblyResponse, block_was_assembled: bool) {
-        let BlockAssemblyResponse {included, valid_but_not_included, temporary_rejected, completely_rejected} = response;
+        println!("Processing reponse, old queue length = {}", self.len());
+        let BlockAssemblyResponse {included, valid_but_not_included, temporary_rejected, completely_rejected, affected_accounts} = response;
         let mut affected_accounts: FnvHashSet<u32> = FnvHashSet::default();
+        let mut old_lengths: FnvHashMap<u32, usize> = FnvHashMap::default();
+
+        for from in affected_accounts.clone() {
+            let queue = self.queues.get_mut(&from).expect("queue is never discarded even when empty");
+            let old_length = queue.len();
+            old_lengths.insert(from, old_length);
+        }
 
         if block_was_assembled {
             // accept all transacitons
@@ -454,17 +515,15 @@ impl TxQueue {
                 let tx_data = pool_tx.transaction.tx_data().expect("transaction in response is always almost valid");
                 queue.reorganize(TransactionPickerResponse::Included(pool_tx));
                 self.filter.set.remove(&tx_data);
-                affected_accounts.insert(from);
             }
         } else {
-            // accept all transacitons
+            // return transactions
             for pool_tx in valid_but_not_included {
                 let from = pool_tx.transaction.from;
                 let queue = self.queues.get_mut(&from).expect("queue is never discarded even when empty");
                 let tx_data = pool_tx.transaction.tx_data().expect("transaction in response is always almost valid");
                 queue.reorganize(TransactionPickerResponse::ValidButNotIncluded(pool_tx));
                 self.filter.set.remove(&tx_data);
-                affected_accounts.insert(from);
             }
         }
         for pool_tx in temporary_rejected {
@@ -476,7 +535,6 @@ impl TxQueue {
             modified_tx.lifetime = modified_tx.lifetime / 2;
             queue.reorganize(TransactionPickerResponse::TemporaryRejected(modified_tx));
             self.filter.set.remove(&tx_data);
-            affected_accounts.insert(from);
         }
 
         for pool_tx in completely_rejected {
@@ -485,15 +543,24 @@ impl TxQueue {
             let tx_data = pool_tx.transaction.tx_data().expect("transaction in response is always almost valid");
             queue.reorganize(TransactionPickerResponse::RejectedCompletely(pool_tx));
             self.filter.set.remove(&tx_data);
-            affected_accounts.insert(from);
         }
 
+        println!("Updating priorities for affected accounts");
         for account in affected_accounts {
             let queue = self.queues.get(&account).expect("queue is never discarded even when empty");
             if let Some(fee) = queue.next_fee() {
-                self.order.change_priority(&account, fee);
+                self.order.push(account, fee);
             }
         }
+
+        for (k, v) in old_lengths {
+            let queue = self.queues.get(&k).expect("queue is never discarded even when empty");
+            let new_length = queue.len();
+            self.len += new_length;
+            self.len -= v;
+        }
+
+        println!("Done processing reponse, new queue length = {}", self.len());
 
     }
 
@@ -528,7 +595,14 @@ impl MemPool {
                 MempoolRequest::ProcessBatch => {
                     self.batch_requested = false;
                     let do_padding = false; // TODO: use when neccessary
-                    self.process_batch(do_padding, &tx_for_blocks);
+                    if !self.batch_requested && self.queue.len() >= config::TRANSFER_BATCH_SIZE {
+                        self.process_batch(do_padding, &tx_for_blocks);
+                        if !self.batch_requested && self.queue.len() >= config::TRANSFER_BATCH_SIZE {
+                            println!("After previous response processing we can already make a new one");
+                            self.batch_requested = true;
+                            tx_for_requests.send(MempoolRequest::ProcessBatch);
+                        }
+                    }
                 },
                 MempoolRequest::GetPendingNonce(account_id, channel) => {
                     channel.send(Some(self.next_nonce(account_id)));
