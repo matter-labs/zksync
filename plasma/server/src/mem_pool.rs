@@ -16,6 +16,7 @@ const MAX_TRANSACTIONS_PER_ACCOUNT: usize = 128;
 const MAX_SEARCH_DEPTH: usize = 4;
 const TX_LIFETIME: std::time::Duration = std::time::Duration::from_secs(3600);
 const RETUTATION_PRICE: u128 = 0;
+const MAX_GAP: u32 = 16;
 
 use plasma::models::{Account};
 
@@ -220,7 +221,7 @@ impl PerAccountQueue {
                 }
             }
 
-            if nonce > self.minimal_nonce + (MAX_TRANSACTIONS_PER_ACCOUNT / 2) as u32 {
+            if nonce > self.next_nonce_without_gaps + MAX_GAP {
                 println!("Inserting this far into the future is pointless");
                 return Err(format!("Inserting nonce too far into the future"));
             }
@@ -423,7 +424,7 @@ impl TxQueue {
             if ejected == 1 {
                 println!("peeked transaction from priority queue");
             }
-            self.len -= ejected;
+            // self.len -= ejected;
             (tx, queue.next_fee())
         };
         if let Some(next_fee) = next_fee {
