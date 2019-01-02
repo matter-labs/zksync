@@ -168,7 +168,6 @@ import ethUtil from 'ethjs-util'
 import transactionLib from '../../contracts/lib/transaction.js'
 import ABI from './contract'
 
-const baseUrl = 'https://api.plasma-winter.io'
 const maxExitEntries = 32;
 
 export default {
@@ -190,17 +189,18 @@ export default {
         console.log('start')
         let result = await axios({
             method: 'get',
-            url:    baseUrl + '/details',
+            url:    this.baseUrl + '/details',
         })
         if(!result.data) throw "Can not load contract address"
         store.contractAddress = result.data.address
         window.contractAddress = result.data.address
 
-        let contract = window.eth.contract(ABI).at(window.contractAddress);
+        console.log('contract: ', window.contractAddress)
+        let contract = window.eth.contract(ABI).at(window.contractAddress)
 
         window.contract = contract
 
-        window.ethersContract = new ethers.Contract(window.contractAddress, ABI, window.ethersProvider);
+        window.ethersContract = new ethers.Contract(window.contractAddress, ABI, window.ethersProvider)
 
         this.updateAccountInfo()
         window.t = this
@@ -208,6 +208,7 @@ export default {
     destroyed() {
     },
     computed: {
+        baseUrl: () => web3.version.network === '4' ? 'https://api.plasma-winter.io' : 'http://localhost:80',
         store: () => store,
         contractAddress: () => window.contractAddress,
         depositProblem() {
@@ -315,14 +316,14 @@ export default {
             const apiForm = transactionLib.createTransaction(from, to, amount, fee, nonce, good_until_block, privateKey);
             const result = await axios({
                 method:     'post',
-                url:        baseUrl + '/send',
+                url:        this.baseUrl + '/send',
                 data:       apiForm
             });
             if(result.data.accepted) {
                 this.alert(`Transaction with nonce #${this.nonce} accepted`, 'success')
                 let new_nonce_result = await axios({
                         method: 'get',
-                        url:    baseUrl + '/account/' + from,
+                        url:    this.baseUrl + '/account/' + from,
                     })
                 if(!new_nonce_result.error) {
                     let new_nonce = new_nonce_result.data.pending_nonce
@@ -353,7 +354,7 @@ export default {
             //console.log(`getAccountInfo ${accountId}`)
             let result = (await axios({
                 method: 'get',
-                url:    baseUrl + '/account/' + accountId,
+                url:    this.baseUrl + '/account/' + accountId,
             }))
             if(result.status !== 200) {
                 throw `Could not load data for account ${accountId}: ${result.error}`
@@ -481,6 +482,7 @@ export default {
                 }
             } catch (err) {
                 this.alert('Status update failed: ' + err)
+                console.log(err)
             }
             if(timer === this.updateTimer) { // if this handler is still valid
                 store.account.address = newData.address

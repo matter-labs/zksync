@@ -1,7 +1,7 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
 use std::sync::mpsc;
-use plasma::models::{TransferTx, PublicKey, Account};
+use plasma::models::{TransferTx, PublicKey, Account, Nonce};
 use super::models::StateProcessingRequest;
 use super::storage::{ConnectionPool, StorageProcessor};
 use super::mem_pool::{MempoolRequest};
@@ -49,10 +49,10 @@ struct DetailsResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct AccountDetailsResponse {
-    pending_nonce: Option<u32>,
-    pending: Option<Account>,
-    verified: Option<Account>,
-    committed: Option<Account>,
+    pending_nonce:  Nonce,
+    pending:        Option<Account>,
+    verified:       Option<Account>,
+    committed:      Option<Account>,
 }
 
 // singleton to keep info about channels required for Http server
@@ -138,11 +138,19 @@ fn handle_get_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     tx_to_mempool.send(MempoolRequest::GetPendingNonce(account_id_u32, nonce_tx)).expect("must send request for a pending nonce to mempool");
     let pending_nonce = nonce_rx.recv_timeout(std::time::Duration::from_millis(100)).expect("must get pending nonce in time");
 
+    // TODO: compare to client
+    let pending_nonce = std::cmp::max(
+        pending_nonce.unwrap_or(0), 
+        account_info.as_ref().map(|pending| pending.nonce).unwrap_or(0)
+    );
+
+    // QUESTION: why do we need committed here?
+
     let response = AccountDetailsResponse {
-        pending_nonce: pending_nonce,
+        pending_nonce,
         pending: account_info,
-        verified: verified,
-        committed: committed,
+        verified,
+        committed,
     };
 
     Ok(HttpResponse::Ok().json(response))

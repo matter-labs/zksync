@@ -34,6 +34,8 @@ serde_bytes = "0.10.4"
 #r2d2_postgres = "0.14.0"
 
 im = "12.2.0"
+priority-queue = "0.5.2"
+num-traits = "0.2"
 
 actix = "0.7.7"
 actix-web = "0.7.14"

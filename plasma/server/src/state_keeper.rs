@@ -10,18 +10,20 @@ use web3::types::{U128, H256, U256};
 use std::str::FromStr;
 
 use plasma::models::{self, *};
+use plasma::models::state::{TransferApplicationError};
 
-use super::models::{Operation, Action, EthBlockData};
+use super::models::{StateProcessingRequest, Operation, Action, EthBlockData, BlockAssemblyResponse, InPoolTransaction};
+use super::mem_pool::{TxQueue};
 use super::prover::BabyProver;
 use super::storage::{ConnectionPool, StorageProcessor};
+use super::config;
 
 use rand::{SeedableRng, Rng, XorShiftRng};
 
 use std::sync::mpsc::{Sender, Receiver};
-use fnv::FnvHashMap;
-use bigdecimal::BigDecimal;
-
-use super::models::StateProcessingRequest;
+use fnv::{FnvHashMap, FnvHashSet};
+use bigdecimal::{BigDecimal, ToPrimitive};
+use ff::{PrimeField, PrimeFieldRepr};
 
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
@@ -33,6 +35,10 @@ pub struct PlasmaStateKeeper {
     connection_pool: ConnectionPool
 
 }
+
+type RootHash = H256;
+type UpdatedAccounts = AccountMap;
+type AppliedBlock = (RootHash, EthBlockData, UpdatedAccounts);
 
 impl PlasmaStateKeeper {
 
@@ -57,6 +63,22 @@ impl PlasmaStateKeeper {
         keeper
     }
 
+    fn commit_block(&mut self, tx_for_commitments: &Sender<Operation>, block: Block, result: AppliedBlock) {
+        let (new_root, block_data, accounts_updated) = result;
+        // send commitment tx to eth
+        let op = Operation{
+            action:         Action::Commit{new_root, block: Some(block)},
+            block_number:   self.state.block_number,
+            block_data,
+            accounts_updated,
+        };
+
+        tx_for_commitments.send(op).expect("must send new operation for commitment");
+
+        // bump current block number as we've made one
+        self.state.block_number += 1;
+    }
+
     fn run(&mut self, 
         rx_for_blocks: Receiver<StateProcessingRequest>, 
         tx_for_commitments: Sender<Operation>,
@@ -64,48 +86,41 @@ impl PlasmaStateKeeper {
     {
         for req in rx_for_blocks {
             match req {
-                StateProcessingRequest::ApplyBlock(mut block, source) => {
-                    let applied = match &mut block {
-                        &mut Block::Transfer(ref mut block) => self.apply_transfer_block(block),
-                        &mut Block::Deposit(ref mut block, batch_number) => self.apply_deposit_block(block, batch_number),
-                        &mut Block::Exit(ref mut block, batch_number) => self.apply_exit_block(block, batch_number),
-                    };
-                    let result = match applied {
-                        Ok((new_root, block_data, accounts_updated)) => {
-                            // send commitment tx to eth
-                            let op = Operation{
-                                action:         Action::Commit{new_root, block: Some(block)},
-                                block_number:   self.state.block_number,
-                                block_data,
-                                accounts_updated,
-                            };
+                StateProcessingRequest::CreateTransferBlock(mut queue, do_padding, sender) => {
+                    let result = self.create_transfer_block(do_padding, &mut queue);
+                    match result {
+                        Ok((block, applied_block, response)) => {
+                            sender.send( ( queue, Ok( (response, block.block_number) ) ) ).expect("must send back block processing result");
 
-                            tx_for_commitments.send(op).expect("must send new operation for commitment");
-
-                            // bump current block number as we've made one
-                            self.state.block_number += 1;
-
-                            Ok(())
+                            self.commit_block(&tx_for_commitments, Block::Transfer(block), applied_block);
                         },
-                        Err(_) => Err(block),
-                    };
-                    if let Some(sender) = source {
-                        sender.send(result).expect("must send back block processing result");
+                        Err(response) => {
+                            sender.send( ( queue, Err(response) ) ).expect("must send back block processing result");
+                        },
                     }
+                },
+                StateProcessingRequest::ApplyBlock(mut block) => {
+                    let result = match block {
+                        Block::Transfer(_) => panic!("Transfer blocks must be handled in ApplyTransferBlock"),
+                        Block::Deposit(ref mut block, batch_number) => self.apply_deposit_block(block, batch_number),
+                        Block::Exit(ref mut block, batch_number) => self.apply_exit_block(block, batch_number),
+                    };
+                    self.commit_block(&tx_for_commitments, block, result);
                 },
                 StateProcessingRequest::GetPubKey(account_id, sender) => {
-                    sender.send(self.state.get_pub_key(account_id));
+                    let r = sender.send(self.state.get_pub_key(account_id));
                     // .expect("must send request for a public key");
+                    if let Err(err) = r {
+                        println!("GetPubKey: Error sending msg: {:?}", err);
+                    } 
                 },
                 StateProcessingRequest::GetLatestState(account_id, sender) => {
-                    let pk = self.state.get_pub_key(account_id);
-                    if pk.is_none() {
-                        sender.send(None);
-                        // .expect("queue to return state processing request must work");
-                    }
-                    let account = self.account(account_id);
-                    sender.send(Some(account));
-                        // .expect("queue to return state processing request must work");
+                    let account = self.state.balance_tree.items.get(&account_id).cloned();
+                    let r = sender.send(account);
+                    // .expect("queue to return state processing request must work");
+                    if let Err(err) = r {
+                        println!("GetLatestState: Error sending msg: {:?}", err);
+                    } 
                 }
             }
         }
@@ -149,54 +164,111 @@ impl PlasmaStateKeeper {
         block.transactions = txes;
     }
 
-    fn apply_transfer_block(&mut self, block: &mut TransferBlock) -> Result<(H256, EthBlockData, AccountMap), ()> {
-        use ff::{PrimeField, PrimeFieldRepr};
-        use bigdecimal::{ToPrimitive};
-        let mut saved_state = FnvHashMap::<u32, Account>::default();
-        let mut updated_accounts = FnvHashMap::<u32, Account>::default();
-
-        // TODO: this assert is for test, remove in production
+    fn create_transfer_block(&mut self, do_padding: bool, queue: &mut TxQueue) -> 
+        Result<(TransferBlock, AppliedBlock, BlockAssemblyResponse), BlockAssemblyResponse> 
+    {
+        let mut block = TransferBlock::default();
         let root_hash = self.state.root_hash();
 
-        // save state before applying transactions
-        for tx in block.transactions.iter() {
-            saved_state.insert(tx.from, self.account(tx.from));
-            saved_state.insert(tx.to, self.account(tx.to));
+        let mut original_state = FnvHashMap::<u32, Account>::default();
+        let mut applied_transactions: Vec<TransferTx> = Vec::with_capacity(config::TRANSFER_BATCH_SIZE);
+
+        let mut response = BlockAssemblyResponse {
+            included: Vec::with_capacity(config::TRANSFER_BATCH_SIZE),
+            valid_but_not_included: Vec::new(),
+            temporary_rejected: Vec::new(),
+            completely_rejected: Vec::new(),
+            affected_accounts: FnvHashSet::default(),
+        };
+
+        while applied_transactions.len() < config::TRANSFER_BATCH_SIZE {
+
+            let next_from = queue.peek_next();
+            if next_from.is_none() {
+                println!("no next from the pool"); 
+                break; 
+            }
+            let next_from = next_from.unwrap();
+
+            let from = self.account(next_from);
+            // let (mut rejected, tx) = queue.next(next_from, from.nonce);
+            // rejected_transactions.append(&mut rejected);
+
+            if let Some(pool_tx) = queue.next(next_from, from.nonce) {
+                println!("There is some transaction");
+                let tx = pool_tx.transaction.clone();
+                // save state before applying transactions
+                let to = self.account(tx.to);
+
+                // only saving once per account, so that we keep the original state
+                if !original_state.contains_key(&tx.from) { original_state.insert(tx.from, from.clone()); }
+                if !original_state.contains_key(&tx.to) { original_state.insert(tx.to, to.clone()); }
+
+                let appication_result = self.state.apply_transfer(&tx);
+                match appication_result {
+                    Ok(()) => {
+                        println!("accepted transaction for account {}, nonce {}", tx.from, tx.nonce);
+                        applied_transactions.push(tx);
+                        response.included.push(pool_tx);
+                        response.affected_accounts.insert(next_from);
+                    },
+                    Err(error_type) => {
+                        self.state.balance_tree.insert(tx.from, from);
+                        self.state.balance_tree.insert(tx.to, to);
+                        response.affected_accounts.insert(next_from);
+                        match error_type {
+                            TransferApplicationError::InsufficientBalance => {
+                                println!("insufficient balance");
+                                response.temporary_rejected.push(pool_tx);
+                            },
+                            TransferApplicationError::NonceIsTooHigh => {
+                                println!("nonce is too high");
+                                response.temporary_rejected.push(pool_tx);
+                            },
+                            _ => {
+                                response.completely_rejected.push(pool_tx);
+                            }
+                        };
+                    },
+                }
+            }
         }
 
-        let transactions: Vec<TransferTx> = block.transactions.clone()
-            .into_iter()
-            .filter(|tx| self.state.apply_transfer(&tx).is_ok())
-            .collect();
-        
-        if transactions.len() != block.transactions.len() {
-            // some transactions were rejected, revert state
-            println!("reverting the state");
+        if do_padding && applied_transactions.len() > 0 {
+            unimplemented!()
+            // TODO: implement padding
+        }
 
-            for (k,v) in saved_state.into_iter() {
+        assert_eq!(applied_transactions.len(), response.included.len());
+
+        if applied_transactions.len() != config::TRANSFER_BATCH_SIZE {
+            // some transactions were rejected, revert state
+            println!("reverting the state: expected {} transactions, got only {}", config::TRANSFER_BATCH_SIZE, applied_transactions.len());
+
+            for (k,v) in original_state.into_iter() {
                 // TODO: add tree.insert_existing() for performance
                 self.state.balance_tree.insert(k, v);
             }
 
-            block.transactions = transactions;
-
-            // TODO: this assert is for test, remove in production
             assert_eq!(root_hash, self.state.root_hash());
-
-            return Err(());
+            response.valid_but_not_included = response.included;
+            response.included = vec![];
+            return Err(response);
         }
 
         // collect updated state
-        for tx in transactions.iter() {
+        let mut updated_accounts = FnvHashMap::<u32, Account>::default();
+        for tx in applied_transactions.iter() {
             updated_accounts.insert(tx.from, self.account(tx.from));
             updated_accounts.insert(tx.to, self.account(tx.to));
         }
-            
+ 
         let mut total_fees = 0u128;
-        for tx in transactions {
+        for tx in applied_transactions.iter() {
             total_fees += tx.fee.to_u128().expect("fee should not overflow u128");
         }
 
+        block.transactions = applied_transactions.clone();
         block.block_number = self.state.block_number;
         block.new_root_hash = self.state.root_hash();
 
@@ -204,16 +276,16 @@ impl PlasmaStateKeeper {
             total_fees:     U128::from_dec_str(&total_fees.to_string()).expect("fee should fit into U128 Ethereum type"), 
             public_data:    BabyProver::encode_transfer_transactions(&block).unwrap(),
         };
+
         let mut be_bytes: Vec<u8> = vec![];
-        &block.new_root_hash.clone().into_repr().write_be(& mut be_bytes);
+        &block.new_root_hash.clone().into_repr().write_be(&mut be_bytes);
         let root = H256::from(U256::from_big_endian(&be_bytes));
-        println!("Block was assembled");
-        Ok((root, eth_block_data, updated_accounts))
+
+        println!("block was assembled");
+        Ok(( block, (root, eth_block_data, updated_accounts), response ))
     }
 
-    fn apply_deposit_block(&mut self, block: &mut DepositBlock, batch_number: BatchNumber) -> Result<(H256, EthBlockData, AccountMap), ()> {
-        use ff::{PrimeField, PrimeFieldRepr};
-
+    fn apply_deposit_block(&mut self, block: &mut DepositBlock, batch_number: BatchNumber) -> AppliedBlock {
         Self::sort_deposit_block(block);
 
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
@@ -231,13 +303,12 @@ impl PlasmaStateKeeper {
         let mut be_bytes: Vec<u8> = vec![];
         &block.new_root_hash.clone().into_repr().write_be(& mut be_bytes);
         let root = H256::from(U256::from_big_endian(&be_bytes));
-        Ok((root, eth_block_data, updated_accounts))
+        
+        (root, eth_block_data, updated_accounts)
     }
 
     // prover MUST read old balances and mutate the block data
-    fn apply_exit_block(&mut self, block: &mut ExitBlock, batch_number: BatchNumber) -> Result<(H256, EthBlockData, AccountMap), ()> {
-        use ff::{PrimeField, PrimeFieldRepr};
-        
+    fn apply_exit_block(&mut self, block: &mut ExitBlock, batch_number: BatchNumber) -> AppliedBlock {        
         Self::sort_exit_block(block);
 
         let mut updated_accounts = FnvHashMap::<u32, Account>::default();
@@ -260,33 +331,8 @@ impl PlasmaStateKeeper {
         let mut be_bytes: Vec<u8> = vec![];
         &block.new_root_hash.clone().into_repr().write_be(& mut be_bytes);
         let root = H256::from(U256::from_big_endian(&be_bytes));
-        Ok((root, eth_block_data, updated_accounts))
+        (root, eth_block_data, updated_accounts)
     }
-
-
-    // // augument and sign transaction (for demo only; TODO: remove this!)
-    // fn augument_and_sign(&self, mut tx: TransferTx) -> TransferTx {
-
-    //     let from = self.state.balance_tree.items.get(&tx.from).unwrap().clone();
-    //     tx.nonce = from.nonce;
-    //     tx.good_until_block = self.state.block_number;
-
-    //     let sk = self.private_keys.get(&tx.from).unwrap();
-    //     Self::sign_tx(&mut tx, sk);
-    //     tx
-    // }
-
-    // // TODO: remove this function when done with demo
-    // fn sign_tx(tx: &mut TransferTx, sk: &PrivateKey<Bn256>) {
-    //     // let params = &AltJubjubBn256::new();
-    //     let p_g = FixedGenerators::SpendingKeyGenerator;
-    //     let mut rng = OsRng::new().unwrap();
-
-    //     let mut tx_fr = models::circuit::TransferTx::try_from(tx).unwrap();
-    //     tx_fr.sign(sk, p_g, &params::JUBJUB_PARAMS, &mut rng);
-    //     tx.signature = TxSignature::try_from(tx_fr.signature).expect("serialize signature");
-    // }
-
 }
 
 pub fn start_state_keeper(mut sk: PlasmaStateKeeper, 

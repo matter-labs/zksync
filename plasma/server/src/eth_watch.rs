@@ -346,7 +346,7 @@ impl EthWatch {
             transactions: all_deposits,
             new_root_hash: Fr::zero(),
         };
-        let request = StateProcessingRequest::ApplyBlock(Block::Deposit(block, self.last_deposit_batch.as_u32()), None);
+        let request = StateProcessingRequest::ApplyBlock(Block::Deposit(block, self.last_deposit_batch.as_u32()));
 
         let send_result = channel.send(request);
 
@@ -529,7 +529,7 @@ impl EthWatch {
             transactions: all_exits,
             new_root_hash: Fr::zero(),
         };
-        let request = StateProcessingRequest::ApplyBlock(Block::Exit(block, self.last_exit_batch.as_u32()), None);
+        let request = StateProcessingRequest::ApplyBlock(Block::Exit(block, self.last_exit_batch.as_u32()));
 
         let send_result = channel.send(request);
 
@@ -547,13 +547,4 @@ pub fn start_eth_watch(mut eth_watch: EthWatch, tx_for_blocks: Sender<StateProce
     std::thread::Builder::new().name("eth_watch".to_string()).spawn(move || {
         eth_watch.run(tx_for_blocks);
     });
-}
-
-#[test]
-fn test_eth_watcher() {
-
-    let mut client = EthWatch::new(3, 0);
-    let (tx_for_state, rx) = std::sync::mpsc::channel::<StateProcessingRequest>();
-
-    client.run(tx_for_state);
 }

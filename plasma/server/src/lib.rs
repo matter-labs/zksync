@@ -47,3 +47,7 @@ extern crate serde_bytes;
 extern crate diesel;
 extern crate dotenv;
 extern crate bigdecimal;
+
+extern crate priority_queue;
+extern crate im;
+extern crate num_traits;

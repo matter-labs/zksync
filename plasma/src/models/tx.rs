@@ -17,7 +17,7 @@ use rustc_hex::ToHex;
 use std::cmp::{Ord, PartialEq, PartialOrd, Eq, Ordering};
 
 /// Unpacked transaction data
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct TransferTx {
     pub from:               u32,
     pub to:                 u32,
@@ -30,6 +30,12 @@ pub struct TransferTx {
     /// If present, it means that the signature has been verified against this key
     #[serde(skip)]
     pub cached_pub_key:     Option<PublicKey>,       
+}
+
+impl std::fmt::Debug for TransferTx {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "tx{{ from: {}, to: {}, nonce: {}, amount: {} }}", self.from, self.to, self.nonce, self.amount)
+    }
 }
 
 impl Ord for TransferTx {
@@ -81,26 +87,42 @@ impl TransferTx {
         r
     }
 
+    pub fn tx_data(&self) -> Option<Vec<u8>> {
+        let message_bits = self.message_bits();
+
+        if message_bits.len() % 8 != 0 {
+            return None;
+        }
+        let as_bytes = pack_bits_into_bytes(message_bits);
+
+        Some(as_bytes)
+    }
+
     pub fn verify_sig(
             &self, 
             public_key: &PublicKey
         ) -> bool {
         let message_bits = self.message_bits();
-        assert_eq!(message_bits.len() % 8, 0);
+        if message_bits.len() % 8 != 0 {
+            return false;
+        }
         let as_bytes = pack_bits_into_bytes(message_bits);
-        let hex: String = as_bytes.clone().to_hex();
-        println!("Transaction bytes = {}", hex);
-        let signature = self.signature.to_jubjub_eddsa().expect("should parse signature");
-        let p_g = FixedGenerators::SpendingKeyGenerator;
-        let valid = public_key.verify_for_raw_message(
-            &as_bytes, 
-            &signature, 
-            p_g, 
-            &params::JUBJUB_PARAMS, 
-            30
-        );
+        // let hex: String = as_bytes.clone().to_hex();
+        // println!("Transaction bytes = {}", hex);
+        if let Ok(signature) = self.signature.to_jubjub_eddsa() {
+            let p_g = FixedGenerators::SpendingKeyGenerator;
+            let valid = public_key.verify_for_raw_message(
+                &as_bytes, 
+                &signature, 
+                p_g, 
+                &params::JUBJUB_PARAMS, 
+                30
+            );
 
-        valid
+            return valid;
+        }
+
+        false
     }
 
     pub fn validate(&self) -> bool {
@@ -130,7 +152,7 @@ pub struct ExitTx{
     pub amount:             BigDecimal,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct TxSignature{
     pub r_x: Fr,
     pub r_y: Fr,
