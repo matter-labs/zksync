@@ -10,9 +10,10 @@ use web3::types::{U128, H256, U256};
 use std::str::FromStr;
 
 use plasma::models::{self, *};
+use plasma::models::state::{TransferApplicationError};
 
-use super::models::{StateProcessingRequest, Operation, Action, EthBlockData, AppliedTransactions, RejectedTransactions};
-use super::mem_pool::TxQueue;
+use super::models::{StateProcessingRequest, Operation, Action, EthBlockData, BlockAssemblyResponse, InPoolTransaction};
+use super::mem_pool::{TxQueue};
 use super::prover::BabyProver;
 use super::storage::{ConnectionPool, StorageProcessor};
 use super::config;
@@ -88,12 +89,13 @@ impl PlasmaStateKeeper {
                 StateProcessingRequest::CreateTransferBlock(mut queue, do_padding, sender) => {
                     let result = self.create_transfer_block(do_padding, &mut queue);
                     match result {
-                        Ok((block, applied_block, applied_transactions)) => {
-                            sender.send(( queue, Ok(( applied_transactions, block.block_number )) )).expect("must send back block processing result");
+                        Ok((block, applied_block, response)) => {
+                            sender.send( ( queue, Ok( (response, block.block_number) ) ) ).expect("must send back block processing result");
+
                             self.commit_block(&tx_for_commitments, Block::Transfer(block), applied_block);
                         },
-                        Err((applied, rejected)) => {
-                            sender.send(( queue, Err((applied, rejected)) )).expect("must send back block processing result");
+                        Err(response) => {
+                            sender.send( ( queue, Err(response) ) ).expect("must send back block processing result");
                         },
                     }
                 },
@@ -163,14 +165,20 @@ impl PlasmaStateKeeper {
     }
 
     fn create_transfer_block(&mut self, do_padding: bool, queue: &mut TxQueue) -> 
-        Result<(TransferBlock, AppliedBlock, AppliedTransactions), (AppliedTransactions, RejectedTransactions)> 
+        Result<(TransferBlock, AppliedBlock, BlockAssemblyResponse), BlockAssemblyResponse> 
     {
         let mut block = TransferBlock::default();
         let root_hash = self.state.root_hash();
 
         let mut original_state = FnvHashMap::<u32, Account>::default();
         let mut applied_transactions: Vec<TransferTx> = Vec::with_capacity(config::TRANSFER_BATCH_SIZE);
-        let mut rejected_transactions: Vec<TransferTx> = Vec::new();
+
+        let mut response = BlockAssemblyResponse {
+            included: Vec::with_capacity(config::TRANSFER_BATCH_SIZE),
+            valid_but_not_included: Vec::new(),
+            temporary_rejected: Vec::new(),
+            completely_rejected: Vec::new(),
+        };
 
         while applied_transactions.len() < config::TRANSFER_BATCH_SIZE {
 
@@ -179,10 +187,11 @@ impl PlasmaStateKeeper {
             let next_from = next_from.unwrap();
 
             let from = self.account(next_from);
-            let (mut rejected, tx) = queue.next(next_from, from.nonce);
-            rejected_transactions.append(&mut rejected);
+            // let (mut rejected, tx) = queue.next(next_from, from.nonce);
+            // rejected_transactions.append(&mut rejected);
 
-            if let Some(tx) = tx {
+            if let Some(pool_tx) = queue.next(next_from, from.nonce) {
+                let tx = pool_tx.transaction.clone();
                 // save state before applying transactions
                 let to = self.account(tx.to);
 
@@ -190,14 +199,28 @@ impl PlasmaStateKeeper {
                 if !original_state.contains_key(&tx.from) { original_state.insert(tx.from, from.clone()); }
                 if !original_state.contains_key(&tx.to) { original_state.insert(tx.to, to.clone()); }
 
-                if self.state.apply_transfer(&tx).is_ok() {
-                    applied_transactions.push(tx);
-                } else {
-                    // revert state immediately
-                    self.state.balance_tree.insert(tx.from, from);
-                    self.state.balance_tree.insert(tx.to, to);
+                let appication_result = self.state.apply_transfer(&tx);
+                match appication_result {
+                    Ok(()) => {
+                        applied_transactions.push(tx);
+                        response.included.push(pool_tx);
+                    },
+                    Err(error_type) => {
+                        self.state.balance_tree.insert(tx.from, from);
+                        self.state.balance_tree.insert(tx.to, to);
+                        match error_type {
+                            TransferApplicationError::InsufficientBalance => {
+                                response.temporary_rejected.push(pool_tx);
+                            },
+                            TransferApplicationError::NonceIsTooHigh => {
+                                response.temporary_rejected.push(pool_tx);
+                            },
+                            _ => {
+                                response.completely_rejected.push(pool_tx);
+                            }
+                        };
+                    },
 
-                    rejected_transactions.push(tx);
                 }
             }
         }
@@ -206,6 +229,8 @@ impl PlasmaStateKeeper {
             unimplemented!()
             // TODO: implement padding
         }
+
+        assert_eq!(applied_transactions.len(), response.included.len());
 
         if applied_transactions.len() != config::TRANSFER_BATCH_SIZE {
             // some transactions were rejected, revert state
@@ -217,7 +242,9 @@ impl PlasmaStateKeeper {
             }
 
             assert_eq!(root_hash, self.state.root_hash());
-            return Err((applied_transactions, rejected_transactions));
+            response.valid_but_not_included = response.included;
+            response.included = vec![];
+            return Err(response);
         }
 
         // collect updated state
@@ -246,7 +273,7 @@ impl PlasmaStateKeeper {
         let root = H256::from(U256::from_big_endian(&be_bytes));
 
         println!("block was assembled");
-        Ok(( block, (root, eth_block_data, updated_accounts), applied_transactions ))
+        Ok(( block, (root, eth_block_data, updated_accounts), response ))
     }
 
     fn apply_deposit_block(&mut self, block: &mut DepositBlock, batch_number: BatchNumber) -> AppliedBlock {

@@ -18,8 +18,8 @@ pub fn run() {
     let (tx_for_ops, rx_for_ops) = channel();
 
 let connection_pool = ConnectionPool::new();
-let mem_pool = MemPool::default();
 let state_keeper = PlasmaStateKeeper::new(connection_pool.clone());
+let mem_pool = MemPool::new(&state_keeper);
 let prover = BabyProver::create(connection_pool.clone()).unwrap();
 let eth_watch = EthWatch::new(0, 0, connection_pool.clone());
 

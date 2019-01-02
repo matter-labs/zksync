@@ -1,68 +1,330 @@
 use std::sync::{Arc, mpsc::{channel, Sender, Receiver}};
 use plasma::models::{TransferTx, TransferBlock, Block, AccountId, Nonce};
-use fnv::FnvHashMap;
-use super::models::{StateProcessingRequest, AppliedTransactions, RejectedTransactions};
+use fnv::{FnvHashMap, FnvHashSet};
+use super::models::{StateProcessingRequest, BlockAssemblyResponse, InPoolTransaction, TransactionPickerResponse};
 use super::config;
+use super::state_keeper::PlasmaStateKeeper;
 use priority_queue::PriorityQueue;
 use bigdecimal::BigDecimal;
 use im::ordmap::OrdMap;
 use num_traits::Zero;
 use std::borrow::BorrowMut;
+use std::sync::mpsc::{sync_channel, SyncSender};
 
+const MAX_QUEUE_SIZE: usize = 1 << 16;
 const MAX_TRANSACTIONS_PER_ACCOUNT: usize = 128;
+const MAX_SEARCH_DEPTH: usize = 4;
+const TX_LIFETIME: std::time::Duration = std::time::Duration::from_secs(3600);
+const RETUTATION_PRICE: u128 = 0;
 
-#[derive(Default, Debug, Clone)]
-struct AccountTxQueue {
-    pub queue: OrdMap<Nonce, TransferTx>,
+use plasma::models::{Account};
+
+impl Default for InPoolTransaction {
+    fn default() -> Self {
+        Self{
+            timestamp: std::time::Instant::now(),
+            lifetime: TX_LIFETIME,
+            transaction: TransferTx::default(),
+        }
+    }
 }
 
-pub type TxResult<T> = std::result::Result<T, String>;
+#[derive(Default, Debug, Clone)]
+pub struct UniqueTxFilter {
+    pub set: FnvHashSet<Vec<u8>>
+}
 
-impl AccountTxQueue {
+#[derive(Default, Debug, Clone)]
+pub struct TxQueue {
+    filter: UniqueTxFilter,
+    queues: FnvHashMap<AccountId, PerAccountQueue>,
+    order:  PriorityQueue<AccountId, BigDecimal>,
+    len:    usize,
+}
+
+pub struct MemPool {
+    // Batch size
+    batch_requested:    bool,
+    buffer:             (SyncSender<InPoolTransaction>, Receiver<InPoolTransaction>),
+    queue:              TxQueue,
+}
+
+impl Default for MemPool {
+    fn default() -> Self {
+        Self {
+            batch_requested: false,
+            buffer: sync_channel(MAX_QUEUE_SIZE),
+            queue: TxQueue::default(),
+        }
+    }
+}
+
+impl MemPool {
+    pub fn new(state_keeper: &PlasmaStateKeeper) -> Self {
+        let mut queue = TxQueue::default();
+        for (k, v) in &state_keeper.state.balance_tree.items {
+            let new_per_account = PerAccountQueue::new(v.clone());
+            queue.queues.insert(*k, new_per_account);
+        }
+
+        Self {
+            batch_requested: false,
+            buffer: sync_channel(MAX_QUEUE_SIZE),
+            queue: queue,
+        }
+    }
+}
+
+impl NonceClient for MemPool {
+    /// Get minimal nonce for this account that would allow replacement
+    fn min_nonce(&self, account: u32) -> Nonce {
+        if let Some(per_account_queue) = self.queue.queues.get(&account) {
+            return per_account_queue.min_nonce();
+        }
+        
+        0
+    }
+
+
+    /// Get max nonce already in the queue, including gapped txes
+    fn max_nonce(&self, account: u32) -> Option<Nonce> {
+        if let Some(per_account_queue) = self.queue.queues.get(&account) {
+            return per_account_queue.max_nonce();
+        }
+        
+        None
+    }
+
+    /// Get next expected nonce without gaps
+    fn next_nonce(&self, account: u32) -> Nonce {
+        if let Some(per_account_queue) = self.queue.queues.get(&account) {
+            return per_account_queue.next_nonce();
+        }
+        
+        0
+    }
+}
+
+pub enum MempoolRequest {
+    AddTransaction(TransferTx),
+    GetPendingNonce(AccountId, Sender<Option<Nonce>>),
+    ProcessBatch,
+}
+
+// this memory pool is responsible for both accumulation of transactions 
+// and for continuous attempts to find an optimal next batch
+pub struct TransactionPicker {
+    pub in_memory_state: FnvHashMap<u32, Account>,
+    pub request_queue: Receiver<()>,
+    pub padding_pool: Vec<TransferTx>,
+}
+
+#[derive(Default, Debug, Clone)]
+struct PerAccountQueue {
+    reputation: i32,
+    queue: OrdMap<Nonce, InPoolTransaction>,
+    current_nonce: Nonce,
+    distance: u32,
+    default_nonce: Nonce,
+    in_order_nonce: Nonce,
+}
+
+pub trait NonceClient {
+    /// Get minimal nonce for this account that would allow replacement
+    fn min_nonce(&self, account: u32) -> Nonce;
+
+    /// Get max nonce already in the queue, including gapped txes
+    fn max_nonce(&self, account: u32) -> Option<Nonce>;
+
+    /// Get next expected nonce without gaps
+    fn next_nonce(&self, account: u32) -> Nonce;
+}
+
+impl PerAccountQueue {
+    // Create a new per account queue from the account state
+    pub fn new(account_state: Account) -> Self {
+        let current_nonce = account_state.nonce;
+
+        Self {
+            reputation: 0i32,
+            queue: OrdMap::new(),
+            current_nonce: current_nonce,
+            distance: 0,
+            default_nonce: current_nonce,
+            in_order_nonce: current_nonce,
+        }
+    }
 
     /// Returns true if new item added
-    pub fn insert(&mut self, tx: TransferTx) -> bool {
-        self.queue.insert(tx.nonce, tx).is_none()
-    }
+    pub fn insert(&mut self, tx: TransferTx) -> Result<bool, String> {
+        let nonce = tx.nonce;
 
-    pub fn get_fee(&self, nonce: Nonce) -> Option<BigDecimal> {
-        self.queue.get(&nonce).map(|v| v.fee.clone())
-    }
+        let mut value = None;
 
-    fn min_nonce(&self) -> Nonce {
-        self.queue.get_min().map(|(k,_)| *k).unwrap_or(0)
-    }
-
-    pub fn pending_nonce(&self) -> Nonce {
-        let mut next_nonce = self.min_nonce();
-        for nonce in self.queue.keys() {
-            if next_nonce != *nonce { break }
-            next_nonce += 1;
+        {
+            value = self.queue.get(&nonce).cloned();
         }
-        next_nonce
+
+        if let Some(value) = value {
+            if tx.fee > value.transaction.fee {
+                // replacement by fee
+                let in_pool_tx = InPoolTransaction {
+                    timestamp: std::time::Instant::now(),
+                    lifetime: TX_LIFETIME,
+                    transaction: tx
+                };
+
+                self.queue.insert(nonce, in_pool_tx);
+                return Ok(false);
+            }
+
+            return Err(format!("Replacement transaction is underpriced"));
+        } else {
+            let in_pool_tx = InPoolTransaction {
+                timestamp: std::time::Instant::now(),
+                lifetime: TX_LIFETIME,
+                transaction: tx
+            };
+
+            if nonce < self.default_nonce {
+                // no insertion of pre-taken or outdated transactions
+                return Err(format!("Trying to insert into the part already booked for next batch"));
+            }
+            if nonce == self.in_order_nonce {
+                self.in_order_nonce += 1;
+            }
+
+            if self.queue.len() >= MAX_TRANSACTIONS_PER_ACCOUNT {
+                return Err(format!("Too many pending transaction per account"));
+            }
+
+            if self.queue.insert(nonce, in_pool_tx).is_none() {
+                return Ok(true);
+            } else {
+                return Err(format!("Could not insert a transaction for some reason"));
+            }
+        }
+
+        
+    }
+
+    /// Get fee for nonce
+    pub fn get_fee(&self, nonce: Nonce) -> Option<BigDecimal> {
+        self.queue.get(&nonce).map(|v| v.transaction.fee.clone())
+    }
+
+    /// Get minimal expected nonce in the queue
+    fn min_nonce(&self) -> Nonce {
+        // self.default_nonce
+
+        self.queue.values().next().map(|v| v.transaction.nonce).unwrap_or(self.default_nonce)
+        // self.queue.get_min().map(|(k,_)| *k).unwrap_or(self.default_nonce)
+    }
+
+    /// Get nonce already in the queue
+    fn max_nonce(&self) -> Option<Nonce> {
+        // if self.queue.len() == 0 {
+        //     return None;
+        // }
+
+        // Some(self.current_nonce)
+
+        self.queue.values().last().map(|v| v.transaction.nonce)
+        // self.queue.get_max().map(|(k,_)| *k + 1).unwrap_or(self.current_nonce)
+    }
+
+    /// Get next expected nonce without gaps
+    fn next_nonce(&self) -> Nonce {
+        self.in_order_nonce
+
+        // self.queue.values().last().map(|v| v.transaction.nonce + 1).unwrap_or(self.current_nonce)
+        // self.queue.get_max().map(|(k,_)| *k + 1).unwrap_or(self.current_nonce)
     }
 
     pub fn next_fee(&self) -> Option<BigDecimal> {
-        self.queue.values().next().map(|v| v.fee.clone())
+        self.queue.get(&self.current_nonce).map(|v| v.transaction.fee.clone())
+        // self.queue.values().next().map(|v| v.transaction.fee.clone())
     }
 
-    pub fn pop(&mut self, expected_nonce: Nonce) -> (RejectedTransactions, Option<TransferTx>) {
+    // take an item from the queue. Move the queue pointer to this nonce value and do nothing else
+    pub fn next(&mut self, expected_nonce: Nonce) -> Option<InPoolTransaction> {
+        if self.in_order_nonce >= expected_nonce {
+            // there were no gaps before, so it's allowed to take
 
-        let exact_match = self.min_nonce() == expected_nonce;
-        let (lesser, mut tx, greater) = self.queue.split_lookup(&expected_nonce);
-        let mut rejected: RejectedTransactions = lesser.into_iter().map(|(k,v)| v).collect();
-        if tx.is_some() {
-            self.queue = greater;
-            if !exact_match {
-                // put it back for this loop cycle, because we need to update priority queue first: maybe it's not the highest fee
-                self.queue.insert(expected_nonce, tx.take().unwrap());
+            if self.current_nonce != expected_nonce {
+                // can not take not the next one
+                return None;
             }
-        } else {
-            self.queue = OrdMap::new();
-            rejected.extend(greater.into_iter().map(|(k,v)| v));
+            // we've may be taken some transactions from the per-account pool already, so give the next one
+            if let Some(tx) = self.queue.get(&self.current_nonce) {
+                self.current_nonce += 1;
+                self.distance += 1;
+                return Some(tx.clone());
+            }
+
+            return None;
         }
 
-        (rejected, tx)
+        // it's not allowed to take nonce with gaps
+        None
+    }
+
+    // reorganize the queue due to transaction being accepted, temporary or completely rejected
+    pub fn reorganize(&mut self, reason: TransactionPickerResponse) {
+        match reason {
+            TransactionPickerResponse::Included(transaction) => {
+                // all calls here are expected to be ordered by nonce
+                let nonce = transaction.transaction.nonce;
+                if nonce != self.default_nonce {
+                    panic!("Account queue is in inconsistent state!");
+                }
+                self.queue = self.queue.skip(1);
+                self.distance -= 1;
+                self.current_nonce = nonce;
+                self.default_nonce += 1;
+            },
+            TransactionPickerResponse::ValidButNotIncluded(transaction) => {
+                // all calls here are expected to be REVERSE ordered by nonce
+                let nonce = transaction.transaction.nonce;
+                if nonce != self.current_nonce {
+                    panic!("Account queue is in inconsistent state!");
+                }
+                // move pointer backwards
+                self.current_nonce -= 1;
+                self.distance -= 1;
+            },
+            TransactionPickerResponse::TemporaryRejected(transaction) => {
+                // don't need to check for a first item, just check how far from the begining transactions
+                // were rejected and if any one of those should be pushed out from the pool - just purge the rest too
+                if transaction.timestamp + transaction.lifetime <= std::time::Instant::now() {
+                    let mut nonce = transaction.transaction.nonce;
+                    if nonce > self.current_nonce {
+                        // do nothing, it was purged already, 
+                        return;
+                    }
+                    nonce -= 1;
+                    // one nonce is already dead, so purge everything after
+                    let distance = self.distance + nonce - self.current_nonce;
+                    self.queue = self.queue.take(distance as usize);
+                    self.distance = distance;
+                    self.current_nonce = nonce;
+                }
+            },
+            TransactionPickerResponse::RejectedCompletely(transaction) => {
+                // just delete this one and all after
+                let mut nonce = transaction.transaction.nonce;
+                if nonce > self.current_nonce {
+                    // do nothing, it was purged already, 
+                    return;
+                }
+                nonce -= 1;
+                // one nonce is already dead, so purge everything after
+                let distance = self.distance + nonce - self.current_nonce;
+                self.queue = self.queue.take(distance as usize);
+                self.distance = distance;
+                self.current_nonce = nonce;
+            }
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -71,14 +333,7 @@ impl AccountTxQueue {
 
 }
 
-#[derive(Default, Debug, Clone)]
-pub struct TxQueue {
-    queues: FnvHashMap<AccountId, AccountTxQueue>,
-    order:  PriorityQueue<AccountId, BigDecimal>,
-    len:    usize,
-}
-
-// For state_keeper::create_transfer_block()
+// // For state_keeper::create_transfer_block()
 impl TxQueue {
 
     pub fn peek_next(&self) -> Option<AccountId> {
@@ -86,24 +341,24 @@ impl TxQueue {
     }
 
     /// next() must be called immediately after peek_next(), so that the queue for account_id exists
-    pub fn next(&mut self, account_id: AccountId, next_nonce: Nonce) -> (RejectedTransactions, Option<TransferTx>) {
+    pub fn next(&mut self, account_id: AccountId, next_nonce: Nonce) -> Option<InPoolTransaction> {
         assert_eq!(account_id, self.peek_next().unwrap());
-        let (rejected, tx, next_fee) = {
+        let (tx, next_fee) = {
             let queue = self.queues.get_mut(&account_id).unwrap();
-            let (rejected, tx) = queue.pop(next_nonce);
-            let ejected = rejected.len() + if tx.is_some() {1} else {0};
+            let tx = queue.next(next_nonce);
+            let ejected = if tx.is_some() {1} else {0};
             self.len -= ejected;
-            (rejected, tx, queue.next_fee())
+            (tx, queue.next_fee())
         };
         if let Some(next_fee) = next_fee {
             // update priority
             self.order.change_priority(&account_id, next_fee);
         } else {
-            // remove empty queue
+            // remove current account from the queue
             self.order.pop();
-            self.queues.remove(&account_id);
         }
-        (rejected, tx)
+
+        tx
     }
 }
 
@@ -111,31 +366,93 @@ impl TxQueue {
 
     fn ensure_queue(&mut self, account_id: AccountId)  {
         if self.queues.get(&account_id).is_none() {
-            self.queues.insert(account_id, AccountTxQueue::default());
+            self.queues.insert(account_id, PerAccountQueue::default());
             self.order.push(account_id, BigDecimal::zero());
         }
     }
 
-    fn insert(&mut self, tx: TransferTx) {
+    fn insert(&mut self, tx: TransferTx) -> Result<(), String> {
+        let tx_data = tx.tx_data();
+        if tx_data.is_none() {
+            return Err(format!("Trying to insert malformed transaction"));
+        }
+        let data = tx_data.unwrap();
+        if self.filter.set.get(&data).is_some() {
+            return Err(format!("Trying to add a complete duplicate"));
+        }
+
         let from = tx.from;
         self.ensure_queue(from);
         let queue = self.queues.get_mut(&from).unwrap();
-        if queue.insert(tx) {
+        let insertion_result = queue.insert(tx);
+        if insertion_result.is_err() {
+            return Err(insertion_result.err().unwrap());
+        }
+        if insertion_result.unwrap() {
             self.len += 1;
         }
+        self.filter.set.insert(data);
+
         self.order.change_priority(&from, queue.next_fee().unwrap());
+
+        Ok(())
     }
 
-    fn batch_insert(&mut self, list: Vec<TransferTx>) {
-        // TODO: optimize performance: group by accounts, then update order once per account
-        for tx in list.into_iter() {
-            self.insert(tx);
+    fn process_response(&mut self, response: BlockAssemblyResponse, block_was_assembled: bool) {
+        let BlockAssemblyResponse {included, valid_but_not_included, temporary_rejected, completely_rejected} = response;
+        if block_was_assembled {
+            // accept all transacitons
+            for pool_tx in included {
+                let from = pool_tx.transaction.from;
+                let queue = self.queues.get_mut(&from).expect("queue is never discarded even when empty");
+                let tx_data = pool_tx.transaction.tx_data().expect("transaction in response is always almost valid");
+                queue.reorganize(TransactionPickerResponse::Included(pool_tx));
+                self.filter.set.remove(&tx_data);
+                if let Some(fee) = queue.next_fee() {
+                    self.order.change_priority(&from, fee);
+                }
+            }
+        } else {
+            // accept all transacitons
+            for pool_tx in valid_but_not_included.into_iter().rev() {
+                let from = pool_tx.transaction.from;
+                let queue = self.queues.get_mut(&from).expect("queue is never discarded even when empty");
+                let tx_data = pool_tx.transaction.tx_data().expect("transaction in response is always almost valid");
+                queue.reorganize(TransactionPickerResponse::ValidButNotIncluded(pool_tx));
+                self.filter.set.remove(&tx_data);
+                if let Some(fee) = queue.next_fee() {
+                    self.order.change_priority(&from, fee);
+                }
+            }
+        }
+        for pool_tx in temporary_rejected {
+            // modify the transaction lifetime
+            let mut modified_tx = pool_tx.clone();
+            let from = pool_tx.transaction.from;
+            let queue = self.queues.get_mut(&from).expect("queue is never discarded even when empty");
+            let tx_data = pool_tx.transaction.tx_data().expect("transaction in response is always almost valid");
+            modified_tx.lifetime = modified_tx.lifetime / 2;
+            queue.reorganize(TransactionPickerResponse::TemporaryRejected(modified_tx));
+            self.filter.set.remove(&tx_data);
+            if let Some(fee) = queue.next_fee() {
+                self.order.change_priority(&from, fee);
+            }
+        }
+        for pool_tx in completely_rejected {
+            let from = pool_tx.transaction.from;
+            let queue = self.queues.get_mut(&from).expect("queue is never discarded even when empty");
+            let tx_data = pool_tx.transaction.tx_data().expect("transaction in response is always almost valid");
+            queue.reorganize(TransactionPickerResponse::RejectedCompletely(pool_tx));
+            self.filter.set.remove(&tx_data);
+            if let Some(fee) = queue.next_fee() {
+                self.order.change_priority(&from, fee);
+            }
         }
     }
 
-    fn pending_nonce(&self, account_id: AccountId) -> Option<Nonce> {
-        self.queues.get(&account_id).map(|queue| queue.pending_nonce())
-    }
+    // fn pending_nonce(&self, account_id: AccountId) -> Option<Nonce> {
+    //     self.queues.get(&account_id).map(|queue| queue.pending_nonce())
+    // }
 
     fn len(&self) -> usize {
         self.len
@@ -143,18 +460,7 @@ impl TxQueue {
 }
 
 
-#[derive(Default)]
-pub struct MemPool {
-    // Batch size
-    batch_requested:    bool,
-    queue:              TxQueue,
-}
 
-pub enum MempoolRequest {
-    AddTransaction(TransferTx),
-    GetPendingNonce(AccountId, Sender<Option<Nonce>>),
-    ProcessBatch,
-}
 
 impl MemPool {
 
@@ -186,34 +492,19 @@ impl MemPool {
                     self.process_batch(do_padding, &tx_for_blocks);
                 },
                 MempoolRequest::GetPendingNonce(account_id, channel) => {
-                    channel.send(self.queue.pending_nonce(account_id));
+                    channel.send(Some(self.next_nonce(account_id)));
                 },
             }
         }
     }
 
-    fn add_transaction(&mut self, transaction: TransferTx) -> TxResult<()> {
+    fn add_transaction(&mut self, transaction: TransferTx) -> Result<(), String> {
         println!("adding tx to mem pool");
 
-        if let Some(queue) = self.queue.queues.get(&transaction.from) {
-            if queue.len() >= MAX_TRANSACTIONS_PER_ACCOUNT {
-                return Err(format!("Too many transactions in the queue for this account"))
-            }
-
-            if let Some(existing_fee) = queue.get_fee(transaction.nonce) {
-                if existing_fee > transaction.fee {
-                    return Err(format!("Transaction for nonce {} already in the pool with higher fee {} (new fee is {})", 
-                        transaction.nonce, existing_fee, transaction.fee))
-                }
-            } else {
-                let pending_nonce = queue.pending_nonce();
-                if transaction.nonce != pending_nonce {
-                    return Err(format!("Nonce is out of sequence: expected {}, got {}", pending_nonce, transaction.nonce))
-                }
-            }
+        let result = self.queue.insert(transaction);
+        if result.is_err() {
+            return result;
         }
-
-        self.queue.insert(transaction);
         // TODO: commit to database
         Ok(())
     }
@@ -236,15 +527,23 @@ impl MemPool {
         self.queue = queue;
 
         match result {
-            Ok((applied, block_number)) => {
+            Ok((response, block_number)) => {
+                self.queue.process_response(response, true);
                 // TODO: remove applied, block_number, wait here for committer instead
             },
-            Err((valid, invalid)) => {
-                println!("creating transfer block failed: {} transactions rejected, {} going back to queue", invalid.len(), valid.len());
-                self.queue.batch_insert(valid)
+            Err(response) => {
+                println!("creating transfer block failed: {} transactions rejected, {} going back to queue", 
+                    response.completely_rejected.len(), 
+                    response.temporary_rejected.len() + response.valid_but_not_included.len()
+                );
+                self.queue.process_response(response, false);
                 // TODO: remove invalid transactions from db
             },
         };
+    }
+
+    fn process_reponse(&mut self, reponse: BlockAssemblyResponse) {
+
     }
 
 }
@@ -277,129 +576,149 @@ mod test {
 }
 
 #[test] 
-fn test_account_tx_queue() {
+fn test_per_account_queue() {
 
-    let mut q = AccountTxQueue::default();
+    let mut acc = Account::default();
+    acc.nonce = 5;
 
-    assert_eq!(q.pending_nonce(), 0);
+    let mut q = PerAccountQueue::new(acc);
+
+    assert_eq!(q.min_nonce(), 5);
+    assert_eq!(q.max_nonce(), None);
+
     assert_eq!(q.next_fee(), None);
 
-    assert_eq!(q.insert(test::tx(1, 5, 20)), true);
+    // insert some tx for nonce = 5
+    assert!(q.insert(test::tx(1, 5, 20)).is_ok());
     assert_eq!(q.len(), 1);
-    assert_eq!(q.insert(test::tx(1, 5, 20)), false);
+    assert!(q.insert(test::tx(1, 5, 20)).is_err());
     assert_eq!(q.len(), 1);
     assert_eq!(q.next_fee().unwrap(), BigDecimal::from(20));
 
-    assert_eq!(q.pending_nonce(), 6);
+    // next nonce is at 6
+    assert_eq!(q.next_nonce(), 6);
 
-    assert_eq!(q.insert(test::tx(1, 7, 40)), true);
+    // allow to insert nonce = 7 even while out of order
+    assert!(q.insert(test::tx(1, 7, 40)).is_err());
     assert_eq!(q.len(), 2);
     assert_eq!(q.next_fee().unwrap(), BigDecimal::from(20));
 
     assert_eq!(q.get_fee(7).unwrap(), BigDecimal::from(40));
     assert_eq!(q.get_fee(5).unwrap(), BigDecimal::from(20));
+    // there is no tx for 6, so it's none
+    assert_eq!(q.get_fee(6), None);
 
-    let _q = q;
+    // one can not take transactions for nonce 6 or 7
+    assert!(q.next(6).is_none());
+    assert!(q.next(7).is_none());
 
-    let mut q = _q.clone();
-    let (rejected, tx) = q.pop(5);
-    assert_eq!(rejected.len(), 0); 
-    assert_eq!(tx.unwrap().nonce, 5); 
-    assert_eq!(q.len(), 1);
-    assert_eq!(q.next_fee().unwrap(), BigDecimal::from(40));
-    assert_eq!(q.pending_nonce(), 8);
+    // one take take a transaction number 5
+    assert!(q.next(5).is_some());
+    // but not twice
+    assert!(q.next(5).is_none());
+    
 
-    let mut q = _q.clone();
+    // let _q = q;
 
-    assert_eq!(q.insert(test::tx(1, 5, 60)), false);
-    assert_eq!(q.get_fee(5).unwrap(), BigDecimal::from(60));
+    // let mut q = _q.clone();
+    // let (rejected, tx) = q.pop(5);
+    // assert_eq!(rejected.len(), 0); 
+    // assert_eq!(tx.unwrap().nonce, 5); 
+    // assert_eq!(q.len(), 1);
+    // assert_eq!(q.next_fee().unwrap(), BigDecimal::from(40));
+    // assert_eq!(q.pending_nonce(), 8);
 
-    let mut q = _q.clone();
-    let (rejected, tx) = q.pop(6);
-    assert_eq!(rejected.len(), 2); 
-    assert_eq!(tx.is_none(), true);
-    assert_eq!(q.len(), 0);
-    assert_eq!(q.next_fee(), None);
+    // let mut q = _q.clone();
 
-    let mut q = _q.clone();
-    let (rejected, tx) = q.pop(7);
-    assert_eq!(rejected.len(), 1); 
-    assert_eq!(tx, None);
-    assert_eq!(q.len(), 1);
-    assert_eq!(q.pending_nonce(), 8);
+    // assert_eq!(q.insert(test::tx(1, 5, 60)), false);
+    // assert_eq!(q.get_fee(5).unwrap(), BigDecimal::from(60));
 
-    let mut q = _q.clone();
-    let (rejected, tx) = q.pop(8);
-    assert_eq!(rejected.len(), 2); 
-    assert_eq!(tx.is_none(), true);
-    assert_eq!(q.pending_nonce(), 0);
+    // let mut q = _q.clone();
+    // let (rejected, tx) = q.pop(6);
+    // assert_eq!(rejected.len(), 2); 
+    // assert_eq!(tx.is_none(), true);
+    // assert_eq!(q.len(), 0);
+    // assert_eq!(q.next_fee(), None);
 
-    let mut q = _q.clone();
-    assert_eq!(q.insert(test::tx(1, 6, 40)), true);
-    let (rejected, tx) = q.pop(6);
-    assert_eq!(rejected.len(), 1); 
-    assert_eq!(tx, None);
+    // let mut q = _q.clone();
+    // let (rejected, tx) = q.pop(7);
+    // assert_eq!(rejected.len(), 1); 
+    // assert_eq!(tx, None);
+    // assert_eq!(q.len(), 1);
+    // assert_eq!(q.pending_nonce(), 8);
 
-    let (rejected, tx) = q.pop(6);
-    assert_eq!(rejected.len(), 0); 
-    assert_eq!(tx.unwrap().nonce, 6);
-    assert_eq!(q.len(), 1);
-    assert_eq!(q.next_fee().unwrap(), BigDecimal::from(40));
-    assert_eq!(q.pending_nonce(), 8);
+    // let mut q = _q.clone();
+    // let (rejected, tx) = q.pop(8);
+    // assert_eq!(rejected.len(), 2); 
+    // assert_eq!(tx.is_none(), true);
+    // assert_eq!(q.pending_nonce(), 0);
+
+    // let mut q = _q.clone();
+    // assert_eq!(q.insert(test::tx(1, 6, 40)), true);
+    // let (rejected, tx) = q.pop(6);
+    // assert_eq!(rejected.len(), 1); 
+    // assert_eq!(tx, None);
+
+    // let (rejected, tx) = q.pop(6);
+    // assert_eq!(rejected.len(), 0); 
+    // assert_eq!(tx.unwrap().nonce, 6);
+    // assert_eq!(q.len(), 1);
+    // assert_eq!(q.next_fee().unwrap(), BigDecimal::from(40));
+    // assert_eq!(q.pending_nonce(), 8);
 
 }
 
-#[test] 
-fn test_tx_queue() {
-    let mut q = TxQueue::default();
-    assert_eq!(q.peek_next(), None);
+// #[test] 
+// fn test_tx_queue() {
+//     let mut q = TxQueue::default();
+//     assert_eq!(q.peek_next(), None);
 
-    q.insert(test::tx(1, 5, 20));
-    assert_eq!(q.len(), 1);
-    assert_eq!(q.peek_next().unwrap(), 1);
+//     q.insert(test::tx(1, 5, 20));
+//     assert_eq!(q.len(), 1);
+//     assert_eq!(q.peek_next().unwrap(), 1);
 
-    q.insert(test::tx(2, 0, 40));
-    assert_eq!(q.len(), 2);
-    assert_eq!(q.peek_next().unwrap(), 2);
+//     q.insert(test::tx(2, 0, 40));
+//     assert_eq!(q.len(), 2);
+//     assert_eq!(q.peek_next().unwrap(), 2);
 
-    q.insert(test::tx(1, 6, 50));
-    assert_eq!(q.len(), 3);
-    assert_eq!(q.peek_next().unwrap(), 2);
+//     q.insert(test::tx(1, 6, 50));
+//     assert_eq!(q.len(), 3);
+//     assert_eq!(q.peek_next().unwrap(), 2);
 
-    q.insert(test::tx(1, 5, 50));
-    assert_eq!(q.len(), 3);
-    assert_eq!(q.peek_next().unwrap(), 1);
+//     q.insert(test::tx(1, 5, 50));
+//     assert_eq!(q.len(), 3);
+//     assert_eq!(q.peek_next().unwrap(), 1);
 
-    let _q = q;
+//     let _q = q;
 
-    let mut q = _q.clone();
-    let (rejected, tx) = q.next(1, 5);
-    assert_eq!(rejected.len(), 0);
-    assert_eq!(tx.as_ref().unwrap().from, 1);
-    assert_eq!(tx.as_ref().unwrap().nonce, 5);
-    assert_eq!(tx.as_ref().unwrap().fee, BigDecimal::from(50));
-    assert_eq!(q.len(), 2);
-    assert_eq!(q.peek_next().unwrap(), 1);
+//     let mut q = _q.clone();
+//     let (rejected, tx) = q.next(1, 5);
+//     assert_eq!(rejected.len(), 0);
+//     assert_eq!(tx.as_ref().unwrap().from, 1);
+//     assert_eq!(tx.as_ref().unwrap().nonce, 5);
+//     assert_eq!(tx.as_ref().unwrap().fee, BigDecimal::from(50));
+//     assert_eq!(q.len(), 2);
+//     assert_eq!(q.peek_next().unwrap(), 1);
 
-    let mut q = _q.clone();
-    let (rejected, tx) = q.next(1, 6);
-    assert_eq!(rejected.len(), 1);
-    assert_eq!(tx, None);
-    assert_eq!(q.len(), 2);
-    assert_eq!(q.peek_next().unwrap(), 1);
+//     let mut q = _q.clone();
+//     let (rejected, tx) = q.next(1, 6);
+//     assert_eq!(rejected.len(), 1);
+//     assert_eq!(tx, None);
+//     assert_eq!(q.len(), 2);
+//     assert_eq!(q.peek_next().unwrap(), 1);
 
-    let (rejected, tx) = q.next(1, 6);
-    assert_eq!(rejected.len(), 0);
-    assert_eq!(tx.as_ref().unwrap().from, 1);
-    assert_eq!(tx.as_ref().unwrap().nonce, 6);
-    assert_eq!(tx.as_ref().unwrap().fee, BigDecimal::from(50));
-    assert_eq!(q.len(), 1);
-    assert_eq!(q.peek_next().unwrap(), 2);
+//     let (rejected, tx) = q.next(1, 6);
+//     assert_eq!(rejected.len(), 0);
+//     assert_eq!(tx.as_ref().unwrap().from, 1);
+//     assert_eq!(tx.as_ref().unwrap().nonce, 6);
+//     assert_eq!(tx.as_ref().unwrap().fee, BigDecimal::from(50));
+//     assert_eq!(q.len(), 1);
+//     assert_eq!(q.peek_next().unwrap(), 2);
 
-    let (rejected, tx) = q.next(2, 0);
-    assert_eq!(rejected.len(), 0);
-    assert_eq!(tx.as_ref().unwrap().from, 2);
-    assert_eq!(tx.as_ref().unwrap().nonce, 0);
-    assert_eq!(q.len(), 0);
-    assert_eq!(q.peek_next(), None);
-}
+//     let (rejected, tx) = q.next(2, 0);
+//     assert_eq!(rejected.len(), 0);
+//     assert_eq!(tx.as_ref().unwrap().from, 2);
+//     assert_eq!(tx.as_ref().unwrap().nonce, 0);
+//     assert_eq!(q.len(), 0);
+//     assert_eq!(q.peek_next(), None);
+// }

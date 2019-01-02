@@ -12,6 +12,16 @@ pub struct PlasmaState {
     
 }
 
+#[derive(Debug)]
+pub enum TransferApplicationError {
+    Unknown,
+    InsufficientBalance,
+    NonceIsTooLow,
+    NonceIsTooHigh,
+    InvalidSigner,
+    InvalidTransaction(String),
+}
+
 impl PlasmaState {
     
     pub fn new(accounts: AccountMap, current_block: u32) -> Self {
@@ -54,46 +64,58 @@ impl PlasmaState {
         self.balance_tree.root_hash().clone()
     }
 
-    pub fn apply_transfer(&mut self, tx: &TransferTx) -> Result<(), ()> {
+    pub fn apply_transfer(&mut self, tx: &TransferTx) -> Result<(), TransferApplicationError> {
 
-        let mut from = self.balance_tree.items.get(&tx.from).ok_or(())?.clone();
+        if let Some(mut from) = self.balance_tree.items.get(&tx.from).cloned() {
+            // TODO: take from `from` instead and uncomment below
+            let pub_key = self.get_pub_key(tx.from).unwrap();
+            if let Some(verified_against) = tx.cached_pub_key.as_ref() {
+                if pub_key.0 != verified_against.0 { 
+                    return Err(TransferApplicationError::InvalidSigner);
+                }   
+            } else {
+                return Err(TransferApplicationError::InvalidSigner);
+            }
+            
+            if from.balance < tx.amount { 
+                println!("Insufficient balance");
+                return Err(TransferApplicationError::InsufficientBalance); 
+            }
+            if tx.nonce > from.nonce { 
+                println!("Nonce is too high");
+                return Err(TransferApplicationError::NonceIsTooHigh); 
+            } else if tx.nonce < from.nonce {
+                println!("Nonce is too low");
+                return Err(TransferApplicationError::NonceIsTooLow); 
+            }
 
-        // TODO: take from `from` instead and uncomment below
-        let pub_key = self.get_pub_key(tx.from).unwrap();
-        let verified_against = tx.cached_pub_key.as_ref().ok_or(())?;
-        if pub_key.0 != verified_against.0 { return Err(()); }
+            // update state
 
-        if from.balance < tx.amount { 
-            println!("Insufficient balance");
-            return Err(()); 
+            // allow to send to non-existing accounts
+            // let mut to = self.balance_tree.items.get(&tx.to).ok_or(())?.clone();
+            
+            let mut to = Account::default();
+            if let Some(existing_to) = self.balance_tree.items.get(&tx.to) {
+                to = existing_to.clone();
+            }
+            from.balance -= &tx.amount;
+            
+            // TODO: subtract fee
+
+            from.nonce += 1;
+            if tx.to != 0 {
+                to.balance += &tx.amount;
+            }
+
+            self.balance_tree.insert(tx.from, from);
+            self.balance_tree.insert(tx.to, to);
+
+            return Ok(());
         }
-        if from.nonce != tx.nonce { 
-            println!("Nonce does not match");
-            return Err(()); 
-        }
 
-        // update state
+        Err(TransferApplicationError::InvalidSigner)
 
-        // allow to send to non-existing accounts
-        // let mut to = self.balance_tree.items.get(&tx.to).ok_or(())?.clone();
-        
-        let mut to = Account::default();
-        if let Some(existing_to) = self.balance_tree.items.get(&tx.to) {
-            to = existing_to.clone();
-        }
-        from.balance -= &tx.amount;
-        
-        // TODO: subtract fee
-
-        from.nonce += 1;
-        if tx.to != 0 {
-            to.balance += &tx.amount;
-        }
-
-        self.balance_tree.insert(tx.from, from);
-        self.balance_tree.insert(tx.to, to);
-
-        Ok(())
+       
     }
 
     pub fn apply_deposit(&mut self, tx: &DepositTx) -> Result<(), ()> {

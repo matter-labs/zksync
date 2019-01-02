@@ -17,7 +17,6 @@ mod mem_pool;
 mod eth_watch;
 mod storage;
 mod schema;
-mod memory_pool;
 
 extern crate plasma;
 

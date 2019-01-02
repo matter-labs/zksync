@@ -6,16 +6,40 @@ use crate::schema::*;
 
 use super::mem_pool::TxQueue;
 
-pub type AppliedTransactions = Vec<TransferTx>;
-pub type RejectedTransactions = Vec<TransferTx>;
-
-type TransferBlockResult = Result<(AppliedTransactions, BlockNumber), (AppliedTransactions, RejectedTransactions)>;
+type TransferBlockResult = Result<(BlockAssemblyResponse, BlockNumber), BlockAssemblyResponse>;
 
 pub enum StateProcessingRequest{
     CreateTransferBlock(TxQueue, bool, Sender<(TxQueue, TransferBlockResult)>),
     ApplyBlock(Block),
     GetPubKey(u32, Sender<Option<PublicKey>>),   // return public key if found
     GetLatestState(u32, Sender<Option<Account>>), // return account state
+}
+
+#[derive(Debug, Clone)]
+pub struct InPoolTransaction{
+    pub timestamp: std::time::Instant,
+    pub lifetime: std::time::Duration,
+    pub transaction: TransferTx,
+}
+
+pub enum IndividualTransactionResponse{
+    Accepted(Vec<InPoolTransaction>),
+    TemporaryRejected(Vec<InPoolTransaction>),
+    RejectedCompletely(Vec<InPoolTransaction>),
+}
+
+pub enum TransactionPickerResponse{
+    Included(InPoolTransaction),
+    ValidButNotIncluded(InPoolTransaction),
+    TemporaryRejected(InPoolTransaction),
+    RejectedCompletely(InPoolTransaction),
+}
+
+pub struct BlockAssemblyResponse{
+    pub included: Vec<InPoolTransaction>,
+    pub valid_but_not_included: Vec<InPoolTransaction>,
+    pub temporary_rejected: Vec<InPoolTransaction>,
+    pub completely_rejected: Vec<InPoolTransaction>,
 }
 
 pub type EncodedProof = [U256; 8];
