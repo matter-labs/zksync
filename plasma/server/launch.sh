@@ -1,6 +1,6 @@
 #!/bin/sh
 
-ps auxw | grep server | grep -v grep > /dev/null
+ps auxw | grep target/release/server | grep -v grep > /dev/null
 
 if [ $? != 0 ]
 then
