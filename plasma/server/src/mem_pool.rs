@@ -286,12 +286,19 @@ impl PerAccountQueue {
             TransactionPickerResponse::ValidButNotIncluded(transaction) => {
                 // all calls here are expected to be REVERSE ordered by nonce
                 let nonce = transaction.transaction.nonce;
-                if nonce != self.current_nonce {
+                if nonce > self.current_nonce {
+                    return;
+                }
+                if nonce < self.default_nonce {
                     panic!("Account queue is in inconsistent state!");
                 }
+                let distance = self.distance + nonce - self.current_nonce;
                 // move pointer backwards
-                self.current_nonce -= 1;
-                self.distance -= 1;
+                self.current_nonce = nonce; 
+                self.default_nonce = nonce;
+                self.queue = self.queue.skip(distance as usize);
+                self.distance = 0;
+
             },
             TransactionPickerResponse::TemporaryRejected(transaction) => {
                 // don't need to check for a first item, just check how far from the begining transactions
@@ -414,7 +421,7 @@ impl TxQueue {
             }
         } else {
             // accept all transacitons
-            for pool_tx in valid_but_not_included.into_iter().rev() {
+            for pool_tx in valid_but_not_included {
                 let from = pool_tx.transaction.from;
                 let queue = self.queues.get_mut(&from).expect("queue is never discarded even when empty");
                 let tx_data = pool_tx.transaction.tx_data().expect("transaction in response is always almost valid");
