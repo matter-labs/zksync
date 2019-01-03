@@ -3,7 +3,7 @@
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
         <b-navbar-toggle target="nav_collapse"></b-navbar-toggle>
-        <b-navbar-brand>Plasma Wallet <span style="font-size: 0.4em">ALPHA</span></b-navbar-brand>
+        <b-navbar-brand>Ignis Wallet <span style="font-size: 0.4em">ALPHA</span></b-navbar-brand>
         <b-collapse is-nav id="nav_collapse">
             <b-navbar-nav>
                 <b-nav-item href="#" active>Account</b-nav-item>
@@ -23,7 +23,7 @@
         </b-alert>
         <b-row>
             <b-col sm="6" order="2" class="col-xl-8 col-lg-7 col-md-6 col-sm-12">
-                <b-card title="Transfer in Plasma" class="mb-4 d-flex">
+                <b-card title="Transfer in Ignis" class="mb-4 d-flex">
                     <label for="transferToInput">To:</label>
                     <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input>
                     <label for="transferAmountInput" class="mt-4">Amount</label>
@@ -80,7 +80,7 @@
                         </b-col>
                     </b-row>
                     <b-card class="mt-2">
-                        <p class="mb-2"><strong>Plasma</strong>
+                        <p class="mb-2"><strong>Ignis</strong>
                             (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+store.contractAddress"
                             target="blanc">contract</a>)</p>
 
@@ -222,21 +222,21 @@ export default {
                 + this.depositAmount + " > " + store.account.balance
         }, 
         withdrawProblem() {
-            if(!(Number(store.account.plasma.committed.balance) > 0)) return "empty balance in the Plasma account"
+            if(!(Number(store.account.plasma.committed.balance) > 0)) return "empty balance in the Ignis account"
         },
         doWithdrawProblem() {
             if(this.depositProblem) return this.depositProblem
-            if(Number(this.withdrawAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Plasma balance"
-            if(Number(this.nonce) < Number(store.account.plasma.committed.nonce)) return "nonce must be greater then confirmed in Plasma: got " 
+            if(Number(this.withdrawAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Ignis balance"
+            if(Number(this.nonce) < Number(store.account.plasma.committed.nonce)) return "nonce must be greater then confirmed in Ignis: got " 
                 + this.nonce + ", expected >= " + store.account.plasma.committed.nonce
         },
         transferProblem() {
-            if(!store.account.plasma.id) return "no Plasma account exists yet"
-            if(!(store.account.plasma.committed.balance > 0)) return "Plasma account has empty balance"
+            if(!store.account.plasma.id) return "no Ignis account exists yet"
+            if(!(store.account.plasma.committed.balance > 0)) return "Ignis account has empty balance"
             if(!ethUtil.isHexString(this.transferTo)) return "`To` is not a valid ethereum address: " + this.transferTo
             if(!(this.transferAmount > 0)) return "positive amount required, e.g. 100.55"
-            if(Number(this.transferAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Plasma balance"
-            if(Number(this.nonce) < Number(store.account.plasma.committed.nonce)) return "nonce must be greater then confirmed in Plasma: got " 
+            if(Number(this.transferAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Ignis balance"
+            if(Number(this.nonce) < Number(store.account.plasma.committed.nonce)) return "nonce must be greater then confirmed in Ignis: got " 
                 + this.nonce + ", expected >= " + store.account.plasma.committed.nonce
         },
         pendingWithdraw: () => Number(store.account.onchain.balance) > 0,

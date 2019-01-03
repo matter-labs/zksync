@@ -12,11 +12,11 @@ use std::borrow::BorrowMut;
 use std::sync::mpsc::{sync_channel, SyncSender};
 
 const MAX_QUEUE_SIZE: usize = 1 << 16;
-const MAX_TRANSACTIONS_PER_ACCOUNT: usize = 128;
+const MAX_TRANSACTIONS_PER_ACCOUNT: usize = 16;
 const MAX_SEARCH_DEPTH: usize = 4;
 const TX_LIFETIME: std::time::Duration = std::time::Duration::from_secs(3600);
 const RETUTATION_PRICE: u128 = 0;
-const MAX_GAP: u32 = 16;
+const MAX_GAP: u32 = 4;
 
 use plasma::models::{Account};
 
@@ -219,9 +219,10 @@ impl PerAccountQueue {
                         break;
                     }
                 }
-            } else if nonce > self.next_nonce_without_gaps {
-                return Err(format!("Inserting nonce out of sequence is not allowed for now"));
             }
+            // else if nonce > self.next_nonce_without_gaps {
+            //     return Err(format!("Inserting nonce out of sequence is not allowed for now"));
+            // }
 
             if nonce > self.next_nonce_without_gaps + MAX_GAP {
                 println!("Inserting this far into the future is pointless");
@@ -232,10 +233,10 @@ impl PerAccountQueue {
                 println!("Successfully inserted a fresh transaction in the pool");
                 return Ok(true);
             } else {
-                println!("Replaced some old tx");
-                return Ok(false);
-                // println!("Failed to insert a transaction");
-                // return Err(format!("Could not insert a transaction for some reason"));
+                // println!("Replaced some old tx");
+                // return Ok(false);
+                println!("Failed to insert a transaction");
+                return Err(format!("Could not insert a transaction for some reason"));
             }
         }        
     }
@@ -247,7 +248,8 @@ impl PerAccountQueue {
 
     /// Get minimal expected nonce in the queue
     fn min_nonce(&self) -> Nonce {
-        self.queue.values().next().map(|v| v.transaction.nonce).unwrap_or(self.minimal_nonce)
+        self.minimal_nonce
+        // self.queue.values().next().map(|v| v.transaction.nonce).unwrap_or(self.minimal_nonce)
         // self.queue.get_min().map(|(k,_)| *k).unwrap_or(self.default_nonce)
     }
 
@@ -500,11 +502,13 @@ impl TxQueue {
         Ok(())
     }
 
-    fn process_response(&mut self, response: BlockAssemblyResponse, block_was_assembled: bool) {
-        println!("Processing reponse, old queue length = {}", self.len());
+    fn process_response(&mut self, response: BlockAssemblyResponse, block_was_assembled: bool) -> bool {
         let BlockAssemblyResponse {included, valid_but_not_included, temporary_rejected, completely_rejected, affected_accounts} = response;
         let mut affected_accounts: FnvHashSet<u32> = FnvHashSet::default();
         let mut old_lengths: FnvHashMap<u32, usize> = FnvHashMap::default();
+
+        let initial_length = self.len();
+        let mut total_removed: usize = 0;
 
         for from in affected_accounts.clone() {
             let queue = self.queues.get_mut(&from).expect("queue is never discarded even when empty");
@@ -520,6 +524,7 @@ impl TxQueue {
                 let tx_data = pool_tx.transaction.tx_data().expect("transaction in response is always almost valid");
                 queue.reorganize(TransactionPickerResponse::Included(pool_tx));
                 self.filter.set.remove(&tx_data);
+                total_removed += 1;
             }
         } else {
             // return transactions
@@ -528,7 +533,6 @@ impl TxQueue {
                 let queue = self.queues.get_mut(&from).expect("queue is never discarded even when empty");
                 let tx_data = pool_tx.transaction.tx_data().expect("transaction in response is always almost valid");
                 queue.reorganize(TransactionPickerResponse::ValidButNotIncluded(pool_tx));
-                self.filter.set.remove(&tx_data);
             }
         }
         for pool_tx in temporary_rejected {
@@ -539,7 +543,6 @@ impl TxQueue {
             let tx_data = pool_tx.transaction.tx_data().expect("transaction in response is always almost valid");
             modified_tx.lifetime = modified_tx.lifetime / 2;
             queue.reorganize(TransactionPickerResponse::TemporaryRejected(modified_tx));
-            self.filter.set.remove(&tx_data);
         }
 
         for pool_tx in completely_rejected {
@@ -548,6 +551,7 @@ impl TxQueue {
             let tx_data = pool_tx.transaction.tx_data().expect("transaction in response is always almost valid");
             queue.reorganize(TransactionPickerResponse::RejectedCompletely(pool_tx));
             self.filter.set.remove(&tx_data);
+            total_removed += 1;
         }
 
         println!("Updating priorities for affected accounts");
@@ -565,7 +569,17 @@ impl TxQueue {
             self.len -= v;
         }
 
-        println!("Done processing reponse, new queue length = {}", self.len());
+        let final_length = self.len();
+
+        println!("Done processing reponse, old queue length = {}, new queue length = {}, total remove = {}", 
+            initial_length, final_length, total_removed);
+
+        if total_removed == 0 && final_length == initial_length {
+            // should not try again immediately
+            return false;
+        }
+
+        true
 
     }
 
@@ -601,8 +615,8 @@ impl MemPool {
                     self.batch_requested = false;
                     let do_padding = false; // TODO: use when neccessary
                     if !self.batch_requested && self.queue.len() >= config::TRANSFER_BATCH_SIZE {
-                        self.process_batch(do_padding, &tx_for_blocks);
-                        if !self.batch_requested && self.queue.len() >= config::TRANSFER_BATCH_SIZE {
+                        let may_try_again = self.process_batch(do_padding, &tx_for_blocks);
+                        if !self.batch_requested && self.queue.len() >= config::TRANSFER_BATCH_SIZE && may_try_again {
                             println!("After previous response processing we can already make a new one");
                             self.batch_requested = true;
                             tx_for_requests.send(MempoolRequest::ProcessBatch);
@@ -651,7 +665,9 @@ impl MemPool {
                     response.included.len(),
                     response.temporary_rejected.len()
                 );
-                self.queue.process_response(response, true);
+                let may_try_again = self.queue.process_response(response, true);
+
+                return may_try_again;
                 // TODO: remove applied, block_number, wait here for committer instead
             },
             Err(response) => {
@@ -659,16 +675,13 @@ impl MemPool {
                     response.completely_rejected.len(), 
                     response.temporary_rejected.len() + response.valid_but_not_included.len()
                 );
-                self.queue.process_response(response, false);
+                let may_try_again = self.queue.process_response(response, false);
+
+                return may_try_again;
                 // TODO: remove invalid transactions from db
             },
         };
     }
-
-    fn process_reponse(&mut self, reponse: BlockAssemblyResponse) {
-
-    }
-
 }
 
 pub fn start_mem_pool(mut mem_pool: MemPool, 
@@ -706,40 +719,87 @@ fn test_per_account_queue() {
 
     let mut q = PerAccountQueue::new(acc);
 
-    assert_eq!(q.min_nonce(), 5);
-    assert_eq!(q.max_nonce(), None);
+    assert_eq!(q.min_nonce(), 5, "minimal nonce mismatch");
+    assert_eq!(q.next_nonce(), 5, "next nonce mismatch");
+    assert_eq!(q.max_nonce(), None, "max nonce mismatch");
 
-    assert_eq!(q.next_fee(), None);
+    assert_eq!(q.next_fee(), None, "next fee mismatch");
 
     // insert some tx for nonce = 5
-    assert!(q.insert(test::tx(1, 5, 20)).is_ok());
-    assert_eq!(q.len(), 1);
-    assert!(q.insert(test::tx(1, 5, 20)).is_err());
-    assert_eq!(q.len(), 1);
-    assert_eq!(q.next_fee().unwrap(), BigDecimal::from(20));
+    assert!(q.insert(test::tx(1, 5, 20)).is_ok(), "must insert a new tx");
+    assert_eq!(q.len(), 1, "queue length mismatch after one insert");
+    assert!(q.insert(test::tx(1, 5, 20)).is_err(), "must not insert a new tx without replacement");
+    assert_eq!(q.len(), 1, "queue length must not change");
+    assert_eq!(q.next_fee().unwrap(), BigDecimal::from(20), "next fee mismatch");
 
     // next nonce is at 6
-    assert_eq!(q.next_nonce(), 6);
+    assert_eq!(q.next_nonce(), 6, "next expected nonce mismatch");
 
     // allow to insert nonce = 7 even while out of order
-    assert!(q.insert(test::tx(1, 7, 40)).is_err());
-    assert_eq!(q.len(), 2);
-    assert_eq!(q.next_fee().unwrap(), BigDecimal::from(20));
+    assert!(q.insert(test::tx(1, 7, 40)).is_ok(), "should allow to insert out of order");
+    assert_eq!(q.len(), 1, "queue len must not change if transaction is out of order");
+    assert_eq!(q.next_fee().unwrap(), BigDecimal::from(20), "next fee must not change");
 
-    assert_eq!(q.get_fee(7).unwrap(), BigDecimal::from(40));
-    assert_eq!(q.get_fee(5).unwrap(), BigDecimal::from(20));
+    assert_eq!(q.get_fee(7).unwrap(), BigDecimal::from(40), "can get fee for some place in queue");
+    assert_eq!(q.get_fee(5).unwrap(), BigDecimal::from(20), "can get fee for some place in queue");
     // there is no tx for 6, so it's none
-    assert_eq!(q.get_fee(6), None);
+    assert_eq!(q.get_fee(6), None, "must be empty fee");
 
     // one can not take transactions for nonce 6 or 7
-    assert!(q.next(6).is_none());
-    assert!(q.next(7).is_none());
+    assert!(q.next(6).is_none(), "must not take out of order tx");
+    assert!(q.next(7).is_none(), "must not take out of order tx");
+
+    assert_eq!(q.current_nonce, 5, "current nonce must be at the begining");
 
     // one take take a transaction number 5
-    assert!(q.next(5).is_some());
+    let next = q.next(5);
+    assert!(next.is_some(), "must take first transaction in the queue");
+    assert_eq!(q.current_nonce, 6, "must update current nonce");
+    assert_eq!(q.pointer, 1, "must update pointer");
     // but not twice
-    assert!(q.next(5).is_none());
+    assert!(q.next(5).is_none(), "must not take same transaction twice");
     
+    let _q = q;
+    let mut q = _q.clone();
+
+    let next = next.unwrap();
+
+    let response = TransactionPickerResponse::Included(next.clone());
+    q.reorganize(response);
+    assert_eq!(q.len(), 0, "queue length is not empty");
+    assert_eq!(q.current_nonce, 6, "current nonce does not change");
+    assert_eq!(q.min_nonce(), 6, "minimal nonce changes");
+    assert_eq!(q.pointer, 0, "pointer is decreased");
+    assert!(q.insert(test::tx(1, 6, 30)).is_ok(), "should allow to insert in order");
+    assert_eq!(q.next_nonce_without_gaps, 8, "recalculate next nonce without gaps");
+    assert_eq!(q.len(), 2, "queue length must be updated on insert");
+    assert_eq!(q.next_fee().unwrap(), BigDecimal::from(30), "next fee must match");
+
+    let mut q = _q.clone();
+    let response = TransactionPickerResponse::ValidButNotIncluded(next.clone());
+    q.reorganize(response);
+    assert_eq!(q.len(), 1, "queue length is not empty");
+    assert_eq!(q.current_nonce, 5, "current nonce does not change");
+    assert_eq!(q.min_nonce(), 5, "minimal nonce changes");
+    assert_eq!(q.pointer, 0, "pointer is decreased");
+    assert!(q.insert(test::tx(1, 6, 30)).is_ok(), "should allow to insert in order");
+    assert_eq!(q.next_nonce_without_gaps, 8, "recalculate next nonce without gaps");
+    assert_eq!(q.len(), 3, "queue length must be updated on insert");
+    assert_eq!(q.next_fee().unwrap(), BigDecimal::from(20), "next must not update");
+
+
+    let mut q = _q.clone();
+    let response = TransactionPickerResponse::ValidButNotIncluded(next.clone());
+    q.reorganize(response);
+    assert_eq!(q.len(), 1, "queue length is not empty");
+    assert_eq!(q.current_nonce, 5, "current nonce does not change");
+    assert_eq!(q.min_nonce(), 5, "minimal nonce changes");
+    assert_eq!(q.pointer, 0, "pointer is decreased");
+    assert!(q.insert(test::tx(1, 6, 30)).is_ok(), "should allow to insert in order");
+    assert_eq!(q.next_nonce_without_gaps, 8, "recalculate next nonce without gaps");
+    assert_eq!(q.len(), 3, "queue length must be updated on insert");
+    assert_eq!(q.next_fee().unwrap(), BigDecimal::from(20), "next must not update");
+
 
     // let _q = q;
 
