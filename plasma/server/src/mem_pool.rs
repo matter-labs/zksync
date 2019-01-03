@@ -316,53 +316,59 @@ impl PerAccountQueue {
         None
     }
 
+    fn remove_for_nonce(&mut self, nonce: &Nonce) {
+        let old_length = self.queue.len();
+        self.queue.remove(nonce);
+        let new_length = self.queue.len();
+        assert_eq!(old_length, new_length + 1);
+    }
+
+    fn fix_current_nonce(&mut self) {
+        if self.current_nonce < self.minimal_nonce {
+            self.current_nonce = self.minimal_nonce;
+        }
+    }
+
+    fn fix_pointer(&mut self) {
+        self.pointer = self.current_nonce - self.minimal_nonce;
+    }
+
+    fn purge_taken_after_nonce(&mut self, nonce: Nonce) {
+        if nonce < self.current_nonce {
+            self.current_nonce = nonce;
+        }
+    }
+
+    fn reset_batch(&mut self) {
+        if self.current_nonce != self.minimal_nonce {
+            self.current_nonce = self.minimal_nonce;
+            self.pointer = 0;
+        }
+    }
+
     // reorganize the queue due to transaction being accepted, temporary or completely rejected
     pub fn reorganize(&mut self, reason: TransactionPickerResponse) {
         match reason {
             TransactionPickerResponse::Included(transaction) => {
                 println!("Removing included transaction form the pool");
+                assert!(self.pointer != 0, "can only include transactions if pointer != 0");
                 // all calls here are expected to be ordered by nonce
-                let old_length = self.queue.len();
                 let nonce = transaction.transaction.nonce;
                 if nonce != self.minimal_nonce {
                     panic!("Account queue is in inconsistent state!");
                 }
                 self.minimal_nonce += 1;
-                self.queue.remove(&nonce);
-                if self.current_nonce > self.minimal_nonce {
-                    self.current_nonce = self.minimal_nonce;
-                }
-                self.pointer = 0;
-
-                let new_length = self.queue.len();
-                assert_eq!(old_length, new_length + 1);
+                self.remove_for_nonce(&nonce);
+                self.reset_batch();
             },
             TransactionPickerResponse::ValidButNotIncluded(transaction) => {
+                // transactions are ordered by nonce, so any call to this or other cases will reset the queue
                 println!("Returning transaction to the pool without prejustice");
-                let old_length = self.queue.len();
                 let nonce = transaction.transaction.nonce;
-                println!("Current nonce = {}", self.current_nonce);
-                println!("Returned nonce = {}", nonce);
-                if nonce > self.current_nonce {
-                    // no action is required
-                    println!("Returned transaction is with the nonce higher than the current, do nothing");
-                    return;
-                }
                 if nonce < self.minimal_nonce {
                     panic!("Account queue is in inconsistent state!");
                 }
-                if nonce <= self.current_nonce {
-                    // assert!(self.pointer != 0, "on queue resets it should have something taken out");
-                    // this transaction was either current or somewhere before, so we reset the queue
-                    self.pointer = 0;
-                }
-                if self.current_nonce > self.minimal_nonce {
-                    self.current_nonce = self.minimal_nonce;
-                }
-                let new_length = self.queue.len();
-                assert_eq!(old_length, new_length);
-                // no actions about the queue
-
+                self.reset_batch();
             },
             TransactionPickerResponse::TemporaryRejected(transaction) => {
                 // don't need to check for a first item, just check how far from the begining transactions
@@ -371,65 +377,27 @@ impl PerAccountQueue {
                 let nonce = transaction.transaction.nonce;
                 if nonce < self.minimal_nonce {
                     panic!("Account queue is in inconsistent state!");
-                }
-
-                let old_length = self.queue.len();
-                            
+                }                            
                 if transaction.timestamp + transaction.lifetime <= std::time::Instant::now() {
-                    self.queue.remove(&nonce);
+                    self.remove_for_nonce(&nonce);
                     if nonce <= self.next_nonce_without_gaps {
                         self.next_nonce_without_gaps = nonce - 1;
                     }
-                    let new_length = self.queue.len();
-                    assert_eq!(old_length, new_length+1);
-                    // this transaction is dead, so purge it
-                } else {
-                    let nonce = transaction.transaction.nonce;
-                    if self.queue.get(&nonce).is_some() {
-                        self.queue.insert(nonce, transaction);
-                    }           
-                    let new_length = self.queue.len();
-                    assert_eq!(old_length, new_length);         
                 }
-                if nonce > self.current_nonce {
-                    // do nothing, it was purged already, 
-                    return;
-                }
-                if nonce <= self.current_nonce {
-                    // assert!(self.pointer != 0, "on queue resets it should have something taken out");
-                    // this transaction was either current or somewhere before, so we reset the queue
-                    self.pointer = 0;
-                }
-                if self.current_nonce > self.minimal_nonce {
-                    self.current_nonce = self.minimal_nonce;
-                }
+                self.reset_batch();
             },
             TransactionPickerResponse::RejectedCompletely(transaction) => {
                 println!("Removing transaction from the pool due to rejection");
                 // just delete this one and all after
-                let old_length = self.queue.len();
                 let mut nonce = transaction.transaction.nonce;
                 if nonce < self.minimal_nonce {
                     panic!("Account queue is in inconsistent state!");
                 }
-                self.queue.remove(&nonce);
-                let new_length = self.queue.len();
-                assert_eq!(old_length, new_length+1); 
-                if nonce > self.current_nonce {
-                    // do nothing, it was purged already, 
-                    return;
-                }
+                self.remove_for_nonce(&nonce);
                 if nonce <= self.next_nonce_without_gaps {
                     self.next_nonce_without_gaps = nonce - 1;
                 }
-                if nonce <= self.current_nonce {
-                    // assert!(self.pointer != 0, "on queue resets it should have something taken out");
-                    // this transaction was either current or somewhere before, so we reset the queue
-                    self.pointer = 0;
-                }
-                if self.current_nonce > self.minimal_nonce {
-                    self.current_nonce = self.minimal_nonce;
-                }
+                self.reset_batch();
             }
         }
         // TODO: this is inefficient and may be moved to higher level, but for now it's ok
