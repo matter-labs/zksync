@@ -619,8 +619,8 @@ impl MemPool {
                 MempoolRequest::AddTransaction(tx, sender) => {
                     let add_result = self.add_transaction(tx);
                     if let Err(err) = add_result {
-                        sender.send(Err(err));
                         println!("error adding transaction to mempool: {}", err);
+                        sender.send(Err(err));
                         // TODO: return error message to api server
                     } else {
                         sender.send(Ok(()));
