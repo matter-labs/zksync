@@ -355,6 +355,8 @@ impl PerAccountQueue {
                     // assert!(self.pointer != 0, "on queue resets it should have something taken out");
                     // this transaction was either current or somewhere before, so we reset the queue
                     self.pointer = 0;
+                }
+                if self.current_nonce > self.minimal_nonce {
                     self.current_nonce = self.minimal_nonce;
                 }
                 let new_length = self.queue.len();
@@ -397,6 +399,8 @@ impl PerAccountQueue {
                     // assert!(self.pointer != 0, "on queue resets it should have something taken out");
                     // this transaction was either current or somewhere before, so we reset the queue
                     self.pointer = 0;
+                }
+                if self.current_nonce > self.minimal_nonce {
                     self.current_nonce = self.minimal_nonce;
                 }
             },
@@ -422,6 +426,8 @@ impl PerAccountQueue {
                     // assert!(self.pointer != 0, "on queue resets it should have something taken out");
                     // this transaction was either current or somewhere before, so we reset the queue
                     self.pointer = 0;
+                }
+                if self.current_nonce > self.minimal_nonce {
                     self.current_nonce = self.minimal_nonce;
                 }
             }
@@ -598,7 +604,12 @@ impl TxQueue {
         for account in affected_accounts {
             let queue = self.queues.get(&account).expect("queue is never discarded even when empty");
             if let Some(fee) = queue.next_fee() {
-                self.order.push(account, fee);
+                if self.order.get(&account).is_none() {
+                    self.order.push(account, fee);
+                }
+                else {
+                    self.order.change_priority(&account, fee);
+                }
             }
         }
 
