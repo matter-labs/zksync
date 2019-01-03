@@ -532,7 +532,6 @@ impl TxQueue {
 
     fn process_response(&mut self, response: BlockAssemblyResponse, block_was_assembled: bool) -> bool {
         let BlockAssemblyResponse {included, valid_but_not_included, temporary_rejected, completely_rejected, affected_accounts} = response;
-        let mut affected_accounts: FnvHashSet<u32> = FnvHashSet::default();
         let mut old_lengths: FnvHashMap<u32, usize> = FnvHashMap::default();
 
         let initial_length = self.len();

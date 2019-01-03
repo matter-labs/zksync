@@ -213,7 +213,7 @@ impl PlasmaStateKeeper {
                         applied_transactions.push(tx);
                         response.included.push(pool_tx);
 
-                        let inserted = all_affected_senders.insert(next_from);
+                        let inserted = response.affected_accounts.insert(next_from);
                         if inserted {
                             println!("Inserted {} in all affected senders", next_from);
                         }
@@ -222,7 +222,7 @@ impl PlasmaStateKeeper {
                         self.state.balance_tree.insert(tx.from, from);
                         self.state.balance_tree.insert(tx.to, to);
 
-                        let inserted = all_affected_senders.insert(next_from);
+                        let inserted = response.affected_accounts.insert(next_from);
                         if inserted {
                             println!("Inserted {} in all affected senders", next_from);
                         }
@@ -248,9 +248,6 @@ impl PlasmaStateKeeper {
             unimplemented!()
             // TODO: implement padding
         }
-        println!("Affected sender = {}", all_affected_senders.len());
-
-        response.affected_accounts = all_affected_senders;
 
         println!("Added to response, affected accounts = {}", response.affected_accounts.len());
 
