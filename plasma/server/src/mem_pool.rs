@@ -322,16 +322,26 @@ impl PerAccountQueue {
             TransactionPickerResponse::Included(transaction) => {
                 println!("Removing included transaction form the pool");
                 // all calls here are expected to be ordered by nonce
+                let old_length = self.queue.len();
                 let nonce = transaction.transaction.nonce;
                 if nonce != self.minimal_nonce {
                     panic!("Account queue is in inconsistent state!");
                 }
-                // remove the first item from the queue
-                self.queue = self.queue.skip(1);
-                // pointer from the minimal nonce to the current is smaller
-                self.pointer -= 1;
-                // minimal nonce is now +1
                 self.minimal_nonce += 1;
+                self.queue.remove(&nonce);
+                let new_length = self.queue.len();
+                assert_eq!(old_length, new_length + 1);
+                if nonce > self.current_nonce {
+                    // no action is required
+                    println!("Returned transaction is with the nonce higher than the current, do nothing");
+                    return;
+                }
+                if nonce <= self.current_nonce {
+                    assert!(self.pointer != 0, "on queue resets it should have something taken out");
+                    // this transaction was either current or somewhere before, so we reset the queue
+                    self.pointer = 0;
+                    self.current_nonce = self.minimal_nonce;
+                }
             },
             TransactionPickerResponse::ValidButNotIncluded(transaction) => {
                 println!("Returning transaction to the pool without prejustice");
