@@ -351,15 +351,17 @@ impl PerAccountQueue {
         match reason {
             TransactionPickerResponse::Included(transaction) => {
                 println!("Removing included transaction form the pool");
-                assert!(self.pointer != 0, "can only include transactions if pointer != 0");
+                // assert!(self.pointer != 0, "can only include transactions if pointer != 0");
                 // all calls here are expected to be ordered by nonce
                 let nonce = transaction.transaction.nonce;
                 if nonce != self.minimal_nonce {
                     panic!("Account queue is in inconsistent state!");
                 }
                 self.minimal_nonce += 1;
+                self.pointer -= 1;
                 self.remove_for_nonce(&nonce);
-                self.reset_batch();
+
+                // self.reset_batch();
             },
             TransactionPickerResponse::ValidButNotIncluded(transaction) => {
                 // transactions are ordered by nonce, so any call to this or other cases will reset the queue
