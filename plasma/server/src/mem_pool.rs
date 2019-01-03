@@ -219,6 +219,8 @@ impl PerAccountQueue {
                         break;
                     }
                 }
+            } else if nonce > self.next_nonce_without_gaps {
+                return Err(format!("Inserting nonce out of sequence is not allowed for now"));
             }
 
             if nonce > self.next_nonce_without_gaps + MAX_GAP {
@@ -230,8 +232,10 @@ impl PerAccountQueue {
                 println!("Successfully inserted a fresh transaction in the pool");
                 return Ok(true);
             } else {
-                println!("Failed to insert a transaction");
-                return Err(format!("Could not insert a transaction for some reason"));
+                println!("Replaced some old tx");
+                return Ok(false);
+                // println!("Failed to insert a transaction");
+                // return Err(format!("Could not insert a transaction for some reason"));
             }
         }        
     }
