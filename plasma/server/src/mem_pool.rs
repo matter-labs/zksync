@@ -289,7 +289,7 @@ impl PerAccountQueue {
     }
 
     pub fn next_fee(&self) -> Option<BigDecimal> {
-        println!("Current nonce = {}", self.current_nonce);
+        // println!("Current nonce = {}", self.current_nonce);
 
         self.queue.get(&self.current_nonce).map(|v| v.transaction.fee.clone())
         // self.queue.values().next().map(|v| v.transaction.fee.clone())
@@ -448,6 +448,7 @@ impl TxQueue {
     pub fn next(&mut self, account_id: AccountId, next_nonce: Nonce) -> Option<InPoolTransaction> {
         println!("Picking next transaction from the queue for account {} and nonce {}", account_id, next_nonce);
         if self.peek_next().is_none() {
+            println!("Peek returned none");
             return None;
         }
         assert_eq!(account_id, self.peek_next().unwrap());
@@ -464,8 +465,10 @@ impl TxQueue {
         if let Some(next_fee) = next_fee {
             // update priority
             // pushing a duplicate is equivalent to update
-            self.order.push(account_id, next_fee);
+            println!("There is a next fee for this account, so update");
+            self.order.change_priority(&account_id, next_fee);
         } else {
+            println!("There is no next fee for this account, pop from the queue");
             // remove current account from the queue
             self.order.pop();
         }
