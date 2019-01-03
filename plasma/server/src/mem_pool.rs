@@ -351,7 +351,7 @@ impl PerAccountQueue {
         match reason {
             TransactionPickerResponse::Included(transaction) => {
                 println!("Removing included transaction form the pool");
-                // assert!(self.pointer != 0, "can only include transactions if pointer != 0");
+                assert!(self.pointer != 0, "can only include transactions if pointer != 0");
                 // all calls here are expected to be ordered by nonce
                 let nonce = transaction.transaction.nonce;
                 if nonce != self.minimal_nonce {
@@ -362,6 +362,7 @@ impl PerAccountQueue {
                 self.remove_for_nonce(&nonce);
 
                 // self.reset_batch();
+                // self.order_and_clear();
             },
             TransactionPickerResponse::ValidButNotIncluded(transaction) => {
                 // transactions are ordered by nonce, so any call to this or other cases will reset the queue
@@ -371,6 +372,7 @@ impl PerAccountQueue {
                     panic!("Account queue is in inconsistent state!");
                 }
                 self.reset_batch();
+                self.order_and_clear();
             },
             TransactionPickerResponse::TemporaryRejected(transaction) => {
                 // don't need to check for a first item, just check how far from the begining transactions
@@ -387,6 +389,7 @@ impl PerAccountQueue {
                     }
                 }
                 self.reset_batch();
+                self.order_and_clear();
             },
             TransactionPickerResponse::RejectedCompletely(transaction) => {
                 println!("Removing transaction from the pool due to rejection");
@@ -400,10 +403,9 @@ impl PerAccountQueue {
                     self.next_nonce_without_gaps = nonce - 1;
                 }
                 self.reset_batch();
+                self.order_and_clear();
             }
         }
-        // TODO: this is inefficient and may be moved to higher level, but for now it's ok
-        self.order_and_clear();
     }
 
     pub fn len(&self) -> usize {
