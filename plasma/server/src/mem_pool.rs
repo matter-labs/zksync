@@ -263,6 +263,31 @@ impl PerAccountQueue {
         self.next_nonce_without_gaps
     }
 
+    fn order_and_clear(&mut self) {
+        assert_eq!(self.pointer, 0, "cleanup must not happen when there is batch processing in place");
+        if self.pointer != 0 {
+            // reorg mut not happed during batch processing, when something is taken
+            return;
+        }
+        let begining = self.minimal_nonce;
+        let end = self.max_nonce().unwrap_or(begining) + 1;
+        let mut in_order_candidate = begining;
+        for i in begining..end {
+            if let Some(in_pool_tx) = self.queue.get(&i).cloned() {
+                let alive = in_pool_tx.timestamp + in_pool_tx.lifetime > std::time::Instant::now();
+                if (alive) {
+                    if in_pool_tx.transaction.nonce == in_order_candidate {
+                        in_order_candidate += 1;
+                    }
+                } else {
+                    self.queue.remove(&i);
+                }
+            }
+        }
+        println!("After cleanup new nonce without gaps = {}", in_order_candidate);
+        self.next_nonce_without_gaps = in_order_candidate;
+    }
+
     pub fn next_fee(&self) -> Option<BigDecimal> {
         println!("Current nonce = {}", self.current_nonce);
 
@@ -322,16 +347,12 @@ impl PerAccountQueue {
                 if nonce < self.minimal_nonce {
                     panic!("Account queue is in inconsistent state!");
                 }
-                // do the cascade update
-                // make this nonce current
-                // change pointer
-                // don't change the minimal
-                println!("Old pointer = {}", self.pointer);
-                let new_pointer = self.pointer + nonce - self.current_nonce;
-                println!("New pointer = {}", new_pointer);
-                // move pointer backwards
-                self.current_nonce = nonce; 
-                self.pointer = new_pointer;
+                if nonce <= self.current_nonce {
+                    assert!(self.pointer != 0, "on queue resets it should have something taken out");
+                    // this transaction was either current or somewhere before, so we reset the queue
+                    self.pointer = 0;
+                    self.current_nonce = self.minimal_nonce;
+                }
                 let new_length = self.queue.len();
                 assert_eq!(old_length, new_length);
                 // no actions about the queue
@@ -341,43 +362,35 @@ impl PerAccountQueue {
                 // don't need to check for a first item, just check how far from the begining transactions
                 // were rejected and if any one of those should be pushed out from the pool - just purge the rest too
                 println!("Returning transaction to the pool with penalties");
+                let nonce = transaction.transaction.nonce;
+                if nonce < self.minimal_nonce {
+                    panic!("Account queue is in inconsistent state!");
+                }
+
+                let old_length = self.queue.len();
+                            
                 if transaction.timestamp + transaction.lifetime <= std::time::Instant::now() {
-                    // this transaction is dead, so purge it
-                    let  nonce = transaction.transaction.nonce;
-                    if nonce > self.current_nonce {
-                        // do nothing, it was purged already, 
-                        return;
-                    }
-                    if nonce < self.minimal_nonce {
-                        panic!("Account queue is in inconsistent state!");
-                    }
-                    // one nonce is already dead, so purge everything after
-                    let distance = self.pointer + nonce - self.current_nonce;
                     self.queue.remove(&nonce);
-                    self.pointer = distance;
-                    self.current_nonce = nonce;
-                    if self.next_nonce_without_gaps >= nonce + 1 {
-                        self.next_nonce_without_gaps = nonce;
-                    }
+                    let new_length = self.queue.len();
+                    assert_eq!(old_length, new_length+1);
+                    // this transaction is dead, so purge it
                 } else {
                     let nonce = transaction.transaction.nonce;
-                    if nonce < self.minimal_nonce {
-                        panic!("Account queue is in inconsistent state!");
-                    }
                     if self.queue.get(&nonce).is_some() {
                         self.queue.insert(nonce, transaction);
-                    }
-                    if nonce > self.current_nonce {
-                        // do nothing, it was purged already, 
-                        return;
-                    }
-                    println!("Old pointer = {}", self.pointer);
-                    let new_pointer = self.pointer + nonce - self.current_nonce;
-                    println!("New pointer = {}", new_pointer);
-                    // move pointer backwards
-                    self.current_nonce = nonce; 
-                    self.pointer = new_pointer;
-                    // no actions about the queue
+                    }           
+                    let new_length = self.queue.len();
+                    assert_eq!(old_length, new_length);         
+                }
+                if nonce > self.current_nonce {
+                    // do nothing, it was purged already, 
+                    return;
+                }
+                if nonce <= self.current_nonce {
+                    assert!(self.pointer != 0, "on queue resets it should have something taken out");
+                    // this transaction was either current or somewhere before, so we reset the queue
+                    self.pointer = 0;
+                    self.current_nonce = self.minimal_nonce;
                 }
             },
             TransactionPickerResponse::RejectedCompletely(transaction) => {
@@ -392,14 +405,19 @@ impl PerAccountQueue {
                     // do nothing, it was purged already, 
                     return;
                 }
-                nonce -= 1;
-                // one nonce is already dead, so purge everything after
-                let distance = self.pointer + nonce - self.current_nonce;
-                self.queue = self.queue.take(distance as usize);
-                self.pointer = distance;
-                self.current_nonce = nonce;
+                if nonce == self.next_nonce_without_gaps {
+                    self.next_nonce_without_gaps -= 1;
+                }
+                if nonce <= self.current_nonce {
+                    assert!(self.pointer != 0, "on queue resets it should have something taken out");
+                    // this transaction was either current or somewhere before, so we reset the queue
+                    self.pointer = 0;
+                    self.current_nonce = self.minimal_nonce;
+                }
             }
         }
+        // TODO: this is inefficient and may be moved to higher level, but for now it's ok
+        self.order_and_clear();
     }
 
     pub fn len(&self) -> usize {
@@ -737,6 +755,7 @@ fn test_per_account_queue() {
 
     // allow to insert nonce = 7 even while out of order
     assert!(q.insert(test::tx(1, 7, 40)).is_ok(), "should allow to insert out of order");
+    assert!(q.queue.get(&7).is_some(), "insertion must in fact happen");
     assert_eq!(q.len(), 1, "queue len must not change if transaction is out of order");
     assert_eq!(q.next_fee().unwrap(), BigDecimal::from(20), "next fee must not change");
 
@@ -783,72 +802,47 @@ fn test_per_account_queue() {
     assert_eq!(q.min_nonce(), 5, "minimal nonce changes");
     assert_eq!(q.pointer, 0, "pointer is decreased");
     assert!(q.insert(test::tx(1, 6, 30)).is_ok(), "should allow to insert in order");
-    assert_eq!(q.next_nonce_without_gaps, 8, "recalculate next nonce without gaps");
+    assert_eq!(q.next_nonce_without_gaps, 8, "recalculate next nonce without gaps after return of the valid tx");
     assert_eq!(q.len(), 3, "queue length must be updated on insert");
     assert_eq!(q.next_fee().unwrap(), BigDecimal::from(20), "next must not update");
 
-
     let mut q = _q.clone();
-    let response = TransactionPickerResponse::ValidButNotIncluded(next.clone());
+    let response = TransactionPickerResponse::TemporaryRejected(next.clone());
     q.reorganize(response);
     assert_eq!(q.len(), 1, "queue length is not empty");
     assert_eq!(q.current_nonce, 5, "current nonce does not change");
     assert_eq!(q.min_nonce(), 5, "minimal nonce changes");
     assert_eq!(q.pointer, 0, "pointer is decreased");
     assert!(q.insert(test::tx(1, 6, 30)).is_ok(), "should allow to insert in order");
-    assert_eq!(q.next_nonce_without_gaps, 8, "recalculate next nonce without gaps");
+    assert_eq!(q.next_nonce_without_gaps, 8, "recalculate next nonce without gaps after return of the valid tx");
     assert_eq!(q.len(), 3, "queue length must be updated on insert");
     assert_eq!(q.next_fee().unwrap(), BigDecimal::from(20), "next must not update");
 
+    let mut q = _q.clone();
+    let mut modified_next = next.clone();
+    modified_next.timestamp = modified_next.timestamp - modified_next.lifetime;
+    let response = TransactionPickerResponse::TemporaryRejected(modified_next);
+    q.reorganize(response);
+    assert_eq!(q.len(), 0, "queue length is empty");
+    assert_eq!(q.current_nonce, 5, "current nonce does not change");
+    assert_eq!(q.min_nonce(), 5, "minimal nonce changes");
+    assert_eq!(q.pointer, 0, "pointer is decreased");
+    assert!(q.insert(test::tx(1, 6, 30)).is_ok(), "should allow to insert out of order");
+    assert_eq!(q.next_nonce_without_gaps, 5, "nonce without gaps should point to the begining");
+    assert_eq!(q.len(), 0, "queue length must be updated on insert");
+    assert_eq!(q.next_fee(), None, "next fee must be missing");
 
-    // let _q = q;
-
-    // let mut q = _q.clone();
-    // let (rejected, tx) = q.pop(5);
-    // assert_eq!(rejected.len(), 0); 
-    // assert_eq!(tx.unwrap().nonce, 5); 
-    // assert_eq!(q.len(), 1);
-    // assert_eq!(q.next_fee().unwrap(), BigDecimal::from(40));
-    // assert_eq!(q.pending_nonce(), 8);
-
-    // let mut q = _q.clone();
-
-    // assert_eq!(q.insert(test::tx(1, 5, 60)), false);
-    // assert_eq!(q.get_fee(5).unwrap(), BigDecimal::from(60));
-
-    // let mut q = _q.clone();
-    // let (rejected, tx) = q.pop(6);
-    // assert_eq!(rejected.len(), 2); 
-    // assert_eq!(tx.is_none(), true);
-    // assert_eq!(q.len(), 0);
-    // assert_eq!(q.next_fee(), None);
-
-    // let mut q = _q.clone();
-    // let (rejected, tx) = q.pop(7);
-    // assert_eq!(rejected.len(), 1); 
-    // assert_eq!(tx, None);
-    // assert_eq!(q.len(), 1);
-    // assert_eq!(q.pending_nonce(), 8);
-
-    // let mut q = _q.clone();
-    // let (rejected, tx) = q.pop(8);
-    // assert_eq!(rejected.len(), 2); 
-    // assert_eq!(tx.is_none(), true);
-    // assert_eq!(q.pending_nonce(), 0);
-
-    // let mut q = _q.clone();
-    // assert_eq!(q.insert(test::tx(1, 6, 40)), true);
-    // let (rejected, tx) = q.pop(6);
-    // assert_eq!(rejected.len(), 1); 
-    // assert_eq!(tx, None);
-
-    // let (rejected, tx) = q.pop(6);
-    // assert_eq!(rejected.len(), 0); 
-    // assert_eq!(tx.unwrap().nonce, 6);
-    // assert_eq!(q.len(), 1);
-    // assert_eq!(q.next_fee().unwrap(), BigDecimal::from(40));
-    // assert_eq!(q.pending_nonce(), 8);
-
+    let mut q = _q.clone();
+    let response = TransactionPickerResponse::RejectedCompletely(next.clone());
+    q.reorganize(response);
+    assert_eq!(q.len(), 0, "queue length is empty");
+    assert_eq!(q.current_nonce, 5, "current nonce does not change");
+    assert_eq!(q.min_nonce(), 5, "minimal nonce changes");
+    assert_eq!(q.pointer, 0, "pointer is decreased");
+    assert!(q.insert(test::tx(1, 6, 30)).is_ok(), "should allow to insert out of order");
+    assert_eq!(q.next_nonce_without_gaps, 5, "nonce without gaps should point to the begining");
+    assert_eq!(q.len(), 0, "queue length must be updated on insert");
+    assert_eq!(q.next_fee(), None, "next fee must be missing");
 }
 
 // #[test] 
