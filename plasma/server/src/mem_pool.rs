@@ -641,7 +641,7 @@ impl MemPool {
         Ok(())
     }
 
-    fn process_batch(&mut self, do_padding: bool, tx_for_blocks: &Sender<StateProcessingRequest>) {
+    fn process_batch(&mut self, do_padding: bool, tx_for_blocks: &Sender<StateProcessingRequest>) -> bool{
 
         // send request to state_keeper
         let (tx, rx) = channel();
