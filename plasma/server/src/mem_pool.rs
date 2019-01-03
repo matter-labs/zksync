@@ -462,14 +462,22 @@ impl TxQueue {
             // self.len -= ejected;
             (tx, queue.next_fee())
         };
-        if let Some(next_fee) = next_fee {
-            // update priority
-            // pushing a duplicate is equivalent to update
-            println!("There is a next fee for this account, so update");
-            self.order.change_priority(&account_id, next_fee);
+        if tx.is_some() {
+            // we've taken a transaction from the queue for expected nonce
+            if let Some(next_fee) = next_fee {
+                // there is some NEXT transaction with some fee, so update account priority
+                // update priority
+                // pushing a duplicate is equivalent to update
+                println!("There is a next fee for this account, so update");
+                self.order.change_priority(&account_id, next_fee);
+            } else {
+                println!("There is no next fee for this account, pop from the queue");
+                // remove current account from the queue
+                self.order.pop();
+            }
         } else {
-            println!("There is no next fee for this account, pop from the queue");
-            // remove current account from the queue
+            // we couldn't take a valid transaction for this account, so pop
+            println!("Pop the account cause we couldn't take a transaction");
             self.order.pop();
         }
 
@@ -482,7 +490,7 @@ impl TxQueue {
     fn ensure_queue(&mut self, account_id: AccountId)  {
         if self.queues.get(&account_id).is_none() {
             self.queues.insert(account_id, PerAccountQueue::default());
-            self.order.push(account_id, BigDecimal::zero());
+            // self.order.push(account_id, BigDecimal::zero());
         }
     }
 
