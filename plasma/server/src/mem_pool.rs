@@ -108,7 +108,7 @@ impl NonceClient for MemPool {
 }
 
 pub enum MempoolRequest {
-    AddTransaction(TransferTx),
+    AddTransaction(TransferTx, Sender<Result<(), String>>),
     GetPendingNonce(AccountId, Sender<Option<Nonce>>),
     ProcessBatch,
 }
@@ -329,10 +329,11 @@ impl PerAccountQueue {
                 }
                 self.minimal_nonce += 1;
                 self.queue.remove(&nonce);
-                let new_length = self.queue.len();
-                assert_eq!(old_length, new_length + 1);
                 self.current_nonce = self.minimal_nonce;
                 self.pointer = 0;
+
+                let new_length = self.queue.len();
+                assert_eq!(old_length, new_length + 1);
             },
             TransactionPickerResponse::ValidButNotIncluded(transaction) => {
                 println!("Returning transaction to the pool without prejustice");
@@ -615,12 +616,14 @@ impl MemPool {
     {
         for req in rx_for_requests {            
             match req {
-                MempoolRequest::AddTransaction(tx) => {
+                MempoolRequest::AddTransaction(tx, sender) => {
                     let add_result = self.add_transaction(tx);
                     if let Err(err) = add_result {
+                        sender.send(Err(err));
                         println!("error adding transaction to mempool: {}", err);
                         // TODO: return error message to api server
                     } else {
+                        sender.send(Ok(()));
                         println!("mempool queue length = {}", self.queue.len());
                         // TODO: also check that batch is now possible (e.g. that Ethereum queue is not too long)
                         if !self.batch_requested && self.queue.len() >= config::TRANSFER_BATCH_SIZE {

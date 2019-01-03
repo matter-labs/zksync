@@ -88,13 +88,33 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
             let accepted = pub_key.as_ref().map(|pk| tx.verify_sig(pk) ).unwrap_or(false);
             if accepted {
                 let mut tx = tx.clone();
+                let (add_tx, add_rx) = mpsc::channel();
                 tx.cached_pub_key = pub_key;
-                tx_to_mempool.send(MempoolRequest::AddTransaction(tx)).expect("must send transaction to mempool from rest api"); // pass to mem_pool
+                tx_to_mempool.send(MempoolRequest::AddTransaction(tx, add_tx)).expect("must send transaction to mempool from rest api"); // pass to mem_pool
+                let add_result = add_rx.recv_timeout(std::time::Duration::from_millis(500));
+                if add_result.is_ok() {
+                    if add_result.unwrap().is_ok() {
+                        let resp = TransactionResponse{
+                            accepted: true
+                        };
+                        return Ok(HttpResponse::Ok().json(resp));
+                    } else {
+                        let resp = TransactionResponse{
+                            accepted: false
+                        };
+                        return Ok(HttpResponse::Ok().json(resp));
+                    }
+                } else {
+                    let resp = TransactionResponse{
+                        accepted: false
+                    };
+                    return Ok(HttpResponse::Ok().json(resp));
+                }
             }
             let resp = TransactionResponse{
-                accepted
+                accepted: false
             };
-            Ok(HttpResponse::Ok().json(resp))
+            return Ok(HttpResponse::Ok().json(resp));
         })
         .responder()
 }
