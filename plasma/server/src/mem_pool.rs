@@ -349,7 +349,7 @@ impl PerAccountQueue {
                     panic!("Account queue is in inconsistent state!");
                 }
                 if nonce <= self.current_nonce {
-                    assert!(self.pointer != 0, "on queue resets it should have something taken out");
+                    // assert!(self.pointer != 0, "on queue resets it should have something taken out");
                     // this transaction was either current or somewhere before, so we reset the queue
                     self.pointer = 0;
                     self.current_nonce = self.minimal_nonce;
@@ -388,7 +388,7 @@ impl PerAccountQueue {
                     return;
                 }
                 if nonce <= self.current_nonce {
-                    assert!(self.pointer != 0, "on queue resets it should have something taken out");
+                    // assert!(self.pointer != 0, "on queue resets it should have something taken out");
                     // this transaction was either current or somewhere before, so we reset the queue
                     self.pointer = 0;
                     self.current_nonce = self.minimal_nonce;
@@ -410,7 +410,7 @@ impl PerAccountQueue {
                     self.next_nonce_without_gaps -= 1;
                 }
                 if nonce <= self.current_nonce {
-                    assert!(self.pointer != 0, "on queue resets it should have something taken out");
+                    // assert!(self.pointer != 0, "on queue resets it should have something taken out");
                     // this transaction was either current or somewhere before, so we reset the queue
                     self.pointer = 0;
                     self.current_nonce = self.minimal_nonce;
