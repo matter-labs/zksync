@@ -289,7 +289,7 @@ impl PerAccountQueue {
     }
 
     pub fn next_fee(&self) -> Option<BigDecimal> {
-        println!("Nonce for next fee= {}, minimal = ", self.current_nonce, self.minimal_nonce);
+        println!("Nonce for next fee= {}, minimal = {}", self.current_nonce, self.minimal_nonce);
 
         self.queue.get(&self.current_nonce).map(|v| v.transaction.fee.clone())
         // self.queue.values().next().map(|v| v.transaction.fee.clone())
