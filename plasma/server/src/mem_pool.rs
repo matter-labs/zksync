@@ -538,6 +538,8 @@ impl TxQueue {
         let initial_length = self.len();
         let mut total_removed: usize = 0;
 
+        println!("Total affected account in this block = {}", affected_accounts.len());
+
         for from in affected_accounts.clone() {
             let queue = self.queues.get(&from).expect("queue is never discarded even when empty");
             let old_length = queue.len();
