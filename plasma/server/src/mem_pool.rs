@@ -331,17 +331,8 @@ impl PerAccountQueue {
                 self.queue.remove(&nonce);
                 let new_length = self.queue.len();
                 assert_eq!(old_length, new_length + 1);
-                if nonce > self.current_nonce {
-                    // no action is required
-                    println!("Returned transaction is with the nonce higher than the current, do nothing");
-                    return;
-                }
-                if nonce <= self.current_nonce {
-                    assert!(self.pointer != 0, "on queue resets it should have something taken out");
-                    // this transaction was either current or somewhere before, so we reset the queue
-                    self.pointer = 0;
-                    self.current_nonce = self.minimal_nonce;
-                }
+                self.current_nonce = self.minimal_nonce;
+                self.pointer = 0;
             },
             TransactionPickerResponse::ValidButNotIncluded(transaction) => {
                 println!("Returning transaction to the pool without prejustice");
