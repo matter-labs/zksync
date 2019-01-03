@@ -329,7 +329,9 @@ impl PerAccountQueue {
                 }
                 self.minimal_nonce += 1;
                 self.queue.remove(&nonce);
-                self.current_nonce = self.minimal_nonce;
+                if self.current_nonce > self.minimal_nonce {
+                    self.current_nonce = self.minimal_nonce;
+                }
                 self.pointer = 0;
 
                 let new_length = self.queue.len();
@@ -373,6 +375,9 @@ impl PerAccountQueue {
                             
                 if transaction.timestamp + transaction.lifetime <= std::time::Instant::now() {
                     self.queue.remove(&nonce);
+                    if nonce <= self.next_nonce_without_gaps {
+                        self.next_nonce_without_gaps = nonce - 1;
+                    }
                     let new_length = self.queue.len();
                     assert_eq!(old_length, new_length+1);
                     // this transaction is dead, so purge it
@@ -398,17 +403,20 @@ impl PerAccountQueue {
             TransactionPickerResponse::RejectedCompletely(transaction) => {
                 println!("Removing transaction from the pool due to rejection");
                 // just delete this one and all after
+                let old_length = self.queue.len();
                 let mut nonce = transaction.transaction.nonce;
                 if nonce < self.minimal_nonce {
                     panic!("Account queue is in inconsistent state!");
                 }
                 self.queue.remove(&nonce);
+                let new_length = self.queue.len();
+                assert_eq!(old_length, new_length+1); 
                 if nonce > self.current_nonce {
                     // do nothing, it was purged already, 
                     return;
                 }
-                if nonce == self.next_nonce_without_gaps {
-                    self.next_nonce_without_gaps -= 1;
+                if nonce <= self.next_nonce_without_gaps {
+                    self.next_nonce_without_gaps = nonce - 1;
                 }
                 if nonce <= self.current_nonce {
                     // assert!(self.pointer != 0, "on queue resets it should have something taken out");
@@ -531,7 +539,7 @@ impl TxQueue {
         let mut total_removed: usize = 0;
 
         for from in affected_accounts.clone() {
-            let queue = self.queues.get_mut(&from).expect("queue is never discarded even when empty");
+            let queue = self.queues.get(&from).expect("queue is never discarded even when empty");
             let old_length = queue.len();
             old_lengths.insert(from, old_length);
         }
@@ -585,6 +593,7 @@ impl TxQueue {
         for (k, v) in old_lengths {
             let queue = self.queues.get(&k).expect("queue is never discarded even when empty");
             let new_length = queue.len();
+            println!("Queue length for account {} changed from {} to {}", k, v, new_length);
             self.len += new_length;
             self.len -= v;
         }
