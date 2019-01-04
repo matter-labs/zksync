@@ -14,6 +14,9 @@ use memmap::*;
 use powersoftau::parameters::PowersOfTauParameters;
 
 fn main() {
+    println!("Will generate an empty accumulator for 2^{} powers of tau", Bn256CeremonyParameters::REQUIRED_POWER);
+    println!("In total will generate up to {} powers", Bn256CeremonyParameters::TAU_POWERS_G1_LENGTH);
+    
     let file = OpenOptions::new()
                             .read(true)
                             .write(true)

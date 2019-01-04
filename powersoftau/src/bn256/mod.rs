@@ -31,7 +31,7 @@ pub struct Bn256CeremonyParameters {
 }
 
 impl PowersOfTauParameters for Bn256CeremonyParameters {
-    const REQUIRED_POWER: usize = 5; // generate to have roughly 64 million constraints
+    const REQUIRED_POWER: usize = 26; // generate to have roughly 64 million constraints
 
     // This ceremony is based on the BN256 elliptic curve construction.
     const G1_UNCOMPRESSED_BYTE_SIZE: usize = 64;

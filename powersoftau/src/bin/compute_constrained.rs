@@ -17,6 +17,9 @@ use memmap::*;
 use powersoftau::parameters::PowersOfTauParameters;
 
 fn main() {
+    println!("Will contribute to accumulator for 2^{} powers of tau", Bn256CeremonyParameters::REQUIRED_POWER);
+    println!("In total will generate up to {} powers", Bn256CeremonyParameters::TAU_POWERS_G1_LENGTH);
+    
     // Create an RNG based on a mixture of system randomness and user provided randomness
     let mut rng = {
         use byteorder::{ReadBytesExt, BigEndian};

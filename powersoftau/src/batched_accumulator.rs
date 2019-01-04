@@ -702,6 +702,8 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
                 batch_exp::<E, _>(&mut accumulator.beta_tau_powers_g1, &taupowers[0..], Some(&key.beta));
                 accumulator.beta_g2 = accumulator.beta_g2.mul(key.beta).into_affine();
                 accumulator.write_chunk(start, UseCompression::Yes, output_map)?;
+
+                println!("Done processing {} powers of tau", end);
             } else {
                 panic!("Chunk does not have a min and max");
             }
@@ -734,6 +736,8 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
                 batch_exp::<E, _>(&mut accumulator.tau_powers_g1, &taupowers[0..], None);
                 accumulator.beta_g2 = accumulator.beta_g2.mul(key.beta).into_affine();
                 accumulator.write_chunk(start, UseCompression::Yes, output_map)?;
+
+                println!("Done processing {} powers of tau", end);
             } else {
                 panic!("Chunk does not have a min and max");
             }
@@ -755,7 +759,6 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
         for chunk in &(0..P::TAU_POWERS_LENGTH).into_iter().chunks(P::EMPIRICAL_BATCH_SIZE) {
             if let MinMax(start, end) = chunk.minmax() {
                 let size = end - start + 1;
-                println!("Same contribution of size {}", size);
                 let mut accumulator = Self {
                     tau_powers_g1: vec![E::G1Affine::one(); size],
                     tau_powers_g2: vec![E::G2Affine::one(); size],
@@ -768,6 +771,7 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
                 };
 
                 accumulator.write_chunk(start, UseCompression::No, output_map)?;
+                println!("Done processing {} powers of tau", end);
             } else {
                 panic!("Chunk does not have a min and max");
             }
@@ -776,7 +780,6 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
         for chunk in &(P::TAU_POWERS_LENGTH..P::TAU_POWERS_G1_LENGTH).into_iter().chunks(P::EMPIRICAL_BATCH_SIZE) {
             if let MinMax(start, end) = chunk.minmax() {
                 let size = end - start + 1;
-                println!("Tau G1 extra contribution of size {}", size);
                 let mut accumulator = Self {
                     tau_powers_g1: vec![E::G1Affine::one(); size],
                     tau_powers_g2: vec![],
@@ -789,6 +792,7 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
                 };
 
                 accumulator.write_chunk(start, UseCompression::No, output_map)?;
+                println!("Done processing {} powers of tau", end);
             } else {
                 panic!("Chunk does not have a min and max");
             }
