@@ -17,7 +17,10 @@
     </b-container>
     </b-navbar>
     <br>
-    <b-container class="bv-example-row">
+    <b-container v-if="!isTestnet">
+        <h3 style="color: red">Please switch to Rinkeby network in Metamask to try this demo.</h3>
+    </b-container>
+    <b-container v-else>
         <b-alert show dismissible :variant="alertType" fade :show="countdown" @dismissed="countdown=0" class="mt-2">
             {{result}}
         </b-alert>
@@ -175,6 +178,8 @@ const maxExitEntries = 32;
 export default {
     name: 'wallet',
     data: () => ({ 
+        network:            null,
+
         nonce:              null,
         transferTo:         '',
         transferAmount:     '0.001',
@@ -206,10 +211,15 @@ export default {
 
         this.updateAccountInfo()
         window.t = this
+
+        this.network = web3.version.network
     },
     destroyed() {
     },
     computed: {
+        isTestnet() {
+            return this.network === '4' || this.network === '1335'
+        },
         baseUrl: () => web3.version.network === '4' ? 'https://api.plasma-winter.io' : 'http://localhost:80',
         store: () => store,
         contractAddress: () => window.contractAddress,
@@ -457,6 +467,9 @@ export default {
             return {blocks: entries, pendingBalance}
         },
         async updateAccountInfo() {
+
+            this.network = web3.version.network
+
             let newData = {}
             let timer = this.updateTimer
             let plasmaData = {}
