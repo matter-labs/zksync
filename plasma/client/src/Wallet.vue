@@ -24,8 +24,9 @@
         <b-row>
             <b-col sm="6" order="2" class="col-xl-8 col-lg-7 col-md-6 col-sm-12">
                 <b-card title="Transfer in Ignis" class="mb-4 d-flex">
-                    <label for="transferToInput">To (your recipient must register into Ignis first. For tests use 0x6394b37cf80a7358b38068f0ca4760ad49983a1b):</label>
+                    <label for="transferToInput">To:</label>
                     <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input>
+                    <p class="mt-2" style="color: grey">Note: your recipient must register in Ignis first. For testing you can also use 0x6394b37cf80a7358b38068f0ca4760ad49983a1b</p>
                     <label for="transferAmountInput" class="mt-4">Amount</label>
                             (max Ξ<a href="#" @click="transferAmount=store.account.plasma.committed.balance">{{store.account.plasma.committed.balance || 0}}</a>):
                     <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
@@ -35,6 +36,7 @@
                         <img v-if="transferPending" style="margin-right: 1.5em" src="./assets/loading.gif" width="100em">
                         <b-btn v-else class="mt-4" variant="outline-primary" @click="transfer" :disabled="!!transferProblem">Submit transaction</b-btn>
                     </div>
+                    <p class="mt-2" style="color: grey">If you want to have your transactions included immediately - send at least 8 of them in correct sequence otherwise you have to wait until other users the block.</p>
                     <b-tooltip target="transferBtn" :disabled="transferPending || !transferProblem" triggers="hover">
                         Transfer not possible: {{ transferProblem }}
                     </b-tooltip>
