@@ -1,0 +1,52 @@
+extern crate powersoftau;
+extern crate pairing;
+extern crate memmap;
+
+use powersoftau::bn256::{Bn256CeremonyParameters};
+use powersoftau::constrained_accumulator::{ConstrainedAccumulator};
+use powersoftau::accumulator::{blank_hash, UseCompression, PowersOfTauParameters};
+
+use std::fs::OpenOptions;
+use std::io::{Write, BufWriter};
+use pairing::bn256::Bn256;
+use memmap::*;
+
+fn main() {
+    let file = OpenOptions::new()
+                            .read(true)
+                            .write(true)
+                            .create_new(true)
+                            .open("challenge").expect("unable to create `./challenge`");
+
+    let parameters = Bn256CeremonyParameters{};
+
+    file.set_len(Bn256CeremonyParameters::CONTRIBUTION_BYTE_SIZE as u64).expect("unable to allocate large enough file");
+
+    // {
+    //     let mut writer = BufWriter::new(writer);
+
+    //     // Write a blank BLAKE2b hash:
+    //     writer.write_all(&blank_hash().as_slice()).expect("unable to write blank hash to `./challenge`");
+    // }
+                        
+
+    let mut writable_map = unsafe { MmapOptions::new().map_mut(&file).expect("unable to create a memory map") };
+
+    // Write a blank BLAKE2b hash:
+    let hash = blank_hash();
+    (&mut writable_map[0..]).write(hash.as_slice()).expect("unable to write a default hash to mmap");
+
+    writable_map.flush().expect("unable to write blank hash to `./challenge`");
+
+    // for ease of work with accumulator offset a map, so first element starts from zero
+    writable_map = writable_map.offset(hash.len());
+
+    let parameters = Bn256CeremonyParameters{};
+
+    let acc: ConstrainedAccumulator<Bn256, _> = ConstrainedAccumulator::new(parameters);
+    println!("Writing an empty accumulator to disk");
+    acc.serialize(&mut writer, UseCompression::No).expect("unable to write fresh accumulator to `./challenge`");
+    writer.flush().expect("unable to flush accumulator to disk");
+
+    println!("Wrote a fresh accumulator to `./challenge`");
+}

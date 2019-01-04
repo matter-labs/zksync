@@ -3,6 +3,7 @@ name = "powersoftau"
 version = "0.1.2"
 authors = ["Sean Bowe", "Alex Vlasov"]
 license = "MIT/Apache-2.0"
+edition = "2018"
 
 description = "Communal zk-SNARK MPC for Public Parameters"
 documentation = "https://docs.rs/powersoftau/"
@@ -19,6 +20,10 @@ typenum = "1.9.0"
 byteorder = "1.1.0"
 hex-literal = "0.1"
 rust-crypto = "0.2"
+
+memmap = "0.7.0"
+itertools = "0.8.0"
+
 ff = { path = "../ff", features = ["derive"] }
 pairing = { path = "../pairing", features = ["expose-arith"]}
 bellman = { path = "../bellman" }
