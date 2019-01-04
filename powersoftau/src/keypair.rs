@@ -7,7 +7,11 @@ extern crate generic_array;
 extern crate typenum;
 extern crate byteorder;
 extern crate ff;
+extern crate memmap;
+extern crate itertools;
 
+use itertools::Itertools;
+use memmap::{Mmap, MmapMut};
 use self::ff::{Field, PrimeField};
 use self::byteorder::{ReadBytesExt, BigEndian};
 use self::rand::{SeedableRng, Rng, Rand};
@@ -163,6 +167,108 @@ impl<E: Engine> PublicKey<E> {
         let tau_g2 = read_uncompressed::<E, _, _>(reader)?;
         let alpha_g2 = read_uncompressed::<E, _, _>(reader)?;
         let beta_g2 = read_uncompressed::<E, _, _>(reader)?;
+
+        Ok(PublicKey {
+            tau_g1: (tau_g1_s, tau_g1_s_tau),
+            alpha_g1: (alpha_g1_s, alpha_g1_s_alpha),
+            beta_g1: (beta_g1_s, beta_g1_s_beta),
+            tau_g2: tau_g2,
+            alpha_g2: alpha_g2,
+            beta_g2: beta_g2
+        })
+    }
+}
+
+impl<E: Engine> PublicKey<E> {
+
+    pub fn write<P>(
+        &self,
+        output_map: &mut MmapMut,
+    )
+    -> io::Result<()>
+        where P: PowersOfTauParameters
+    {
+        let mut position = P::CONTRIBUTION_BYTE_SIZE - P::PUBLIC_KEY_SIZE;
+        (&mut output_map[position..]).write(&self.tau_g1.0.into_uncompressed().as_ref())?;
+        position += P::G1_UNCOMPRESSED_BYTE_SIZE;
+
+        (&mut output_map[position..]).write(&self.tau_g1.1.into_uncompressed().as_ref())?;
+        position += P::G1_UNCOMPRESSED_BYTE_SIZE;
+
+        (&mut output_map[position..]).write(&self.alpha_g1.0.into_uncompressed().as_ref())?;
+        position += P::G1_UNCOMPRESSED_BYTE_SIZE;
+
+        (&mut output_map[position..]).write(&self.alpha_g1.1.into_uncompressed().as_ref())?;
+        position += P::G1_UNCOMPRESSED_BYTE_SIZE;
+
+        (&mut output_map[position..]).write(&self.beta_g1.0.into_uncompressed().as_ref())?;
+        position += P::G1_UNCOMPRESSED_BYTE_SIZE;
+
+        (&mut output_map[position..]).write(&self.beta_g1.1.into_uncompressed().as_ref())?;
+        position += P::G1_UNCOMPRESSED_BYTE_SIZE;
+
+        (&mut output_map[position..]).write(&self.tau_g2.into_uncompressed().as_ref())?;
+        position += P::G2_UNCOMPRESSED_BYTE_SIZE;
+
+        (&mut output_map[position..]).write(&self.alpha_g2.into_uncompressed().as_ref())?;
+        position += P::G2_UNCOMPRESSED_BYTE_SIZE;
+
+        (&mut output_map[position..]).write(&self.beta_g2.into_uncompressed().as_ref())?;
+
+        output_map.flush()?;
+
+        Ok(())
+    }
+
+    /// Deserialize the public key. Points are always in uncompressed form, and
+    /// always checked, since there aren't very many of them. Does not allow any
+    /// points at infinity.
+    pub fn read<P>(
+        input_map: &Mmap,
+    ) -> Result<Self, DeserializationError>
+        where P: PowersOfTauParameters
+    {
+        fn read_uncompressed<EE: Engine, C: CurveAffine<Engine = EE, Scalar = EE::Fr>>(input_map: &Mmap, position: usize) -> Result<C, DeserializationError> {
+            let mut repr = C::Uncompressed::empty();
+            let element_size = C::Uncompressed::size();
+            let memory_slice = input_map.get(position..position+element_size).expect("must read point data from file");
+            memory_slice.clone().read_exact(repr.as_mut())?;
+            let v = repr.into_affine()?;
+
+            if v.is_zero() {
+                Err(DeserializationError::PointAtInfinity)
+            } else {
+                Ok(v)
+            }
+        }
+
+        let mut position = 0;
+
+        let tau_g1_s = read_uncompressed::<E, _>(input_map, position)?;
+        position += P::G1_UNCOMPRESSED_BYTE_SIZE;
+
+        let tau_g1_s_tau = read_uncompressed::<E, _>(input_map, position)?;
+        position += P::G1_UNCOMPRESSED_BYTE_SIZE;
+
+        let alpha_g1_s = read_uncompressed::<E, _>(input_map, position)?;
+        position += P::G1_UNCOMPRESSED_BYTE_SIZE;
+
+        let alpha_g1_s_alpha = read_uncompressed::<E, _>(input_map, position)?;
+        position += P::G1_UNCOMPRESSED_BYTE_SIZE;
+
+        let beta_g1_s = read_uncompressed::<E, _>(input_map, position)?;
+        position += P::G1_UNCOMPRESSED_BYTE_SIZE;
+
+        let beta_g1_s_beta = read_uncompressed::<E, _>(input_map, position)?;
+        position += P::G1_UNCOMPRESSED_BYTE_SIZE;
+
+        let tau_g2 = read_uncompressed::<E, _>(input_map, position)?;
+        position += P::G2_UNCOMPRESSED_BYTE_SIZE;
+
+        let alpha_g2 = read_uncompressed::<E, _>(input_map, position)?;
+        position += P::G2_UNCOMPRESSED_BYTE_SIZE;
+
+        let beta_g2 = read_uncompressed::<E, _>(input_map, position)?;
 
         Ok(PublicKey {
             tau_g1: (tau_g1_s, tau_g1_s_tau),
