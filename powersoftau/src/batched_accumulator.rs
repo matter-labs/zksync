@@ -227,7 +227,7 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
         // these checks only touch a part of the accumulator, so read one element in principle
 
         {
-            let chunk_size = 1;
+            let chunk_size = 2;
             before.read_chunk(0, chunk_size, UseCompression::No, CheckForCorrectness::No, &input_map).expect("must read a first chunk");
             after.read_chunk(0, chunk_size, output_is_compressed, CheckForCorrectness::No, &output_map).expect("must read a first chunk");
 
@@ -289,9 +289,6 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
                 before.read_chunk(start, size, UseCompression::No, CheckForCorrectness::No, &input_map).expect("must read a first chunk");
                 after.read_chunk(start, size, output_is_compressed, CheckForCorrectness::No, &output_map).expect("must read a first chunk");
 
-                assert_eq!(before.tau_powers_g2.len(), 0, "during rest of tau g1 generation tau g2 must be empty");
-                assert_eq!(after.tau_powers_g2.len(), 0, "during rest of tau g1 generation tau g2 must be empty");
-
                 // Are the powers of tau correct?
                 if !same_ratio(power_pairs(&after.tau_powers_g1), (tau_powers_g2_0, tau_powers_g2_1)) {
                     println!("Invalid ratio power_pairs(&after.tau_powers_g1), (tau_powers_g2_0, tau_powers_g2_1)");
@@ -319,6 +316,9 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
                 let size = end - start + 1;
                 before.read_chunk(start, size, UseCompression::No, CheckForCorrectness::No, &input_map).expect("must read a first chunk");
                 after.read_chunk(start, size, output_is_compressed, CheckForCorrectness::No, &output_map).expect("must read a first chunk");
+
+                assert_eq!(before.tau_powers_g2.len(), 0, "during rest of tau g1 generation tau g2 must be empty");
+                assert_eq!(after.tau_powers_g2.len(), 0, "during rest of tau g1 generation tau g2 must be empty");
 
                 // Are the powers of tau correct?
                 if !same_ratio(power_pairs(&after.tau_powers_g1), (tau_powers_g2_0, tau_powers_g2_1)) {

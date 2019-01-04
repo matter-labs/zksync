@@ -126,7 +126,7 @@ fn main() {
         &output_readonly,
         parameters.clone(),
         &pubkey,
-        &contribution_hash.as_slice(),
+        &current_accumulator_hash.as_slice(),
         UseCompression::Yes,
     );
 
