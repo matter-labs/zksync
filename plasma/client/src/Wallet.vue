@@ -24,7 +24,7 @@
         <b-row>
             <b-col sm="6" order="2" class="col-xl-8 col-lg-7 col-md-6 col-sm-12">
                 <b-card title="Transfer in Ignis" class="mb-4 d-flex">
-                    <label for="transferToInput">To:</label>
+                    <label for="transferToInput">To (your recipient must register into Ignis first. For tests use 0x6394b37cf80a7358b38068f0ca4760ad49983a1b):</label>
                     <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input>
                     <label for="transferAmountInput" class="mt-4">Amount</label>
                             (max Ξ<a href="#" @click="transferAmount=store.account.plasma.committed.balance">{{store.account.plasma.committed.balance || 0}}</a>):
