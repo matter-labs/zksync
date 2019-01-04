@@ -220,7 +220,8 @@ export default {
         isTestnet() {
             return this.network === '4' || this.network === '1335'
         },
-        baseUrl: () => web3.version.network === '4' ? 'https://api.plasma-winter.io' : 'http://localhost:80',
+        //baseUrl: () => web3.version.network === '4' ? 'https://api.plasma-winter.io' : 'http://localhost:80',
+        baseUrl: () => 'https://api.plasma-winter.io',
         store: () => store,
         contractAddress: () => window.contractAddress,
         depositProblem() {
