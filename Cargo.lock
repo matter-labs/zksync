@@ -211,6 +211,7 @@ version = "0.1.0"
 dependencies = [
  "bellman 0.1.1",
  "ff 0.4.0",
+ "heapsize 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-bigint 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "pairing 0.15.0",
