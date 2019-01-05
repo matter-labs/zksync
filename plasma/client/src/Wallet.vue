@@ -28,7 +28,7 @@
             <b-col sm="6" order="2" class="col-xl-8 col-lg-7 col-md-6 col-sm-12">
                 <b-card title="Transfer in Ignis" class="mb-4 d-flex">
                     <label for="transferToInput">To (recepient ETH address):</label>
-                    <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input>
+                    <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0" autocomplete="off"></b-form-input>
                     <p class="mt-2" style="color: grey">Note: your recipient must register in Ignis first. For testing you can also use 0x6394b37cf80a7358b38068f0ca4760ad49983a1b, we're happy to accept your testcoins! :)</p>
                     <label for="transferAmountInput" class="mt-4">Amount</label>
                             (max ETH <a href="#" @click="transferAmount=store.account.plasma.committed.balance">{{store.account.plasma.committed.balance || 0}}</a>):
