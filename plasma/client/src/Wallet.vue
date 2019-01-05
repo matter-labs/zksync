@@ -11,7 +11,7 @@
             </b-navbar-nav>
             <!-- Right aligned nav items -->
             <b-navbar-nav class="ml-auto">
-                <b-nav-item right>{{ store.account.address }}</b-nav-item>
+                <span style="color: white">{{ store.account.address }}</span>
             </b-navbar-nav>
         </b-collapse>
     </b-container>
