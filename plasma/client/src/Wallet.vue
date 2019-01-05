@@ -17,10 +17,10 @@
     </b-container>
     </b-navbar>
     <br>
-    <b-container v-if="!isTestnet">
+    <b-container v-if="network && !isTestnet">
         <h3 style="color: red">Please switch to Rinkeby network in Metamask to try this demo.</h3>
     </b-container>
-    <b-container v-else>
+    <b-container v-if="network && isTestnet">
         <b-alert show dismissible :variant="alertType" fade :show="countdown" @dismissed="countdown=0" class="mt-2">
             {{result}}
         </b-alert>
@@ -193,6 +193,8 @@ export default {
         result:             null
     }),
     async created() {
+        this.network = web3.version.network
+
         console.log('start')
         let result = await axios({
             method: 'get',
@@ -211,8 +213,6 @@ export default {
 
         this.updateAccountInfo()
         window.t = this
-
-        this.network = web3.version.network
     },
     destroyed() {
     },
@@ -469,7 +469,7 @@ export default {
         },
         async updateAccountInfo() {
 
-            this.network = web3.version.network
+            //this.network = web3.version.network
 
             let newData = {}
             let timer = this.updateTimer
