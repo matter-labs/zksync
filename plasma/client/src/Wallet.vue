@@ -6,8 +6,8 @@
         <b-navbar-brand>Ignis Wallet <span style="font-size: 0.4em">ALPHA</span></b-navbar-brand>
         <b-collapse is-nav id="nav_collapse">
             <b-navbar-nav>
-                <b-nav-item href="#" active>Account</b-nav-item>
-                <b-nav-item href="#" disabled>Transactions</b-nav-item>
+                <!-- <b-nav-item href="#" active>Account</b-nav-item> -->
+                <!-- <b-nav-item href="#" disabled>Transactions</b-nav-item> -->
             </b-navbar-nav>
             <!-- Right aligned nav items -->
             <b-navbar-nav class="ml-auto">
