@@ -27,19 +27,20 @@
         <b-row>
             <b-col sm="6" order="2" class="col-xl-8 col-lg-7 col-md-6 col-sm-12">
                 <b-card title="Transfer in Ignis" class="mb-4 d-flex">
-                    <label for="transferToInput">To:</label>
+                    <label for="transferToInput">To (recepient ETH address):</label>
                     <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0"></b-form-input>
-                    <p class="mt-2" style="color: grey">Note: your recipient must register in Ignis first. For testing you can also use 0x6394b37cf80a7358b38068f0ca4760ad49983a1b</p>
+                    <p class="mt-2" style="color: grey">Note: your recipient must register in Ignis first. For testing you can also use 0x6394b37cf80a7358b38068f0ca4760ad49983a1b, we're happy to accept your testcoins! :)</p>
                     <label for="transferAmountInput" class="mt-4">Amount</label>
-                            (max Ξ<a href="#" @click="transferAmount=store.account.plasma.committed.balance">{{store.account.plasma.committed.balance || 0}}</a>):
+                            (max ETH <a href="#" @click="transferAmount=store.account.plasma.committed.balance">{{store.account.plasma.committed.balance || 0}}</a>):
                     <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
                     <label for="transferNonceInput" class="mt-4">Nonce:</label>
                     <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
-                    <div id="transferBtn" class="float-right">
+                    <div id="transferBtn" class="right">
                         <img v-if="transferPending" style="margin-right: 1.5em" src="./assets/loading.gif" width="100em">
                         <b-btn v-else class="mt-4" variant="outline-primary" @click="transfer" :disabled="!!transferProblem">Submit transaction</b-btn>
                     </div>
-                    <p class="mt-2" style="color: grey">If you want to have your transactions included immediately - send at least 8 of them in correct sequence otherwise you have to wait until other users the block.</p>
+                    <p class="mt-2" style="color: grey">Balances will be updated once the block of 8 transactions is full and verified.</p>
+                    <p class="mt-2" style="color: grey"> To force block generation, simply send at least 8 transactions in the correct nonce sequence.</p>
                     <b-tooltip target="transferBtn" :disabled="transferPending || !transferProblem" triggers="hover">
                         Transfer not possible: {{ transferProblem }}
                     </b-tooltip>
@@ -55,10 +56,10 @@
                                 target="blanc">block explorer</a>):
                         <b-form-input id="addr" v-model="store.account.address" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                         <b-row class="mt-2">
-                            <b-col cols="6">Balance:</b-col> <b-col>Ξ{{store.account.balance}}</b-col>
+                            <b-col cols="6">Balance:</b-col> <b-col>ETH {{store.account.balance}}</b-col>
                         </b-row>
                         <b-row class="mt-2" style="color: grey" v-if="pendingWithdraw">
-                           <b-col cols="6">Pending:</b-col> <b-col>Ξ{{store.account.onchain.balance}}</b-col>
+                           <b-col cols="6">Pending:</b-col> <b-col>ETH {{store.account.onchain.balance}}</b-col>
                         </b-row>
                         <b-row class="mt-2 mx-auto" v-if="pendingWithdraw">
                             <b-btn variant="primary" class="mt-2 mx-auto" @click="completeWithdraw">Complete withdrawal</b-btn>                            
@@ -101,11 +102,11 @@
                             <b-form-input id="acc_id" v-model="store.account.plasma.id" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                             <b-row class="mt-2">
                                 <b-col cols="8">Verified balance:</b-col> 
-                                <b-col>Ξ{{store.account.plasma.verified.balance || 0}}</b-col>
+                                <b-col>ETH {{store.account.plasma.verified.balance || 0}}</b-col>
                             </b-row>
                             <b-row class="mt-2" style="color: grey" v-if="store.account.plasma.verified.balance != store.account.plasma.committed.balance">
                                 <b-col cols="8">Pending balance:</b-col> 
-                                <b-col>Ξ{{store.account.plasma.committed.balance || 0}}</b-col>
+                                <b-col>ETH {{store.account.plasma.committed.balance || 0}}</b-col>
                             </b-row>
                             <b-row class="mt-2">                    
                                 <b-col cols="8">Latest nonce:</b-col> 
@@ -123,7 +124,7 @@
 
     <b-modal ref="depositModal" id="depositModal" title="Deposit" hide-footer>
         <label for="depositAmountInput">Amount</label> 
-            (max Ξ<a href="#" @click="depositAmount=store.account.balance">{{store.account.balance}}</a>):
+            (max ETH <a href="#" @click="depositAmount=store.account.balance">{{store.account.balance}}</a>):
         <b-form-input id="depositAmountInput" type="number" placeholder="7.50" v-model="depositAmount"></b-form-input>
         <div id="doDepositBtn" class="mt-4 float-right">
             <b-btn variant="primary" @click="deposit" :disabled="!!doDepositProblem">Deposit</b-btn>
@@ -137,7 +138,7 @@
         <b-tabs pills card>
             <b-tab title="Partial withdrawal" active>
                 <label for="withdrawAmountInput" class="mt-4">Amount</label>
-                    (max Ξ<a href="#" @click="withdrawAmount=store.account.plasma.verified.balance">{{store.account.plasma.verified.balance}}</a>):
+                    (max ETH <a href="#" @click="withdrawAmount=store.account.plasma.verified.balance">{{store.account.plasma.verified.balance}}</a>):
                 <b-form-input id="withdrawAmountInput" type="number" placeholder="7.50" v-model="withdrawAmount"></b-form-input>
                 <label for="transferNonceInput" class="mt-4">Nonce:</label>
                 <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
