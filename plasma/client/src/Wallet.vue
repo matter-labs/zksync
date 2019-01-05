@@ -33,7 +33,7 @@
                     <label for="transferAmountInput" class="mt-4">Amount</label>
                             (max ETH <a href="#" @click="transferAmount=store.account.plasma.committed.balance">{{store.account.plasma.committed.balance || 0}}</a>):
                     <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
-                    <label for="transferNonceInput" class="mt-4">Nonce:</label>
+                    <label for="transferNonceInput" class="mt-4">Nonce (autoincrementing):</label>
                     <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
                     <div id="transferBtn" class="right">
                         <img v-if="transferPending" style="margin-right: 1.5em" src="./assets/loading.gif" width="100em">
