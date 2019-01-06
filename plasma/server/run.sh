@@ -10,4 +10,5 @@ else
    export CONTRACT_ADDR=ed8e8F18939A0C1912cA9d24992b6110733CA30d
 fi
 
-cargo run --release --bin server
+LOGFILE=/root/server.log
+cargo run --release --bin server | tee ${LOG_FILE}
