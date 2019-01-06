@@ -1,6 +1,7 @@
 use super::*;
 use crate::models::params;
 use sapling_crypto::jubjub::{edwards, Unknown};
+use bigdecimal::{BigDecimal, Zero};
 
 pub struct PlasmaState {
 
@@ -66,8 +67,7 @@ impl PlasmaState {
         self.balance_tree.root_hash().clone()
     }
 
-    pub fn apply_transfer(&mut self, tx: &TransferTx) -> Result<(), TransferApplicationError> {
-
+    pub fn apply_transfer(&mut self, tx: &TransferTx) -> Result<BigDecimal, TransferApplicationError> {
         if let Some(mut from) = self.balance_tree.items.get(&tx.from).cloned() {
             // TODO: take from `from` instead and uncomment below
             let pub_key = self.get_pub_key(tx.from).ok_or(TransferApplicationError::UnknownSigner)?;
@@ -79,7 +79,11 @@ impl PlasmaState {
                 return Err(TransferApplicationError::InvalidSigner);
             }
             
-            if from.balance < tx.amount { 
+            let mut transacted_amount = BigDecimal::zero();
+            transacted_amount += &tx.amount;
+            transacted_amount += &tx.fee;
+
+            if from.balance < transacted_amount { 
                 println!("Insufficient balance");
                 return Err(TransferApplicationError::InsufficientBalance); 
             }
@@ -106,11 +110,8 @@ impl PlasmaState {
             if let Some(existing_to) = self.balance_tree.items.get(&tx.to) {
                 to = existing_to.clone();
             }
-            
-            from.balance -= &tx.amount;
-            from.balance -= &tx.fee;
-            
-            // TODO: subtract fee
+
+            from.balance -= transacted_amount;
 
             from.nonce += 1;
             if tx.to != 0 {
@@ -120,7 +121,9 @@ impl PlasmaState {
             self.balance_tree.insert(tx.from, from);
             self.balance_tree.insert(tx.to, to);
 
-            return Ok(());
+            let collected_fee = tx.fee.clone();
+
+            return Ok(collected_fee);
         }
 
         Err(TransferApplicationError::InvalidSigner)

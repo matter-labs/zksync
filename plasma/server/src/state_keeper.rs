@@ -183,6 +183,8 @@ impl PlasmaStateKeeper {
 
         let mut all_affected_senders: FnvHashSet<u32> = FnvHashSet::default();
 
+        let mut total_fees = 0u128;
+
         while applied_transactions.len() < config::TRANSFER_BATCH_SIZE {
 
             let next_from = queue.peek_next();
@@ -206,10 +208,12 @@ impl PlasmaStateKeeper {
                 if !original_state.contains_key(&tx.from) { original_state.insert(tx.from, from.clone()); }
                 if !original_state.contains_key(&tx.to) { original_state.insert(tx.to, to.clone()); }
 
+                // TODO: we may want to return some metadata here on Ok, like collected fee
                 let appication_result = self.state.apply_transfer(&tx);
                 match appication_result {
-                    Ok(()) => {
+                    Ok(fee) => {
                         println!("accepted transaction for account {}, nonce {}", tx.from, tx.nonce);
+                        total_fees += fee.to_u128().expect("fee should not overflow u128");
                         applied_transactions.push(tx);
                         response.included.push(pool_tx);
 
@@ -275,10 +279,10 @@ impl PlasmaStateKeeper {
             updated_accounts.insert(tx.to, self.account(tx.to));
         }
  
-        let mut total_fees = 0u128;
-        for tx in applied_transactions.iter() {
-            total_fees += tx.fee.to_u128().expect("fee should not overflow u128");
-        }
+        // let mut total_fees = 0u128;
+        // for tx in applied_transactions.iter() {
+        //     total_fees += tx.fee.to_u128().expect("fee should not overflow u128");
+        // }
 
         block.transactions = applied_transactions.clone();
         block.block_number = self.state.block_number;
