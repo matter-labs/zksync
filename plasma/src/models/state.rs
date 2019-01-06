@@ -18,6 +18,7 @@ pub enum TransferApplicationError {
     InsufficientBalance,
     NonceIsTooLow,
     NonceIsTooHigh,
+    UnknownSigner,
     InvalidSigner,
     InvalidTransaction(String),
 }
@@ -68,7 +69,7 @@ impl PlasmaState {
 
         if let Some(mut from) = self.balance_tree.items.get(&tx.from).cloned() {
             // TODO: take from `from` instead and uncomment below
-            let pub_key = self.get_pub_key(tx.from).unwrap();
+            let pub_key = self.get_pub_key(tx.from).ok_or(TransferApplicationError::UnknownSigner)?;
             if let Some(verified_against) = tx.cached_pub_key.as_ref() {
                 if pub_key.0 != verified_against.0 { 
                     return Err(TransferApplicationError::InvalidSigner);
