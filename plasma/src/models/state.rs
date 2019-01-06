@@ -20,6 +20,7 @@ pub enum TransferApplicationError {
     NonceIsTooHigh,
     UnknownSigner,
     InvalidSigner,
+    ExpiredTransaction,
     InvalidTransaction(String),
 }
 
@@ -82,12 +83,18 @@ impl PlasmaState {
                 println!("Insufficient balance");
                 return Err(TransferApplicationError::InsufficientBalance); 
             }
+
             if tx.nonce > from.nonce { 
                 println!("Nonce is too high");
                 return Err(TransferApplicationError::NonceIsTooHigh); 
             } else if tx.nonce < from.nonce {
                 println!("Nonce is too low");
                 return Err(TransferApplicationError::NonceIsTooLow); 
+            }
+
+            if tx.good_until_block < self.block_number {
+                println!("Transaction is outdated");
+                return Err(TransferApplicationError::ExpiredTransaction);
             }
 
             // update state
@@ -99,7 +106,9 @@ impl PlasmaState {
             if let Some(existing_to) = self.balance_tree.items.get(&tx.to) {
                 to = existing_to.clone();
             }
+            
             from.balance -= &tx.amount;
+            from.balance -= &tx.fee;
             
             // TODO: subtract fee
 
@@ -115,8 +124,6 @@ impl PlasmaState {
         }
 
         Err(TransferApplicationError::InvalidSigner)
-
-       
     }
 
     pub fn apply_deposit(&mut self, tx: &DepositTx) -> Result<(), ()> {
