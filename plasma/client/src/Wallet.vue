@@ -24,6 +24,7 @@
         <b-alert show dismissible :variant="alertType" fade :show="countdown" @dismissed="countdown=0" class="mt-2">
             {{result}}
         </b-alert>
+        <p>Warning: this software is for demo purposes only. Database and smart contracts might be reset from time to time, with all test coins lost!</p>
         <b-row>
             <b-col sm="6" order="2" class="col-xl-8 col-lg-7 col-md-6 col-sm-12">
                 <b-card title="Transfer in Ignis" class="mb-4 d-flex">
