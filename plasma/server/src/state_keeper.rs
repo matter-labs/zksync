@@ -181,8 +181,6 @@ impl PlasmaStateKeeper {
             affected_accounts: FnvHashSet::default(),
         };
 
-        let assembled_block_number = self.state.block_number;
-
         let mut all_affected_senders: FnvHashSet<u32> = FnvHashSet::default();
 
         while applied_transactions.len() < config::TRANSFER_BATCH_SIZE {
