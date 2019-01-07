@@ -124,6 +124,7 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
     }
 
     /// File expected structure
+    /// HASH_SIZE bytes for the hash of the contribution
     /// TAU_POWERS_G1_LENGTH of G1 points
     /// TAU_POWERS_LENGTH of G2 points
     /// TAU_POWERS_LENGTH of G1 points for alpha
@@ -196,7 +197,7 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
         output_is_compressed: UseCompression,
     ) -> bool
     {
-        use itertools::MinMaxResult::{NoElements, OneElement, MinMax};
+        use itertools::MinMaxResult::{MinMax};
         assert_eq!(digest.len(), 64);
 
         let tau_g2_s = compute_g2_s::<E>(&digest, &key.tau_g1.0, &key.tau_g1.1, 0);
@@ -224,7 +225,7 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
         let mut before = Self::empty(parameters.clone());
         let mut after = Self::empty(parameters.clone());
 
-        // these checks only touch a part of the accumulator, so read one element in principle
+        // these checks only touch a part of the accumulator, so read two elements
 
         {
             let chunk_size = 2;
