@@ -70,15 +70,17 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
     req.json()
         .from_err() // convert all errors into `Error`
         .and_then(move |tx: TransferTx| {
-        
+            println!("Got some transaction JSON");
             // TODO: the code below will block the current thread; switch to futures instead
             let (key_tx, key_rx) = mpsc::channel();
             let request = StateProcessingRequest::GetPubKey(tx.from, key_tx);
             tx_for_state.send(request).expect("must send a new transaction to queue");
             // now wait for state_keeper to return a result
             let pub_key: Option<PublicKey> = key_rx.recv_timeout(std::time::Duration::from_millis(100)).expect("must get public key back");
+            println!("Got public key");
             let valid = tx.validate();
             if !valid {
+                println!("Transaction itself is invalid");
                 let resp = TransactionResponse{
                     accepted: false,
                 };
@@ -87,34 +89,41 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
 
             let accepted = pub_key.as_ref().map(|pk| tx.verify_sig(pk) ).unwrap_or(false);
             if accepted {
+                println!("Signature is valid");
                 let mut tx = tx.clone();
                 let (add_tx, add_rx) = mpsc::channel();
                 tx.cached_pub_key = pub_key;
                 tx_to_mempool.send(MempoolRequest::AddTransaction(tx, add_tx)).expect("must send transaction to mempool from rest api"); // pass to mem_pool
                 let add_result = add_rx.recv_timeout(std::time::Duration::from_millis(500));
                 if add_result.is_ok() {
+                    println!("Got response from the mempool");
                     if add_result.unwrap().is_ok() {
+                        println!("Transaction was added to the pool");
                         let resp = TransactionResponse{
                             accepted: true
                         };
                         return Ok(HttpResponse::Ok().json(resp));
                     } else {
+                        println!("Mempool rejected the transaction");
                         let resp = TransactionResponse{
                             accepted: false
                         };
                         return Ok(HttpResponse::Ok().json(resp));
                     }
                 } else {
+                    println!("Did not get a result from mempool");
                     let resp = TransactionResponse{
                         accepted: false
                     };
                     return Ok(HttpResponse::Ok().json(resp));
                 }
+            } else {
+                println!("Signature is invalid");
+                let resp = TransactionResponse{
+                    accepted: false
+                };
+                return Ok(HttpResponse::Ok().json(resp));
             }
-            let resp = TransactionResponse{
-                accepted: false
-            };
-            return Ok(HttpResponse::Ok().json(resp));
         })
         .responder()
 }

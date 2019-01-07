@@ -223,8 +223,8 @@ export default {
             return this.network === '4' || this.network === '1335'
         },
         //baseUrl: () => web3.version.network === '4' ? 'https://api.plasma-winter.io' : 'http://localhost:80',
-        // baseUrl: () => 'https://api.plasma-winter.io',
-        baseUrl: () => 'https://api.ignis.thematter.io',
+        baseUrl: () => 'https://api.plasma-winter.io',
+        // baseUrl: () => 'https://api.ignis.thematter.io',
         store: () => store,
         contractAddress: () => window.contractAddress,
         depositProblem() {
@@ -326,7 +326,7 @@ export default {
 
             const privateKey = store.account.plasma.key.privateKey
             const nonce = this.nonce //store.account.plasma.nonce;
-            const good_until_block = 100;
+            const good_until_block = 10000;
             const fee = 0;
 
             console.log(from, to, amount, fee, nonce, good_until_block, privateKey)
