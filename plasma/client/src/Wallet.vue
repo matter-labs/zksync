@@ -486,7 +486,13 @@ export default {
                 newData.balance = Eth.fromWei(new BN(balance), 'ether')
                 let id = (await contract.ethereumAddressToAccountID(newData.address))[0].toNumber();
 
-                if( id !== store.account.plasma.id ) store.account.plasma.id = null // display loading.gif
+                if( store.account.plasma.id && id !== store.account.plasma.id ) {
+                    // FIXME:
+                    //store.account.plasma.id = null // display loading.gif
+                    store.account.plasma.id = null
+                    this.$router.push('/login')
+                    return
+                }
 
                 let accountState = await contract.accounts(id);
 
