@@ -347,7 +347,8 @@ impl PerAccountQueue {
     }
 
     // reorganize the queue due to transaction being accepted, temporary or completely rejected
-    pub fn reorganize(&mut self, reason: TransactionPickerResponse) {
+    // returns "true" if transaction was removed from the queue
+    pub fn reorganize(&mut self, reason: TransactionPickerResponse) -> bool {
         match reason {
             TransactionPickerResponse::Included(transaction) => {
                 println!("Removing included transaction form the pool");
@@ -361,6 +362,8 @@ impl PerAccountQueue {
                 self.pointer -= 1;
                 self.remove_for_nonce(&nonce);
 
+                return true;
+
                 // self.reset_batch();
                 // self.order_and_clear();
             },
@@ -372,7 +375,9 @@ impl PerAccountQueue {
                     panic!("Account queue is in inconsistent state!");
                 }
                 self.reset_batch();
-                self.order_and_clear();
+                // self.order_and_clear();
+
+                return false;
             },
             TransactionPickerResponse::TemporaryRejected(transaction) => {
                 // don't need to check for a first item, just check how far from the begining transactions
@@ -381,15 +386,19 @@ impl PerAccountQueue {
                 let nonce = transaction.transaction.nonce;
                 if nonce < self.minimal_nonce {
                     panic!("Account queue is in inconsistent state!");
-                }                            
+                }           
+                let mut removed = false;                 
                 if transaction.timestamp + transaction.lifetime <= std::time::Instant::now() {
                     self.remove_for_nonce(&nonce);
                     if nonce <= self.next_nonce_without_gaps {
                         self.next_nonce_without_gaps = nonce - 1;
                     }
+                    removed = true;
                 }
                 self.reset_batch();
-                self.order_and_clear();
+                // self.order_and_clear();
+
+                return removed;
             },
             TransactionPickerResponse::RejectedCompletely(transaction) => {
                 println!("Removing transaction from the pool due to rejection");
@@ -403,7 +412,9 @@ impl PerAccountQueue {
                     self.next_nonce_without_gaps = nonce - 1;
                 }
                 self.reset_batch();
-                self.order_and_clear();
+                // self.order_and_clear();
+
+                return true;
             }
         }
     }
@@ -540,9 +551,11 @@ impl TxQueue {
                 let from = pool_tx.transaction.from;
                 let queue = self.queues.get_mut(&from).expect("queue is never discarded even when empty");
                 let tx_data = pool_tx.transaction.tx_data().expect("transaction in response is always almost valid");
-                queue.reorganize(TransactionPickerResponse::Included(pool_tx));
+                let removed = queue.reorganize(TransactionPickerResponse::Included(pool_tx));
                 self.filter.set.remove(&tx_data);
-                total_removed += 1;
+                if removed {
+                    total_removed += 1;
+                }
             }
         } else {
             // return transactions
@@ -550,7 +563,10 @@ impl TxQueue {
                 let from = pool_tx.transaction.from;
                 let queue = self.queues.get_mut(&from).expect("queue is never discarded even when empty");
                 let tx_data = pool_tx.transaction.tx_data().expect("transaction in response is always almost valid");
-                queue.reorganize(TransactionPickerResponse::ValidButNotIncluded(pool_tx));
+                let removed = queue.reorganize(TransactionPickerResponse::ValidButNotIncluded(pool_tx));
+                if removed {
+                    total_removed += 1;
+                }
             }
         }
         for pool_tx in temporary_rejected {
@@ -560,21 +576,27 @@ impl TxQueue {
             let queue = self.queues.get_mut(&from).expect("queue is never discarded even when empty");
             let tx_data = pool_tx.transaction.tx_data().expect("transaction in response is always almost valid");
             modified_tx.lifetime = modified_tx.lifetime / 2;
-            queue.reorganize(TransactionPickerResponse::TemporaryRejected(modified_tx));
+            let removed = queue.reorganize(TransactionPickerResponse::TemporaryRejected(modified_tx));
+            if removed {
+                total_removed += 1;
+            }
         }
 
         for pool_tx in completely_rejected {
             let from = pool_tx.transaction.from;
             let queue = self.queues.get_mut(&from).expect("queue is never discarded even when empty");
             let tx_data = pool_tx.transaction.tx_data().expect("transaction in response is always almost valid");
-            queue.reorganize(TransactionPickerResponse::RejectedCompletely(pool_tx));
+            let removed = queue.reorganize(TransactionPickerResponse::RejectedCompletely(pool_tx));
             self.filter.set.remove(&tx_data);
-            total_removed += 1;
+            if removed {
+                total_removed += 1;
+            }
         }
 
         println!("Updating priorities for affected accounts");
         for account in affected_accounts {
-            let queue = self.queues.get(&account).expect("queue is never discarded even when empty");
+            let queue = self.queues.get_mut(&account).expect("queue is never discarded even when empty");
+            queue.order_and_clear();
             if let Some(fee) = queue.next_fee() {
                 if self.order.get(&account).is_none() {
                     self.order.push(account, fee);
