@@ -340,12 +340,14 @@ impl<E: JubjubEngine> PublicKey<E> {
         // this one is for a simple sanity check. In application purposes the pk will always be in a right group 
         let order_check_pk = self.0.mul(E::Fs::char(), params);
         if !order_check_pk.eq(&Point::zero()) {
+            println!("Order check for public key failed");
             return false;
         }
 
         // r is input from user, so always check it!
         let order_check_r = sig.r.mul(E::Fs::char(), params);
         if !order_check_r.eq(&Point::zero()) {
+            println!("Order check for r failed");
             return false;
         }
 
