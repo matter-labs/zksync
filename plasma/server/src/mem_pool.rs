@@ -206,29 +206,28 @@ impl PerAccountQueue {
                 return Err(format!("Too many pending transaction per account"));
             }
 
-            if nonce == self.next_nonce_without_gaps {
-                println!("Increased in-order transaction nonce");
-                self.next_nonce_without_gaps += 1;
-                println!("New nonce without gaps = {}", self.next_nonce_without_gaps);
-                self.order_and_clear();
-                // check, we may have had transactions in the pool after the gap and now can fill it
-                // loop {
-                //     if self.queue.get(&self.next_nonce_without_gaps).is_some() {
-                //         self.next_nonce_without_gaps += 1;
-                //         println!("New nonce without gaps = {}", self.next_nonce_without_gaps);
-                //     } else {
-                //         break;
-                //     }
-                // }
-            }
-            // else if nonce > self.next_nonce_without_gaps {
-            //     return Err(format!("Inserting nonce out of sequence is not allowed for now"));
-            // }
-
             if nonce > self.next_nonce_without_gaps + MAX_GAP {
                 println!("Inserting this far into the future is pointless");
                 return Err(format!("Inserting nonce too far into the future"));
             }
+
+            if nonce == self.next_nonce_without_gaps {
+                println!("Increased in-order transaction nonce");
+                self.next_nonce_without_gaps += 1;
+                println!("New nonce without gaps = {}", self.next_nonce_without_gaps);
+                // check, we may have had transactions in the pool after the gap and now can fill it
+                loop {
+                    if self.queue.get(&self.next_nonce_without_gaps).is_some() {
+                        self.next_nonce_without_gaps += 1;
+                        println!("New nonce without gaps = {}", self.next_nonce_without_gaps);
+                    } else {
+                        break;
+                    }
+                }
+            }
+            // else if nonce > self.next_nonce_without_gaps {
+            //     return Err(format!("Inserting nonce out of sequence is not allowed for now"));
+            // }
 
             if self.queue.insert(nonce, in_pool_tx).is_none() {
                 println!("Successfully inserted a fresh transaction in the pool for account {} with nonce {}", from, nonce);
