@@ -13,17 +13,17 @@ const store = {
             id:         null,
             closing:    false,
             key:        null,
-            pending_nonce: null,
+            pending_nonce: 0,
             pending: {
-                nonce:   null
+                nonce:   0
             },
             committed: {
                 balance: null,
-                nonce:   null
+                nonce:   0
             },
             verified: {
                 balance: null,
-                nonce:   null
+                nonce:   0
             }
         }
     }

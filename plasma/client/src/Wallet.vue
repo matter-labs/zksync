@@ -182,7 +182,7 @@ export default {
     data: () => ({ 
         network:            null,
 
-        nonce:              null,
+        nonce:              0,
         transferTo:         '',
         transferAmount:     '0.001',
         transferPending:    false,
@@ -518,10 +518,10 @@ export default {
                     store.account.plasma.committed = plasmaData.committed || {}
                     store.account.plasma.pending = plasmaData.pending || {}
 
-                    if(store.account.plasma.pending.nonce) {
-                        if (this.nonce === null) {
-                            this.nonce = store.account.plasma.pending.nonce
-                        }
+                    if(store.account.plasma.pending.nonce !== null) {
+                        
+                        this.nonce = store.account.plasma.pending.nonce
+                        
                         // if (store.account.plasma.pending.nonce > Number(this.nonce)) {
                         //     this.nonce = store.account.plasma.pending.nonce
                         // }
