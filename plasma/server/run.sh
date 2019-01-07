@@ -11,4 +11,4 @@ else
 fi
 
 LOGFILE=/var/log/plasma.log
-cargo run --release --bin server 2>&1 | tee ${LOG_FILE}
+cargo run --release --bin server | tee ${LOG_FILE}
