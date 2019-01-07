@@ -223,7 +223,8 @@ export default {
             return this.network === '4' || this.network === '1335'
         },
         //baseUrl: () => web3.version.network === '4' ? 'https://api.plasma-winter.io' : 'http://localhost:80',
-        baseUrl: () => 'https://api.plasma-winter.io',
+        // baseUrl: () => 'https://api.plasma-winter.io',
+        baseUrl: () => 'https://api.ignis.thematter.io',
         store: () => store,
         contractAddress: () => window.contractAddress,
         depositProblem() {
