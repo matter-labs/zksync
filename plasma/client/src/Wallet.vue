@@ -237,22 +237,24 @@ export default {
                 + this.depositAmount + " > " + store.account.balance
         }, 
         withdrawProblem() {
+            if(!(Number(store.account.plasma.committed.balance) > 0)) return "empty balance in the Ignis account"
             if(!(Number(store.account.plasma.verified.balance) > 0)) return "empty balance in the Ignis account"
         },
         doWithdrawProblem() {
             if(this.depositProblem) return this.depositProblem
-            if(Number(this.withdrawAmount) > Number(store.account.plasma.verified.balance)) return "specified amount exceeds Ignis balance"
-            if(Number(this.nonce) < Number(store.account.plasma.verified.nonce)) return "nonce must be greater then confirmed in Ignis: got " 
-                + this.nonce + ", expected >= " + store.account.plasma.verified.nonce
+            if(Number(this.withdrawAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Ignis balance"
+            if(Number(this.nonce) < Number(store.account.plasma.committed.nonce)) return "nonce must be greater then confirmed in Ignis: got " 
+                + this.nonce + ", expected >= " + store.account.plasma.committed.nonce
         },
         transferProblem() {
             if(!store.account.plasma.id) return "no Ignis account exists yet"
-            if(!(store.account.plasma.verified.balance > 0)) return "Ignis account has empty balance"
+            if(!(Number(store.account.plasma.committed.balance) > 0)) return "Ignis account has empty balance"
+            if(!(Number(store.account.plasma.verified.balance) > 0)) return "empty balance in the Ignis account"
             if(!ethUtil.isHexString(this.transferTo)) return "`To` is not a valid ethereum address: " + this.transferTo
             if(!(this.transferAmount > 0)) return "positive amount required, e.g. 100.55"
-            if(Number(this.transferAmount) > Number(store.account.plasma.verified.balance)) return "specified amount exceeds Ignis balance"
-            if(Number(this.nonce) < Number(store.account.plasma.verified.nonce)) return "nonce must be greater then confirmed in Ignis: got " 
-                + this.nonce + ", expected >= " + store.account.plasma.verified.nonce
+            if(Number(this.transferAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Ignis balance"
+            if(Number(this.nonce) < Number(store.account.plasma.committed.nonce)) return "nonce must be greater then confirmed in Ignis: got " 
+                + this.nonce + ", expected >= " + store.account.plasma.committed.nonce
         },
         pendingWithdraw: () => Number(store.account.onchain.balance) > 0,
     },
