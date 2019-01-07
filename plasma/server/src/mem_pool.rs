@@ -210,15 +210,16 @@ impl PerAccountQueue {
                 println!("Increased in-order transaction nonce");
                 self.next_nonce_without_gaps += 1;
                 println!("New nonce without gaps = {}", self.next_nonce_without_gaps);
+                self.order_and_clear();
                 // check, we may have had transactions in the pool after the gap and now can fill it
-                loop {
-                    if self.queue.get(&self.next_nonce_without_gaps).is_some() {
-                        self.next_nonce_without_gaps += 1;
-                        println!("New nonce without gaps = {}", self.next_nonce_without_gaps);
-                    } else {
-                        break;
-                    }
-                }
+                // loop {
+                //     if self.queue.get(&self.next_nonce_without_gaps).is_some() {
+                //         self.next_nonce_without_gaps += 1;
+                //         println!("New nonce without gaps = {}", self.next_nonce_without_gaps);
+                //     } else {
+                //         break;
+                //     }
+                // }
             }
             // else if nonce > self.next_nonce_without_gaps {
             //     return Err(format!("Inserting nonce out of sequence is not allowed for now"));
@@ -230,7 +231,7 @@ impl PerAccountQueue {
             }
 
             if self.queue.insert(nonce, in_pool_tx).is_none() {
-                println!("Successfully inserted a fresh transaction in the pool");
+                println!("Successfully inserted a fresh transaction in the pool for account {} with nonce {}", from, nonce);
                 return Ok(true);
             } else {
                 // println!("Replaced some old tx");
@@ -264,7 +265,7 @@ impl PerAccountQueue {
     }
 
     fn order_and_clear(&mut self) {
-        assert_eq!(self.pointer, 0, "cleanup must not happen when there is batch processing in place");
+        // assert_eq!(self.pointer, 0, "cleanup must not happen when there is batch processing in place");
         if self.pointer != 0 {
             // reorg mut not happed during batch processing, when something is taken
             return;
@@ -479,7 +480,7 @@ impl TxQueue {
     fn ensure_queue(&mut self, account_id: AccountId)  {
         if self.queues.get(&account_id).is_none() {
             self.queues.insert(account_id, PerAccountQueue::default());
-            // self.order.push(account_id, BigDecimal::zero());
+            self.order.push(account_id, BigDecimal::zero());
         }
     }
 
@@ -501,26 +502,26 @@ impl TxQueue {
         let old_length = queue.len();
         let insertion_result = queue.insert(tx);
         if insertion_result.is_err() {
-            println!("Failed to insert a transaction");
+            println!("Failed to insert a transaction for account {}", from);
             return Err(insertion_result.err().unwrap());
         }
         let next_fee = queue.next_fee();
 
         if insertion_result.unwrap() {
-            println!("Inserted a new transaction");
+            println!("Inserted a new transaction for account {}", from);
             if let Some(next_fee) = next_fee {
                 println!("Next fee for account {} = {}", from, next_fee);
-                self.order.push(from, next_fee);
+                self.order.change_priority(&from, next_fee);
             }
         } else {
-            println!("Replaced some transaction");
+            println!("Replaced some transaction for account {}", from);
             if let Some(next_fee) = next_fee {
                 println!("Next fee for account {} = {}", from, next_fee);
                 self.order.change_priority(&from, next_fee);
             }
         }
 
-        self.filter.set.insert(data);
+        // self.filter.set.insert(data);
         let new_length = queue.len();
         println!("Inserted something into the queue, old len = {}, new len = {}", old_length, new_length);
 
