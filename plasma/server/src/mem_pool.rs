@@ -458,7 +458,12 @@ impl TxQueue {
                 // update priority
                 // pushing a duplicate is equivalent to update
                 println!("There is a next fee for this account, so update");
-                self.order.change_priority(&account_id, next_fee);
+                if self.order.get(&account_id).is_none() {
+                    self.order.push(account_id, next_fee);
+                }
+                else {
+                    self.order.change_priority(&account_id, next_fee);
+                }
             } else {
                 println!("There is no next fee for this account, pop from the queue");
                 // remove current account from the queue
@@ -510,13 +515,23 @@ impl TxQueue {
             println!("Inserted a new transaction for account {}", from);
             if let Some(next_fee) = next_fee {
                 println!("Next fee for account {} = {}", from, next_fee);
-                self.order.change_priority(&from, next_fee);
+                if self.order.get(&from).is_none() {
+                    self.order.push(from, next_fee);
+                }
+                else {
+                    self.order.change_priority(&from, next_fee);
+                }
             }
         } else {
             println!("Replaced some transaction for account {}", from);
             if let Some(next_fee) = next_fee {
                 println!("Next fee for account {} = {}", from, next_fee);
-                self.order.change_priority(&from, next_fee);
+                if self.order.get(&from).is_none() {
+                    self.order.push(from, next_fee);
+                }
+                else {
+                    self.order.change_priority(&from, next_fee);
+                }
             }
         }
 
