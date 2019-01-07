@@ -479,10 +479,10 @@ impl TxQueue {
             return Err(format!("Trying to insert malformed transaction"));
         }
         let data = tx_data.unwrap();
-        if self.filter.set.get(&data).is_some() {
-            println!("Trying to insert a duplicate");
-            return Err(format!("Trying to add a complete duplicate"));
-        }
+        // if self.filter.set.get(&data).is_some() {
+        //     println!("Trying to insert a duplicate");
+        //     return Err(format!("Trying to add a complete duplicate"));
+        // }
 
         let from = tx.from;
         self.ensure_queue(from);
