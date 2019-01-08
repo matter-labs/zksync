@@ -2,6 +2,6 @@
 **/*.rs.bk
 .vscode
 *.key
-vk.sol
-VerificationKeys.sol
-start_demo.sh
+./vk.sol
+./VerificationKeys.sol
+./start_demo.sh
