@@ -122,7 +122,7 @@ impl JubjubParams<Bn256> for AltJubjubBn256 {
     {
         &self.fixed_base_circuit_generators[base as usize][..]
     }
-    fn pedersen_hash_exp_window_size() -> u32 {
+    fn pedersen_hash_exp_window_size(&self) -> u32 {
         8
     }
 }
@@ -220,7 +220,7 @@ impl AltJubjubBn256 {
             for g in &tmp_params.pedersen_hash_generators {
                 let mut g = g.clone();
 
-                let window = AltJubjubBn256::pedersen_hash_exp_window_size();
+                let window = tmp_params.pedersen_hash_exp_window_size();
 
                 let mut tables = vec![];
 

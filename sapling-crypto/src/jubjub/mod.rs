@@ -134,7 +134,7 @@ pub trait JubjubParams<E: JubjubEngine>: Sized {
     fn circuit_generators(&self, FixedGenerators) -> &[Vec<(E::Fr, E::Fr)>];
     /// Returns the window size for exponentiation of Pedersen hash generators
     /// outside the circuit
-    fn pedersen_hash_exp_window_size() -> u32;
+    fn pedersen_hash_exp_window_size(&self) -> u32;
 }
 
 impl JubjubEngine for Bls12 {
@@ -184,7 +184,7 @@ impl JubjubParams<Bls12> for JubjubBls12 {
     {
         &self.fixed_base_circuit_generators[base as usize][..]
     }
-    fn pedersen_hash_exp_window_size() -> u32 {
+    fn pedersen_hash_exp_window_size(&self) -> u32 {
         8
     }
 }
@@ -282,7 +282,7 @@ impl JubjubBls12 {
             for g in &tmp_params.pedersen_hash_generators {
                 let mut g = g.clone();
 
-                let window = JubjubBls12::pedersen_hash_exp_window_size();
+                let window = tmp_params.pedersen_hash_exp_window_size();
 
                 let mut tables = vec![];
 
