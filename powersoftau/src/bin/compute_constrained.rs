@@ -5,7 +5,8 @@ extern crate rand;
 extern crate blake2;
 extern crate byteorder;
 
-use powersoftau::bn256::{Bn256CeremonyParameters};
+// use powersoftau::bn256::{Bn256CeremonyParameters};
+use powersoftau::small_bn256::{Bn256CeremonyParameters};
 use powersoftau::batched_accumulator::{BachedAccumulator};
 use powersoftau::keypair::{keypair};
 use powersoftau::parameters::{UseCompression, CheckForCorrectness};
@@ -13,6 +14,8 @@ use powersoftau::parameters::{UseCompression, CheckForCorrectness};
 use std::fs::OpenOptions;
 use pairing::bn256::Bn256;
 use memmap::*;
+
+use std::io::Write;
 
 use powersoftau::parameters::PowersOfTauParameters;
 
@@ -109,6 +112,24 @@ fn main() {
 
     assert!(UseCompression::No == input_is_compressed, "Hashing the compressed file in not yet defined");
     let current_accumulator_hash = BachedAccumulator::<Bn256, Bn256CeremonyParameters>::calculate_hash(&readable_map);
+
+    {
+        println!("Contributing on top of the hash:");
+        for line in current_accumulator_hash.as_slice().chunks(16) {
+            print!("\t");
+            for section in line.chunks(4) {
+                for b in section {
+                    print!("{:02x}", b);
+                }
+                print!(" ");
+            }
+            println!("");
+        }
+
+        (&mut writable_map[0..]).write(current_accumulator_hash.as_slice()).expect("unable to write a challenge hash to mmap");
+
+        writable_map.flush().expect("unable to write hash to `./response`");
+    }
 
     // Construct our keypair using the RNG we created above
     let (pubkey, privkey) = keypair(&mut rng, current_accumulator_hash.as_ref());

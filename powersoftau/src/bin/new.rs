@@ -1,6 +1,8 @@
 extern crate powersoftau;
 extern crate pairing;
-use powersoftau::bn256::{Bn256CeremonyParameters};
+
+// use powersoftau::bn256::{Bn256CeremonyParameters};
+use powersoftau::small_bn256::{Bn256CeremonyParameters};
 use powersoftau::accumulator::{Accumulator};
 use powersoftau::utils::{blank_hash};
 use powersoftau::parameters::{UseCompression};

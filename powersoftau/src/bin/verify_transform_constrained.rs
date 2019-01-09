@@ -5,7 +5,8 @@ extern crate rand;
 extern crate blake2;
 extern crate byteorder;
 
-use powersoftau::bn256::{Bn256CeremonyParameters};
+// use powersoftau::bn256::{Bn256CeremonyParameters};
+use powersoftau::small_bn256::{Bn256CeremonyParameters};
 use powersoftau::batched_accumulator::{BachedAccumulator};
 use powersoftau::keypair::{PublicKey};
 use powersoftau::parameters::{UseCompression, CheckForCorrectness};
@@ -54,7 +55,7 @@ fn main() {
 
     {
         let metadata = response_reader.metadata().expect("unable to get filesystem metadata for `./response`");
-        let expected_response_length = match previous_challenge_is_compressed {
+        let expected_response_length = match contribution_is_compressed {
             UseCompression::Yes => {
                 Bn256CeremonyParameters::CONTRIBUTION_BYTE_SIZE 
             },
@@ -75,11 +76,35 @@ fn main() {
 
     let current_accumulator_hash = BachedAccumulator::<Bn256, Bn256CeremonyParameters>::calculate_hash(&challenge_readable_map);
 
+    println!("Previous challenge hash");
+    for line in current_accumulator_hash.as_slice().chunks(16) {
+        print!("\t");
+        for section in line.chunks(4) {
+            for b in section {
+                print!("{:02x}", b);
+            }
+            print!(" ");
+        }
+        println!("");
+    }
+
     // Check the hash chain - a new response must be based on the previous challenge!
     {
         let mut response_challenge_hash = [0; 64];
         let memory_slice = response_readable_map.get(0..64).expect("must read point data from file");
         memory_slice.clone().read_exact(&mut response_challenge_hash).expect("couldn't read hash of challenge file from response file");
+
+        println!("Response was based on the hash");
+        for line in response_challenge_hash.chunks(16) {
+            print!("\t");
+            for section in line.chunks(4) {
+                for b in section {
+                    print!("{:02x}", b);
+                }
+                print!(" ");
+            }
+            println!("");
+        }
 
         if &response_challenge_hash[..] != current_accumulator_hash.as_slice() {
             panic!("Hash chain failure. This is not the right response.");

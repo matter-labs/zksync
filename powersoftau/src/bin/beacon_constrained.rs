@@ -6,7 +6,8 @@ extern crate blake2;
 extern crate byteorder;
 extern crate crypto;
 
-use powersoftau::bn256::{Bn256CeremonyParameters};
+// use powersoftau::bn256::{Bn256CeremonyParameters};
+use powersoftau::small_bn256::{Bn256CeremonyParameters};
 use powersoftau::batched_accumulator::{BachedAccumulator};
 use powersoftau::keypair::{keypair};
 use powersoftau::parameters::{UseCompression, CheckForCorrectness};
@@ -14,6 +15,8 @@ use powersoftau::parameters::{UseCompression, CheckForCorrectness};
 use std::fs::OpenOptions;
 use pairing::bn256::Bn256;
 use memmap::*;
+
+use std::io::Write;
 
 use powersoftau::parameters::PowersOfTauParameters;
 
@@ -41,19 +44,22 @@ fn main() {
         let mut cur_hash: [u8; 32] = hex!("00000000000000000034b33e842ac1c50456abe5fa92b60f6b3dfc5d247f7b58");
 
         // Performs 2^n hash iterations over it
-        const N: usize = 42;
+        // const N: usize = 42;
+
+        const N: usize = 16;
 
         for i in 0..(1u64<<N) {
             // Print 1024 of the interstitial states
             // so that verification can be
             // parallelized
-            if i % (1u64<<(N-10)) == 0 {
-                print!("{}: ", i);
-                for b in cur_hash.iter() {
-                    print!("{:02x}", b);
-                }
-                println!("");
-            }
+
+            // if i % (1u64<<(N-10)) == 0 {
+            //     print!("{}: ", i);
+            //     for b in cur_hash.iter() {
+            //         print!("{:02x}", b);
+            //     }
+            //     println!("");
+            // }
 
             let mut h = Sha256::new();
             h.input(&cur_hash);
@@ -76,10 +82,12 @@ fn main() {
         ChaChaRng::from_seed(&seed)
     };
 
+    println!("Done creating a beacon RNG");
+
     // Try to load `./challenge` from disk.
     let reader = OpenOptions::new()
                             .read(true)
-                            .open("challenge_constrained").expect("unable open `./challenge` in this directory");
+                            .open("challenge").expect("unable open `./challenge` in this directory");
 
     {
         let metadata = reader.metadata().expect("unable to get filesystem metadata for `./challenge`");
@@ -122,6 +130,24 @@ fn main() {
     println!("Calculating previous contribution hash...");
 
     let current_accumulator_hash = BachedAccumulator::<Bn256, Bn256CeremonyParameters>::calculate_hash(&readable_map);
+
+    {
+        println!("Contributing on top of the hash:");
+        for line in current_accumulator_hash.as_slice().chunks(16) {
+            print!("\t");
+            for section in line.chunks(4) {
+                for b in section {
+                    print!("{:02x}", b);
+                }
+                print!(" ");
+            }
+            println!("");
+        }
+
+        (&mut writable_map[0..]).write(current_accumulator_hash.as_slice()).expect("unable to write a challenge hash to mmap");
+
+        writable_map.flush().expect("unable to write hash to `./response`");
+    }
 
     // Construct our keypair using the RNG we created above
     let (pubkey, privkey) = keypair(&mut rng, current_accumulator_hash.as_ref());
