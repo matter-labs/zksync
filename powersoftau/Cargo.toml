@@ -28,6 +28,7 @@ ff = { path = "../ff", features = ["derive"] }
 pairing = { path = "../pairing", features = ["expose-arith"]}
 bellman = { path = "../bellman" }
 
+#ff = { git = 'https://github.com/matterinc/ff', features = ["derive"] }
 #pairing = { git = 'https://github.com/matterinc/pairing', features = ["expose-arith"] }
 #bellman = { git = 'https://github.com/matterinc/bellman'}
 

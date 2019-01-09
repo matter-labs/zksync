@@ -18,6 +18,7 @@ repository = "https://github.com/matterinc/pairing"
 [dependencies]
 rand = "0.4"
 byteorder = "1"
+#ff = { git = 'https://github.com/matterinc/ff', features = ["derive"] }
 ff = { path = "../ff", features = ["derive"] }
 serde = "1.0.80"
 serde_derive = "1.0.80"

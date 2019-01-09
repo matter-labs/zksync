@@ -4,6 +4,7 @@ extern crate memmap;
 extern crate rand;
 extern crate blake2;
 extern crate byteorder;
+extern crate crypto;
 
 use powersoftau::bn256::{Bn256CeremonyParameters};
 use powersoftau::batched_accumulator::{BachedAccumulator};
@@ -16,44 +17,57 @@ use memmap::*;
 
 use powersoftau::parameters::PowersOfTauParameters;
 
+#[macro_use]
+extern crate hex_literal;
+
 const input_is_compressed: UseCompression = UseCompression::No;
 const compress_the_output: UseCompression = UseCompression::Yes;
 const check_input_correctness: CheckForCorrectness = CheckForCorrectness::No;
 
+
 fn main() {
-    println!("Will contribute to accumulator for 2^{} powers of tau", Bn256CeremonyParameters::REQUIRED_POWER);
+    println!("Will contribute a random beacon to accumulator for 2^{} powers of tau", Bn256CeremonyParameters::REQUIRED_POWER);
     println!("In total will generate up to {} powers", Bn256CeremonyParameters::TAU_POWERS_G1_LENGTH);
     
-    // Create an RNG based on a mixture of system randomness and user provided randomness
+    // Create an RNG based on the outcome of the random beacon
     let mut rng = {
         use byteorder::{ReadBytesExt, BigEndian};
-        use blake2::{Blake2b, Digest};
-        use rand::{SeedableRng, Rng, OsRng};
+        use rand::{SeedableRng};
         use rand::chacha::ChaChaRng;
+        use crypto::sha2::Sha256;
+        use crypto::digest::Digest;
 
-        let h = {
-            let mut system_rng = OsRng::new().unwrap();
-            let mut h = Blake2b::default();
+        // Place block hash here (block number #514200)
+        let mut cur_hash: [u8; 32] = hex!("00000000000000000034b33e842ac1c50456abe5fa92b60f6b3dfc5d247f7b58");
 
-            // Gather 1024 bytes of entropy from the system
-            for _ in 0..1024 {
-                let r: u8 = system_rng.gen();
-                h.input(&[r]);
+        // Performs 2^n hash iterations over it
+        const N: usize = 42;
+
+        for i in 0..(1u64<<N) {
+            // Print 1024 of the interstitial states
+            // so that verification can be
+            // parallelized
+            if i % (1u64<<(N-10)) == 0 {
+                print!("{}: ", i);
+                for b in cur_hash.iter() {
+                    print!("{:02x}", b);
+                }
+                println!("");
             }
 
-            // Ask the user to provide some information for additional entropy
-            let mut user_input = String::new();
-            println!("Type some random text and press [ENTER] to provide additional entropy...");
-            std::io::stdin().read_line(&mut user_input).expect("expected to read some random text from the user");
+            let mut h = Sha256::new();
+            h.input(&cur_hash);
+            h.result(&mut cur_hash);
+        }
 
-            // Hash it all up to make a seed
-            h.input(&user_input.as_bytes());
-            h.result()
-        };
+        print!("Final result of beacon: ");
+        for b in cur_hash.iter() {
+            print!("{:02x}", b);
+        }
+        println!("");
 
-        let mut digest = &h[..];
+        let mut digest = &cur_hash[..];
 
-        // Interpret the first 32 bytes of the digest as 8 32-bit words
         let mut seed = [0u32; 8];
         for i in 0..8 {
             seed[i] = digest.read_u32::<BigEndian>().expect("digest is large enough for this to work");
@@ -65,7 +79,7 @@ fn main() {
     // Try to load `./challenge` from disk.
     let reader = OpenOptions::new()
                             .read(true)
-                            .open("challenge").expect("unable open `./challenge` in this directory");
+                            .open("challenge_constrained").expect("unable open `./challenge` in this directory");
 
     {
         let metadata = reader.metadata().expect("unable to get filesystem metadata for `./challenge`");
@@ -107,7 +121,6 @@ fn main() {
     
     println!("Calculating previous contribution hash...");
 
-    assert!(UseCompression::No == input_is_compressed, "Hashing the compressed file in not yet defined");
     let current_accumulator_hash = BachedAccumulator::<Bn256, Bn256CeremonyParameters>::calculate_hash(&readable_map);
 
     // Construct our keypair using the RNG we created above
@@ -125,13 +138,10 @@ fn main() {
         check_input_correctness, 
         &privkey
     ).expect("must transform with the key");
-
     println!("Finihsing writing your contribution to `./response`...");
 
     // Write the public key
     pubkey.write::<Bn256CeremonyParameters>(&mut writable_map, compress_the_output).expect("unable to write public key");
-
-    writable_map.flush().expect("must flush a memory map");
 
     // Get the hash of the contribution, so the user can compare later
     let output_readonly = writable_map.make_read_only().expect("must make a map readonly");

@@ -62,7 +62,7 @@ pub trait PowersOfTauParameters: Clone {
 
 
 /// Determines if point compression should be used.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum UseCompression {
     Yes,
     No
@@ -71,7 +71,7 @@ pub enum UseCompression {
 /// Determines if points should be checked for correctness during deserialization.
 /// This is not necessary for participants, because a transcript verifier can
 /// check this theirself.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum CheckForCorrectness {
     Yes,
     No
@@ -108,7 +108,7 @@ impl From<GroupDecodingError> for DeserializationError {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ElementType {
     TauG1,
     TauG2,

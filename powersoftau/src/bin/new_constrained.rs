@@ -4,6 +4,7 @@ extern crate memmap;
 
 use powersoftau::bn256::{Bn256CeremonyParameters};
 use powersoftau::batched_accumulator::{BachedAccumulator};
+use powersoftau::parameters::{UseCompression};
 use powersoftau::utils::{blank_hash};
 
 use std::fs::OpenOptions;
@@ -13,6 +14,8 @@ use memmap::*;
 
 use powersoftau::parameters::PowersOfTauParameters;
 
+const compress_new_challenge: UseCompression = UseCompression::No;
+
 fn main() {
     println!("Will generate an empty accumulator for 2^{} powers of tau", Bn256CeremonyParameters::REQUIRED_POWER);
     println!("In total will generate up to {} powers", Bn256CeremonyParameters::TAU_POWERS_G1_LENGTH);
@@ -21,11 +24,18 @@ fn main() {
                             .read(true)
                             .write(true)
                             .create_new(true)
-                            .open("challenge_constrained").expect("unable to create `./challenge`");
+                            .open("challenge").expect("unable to create `./challenge`");
+            
+    let expected_challenge_length = match compress_new_challenge {
+        UseCompression::Yes => {
+            Bn256CeremonyParameters::CONTRIBUTION_BYTE_SIZE - Bn256CeremonyParameters::PUBLIC_KEY_SIZE
+        },
+        UseCompression::No => {
+            Bn256CeremonyParameters::ACCUMULATOR_BYTE_SIZE
+        }
+    };
 
-    let parameters = Bn256CeremonyParameters{};
-
-    file.set_len(Bn256CeremonyParameters::ACCUMULATOR_BYTE_SIZE as u64).expect("unable to allocate large enough file");
+    file.set_len(expected_challenge_length as u64).expect("unable to allocate large enough file");
 
     let mut writable_map = unsafe { MmapOptions::new().map_mut(&file).expect("unable to create a memory map") };
 
@@ -35,7 +45,7 @@ fn main() {
 
     writable_map.flush().expect("unable to write blank hash to `./challenge`");
 
-    BachedAccumulator::<Bn256, _>::generate_initial(&mut writable_map, parameters).expect("generation of initial accumulator is successful");
+    BachedAccumulator::<Bn256, Bn256CeremonyParameters>::generate_initial(&mut writable_map, compress_new_challenge).expect("generation of initial accumulator is successful");
     writable_map.flush().expect("unable to flush memmap to disk");
 
     println!("Wrote a fresh accumulator to `./challenge`");

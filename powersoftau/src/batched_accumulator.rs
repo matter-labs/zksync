@@ -56,16 +56,20 @@ pub struct BachedAccumulator<E: Engine, P: PowersOfTauParameters> {
     pub beta_tau_powers_g1: Vec<E::G1Affine>,
     /// beta
     pub beta_g2: E::G2Affine,
-    /// Keep parameters here
-    pub parameters: P,
-    /// Keep the last point read from file
-    pub state: AccumulatorState,
     /// Hash chain hash
-    pub hash: GenericArray<u8, U64>
+    pub hash: GenericArray<u8, U64>,
+    /// Keep parameters here as a marker
+    marker: std::marker::PhantomData<P>,
 }
 
 impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
-    pub fn calculate_hash(input_map: &Mmap) -> GenericArray<u8, U64> {
+    /// Calcualte the contibution hash from the resulting file. Original powers of tau implementaiton
+    /// used a specially formed writer to write to the file and calculate a hash on the fly, but memory-constrained
+    /// implementation now writes without a particular order, so plain recalculation at the end 
+    /// of the procedure is more efficient
+    pub fn calculate_hash(
+        input_map: &Mmap
+    ) -> GenericArray<u8, U64> {
         let chunk_size = 1 << 30; // read by 1GB from map
         let mut hasher = Blake2b::default();
         for chunk in input_map.chunks(chunk_size) {
@@ -77,16 +81,15 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
 }
 
 impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
-    pub fn empty(parameters: P) -> Self {
+    pub fn empty() -> Self {
         Self {
             tau_powers_g1: vec![],
             tau_powers_g2: vec![],
             alpha_tau_powers_g1: vec![],
             beta_tau_powers_g1: vec![],
             beta_g2: E::G2Affine::zero(),
-            parameters: parameters,
-            state: AccumulatorState::Empty,
             hash: blank_hash(),
+            marker: std::marker::PhantomData::<P>{}
         }
     }
 }
@@ -130,6 +133,7 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
     /// TAU_POWERS_LENGTH of G1 points for alpha
     /// TAU_POWERS_LENGTH of G1 points for beta
     /// One G2 point for beta
+    /// Public key appended to the end of file, but it's irrelevant for an accumulator itself
     
     fn calculate_mmap_position(index: usize, element_type: ElementType, compression: UseCompression) -> usize {
         let g1_size = Self::g1_size(compression);
@@ -191,10 +195,12 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
     pub fn verify_transformation(
         input_map: &Mmap,
         output_map: &Mmap,
-        parameters: P,
         key: &PublicKey<E>, 
         digest: &[u8],
+        input_is_compressed: UseCompression,
         output_is_compressed: UseCompression,
+        check_input_for_correctness: CheckForCorrectness,
+        check_output_for_correctness: CheckForCorrectness,
     ) -> bool
     {
         use itertools::MinMaxResult::{MinMax};
@@ -222,25 +228,15 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
 
         // Load accumulators AND perform computations
 
-        let mut before = Self::empty(parameters.clone());
-        let mut after = Self::empty(parameters.clone());
+        let mut before = Self::empty();
+        let mut after = Self::empty();
 
         // these checks only touch a part of the accumulator, so read two elements
 
         {
             let chunk_size = 2;
-            before.read_chunk(0, chunk_size, UseCompression::No, CheckForCorrectness::No, &input_map).expect("must read a first chunk");
-            after.read_chunk(0, chunk_size, output_is_compressed, CheckForCorrectness::No, &output_map).expect("must read a first chunk");
-
-            match before.state {
-                AccumulatorState::Empty => {panic!("Accumulator is empty")},
-                _ => {}
-            };
-
-            match after.state {
-                AccumulatorState::Empty => {panic!("Accumulator is empty")},
-                _ => {}
-            };
+            before.read_chunk(0, chunk_size, input_is_compressed, check_input_for_correctness, &input_map).expect("must read a first chunk");
+            after.read_chunk(0, chunk_size, output_is_compressed, check_output_for_correctness, &output_map).expect("must read a first chunk");
 
             // Check the correctness of the generators for tau powers
             if after.tau_powers_g1[0] != E::G1Affine::one() {
@@ -287,8 +283,8 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
         for chunk in &(0..P::TAU_POWERS_LENGTH).into_iter().chunks(P::EMPIRICAL_BATCH_SIZE) {
             if let MinMax(start, end) = chunk.minmax() {
                 let size = end - start + 1;
-                before.read_chunk(start, size, UseCompression::No, CheckForCorrectness::No, &input_map).expect("must read a first chunk");
-                after.read_chunk(start, size, output_is_compressed, CheckForCorrectness::No, &output_map).expect("must read a first chunk");
+                before.read_chunk(start, size, input_is_compressed, check_input_for_correctness, &input_map).expect("must read a first chunk");
+                after.read_chunk(start, size, output_is_compressed, check_output_for_correctness, &output_map).expect("must read a first chunk");
 
                 // Are the powers of tau correct?
                 if !same_ratio(power_pairs(&after.tau_powers_g1), (tau_powers_g2_0, tau_powers_g2_1)) {
@@ -315,8 +311,8 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
         for chunk in &(P::TAU_POWERS_LENGTH..P::TAU_POWERS_G1_LENGTH).into_iter().chunks(P::EMPIRICAL_BATCH_SIZE) {
             if let MinMax(start, end) = chunk.minmax() {
                 let size = end - start + 1;
-                before.read_chunk(start, size, UseCompression::No, CheckForCorrectness::No, &input_map).expect("must read a first chunk");
-                after.read_chunk(start, size, output_is_compressed, CheckForCorrectness::No, &output_map).expect("must read a first chunk");
+                before.read_chunk(start, size, input_is_compressed, check_input_for_correctness, &input_map).expect("must read a first chunk");
+                after.read_chunk(start, size, output_is_compressed, check_output_for_correctness, &output_map).expect("must read a first chunk");
 
                 assert_eq!(before.tau_powers_g2.len(), 0, "during rest of tau g1 generation tau g2 must be empty");
                 assert_eq!(after.tau_powers_g2.len(), 0, "during rest of tau g1 generation tau g2 must be empty");
@@ -332,6 +328,42 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
         }
 
         true
+    }
+
+    pub fn decompress(
+        input_map: &Mmap,
+        output_map: &mut MmapMut,
+        check_input_for_correctness: CheckForCorrectness,
+    ) -> io::Result<()>
+    {
+        use itertools::MinMaxResult::{MinMax};
+
+        let mut accumulator = Self::empty();
+    
+        for chunk in &(0..P::TAU_POWERS_LENGTH).into_iter().chunks(P::EMPIRICAL_BATCH_SIZE) {
+            if let MinMax(start, end) = chunk.minmax() {
+                let size = end - start + 1;
+                accumulator.read_chunk(start, size, UseCompression::Yes, check_input_for_correctness, &input_map).expect("Must read a chunk");
+                accumulator.write_chunk(start, UseCompression::No, output_map)?;
+            } else {
+                panic!("Chunk does not have a min and max");
+            }
+        }
+
+        for chunk in &(P::TAU_POWERS_LENGTH..P::TAU_POWERS_G1_LENGTH).into_iter().chunks(P::EMPIRICAL_BATCH_SIZE) {
+            if let MinMax(start, end) = chunk.minmax() {
+                let size = end - start + 1;
+                accumulator.read_chunk(start, size, UseCompression::Yes, check_input_for_correctness, &input_map).expect("must read a chunk");
+                assert_eq!(accumulator.tau_powers_g2.len(), 0, "during rest of tau g1 generation tau g2 must be empty");
+                
+                accumulator.write_chunk(start, UseCompression::No, output_map)?;
+
+            } else {
+                panic!("Chunk does not have a min and max");
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -397,13 +429,6 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
             },
         };
 
-        match self.state {
-            AccumulatorState::Empty => {
-                self.state = AccumulatorState::NonEmpty;
-            },
-            _ => {},
-        };
-
         Ok(())
     }
 
@@ -442,8 +467,6 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
             let element_size = Self::get_size(element_type, compression);
             let memory_slice = input_map.get(position..position+element_size).expect("must read point data from file");
             memory_slice.clone().read_exact(encoded.as_mut())?;
-            // memory_slice.write();
-            // encoded.as_mut() = self.input_map[position+element_size];
         }
 
         // Allocate space for the deserialized elements
@@ -615,10 +638,17 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
 
 impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
     /// Transforms the accumulator with a private key.
+    /// Due to large amount of data in a previous accumulator even in the compressed form
+    /// this function can now work on compressed input. Output can be made in any form 
+    /// WARNING: Contributor does not have to check that values from challenge file were serialized
+    /// corrently, but we may want to enforce it if a ceremony coordinator does not recompress the previous
+    /// contribution into the new challenge file 
     pub fn transform(
         input_map: &Mmap,
         output_map: &mut MmapMut,
-        parameters: P,
+        input_is_compressed: UseCompression,
+        compress_the_output: UseCompression,
+        check_input_for_correctness: CheckForCorrectness,
         key: &PrivateKey<E>
     ) -> io::Result<()>
     {
@@ -670,14 +700,14 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
             }
         }
 
-        let mut accumulator = Self::empty(parameters.clone());
+        let mut accumulator = Self::empty();
 
-        use itertools::MinMaxResult::{NoElements, OneElement, MinMax};
+        use itertools::MinMaxResult::{MinMax};
 
         for chunk in &(0..P::TAU_POWERS_LENGTH).into_iter().chunks(P::EMPIRICAL_BATCH_SIZE) {
             if let MinMax(start, end) = chunk.minmax() {
                 let size = end - start + 1;
-                accumulator.read_chunk(start, size, UseCompression::No, CheckForCorrectness::No, &input_map).expect("must read a first chunk");
+                accumulator.read_chunk(start, size, input_is_compressed, check_input_for_correctness, &input_map).expect("must read a first chunk");
 
                 // Construct the powers of tau
                 let mut taupowers = vec![E::Fr::zero(); size];
@@ -702,7 +732,7 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
                 batch_exp::<E, _>(&mut accumulator.alpha_tau_powers_g1, &taupowers[0..], Some(&key.alpha));
                 batch_exp::<E, _>(&mut accumulator.beta_tau_powers_g1, &taupowers[0..], Some(&key.beta));
                 accumulator.beta_g2 = accumulator.beta_g2.mul(key.beta).into_affine();
-                accumulator.write_chunk(start, UseCompression::Yes, output_map)?;
+                accumulator.write_chunk(start, compress_the_output, output_map)?;
 
                 println!("Done processing {} powers of tau", end);
             } else {
@@ -713,7 +743,7 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
         for chunk in &(P::TAU_POWERS_LENGTH..P::TAU_POWERS_G1_LENGTH).into_iter().chunks(P::EMPIRICAL_BATCH_SIZE) {
             if let MinMax(start, end) = chunk.minmax() {
                 let size = end - start + 1;
-                accumulator.read_chunk(start, size, UseCompression::No, CheckForCorrectness::No, &input_map).expect("must read a first chunk");
+                accumulator.read_chunk(start, size, input_is_compressed, check_input_for_correctness, &input_map).expect("must read a first chunk");
                 assert_eq!(accumulator.tau_powers_g2.len(), 0, "during rest of tau g1 generation tau g2 must be empty");
 
                 // Construct the powers of tau
@@ -736,7 +766,7 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
 
                 batch_exp::<E, _>(&mut accumulator.tau_powers_g1, &taupowers[0..], None);
                 accumulator.beta_g2 = accumulator.beta_g2.mul(key.beta).into_affine();
-                accumulator.write_chunk(start, UseCompression::Yes, output_map)?;
+                accumulator.write_chunk(start, compress_the_output, output_map)?;
 
                 println!("Done processing {} powers of tau", end);
             } else {
@@ -752,10 +782,10 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
     /// Transforms the accumulator with a private key.
     pub fn generate_initial(
         output_map: &mut MmapMut,
-        parameters: P,
+        compress_the_output: UseCompression,
     ) -> io::Result<()>
     {
-        use itertools::MinMaxResult::{NoElements, OneElement, MinMax};
+        use itertools::MinMaxResult::{MinMax};
 
         for chunk in &(0..P::TAU_POWERS_LENGTH).into_iter().chunks(P::EMPIRICAL_BATCH_SIZE) {
             if let MinMax(start, end) = chunk.minmax() {
@@ -766,12 +796,11 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
                     alpha_tau_powers_g1: vec![E::G1Affine::one(); size],
                     beta_tau_powers_g1: vec![E::G1Affine::one(); size],
                     beta_g2: E::G2Affine::one(),
-                    parameters: parameters.clone(),
-                    state: AccumulatorState::NonEmpty,
                     hash: blank_hash(),
+                    marker: std::marker::PhantomData::<P>{}
                 };
 
-                accumulator.write_chunk(start, UseCompression::No, output_map)?;
+                accumulator.write_chunk(start, compress_the_output, output_map)?;
                 println!("Done processing {} powers of tau", end);
             } else {
                 panic!("Chunk does not have a min and max");
@@ -787,12 +816,11 @@ impl<E:Engine, P: PowersOfTauParameters> BachedAccumulator<E, P> {
                     alpha_tau_powers_g1: vec![],
                     beta_tau_powers_g1: vec![],
                     beta_g2: E::G2Affine::one(),
-                    parameters: parameters.clone(),
-                    state: AccumulatorState::NonEmpty,
                     hash: blank_hash(),
+                    marker: std::marker::PhantomData::<P>{}
                 };
 
-                accumulator.write_chunk(start, UseCompression::No, output_map)?;
+                accumulator.write_chunk(start, compress_the_output, output_map)?;
                 println!("Done processing {} powers of tau", end);
             } else {
                 panic!("Chunk does not have a min and max");

@@ -71,7 +71,10 @@ pub fn keypair<R: Rng, E: Engine>(rng: &mut R, digest: &[u8]) -> (PublicKey<E>, 
 {
     assert_eq!(digest.len(), 64);
 
+    // tau is a conribution to the "powers of tau", in a set of points of the form "tau^i * G"
     let tau = E::Fr::rand(rng);
+    // alpha and beta are a set of conrtibuitons in a form "alpha * tau^i * G" and that are required
+    // for construction of the polynomials
     let alpha = E::Fr::rand(rng);
     let beta = E::Fr::rand(rng);
 
@@ -97,6 +100,8 @@ pub fn keypair<R: Rng, E: Engine>(rng: &mut R, digest: &[u8]) -> (PublicKey<E>, 
         ((g1_s, g1_s_x), g2_s_x)
     };
 
+    // these "public keys" are requried for for next participants to check that points are in fact
+    // sequential powers
     let pk_tau = op(tau, 0);
     let pk_alpha = op(alpha, 1);
     let pk_beta = op(beta, 2);
@@ -181,14 +186,26 @@ impl<E: Engine> PublicKey<E> {
 
 impl<E: Engine> PublicKey<E> {
 
+    /// This function is intended to write the key to the memory map and calculates
+    /// a position for writing into the file itself based on information whether
+    /// contribution was output in compressed on uncompressed form
     pub fn write<P>(
         &self,
         output_map: &mut MmapMut,
+        accumulator_was_compressed: UseCompression
     )
     -> io::Result<()>
         where P: PowersOfTauParameters
     {
-        let mut position = P::CONTRIBUTION_BYTE_SIZE - P::PUBLIC_KEY_SIZE;
+        let mut position = match accumulator_was_compressed {
+            UseCompression::Yes => {
+                P::CONTRIBUTION_BYTE_SIZE - P::PUBLIC_KEY_SIZE
+            },
+            UseCompression::No => {
+                P::ACCUMULATOR_BYTE_SIZE
+            }
+        };
+
         (&mut output_map[position..]).write(&self.tau_g1.0.into_uncompressed().as_ref())?;
         position += P::G1_UNCOMPRESSED_BYTE_SIZE;
 
@@ -225,6 +242,7 @@ impl<E: Engine> PublicKey<E> {
     /// points at infinity.
     pub fn read<P>(
         input_map: &Mmap,
+        accumulator_was_compressed: UseCompression
     ) -> Result<Self, DeserializationError>
         where P: PowersOfTauParameters
     {
@@ -242,7 +260,14 @@ impl<E: Engine> PublicKey<E> {
             }
         }
 
-        let mut position = 0;
+        let mut position = match accumulator_was_compressed {
+            UseCompression::Yes => {
+                P::CONTRIBUTION_BYTE_SIZE - P::PUBLIC_KEY_SIZE
+            },
+            UseCompression::No => {
+                P::ACCUMULATOR_BYTE_SIZE
+            }
+        };
 
         let tau_g1_s = read_uncompressed::<E, _>(input_map, position)?;
         position += P::G1_UNCOMPRESSED_BYTE_SIZE;

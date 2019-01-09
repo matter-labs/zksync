@@ -1,12 +1,14 @@
 [package]
 name = "ff_derive"
-version = "0.3.0"
-authors = ["Sean Bowe <ewillbefull@gmail.com>"]
+version = "0.4.0"
+authors = ["Sean Bowe <ewillbefull@gmail.com>",    
+    "Alex Gluchowski <alex@gluchowski.net>",
+    "Alex Vlasov <alex.m.vlasov@gmail.com>"]
 description = "Procedural macro library used to build custom prime field implementations"
 documentation = "https://docs.rs/ff/"
-homepage = "https://github.com/ebfull/ff"
+homepage = "https://github.com/matterinc/ff"
 license = "MIT/Apache-2.0"
-repository = "https://github.com/ebfull/ff"
+repository = "https://github.com/matterinc/ff"
 
 [lib]
 proc-macro = true
