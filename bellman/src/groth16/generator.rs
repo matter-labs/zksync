@@ -1,12 +1,8 @@
 extern crate time;
 
-extern crate pbr;
-
 use super::super::verbose_flag;
 
 use self::time::PreciseTime;
-//use self::pbr::{MultiBar};
-use super::super::progress_bar::{MultiBar};
 
 use rand::Rng;
 
@@ -182,8 +178,6 @@ impl<E: Engine> ConstraintSystem<E> for KeypairAssembly<E> {
     }
 }
 
-const MIN_STEP: u64 = 1000;
-
 /// Create parameters for a circuit, given some toxic waste.
 pub fn generate_parameters<E, C>(
     circuit: C,
@@ -267,7 +261,6 @@ pub fn generate_parameters<E, C>(
             worker.scope(powers_of_tau.len(), |scope, chunk| {
                 for (i, powers_of_tau) in powers_of_tau.chunks_mut(chunk).enumerate()
                 {
-                    //let mut progress_bar = mb.create_bar(a.len() as u64);
                     scope.spawn(move || {
                         let mut current_tau_power = tau.pow(&[(i*chunk) as u64]);
 
@@ -289,14 +282,11 @@ pub fn generate_parameters<E, C>(
         let start = PreciseTime::now();
         // Compute the H query with multiple threads
         worker.scope(h.len(), |scope, chunk| {
-            let mut mb = if verbose {Some(MultiBar::new())} else {None};
             for (h, p) in h.chunks_mut(chunk).zip(powers_of_tau.as_ref().chunks(chunk))
             {
                 let mut g1_wnaf = g1_wnaf.shared();
-                let mut progress_bar = if let Some(mb) = mb.as_mut() {Some(mb.create_bar(h.len() as u64))} else {None};
                 scope.spawn(move || {
                     // Set values of the H query to g1^{(tau^i * t(tau)) / delta}
-                    let mut step: u64 = 0;
                     for (h, p) in h.iter_mut().zip(p.iter())
                     {
                         // Compute final exponent
@@ -305,20 +295,12 @@ pub fn generate_parameters<E, C>(
 
                         // Exponentiate
                         *h = g1_wnaf.scalar(exp.into_repr());
-                        if let Some(progress_bar) = progress_bar.as_mut() {
-                            step += 1;
-                            if step % MIN_STEP == 0 {
-                                progress_bar.add(MIN_STEP);
-                            };
-                        };
                     }
 
                     // Batch normalize
                     E::G1::batch_normalization(h);
-                    if let Some(progress_bar) = progress_bar.as_mut() {progress_bar.finish();}
                 });
             }
-            if let Some(mb) = mb.as_mut() {mb.listen();}
         });
         if verbose {eprintln!("computing the H query done in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);};
     }
@@ -372,8 +354,6 @@ pub fn generate_parameters<E, C>(
     )
 
     {
-        let verbose = verbose_flag();
-
         // Sanity check
         assert_eq!(a.len(), at.len());
         assert_eq!(a.len(), bt.len());
@@ -384,7 +364,6 @@ pub fn generate_parameters<E, C>(
 
         // Evaluate polynomials in multiple threads
         worker.scope(a.len(), |scope, chunk| {
-            let mut mb = if verbose {Some(MultiBar::new())} else {None};
             for ((((((a, b_g1), b_g2), ext), at), bt), ct) in a.chunks_mut(chunk)
                                                                .zip(b_g1.chunks_mut(chunk))
                                                                .zip(b_g2.chunks_mut(chunk))
@@ -396,9 +375,7 @@ pub fn generate_parameters<E, C>(
                 let mut g1_wnaf = g1_wnaf.shared();
                 let mut g2_wnaf = g2_wnaf.shared();
 
-                let mut progress_bar = if let Some(mb) = mb.as_mut() {Some(mb.create_bar(a.len() as u64))} else {None};
                 scope.spawn(move || {
-                    let mut step: u64 = 0;
                     for ((((((a, b_g1), b_g2), ext), at), bt), ct) in a.iter_mut()
                                                                        .zip(b_g1.iter_mut())
                                                                        .zip(b_g2.iter_mut())
@@ -449,15 +426,7 @@ pub fn generate_parameters<E, C>(
                         e.mul_assign(inv);
 
                         *ext = g1_wnaf.scalar(e.into_repr());
-                        if let Some(progress_bar) = progress_bar.as_mut() {
-                            step += 1;
-                            if step % MIN_STEP == 0 {
-                                progress_bar.add(MIN_STEP);
-                            };
-                        };
                     }
-
-                    if let Some(progress_bar) = progress_bar.as_mut() {progress_bar.finish();}
 
                     // Batch normalize
                     E::G1::batch_normalization(a);
@@ -466,7 +435,6 @@ pub fn generate_parameters<E, C>(
                     E::G1::batch_normalization(ext);
                 });
             };
-            if let Some(mb) = mb.as_mut() {mb.listen();}
         });
     }
 
