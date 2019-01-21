@@ -20,6 +20,7 @@ pairing = { path = "../pairing", features = ["expose-arith"]}
 bellman = { path = "../bellman" }
 serde = "1.0.80"
 serde_derive = "1.0.80"
+tiny-keccak = "1.4.2"
 
 #pairing = { git = 'https://github.com/matterinc/pairing', features = ["expose-arith"] }
 #bellman = { git = 'https://github.com/matterinc/bellman'}

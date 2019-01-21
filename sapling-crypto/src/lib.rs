@@ -9,6 +9,7 @@ extern crate digest;
 extern crate rand;
 extern crate byteorder;
 extern crate ff;
+extern crate tiny_keccak;
 
 #[cfg(test)]
 #[macro_use]
