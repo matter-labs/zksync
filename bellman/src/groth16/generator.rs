@@ -1,8 +1,4 @@
-extern crate time;
-
 use super::super::verbose_flag;
-
-use self::time::PreciseTime;
 
 use rand::Rng;
 
@@ -255,7 +251,9 @@ pub fn generate_parameters<E, C>(
     {
         // Compute powers of tau
         if verbose {eprintln!("computing powers of tau...")};
-        let start = PreciseTime::now();
+
+        let start = std::time::Instant::now();
+
         {
             let powers_of_tau = powers_of_tau.as_mut();
             worker.scope(powers_of_tau.len(), |scope, chunk| {
@@ -272,14 +270,16 @@ pub fn generate_parameters<E, C>(
                 }
             });
         }
-        if verbose {eprintln!("powers of tau stage 1 done in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);};
+        if verbose {eprintln!("powers of tau stage 1 done in {} s", start.elapsed().as_millis() as f64 / 1000.0);};
 
         // coeff = t(x) / delta
         let mut coeff = powers_of_tau.z(&tau);
         coeff.mul_assign(&delta_inverse);
 
         if verbose {eprintln!("computing the H query with multiple threads...")};
-        let start = PreciseTime::now();
+
+        let start = std::time::Instant::now();
+
         // Compute the H query with multiple threads
         worker.scope(h.len(), |scope, chunk| {
             for (h, p) in h.chunks_mut(chunk).zip(powers_of_tau.as_ref().chunks(chunk))
@@ -302,17 +302,18 @@ pub fn generate_parameters<E, C>(
                 });
             }
         });
-        if verbose {eprintln!("computing the H query done in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);};
+        if verbose {eprintln!("computing the H query done in {} s", start.elapsed().as_millis() as f64 / 1000.0);};
     }
 
     if verbose {eprintln!("using inverse FFT to convert powers of tau to Lagrange coefficients...")};
-    let start = PreciseTime::now();
+    
+    let start = std::time::Instant::now();
 
     // Use inverse FFT to convert powers of tau to Lagrange coefficients
     powers_of_tau.ifft(&worker);
     let powers_of_tau = powers_of_tau.into_coeffs();
 
-    if verbose {eprintln!("powers of tau stage 2 done in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0)};
+    if verbose {eprintln!("powers of tau stage 2 done in {} s", start.elapsed().as_millis() as f64 / 1000.0)};
 
     let mut a = vec![E::G1::zero(); assembly.num_inputs + assembly.num_aux];
     let mut b_g1 = vec![E::G1::zero(); assembly.num_inputs + assembly.num_aux];
@@ -321,7 +322,7 @@ pub fn generate_parameters<E, C>(
     let mut l = vec![E::G1::zero(); assembly.num_aux];
 
     if verbose {eprintln!("evaluating polynomials...")};
-    let start = PreciseTime::now();
+    let start = std::time::Instant::now();
 
     fn eval<E: Engine>(
         // wNAF window tables
@@ -474,7 +475,7 @@ pub fn generate_parameters<E, C>(
         &worker
     );
 
-    if verbose {eprintln!("evaluating polynomials done in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);};
+    if verbose {eprintln!("evaluating polynomials done in {} s", start.elapsed().as_millis() as f64 / 1000.0);};
 
     // Don't allow any elements be unconstrained, so that
     // the L query is always fully dense.

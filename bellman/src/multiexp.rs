@@ -142,6 +142,36 @@ impl DensityTracker {
     }
 }
 
+/// This genious piece of code works in the following way:
+/// - choose `c` - the bit length of the region that one thread works on
+/// - make `2^c - 1` buckets and initialize them with `G = infinity` (that's equivalent of zero)
+/// - there is no bucket for "zero" cause it's not necessary
+/// - go over the pairs `(base, scalar)`
+/// - for each scalar calculate `scalar % 2^c` and add the base (without any multiplications!) to the 
+/// corresponding bucket
+/// - at the end each bucket will have an accumulated value that should be multiplied by the corresponding factor
+/// between `1` and `2^c - 1` to get the right value
+/// - here comes the first trick - you don't need to do multiplications at all, just add all the buckets together
+/// starting from the first one `(a + b + c + ...)` and than add to the first sum another sum of the form
+/// `(b + c + d + ...)`, and than the third one `(c + d + ...)`, that will result in the proper prefactor infront of every
+/// accumulator, without any multiplication operations at all
+/// - that's of course not enough, so spawn the next thread
+/// - this thread works with the same bit width `c`, but SKIPS lowers bits completely, so it actually takes values
+/// in the form `(scalar >> c) % 2^c`, so works on the next region
+/// - spawn more threads until you exhaust all the bit length
+/// - you will get roughly `[bitlength / c] + 1` inaccumulators
+/// - double the highest accumulator enough times, add to the next one, double the result, add the next accumulator, continue
+/// 
+/// Demo why it works:
+/// ```
+///     a * G + b * H = (a_2 * (2^c)^2 + a_1 * (2^c)^1 + a_0) * G + (b_2 * (2^c)^2 + b_1 * (2^c)^1 + b_0) * H
+/// ```
+/// - make buckets over `0` labeled coefficients
+/// - make buckets over `1` labeled coefficients
+/// - make buckets over `2` labeled coefficients
+/// - accumulators over each set of buckets will have an implicit factor of `(2^c)^i`, so before summing thme up
+/// "higher" accumulators must be doubled `c` times
+///
 fn multiexp_inner<Q, D, G, S>(
     pool: &Worker,
     bases: S,
@@ -195,7 +225,7 @@ fn multiexp_inner<Q, D, G, S>(
                     } else {
                         // Place multiplication into the bucket: Separate s * P as 
                         // (s/2^c) * P + (s mod 2^c) P
-                        // First multiplication is c bits less, do one can do it,
+                        // First multiplication is c bits less, so one can do it,
                         // sum results from different buckets and double it c times,
                         // then add with (s mod 2^c) P parts
                         let mut exp = exp;
@@ -316,4 +346,35 @@ fn test_with_bls12() {
     ).wait().unwrap();
 
     assert_eq!(naive, fast);
+}
+
+#[test]
+fn test_speed_with_bn256() {
+    use rand::{self, Rand};
+    use pairing::bn256::Bn256;
+    use num_cpus;
+
+    let cpus = num_cpus::get();
+    const SAMPLES: usize = 1 << 22;
+
+    let rng = &mut rand::thread_rng();
+    let v = Arc::new((0..SAMPLES).map(|_| <Bn256 as ScalarEngine>::Fr::rand(rng).into_repr()).collect::<Vec<_>>());
+    let g = Arc::new((0..SAMPLES).map(|_| <Bn256 as Engine>::G1::rand(rng).into_affine()).collect::<Vec<_>>());
+
+    let pool = Worker::new();
+
+    let start = std::time::Instant::now();
+
+    let _fast = multiexp(
+        &pool,
+        (g, 0),
+        FullDensity,
+        v
+    ).wait().unwrap();
+
+
+    let duration_ns = start.elapsed().as_nanos() as f64;
+    println!("Elapsed {} ns for {} samples", duration_ns, SAMPLES);
+    let time_per_sample = duration_ns/(SAMPLES as f64);
+    println!("Tested on {} samples on {} CPUs with {} ns per multiplication", SAMPLES, cpus, time_per_sample);
 }

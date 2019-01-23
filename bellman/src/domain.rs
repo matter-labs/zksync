@@ -509,3 +509,59 @@ fn parallel_fft_consistency() {
 
     test_consistency::<Bls12, _>(rng);
 }
+
+#[test]
+fn test_field_element_multiplication_bn256() {
+    use rand::{self, Rand};
+    use pairing::bn256::Bn256;
+    use pairing::bn256::Fr;
+    use num_cpus;
+
+    let cpus = num_cpus::get();
+    const SAMPLES: usize = 1 << 27;
+
+    let rng = &mut rand::thread_rng();
+    let v1 = (0..SAMPLES).map(|_| Scalar::<Bn256>(Fr::rand(rng))).collect::<Vec<_>>();
+    let v2 = (0..SAMPLES).map(|_| Scalar::<Bn256>(Fr::rand(rng))).collect::<Vec<_>>();
+
+    let mut v1 = EvaluationDomain::from_coeffs(v1).unwrap();
+    let v2 = EvaluationDomain::from_coeffs(v2).unwrap();
+
+    let pool = Worker::new();
+
+    let start = std::time::Instant::now();
+
+    v1.mul_assign(&pool, &v2);
+
+    let duration_ns = start.elapsed().as_nanos() as f64;
+    println!("Elapsed {} ns for {} samples", duration_ns, SAMPLES);
+    let time_per_sample = duration_ns/(SAMPLES as f64);
+    println!("Tested on {} samples on {} CPUs with {} ns per field element multiplication", SAMPLES, cpus, time_per_sample);
+}
+
+#[test]
+fn test_fft_bn256() {
+    use rand::{self, Rand};
+    use pairing::bn256::Bn256;
+    use pairing::bn256::Fr;
+    use num_cpus;
+
+    let cpus = num_cpus::get();
+    const SAMPLES: usize = 1 << 27;
+
+    let rng = &mut rand::thread_rng();
+    let v1 = (0..SAMPLES).map(|_| Scalar::<Bn256>(Fr::rand(rng))).collect::<Vec<_>>();
+
+    let mut v1 = EvaluationDomain::from_coeffs(v1).unwrap();
+
+    let pool = Worker::new();
+
+    let start = std::time::Instant::now();
+
+    v1.ifft(&pool);
+
+    let duration_ns = start.elapsed().as_nanos() as f64;
+    println!("Elapsed {} ns for {} samples", duration_ns, SAMPLES);
+    let time_per_sample = duration_ns/(SAMPLES as f64);
+    println!("Tested on {} samples on {} CPUs with {} ns per field element multiplication", SAMPLES, cpus, time_per_sample);
+}

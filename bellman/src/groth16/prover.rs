@@ -1,6 +1,3 @@
-extern crate time;
-use self::time::PreciseTime;
-
 use super::super::verbose_flag;
 
 use rand::Rng;
@@ -173,7 +170,7 @@ impl<E:Engine> PreparedProver<E> {
 
         let vk = params.get_vk(self.assignment.input_assignment.len())?;
 
-        let h_start = PreciseTime::now();
+        let start = std::time::Instant::now();
 
         let h = {
             let mut a = EvaluationDomain::from_coeffs(prover.a)?;
@@ -209,10 +206,9 @@ impl<E:Engine> PreparedProver<E> {
             multiexp(&worker, params.get_h(a.len())?, FullDensity, a)
         };
 
-        let h_end = PreciseTime::now();
-        if verbose {eprintln!("{} seconds for prover for H evaluation", h_start.to(h_end))};
+        if verbose {eprintln!("{} seconds for prover for H evaluation", start.elapsed().as_secs())};
 
-        let points_start = PreciseTime::now();
+        let start = std::time::Instant::now();
 
         // TODO: Check that difference in operations for different chunks is small
 
@@ -283,8 +279,7 @@ impl<E:Engine> PreparedProver<E> {
         g_c.add_assign(&h.wait()?);
         g_c.add_assign(&l.wait()?);
 
-        let points_end = PreciseTime::now();
-        if verbose {eprintln!("{} seconds for prover for point multiplication", points_start.to(points_end))};
+        if verbose {eprintln!("{} seconds for prover for point multiplication", start.elapsed().as_secs())};
 
         Ok(Proof {
             a: g_a.into_affine(),
@@ -437,7 +432,7 @@ pub fn create_proof<E, C, P: ParameterSource<E>>(
 
     let vk = params.get_vk(prover.input_assignment.len())?;
 
-    let h_start = PreciseTime::now();
+    let start = std::time::Instant::now();
 
     let h = {
         let mut a = EvaluationDomain::from_coeffs(prover.a)?;
@@ -473,10 +468,9 @@ pub fn create_proof<E, C, P: ParameterSource<E>>(
         multiexp(&worker, params.get_h(a.len())?, FullDensity, a)
     };
 
-    let h_end = PreciseTime::now();
-    if verbose {eprintln!("{} seconds for prover for H evaluation", h_start.to(h_end))};
+    if verbose {eprintln!("{} seconds for prover for H evaluation", start.elapsed().as_secs())};
 
-    let points_start = PreciseTime::now();
+    let start = std::time::Instant::now();
 
     // TODO: Check that difference in operations for different chunks is small
 
@@ -547,8 +541,7 @@ pub fn create_proof<E, C, P: ParameterSource<E>>(
     g_c.add_assign(&h.wait()?);
     g_c.add_assign(&l.wait()?);
 
-    let points_end = PreciseTime::now();
-    if verbose {eprintln!("{} seconds for prover for point multiplication", points_start.to(points_end))};
+    if verbose {eprintln!("{} seconds for prover for point multiplication", start.elapsed().as_secs())};
 
     Ok(Proof {
         a: g_a.into_affine(),

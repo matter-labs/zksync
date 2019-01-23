@@ -8,6 +8,9 @@ name = "bellman"
 repository = "https://github.com/matterinc/bellman"
 version = "0.1.1"
 
+[lib]
+crate-type = ["cdylib", "lib", "staticlib"]
+
 [dependencies]
 rand = "0.4"
 bit-vec = "0.4.4"
@@ -19,8 +22,6 @@ pairing = { path = "../pairing" }
 #pairing = { git = 'https://github.com/matterinc/pairing' }
 byteorder = "1"
 ff = { path = "../ff", features = ["derive"] }
-pbr = "1.0.1"
-time = "0.1"
 
 [features]
 default = []

@@ -42,7 +42,7 @@ use ff::{
     PrimeField,
 };
 
-use group_hash::baby_group_hash;
+use group_hash::{baby_group_hash, generic_group_hash};
 
 use constants;
 
@@ -51,7 +51,7 @@ use pairing::bn256::{
     Fr
 };
 
-pub use ::jubjub::{
+pub use super::jubjub::{
     Unknown,
     PrimeOrder,
     FixedGenerators,
@@ -74,6 +74,8 @@ pub mod fs;
 
 #[cfg(test)]
 pub mod tests;
+
+use super::group_hash::GroupHasher;
 
 impl JubjubEngine for Bn256 {
     type Fs = self::fs::Fs;
@@ -346,6 +348,225 @@ impl AltJubjubBn256 {
 
         tmp_params
     }
+
+    pub fn new_with_hasher<H: GroupHasher>() -> Self {
+        let montgomery_a = Fr::from_str("168698").unwrap();
+        let mut montgomery_2a = montgomery_a;
+        montgomery_2a.double();
+
+        let mut tmp_params = AltJubjubBn256 {
+            // d = -(168696/168700)
+            edwards_d: Fr::from_str("12181644023421730124874158521699555681764249180949974110617291017600649128846").unwrap(),
+            // A = 168698
+            montgomery_a: montgomery_a,
+            // 2A = 2.A
+            montgomery_2a: montgomery_2a,
+            // scaling factor = sqrt(4 / (a - d))
+            scale: Fr::from_str("6360561867910373094066688120553762416144456282423235903351243436111059670888").unwrap(),
+
+            // We'll initialize these below
+            pedersen_hash_generators: vec![],
+            pedersen_hash_exp: vec![],
+            pedersen_circuit_generators: vec![],
+            fixed_base_generators: vec![],
+            fixed_base_circuit_generators: vec![],
+        };
+
+        fn find_group_hash<E: JubjubEngine, HH: GroupHasher>(
+            m: &[u8],
+            personalization: &[u8; 8],
+            params: &E::Params
+        ) -> edwards::Point<E, PrimeOrder>
+        {
+            let mut tag = m.to_vec();
+            let i = tag.len();
+            tag.push(0u8);
+
+            loop {
+                let gh = generic_group_hash::<_, HH>(
+                    &tag,
+                    personalization,
+                    params
+                );
+
+                // We don't want to overflow and start reusing generators
+                assert!(tag[i] != u8::max_value());
+                tag[i] += 1;
+
+                if let Some(gh) = gh {
+                    break gh;
+                }
+            }
+        }
+
+        // Create the bases for the Pedersen hashes
+        {
+            let mut pedersen_hash_generators = vec![];
+
+            for m in 0..5 {
+                use byteorder::{WriteBytesExt, LittleEndian};
+
+                let mut segment_number = [0u8; 4];
+                (&mut segment_number[0..4]).write_u32::<LittleEndian>(m).unwrap();
+
+                pedersen_hash_generators.push(
+                    find_group_hash::<_, H>(
+                        &segment_number,
+                        constants::PEDERSEN_HASH_GENERATORS_PERSONALIZATION,
+                        &tmp_params
+                    )
+                );
+            }
+
+            // Check for duplicates, far worse than spec inconsistencies!
+            for (i, p1) in pedersen_hash_generators.iter().enumerate() {
+                if p1 == &edwards::Point::zero() {
+                    panic!("Neutral element!");
+                }
+
+                for p2 in pedersen_hash_generators.iter().skip(i+1) {
+                    if p1 == p2 {
+                        panic!("Duplicate generator!");
+                    }
+                }
+            }
+
+            tmp_params.pedersen_hash_generators = pedersen_hash_generators;
+        }
+
+        // Create the exp table for the Pedersen hash generators
+        {
+            let mut pedersen_hash_exp = vec![];
+
+            for g in &tmp_params.pedersen_hash_generators {
+                let mut g = g.clone();
+
+                let window = tmp_params.pedersen_hash_exp_window_size();
+
+                let mut tables = vec![];
+
+                let mut num_bits = 0;
+                while num_bits <= fs::Fs::NUM_BITS {
+                    let mut table = Vec::with_capacity(1 << window);
+
+                    let mut base = edwards::Point::zero();
+
+                    for _ in 0..(1 << window) {
+                        table.push(base.clone());
+                        base = base.add(&g, &tmp_params);
+                    }
+
+                    tables.push(table);
+                    num_bits += window;
+
+                    for _ in 0..window {
+                        g = g.double(&tmp_params);
+                    }
+                }
+
+                pedersen_hash_exp.push(tables);
+            }
+
+            tmp_params.pedersen_hash_exp = pedersen_hash_exp;
+        }
+
+        // Create the bases for other parts of the protocol
+        {
+            let mut fixed_base_generators = vec![edwards::Point::zero(); FixedGenerators::Max as usize];
+
+            fixed_base_generators[FixedGenerators::ProofGenerationKey as usize] =
+                find_group_hash::<_, H>(&[], constants::PROOF_GENERATION_KEY_BASE_GENERATOR_PERSONALIZATION, &tmp_params);
+
+            fixed_base_generators[FixedGenerators::NoteCommitmentRandomness as usize] =
+                find_group_hash::<_, H>(b"r", constants::PEDERSEN_HASH_GENERATORS_PERSONALIZATION, &tmp_params);
+
+            fixed_base_generators[FixedGenerators::NullifierPosition as usize] =
+                find_group_hash::<_, H>(&[], constants::NULLIFIER_POSITION_IN_TREE_GENERATOR_PERSONALIZATION, &tmp_params);
+
+            fixed_base_generators[FixedGenerators::ValueCommitmentValue as usize] =
+                find_group_hash::<_, H>(b"v", constants::VALUE_COMMITMENT_GENERATOR_PERSONALIZATION, &tmp_params);
+
+            fixed_base_generators[FixedGenerators::ValueCommitmentRandomness as usize] =
+                find_group_hash::<_, H>(b"r", constants::VALUE_COMMITMENT_GENERATOR_PERSONALIZATION, &tmp_params);
+
+            fixed_base_generators[FixedGenerators::SpendingKeyGenerator as usize] =
+                find_group_hash::<_, H>(&[], constants::SPENDING_KEY_GENERATOR_PERSONALIZATION, &tmp_params);
+
+            // Check for duplicates, far worse than spec inconsistencies!
+            for (i, p1) in fixed_base_generators.iter().enumerate() {
+                if p1 == &edwards::Point::zero() {
+                    panic!("Neutral element!");
+                }
+
+                for p2 in fixed_base_generators.iter().skip(i+1) {
+                    if p1 == p2 {
+                        panic!("Duplicate generator!");
+                    }
+                }
+            }
+
+            tmp_params.fixed_base_generators = fixed_base_generators;
+        }
+
+        // Create the 2-bit window table lookups for each 4-bit
+        // "chunk" in each segment of the Pedersen hash
+        {
+            let mut pedersen_circuit_generators = vec![];
+
+            // Process each segment
+            for mut gen in tmp_params.pedersen_hash_generators.iter().cloned() {
+                let mut gen = montgomery::Point::from_edwards(&gen, &tmp_params);
+                let mut windows = vec![];
+                for _ in 0..tmp_params.pedersen_hash_chunks_per_generator() {
+                    // Create (x, y) coeffs for this chunk
+                    let mut coeffs = vec![];
+                    let mut g = gen.clone();
+
+                    // coeffs = g, g*2, g*3, g*4
+                    for _ in 0..4 {
+                        coeffs.push(g.into_xy().expect("cannot produce O"));
+                        g = g.add(&gen, &tmp_params);
+                    }
+                    windows.push(coeffs);
+
+                    // Our chunks are separated by 2 bits to prevent overlap.
+                    for _ in 0..4 {
+                        gen = gen.double(&tmp_params);
+                    }
+                }
+                pedersen_circuit_generators.push(windows);
+            }
+
+            tmp_params.pedersen_circuit_generators = pedersen_circuit_generators;
+        }
+
+        // Create the 3-bit window table lookups for fixed-base
+        // exp of each base in the protocol.
+        {
+            let mut fixed_base_circuit_generators = vec![];
+
+            for mut gen in tmp_params.fixed_base_generators.iter().cloned() {
+                let mut windows = vec![];
+                for _ in 0..tmp_params.fixed_base_chunks_per_generator() {
+                    let mut coeffs = vec![(Fr::zero(), Fr::one())];
+                    let mut g = gen.clone();
+                    for _ in 0..7 {
+                        coeffs.push(g.into_xy());
+                        g = g.add(&gen, &tmp_params);
+                    }
+                    windows.push(coeffs);
+
+                    // gen = gen * 8
+                    gen = g;
+                }
+                fixed_base_circuit_generators.push(windows);
+            }
+
+            tmp_params.fixed_base_circuit_generators = fixed_base_circuit_generators;
+        }
+
+        tmp_params
+    }
 }
 
 #[test]
@@ -374,4 +595,58 @@ fn test_jubjub_altbn256() {
     // ).unwrap();
 
     // assert!(p == q);
+}
+
+#[test]
+fn test_generic_params() {
+    use super::group_hash::BlakeHasher;
+
+    let params = AltJubjubBn256::new();
+    let generic_params = AltJubjubBn256::new_with_hasher::<BlakeHasher>();
+
+    assert!(params.pedersen_hash_generators == generic_params.pedersen_hash_generators);
+    assert!(params.fixed_base_generators == generic_params.fixed_base_generators);
+
+    assert_eq!(params.pedersen_circuit_generators, generic_params.pedersen_circuit_generators);
+    assert_eq!(params.fixed_base_circuit_generators, generic_params.fixed_base_circuit_generators);
+}
+
+#[test]
+fn pretty_print_params_for_blake() {
+    use super::group_hash::BlakeHasher;
+
+    let generic_params = AltJubjubBn256::new_with_hasher::<BlakeHasher>();
+
+    println!("Creating generators using Blake2s");
+
+    println!("Using personalization `{}`", std::str::from_utf8(constants::PEDERSEN_HASH_GENERATORS_PERSONALIZATION).unwrap());
+
+    println!("Pedersen hash generators:");
+
+    for (i, e) in generic_params.pedersen_hash_generators.iter().enumerate() {
+        let (x, y) = e.into_xy();
+        println!("Generator {}", i);
+        println!("X = {}", x);
+        println!("Y = {}", y);
+    }
+}
+
+#[test]
+fn pretty_print_params_for_keccak() {
+    use super::group_hash::Keccak256Hasher;
+
+    let generic_params = AltJubjubBn256::new_with_hasher::<Keccak256Hasher>();
+
+    println!("Creating generators using Keccak256 (Ethereum style)");
+
+    println!("Using personalization `{}`", std::str::from_utf8(constants::PEDERSEN_HASH_GENERATORS_PERSONALIZATION).unwrap());
+
+    println!("Pedersen hash generators:");
+
+    for (i, e) in generic_params.pedersen_hash_generators.iter().enumerate() {
+        let (x, y) = e.into_xy();
+        println!("Generator {}", i);
+        println!("X = {}", x);
+        println!("Y = {}", y);
+    }
 }

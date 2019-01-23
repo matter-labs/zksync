@@ -179,3 +179,35 @@ pub fn generic_group_hash<E: JubjubEngine, H: GroupHasher>(
         Err(_) => None
     }
 }
+
+#[test]
+fn test_generic_hash() {
+    use pairing::bn256::Bn256;
+    use alt_babyjubjub::JubjubEngine;
+    use alt_babyjubjub::AltJubjubBn256;
+
+    let personalization = b"Hello123";
+    let params = AltJubjubBn256::new();
+    for t in 0u8..=255u8 {
+        let tag = [t];
+        let blake_point = baby_group_hash::<Bn256>(&tag, &personalization[..], &params);
+        let generic_point = generic_group_hash::<Bn256, BlakeHasher>(&tag, &personalization[..], &params);
+        assert!(blake_point == generic_point);
+    }
+}
+
+#[test]
+fn test_export_blake_generators() {
+    use pairing::bn256::Bn256;
+    use alt_babyjubjub::JubjubEngine;
+    use alt_babyjubjub::AltJubjubBn256;
+
+    let personalization = b"Hello123";
+    let params = AltJubjubBn256::new();
+    for t in 0u8..=255u8 {
+        let tag = [t];
+        let blake_point = baby_group_hash::<Bn256>(&tag, &personalization[..], &params);
+        let generic_point = generic_group_hash::<Bn256, BlakeHasher>(&tag, &personalization[..], &params);
+        assert!(blake_point == generic_point);
+    }
+}
