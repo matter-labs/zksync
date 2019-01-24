@@ -33,6 +33,7 @@ pub mod redjubjub;
 pub mod baby_util;
 pub mod util;
 pub mod eddsa;
+pub mod interpolation;
 
 extern crate serde;
 #[macro_use]
