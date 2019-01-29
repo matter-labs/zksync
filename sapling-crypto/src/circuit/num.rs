@@ -460,28 +460,13 @@ impl<E: Engine> AllocatedNum<E> {
             coeff.double();
         }
 
-        // let top_bits_value = AllocatedNum::alloc(
-        //     cs.namespace(|| "allocate top bits"),
-        //     || Ok(top_bits_lc.get_value().get()?)
-        // ).unwrap();
-
         // enforce packing and zeroness
-
         cs.enforce(
             || "repack top bits",
             |lc| lc,
             |lc| lc + CS::one(),
             |_| top_bits_lc.lc(E::Fr::one())
         );
-
-        // enforce top bits to be zero
-        // cs.enforce(
-        //     || "repack top bits",
-        //     |lc| lc + top_bits_value.get_variable(),
-        //     |lc| lc + CS::one(),
-        //     |_| top_bits_lc.lc(E::Fr::one())
-        // );
-
 
         Ok(())
     }
@@ -523,6 +508,30 @@ impl<E: Engine> Num<E> {
 
     pub fn lc(&self, coeff: E::Fr) -> LinearCombination<E> {
         LinearCombination::zero() + (coeff, &self.lc)
+    }
+
+    pub fn add_number_with_coeff(
+        self,
+        variable: &AllocatedNum<E>,
+        coeff: E::Fr
+    ) -> Self
+    {
+        let newval = match (self.value, variable.get_value()) {
+            (Some(mut curval), Some(val)) => {
+                let mut tmp = val;
+                tmp.mul_assign(&coeff);
+
+                curval.add_assign(&tmp);
+
+                Some(curval)
+            },
+            _ => None
+        };
+
+        Num {
+            value: newval,
+            lc: self.lc + (coeff, variable.get_variable())
+        }
     }
 
     pub fn add_bool_with_coeff(

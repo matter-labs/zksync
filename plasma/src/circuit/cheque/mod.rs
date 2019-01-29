@@ -23,6 +23,7 @@ use sapling_crypto::circuit::{
     multipack,
     baby_eddsa,
     float_point,
+    polynomial_lookup
 };
 
 pub mod bitwindow;

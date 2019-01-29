@@ -1173,16 +1173,16 @@ fn apply_transaction<E, CS>(
 }
 
 
-fn print_boolean_vector(vector: &[boolean::Boolean]) {
-    for b in vector {
-        if b.get_value().unwrap() {
-            print!("1");
-        } else {
-            print!("0");
-        }
-    }
-    print!("\n");
-}
+// fn print_boolean_vector(vector: &[boolean::Boolean]) {
+//     for b in vector {
+//         if b.get_value().unwrap() {
+//             print!("1");
+//         } else {
+//             print!("0");
+//         }
+//     }
+//     print!("\n");
+// }
 
 #[test]
 fn test_bits_into_fr(){
