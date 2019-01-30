@@ -74,9 +74,6 @@ fn print_boolean_vector(vector: &[boolean::Boolean]) {
     print!("\n");
 }
 
-// TODO: Update the start in case of shift
-
-
 // generate a set of lookup polynomials
 // - first one outputs a bitmask for a shift (shift by 1 bit -> mask is 0x000000....1 as Fr)
 // - second one outputs just a bit 1 or 0 that tells that this distance is correct (outputs 1 or 0)
@@ -165,11 +162,38 @@ fn generate_correctness_polynomial<E: JubjubEngine>(min_valid: u128, max_valid: 
     interpolation
 }
 
+// make a polynomial that it's for a range of `i` in [min_with_shift, max_with_shift] outputs `2^(i+1-min_with_shift) - 1`,
+// and for [min_no_shift, min_with_shift) outputs 0
+fn generate_start_adjustment_polynomial<E: JubjubEngine>(min_no_shift: u128, min_with_shift: u128, max_with_shift: u128) -> Vec<E::Fr> {
+    use sapling_crypto::interpolation::interpolate;
+
+    let mut points: Vec<(E::Fr, E::Fr)> = vec![];
+    for i in min_no_shift..min_with_shift {
+        let x = E::Fr::from_str(&i.to_string()).unwrap();
+        let y = E::Fr::zero();
+        points.push((x,y));
+    }
+
+    let mut shift = E::Fr::one();
+    for i in min_with_shift..=max_with_shift {
+        let x = E::Fr::from_str(&i.to_string()).unwrap();
+        let y = shift;
+        points.push((x,y));
+
+        shift.add_assign(&E::Fr::one());
+    }
+    let interpolation = interpolate::<E>(&points[..]).expect("must interpolate");
+    assert_eq!(interpolation.len(), (max_with_shift+1) as usize);
+
+    interpolation
+}
+
 impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
     fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError>
     {
         let bitfield_length = 128u128;
         let shift_length = 64u128;
+        let log_shift_length = 6;
 
         // distance in range [0, 127] is without shift
         // distance [128, 191] is with shift
@@ -257,6 +281,9 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
         let valid_distance_lookup_coeffs = generate_correctness_polynomial::<E>(0u128, bitfield_length + shift_length - 1u128, (1u128 << lookup_argument_bit_width) - 1u128);
         assert_eq!(valid_distance_lookup_coeffs.len(), lookup_polynomial_length as usize);
 
+        let start_adjustment_lookup_coeffs = generate_start_adjustment_polynomial::<E>(0u128, bitfield_length, max_valid_distance);
+        assert_eq!(start_adjustment_lookup_coeffs.len(), (bitfield_length + shift_length) as usize);
+
         let is_valid = do_the_lookup(
             cs.namespace(|| "lookup distance validity"), 
             &valid_distance_lookup_coeffs,
@@ -288,12 +315,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
         // mask_bits.truncate(bitfield_length as usize);
 
         let mut masked_bits: Vec<boolean::Boolean> = vec![];
-        // println!("Mask");
-        // print_boolean_vector(&mask_bits);
-
-        // println!("Field");
-        // print_boolean_vector(&current_bits);
-
         assert_eq!(current_bits.len(), mask_bits.len());
 
         // mask the field bits to further make a shift. This is basically bitfield mod 2^shift
@@ -306,9 +327,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
             
             masked_bits.push(bit);
         }
-
-        // println!("Masked result");
-        // print_boolean_vector(&masked_bits);
 
         // repack remainder before shifting 
         let mut masked_lc = Num::<E>::zero();
@@ -348,10 +366,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
             |lc| lc + current_bits_fe.get_variable() - remainder.get_variable()
         );
 
-        // let quot_bits = quotient.into_bits_le(cs.namespace(|| "quot bits"))?;
-        // println!("Quotient");
-        // print_boolean_vector(&quot_bits);
-
         let mut shifted_quotient = quotient.clone();
 
         // do the bitshifting
@@ -390,13 +404,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
 
         let shifted_bits = shifted_quotient.into_bits_le(cs.namespace(|| "get shifted register bits"))?;
 
-        // println!("Shifted quotient");
-        // print_boolean_vector(&shifted_bits);
-
-        // println!("Initial register = {}", current_bits_fe.get_value().unwrap());
-        // println!("Mask = {}", mask_fe.get_value().unwrap());
-        // println!("Masked register = {}", quotient.get_value().unwrap());
-        // println!("Shifted register = {}", shifted_quotient.get_value().unwrap());
         let bit_position_bits = bit_position_fe.into_bits_le(cs.namespace(|| "get bit of interest mask bits"))?;
 
         for (i, (reg_bit, position_bit)) in shifted_bits.iter().zip(bit_position_bits.iter()).enumerate() {
@@ -434,6 +441,40 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
             |lc| lc + shifted_quotient.get_variable() + bit_position_fe.get_variable()
         );
 
+        let start_adjustment = do_the_lookup(
+            cs.namespace(|| "create start adjustment"),
+            &start_adjustment_lookup_coeffs,
+            &distance_powers[0..((bitfield_length + shift_length) as usize)]
+        )?;
+
+        // start_adjustment.limit_number_of_bits(
+        //     cs.namespace(|| "limit number of bits in the start change"),
+        //     log_shift_length + 1
+        // )?;
+
+        let new_start = AllocatedNum::alloc(
+            cs.namespace(|| "allocate new start"),
+            || {
+                let mut new_val = start.get_value().get()?.clone();
+                let shift = start_adjustment.get_value().get()?.clone();
+                new_val.add_assign(&shift);
+
+                Ok(new_val)
+            }
+        )?;
+
+        cs.enforce(
+            || "enforce new start",
+            |lc| lc + new_start.get_variable(),
+            |lc| lc + CS::one(),
+            |lc| lc + start.get_variable() + start_adjustment.get_variable()
+        );
+
+        new_start.limit_number_of_bits(
+            cs.namespace(|| "limit number of bits for a new start"),
+            32
+        )?;
+
         Ok(())
 
 
@@ -461,7 +502,7 @@ fn test_redeem() {
 
     let start = 0u128;
 
-    for bit_of_interest in 128u128..=max_valid_distance {
+    for bit_of_interest in 0u128..=max_valid_distance {
         let mut cs = TestConstraintSystem::<Bn256>::new();
 
         let bottom_bits: u64 = rng.gen();
@@ -509,6 +550,93 @@ fn test_redeem() {
             println!("Satisfied for bit = {}", bit_of_interest);
         }
     }
+}
+
+#[test]
+fn test_redeem_proof_generation() {
+    use ff::{Field, BitIterator};
+    use pairing::bn256::*;
+    use rand::{SeedableRng, Rng, XorShiftRng, Rand};
+    use sapling_crypto::circuit::test::*;
+    use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
+    use crate::circuit::utils::{encode_fs_into_fr, be_bit_vector_into_bytes};
+    use crate::primitives::GetBits;
+    extern crate hex;
+    use bellman::groth16::{generate_random_parameters, create_random_proof, verify_proof, prepare_verifying_key};
+
+    let mut rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+
+    let params = &AltJubjubBn256::new();
+
+    let bitfield_length = 128u128;
+    let shift_length = 64u128;
+    let max_valid_distance = bitfield_length + shift_length - 1u128;
+
+    let start = 0u128;
+
+    let bit_of_interest = 129u128;
+
+    let mut cs = TestConstraintSystem::<Bn256>::new();
+
+    let bottom_bits: u64 = rng.gen();
+    let top_bits: u64 = rng.gen();
+
+    let mut existing_field: u128 = (u128::from(top_bits) << 64) + u128::from(bottom_bits);
+    if bit_of_interest < bitfield_length {
+        let mask = 1u128 << bit_of_interest;
+
+        if existing_field & mask > 0 {
+            existing_field -= mask;
+        }
+        assert!(existing_field & mask == 0u128);
+    }
+
+    let witness = BitWindowWitness {
+        bits: Fr::from_str(&existing_field.to_string()),
+
+        start: Fr::from_str(&start.to_string()),
+    };
+
+    let number = BitNumber {
+        number: Fr::from_str(&bit_of_interest.to_string()),
+    };
+
+    let instance = BitSet {
+        params: params,
+
+        action: (number, witness),
+    };
+
+    let parameters = {
+        let w = BitWindowWitness::<Bn256> {
+            bits: None,
+            start: None,
+        };
+
+        let n = BitNumber::<Bn256> {
+            number: None
+        };
+
+        let inst = BitSet::<Bn256> {
+            params: params,
+
+            action: (n, w),
+        };
+
+        let p = generate_random_parameters::<Bn256, _, _>(inst, &mut rng).expect("must generate parameters");
+
+        p
+    };
+
+    let proof = create_random_proof::<Bn256, _, _, _>(instance, &parameters, &mut rng).expect("must generate proof");
+
+    let pvk = prepare_verifying_key(&parameters.vk);
+
+    let inputs: Vec<Fr> = vec![];
+
+    let valid = verify_proof(&pvk, &proof, &inputs).expect("must verify proof");
+
+    assert!(valid);
 }
 
 #[test]
