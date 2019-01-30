@@ -463,6 +463,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
             }
         )?;
 
+        println!("New start = {}", new_start.get_value().unwrap());
+
         cs.enforce(
             || "enforce new start",
             |lc| lc + new_start.get_variable(),
@@ -476,8 +478,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
         )?;
 
         Ok(())
-
-
     }
 }
 
@@ -553,7 +553,7 @@ fn test_redeem() {
 }
 
 #[test]
-fn test_redeem_proof_generation() {
+fn test_proof_generation() {
     use ff::{Field, BitIterator};
     use pairing::bn256::*;
     use rand::{SeedableRng, Rng, XorShiftRng, Rand};
@@ -575,8 +575,6 @@ fn test_redeem_proof_generation() {
     let start = 0u128;
 
     let bit_of_interest = 129u128;
-
-    let mut cs = TestConstraintSystem::<Bn256>::new();
 
     let bottom_bits: u64 = rng.gen();
     let top_bits: u64 = rng.gen();
