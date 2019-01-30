@@ -463,8 +463,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
             }
         )?;
 
-        println!("New start = {}", new_start.get_value().unwrap());
-
         cs.enforce(
             || "enforce new start",
             |lc| lc + new_start.get_variable(),
