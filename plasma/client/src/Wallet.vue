@@ -3,7 +3,7 @@
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
         <b-navbar-toggle target="nav_collapse"></b-navbar-toggle>
-        <b-navbar-brand>Ignis Wallet <span style="font-size: 0.4em">ALPHA</span></b-navbar-brand>
+        <b-navbar-brand>Matter Network Wallet <span style="font-size: 0.4em">ALPHA</span></b-navbar-brand>
         <b-collapse is-nav id="nav_collapse">
             <b-navbar-nav>
                 <!-- <b-nav-item href="#" active>Account</b-nav-item> -->
@@ -27,10 +27,10 @@
         <p>Warning: this software is for demo purposes only. Database and smart contracts might be reset from time to time, with all test coins lost!</p>
         <b-row>
             <b-col sm="6" order="2" class="col-xl-8 col-lg-7 col-md-6 col-sm-12">
-                <b-card title="Transfer in Ignis" class="mb-4 d-flex">
+                <b-card title="Transfer in Matter Network" class="mb-4 d-flex">
                     <label for="transferToInput">To (recepient ETH address):</label>
                     <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0" autocomplete="off"></b-form-input>
-                    <p class="mt-2" style="color: grey">Note: your recipient must register in Ignis first. For testing you can also use 0x6394b37cf80a7358b38068f0ca4760ad49983a1b, we're happy to accept your testcoins! :)</p>
+                    <p class="mt-2" style="color: grey">Note: your recipient must register in Matter Network first. For testing you can also use 0x6394b37cf80a7358b38068f0ca4760ad49983a1b, we're happy to accept your testcoins! :)</p>
                     <label for="transferAmountInput" class="mt-4">Amount</label>
                             (max ETH <a href="#" @click="transferAmount=store.account.plasma.committed.balance">{{store.account.plasma.committed.balance || 0}}</a>):
                     <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
@@ -87,7 +87,7 @@
                         </b-col>
                     </b-row>
                     <b-card class="mt-2">
-                        <p class="mb-2"><strong>Ignis</strong>
+                        <p class="mb-2"><strong>Matter Network</strong>
                             (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+store.contractAddress"
                             target="blanc">contract</a>)</p>
 
@@ -224,7 +224,7 @@ export default {
         },
         //baseUrl: () => web3.version.network === '4' ? 'https://api.plasma-winter.io' : 'http://localhost:80',
         baseUrl: () => 'https://api.plasma-winter.io',
-        // baseUrl: () => 'https://api.ignis.thematter.io',
+        // baseUrl: () => 'https://api.Matter Network.thematter.io',
         store: () => store,
         contractAddress: () => window.contractAddress,
         depositProblem() {
@@ -238,23 +238,23 @@ export default {
                 + this.depositAmount + " > " + store.account.balance
         }, 
         withdrawProblem() {
-            if(!(Number(store.account.plasma.committed.balance) > 0)) return "empty balance in the Ignis account"
-            if(!(Number(store.account.plasma.verified.balance) > 0)) return "empty balance in the Ignis account"
+            if(!(Number(store.account.plasma.committed.balance) > 0)) return "empty balance in the Matter Network account"
+            if(!(Number(store.account.plasma.verified.balance) > 0)) return "empty balance in the Matter Network account"
         },
         doWithdrawProblem() {
             if(this.depositProblem) return this.depositProblem
-            if(Number(this.withdrawAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Ignis balance"
-            if(Number(this.nonce) < Number(store.account.plasma.committed.nonce)) return "nonce must be greater then confirmed in Ignis: got " 
+            if(Number(this.withdrawAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Matter Network balance"
+            if(Number(this.nonce) < Number(store.account.plasma.committed.nonce)) return "nonce must be greater then confirmed in Matter Network: got " 
                 + this.nonce + ", expected >= " + store.account.plasma.committed.nonce
         },
         transferProblem() {
-            if(!store.account.plasma.id) return "no Ignis account exists yet"
-            if(!(Number(store.account.plasma.committed.balance) > 0)) return "Ignis account has empty balance"
-            if(!(Number(store.account.plasma.verified.balance) > 0)) return "empty balance in the Ignis account"
+            if(!store.account.plasma.id) return "no Matter Network account exists yet"
+            if(!(Number(store.account.plasma.committed.balance) > 0)) return "Matter Network account has empty balance"
+            if(!(Number(store.account.plasma.verified.balance) > 0)) return "empty balance in the Matter Network account"
             if(!ethUtil.isHexString(this.transferTo)) return "`To` is not a valid ethereum address: " + this.transferTo
             if(!(this.transferAmount > 0)) return "positive amount required, e.g. 100.55"
-            if(Number(this.transferAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Ignis balance"
-            if(Number(this.nonce) < Number(store.account.plasma.committed.nonce)) return "nonce must be greater then confirmed in Ignis: got " 
+            if(Number(this.transferAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Matter Network balance"
+            if(Number(this.nonce) < Number(store.account.plasma.committed.nonce)) return "nonce must be greater then confirmed in Matter Network: got " 
                 + this.nonce + ", expected >= " + store.account.plasma.committed.nonce
         },
         pendingWithdraw: () => Number(store.account.onchain.balance) > 0,
