@@ -222,8 +222,10 @@ export default {
         isTestnet() {
             return this.network === '4' || this.network === '1335'
         },
-        //baseUrl: () => web3.version.network === '4' ? 'https://api.plasma-winter.io' : 'http://localhost:80',
-        baseUrl: () => 'https://api.plasma-winter.io',
+        baseUrl() {
+            return this.isDev ? 'http://localhost:3000' : 'https://api.plasma-winter.io'
+        },
+        //baseUrl: () => 'https://api.plasma-winter.io',
         // baseUrl: () => 'https://api.Matter Network.thematter.io',
         store: () => store,
         contractAddress: () => window.contractAddress,
