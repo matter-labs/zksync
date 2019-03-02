@@ -122,7 +122,13 @@ To stop:
 ./stop.sh
 ```
 
-## Deploy client
+## Running client
+
+### Run locally
+
+See [client/README.md]
+
+### Deploy to server
 
 ```
 ./scripts/deploy-client
