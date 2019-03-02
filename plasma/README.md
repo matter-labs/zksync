@@ -48,6 +48,10 @@ mv -f *_pk.key ./server/
 
 If the pregenerated leaf format changes, replace the `EMPTY_TREE_ROOT` constant in `contracts/contracts/PlasmaStorage.sol`.
 
+## Web3 provider
+
+In the `server/.env` set up `CHAIN_ID` and `WEB3_URL` accordingly.
+
 ## Contratcs
 
 ### Install truffle and dependencies:
@@ -72,7 +76,8 @@ So you need to rebuild the code on every change (to be automated soon).
 After the keys have been generated and copied to contracts:
 
 - copy `contracts/scripts/deploy_example.sh` to `contracts/deploy.sh`
-- add mnemonics and infura id
+- add mnemonics
+- add infura id to `WEB3_URL` as: `WEB3_URL=https://rinkeby.infura.io/{infura_project_id}` (optional, seems to work without it too)
 - launch `./deploy.sh`
 
 Update addresses (make sure to exclude 0x !):
