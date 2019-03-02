@@ -5,7 +5,7 @@
         Matter Network Wallet <span style="font-size: 0.3em"><strong>ALPHA</strong></span>
     </template>
     <template slot="lead">
-        <span v-if="isDev" class="local">Running on local testnet, API at http://localhost:3000</span>
+        <span v-if="isDev" class="local">Running server locally, API at http://localhost:3000</span>
         <span v-else></span>
     </template>
     <hr class="my-4">
@@ -67,8 +67,8 @@ export default {
 }
 
 .local {
-    color: white;
-    background: blue;
+    color: yellow;
+    background: navy;
     padding: 0.5em;
     margin: 1em;
 }
