@@ -219,28 +219,30 @@ pub fn start_api_server(tx_to_mempool: mpsc::Sender<MempoolRequest>,
             }.clone()) // <- create app with shared state
                 // enable logger
                 .middleware(middleware::Logger::default())
-                // enable CORS
-                .configure(|app| {
-                    Cors::for_app(app)
-                        .send_wildcard()
-                        .max_age(3600)
-                        .resource("/send", |r| {
-                            r.method(Method::POST).f(handle_send_transaction);
-                            r.method(Method::OPTIONS).f(|_| HttpResponse::Ok());
-                            r.method(Method::GET).f(|_| HttpResponse::Ok());
-                        })
-                        .resource("/account/{id}", |r| {
-                            r.method(Method::POST).f(|_| HttpResponse::Ok());
-                            r.method(Method::OPTIONS).f(|_| HttpResponse::Ok());
-                            r.method(Method::GET).f(handle_get_state);
-                        })
-                        .resource("/details", |r| {
-                            r.method(Method::POST).f(|_| HttpResponse::Ok());
-                            r.method(Method::OPTIONS).f(|_| HttpResponse::Ok());
-                            r.method(Method::GET).f(handle_get_details);
-                        })
-                        .register()
+                .middleware(Cors::build()
+                    .send_wildcard()
+                    .max_age(3600)
+                    .finish())
+                .scope("/api/v0.1", |api_scope| {
+                    api_scope
+                    //enable CORS
+                    .resource("/submit_tx", |r| {
+                        r.method(Method::POST).f(handle_send_transaction);
+                        r.method(Method::OPTIONS).f(|_| HttpResponse::Ok());
+                        r.method(Method::GET).f(|_| HttpResponse::Ok());
+                    })
+                    .resource("/account/{id}", |r| {
+                        r.method(Method::POST).f(|_| HttpResponse::Ok());
+                        r.method(Method::OPTIONS).f(|_| HttpResponse::Ok());
+                        r.method(Method::GET).f(handle_get_state);
+                    })
+                    .resource("/testnet_config", |r| {
+                        r.method(Method::POST).f(|_| HttpResponse::Ok());
+                        r.method(Method::OPTIONS).f(|_| HttpResponse::Ok());
+                        r.method(Method::GET).f(handle_get_details);
+                    })
                 })
+                //.register()
         }).bind(&server_config)
         .unwrap()
         .shutdown_timeout(1)

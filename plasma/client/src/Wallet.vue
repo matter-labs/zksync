@@ -201,7 +201,7 @@ export default {
         console.log('start')
         let result = await axios({
             method: 'get',
-            url:    this.baseUrl + '/details',
+            url:    this.baseUrl + '/testnet_config',
         })
         if(!result.data) throw "Can not load contract address"
         store.contractAddress = result.data.address
@@ -224,7 +224,7 @@ export default {
             return this.network === '4' || this.network === '1335'
         },
         baseUrl() {
-            return this.isDev ? 'http://localhost:3000' : 'https://api.plasma-winter.io'
+            return (this.isDev ? 'http://localhost:3000' : 'https://api.plasma-winter.io') + '/api/v0.1'
         },
         //baseUrl: () => 'https://api.plasma-winter.io',
         // baseUrl: () => 'https://api.Matter Network.thematter.io',
@@ -337,7 +337,7 @@ export default {
             const apiForm = transactionLib.createTransaction(from, to, amount, fee, nonce, good_until_block, privateKey);
             const result = await axios({
                 method:     'post',
-                url:        this.baseUrl + '/send',
+                url:        this.baseUrl + '/submit_tx',
                 data:       apiForm
             });
             if(result.data.accepted) {

@@ -114,7 +114,7 @@ cd server
 ./launch.sh
 ```
 
-To stop:
+To stop (Note, that Ctrl+C won't work! You need to run stop from a new terminal):
 
 ```shell
 ./stop.sh
