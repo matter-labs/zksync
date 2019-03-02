@@ -64,7 +64,7 @@ pub struct AppState {
     connection_pool: ConnectionPool
 }
 
-fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let tx_to_mempool = req.state().tx_to_mempool.clone();
     let tx_for_state = req.state().tx_for_state.clone();
     req.json()
@@ -130,7 +130,7 @@ fn handle_send_transaction(req: &HttpRequest<AppState>) -> Box<Future<Item = Htt
 
 use actix_web::Result as ActixResult;
 
-fn handle_get_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let tx_to_mempool = req.state().tx_to_mempool.clone();
     let tx_for_state = req.state().tx_for_state.clone();
     let pool = req.state().connection_pool.clone();
@@ -185,12 +185,16 @@ fn handle_get_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     Ok(HttpResponse::Ok().json(response))
 }
 
-fn handle_get_details(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+fn handle_get_testnet_config(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let address = req.state().contract_address.clone();
 
     Ok(HttpResponse::Ok().json(DetailsResponse{
         address: format!("0x{}", address)
     }))
+}
+
+fn handle_get_account_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    Ok(HttpResponse::Ok().json("{}"))
 }
 
 pub fn start_api_server(tx_to_mempool: mpsc::Sender<MempoolRequest>, 
@@ -203,7 +207,6 @@ pub fn start_api_server(tx_to_mempool: mpsc::Sender<MempoolRequest>,
     let port = env::var("PORT").unwrap_or("8080".to_string());
     let contract_address = env::var("CONTRACT_ADDR").unwrap();
 
-
     std::thread::Builder::new().name("api_server".to_string()).spawn(move || {
         ::std::env::set_var("RUST_LOG", "actix_web=info");
         let sys = actix::System::new("ws-example");
@@ -211,38 +214,36 @@ pub fn start_api_server(tx_to_mempool: mpsc::Sender<MempoolRequest>,
 
         //move is necessary to give closure below ownership
         server::new(move || {
-            App::with_state(AppState {
-                tx_to_mempool: tx_to_mempool.clone(),
-                tx_for_state: tx_for_state.clone(),
-                contract_address: contract_address.clone(),
-                connection_pool: connection_pool.clone(),
-            }.clone()) // <- create app with shared state
-                // enable logger
-                .middleware(middleware::Logger::default())
-                .middleware(Cors::build()
+            App::with_state(
+                AppState {
+                    tx_to_mempool: tx_to_mempool.clone(),
+                    tx_for_state: tx_for_state.clone(),
+                    contract_address: contract_address.clone(),
+                    connection_pool: connection_pool.clone(),
+                }.clone()
+            ) // <- create app with shared state
+            .middleware( middleware::Logger::default() )
+            .middleware(
+                Cors::build()
                     .send_wildcard()
                     .max_age(3600)
-                    .finish())
-                .scope("/api/v0.1", |api_scope| {
-                    api_scope
-                    //enable CORS
-                    .resource("/submit_tx", |r| {
-                        r.method(Method::POST).f(handle_send_transaction);
-                        r.method(Method::OPTIONS).f(|_| HttpResponse::Ok());
-                        r.method(Method::GET).f(|_| HttpResponse::Ok());
-                    })
-                    .resource("/account/{id}", |r| {
-                        r.method(Method::POST).f(|_| HttpResponse::Ok());
-                        r.method(Method::OPTIONS).f(|_| HttpResponse::Ok());
-                        r.method(Method::GET).f(handle_get_state);
-                    })
-                    .resource("/testnet_config", |r| {
-                        r.method(Method::POST).f(|_| HttpResponse::Ok());
-                        r.method(Method::OPTIONS).f(|_| HttpResponse::Ok());
-                        r.method(Method::GET).f(handle_get_details);
-                    })
+                    .finish()
+            )
+            .scope("/api/v0.1", |api_scope| {
+                api_scope
+                .resource("/testnet_config", |r| {
+                    r.method(Method::GET).f(handle_get_testnet_config);
                 })
-                //.register()
+                .resource("/submit_tx", |r| {
+                    r.method(Method::POST).f(handle_submit_tx);
+                })
+                .resource("/account/{id}", |r| {
+                    r.method(Method::GET).f(handle_get_account_state);
+                })
+                .resource("/account/{id}/transactions", |r| {
+                    r.method(Method::GET).f(handle_get_account_transactions);
+                })
+            })
         }).bind(&server_config)
         .unwrap()
         .shutdown_timeout(1)
