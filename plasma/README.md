@@ -2,6 +2,15 @@
 
 Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 
+## Prerequisite
+
+Install the latest rust version (>= 1.32):
+
+```
+rustc --version
+rustc 1.32.0-nightly (21f268495 2018-12-02)
+```
+
 ## Setup postgres database
 
 ### Testing
