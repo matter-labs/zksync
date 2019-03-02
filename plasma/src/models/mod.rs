@@ -23,6 +23,7 @@ pub type DepositBlock = block::Block<DepositTx>;
 pub type ExitBlock = block::Block<ExitTx>;
 
 pub type PublicKey = eddsa::PublicKey<Engine>;
+pub type PrivateKey = eddsa::PrivateKey<Engine>;
 
 pub type AccountMap = fnv::FnvHashMap<u32, Account>;
 

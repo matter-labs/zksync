@@ -24,6 +24,9 @@ use std::sync::mpsc::{Sender, Receiver};
 use fnv::{FnvHashMap, FnvHashSet};
 use bigdecimal::{BigDecimal, ToPrimitive};
 use ff::{PrimeField, PrimeFieldRepr};
+use bigdecimal::Zero;
+
+use std::io::BufReader;
 
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
@@ -248,14 +251,37 @@ impl PlasmaStateKeeper {
             }
         }
 
-        if do_padding && applied_transactions.len() > 0 {
-            unimplemented!()
-            // TODO: implement padding
-        }
-
         println!("Added to response, affected accounts = {}", response.affected_accounts.len());
-
         assert_eq!(applied_transactions.len(), response.included.len());
+
+        if /* do_padding && */ applied_transactions.len() > 0 {
+
+            println!("padding transactions");
+            let pk_bytes = hex::decode("8ea0225bbf7f3689eb8ba6f8d7bef3d8ae2541573d71711a28d5149807b40805").unwrap();
+            let private_key: PrivateKey<Bn256> = PrivateKey::read(BufReader::new(pk_bytes.as_slice())).unwrap();
+            let padding_account_id = 2;
+
+            let to_pad = config::TRANSFER_BATCH_SIZE - applied_transactions.len();
+            for i in 0..to_pad {
+                let nonce = self.account(padding_account_id).nonce;
+                let tx = TransferTx::create_signed_tx(
+                    padding_account_id, // from
+                    0, // to
+                    BigDecimal::zero(), // amount
+                    BigDecimal::zero(), // fee
+                    nonce, // nonce
+                    2147483647, // good until max_block
+                    &private_key
+                );
+
+                let pub_key = self.state.get_pub_key(padding_account_id).expect("public key must exist for padding account");
+                assert!( tx.verify_sig(&pub_key) );
+                println!("padding tx verified, nonce = {}", nonce);
+
+                self.state.apply_transfer(&tx).expect("padding must always be applied correctly");
+                applied_transactions.push(tx);
+            }
+        }
 
         if applied_transactions.len() != config::TRANSFER_BATCH_SIZE {
             // some transactions were rejected, revert state
@@ -358,4 +384,29 @@ pub fn start_state_keeper(mut sk: PlasmaStateKeeper,
     std::thread::Builder::new().name("state_keeper".to_string()).spawn(move || {
         sk.run(rx_for_blocks, tx_for_commitments)
     });
+}
+
+
+#[test]
+fn test_read_private_key() {
+    let pk_bytes = hex::decode("8ea0225bbf7f3689eb8ba6f8d7bef3d8ae2541573d71711a28d5149807b40805").unwrap();
+    let private_key: PrivateKey<Bn256> = PrivateKey::read(BufReader::new(pk_bytes.as_slice())).unwrap();
+
+    let padding_account_id = 2;
+
+    let nonce = 0;
+    let tx = TransferTx::create_signed_tx(
+        padding_account_id, // from
+        0, // to
+        BigDecimal::zero(), // amount
+        BigDecimal::zero(), // fee
+        nonce, // nonce
+        2147483647, // good until max_block
+        &private_key
+    );
+
+    //let pub_key = PublicKey::from_private(private_key, FixedGenerators::SpendingKeyGenerator, &params::JUBJUB_PARAMS as &sapling_crypto::alt_babyjubjub::AltJubjubBn256);
+    //assert!( tx.verify_sig(&pub_key) );
+
+
 }

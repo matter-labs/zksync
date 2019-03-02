@@ -4,15 +4,15 @@ use sapling_crypto::jubjub::{JubjubEngine, FixedGenerators, edwards, Unknown};
 use sapling_crypto::circuit::float_point::{convert_to_float};
 use sapling_crypto::eddsa::{Signature};
 use crate::models::circuit::sig::TransactionSignature;
-use super::PublicKey;
+use super::{PublicKey, PrivateKey};
 use crate::models::params;
 use ff::{PrimeField};
 use super::{Fr, Engine};
-use crate::circuit::utils::{encode_fr_into_fs, le_bit_vector_into_field_element};
+use crate::circuit::utils::{encode_fr_into_fs, encode_fs_into_fr, le_bit_vector_into_field_element};
 use crate::models::circuit::transfer::{Tx};
 use crate::models::circuit::deposit::{DepositRequest};
 use crate::models::circuit::exit::{ExitRequest};
-use rustc_hex::ToHex;
+use ff::Field;
 
 use std::cmp::{Ord, PartialEq, PartialOrd, Eq, Ordering};
 
@@ -98,6 +98,52 @@ impl TransferTx {
         Some(as_bytes)
     }
 
+    pub fn create_signed_tx(
+        from:               u32,
+        to:                 u32,
+        amount:             BigDecimal,
+        fee:                BigDecimal,
+        nonce:              u32,
+        good_until_block:   u32,
+        private_key:        &PrivateKey
+    ) -> Self {
+
+        let tx = TransferTx {
+            from,
+            to,
+            amount: amount.clone(),
+            fee: fee.clone(),
+            nonce,
+            good_until_block,
+            signature: TxSignature{
+                r_x: Fr::zero(), 
+                r_y: Fr::zero(), 
+                s: Fr::zero()
+            },
+            cached_pub_key: None,       
+        };
+
+        let message_bits = tx.message_bits();
+        let as_bytes = pack_bits_into_bytes(message_bits);
+
+        let rng = &mut rand::thread_rng();
+        let p_g = FixedGenerators::SpendingKeyGenerator;
+
+        let signature = TxSignature::from(private_key.sign_raw_message(&as_bytes, rng, p_g, &params::JUBJUB_PARAMS, as_bytes.len()));
+        let cached_pub_key = Some( PublicKey::from_private(&private_key, p_g, &params::JUBJUB_PARAMS) );
+
+        TransferTx {
+            from,
+            to,
+            amount,
+            fee,
+            nonce,
+            good_until_block,
+            signature,
+            cached_pub_key,       
+        }
+    }
+
     pub fn verify_sig(
             &self, 
             public_key: &PublicKey
@@ -173,6 +219,16 @@ impl TxSignature{
             r_y: y,
             s: signature.s
         })
+    }
+
+    pub fn from(
+        signature: Signature<Engine>,
+    ) -> Self {
+
+        let (r_x, r_y) = signature.r.into_xy();
+        let s = encode_fs_into_fr::<Engine>(signature.s);
+
+        Self{ r_x, r_y, s }
     }
 
     pub fn to_jubjub_eddsa(

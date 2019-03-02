@@ -17,11 +17,11 @@ pub fn run() {
     let (tx_for_proof_requests, rx_for_proof_requests) = channel();
     let (tx_for_ops, rx_for_ops) = channel();
 
-let connection_pool = ConnectionPool::new();
-let state_keeper = PlasmaStateKeeper::new(connection_pool.clone());
-let mem_pool = MemPool::new(&state_keeper);
-let prover = BabyProver::create(connection_pool.clone()).unwrap();
-let eth_watch = EthWatch::new(0, 0, connection_pool.clone());
+    let connection_pool = ConnectionPool::new();
+    let state_keeper = PlasmaStateKeeper::new(connection_pool.clone());
+    let mem_pool = MemPool::new(&state_keeper);
+    let prover = BabyProver::create(connection_pool.clone()).unwrap();
+    let eth_watch = EthWatch::new(0, 0, connection_pool.clone());
 
     // spawn threads for different processes
     // see https://docs.google.com/drawings/d/16UeYq7cuZnpkyMWGrgDAbmlaGviN2baY1w1y745Me70/edit?usp=sharing

@@ -667,7 +667,7 @@ impl MemPool {
                         sender.send(Ok(()));
                         println!("mempool queue length = {}", self.queue.len());
                         // TODO: also check that batch is now possible (e.g. that Ethereum queue is not too long)
-                        if !self.batch_requested && self.queue.len() >= config::TRANSFER_BATCH_SIZE {
+                        if !self.batch_requested && self.queue.len() >= config::TRANSFER_BATCH_SIZE-4 {
                             println!("batch processing requested");
                             self.batch_requested = true;
                             tx_for_requests.send(MempoolRequest::ProcessBatch);
@@ -677,13 +677,15 @@ impl MemPool {
                 MempoolRequest::ProcessBatch => {
                     self.batch_requested = false;
                     let do_padding = false; // TODO: use when neccessary
-                    if !self.batch_requested && self.queue.len() >= config::TRANSFER_BATCH_SIZE {
+                    if !self.batch_requested && self.queue.len() >= config::TRANSFER_BATCH_SIZE-4 {
+                        
                         let may_try_again = self.process_batch(do_padding, &tx_for_blocks);
-                        if !self.batch_requested && self.queue.len() >= config::TRANSFER_BATCH_SIZE && may_try_again {
-                            println!("After previous response processing we can already make a new one");
-                            self.batch_requested = true;
-                            tx_for_requests.send(MempoolRequest::ProcessBatch);
-                        }
+
+                        // if !self.batch_requested && self.queue.len() >= config::TRANSFER_BATCH_SIZE && may_try_again {
+                        //     println!("After previous response processing we can already make a new one");
+                        //     self.batch_requested = true;
+                        //     tx_for_requests.send(MempoolRequest::ProcessBatch);
+                        // }
                     }
                 },
                 MempoolRequest::GetPendingNonce(account_id, channel) => {
