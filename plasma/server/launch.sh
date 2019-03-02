@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# This script shall be used on on server; it starts run.sh internally
+
 ps auxw | grep target/release/server | grep -v grep > /dev/null
 
 if [ $? != 0 ]
