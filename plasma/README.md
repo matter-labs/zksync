@@ -94,8 +94,6 @@ Update addresses (make sure to exclude 0x !):
 - copy contracts address of `PlasmaContract` to `CONTRACT_ADDR` in `server/.env` 
 - in the same file, set up proper values for `SENDER_ACCOUNT` and `PRIVATE_KEY`
 
-See [contracts/README.md] for more options.
-
 ## Prepare server scripts
 
 Copy `server/start_demo_example.sh` by inserting proper URLs, addresses and keys
@@ -126,7 +124,7 @@ To stop:
 
 ### Run locally
 
-See [client/README.md]
+See [client/README.md](client/README.md)
 
 ### Deploy to server
 
