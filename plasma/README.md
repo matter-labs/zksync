@@ -124,9 +124,20 @@ To stop:
 
 ### Run locally
 
-See [client/README.md](client/README.md)
+``` bash
+# install dependencies
+yarn
 
-### Deploy to server
+# serve with hot reload at localhost:8080; API server will be queried at localhost:3000
+yarn run dev
+
+# build for production with minification
+yarn run build
+```
+
+### Deploy client publicly
+
+Single command to build and deploy to github pages:
 
 ```
 ./scripts/deploy-client
