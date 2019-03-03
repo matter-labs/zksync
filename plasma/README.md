@@ -70,6 +70,8 @@ cd contracts
 yarn
 ```
 
+NOTE: Python >= 3.5 and pip is required for solidity flattener. You might want to run `brew upgrade python`
+
 ### Re-build contracts:
 
 ```
@@ -94,18 +96,24 @@ Update addresses (make sure to exclude 0x !):
 - copy contracts address of `PlasmaContract` to `CONTRACT_ADDR` in `server/.env` 
 - in the same file, set up proper values for `SENDER_ACCOUNT` and `PRIVATE_KEY`
 
-## Prepare server scripts
+### Publish source
+
+```
+yarn flatten
+```
+
+## Server
 
 Copy `server/start_demo_example.sh` by inserting proper URLs, addresses and keys
 
-## Running locally
+### Running locally
 
 ```shell
 cd server
 ./run.sh
 ```
 
-## Running as server
+### Running in production
 
 To launch and restart:
 
@@ -120,7 +128,7 @@ To stop (Note, that Ctrl+C won't work! You need to run stop from a new terminal)
 ./stop.sh
 ```
 
-## Running client
+## Client UI
 
 ### Run locally
 

@@ -25,11 +25,14 @@ contract PlasmaContract is PlasmaDepositor {
     //     exitor = _exitor;
     // }
 
-    constructor(address _transactor, address _exitor) public {
+    constructor(address _transactor, address _exitor, uint256[2] _paddingPubKey) public {
         nextAccountToRegister = 2;
         lastVerifiedRoot = EMPTY_TREE_ROOT;
         operators[msg.sender] = true;
         transactor = _transactor;
         exitor = _exitor;
+
+        // make the first deposit to install pub_key for padding
+        deposit(_paddingPubKey, 0);
     }
 }
