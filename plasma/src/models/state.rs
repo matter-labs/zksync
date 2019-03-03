@@ -1,6 +1,5 @@
 use super::*;
 use crate::models::params;
-use sapling_crypto::jubjub::{edwards, Unknown};
 use bigdecimal::{BigDecimal, Zero};
 
 pub struct PlasmaState {
@@ -11,18 +10,6 @@ pub struct PlasmaState {
     /// Current block number
     pub block_number: u32,
     
-}
-
-#[derive(Debug)]
-pub enum TransferApplicationError {
-    Unknown,
-    InsufficientBalance,
-    NonceIsTooLow,
-    NonceIsTooHigh,
-    UnknownSigner,
-    InvalidSigner,
-    ExpiredTransaction,
-    InvalidTransaction(String),
 }
 
 impl PlasmaState {
@@ -43,38 +30,22 @@ impl PlasmaState {
         self.balance_tree.items.iter().map(|a| (*a.0 as u32, a.1.clone()) ).collect()
     }
 
-    pub fn get_pub_key(&self, account_id: u32) -> Option<PublicKey> {
-        let item = self.balance_tree.items.get(&account_id);
-        if item.is_none() {
-            return None;
-        }
-        let acc = item.unwrap();
-        let point = edwards::Point::<Engine, Unknown>::from_xy(
-            acc.public_key_x, 
-            acc.public_key_y, 
-            &params::JUBJUB_PARAMS
-        );
-        if point.is_none() {
-            return None;
-        }
-
-        let pk = sapling_crypto::eddsa::PublicKey::<Engine>(point.unwrap());
-
-        Some(pk)
+    pub fn root_hash(&self) -> Fr {
+        self.balance_tree.root_hash().clone()
     }
 
-    pub fn root_hash (&self) -> Fr {
-        self.balance_tree.root_hash().clone()
+    pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
+        self.balance_tree.items.get(&account_id).cloned()
     }
 
     pub fn apply_transfer(&mut self, tx: &TransferTx) -> Result<BigDecimal, TransferApplicationError> {
         if let Some(mut from) = self.balance_tree.items.get(&tx.from).cloned() {
             // TODO: take from `from` instead and uncomment below
-            let pub_key = self.get_pub_key(tx.from).ok_or(TransferApplicationError::UnknownSigner)?;
+            let pub_key = self.get_account(tx.from).and_then(|a| a.get_pub_key()).ok_or(TransferApplicationError::UnknownSigner)?;
             if let Some(verified_against) = tx.cached_pub_key.as_ref() {
                 if pub_key.0 != verified_against.0 { 
                     return Err(TransferApplicationError::InvalidSigner);
-                }   
+                }
             } else {
                 return Err(TransferApplicationError::InvalidSigner);
             }

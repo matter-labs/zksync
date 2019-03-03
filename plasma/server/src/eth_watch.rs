@@ -7,7 +7,7 @@ use std::env;
 use std::str::FromStr;
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::Sender;
-use super::models::{StateProcessingRequest};
+use super::models::{StateKeeperRequest};
 use plasma::models::{Block, DepositBlock, DepositTx, Engine, Fr, ExitBlock, ExitTx};
 use bigdecimal::{Num, BigDecimal};
 use plasma::models::params;
@@ -116,7 +116,7 @@ impl EthWatch {
     /// - check if the last deposit batch number is equal to the one in contract
     /// - if it's larger - collect events and send for processing
     /// - if it's not bumped but a timeout is past due - may be try to send the transaction that bumps it
-    pub fn run(&mut self, tx_for_blocks: Sender<StateProcessingRequest>) {
+    pub fn run(&mut self, tx_for_blocks: Sender<StateKeeperRequest>) {
         let (_eloop, transport) = web3::transports::Http::new(&self.web3_url).unwrap();
         let web3 = web3::Web3::new(transport);
         // let mut eloop = tokio_core::reactor::Core::new().unwrap();
@@ -159,7 +159,7 @@ impl EthWatch {
 
     fn process_deposits<T: web3::Transport>(& mut self, 
         block_number: u64, 
-        channel: &Sender<StateProcessingRequest>,
+        channel: &Sender<StateKeeperRequest>,
         web3: &web3::Web3<T>,
         contract: &Contract<T>)
     -> Result<(), ()>
@@ -203,7 +203,7 @@ impl EthWatch {
     fn process_single_deposit_batch<T: web3::Transport>(
         & mut self, 
         batch_number: u64,
-        channel: &Sender<StateProcessingRequest>,
+        channel: &Sender<StateKeeperRequest>,
         web3: &web3::Web3<T>,
         contract: &Contract<T>)
     -> Result<(), ()> {
@@ -346,7 +346,7 @@ impl EthWatch {
             transactions: all_deposits,
             new_root_hash: Fr::zero(),
         };
-        let request = StateProcessingRequest::ApplyBlock(Block::Deposit(block, self.last_deposit_batch.as_u32()));
+        let request = StateKeeperRequest::AddBlock(Block::Deposit(block, self.last_deposit_batch.as_u32()));
 
         let send_result = channel.send(request);
 
@@ -360,7 +360,7 @@ impl EthWatch {
 
     fn process_exits<T: web3::Transport>(& mut self, 
         block_number: u64, 
-        channel: &Sender<StateProcessingRequest>,
+        channel: &Sender<StateKeeperRequest>,
         web3: &web3::Web3<T>,
         contract: &Contract<T>)
     -> Result<(), ()>
@@ -405,7 +405,7 @@ impl EthWatch {
     fn process_single_exit_batch<T: web3::Transport>(
         & mut self, 
         batch_number: u64, 
-        channel: &Sender<StateProcessingRequest>,
+        channel: &Sender<StateKeeperRequest>,
         web3: &web3::Web3<T>,
         contract: &Contract<T>)
     -> Result<(), ()>
@@ -529,7 +529,7 @@ impl EthWatch {
             transactions: all_exits,
             new_root_hash: Fr::zero(),
         };
-        let request = StateProcessingRequest::ApplyBlock(Block::Exit(block, self.last_exit_batch.as_u32()));
+        let request = StateKeeperRequest::AddBlock(Block::Exit(block, self.last_exit_batch.as_u32()));
 
         let send_result = channel.send(request);
 
@@ -543,7 +543,7 @@ impl EthWatch {
 
 }
 
-pub fn start_eth_watch(mut eth_watch: EthWatch, tx_for_blocks: Sender<StateProcessingRequest>) {
+pub fn start_eth_watch(mut eth_watch: EthWatch, tx_for_blocks: Sender<StateKeeperRequest>) {
     std::thread::Builder::new().name("eth_watch".to_string()).spawn(move || {
         eth_watch.run(tx_for_blocks);
     });

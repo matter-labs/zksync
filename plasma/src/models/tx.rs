@@ -12,7 +12,6 @@ use crate::circuit::utils::{encode_fr_into_fs, encode_fs_into_fr, le_bit_vector_
 use crate::models::circuit::transfer::{Tx};
 use crate::models::circuit::deposit::{DepositRequest};
 use crate::models::circuit::exit::{ExitRequest};
-use ff::Field;
 
 use std::cmp::{Ord, PartialEq, PartialOrd, Eq, Ordering};
 
