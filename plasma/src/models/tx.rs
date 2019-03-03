@@ -115,12 +115,8 @@ impl TransferTx {
             fee: fee.clone(),
             nonce,
             good_until_block,
-            signature: TxSignature{
-                r_x: Fr::zero(), 
-                r_y: Fr::zero(), 
-                s: Fr::zero()
-            },
-            cached_pub_key: None,       
+            signature: TxSignature::default(),
+            cached_pub_key: None,  
         };
 
         let message_bits = tx.message_bits();
