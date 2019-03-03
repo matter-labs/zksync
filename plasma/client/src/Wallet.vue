@@ -107,8 +107,12 @@
                                 <b-col>ETH {{store.account.plasma.verified.balance || 0}}</b-col>
                             </b-row>
                             <b-row class="mt-2" style="color: grey" v-if="store.account.plasma.verified.balance != store.account.plasma.committed.balance">
-                                <b-col cols="8">Pending balance:</b-col> 
+                                <b-col cols="8">Committed balance:</b-col> 
                                 <b-col>ETH {{store.account.plasma.committed.balance || 0}}</b-col>
+                            </b-row>
+                            <b-row class="mt-2" style="color: grey" v-if="store.account.plasma.pending.balance != store.account.plasma.committed.balance">
+                                <b-col cols="8">Pending balance:</b-col> 
+                                <b-col>ETH {{store.account.plasma.pending.balance || 0}}</b-col>
                             </b-row>
                             <b-row class="mt-2">                    
                                 <b-col cols="8">Latest nonce:</b-col> 
@@ -365,6 +369,7 @@ export default {
             const multiplier = new BN('1000000000000')
             data.verified.balance = Eth.fromWei((new BN(data.verified.balance)).mul(multiplier), 'ether')
             data.committed.balance = Eth.fromWei((new BN(data.committed.balance)).mul(multiplier), 'ether')
+            data.pending.balance = Eth.fromWei((new BN(data.pending.balance)).mul(multiplier), 'ether')
             // TODO: remove when server updated
             if (Number(data.pending_nonce) > Number(data.pending.nonce)) {
                 data.pending.nonce = data.pending_nonce
