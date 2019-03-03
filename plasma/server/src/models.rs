@@ -12,10 +12,16 @@ pub struct TransferTxConfirmation {
 
 pub type TransferTxResult = Result<TransferTxConfirmation, TransferApplicationError>;
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NetworkStatus {
+    pub next_block_at_max: Option<u64>,
+}
+
 pub enum StateKeeperRequest{
     AddTransferTx(TransferTx, Sender<TransferTxResult>),
     AddBlock(Block),
     GetAccount(u32, Sender<Option<Account>>),
+    GetNetworkStatus(Sender<NetworkStatus>),
     TimerTick,
 }
 

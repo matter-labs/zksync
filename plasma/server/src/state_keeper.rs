@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 use plasma::models::{self, *, block::GenericBlock};
 
-use super::models::{StateKeeperRequest, Operation, Action, EthBlockData, TransferTxResult, TransferTxConfirmation};
+use super::models::{StateKeeperRequest, Operation, Action, EthBlockData, TransferTxResult, TransferTxConfirmation, NetworkStatus};
 use super::prover::BabyProver;
 use super::storage::{ConnectionPool, StorageProcessor};
 use super::config;
@@ -25,7 +25,7 @@ use ff::{PrimeField, PrimeFieldRepr};
 use bigdecimal::Zero;
 
 use std::io::BufReader;
-use std::time::{Instant, Duration};
+use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
@@ -40,7 +40,7 @@ pub struct PlasmaStateKeeper {
     transfer_tx_queue:  Vec<TransferTx>,
 
     /// Promised latest UNIX timestamp of the next block
-    next_block_at_max:  Option<Instant>,
+    next_block_at_max:  Option<SystemTime>,
 }
 
 type RootHash = H256;
@@ -98,6 +98,11 @@ impl PlasmaStateKeeper {
     {
         for req in rx_for_blocks {
             match req {
+                StateKeeperRequest::GetNetworkStatus(sender) => {
+                    sender.send(NetworkStatus{
+                        next_block_at_max: self.next_block_at_max.map(|t| t.duration_since(UNIX_EPOCH).unwrap().as_secs())
+                    }).expect("sending network status must work");
+                },
                 StateKeeperRequest::GetAccount(account_id, sender) => {
                     let account = self.state.get_account(account_id);
                     sender.send(account).expect("sending account state must work");
@@ -105,7 +110,7 @@ impl PlasmaStateKeeper {
                 StateKeeperRequest::AddTransferTx(tx, sender) => {
                     let result = self.apply_transfer_tx(tx);
                     if result.is_ok() && self.next_block_at_max.is_none() {
-                        self.next_block_at_max = Some(Instant::now() + Duration::from_secs(config::PADDING_INTERVAL));
+                        self.next_block_at_max = Some(SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL));
                     }
                     sender.send(result);
 
@@ -121,7 +126,7 @@ impl PlasmaStateKeeper {
                 },
                 StateKeeperRequest::TimerTick => {
                     if let Some(next_block_at) = self.next_block_at_max {
-                        if next_block_at <= Instant::now() {
+                        if next_block_at <= SystemTime::now() {
                             self.finalize_current_batch(&tx_for_commitments);
                         }
                     }

@@ -2,7 +2,7 @@
 
 use std::sync::mpsc;
 use plasma::models::{TransferTx, PublicKey, Account, Nonce};
-use super::models::StateKeeperRequest;
+use super::models::{StateKeeperRequest, NetworkStatus};
 use super::storage::{ConnectionPool, StorageProcessor};
 
 use actix_web::{
@@ -23,6 +23,7 @@ use futures::Future;
 
 use std::env;
 use dotenv::dotenv;
+use std::time::Instant;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct TransactionRequest {
@@ -42,7 +43,7 @@ struct AccountError {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct DetailsResponse {
+struct TestnetConfigResponse {
     address: String,
 }
 
@@ -83,6 +84,7 @@ fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
             tx_for_state.send(request).expect("must send a new transaction to queue");
             // now wait for state_keeper to return a result
             let account = key_rx.recv_timeout(std::time::Duration::from_millis(100)).expect("must get public key back");
+
             let pub_key: Option<PublicKey> = account.and_then( |a| a.get_pub_key() );
             println!("Got public key");
 
@@ -153,6 +155,7 @@ fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResp
     if account_id.is_err(){
         return Ok(HttpResponse::Ok().json(AccountError{error:"invalid account_id".to_string()}));
     }
+
     let (acc_tx, acc_rx) = mpsc::channel();
     let account_id_u32 = account_id.unwrap();
     let request = StateKeeperRequest::GetAccount(account_id_u32, acc_tx);
@@ -179,10 +182,20 @@ fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResp
 
 fn handle_get_testnet_config(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let address = req.state().contract_address.clone();
-
-    Ok(HttpResponse::Ok().json(DetailsResponse{
+    Ok(HttpResponse::Ok().json(TestnetConfigResponse{
         address: format!("0x{}", address)
     }))
+}
+
+fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    let tx_for_state = req.state().tx_for_state.clone();
+
+    let (tx, rx) = mpsc::channel();
+    let request = StateKeeperRequest::GetNetworkStatus(tx);
+    tx_for_state.send(request).expect("must send a new transaction to queue");
+    let status: NetworkStatus = rx.recv_timeout(std::time::Duration::from_millis(1000)).expect("must get status back");
+
+    Ok(HttpResponse::Ok().json(status))
 }
 
 fn handle_get_account_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
@@ -225,6 +238,9 @@ pub fn start_api_server(
                 api_scope
                 .resource("/testnet_config", |r| {
                     r.method(Method::GET).f(handle_get_testnet_config);
+                })
+                .resource("/status", |r| {
+                    r.method(Method::GET).f(handle_get_network_status);
                 })
                 .resource("/submit_tx", |r| {
                     r.method(Method::POST).f(handle_submit_tx);
