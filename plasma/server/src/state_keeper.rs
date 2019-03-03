@@ -306,9 +306,6 @@ impl PlasmaStateKeeper {
     }
 
     fn account(&self, account_id: AccountId) -> Account {
-        // if let Some(existing) = self.state.balance_tree.items.get(&account_id) {
-        //     return existing.clone();
-        // }
         self.state.get_account(account_id).unwrap_or(Account::default())
     }
 }

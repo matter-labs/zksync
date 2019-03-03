@@ -6,6 +6,7 @@ use super::rest_api::start_api_server;
 use super::committer;
 use super::eth_watch::{EthWatch, start_eth_watch};
 use super::storage::{ConnectionPool};
+use super::models::StateKeeperRequest;
 
 pub fn run() {
 
@@ -25,8 +26,17 @@ pub fn run() {
 
     println!("starting actors");
 
+    // Simple timer, pings every 15 seconds
+    let tx_for_state_ticker = tx_for_state.clone();
+    std::thread::Builder::new().name("timer".to_string()).spawn(move || {
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(15));
+            tx_for_state_ticker.send(StateKeeperRequest::TimerTick);
+        }
+    });
+
     start_api_server(tx_for_state.clone(), connection_pool.clone());
-    start_eth_watch(eth_watch, tx_for_state);
+    start_eth_watch(eth_watch, tx_for_state.clone());
     
     start_state_keeper(state_keeper, rx_for_state, tx_for_ops.clone());
     start_prover(prover, rx_for_proof_requests, tx_for_ops);
