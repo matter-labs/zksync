@@ -293,7 +293,7 @@ contract PlasmaDepositor is Plasma {
             }
             require(i == 0 || accountIDs[i] > accountIDs[i-1], "accountID are not properly ordered");
             DepositRequest storage request = depositRequests[batchNumber][accountIDs[i]];
-            require(request.amount != 0, "trying to process an empty request and collect fees");
+            //require(request.amount != 0, "trying to process an empty request and collect fees");
             delete depositRequests[batchNumber][accountIDs[i]];
             totalFees += batchFee;
         }
