@@ -2,7 +2,7 @@
 
 use std::sync::mpsc;
 use plasma::models::{TransferTx, PublicKey, Account, Nonce};
-use super::models::{StateKeeperRequest, NetworkStatus};
+use super::models::{StateKeeperRequest, NetworkStatus, TransferTxConfirmation};
 use super::storage::{ConnectionPool, StorageProcessor};
 
 use actix_web::{
@@ -34,7 +34,9 @@ struct TransactionRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct TransactionResponse {
-    accepted: bool,
+    accepted:       bool,
+    error:          Option<String>,
+    confirmation:   Option<TransferTxConfirmation>
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -67,13 +69,14 @@ fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
     req.json()
         .from_err() // convert all errors into `Error`
         .and_then(move |tx: TransferTx| {
-            println!("Got incoming transaction");
+            println!("New incoming transaction: {:?}", &tx);
 
-            let valid = tx.validate();
-            if !valid {
-                println!("Transaction itself is invalid");
+            if let Err(error) = tx.validate() {
+                println!("Transaction itself is invalid: {}", error);
                 let resp = TransactionResponse{
-                    accepted: false,
+                    accepted:       false,
+                    error:          Some(error),
+                    confirmation:   None,
                 };
                 return Ok(HttpResponse::Ok().json(resp));
             }
@@ -86,13 +89,18 @@ fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
             let account = key_rx.recv_timeout(std::time::Duration::from_millis(100)).expect("must get public key back");
 
             let pub_key: Option<PublicKey> = account.and_then( |a| a.get_pub_key() );
-            println!("Got public key");
+            if let Some(pk) = pub_key.clone() {
+                let (x, y) = pk.0.into_xy();
+                println!("Got public key: {:?}, {:?}", x, y);
+            }
 
             let verified = pub_key.as_ref().map( |pk| tx.verify_sig(pk) ).unwrap_or(false);
             if !verified {
                 println!("Signature is invalid");
                 let resp = TransactionResponse{
-                    accepted: false
+                    accepted:       false,
+                    error:          Some("invalid signature".to_owned()),
+                    confirmation:   None,
                 };
                 return Ok(HttpResponse::Ok().json(resp));
             }
@@ -105,30 +113,38 @@ fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
             tx_for_state.send(StateKeeperRequest::AddTransferTx(tx, add_tx)).expect("must send transaction to sate keeper from rest api");
 
             // TODO: reconsider timeouts
-            let add_result = add_rx.recv_timeout(std::time::Duration::from_millis(500));
-            if add_result.is_ok() {
-                println!("Got response from state keeper");
-                if add_result.unwrap().is_ok() {
-                    println!("Transaction was accepted");
+            let send_result = add_rx.recv_timeout(std::time::Duration::from_millis(500));
+            match send_result {
+                Ok(result) => match result {
+                    Ok(confirmation) => {
+                        println!("Transaction was accepted");
+                        let resp = TransactionResponse{
+                            accepted:       true,
+                            error:          None,
+                            confirmation:   Some(confirmation),
+                        };
+                        Ok(HttpResponse::Ok().json(resp))
+                    },
+                    Err(error) => {
+                        println!("State keeper rejected the transaction");
+                        let resp = TransactionResponse{
+                            accepted:       false,
+                            error:          Some(format!("{:?}", error)),
+                            confirmation:   None,
+                        };
+                        Ok(HttpResponse::Ok().json(resp))
+                    },
+                },
+                Err(_) => {
+                    println!("Did not get a result from the state keeper");
                     let resp = TransactionResponse{
-                        accepted: true
+                        accepted:       false,
+                        error:          Some("internal server error".to_owned()),
+                        confirmation:   None,
                     };
-                    return Ok(HttpResponse::Ok().json(resp));
-                } else {
-                    println!("State keeper rejected the transaction");
-                    let resp = TransactionResponse{
-                        accepted: false
-                    };
-                    return Ok(HttpResponse::Ok().json(resp));
+                    Ok(HttpResponse::Ok().json(resp))
                 }
-            } else {
-                println!("Did not get a result from the state keeper");
-                let resp = TransactionResponse{
-                    accepted: false
-                };
-                return Ok(HttpResponse::Ok().json(resp));
             }
-
         })
         .responder()
 }

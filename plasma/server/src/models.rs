@@ -5,6 +5,7 @@ use std::sync::Arc;
 use crate::schema::*;
 use fnv::{FnvHashSet};
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TransferTxConfirmation {
     pub block_number:   BlockNumber,
     pub signature:      String,

@@ -169,16 +169,16 @@ impl TransferTx {
         false
     }
 
-    pub fn validate(&self) -> bool {
+    pub fn validate(&self) -> Result<(), String> {
         use bigdecimal::Zero;
         if self.from == self.to {
-            return false;
+            return Err(format!("tx.from may not equal tx.to: {}", self.from));
         }
         if self.amount == BigDecimal::zero() {
-            return false;
+            return Err(format!("zero amount is not allowed"));
         }
 
-        true
+        Ok(())
     }
 }
 
