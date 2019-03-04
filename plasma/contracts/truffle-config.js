@@ -49,6 +49,7 @@ module.exports = {
 
       rinkeby:{
         network_id: 4,
+        gas: 6800000,
         provider: function() { 
           const HDWalletProvider = require("truffle-hdwallet-provider");
           let url = `https://rinkeby.infura.io/${process.env.INFURA_PROJECT_ID}`
