@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+#![feature(duration_as_u128)]
 
 extern crate pairing;
 extern crate rand;

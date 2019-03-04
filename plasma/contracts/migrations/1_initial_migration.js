@@ -5,9 +5,13 @@ var Transactor = artifacts.require("./PlasmaTransactor.sol");
 
 module.exports = async function(deployer) {
     let m = await deployer.deploy(Migrations);
+
     await deployer.deploy(Exitor);
     let ex = await Exitor.deployed();
+
     await deployer.deploy(Transactor);
     let tr = await Transactor.deployed();
-    let plasma = await deployer.deploy(PlasmaContract, tr.address, ex.address);
+
+    let paddingPubKey = JSON.parse(process.env.PADDING_PUB_KEY);
+    let plasma = await deployer.deploy(PlasmaContract, tr.address, ex.address, paddingPubKey);
 };

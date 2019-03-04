@@ -41,7 +41,7 @@ contract PlasmaDepositor is Plasma {
         // and the operator
         require(maxFee >= currentDepositBatchFee, "deposit fee is less than required");
         uint128 scaledValue = scaleIntoPlasmaUnitsFromWei(msg.value);
-        require(scaledValue > currentDepositBatchFee, "deposit amount should cover the fee");
+        require(scaledValue >= currentDepositBatchFee, "deposit amount should cover the fee");
         require(accountID < nextAccountToRegister, "for now only allow to deposit into non-empty accounts");
         // read account info
         Account memory accountInformation = accounts[accountID];
@@ -293,7 +293,7 @@ contract PlasmaDepositor is Plasma {
             }
             require(i == 0 || accountIDs[i] > accountIDs[i-1], "accountID are not properly ordered");
             DepositRequest storage request = depositRequests[batchNumber][accountIDs[i]];
-            require(request.amount != 0, "trying to process an empty request and collect fees");
+            //require(request.amount != 0, "trying to process an empty request and collect fees");
             delete depositRequests[batchNumber][accountIDs[i]];
             totalFees += batchFee;
         }

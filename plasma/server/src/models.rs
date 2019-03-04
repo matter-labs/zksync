@@ -5,43 +5,25 @@ use std::sync::Arc;
 use crate::schema::*;
 use fnv::{FnvHashSet};
 
-use super::mem_pool::TxQueue;
-
-type TransferBlockResult = Result<(BlockAssemblyResponse, BlockNumber), BlockAssemblyResponse>;
-
-pub enum StateProcessingRequest{
-    CreateTransferBlock(TxQueue, bool, Sender<(TxQueue, TransferBlockResult)>),
-    ApplyBlock(Block),
-    GetPubKey(u32, Sender<Option<PublicKey>>),   // return public key if found
-    GetLatestState(u32, Sender<Option<Account>>), // return account state
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TransferTxConfirmation {
+    pub block_number:   BlockNumber,
+    pub signature:      String,
 }
 
-#[derive(Debug, Clone)]
-pub struct InPoolTransaction{
-    pub timestamp: std::time::Instant,
-    pub lifetime: std::time::Duration,
-    pub transaction: TransferTx,
+pub type TransferTxResult = Result<TransferTxConfirmation, TransferApplicationError>;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NetworkStatus {
+    pub next_block_at_max: Option<u64>,
 }
 
-pub enum IndividualTransactionResponse{
-    Accepted(Vec<InPoolTransaction>),
-    TemporaryRejected(Vec<InPoolTransaction>),
-    RejectedCompletely(Vec<InPoolTransaction>),
-}
-
-pub enum TransactionPickerResponse{
-    Included(InPoolTransaction),
-    ValidButNotIncluded(InPoolTransaction),
-    TemporaryRejected(InPoolTransaction),
-    RejectedCompletely(InPoolTransaction),
-}
-
-pub struct BlockAssemblyResponse{
-    pub included: Vec<InPoolTransaction>,
-    pub valid_but_not_included: Vec<InPoolTransaction>,
-    pub temporary_rejected: Vec<InPoolTransaction>,
-    pub completely_rejected: Vec<InPoolTransaction>,
-    pub affected_accounts: FnvHashSet<u32>,
+pub enum StateKeeperRequest{
+    AddTransferTx(TransferTx, Sender<TransferTxResult>),
+    AddBlock(Block),
+    GetAccount(u32, Sender<Option<Account>>),
+    GetNetworkStatus(Sender<NetworkStatus>),
+    TimerTick,
 }
 
 pub type EncodedProof = [U256; 8];

@@ -8,7 +8,7 @@
 # install dependencies
 yarn
 
-# serve with hot reload at localhost:8080
+# serve with hot reload at localhost:8080; API server will be queried at localhost:3000
 yarn run dev
 
 # build for production with minification

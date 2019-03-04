@@ -3,7 +3,8 @@
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
         <b-navbar-toggle target="nav_collapse"></b-navbar-toggle>
-        <b-navbar-brand>Matter Network Wallet <span style="font-size: 0.4em">ALPHA</span></b-navbar-brand>
+        <b-navbar-brand v-if="isDev" style="color: yellow;">Running server locally</b-navbar-brand>
+        <b-navbar-brand v-else>Matter Network Wallet <span style="font-size: 0.4em">ALPHA</span></b-navbar-brand>
         <b-collapse is-nav id="nav_collapse">
             <b-navbar-nav>
                 <!-- <b-nav-item href="#" active>Account</b-nav-item> -->
@@ -106,8 +107,12 @@
                                 <b-col>ETH {{store.account.plasma.verified.balance || 0}}</b-col>
                             </b-row>
                             <b-row class="mt-2" style="color: grey" v-if="store.account.plasma.verified.balance != store.account.plasma.committed.balance">
-                                <b-col cols="8">Pending balance:</b-col> 
+                                <b-col cols="8">Committed balance:</b-col> 
                                 <b-col>ETH {{store.account.plasma.committed.balance || 0}}</b-col>
+                            </b-row>
+                            <b-row class="mt-2" style="color: grey" v-if="store.account.plasma.pending.balance != store.account.plasma.committed.balance">
+                                <b-col cols="8">Pending balance:</b-col> 
+                                <b-col>ETH {{store.account.plasma.pending.balance || 0}}</b-col>
                             </b-row>
                             <b-row class="mt-2">                    
                                 <b-col cols="8">Latest nonce:</b-col> 
@@ -200,7 +205,7 @@ export default {
         console.log('start')
         let result = await axios({
             method: 'get',
-            url:    this.baseUrl + '/details',
+            url:    this.baseUrl + '/testnet_config',
         })
         if(!result.data) throw "Can not load contract address"
         store.contractAddress = result.data.address
@@ -222,8 +227,10 @@ export default {
         isTestnet() {
             return this.network === '4' || this.network === '1335'
         },
-        //baseUrl: () => web3.version.network === '4' ? 'https://api.plasma-winter.io' : 'http://localhost:80',
-        baseUrl: () => 'https://api.plasma-winter.io',
+        baseUrl() {
+            return (this.isDev ? 'http://localhost:3000' : 'https://api.plasma-winter.io') + '/api/v0.1'
+        },
+        //baseUrl: () => 'https://api.plasma-winter.io',
         // baseUrl: () => 'https://api.Matter Network.thematter.io',
         store: () => store,
         contractAddress: () => window.contractAddress,
@@ -334,7 +341,7 @@ export default {
             const apiForm = transactionLib.createTransaction(from, to, amount, fee, nonce, good_until_block, privateKey);
             const result = await axios({
                 method:     'post',
-                url:        this.baseUrl + '/send',
+                url:        this.baseUrl + '/submit_tx',
                 data:       apiForm
             });
             if(result.data.accepted) {
@@ -362,6 +369,7 @@ export default {
             const multiplier = new BN('1000000000000')
             data.verified.balance = Eth.fromWei((new BN(data.verified.balance)).mul(multiplier), 'ether')
             data.committed.balance = Eth.fromWei((new BN(data.committed.balance)).mul(multiplier), 'ether')
+            data.pending.balance = Eth.fromWei((new BN(data.pending.balance)).mul(multiplier), 'ether')
             // TODO: remove when server updated
             if (Number(data.pending_nonce) > Number(data.pending.nonce)) {
                 data.pending.nonce = data.pending_nonce

@@ -28,6 +28,12 @@ const router = new Router({
     routes // short for `routes: routes`
 })
 
+Vue.mixin({
+    computed: {
+        isDev: () => process.env.NODE_ENV === 'development',
+    },
+})
+
 window.app = new Vue({
     el: '#app',
     router,

@@ -18,11 +18,12 @@ pub type Fr = bn256::Fr;
 
 pub type AccountTree = SparseMerkleTree<Account, Fr, PedersenHasher<Engine>>;
 
-pub type TransferBlock = block::Block<TransferTx>;
-pub type DepositBlock = block::Block<DepositTx>;
-pub type ExitBlock = block::Block<ExitTx>;
+pub type TransferBlock = block::GenericBlock<TransferTx>;
+pub type DepositBlock = block::GenericBlock<DepositTx>;
+pub type ExitBlock = block::GenericBlock<ExitTx>;
 
 pub type PublicKey = eddsa::PublicKey<Engine>;
+pub type PrivateKey = eddsa::PrivateKey<Engine>;
 
 pub type AccountMap = fnv::FnvHashMap<u32, Account>;
 
@@ -36,4 +37,16 @@ pub enum Block {
     Transfer(TransferBlock),
     Deposit(DepositBlock, BatchNumber),
     Exit(ExitBlock, BatchNumber)
+}
+
+#[derive(Debug)]
+pub enum TransferApplicationError {
+    Unknown,
+    InsufficientBalance,
+    NonceIsTooLow,
+    NonceIsTooHigh,
+    UnknownSigner,
+    InvalidSigner,
+    ExpiredTransaction,
+    InvalidTransaction(String),
 }

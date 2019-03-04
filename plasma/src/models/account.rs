@@ -1,8 +1,9 @@
 use crate::primitives::{GetBits};
 use bigdecimal::BigDecimal;
 use super::circuit;
-
-use super::{Engine, Fr};
+use crate::models::params;
+use sapling_crypto::jubjub::{edwards, Unknown};
+use super::{Engine, Fr, PublicKey};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Account {
@@ -25,6 +26,18 @@ impl GetBits for Account {
         // leaf_content.extend(self.pub_x.get_bits_le_fixed(params::FR_BIT_WIDTH));
         // leaf_content.extend(self.pub_y.get_bits_le_fixed(params::FR_BIT_WIDTH));
         // leaf_content
+    }
+}
+
+impl Account {
+
+    pub fn get_pub_key(&self) -> Option<PublicKey> {
+        let point = edwards::Point::<Engine, Unknown>::from_xy(
+            self.public_key_x, 
+            self.public_key_y, 
+            &params::JUBJUB_PARAMS
+        );
+        point.map( |p| sapling_crypto::eddsa::PublicKey::<Engine>(p) )
     }
 }
 

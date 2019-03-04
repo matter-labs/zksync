@@ -5,7 +5,8 @@
         Matter Network Wallet <span style="font-size: 0.3em"><strong>ALPHA</strong></span>
     </template>
     <template slot="lead">
-        Plasma on SNARKs has arrived
+        <span v-if="isDev" class="local">Running server locally, API at http://localhost:3000</span>
+        <span v-else></span>
     </template>
     <hr class="my-4">
     <b-btn v-if="ethereumSupported" variant="success" size="lg" @click="login">Login with Metamask</b-btn>
@@ -63,6 +64,13 @@ export default {
     text-align: center;
     color: #2c3e50;
     margin-top: 60px;
+}
+
+.local {
+    color: yellow;
+    background: navy;
+    padding: 0.5em;
+    margin: 1em;
 }
 
 h1, h2 {

@@ -2,3 +2,4 @@
 .vscode
 target
 .DS_Store
+plasma/contracts/yarn-error.log

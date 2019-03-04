@@ -1,53 +1,152 @@
-#Plasma Winter: governed by SNARKs
+# Rollup: sidechain governed by SNARKs
 
 Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 
-## How to run
+## Prerequisite
 
-- Generate a proving key
+Install the latest rust version (>= 1.32):
+
 ```
-   cargo run --release --bin read_write_keys
-```
-
-It will generate a `VerificationKeys.sol` and proving key `pk.key` in the root folder.
-
-- Copy `VerificationKeys.sol` into the `./contracts/contracts/` with replacement
-
-- Replace a `EMPTY_TREE_ROOT` with value `0x09d809ed651bf1f19906bd7c170e1736176d3fbb2053e702dbbc2a8eed3e929f`. It's a root hash of demo server with pregenerated 1000 accounts
-
-- Run the migration by making a proper adjustments in `deploy_example.sh` file
-
-- Run server:
-   - Change `start_demo_example.sh` by inserting proper URLs, addresses and keys
-   - Run the script
-
-- Server has 1000 accounts pregenerated and you can send using 
-```
-   POST http://127.0.0.1:8080/send
-
-{
-   "from": 0,
-   "to": 1,
-   "amount": 1000
-}
-```
-- Valid response is 
-```
-{
-   "accepted": true
-}
+rustc --version
+rustc 1.32.0-nightly (21f268495 2018-12-02)
 ```
 
-- Batch size is 32 transactions, so you need to send this number of txes to start block commitment and proof generation process
+## Database
 
-- UI lives here `https://github.com/gluk64/gluk64.github.io`, you need to change 
+### Testing
+
+- Install postgres locally
+- Install diesel-cli:
+
+```cargo install diesel_cli --no-default-features --features postgres```
+
+- From `server` dir run
+
+```diesel database setup```
+
+This will create database 'plasma' (db url is set in [server/.env] file) with our schema.
+
+- To reset migrations (will reset the db), run from server dir:
+
+```diesel migration redo```
+
+- Run test to make sure everything works:
+
+```cargo test --lib -- --nocapture test_store_state```
+
+### Production
+
+For production, `DATABSE_URL` env var must be set properly.
+
+## Generating keys
+
+To generate a proving key, from `server` dir run:
+
 ```
-   const APIserver = 'https://1be52733.ngrok.io/send'
+cargo run --release --bin read_write_keys
 ```
 
-To something else
+It will generate a `*VerificationKey.sol` and `*_pk.key` files for 'deposit', 'exit' and 'transfer' circuits in the root folder.
 
-# License
+Move files to proper locations:
 
-Plasma Winter is licensed under a
-Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
+```shell
+mv -f n*VerificationKey.sol ./contracts/contracts/
+mv -f *_pk.key ./server/
+```
+
+If the pregenerated leaf format changes, replace the `EMPTY_TREE_ROOT` constant in `contracts/contracts/PlasmaStorage.sol`.
+
+## Web3 provider
+
+In the `server/.env` set up `CHAIN_ID` and `WEB3_URL` accordingly.
+
+## Contratcs
+
+### Install truffle and dependencies:
+
+```
+cd contracts
+yarn
+```
+
+NOTE: Python >= 3.5 and pip is required for solidity flattener. You might want to run `brew upgrade python`
+
+### Re-build contracts:
+
+```
+yarn build
+```
+
+IMPORTANT! Generated `.abi` and `.bin` files are fed to cargo to build module `plasma::eth`. 
+
+So you need to rebuild the code on every change (to be automated soon).
+
+### Deploy contracts
+
+After the keys have been generated and copied to contracts:
+
+- copy `contracts/scripts/deploy_example.sh` to `contracts/deploy.sh`
+- add mnemonics
+- add infura id to `WEB3_URL` as: `WEB3_URL=https://rinkeby.infura.io/{infura_project_id}` (optional, seems to work without it too)
+- launch `./deploy.sh`
+
+Update addresses (make sure to exclude 0x !):
+
+- copy contracts address of `PlasmaContract` to `CONTRACT_ADDR` in `server/.env` 
+- in the same file, set up proper values for `SENDER_ACCOUNT` and `PRIVATE_KEY`
+
+### Publish source
+
+```
+yarn flatten
+```
+
+## Server
+
+Copy `server/start_demo_example.sh` by inserting proper URLs, addresses and keys
+
+### Running locally
+
+```shell
+cd server
+./run.sh
+```
+
+### Running in production
+
+To launch and restart:
+
+```shell
+cd server
+./launch.sh
+```
+
+To stop (Note, that Ctrl+C won't work! You need to run stop from a new terminal):
+
+```shell
+./stop.sh
+```
+
+## Client UI
+
+### Run locally
+
+``` bash
+# install dependencies
+yarn
+
+# serve with hot reload at localhost:8080; API server will be queried at localhost:3000
+yarn run dev
+
+# build for production with minification
+yarn run build
+```
+
+### Deploy client publicly
+
+Single command to build and deploy to github pages:
+
+```
+./scripts/deploy-client
+```

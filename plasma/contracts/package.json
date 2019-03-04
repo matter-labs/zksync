@@ -16,7 +16,7 @@
     "hmac-drbg": "^1.0.1",
     "minimalistic-assert": "^1.0.1",
     "minimalistic-crypto-utils": "^1.0.1",
-    "solc": "^0.4.25",
+    "solc": "^0.4.24",
     "truffle": "^5.0.0",
     "truffle-hdwallet-provider": "^1.0.0-web3one.1",
     "web3": "^1.0.0-beta.37"
@@ -28,9 +28,12 @@
     "start-geth": "geth --rpc --rpcapi \"eth,net,web3,personal\" --dev --miner.gastarget 8000000 --dev.period=1",
     "deploy-local": "truffle migrate --reset --network dev",
     "deploy-geth": "truffle migrate --reset --network geth",
-    "geth": "node setup-geth.js 2& yarn start-geth",
-    "geth-deployed": "(sleep 10 && node setup-geth.js && yarn deploy-geth)& yarn start-geth > /dev/null",
+    "geth": "node scripts/setup-geth.js 2& yarn start-geth",
+    "geth-deployed": "(sleep 10 && node scripts/setup-geth.js && yarn deploy-geth)& yarn start-geth > /dev/null",
     "start-parity": "parity --config dev --jsonrpc-apis all",
-    "parity-deployed": "(sleep 2 && node setup-geth.js && yarn deploy-local)& yarn start-parity > /dev/null"
+    "parity-deployed": "(sleep 2 && node scripts/setup-geth.js && yarn deploy-local)& yarn start-parity > /dev/null",
+    "flat": "flat -input contracts/PlasmaContract.sol -output build/PlasmaContractFlattened.sol",
+    "flatten": "solidity_flattener contracts/PlasmaContract.sol",
+    "postinstall": "python -m pip install solidity-flattener"
   }
 }
