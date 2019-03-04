@@ -270,7 +270,7 @@ pub fn generate_parameters<E, C>(
                 }
             });
         }
-        if verbose {eprintln!("powers of tau stage 1 done in {} s", start.elapsed().as_millis() as f64 / 1000.0);};
+        if verbose {eprintln!("powers of tau stage 1 done in {} s", start.elapsed().as_secs());};
 
         // coeff = t(x) / delta
         let mut coeff = powers_of_tau.z(&tau);
@@ -302,7 +302,7 @@ pub fn generate_parameters<E, C>(
                 });
             }
         });
-        if verbose {eprintln!("computing the H query done in {} s", start.elapsed().as_millis() as f64 / 1000.0);};
+        if verbose {eprintln!("computing the H query done in {} s", start.elapsed().as_secs());};
     }
 
     if verbose {eprintln!("using inverse FFT to convert powers of tau to Lagrange coefficients...")};
@@ -313,7 +313,7 @@ pub fn generate_parameters<E, C>(
     powers_of_tau.ifft(&worker);
     let powers_of_tau = powers_of_tau.into_coeffs();
 
-    if verbose {eprintln!("powers of tau stage 2 done in {} s", start.elapsed().as_millis() as f64 / 1000.0)};
+    if verbose {eprintln!("powers of tau stage 2 done in {} s", start.elapsed().as_secs())};
 
     let mut a = vec![E::G1::zero(); assembly.num_inputs + assembly.num_aux];
     let mut b_g1 = vec![E::G1::zero(); assembly.num_inputs + assembly.num_aux];
@@ -475,7 +475,7 @@ pub fn generate_parameters<E, C>(
         &worker
     );
 
-    if verbose {eprintln!("evaluating polynomials done in {} s", start.elapsed().as_millis() as f64 / 1000.0);};
+    if verbose {eprintln!("evaluating polynomials done in {} s", start.elapsed().as_secs());};
 
     // Don't allow any elements be unconstrained, so that
     // the L query is always fully dense.
