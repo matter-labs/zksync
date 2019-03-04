@@ -31,7 +31,7 @@
                 <b-card title="Transfer in Matter Network" class="mb-4 d-flex">
                     <label for="transferToInput">To (recepient ETH address):</label>
                     <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0" autocomplete="off"></b-form-input>
-                    <p class="mt-2" style="color: grey">Note: your recipient must register in Matter Network first. For testing you can also use 0x6394b37cf80a7358b38068f0ca4760ad49983a1b, we're happy to accept your testcoins! :)</p>
+                    <p class="mt-2" style="color: grey">Note: your recipient must register in Matter Network first. For testing you can send to 0x153aa9a03a255cc635f00c54666f3686bf881001</p>
                     <label for="transferAmountInput" class="mt-4">Amount</label>
                             (max ETH <a href="#" @click="transferAmount=store.account.plasma.committed.balance">{{store.account.plasma.committed.balance || 0}}</a>):
                     <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
@@ -357,7 +357,7 @@ export default {
                     console.log('could not fetch data from server: ', new_nonce_result.error)
                 }
             } else  {
-                this.alert(`Transaction rejected!`)
+                this.alert(`Transaction rejected: ` + result.data.error)
             }
         },
         parseStateResult(data) {
