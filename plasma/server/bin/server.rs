@@ -1,20 +1,22 @@
+extern crate server;
+
 extern crate ctrlc;
 extern crate signal_hook;
 
 use std::sync::mpsc::{channel};
 
-use super::prover::{BabyProver, start_prover};
-use super::state_keeper::{PlasmaStateKeeper, start_state_keeper};
-use super::rest_api::start_api_server;
-use super::committer;
-use super::eth_watch::{EthWatch, start_eth_watch};
-use super::storage::{ConnectionPool};
-use super::models::StateKeeperRequest;
+use server::prover::{BabyProver, start_prover};
+use server::state_keeper::{PlasmaStateKeeper, start_state_keeper};
+use server::rest_api::start_api_server;
+use server::committer;
+use server::eth_watch::{EthWatch, start_eth_watch};
+use server::storage::{ConnectionPool};
+use server::models::StateKeeperRequest;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-pub fn run() {
+fn main() {
 
     // handle ctrl+c
     let stop_signal = Arc::new(AtomicBool::new(false));

@@ -7,7 +7,7 @@ PROCESS_ID=`ps aux | grep target/release/server | grep -v grep | grep -o -E '[0-
 
 if [ -z "$PROCESS_ID" ]
 then
-    cargo run --release --bin server 2>&1 | tee $LOG_FILE
+    cargo run --release --bin server
 else
     echo "Server already running at PID $PROCESS_ID; run stop to kill it."
 fi

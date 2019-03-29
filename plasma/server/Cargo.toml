@@ -4,7 +4,7 @@ version = "0.0.1"
 
 [[bin]]
 name = "server"
-path = "bin/demo_server.rs"
+path = "bin/server.rs"
 
 [dependencies]
 plasma = { path = ".." }

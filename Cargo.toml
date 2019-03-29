@@ -6,9 +6,6 @@ members = [
     "pairing",
     "bellman",
     "sapling-crypto",
-    "bellman-demo",
     "plasma",
-    "plasma/server",
-    "powersoftau",
-    "plasma_cash_bonus"
+    "plasma/server"
 ]
