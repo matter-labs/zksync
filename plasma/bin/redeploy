@@ -6,7 +6,7 @@ cd ..
 
 cd contracts
 echo yarn deploy
-#yarn deploy  | tee ../deploy.log
+yarn deploy  | tee ../deploy.log
 cd ..
 
 NEW_CONTRACT=`grep -A999 "Starting migrations" deploy.log | grep -A4 "Replacing 'PlasmaContract'" | grep "contract address" | grep -oE '0x(.+)' \
