@@ -7,4 +7,6 @@ members = [
     "sapling-crypto",
     "plasma",
     "plasma/server",
+    "plasma/server/models",
+    "plasma/server/storage",
 ]
