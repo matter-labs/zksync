@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd `dirname $0`/..
+
 cd client
 yarn dev
 

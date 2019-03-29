@@ -1,5 +1,4 @@
 [workspace]
-
 members = [
     "ff",
     "ff/ff_derive",
@@ -7,5 +6,5 @@ members = [
     "bellman",
     "sapling-crypto",
     "plasma",
-    "plasma/server"
+    "plasma/server",
 ]

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd `dirname $0`/..
+
 cd contracts
 echo yarn deploy
 yarn deploy  | tee ../deploy.log
