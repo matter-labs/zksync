@@ -3,6 +3,9 @@ extern crate serde_derive;
 extern crate serde_bytes;
 extern crate plasma;
 
+pub mod config;
+pub mod encoder;
+
 use plasma::models::*;
 use std::sync::mpsc::{Sender};
 

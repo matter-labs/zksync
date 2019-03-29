@@ -2,12 +2,14 @@
 name = "storage"
 version = "0.0.1"
 
+workspace = "../../.."
+
 [lib]
 path = "storage.rs"
 
 [dependencies]
 plasma = { path = "../.." }
-models = { path = "../models" }
+server_models = { path = "../server_models" }
 
 # ff = { path = "../../ff", features = ["derive"] }
 # pairing = { path = "../../pairing" }
@@ -19,7 +21,7 @@ models = { path = "../models" }
 # time = "0.1"
 # num-bigint = "0.2"
 # rust-crypto = "0.2"
-# fnv = "1.0.3"
+fnv = "1.0.3"
 # ethabi = "6.1.0"
 # web3 = { git = "https://github.com/tomusdrw/rust-web3" }
 # rustc-hex = "2.0.1"

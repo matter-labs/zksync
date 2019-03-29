@@ -2,7 +2,7 @@ use std::sync::mpsc::{channel, Sender, Receiver};
 use plasma::eth_client::{ETHClient, TxMeta, TEST_PLASMA_ALWAYS_VERIFY};
 use plasma::models::{Block, AccountMap, params};
 use super::storage::{ConnectionPool, StorageProcessor};
-use super::models::*;
+use super::server_models::*;
 use web3::types::{U256, H256};
 use super::config;
 

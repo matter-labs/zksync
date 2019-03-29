@@ -1,5 +1,6 @@
-extern crate models;
+extern crate server_models;
 extern crate plasma;
+extern crate fnv;
 
 #[macro_use]
 extern crate diesel;
@@ -7,7 +8,7 @@ extern crate bigdecimal;
 extern crate serde_json;
 
 use plasma::models::*;
-use models::{Operation, Action};
+use server_models::{Operation, Action};
 
 mod schema;
 use schema::*;
@@ -375,9 +376,8 @@ mod test {
         assert_eq!( state.get(&2).unwrap(), &acc(23) );
     }
 
-    use plasma::models::{Block, DepositBlock};
+    use plasma::models::{Block, DepositBlock, U256, H256};
     use crate::models::{Operation, EthBlockData, Action};
-    use web3::types::{U256, H256};
 
     #[test]
     fn test_store_txs() {

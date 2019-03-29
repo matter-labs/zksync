@@ -7,7 +7,7 @@ use std::env;
 use std::str::FromStr;
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::Sender;
-use super::models::{StateKeeperRequest};
+use super::server_models::{StateKeeperRequest};
 use plasma::models::{Block, DepositBlock, DepositTx, Engine, Fr, ExitBlock, ExitTx};
 use bigdecimal::{Num, BigDecimal};
 use plasma::models::params;

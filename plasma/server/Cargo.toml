@@ -8,8 +8,9 @@ path = "bin/server.rs"
 
 [dependencies]
 plasma = { path = ".." }
-models= { path = "models" }
+server_models = { path = "server_models" }
 storage = { path = "storage" }
+prover = { path = "prover" }
 
 ff = { path = "../../ff", features = ["derive"] }
 pairing = { path = "../../pairing" }

@@ -2,7 +2,7 @@
 
 use std::sync::mpsc;
 use plasma::models::{TransferTx, PublicKey, Account, Nonce};
-use super::models::{StateKeeperRequest, NetworkStatus, TransferTxConfirmation};
+use super::server_models::{StateKeeperRequest, NetworkStatus, TransferTxConfirmation};
 use super::storage::{ConnectionPool, StorageProcessor};
 
 use actix_web::{

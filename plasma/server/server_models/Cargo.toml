@@ -1,9 +1,11 @@
 [package]
-name = "models"
+name = "server_models"
 version = "0.0.1"
 
+workspace = "../../.."
+
 [lib]
-path = "models.rs"
+path = "lib.rs"
 
 [dependencies]
 plasma = { path = "../.." }

@@ -1,19 +1,21 @@
 extern crate server;
 extern crate storage;
-extern crate models;
+extern crate server_models;
+extern crate prover;
 extern crate ctrlc;
 extern crate signal_hook;
 
 use std::sync::mpsc::{channel};
 
-use server::prover::{BabyProver, start_prover};
+use prover::{BabyProver, start_prover};
+
 use server::state_keeper::{PlasmaStateKeeper, start_state_keeper};
 use server::rest_api::start_api_server;
 use server::committer;
 use server::eth_watch::{EthWatch, start_eth_watch};
 
 use storage::{ConnectionPool};
-use models::StateKeeperRequest;
+use server_models::StateKeeperRequest;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -33,7 +35,7 @@ fn main() {
 
     let connection_pool = ConnectionPool::new();
     let state_keeper = PlasmaStateKeeper::new(connection_pool.clone());
-    let prover = BabyProver::create(connection_pool.clone()).unwrap();
+    //let prover = BabyProver::create(connection_pool.clone()).unwrap();
     let eth_watch = EthWatch::new(0, 0, connection_pool.clone());
 
     // spawn threads for different processes
@@ -54,7 +56,7 @@ fn main() {
     start_eth_watch(eth_watch, tx_for_state.clone());
     
     start_state_keeper(state_keeper, rx_for_state, tx_for_ops.clone());
-    start_prover(prover, rx_for_proof_requests, tx_for_ops);
+    start_prover(connection_pool.clone(), rx_for_proof_requests, tx_for_ops);
 
     let tx_for_eth = committer::start_eth_sender(connection_pool.clone());
 
