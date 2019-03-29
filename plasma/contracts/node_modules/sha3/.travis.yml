@@ -1,0 +1,26 @@
+language: node_js
+
+env:
+  - CXX=g++-4.8
+
+node_js:
+  - '10.0.0'
+  - '9.11.1'
+  - '8.11.1'
+  - '6.14.2'
+  - '4.9.1'
+
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    packages:
+    - g++-4.8
+
+notifications:
+  email: false
+
+sudo: false
+
+before_install:
+  - $CXX --version

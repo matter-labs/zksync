@@ -160,7 +160,7 @@ impl StorageProcessor {
             WITH s AS (
                 SELECT account_id as id, max(block_number) as last_block 
                 FROM account_updates u 
-                WHERE u.block_number > {} AND u.block_number <= {}
+                WHERE u.block_number >= {} AND u.block_number < {}
                 GROUP BY account_id
             ) 
             SELECT u.account_id AS id, u.block_number AS last_block, u.data FROM s, account_updates u WHERE s.id = u.account_id AND u.block_number = s.last_block
@@ -170,6 +170,11 @@ impl StorageProcessor {
         ORDER BY id", start_block, end_block);
 
         self.load_state(select.as_str())
+    }
+
+    /// loads the state of accounts updated in a specific block
+    pub fn load_state_at_block(&self, block_number: u32) -> QueryResult<(u32, AccountMap)> {
+        self.load_state_diff(block_number-1, block_number)
     }
 
     fn load_state(&self, query: &str) -> QueryResult<(u32, AccountMap)> {
@@ -330,7 +335,7 @@ mod test {
             state.into_iter().collect::<Vec<(u32, models::Account)>>(), 
             accounts.clone().into_iter().collect::<Vec<(u32, models::Account)>>());
 
-        let (_, state) = conn.load_state_diff(0, 1).unwrap();
+        let (_, state) = conn.load_state_diff(1, 2).unwrap();
         assert_eq!( state.get(&2).unwrap(), &acc(2) );
 
         // commit second state update
@@ -342,11 +347,11 @@ mod test {
         assert_eq!(conn.load_verified_state().unwrap().1.len(), 3);
         assert_eq!(conn.load_committed_state().unwrap().1.len(), 4);
 
-        let (_, state) = conn.load_state_diff(0, 1).unwrap();
-        assert_eq!( state.get(&2).unwrap(), &acc(2) );
-        let (_, state) = conn.load_state_diff(0, 2).unwrap();
-        assert_eq!( state.get(&2).unwrap(), &acc(23) );
         let (_, state) = conn.load_state_diff(1, 2).unwrap();
+        assert_eq!( state.get(&2).unwrap(), &acc(2) );
+        let (_, state) = conn.load_state_diff(1, 3).unwrap();
+        assert_eq!( state.get(&2).unwrap(), &acc(23) );
+        let (_, state) = conn.load_state_diff(2, 3).unwrap();
         assert_eq!( state.get(&2).unwrap(), &acc(23) );
     }
 

@@ -1,1 +1,2 @@
-.env
+/keys
+/schema.rs.generated

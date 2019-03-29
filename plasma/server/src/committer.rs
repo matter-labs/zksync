@@ -147,7 +147,7 @@ pub fn start_eth_sender(pool: ConnectionPool) -> Sender<(Operation, TxMeta)> {
 pub fn run_committer(
     rx_for_ops: Receiver<Operation>, 
     tx_for_eth: Sender<(Operation, TxMeta)>,
-    tx_for_proof_requests: Sender<(u32, Block, EthBlockData, AccountMap)>,
+    tx_for_proof_requests: Sender<ProverRequest>,
     pool: ConnectionPool,
 ) {
 
@@ -161,7 +161,7 @@ pub fn run_committer(
         for pending_op in ops {
             let op: Operation = serde_json::from_value(pending_op.data).unwrap();
             if let Action::Commit{block, new_root: _} = op.action {
-                tx_for_proof_requests.send((op.block_number, block.unwrap(), op.block_data.clone(), op.accounts_updated.clone())).expect("must send a proof request for pending operations");
+                tx_for_proof_requests.send(ProverRequest(op.block_number, block.unwrap(), op.block_data.clone(), op.accounts_updated.clone())).expect("must send a proof request for pending operations");
             }
         }
     }
@@ -173,7 +173,7 @@ pub fn run_committer(
         let committed_op = storage.commit_op(&op).expect("committer must commit the op into db");
 
         if let Action::Commit{ref mut block, new_root: _} = op.action {
-            tx_for_proof_requests.send((op.block_number, block.take().unwrap(), op.block_data.clone(), op.accounts_updated.clone()))
+            tx_for_proof_requests.send(ProverRequest(op.block_number, block.take().unwrap(), op.block_data.clone(), op.accounts_updated.clone()))
                 .expect("must send a proof request");
         }
 

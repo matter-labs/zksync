@@ -1,0 +1,5 @@
+#!/bin/bash
+
+. env
+cd server
+cargo run --release --bin server | tee ${LOG_FILE}

@@ -48,6 +48,8 @@ pub enum EthBlockData {
     },
 }
 
+pub struct ProverRequest(pub BlockNumber, pub Block, pub EthBlockData, pub AccountMap);
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Action {
