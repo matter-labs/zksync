@@ -1,3 +1,6 @@
+extern crate ctrlc;
+extern crate signal_hook;
+
 use std::sync::mpsc::{channel};
 
 use super::prover::{BabyProver, start_prover};
@@ -8,10 +11,18 @@ use super::eth_watch::{EthWatch, start_eth_watch};
 use super::storage::{ConnectionPool};
 use super::models::StateKeeperRequest;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
 pub fn run() {
 
-    // create channel to accept deserialized requests for new transacitons
+    // handle ctrl+c
+    let stop_signal = Arc::new(AtomicBool::new(false));
+    signal_hook::flag::register(signal_hook::SIGTERM, Arc::clone(&stop_signal)).expect("Error setting SIGTERM handler");
+    signal_hook::flag::register(signal_hook::SIGINT, Arc::clone(&stop_signal)).expect("Error setting SIGINT handler");
+    signal_hook::flag::register(signal_hook::SIGQUIT, Arc::clone(&stop_signal)).expect("Error setting SIGQUIT handler");
 
+    // create channel to accept deserialized requests for new transacitons
     let (tx_for_state, rx_for_state) = channel();
     let (tx_for_proof_requests, rx_for_proof_requests) = channel();
     let (tx_for_ops, rx_for_ops) = channel();
@@ -42,5 +53,12 @@ pub fn run() {
     start_prover(prover, rx_for_proof_requests, tx_for_ops);
 
     let tx_for_eth = committer::start_eth_sender(connection_pool.clone());
-    committer::run_committer(rx_for_ops, tx_for_eth, tx_for_proof_requests, connection_pool.clone());
+
+    std::thread::Builder::new().name("timer".to_string()).spawn(move || {
+        committer::run_committer(rx_for_ops, tx_for_eth, tx_for_proof_requests, connection_pool.clone());
+    });
+
+    while !stop_signal.load(Ordering::SeqCst) {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
 }
