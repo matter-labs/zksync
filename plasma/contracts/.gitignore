@@ -1,4 +1,2 @@
-node_modules
-build
-deploy.sh
-.vscode
+./node_modules
+./build

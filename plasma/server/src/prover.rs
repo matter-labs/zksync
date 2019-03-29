@@ -9,7 +9,6 @@ use crypto::sha2::Sha256;
 use crypto::digest::Digest;
 
 use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
-use plasma::models::{Engine, Fr};
 use sapling_crypto::circuit::float_point::parse_float_to_u128;
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 use sapling_crypto::jubjub::{JubjubEngine, edwards};
@@ -18,12 +17,13 @@ use self::rustc_hex::ToHex;
 
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
 
+use plasma::models::{Engine, Fr, AccountId};
 use plasma::models::{self, params, TransferBlock, DepositBlock, ExitBlock, Block, PlasmaState, AccountMap};
 use plasma::models::circuit::{Account, AccountTree};
 
 use super::config::{TRANSFER_BATCH_SIZE, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE};
 
-use super::models::{EncodedProof, Operation, Action, EthBlockData};
+use super::models::{EncodedProof, Operation, Action, EthBlockData, ProverRequest};
 use super::storage::{ConnectionPool, StorageProcessor};
 
 use plasma::circuit::utils::be_bit_vector_into_bytes;
@@ -50,6 +50,7 @@ pub struct Prover<E:JubjubEngine> {
     pub deposit_parameters: BabyParameters,
     pub exit_parameters: BabyParameters,
     pub jubjub_params: E::Params,
+    pub pool: ConnectionPool,
 }
 
 pub type BabyProof = Proof<Engine>;
@@ -119,6 +120,14 @@ fn read_parameters(file_name: &str) -> Result<BabyParameters, BabyProverErr> {
     Ok(circuit_params.unwrap())
 }
 
+fn extend_accounts<I: Sized + Iterator<Item=(AccountId, plasma::models::Account)>>(tree: &mut AccountTree, accounts: I) {
+    for e in accounts {
+        let acc_number = e.0;
+        let leaf_copy = Account::from(e.1.clone());
+        tree.insert(acc_number, leaf_copy);
+    }
+}
+
 // IMPORTANT: prover does NOT care about some ordering of the transactions, so blocks supplied here MUST be ordered
 // for the application layer
 
@@ -139,21 +148,21 @@ impl BabyProver {
 
         println!("Reading proving key, may take a while");
 
-        let transfer_circuit_params = read_parameters("transfer_pk.key");
+        let transfer_circuit_params = read_parameters("keys/transfer_pk.key");
         if transfer_circuit_params.is_err() {
             return Err(transfer_circuit_params.err().unwrap());
         }
 
         println!("Done reading transfer key");
 
-        let deposit_circuit_params = read_parameters("deposit_pk.key");
+        let deposit_circuit_params = read_parameters("keys/deposit_pk.key");
         if deposit_circuit_params.is_err() {
             return Err(deposit_circuit_params.err().unwrap());
         }
 
         println!("Done reading deposit key");
 
-        let exit_circuit_params = read_parameters("exit_pk.key");
+        let exit_circuit_params = read_parameters("keys/exit_pk.key");
         if exit_circuit_params.is_err() {
             return Err(exit_circuit_params.err().unwrap());
         }
@@ -164,15 +173,16 @@ impl BabyProver {
 
         // TODO: replace with .clone() by moving PedersenHasher to static context
         let mut tree = AccountTree::new(params::BALANCE_TREE_DEPTH as u32);
-        {
-            let iter = initial_state.get_accounts().into_iter();
+        extend_accounts(&mut tree, initial_state.get_accounts().into_iter());
+        // {
+        //     let iter = initial_state.get_accounts().into_iter();
 
-            for e in iter {
-                let acc_number = e.0;
-                let leaf_copy = Account::from(e.1.clone());
-                tree.insert(acc_number, leaf_copy);
-            }
-        }
+        //     for e in iter {
+        //         let acc_number = e.0;
+        //         let leaf_copy = Account::from(e.1.clone());
+        //         tree.insert(acc_number, leaf_copy);
+        //     }
+        // }
 
         let root = tree.root_hash();
 
@@ -197,7 +207,8 @@ impl BabyProver {
             transfer_parameters: transfer_circuit_params.unwrap(),
             deposit_parameters: deposit_circuit_params.unwrap(),
             exit_parameters: exit_circuit_params.unwrap(),
-            jubjub_params: jubjub_params
+            jubjub_params,
+            pool,
         })
     }
 }
@@ -996,11 +1007,17 @@ impl BabyProver {
 
     fn run(
             &mut self,
-            rx_for_blocks: mpsc::Receiver<(u32, Block, EthBlockData, AccountMap)>, 
+            rx_for_blocks: mpsc::Receiver<ProverRequest>, 
             tx_for_ops: mpsc::Sender<Operation>
         ) 
     {
-        for (block_number, block, block_data, accounts_updated) in rx_for_blocks {
+        for ProverRequest(block_number, block, block_data, accounts_updated) in rx_for_blocks {
+            // fast forward state: self.block_number => block_number
+            let connection = self.pool.pool.get().expect("must get connection from the pool");
+            let storage = StorageProcessor::from_connection(connection);
+            let (_, updated_accounts) = storage.load_state_diff(self.block_number, block_number).expect("loading from db must work");
+            extend_accounts(&mut self.accounts_tree, updated_accounts.into_iter());
+
             let proof = self.apply_and_prove(block).unwrap();
             tx_for_ops.send(Operation{
                 action: Action::Verify{
@@ -1016,7 +1033,7 @@ impl BabyProver {
 
 pub fn start_prover(
         mut prover: BabyProver,
-        rx_for_blocks: mpsc::Receiver<(u32, Block, EthBlockData, AccountMap)>, 
+        rx_for_blocks: mpsc::Receiver<ProverRequest>, 
         tx_for_ops: mpsc::Sender<Operation>
     ) 
 {

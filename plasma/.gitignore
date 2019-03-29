@@ -1,7 +1,4 @@
 /target
-**/*.rs.bk
-.vscode
-*.key
-*.sol
-start_demo.sh
-.env
+/env
+/deploy.log
+/*.bak

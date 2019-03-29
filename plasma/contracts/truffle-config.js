@@ -44,25 +44,14 @@ module.exports = {
           gas: 6800000,
           from: "0x5cc401a56a5295709958e07519755a53b0506b1e",
           network_id: "*" // match any network
-        },
-        
+        },   
 
       rinkeby:{
         network_id: 4,
         gas: 6800000,
         provider: function() { 
           const HDWalletProvider = require("truffle-hdwallet-provider");
-          let url = `https://rinkeby.infura.io/${process.env.INFURA_PROJECT_ID}`
-          let mnemonic = process.env.MNEMONIC
-          return new HDWalletProvider(mnemonic, url) 
-        },
-      },
-
-      ropsten:{
-        network_id: 3,
-        provider: function() { 
-          const HDWalletProvider = require("truffle-hdwallet-provider");
-          let url = `https://ropsten.infura.io/${process.env.INFURA_PROJECT_ID}`
+          let url = `https://rinkeby.infura.io/v3/${process.env.INFURA_PROJECT_ID}`
           let mnemonic = process.env.MNEMONIC
           return new HDWalletProvider(mnemonic, url) 
         },

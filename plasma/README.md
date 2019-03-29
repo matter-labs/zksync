@@ -11,6 +11,12 @@ rustc --version
 rustc 1.32.0-nightly (21f268495 2018-12-02)
 ```
 
+## Config
+
+All environment variables must be located in a single file `/env`.
+
+- Copy `/env.example` to `/env` and set all of them correctly
+
 ## Database
 
 ### Testing
@@ -26,7 +32,9 @@ rustc 1.32.0-nightly (21f268495 2018-12-02)
 
 This will create database 'plasma' (db url is set in [server/.env] file) with our schema.
 
-- To reset migrations (will reset the db), run from server dir:
+- Move `server/schema.rs.generated` to `server/src/schema.rs`
+
+- To reset migrations (will reset the db), run:
 
 ```diesel migration redo```
 
@@ -52,7 +60,7 @@ Move files to proper locations:
 
 ```shell
 mv -f n*VerificationKey.sol ./contracts/contracts/
-mv -f *_pk.key ./server/
+mv -f *_pk.key ./server/keys/
 ```
 
 If the pregenerated leaf format changes, replace the `EMPTY_TREE_ROOT` constant in `contracts/contracts/PlasmaStorage.sol`.
@@ -86,15 +94,11 @@ So you need to rebuild the code on every change (to be automated soon).
 
 After the keys have been generated and copied to contracts:
 
-- copy `contracts/scripts/deploy_example.sh` to `contracts/deploy.sh`
-- add mnemonics
-- add infura id to `WEB3_URL` as: `WEB3_URL=https://rinkeby.infura.io/{infura_project_id}` (optional, seems to work without it too)
-- launch `./deploy.sh`
+- run `redeploy`
 
 Update addresses (make sure to exclude 0x !):
 
-- copy contracts address of `PlasmaContract` to `CONTRACT_ADDR` in `server/.env` 
-- in the same file, set up proper values for `SENDER_ACCOUNT` and `PRIVATE_KEY`
+- copy contracts address of `PlasmaContract` to `CONTRACT_ADDR` in `/env` 
 
 ### Publish source
 
@@ -104,13 +108,10 @@ yarn flatten
 
 ## Server
 
-Copy `server/start_demo_example.sh` by inserting proper URLs, addresses and keys
-
 ### Running locally
 
 ```shell
-cd server
-./run.sh
+run
 ```
 
 ### Running in production
@@ -118,14 +119,13 @@ cd server
 To launch and restart:
 
 ```shell
-cd server
-./launch.sh
+launch
 ```
 
 To stop (Note, that Ctrl+C won't work! You need to run stop from a new terminal):
 
 ```shell
-./stop.sh
+stop
 ```
 
 ## Client UI
@@ -148,5 +148,5 @@ yarn run build
 Single command to build and deploy to github pages:
 
 ```
-./scripts/deploy-client
+update-client
 ```

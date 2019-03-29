@@ -29,7 +29,7 @@ pub type AccountMap = fnv::FnvHashMap<u32, Account>;
 
 pub type BatchNumber = u32;
 pub type BlockNumber = u32;
-pub type AccountId= u32;
+pub type AccountId = u32;
 pub type Nonce = u32;
 
 #[derive(Clone, Serialize, Deserialize)]
