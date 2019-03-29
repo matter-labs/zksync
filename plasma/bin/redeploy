@@ -17,5 +17,5 @@ echo New contract at $NEW_CONTRACT
 OLD_CONTRACT=`grep CONTRACT_ADDR env | grep -oE '=(.+)' | sed -n "s/=//p"`
 echo Old contract at $OLD_CONTRACT
 
-sed -i"-`date +%Y-%m-%d-%H%M%S`.bak" "s/$OLD_CONTRACT/$NEW_CONTRACT/g" ./env
+sed -i"-`date +%Y-%m-%d-%H%M%S`.bak" "s/CONTRACT_ADDR=$OLD_CONTRACT/CONTRACT_ADDR=$NEW_CONTRACT/g" ./env
 
