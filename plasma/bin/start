@@ -1,13 +1,13 @@
 #!/bin/sh
 
 # This script shall be used on on server; it starts run.sh internally
+#export PATH="$HOME/.cargo/bin:$PATH"
 
+. ./env
 ps auxw | grep target/release/server | grep -v grep > /dev/null
 
 if [ $? != 0 ]
 then
-    cp $LOGFILE plasma-`date +%Y-%m-%d-%H%M%S`.log
-
-    export PATH="$HOME/.cargo/bin:$PATH"
-    ./run 2>&1 | tee $LOGFILE
+    cp $LOGFILE $LOGDIR/plasma-`date +%Y-%m-%d-%H%M%S`.log
+    bin/run 2>&1 | tee $LOGFILE
 fi

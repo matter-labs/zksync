@@ -5,5 +5,7 @@ PROCESS_ID=`ps aux | grep target/release/server | grep -v grep | grep -o -E '[0-
 if [ ! -z "$PROCESS_ID" ]
 then
     kill -9 $PROCESS_ID
-    echo server stopped -- process id $PROCESS_ID
+    echo "Server stopped (PID $PROCESS_ID)"
+else 
+    echo "No server running"
 fi
