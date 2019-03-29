@@ -5,15 +5,15 @@
 #![allow(unused_imports)]
 #![allow(unused)]
 
-pub mod models;
+extern crate models;
+extern crate storage;
+
 pub mod rest_api;
 pub mod state_keeper;
 pub mod prover;
 pub mod committer;
 pub mod config;
 pub mod eth_watch;
-pub mod storage;
-pub mod schema;
 
 extern crate plasma;
 

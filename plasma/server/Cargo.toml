@@ -8,6 +8,8 @@ path = "bin/server.rs"
 
 [dependencies]
 plasma = { path = ".." }
+models= { path = "models" }
+storage = { path = "storage" }
 
 ff = { path = "../../ff", features = ["derive"] }
 pairing = { path = "../../pairing" }
@@ -46,3 +48,10 @@ dotenv = "0.9.0"
 
 ctrlc = { version = "3.1.1", features = ["termination"] }
 signal-hook = "0.1.8"
+
+[workspace]
+
+members = [
+    "models",
+    "storage"
+]

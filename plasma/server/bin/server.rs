@@ -1,5 +1,6 @@
 extern crate server;
-
+extern crate storage;
+extern crate models;
 extern crate ctrlc;
 extern crate signal_hook;
 
@@ -10,8 +11,9 @@ use server::state_keeper::{PlasmaStateKeeper, start_state_keeper};
 use server::rest_api::start_api_server;
 use server::committer;
 use server::eth_watch::{EthWatch, start_eth_watch};
-use server::storage::{ConnectionPool};
-use server::models::StateKeeperRequest;
+
+use storage::{ConnectionPool};
+use models::StateKeeperRequest;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -44,9 +46,9 @@ fn main() {
     std::thread::Builder::new().name("timer".to_string()).spawn(move || {
         loop {
             std::thread::sleep(std::time::Duration::from_secs(15));
-            tx_for_state_ticker.send(StateKeeperRequest::TimerTick);
+            tx_for_state_ticker.send(StateKeeperRequest::TimerTick).expect("tx_for_state_ticker channel failed");
         }
-    });
+    }).expect("threade creation failed");
 
     start_api_server(tx_for_state.clone(), connection_pool.clone());
     start_eth_watch(eth_watch, tx_for_state.clone());
@@ -58,7 +60,7 @@ fn main() {
 
     std::thread::Builder::new().name("timer".to_string()).spawn(move || {
         committer::run_committer(rx_for_ops, tx_for_eth, tx_for_proof_requests, connection_pool.clone());
-    });
+    }).expect("threade creation failed");
 
     while !stop_signal.load(Ordering::SeqCst) {
         std::thread::sleep(std::time::Duration::from_secs(1));

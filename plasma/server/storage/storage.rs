@@ -1,15 +1,25 @@
+extern crate models;
+extern crate plasma;
+
+#[macro_use]
+extern crate diesel;
+extern crate bigdecimal;
+extern crate serde_json;
+
 use plasma::models::*;
-use crate::schema::*;
-use super::models::{Operation, Action, StoredOperation};
+use models::{Operation, Action};
+
+mod schema;
+use schema::*;
 
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
 use diesel::sql_types::Integer;
 use diesel::result::Error;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
-use dotenv::dotenv;
-use std::env;
+
 use serde_json::{to_value, value::Value};
+use std::env;
 use std::iter::FromIterator;
 
 #[derive(Clone)]
@@ -19,7 +29,6 @@ pub struct ConnectionPool {
 
 impl ConnectionPool {
     pub fn new() -> Self {
-        dotenv().ok();
         let database_url = env::var("DATABASE_URL")
             .expect("DATABASE_URL must be set");
 
@@ -56,6 +65,17 @@ struct NewOperation {
     pub action_type:    String,
 }
 
+#[derive(Debug, Queryable, QueryableByName)]
+#[table_name="operations"]
+pub struct StoredOperation {
+    pub id:             i32,
+    pub data:           serde_json::Value,
+    pub addr:           String,
+    pub nonce:          i32,
+    pub block_number:   i32,
+    pub action_type:    String,
+    pub created_at:     std::time::SystemTime,
+}
 
 #[derive(Debug, QueryableByName)]
 pub struct IntegerNumber {

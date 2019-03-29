@@ -5,6 +5,8 @@ pub mod circuit;
 pub mod block;
 pub mod tx;
 
+pub use web3::types::{U256, U128, H256};
+
 use pairing::bn256;
 use crate::merkle_tree::{SparseMerkleTree, PedersenHasher};
 use sapling_crypto::eddsa;
