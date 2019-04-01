@@ -1,23 +1,17 @@
 use ff::{
     PrimeField,
-    Field,
     BitIterator,
-    PrimeFieldRepr
 };
 
 use sapling_crypto::jubjub::{
     JubjubEngine,
     FixedGenerators,
-    Unknown,
-    edwards,
-    JubjubParams
 };
 
 use super::boolean;
 use super::num::{AllocatedNum};
 
 use sapling_crypto::eddsa::{
-    Signature,
     PrivateKey,
     PublicKey
 };
