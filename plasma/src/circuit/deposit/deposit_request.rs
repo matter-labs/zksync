@@ -1,46 +1,16 @@
 use ff::{
     PrimeField,
-    Field,
     BitIterator,
-    PrimeFieldRepr
-};
-
-use bellman::{
-    SynthesisError,
-    ConstraintSystem,
-    Circuit
 };
 
 use sapling_crypto::jubjub::{
     JubjubEngine,
-    FixedGenerators,
     Unknown,
     edwards,
-    JubjubParams,
     edwards::Point,
 };
 
-use super::Assignment;
-use super::boolean;
-use super::ecc;
-use super::pedersen_hash;
-use super::sha256;
-use super::num;
-use super::multipack;
-use super::num::{AllocatedNum, Num};
-use super::float_point::{parse_with_exponent_le, convert_to_float};
-use super::baby_eddsa::EddsaSignature;
-
-use sapling_crypto::eddsa::{
-    Signature,
-    PrivateKey,
-    PublicKey
-};
-
-use sapling_crypto::alt_babyjubjub::*;
-
 use crate::models::params as plasma_constants;
-use crate::circuit::utils::{le_bit_vector_into_field_element};
 
 // This is deposit request
 

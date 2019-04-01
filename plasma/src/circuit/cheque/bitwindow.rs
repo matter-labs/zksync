@@ -40,16 +40,16 @@ pub struct BitSet<'a, E: JubjubEngine> {
 
 }
 
-fn print_boolean_vector(vector: &[boolean::Boolean]) {
-    for b in vector {
-        if b.get_value().unwrap() {
-            print!("1");
-        } else {
-            print!("0");
-        }
-    }
-    print!("\n");
-}
+// fn print_boolean_vector(vector: &[boolean::Boolean]) {
+//     for b in vector {
+//         if b.get_value().unwrap() {
+//             print!("1");
+//         } else {
+//             print!("0");
+//         }
+//     }
+//     print!("\n");
+// }
 
 // generate a set of lookup polynomials
 // - first one outputs a bitmask for a shift (shift by 1 bit -> mask is 0x000000....1 as Fr)
@@ -170,7 +170,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
     {
         let bitfield_length = 128u128;
         let shift_length = 64u128;
-        let log_shift_length = 6;
+        // let log_shift_length = 6;
 
         // distance in range [0, 127] is without shift
         // distance [128, 191] is with shift
@@ -201,7 +201,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
 
         let two_inverted = E::Fr::from_str("2").unwrap().inverse().unwrap();
 
-        let mut current_bits = current_bits_fe.into_bits_le(
+        let current_bits = current_bits_fe.into_bits_le(
             cs.namespace(|| "get current bits")
         )?;
 
@@ -286,7 +286,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
             |lc| lc + CS::one()
         );
 
-        let mut mask_bits = mask_fe.into_bits_le(cs.namespace(|| "bitshift mask bit decomposition"))?;
+        let mask_bits = mask_fe.into_bits_le(cs.namespace(|| "bitshift mask bit decomposition"))?;
 
         // current_bits.truncate(bitfield_length as usize);
         // mask_bits.truncate(bitfield_length as usize);
@@ -460,7 +460,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
 mod test {
         
     use super::*;
-    
+
     use ff::{
         BitIterator,
         PrimeFieldRepr,
