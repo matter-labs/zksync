@@ -5,12 +5,10 @@ use sapling_crypto::jubjub::{
 use bellman::{ConstraintSystem, SynthesisError};
 use super::Assignment;
 use super::boolean;
-use super::num::{AllocatedNum, Num};
-use super::float_point::{parse_with_exponent_le, convert_to_float};
-use super::baby_eddsa::EddsaSignature;
+use super::num::{AllocatedNum};
 
 use crate::models::params as plasma_constants;
-use crate::circuit::utils::{le_bit_vector_into_field_element, allocate_audit_path, append_packed_public_key};
+use crate::circuit::utils::{append_packed_public_key};
 
 #[derive(Clone)]
 pub struct LeafWitness<E: JubjubEngine> {

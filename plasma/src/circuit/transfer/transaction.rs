@@ -5,12 +5,6 @@ use ff::{
     PrimeFieldRepr
 };
 
-use bellman::{
-    SynthesisError,
-    ConstraintSystem,
-    Circuit
-};
-
 use sapling_crypto::jubjub::{
     JubjubEngine,
     FixedGenerators,
@@ -19,16 +13,8 @@ use sapling_crypto::jubjub::{
     JubjubParams
 };
 
-use super::Assignment;
 use super::boolean;
-use super::ecc;
-use super::pedersen_hash;
-use super::sha256;
-use super::num;
-use super::multipack;
-use super::num::{AllocatedNum, Num};
-use super::float_point::{parse_with_exponent_le, convert_to_float};
-use super::baby_eddsa::EddsaSignature;
+use super::num::{AllocatedNum};
 
 use sapling_crypto::eddsa::{
     Signature,
@@ -37,7 +23,7 @@ use sapling_crypto::eddsa::{
 };
 
 use crate::models::params as plasma_constants;
-use crate::circuit::utils::{le_bit_vector_into_field_element, allocate_audit_path, append_packed_public_key};
+use crate::circuit::utils::{le_bit_vector_into_field_element};
 
 use crate::models::circuit::sig::{TransactionSignature};
 // This is transaction data

@@ -1,8 +1,6 @@
 use ff::{
     PrimeField,
     Field,
-    BitIterator,
-    PrimeFieldRepr
 };
 
 use bellman::{
@@ -14,8 +12,6 @@ use bellman::{
 use sapling_crypto::jubjub::{
     JubjubEngine,
     FixedGenerators,
-    Unknown,
-    edwards,
     JubjubParams
 };
 
@@ -26,13 +22,13 @@ use super::pedersen_hash;
 use super::sha256;
 use super::num;
 use super::num::{AllocatedNum, Num};
-use super::float_point::{parse_with_exponent_le, convert_to_float};
+use super::float_point::{parse_with_exponent_le};
 use super::baby_eddsa::EddsaSignature;
 
 use crate::models::params as plasma_constants;
 pub use super::super::leaf::LeafWitness;
 use super::super::leaf::{LeafContent, make_leaf_content};
-use crate::circuit::utils::{le_bit_vector_into_field_element, allocate_audit_path, append_packed_public_key};
+use crate::circuit::utils::{allocate_audit_path, append_packed_public_key};
 use super::transaction::{Transaction, TransactionContent};
 
 #[derive(Clone)]
@@ -1184,289 +1180,299 @@ fn apply_transaction<E, CS>(
 //     print!("\n");
 // }
 
-#[test]
-fn test_bits_into_fr(){
-    use ff::{PrimeField};
-    use pairing::bn256::*;
-    use std::str::FromStr;
+#[cfg(test)]
+mod test {
 
-    // representation of 4 + 8 + 256 = 12 + 256 = 268 = 0x010c;
-    let bits: Vec<bool> = [false, false, true, true, false, false, false, false, true].to_vec();
+    use super::*;
+    use ff::{BitIterator, PrimeFieldRepr};
+    use crate::circuit::utils::{le_bit_vector_into_field_element};
+    use super::super::float_point::{convert_to_float};
 
-    let fe: Fr = le_bit_vector_into_field_element::<Fr>(&bits);
+    #[test]
+    fn test_bits_into_fr(){
+        use ff::{PrimeField};
+        use pairing::bn256::*;
+        use std::str::FromStr;
 
-    print!("{}\n", fe);
-}
+        // representation of 4 + 8 + 256 = 12 + 256 = 268 = 0x010c;
+        let bits: Vec<bool> = [false, false, true, true, false, false, false, false, true].to_vec();
 
+        let fe: Fr = le_bit_vector_into_field_element::<Fr>(&bits);
 
+        print!("{}\n", fe);
+    }
 
-#[test]
-fn test_transfer_circuit_with_witness() {
-    use sapling_crypto::eddsa::{PrivateKey, PublicKey, Signature};
-    use ff::{Field};
-    use pairing::bn256::*;
-    use rand::{SeedableRng, Rng, XorShiftRng, Rand};
-    use sapling_crypto::circuit::test::*;
-    use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
-    use crate::models::circuit::{AccountTree, Account};
-    // use super::super::account_tree::{AccountTree, Account};
-    use crypto::sha2::Sha256;
-    use crypto::digest::Digest;
-    use crate::circuit::utils::be_bit_vector_into_bytes;
 
-    extern crate hex;
 
-    let p_g = FixedGenerators::SpendingKeyGenerator;
-    let params = &AltJubjubBn256::new();
+    #[test]
+    fn test_transfer_circuit_with_witness() {
+        use sapling_crypto::eddsa::{PrivateKey, PublicKey, Signature};
+        use ff::{Field};
+        use pairing::bn256::*;
+        use rand::{SeedableRng, Rng, XorShiftRng, Rand};
+        use sapling_crypto::circuit::test::*;
+        use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
+        use crate::models::circuit::{AccountTree, Account};
+        // use super::super::account_tree::{AccountTree, Account};
+        use crypto::sha2::Sha256;
+        use crypto::digest::Digest;
+        use crate::circuit::utils::be_bit_vector_into_bytes;
 
-    let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        extern crate hex;
 
-    for _ in 0..1 {
-        let tree_depth = plasma_constants::BALANCE_TREE_DEPTH as u32;
-        let mut tree = AccountTree::new(tree_depth);
+        let p_g = FixedGenerators::SpendingKeyGenerator;
+        let params = &AltJubjubBn256::new();
 
-        let capacity = tree.capacity();
-        assert_eq!(capacity, 1 << plasma_constants::BALANCE_TREE_DEPTH);
+        let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
-        let sender_sk = PrivateKey::<Bn256>(rng.gen());
-        let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
-        let (sender_x, sender_y) = sender_pk.0.into_xy();
-    
-        let recipient_sk = PrivateKey::<Bn256>(rng.gen());
-        let recipient_pk = PublicKey::from_private(&recipient_sk, p_g, params);
-        let (recipient_x, recipient_y) = recipient_pk.0.into_xy();
+        for _ in 0..1 {
+            let tree_depth = plasma_constants::BALANCE_TREE_DEPTH as u32;
+            let mut tree = AccountTree::new(tree_depth);
 
-        // give some funds to sender and make zero balance for recipient
+            let capacity = tree.capacity();
+            assert_eq!(capacity, 1 << plasma_constants::BALANCE_TREE_DEPTH);
 
-        // let sender_leaf_number = 1;
-        // let recipient_leaf_number = 2;
+            let sender_sk = PrivateKey::<Bn256>(rng.gen());
+            let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
+            let (sender_x, sender_y) = sender_pk.0.into_xy();
+        
+            let recipient_sk = PrivateKey::<Bn256>(rng.gen());
+            let recipient_pk = PublicKey::from_private(&recipient_sk, p_g, params);
+            let (recipient_x, recipient_y) = recipient_pk.0.into_xy();
 
-        let mut sender_leaf_number : u32 = rng.gen();
-        sender_leaf_number = sender_leaf_number % capacity;
-        let mut recipient_leaf_number : u32 = rng.gen();
-        recipient_leaf_number = recipient_leaf_number % capacity;
-
-        let transfer_amount : u128 = 500;
-
-        let transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
-
-        let transfer_amount_bits = convert_to_float(
-            transfer_amount,
-            plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-            plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH,
-            10
-        ).unwrap();
-
-        let transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
-
-        let fee : u128 = 0;
-
-        let fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
-
-        let fee_bits = convert_to_float(
-            fee,
-            plasma_constants::FEE_EXPONENT_BIT_WIDTH,
-            plasma_constants::FEE_MANTISSA_BIT_WIDTH,
-            10
-        ).unwrap();
-
-        let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
-
-        let sender_leaf = Account {
-                balance:    Fr::from_str("1000").unwrap(),
-                nonce:      Fr::zero(),
-                pub_x:      sender_x,
-                pub_y:      sender_y,
-        };
+            // give some funds to sender and make zero balance for recipient
 
-        let recipient_leaf = Account {
-                balance:    Fr::zero(),
-                nonce:      Fr::one(),
-                pub_x:      recipient_x,
-                pub_y:      recipient_y,
-        };
+            // let sender_leaf_number = 1;
+            // let recipient_leaf_number = 2;
 
-        let initial_root = tree.root_hash();
-        print!("Empty root = {}\n", initial_root);
+            let mut sender_leaf_number : u32 = rng.gen();
+            sender_leaf_number = sender_leaf_number % capacity;
+            let mut recipient_leaf_number : u32 = rng.gen();
+            recipient_leaf_number = recipient_leaf_number % capacity;
 
-        tree.insert(sender_leaf_number, sender_leaf.clone());
-        tree.insert(recipient_leaf_number, recipient_leaf.clone());
+            let transfer_amount : u128 = 500;
 
-        let old_root = tree.root_hash();
-        print!("Old root = {}\n", old_root);
+            let transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
 
-        print!("Sender leaf hash is {}\n", tree.get_hash((tree_depth, sender_leaf_number)));
-        print!("Recipient leaf hash is {}\n", tree.get_hash((tree_depth, recipient_leaf_number)));
+            let transfer_amount_bits = convert_to_float(
+                transfer_amount,
+                plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+                plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH,
+                10
+            ).unwrap();
 
-        // check empty leafs 
+            let transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
 
-        // print!("Empty leaf hash is {}\n", tree.get_hash((tree_depth, 0)));
+            let fee : u128 = 0;
 
-        // print!("Verifying merkle proof for an old leaf\n");
-        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-        // print!("Done verifying merkle proof for an old leaf, result {}\n", inc);
+            let fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
 
-        let path_from : Vec<Option<Fr>> = tree.merkle_path(sender_leaf_number).into_iter().map(|e| Some(e.0)).collect();
-        let path_to: Vec<Option<Fr>>  = tree.merkle_path(recipient_leaf_number).into_iter().map(|e| Some(e.0)).collect();
+            let fee_bits = convert_to_float(
+                fee,
+                plasma_constants::FEE_EXPONENT_BIT_WIDTH,
+                plasma_constants::FEE_MANTISSA_BIT_WIDTH,
+                10
+            ).unwrap();
 
-        let from = Fr::from_str(& sender_leaf_number.to_string());
-        let to = Fr::from_str(& recipient_leaf_number.to_string());
+            let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
 
-        let mut transaction : Transaction<Bn256> = Transaction {
-            from: from,
-            to: to,
-            amount: Some(transfer_amount_encoded),
-            fee: Some(fee_encoded),
-            nonce: Some(Fr::zero()),
-            good_until_block: Some(Fr::one()),
-            signature: None
-        };
-
-        transaction.sign(
-            &sender_sk,
-            p_g,
-            params,
-            rng
-        );
-
-        assert!(transaction.signature.is_some());
-
-        let mut updated_sender_leaf = sender_leaf.clone();
-        let mut updated_recipient_leaf = recipient_leaf.clone();
-
-        let leaf_witness_from = LeafWitness {
-            balance: Some(sender_leaf.balance),
-            nonce: Some(sender_leaf.nonce),
-            pub_x: Some(sender_leaf.pub_x),
-            pub_y: Some(sender_leaf.pub_y),
-        };
-
-        let leaf_witness_to = LeafWitness {
-            balance: Some(recipient_leaf.balance),
-            nonce: Some(recipient_leaf.nonce),
-            pub_x: Some(recipient_leaf.pub_x),
-            pub_y: Some(recipient_leaf.pub_y),
-        };
-
-        let transaction_witness = TransactionWitness {
-            leaf_from: leaf_witness_from,
-            auth_path_from: path_from,
-            leaf_to: leaf_witness_to,
-            auth_path_to: path_to,
-        };
-
-        updated_sender_leaf.balance.sub_assign(&transfer_amount_as_field_element);
-        updated_sender_leaf.nonce.add_assign(&Fr::one());
-
-        print!("Updated sender: \n");
-        print!("Amount: {}\n", updated_sender_leaf.clone().balance);
-        print!("Nonce: {}\n", updated_sender_leaf.clone().nonce);
-
-        updated_recipient_leaf.balance.add_assign(&transfer_amount_as_field_element);
-        print!("Updated recipient: \n");
-        print!("Amount: {}\n", updated_recipient_leaf.clone().balance);
-        print!("Nonce: {}\n", updated_recipient_leaf.clone().nonce);
-
-        tree.insert(sender_leaf_number, updated_sender_leaf.clone());
-        tree.insert(recipient_leaf_number, updated_recipient_leaf.clone());
-
-        print!("Final sender leaf hash is {}\n", tree.get_hash((tree_depth, sender_leaf_number)));
-        print!("Final recipient leaf hash is {}\n", tree.get_hash((tree_depth, recipient_leaf_number)));
-
-        // assert!(tree.verify_proof(sender_leaf_number, updated_sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-        // assert!(tree.verify_proof(recipient_leaf_number, updated_recipient_leaf.clone(), tree.merkle_path(recipient_leaf_number)));
-
-        let new_root = tree.root_hash();
-
-        print!("New root = {}\n", new_root);
-
-        assert!(old_root != new_root);
-
-        {
-            let mut cs = TestConstraintSystem::<Bn256>::new();
-
-            let mut public_data_initial_bits = vec![];
-
-            // these two are BE encodings because an iterator is BE. This is also an Ethereum standard behavior
-
-            let block_number_bits: Vec<bool> = BitIterator::new(Fr::one().into_repr()).collect();
-            for _ in 0..256-block_number_bits.len() {
-                public_data_initial_bits.push(false);
-            }
-            public_data_initial_bits.extend(block_number_bits.into_iter());
-
-            let total_fee_bits: Vec<bool> = BitIterator::new(Fr::zero().into_repr()).collect();
-            for _ in 0..256-total_fee_bits.len() {
-                public_data_initial_bits.push(false);
-            }
-            public_data_initial_bits.extend(total_fee_bits.into_iter());
-
-            assert_eq!(public_data_initial_bits.len(), 512);
-
-            let mut h = Sha256::new();
-
-            let bytes_to_hash = be_bit_vector_into_bytes(&public_data_initial_bits);
-
-            h.input(&bytes_to_hash);
-
-            let mut hash_result = [0u8; 32];
-            h.result(&mut hash_result[..]);
-
-
-            print!("Initial hash hex {}\n", hex::encode(hash_result.clone()));
-
-            let mut packed_transaction_data = vec![];
-            let transaction_data = transaction.public_data_into_bits();
-            packed_transaction_data.extend(transaction_data.clone().into_iter());
-
-            let packed_transaction_data_bytes = be_bit_vector_into_bytes(&packed_transaction_data);
-
-            print!("Packed transaction data hex {}\n", hex::encode(packed_transaction_data_bytes.clone()));
-
-            let mut next_round_hash_bytes = vec![];
-            next_round_hash_bytes.extend(hash_result.iter());
-            next_round_hash_bytes.extend(packed_transaction_data_bytes);
-            // assert_eq!(next_round_hash_bytes.len(), 64);
-
-            h = Sha256::new();
-            h.input(&next_round_hash_bytes);
-            hash_result = [0u8; 32];
-            h.result(&mut hash_result[..]);
-
-            print!("Final hash as hex {}\n", hex::encode(hash_result.clone()));
-
-            hash_result[0] &= 0x1f; // temporary solution
-
-            let mut repr = Fr::zero().into_repr();
-            repr.read_be(&hash_result[..]).expect("pack hash as field element");
-
-            let public_data_commitment = Fr::from_repr(repr).unwrap();
-
-            print!("Final data commitment as field element = {}\n", public_data_commitment);
-
-            let instance = Transfer {
-                params: params,
-                number_of_transactions: 1,
-                old_root: Some(old_root),
-                new_root: Some(new_root),
-                public_data_commitment: Some(public_data_commitment),
-                block_number: Some(Fr::one()),
-                total_fee: Some(Fr::zero()),
-                transactions: vec![(transaction, transaction_witness)],
+            let sender_leaf = Account {
+                    balance:    Fr::from_str("1000").unwrap(),
+                    nonce:      Fr::zero(),
+                    pub_x:      sender_x,
+                    pub_y:      sender_y,
             };
 
-            instance.synthesize(&mut cs).unwrap();
+            let recipient_leaf = Account {
+                    balance:    Fr::zero(),
+                    nonce:      Fr::one(),
+                    pub_x:      recipient_x,
+                    pub_y:      recipient_y,
+            };
 
-            print!("{}\n", cs.find_unconstrained());
+            let initial_root = tree.root_hash();
+            print!("Empty root = {}\n", initial_root);
 
-            print!("{}\n", cs.num_constraints());
+            tree.insert(sender_leaf_number, sender_leaf.clone());
+            tree.insert(recipient_leaf_number, recipient_leaf.clone());
 
-            assert_eq!(cs.num_inputs(), 4);
+            let old_root = tree.root_hash();
+            print!("Old root = {}\n", old_root);
 
-            let err = cs.which_is_unsatisfied();
-            if err.is_some() {
-                panic!("ERROR satisfying in {}\n", err.unwrap());
+            print!("Sender leaf hash is {}\n", tree.get_hash((tree_depth, sender_leaf_number)));
+            print!("Recipient leaf hash is {}\n", tree.get_hash((tree_depth, recipient_leaf_number)));
+
+            // check empty leafs 
+
+            // print!("Empty leaf hash is {}\n", tree.get_hash((tree_depth, 0)));
+
+            // print!("Verifying merkle proof for an old leaf\n");
+            //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+            // print!("Done verifying merkle proof for an old leaf, result {}\n", inc);
+
+            let path_from : Vec<Option<Fr>> = tree.merkle_path(sender_leaf_number).into_iter().map(|e| Some(e.0)).collect();
+            let path_to: Vec<Option<Fr>>  = tree.merkle_path(recipient_leaf_number).into_iter().map(|e| Some(e.0)).collect();
+
+            let from = Fr::from_str(& sender_leaf_number.to_string());
+            let to = Fr::from_str(& recipient_leaf_number.to_string());
+
+            let mut transaction : Transaction<Bn256> = Transaction {
+                from: from,
+                to: to,
+                amount: Some(transfer_amount_encoded),
+                fee: Some(fee_encoded),
+                nonce: Some(Fr::zero()),
+                good_until_block: Some(Fr::one()),
+                signature: None
+            };
+
+            transaction.sign(
+                &sender_sk,
+                p_g,
+                params,
+                rng
+            );
+
+            assert!(transaction.signature.is_some());
+
+            let mut updated_sender_leaf = sender_leaf.clone();
+            let mut updated_recipient_leaf = recipient_leaf.clone();
+
+            let leaf_witness_from = LeafWitness {
+                balance: Some(sender_leaf.balance),
+                nonce: Some(sender_leaf.nonce),
+                pub_x: Some(sender_leaf.pub_x),
+                pub_y: Some(sender_leaf.pub_y),
+            };
+
+            let leaf_witness_to = LeafWitness {
+                balance: Some(recipient_leaf.balance),
+                nonce: Some(recipient_leaf.nonce),
+                pub_x: Some(recipient_leaf.pub_x),
+                pub_y: Some(recipient_leaf.pub_y),
+            };
+
+            let transaction_witness = TransactionWitness {
+                leaf_from: leaf_witness_from,
+                auth_path_from: path_from,
+                leaf_to: leaf_witness_to,
+                auth_path_to: path_to,
+            };
+
+            updated_sender_leaf.balance.sub_assign(&transfer_amount_as_field_element);
+            updated_sender_leaf.nonce.add_assign(&Fr::one());
+
+            print!("Updated sender: \n");
+            print!("Amount: {}\n", updated_sender_leaf.clone().balance);
+            print!("Nonce: {}\n", updated_sender_leaf.clone().nonce);
+
+            updated_recipient_leaf.balance.add_assign(&transfer_amount_as_field_element);
+            print!("Updated recipient: \n");
+            print!("Amount: {}\n", updated_recipient_leaf.clone().balance);
+            print!("Nonce: {}\n", updated_recipient_leaf.clone().nonce);
+
+            tree.insert(sender_leaf_number, updated_sender_leaf.clone());
+            tree.insert(recipient_leaf_number, updated_recipient_leaf.clone());
+
+            print!("Final sender leaf hash is {}\n", tree.get_hash((tree_depth, sender_leaf_number)));
+            print!("Final recipient leaf hash is {}\n", tree.get_hash((tree_depth, recipient_leaf_number)));
+
+            // assert!(tree.verify_proof(sender_leaf_number, updated_sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+            // assert!(tree.verify_proof(recipient_leaf_number, updated_recipient_leaf.clone(), tree.merkle_path(recipient_leaf_number)));
+
+            let new_root = tree.root_hash();
+
+            print!("New root = {}\n", new_root);
+
+            assert!(old_root != new_root);
+
+            {
+                let mut cs = TestConstraintSystem::<Bn256>::new();
+
+                let mut public_data_initial_bits = vec![];
+
+                // these two are BE encodings because an iterator is BE. This is also an Ethereum standard behavior
+
+                let block_number_bits: Vec<bool> = BitIterator::new(Fr::one().into_repr()).collect();
+                for _ in 0..256-block_number_bits.len() {
+                    public_data_initial_bits.push(false);
+                }
+                public_data_initial_bits.extend(block_number_bits.into_iter());
+
+                let total_fee_bits: Vec<bool> = BitIterator::new(Fr::zero().into_repr()).collect();
+                for _ in 0..256-total_fee_bits.len() {
+                    public_data_initial_bits.push(false);
+                }
+                public_data_initial_bits.extend(total_fee_bits.into_iter());
+
+                assert_eq!(public_data_initial_bits.len(), 512);
+
+                let mut h = Sha256::new();
+
+                let bytes_to_hash = be_bit_vector_into_bytes(&public_data_initial_bits);
+
+                h.input(&bytes_to_hash);
+
+                let mut hash_result = [0u8; 32];
+                h.result(&mut hash_result[..]);
+
+
+                print!("Initial hash hex {}\n", hex::encode(hash_result.clone()));
+
+                let mut packed_transaction_data = vec![];
+                let transaction_data = transaction.public_data_into_bits();
+                packed_transaction_data.extend(transaction_data.clone().into_iter());
+
+                let packed_transaction_data_bytes = be_bit_vector_into_bytes(&packed_transaction_data);
+
+                print!("Packed transaction data hex {}\n", hex::encode(packed_transaction_data_bytes.clone()));
+
+                let mut next_round_hash_bytes = vec![];
+                next_round_hash_bytes.extend(hash_result.iter());
+                next_round_hash_bytes.extend(packed_transaction_data_bytes);
+                // assert_eq!(next_round_hash_bytes.len(), 64);
+
+                h = Sha256::new();
+                h.input(&next_round_hash_bytes);
+                hash_result = [0u8; 32];
+                h.result(&mut hash_result[..]);
+
+                print!("Final hash as hex {}\n", hex::encode(hash_result.clone()));
+
+                hash_result[0] &= 0x1f; // temporary solution
+
+                let mut repr = Fr::zero().into_repr();
+                repr.read_be(&hash_result[..]).expect("pack hash as field element");
+
+                let public_data_commitment = Fr::from_repr(repr).unwrap();
+
+                print!("Final data commitment as field element = {}\n", public_data_commitment);
+
+                let instance = Transfer {
+                    params: params,
+                    number_of_transactions: 1,
+                    old_root: Some(old_root),
+                    new_root: Some(new_root),
+                    public_data_commitment: Some(public_data_commitment),
+                    block_number: Some(Fr::one()),
+                    total_fee: Some(Fr::zero()),
+                    transactions: vec![(transaction, transaction_witness)],
+                };
+
+                instance.synthesize(&mut cs).unwrap();
+
+                print!("{}\n", cs.find_unconstrained());
+
+                print!("{}\n", cs.num_constraints());
+
+                assert_eq!(cs.num_inputs(), 4);
+
+                let err = cs.which_is_unsatisfied();
+                if err.is_some() {
+                    panic!("ERROR satisfying in {}\n", err.unwrap());
+                }
             }
         }
     }
+
 }
