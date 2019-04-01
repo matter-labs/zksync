@@ -281,7 +281,7 @@ impl StorageProcessor {
 
     pub fn load_last_committed_deposit_batch(&self) -> QueryResult<i32> {
         self.load_number("
-            SELECT COALESCE(max((data->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
+            SELECT COALESCE(max((block->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
             WHERE data->'action'->>'type' = 'Commit' 
             AND data->'block_data'->>'type' = 'Deposit'
         ")
@@ -289,7 +289,7 @@ impl StorageProcessor {
 
     pub fn load_last_committed_exit_batch(&self) -> QueryResult<i32> {
         self.load_number("
-            SELECT COALESCE(max((data->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
+            SELECT COALESCE(max((block->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
             WHERE data->'action'->>'type' = 'Commit' 
             AND data->'block_data'->>'type' = 'Exit'
         ")
