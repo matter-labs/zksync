@@ -1,14 +1,5 @@
 [workspace]
-
 members = [
-    "ff",
-    "ff/ff_derive",
-    "pairing",
-    "bellman",
-    "sapling-crypto",
-    "bellman-demo",
     "plasma",
     "plasma/server",
-    "powersoftau",
-    "plasma_cash_bonus"
 ]

@@ -23,7 +23,7 @@
   },
   "scripts": {
     "build": "solcjs -o bin --bin --abi contracts/*.sol",
-    "migrate": ". env && truffle migrate --reset --network dev",
+    "migrate": ". ../env && truffle migrate --reset --network dev",
     "ganache": "ganache-cli -l 7000000 -i 4 -m \"cliff flag flag fence mesh quarter coyote mechanic cash draw remain priority\" ",
     "start-geth": "geth --rpc --rpcapi \"eth,net,web3,personal\" --dev --miner.gastarget 8000000 --dev.period=1",
     "deploy": ". env && yarn truffle migrate --reset --network rinkeby",

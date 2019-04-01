@@ -1,9 +1,13 @@
-use web3::types::{U256, U128, H256};
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_bytes;
+extern crate plasma;
+
+pub mod config;
+pub mod encoder;
+
 use plasma::models::*;
 use std::sync::mpsc::{Sender};
-use std::sync::Arc;
-use crate::schema::*;
-use fnv::{FnvHashSet};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TransferTxConfirmation {
@@ -83,16 +87,4 @@ pub struct Operation {
     pub block_number:       u32, 
     pub block_data:         EthBlockData,
     pub accounts_updated:   AccountMap,
-}
-
-#[derive(Debug, Queryable, QueryableByName)]
-#[table_name="operations"]
-pub struct StoredOperation {
-    pub id:             i32,
-    pub data:           serde_json::Value,
-    pub addr:           String,
-    pub nonce:          i32,
-    pub block_number:   i32,
-    pub action_type:    String,
-    pub created_at:     std::time::SystemTime,
 }

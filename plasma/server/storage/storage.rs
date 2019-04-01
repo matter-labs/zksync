@@ -1,15 +1,26 @@
+extern crate server_models;
+extern crate plasma;
+extern crate fnv;
+
+#[macro_use]
+extern crate diesel;
+extern crate bigdecimal;
+extern crate serde_json;
+
 use plasma::models::*;
-use crate::schema::*;
-use super::models::{Operation, Action, StoredOperation};
+use server_models::{Operation, Action};
+
+mod schema;
+use schema::*;
 
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
 use diesel::sql_types::Integer;
 use diesel::result::Error;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
-use dotenv::dotenv;
-use std::env;
+
 use serde_json::{to_value, value::Value};
+use std::env;
 use std::iter::FromIterator;
 
 #[derive(Clone)]
@@ -19,7 +30,6 @@ pub struct ConnectionPool {
 
 impl ConnectionPool {
     pub fn new() -> Self {
-        dotenv().ok();
         let database_url = env::var("DATABASE_URL")
             .expect("DATABASE_URL must be set");
 
@@ -56,6 +66,17 @@ struct NewOperation {
     pub action_type:    String,
 }
 
+#[derive(Debug, Queryable, QueryableByName)]
+#[table_name="operations"]
+pub struct StoredOperation {
+    pub id:             i32,
+    pub data:           serde_json::Value,
+    pub addr:           String,
+    pub nonce:          i32,
+    pub block_number:   i32,
+    pub action_type:    String,
+    pub created_at:     std::time::SystemTime,
+}
 
 #[derive(Debug, QueryableByName)]
 pub struct IntegerNumber {
@@ -355,9 +376,8 @@ mod test {
         assert_eq!( state.get(&2).unwrap(), &acc(23) );
     }
 
-    use plasma::models::{Block, DepositBlock};
+    use plasma::models::{Block, DepositBlock, U256, H256};
     use crate::models::{Operation, EthBlockData, Action};
-    use web3::types::{U256, H256};
 
     #[test]
     fn test_store_txs() {

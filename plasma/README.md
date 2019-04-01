@@ -32,7 +32,7 @@ All environment variables must be located in a single file `/env`.
 
 This will create database 'plasma' (db url is set in [server/.env] file) with our schema.
 
-- Move `server/schema.rs.generated` to `server/src/schema.rs`
+- Rename `server/storage/schema.rs.generated` to `schema.rs`
 
 - To reset migrations (will reset the db), run:
 

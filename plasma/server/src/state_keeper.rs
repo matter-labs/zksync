@@ -11,8 +11,7 @@ use std::str::FromStr;
 
 use plasma::models::{self, *, block::GenericBlock};
 
-use super::models::{StateKeeperRequest, Operation, Action, EthBlockData, TransferTxResult, TransferTxConfirmation, NetworkStatus};
-use super::prover::BabyProver;
+use super::server_models::{encoder, StateKeeperRequest, Operation, Action, EthBlockData, TransferTxResult, TransferTxConfirmation, NetworkStatus};
 use super::storage::{ConnectionPool, StorageProcessor};
 use super::config;
 
@@ -214,7 +213,7 @@ impl PlasmaStateKeeper {
 
         let eth_block_data = EthBlockData::Transfer{
             total_fees:     U128::from_dec_str(&total_fees.to_string()).expect("fee should fit into U128 Ethereum type"), 
-            public_data:    BabyProver::encode_transfer_transactions(&block).unwrap(),
+            public_data:    encoder::encode_transfer_transactions(&block).unwrap(),
         };
 
         let mut be_bytes: Vec<u8> = vec![];
@@ -265,7 +264,7 @@ impl PlasmaStateKeeper {
 
         let eth_block_data = EthBlockData::Exit{ 
             batch_number,
-            public_data: BabyProver::encode_exit_transactions(&block).expect("must encode exit block information")
+            public_data: encoder::encode_exit_transactions(&block).expect("must encode exit block information")
         };
         let mut be_bytes: Vec<u8> = vec![];
         &block.new_root_hash.clone().into_repr().write_be(& mut be_bytes);

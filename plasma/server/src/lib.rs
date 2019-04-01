@@ -5,17 +5,17 @@
 #![allow(unused_imports)]
 #![allow(unused)]
 
-pub mod runner;
+extern crate server_models;
+extern crate storage;
 
-mod models;
-mod rest_api;
-mod state_keeper;
-mod prover;
-mod committer;
-mod config;
-mod eth_watch;
-mod storage;
-mod schema;
+pub mod rest_api;
+pub mod state_keeper;
+pub mod committer;
+pub mod eth_sender;
+
+pub use server_models::config;
+
+pub mod eth_watch;
 
 extern crate plasma;
 

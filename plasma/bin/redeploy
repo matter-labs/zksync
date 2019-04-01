@@ -1,21 +1,27 @@
 #!/bin/bash
 
-cd server
-#diesel migration redo
-cd ..
+cd `dirname $0`/..
 
 cd contracts
 echo yarn deploy
-#yarn deploy  | tee ../deploy.log
+yarn deploy  | tee ../deploy.log
 cd ..
 
 NEW_CONTRACT=`grep -A999 "Starting migrations" deploy.log | grep -A4 "Replacing 'PlasmaContract'" | grep "contract address" | grep -oE '0x(.+)' \
 | sed -n "s/0x//p"`
 
-echo New contract at $NEW_CONTRACT
+if [! -z $NEW_CONTRACT]
+then
+    echo New contract at $NEW_CONTRACT
 
-OLD_CONTRACT=`grep CONTRACT_ADDR env | grep -oE '=(.+)' | sed -n "s/=//p"`
-echo Old contract at $OLD_CONTRACT
+    OLD_CONTRACT=`grep CONTRACT_ADDR env | grep -oE '=(.+)' | sed -n "s/=//p"`
+    echo Old contract at $OLD_CONTRACT
 
-sed -i"-`date +%Y-%m-%d-%H%M%S`.bak" "s/$OLD_CONTRACT/$NEW_CONTRACT/g" ./env
+    sed -i"-`date +%Y-%m-%d-%H%M%S`.bak" "s/CONTRACT_ADDR=$OLD_CONTRACT/CONTRACT_ADDR=$NEW_CONTRACT/g" ./env
 
+    cd server/storage
+    diesel migration redo
+    cd ../..
+else
+    echo "Contract deployment failed"
+fi

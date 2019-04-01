@@ -1,12 +1,10 @@
-use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
+use ff::{Field, PrimeField, BitIterator};
 use sapling_crypto::jubjub::{JubjubEngine};
 use bellman::{ConstraintSystem, SynthesisError};
 
 use super::Assignment;
 use super::boolean;
 use super::num::{AllocatedNum, Num};
-use super::float_point::{parse_with_exponent_le, convert_to_float};
-use super::baby_eddsa::EddsaSignature;
 
 use crate::models::params as plasma_constants;
 

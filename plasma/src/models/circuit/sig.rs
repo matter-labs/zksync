@@ -1,9 +1,6 @@
 use sapling_crypto::alt_babyjubjub::{JubjubEngine};
-use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
-use sapling_crypto::eddsa::{PrivateKey, PublicKey};
-use sapling_crypto::jubjub::{FixedGenerators, Unknown, edwards};
-use crate::circuit::utils::{le_bit_vector_into_field_element};
-use sapling_crypto::circuit::float_point::{convert_to_float}; // TODO: move to primitives
+use ff::{Field};
+use sapling_crypto::jubjub::{Unknown, edwards};
 
 // use crate::models::params;
 

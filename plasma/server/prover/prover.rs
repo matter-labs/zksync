@@ -1,4 +1,14 @@
 extern crate rustc_hex;
+extern crate plasma;
+extern crate server_models;
+extern crate storage;
+
+extern crate rand;
+extern crate crypto;
+
+extern crate ff;
+extern crate bellman;
+extern crate sapling_crypto;
 
 use std::error::Error;
 use std::fmt;
@@ -18,13 +28,13 @@ use self::rustc_hex::ToHex;
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
 
 use plasma::models::{Engine, Fr, AccountId};
-use plasma::models::{self, params, TransferBlock, DepositBlock, ExitBlock, Block, PlasmaState, AccountMap};
+use plasma::models::{self, params, TransferBlock, DepositBlock, ExitBlock, Block, PlasmaState};
 use plasma::models::circuit::{Account, AccountTree};
 
-use super::config::{TRANSFER_BATCH_SIZE, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE};
-
-use super::models::{EncodedProof, Operation, Action, EthBlockData, ProverRequest};
-use super::storage::{ConnectionPool, StorageProcessor};
+use server_models::encoder;
+use server_models::config::{TRANSFER_BATCH_SIZE, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE};
+use server_models::{EncodedProof, Operation, Action, ProverRequest};
+use storage::{ConnectionPool, StorageProcessor};
 
 use plasma::circuit::utils::be_bit_vector_into_bytes;
 use plasma::circuit::transfer::transaction::{Transaction};
@@ -38,7 +48,7 @@ use plasma::circuit::transfer::circuit::{
     Transfer, 
     TransactionWitness};
 
-use plasma::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum, field_element_to_u32};
+use plasma::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, field_element_to_u32};
 
 pub struct Prover<E:JubjubEngine> {
     pub transfer_batch_size: usize,
@@ -133,6 +143,45 @@ fn extend_accounts<I: Sized + Iterator<Item=(AccountId, plasma::models::Account)
 
 impl BabyProver {
 
+    // Outputs
+    // - 8 uint256 for encoding of the field elements
+    // - one uint256 for new root hash
+    // - uint256 block number
+    // - uint256 total fees
+    // - Bytes public data
+    //
+    // Old root is available to take from the storage of the smart-contract
+    pub fn encode_proof(proof: &FullBabyProof) -> Result<EncodedProof, Err> {
+
+        // proof     
+        // pub a: E::G1Affine,
+        // pub b: E::G2Affine,
+        // pub c: E::G1Affine
+
+        let (a_x, a_y) = serialize_g1_for_ethereum(proof.proof.a);
+
+        let ((b_x_0, b_x_1), (b_y_0, b_y_1)) = serialize_g2_for_ethereum(proof.proof.b);
+
+        let (c_x, c_y) = serialize_g1_for_ethereum(proof.proof.c);
+
+        // let new_root = serialize_fe_for_ethereum(proof.inputs[1]);
+
+        // let total_fees = serialize_fe_for_ethereum(proof.total_fees);
+
+        // let block_number = serialize_fe_for_ethereum(proof.block_number);
+
+        // let public_data = proof.public_data.clone();
+
+        let p = [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y];
+
+        // EncodedProof{
+        //     groth_proof: [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y],
+        //     //block_number: block_number,
+        // };
+
+        Ok(p)
+    }
+
     pub fn create(pool: ConnectionPool) -> Result<BabyProver, BabyProverErr> {
 
         let connection = pool.pool.get();
@@ -217,105 +266,12 @@ type Err = BabyProverErr;
 
 impl BabyProver {
 
-    // Outputs
-    // - 8 uint256 for encoding of the field elements
-    // - one uint256 for new root hash
-    // - uint256 block number
-    // - uint256 total fees
-    // - Bytes public data
-    //
-    // Old root is available to take from the storage of the smart-contract
-    pub fn encode_proof(proof: &FullBabyProof) -> Result<EncodedProof, Err> {
-
-        // proof     
-        // pub a: E::G1Affine,
-        // pub b: E::G2Affine,
-        // pub c: E::G1Affine
-
-        let (a_x, a_y) = serialize_g1_for_ethereum(proof.proof.a);
-
-        let ((b_x_0, b_x_1), (b_y_0, b_y_1)) = serialize_g2_for_ethereum(proof.proof.b);
-
-        let (c_x, c_y) = serialize_g1_for_ethereum(proof.proof.c);
-
-        // let new_root = serialize_fe_for_ethereum(proof.inputs[1]);
-
-        // let total_fees = serialize_fe_for_ethereum(proof.total_fees);
-
-        // let block_number = serialize_fe_for_ethereum(proof.block_number);
-
-        // let public_data = proof.public_data.clone();
-
-        let p = [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y];
-
-        // EncodedProof{
-        //     groth_proof: [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y],
-        //     //block_number: block_number,
-        // };
-
-        Ok(p)
-    }
-
-    pub fn encode_transfer_transactions(block: &TransferBlock) -> Result<Vec<u8>, Err> {
-        let mut encoding: Vec<u8> = vec![];
-        
-        let transactions = &block.transactions;
-
-        for tx in transactions {
-            let tx = models::circuit::TransferTx::try_from(tx).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
-            let tx_bits = tx.public_data_into_bits();
-            let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
-            encoding.extend(tx_encoding.into_iter());
-        }
-
-        Ok(encoding)
-    }
-
-    pub fn encode_deposit_transactions(block: &DepositBlock) -> Result<Vec<u8>, Err> {
-        let mut encoding: Vec<u8> = vec![];
-
-        // let sorted_block = sorted_deposit_block(&block);
-        
-        let transactions = &block.transactions;
-
-        for tx in transactions {
-            let tx = models::circuit::DepositRequest::try_from(tx).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
-            let tx_bits = tx.public_data_into_bits();
-            let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
-            encoding.extend(tx_encoding.into_iter());
-        }
-
-        Ok(encoding)
-    }
-
-    // this method is different, it actually reads the state 
-    pub fn encode_exit_transactions(block: &ExitBlock) -> Result<Vec<u8>, Err> {
-        let mut encoding: Vec<u8> = vec![];
-                
-        let transactions = &block.transactions;
-
-        for tx in transactions {
-            let tx = models::circuit::ExitRequest::try_from(tx).map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
-            if (tx.amount == Fr::zero()) {
-                println!("Trying to exit a zero balance");
-            }
-            let tx_bits = tx.public_data_into_bits();
-            let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
-            encoding.extend(tx_encoding.into_iter());
-        }
-
-        // let public_data_hex: String = encoding.clone().to_hex();
-        // println!("Final encoding = {}", public_data_hex);
-
-        Ok(encoding)
-    }
-
     pub fn apply_and_prove(&mut self, block: Block) -> Result<FullBabyProof, Err> {
         match block {
-            Block::Deposit(block, batch_number) => {
+            Block::Deposit(block, _) => {
                 return self.apply_and_prove_deposit(&block);
             },
-            Block::Exit(block, batch_number) => {
+            Block::Exit(block, _) => {
                 return self.apply_and_prove_exit(&block);
             },
             Block::Transfer(block) => {
@@ -333,7 +289,7 @@ impl BabyProver {
         }
         let block_final_root = block.new_root_hash.clone();
 
-        let public_data: Vec<u8> = BabyProver::encode_transfer_transactions(block).unwrap();
+        let public_data: Vec<u8> = encoder::encode_transfer_transactions(block).unwrap();
 
         let transactions = &block.transactions;
         let num_txes = transactions.len();
@@ -614,7 +570,7 @@ impl BabyProver {
         }
         let block_final_root = block.new_root_hash.clone();
 
-        let public_data: Vec<u8> = BabyProver::encode_deposit_transactions(block).unwrap();
+        let public_data: Vec<u8> = encoder::encode_deposit_transactions(block).unwrap();
 
         let transactions = &block.transactions;
         let num_txes = transactions.len();
@@ -1032,14 +988,24 @@ impl BabyProver {
 }
 
 pub fn start_prover(
-        mut prover: BabyProver,
+        connection_pool: ConnectionPool,
         rx_for_blocks: mpsc::Receiver<ProverRequest>, 
         tx_for_ops: mpsc::Sender<Operation>
     ) 
 {
+    let mut prover = BabyProver::create(connection_pool.clone()).unwrap();
     std::thread::Builder::new().name("prover".to_string()).spawn(move || {
         prover.run(rx_for_blocks, tx_for_ops)
-    });
+    }).expect("prover thread must start");
+}
+
+pub fn start_prover_handler(
+        connection_pool: ConnectionPool,
+        rx_for_blocks: mpsc::Receiver<ProverRequest>, 
+        tx_for_ops: mpsc::Sender<Operation>
+    ) 
+{
+    start_prover(connection_pool.clone(), rx_for_blocks, tx_for_ops)
 }
 
 // #[test]

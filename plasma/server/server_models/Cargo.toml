@@ -1,0 +1,15 @@
+[package]
+name = "server_models"
+version = "0.0.1"
+
+workspace = "../../.."
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+plasma = { path = "../.." }
+
+serde = "1.0.80"
+serde_derive = "1.0.80"
+serde_bytes = "0.10.4"
