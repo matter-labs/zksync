@@ -1,57 +1,34 @@
-use super::{DepositBlock, TransferBlock, ExitBlock};
+//use super::{DepositBlock, TransferBlock, ExitBlock};
 use plasma::circuit::utils::be_bit_vector_into_bytes;
-use plasma::models;
+use plasma::models::circuit::{TransferTx, DepositRequest, ExitRequest};
+use plasma::models::{self, Block, BlockData};
 
-pub fn encode_transfer_transactions(block: &TransferBlock) -> Result<Vec<u8>, String> {
-    let mut encoding: Vec<u8> = vec![];
 
-    let transactions = &block.transactions;
-
-    for tx in transactions {
-        let tx = models::circuit::TransferTx::try_from(tx).map_err(|e| e.to_string())?; // BabyProverErr::InvalidTransaction(e.to_string())
-        let tx_bits = tx.public_data_into_bits();
-        let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
-        encoding.extend(tx_encoding.into_iter());
-    }
-
-    Ok(encoding)
+fn convert_transfer(transactions: &Vec<models::TransferTx>) -> Result<Vec<Vec<bool>>, String> {
+    transactions.iter().map(|tx| TransferTx::try_from(tx).map(|tx| tx.public_data_into_bits())).collect()
 }
 
-pub fn encode_deposit_transactions(block: &DepositBlock) -> Result<Vec<u8>, String> {
-    let mut encoding: Vec<u8> = vec![];
-
-    // let sorted_block = sorted_deposit_block(&block);
-
-    let transactions = &block.transactions;
-
-    for tx in transactions {
-        let tx = models::circuit::DepositRequest::try_from(tx).map_err(|e| e.to_string())?;
-        let tx_bits = tx.public_data_into_bits();
-        let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
-        encoding.extend(tx_encoding.into_iter());
-    }
-
-    Ok(encoding)
+fn convert_deposit(transactions: &Vec<models::DepositTx>) -> Result<Vec<Vec<bool>>, String> {
+    transactions.iter().map(|tx| DepositRequest::try_from(tx).map(|tx| tx.public_data_into_bits())).collect()
 }
 
-// this method is different, it actually reads the state 
-pub fn encode_exit_transactions(block: &ExitBlock) -> Result<Vec<u8>, String> {
+fn convert_exit(transactions: &Vec<models::ExitTx>) -> Result<Vec<Vec<bool>>, String> {
+    transactions.iter().map(|tx| ExitRequest::try_from(tx).map(|tx| tx.public_data_into_bits())).collect()
+}
+
+pub fn encode_transactions(block: &Block) -> Result<Vec<u8>, String> {
     let mut encoding: Vec<u8> = vec![];
 
-    let transactions = &block.transactions;
+    let transactions_bits: Vec<Vec<bool> > = match &block.block_data {
+        BlockData::Transfer{transactions, total_fees: _} =>     convert_transfer(transactions)?,
+        BlockData::Deposit{transactions, batch_number: _} =>    convert_deposit(transactions)?,
+        BlockData::Exit{transactions, batch_number: _} =>       convert_exit(transactions)?,
+    };
 
-    for tx in transactions {
-        let tx = models::circuit::ExitRequest::try_from(tx).map_err(|e| e.to_string())?;
-        // if tx.amount == Fr::zero() {
-        //     println!("Trying to exit a zero balance");
-        // }
-        let tx_bits = tx.public_data_into_bits();
+    for tx_bits in transactions_bits {
         let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
         encoding.extend(tx_encoding.into_iter());
     }
-
-    // let public_data_hex: String = encoding.clone().to_hex();
-    // println!("Final encoding = {}", public_data_hex);
 
     Ok(encoding)
 }

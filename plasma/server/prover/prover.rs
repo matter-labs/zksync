@@ -27,13 +27,13 @@ use self::rustc_hex::ToHex;
 
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
 
-use plasma::models::{Engine, Fr, AccountId};
-use plasma::models::{self, params, TransferBlock, DepositBlock, ExitBlock, Block, PlasmaState};
+use plasma::models::{Engine, Fr, AccountId, BlockData, TransferTx, DepositTx, ExitTx};
+use plasma::models::{self, params, Block, PlasmaState};
 use plasma::models::circuit::{Account, AccountTree};
 
 use server_models::encoder;
 use server_models::config::{TRANSFER_BATCH_SIZE, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE};
-use server_models::{EncodedProof, Operation, Action, ProverRequest};
+use server_models::{EncodedProof, CommitRequest, ProverRequest};
 use storage::{ConnectionPool, StorageProcessor};
 
 use plasma::circuit::utils::be_bit_vector_into_bytes;
@@ -266,22 +266,24 @@ type Err = BabyProverErr;
 
 impl BabyProver {
 
-    pub fn apply_and_prove(&mut self, block: Block) -> Result<FullBabyProof, Err> {
-        match block {
-            Block::Deposit(block, _) => {
-                return self.apply_and_prove_deposit(&block);
+    pub fn apply_and_prove(&mut self, block: &Block) -> Result<FullBabyProof, Err> {
+        // let block_number = block.block_number;
+        // let new_root_hash = block.new_root_hash;
+        match block.block_data {
+            BlockData::Deposit{batch_number: _, ref transactions} => {
+                return self.apply_and_prove_deposit(&block, transactions);
             },
-            Block::Exit(block, _) => {
-                return self.apply_and_prove_exit(&block);
+            BlockData::Exit{batch_number: _, ref transactions} => {
+                return self.apply_and_prove_exit(&block, transactions);
             },
-            Block::Transfer(block) => {
-                return self.apply_and_prove_transfer(&block);
+            BlockData::Transfer{total_fees: _, ref transactions} => {
+                return self.apply_and_prove_transfer(&block, &transactions);
             },
         }
     }
 
     // Apply transactions to the state while also making a witness for proof, then calculate proof
-    pub fn apply_and_prove_transfer(&mut self, block: &TransferBlock) -> Result<FullBabyProof, Err> {
+    pub fn apply_and_prove_transfer(&mut self, block: &Block, transactions: &Vec<TransferTx>) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.block_number {
             println!("Transfer proof request is for block {}, while prover state is block {}", block_number, self.block_number);
@@ -289,9 +291,9 @@ impl BabyProver {
         }
         let block_final_root = block.new_root_hash.clone();
 
-        let public_data: Vec<u8> = encoder::encode_transfer_transactions(block).unwrap();
+        let public_data: Vec<u8> = encoder::encode_transactions(&block).expect("encoding transactions failed");
 
-        let transactions = &block.transactions;
+        //let transactions = &block.transactions;
         let num_txes = transactions.len();
 
         if num_txes != self.transfer_batch_size {
@@ -562,7 +564,7 @@ impl BabyProver {
     }
 
     // expects accounts in block to be sorted already
-    pub fn apply_and_prove_deposit(&mut self, block: &DepositBlock) -> Result<FullBabyProof, Err> {
+    pub fn apply_and_prove_deposit(&mut self, block: &Block, transactions: &Vec<DepositTx>) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.block_number {
             println!("Deposit proof request is for block {}, while prover state is block {}", block_number, self.block_number);
@@ -570,9 +572,9 @@ impl BabyProver {
         }
         let block_final_root = block.new_root_hash.clone();
 
-        let public_data: Vec<u8> = encoder::encode_deposit_transactions(block).unwrap();
+        let public_data: Vec<u8> = encoder::encode_transactions(block).expect("prover: encoding failed");
 
-        let transactions = &block.transactions;
+        //let transactions = &block.transactions;
         let num_txes = transactions.len();
 
         if num_txes != self.deposit_batch_size {
@@ -762,7 +764,7 @@ impl BabyProver {
     }
 
     // expects accounts in block to be sorted already
-    pub fn apply_and_prove_exit(&mut self, block: &ExitBlock) -> Result<FullBabyProof, Err> {
+    pub fn apply_and_prove_exit(&mut self, block: &Block, transactions: &Vec<ExitTx>) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.block_number {
             println!("Exit proof request is for block {}, while prover state is block {}", block_number, self.block_number);
@@ -770,7 +772,7 @@ impl BabyProver {
         }
         let block_final_root = block.new_root_hash.clone();
 
-        let transactions = &block.transactions;
+        //let transactions = &block.transactions;
         let num_txes = transactions.len();
 
         if num_txes != self.deposit_batch_size {
@@ -964,25 +966,22 @@ impl BabyProver {
     fn run(
             &mut self,
             rx_for_blocks: mpsc::Receiver<ProverRequest>, 
-            tx_for_ops: mpsc::Sender<Operation>
+            tx_for_ops: mpsc::Sender<CommitRequest>
         ) 
     {
-        for ProverRequest(block_number, block, block_data, accounts_updated) in rx_for_blocks {
+        for ProverRequest(block_number, block) in rx_for_blocks {
             // fast forward state: self.block_number => block_number
             let connection = self.pool.pool.get().expect("must get connection from the pool");
             let storage = StorageProcessor::from_connection(connection);
             let (_, updated_accounts) = storage.load_state_diff(self.block_number, block_number).expect("loading from db must work");
             extend_accounts(&mut self.accounts_tree, updated_accounts.into_iter());
 
-            let proof = self.apply_and_prove(block).unwrap();
-            tx_for_ops.send(Operation{
-                action: Action::Verify{
-                    proof: Self::encode_proof(&proof).unwrap(),
-                },
-                block_number,
-                block_data,         
-                accounts_updated,
-            }).expect("must send an operation from prover for commitment");
+            let proof = self.apply_and_prove(&block).expect("prover block failed");
+            tx_for_ops.send(CommitRequest::NewProof(
+                block_number, 
+                block,
+                Self::encode_proof(&proof).expect("proof encoding failed"))
+            ).expect("must send a proof for commitment");
         }
     }
 }
@@ -990,7 +989,7 @@ impl BabyProver {
 pub fn start_prover(
         connection_pool: ConnectionPool,
         rx_for_blocks: mpsc::Receiver<ProverRequest>, 
-        tx_for_ops: mpsc::Sender<Operation>
+        tx_for_ops: mpsc::Sender<CommitRequest>
     ) 
 {
     let mut prover = BabyProver::create(connection_pool.clone()).unwrap();
@@ -1002,7 +1001,7 @@ pub fn start_prover(
 pub fn start_prover_handler(
         connection_pool: ConnectionPool,
         rx_for_blocks: mpsc::Receiver<ProverRequest>, 
-        tx_for_ops: mpsc::Sender<Operation>
+        tx_for_ops: mpsc::Sender<CommitRequest>
     ) 
 {
     start_prover(connection_pool.clone(), rx_for_blocks, tx_for_ops)

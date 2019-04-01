@@ -30,8 +30,8 @@ extern crate reqwest;
 #[macro_use]
 extern crate serde_derive;
 extern crate bigdecimal;
-#[macro_use]
-extern crate smart_default;
+// #[macro_use]
+// extern crate smart_default;
 
 #[macro_use]
 extern crate lazy_static;

@@ -61,7 +61,7 @@ fn main() {
 
     let tx_for_eth = eth_sender::start_eth_sender(connection_pool.clone());
 
-    std::thread::Builder::new().name("timer".to_string()).spawn(move || {
+    std::thread::Builder::new().name("committer".to_string()).spawn(move || {
         committer::run_committer(rx_for_ops, tx_for_eth, tx_for_proof_requests, connection_pool.clone());
     }).expect("threade creation failed");
 

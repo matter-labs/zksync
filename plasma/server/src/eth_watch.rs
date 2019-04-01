@@ -7,8 +7,8 @@ use std::env;
 use std::str::FromStr;
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::Sender;
-use super::server_models::{StateKeeperRequest};
-use plasma::models::{Block, DepositBlock, DepositTx, Engine, Fr, ExitBlock, ExitTx};
+use super::server_models::{StateKeeperRequest, ProtoBlock};
+use plasma::models::{Block, BlockData, DepositTx, Engine, Fr, ExitTx};
 use bigdecimal::{Num, BigDecimal};
 use plasma::models::params;
 use dotenv::dotenv;
@@ -341,12 +341,11 @@ impl EthWatch {
             all_deposits.push(tx);
         }
 
-        let block = DepositBlock {
-            block_number: 0,
-            transactions: all_deposits,
-            new_root_hash: Fr::zero(),
-        };
-        let request = StateKeeperRequest::AddBlock(Block::Deposit(block, self.last_deposit_batch.as_u32()));
+        let block = ProtoBlock::Deposit(
+            self.last_deposit_batch.as_u32(),
+            all_deposits,
+        );
+        let request = StateKeeperRequest::AddBlock(block);
 
         let send_result = channel.send(request);
 
@@ -524,12 +523,11 @@ impl EthWatch {
             all_exits.push(tx);
         }
 
-        let block = ExitBlock {
-            block_number: 0,
-            transactions: all_exits,
-            new_root_hash: Fr::zero(),
-        };
-        let request = StateKeeperRequest::AddBlock(Block::Exit(block, self.last_exit_batch.as_u32()));
+        let block = ProtoBlock::Exit(
+            self.last_exit_batch.as_u32(),
+            all_exits,
+        );
+        let request = StateKeeperRequest::AddBlock(block);
 
         let send_result = channel.send(request);
 

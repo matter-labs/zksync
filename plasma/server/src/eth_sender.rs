@@ -1,10 +1,11 @@
 use std::sync::mpsc::{channel, Sender, Receiver};
 use plasma::eth_client::{ETHClient, TxMeta, TEST_PLASMA_ALWAYS_VERIFY};
-use plasma::models::{Block, AccountMap, params};
+use plasma::models::{Block, BlockData, AccountMap, params};
 use super::storage::{ConnectionPool, StorageProcessor};
 use super::server_models::*;
-use web3::types::{U256, H256};
+use web3::types::{U128, U256, H256};
 use super::config;
+use ff::{PrimeField, PrimeFieldRepr};
 
 fn sorted_and_padded_for_deposits(accounts_updated: AccountMap) -> [u64; config::DEPOSIT_BATCH_SIZE] {
     let mut tmp = [params::SPECIAL_ACCOUNT_DEPOSIT as u64; config::DEPOSIT_BATCH_SIZE];
@@ -42,39 +43,75 @@ fn keys_sorted(accounts_updated: AccountMap) -> Vec<u64> {
     acc
 } 
 
-
-fn run_eth_sender(rx_for_eth: Receiver<(Operation, TxMeta)>, mut eth_client: ETHClient) {
-    for (op, meta) in rx_for_eth {
+fn run_eth_sender(rx_for_eth: Receiver<Operation>, mut eth_client: ETHClient) {
+    for op in rx_for_eth {
         println!("Operation requested"); // println!("Operation requested: {:?}", &op);
         let tx = match op.action {
-            Action::Commit{new_root, block: _} => {
-                match op.block_data {
-                    EthBlockData::Transfer{total_fees, public_data} =>
-                        eth_client.call("commitTransferBlock", meta, 
-                            (op.block_number as u64, total_fees, public_data, new_root)),
+            Action::Commit => {
 
-                    EthBlockData::Deposit{batch_number} =>
-                        eth_client.call("commitDepositBlock", meta,
-                            (U256::from(batch_number), sorted_and_padded_for_deposits(op.accounts_updated), op.block_number as u64, new_root)),
+                let mut be_bytes: Vec<u8> = vec![];
+                &op.block.new_root_hash.clone().into_repr().write_be(& mut be_bytes);
+                let root = H256::from(U256::from_big_endian(&be_bytes));
 
-                    EthBlockData::Exit{batch_number, public_data} =>
-                        eth_client.call("commitExitBlock", meta,
-                            (U256::from(batch_number), sorted_and_padded_for_exits(op.accounts_updated), op.block_number as u64, public_data, new_root)),
+                match &op.block.block_data {
+                    BlockData::Transfer{total_fees, transactions} => {
+
+                        // let eth_block_data = EthBlockData::Transfer{
+                        //     total_fees:     U128::from_dec_str(&total_fees.to_string()).expect("fee should fit into U128 Ethereum type"), 
+                        //     public_data:    encoder::encode_transfer_transactions(&block).unwrap(),
+                        // };
+
+                        let total_fees = U128::from_dec_str(&total_fees.to_string()).expect("fee should fit into U128 Ethereum type");
+                        let public_data = encoder::encode_transactions(&op.block).unwrap();
+
+                        // let mut be_bytes: Vec<u8> = vec![];
+                        // &block.new_root_hash.clone().into_repr().write_be(&mut be_bytes);
+                        // let root = H256::from(U256::from_big_endian(&be_bytes));
+
+                        eth_client.call("commitTransferBlock", op.tx_meta.expect("tx meta missing"), 
+                            (op.block.block_number as u64, total_fees, public_data, root))
+                    },
+
+                    BlockData::Deposit{batch_number, transactions: _} => {
+
+                        // let eth_block_data = EthBlockData::Deposit{ batch_number };
+                        // let mut be_bytes: Vec<u8> = vec![];
+                        // &block.new_root_hash.clone().into_repr().write_be(& mut be_bytes);
+                        // let root = H256:
+                        
+                        eth_client.call("commitDepositBlock", op.tx_meta.expect("tx meta missing"),
+                            (U256::from(*batch_number), sorted_and_padded_for_deposits(op.accounts_updated.unwrap()), op.block.block_number as u64, root))
+                    },
+
+                    BlockData::Exit{batch_number, transactions} => {
+
+                        // let eth_block_data = EthBlockData::Exit{ 
+                        //     batch_number,
+                        //     public_data: encoder::encode_exit_transactions(&block).expect("must encode exit block information")
+                        // };
+                        // let mut be_bytes: Vec<u8> = vec![];
+                        // &block.new_root_hash.clone().into_repr().write_be(& mut be_bytes);
+                        // let root = H256::fro
+                        
+                        let public_data = encoder::encode_transactions(&op.block).unwrap();
+                        eth_client.call("commitExitBlock", op.tx_meta.expect("tx meta missing"),
+                            (U256::from(*batch_number), sorted_and_padded_for_exits(op.accounts_updated.unwrap()), op.block.block_number as u64, public_data, root))
+                    },
                 }
             },
             Action::Verify{proof} => {
-                match op.block_data {
-                    EthBlockData::Transfer{total_fees: _, public_data: _} =>
-                        eth_client.call("verifyTransferBlock", meta,
-                            (op.block_number as u64, proof)),
+                match op.block.block_data {
+                    BlockData::Transfer{total_fees: _, transactions: _} =>
+                        eth_client.call("verifyTransferBlock", op.tx_meta.expect("tx meta missing"),
+                            (op.block.block_number as u64, proof)),
 
-                    EthBlockData::Deposit{batch_number} =>
-                        eth_client.call("verifyDepositBlock", meta,
-                            (U256::from(batch_number), sorted_and_padded_for_deposits(op.accounts_updated), op.block_number as u64, proof)),
+                    BlockData::Deposit{batch_number, transactions: _} =>
+                        eth_client.call("verifyDepositBlock", op.tx_meta.expect("tx meta missing"),
+                            (U256::from(batch_number), sorted_and_padded_for_deposits(op.accounts_updated.unwrap()), op.block.block_number as u64, proof)),
 
-                    EthBlockData::Exit{batch_number, public_data: _} =>
-                        eth_client.call("verifyExitBlock", meta,
-                            (batch_number as u64, op.block_number as u64, proof)),
+                    BlockData::Exit{batch_number, transactions: _} =>
+                        eth_client.call("verifyExitBlock", op.tx_meta.expect("tx meta missing"),
+                            (batch_number as u64, op.block.block_number as u64, proof)),
                 }
             },
             _ => unimplemented!(),
@@ -90,8 +127,8 @@ fn run_eth_sender(rx_for_eth: Receiver<(Operation, TxMeta)>, mut eth_client: ETH
     }
 }
 
-pub fn start_eth_sender(pool: ConnectionPool) -> Sender<(Operation, TxMeta)> {
-    let (tx_for_eth, rx_for_eth) = channel::<(Operation, TxMeta)>();
+pub fn start_eth_sender(pool: ConnectionPool) -> Sender<Operation> {
+    let (tx_for_eth, rx_for_eth) = channel::<Operation>();
     let mut eth_client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
     let current_nonce = eth_client.get_nonce(&eth_client.default_account()).unwrap();
 
@@ -99,17 +136,13 @@ pub fn start_eth_sender(pool: ConnectionPool) -> Sender<(Operation, TxMeta)> {
     let storage = StorageProcessor::from_connection(connection);
 
     // TODO: this is for test only, introduce a production switch (as we can not rely on debug/release mode because performance is required for circuits)
-    let addr = std::env::var("SENDER_ACCOUNT").unwrap_or("e5d0efb4756bd5cdd4b5140d3d2e08ca7e6cf644".to_string());
-    storage.reset_op_config(&addr, current_nonce.as_u32());
+    let addr = std::env::var("SENDER_ACCOUNT").expect("SENDER_ACCOUNT env var not found");
+    storage.update_op_config(&addr, current_nonce.as_u32());
 
     // execute pending transactions
-    let ops = storage.load_pendings_txs(current_nonce.as_u32()).expect("db must be functional");
+    let ops = storage.load_pendings_ops(current_nonce.as_u32()).expect("db must be functional");
     for pending_op in ops {
-        let op = serde_json::from_value(pending_op.data).unwrap();
-        tx_for_eth.send((op, TxMeta{
-            addr:   pending_op.addr, 
-            nonce:  pending_op.nonce as u32,
-        })).expect("must send a request for ethereum transaction for pending operations");
+        tx_for_eth.send(pending_op).expect("must send a request for ethereum transaction for pending operations");
     }
 
     std::thread::Builder::new().name("eth_sender".to_string()).spawn(move || {

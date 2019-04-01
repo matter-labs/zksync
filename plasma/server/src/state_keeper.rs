@@ -9,9 +9,9 @@ use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 use web3::types::{U128, H256, U256};
 use std::str::FromStr;
 
-use plasma::models::{self, *, block::GenericBlock};
+use plasma::models::{self, *};
 
-use super::server_models::{encoder, StateKeeperRequest, Operation, Action, EthBlockData, TransferTxResult, TransferTxConfirmation, NetworkStatus};
+use super::server_models::{StateKeeperRequest, TransferTxResult, TransferTxConfirmation, NetworkStatus, ProtoBlock, CommitRequest};
 use super::storage::{ConnectionPool, StorageProcessor};
 use super::config;
 
@@ -33,7 +33,7 @@ pub struct PlasmaStateKeeper {
     state:              PlasmaState,
 
     /// Queue for blocks to be processed next
-    block_queue:        VecDeque<Block>,
+    block_queue:        VecDeque<ProtoBlock>,
 
     /// Queue for transfer transactions
     transfer_tx_queue:  Vec<TransferTx>,
@@ -44,7 +44,6 @@ pub struct PlasmaStateKeeper {
 
 type RootHash = H256;
 type UpdatedAccounts = AccountMap;
-type AppliedBlock = (RootHash, EthBlockData, UpdatedAccounts);
 
 impl PlasmaStateKeeper {
 
@@ -74,25 +73,9 @@ impl PlasmaStateKeeper {
         keeper
     }
 
-    fn commit_block(&mut self, tx_for_commitments: &Sender<Operation>, block: Block, result: AppliedBlock) {
-        let (new_root, block_data, accounts_updated) = result;
-        // send commitment tx to eth
-        let op = Operation{
-            action:         Action::Commit{new_root, block: Some(block)},
-            block_number:   self.state.block_number,
-            block_data,
-            accounts_updated,
-        };
-
-        tx_for_commitments.send(op).expect("must send new operation for commitment");
-
-        // bump current block number as we've made one
-        self.state.block_number += 1;
-    }
-
     fn run(&mut self, 
         rx_for_blocks: Receiver<StateKeeperRequest>, 
-        tx_for_commitments: Sender<Operation>,
+        tx_for_commitments: Sender<CommitRequest>,
     )
     {
         for req in rx_for_blocks {
@@ -134,15 +117,16 @@ impl PlasmaStateKeeper {
         }
     }
 
-    fn process_block_queue(&mut self, tx_for_commitments: &Sender<Operation>) {
+    fn process_block_queue(&mut self, tx_for_commitments: &Sender<CommitRequest>) {
         let mut blocks = std::mem::replace(&mut self.block_queue, VecDeque::default());
         for mut block in blocks.into_iter() {
-            let result = match block {
-                Block::Transfer(ref mut block) => self.process_transfer_block(block),
-                Block::Deposit(ref mut block, batch_number) => self.process_deposit_block(block, batch_number),
-                Block::Exit(ref mut block, batch_number) => self.process_exit_block(block, batch_number),
+            let req = match block {
+                ProtoBlock::Transfer => self.create_transfer_block(),
+                ProtoBlock::Deposit(batch_number, transactions) => self.create_deposit_block(batch_number, transactions),
+                ProtoBlock::Exit(batch_number, transactions) => self.create_exit_block(batch_number, transactions),
             };
-            self.commit_block(&tx_for_commitments, block, result);
+            tx_for_commitments.send(req).expect("must send new operation for commitment");
+            self.state.block_number += 1; // bump current block number as we've made one
         }
     }
 
@@ -160,9 +144,9 @@ impl PlasmaStateKeeper {
         })
     }
 
-    fn finalize_current_batch(&mut self, tx_for_commitments: &Sender<Operation>) {
+    fn finalize_current_batch(&mut self, tx_for_commitments: &Sender<CommitRequest>) {
         self.apply_padding();
-        self.block_queue.push_front(Block::Transfer(TransferBlock::default()));
+        self.block_queue.push_front(ProtoBlock::Transfer);
         self.process_block_queue(&tx_for_commitments);
         self.next_block_at_max = None;
     }
@@ -197,111 +181,102 @@ impl PlasmaStateKeeper {
         }
     }
 
-    fn process_transfer_block(&mut self, block: &mut TransferBlock) -> AppliedBlock {
-        block.transactions = std::mem::replace(&mut self.transfer_tx_queue, Vec::default());
-        let mut total_fees: u128 = block.transactions.iter().map( |tx| tx.fee.to_u128().expect("should not overflow") ).sum();
+    fn create_transfer_block(&mut self) -> CommitRequest {
+        
+        let transactions = std::mem::replace(&mut self.transfer_tx_queue, Vec::default());
+        let mut total_fees: u128 = transactions.iter().map( |tx| tx.fee.to_u128().expect("should not overflow") ).sum();
 
         // collect updated state
-        let mut updated_accounts = FnvHashMap::<u32, Account>::default();
-        for tx in block.transactions.iter() {
-            updated_accounts.insert(tx.from, self.account(tx.from));
-            updated_accounts.insert(tx.to, self.account(tx.to));
+        let mut accounts_updated = FnvHashMap::<u32, Account>::default();
+        for tx in transactions.iter() {
+            accounts_updated.insert(tx.from, self.account(tx.from));
+            accounts_updated.insert(tx.to, self.account(tx.to));
         }
 
-        block.block_number = self.state.block_number;
-        block.new_root_hash = self.state.root_hash();
-
-        let eth_block_data = EthBlockData::Transfer{
-            total_fees:     U128::from_dec_str(&total_fees.to_string()).expect("fee should fit into U128 Ethereum type"), 
-            public_data:    encoder::encode_transfer_transactions(&block).unwrap(),
+        let block = Block{
+            block_number: self.state.block_number,
+            new_root_hash: self.state.root_hash(),
+            block_data: BlockData::Transfer{
+                total_fees,
+                transactions,
+            }
         };
 
-        let mut be_bytes: Vec<u8> = vec![];
-        &block.new_root_hash.clone().into_repr().write_be(&mut be_bytes);
-        let root = H256::from(U256::from_big_endian(&be_bytes));
-
-        (root, eth_block_data, updated_accounts)
+        CommitRequest::NewBlock{block, accounts_updated}
     }
 
-    fn process_deposit_block(&mut self, block: &mut DepositBlock, batch_number: BatchNumber) -> AppliedBlock {
-        Self::sort_deposit_block(block);
-
-        let mut updated_accounts = FnvHashMap::<u32, Account>::default();
-        for tx in block.transactions.iter() {
+    fn create_deposit_block(&mut self, batch_number: BatchNumber, transactions: Vec<DepositTx>) -> CommitRequest {
+        
+        let transactions = Self::sort_deposit_block(transactions);
+        let mut accounts_updated = FnvHashMap::<u32, Account>::default();
+        for tx in transactions.iter() {
             self.state.apply_deposit(&tx).expect("must apply deposit transaction");
 
             // collect updated state
-            updated_accounts.insert(tx.account, self.account(tx.account));
+            accounts_updated.insert(tx.account, self.account(tx.account));
         }
             
-        block.block_number = self.state.block_number;
-        block.new_root_hash = self.state.root_hash();
+        let block = Block{
+            block_number: self.state.block_number,
+            new_root_hash: self.state.root_hash(),
+            block_data: BlockData::Deposit{
+                batch_number,
+                transactions,
+            }
+        };
 
-        let eth_block_data = EthBlockData::Deposit{ batch_number };
-        let mut be_bytes: Vec<u8> = vec![];
-        &block.new_root_hash.clone().into_repr().write_be(& mut be_bytes);
-        let root = H256::from(U256::from_big_endian(&be_bytes));
-        
-        (root, eth_block_data, updated_accounts)
+        CommitRequest::NewBlock{block, accounts_updated}
     }
 
     // prover MUST read old balances and mutate the block data
-    fn process_exit_block(&mut self, block: &mut ExitBlock, batch_number: BatchNumber) -> AppliedBlock {        
-        Self::sort_exit_block(block);
-
-        let mut updated_accounts = FnvHashMap::<u32, Account>::default();
+    fn create_exit_block(&mut self, batch_number: BatchNumber, transactions: Vec<ExitTx>) -> CommitRequest {        
+        
+        let transactions = Self::sort_exit_block(transactions);
+        let mut accounts_updated = FnvHashMap::<u32, Account>::default();
         let mut augmented_txes = vec![];
-        for tx in block.transactions.iter() {
+        for tx in transactions.iter() {
             let augmented_tx = self.state.apply_exit(&tx).expect("must augment exit transaction information");
             augmented_txes.push(augmented_tx);
             // collect updated state
-            updated_accounts.insert(tx.account, self.account(tx.account));
+            accounts_updated.insert(tx.account, self.account(tx.account));
         }
             
-        block.block_number = self.state.block_number;
-        block.new_root_hash = self.state.root_hash();
-        block.transactions = augmented_txes;
-
-        let eth_block_data = EthBlockData::Exit{ 
-            batch_number,
-            public_data: encoder::encode_exit_transactions(&block).expect("must encode exit block information")
+        let block = Block{
+            block_number: self.state.block_number,
+            new_root_hash: self.state.root_hash(),
+            block_data: BlockData::Exit{
+                batch_number,
+                transactions: augmented_txes,
+            }
         };
-        let mut be_bytes: Vec<u8> = vec![];
-        &block.new_root_hash.clone().into_repr().write_be(& mut be_bytes);
-        let root = H256::from(U256::from_big_endian(&be_bytes));
-        (root, eth_block_data, updated_accounts)
+
+        CommitRequest::NewBlock{block, accounts_updated}
     }
 
     // sorting is required to ensure that all accounts affected are unique, see the smart contract
-    fn sort_deposit_block(block: &mut DepositBlock) {
-        let mut txes = block.transactions.clone();
+    fn sort_deposit_block(mut txes: Vec<DepositTx>) -> Vec<DepositTx> {
         txes.sort_by(|l, r| {
             if l.account < r.account {
                 return std::cmp::Ordering::Less;
             } else if r.account > l.account {
                 return std::cmp::Ordering::Greater;
             }
-
             std::cmp::Ordering::Equal
         });
-
-        block.transactions = txes;
+        txes
     }
 
     // sorting is required to ensure that all accounts affected are unique, see the smart contract
-    fn sort_exit_block(block: &mut ExitBlock){
-        let mut txes = block.transactions.clone();
+    fn sort_exit_block(mut txes: Vec<ExitTx>) -> Vec<ExitTx> {
         txes.sort_by(|l, r| {
             if l.account < r.account {
                 return std::cmp::Ordering::Less;
             } else if r.account > l.account {
                 return std::cmp::Ordering::Greater;
             }
-
             std::cmp::Ordering::Equal
         });
-
-        block.transactions = txes;
+        txes
     }
 
     fn account(&self, account_id: AccountId) -> Account {
@@ -311,7 +286,7 @@ impl PlasmaStateKeeper {
 
 pub fn start_state_keeper(mut sk: PlasmaStateKeeper, 
     rx_for_blocks: Receiver<StateKeeperRequest>, 
-    tx_for_commitments: Sender<Operation>,
+    tx_for_commitments: Sender<CommitRequest>,
 ) {
     std::thread::Builder::new().name("state_keeper".to_string()).spawn(move || {
         sk.run(rx_for_blocks, tx_for_commitments)

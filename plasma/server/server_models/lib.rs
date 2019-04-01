@@ -22,9 +22,15 @@ pub struct NetworkStatus {
     pub next_block_at_max: Option<u64>,
 }
 
+pub enum ProtoBlock{
+    Transfer,
+    Deposit(BatchNumber, Vec<DepositTx>),
+    Exit(BatchNumber, Vec<ExitTx>),
+}
+
 pub enum StateKeeperRequest{
     AddTransferTx(TransferTx, Sender<TransferTxResult>),
-    AddBlock(Block),
+    AddBlock(ProtoBlock),
     GetAccount(u32, Sender<Option<Account>>),
     GetNetworkStatus(Sender<NetworkStatus>),
     TimerTick,
@@ -52,25 +58,20 @@ pub enum EthBlockData {
     },
 }
 
-pub struct ProverRequest(pub BlockNumber, pub Block, pub EthBlockData, pub AccountMap);
+pub struct ProverRequest(pub BlockNumber, pub Block);
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Action {
-    Commit{
-        new_root:   H256,
-        block:      Option<Block>,
-    },
-    Verify{
-        proof:      EncodedProof, 
-    },
+    Commit,
+    Verify{proof: EncodedProof},
 }
 
 impl std::string::ToString for Action {
     fn to_string(&self) -> String {
         match self {
-            Action::Commit{new_root: _, block: _}   => "Commit".to_owned(),
-            Action::Verify{proof: _}                => "Verify".to_owned(),
+            Action::Commit           => "Commit".to_owned(),
+            Action::Verify{proof: _} => "Verify".to_owned(),
         }
     }
 }
@@ -81,10 +82,21 @@ impl std::fmt::Debug for Action {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Operation {
     pub action:             Action,
-    pub block_number:       u32, 
-    pub block_data:         EthBlockData,
-    pub accounts_updated:   AccountMap,
+    pub block:              Block, 
+    pub accounts_updated:   Option<AccountMap>,
+
+    #[serde(skip)]
+    pub tx_meta:            Option<TxMeta>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub enum CommitRequest {
+    NewBlock{
+        block:              Block, 
+        accounts_updated:   AccountMap,
+    },
+    NewProof(BlockNumber, Block, EncodedProof)
 }

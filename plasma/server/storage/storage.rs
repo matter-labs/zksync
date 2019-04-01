@@ -78,6 +78,28 @@ pub struct StoredOperation {
     pub created_at:     std::time::SystemTime,
 }
 
+impl StoredOperation {
+    pub fn get_meta(&self) -> TxMeta {
+        TxMeta{
+            addr:   self.addr.clone(), 
+            nonce:  self.nonce as u32,
+        }
+    }
+
+    pub fn into_op(self, conn: &StorageProcessor) -> QueryResult<Operation> {
+        let meta = self.get_meta();
+        let mut op: Operation = serde_json::from_value(self.data).unwrap();
+        op.tx_meta = Some(meta);
+
+        if op.accounts_updated.is_none() {
+            let (_, updates) = conn.load_state_at_block(op.block.block_number)?;
+            op.accounts_updated = Some(updates);
+        };
+
+        Ok(op)
+    }
+}
+
 #[derive(Debug, QueryableByName)]
 pub struct IntegerNumber {
     #[sql_type="Integer"]
@@ -97,22 +119,23 @@ impl StorageProcessor {
         }
     }
 
-    pub fn commit_op(&self, op: &Operation) -> QueryResult<StoredOperation> {
+    pub fn commit_and_augument_op(&self, op: &Operation) -> QueryResult<Operation> {
 
         self.conn.transaction(|| {
             match &op.action {
-                Action::Commit{block: _, new_root: _} => 
-                    self.commit_state_update(op.block_number, &op.accounts_updated)?,
+                Action::Commit => 
+                    self.commit_state_update(op.block.block_number, op.accounts_updated.as_ref().unwrap())?,
                 Action::Verify{proof: _} => 
-                    self.apply_state_update(op.block_number)?,
+                    self.apply_state_update(op.block.block_number)?,
             };
-            diesel::insert_into(operations::table)
+            let stored: StoredOperation = diesel::insert_into(operations::table)
                 .values(&NewOperation{ 
-                    block_number:   op.block_number as i32,
+                    block_number:   op.block.block_number as i32,
                     action_type:    op.action.to_string(),
                     data:           serde_json::to_value(&op).unwrap(), 
                 })
-                .get_result(&self.conn)
+                .get_result(&self.conn)?;
+            stored.into_op(self)
         })
     }
 
@@ -212,7 +235,7 @@ impl StorageProcessor {
         r
     }
 
-    pub fn reset_op_config(&self, addr: &str, nonce: u32) -> QueryResult<()> {
+    pub fn update_op_config(&self, addr: &str, nonce: u32) -> QueryResult<()> {
         diesel::sql_query(format!("
             UPDATE op_config 
             SET addr = '{addr}', next_nonce = s.next_nonce
@@ -228,11 +251,14 @@ impl StorageProcessor {
             .map(|_|())
     }
 
-    pub fn load_pendings_txs(&self, current_nonce: u32) -> QueryResult<Vec<StoredOperation>> {
+    pub fn load_pendings_ops(&self, current_nonce: u32) -> QueryResult<Vec<Operation>> {
         use crate::schema::operations::dsl::*;
-        operations
-            .filter(nonce.ge(current_nonce as i32)) // WHERE nonce >= current_nonce
-            .load(&self.conn)
+        self.conn.transaction(|| {
+            let ops: Vec<StoredOperation> = operations
+                .filter(nonce.ge(current_nonce as i32)) // WHERE nonce >= current_nonce
+                .load(&self.conn)?;
+            ops.into_iter().map(|o| o.into_op(self)).collect()
+        })
     }
 
     pub fn load_pendings_proof_reqs(&self) -> QueryResult<Vec<StoredOperation>> {
@@ -385,7 +411,7 @@ mod test {
 
         let conn = super::StorageProcessor::from_connection(pool.pool.get().unwrap());
         conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
-        conn.reset_op_config("0x0", 0).unwrap();
+        conn.update_op_config("0x0", 0).unwrap();
 
         let mut accounts = fnv::FnvHashMap::default();
         let acc = |balance| { 
@@ -423,16 +449,16 @@ mod test {
         assert_eq!(conn.last_verified_state_for_account(7).unwrap().unwrap().balance, BigDecimal::from(3));
         assert_eq!(conn.last_committed_state_for_account(7).unwrap().unwrap().balance, BigDecimal::from(3));
 
-        let pending = conn.load_pendings_txs(0).unwrap();
+        let pending = conn.load_pendings_ops(0).unwrap();
         assert_eq!(pending.len(), 2);
         assert_eq!(pending[0].nonce, 0);
         assert_eq!(pending[1].nonce, 1);
 
-        let pending = conn.load_pendings_txs(1).unwrap();
+        let pending = conn.load_pendings_ops(1).unwrap();
         assert_eq!(pending.len(), 1);
         assert_eq!(pending[0].nonce, 1);
 
-        let pending = conn.load_pendings_txs(2).unwrap();
+        let pending = conn.load_pendings_ops(2).unwrap();
         assert_eq!(pending.len(), 0);
     }
 
@@ -443,7 +469,7 @@ mod test {
         let conn = super::StorageProcessor::from_connection(pool.pool.get().unwrap());
 
         conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
-        conn.reset_op_config("0x0", 0).unwrap();
+        conn.update_op_config("0x0", 0).unwrap();
 
         let commit = conn.commit_op(&Operation{
             action: Action::Commit{
