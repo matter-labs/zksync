@@ -1,8 +1,6 @@
 use ff::{
     PrimeField,
     Field,
-    BitIterator,
-    PrimeFieldRepr
 };
 
 use bellman::{
@@ -13,33 +11,12 @@ use bellman::{
 
 use sapling_crypto::jubjub::{
     JubjubEngine,
-    FixedGenerators,
-    Unknown,
-    edwards,
-    JubjubParams
 };
 
 use super::Assignment;
 use super::boolean;
-use super::ecc;
-use super::pedersen_hash;
-use super::sha256;
-use super::num;
-use super::multipack;
 use super::num::{AllocatedNum, Num};
-use super::float_point::{parse_with_exponent_le, convert_to_float};
-use super::baby_eddsa::EddsaSignature;
 use super::polynomial_lookup::{generate_powers, do_the_lookup};
-
-use sapling_crypto::eddsa::{
-    Signature,
-    PrivateKey,
-    PublicKey
-};
-
-use crate::models::params as plasma_constants;
-use super::super::leaf::{LeafWitness, LeafContent, make_leaf_content};
-use crate::circuit::utils::{le_bit_vector_into_field_element, allocate_audit_path, append_packed_public_key};
 
 #[derive(Clone)]
 pub struct BitWindowWitness<E: JubjubEngine> {
@@ -479,29 +456,112 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
     }
 }
 
-#[test]
-fn test_redeem() {
-    use ff::{Field, BitIterator};
-    use pairing::bn256::*;
-    use rand::{SeedableRng, Rng, XorShiftRng, Rand};
-    use sapling_crypto::circuit::test::*;
-    use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
-    use crate::circuit::utils::{encode_fs_into_fr, be_bit_vector_into_bytes};
-    use crate::primitives::GetBits;
-    extern crate hex;
+#[cfg(test)]
+mod test {
+        
+    use super::*;
+    
+    use ff::{
+        BitIterator,
+        PrimeFieldRepr,
+        PrimeField,
+        Field
+    };
 
-    let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+    #[test]
+    fn test_redeem() {
+        use ff::{Field, BitIterator};
+        use pairing::bn256::*;
+        use rand::{SeedableRng, Rng, XorShiftRng, Rand};
+        use sapling_crypto::circuit::test::*;
+        use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
+        use crate::circuit::utils::{encode_fs_into_fr, be_bit_vector_into_bytes};
+        use crate::primitives::GetBits;
+        extern crate hex;
 
-    let params = &AltJubjubBn256::new();
+        let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
-    let bitfield_length = 128u128;
-    let shift_length = 64u128;
-    let max_valid_distance = bitfield_length + shift_length - 1u128;
+        let params = &AltJubjubBn256::new();
 
-    let start = 0u128;
+        let bitfield_length = 128u128;
+        let shift_length = 64u128;
+        let max_valid_distance = bitfield_length + shift_length - 1u128;
 
-    for bit_of_interest in 0u128..=max_valid_distance {
-        let mut cs = TestConstraintSystem::<Bn256>::new();
+        let start = 0u128;
+
+        for bit_of_interest in 0u128..=max_valid_distance {
+            let mut cs = TestConstraintSystem::<Bn256>::new();
+
+            let bottom_bits: u64 = rng.gen();
+            let top_bits: u64 = rng.gen();
+
+            let mut existing_field: u128 = (u128::from(top_bits) << 64) + u128::from(bottom_bits);
+            if bit_of_interest < bitfield_length {
+                let mask = 1u128 << bit_of_interest;
+
+                if existing_field & mask > 0 {
+                    existing_field -= mask;
+                }
+                assert!(existing_field & mask == 0u128);
+            }
+
+            let witness = BitWindowWitness {
+                bits: Fr::from_str(&existing_field.to_string()),
+
+                start: Fr::from_str(&start.to_string()),
+            };
+
+            let number = BitNumber {
+                number: Fr::from_str(&bit_of_interest.to_string()),
+            };
+
+            let instance = BitSet {
+                params: params,
+
+                action: (number, witness),
+            };
+
+            instance.synthesize(&mut cs).expect("must synthesize");
+
+            print!("{}\n", cs.find_unconstrained());
+
+            print!("{}\n", cs.num_constraints());
+
+            assert_eq!(cs.num_inputs(), 1);
+
+            let err = cs.which_is_unsatisfied();
+            if err.is_some() {
+                println!("Error for bitfield = {:#b}, bit of interest = {}", existing_field, bit_of_interest);
+                panic!("ERROR satisfying in {}\n", err.unwrap());
+            } else {
+                println!("Satisfied for bit = {}", bit_of_interest);
+            }
+        }
+    }
+
+    #[test]
+    fn test_proof_generation() {
+        use ff::{Field, BitIterator};
+        use pairing::bn256::*;
+        use rand::{SeedableRng, Rng, XorShiftRng, Rand};
+        use sapling_crypto::circuit::test::*;
+        use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
+        use crate::circuit::utils::{encode_fs_into_fr, be_bit_vector_into_bytes};
+        use crate::primitives::GetBits;
+        extern crate hex;
+        use bellman::groth16::{generate_random_parameters, create_random_proof, verify_proof, prepare_verifying_key};
+
+        let mut rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+
+        let params = &AltJubjubBn256::new();
+
+        let bitfield_length = 128u128;
+        let shift_length = 64u128;
+        let max_valid_distance = bitfield_length + shift_length - 1u128;
+
+        let start = 0u128;
+
+        let bit_of_interest = 129u128;
 
         let bottom_bits: u64 = rng.gen();
         let top_bits: u64 = rng.gen();
@@ -532,210 +592,140 @@ fn test_redeem() {
             action: (number, witness),
         };
 
-        instance.synthesize(&mut cs).expect("must synthesize");
+        let parameters = {
+            let w = BitWindowWitness::<Bn256> {
+                bits: None,
+                start: None,
+            };
 
-        print!("{}\n", cs.find_unconstrained());
+            let n = BitNumber::<Bn256> {
+                number: None
+            };
 
-        print!("{}\n", cs.num_constraints());
+            let inst = BitSet::<Bn256> {
+                params: params,
 
-        assert_eq!(cs.num_inputs(), 1);
+                action: (n, w),
+            };
 
-        let err = cs.which_is_unsatisfied();
-        if err.is_some() {
-            println!("Error for bitfield = {:#b}, bit of interest = {}", existing_field, bit_of_interest);
-            panic!("ERROR satisfying in {}\n", err.unwrap());
-        } else {
-            println!("Satisfied for bit = {}", bit_of_interest);
-        }
-    }
-}
+            let p = generate_random_parameters::<Bn256, _, _>(inst, &mut rng).expect("must generate parameters");
 
-#[test]
-fn test_proof_generation() {
-    use ff::{Field, BitIterator};
-    use pairing::bn256::*;
-    use rand::{SeedableRng, Rng, XorShiftRng, Rand};
-    use sapling_crypto::circuit::test::*;
-    use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
-    use crate::circuit::utils::{encode_fs_into_fr, be_bit_vector_into_bytes};
-    use crate::primitives::GetBits;
-    extern crate hex;
-    use bellman::groth16::{generate_random_parameters, create_random_proof, verify_proof, prepare_verifying_key};
-
-    let mut rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
-
-    let params = &AltJubjubBn256::new();
-
-    let bitfield_length = 128u128;
-    let shift_length = 64u128;
-    let max_valid_distance = bitfield_length + shift_length - 1u128;
-
-    let start = 0u128;
-
-    let bit_of_interest = 129u128;
-
-    let bottom_bits: u64 = rng.gen();
-    let top_bits: u64 = rng.gen();
-
-    let mut existing_field: u128 = (u128::from(top_bits) << 64) + u128::from(bottom_bits);
-    if bit_of_interest < bitfield_length {
-        let mask = 1u128 << bit_of_interest;
-
-        if existing_field & mask > 0 {
-            existing_field -= mask;
-        }
-        assert!(existing_field & mask == 0u128);
-    }
-
-    let witness = BitWindowWitness {
-        bits: Fr::from_str(&existing_field.to_string()),
-
-        start: Fr::from_str(&start.to_string()),
-    };
-
-    let number = BitNumber {
-        number: Fr::from_str(&bit_of_interest.to_string()),
-    };
-
-    let instance = BitSet {
-        params: params,
-
-        action: (number, witness),
-    };
-
-    let parameters = {
-        let w = BitWindowWitness::<Bn256> {
-            bits: None,
-            start: None,
+            p
         };
 
-        let n = BitNumber::<Bn256> {
-            number: None
-        };
+        let proof = create_random_proof::<Bn256, _, _, _>(instance, &parameters, &mut rng).expect("must generate proof");
 
-        let inst = BitSet::<Bn256> {
-            params: params,
+        let pvk = prepare_verifying_key(&parameters.vk);
 
-            action: (n, w),
-        };
+        let inputs: Vec<Fr> = vec![];
 
-        let p = generate_random_parameters::<Bn256, _, _>(inst, &mut rng).expect("must generate parameters");
+        let valid = verify_proof(&pvk, &proof, &inputs).expect("must verify proof");
 
-        p
-    };
-
-    let proof = create_random_proof::<Bn256, _, _, _>(instance, &parameters, &mut rng).expect("must generate proof");
-
-    let pvk = prepare_verifying_key(&parameters.vk);
-
-    let inputs: Vec<Fr> = vec![];
-
-    let valid = verify_proof(&pvk, &proof, &inputs).expect("must verify proof");
-
-    assert!(valid);
-}
-
-#[test]
-fn test_bit_shifts() {
-    use pairing::bn256::{Bn256, Fr};
-    use rand::{SeedableRng, Rng, XorShiftRng, Rand};
-
-    let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
-    let mut bitmask: Fr = rng.gen();
-    let power_of_two = 8;
-    let mut pow = Fr::one();
-    let two = Fr::from_str("2").unwrap();
-    for _ in 0..power_of_two {
-        pow.mul_assign(&two);
+        assert!(valid);
     }
 
-    let pow_bits: Vec<bool> = BitIterator::new(pow.into_repr()).collect();
-    for b in pow_bits {
-        if b {
-            print!("1");
-        } else {
-            print!("0");
+    #[test]
+    fn test_bit_shifts() {
+        use pairing::bn256::{Bn256, Fr};
+        use rand::{SeedableRng, Rng, XorShiftRng, Rand};
+
+        let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let mut bitmask: Fr = rng.gen();
+        let power_of_two = 8;
+        let mut pow = Fr::one();
+        let two = Fr::from_str("2").unwrap();
+        for _ in 0..power_of_two {
+            pow.mul_assign(&two);
+        }
+
+        let pow_bits: Vec<bool> = BitIterator::new(pow.into_repr()).collect();
+        for b in pow_bits {
+            if b {
+                print!("1");
+            } else {
+                print!("0");
+            }
+        }
+        print!("\n");
+
+        
+
+        let bits_before: Vec<bool> = BitIterator::new(bitmask.into_repr()).collect();
+        for b in bits_before {
+            if b {
+                print!("1");
+            } else {
+                print!("0");
+            }
+        }
+        print!("\n");
+
+        pow = pow.inverse().unwrap();
+
+        bitmask.mul_assign(&pow);
+
+        let bits_after: Vec<bool> = BitIterator::new(bitmask.into_repr()).collect();
+        for b in bits_after {
+            if b {
+                print!("1");
+            } else {
+                print!("0");
+            }
+        }
+        print!("\n");
+    }
+
+    #[test]
+    fn test_bitmask_lookups() {
+        use pairing::bn256::{Bn256, Fr};
+        use sapling_crypto::interpolation::evaluate_at_x;
+
+        let min_no_shift = 0u128;
+        let min_with_shift = 128u128;
+        let max_with_shift = 255u128;
+
+        let interpolation = generate_shift_bitmask_polynomial::<Bn256>(min_no_shift, min_with_shift, max_with_shift);
+
+        for i in 0..=max_with_shift {
+            let x = Fr::from_str(&i.to_string()).unwrap();
+            let val = evaluate_at_x::<Bn256>(&interpolation[..], &x);
+            println!("X = {}, Y = {}", x, val);
         }
     }
-    print!("\n");
 
-    
+    #[test]
+    fn test_check_bit_lookups() {
+        use pairing::bn256::{Bn256, Fr};
+        use sapling_crypto::interpolation::evaluate_at_x;
 
-    let bits_before: Vec<bool> = BitIterator::new(bitmask.into_repr()).collect();
-    for b in bits_before {
-        if b {
-            print!("1");
-        } else {
-            print!("0");
+        let min_no_shift = 0u128;
+        let min_with_shift = 128u128;
+        let max_with_shift = 255u128;
+
+        let interpolation = generate_bit_lookup_polynomial::<Bn256>(min_no_shift, min_with_shift, max_with_shift);
+
+        for i in 0..=max_with_shift {
+            let x = Fr::from_str(&i.to_string()).unwrap();
+            let val = evaluate_at_x::<Bn256>(&interpolation[..], &x);
+            println!("X = {}, Y = {}", x, val);
         }
     }
-    print!("\n");
 
-    pow = pow.inverse().unwrap();
+    #[test]
+    fn test_validity_lookups() {
+        use pairing::bn256::{Bn256, Fr};
+        use sapling_crypto::interpolation::evaluate_at_x;
 
-    bitmask.mul_assign(&pow);
+        let min_valid = 0u128;
+        let max_valid = 128u128 + 64u128;
+        let full_range = 255u128;
 
-    let bits_after: Vec<bool> = BitIterator::new(bitmask.into_repr()).collect();
-    for b in bits_after {
-        if b {
-            print!("1");
-        } else {
-            print!("0");
+        let interpolation = generate_correctness_polynomial::<Bn256>(min_valid, max_valid, full_range);
+
+        for i in 0..=full_range {
+            let x = Fr::from_str(&i.to_string()).unwrap();
+            let val = evaluate_at_x::<Bn256>(&interpolation[..], &x);
+            println!("X = {}, Y = {}", x, val);
         }
-    }
-    print!("\n");
-}
-
-#[test]
-fn test_bitmask_lookups() {
-    use pairing::bn256::{Bn256, Fr};
-    use sapling_crypto::interpolation::evaluate_at_x;
-
-    let min_no_shift = 0u128;
-    let min_with_shift = 128u128;
-    let max_with_shift = 255u128;
-
-    let interpolation = generate_shift_bitmask_polynomial::<Bn256>(min_no_shift, min_with_shift, max_with_shift);
-
-    for i in 0..=max_with_shift {
-        let x = Fr::from_str(&i.to_string()).unwrap();
-        let val = evaluate_at_x::<Bn256>(&interpolation[..], &x);
-        println!("X = {}, Y = {}", x, val);
-    }
-}
-
-#[test]
-fn test_check_bit_lookups() {
-    use pairing::bn256::{Bn256, Fr};
-    use sapling_crypto::interpolation::evaluate_at_x;
-
-    let min_no_shift = 0u128;
-    let min_with_shift = 128u128;
-    let max_with_shift = 255u128;
-
-    let interpolation = generate_bit_lookup_polynomial::<Bn256>(min_no_shift, min_with_shift, max_with_shift);
-
-    for i in 0..=max_with_shift {
-        let x = Fr::from_str(&i.to_string()).unwrap();
-        let val = evaluate_at_x::<Bn256>(&interpolation[..], &x);
-        println!("X = {}, Y = {}", x, val);
-    }
-}
-
-#[test]
-fn test_validity_lookups() {
-    use pairing::bn256::{Bn256, Fr};
-    use sapling_crypto::interpolation::evaluate_at_x;
-
-    let min_valid = 0u128;
-    let max_valid = 128u128 + 64u128;
-    let full_range = 255u128;
-
-    let interpolation = generate_correctness_polynomial::<Bn256>(min_valid, max_valid, full_range);
-
-    for i in 0..=full_range {
-        let x = Fr::from_str(&i.to_string()).unwrap();
-        let val = evaluate_at_x::<Bn256>(&interpolation[..], &x);
-        println!("X = {}, Y = {}", x, val);
     }
 }
