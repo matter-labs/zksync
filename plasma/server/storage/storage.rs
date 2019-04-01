@@ -261,16 +261,19 @@ impl StorageProcessor {
         })
     }
 
-    pub fn load_pendings_proof_reqs(&self) -> QueryResult<Vec<StoredOperation>> {
-        diesel::sql_query("
-            SELECT * FROM operations
-            WHERE action_type = 'Commit'
-            AND block_number > (
-                SELECT COALESCE(max(block_number), 0)  
-                FROM operations 
-                WHERE action_type = 'Verify'
-            )
-        ").load(&self.conn)
+    pub fn load_pendings_proof_reqs(&self) -> QueryResult<Vec<Operation>> {
+        self.conn.transaction(|| {
+            let ops: Vec<StoredOperation> = diesel::sql_query("
+                SELECT * FROM operations
+                WHERE action_type = 'Commit'
+                AND block_number > (
+                    SELECT COALESCE(max(block_number), 0)  
+                    FROM operations 
+                    WHERE action_type = 'Verify'
+                )
+            ").load(&self.conn)?;
+            ops.into_iter().map(|o| o.into_op(self)).collect()
+        })
     }
 
     fn load_number(&self, query: &str) -> QueryResult<i32> {
@@ -281,7 +284,7 @@ impl StorageProcessor {
 
     pub fn load_last_committed_deposit_batch(&self) -> QueryResult<i32> {
         self.load_number("
-            SELECT COALESCE(max((block->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
+            SELECT COALESCE(max((data->'block'->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
             WHERE data->'action'->>'type' = 'Commit' 
             AND data->'block_data'->>'type' = 'Deposit'
         ")
@@ -289,7 +292,7 @@ impl StorageProcessor {
 
     pub fn load_last_committed_exit_batch(&self) -> QueryResult<i32> {
         self.load_number("
-            SELECT COALESCE(max((block->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
+            SELECT COALESCE(max((data->'block'->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
             WHERE data->'action'->>'type' = 'Commit' 
             AND data->'block_data'->>'type' = 'Exit'
         ")

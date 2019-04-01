@@ -15,8 +15,8 @@ pub fn run_committer(
 
     // request unverified proofs
     let ops = storage.load_pendings_proof_reqs().expect("committer must load pending ops from db");
-    for pending_op in ops {
-        let op: Operation = serde_json::from_value(pending_op.data).unwrap();
+    for op in ops {
+        //let op: Operation = serde_json::from_value(pending_op.data).unwrap();
         if let Action::Commit = op.action {
             tx_for_proof_requests.send(ProverRequest(op.block.block_number, op.block)).expect("must send a proof request for pending operations");
         }

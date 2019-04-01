@@ -29,22 +29,21 @@ pub type BlockNumber = u32;
 pub type AccountId = u32;
 pub type Nonce = u32;
 
-// Transactions are skipped in serde because they are stored in a separate db table
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum BlockData {
     Transfer{
-        #[serde(skip)]
+        //#[serde(skip)]
         transactions:   Vec<TransferTx>,
         total_fees:     u128,
     },
     Deposit{
-        #[serde(skip)]
+        //#[serde(skip)]
         transactions: Vec<DepositTx>, 
         batch_number: BatchNumber,
     },
     Exit{
-        #[serde(skip)]
+        //#[serde(skip)]
         transactions: Vec<ExitTx>, 
         batch_number: BatchNumber,
     }

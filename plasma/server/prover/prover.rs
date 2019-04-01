@@ -10,7 +10,6 @@ extern crate ff;
 extern crate bellman;
 extern crate sapling_crypto;
 
-use std::error::Error;
 use std::fmt;
 use rand::{OsRng};
 use std::sync::mpsc;
@@ -69,25 +68,25 @@ pub type BabyProver = Prover<Engine>;
 
 #[derive(Debug)]
 pub enum BabyProverErr {
-    Unknown,
     InvalidAmountEncoding,
     InvalidFeeEncoding,
     InvalidSender,
     InvalidRecipient,
     InvalidTransaction(String),
-    IoError(std::io::Error)
+    IoError(std::io::Error),
+    Other(String),
 }
 
-impl Error for BabyProverErr {
-    fn description(&self) -> &str {
+impl BabyProverErr {
+    fn description(&self) -> String {
         match *self {
-            BabyProverErr::Unknown => "Unknown error",
-            BabyProverErr::InvalidAmountEncoding => "transfer amount is malformed or too large",
-            BabyProverErr::InvalidFeeEncoding => "transfer fee is malformed or too large",
-            BabyProverErr::InvalidSender => "sender account is unknown",
-            BabyProverErr::InvalidRecipient => "recipient account is unknown",
-            BabyProverErr::InvalidTransaction(_) => "invalid tx data",
-            BabyProverErr::IoError(_) => "encountered an I/O error",
+            BabyProverErr::InvalidAmountEncoding => "transfer amount is malformed or too large".to_owned(),
+            BabyProverErr::InvalidFeeEncoding => "transfer fee is malformed or too large".to_owned(),
+            BabyProverErr::InvalidSender => "sender account is unknown".to_owned(),
+            BabyProverErr::InvalidRecipient => "recipient account is unknown".to_owned(),
+            BabyProverErr::InvalidTransaction(ref reason) => format!("invalid tx data: {}", reason),
+            BabyProverErr::IoError(_) => "encountered an I/O error".to_owned(),
+            BabyProverErr::Other(ref reason) => format!("Prover error: {}", reason),
         }
     }
 }
@@ -187,7 +186,7 @@ impl BabyProver {
         let connection = pool.pool.get();
         if connection.is_err() {
             println!("No connection to database");
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("No connection to database".to_owned()));
         }
 
         let storage = StorageProcessor::from_connection(connection.unwrap());
@@ -242,7 +241,7 @@ impl BabyProver {
         let supplied_root = initial_state.root_hash();
 
         if root != supplied_root {
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("root did not change".to_owned()));
         }
 
         let jubjub_params = AltJubjubBn256::new();
@@ -287,7 +286,7 @@ impl BabyProver {
         let block_number = block.block_number;
         if block_number != self.block_number {
             println!("Transfer proof request is for block {}, while prover state is block {}", block_number, self.block_number);
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("incorrect block".to_owned()));
         }
         let block_final_root = block.new_root_hash.clone();
 
@@ -297,7 +296,7 @@ impl BabyProver {
         let num_txes = transactions.len();
 
         if num_txes != self.transfer_batch_size {
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("num_txes != self.transfer_batch_size".to_owned()));
         }
 
         let mut witnesses: Vec<(Transaction<Engine>, TransactionWitness<Engine>)> = vec![];
@@ -420,13 +419,13 @@ impl BabyProver {
         let final_root = self.accounts_tree.root_hash();
 
         if initial_root == final_root {
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("initial_root == final_root".to_owned()));
         }
 
         println!("Prover final root = {}, final root from state keeper = {}", final_root, block_final_root);
 
         if block_final_root != final_root {
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("block_final_root != final_root".to_owned()));
         }
 
         self.block_number += 1;
@@ -532,7 +531,7 @@ impl BabyProver {
         println!("Prover has started to work transfer");
         let proof = create_random_proof(instance, &self.transfer_parameters, & mut rng);
         if proof.is_err() {
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("proof.is_err()".to_owned()));
         }
 
         let p = proof.unwrap();
@@ -543,11 +542,11 @@ impl BabyProver {
         let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]);
         if success.is_err() {
             println!("Proof is verification failed with error {}", success.err().unwrap());
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("Proof is verification failed".to_owned()));
         }
         if success.unwrap() == false {
             println!("Proof is invalid");
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("Proof is invalid".to_owned()));
         }
         
         println!("Proof generation is complete");
@@ -565,10 +564,14 @@ impl BabyProver {
 
     // expects accounts in block to be sorted already
     pub fn apply_and_prove_deposit(&mut self, block: &Block, transactions: &Vec<DepositTx>) -> Result<FullBabyProof, Err> {
+
+        // println!("block: {:?}", &block.block_data);
+        // println!("transactions: {:?}", &transactions);
+
         let block_number = block.block_number;
         if block_number != self.block_number {
             println!("Deposit proof request is for block {}, while prover state is block {}", block_number, self.block_number);
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("block_number != self.block_number".to_owned()));
         }
         let block_final_root = block.new_root_hash.clone();
 
@@ -578,7 +581,7 @@ impl BabyProver {
         let num_txes = transactions.len();
 
         if num_txes != self.deposit_batch_size {
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("num_txes != self.deposit_batch_size".to_owned()));
         }
 
         let mut witnesses: Vec<(DepositRequest<Engine>, DepositWitness<Engine>)> = vec![];
@@ -617,7 +620,7 @@ impl BabyProver {
             let public_key = edwards::Point::from_xy(new_leaf.pub_x.clone(), new_leaf.pub_y.clone(), &self.jubjub_params);
 
             if public_key.is_none() {
-                return Err(BabyProverErr::Unknown);
+                return Err(BabyProverErr::Other("public_key.is_none()".to_owned()));
             }
 
             let request = DepositRequest {
@@ -654,13 +657,13 @@ impl BabyProver {
         let final_root = self.accounts_tree.root_hash();
 
         if initial_root == final_root {
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("initial_root == final_root".to_owned()));
         }
 
         println!("Prover final root = {}, final root from state keeper = {}", final_root, block_final_root);
 
         if block_final_root != final_root {
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("block_final_root != final_root".to_owned()));
         }
 
         self.block_number += 1;
@@ -732,7 +735,7 @@ impl BabyProver {
         println!("Prover has started to work deposits");
         let proof = create_random_proof(instance, &self.deposit_parameters, & mut rng);
         if proof.is_err() {
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("proof.is_err()".to_owned()));
         }
 
         let p = proof.unwrap();
@@ -743,12 +746,12 @@ impl BabyProver {
         let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]);
         
         if success.is_err() {
-            println!("Proof is verification failed with error {}", success.err().unwrap());
-            return Err(BabyProverErr::Unknown);
+            println!("Proof verification failed with error {}", success.err().unwrap());
+            return Err(BabyProverErr::Other("Proof verification failed".to_owned()));
         }
         if success.unwrap() == false {
             println!("Proof is invalid");
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("Proof is invalid".to_owned()));
         }
         println!("Proof generation is complete");
 
@@ -768,7 +771,7 @@ impl BabyProver {
         let block_number = block.block_number;
         if block_number != self.block_number {
             println!("Exit proof request is for block {}, while prover state is block {}", block_number, self.block_number);
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("block_number != self.block_number".to_owned()));
         }
         let block_final_root = block.new_root_hash.clone();
 
@@ -776,7 +779,7 @@ impl BabyProver {
         let num_txes = transactions.len();
 
         if num_txes != self.deposit_batch_size {
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("num_txes != self.deposit_batch_size".to_owned()));
         }
 
         let mut witnesses: Vec<(ExitRequest<Engine>, ExitWitness<Engine>)> = vec![];
@@ -797,7 +800,7 @@ impl BabyProver {
             let existing_leaf = items.get(&from_leaf_number);
 
             if existing_leaf.is_none() {
-                return Err(BabyProverErr::Unknown);
+                return Err(BabyProverErr::Other("existing_leaf.is_none()".to_owned()));
             }
 
             let old_leaf = existing_leaf.unwrap();
@@ -840,13 +843,13 @@ impl BabyProver {
         let final_root = self.accounts_tree.root_hash();
 
         if initial_root == final_root {
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("initial_root == final_root".to_owned()));
         }
 
         println!("Prover final root = {}, final root from state keeper = {}", final_root, block_final_root);
 
         if block_final_root != final_root {
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("block_final_root != final_root".to_owned()));
         }
 
         self.block_number += 1;
@@ -932,7 +935,7 @@ impl BabyProver {
         println!("Prover has started to work on exits");
         let proof = create_random_proof(instance, &self.exit_parameters, & mut rng);
         if proof.is_err() {
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("proof.is_err()".to_owned()));
         }
 
         let p = proof.unwrap();
@@ -943,12 +946,12 @@ impl BabyProver {
         let success = verify_proof(&pvk, &p.clone(), &[initial_root, final_root, public_data_commitment]);
         
         if success.is_err() {
-            println!("Proof is verification failed with error {}", success.err().unwrap());
-            return Err(BabyProverErr::Unknown);
+            println!("Proof verification failed with error {}", success.err().unwrap());
+            return Err(BabyProverErr::Other("Proof verification failed".to_owned()));
         }
         if success.unwrap() == false {
             println!("Proof is invalid");
-            return Err(BabyProverErr::Unknown);
+            return Err(BabyProverErr::Other("Proof is invalid".to_owned()));
         }
         println!("Proof generation is complete");
 
