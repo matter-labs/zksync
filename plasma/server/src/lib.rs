@@ -11,6 +11,7 @@ extern crate storage;
 pub mod rest_api;
 pub mod state_keeper;
 pub mod committer;
+pub mod eth_sender;
 
 pub use server_models::config;
 

@@ -7,11 +7,12 @@ extern crate signal_hook;
 
 use std::sync::mpsc::{channel};
 
-use prover::{BabyProver, start_prover};
+use prover::start_prover_handler;
 
 use server::state_keeper::{PlasmaStateKeeper, start_state_keeper};
 use server::rest_api::start_api_server;
 use server::committer;
+use server::eth_sender;
 use server::eth_watch::{EthWatch, start_eth_watch};
 
 use storage::{ConnectionPool};
@@ -56,9 +57,9 @@ fn main() {
     start_eth_watch(eth_watch, tx_for_state.clone());
     
     start_state_keeper(state_keeper, rx_for_state, tx_for_ops.clone());
-    start_prover(connection_pool.clone(), rx_for_proof_requests, tx_for_ops);
+    start_prover_handler(connection_pool.clone(), rx_for_proof_requests, tx_for_ops);
 
-    let tx_for_eth = committer::start_eth_sender(connection_pool.clone());
+    let tx_for_eth = eth_sender::start_eth_sender(connection_pool.clone());
 
     std::thread::Builder::new().name("timer".to_string()).spawn(move || {
         committer::run_committer(rx_for_ops, tx_for_eth, tx_for_proof_requests, connection_pool.clone());

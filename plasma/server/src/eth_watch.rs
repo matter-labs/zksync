@@ -82,8 +82,8 @@ impl EthWatch {
         let mut this = Self {
             last_processed_block: start,
             blocks_lag: delay,
-            web3_url:       env::var("WEB3_URL").unwrap_or("http://localhost:8545".to_string()),
-            contract_addr:  H160::from_str(&env::var("CONTRACT_ADDR").unwrap_or("4169D71D56563eA9FDE76D92185bEB7aa1Da6fB8".to_string())).expect("contract address must be correct"),
+            web3_url:       env::var("WEB3_URL").expect("WEB3_URL env var not found"),
+            contract_addr:  H160::from_str(&env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR env var not found")).expect("contract address must be correct"),
             contract:       ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).expect("contract must be loaded"),
             last_deposit_batch: U256::from(0),
             last_exit_batch: U256::from(0),

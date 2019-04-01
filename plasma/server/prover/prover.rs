@@ -28,12 +28,12 @@ use self::rustc_hex::ToHex;
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
 
 use plasma::models::{Engine, Fr, AccountId};
-use plasma::models::{self, params, TransferBlock, DepositBlock, ExitBlock, Block, PlasmaState, AccountMap};
+use plasma::models::{self, params, TransferBlock, DepositBlock, ExitBlock, Block, PlasmaState};
 use plasma::models::circuit::{Account, AccountTree};
 
 use server_models::encoder;
 use server_models::config::{TRANSFER_BATCH_SIZE, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE};
-use server_models::{EncodedProof, Operation, Action, EthBlockData, ProverRequest};
+use server_models::{EncodedProof, Operation, Action, ProverRequest};
 use storage::{ConnectionPool, StorageProcessor};
 
 use plasma::circuit::utils::be_bit_vector_into_bytes;
@@ -48,7 +48,7 @@ use plasma::circuit::transfer::circuit::{
     Transfer, 
     TransactionWitness};
 
-use plasma::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, serialize_fe_for_ethereum, field_element_to_u32};
+use plasma::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, field_element_to_u32};
 
 pub struct Prover<E:JubjubEngine> {
     pub transfer_batch_size: usize,
@@ -268,10 +268,10 @@ impl BabyProver {
 
     pub fn apply_and_prove(&mut self, block: Block) -> Result<FullBabyProof, Err> {
         match block {
-            Block::Deposit(block, batch_number) => {
+            Block::Deposit(block, _) => {
                 return self.apply_and_prove_deposit(&block);
             },
-            Block::Exit(block, batch_number) => {
+            Block::Exit(block, _) => {
                 return self.apply_and_prove_exit(&block);
             },
             Block::Transfer(block) => {
@@ -996,7 +996,16 @@ pub fn start_prover(
     let mut prover = BabyProver::create(connection_pool.clone()).unwrap();
     std::thread::Builder::new().name("prover".to_string()).spawn(move || {
         prover.run(rx_for_blocks, tx_for_ops)
-    });
+    }).expect("prover thread must start");
+}
+
+pub fn start_prover_handler(
+        connection_pool: ConnectionPool,
+        rx_for_blocks: mpsc::Receiver<ProverRequest>, 
+        tx_for_ops: mpsc::Sender<Operation>
+    ) 
+{
+    start_prover(connection_pool.clone(), rx_for_blocks, tx_for_ops)
 }
 
 // #[test]
