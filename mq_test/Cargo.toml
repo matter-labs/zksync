@@ -1,0 +1,9 @@
+[package]
+name = "mq_test"
+version = "0.0.1"
+
+[[bin]]
+name = "mq_test"
+path = "src/test.rs"
+
+[dependencies]

@@ -1184,6 +1184,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "mq_test"
+version = "0.0.1"
+
+[[package]]
 name = "native-tls"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
