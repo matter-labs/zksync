@@ -9,7 +9,7 @@ extern crate serde_json;
 
 use plasma::models::*;
 use diesel::dsl::*;
-use server_models::{Operation, Action};
+use server_models::{Operation, Action, EncodedProof};
 
 mod schema;
 use schema::*;
@@ -111,15 +111,19 @@ impl StoredOperation {
     }
 }
 
-#[derive(Debug, Queryable, QueryableByName)]
+#[derive(Debug, Insertable, Queryable, QueryableByName)]
+#[table_name="proofs"]
+pub struct NewProof {
+    pub block_number:   i32,
+    pub proof:          serde_json::Value,
+}
+
+#[derive(Debug, Insertable, Queryable, QueryableByName)]
 #[table_name="proofs"]
 pub struct StoredProof {
     pub block_number:   i32,
+    pub proof:          serde_json::Value,
     pub created_at:     std::time::SystemTime,
-    pub started_at:     std::time::SystemTime,
-    pub finished_at:    Option<std::time::SystemTime>,
-    pub proof:          Option<serde_json::Value>,
-    pub worker:         Option<String>,
 }
 
 #[derive(Debug, QueryableByName)]
@@ -127,7 +131,6 @@ pub struct IntegerNumber {
     #[sql_type="Integer"]
     pub integer_value: i32,
 }
-
 
 pub struct StorageProcessor {
     conn:  PooledConnection<ConnectionManager<PgConnection>>,
@@ -404,6 +407,32 @@ impl StorageProcessor {
         //self.load_number("SELECT COALESCE(max(last_block), 0) AS integer_value FROM accounts")
     }
 
+    // /// Store the timestamp of the prover start
+    // pub fn store_prover_started(&self, block_number: BlockNumber, worker: String) -> QueryResult<usize> {
+    //     use crate::schema::proofs::dsl::{self, *};
+    //     insert_into(proofs)
+    //         .values(dsl::worker.eq(worker))
+    //         .execute(&self.conn)
+    // }
+
+    /// Store the timestamp of the prover finish and the proof
+    pub fn store_proof(&self, block_number: BlockNumber, proof: &EncodedProof) -> QueryResult<usize> {
+        let to_store = NewProof{
+            block_number:   block_number as i32,
+            proof:          serde_json::to_value(proof).unwrap(),
+        };
+        use crate::schema::proofs::dsl::proofs;
+        insert_into(proofs).values(&to_store).execute(&self.conn)
+    }
+
+    pub fn load_proof(&self, block_number: BlockNumber) -> QueryResult<EncodedProof> {
+        use crate::schema::proofs::dsl;
+        let stored: StoredProof = dsl::proofs
+            .filter(dsl::block_number.eq(block_number as i32))
+            .get_result(&self.conn)?;
+        Ok( serde_json::from_value(stored.proof).unwrap() )
+    }
+
 }
 
 #[cfg(test)]
@@ -416,8 +445,22 @@ mod test {
     use diesel::RunQueryDsl;
 
     #[test]
-    fn test_store_state() {
-        
+    fn test_store_proof() {
+        let pool = ConnectionPool::new();
+        let conn = pool.access_storage().unwrap();
+        conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
+
+        assert!(conn.load_proof(1).is_err());
+
+        let proof = EncodedProof::default();
+        assert!(conn.store_proof(1, &proof).is_ok());
+
+        let loaded = conn.load_proof(1).expect("must load proof");
+        assert_eq!(loaded, proof);
+    }
+
+    #[test]
+    fn test_store_state() {     
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
         conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
