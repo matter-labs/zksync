@@ -4,13 +4,14 @@ extern crate server_models;
 extern crate prover;
 extern crate ctrlc;
 extern crate signal_hook;
+extern crate tokio;
 
 use std::sync::mpsc::{channel};
 
 use prover::start_prover_handler;
 
 use server::state_keeper::{PlasmaStateKeeper, start_state_keeper};
-use server::rest_api::start_api_server;
+use server::api_server::start_api_server;
 use server::committer;
 use server::eth_sender;
 use server::eth_watch::{EthWatch, start_eth_watch};
@@ -21,6 +22,8 @@ use server_models::StateKeeperRequest;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use tokio::runtime::Runtime;
+
 fn main() {
 
     // handle ctrl+c
@@ -28,6 +31,9 @@ fn main() {
     signal_hook::flag::register(signal_hook::SIGTERM, Arc::clone(&stop_signal)).expect("Error setting SIGTERM handler");
     signal_hook::flag::register(signal_hook::SIGINT, Arc::clone(&stop_signal)).expect("Error setting SIGINT handler");
     signal_hook::flag::register(signal_hook::SIGQUIT, Arc::clone(&stop_signal)).expect("Error setting SIGQUIT handler");
+
+    // create main tokio runtime
+    //let rt = Runtime::new().unwrap();
 
     // create channel to accept deserialized requests for new transacitons
     let (tx_for_state, rx_for_state) = channel();
@@ -51,7 +57,7 @@ fn main() {
             std::thread::sleep(std::time::Duration::from_secs(15));
             tx_for_state_ticker.send(StateKeeperRequest::TimerTick).expect("tx_for_state_ticker channel failed");
         }
-    }).expect("threade creation failed");
+    }).expect("thread creation failed");
 
     start_api_server(tx_for_state.clone(), connection_pool.clone());
     start_eth_watch(eth_watch, tx_for_state.clone());

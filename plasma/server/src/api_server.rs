@@ -22,7 +22,6 @@ use actix_web::{
 use futures::Future;
 
 use std::env;
-use dotenv::dotenv;
 use std::time::Instant;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -222,57 +221,53 @@ pub fn start_api_server(
     connection_pool: ConnectionPool) 
 {
     
-    dotenv().ok();
-
     let address = env::var("BIND_TO").unwrap_or("127.0.0.1".to_string());
     let port = env::var("PORT").unwrap_or("8080".to_string());
     let contract_address = env::var("CONTRACT_ADDR").unwrap();
 
-    std::thread::Builder::new().name("api_server".to_string()).spawn(move || {
-        ::std::env::set_var("RUST_LOG", "actix_web=info");
-        let sys = actix::System::new("ws-example");
-        let server_config = format!("{}:{}", address, port);
+    ::std::env::set_var("RUST_LOG", "actix_web=info");
+    let sys = actix::System::new("api-server");
+    let server_config = format!("{}:{}", address, port);
 
-        //move is necessary to give closure below ownership
-        server::new(move || {
-            App::with_state(
-                AppState {
-                    tx_for_state: tx_for_state.clone(),
-                    contract_address: contract_address.clone(),
-                    connection_pool: connection_pool.clone(),
-                }.clone()
-            ) // <- create app with shared state
-            .middleware( middleware::Logger::default() )
-            .middleware(
-                Cors::build()
-                    .send_wildcard()
-                    .max_age(3600)
-                    .finish()
-            )
-            .scope("/api/v0.1", |api_scope| {
-                api_scope
-                .resource("/testnet_config", |r| {
-                    r.method(Method::GET).f(handle_get_testnet_config);
-                })
-                .resource("/status", |r| {
-                    r.method(Method::GET).f(handle_get_network_status);
-                })
-                .resource("/submit_tx", |r| {
-                    r.method(Method::POST).f(handle_submit_tx);
-                })
-                .resource("/account/{id}", |r| {
-                    r.method(Method::GET).f(handle_get_account_state);
-                })
-                .resource("/account/{id}/transactions", |r| {
-                    r.method(Method::GET).f(handle_get_account_transactions);
-                })
+    //move is necessary to give closure below ownership
+    server::new(move || {
+        App::with_state(
+            AppState {
+                tx_for_state: tx_for_state.clone(),
+                contract_address: contract_address.clone(),
+                connection_pool: connection_pool.clone(),
+            }.clone()
+        ) // <- create app with shared state
+        .middleware( middleware::Logger::default() )
+        .middleware(
+            Cors::build()
+                .send_wildcard()
+                .max_age(3600)
+                .finish()
+        )
+        .scope("/api/v0.1", |api_scope| {
+            api_scope
+            .resource("/testnet_config", |r| {
+                r.method(Method::GET).f(handle_get_testnet_config);
             })
-        }).bind(&server_config)
-        .unwrap()
-        .shutdown_timeout(1)
-        .start();
+            .resource("/status", |r| {
+                r.method(Method::GET).f(handle_get_network_status);
+            })
+            .resource("/submit_tx", |r| {
+                r.method(Method::POST).f(handle_submit_tx);
+            })
+            .resource("/account/{id}", |r| {
+                r.method(Method::GET).f(handle_get_account_state);
+            })
+            .resource("/account/{id}/transactions", |r| {
+                r.method(Method::GET).f(handle_get_account_transactions);
+            })
+        })
+    }).bind(&server_config)
+    .unwrap()
+    .shutdown_timeout(1)
+    .start();
 
-        println!("Started http server: {}", server_config);
-        sys.run();
-    });
+    println!("Started http server: {}", server_config);
+    //sys.run();
 }

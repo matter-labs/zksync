@@ -8,7 +8,7 @@
 extern crate server_models;
 extern crate storage;
 
-pub mod rest_api;
+pub mod api_server;
 pub mod state_keeper;
 pub mod committer;
 pub mod eth_sender;
@@ -35,6 +35,7 @@ extern crate hyper;
 extern crate serde;
 extern crate serde_json;
 
+extern crate tokio;
 extern crate actix;
 extern crate actix_web;
 
@@ -44,7 +45,6 @@ extern crate serde_bytes;
 
 #[macro_use]
 extern crate diesel;
-extern crate dotenv;
 extern crate bigdecimal;
 
 extern crate priority_queue;

@@ -11,7 +11,6 @@ use super::server_models::{StateKeeperRequest, ProtoBlock};
 use plasma::models::{Block, BlockData, DepositTx, Engine, Fr, ExitTx};
 use bigdecimal::{Num, BigDecimal};
 use plasma::models::params;
-use dotenv::dotenv;
 
 use std::time;
 use web3::contract::{Contract, Options};
@@ -67,7 +66,6 @@ pub struct EthWatch {
 impl EthWatch {
 
     pub fn new(start_from_block: u64, lag: u64, pool: ConnectionPool) -> Self {
-        dotenv().ok();
 
         let mut start = start_from_block;
         if let Some(starting_block_from_env) = u64_from_environment("FROM_BLOCK") {
