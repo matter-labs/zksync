@@ -17,7 +17,7 @@ pub fn run_committer(
     for op in ops {
         //let op: Operation = serde_json::from_value(pending_op.data).unwrap();
         if let Action::Commit = op.action {
-            tx_for_proof_requests.send(ProverRequest(op.block.block_number, op.block)).expect("must send a proof request for pending operations");
+            tx_for_proof_requests.send(ProverRequest(op.block.block_number)).expect("must send a proof request for pending operations");
         }
     }
 
@@ -31,7 +31,9 @@ pub fn run_committer(
                     tx_meta: None
                 }
             },
-            CommitRequest::NewProof(block_number, block, proof) => {
+            CommitRequest::NewProof(block_number) => {
+                let block = storage.load_committed_block(block_number).expect(format!("failed to load block #{}", block_number).as_str());
+                let proof = storage.load_proof(block_number).expect(format!("failed to load proof for block #{}", block_number).as_str());
                 Operation{
                     action: Action::Verify{proof}, 
                     block, 
@@ -46,7 +48,7 @@ pub fn run_committer(
 
         // send a request for proof
         if let Action::Commit = op.action {
-            tx_for_proof_requests.send(ProverRequest(op.block.block_number, op.block.clone())).expect("must send a proof request");
+            tx_for_proof_requests.send(ProverRequest(op.block.block_number)).expect("must send a proof request");
         }
 
         // then submit to eth

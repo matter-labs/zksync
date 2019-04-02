@@ -966,7 +966,7 @@ impl BabyProver {
             tx_for_ops: mpsc::Sender<CommitRequest>
         ) 
     {
-        for ProverRequest(block_number, _) in rx_for_blocks {
+        for ProverRequest(block_number) in rx_for_blocks {
             // fast forward state: self.block_number => block_number
             let storage = self.pool.access_storage().expect("must get connection from the pool");
             let (_, updated_accounts) = storage.load_state_diff(self.block_number, block_number).expect("loading from db must work");
@@ -975,10 +975,14 @@ impl BabyProver {
             let block = storage.load_committed_block(block_number).expect("failed loading committed block");
 
             let proof = self.apply_and_prove(&block).expect("prover block failed");
+            let encoded = Self::encode_proof(&proof).expect("proof encoding failed");
+            storage.store_proof(block_number, &encoded).expect("saving proof failed");
+
             tx_for_ops.send(CommitRequest::NewProof(
-                block_number, 
-                block,
-                Self::encode_proof(&proof).expect("proof encoding failed"))
+                    block_number, 
+                    //block,
+                    //Self::encode_proof(&proof).expect("proof encoding failed")
+                )
             ).expect("must send a proof for commitment");
         }
     }

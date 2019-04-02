@@ -58,7 +58,7 @@ pub enum EthBlockData {
     },
 }
 
-pub struct ProverRequest(pub BlockNumber, pub Block);
+pub struct ProverRequest(pub BlockNumber);
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -98,5 +98,5 @@ pub enum CommitRequest {
         block:              Block, 
         accounts_updated:   AccountMap,
     },
-    NewProof(BlockNumber, Block, EncodedProof)
+    NewProof(BlockNumber) //, Block, EncodedProof)
 }
