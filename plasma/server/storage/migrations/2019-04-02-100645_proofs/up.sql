@@ -5,3 +5,10 @@ CREATE TABLE proofs (
     proof           jsonb not null,
     created_at      timestamp not null default now()
 );
+
+CREATE TABLE prover_runs (
+    id              serial primary key,
+    block_number    int not null,
+    worker          text,
+    created_at      timestamp not null default now()
+);

@@ -126,6 +126,13 @@ pub struct StoredProof {
     pub created_at:     std::time::SystemTime,
 }
 
+#[derive(Debug, Insertable, Queryable, QueryableByName)]
+#[table_name="prover_runs"]
+pub struct NewProverRun {
+    pub block_number:   i32,
+    pub worker:         String,
+}
+
 #[derive(Debug, QueryableByName)]
 pub struct IntegerNumber {
     #[sql_type="Integer"]
@@ -416,6 +423,16 @@ impl StorageProcessor {
     //         .values(dsl::worker.eq(worker))
     //         .execute(&self.conn)
     // }
+
+    /// Store the timestamp of the prover finish and the proof
+    pub fn store_prover_run(&self, block_number: BlockNumber, worker: String) -> QueryResult<usize> {
+        let to_store = NewProverRun{
+            block_number: block_number as i32,
+            worker,
+        };
+        use schema::prover_runs::dsl::prover_runs;
+        insert_into(prover_runs).values(&to_store).execute(&self.conn)
+    }
 
     /// Store the timestamp of the prover finish and the proof
     pub fn store_proof(&self, block_number: BlockNumber, proof: &EncodedProof) -> QueryResult<usize> {

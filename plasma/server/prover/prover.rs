@@ -974,16 +974,13 @@ impl BabyProver {
 
             let block = storage.load_committed_block(block_number).expect("failed loading committed block");
 
+            storage.store_prover_run(block_number, "default_worker".to_owned()).expect("storing prover run must work");
+
             let proof = self.apply_and_prove(&block).expect("prover block failed");
             let encoded = Self::encode_proof(&proof).expect("proof encoding failed");
             storage.store_proof(block_number, &encoded).expect("saving proof failed");
 
-            tx_for_ops.send(CommitRequest::NewProof(
-                    block_number, 
-                    //block,
-                    //Self::encode_proof(&proof).expect("proof encoding failed")
-                )
-            ).expect("must send a proof for commitment");
+            tx_for_ops.send(CommitRequest::NewProof(block_number)).expect("must send a proof for commitment");
         }
     }
 }

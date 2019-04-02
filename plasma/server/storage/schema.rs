@@ -41,10 +41,20 @@ table! {
     }
 }
 
+table! {
+    prover_runs (id) {
+        id -> Int4,
+        block_number -> Int4,
+        worker -> Nullable<Text>,
+        created_at -> Timestamp,
+    }
+}
+
 allow_tables_to_appear_in_same_query!(
     account_updates,
     accounts,
     op_config,
     operations,
     proofs,
+    prover_runs,
 );
