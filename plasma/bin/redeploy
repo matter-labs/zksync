@@ -20,7 +20,7 @@ then
     sed -i"-`date +%Y-%m-%d-%H%M%S`.bak" "s/CONTRACT_ADDR=$OLD_CONTRACT/CONTRACT_ADDR=$NEW_CONTRACT/g" ./env
 
     cd server/storage
-    diesel migration redo
+    diesel database reset
     cd ../..
 else
     echo "Contract deployment failed"

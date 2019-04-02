@@ -42,7 +42,7 @@ pub fn run_committer(
         };
 
         // persist in storage first
-        let op: Operation = storage.commit_and_augument_op(&op).expect("committer must commit the op into db");
+        let op: Operation = storage.execute_operation(&op).expect("committer must commit the op into db");
 
         // send a request for proof
         if let Action::Commit = op.action {

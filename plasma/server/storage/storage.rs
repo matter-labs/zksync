@@ -105,6 +105,17 @@ impl StoredOperation {
     }
 }
 
+#[derive(Debug, Queryable, QueryableByName)]
+#[table_name="proofs"]
+pub struct StoredProof {
+    pub block_number:   i32,
+    pub created_at:     std::time::SystemTime,
+    pub started_at:     std::time::SystemTime,
+    pub finished_at:    Option<std::time::SystemTime>,
+    pub proof:          Option<serde_json::Value>,
+    pub worker:         Option<String>,
+}
+
 #[derive(Debug, QueryableByName)]
 pub struct IntegerNumber {
     #[sql_type="Integer"]
@@ -124,8 +135,10 @@ impl StorageProcessor {
         }
     }
 
-    pub fn commit_and_augument_op(&self, op: &Operation) -> QueryResult<Operation> {
-
+    /// Execute an operation: store op, modify state accordingly, load additional data and meta tx info
+    /// - Commit => store account updates
+    /// - Verify => apply account updates
+    pub fn execute_operation(&self, op: &Operation) -> QueryResult<Operation> {
         self.conn.transaction(|| {
             match &op.action {
                 Action::Commit => 
@@ -240,7 +253,7 @@ impl StorageProcessor {
         r
     }
 
-    pub fn update_op_config(&self, addr: &str, nonce: u32) -> QueryResult<()> {
+    pub fn update_op_config(&self, addr: &str, nonce: Nonce) -> QueryResult<()> {
         diesel::sql_query(format!("
             UPDATE op_config 
             SET addr = '{addr}', next_nonce = s.next_nonce
@@ -256,7 +269,23 @@ impl StorageProcessor {
             .map(|_|())
     }
 
-    pub fn load_pendings_ops(&self, current_nonce: u32) -> QueryResult<Vec<Operation>> {
+    pub fn load_commit_op(&self, block_number: BlockNumber) -> QueryResult<Operation> {
+        use crate::schema::operations::dsl;
+        self.conn.transaction(|| {
+            let op: StoredOperation = dsl::operations
+                .filter(dsl::block_number.eq(block_number as i32))
+                .filter(dsl::action_type.eq("Commit"))
+                .get_result(&self.conn)?;
+            op.into_op(self)
+        })
+    }
+
+    pub fn load_committed_block(&self, block_number: BlockNumber) -> QueryResult<Block> {
+        let op = self.load_commit_op(block_number)?;
+        Ok(op.block)
+    }
+
+    pub fn load_pendings_ops(&self, current_nonce: Nonce) -> QueryResult<Vec<Operation>> {
         use crate::schema::operations::dsl::*;
         self.conn.transaction(|| {
             let ops: Vec<StoredOperation> = operations
@@ -291,7 +320,7 @@ impl StorageProcessor {
         self.load_number("
             SELECT COALESCE(max((data->'block'->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
             WHERE data->'action'->>'type' = 'Commit' 
-            AND data->'block_data'->>'type' = 'Deposit'
+            AND data->'block'->'block_data'->>'type' = 'Deposit'
         ")
     }
 
@@ -299,7 +328,7 @@ impl StorageProcessor {
         self.load_number("
             SELECT COALESCE(max((data->'block'->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
             WHERE data->'action'->>'type' = 'Commit' 
-            AND data->'block_data'->>'type' = 'Exit'
+            AND data->'block'->'block_data'->>'type' = 'Exit'
         ")
     }
 
@@ -333,10 +362,11 @@ impl StorageProcessor {
 
 }
 
-#[cfg(test)]
-mod test {
+// #[cfg(test)]
+// mod test {
 
-    use diesel::prelude::*;
+    //use diesel::prelude::*;
+    //use super::*;
     use plasma::models::{self, AccountMap};
     use diesel::Connection;
     use bigdecimal::BigDecimal;
@@ -345,9 +375,8 @@ mod test {
     #[test]
     fn test_store_state() {
         
-        let pool = super::ConnectionPool::new();
-
-        let conn = super::StorageProcessor::from_connection(pool.pool.get().unwrap());
+        let pool = ConnectionPool::new();
+        let conn = pool.access_storage().unwrap();
         conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
 
         // uncomment below for debugging to generate initial state
@@ -410,14 +439,12 @@ mod test {
         assert_eq!( state.get(&2).unwrap(), &acc(23) );
     }
 
-    use plasma::models::{Block, DepositBlock, U256, H256};
-    use crate::models::{Operation, EthBlockData, Action};
+    use plasma::models::{Block, BlockData, U256};
 
     #[test]
     fn test_store_txs() {
-        let pool = super::ConnectionPool::new();
-
-        let conn = super::StorageProcessor::from_connection(pool.pool.get().unwrap());
+        let pool = ConnectionPool::new();
+        let conn = pool.access_storage().unwrap();
         conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
         conn.update_op_config("0x0", 0).unwrap();
 
@@ -432,26 +459,37 @@ mod test {
         accounts.insert(5, acc(2));
         accounts.insert(7, acc(3));
         accounts.insert(8, acc(4));
-        let commit = conn.commit_op(&Operation{
-            action: Action::Commit{
-                new_root:   H256::zero(), 
-                block:      None,
-            },
-            block_number:       1, 
-            block_data:         EthBlockData::Deposit{batch_number: 0}, 
-            accounts_updated:   accounts.clone()
+        conn.execute_operation(&Operation{
+            action: Action::Commit,
+            block:  Block{
+                block_number:   1,
+                new_root_hash:  Fr::default(),
+                block_data:     BlockData::Deposit{
+                    batch_number: 0,
+                    transactions: vec![],
+                }
+            }, 
+            accounts_updated:   Some(accounts.clone()),
+            tx_meta:            None,
         }).unwrap();
 
         assert_eq!(conn.last_verified_state_for_account(5).unwrap(), None);
         assert_eq!(conn.last_committed_state_for_account(5).unwrap().unwrap().balance, BigDecimal::from(2));
 
-        let verify = conn.commit_op(&Operation{
+        conn.execute_operation(&Operation{
             action: Action::Verify{
                 proof: [U256::zero(); 8], 
             },
-            block_number:       1, 
-            block_data:         EthBlockData::Deposit{batch_number: 0}, 
-            accounts_updated:   accounts.clone()
+            block:  Block{
+                block_number:   1,
+                new_root_hash:  Fr::default(),
+                block_data:     BlockData::Deposit{
+                    batch_number: 0,
+                    transactions: vec![],
+                }
+            }, 
+            accounts_updated:   Some(accounts.clone()),
+            tx_meta:            None,
         }).unwrap();
 
         assert_eq!(conn.last_verified_state_for_account(7).unwrap().unwrap().balance, BigDecimal::from(3));
@@ -459,12 +497,12 @@ mod test {
 
         let pending = conn.load_pendings_ops(0).unwrap();
         assert_eq!(pending.len(), 2);
-        assert_eq!(pending[0].nonce, 0);
-        assert_eq!(pending[1].nonce, 1);
+        assert_eq!(pending[0].tx_meta.as_ref().unwrap().nonce, 0);
+        assert_eq!(pending[1].tx_meta.as_ref().unwrap().nonce, 1);
 
         let pending = conn.load_pendings_ops(1).unwrap();
         assert_eq!(pending.len(), 1);
-        assert_eq!(pending[0].nonce, 1);
+        assert_eq!(pending[0].tx_meta.as_ref().unwrap().nonce, 1);
 
         let pending = conn.load_pendings_ops(2).unwrap();
         assert_eq!(pending.len(), 0);
@@ -472,33 +510,42 @@ mod test {
 
     #[test]
     fn test_store_proof_reqs() {
-        let pool = super::ConnectionPool::new();
-
-        let conn = super::StorageProcessor::from_connection(pool.pool.get().unwrap());
-
+        let pool = ConnectionPool::new();
+        let conn = pool.access_storage().unwrap();
         conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
         conn.update_op_config("0x0", 0).unwrap();
 
-        let commit = conn.commit_op(&Operation{
-            action: Action::Commit{
-                new_root:   H256::zero(), 
-                block:      Some(Block::Deposit(DepositBlock::default(), 1)),
-            },
-            block_number:       1, 
-            block_data:         EthBlockData::Deposit{batch_number: 1}, 
-            accounts_updated:   fnv::FnvHashMap::default()
+        conn.execute_operation(&Operation{
+            action: Action::Commit,
+            block:  Block{
+                block_number:   1,
+                new_root_hash:  Fr::default(),
+                block_data:     BlockData::Deposit{
+                    batch_number: 1,
+                    transactions: vec![],
+                }
+            }, 
+            accounts_updated:   Some(fnv::FnvHashMap::default()),
+            tx_meta:            None,
         }).unwrap();
 
         let pending = conn.load_pendings_proof_reqs().unwrap();
         assert_eq!(pending.len(), 1);
 
-        let verify = conn.commit_op(&Operation{
+        conn.execute_operation(&Operation{
             action: Action::Verify{
                 proof: [U256::zero(); 8], 
             },
-            block_number:       1, 
-            block_data:         EthBlockData::Deposit{batch_number: 0}, 
-            accounts_updated:   fnv::FnvHashMap::default()
+            block:  Block{
+                block_number:   1,
+                new_root_hash:  Fr::default(),
+                block_data:     BlockData::Deposit{
+                    batch_number: 1,
+                    transactions: vec![],
+                }
+            }, 
+            accounts_updated:   Some(fnv::FnvHashMap::default()),
+            tx_meta:            None,
         }).unwrap();
 
         let pending = conn.load_pendings_proof_reqs().unwrap();
@@ -506,18 +553,47 @@ mod test {
     }
 
     #[test]
-    fn test_storage_helpers() {
-        let pool = super::ConnectionPool::new();
-
-        let conn = super::StorageProcessor::from_connection(pool.pool.get().unwrap());
+    fn test_store_helpers() {
+        let pool = ConnectionPool::new();
+        let conn = pool.access_storage().unwrap();
+        conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
 
         assert_eq!(-1, conn.load_last_committed_deposit_batch().unwrap());
         assert_eq!(-1, conn.load_last_committed_exit_batch().unwrap());
         assert_eq!(0, conn.get_last_committed_block().unwrap());
         assert_eq!(0, conn.get_last_verified_block().unwrap());
-
         assert_eq!(conn.last_committed_state_for_account(9999).unwrap(), None);
         assert_eq!(conn.last_verified_state_for_account(9999).unwrap(), None);
+
+        conn.execute_operation(&Operation{
+            action: Action::Commit,
+            block:  Block{
+                block_number:   1,
+                new_root_hash:  Fr::default(),
+                block_data:     BlockData::Deposit{
+                    batch_number: 3,
+                    transactions: vec![],
+                }
+            }, 
+            accounts_updated:   Some(fnv::FnvHashMap::default()),
+            tx_meta:            None,
+        }).unwrap();
+        assert_eq!(3, conn.load_last_committed_deposit_batch().unwrap());
+
+        conn.execute_operation(&Operation{
+            action: Action::Commit,
+            block:  Block{
+                block_number:   1,
+                new_root_hash:  Fr::default(),
+                block_data:     BlockData::Exit{
+                    batch_number: 2,
+                    transactions: vec![],
+                }
+            }, 
+            accounts_updated:   Some(fnv::FnvHashMap::default()),
+            tx_meta:            None,
+        }).unwrap();
+        assert_eq!(2, conn.load_last_committed_exit_batch().unwrap());
     }
 
-}
+//}

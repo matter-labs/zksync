@@ -650,11 +650,11 @@ impl BabyProver {
 
         let final_root = self.accounts_tree.root_hash();
 
-        if initial_root == final_root {
-            return Err(BabyProverErr::Other("initial_root == final_root".to_owned()));
-        }
-
         println!("Prover final root = {}, final root from state keeper = {}", final_root, block_final_root);
+
+        if initial_root == final_root {
+            return Err(BabyProverErr::Other(format!("initial_root == final_root, {:?}", initial_root)));
+        }
 
         if block_final_root != final_root {
             return Err(BabyProverErr::Other("block_final_root != final_root".to_owned()));
@@ -966,11 +966,13 @@ impl BabyProver {
             tx_for_ops: mpsc::Sender<CommitRequest>
         ) 
     {
-        for ProverRequest(block_number, block) in rx_for_blocks {
+        for ProverRequest(block_number, _) in rx_for_blocks {
             // fast forward state: self.block_number => block_number
             let storage = self.pool.access_storage().expect("must get connection from the pool");
             let (_, updated_accounts) = storage.load_state_diff(self.block_number, block_number).expect("loading from db must work");
             extend_accounts(&mut self.accounts_tree, updated_accounts.into_iter());
+
+            let block = storage.load_committed_block(block_number).expect("failed loading committed block");
 
             let proof = self.apply_and_prove(&block).expect("prover block failed");
             tx_for_ops.send(CommitRequest::NewProof(

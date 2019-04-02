@@ -30,6 +30,18 @@ table! {
         block_number -> Int4,
         action_type -> Text,
         created_at -> Timestamp,
+
+    }
+}
+
+table! {
+    proofs (block_number) {
+        block_number -> Int4,
+        created_at -> Timestamp,
+        started_at -> Timestamp,
+        finished_at -> Nullable<Timestamp>,
+        proof -> Nullable<Jsonb>,
+        worker -> Nullable<Text>,
     }
 }
 
@@ -38,4 +50,5 @@ allow_tables_to_appear_in_same_query!(
     accounts,
     op_config,
     operations,
+    proofs,
 );

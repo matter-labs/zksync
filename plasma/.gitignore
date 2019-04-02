@@ -2,3 +2,4 @@
 /env
 /deploy.log
 /*.bak
+schema.rs.generated
