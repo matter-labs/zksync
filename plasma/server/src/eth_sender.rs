@@ -139,7 +139,7 @@ pub fn start_eth_sender(pool: ConnectionPool) -> Sender<Operation> {
     storage.update_op_config(&addr, current_nonce.as_u32());
 
     // execute pending transactions
-    let ops = storage.load_pendings_ops(current_nonce.as_u32()).expect("db must be functional");
+    let ops = storage.load_unsent_ops(current_nonce.as_u32()).expect("db must be functional");
     for pending_op in ops {
         tx_for_eth.send(pending_op).expect("must send a request for ethereum transaction for pending operations");
     }

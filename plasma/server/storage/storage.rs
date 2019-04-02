@@ -191,7 +191,6 @@ impl StorageProcessor {
             .map(|_|())
     }
 
-
     pub fn load_committed_state(&self) -> QueryResult<(u32, AccountMap)> {
         const SELECT: &str = "
         WITH upd AS (
@@ -285,7 +284,7 @@ impl StorageProcessor {
         Ok(op.block)
     }
 
-    pub fn load_pendings_ops(&self, current_nonce: Nonce) -> QueryResult<Vec<Operation>> {
+    pub fn load_unsent_ops(&self, current_nonce: Nonce) -> QueryResult<Vec<Operation>> {
         use crate::schema::operations::dsl::*;
         self.conn.transaction(|| {
             let ops: Vec<StoredOperation> = operations
@@ -295,7 +294,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn load_pendings_proof_reqs(&self) -> QueryResult<Vec<Operation>> {
+    pub fn load_unverified_commitments(&self) -> QueryResult<Vec<Operation>> {
         self.conn.transaction(|| {
             let ops: Vec<StoredOperation> = diesel::sql_query("
                 SELECT * FROM operations
@@ -494,16 +493,16 @@ mod test {
         assert_eq!(conn.last_verified_state_for_account(7).unwrap().unwrap().balance, BigDecimal::from(3));
         assert_eq!(conn.last_committed_state_for_account(7).unwrap().unwrap().balance, BigDecimal::from(3));
 
-        let pending = conn.load_pendings_ops(0).unwrap();
+        let pending = conn.load_unsent_ops(0).unwrap();
         assert_eq!(pending.len(), 2);
         assert_eq!(pending[0].tx_meta.as_ref().unwrap().nonce, 0);
         assert_eq!(pending[1].tx_meta.as_ref().unwrap().nonce, 1);
 
-        let pending = conn.load_pendings_ops(1).unwrap();
+        let pending = conn.load_unsent_ops(1).unwrap();
         assert_eq!(pending.len(), 1);
         assert_eq!(pending[0].tx_meta.as_ref().unwrap().nonce, 1);
 
-        let pending = conn.load_pendings_ops(2).unwrap();
+        let pending = conn.load_unsent_ops(2).unwrap();
         assert_eq!(pending.len(), 0);
     }
 
@@ -528,7 +527,7 @@ mod test {
             tx_meta:            None,
         }).unwrap();
 
-        let pending = conn.load_pendings_proof_reqs().unwrap();
+        let pending = conn.load_unverified_commitments().unwrap();
         assert_eq!(pending.len(), 1);
 
         conn.execute_operation(&Operation{
@@ -547,7 +546,7 @@ mod test {
             tx_meta:            None,
         }).unwrap();
 
-        let pending = conn.load_pendings_proof_reqs().unwrap();
+        let pending = conn.load_unverified_commitments().unwrap();
         assert_eq!(pending.len(), 0);
     }
 

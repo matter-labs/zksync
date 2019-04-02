@@ -13,7 +13,7 @@ pub fn run_committer(
     let storage = pool.access_storage().expect("db connection failed for committer");;
 
     // request unverified proofs
-    let ops = storage.load_pendings_proof_reqs().expect("committer must load pending ops from db");
+    let ops = storage.load_unverified_commitments().expect("committer must load pending ops from db");
     for op in ops {
         //let op: Operation = serde_json::from_value(pending_op.data).unwrap();
         if let Action::Commit = op.action {
