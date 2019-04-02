@@ -362,12 +362,11 @@ impl StorageProcessor {
 
 }
 
-// #[cfg(test)]
-// mod test {
+#[cfg(test)]
+mod test {
 
-    //use diesel::prelude::*;
-    //use super::*;
-    use plasma::models::{self, AccountMap};
+    use super::*;
+    use plasma::models;
     use diesel::Connection;
     use bigdecimal::BigDecimal;
     use diesel::RunQueryDsl;
@@ -596,4 +595,4 @@ impl StorageProcessor {
         assert_eq!(2, conn.load_last_committed_exit_batch().unwrap());
     }
 
-//}
+}
