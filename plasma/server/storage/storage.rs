@@ -17,7 +17,7 @@ use diesel::prelude::*;
 use diesel::pg::PgConnection;
 use diesel::sql_types::Integer;
 use diesel::result::Error;
-use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
+use diesel::r2d2::{PoolError, ConnectionManager, Pool, PooledConnection};
 
 use serde_json::{to_value, value::Value};
 use std::env;
@@ -25,7 +25,7 @@ use std::iter::FromIterator;
 
 #[derive(Clone)]
 pub struct ConnectionPool {
-    pub pool: Pool<ConnectionManager<PgConnection>>, 
+    pool: Pool<ConnectionManager<PgConnection>>, 
 }
 
 impl ConnectionPool {
@@ -39,6 +39,11 @@ impl ConnectionPool {
         Self {
             pool
         }
+    }
+
+    pub fn access_storage(&self) -> Result<StorageProcessor, PoolError> {
+        let connection = self.pool.get()?;
+        Ok(StorageProcessor::from_connection(connection))
     }
 }
 

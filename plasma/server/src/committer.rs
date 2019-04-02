@@ -10,8 +10,7 @@ pub fn run_committer(
     pool: ConnectionPool,
 ) {
 
-    let connection = pool.pool.get().expect("committer must connect to db");
-    let storage = StorageProcessor::from_connection(connection);
+    let storage = pool.access_storage().expect("db connection failed for committer");;
 
     // request unverified proofs
     let ops = storage.load_pendings_proof_reqs().expect("committer must load pending ops from db");

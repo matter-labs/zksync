@@ -155,12 +155,11 @@ fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResp
     let tx_for_state = req.state().tx_for_state.clone();
     let pool = req.state().connection_pool.clone();
 
-    let connection = pool.pool.get();
-    if connection.is_err() {
+    let storage = pool.access_storage();
+    if storage.is_err() {
         return Ok(HttpResponse::Ok().json(AccountError{error:"rate limit".to_string()}));
     }
-
-    let storage = StorageProcessor::from_connection(connection.unwrap());
+    let storage = storage.unwrap();
 
     // check that something like this exists in state keeper's memory at all
     let account_id_string = req.match_info().get("id");

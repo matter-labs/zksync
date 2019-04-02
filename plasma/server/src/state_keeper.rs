@@ -52,8 +52,7 @@ impl PlasmaStateKeeper {
         println!("constructing state keeper instance");
 
         // here we should insert default accounts into the tree
-        let connection = pool.pool.get().expect("state keeper must connect to db");
-        let storage = StorageProcessor::from_connection(connection);
+        let storage = pool.access_storage().expect("db connection failed for statekeeper");
         
         let (last_block, accounts) = storage.load_committed_state().expect("db must be functional");
         let state = PlasmaState::new(accounts, last_block + 1);

@@ -132,8 +132,7 @@ pub fn start_eth_sender(pool: ConnectionPool) -> Sender<Operation> {
     let mut eth_client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
     let current_nonce = eth_client.get_nonce(&eth_client.default_account()).unwrap();
 
-    let connection = pool.pool.get().expect("committer must connect to db");
-    let storage = StorageProcessor::from_connection(connection);
+    let storage = pool.access_storage().expect("db connection failed for eth sender");;
 
     // TODO: this is for test only, introduce a production switch (as we can not rely on debug/release mode because performance is required for circuits)
     let addr = std::env::var("SENDER_ACCOUNT").expect("SENDER_ACCOUNT env var not found");

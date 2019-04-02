@@ -33,7 +33,7 @@ use plasma::models::circuit::{Account, AccountTree};
 use server_models::encoder;
 use server_models::config::{TRANSFER_BATCH_SIZE, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE};
 use server_models::{EncodedProof, CommitRequest, ProverRequest};
-use storage::{ConnectionPool, StorageProcessor};
+use storage::{ConnectionPool};
 
 use plasma::circuit::utils::be_bit_vector_into_bytes;
 use plasma::circuit::transfer::transaction::{Transaction};
@@ -183,13 +183,7 @@ impl BabyProver {
 
     pub fn create(pool: ConnectionPool) -> Result<BabyProver, BabyProverErr> {
 
-        let connection = pool.pool.get();
-        if connection.is_err() {
-            println!("No connection to database");
-            return Err(BabyProverErr::Other("No connection to database".to_owned()));
-        }
-
-        let storage = StorageProcessor::from_connection(connection.unwrap());
+        let storage = pool.access_storage().expect("db connection failed for prover");
 
         let (last_block, accounts) = storage.load_verified_state().expect("db must be functional");
         let initial_state = PlasmaState::new(accounts, last_block + 1);
@@ -974,8 +968,7 @@ impl BabyProver {
     {
         for ProverRequest(block_number, block) in rx_for_blocks {
             // fast forward state: self.block_number => block_number
-            let connection = self.pool.pool.get().expect("must get connection from the pool");
-            let storage = StorageProcessor::from_connection(connection);
+            let storage = self.pool.access_storage().expect("must get connection from the pool");
             let (_, updated_accounts) = storage.load_state_diff(self.block_number, block_number).expect("loading from db must work");
             extend_accounts(&mut self.accounts_tree, updated_accounts.into_iter());
 

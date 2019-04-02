@@ -92,8 +92,7 @@ impl EthWatch {
             connection_pool: pool,
         };
 
-        let connection = this.connection_pool.pool.get().expect("committer must connect to db");
-        let storage = StorageProcessor::from_connection(connection);
+        let storage = this.connection_pool.access_storage().expect("db connection failed for eth watcher");;
         let last_committed_deposit = storage.load_last_committed_deposit_batch().expect("load_last_committed_deposit_batch: db must work");
         let last_committed_exit = storage.load_last_committed_exit_batch().expect("load_last_committed_exit_batch: db must work");
 
