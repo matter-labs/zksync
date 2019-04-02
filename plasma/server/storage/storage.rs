@@ -126,6 +126,7 @@ pub struct StoredProof {
     pub created_at:     std::time::SystemTime,
 }
 
+// Every time before a prover worker starts generating the proof, a prover run is recorded for monitoring purposes
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
 #[table_name="prover_runs"]
 pub struct NewProverRun {
