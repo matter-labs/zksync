@@ -383,7 +383,7 @@ impl StorageProcessor {
         Ok( r.pop().map(|acc: Account| serde_json::from_value(acc.data).unwrap()) )
     }
 
-    pub fn get_last_committed_block(&self) -> QueryResult<i32> {
+    pub fn get_last_committed_block(&self) -> QueryResult<BlockNumber> {
         // use crate::schema::account_updates::dsl::*;
         // account_updates
         //     .select(max(block_number))
@@ -395,12 +395,12 @@ impl StorageProcessor {
             .select(max(block_number))
             .filter(action_type.eq(ACTION_COMMIT))
             .get_result::<Option<i32>>(&self.conn)
-            .map(|max| max.unwrap_or(0))
+            .map(|max| max.unwrap_or(0) as BlockNumber)
 
         //self.load_number("SELECT COALESCE(max(block_number), 0) AS integer_value FROM account_updates")        
     }
 
-    pub fn get_last_verified_block(&self) -> QueryResult<i32> {
+    pub fn get_last_verified_block(&self) -> QueryResult<BlockNumber> {
         // use crate::schema::accounts::dsl::*;
         // accounts
         //     .select(max(last_block))
@@ -412,7 +412,7 @@ impl StorageProcessor {
             .select(max(block_number))
             .filter(action_type.eq(ACTION_VERIFY))
             .get_result::<Option<i32>>(&self.conn)
-            .map(|max| max.unwrap_or(0))
+            .map(|max| max.unwrap_or(0) as BlockNumber)
 
         //self.load_number("SELECT COALESCE(max(last_block), 0) AS integer_value FROM accounts")
     }
