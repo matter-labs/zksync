@@ -8,6 +8,7 @@ extern crate bigdecimal;
 extern crate serde_json;
 
 use plasma::models::*;
+use diesel::dsl::*;
 use server_models::{Operation, Action};
 
 mod schema;
@@ -15,13 +16,15 @@ use schema::*;
 
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
-use diesel::sql_types::Integer;
 use diesel::result::Error;
 use diesel::r2d2::{PoolError, ConnectionManager, Pool, PooledConnection};
 
 use serde_json::{to_value, value::Value};
 use std::env;
 use std::iter::FromIterator;
+
+use diesel::sql_types::{Nullable, Integer};
+sql_function!(coalesce, Coalesce, (x: Nullable<Integer>, y: Integer) -> Integer);
 
 #[derive(Clone)]
 pub struct ConnectionPool {
@@ -70,6 +73,9 @@ struct NewOperation {
     pub block_number:   i32,
     pub action_type:    String,
 }
+
+pub const ACTION_COMMIT: &'static str = "Commit";
+pub const ACTION_VERIFY: &'static str = "Verify";
 
 #[derive(Debug, Queryable, QueryableByName)]
 #[table_name="operations"]
@@ -273,7 +279,7 @@ impl StorageProcessor {
         self.conn.transaction(|| {
             let op: StoredOperation = dsl::operations
                 .filter(dsl::block_number.eq(block_number as i32))
-                .filter(dsl::action_type.eq("Commit"))
+                .filter(dsl::action_type.eq(ACTION_COMMIT))
                 .get_result(&self.conn)?;
             op.into_op(self)
         })
@@ -285,10 +291,10 @@ impl StorageProcessor {
     }
 
     pub fn load_unsent_ops(&self, current_nonce: Nonce) -> QueryResult<Vec<Operation>> {
-        use crate::schema::operations::dsl::*;
+        use crate::schema::operations::dsl;
         self.conn.transaction(|| {
-            let ops: Vec<StoredOperation> = operations
-                .filter(nonce.ge(current_nonce as i32)) // WHERE nonce >= current_nonce
+            let ops: Vec<StoredOperation> = dsl::operations
+                .filter(dsl::nonce.ge(current_nonce as i32)) // WHERE nonce >= current_nonce
                 .load(&self.conn)?;
             ops.into_iter().map(|o| o.into_op(self)).collect()
         })
@@ -296,6 +302,16 @@ impl StorageProcessor {
 
     pub fn load_unverified_commitments(&self) -> QueryResult<Vec<Operation>> {
         self.conn.transaction(|| {
+
+            // use crate::schema::operations::dsl::*;
+            // let ops: Vec<StoredOperation> = operations
+            //     .filter(action_type.eq(ACTION_COMMIT).and(block_number.gt(
+            //         operations.select(max(block_number))
+            //         .filter(action_type.eq(ACTION_VERIFY))
+            //         .single_value()
+            //     )))
+            //     .load(&self.conn)?;
+
             let ops: Vec<StoredOperation> = diesel::sql_query("
                 SELECT * FROM operations
                 WHERE action_type = 'Commit'
@@ -352,11 +368,37 @@ impl StorageProcessor {
     }
 
     pub fn get_last_committed_block(&self) -> QueryResult<i32> {
-        self.load_number("SELECT COALESCE(max(block_number), 0) AS integer_value FROM account_updates")
+        // use crate::schema::account_updates::dsl::*;
+        // account_updates
+        //     .select(max(block_number))
+        //     .get_result::<Option<i32>>(&self.conn)
+        //     .map(|max| max.unwrap_or(0))
+
+        use crate::schema::operations::dsl::*;
+        operations
+            .select(max(block_number))
+            .filter(action_type.eq(ACTION_COMMIT))
+            .get_result::<Option<i32>>(&self.conn)
+            .map(|max| max.unwrap_or(0))
+
+        //self.load_number("SELECT COALESCE(max(block_number), 0) AS integer_value FROM account_updates")        
     }
 
     pub fn get_last_verified_block(&self) -> QueryResult<i32> {
-        self.load_number("SELECT COALESCE(max(last_block), 0) AS integer_value FROM accounts")
+        // use crate::schema::accounts::dsl::*;
+        // accounts
+        //     .select(max(last_block))
+        //     .get_result::<Option<i32>>(&self.conn)
+        //     .map(|max| max.unwrap_or(0))
+
+        use crate::schema::operations::dsl::*;
+        operations
+            .select(max(block_number))
+            .filter(action_type.eq(ACTION_VERIFY))
+            .get_result::<Option<i32>>(&self.conn)
+            .map(|max| max.unwrap_or(0))
+
+        //self.load_number("SELECT COALESCE(max(last_block), 0) AS integer_value FROM accounts")
     }
 
 }
