@@ -305,11 +305,14 @@ impl StorageProcessor {
 
             // use crate::schema::operations::dsl::*;
             // let ops: Vec<StoredOperation> = operations
-            //     .filter(action_type.eq(ACTION_COMMIT).and(block_number.gt(
-            //         operations.select(max(block_number))
-            //         .filter(action_type.eq(ACTION_VERIFY))
-            //         .single_value()
-            //     )))
+            //     .filter(action_type.eq(ACTION_COMMIT)
+            //             .and(block_number.gt(
+            //                 operations
+            //                 .select(coalesce(max(block_number), 0))
+            //                 .filter(action_type.eq(ACTION_VERIFY))
+            //                 .single_value()
+            //             ))
+            //     )
             //     .load(&self.conn)?;
 
             let ops: Vec<StoredOperation> = diesel::sql_query("
