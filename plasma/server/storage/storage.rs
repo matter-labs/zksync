@@ -306,14 +306,16 @@ impl StorageProcessor {
     pub fn load_unverified_commitments(&self) -> QueryResult<Vec<Operation>> {
         self.conn.transaction(|| {
 
-            // use crate::schema::operations::dsl::*;
+            // // https://docs.diesel.rs/diesel/query_dsl/trait.QueryDsl.html
+            // use crate::schema::operations::dsl::{*};
             // let ops: Vec<StoredOperation> = operations
             //     .filter(action_type.eq(ACTION_COMMIT)
             //             .and(block_number.gt(
-            //                 operations
-            //                 .select(coalesce(max(block_number), 0))
-            //                 .filter(action_type.eq(ACTION_VERIFY))
-            //                 .single_value()
+            //                 coalesce(
+            //                     operations
+            //                     .select(block_number)
+            //                     .filter(action_type.eq(ACTION_VERIFY))
+            //                     .single_value(), 0)
             //             ))
             //     )
             //     .load(&self.conn)?;
