@@ -94,10 +94,7 @@ pub enum StateKeeperRequest{
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum CommitRequest {
-    NewBlock{
-        block:              Block, 
-        accounts_updated:   AccountMap,
-    },
-    TimerTick,
+pub struct CommitRequest {
+    pub block:              Block, 
+    pub accounts_updated:   AccountMap,
 }

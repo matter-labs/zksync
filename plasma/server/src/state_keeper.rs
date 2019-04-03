@@ -203,7 +203,7 @@ impl PlasmaStateKeeper {
             }
         };
 
-        CommitRequest::NewBlock{block, accounts_updated}
+        CommitRequest{block, accounts_updated}
     }
 
     fn create_deposit_block(&mut self, batch_number: BatchNumber, transactions: Vec<DepositTx>) -> CommitRequest {
@@ -226,7 +226,7 @@ impl PlasmaStateKeeper {
             }
         };
 
-        CommitRequest::NewBlock{block, accounts_updated}
+        CommitRequest{block, accounts_updated}
     }
 
     // prover MUST read old balances and mutate the block data
@@ -251,7 +251,7 @@ impl PlasmaStateKeeper {
             }
         };
 
-        CommitRequest::NewBlock{block, accounts_updated}
+        CommitRequest{block, accounts_updated}
     }
 
     // sorting is required to ensure that all accounts affected are unique, see the smart contract

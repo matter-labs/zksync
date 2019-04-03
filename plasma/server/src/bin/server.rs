@@ -19,7 +19,7 @@ use server::eth_sender;
 use server::eth_watch::{EthWatch, start_eth_watch};
 
 use storage::ConnectionPool;
-use server_models::{StateKeeperRequest, CommitRequest};
+use server_models::{StateKeeperRequest};
 
 //use tokio::runtime::Runtime;
 
@@ -55,12 +55,11 @@ fn main() {
     // start_prover(connection_pool.clone(), "worker 2");
     // start_prover(connection_pool.clone(), "worker 3");
 
-    // Simple timer, pings every second
+    // Simple timer, pings every 100 ms
     thread::Builder::new().name("timer".to_string()).spawn(move || {
         loop {
             tx_for_state.send(StateKeeperRequest::TimerTick).expect("tx_for_state channel failed");
-            tx_for_ops.send(CommitRequest::TimerTick).expect("tx_for_ops channel failed");
-            thread::sleep(Duration::from_secs(1));
+            thread::sleep(Duration::from_millis(100));
         }
     }).expect("thread creation failed");
 

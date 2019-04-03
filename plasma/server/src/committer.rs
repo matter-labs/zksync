@@ -1,5 +1,6 @@
 use std::thread;
 use std::sync::mpsc::{channel, Sender, Receiver};
+use std::time::Duration;
 use plasma::eth_client::{TxMeta};
 use super::storage::{ConnectionPool, StorageProcessor};
 use super::server_models::{Operation, Action, ProverRequest, CommitRequest};
@@ -33,40 +34,40 @@ fn run_committer(
     // }
 
     let mut last_verified_block = storage.get_last_verified_block().expect("db failed");
-    for mut req in rx_for_ops {
-        match req {
-            CommitRequest::NewBlock{block, accounts_updated} => {
-                let op = Operation{
-                    action: Action::Commit, 
-                    block, 
-                    accounts_updated: Some(accounts_updated), 
-                    tx_meta: None
-                };
-                println!("commit block #{}", op.block.block_number);
-                let op = storage.execute_operation(&op).expect("committer must commit the op into db");
-                //tx_for_proof_requests.send(ProverRequest(op.block.block_number)).expect("must send a proof request");
-                tx_for_eth.send(op).expect("must send an operation for commitment to ethereum");
-            },
-            CommitRequest::TimerTick => {
-                loop {
-                    let block_number = last_verified_block + 1;
-                    let proof = storage.load_proof(block_number);
-                    if let Ok(proof) = proof {
-                        let block = storage.load_committed_block(block_number).expect(format!("failed to load block #{}", block_number).as_str());
-                        let op = Operation{
-                            action: Action::Verify{proof}, 
-                            block, 
-                            accounts_updated: None, 
-                            tx_meta: None
-                        };
-                        let op = storage.execute_operation(&op).expect("committer must commit the op into db");
-                        tx_for_eth.send(op).expect("must send an operation for commitment to ethereum");
-                        last_verified_block += 1;
-                    } else {
-                        break;
-                    }
+    loop {
+        let req = rx_for_ops.recv_timeout(Duration::from_millis(100));
+        if let Ok(CommitRequest{block, accounts_updated}) = req {
+            let op = Operation{
+                action: Action::Commit, 
+                block, 
+                accounts_updated: Some(accounts_updated), 
+                tx_meta: None
+            };
+            println!("commit block #{}", op.block.block_number);
+            let op = storage.execute_operation(&op).expect("committer must commit the op into db");
+            //tx_for_proof_requests.send(ProverRequest(op.block.block_number)).expect("must send a proof request");
+            tx_for_eth.send(op).expect("must send an operation for commitment to ethereum");
+            continue;
+        } else {
+            // there was a timeout, so check for the new ready proofs
+            loop {
+                let block_number = last_verified_block + 1;
+                let proof = storage.load_proof(block_number);
+                if let Ok(proof) = proof {
+                    let block = storage.load_committed_block(block_number).expect(format!("failed to load block #{}", block_number).as_str());
+                    let op = Operation{
+                        action: Action::Verify{proof}, 
+                        block, 
+                        accounts_updated: None, 
+                        tx_meta: None
+                    };
+                    let op = storage.execute_operation(&op).expect("committer must commit the op into db");
+                    tx_for_eth.send(op).expect("must send an operation for commitment to ethereum");
+                    last_verified_block += 1;
+                } else {
+                    break;
                 }
-            },
+            }
         };
     }
 }
