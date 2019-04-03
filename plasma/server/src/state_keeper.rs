@@ -1,6 +1,6 @@
 use pairing::bn256::{Bn256};
-use sapling_crypto::jubjub::{FixedGenerators};
-use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
+// use sapling_crypto::jubjub::{FixedGenerators};
+// use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 
 use std::{thread};
 use std::collections::{HashMap, VecDeque};

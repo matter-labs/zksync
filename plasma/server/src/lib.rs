@@ -19,7 +19,6 @@ pub mod eth_watch;
 
 extern crate plasma;
 
-extern crate bellman;
 extern crate pairing;
 extern crate rand;
 extern crate hex;

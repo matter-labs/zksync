@@ -10,14 +10,15 @@ authors = [
 
 [dependencies]
 
-ff = { path = "../ff", features = ["derive"] }
-pairing = { path = "../pairing" }
-bellman = { path = "../bellman" }
-sapling-crypto = { path = "../sapling-crypto" }
+ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
+pairing = { package = "pairing_ce", version = "0.17.0" }
+bellman = { package = "bellman_ce", version = "0.3.0" }
+sapling-crypto = { package = "sapling-crypto_ce", version = "0.0.5" }
 
-#pairing = { git = 'https://github.com/matterinc/pairing' }
-#sapling-crypto = { git = 'https://github.com/matterinc/sapling-crypto' }
-#bellman = { git = 'https://github.com/matterinc/bellman' }
+# ff = { path = "../ff" }
+# pairing = { path = "../pairing" }
+# bellman = { path = "../bellman" }
+# sapling-crypto = { path = "../sapling-crypto" }
 
 rand = "0.4"
 hex = "0.3.2"

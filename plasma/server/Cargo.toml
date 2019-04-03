@@ -11,10 +11,15 @@ plasma = { path = ".." }
 server_models = { path = "server_models" }
 storage = { path = "storage" }
 
-ff = { path = "../../ff", features = ["derive"] }
-pairing = { path = "../../pairing" }
-bellman = { path = "../../bellman" }
-sapling-crypto = { path = "../../sapling-crypto" }
+ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
+pairing = { package = "pairing_ce", version = "0.17.0" }
+# bellman = { package = "bellman_ce", version = "0.3.0" }
+sapling-crypto = { package = "sapling-crypto_ce", version = "0.0.5" }
+
+# ff = { path = "../ff" }
+# pairing = { path = "../pairing" }
+# bellman = { path = "../bellman" }
+# sapling-crypto = { path = "../sapling-crypto" }
 
 rand = "0.4"
 hex = "0.3.2"
