@@ -1,0 +1,24 @@
+[package]
+name = "prover"
+version = "0.0.1"
+
+[dependencies]
+plasma = { path = "../plasma" }
+models = { path = "../models" }
+storage = { path = "../storage" }
+
+ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
+pairing = { package = "pairing_ce", version = "0.17.0" }
+bellman = { package = "bellman_ce", version = "0.3.0" }
+sapling-crypto = { package = "sapling-crypto_ce", version = "0.0.5" }
+
+# ff = { path = "../ff" }
+# pairing = { path = "../pairing" }
+# bellman = { path = "../bellman" }
+# sapling-crypto = { path = "../sapling-crypto" }
+
+rand = "0.4"
+rust-crypto = "0.2"
+rustc-hex = "2.0.1"
+
+signal-hook = "0.1.8"

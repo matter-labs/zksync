@@ -1,1 +1,0 @@
-web: (cd plasma/client && node app.js)

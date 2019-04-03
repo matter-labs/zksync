@@ -1,0 +1,46 @@
+[package]
+name = "plasma"
+version = "0.1.1"
+edition = "2018"
+
+authors = [
+    "Alex Gluchowski <alex@gluchowski.net>",
+    "Alex Vlasov <alex.m.vlasov@gmail.com>"
+]
+
+[dependencies]
+
+ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
+pairing = { package = "pairing_ce", version = "0.17.0" }
+bellman = { package = "bellman_ce", version = "0.3.0" }
+sapling-crypto = { package = "sapling-crypto_ce", version = "0.0.5" }
+
+rand = "0.4"
+hex = "0.3.2"
+time = "0.1"
+num-bigint = "0.2"
+rust-crypto = "0.2"
+fnv = "1.0.3"
+ethereum-types = "0.4.0"
+ethabi = "6.1.0"
+web3 = { git = "https://github.com/tomusdrw/rust-web3" }
+ethereum-tx-sign = "0.0.2"
+rustc-hex = "2.0.1"
+
+futures = "0.1.25"
+futures-cpupool = "0.1.8"
+crossbeam = "0.5.0"
+crossbeam-utils = "0.6.1"
+rayon = "1.0.3"
+hyper = "0.12.16"
+serde = "1.0.80"
+serde_derive = "1.0.80"
+tokio = "0.1.13"
+reqwest = "0.9.5"
+smart-default = "0.3.0"
+
+rlp = "0.3.0"
+tiny-keccak = "1.4.2"
+secp256k1 = "0.11.1"
+bigdecimal = { version = "0.0.11", features = ["serde"]}
+lazy_static = "1.2.0"

@@ -1,0 +1,21 @@
+error[E0554]: #![feature] may not be used on the stable release channel
+ --> <anon>:1:1
+  |
+1 | #![feature(untagged_unions)]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: aborting due to previous error
+
+For more information about this error, try `rustc --explain E0554`.
+error[E0658]: unions with non-`Copy` fields are unstable (see issue #32836)
+ --> <anon>:6:5
+  |
+6 | /     pub union MaybeUninit<T> {
+7 | |         empty: (),
+8 | |         value: ManuallyDrop<T>,
+9 | |     }
+  | |_____^
+
+error: aborting due to previous error
+
+For more information about this error, try `rustc --explain E0658`.

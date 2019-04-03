@@ -1,0 +1,38 @@
+{
+  "name": "plasma-contracts",
+  "version": "0.1.0",
+  "license": "GPL-3.0-only",
+  "devDependencies": {},
+  "dependencies": {
+    "axios": "^0.18.0",
+    "bn.js": "^4.11.8",
+    "brorand": "^1.1.0",
+    "elliptic": "^6.4.1",
+    "ethereumjs-util": "^6.0.0",
+    "ethers": "^4.0.20",
+    "ethjs": "^0.4.0",
+    "ganache-cli": "^6.2.3",
+    "hash.js": "^1.1.7",
+    "hmac-drbg": "^1.0.1",
+    "minimalistic-assert": "^1.0.1",
+    "minimalistic-crypto-utils": "^1.0.1",
+    "solc": "^0.4.24",
+    "truffle": "^5.0.0",
+    "truffle-hdwallet-provider": "^1.0.0-web3one.1",
+    "web3": "^1.0.0-beta.37"
+  },
+  "scripts": {
+    "build": "solcjs -o bin --bin --abi contracts/*.sol",
+    "migrate": ". ../env && truffle migrate --reset --network dev",
+    "ganache": "ganache-cli -l 7000000 -i 4 -m \"cliff flag flag fence mesh quarter coyote mechanic cash draw remain priority\" ",
+    "start-geth": "geth --rpc --rpcapi \"eth,net,web3,personal\" --dev --miner.gastarget 8000000 --dev.period=1",
+    "deploy": ". ../env && yarn truffle migrate --reset --network rinkeby",
+    "geth": "node scripts/setup-geth.js 2& yarn start-geth",
+    "geth-deployed": "(sleep 10 && node scripts/setup-geth.js && yarn deploy-geth)& yarn start-geth > /dev/null",
+    "start-parity": "parity --config dev --jsonrpc-apis all",
+    "parity-deployed": "(sleep 2 && node scripts/setup-geth.js && yarn deploy-local)& yarn start-parity > /dev/null",
+    "flat": "flat -input contracts/PlasmaContract.sol -output build/PlasmaContractFlattened.sol",
+    "flatten": "solidity_flattener contracts/PlasmaContract.sol",
+    "postinstall": "python -m pip install solidity-flattener"
+  }
+}

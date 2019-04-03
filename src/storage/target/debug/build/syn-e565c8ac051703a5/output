@@ -1,0 +1,3 @@
+cargo:rustc-cfg=syn_can_use_thread_id
+cargo:rustc-cfg=syn_can_call_macro_by_path
+cargo:rustc-cfg=syn_disable_nightly_tests
