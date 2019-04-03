@@ -996,15 +996,10 @@ impl BabyProver {
 
 pub fn start_prover(connection_pool: ConnectionPool, worker: String) {
     thread::Builder::new().name(worker.clone()).spawn(move || {
+        println!("staring prover worker: {}", worker);
         let mut prover = BabyProver::create(connection_pool).unwrap();
         prover.run(&worker)
     }).expect("prover thread must start");
-}
-
-pub fn start_prover_handler(connection_pool: ConnectionPool) {
-    start_prover(connection_pool.clone(), "worker 1".to_owned());
-    start_prover(connection_pool.clone(), "worker 2".to_owned());
-    start_prover(connection_pool.clone(), "worker 3".to_owned());
 }
 
 // #[test]

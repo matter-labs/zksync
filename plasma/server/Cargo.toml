@@ -2,9 +2,9 @@
 name = "server"
 version = "0.0.1"
 
-[[bin]]
-name = "server"
-path = "bin/server.rs"
+# [[bin]]
+# name = "server"
+# path = "bin/server.rs"
 
 [dependencies]
 plasma = { path = ".." }

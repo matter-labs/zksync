@@ -1,7 +1,7 @@
 extern crate server;
 extern crate storage;
 extern crate server_models;
-extern crate prover;
+//extern crate prover;
 extern crate ctrlc;
 extern crate signal_hook;
 extern crate tokio;
@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use prover::start_prover_handler;
+//use prover::start_prover_handler;
 use server::state_keeper::{PlasmaStateKeeper, start_state_keeper};
 use server::api_server::start_api_server;
 use server::committer::start_committer;
@@ -49,9 +49,12 @@ fn main() {
     start_eth_watch(eth_watch, tx_for_state.clone());
     let (tx_for_ops, rx_for_ops) = channel();
     start_state_keeper(state_keeper, rx_for_state, tx_for_ops.clone());
-    start_prover_handler(connection_pool.clone());
     let tx_for_eth = eth_sender::start_eth_sender(connection_pool.clone());
     start_committer(rx_for_ops, tx_for_eth, connection_pool.clone());
+
+    // start_prover(connection_pool.clone(), "worker 1");
+    // start_prover(connection_pool.clone(), "worker 2");
+    // start_prover(connection_pool.clone(), "worker 3");
 
     // Simple timer, pings every second
     thread::Builder::new().name("timer".to_string()).spawn(move || {
