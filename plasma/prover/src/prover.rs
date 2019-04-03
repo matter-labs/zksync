@@ -27,7 +27,7 @@ use self::rustc_hex::ToHex;
 
 use bellman::groth16::{Proof, Parameters, create_random_proof, verify_proof, prepare_verifying_key};
 
-use plasma::models::{Engine, Fr, AccountId, BlockData, TransferTx, DepositTx, ExitTx};
+use plasma::models::{Engine, Fr, BlockNumber, AccountId, BlockData, TransferTx, DepositTx, ExitTx};
 use plasma::models::{self, params, Block, PlasmaState};
 use plasma::models::circuit::{Account, AccountTree};
 
@@ -51,16 +51,16 @@ use plasma::circuit::transfer::circuit::{
 use plasma::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum, field_element_to_u32};
 
 pub struct Prover<E:JubjubEngine> {
-    pub transfer_batch_size: usize,
-    pub deposit_batch_size: usize,
-    pub exit_batch_size: usize,
-    pub block_number: u32,
-    pub accounts_tree: AccountTree,
-    pub transfer_parameters: BabyParameters,
-    pub deposit_parameters: BabyParameters,
-    pub exit_parameters: BabyParameters,
-    pub jubjub_params: E::Params,
-    pub pool: ConnectionPool,
+    pub transfer_batch_size:    usize,
+    pub deposit_batch_size:     usize,
+    pub exit_batch_size:        usize,
+    pub current_block_number:   BlockNumber,
+    pub accounts_tree:          AccountTree,
+    pub transfer_parameters:    BabyParameters,
+    pub deposit_parameters:     BabyParameters,
+    pub exit_parameters:        BabyParameters,
+    pub jubjub_params:          E::Params,
+    pub storage:                StorageProcessor,
 }
 
 pub type BabyProof = Proof<Engine>;
@@ -242,16 +242,16 @@ impl BabyProver {
         let jubjub_params = AltJubjubBn256::new();
 
         Ok(Self{
-            transfer_batch_size: TRANSFER_BATCH_SIZE,
-            deposit_batch_size: DEPOSIT_BATCH_SIZE,
-            exit_batch_size: EXIT_BATCH_SIZE,
-            block_number: state_block_number,
-            accounts_tree: tree,
-            transfer_parameters: transfer_circuit_params.unwrap(),
-            deposit_parameters: deposit_circuit_params.unwrap(),
-            exit_parameters: exit_circuit_params.unwrap(),
+            transfer_batch_size:    TRANSFER_BATCH_SIZE,
+            deposit_batch_size:     DEPOSIT_BATCH_SIZE,
+            exit_batch_size:        EXIT_BATCH_SIZE,
+            current_block_number:   state_block_number,
+            accounts_tree:          tree,
+            transfer_parameters:    transfer_circuit_params.unwrap(),
+            deposit_parameters:     deposit_circuit_params.unwrap(),
+            exit_parameters:        exit_circuit_params.unwrap(),
             jubjub_params,
-            pool,
+            storage,
         })
     }
 }
@@ -279,8 +279,8 @@ impl BabyProver {
     // Apply transactions to the state while also making a witness for proof, then calculate proof
     pub fn apply_and_prove_transfer(&mut self, block: &Block, transactions: &Vec<TransferTx>) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
-        if block_number != self.block_number {
-            println!("Transfer proof request is for block {}, while prover state is block {}", block_number, self.block_number);
+        if block_number != self.current_block_number {
+            println!("Transfer proof request is for block {}, while prover state is block {}", block_number, self.current_block_number);
             return Err(BabyProverErr::Other("incorrect block".to_owned()));
         }
         let block_final_root = block.new_root_hash.clone();
@@ -423,7 +423,7 @@ impl BabyProver {
             return Err(BabyProverErr::Other("block_final_root != final_root".to_owned()));
         }
 
-        self.block_number += 1;
+        self.current_block_number += 1;
 
         let mut public_data_initial_bits = vec![];
 
@@ -564,9 +564,9 @@ impl BabyProver {
         // println!("transactions: {:?}", &transactions);
 
         let block_number = block.block_number;
-        if block_number != self.block_number {
-            println!("Deposit proof request is for block {}, while prover state is block {}", block_number, self.block_number);
-            return Err(BabyProverErr::Other("block_number != self.block_number".to_owned()));
+        if block_number != self.current_block_number {
+            println!("Deposit proof request is for block {}, while prover state is block {}", block_number, self.current_block_number);
+            return Err(BabyProverErr::Other("block_number != self.current_block_number".to_owned()));
         }
         let block_final_root = block.new_root_hash.clone();
 
@@ -661,7 +661,7 @@ impl BabyProver {
             return Err(BabyProverErr::Other("block_final_root != final_root".to_owned()));
         }
 
-        self.block_number += 1;
+        self.current_block_number += 1;
 
         let mut public_data_initial_bits = vec![];
 
@@ -764,9 +764,9 @@ impl BabyProver {
     // expects accounts in block to be sorted already
     pub fn apply_and_prove_exit(&mut self, block: &Block, transactions: &Vec<ExitTx>) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
-        if block_number != self.block_number {
-            println!("Exit proof request is for block {}, while prover state is block {}", block_number, self.block_number);
-            return Err(BabyProverErr::Other("block_number != self.block_number".to_owned()));
+        if block_number != self.current_block_number {
+            println!("Exit proof request is for block {}, while prover state is block {}", block_number, self.current_block_number);
+            return Err(BabyProverErr::Other("block_number != self.current_block_number".to_owned()));
         }
         let block_final_root = block.new_root_hash.clone();
 
@@ -847,7 +847,7 @@ impl BabyProver {
             return Err(BabyProverErr::Other("block_final_root != final_root".to_owned()));
         }
 
-        self.block_number += 1;
+        self.current_block_number += 1;
 
         let mut public_data_initial_bits = vec![];
 
@@ -961,34 +961,44 @@ impl BabyProver {
         Ok(full_proof)
     }
 
-    fn make_proving_attempt(&mut self, storage: &StorageProcessor, worker: &String) -> Result<bool, String> {
-        let job = storage.fetch_prover_job(worker, PROVER_TIMEOUT).map_err(|e| format!("fetch_prover_job failed: {}", e))?;
+    fn rewind_state(&mut self, expected_current_block: BlockNumber) -> Result<(), String> {
+        if self.current_block_number != expected_current_block {
+            println!("rewinding the state from block #{} to #{}", self.current_block_number, expected_current_block);
+            let (_, updated_accounts) = self.storage.load_state_diff(self.current_block_number, expected_current_block)
+                .map_err(|e| format!("load_state_diff failed: {}", e))?;
+            extend_accounts(&mut self.accounts_tree, updated_accounts.into_iter());
+            self.current_block_number = expected_current_block;
+        }
+        Ok(())
+    }
+
+    fn make_proving_attempt(&mut self, worker: &String) -> Result<(), String> {
+        let job = self.storage.fetch_prover_job(worker, PROVER_TIMEOUT).map_err(|e| format!("fetch_prover_job failed: {}", e))?;
         if let Some(block_number) = job {
             println!("prover {} got a new job for block {}", worker, block_number);
 
-            // load state delta self.block_number => block_number (can go both forwards and backwards)
-            let (_, updated_accounts) = storage.load_state_diff(self.block_number, block_number).map_err(|e| format!("load_state_diff failed: {}", e))?;
-            extend_accounts(&mut self.accounts_tree, updated_accounts.into_iter());
-            self.block_number = block_number;
+            // load state delta self.current_block_number => block_number (can go both forwards and backwards)
+            let expected_current_block = block_number - 1;
+            self.rewind_state(expected_current_block)?;
 
-            let block = storage.load_committed_block(block_number).map_err(|e| format!("load_committed_block failed: {}", e))?;
+            let block = self.storage.load_committed_block(block_number).map_err(|e| format!("load_committed_block failed: {}", e))?;
 
             let proof = self.apply_and_prove(&block).map_err(|e| format!("apply_and_prove failed: {}", e))?;
             let encoded = Self::encode_proof(&proof).expect("proof encoding failed");
-            storage.store_proof(block_number, &encoded).map_err(|e| format!("store_proof failed: {}", e))?;
-
-            Ok(true)
+            self.storage.store_proof(block_number, &encoded).map_err(|e| format!("store_proof failed: {}", e))?;
         } else {
-            Ok(false)
+            // no new job, so let's try to fast forward to the latest verified state for efficiency, and then sleep
+            let last_verified_block = self.storage.get_last_verified_block().map_err(|e| format!("get_last_verified_block failed: {}", e))?;
+            self.rewind_state(last_verified_block).map_err(|e| format!("rewind_state failed: {}", e))?;
+            thread::sleep(Duration::from_millis(500));
         }
+        Ok(())
     }
 
     fn run(&mut self, worker: &String) {
-        let storage = self.pool.access_storage().expect("must get db connection");
         loop {
-            match self.make_proving_attempt(&storage, worker) {
-                Ok(done) => if !done {thread::sleep(Duration::from_millis(500));}
-                Err(err) => eprint!("Proving attempt failed: {}", err),
+            if let Err(err) = self.make_proving_attempt(worker) {
+                eprint!("Error: {}", err);
             }
         }
     }

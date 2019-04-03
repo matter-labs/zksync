@@ -1,0 +1,23 @@
+[package]
+name = "prover"
+version = "0.0.1"
+workspace = "../.."
+
+[lib]
+path = "src/prover.rs"
+
+[dependencies]
+plasma = { path = ".." }
+server_models = { path = "../server/server_models" }
+storage = { path = "../server/storage" }
+
+ff = { path = "../../ff", features = ["derive"] }
+pairing = { path = "../../pairing" }
+bellman = { path = "../../bellman" }
+sapling-crypto = { path = "../../sapling-crypto" }
+
+rand = "0.4"
+rust-crypto = "0.2"
+rustc-hex = "2.0.1"
+
+signal-hook = "0.1.8"

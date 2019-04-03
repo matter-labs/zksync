@@ -2,5 +2,5 @@
 members = [
     "plasma",
     "plasma/server",
-    "mq_test"
+    "plasma/prover"
 ]

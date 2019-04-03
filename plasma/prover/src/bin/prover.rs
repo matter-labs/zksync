@@ -1,8 +1,6 @@
 extern crate storage;
 extern crate prover;
-extern crate ctrlc;
 extern crate signal_hook;
-extern crate tokio;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

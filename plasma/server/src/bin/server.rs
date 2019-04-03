@@ -2,7 +2,6 @@ extern crate server;
 extern crate storage;
 extern crate server_models;
 //extern crate prover;
-extern crate ctrlc;
 extern crate signal_hook;
 extern crate tokio;
 
