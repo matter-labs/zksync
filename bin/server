@@ -1,0 +1,6 @@
+#!/bin/bash
+
+cd `dirname $0`/..
+. ./env
+
+cargo run --bin server

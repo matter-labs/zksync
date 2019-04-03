@@ -1,0 +1,39 @@
+[package]
+name = "server"
+version = "0.0.1"
+
+[dependencies]
+eth_client = { path = "../eth_client" }
+plasma = { path = "../plasma" }
+models = { path = "../models" }
+storage = { path = "../storage" }
+
+ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
+pairing = { package = "pairing_ce", version = "0.17.0" }
+sapling-crypto = { package = "sapling-crypto_ce", version = "0.0.5" }
+
+rand = "0.4"
+hex = "0.3.2"
+time = "0.1"
+num-bigint = "0.2"
+rust-crypto = "0.2"
+fnv = "1.0.3"
+ethabi = "6.1.0"
+web3 = { git = "https://github.com/tomusdrw/rust-web3" }
+rustc-hex = "2.0.1"
+futures = "0.1.25"
+hyper = "0.12.16"
+serde = "1.0.80"
+serde_json = "1.0.33"
+serde_derive = "1.0.80"
+serde_bytes = "0.10.4"
+
+im = "12.2.0"
+priority-queue = "0.5.2"
+num-traits = "0.2"
+
+tokio = "0.1.18"
+actix = "0.7.9"
+actix-web = "0.7.19"
+
+bigdecimal = { version = "0.0.11", features = ["serde"]}

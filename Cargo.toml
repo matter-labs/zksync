@@ -1,6 +1,20 @@
-[workspace]
-members = [
-    "plasma",
-    "plasma/server",
-    "plasma/prover"
+[package]
+
+name = "franlklin"
+version = "0.1.0"
+edition = "2018"
+
+authors = [
+    "Alex Gluchowski <alex@gluchowski.net>",
+    "Alex Vlasov <alex.m.vlasov@gmail.com>"
 ]
+
+[dependencies]
+eth_client = { path = "src/eth_client" }
+plasma = { path = "src/plasma" }
+models = { path = "src/models" }
+storage = { path = "src/storage" }
+prover = { path = "src/prover" }
+server = { path = "src/server" }
+
+signal-hook = "0.1.8"

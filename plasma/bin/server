@@ -1,8 +1,0 @@
-#!/bin/bash
-
-cd `dirname $0`/..
-
-. ./env
-cd server
-
-cargo run --release --bin server

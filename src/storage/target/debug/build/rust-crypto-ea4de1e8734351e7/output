@@ -1,0 +1,38 @@
+TARGET = Some("x86_64-apple-darwin")
+OPT_LEVEL = Some("0")
+TARGET = Some("x86_64-apple-darwin")
+TARGET = Some("x86_64-apple-darwin")
+HOST = Some("x86_64-apple-darwin")
+CFLAGS_x86_64-apple-darwin = None
+CFLAGS_x86_64_apple_darwin = None
+HOST_CFLAGS = None
+CFLAGS = None
+DEBUG = Some("true")
+running: "cc" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-m64" "-Wall" "-Wextra" "-o" "/Users/alex/src/shamatar/franklin/src/storage/target/debug/build/rust-crypto-ea4de1e8734351e7/out/src/util_helpers.o" "-c" "src/util_helpers.c"
+exit code: 0
+TARGET = Some("x86_64-apple-darwin")
+OPT_LEVEL = Some("0")
+TARGET = Some("x86_64-apple-darwin")
+TARGET = Some("x86_64-apple-darwin")
+HOST = Some("x86_64-apple-darwin")
+CFLAGS_x86_64-apple-darwin = None
+CFLAGS_x86_64_apple_darwin = None
+HOST_CFLAGS = None
+CFLAGS = None
+DEBUG = Some("true")
+running: "cc" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-m64" "-Wall" "-Wextra" "-o" "/Users/alex/src/shamatar/franklin/src/storage/target/debug/build/rust-crypto-ea4de1e8734351e7/out/src/aesni_helpers.o" "-c" "src/aesni_helpers.c"
+exit code: 0
+TARGET = Some("x86_64-apple-darwin")
+TARGET = Some("x86_64-apple-darwin")
+HOST = Some("x86_64-apple-darwin")
+AR_x86_64-apple-darwin = None
+AR_x86_64_apple_darwin = None
+HOST_AR = None
+AR = None
+TARGET = Some("x86_64-apple-darwin")
+TARGET = Some("x86_64-apple-darwin")
+running: "ar" "crs" "/Users/alex/src/shamatar/franklin/src/storage/target/debug/build/rust-crypto-ea4de1e8734351e7/out/lib_rust_crypto_helpers.a" "/Users/alex/src/shamatar/franklin/src/storage/target/debug/build/rust-crypto-ea4de1e8734351e7/out/src/util_helpers.o" "/Users/alex/src/shamatar/franklin/src/storage/target/debug/build/rust-crypto-ea4de1e8734351e7/out/src/aesni_helpers.o"
+exit code: 0
+TARGET = Some("x86_64-apple-darwin")
+cargo:rustc-link-lib=static=_rust_crypto_helpers
+cargo:rustc-link-search=native=/Users/alex/src/shamatar/franklin/src/storage/target/debug/build/rust-crypto-ea4de1e8734351e7/out

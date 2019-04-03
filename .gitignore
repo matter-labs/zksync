@@ -1,5 +1,8 @@
 .idea/
 .vscode
-target
 .DS_Store
-plasma/contracts/yarn-error.log
+/contracts/yarn-error.log
+/target
+/env
+/deploy.log
+/*.bak

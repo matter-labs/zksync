@@ -1,0 +1,1 @@
+cargo:rustc-cfg=byteorder_i128

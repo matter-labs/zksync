@@ -1,0 +1,4 @@
+cargo:rerun-if-changed=build.rs
+cargo:rustc-cfg=rustc_1_25
+cargo:rustc-cfg=rustc_1_26
+cargo:rustc-cfg=rustc_1_27

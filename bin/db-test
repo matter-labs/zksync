@@ -1,0 +1,11 @@
+#!/bin/bash
+
+cd `dirname $0`/..
+. ./env
+cd src/storage
+
+DATABASE_URL=$TEST_DATABASE_URL
+
+diesel database setup
+
+cargo test
