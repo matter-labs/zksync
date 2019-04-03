@@ -962,13 +962,11 @@ impl BabyProver {
     }
 
     fn rewind_state(&mut self, expected_current_block: BlockNumber) -> Result<(), String> {
-        if self.current_block_number != expected_current_block {
-            println!("rewinding the state from block #{} to #{}", self.current_block_number, expected_current_block);
-            let (_, updated_accounts) = self.storage.load_state_diff(self.current_block_number, expected_current_block)
-                .map_err(|e| format!("load_state_diff failed: {}", e))?;
-            extend_accounts(&mut self.accounts_tree, updated_accounts.into_iter());
-            self.current_block_number = expected_current_block;
-        }
+        println!("rewinding the state from block #{} to #{}", self.current_block_number, expected_current_block);
+        let (_, updated_accounts) = self.storage.load_state_diff(self.current_block_number, expected_current_block)
+            .map_err(|e| format!("load_state_diff failed: {}", e))?;
+        extend_accounts(&mut self.accounts_tree, updated_accounts.into_iter());
+        self.current_block_number = expected_current_block;
         Ok(())
     }
 
@@ -979,7 +977,9 @@ impl BabyProver {
 
             // load state delta self.current_block_number => block_number (can go both forwards and backwards)
             let expected_current_block = block_number;
-            self.rewind_state(expected_current_block)?;
+            if self.current_block_number != expected_current_block {
+                self.rewind_state(expected_current_block)?;
+            }
 
             let block = self.storage.load_committed_block(block_number).map_err(|e| format!("load_committed_block failed: {}", e))?;
 
@@ -989,7 +989,9 @@ impl BabyProver {
         } else {
             // no new job, so let's try to fast forward to the latest verified state for efficiency, and then sleep
             let last_verified_block = self.storage.get_last_verified_block().map_err(|e| format!("get_last_verified_block failed: {}", e))?;
-            self.rewind_state(last_verified_block + 1).map_err(|e| format!("rewind_state failed: {}", e))?;
+            if self.current_block_number < last_verified_block + 1 {
+                self.rewind_state(last_verified_block + 1).map_err(|e| format!("rewind_state failed: {}", e))?;
+            }
             thread::sleep(Duration::from_millis(500));
         }
         Ok(())
