@@ -417,22 +417,36 @@ impl StorageProcessor {
         //self.load_number("SELECT COALESCE(max(last_block), 0) AS integer_value FROM accounts")
     }
 
-    // /// Store the timestamp of the prover start
-    // pub fn store_prover_started(&self, block_number: BlockNumber, worker: String) -> QueryResult<usize> {
-    //     use crate::schema::proofs::dsl::{self, *};
-    //     insert_into(proofs)
-    //         .values(dsl::worker.eq(worker))
-    //         .execute(&self.conn)
-    // }
+    pub fn fetch_prover_job(&self, worker: &String, timeout_seconds: usize) -> QueryResult<Option<BlockNumber>> {
+        self.conn.transaction(|| {
+            let job: Option<BlockNumber> = diesel::sql_query(format!("
+                    LOCK TABLE prover_runs IN EXCLUSIVE MODE;
 
-    /// Store the timestamp of the prover finish and the proof
-    pub fn store_prover_run(&self, block_number: BlockNumber, worker: String) -> QueryResult<usize> {
-        let to_store = NewProverRun{
-            block_number: block_number as i32,
-            worker,
-        };
-        use schema::prover_runs::dsl::prover_runs;
-        insert_into(prover_runs).values(&to_store).execute(&self.conn)
+                    SELECT min(block_number) as integer_value FROM operations o
+                    WHERE action_type = 'Commit'
+                    AND block_number >
+                        (SELECT max(block_number) FROM operations WHERE action_type = 'Verify')
+                    AND NOT EXISTS 
+                        (SELECT * FROM proofs WHERE block_number = o.block_number)
+                    AND NOT EXISTS
+                        (SELECT * FROM prover_runs 
+                            WHERE block_number = o.block_number AND (now() - created_at) < interval '{} seconds')
+                ", timeout_seconds))
+                .get_result::<IntegerNumber>(&self.conn)
+                .optional()?
+                .map(|i| i.integer_value as BlockNumber);
+            
+            if let Some(block_number) = job {
+                let to_store = NewProverRun{
+                    block_number: block_number as i32,
+                    worker: worker.to_string(),
+                };
+                use schema::prover_runs::dsl::prover_runs;
+                insert_into(prover_runs).values(&to_store).execute(&self.conn)?;
+            }
+
+            Ok(job)
+        })
     }
 
     /// Store the timestamp of the prover finish and the proof

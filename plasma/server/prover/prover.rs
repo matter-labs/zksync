@@ -11,8 +11,9 @@ extern crate bellman;
 extern crate sapling_crypto;
 
 use std::fmt;
+use std::thread;
+use std::time::Duration;
 use rand::{OsRng};
-use std::sync::mpsc;
 
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
@@ -31,9 +32,9 @@ use plasma::models::{self, params, Block, PlasmaState};
 use plasma::models::circuit::{Account, AccountTree};
 
 use server_models::encoder;
-use server_models::config::{TRANSFER_BATCH_SIZE, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE};
-use server_models::{EncodedProof, CommitRequest, ProverRequest};
-use storage::{ConnectionPool};
+use server_models::config::{TRANSFER_BATCH_SIZE, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE, PROVER_TIMEOUT};
+use server_models::{EncodedProof};
+use storage::{ConnectionPool, StorageProcessor};
 
 use plasma::circuit::utils::be_bit_vector_into_bytes;
 use plasma::circuit::transfer::transaction::{Transaction};
@@ -960,50 +961,45 @@ impl BabyProver {
         Ok(full_proof)
     }
 
-    fn run(
-            &mut self,
-            rx_for_blocks: mpsc::Receiver<ProverRequest>, 
-            tx_for_ops: mpsc::Sender<CommitRequest>
-        ) 
-    {
-        for ProverRequest(block_number) in rx_for_blocks {
+    fn make_proving_attempt(&mut self, storage: &StorageProcessor, worker: &String) -> Result<bool, String> {
+        let job = storage.fetch_prover_job(worker, PROVER_TIMEOUT).expect("fetching job failed");
+        if let Some(block_number) = job {
             // fast forward state: self.block_number => block_number
-            let storage = self.pool.access_storage().expect("must get connection from the pool");
-            let (_, updated_accounts) = storage.load_state_diff(self.block_number, block_number).expect("loading from db must work");
+            let (_, updated_accounts) = storage.load_state_diff(self.block_number, block_number).map_err(|e| e.to_string())?;
             extend_accounts(&mut self.accounts_tree, updated_accounts.into_iter());
 
-            let block = storage.load_committed_block(block_number).expect("failed loading committed block");
+            let block = storage.load_committed_block(block_number).map_err(|e| e.to_string())?;
 
-            storage.store_prover_run(block_number, "default_worker".to_owned()).expect("storing prover run must work");
-
-            let proof = self.apply_and_prove(&block).expect("prover block failed");
+            let proof = self.apply_and_prove(&block).map_err(|e| e.to_string())?;
             let encoded = Self::encode_proof(&proof).expect("proof encoding failed");
-            storage.store_proof(block_number, &encoded).expect("saving proof failed");
+            storage.store_proof(block_number, &encoded).map_err(|e| e.to_string())?;
 
-            tx_for_ops.send(CommitRequest::NewProof(block_number)).expect("must send a proof for commitment");
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn run(&mut self, worker: &String) {
+        let storage = self.pool.access_storage().expect("must get db connection");
+        loop {
+            match self.make_proving_attempt(&storage, worker) {
+                Ok(done) => if !done {thread::sleep(Duration::from_millis(500));}
+                Err(err) => eprint!("Proving attempt failed: {}", err),
+            }
         }
     }
 }
 
-pub fn start_prover(
-        connection_pool: ConnectionPool,
-        rx_for_blocks: mpsc::Receiver<ProverRequest>, 
-        tx_for_ops: mpsc::Sender<CommitRequest>
-    ) 
-{
-    let mut prover = BabyProver::create(connection_pool.clone()).unwrap();
-    std::thread::Builder::new().name("prover".to_string()).spawn(move || {
-        prover.run(rx_for_blocks, tx_for_ops)
+pub fn start_prover(connection_pool: ConnectionPool, worker: String) {
+    thread::Builder::new().name(worker.clone()).spawn(move || {
+        let mut prover = BabyProver::create(connection_pool).unwrap();
+        prover.run(&worker)
     }).expect("prover thread must start");
 }
 
-pub fn start_prover_handler(
-        connection_pool: ConnectionPool,
-        rx_for_blocks: mpsc::Receiver<ProverRequest>, 
-        tx_for_ops: mpsc::Sender<CommitRequest>
-    ) 
-{
-    start_prover(connection_pool.clone(), rx_for_blocks, tx_for_ops)
+pub fn start_prover_handler(connection_pool: ConnectionPool) {
+    start_prover(connection_pool.clone(), "worker 1".to_owned());
 }
 
 // #[test]

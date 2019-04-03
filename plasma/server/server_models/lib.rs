@@ -22,19 +22,6 @@ pub struct NetworkStatus {
     pub next_block_at_max: Option<u64>,
 }
 
-pub enum ProtoBlock{
-    Transfer,
-    Deposit(BatchNumber, Vec<DepositTx>),
-    Exit(BatchNumber, Vec<ExitTx>),
-}
-
-pub enum StateKeeperRequest{
-    AddTransferTx(TransferTx, Sender<TransferTxResult>),
-    AddBlock(ProtoBlock),
-    GetAccount(u32, Sender<Option<Account>>),
-    GetNetworkStatus(Sender<NetworkStatus>),
-    TimerTick,
-}
 
 pub type EncodedProof = [U256; 8];
 
@@ -92,11 +79,25 @@ pub struct Operation {
     pub tx_meta:            Option<TxMeta>,
 }
 
+pub enum ProtoBlock{
+    Transfer,
+    Deposit(BatchNumber, Vec<DepositTx>),
+    Exit(BatchNumber, Vec<ExitTx>),
+}
+
+pub enum StateKeeperRequest{
+    AddTransferTx(TransferTx, Sender<TransferTxResult>),
+    AddBlock(ProtoBlock),
+    GetAccount(u32, Sender<Option<Account>>),
+    GetNetworkStatus(Sender<NetworkStatus>),
+    TimerTick,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub enum CommitRequest {
     NewBlock{
         block:              Block, 
         accounts_updated:   AccountMap,
     },
-    NewProof(BlockNumber) //, Block, EncodedProof)
+    TimerTick,
 }
