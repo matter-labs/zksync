@@ -60,7 +60,7 @@ Move files to proper locations:
 
 ```shell
 mv -f n*VerificationKey.sol ./contracts/contracts/
-mv -f *_pk.key ./server/keys/
+mv -f *_pk.key ./prover/keys/
 ```
 
 If the pregenerated leaf format changes, replace the `EMPTY_TREE_ROOT` constant in `contracts/contracts/PlasmaStorage.sol`.

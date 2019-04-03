@@ -43,8 +43,6 @@ extern crate actix_web;
 extern crate serde_derive;
 extern crate serde_bytes;
 
-#[macro_use]
-extern crate diesel;
 extern crate bigdecimal;
 
 extern crate priority_queue;
