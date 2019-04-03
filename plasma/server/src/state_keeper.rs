@@ -101,6 +101,7 @@ impl PlasmaStateKeeper {
                 },
                 StateKeeperRequest::AddBlock(mut block) => {
                     self.block_queue.push_back(block);
+                    //println!("new protoblock, transfer_tx_queue.len() = {}", self.transfer_tx_queue.len());
                     if self.transfer_tx_queue.len() == 0 {
                         self.process_block_queue(&tx_for_commitments);
                     }
@@ -124,6 +125,7 @@ impl PlasmaStateKeeper {
                 ProtoBlock::Deposit(batch_number, transactions) => self.create_deposit_block(batch_number, transactions),
                 ProtoBlock::Exit(batch_number, transactions) => self.create_exit_block(batch_number, transactions),
             };
+            //println!("sending request to committer {:?}", req);
             tx_for_commitments.send(req).expect("must send new operation for commitment");
             self.state.block_number += 1; // bump current block number as we've made one
         }

@@ -962,17 +962,20 @@ impl BabyProver {
     }
 
     fn make_proving_attempt(&mut self, storage: &StorageProcessor, worker: &String) -> Result<bool, String> {
-        let job = storage.fetch_prover_job(worker, PROVER_TIMEOUT).expect("fetching job failed");
+        let job = storage.fetch_prover_job(worker, PROVER_TIMEOUT).map_err(|e| format!("fetch_prover_job failed: {}", e))?;
         if let Some(block_number) = job {
-            // fast forward state: self.block_number => block_number
-            let (_, updated_accounts) = storage.load_state_diff(self.block_number, block_number).map_err(|e| e.to_string())?;
+            println!("prover {} got a new job for block {}", worker, block_number);
+
+            // load state delta self.block_number => block_number (can go both forwards and backwards)
+            let (_, updated_accounts) = storage.load_state_diff(self.block_number, block_number).map_err(|e| format!("load_state_diff failed: {}", e))?;
             extend_accounts(&mut self.accounts_tree, updated_accounts.into_iter());
+            self.block_number = block_number;
 
-            let block = storage.load_committed_block(block_number).map_err(|e| e.to_string())?;
+            let block = storage.load_committed_block(block_number).map_err(|e| format!("load_committed_block failed: {}", e))?;
 
-            let proof = self.apply_and_prove(&block).map_err(|e| e.to_string())?;
+            let proof = self.apply_and_prove(&block).map_err(|e| format!("apply_and_prove failed: {}", e))?;
             let encoded = Self::encode_proof(&proof).expect("proof encoding failed");
-            storage.store_proof(block_number, &encoded).map_err(|e| e.to_string())?;
+            storage.store_proof(block_number, &encoded).map_err(|e| format!("store_proof failed: {}", e))?;
 
             Ok(true)
         } else {
@@ -1000,6 +1003,8 @@ pub fn start_prover(connection_pool: ConnectionPool, worker: String) {
 
 pub fn start_prover_handler(connection_pool: ConnectionPool) {
     start_prover(connection_pool.clone(), "worker 1".to_owned());
+    start_prover(connection_pool.clone(), "worker 2".to_owned());
+    start_prover(connection_pool.clone(), "worker 3".to_owned());
 }
 
 // #[test]

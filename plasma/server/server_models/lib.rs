@@ -93,7 +93,7 @@ pub enum StateKeeperRequest{
     TimerTick,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum CommitRequest {
     NewBlock{
         block:              Block, 

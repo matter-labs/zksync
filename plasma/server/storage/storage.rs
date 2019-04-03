@@ -10,6 +10,7 @@ extern crate serde_json;
 use plasma::models::*;
 use diesel::dsl::*;
 use server_models::{Operation, Action, EncodedProof};
+use std::cmp;
 
 mod schema;
 use schema::*;
@@ -32,17 +33,17 @@ pub struct ConnectionPool {
 }
 
 impl ConnectionPool {
-    pub fn new() -> Self {
-        let database_url = env::var("DATABASE_URL")
-            .expect("DATABASE_URL must be set");
+pub fn new() -> Self {
+    let database_url = env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set");
 
-        let manager = ConnectionManager::<PgConnection>::new(database_url);
-        let pool = Pool::builder().build(manager).expect("Failed to create connection pool");
-        
-        Self {
-            pool
-        }
+    let manager = ConnectionManager::<PgConnection>::new(database_url);
+    let pool = Pool::builder().build(manager).expect("Failed to create connection pool");
+
+    Self {
+        pool
     }
+}
 
     pub fn access_storage(&self) -> Result<StorageProcessor, PoolError> {
         let connection = self.pool.get()?;
@@ -103,7 +104,7 @@ impl StoredOperation {
         op.tx_meta = Some(meta);
 
         if op.accounts_updated.is_none() {
-            let (_, updates) = conn.load_state_at_block(op.block.block_number)?;
+            let (_, updates) = conn.load_state_diff_for_block(op.block.block_number)?;
             op.accounts_updated = Some(updates);
         };
 
@@ -231,27 +232,35 @@ impl StorageProcessor {
         self.load_state("SELECT * FROM accounts a")
     }
 
-    /// loads the state of accounts updated between two blocks: (start, end]
-    pub fn load_state_diff(&self, start_block: u32, end_block: u32) -> QueryResult<(u32, AccountMap)> {
-        let select = format!("
-        WITH upd AS (
-            WITH s AS (
-                SELECT account_id as id, max(block_number) as last_block 
-                FROM account_updates u 
-                WHERE u.block_number >= {} AND u.block_number < {}
-                GROUP BY account_id
-            ) 
-            SELECT u.account_id AS id, u.block_number AS last_block, u.data FROM s, account_updates u WHERE s.id = u.account_id AND u.block_number = s.last_block
-        )
-        SELECT u.id, u.last_block, u.data
-        FROM upd u
-        ORDER BY id", start_block, end_block);
+    /// loads the state of accounts updated between two blocks
+    pub fn load_state_diff(&self, from_block: u32, to_block: u32) -> QueryResult<(u32, AccountMap)> {
+        let start_block = cmp::min(from_block, to_block);
+        let end_block = cmp::max(from_block, to_block);
 
+        // this takes all blocks changed between `start_block` and `end_block`
+        // and then takes the latest updated for each before `to_block`
+        let select = format!("
+            WITH upd AS (
+                WITH s AS (
+                    SELECT 
+                        account_id as id, 
+                        (SELECT max(block_number) FROM account_updates 
+                            WHERE block_number <= {to_block}
+                            AND account_id = u.account_id) as last_block 
+                    FROM account_updates u 
+                    WHERE u.block_number > {start_block} AND u.block_number <= {end_block}
+                    GROUP BY account_id
+                ) 
+                SELECT u.account_id AS id, u.block_number AS last_block, u.data FROM s, account_updates u WHERE s.id = u.account_id AND u.block_number = s.last_block
+            )
+            SELECT u.id, u.last_block, u.data
+            FROM upd u
+            ORDER BY id", to_block=to_block, start_block=start_block, end_block=end_block);
         self.load_state(select.as_str())
     }
 
     /// loads the state of accounts updated in a specific block
-    pub fn load_state_at_block(&self, block_number: u32) -> QueryResult<(u32, AccountMap)> {
+    pub fn load_state_diff_for_block(&self, block_number: u32) -> QueryResult<(u32, AccountMap)> {
         self.load_state_diff(block_number-1, block_number)
     }
 
@@ -390,7 +399,7 @@ impl StorageProcessor {
         //     .get_result::<Option<i32>>(&self.conn)
         //     .map(|max| max.unwrap_or(0))
 
-        use crate::schema::operations::dsl::*;
+        use schema::operations::dsl::*;
         operations
             .select(max(block_number))
             .filter(action_type.eq(ACTION_COMMIT))
@@ -419,9 +428,8 @@ impl StorageProcessor {
 
     pub fn fetch_prover_job(&self, worker: &String, timeout_seconds: usize) -> QueryResult<Option<BlockNumber>> {
         self.conn.transaction(|| {
+            sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(&self.conn)?;
             let job: Option<BlockNumber> = diesel::sql_query(format!("
-                    LOCK TABLE prover_runs IN EXCLUSIVE MODE;
-
                     SELECT min(block_number) as integer_value FROM operations o
                     WHERE action_type = 'Commit'
                     AND block_number >
@@ -432,8 +440,7 @@ impl StorageProcessor {
                         (SELECT * FROM prover_runs 
                             WHERE block_number = o.block_number AND (now() - created_at) < interval '{} seconds')
                 ", timeout_seconds))
-                .get_result::<IntegerNumber>(&self.conn)
-                .optional()?
+                .get_result::<Option<IntegerNumber>>(&self.conn)?
                 .map(|i| i.integer_value as BlockNumber);
             
             if let Some(block_number) = job {
@@ -539,8 +546,11 @@ mod test {
             state.into_iter().collect::<Vec<(u32, models::Account)>>(), 
             accounts.clone().into_iter().collect::<Vec<(u32, models::Account)>>());
 
-        let (_, state) = conn.load_state_diff(1, 2).unwrap();
+        let (_, state) = conn.load_state_diff(0, 1).expect("load_state_diff failed");
         assert_eq!( state.get(&2).unwrap(), &acc(2) );
+
+        let (_, reverse) = conn.load_state_diff(1, 0).unwrap();
+        assert_eq!( reverse.len(), 0 );
 
         // commit second state update
         let mut accounts2 = fnv::FnvHashMap::default();
@@ -551,12 +561,16 @@ mod test {
         assert_eq!(conn.load_verified_state().unwrap().1.len(), 3);
         assert_eq!(conn.load_committed_state().unwrap().1.len(), 4);
 
-        let (_, state) = conn.load_state_diff(1, 2).unwrap();
+        let (_, state) = conn.load_state_diff(0, 1).unwrap();
         assert_eq!( state.get(&2).unwrap(), &acc(2) );
-        let (_, state) = conn.load_state_diff(1, 3).unwrap();
+        let (_, state) = conn.load_state_diff(0, 2).unwrap();
         assert_eq!( state.get(&2).unwrap(), &acc(23) );
-        let (_, state) = conn.load_state_diff(2, 3).unwrap();
+        let (_, state) = conn.load_state_diff(1, 2).unwrap();
         assert_eq!( state.get(&2).unwrap(), &acc(23) );
+
+        let (_, reverse) = conn.load_state_diff(2, 1).unwrap();
+        assert_eq!( reverse.get(&2).unwrap(), &acc(2) );
+
     }
 
     use plasma::models::{Block, BlockData, U256};

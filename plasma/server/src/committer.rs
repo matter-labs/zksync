@@ -20,6 +20,7 @@ fn run_committer(
     pool: ConnectionPool,
 ) {
 
+    println!("committer started");
     let storage = pool.access_storage().expect("db connection failed for committer");;
 
     // // request unverified proofs
@@ -41,6 +42,7 @@ fn run_committer(
                     accounts_updated: Some(accounts_updated), 
                     tx_meta: None
                 };
+                println!("commit block #{}", op.block.block_number);
                 let op = storage.execute_operation(&op).expect("committer must commit the op into db");
                 //tx_for_proof_requests.send(ProverRequest(op.block.block_number)).expect("must send a proof request");
                 tx_for_eth.send(op).expect("must send an operation for commitment to ethereum");
@@ -60,6 +62,8 @@ fn run_committer(
                         let op = storage.execute_operation(&op).expect("committer must commit the op into db");
                         tx_for_eth.send(op).expect("must send an operation for commitment to ethereum");
                         last_verified_block += 1;
+                    } else {
+                        break;
                     }
                 }
             },

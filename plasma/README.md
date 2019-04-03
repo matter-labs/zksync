@@ -38,9 +38,9 @@ This will create database 'plasma' (db url is set in [server/.env] file) with ou
 
 ```diesel migration redo```
 
-- Run test to make sure everything works:
+- Run tests:
 
-```cargo test --lib -- --nocapture test_store_state```
+```db-tests```
 
 ### Production
 
