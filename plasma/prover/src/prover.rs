@@ -978,7 +978,7 @@ impl BabyProver {
             println!("prover {} got a new job for block {}", worker, block_number);
 
             // load state delta self.current_block_number => block_number (can go both forwards and backwards)
-            let expected_current_block = block_number - 1;
+            let expected_current_block = block_number;
             self.rewind_state(expected_current_block)?;
 
             let block = self.storage.load_committed_block(block_number).map_err(|e| format!("load_committed_block failed: {}", e))?;
@@ -989,7 +989,7 @@ impl BabyProver {
         } else {
             // no new job, so let's try to fast forward to the latest verified state for efficiency, and then sleep
             let last_verified_block = self.storage.get_last_verified_block().map_err(|e| format!("get_last_verified_block failed: {}", e))?;
-            self.rewind_state(last_verified_block).map_err(|e| format!("rewind_state failed: {}", e))?;
+            self.rewind_state(last_verified_block + 1).map_err(|e| format!("rewind_state failed: {}", e))?;
             thread::sleep(Duration::from_millis(500));
         }
         Ok(())

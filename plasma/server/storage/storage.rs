@@ -239,16 +239,19 @@ impl StorageProcessor {
 
         // this takes all blocks changed between `start_block` and `end_block`
         // and then takes the latest updated for each before `to_block`
+        //
+        // argument block numbers point at the next expected block, i.e. empty state starts at block 1
+        
         let select = format!("
             WITH upd AS (
                 WITH s AS (
                     SELECT 
                         account_id as id, 
                         (SELECT max(block_number) FROM account_updates 
-                            WHERE block_number <= {to_block}
+                            WHERE block_number < {to_block}
                             AND account_id = u.account_id) as last_block 
                     FROM account_updates u 
-                    WHERE u.block_number > {start_block} AND u.block_number <= {end_block}
+                    WHERE u.block_number >= {start_block} AND u.block_number < {end_block}
                     GROUP BY account_id
                 ) 
                 SELECT u.account_id AS id, u.block_number AS last_block, u.data FROM s, account_updates u WHERE s.id = u.account_id AND u.block_number = s.last_block
@@ -546,10 +549,10 @@ mod test {
             state.into_iter().collect::<Vec<(u32, models::Account)>>(), 
             accounts.clone().into_iter().collect::<Vec<(u32, models::Account)>>());
 
-        let (_, state) = conn.load_state_diff(0, 1).expect("load_state_diff failed");
+        let (_, state) = conn.load_state_diff(1, 2).expect("load_state_diff failed");
         assert_eq!( state.get(&2).unwrap(), &acc(2) );
 
-        let (_, reverse) = conn.load_state_diff(1, 0).unwrap();
+        let (_, reverse) = conn.load_state_diff(2, 1).unwrap();
         assert_eq!( reverse.len(), 0 );
 
         // commit second state update
@@ -561,14 +564,14 @@ mod test {
         assert_eq!(conn.load_verified_state().unwrap().1.len(), 3);
         assert_eq!(conn.load_committed_state().unwrap().1.len(), 4);
 
-        let (_, state) = conn.load_state_diff(0, 1).unwrap();
-        assert_eq!( state.get(&2).unwrap(), &acc(2) );
-        let (_, state) = conn.load_state_diff(0, 2).unwrap();
-        assert_eq!( state.get(&2).unwrap(), &acc(23) );
         let (_, state) = conn.load_state_diff(1, 2).unwrap();
+        assert_eq!( state.get(&2).unwrap(), &acc(2) );
+        let (_, state) = conn.load_state_diff(1, 3).unwrap();
+        assert_eq!( state.get(&2).unwrap(), &acc(23) );
+        let (_, state) = conn.load_state_diff(2, 3).unwrap();
         assert_eq!( state.get(&2).unwrap(), &acc(23) );
 
-        let (_, reverse) = conn.load_state_diff(2, 1).unwrap();
+        let (_, reverse) = conn.load_state_diff(3, 2).unwrap();
         assert_eq!( reverse.get(&2).unwrap(), &acc(2) );
 
     }
