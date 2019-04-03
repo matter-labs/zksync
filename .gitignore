@@ -1,6 +1,12 @@
-.idea/
+# Editor directories and files
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
 .vscode
 .DS_Store
+
 /contracts/yarn-error.log
 /target
 /env
