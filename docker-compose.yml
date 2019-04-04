@@ -1,6 +1,14 @@
-version: '3'
+version: '3.2'
 services:
   server:
     network_mode: host
     image: "server"
     env_file: .env
+  prover:
+    network_mode: host
+    image: "prover"
+    env_file: .env
+    volumes:
+      - type: bind
+        source: ./keys
+        target: /keys

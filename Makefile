@@ -6,6 +6,7 @@
 
 export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
 export SERVER_DOCKER_IMAGE ?= server
+export PROVER_DOCKER_IMAGE ?= prover
 
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
 rust-musl-builder = @docker run $(docker-options) -it ekidd/rust-musl-builder
@@ -23,5 +24,9 @@ build-server-image:
 	$(rust-musl-builder) cargo build --release
 	docker build -t "${SERVER_DOCKER_IMAGE}" -f ./etc/docker/server/Dockerfile .
 
-run-server-image:
-	@docker run server
+build-prover-image:
+	$(rust-musl-builder) cargo build --release
+	docker build -t "${PROVER_DOCKER_IMAGE}" -f ./etc/docker/prover/Dockerfile .
+
+up:
+	@docker-compose up

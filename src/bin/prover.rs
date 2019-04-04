@@ -20,13 +20,13 @@ fn main() {
     signal_hook::flag::register(signal_hook::SIGQUIT, Arc::clone(&stop_signal)).expect("Error setting SIGQUIT handler");
 
     let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        println!("Usage: prover <worker_name>");
-        return;
-    }
+    // if args.len() < 2 {
+    //     println!("Usage: prover <worker_name>");
+    //     return;
+    // }
 
     let connection_pool = ConnectionPool::new();
-    start_prover(connection_pool.clone(), args.get(1).unwrap().to_string());
+    start_prover(connection_pool.clone(), args.get(1).unwrap_or(&"default".to_string()).clone());
 
     while !stop_signal.load(Ordering::SeqCst) {
         thread::sleep(Duration::from_secs(1));
