@@ -25,7 +25,7 @@ echo yarn deploy
 yarn deploy  | tee ../deploy.log
 cd ..
 
-NEW_CONTRACT=`grep -A999 "Starting migrations" deploy.log | grep -A4 "Replacing 'PlasmaContract'" | grep "contract address" | grep -oE '0x(.+)' \
+NEW_CONTRACT=`grep -A999 "Starting migrations" deploy.log | grep -A4 "'PlasmaContract'" | grep "contract address" | grep -oE '0x(.+)' \
 | sed -n "s/0x//p"`
 
 if [ ! -z "$NEW_CONTRACT" ]
@@ -38,6 +38,7 @@ then
     sed -i"-`date +%Y-%m-%d-%H%M%S`.bak" "s/CONTRACT_ADDR=$OLD_CONTRACT/CONTRACT_ADDR=$NEW_CONTRACT/g" ./$ENV_FILE
 
     cd server/storage
+
     diesel database reset
     cd ../..
 else
