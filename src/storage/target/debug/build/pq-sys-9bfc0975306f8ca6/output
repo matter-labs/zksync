@@ -1,7 +1,0 @@
-cargo:rerun-if-env-changed=PQ_LIB_DIR
-cargo:rerun-if-env-changed=PQ_LIB_STATIC
-cargo:rerun-if-env-changed=TARGET
-cargo:rerun-if-env-changed=PG_CONFIG_X86_64_APPLE_DARWIN
-cargo:rustc-link-search=native=/usr/local/opt/postgresql/lib
-cargo:rerun-if-env-changed=PQ_LIB_STATIC_X86_64_APPLE_DARWIN
-cargo:rustc-link-lib=pq

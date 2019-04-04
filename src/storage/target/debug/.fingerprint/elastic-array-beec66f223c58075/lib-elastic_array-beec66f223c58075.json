@@ -1,1 +1,0 @@
-{"rustc":15213319881204273412,"features":"[\"default\", \"heapsize\", \"std\"]","target":6048292299538726425,"profile":11870183705523825133,"path":14770032275200268828,"deps":[["heapsize v0.4.2","heapsize",15728451985778124963]],"local":[{"Precalculated":"0.10.2"}],"rustflags":[],"edition":"Edition2015"}

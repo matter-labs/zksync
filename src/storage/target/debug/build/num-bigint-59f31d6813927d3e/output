@@ -1,1 +1,0 @@
-cargo:rustc-cfg=has_i128

@@ -1,2 +1,0 @@
-cargo:rustc-cfg=__unicase__iter_cmp
-cargo:rustc-cfg=__unicase__default_hasher

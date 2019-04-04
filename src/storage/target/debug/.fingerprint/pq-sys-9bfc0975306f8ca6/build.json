@@ -1,1 +1,0 @@
-{"rustc":15213319881204273412,"features":"","target":0,"profile":0,"path":0,"deps":[],"local":[{"EnvBased":["PQ_LIB_DIR",null]},{"EnvBased":["PQ_LIB_STATIC",null]},{"EnvBased":["TARGET",null]},{"EnvBased":["PG_CONFIG_X86_64_APPLE_DARWIN",null]},{"EnvBased":["PQ_LIB_STATIC_X86_64_APPLE_DARWIN",null]}],"rustflags":[],"edition":"Edition2015"}

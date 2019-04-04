@@ -1,1 +1,0 @@
-{"rustc":15213319881204273412,"features":"[\"clone-impls\", \"default\", \"derive\", \"extra-traits\", \"fold\", \"full\", \"parsing\", \"printing\", \"proc-macro\", \"proc-macro2\", \"quote\", \"visit\"]","target":4944179213620976468,"profile":11870183705523825133,"path":3639066510636201188,"deps":[],"local":[{"Precalculated":"0.15.30"}],"rustflags":[],"edition":"Edition2015"}
