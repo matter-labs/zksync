@@ -20,5 +20,8 @@ build-test-image:
 	docker build -t test -f ./etc/docker/test/Dockerfile .
 
 build-server-image:
-	#$(rust-musl-builder) cargo build --release
+	$(rust-musl-builder) cargo build --release
 	docker build -t "${SERVER_DOCKER_IMAGE}" -f ./etc/docker/server/Dockerfile .
+
+run-server-image:
+	@docker run server

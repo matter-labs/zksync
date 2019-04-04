@@ -22,6 +22,8 @@ use models::{StateKeeperRequest};
 
 fn main() {
 
+    println!("starting server");
+
     // handle ctrl+c
     let stop_signal = Arc::new(AtomicBool::new(false));
     signal_hook::flag::register(signal_hook::SIGTERM, Arc::clone(&stop_signal)).expect("Error setting SIGTERM handler");

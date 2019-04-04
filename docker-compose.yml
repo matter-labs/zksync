@@ -1,0 +1,6 @@
+version: '3'
+services:
+  server:
+    network_mode: host
+    image: "server"
+    env_file: .env
