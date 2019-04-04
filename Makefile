@@ -11,6 +11,9 @@ export PROVER_DOCKER_IMAGE ?= prover
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
 rust-musl-builder = @docker run $(docker-options) -it ekidd/rust-musl-builder
 
+redeploy-prod:
+	./bin/redeploy prod
+
 test:
 	$(rust-musl-builder) cargo --version
 

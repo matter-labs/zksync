@@ -2,6 +2,24 @@
 
 cd `dirname $0`/..
 
+if [ -z "$1" ]
+then
+    export ENV_FILE=local.env
+else
+    export ENV_FILE=$1.env
+fi
+
+if [ ! -f $ENV_FILE ]; then
+    echo "no config file found: $1"
+    exit
+fi
+
+set -o allexport
+source $ENV_FILE
+set +o allexport
+
+echo redeploying for the db $DATABASE_URL
+
 cd contracts
 echo yarn deploy
 yarn deploy  | tee ../deploy.log
@@ -14,10 +32,10 @@ if [ ! -z "$NEW_CONTRACT" ]
 then
     echo New contract at $NEW_CONTRACT
 
-    OLD_CONTRACT=`grep CONTRACT_ADDR env | grep -oE '=(.+)' | sed -n "s/=//p"`
+    OLD_CONTRACT=`grep CONTRACT_ADDR ./$ENV_FILE | grep -oE '=(.+)' | sed -n "s/=//p"`
     echo Old contract at $OLD_CONTRACT
 
-    sed -i"-`date +%Y-%m-%d-%H%M%S`.bak" "s/CONTRACT_ADDR=$OLD_CONTRACT/CONTRACT_ADDR=$NEW_CONTRACT/g" ./env
+    sed -i"-`date +%Y-%m-%d-%H%M%S`.bak" "s/CONTRACT_ADDR=$OLD_CONTRACT/CONTRACT_ADDR=$NEW_CONTRACT/g" ./$ENV_FILE
 
     cd server/storage
     diesel database reset
