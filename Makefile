@@ -29,4 +29,4 @@ build-prover-image:
 	docker build -t "${PROVER_DOCKER_IMAGE}" -f ./etc/docker/prover/Dockerfile .
 
 up:
-	@docker-compose up
+	@docker-compose up --scale prover=3
