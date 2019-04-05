@@ -3,8 +3,4 @@
 . .setup_env
 cd src/storage
 
-export DATABASE_URL=$TEST_DATABASE_URL
-
 diesel database setup
-
-cargo test
