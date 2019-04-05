@@ -1,7 +1,4 @@
-#!/bin/bash
-
-export SPACE_URL=https://ams3.digitaloceanspaces.com/keys
-export KEY_FILES="deposit_pk.key exit_pk.key"
+#!/bin/sh
 
 mkdir -p keys
 
@@ -12,4 +9,5 @@ for i in $KEY_FILES; do
     fi
 done
 
+echo key download complete, starting prover
 ./prover
