@@ -34,7 +34,7 @@ use plasma::models::circuit::{Account, AccountTree};
 use models::encoder;
 use models::config::{TRANSFER_BATCH_SIZE, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE, PROVER_TIMEOUT};
 use models::{EncodedProof};
-use storage::{ConnectionPool, StorageProcessor};
+use storage::StorageProcessor;
 
 use plasma::circuit::utils::be_bit_vector_into_bytes;
 use plasma::circuit::transfer::transaction::{Transaction};
@@ -60,7 +60,6 @@ pub struct Prover<E:JubjubEngine> {
     pub deposit_parameters:     BabyParameters,
     pub exit_parameters:        BabyParameters,
     pub jubjub_params:          E::Params,
-    pub storage:                StorageProcessor,
 }
 
 pub type BabyProof = Proof<Engine>;
@@ -182,9 +181,9 @@ impl BabyProver {
         Ok(p)
     }
 
-    pub fn create(pool: ConnectionPool) -> Result<BabyProver, BabyProverErr> {
+    pub fn create() -> Result<BabyProver, BabyProverErr> {
 
-        let storage = pool.access_storage().expect("db connection failed for prover");
+        let storage = StorageProcessor::establish_connection().expect("db connection failed for prover");
 
         let (last_block, accounts) = storage.load_verified_state().expect("db must be functional");
         let initial_state = PlasmaState::new(accounts, last_block + 1);
@@ -251,7 +250,6 @@ impl BabyProver {
             deposit_parameters:     deposit_circuit_params.unwrap(),
             exit_parameters:        exit_circuit_params.unwrap(),
             jubjub_params,
-            storage,
         })
     }
 }
@@ -961,9 +959,9 @@ impl BabyProver {
         Ok(full_proof)
     }
 
-    fn rewind_state(&mut self, expected_current_block: BlockNumber) -> Result<(), String> {
+    fn rewind_state(&mut self, storage: &StorageProcessor, expected_current_block: BlockNumber) -> Result<(), String> {
         println!("rewinding the state from block #{} to #{}", self.current_block_number, expected_current_block);
-        let (_, updated_accounts) = self.storage.load_state_diff(self.current_block_number, expected_current_block)
+        let (_, updated_accounts) = storage.load_state_diff(self.current_block_number, expected_current_block)
             .map_err(|e| format!("load_state_diff failed: {}", e))?;
         extend_accounts(&mut self.accounts_tree, updated_accounts.into_iter());
         self.current_block_number = expected_current_block;
@@ -971,26 +969,31 @@ impl BabyProver {
     }
 
     fn make_proving_attempt(&mut self, worker: &String) -> Result<(), String> {
-        let job = self.storage.fetch_prover_job(worker, PROVER_TIMEOUT).map_err(|e| format!("fetch_prover_job failed: {}", e))?;
+        let storage = StorageProcessor::establish_connection().map_err(|e| format!("establish_connection failed: {}", e))?;
+        let job = storage.fetch_prover_job(worker, PROVER_TIMEOUT).map_err(|e| format!("fetch_prover_job failed: {}", e))?;
+
         if let Some(block_number) = job {
             println!("prover {} got a new job for block {}", worker, block_number);
 
             // load state delta self.current_block_number => block_number (can go both forwards and backwards)
             let expected_current_block = block_number;
             if self.current_block_number != expected_current_block {
-                self.rewind_state(expected_current_block)?;
+                self.rewind_state(&storage, expected_current_block)?;
             }
 
-            let block = self.storage.load_committed_block(block_number).map_err(|e| format!("load_committed_block failed: {}", e))?;
+            let block = storage.load_committed_block(block_number).map_err(|e| format!("load_committed_block failed: {}", e))?;
+            drop(storage);
 
             let proof = self.apply_and_prove(&block).map_err(|e| format!("apply_and_prove failed: {}", e))?;
             let encoded = Self::encode_proof(&proof).expect("proof encoding failed");
-            self.storage.store_proof(block_number, &encoded).map_err(|e| format!("store_proof failed: {}", e))?;
+
+            let storage = StorageProcessor::establish_connection().map_err(|e| format!("establish_connection failed: {}", e))?;
+            storage.store_proof(block_number, &encoded).map_err(|e| format!("store_proof failed: {}", e))?;
         } else {
             // no new job, so let's try to fast forward to the latest verified state for efficiency, and then sleep
-            let last_verified_block = self.storage.get_last_verified_block().map_err(|e| format!("get_last_verified_block failed: {}", e))?;
+            let last_verified_block = storage.get_last_verified_block().map_err(|e| format!("get_last_verified_block failed: {}", e))?;
             if self.current_block_number < last_verified_block + 1 {
-                self.rewind_state(last_verified_block + 1).map_err(|e| format!("rewind_state failed: {}", e))?;
+                self.rewind_state(&storage, last_verified_block + 1).map_err(|e| format!("rewind_state failed: {}", e))?;
             }
             thread::sleep(Duration::from_millis(500));
         }
@@ -1006,10 +1009,11 @@ impl BabyProver {
     }
 }
 
-pub fn start_prover(connection_pool: ConnectionPool, worker: String) {
+pub fn start_prover(worker: String) {
     thread::Builder::new().name(worker.clone()).spawn(move || {
-        println!("staring prover worker: {}", worker);
-        let mut prover = BabyProver::create(connection_pool).unwrap();
+        println!("prover worker: {}", worker);
+        let mut prover = BabyProver::create().unwrap();
+        println!("starting");
         prover.run(&worker)
     }).expect("prover thread must start");
 }

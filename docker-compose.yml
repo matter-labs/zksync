@@ -3,11 +3,11 @@ services:
   server:
     network_mode: host
     image: "server"
-    env_file: .env
+    env_file: ./etc/prod/server.env
   prover:
     network_mode: host
     image: "prover"
-    env_file: .env
+    env_file: ./etc/prod/prover.env
     volumes:
       - type: bind
         source: ./keys

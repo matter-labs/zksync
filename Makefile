@@ -20,8 +20,8 @@ test:
 build:
 	@cargo build
 
-build-test-image:
-	docker build -t test -f ./etc/docker/test/Dockerfile .
+# build-test-image:
+# 	docker build -t test -f ./etc/docker/test/Dockerfile .
 
 build-server-image:
 	$(rust-musl-builder) cargo build --release
@@ -31,5 +31,7 @@ build-prover-image:
 	$(rust-musl-builder) cargo build --release
 	docker build -t "${PROVER_DOCKER_IMAGE}" -f ./etc/docker/prover/Dockerfile .
 
+build-images: build-server-image build-prover-image
+
 up:
-	@docker-compose up --scale prover=3
+	@docker-compose up --scale prover=6

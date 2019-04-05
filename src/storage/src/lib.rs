@@ -33,21 +33,22 @@ pub struct ConnectionPool {
 }
 
 impl ConnectionPool {
-pub fn new() -> Self {
-    let database_url = env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set");
 
-    let manager = ConnectionManager::<PgConnection>::new(database_url);
-    let pool = Pool::builder().build(manager).expect("Failed to create connection pool");
+    pub fn new() -> Self {
+        let database_url = env::var("DATABASE_URL")
+            .expect("DATABASE_URL must be set");
 
-    Self {
-        pool
+        let manager = ConnectionManager::<PgConnection>::new(database_url);
+        let pool = Pool::builder().build(manager).expect("Failed to create connection pool");
+
+        Self {
+            pool
+        }
     }
-}
 
     pub fn access_storage(&self) -> Result<StorageProcessor, PoolError> {
         let connection = self.pool.get()?;
-        Ok(StorageProcessor::from_connection(connection))
+        Ok(StorageProcessor::from_pool(connection))
     }
 }
 
@@ -141,15 +142,33 @@ pub struct IntegerNumber {
     pub integer_value: i32,
 }
 
+enum ConnectionHolder {
+    Pooled(PooledConnection<ConnectionManager<PgConnection>>),
+    Direct(PgConnection),
+}
+
 pub struct StorageProcessor {
-    conn:  PooledConnection<ConnectionManager<PgConnection>>,
+    conn: ConnectionHolder,
 }
 
 impl StorageProcessor {
 
-    pub fn from_connection(conn: PooledConnection<ConnectionManager<PgConnection>>) -> Self {
+    pub fn establish_connection() -> ConnectionResult<Self> {
+        let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        let connection = PgConnection::establish(&database_url)?;//.expect(&format!("Error connecting to {}", database_url));
+        Ok( Self {conn: ConnectionHolder::Direct(connection)} )
+    }
+
+    pub fn from_pool(conn: PooledConnection<ConnectionManager<PgConnection>>) -> Self {
         Self {
-            conn: conn
+            conn: ConnectionHolder::Pooled(conn)
+        }
+    }
+
+    fn conn(&self) -> &PgConnection {
+        match self.conn {
+            ConnectionHolder::Pooled(ref conn) => conn,
+            ConnectionHolder::Direct(ref conn) => conn,
         }
     }
 
@@ -157,7 +176,7 @@ impl StorageProcessor {
     /// - Commit => store account updates
     /// - Verify => apply account updates
     pub fn execute_operation(&self, op: &Operation) -> QueryResult<Operation> {
-        self.conn.transaction(|| {
+        self.conn().transaction(|| {
             match &op.action {
                 Action::Commit => 
                     self.commit_state_update(op.block.block_number, op.accounts_updated.as_ref().unwrap())?,
@@ -170,7 +189,7 @@ impl StorageProcessor {
                     action_type:    op.action.to_string(),
                     data:           serde_json::to_value(&op).unwrap(), 
                 })
-                .get_result(&self.conn)?;
+                .get_result(self.conn())?;
             stored.into_op(self)
         })
     }
@@ -184,7 +203,7 @@ impl StorageProcessor {
                     block_number:   block_number as i32,
                     data:           to_value(a).unwrap(),
                 })
-                .execute(&self.conn)?;
+                .execute(self.conn())?;
             if 0 == inserted {
                 eprintln!("Error: could not commit all state updates!");
                 return Err(Error::RollbackTransaction)
@@ -205,7 +224,7 @@ impl StorageProcessor {
             DO UPDATE 
             SET data = EXCLUDED.data, last_block = EXCLUDED.last_block", block_number);
         diesel::sql_query(update.as_str())
-            .execute(&self.conn)
+            .execute(self.conn())
             .map(|_|())
     }
 
@@ -268,17 +287,17 @@ impl StorageProcessor {
     }
 
     fn load_state(&self, query: &str) -> QueryResult<(u32, AccountMap)> {
-        let r = diesel::sql_query(query)
-            .load(&self.conn)
-            .map(|accounts: Vec<Account>| {
-                let last_block = accounts.iter().map(|a| a.last_block as u32).max().unwrap_or(0);
-                let result = AccountMap::from_iter(accounts.into_iter().map(|a| (
-                        a.id as u32, 
-                        serde_json::from_value(a.data).unwrap()
-                    )));
-                (last_block, result)
-            });
-        r
+            let r = diesel::sql_query(query)
+                .load(self.conn())
+                .map(|accounts: Vec<Account>| {
+                    let last_block = accounts.iter().map(|a| a.last_block as u32).max().unwrap_or(0);
+                    let result = AccountMap::from_iter(accounts.into_iter().map(|a| (
+                            a.id as u32, 
+                            serde_json::from_value(a.data).unwrap()
+                        )));
+                    (last_block, result)
+                });
+            r
     }
 
     pub fn update_op_config(&self, addr: &str, nonce: Nonce) -> QueryResult<()> {
@@ -293,17 +312,17 @@ impl StorageProcessor {
                     UNION SELECT {nonce} AS max_nonce
                 ) t
             ) s", addr = addr, nonce = nonce as i32).as_str())
-            .execute(&self.conn)
+            .execute(self.conn())
             .map(|_|())
     }
 
     pub fn load_commit_op(&self, block_number: BlockNumber) -> QueryResult<Operation> {
         use crate::schema::operations::dsl;
-        self.conn.transaction(|| {
+        self.conn().transaction(|| {
             let op: StoredOperation = dsl::operations
                 .filter(dsl::block_number.eq(block_number as i32))
                 .filter(dsl::action_type.eq(ACTION_COMMIT))
-                .get_result(&self.conn)?;
+                .get_result(self.conn())?;
             op.into_op(self)
         })
     }
@@ -315,16 +334,16 @@ impl StorageProcessor {
 
     pub fn load_unsent_ops(&self, current_nonce: Nonce) -> QueryResult<Vec<Operation>> {
         use crate::schema::operations::dsl;
-        self.conn.transaction(|| {
+        self.conn().transaction(|| {
             let ops: Vec<StoredOperation> = dsl::operations
                 .filter(dsl::nonce.ge(current_nonce as i32)) // WHERE nonce >= current_nonce
-                .load(&self.conn)?;
+                .load(self.conn())?;
             ops.into_iter().map(|o| o.into_op(self)).collect()
         })
     }
 
     pub fn load_unverified_commitments(&self) -> QueryResult<Vec<Operation>> {
-        self.conn.transaction(|| {
+        self.conn().transaction(|| {
 
             // // https://docs.diesel.rs/diesel/query_dsl/trait.QueryDsl.html
             // use crate::schema::operations::dsl::{*};
@@ -338,7 +357,7 @@ impl StorageProcessor {
             //                     .single_value(), 0)
             //             ))
             //     )
-            //     .load(&self.conn)?;
+            //     .load(self.conn())?;
 
             let ops: Vec<StoredOperation> = diesel::sql_query("
                 SELECT * FROM operations
@@ -348,14 +367,14 @@ impl StorageProcessor {
                     FROM operations 
                     WHERE action_type = 'Verify'
                 )
-            ").load(&self.conn)?;
+            ").load(self.conn())?;
             ops.into_iter().map(|o| o.into_op(self)).collect()
         })
     }
 
     fn load_number(&self, query: &str) -> QueryResult<i32> {
         diesel::sql_query(query)
-            .get_result::<IntegerNumber>(&self.conn)
+            .get_result::<IntegerNumber>(self.conn())
             .map(|r| r.integer_value)
     }
 
@@ -382,7 +401,7 @@ impl StorageProcessor {
             ORDER BY block_number DESC LIMIT 1
         ", account_id);
         let r = diesel::sql_query(query)
-            .get_result(&self.conn)
+            .get_result(self.conn())
             .optional()?;
         Ok( r.map(|acc: Account| serde_json::from_value(acc.data).unwrap()) )
     }
@@ -391,7 +410,7 @@ impl StorageProcessor {
         use crate::schema::accounts::dsl::*;
         let mut r = accounts
             .filter(id.eq(account_id as i32))
-            .load(&self.conn)?;
+            .load(self.conn())?;
         Ok( r.pop().map(|acc: Account| serde_json::from_value(acc.data).unwrap()) )
     }
 
@@ -399,14 +418,14 @@ impl StorageProcessor {
         // use crate::schema::account_updates::dsl::*;
         // account_updates
         //     .select(max(block_number))
-        //     .get_result::<Option<i32>>(&self.conn)
+        //     .get_result::<Option<i32>>(self.conn())
         //     .map(|max| max.unwrap_or(0))
 
         use schema::operations::dsl::*;
         operations
             .select(max(block_number))
             .filter(action_type.eq(ACTION_COMMIT))
-            .get_result::<Option<i32>>(&self.conn)
+            .get_result::<Option<i32>>(self.conn())
             .map(|max| max.unwrap_or(0) as BlockNumber)
 
         //self.load_number("SELECT COALESCE(max(block_number), 0) AS integer_value FROM account_updates")        
@@ -416,22 +435,22 @@ impl StorageProcessor {
         // use crate::schema::accounts::dsl::*;
         // accounts
         //     .select(max(last_block))
-        //     .get_result::<Option<i32>>(&self.conn)
+        //     .get_result::<Option<i32>>(self.conn())
         //     .map(|max| max.unwrap_or(0))
 
         use crate::schema::operations::dsl::*;
         operations
             .select(max(block_number))
             .filter(action_type.eq(ACTION_VERIFY))
-            .get_result::<Option<i32>>(&self.conn)
+            .get_result::<Option<i32>>(self.conn())
             .map(|max| max.unwrap_or(0) as BlockNumber)
 
         //self.load_number("SELECT COALESCE(max(last_block), 0) AS integer_value FROM accounts")
     }
 
     pub fn fetch_prover_job(&self, worker: &String, timeout_seconds: usize) -> QueryResult<Option<BlockNumber>> {
-        self.conn.transaction(|| {
-            sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(&self.conn)?;
+        self.conn().transaction(|| {
+            sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.conn())?;
             let job: Option<BlockNumber> = diesel::sql_query(format!("
                     SELECT min(block_number) as integer_value FROM operations o
                     WHERE action_type = 'Commit'
@@ -443,7 +462,7 @@ impl StorageProcessor {
                         (SELECT * FROM prover_runs 
                             WHERE block_number = o.block_number AND (now() - created_at) < interval '{} seconds')
                 ", timeout_seconds))
-                .get_result::<Option<IntegerNumber>>(&self.conn)?
+                .get_result::<Option<IntegerNumber>>(self.conn())?
                 .map(|i| i.integer_value as BlockNumber);
             
             if let Some(block_number) = job {
@@ -452,7 +471,7 @@ impl StorageProcessor {
                     worker: worker.to_string(),
                 };
                 use schema::prover_runs::dsl::prover_runs;
-                insert_into(prover_runs).values(&to_store).execute(&self.conn)?;
+                insert_into(prover_runs).values(&to_store).execute(self.conn())?;
             }
 
             Ok(job)
@@ -466,14 +485,14 @@ impl StorageProcessor {
             proof:          serde_json::to_value(proof).unwrap(),
         };
         use crate::schema::proofs::dsl::proofs;
-        insert_into(proofs).values(&to_store).execute(&self.conn)
+        insert_into(proofs).values(&to_store).execute(self.conn())
     }
 
     pub fn load_proof(&self, block_number: BlockNumber) -> QueryResult<EncodedProof> {
         use crate::schema::proofs::dsl;
         let stored: StoredProof = dsl::proofs
             .filter(dsl::block_number.eq(block_number as i32))
-            .get_result(&self.conn)?;
+            .get_result(self.conn())?;
         Ok( serde_json::from_value(stored.proof).unwrap() )
     }
 
