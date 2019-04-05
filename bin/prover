@@ -1,6 +1,5 @@
 #!/bin/bash
 
-cd `dirname $0`/..
-. ./env
+. .setup_env
 
 cargo run --release --bin prover $1

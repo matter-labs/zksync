@@ -1,7 +1,6 @@
 #!/bin/bash
 
-cd `dirname $0`/..
-. ./env
+. .setup_env
 cd client
 
 yarn dev

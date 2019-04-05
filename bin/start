@@ -2,8 +2,7 @@
 
 # This script shall be used on on server; it starts run.sh internally
 
-cd `dirname $0`/..
-. ./env
+. .setup_env
 
 ps auxw | grep target/release/server | grep -v grep > /dev/null
 if [ $? != 0 ]

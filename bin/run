@@ -1,7 +1,6 @@
 #!/bin/bash
 
-cd `dirname $0`/..
-. ./env
+. .setup_env
 
 PROCESS_ID=`ps aux | grep target/release/server | grep -v grep | grep -o -E '[0-9]+'  | head -1 | sed -e 's/^0\+//'`
 

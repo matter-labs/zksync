@@ -1,0 +1,33 @@
+#!/bin/bash
+
+cd `dirname $0`/..
+
+if [ -z "$1" ]
+then
+    export ENV_FILE=etc/env/local/server.env
+else
+    export ENV_FILE=etc/env/$1/server.env
+fi
+
+if [ ! -f $ENV_FILE ]; then
+    echo "no config file found: $ENV_FILE"
+    exit
+fi
+
+echo Loading config from $ENV_FILE
+
+if [ ! -z "$1" ]
+then
+    echo Connecting to remote configuration: $1
+    echo -n "Retype configuration name to confirm: "
+    read CONFIRM
+
+    if [ ! "$1" == "$CONFIRM" ]; then
+        exit
+    fi
+fi
+
+set -o allexport
+source $ENV_FILE
+set +o allexport
+
