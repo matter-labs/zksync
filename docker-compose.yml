@@ -1,16 +1,15 @@
 version: '3.2'
 services:
-  serverx:
-    # network_mode: bridge
+  server:
     image: "gluk64/franklin:server"
     env_file: etc/env/prod/.env
     ports:
-      - "3000:3000"
-  # prover:
-  #   network_mode: bridge
-  #   image: "gluk64/franklin:prover"
-  #   env_file: etc/env/prod/.env
-  #   volumes:
-  #     - type: bind
-  #       source: ./keys
-  #       target: /keys
+      - "80:3000"
+  prover:
+    network_mode: bridge
+    image: "gluk64/franklin:prover"
+    env_file: etc/env/prod/.env
+    volumes:
+      - type: bind
+        source: ./keys
+        target: /keys
