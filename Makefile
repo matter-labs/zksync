@@ -35,7 +35,10 @@ push-images:
 	docker push gluk64/franklin:server
 	docker push gluk64/franklin:prover
 
+reupload-images: build-images push-images
+
 up:
-	@docker-compose up --scale prover=1
+	@docker-compose pull
+	@docker-compose up -d --scale prover=1
 
 prover: build-prover-image up

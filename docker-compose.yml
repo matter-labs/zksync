@@ -1,14 +1,16 @@
 version: '3.2'
 services:
-  server:
-    network_mode: host
-    image: "server"
-    env_file: ./etc/env/local-docker/.env
-  prover:
-    network_mode: host
-    image: "prover"
-    env_file: ./etc/env/local-docker/.env
-    volumes:
-      - type: bind
-        source: ./keys
-        target: /keys
+  serverx:
+    # network_mode: bridge
+    image: "gluk64/franklin:server"
+    env_file: etc/env/prod/.env
+    ports:
+      - "3000:3000"
+  # prover:
+  #   network_mode: bridge
+  #   image: "gluk64/franklin:prover"
+  #   env_file: etc/env/prod/.env
+  #   volumes:
+  #     - type: bind
+  #       source: ./keys
+  #       target: /keys
