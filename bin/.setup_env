@@ -18,8 +18,7 @@ echo Loading config from $ENV_FILE
 
 if [ ! -z "$1" ]
 then
-    echo Connecting to remote configuration: $1
-    echo -n "Retype configuration name to confirm: "
+    echo -n "Type configuration name ('$1') to confirm: "
     read CONFIRM
 
     if [ ! "$1" == "$CONFIRM" ]; then
