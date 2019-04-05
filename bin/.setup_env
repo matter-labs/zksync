@@ -4,9 +4,9 @@ cd `dirname $0`/..
 
 if [ -z "$1" ]
 then
-    export ENV_FILE=etc/env/local/server.env
+    export ENV_FILE=etc/env/local/.env
 else
-    export ENV_FILE=etc/env/$1/server.env
+    export ENV_FILE=etc/env/$1/.env
 fi
 
 if [ ! -f $ENV_FILE ]; then
