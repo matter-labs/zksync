@@ -33,5 +33,7 @@ build-prover-image:
 
 build-images: build-server-image build-prover-image
 
-prover: build-prover-image
+up:
 	@docker-compose up --scale prover=1
+
+prover: build-prover-image up
