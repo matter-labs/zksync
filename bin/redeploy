@@ -21,7 +21,7 @@ then
 
     sed -i"-`date +%Y-%m-%d-%H%M%S`.bak" "s/CONTRACT_ADDR=$OLD_CONTRACT/CONTRACT_ADDR=$NEW_CONTRACT/g" ./$ENV_FILE
 
-    cd server/storage
+    cd src/storage
 
     diesel database reset
     cd ../..
