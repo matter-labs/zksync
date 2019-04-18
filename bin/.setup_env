@@ -27,6 +27,5 @@ then
 fi
 
 set -o allexport
-source $ENV_FILE
+eval $(grep -v '^#' $ENV_FILE | sed 's/^/export /')
 set +o allexport
-
