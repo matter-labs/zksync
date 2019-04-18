@@ -2,11 +2,6 @@
 
 Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 
-## Local geth
-
-1. Follow the instruction here: https://hackernoon.com/hands-on-creating-your-own-local-private-geth-node-beginner-friendly-3d45902cc612
-2. However, set the gaslimit to 8M *before* starting the geth for the first time!
-
 ## Config
 
 All environment variables must be located in a single file `/env`.

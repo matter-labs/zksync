@@ -2,4 +2,4 @@
 
 . .setup_env
 
-cargo run --release --bin prover $1
+cargo run --release --bin prover
