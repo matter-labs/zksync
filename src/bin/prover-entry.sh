@@ -10,5 +10,9 @@ for i in $KEY_FILES; do
 done
 
 echo key download complete, starting prover
+
+echo DATABASE_URL=$DATABASE_URL
+echo PROVER_DATABASE_URL=$PROVER_DATABASE_URL
+
 export DATABASE_URL=$PROVER_DATABASE_URL
 ./prover

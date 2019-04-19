@@ -1,3 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: server
+  labels:
+    app: server
+spec:
+  type: NodePort
+  ports:
+  - port: 3000
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: server
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,6 +31,12 @@ spec:
       containers:
         - name: server
           image: gluk64/franklin:server
+          imagePullPolicy: Always
+          ports: 
+            - containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: franklin-secret
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -33,3 +55,7 @@ spec:
       containers:
         - name: prover
           image: gluk64/franklin:prover
+          imagePullPolicy: Always
+          envFrom:
+          - secretRef:
+              name: franklin-secret
