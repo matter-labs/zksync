@@ -11,21 +11,16 @@ Now you can check your setup:
 ```
 kubectl config view
 kubectl get deployments
+kubectl get nodes
 kubectl get pods
-kubectl get rs
 ```
 
 ## Secrets
 
-### Create
+View secret:
 
-```
-kubectl create secret generic franklin-secret --from-file=./etc/env/prod/.env
-kubectl create secret generic franklin-secret --from-file=./env.txt --dry-run -o yaml | kubectl apply -f -
-kubectl create secret generic franklin-secret --dry-run -o yaml
+```kubectl get secret franklin-secret -o yaml```
 
-```
+Misc:
 
-### Misc
-
-kubectl set env --from=configmap/myconfigmap deployment/myapp
+```kubectl set env --from=configmap/myconfigmap deployment/myapp```
