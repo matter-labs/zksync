@@ -5,7 +5,7 @@
         Matter Network Wallet <span style="font-size: 0.3em"><strong>ALPHA</strong></span>
     </template>
     <template slot="lead">
-        <span v-if="isDev" class="local">Running server locally, API at http://localhost:3000</span>
+        <span v-if="isDev" class="local">API at {{apiServer}}</span>
         <span v-else></span>
     </template>
     <hr class="my-4">

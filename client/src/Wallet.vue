@@ -3,7 +3,7 @@
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
         <b-navbar-toggle target="nav_collapse"></b-navbar-toggle>
-        <b-navbar-brand v-if="isDev" style="color: yellow;">Running server locally</b-navbar-brand>
+        <b-navbar-brand v-if="isDev" style="color: yellow;">{{apiServer}}</b-navbar-brand>
         <b-navbar-brand v-else>Matter Network Wallet <span style="font-size: 0.4em">ALPHA</span></b-navbar-brand>
         <b-collapse is-nav id="nav_collapse">
             <b-navbar-nav>
@@ -228,7 +228,8 @@ export default {
             return this.network === '4' || this.network === '1335'
         },
         baseUrl() {
-            return (this.isDev ? 'http://localhost:3000' : 'https://api.plasma-winter.io') + '/api/v0.1'
+            //return (this.isDev ? 'http://localhost:3000' : 'https://api.plasma-winter.io') + '/api/v0.1'
+            return this.apiServer + '/api/v0.1'
         },
         //baseUrl: () => 'https://api.plasma-winter.io',
         // baseUrl: () => 'https://api.Matter Network.thematter.io',
@@ -490,7 +491,9 @@ export default {
             let onchain = {}
             try {
                 newData.address = window.ethereum ? ethereum.selectedAddress : (await eth.accounts())[0]
+                console.log('1', newData.address)
                 let balance = (await eth.getBalance(newData.address)).toString(10)
+
                 newData.balance = Eth.fromWei(new BN(balance), 'ether')
                 let id = (await contract.ethereumAddressToAccountID(newData.address))[0].toNumber();
 

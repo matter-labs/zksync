@@ -31,6 +31,7 @@ const router = new Router({
 Vue.mixin({
     computed: {
         isDev: () => process.env.NODE_ENV === 'development',
+        apiServer: () => process.env.API_SERVER,
     },
 })
 
