@@ -11,8 +11,8 @@ Now you can check your setup:
 ```
 kubectl config view
 kubectl get deployments
-kubectl get nodes
-kubectl get pods
+kubectl get nodes --show-labels
+kubectl get pods -o wide
 ```
 
 ## Secrets

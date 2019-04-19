@@ -19,6 +19,8 @@ kind: Deployment
 metadata:
   name: server
 spec:
+  strategy:
+    type: Recreate
   replicas: 1
   selector:
     matchLabels:
@@ -37,6 +39,8 @@ spec:
           envFrom:
             - secretRef:
                 name: franklin-secret
+      nodeSelector:
+        doks.digitalocean.com/node-pool: k8s-ams3-81r8to7yx
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -59,3 +63,5 @@ spec:
           envFrom:
           - secretRef:
               name: franklin-secret
+      nodeSelector:
+        doks.digitalocean.com/node-pool: k8s-ams3-1
