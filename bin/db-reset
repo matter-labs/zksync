@@ -1,0 +1,12 @@
+#!/bin/bash
+
+. .setup_env
+cd src/storage
+
+echo DATABASE_URL=$DATABASE_URL
+
+psql $DATABASE_URL -c 'DROP OWNED BY CURRENT_USER CASCADE'
+diesel migration run
+
+# This is cleaner because dropping the entire database, but it only works if you own it
+# diesel database reset
