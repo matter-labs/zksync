@@ -1013,7 +1013,7 @@ pub fn start_prover(worker: String) {
     thread::Builder::new().name(worker.clone()).spawn(move || {
         println!("prover worker: {}", worker);
         let mut prover = BabyProver::create().unwrap();
-        println!("starting");
+        println!("prover started");
         prover.run(&worker)
     }).expect("prover thread must start");
 }

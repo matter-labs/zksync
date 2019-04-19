@@ -170,6 +170,7 @@ impl EthWatch {
         }
 
         let total_deposit_requests = total_deposit_requests_result.unwrap();
+        println!("total_deposit_requests = {}", total_deposit_requests);
 
         let max_batch_number = total_deposit_requests / self.deposit_batch_size;
 

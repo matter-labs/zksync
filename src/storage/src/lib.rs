@@ -455,7 +455,7 @@ impl StorageProcessor {
                     SELECT min(block_number) as integer_value FROM operations o
                     WHERE action_type = 'Commit'
                     AND block_number >
-                        (SELECT max(block_number) FROM operations WHERE action_type = 'Verify')
+                        (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'Verify')
                     AND NOT EXISTS 
                         (SELECT * FROM proofs WHERE block_number = o.block_number)
                     AND NOT EXISTS
