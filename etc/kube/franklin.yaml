@@ -1,17 +1,35 @@
 apiVersion: apps/v1
-kind: ReplicaSet
+kind: Deployment
 metadata:
-  name: prover-replicaset
+  name: server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: server
+  template:
+    metadata:
+      labels:
+        app: server
+    spec:
+      containers:
+        - name: server
+          image: gluk64/franklin:server
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prover
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: prover-replicaset
+      app: prover
   template:
     metadata:
       labels:
-        app: prover-replicaset
+        app: prover
     spec:
       containers:
-        - name: prover-replicaset
+        - name: prover
           image: gluk64/franklin:prover

@@ -1,8 +1,0 @@
-#!/bin/bash
-
-. .setup_env
-
-#KUBECONFIG=etc/kube/kubeconfig.yaml
-
-kubectl --kubeconfig etc/kube/kubeconfig.yaml config view
-

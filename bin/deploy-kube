@@ -1,0 +1,5 @@
+#!/bin/bash
+
+. .setup_env prod
+
+kubectl --kubeconfig etc/kube/kubeconfig.yaml apply -f etc/kube/franklin.yaml
