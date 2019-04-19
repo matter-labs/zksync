@@ -24,3 +24,7 @@ View secret:
 Misc:
 
 ```kubectl set env --from=configmap/myconfigmap deployment/myapp```
+
+## Scale provers
+
+kubectl scale deployments/prover --replicas=3
