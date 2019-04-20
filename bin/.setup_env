@@ -4,14 +4,14 @@ cd `dirname $0`/..
 
 if [ -z "$1" ]
 then
-    export ENV_FILE=etc/env/local/.env
+    export ENV_FILE=./etc/env/local.env
 else
-    export ENV_FILE=etc/env/$1/.env
+    export ENV_FILE=./etc/env/$1.env
 fi
 
 if [ ! -f $ENV_FILE ]; then
     echo "no config file found: $ENV_FILE"
-    exit
+    #exit
 fi
 
 echo Loading config from $ENV_FILE
