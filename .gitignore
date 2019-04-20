@@ -18,3 +18,5 @@ Cargo.lock
 /*.bak
 /keys
 /tmp
+node_modules
+yarn-error.log
