@@ -1,0 +1,10 @@
+#!/bin/bash
+
+. .setup_env
+cd src/storage
+
+echo DATABASE_URL=$DATABASE_URL
+
+# this is used to clear the produciton db; cannot do `diesel database reset` because we don't own the db
+psql $DATABASE_URL -c 'DROP OWNED BY CURRENT_USER CASCADE'
+diesel migration run
