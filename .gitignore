@@ -6,6 +6,8 @@
 *.sln
 .vscode
 .DS_Store
+*.bak
+
 
 # Remove Cargo.lock from gitignore if creating an executable, leave it for libraries
 # More information here https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html
@@ -15,7 +17,6 @@ Cargo.lock
 /contracts/yarn-error.log
 /target
 /deploy.log
-/*.bak
 /keys
 /tmp
 node_modules
