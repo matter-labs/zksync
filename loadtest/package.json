@@ -4,11 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node index.js"
+    "test": ".setup_env && node index.js"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "sleep": "^6.0.0"
+    "axios": "^0.18.0"
   }
 }
