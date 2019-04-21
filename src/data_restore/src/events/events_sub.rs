@@ -4,8 +4,6 @@ use web3::contract;
 use web3::futures::{Future, Stream};
 use web3::types::{Address, FilterBuilder, U256, H256};
 
-pub const ETH_SUBSCRIPTION: &'static str = r#"{"jsonrpc":"2.0", "id": 1, "method": "eth_subscribe", "params": ["logs", {"address": "0xfddb8167fef957f7cc72686094fac1d31be5ecfe", "topics": ["0xca558d7524956f89ce1ec833efe8a265ed2b1e92b20ff4fe2fb87fb1a042e524"]}]}"#;
-
 pub enum InfuraEndpoint {
     Mainnet,
     Rinkeby
