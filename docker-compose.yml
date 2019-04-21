@@ -36,3 +36,20 @@ services:
     - type: bind
       source: ./volumes/geth
       target: /var/lib/geth/data
+  blockscout_postgres:
+    image: "postgres:10.4"
+    volumes:
+    - type: bind
+      source: ./volumes/blockscout_postgres
+      target: /var/lib/postgresql/data
+  blockscout:
+    image: "gluk64/blockscout"
+    command: /bin/sh -c "mix phx.server"
+    ports:
+      - "4000:4000"
+    environment:
+      - MIX_ENV=prod
+      - DATABASE_URL=postgresql://postgres:@blockscout_postgres:5432/explorer?ssl=false
+      - ETHEREUM_JSONRPC_VARIANT=geth
+      - ETHEREUM_JSONRPC_HTTP_URL=http://geth:8545
+      - COIN=DAI

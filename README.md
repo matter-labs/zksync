@@ -6,12 +6,18 @@ Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 
 - Install prerequisites: see [docs/setup-dev.md](docs/setup-dev.md)
 - Add `./bin` to `PATH`
+
+- Migrate blockscout:
+```make migrate-blockscout```
+
 - Start the dev environment:
 ```make dev-up```
 - Create `plasma` database:
 ```db-setup```
 - Deploy contracts:
 ```deploy-contracts``
+
+Blockscout explorer available at http://localhost:4000/txs
 
 ## Build and run server + prover locally:
 
