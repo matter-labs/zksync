@@ -5,33 +5,34 @@ Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 ## Setup local dev environment
 
 - Install prerequisites: see [docs/setup-dev.md](docs/setup-dev.md)
+- Add `./bin` to `PATH`
 - Start the dev environment:
 ```make dev-up```
 - Create `plasma` database:
 ```db-setup```
+- Deploy contracts:
+```deploy-contracts``
 
 ## Build and run server + prover locally:
 
 ```
-bin/run-server
-bin/run-prover
+run-server
+run-prover
 ```
 
-## Build and start server and prover as local docker containers:
+## Server and prover as local docker containers:
 
-```make up```
-
-To stop:
-
-```make down```
-
-To see logs:
-
-```make logs```
+```
+make up
+make logs
+make down
+```
 
 ## Build and push images to dockerhub:
 
-```make push```
+```
+make push
+```
 
 ---
 
