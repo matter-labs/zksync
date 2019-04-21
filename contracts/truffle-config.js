@@ -51,7 +51,8 @@ module.exports = {
         gas: 6800000,
         provider: function() { 
           const HDWalletProvider = require("truffle-hdwallet-provider");
-          let url = `https://rinkeby.infura.io/v3/${process.env.INFURA_PROJECT_ID}`
+          //let url = `https://rinkeby.infura.io/v3/${process.env.INFURA_PROJECT_ID}`
+          let url = `${process.env.WEB3_URL}`
           let mnemonic = process.env.MNEMONIC
           return new HDWalletProvider(mnemonic, url) 
         },
