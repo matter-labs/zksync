@@ -44,3 +44,6 @@ dev-down:
 
 geth:
 	@docker build -t "${GETH_DOCKER_IMAGE}" ./etc/docker/geth
+
+geth-up: geth
+	@docker-compose up geth
