@@ -7,7 +7,7 @@ Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 - Install prerequisites: see [docs/setup-dev.md](docs/setup-dev.md)
 - Add `./bin` to `PATH`
 
-- Migrate blockscout:
+- Migrate blockscout (do this before starting `make dev-up`):
 ```make migrate-blockscout```
 
 - Start the dev environment:
@@ -17,7 +17,11 @@ Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 - Deploy contracts:
 ```deploy-contracts``
 
-Blockscout explorer available at http://localhost:4000/txs
+## Management:
+
+Seed for Metamask: fine music test violin matrix prize squirrel panther purchase material script deal
+Geth: ```geth attach http://localhost:8545```
+Blockscout explorer: http://localhost:4000/txs
 
 ## Build and run server + prover locally:
 
