@@ -37,14 +37,10 @@ logs:
 	@docker-compose logs -f server prover
 
 dev-up:
-	@docker-compose up -d postgres
+	@docker-compose up -d postgres geth
 
 dev-down:
-	@docker-compose stop postgres
+	@docker-compose stop postgres geth
 
 geth:
 	@docker build -t "${GETH_DOCKER_IMAGE}" ./etc/docker/geth
-
-geth-up: geth
-	@docker-compose run geth
-
