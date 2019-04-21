@@ -10,6 +10,7 @@ authors = [
 ]
 
 [dependencies]
+data_restore = { path = "src/data_restore" }
 eth_client = { path = "src/eth_client" }
 plasma = { path = "src/plasma" }
 models = { path = "src/models" }
