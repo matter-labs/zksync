@@ -3,13 +3,25 @@ services:
   server:
     image: "gluk64/franklin:server"
     env_file: etc/env/local.env
+    environment:
+      - DATABASE_URL=postgres://postgres@postgres/plasma
     ports:
       - "80:3000"
   prover:
     network_mode: bridge
     image: "gluk64/franklin:prover"
     env_file: etc/env/local.env
+    environment:
+      - PROVER_DATABASE_URL=postgres://postgres@postgres/plasma
     volumes:
       - type: bind
         source: ./keys
         target: /keys
+  postgres:
+    image: "postgres:10.4"
+    ports:
+      - "5432:5432"
+    volumes:
+    - type: bind
+      source: ./volumes/postgres
+      target: /var/lib/postgresql/data

@@ -11,34 +11,29 @@ export PROVER_DOCKER_IMAGE ?= gluk64/franklin:prover
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
 rust-musl-builder = @docker run $(docker-options) -it ekidd/rust-musl-builder
 
-redeploy-prod:
-	./bin/redeploy prod
-
-test:
-	$(rust-musl-builder) cargo --version
-
 build-target:
 	$(rust-musl-builder) cargo build --release
 
-# build-test-image:
-# 	docker build -t test -f ./etc/docker/test/Dockerfile .
-
-build-server-image: build-target
+server-image: build-target
 	docker build -t "${SERVER_DOCKER_IMAGE}" -f ./etc/docker/server/Dockerfile .
 
-build-prover-image: build-target
+prover-image: build-target
 	docker build -t "${PROVER_DOCKER_IMAGE}" -f ./etc/docker/prover/Dockerfile .
 
-build-images: build-server-image build-prover-image
+images: server-image prover-image
 
-push-images:
+push: images
 	docker push gluk64/franklin:server
 	docker push gluk64/franklin:prover
 
-reupload-images: build-images push-images
+up: images
+	@docker-compose up -d --scale prover=1 server prover
 
-up:
-	@docker-compose pull
-	@docker-compose up -d --scale prover=1
+down:
+	@docker-compose stop server prover
 
-prover: build-prover-image up
+dev-up:
+	@docker-compose up -d postgres
+
+dev-down:
+	@docker-compose stop postgres

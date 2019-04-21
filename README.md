@@ -2,24 +2,50 @@
 
 Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 
+## Setup local dev environment
+
+- Install prerequisites: see [docs/setup-dev.md](docs/setup-dev.md)
+- Start the dev environment:
+```make dev-up```
+- Create `plasma` database:
+```db-setup```
+
+## Build and run server + prover locally:
+
+```
+bin/run-server
+bin/run-prover
+```
+
+## Build and start server and prover as local docker containers:
+
+```make up```
+
+## Build and push images to dockerhub:
+
+```make push```
+
+---
+
+# Details
+
+## Local geth
+
+1. Follow the instruction here: https://hackernoon.com/hands-on-creating-your-own-local-private-geth-node-beginner-friendly-3d45902cc612
+2. However, set the gaslimit to 8M *before* starting the geth for the first time!
+
 ## Config
 
 All environment variables must be located in a single file `/env`.
 
 - Copy `/env.example` to `/env` and set all of them correctly
 
-## Database
+## Database migrations
 
-### Testing
-
-- Install postgres locally
-- Install diesel-cli:
-
-```cargo install diesel_cli --no-default-features --features postgres```
-
-- From `server` dir run
-
-```diesel database setup```
+```
+cd src/storage
+diesel database setup
+```
 
 This will create database 'plasma' (db url is set in [server/.env] file) with our schema.
 
