@@ -8,6 +8,10 @@ console.log(`Starting loadtest for ${nClients} with ${tps} TPS`)
 const Franklin = require('./franklin.js')
 const franklin = new Franklin(process.env.API_SERVER)
 
+const ethers = require('ethers')
+let w = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1")
+console.log(w)
+
 class Client {
 
     constructor(id) {
@@ -64,4 +68,4 @@ async function test() {
     }
 }
 
-test()
+//test()
