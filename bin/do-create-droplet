@@ -1,5 +1,0 @@
-#!/bin/bash
-
-. .setup_env
-
-docker-machine create --driver digitalocean --digitalocean-region ams3 --digitalocean-access-token $DO_TOKEN $2
