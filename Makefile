@@ -32,6 +32,9 @@ up: images
 down:
 	@docker-compose stop server prover
 
+logs:
+	@docker-compose logs -f server prover
+	
 dev-up:
 	@docker-compose up -d postgres
 

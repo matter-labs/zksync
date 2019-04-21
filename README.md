@@ -21,6 +21,14 @@ bin/run-prover
 
 ```make up```
 
+To stop:
+
+```make down```
+
+To see logs:
+
+```make logs```
+
 ## Build and push images to dockerhub:
 
 ```make push```
