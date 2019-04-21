@@ -31,6 +31,7 @@ services:
     # command: '--rpcapi "db,personal,eth,net,web3" --rpccorsdomain="*" --networkid=456719 --rpc --rpcaddr="0.0.0.0"'
     ports:
       - "8545:8545"
+      - "8546:8546"
     volumes:
     - type: bind
       source: ./volumes/geth
