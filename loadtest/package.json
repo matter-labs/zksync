@@ -9,6 +9,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "axios": "^0.18.0"
+    "axios": "^0.18.0",
+    "bn.js": "^4.11.8",
+    "buffer": "^5.2.1",
+    "ethers": "^4.0.20",
+    "ethjs": "^0.4.0",
+    "ethjs-util": "^0.1.6",
+    "js-sha3": "^0.8.0"
   }
 }
