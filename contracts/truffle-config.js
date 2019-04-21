@@ -30,20 +30,12 @@ module.exports = {
           network_id: "*" // match any network
         },
 
-        // truffle test --network dev
-        ganache: {
-          host: "127.0.0.1",
-          port: 8545,
-          gas: 7000000,
-          network_id: "*" // match any network
-        },
-
         geth: {
           host: "127.0.0.1",
           port: 8545,
           gas: 6800000,
-          from: "0x5cc401a56a5295709958e07519755a53b0506b1e",
-          network_id: "*" // match any network
+          //from: "0x5cc401a56a5295709958e07519755a53b0506b1e",
+          network_id: 9
         },   
 
       rinkeby:{

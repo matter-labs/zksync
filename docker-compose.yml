@@ -5,6 +5,7 @@ services:
     env_file: etc/env/local.env
     environment:
       - DATABASE_URL=postgres://postgres@postgres/plasma
+      - WEB3_URL=http://geth:8545
     ports:
       - "80:3000"
   prover:
@@ -24,3 +25,13 @@ services:
     - type: bind
       source: ./volumes/postgres
       target: /var/lib/postgresql/data
+  geth:
+    image: "gluk64/franklin:geth"
+    # image: "ethereum/client-go"
+    # command: '--rpcapi "db,personal,eth,net,web3" --rpccorsdomain="*" --networkid=456719 --rpc --rpcaddr="0.0.0.0"'
+    ports:
+      - "8545:8545"
+    volumes:
+    - type: bind
+      source: ./volumes/geth
+      target: /var/lib/geth/data

@@ -6,7 +6,8 @@
 
 export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
 export SERVER_DOCKER_IMAGE ?= gluk64/franklin:server
-export PROVER_DOCKER_IMAGE ?= gluk64/franklin:prover
+export PROVER_DOCKER_IMAGE ?=gluk64/franklin:prover
+export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
 
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
 rust-musl-builder = @docker run $(docker-options) -it ekidd/rust-musl-builder
@@ -34,9 +35,16 @@ down:
 
 logs:
 	@docker-compose logs -f server prover
-	
+
 dev-up:
 	@docker-compose up -d postgres
 
 dev-down:
 	@docker-compose stop postgres
+
+geth:
+	@docker build -t "${GETH_DOCKER_IMAGE}" ./etc/docker/geth
+
+geth-up: geth
+	@docker-compose run geth
+
