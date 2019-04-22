@@ -37,10 +37,10 @@ logs:
 	@docker-compose logs -f server prover
 
 dev-up:
-	@docker-compose up -d postgres geth blockscout_postgres blockscout
+	@docker-compose up -d postgres geth
 
 dev-down:
-	@docker-compose stop blockscout blockscout_postgres postgres geth
+	@docker-compose stop postgres geth
 
 geth:
 	@docker build -t "${GETH_DOCKER_IMAGE}" ./etc/docker/geth
@@ -48,6 +48,12 @@ geth:
 geth-up: geth
 	@docker-compose up geth
 
-migrate-blockscout:
+blockscout-migrate:
 	@docker-compose up -d blockscout_postgres
 	@docker-compose run blockscout /bin/sh -c "echo $MIX_ENV && mix do ecto.drop --force, ecto.create, ecto.migrate"
+
+blockscout-up:
+	@docker-compose up -d blockscout_postgres blockscout
+
+blockscout-down:
+	@docker-compose stop blockscout blockscout_postgres

@@ -9,9 +9,6 @@ Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 - Install prerequisites: see [docs/setup-dev.md](docs/setup-dev.md)
 - Add `./bin` to `PATH`
 
-- Migrate blockscout (do this before starting `make dev-up`):
-```make migrate-blockscout```
-
 - Start the dev environment services:
 ```make dev-up```
 - Setup env config:
@@ -33,7 +30,19 @@ To reset the dev environment:
 
 Seed for Metamask: fine music test violin matrix prize squirrel panther purchase material script deal
 Geth: ```geth attach http://localhost:8545```
-Blockscout explorer: http://localhost:4000/txs
+
+# Blockscout (local blockchain explorer)
+
+- Migrate blockscout (do this once to setup database):
+```make blockscout-migrate```
+- Start:
+```make blockscout-up```
+- Stop:
+```make blockscout-down```
+
+Blockscout will be available at http://localhost:4000/txs
+
+It generates quite some CPU load, use with caution.
 
 ## Build and run server + prover locally:
 
