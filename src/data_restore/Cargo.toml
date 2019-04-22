@@ -3,7 +3,7 @@ name = "data_restore"
 version = "0.1.0"
 
 [dependencies]
-env_logger = '*'
-futures = '*'
-tokio-core = '*'
-web3 = '*'
+env_logger = "0.6.1"
+tokio-core = "0.1"
+web3 = { git = "https://github.com/tomusdrw/rust-web3" }
+tiny-keccak = "1.4.2"

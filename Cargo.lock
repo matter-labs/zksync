@@ -500,9 +500,9 @@ name = "data_restore"
 version = "0.1.0"
 dependencies = [
  "env_logger 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tiny-keccak 1.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-core 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "web3 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "web3 0.6.0 (git+https://github.com/tomusdrw/rust-web3)",
 ]
 
 [[package]]
@@ -654,9 +654,6 @@ dependencies = [
 name = "error-chain"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "backtrace 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "eth_client"
@@ -2752,35 +2749,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "web3"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "arrayvec 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "error-chain 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ethabi 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ethereum-types 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
- "hyper 0.12.25 (registry+https://github.com/rust-lang/crates.io-index)",
- "hyper-tls 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "jsonrpc-core 8.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "native-tls 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "parking_lot 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "rustc-hex 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_derive 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_json 1.0.39 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-core 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-io 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-timer 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-uds 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "url 1.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "websocket 0.21.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "websocket"
 version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3152,7 +3120,6 @@ dependencies = [
 "checksum version_check 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "914b1a6776c4c929a602fafd8bc742e06365d4bcbe48c30f9cca5824f70dc9dd"
 "checksum want 0.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "797464475f30ddb8830cc529aaaae648d581f99e2036a928877dfde027ddf6b3"
 "checksum web3 0.6.0 (git+https://github.com/tomusdrw/rust-web3)" = "<none>"
-"checksum web3 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "deff75304fe1d0aadb0debac42722c4e63a168619e71e077bc2def73c250db4e"
 "checksum websocket 0.21.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8c9faed2bff8af2ea6b9f8b917d3d00b467583f6781fe3def174a9e33c879703"
 "checksum widestring 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7157704c2e12e3d2189c507b7482c52820a16dfa4465ba91add92f266667cadb"
 "checksum winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "167dc9d6949a9b857f3451275e911c3f44255842c1f7a76f33c55103a909087a"

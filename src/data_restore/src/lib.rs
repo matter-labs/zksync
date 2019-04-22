@@ -6,5 +6,6 @@
 
 extern crate env_logger;
 extern crate web3;
+extern crate tiny_keccak;
 
 pub mod events;
