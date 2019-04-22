@@ -2,4 +2,13 @@
 
 . .setup_env
 
+mkdir -p keys
+
+for i in $KEY_FILES; do
+    if ! [ -f keys/$i ]; then
+        echo"Downloading $SPACE_URL/$i"
+        curl -o keys/$i $SPACE_URL/$i
+    fi
+done
+
 cargo run --release --bin prover
