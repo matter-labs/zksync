@@ -2,6 +2,8 @@
 
 Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 
+# Basics
+
 ## Setup local dev environment
 
 - Install prerequisites: see [docs/setup-dev.md](docs/setup-dev.md)
@@ -10,7 +12,7 @@ Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 - Migrate blockscout (do this before starting `make dev-up`):
 ```make migrate-blockscout```
 
-- Start the dev environment:
+- Start the dev environment services:
 ```make dev-up```
 - Setup env config:
 ```cp etc/env/local.env.example etc/env/local.env```
@@ -19,7 +21,15 @@ Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 - Deploy contracts:
 ```deploy-contracts``
 
-## Management:
+To reset the dev environment:
+
+- Stop services:
+```make dev-down```
+- Remove mounted container data:
+```rm -rf ./volumes```
+- Repeat the setup procedure above
+
+## Monitoring & management:
 
 Seed for Metamask: fine music test violin matrix prize squirrel panther purchase material script deal
 Geth: ```geth attach http://localhost:8545```
@@ -30,36 +40,25 @@ Blockscout explorer: http://localhost:4000/txs
 ```
 run-server
 run-prover
+run-client
 ```
 
-## Server and prover as local docker containers:
+Client UI will be available at http://localhost:8080
 
-```
-make up
-make logs
-make down
-```
+## Start server and prover as local docker containers:
+
+- Start:
+```make up```
+- Watch logs:
+```make logs```
+- Stop:
+```make down```
 
 ## Build and push images to dockerhub:
 
-```
-make push
-```
+```make push```
 
----
-
-# Details
-
-## Local geth
-
-1. Follow the instruction here: https://hackernoon.com/hands-on-creating-your-own-local-private-geth-node-beginner-friendly-3d45902cc612
-2. However, set the gaslimit to 8M *before* starting the geth for the first time!
-
-## Config
-
-All environment variables must be located in a single file `/env`.
-
-- Copy `/env.example` to `/env` and set all of them correctly
+# Development
 
 ## Database migrations
 
@@ -74,15 +73,11 @@ This will create database 'plasma' (db url is set in [server/.env] file) with ou
 
 - To reset migrations (will reset the db), run:
 
-```diesel migration redo```
+```diesel migration reset```
 
 - Run tests:
 
 ```db-tests```
-
-### Production
-
-For production, `DATABSE_URL` env var must be set properly.
 
 ## Generating keys
 
@@ -103,20 +98,7 @@ mv -f *_pk.key ./prover/keys/
 
 If the pregenerated leaf format changes, replace the `EMPTY_TREE_ROOT` constant in `contracts/contracts/PlasmaStorage.sol`.
 
-## Web3 provider
-
-In the `server/.env` set up `CHAIN_ID` and `WEB3_URL` accordingly.
-
 ## Contratcs
-
-### Install truffle and dependencies:
-
-```
-cd contracts
-yarn
-```
-
-NOTE: Python >= 3.5 and pip is required for solidity flattener. You might want to run `brew upgrade python`
 
 ### Re-build contracts:
 
@@ -144,47 +126,4 @@ Update addresses (make sure to exclude 0x !):
 yarn flatten
 ```
 
-## Server
-
-### Running locally
-
-```shell
-run
-```
-
-### Running in production
-
-To launch and restart:
-
-```shell
-launch
-```
-
-To stop (Note, that Ctrl+C won't work! You need to run stop from a new terminal):
-
-```shell
-stop
-```
-
-## Client UI
-
-### Run locally
-
-``` bash
-# install dependencies
-yarn
-
-# serve with hot reload at localhost:8080; API server will be queried at localhost:3000
-yarn run dev
-
-# build for production with minification
-yarn run build
-```
-
-### Deploy client publicly
-
-Single command to build and deploy to github pages:
-
-```
-update-client
-```
+NOTE: Python >= 3.5 and pip is required for solidity flattener. You might want to run `brew upgrade python`
