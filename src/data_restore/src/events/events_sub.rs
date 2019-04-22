@@ -1,9 +1,7 @@
-use env_logger;
 use std::rc::Rc;
-use web3::contract;
 use web3::futures::{Future, Stream};
-use web3::types::{Address, FilterBuilder, U256, H256};
-use tiny_keccak::{Keccak, keccak256};
+use web3::types::{Address, FilterBuilder, H256};
+use tiny_keccak::{keccak256};
 
 pub enum InfuraEndpoint {
     Mainnet,
@@ -73,19 +71,21 @@ pub fn subscribe_to_logs(on: InfuraEndpoint, topic: String) {
     // TODO: not working genesis block
     let franklin_genesis_block = 0;
 
-    // Init env logger
-    env_logger::init();
-
     // Setup loop and web3
     let mut eloop = tokio_core::reactor::Core::new().unwrap();
     let handle = eloop.handle();
     let w3 = Rc::new(web3::Web3::new(
-        web3::transports::WebSocket::with_event_loop(enpoint, &eloop.handle())
+        web3::transports::WebSocket::with_event_loop(enpoint, &handle)
             .unwrap(),
     ));
 
     // Subscription
-    let subscribe_franklin_logs_future = logs_subscription(franklin_address, franklin_genesis_block, logs_topic, w3.clone());
+    let subscribe_franklin_logs_future = logs_subscription(
+        franklin_address,
+        franklin_genesis_block,
+        logs_topic,
+        w3.clone()
+    );
 
     // Run eloop
     if let Err(_err) = eloop.run(subscribe_franklin_logs_future) {

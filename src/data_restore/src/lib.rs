@@ -4,7 +4,6 @@
 #![allow(unused_must_use)]
 #![allow(unused_assignments)]
 
-extern crate env_logger;
 extern crate web3;
 extern crate tiny_keccak;
 
