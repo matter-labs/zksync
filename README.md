@@ -12,6 +12,8 @@ Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 
 - Start the dev environment:
 ```make dev-up```
+- Setup env config:
+```cp etc/env/local.env.example etc/env/local.env```
 - Create `plasma` database:
 ```db-setup```
 - Deploy contracts:
