@@ -11,14 +11,14 @@ pub enum InfuraEndpoint {
 }
 
 pub struct LogBlockData {
-    block_num: u32,
-    transaction_hash: String
+    pub block_num: u32,
+    pub transaction_hash: String
 }
 
 pub struct EventsFranklin {
-    committed_blocks: Vec<LogBlockData>,
-    verified_blocks: Vec<LogBlockData>,
-    eloop: Core,
+    pub committed_blocks: Vec<LogBlockData>,
+    pub verified_blocks: Vec<LogBlockData>,
+    pub eloop: Core,
 }
 
 impl EventsFranklin {
