@@ -1,48 +1,9 @@
 use std::rc::Rc;
-use web3::futures;
 use web3::futures::{Future, Stream};
 use web3::types::{Address, FilterBuilder, H256};
-use tiny_keccak::{keccak256};
 use tokio_core::reactor::Core;
-use std::cmp::Ordering;
-
-#[derive(Debug, Copy, Clone)]
-pub enum InfuraEndpoint {
-    Mainnet,
-    Rinkeby
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum BlockType {
-    Committed,
-    Verified,
-    Unknown
-}
-
-#[derive(Debug, Copy, Clone, Eq)]
-pub struct LogBlockData {
-    pub block_num: H256,
-    pub transaction_hash: H256,
-    pub block_type: BlockType
-}
-
-impl PartialOrd for LogBlockData {
-    fn partial_cmp(&self, other: &LogBlockData) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for LogBlockData {
-    fn cmp(&self, other: &LogBlockData) -> Ordering {
-        self.block_num.cmp(&other.block_num)
-    }
-}
-
-impl PartialEq for LogBlockData {
-    fn eq(&self, other: &LogBlockData) -> bool {
-        self.block_num == other.block_num
-    }
-}
+use blocks::{BlockType, LogBlockData};
+use helpers::*;
 
 pub struct EventsFranklin {
     pub committed_blocks: Vec<LogBlockData>,
@@ -72,19 +33,6 @@ impl EventsFranklin {
         self.verified_blocks.clone()
     }
 
-    fn keccak256_hash(&mut self, bytes: &[u8]) -> Vec<u8> {
-        keccak256(bytes).into_iter().cloned().collect()
-    }
-
-    fn get_topic_keccak_hash(&mut self, topic: &str) -> web3::types::H256 {
-        let topic_data: Vec<u8> = From::from(topic);
-        let topic_data_vec: &[u8] = topic_data.as_slice();
-        let topic_keccak_data: Vec<u8> = self.keccak256_hash(topic_data_vec);
-        let topic_keccak_data_vec: &[u8] = topic_keccak_data.as_slice();
-        let topic_h256 = H256::from_slice(topic_keccak_data_vec);
-        topic_h256
-    }
-
     pub fn subscribe_to_logs(&mut self, on: InfuraEndpoint) {
         // Websocket Endpoint
         let enpoint = match on {
@@ -101,8 +49,8 @@ impl EventsFranklin {
         // Get topic keccak hash
         let block_verified_topic = "BlockVerified(uint32)";
         let block_committed_topic = "BlockCommitted(uint32)";
-        let block_verified_topic_h256: web3::types::H256 = self.get_topic_keccak_hash(block_verified_topic);
-        let block_committed_topic_h256: web3::types::H256 = self.get_topic_keccak_hash(block_committed_topic);
+        let block_verified_topic_h256: web3::types::H256 = get_topic_keccak_hash(block_verified_topic);
+        let block_committed_topic_h256: web3::types::H256 = get_topic_keccak_hash(block_committed_topic);
 
         let topics_vec_h256: Vec<web3::types::H256> = vec![block_verified_topic_h256, block_committed_topic_h256];
 
@@ -159,9 +107,12 @@ impl EventsFranklin {
                                 println!("Verified");
                                 block.block_type = BlockType::Verified;
                                 self.verified_blocks.push(block);
-                                let result = self.check_committed_block_with_same_number_as_verified(&block);
-                                
-                                println!("Block exists: {:?}", result);
+                                // let result = self.check_committed_block_with_same_number_as_verified(&block);
+                                // println!("Block exists: {:?}", result);
+                                // let tx = result.unwrap().clone().transaction_hash;
+                                // println!("--- Starting getting tx");
+                                // let data = get_transaction_receipt(InfuraEndpoint::Rinkeby, &tx);
+                                // println!("TX data committed: {:?}", data);
                             } else if topic == block_committed_topic_h256 {
                                 println!("-");
                                 println!("Committed");
@@ -184,5 +135,7 @@ impl EventsFranklin {
         }
     }
 }
+
+
 
 
