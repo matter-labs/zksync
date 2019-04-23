@@ -39,7 +39,6 @@ Public data of each operation is padded to 28 bytes.
 
 Create an account and deposit a balance into it.
 
-|Optype         |0                                                       |
 |Pub data       |account: 3, token: 1, amount: 3, pubkey_hash: 20, fee: 1|
 |Pub data size  |28 bytes                                                |
 
@@ -56,7 +55,6 @@ Same as deposit, but requires the operation before to be `transfer_to_new`, and 
 
 Create a new account and transfer some balance into it from an existing one.
 
-|Optype         |1                                                       |
 |Pub data       |account: 3, token: 1                                    |
 |Pub data size  |4 bytes                                                 |
 
@@ -71,7 +69,6 @@ Comments:
 
 Initiate full exit of all account assets to the root chain and clear the account.
 
-|Optype         |2                                                      |
 |Pub data       |account: 3, subtree_root: 20                           |
 |Pub data size  |8 bytes                                                |
 
@@ -88,7 +85,6 @@ Comments:
 
 Withdraw part of a particular token balance to the mainchain.
 
-|Optype         |3                                                      |
 |Pub data       |account: 3, token: 1, amount: 3, fee: 1                |
 |Pub data size  |8 bytes                                                |
 
@@ -99,12 +95,18 @@ Verification:
 
 Resolve state channel conflict by a smart contract on the mainnet.
 
-|Optype         |4                                                                |
 |Pub data       |account: 3, subaccount: 1, creation_nonce: 2, subaccount_nonce: 2|
 |Pub data size  |26 bytes                                                         |
 
 Verification:
 - Either account owner or the co-signer signs (optype, account, subaccount, creation_nonce)
+
+#### padding
+
+Phony operation for block padding.
+
+|Pub data       |           |
+|Pub data size  |0 bytes    |
 
 ### Circuit code
 
@@ -116,7 +118,9 @@ carry := 0
 
 for tx in transactions: # iterate through witness
 
-    running_hash := accumulate(running_hash, tx.pubdata)
+    # running hash: ignoring padding transactions
+
+    running_hash := optype == 'padding' ? running_hash : accumulate(running_hash, tx.pubdata)
 
     # initialize variables from witness
 
@@ -196,6 +200,7 @@ for tx in transactions: # iterate through witness
         'full_exit'         => full_exit_valid
         'partial_exit'      => partial_exit_valid
         'escalation'        => escalation_valid
+        'padding'           => `true`
     
     enforce tx_valid
 
