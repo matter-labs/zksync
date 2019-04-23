@@ -4,6 +4,7 @@ use web3::futures::{Future, Stream};
 use web3::types::{Address, FilterBuilder, H256};
 use tiny_keccak::{keccak256};
 use tokio_core::reactor::Core;
+use std::cmp::Ordering;
 
 #[derive(Debug, Copy, Clone)]
 pub enum InfuraEndpoint {
@@ -11,18 +12,36 @@ pub enum InfuraEndpoint {
     Rinkeby
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum BlockType {
     Committed,
     Verified,
     Unknown
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq)]
 pub struct LogBlockData {
     pub block_num: H256,
     pub transaction_hash: H256,
     pub block_type: BlockType
+}
+
+impl PartialOrd for LogBlockData {
+    fn partial_cmp(&self, other: &LogBlockData) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for LogBlockData {
+    fn cmp(&self, other: &LogBlockData) -> Ordering {
+        self.block_num.cmp(&other.block_num)
+    }
+}
+
+impl PartialEq for LogBlockData {
+    fn eq(&self, other: &LogBlockData) -> bool {
+        self.block_num == other.block_num
+    }
 }
 
 pub struct EventsFranklin {
@@ -37,6 +56,12 @@ impl EventsFranklin {
             verified_blocks: vec![]
         };
         this
+    }
+
+    pub fn check_committed_block_with_same_number_as_verified(&self, verified_block: &LogBlockData) -> Option<&LogBlockData> {
+        let committed_blocks_iter = &mut self.committed_blocks.iter();
+        let committed_block = committed_blocks_iter.find(|&&x| x.block_num == verified_block.block_num);
+        return committed_block
     }
 
     pub fn get_committed_blocks(&self) -> Vec<LogBlockData> {
@@ -134,6 +159,9 @@ impl EventsFranklin {
                                 println!("Verified");
                                 block.block_type = BlockType::Verified;
                                 self.verified_blocks.push(block);
+                                let result = self.check_committed_block_with_same_number_as_verified(&block);
+                                
+                                println!("Block exists: {:?}", result);
                             } else if topic == block_committed_topic_h256 {
                                 println!("-");
                                 println!("Committed");
