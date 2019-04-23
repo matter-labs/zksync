@@ -35,6 +35,17 @@ Public data of each operation is padded to 28 bytes.
 
 ### Circuit operations
 
+#### padding (optype = 0)
+
+Phony operation for block padding.
+
+|Pub data|Total size|
+|--------|----------|
+|        | 0 bytes  |
+
+Comments:
+- Optype must qual 0 so that padding can efficiently be added to the pub data before hashing in the smart contract.
+
 #### deposit
 
 Create an account and deposit a balance into it.
@@ -106,13 +117,6 @@ Resolve state channel conflict by a smart contract on the mainnet.
 Verification:
 - Either account owner or the co-signer signs (optype, account, subaccount, creation_nonce)
 
-#### padding
-
-Phony operation for block padding.
-
-|Pub data|Total size|
-|--------|----------|
-|        | 0 bytes  |
 
 ### Circuit code
 
@@ -126,11 +130,7 @@ for tx in transactions: # iterate through witness
 
     # running hash: ignoring padding transactions
 
-    running_hash := 
-        if optype == 'padding':
-            running_hash 
-        else:
-            accumulate(running_hash, tx.pubdata)
+    running_hash := accumulate(running_hash, tx.pubdata)
 
     # initialize variables from witness
 
