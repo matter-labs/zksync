@@ -67,7 +67,7 @@ Comments:
 
 Initiate full exit of all account assets to the root chain and clear the account.
 
-|Pub data |account: 3, subtree_root: 20| 8 bytes|
+||Pub data |account: 3, subtree_root: 20| 8 bytes||
 
 Verification:
 - User initiates a full exit by a transaction on the root chain which creates an exit queue entry
@@ -153,7 +153,9 @@ for tx in transactions: # iterate through witness
     # check initial merkle paths
 
     full_leaf_index := tx.leaf_is_token ? tx.leaf_index : 0x100 + tx.leaf_index
-    subtree_root := check_merkle_path(full_leaf_index, (leaf_balance, leaf_nonce, creation_nonce, cosigner_pubkey_hash))
+    subtree_root := check_merkle_path(
+        full_leaf_index, 
+        (leaf_balance, leaf_nonce, creation_nonce, cosigner_pubkey_hash, cosigner_balance, token))
     current_root := check_merkle_path(tx.account, hash(owner_pub_key, subtree_root, account_nonce))
     
     # validate operations
@@ -234,7 +236,9 @@ for tx in transactions: # iterate through witness
 
     # check final merkle paths
 
-    subtree_root := check_merkle_path(full_leaf_index, (leaf_balance, leaf_nonce, creation_nonce, cosigner_pubkey_hash))
+    subtree_root := check_merkle_path(
+        full_leaf_index, 
+        (leaf_balance, leaf_nonce, creation_nonce, cosigner_pubkey_hash, cosigner_balance, token))
     current_root := check_merkle_path(tx.account, hash(owner_pub_key, subtree_root, account_nonce))
 
 # at the end of the loop carry must be cleared
