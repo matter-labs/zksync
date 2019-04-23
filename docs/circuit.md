@@ -165,11 +165,13 @@ for tx in transactions: # iterate through witness
     # validate operations
 
     deposit_valid := 
+        (optype == 'deposit' || optype == 'deposit_from') &&
         pubdata == (tx.account, tx.leaf_index, tx.amount, pubkey_hash, tx.fee) &&
         (owner_pub_key, subtree_root, account_nonce) == EMPTY_ACCOUNT &&
         leaf_is_token
 
     transfer_to_new_valid := 
+        optype == 'transfer_to' &&
         pubdata == (tx.account, tx.leaf_index) &&
         subtractable &&
         leaf_is_token &&
@@ -178,9 +180,11 @@ for tx in transactions: # iterate through witness
         signer_pubkey == tx.owner_pub_key
 
     full_exit_valid :=
+        optype == 'full_exit' &&
         pubdata == (tx.account, tx.subtree_root)
 
     partial_exit_valid := 
+        optype == 'partial_exit' &&
         pubdata == (tx.account, tx.leaf_index, tx.amount, tx.fee) &&
         subtractable &&
         leaf_is_token &&
@@ -188,19 +192,22 @@ for tx in transactions: # iterate through witness
         signer_pubkey == tx.owner_pub_key
 
     escalation_valid := 
+        optype == 'escalation' &&
         pubdata == (tx.account, leaf_index, creation_nonce, leaf_nonce) &&
         !leaf_is_token &&
         sig_msg == ('escalation', tx.account, leaf_index, creation_nonce) &&
         (signer_pubkey == tx.owner_pub_key || signer_pubkey == cosigner_pubkey)
     
-    tx_valid := switch optype
-        'deposit'           => deposit_valid
-        'deposit_from'      => deposit_valid
-        'transfer_to_new'   => transfer_to_new_valid
-        'full_exit'         => full_exit_valid
-        'partial_exit'      => partial_exit_valid
-        'escalation'        => escalation_valid
-        'padding'           => `true`
+    padding_valid := 
+        optype == 'padding'
+
+    tx_valid := 
+        deposit_valid ||
+        transfer_to_new_valid ||
+        full_exit_valid ||
+        partial_exit_valid ||
+        escalation_valid ||
+        padding_valid
     
     enforce tx_valid
 
@@ -208,24 +215,24 @@ for tx in transactions: # iterate through witness
 
     # NOTE: `if conditon: x = y` is implemented as a binary switch: `x = condition ? y : x`
 
-    if optype == 'deposit' || optype == 'deposit_from':
+    if deposit_valid:
         leaf_balance = leaf_balance
 
-    if optype == 'transfer_to_new':
+    if transfer_to_new_valid:
         leaf_balance = leaf_balance - amount
         account_nonce = account_nonce + 1
         carry = (amount, fee, pubkey_hash)
 
-    if optype == 'full_exit':
+    if full_exit_valid:
         owner_pub_key = 0
         account_nonce = 0
         subtree_root  = EMPTY_TREE_ROOT
 
-    if optype == 'partial_exit':
+    if partial_exit_valid:
         leaf_balance = leaf_balance - amount
         account_nonce = leaf_nonce + 1
 
-    if optype == 'escalation':
+    if escalation_valid:
         leaf_balance = 0
         leaf_nonce = 0
         creation_nonce = 0
