@@ -152,7 +152,7 @@ for tx in transactions: # iterate through witness
 
     # check carry from previous transaction
 
-    carry_valid := carry == false || optype=='deposit_from' # carry only allowed to be set for deposits
+    carry_valid := carry == false or optype=='deposit_from' # carry only allowed to be set for deposits
     enforce carry_valid
 
     (amount, fee, pubkey_hash) = carry
@@ -173,48 +173,48 @@ for tx in transactions: # iterate through witness
     # validate operations
 
     deposit_valid := 
-        (optype == 'deposit' || optype == 'deposit_from') &&
-        pubdata == (tx.account, tx.leaf_index, tx.amount, pubkey_hash, tx.fee) &&
-        (owner_pub_key, subtree_root, account_nonce) == EMPTY_ACCOUNT &&
+        (optype == 'deposit' or optype == 'deposit_from') and
+        pubdata == (tx.account, tx.leaf_index, tx.amount, pubkey_hash, tx.fee) and
+        (owner_pub_key, subtree_root, account_nonce) == EMPTY_ACCOUNT and
         leaf_is_token
 
     transfer_to_new_valid := 
-        optype == 'transfer_to' &&
-        pubdata == (tx.account, tx.leaf_index) &&
-        subtractable &&
-        leaf_is_token &&
-        deposit_valid && # same checks as for deposit operation
-        sig_msg == ('transfer_to_new', tx.account, leaf_index, account_nonce, tx.amount, tx.fee, pubkey_hash) &&
+        optype == 'transfer_to' and
+        pubdata == (tx.account, tx.leaf_index) and
+        subtractable and
+        leaf_is_token and
+        deposit_valid and # same checks as for deposit operation
+        sig_msg == ('transfer_to_new', tx.account, leaf_index, account_nonce, tx.amount, tx.fee, pubkey_hash) and
         signer_pubkey == tx.owner_pub_key
 
     full_exit_valid :=
-        optype == 'full_exit' &&
+        optype == 'full_exit' and
         pubdata == (tx.account, tx.subtree_root)
 
     partial_exit_valid := 
-        optype == 'partial_exit' &&
-        pubdata == (tx.account, tx.leaf_index, tx.amount, tx.fee) &&
-        subtractable &&
-        leaf_is_token &&
-        sig_msg == ('partial_exit', tx.account, tx.leaf_index, account_nonce, tx.amount, tx.fee) &&
+        optype == 'partial_exit' and
+        pubdata == (tx.account, tx.leaf_index, tx.amount, tx.fee) and
+        subtractable and
+        leaf_is_token and
+        sig_msg == ('partial_exit', tx.account, tx.leaf_index, account_nonce, tx.amount, tx.fee) and
         signer_pubkey == tx.owner_pub_key
 
     escalation_valid := 
-        optype == 'escalation' &&
-        pubdata == (tx.account, leaf_index, creation_nonce, leaf_nonce) &&
-        !leaf_is_token &&
-        sig_msg == ('escalation', tx.account, leaf_index, creation_nonce) &&
-        (signer_pubkey == tx.owner_pub_key || signer_pubkey == cosigner_pubkey)
+        optype == 'escalation' and
+        pubdata == (tx.account, leaf_index, creation_nonce, leaf_nonce) and
+        !leaf_is_token and
+        sig_msg == ('escalation', tx.account, leaf_index, creation_nonce) and
+        (signer_pubkey == tx.owner_pub_key or signer_pubkey == cosigner_pubkey)
     
     padding_valid := 
         optype == 'padding'
 
     tx_valid := 
-        deposit_valid ||
-        transfer_to_new_valid ||
-        full_exit_valid ||
-        partial_exit_valid ||
-        escalation_valid ||
+        deposit_valid or
+        transfer_to_new_valid or
+        full_exit_valid or
+        partial_exit_valid or
+        escalation_valid or
         padding_valid
     
     enforce tx_valid
