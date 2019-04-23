@@ -5,18 +5,26 @@ use web3::types::{Address, FilterBuilder, H256};
 use tiny_keccak::{keccak256};
 use tokio_core::reactor::Core;
 
+#[derive(Debug, Copy, Clone)]
 pub enum InfuraEndpoint {
     Mainnet,
     Rinkeby
 }
 
-#[derive(Debug)]
-pub struct LogBlockData {
-    pub block_num: H256,
-    pub transaction_hash: H256
+#[derive(Debug, Copy, Clone)]
+pub enum BlockType {
+    Committed,
+    Verified,
+    Unknown
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
+pub struct LogBlockData {
+    pub block_num: H256,
+    pub transaction_hash: H256,
+    pub block_type: BlockType
+}
+
 pub struct EventsFranklin {
     pub committed_blocks: Vec<LogBlockData>,
     pub verified_blocks: Vec<LogBlockData>,
@@ -32,27 +40,11 @@ impl EventsFranklin {
     }
 
     pub fn get_committed_blocks(&self) -> Vec<LogBlockData> {
-        let mut blocks: Vec<LogBlockData> = vec![];
-        for block in self.committed_blocks.iter() {
-            let copied_block = LogBlockData { 
-                block_num: block.block_num.clone(),
-                transaction_hash: block.transaction_hash.clone()
-            };
-            blocks.push(copied_block);
-        }
-        blocks
+        self.committed_blocks.clone()
     }
 
     pub fn get_verified_blocks(&self) -> Vec<LogBlockData> {
-        let mut blocks: Vec<LogBlockData> = vec![];
-        for block in self.verified_blocks.iter() {
-            let verified_block = LogBlockData { 
-                block_num: block.block_num.clone(),
-                transaction_hash: block.transaction_hash.clone()
-            };
-            blocks.push(verified_block);
-        }
-        blocks
+        self.verified_blocks.clone()
     }
 
     fn keccak256_hash(&mut self, bytes: &[u8]) -> Vec<u8> {
@@ -84,8 +76,10 @@ impl EventsFranklin {
         // Get topic keccak hash
         let block_verified_topic = "BlockVerified(uint32)";
         let block_committed_topic = "BlockCommitted(uint32)";
+        let block_verified_topic_h256: web3::types::H256 = self.get_topic_keccak_hash(block_verified_topic);
+        let block_committed_topic_h256: web3::types::H256 = self.get_topic_keccak_hash(block_committed_topic);
 
-        let topics: Vec<&str> = vec![block_committed_topic, block_verified_topic];
+        let topics_vec_h256: Vec<web3::types::H256> = vec![block_verified_topic_h256, block_committed_topic_h256];
 
         // TODO: not working genesis block
         let franklin_genesis_block = 0;
@@ -99,19 +93,13 @@ impl EventsFranklin {
         ));
 
         // Subscription
-        println!("subscribing to franklin logs {:?}...", topics);
-
-        let mut topics_vec: Vec<web3::types::H256> = vec![];
-        for i in 0..topics.len() {
-            let topic_h256: web3::types::H256 = self.get_topic_keccak_hash(topics[i]);
-            topics_vec.push(topic_h256);
-        }
+        println!("subscribing to franklin logs {:?} {:?}...", block_verified_topic, block_committed_topic);
 
         let filter = FilterBuilder::default()
             .address(vec![franklin_address])
             .from_block(franklin_genesis_block.into())
             .topics(
-                Some(topics_vec),
+                Some(topics_vec_h256),
                 None,
                 None,
                 None,
@@ -124,17 +112,36 @@ impl EventsFranklin {
                 sub.for_each(|log| {
                     println!("---");
                     println!("got log from subscription: {:?}", log);
+                    
+                    // Form block
                     let mut block: LogBlockData = LogBlockData {
                         block_num: H256::zero(),
-                        transaction_hash : H256::zero()
+                        transaction_hash : H256::zero(),
+                        block_type: BlockType::Unknown
                     };
-                    match log.transaction_hash {
+                    // Log data
+                    let tx_hash = log.transaction_hash;
+                    let topic = log.topics[0];
+                    let block_num = log.topics[1];
+
+                    match tx_hash {
                         Some(hash) => {
-                            block.block_num = log.topics[1];
+                            block.block_num = block_num;
                             block.transaction_hash = hash;
-                            self.committed_blocks.push(block);
-                            println!("-");
-                            println!("Blocks in storage: {:?}", self.committed_blocks);
+
+                            if topic == block_verified_topic_h256 {
+                                println!("-");
+                                println!("Verified");
+                                block.block_type = BlockType::Verified;
+                                self.verified_blocks.push(block);
+                            } else if topic == block_committed_topic_h256 {
+                                println!("-");
+                                println!("Committed");
+                                block.block_type = BlockType::Committed;
+                                self.committed_blocks.push(block);
+                            }
+                            println!("Verified blocks in storage: {:?}", self.verified_blocks);
+                            println!("Committed blocks in storage: {:?}", self.committed_blocks);
                         },
                         None    => println!("No tx hash"),
                     };
