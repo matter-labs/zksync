@@ -39,8 +39,7 @@ Public data of each operation is padded to 28 bytes.
 
 Create an account and deposit a balance into it.
 
-|Pub data       |account: 3, token: 1, amount: 3, pubkey_hash: 20, fee: 1|
-|Pub data size  |28 bytes                                                |
+|Pub data |account: 3, token: 1, amount: 3, pubkey_hash: 20, fee: 1| 28 bytes|
 
 Verification:
 - User initiates a deposit by a transaction on the root chain which creates a deposit queue entry
@@ -55,8 +54,7 @@ Same as deposit, but requires the operation before to be `transfer_to_new`, and 
 
 Create a new account and transfer some balance into it from an existing one.
 
-|Pub data       |account: 3, token: 1                                    |
-|Pub data size  |4 bytes                                                 |
+|Pub data |account: 3, token: 1| 4 bytes|
 
 Verification:
 - Owner of existing account signs (optype, account, token, nonce, amount, fee, pubkey_hash)
@@ -69,8 +67,7 @@ Comments:
 
 Initiate full exit of all account assets to the root chain and clear the account.
 
-|Pub data       |account: 3, subtree_root: 20                           |
-|Pub data size  |8 bytes                                                |
+|Pub data |account: 3, subtree_root: 20| 8 bytes|
 
 Verification:
 - User initiates a full exit by a transaction on the root chain which creates an exit queue entry
@@ -85,8 +82,7 @@ Comments:
 
 Withdraw part of a particular token balance to the mainchain.
 
-|Pub data       |account: 3, token: 1, amount: 3, fee: 1                |
-|Pub data size  |8 bytes                                                |
+|Pub data |account: 3, token: 1, amount: 3, fee: 1| 8 bytes|
 
 Verification:
 - Account owner signs (optype, account, token, leaf_nonce, amount, fee)
@@ -95,8 +91,7 @@ Verification:
 
 Resolve state channel conflict by a smart contract on the mainnet.
 
-|Pub data       |account: 3, subaccount: 1, creation_nonce: 2, subaccount_nonce: 2|
-|Pub data size  |26 bytes                                                         |
+|Pub data |account: 3, subaccount: 1, creation_nonce: 2, subaccount_nonce: 2| 26 bytes|
 
 Verification:
 - Either account owner or the co-signer signs (optype, account, subaccount, creation_nonce)
@@ -105,8 +100,7 @@ Verification:
 
 Phony operation for block padding.
 
-|Pub data       |           |
-|Pub data size  |0 bytes    |
+|Pub data | | 0 bytes|
 
 ### Circuit code
 
@@ -256,51 +250,77 @@ Each operation in the circuit requires:
 - 4 Merkle path proof checks of height 33
 - 4 signature checks
 
-Public data of each operation is padded to 15 bytes + 1 byte for optype.
+Public data of each operation is padded to 16 bytes.
 
 ### Circuit operations
 
 #### transfer
-    - operator will either deposit into an existing account or create a new one
-    - pub data: (amount: 3, token: 1, from_account: 3, to_account: 3, fee: 1): 11 bytes
-    - check sig1(optype, from_account, to_account, token, amount, fee, nonce)
-    - ignore other signatures
+
+Transfer an amount of tokens from one account balance to another.
+
+|Pub data |amount: 3, token: 1, from_account: 3, to_account: 3, fee: 1| 11 bytes|
+
+Verification:
+- Account owner signs (optype, from_account, to_account, token, amount, fee, nonce)
 
 #### create_subaccount
-    - subaccounts are used for both order or state channels
-    - order/state channel conditions are signed and sent to the TEC offchain
-    - pub data: (account: 3, subaccount: 1, amount: 3, token: 1, cosigner_fee: 2, cosigner_account: 3, fee: 1): 14 bytes
-    - check sig1(optype, account, nonce, subaccount, token_type, amount, fee) against account pub key
-    - ignore other signatures
+
+Create subaccount to place an order or open a state channel.
+
+|Pub data |account: 3, subaccount: 1, amount: 3, token: 1, cosigner_fee: 2, cosigner_account: 3, fee: 1| 14 bytes|
+
+Verification:
+- Account owner signs(optype, account, nonce, subaccount, token, amount, fee)
+
+Comments:
+- subaccounts are used for both order or state channels
+- order/state channel conditions are signed and sent to the TEC offchain
 
 #### close_subaccount
-    - cooperative closing; if co-signer doesn't cooperate, resolution via priority queue + escalation
-    - pub data: (account: 3, subaccount: 1, cosigner_balance: 3): 7 bytes
-    - check sig1(optype, account, subaccount, creation_nonce, subaccount_nonce) against either co-signer pubkey, or, after expiration, against account pub key
-    - check sig2(signed state 1) against account1 pubkey
-    - ignore other signatures
-    - cosigner_balance is sent to the co-signer, the rest is sent to the account owner, subaccount leaf is cleared
 
-#### execute_order
-    - partial or full execution of an order against another order
-    - requires signatures of co-signers of both orders as TEC (trade execution coordinators)
-    - order amount is updated, receiving amount is accrued to the user account directly
-    - pub data: (account1: 3, subaccount1: 1, account2: 3, subaccount2: 3, amount12: 3, amount21: 3, fee: 1): 15 bytes
-    - check sig1(signed state 1) against account1 pubkey
-    - check sig2(signed state 2) against account2 pubkey
-    - check sig3(optype, account1, subaccount1, subaccount1_nonce, transfer_amount12, transfer_amount21, fee1) against cosigner1_pubkey
-    - check sig4(same for account 2) against cosigner2_pubkey
+Close a subaccount to cancel an order or settle a state channel.
 
-#### subaccount_transfer
-    - pub data: (account: 3, subaccount: 1, to_account: 3, amount: 3, fee: 1)
-    - tbd
+|Pub data |account: 3, subaccount: 1, cosigner_balance: 3| 7 bytes|
+
+Verification:
+- Account owner signs `signed state` at subaccount creation
+- Tx sender signs(optype, account, subaccount, creation_nonce, subaccount_nonce)
+- Tx sender is either the co-signer or account owner (only if the order expired)
+
+Comments:
+- cooperative closing; if co-signer doesn't cooperate, resolution via priority queue + escalation
+- cosigner_balance is sent to the co-signer, the rest is sent to the account owner, subaccount leaf is cleared
+
+#### execute_orders
+
+Execute two orders against each other.
+
+|Pub data |account1: 3, subaccount1: 1, account2: 3, subaccount2: 3, amount12: 3, amount21: 3, fee: 1| 15 bytes|
+
+Verification:
+- Account owner 1 signs `signed state` at subaccount 1 creation
+- Account owner 2 signs `signed state` at subaccount 2 creation
+- Cosigner 1 signs (optype, account1, subaccount1, subaccount1_nonce, transfer_amount12, transfer_amount21, fee1)
+- Cosigner 2 signs the same for the opposite order
+
+Comments:
+- partial or full execution of an order against another order
+- requires signatures of co-signers of both orders as TEC (trade execution coordinators)
+- order amount is updated, receiving amount is accrued to the user account directly
 
 #### update_nonce
-    - pub data: (account: 3, subaccount: 1, nonce: 2, fee: 1) -- if nonce in pub data is 0, subaccount nonce is incremented
-    - tbd
+
+Update a nonce of a subaccount representing a state channel.
+
+|Pub data |account: 3, subaccount: 1, nonce: 2, fee: 1| 8 bytes|
+
+Comments:
+- if nonce in pub data is 0, subaccount nonce is incremented
+
+tbd
 
 # Todo / Questions
 
-- subaccounts for everything (0 is default)?
-- sign(amount = 0) authorizes full transfer?
+- subaccounts for everything (0 is default): transfers from anything to anything?
+- sign(amount = 0) authorizes transfer of the entire balance?
 - bitmask: explicit control of transfer permission for subaccounts (by Brecht)?
