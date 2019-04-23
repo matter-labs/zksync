@@ -168,7 +168,12 @@ for tx in transactions: # iterate through witness
 
     # check initial merkle paths
 
-    full_leaf_index := tx.leaf_is_token ? tx.leaf_index : 0x100 + tx.leaf_index
+    full_leaf_index := 
+        if tx.leaf_is_token:
+            tx.leaf_index
+        else:
+            0x100 + tx.leaf_index
+
     subtree_root := check_merkle_path(
         full_leaf_index, 
         (leaf_balance, leaf_nonce, creation_nonce, cosigner_pubkey_hash, cosigner_balance, token))
@@ -206,7 +211,7 @@ for tx in transactions: # iterate through witness
     escalation_valid := 
         optype == 'escalation' and
         pubdata == (tx.account, leaf_index, creation_nonce, leaf_nonce) and
-        !leaf_is_token and
+        not leaf_is_token and
         sig_msg == ('escalation', tx.account, leaf_index, creation_nonce) and
         (signer_pubkey == tx.owner_pub_key or signer_pubkey == cosigner_pubkey)
     
