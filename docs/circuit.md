@@ -39,7 +39,9 @@ Public data of each operation is padded to 28 bytes.
 
 Create an account and deposit a balance into it.
 
-|Pub data |account: 3, token: 1, amount: 3, pubkey_hash: 20, fee: 1| 28 bytes|
+|Pub data|Total size|
+|--------|----------|
+|account: 3, token: 1, amount: 3, pubkey_hash: 20, fee: 1| 28 bytes|
 
 Verification:
 - User initiates a deposit by a transaction on the root chain which creates a deposit queue entry
@@ -54,7 +56,9 @@ Same as deposit, but requires the operation before to be `transfer_to_new`, and 
 
 Create a new account and transfer some balance into it from an existing one.
 
-|Pub data |account: 3, token: 1| 4 bytes|
+|Pub data|Total size|
+|--------|----------|
+|account: 3, token: 1| 4 bytes|
 
 Verification:
 - Owner of existing account signs (optype, account, token, nonce, amount, fee, pubkey_hash)
@@ -67,7 +71,9 @@ Comments:
 
 Initiate full exit of all account assets to the root chain and clear the account.
 
-||Pub data |account: 3, subtree_root: 20| 8 bytes||
+|Pub data|Total size|
+|--------|----------|
+|account: 3, subtree_root: 20| 8 bytes|
 
 Verification:
 - User initiates a full exit by a transaction on the root chain which creates an exit queue entry
@@ -82,7 +88,9 @@ Comments:
 
 Withdraw part of a particular token balance to the mainchain.
 
-|Pub data |account: 3, token: 1, amount: 3, fee: 1| 8 bytes|
+|Pub data|Total size|
+|--------|----------|
+|account: 3, token: 1, amount: 3, fee: 1|8 bytes|
 
 Verification:
 - Account owner signs (optype, account, token, leaf_nonce, amount, fee)
@@ -91,7 +99,9 @@ Verification:
 
 Resolve state channel conflict by a smart contract on the mainnet.
 
-|Pub data |account: 3, subaccount: 1, creation_nonce: 2, subaccount_nonce: 2| 26 bytes|
+|Pub data|Total size|
+|--------|----------|
+|account: 3, subaccount: 1, creation_nonce: 2, subaccount_nonce: 2| 26 bytes|
 
 Verification:
 - Either account owner or the co-signer signs (optype, account, subaccount, creation_nonce)
@@ -100,7 +110,9 @@ Verification:
 
 Phony operation for block padding.
 
-|Pub data | | 0 bytes|
+|Pub data|Total size|
+|--------|----------|
+|        | 0 bytes  |
 
 ### Circuit code
 
@@ -262,7 +274,9 @@ Public data of each operation is padded to 16 bytes.
 
 Transfer an amount of tokens from one account balance to another.
 
-|Pub data |amount: 3, token: 1, from_account: 3, to_account: 3, fee: 1| 11 bytes|
+|Pub data|Total size|
+|--------|----------|
+|amount: 3, token: 1, from_account: 3, to_account: 3, fee: 1| 11 bytes|
 
 Verification:
 - Account owner signs (optype, from_account, to_account, token, amount, fee, nonce)
@@ -271,7 +285,9 @@ Verification:
 
 Create subaccount to place an order or open a state channel.
 
-|Pub data |account: 3, subaccount: 1, amount: 3, token: 1, cosigner_fee: 2, cosigner_account: 3, fee: 1| 14 bytes|
+|Pub data|Total size|
+|--------|----------|
+|account: 3, subaccount: 1, amount: 3, token: 1, cosigner_fee: 2, cosigner_account: 3, fee: 1| 14 bytes|
 
 Verification:
 - Account owner signs(optype, account, nonce, subaccount, token, amount, fee)
@@ -284,7 +300,9 @@ Comments:
 
 Close a subaccount to cancel an order or settle a state channel.
 
-|Pub data |account: 3, subaccount: 1, cosigner_balance: 3| 7 bytes|
+|Pub data|Total size|
+|--------|----------|
+|account: 3, subaccount: 1, cosigner_balance: 3| 7 bytes|
 
 Verification:
 - Account owner signs `signed state` at subaccount creation
@@ -299,7 +317,9 @@ Comments:
 
 Execute two orders against each other.
 
-|Pub data |account1: 3, subaccount1: 1, account2: 3, subaccount2: 3, amount12: 3, amount21: 3, fee: 1| 15 bytes|
+|Pub data|Total size|
+|--------|----------|
+|account1: 3, subaccount1: 1, account2: 3, subaccount2: 3, amount12: 3, amount21: 3, fee: 1| 15 bytes|
 
 Verification:
 - Account owner 1 signs `signed state` at subaccount 1 creation
@@ -316,7 +336,9 @@ Comments:
 
 Update a nonce of a subaccount representing a state channel.
 
-|Pub data |account: 3, subaccount: 1, nonce: 2, fee: 1| 8 bytes|
+|Pub data|Total size|
+|--------|----------|
+|account: 3, subaccount: 1, nonce: 2, fee: 1| 8 bytes|
 
 Comments:
 - if nonce in pub data is 0, subaccount nonce is incremented
