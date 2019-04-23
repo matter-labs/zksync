@@ -258,31 +258,22 @@ Each operation in the circuit requires:
 
 Public data of each operation is padded to 15 bytes + 1 byte for optype.
 
-### Circuit code
-
-```
-current_root := state_merkle_root
-for tx in transactions:
-    check_merkle_path(leaf_index, leaf)
-    
-```
-
 ### Circuit operations
 
-- **0. transfer**
+#### transfer
     - operator will either deposit into an existing account or create a new one
     - pub data: (amount: 3, token: 1, from_account: 3, to_account: 3, fee: 1): 11 bytes
     - check sig1(optype, from_account, to_account, token, amount, fee, nonce)
     - ignore other signatures
 
-- **1. create subaccount**
+#### create_subaccount
     - subaccounts are used for both order or state channels
     - order/state channel conditions are signed and sent to the TEC offchain
     - pub data: (account: 3, subaccount: 1, amount: 3, token: 1, cosigner_fee: 2, cosigner_account: 3, fee: 1): 14 bytes
     - check sig1(optype, account, nonce, subaccount, token_type, amount, fee) against account pub key
     - ignore other signatures
 
-- **2. close subaccount**
+#### close_subaccount
     - cooperative closing; if co-signer doesn't cooperate, resolution via priority queue + escalation
     - pub data: (account: 3, subaccount: 1, cosigner_balance: 3): 7 bytes
     - check sig1(optype, account, subaccount, creation_nonce, subaccount_nonce) against either co-signer pubkey, or, after expiration, against account pub key
@@ -290,7 +281,7 @@ for tx in transactions:
     - ignore other signatures
     - cosigner_balance is sent to the co-signer, the rest is sent to the account owner, subaccount leaf is cleared
 
-- **3. execute order**
+#### execute_order
     - partial or full execution of an order against another order
     - requires signatures of co-signers of both orders as TEC (trade execution coordinators)
     - order amount is updated, receiving amount is accrued to the user account directly
@@ -300,16 +291,16 @@ for tx in transactions:
     - check sig3(optype, account1, subaccount1, subaccount1_nonce, transfer_amount12, transfer_amount21, fee1) against cosigner1_pubkey
     - check sig4(same for account 2) against cosigner2_pubkey
 
-- **4. subaccount transfer**
+#### subaccount_transfer
     - pub data: (account: 3, subaccount: 1, to_account: 3, amount: 3, fee: 1)
     - tbd
 
-- **5. update nonce**
+#### update_nonce
     - pub data: (account: 3, subaccount: 1, nonce: 2, fee: 1) -- if nonce in pub data is 0, subaccount nonce is incremented
     - tbd
 
 # Todo / Questions
 
-- subaccounts for everything (0 is default)
-- sign(amount = 0) authorizes full transfer
-- bitmask: allow to transfer (Brecht)
+- subaccounts for everything (0 is default)?
+- sign(amount = 0) authorizes full transfer?
+- bitmask: explicit control of transfer permission for subaccounts (by Brecht)?
