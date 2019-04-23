@@ -126,7 +126,11 @@ for tx in transactions: # iterate through witness
 
     # running hash: ignoring padding transactions
 
-    running_hash := optype == 'padding' ? running_hash : accumulate(running_hash, tx.pubdata)
+    running_hash := 
+        if optype == 'padding':
+            running_hash 
+        else:
+            accumulate(running_hash, tx.pubdata)
 
     # initialize variables from witness
 
