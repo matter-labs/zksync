@@ -157,10 +157,12 @@ for tx in transactions: # iterate through witness
 
     # check carry from previous transaction
 
-    carry_valid := carry == false or optype=='deposit_from' # carry only allowed to be set for deposits
+    carry_valid := carry == 0 or optype=='deposit_from' # carry only allowed to be set for deposits
     enforce carry_valid
 
-    (amount, fee, pubkey_hash) = carry
+    if carry:
+        (amount, fee, pubkey_hash) = carry
+        
     carry = 0
 
     # check signature
