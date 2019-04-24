@@ -92,6 +92,7 @@ Verification:
 - Signature check in circuit is ignored
 
 Comments:
+- This operation is needed to force validators to exit a single account via a priority queue
 - Account leaf and the subtree is cleared
 - `account_subtree_hash` is stored in the smart contract and requires another SNARK transaction to withdraw individual balances (tbd)
 
@@ -268,6 +269,15 @@ enforce current_root == new_state_root
 enforce running_hash == pubdata_hash
 
 ```
+
+## Full exit circuit
+
+This circuit can be used by individual users only when the network enters a terminal recovery mode. It contains a single full exit operation for a single account.
+
+|Pub data|Total size|
+|--------|----------|
+|account: 3, token0_balance: 3, token1_balance: 3, ...|3*257 bytes|
+
 
 ## Main circuit
 
