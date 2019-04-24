@@ -8,14 +8,22 @@ use helpers::*;
 pub struct EventsFranklin {
     pub committed_blocks: Vec<LogBlockData>,
     pub verified_blocks: Vec<LogBlockData>,
+    pub network: InfuraEndpoint
 }
 
 impl EventsFranklin {
-    pub fn new() -> Self {
+    pub fn new(network: InfuraEndpoint) -> Self {
         let this = Self {
             committed_blocks: vec![],
-            verified_blocks: vec![]
+            verified_blocks: vec![],
+            network: network
         };
+        this
+    }
+
+    pub fn subscribe_on_network(network: InfuraEndpoint) -> Self {
+        let mut this = EventsFranklin::new(network);
+        this.subscribe_to_logs();
         this
     }
 
@@ -33,15 +41,15 @@ impl EventsFranklin {
         self.verified_blocks.clone()
     }
 
-    pub fn subscribe_to_logs(&mut self, on: InfuraEndpoint) {
+    fn subscribe_to_logs(&mut self) {
         // Websocket Endpoint
-        let enpoint = match on {
+        let enpoint = match self.network.clone() {
             InfuraEndpoint::Mainnet => "wss://mainnet.infura.io/ws",
             InfuraEndpoint::Rinkeby => "wss://rinkeby.infura.io/ws",
         };
 
         // Contract address
-        let franklin_address: Address = match on {
+        let franklin_address: Address = match self.network.clone() {
             InfuraEndpoint::Mainnet => "fddb8167fef957f7cc72686094fac1d31be5ecfe",
             InfuraEndpoint::Rinkeby => "fddb8167fef957f7cc72686094fac1d31be5ecfe",
         }.parse().unwrap();
