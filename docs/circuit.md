@@ -278,7 +278,6 @@ This circuit can be used by individual users only when the network enters a term
 |--------|----------|
 |account: 3, token0_balance: 3, token1_balance: 3, ...|3*257 bytes|
 
-
 ## Main circuit
 
 Each operation in the circuit requires:
@@ -369,3 +368,5 @@ tbd
 - subaccounts for everything (0 is default): transfers from anything to anything?
 - sign(amount = 0) authorizes transfer of the entire balance?
 - bitmask: explicit control of transfer permission for subaccounts (by Brecht)?
+- commit-reveal against frontrunning?
+- expiration for subaccounts
