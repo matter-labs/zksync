@@ -6,6 +6,6 @@ extern crate tiny_keccak;
 extern crate tokio_core;
 
 pub mod events;
-pub mod web3_transactions;
+pub mod franklin_transaction;
 pub mod blocks;
 pub mod helpers;
