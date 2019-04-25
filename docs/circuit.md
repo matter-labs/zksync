@@ -15,7 +15,9 @@ Full Merkle tree height: 33.
 
 Token type is determined by the index in the balance tree.
 
-## Pub data structure
+## Pub data 
+
+### Structure
 
 Public data is represented by a byte string with concatenated pub data of the transaction. Each pub data set is prefixed with a single byte of the type of operation.
 
@@ -25,101 +27,13 @@ Public data of each operation is padded to the maximum pub data size of the circ
 
 The size of pub data members is indicated in bytes. Pubkeys in pub data are represented by Pedersen hashes truncated to 160 bits.
 
-## Funding circuit
+### By operation
 
-Each operation in the circuit requires:
-- 2 Merkle path proof checks of height 33
-- 1 signature check
+<iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSkeWuuUH7G8MlVJYlI4O3-TgOP8mw8SuRHlDA3DuqSzccp9Z3sK4Mp7rE3FLjk3L8sqNRQKHCcsc2y/pubhtml?gid=0&amp;single=true&amp;widget=true&amp;headers=false"></iframe>
 
-Public data of each operation is padded to 28 bytes.
+([edit here](https://docs.google.com/spreadsheets/d/1ejK1MJfVehcwjgjVDFD3E2k1EZ7auqbG_y0DKidS9nA/edit?usp=drive_open&ouid=102923468016872611309))
 
-### Circuit operations
-
-#### padding (optype = 0)
-
-Phony operation for block padding.
-
-|Pub data|Total size|
-|--------|----------|
-|        | 0 bytes  |
-
-Comments:
-- Optype must qual 0 so that padding can efficiently be added to the pub data before hashing in the smart contract.
-
-#### deposit
-
-Create an account and deposit a balance into it.
-
-|Pub data|Total size|
-|--------|----------|
-|account: 3, token: 1, amount: 3, pubkey_hash: 20, fee: 1| 28 bytes|
-
-Verification:
-- User initiates a deposit by a transaction on the root chain which creates a deposit queue entry
-- Public data for the transaction is checked by the smart contract against the deposit queue
-- Signature check in circuit is ignored
-
-#### deposit_from
-
-Same as deposit, but requires the operation before to be `transfer_to_new`, and balance is taken from an existing account rather than root chain.
-
-#### transfer_to_new
-
-Create a new account and transfer some balance into it from an existing one.
-
-|Pub data|Total size|
-|--------|----------|
-|account: 3, token: 1| 4 bytes|
-
-Verification:
-- Owner of existing account signs (optype, account, token, nonce, amount, fee, pubkey_hash)
-- Requires the subsequent operation to be `deposit`
-
-Comments:
-- Splitting into `transfer_to_new` and `deposit_from` operations is necessary because for each operation in this circuit we only update one account/balance leaf in the tree.
-
-#### full_exit
-
-Initiate full exit of all account assets to the root chain and clear the account.
-
-|Pub data|Total size|
-|--------|----------|
-|account: 3, subtree_root: 20| 8 bytes|
-
-Verification:
-- User initiates a full exit by a transaction on the root chain which creates an exit queue entry
-- Public data for the transaction is checked by the smart contract against the exit queue
-- Signature check in circuit is ignored
-
-Comments:
-- This operation is needed to force validators to exit a single account via a priority queue
-- Account leaf and the subtree is cleared
-- `account_subtree_hash` is stored in the smart contract and requires another SNARK transaction to withdraw individual balances (tbd)
-
-#### partial_exit
-
-Withdraw part of a particular token balance to the mainchain.
-
-|Pub data|Total size|
-|--------|----------|
-|account: 3, token: 1, amount: 3, fee: 1|8 bytes|
-
-Verification:
-- Account owner signs (optype, account, token, leaf_nonce, amount, fee)
-
-#### escalation
-
-Resolve state channel conflict by a smart contract on the mainnet.
-
-|Pub data|Total size|
-|--------|----------|
-|account: 3, subaccount: 1, creation_nonce: 2, subaccount_nonce: 2| 26 bytes|
-
-Verification:
-- Either account owner or the co-signer signs (optype, account, subaccount, creation_nonce)
-
-
-### Circuit code
+## Main circuit code
 
 ```python
 
@@ -162,7 +76,7 @@ for tx in transactions: # iterate through witness
 
     if carry:
         (amount, fee, pubkey_hash) = carry
-        
+
     carry = 0
 
     # check signature
@@ -272,23 +186,74 @@ enforce running_hash == pubdata_hash
 
 ```
 
-## Full exit circuit
-
-This circuit can be used by individual users only when the network enters a terminal recovery mode. It contains a single full exit operation for a single account.
-
-|Pub data|Total size|
-|--------|----------|
-|account: 3, token0_balance: 3, token1_balance: 3, ...|3*257 bytes|
-
-## Main circuit
+## Main circuit ops
 
 Each operation in the circuit requires:
-- 4 Merkle path proof checks of height 33
-- 4 signature checks
+- 2 Merkle path proof checks of height 33
+- 1 signature check
 
-Public data of each operation is padded to 16 bytes.
+Public data of each operation is padded to 28 bytes.
 
 ### Circuit operations
+
+#### padding (optype = 0)
+
+Phony operation for block padding.
+
+Comments:
+- Optype must qual 0 so that padding can efficiently be added to the pub data before hashing in the smart contract.
+
+#### deposit
+
+Create an account and deposit a balance into it.
+
+Verification:
+- User initiates a deposit by a transaction on the root chain which creates a deposit queue entry
+- Public data for the transaction is checked by the smart contract against the deposit queue
+- Signature check in circuit is ignored
+
+#### deposit_from
+
+Same as deposit, but requires the operation before to be `transfer_to_new`, and balance is taken from an existing account rather than root chain.
+
+#### transfer_to_new
+
+Create a new account and transfer some balance into it from an existing one.
+
+Verification:
+- Owner of existing account signs (optype, account, token, nonce, amount, fee, pubkey_hash)
+- Requires the subsequent operation to be `deposit`
+
+Comments:
+- Splitting into `transfer_to_new` and `deposit_from` operations is necessary because for each operation in this circuit we only update one account/balance leaf in the tree.
+
+#### full_exit
+
+Initiate full exit of all account assets to the root chain and clear the account.
+
+Verification:
+- User initiates a full exit by a transaction on the root chain which creates an exit queue entry
+- Public data for the transaction is checked by the smart contract against the exit queue
+- Signature check in circuit is ignored
+
+Comments:
+- This operation is needed to force validators to exit a single account via a priority queue
+- Account leaf and the subtree is cleared
+- `account_subtree_hash` is stored in the smart contract and requires another SNARK transaction to withdraw individual balances (tbd)
+
+#### partial_exit
+
+Withdraw part of a particular token balance to the mainchain.
+
+Verification:
+- Account owner signs (optype, account, token, leaf_nonce, amount, fee)
+
+#### escalation
+
+Resolve state channel conflict by a smart contract on the mainnet.
+
+Verification:
+- Either account owner or the co-signer signs (optype, account, subaccount, creation_nonce)
 
 #### transfer
 
@@ -364,6 +329,10 @@ Comments:
 - if nonce in pub data is 0, subaccount nonce is incremented
 
 tbd
+
+## Full exit circuit
+
+This circuit can be used by individual users only when the network enters a terminal recovery mode. It contains a single full exit operation for a single account.
 
 # Todo / Questions
 
