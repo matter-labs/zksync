@@ -163,7 +163,7 @@ def execute_op(op, cur, lhs, rhs, pubdata, last_chunk):
         # pubdata contains correct data from both branches, so we verify it agains `lhs` and `rhs`
         and pubdata == (lhs.account, lhs.leaf_index, lhs.amount, cur.pubkey_hash, rhs.account, rhs.fee)
 
-        # sender signed the same recepient pubkey of which the hash passed to public data
+        # sender signed the same recepient pubkey of which the hash was passed to public data
         and lhs.pubkey == rhs.pubkey
 
         # leaf of the new account is empty
@@ -218,7 +218,7 @@ def execute_op(op, cur, lhs, rhs, pubdata, last_chunk):
 
     enforce tx_valid
 
-    # updating the state is done by modifying data in `cur` branch
+    # updating the state is done by modifying data in the `cur` branch
 
     if transfer_to_new_lhs:
         cur.leaf_balance = cur.leaf_balance - (op.args.amount + op.args.fee)
