@@ -8,6 +8,8 @@ def circuit:
     prev.lhs := { 0, ... } 
     prev.rhs := { 0, ... } 
     prev.chunk := 0
+    prev.new_root := 0
+    last_chunk := true
 
     for op in operations:
 
@@ -26,12 +28,21 @@ def circuit:
             'transfer' => 2,
             # ...
         enforce op.chunk < max_chunks # 4 constraints
+        last_chunk = op.chunk == max_chunks-1 # flag to mark the last op chunk
 
-        # enforce that previous chunk had exactly the same inputs
+        # enforce that all chunks share the same witness:
+        #   - `args` for the op arguments
+        #   - `lhs` and `rhs` for data of leaves involved in the operation
+        #   - `new_root` of the state after the op is applied
 
         correct_inputs := 
             op.chunk == 0 # skip check for the first chunk
-            or (prev.lhs == op.lhs and prev.rhs == op.rhs) # NOTE: need a gadget for logical equality which works with structs
+            or (
+                prev.args == op.args and 
+                prev.lhs == op.lhs and 
+                prev.rhs == op.rhs and
+                prev.new_root == op.new_root
+            ) # NOTE: need a gadget for logical equality which works with structs
         enforce correct_inputs
 
         # accumulate running sha256 hash: `op.pubdata_chunk` is always 8 bytes long
@@ -45,159 +56,198 @@ def circuit:
                     else:
                         pubdata << 8 + op.pubdata_chunk
 
-        # determine the Merkle branch side (0 for LHS, 1 for RHS) and set variables for current Merkle branch
+        # determine the Merkle branch side (0 for LHS, 1 for RHS) and set variables for the current Merkle branch
 
         current_side := if op.type == 'deposit': LHS; else: op.chunk
-        current := if current_side == LHS: lhs; else: rhs # NOTE: need a gadget for conditional swap applied to each struct member
+        cur := if current_side == LHS: lhs; else: rhs # NOTE: need a gadget for conditional swap applied to each struct member
 
-        # build hashes
+        # build hashes for data in the current branch
 
-        pubkey_hash := hash(current.pubkey) # some pubkey, we will see which one later
-        cosigner_pubkey_hash := hash(current.cosigner_pubkey)
+        cur.pubkey_hash := hash(cur.pubkey) # some pubkey, we will see which one later
+        cur.cosigner_pubkey_hash := hash(cur.cosigner_pubkey)
 
         # check Merkle paths before operation begins
 
-        enforce current.leaf_is_token is boolean
-        full_leaf_index := current.leaf_is_token << 8 + current.leaf_index
+        enforce cur.leaf_is_token is boolean
+        full_leaf_index := cur.leaf_is_token << 8 + cur.leaf_index
 
-        subtree_root := merkle_root(
+        cur.subtree_root := merkle_root(
             index = full_leaf_index,
             witness = subtree_witness,
-            leaf_data = (current.leaf_balance, current.leaf_nonce, current.creation_nonce, current.cosigner_pubkey_hash, current.cosigner_balance, current.token))
+            leaf_data = (cur.leaf_balance, cur.leaf_nonce, cur.creation_nonce, cur.cosigner_pubkey_hash, cur.cosigner_balance, cur.token))
         
         root := merkle_root(
-            index = current.account, 
+            index = cur.account, 
             witness = account_witness,
-            leaf_data = hash(current.owner_pub_key, subtree_root, current.account_nonce))
+            leaf_data = hash(cur.owner_pub_key, subtree_root, cur.account_nonce))
 
         enforce root == current_root
 
-        # check validity and perform state updates by modifying `current` struct
+        # check validity and perform state updates by modifying `cur` struct
 
-        execute_op(op, current, current_side, pubkey_hash, cosigner_pubkey_hash, pubdata)
+        execute_op(op, cur, lhs, rhs, pubdata, last_chunk)
 
         # check final Merkle paths after applying the operation
 
         subtree_root := merkle_root(
             index = full_leaf_index,
             witness = subtree_witness,
-            leaf_data = (current.leaf_balance, current.leaf_nonce, current.creation_nonce, current.cosigner_pubkey_hash, current.cosigner_balance, current.token))
+            leaf_data = (cur.leaf_balance, cur.leaf_nonce, cur.creation_nonce, cur.cosigner_pubkey_hash, cur.cosigner_balance, cur.token))
 
-        # here we check intersection, therefore updated account hashes must be provided via witness
+        new_hash = hash(cur.owner_pub_key, cur.subtree_root, cur.account_nonce)
+        enforce cur.new_hash == new_hash # NOTE: we check intersection below, therefore updated account hashes must be provided via witness
 
-        new_hash = hash(current.owner_pub_key, subtree_root, current.account_nonce)
-        enforce current.new_hash == new_hash
-
-        root := merkle_root(
-            index = current.account, 
+        new_root := merkle_root(
+            index = cur.account, 
             witness = intersection(account_witness, lhs.account, rhs.account, lhs.new_hash, rhs.new_hash, current_side),
             leaf_data = new_hash)
+
+        # verify and update root on last chunk
+
+        enforce new_root == op.new_root # NOTE: we already enforced above that `op.new_root` remains unchanged for all chunks
+
+        if last_chunk:
+            current_root = new_root
         
         # update `prev` references
 
         prev.rhs = op.rhs # NOTE: need a gadget to copy struct members one by one
         prev.lhs = op.lhs
+        prev.args = op.args
+        prev.new_root = op.new_root
         prev.chunk = op.chunk
 
     # final checks
 
     enforce current_root == new_state_root
     enforce running_hash == pubdata_hash
-    # TODO: check that chunks are closed
+    enforce last_chunk
 
 
-def execute_op(op, current, current_side, pubkey_hash, cosigner_pubkey_hash, pubdata):
+def execute_op(op, cur, lhs, rhs, pubdata, last_chunk):
 
-    # range checks
+    # range checks: no need to check overflow for `amount + fee` because their bitsize is enforced via sha256 running hash
 
-    subtractable := amount <= leaf_balance
-
-    # check carry from previous transaction
-
-    carry_valid := carry == 0 or optype=='deposit_from' # carry only allowed to be set for deposits
-    enforce carry_valid
-
-    if carry:
-        (amount, fee, pubkey_hash) = carry
-
-    carry = 0
+    subtractable := (op.args.amount + op.args.fee) <= cur.leaf_balance and op.args.amount >= op.args.fee
 
     # check signature
 
-    check_sig(tx.sig_msg, tx.signer_pubkey) # must always be valid, but msg and signer can be phony
+    check_sig(cur.sig_msg, cur.signer_pubkey) # must always be valid, but msg and signer can be phony
+    
+    # transfer_to_new validation is split into lhs and rhs; pubdata is combined from both branches
 
-    # validate operations
+    transfer_to_new_lhs :=
+        op.type == 'transfer_to_new'
 
-    deposit_valid := 
-        (optype == 'deposit' or optype == 'deposit_from') and
-        pubdata == (tx.account, tx.leaf_index, tx.amount, pubkey_hash, tx.fee) and
-        (owner_pub_key, subtree_root, account_nonce) == EMPTY_ACCOUNT and
-        leaf_is_token
+        # here we process the first chunk
+        and op.chunk == 0
 
-    transfer_to_new_valid := 
-        optype == 'transfer_to' and
-        pubdata == (tx.account, tx.leaf_index) and
+        # sender is using a token balance, not subaccount
+        and lhs.leaf_is_token
+
+        # sender authorized spending and recepient
+        and lhs.sig_msg == ('transfer_to_new', lhs.account, lhs.leaf_index, lhs.account_nonce, op.args.amount, op.args.fee, cur.pubkey_hash)
+
+        # sender is account owner
+        and lhs.signer_pubkey == cur.owner_pub_key
+
+        # sender has enough balance
+        and subtractable
+
+    transfer_to_new_rhs := 
+        op.type == 'transfer_to_new'
+
+        # here we process the second (last) chunk
+        and op.chunk == 1
+
+        # pubdata contains correct data from both branches, so we verify it agains `lhs` and `rhs`
+        and pubdata == (lhs.account, lhs.leaf_index, lhs.amount, cur.pubkey_hash, rhs.account, rhs.fee)
+
+        # sender signed the same recepient pubkey of which the hash passed to public data
+        and lhs.pubkey == rhs.pubkey
+
+        # leaf of the new account is empty
+        and (rhs.owner_pub_key, rhs.subtree_root, rhs.account_nonce) == EMPTY_ACCOUNT
+
+        # deposit into a token balance, not subaccount
+        and rhs.leaf_is_token
+
+    # following operations are of 1 chunk, so `lhs` and `rhs` are not used since we only need to check data in the current branch
+
+    ignore_pubdata := not last_chunk
+    deposit := 
+        (op.type == 'deposit' or op.type == 'deposit_from') and
+        (ignore_pubdata or pubdata == (cur.account, cur.leaf_index, args.amount, cur.pubkey_hash, args.fee)) and
+        (cur.account_pubkey, cur.subtree_root, cur.account_nonce) == EMPTY_ACCOUNT and
+        cur.leaf_is_token
+
+    full_exit :=
+        op.type == 'full_exit' and
+        pubdata == (cur.account, cur.subtree_root)
+
+    partial_exit := 
+        op.type == 'partial_exit' and
+        pubdata == (cur.account, cur.leaf_index, op.args.amount, op.args.fee) and
         subtractable and
-        leaf_is_token and
-        deposit_valid and # same checks as for deposit operation
-        sig_msg == ('transfer_to_new', tx.account, leaf_index, account_nonce, tx.amount, tx.fee, pubkey_hash) and
-        signer_pubkey == tx.owner_pub_key
+        cur.leaf_is_token and
+        cur.sig_msg == ('partial_exit', cur.account, cur.leaf_index, cur.account_nonce, cur.amount, cur.fee) and
+        cur.signer_pubkey == cur.owner_pub_key
 
-    full_exit_valid :=
-        optype == 'full_exit' and
-        pubdata == (tx.account, tx.subtree_root)
+    escalation := 
+        op.type == 'escalation' and
+        pubdata == (cur.account, cur.leaf_index, cur.creation_nonce, cur.leaf_nonce) and
+        not cur.leaf_is_token and
+        cur.sig_msg == ('escalation', cur.account, cur.leaf_index, cur.creation_nonce) and
+        (cur.signer_pubkey == cur.owner_pub_key or cur.signer_pubkey == cosigner_pubkey)
 
-    partial_exit_valid := 
-        optype == 'partial_exit' and
-        pubdata == (tx.account, tx.leaf_index, tx.amount, tx.fee) and
-        subtractable and
-        leaf_is_token and
-        sig_msg == ('partial_exit', tx.account, tx.leaf_index, account_nonce, tx.amount, tx.fee) and
-        signer_pubkey == tx.owner_pub_key
+    # noop is always valid, as long as it is a noop! :)
 
-    escalation_valid := 
-        optype == 'escalation' and
-        pubdata == (tx.account, leaf_index, creation_nonce, leaf_nonce) and
-        not leaf_is_token and
-        sig_msg == ('escalation', tx.account, leaf_index, creation_nonce) and
-        (signer_pubkey == tx.owner_pub_key or signer_pubkey == cosigner_pubkey)
+    noop := 
+        op.type == 'noop'
 
-    padding_valid := 
-        optype == 'padding'
+    # one of the operations MUST be valid
 
     tx_valid := 
-        deposit_valid or
-        transfer_to_new_valid or
-        full_exit_valid or
-        partial_exit_valid or
-        escalation_valid or
-        padding_valid
+        deposit or
+        transfer_to_new_lhs or 
+        transfer_to_new_rhs or
+        full_exit or
+        partial_exit or
+        escalation or
+        padding
 
     enforce tx_valid
 
-    # update state
+    # updating the state is done by modifying data in `cur` branch
 
-    # NOTE: `if conditon: x = y` is implemented as a binary switch: `x = condition ? y : x`
+    if transfer_to_new_lhs:
+        cur.leaf_balance = cur.leaf_balance - (op.args.amount + op.args.fee)
+        cur.account_nonce = cur.account_nonce + 1
 
-    if deposit_valid:
-        leaf_balance = leaf_balance
+    if transfer_to_new_rhs:
+        cur.leaf_balance = op.args.amount - op.args.fee
 
-    if transfer_to_new_valid:
-        leaf_balance = leaf_balance - amount
-        account_nonce = account_nonce + 1
-        carry = (amount, fee, pubkey_hash)
+    if deposit:
+        cur.leaf_balance = op.args.amount - op.args.fee
 
-    if full_exit_valid:
-        owner_pub_key = 0
-        account_nonce = 0
-        subtree_root  = EMPTY_TREE_ROOT
+    if full_exit:
+        cur.owner_pub_key = 0
+        cur.account_nonce = 0
+        cur.subtree_root  = EMPTY_TREE_ROOT
 
-    if partial_exit_valid:
-        leaf_balance = leaf_balance - amount
-        account_nonce = leaf_nonce + 1
+        # we also need to clear the balance leaf #0 passed as witness so that subtree_root check passes
+        cur.leaf_balance = 0
+        cur.leaf_nonce = 0
+        cur.creation_nonce = 0
+        cur.cosigner_pubkey_hash = EMPTY_HASH
 
-    if escalation_valid:
-        leaf_balance = 0
-        leaf_nonce = 0
-        creation_nonce = 0
-        cosigner_pubkey_hash = EMPTY_HASH
+    if partial_exit:
+        cur.leaf_balance = cur.leaf_balance - (op.args.amount + op.args.fee)
+        cur.account_nonce = cur.leaf_nonce + 1
+
+    if escalation:
+        cur.leaf_balance = 0
+        cur.leaf_nonce = 0
+        cur.creation_nonce = 0
+        cur.cosigner_pubkey_hash = EMPTY_HASH
+
