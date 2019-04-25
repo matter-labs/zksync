@@ -29,9 +29,7 @@ The size of pub data members is indicated in bytes. Pubkeys in pub data are repr
 
 ### By operation
 
-<iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSkeWuuUH7G8MlVJYlI4O3-TgOP8mw8SuRHlDA3DuqSzccp9Z3sK4Mp7rE3FLjk3L8sqNRQKHCcsc2y/pubhtml?gid=0&amp;single=true&amp;widget=true&amp;headers=false"></iframe>
-
-([edit here](https://docs.google.com/spreadsheets/d/1ejK1MJfVehcwjgjVDFD3E2k1EZ7auqbG_y0DKidS9nA/edit?usp=drive_open&ouid=102923468016872611309))
+([See table here](https://docs.google.com/spreadsheets/d/1ejK1MJfVehcwjgjVDFD3E2k1EZ7auqbG_y0DKidS9nA/edit?usp=drive_open&ouid=102923468016872611309))
 
 ## Main circuit code
 
