@@ -408,7 +408,7 @@ def create_subaccount(op, cur, computed):
     return lhs_valid or rhs_valid
 
 def close_subaccount(op, cur, computed):
-    # tbd
+    # tbd: similar to create_subaccount()
 
 def fill_orders(op, cur, computed):
     # tbd
