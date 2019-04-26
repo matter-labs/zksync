@@ -151,7 +151,7 @@ def accumulate_pubdata(op, computed):
 
 # determine the Merkle branch side (0 for LHS, 1 for RHS) and set `cur` for the current Merkle branch
 def select_branch(op, computed):
-    current_side := if op.type == 'deposit': LHS; else: op.chunk
+    current_side := if op.tx_type == 'deposit': LHS; else: op.chunk
 
     # TODO: need a gadget for conditional swap applied to each struct member:
     cur := 
@@ -197,7 +197,7 @@ def execute_op(op, cur, computed):
     op_valid = op_valid or full_exit(op, cur, computed)
     op_valid = op_valid or partial_exit(op, cur, computed)
     op_valid = op_valid or escalation(op, cur, computed)
-    op_valid = op_valid or op.type == 'noop'
+    op_valid = op_valid or op.tx_type == 'noop'
 
     # `op` MUST be one of the operations and MUST be valid
 
@@ -208,7 +208,7 @@ def transfer_to_new(op, cur, computed):
     # transfer_to_new validation is split into lhs and rhs; pubdata is combined from both branches
 
     transfer_to_new_lhs :=
-        op.type == 'transfer_to_new'
+        op.tx_type == 'transfer_to_new'
 
         # here we process the first chunk
         and op.chunk == 0
@@ -217,7 +217,7 @@ def transfer_to_new(op, cur, computed):
         and lhs.leaf_is_token
 
         # sender authorized spending and recepient
-        and lhs.sig_msg == ('transfer_to_new', lhs.account, lhs.leaf_index, lhs.account_nonce, op.args.amount_packed, op.args.fee_packed, cur.new_pubkey_hash)
+        and lhs.sig_msg == hash('transfer_to_new', lhs.account, lhs.leaf_index, lhs.account_nonce, op.args.amount_packed, op.args.fee_packed, cur.new_pubkey)
 
         # sender is account owner
         and lhs.signer_pubkey == cur.owner_pub_key
@@ -232,7 +232,7 @@ def transfer_to_new(op, cur, computed):
         cur.account_nonce = cur.account_nonce + 1
 
     transfer_to_new_rhs := 
-        op.type == 'transfer_to_new'
+        op.tx_type == 'transfer_to_new'
 
         # here we process the second (last) chunk
         and op.chunk == 1
@@ -261,7 +261,7 @@ def transfer_to_new(op, cur, computed):
 def deposit(op, cur, computed):
     ignore_pubdata := not last_chunk
     deposit := 
-        op.type == 'deposit'
+        op.tx_type == 'deposit'
         and (ignore_pubdata or pubdata == (cur.account, cur.leaf_index, args.compact_amount, cur.new_pubkey_hash, args.fee))
         and (cur.account_pubkey, cur.subtree_root, cur.account_nonce) == EMPTY_ACCOUNT
         and cur.leaf_is_token
@@ -275,7 +275,7 @@ def deposit(op, cur, computed):
 
 def full_exit(op, cur, computed):
     full_exit :=
-        op.type == 'full_exit'
+        op.tx_type == 'full_exit'
         and pubdata == (cur.account, cur.subtree_root)
 
     if full_exit:
@@ -294,7 +294,7 @@ def full_exit(op, cur, computed):
 
 def partial_exit(op, cur, computed):
     partial_exit := 
-        op.type == 'partial_exit'
+        op.tx_type == 'partial_exit'
         and computed.compact_amount_correct
         and pubdata == (op.tx_type, cur.account, cur.leaf_index, op.args.amount, op.args.fee)
         and subtractable
@@ -311,7 +311,7 @@ def partial_exit(op, cur, computed):
 
 def escalation(op, cur, computed):
     escalation := 
-        op.type == 'escalation'
+        op.tx_type == 'escalation'
         and pubdata == (op.tx_type, cur.account, cur.leaf_index, cur.creation_nonce, cur.leaf_nonce)
         and not cur.leaf_is_token
         and cur.sig_msg == ('escalation', cur.account, cur.leaf_index, cur.creation_nonce)
@@ -324,3 +324,57 @@ def escalation(op, cur, computed):
         cur.cosigner_pubkey_hash = EMPTY_HASH
     
     return escalation
+
+def transfer(op, cur, computed):
+
+    transfer_lhs :=
+        op.tx_type == 'transfer'
+        and op.chunk == 0
+        and cur.leaf_is_token
+        and lhs.sig_msg == ('transfer', lhs.account, lhs.leaf_index, lhs.account_nonce, op.args.amount_packed, op.args.fee_packed, rhs.account_pubkey)
+        and lhs.signer_pubkey == cur.owner_pub_key
+        and computed.subtractable and (op.a == cur.leaf_balance) and (op.b == (op.args.amount + op.args.fee) )
+
+    if transfer_lhs:
+        cur.leaf_balance = cur.leaf_balance - (op.args.amount + op.args.fee)
+        cur.account_nonce = cur.account_nonce + 1
+
+    transfer_rhs := 
+        op.tx_type == 'transfer'
+        and op.chunk == 1
+        and pubdata == (op.tx_type, lhs.account, lhs.leaf_index, op.args.amount, rhs.account, op.args.fee)
+        and cur.leaf_is_token
+
+    if transfer_rhs:
+        cur.leaf_balance = op.args.amount
+
+    return transfer_lhs or transfer_rhs
+
+# Subaccount operations
+
+def create_subaccount(op, cur, computed):
+
+    # on the LHS we have cosigner, no need to do anything; so we only process the RHS here
+
+    # tx_valid :=
+    #     op.tx_type == 'create_subaccount'
+    #     and op.chunk == 1
+    #     and cur.leaf_is_token
+    #     and lhs.sig_msg == ('create_subaccount', lhs.account, lhs.leaf_index, lhs.account_nonce, op.args.amount_packed, op.args.fee_packed, rhs.account_pubkey)
+    #     and lhs.signer_pubkey == cur.owner_pub_key
+    #     and computed.subtractable and (op.a == cur.leaf_balance) and (op.b == (op.args.amount + op.args.fee) )
+
+    # if tx_valid:
+    #     cur.leaf_balance = cur.leaf_balance - (op.args.amount + op.args.fee)
+    #     cur.account_nonce = cur.account_nonce + 1
+
+    # rhs_valid := 
+    #     op.tx_type == 'create_subaccount'
+    #     and op.chunk == 1
+    #     and pubdata == (op.tx_type, lhs.account, lhs.leaf_index, op.args.amount, rhs.account, op.args.fee)
+    #     and cur.leaf_is_token
+
+    # if rhs_valid:
+    #     cur.leaf_balance = op.args.amount
+
+    # return lhs_valid or rhs_valid
