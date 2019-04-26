@@ -28,7 +28,7 @@ struct cur:             # current Merkle branch data
 struct computed:
     last_chunk:         # bool: whether the current chunk is the last one in sequence
     pubdata:            # pubdata accumulated over all chunks
-    subtractable:       # wheather a >= b
+    range_checked:       # bool: ensures that a >= b
     new_pubkey_hash:    # hash of the new pubkey, truncated to 20 bytes (used only for deposits)
 
 
@@ -182,9 +182,9 @@ def check_account_data(op, cur, computed, check_intersection):
 # verify operation and execute state updates
 def execute_op(op, cur, computed):
 
-    # universal range check; a and b are different depending on the op
+    # universal range check
 
-    computed.subtractable := op.a >= op.b
+    computed.range_checked := op.a >= op.b
 
     # TODO: check overflow
     # TODO: check nonce overflow
@@ -241,7 +241,7 @@ def transfer_to_new(op, cur, computed):
 
         # sender has enough balance: we checked above that `op.a >= op.b`
         # NOTE: no need to check overflow for `amount + fee` because their bitlengths are enforced]
-        and computed.subtractable and (op.a == cur.balance) and (op.b == (op.args.amount + op.args.fee) )
+        and computed.range_checked and (op.a == cur.balance) and (op.b == (op.args.amount + op.args.fee) )
 
     # NOTE: updating the state is done by modifying data in the `cur` branch
     if lhs_valid:
@@ -278,9 +278,9 @@ def deposit(op, cur, computed):
     tx_valid := 
         op.tx_type == 'deposit'
         and (ignore_pubdata or pubdata == (cur.account, cur.token, args.compact_amount, cur.new_pubkey_hash, args.fee))
-        and (cur.account_pubkey, cur.subtree_root, cur.account_nonce) == EMPTY_ACCOUNT
+        and cur.is_account_empty
         and computed.compact_amount_correct
-        and computed.subtractable and (op.a == op.args.amount) and (op.b == op.args.fee)
+        and computed.range_checked and (op.a == op.args.amount) and (op.b == op.args.fee)
 
     if tx_valid:
         cur.leaf_balance = op.args.amount - op.args.fee
@@ -299,6 +299,9 @@ def close_account(op, cur, computed):
     
     return tx_valid
 
+def no_nonce_overflow(nonce):
+    nonce_overflow := cur.leaf_nonce == 0x10000-1 # nonce is 2 bytes long
+    return not nonce_overflow
 
 def partial_exit(op, cur, computed):
 
@@ -306,14 +309,15 @@ def partial_exit(op, cur, computed):
         op.tx_type == 'partial_exit'
         and computed.compact_amount_correct
         and pubdata == (op.tx_type, cur.account, cur.token, op.args.amount, op.args.fee)
-        and subtractable and (op.a == cur.balance) and (op.b == (op.args.amount + op.args.fee) )
+        and computed.range_checked and (op.a == cur.balance) and (op.b == (op.args.amount + op.args.fee) )
         and cur.sig_msg == ('partial_exit', cur.account, cur.leaf_index, cur.account_nonce, cur.amount, cur.fee)
         and cur.signer_pubkey == cur.owner_pub_key
+        and no_nonce_overflow(cur.leaf_nonce)
 
     if tx_valid:
         cur.balance = cur.balance - (op.args.amount + op.args.fee)
         cur.account_nonce = cur.leaf_nonce + 1
-    
+        
     return tx_valid
 
 
@@ -338,7 +342,8 @@ def transfer(op, cur, computed):
         and lhs.sig_msg == ('transfer', lhs.account, lhs.token, lhs.account_nonce, op.args.amount_packed, 
             op.args.fee_packed, rhs.account_pubkey)
         and lhs.signer_pubkey == cur.owner_pub_key
-        and computed.subtractable and (op.a == cur.balance) and (op.b == (op.args.amount + op.args.fee) )
+        and computed.range_checked and (op.a == cur.balance) and (op.b == (op.args.amount + op.args.fee) )
+        and no_nonce_overflow(cur.account_nonce)
 
     if lhs_valid:
         cur.balance = cur.balance - (op.args.amount + op.args.fee)
@@ -349,7 +354,7 @@ def transfer(op, cur, computed):
         and op.chunk == 1
         and not cur.account_is_empty
         and pubdata == (op.tx_type, lhs.account, lhs.token, op.args.amount, rhs.account, op.args.fee)
-        # TODO: check overflow
+        and computed.range_checked and (op.a == (cur.balance + op.args.amount) ) and (op.b == cur.balance )
 
     if rhs_valid:
         cur.balance = cur.balance + op.args.amount
@@ -360,10 +365,16 @@ def transfer(op, cur, computed):
 
 def create_subaccount(op, cur, computed):
 
-    # On the LHS we have cosigner, no need to do anything apart from normal Merkle path checks in the main loop; 
-    # So we only process the RHS here
+    # On the LHS we have cosigner, we only use it for a overflow check
 
-    tx_valid :=
+    lhs_valid: = 
+        op.tx_type == 'create_subaccount'
+        and op.chunk == 0
+        and computed.range_checked and (op.a == rhs.balance) and (op.b == (op.args.amount + op.args.fee) )
+
+    # We process everything else on the RHS
+
+    rhs_valid :=
         op.tx_type == 'create_subaccount'
         and op.chunk == 1
         and cur.sig_msg == (
@@ -378,9 +389,10 @@ def create_subaccount(op, cur, computed):
         and cur.signer_pubkey == cur.owner_pub_key
         and cur.subaccount_is_empty
         and pubdata == (op.tx_type, lhs.account, lhs.leaf_index, op.args.amount, rhs.account, op.args.fee)
-        and computed.subtractable and (op.a == cur.balance) and (op.b == (op.args.amount + op.args.fee) )
+        and computed.range_checked and (op.a == (cur.subaccount_balance + op.args.amount) ) and (op.b == cur.subaccount_balance)
+        and no_nonce_overflow(cur.account_nonce)
 
-    if tx_valid:
+    if rhs_valid:
         # initialize subaccount
         cur.subaccount_balance = cur.subaccount_balance + op.args.amount
         cur.creation_nonce = cur.account_nonce
@@ -391,4 +403,4 @@ def create_subaccount(op, cur, computed):
         cur.balance = cur.balance - (op.args.amount + op.args.fee)
         cur.account_nonce = cur.account_nonce + 1
 
-    return tx_valid
+    return lhs_valid or rhs_valid
