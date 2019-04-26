@@ -186,9 +186,6 @@ def execute_op(op, cur, computed):
 
     computed.range_checked := op.a >= op.b
 
-    # TODO: check overflow
-    # TODO: check nonce overflow
-
     # unpack floating point values and hashes
 
     op.args.amount  := unpack(op.args.amount_packed)
@@ -290,9 +287,10 @@ def deposit(op, cur, computed):
 def close_account(op, cur, computed):
     
     tx_valid :=
-        op.tx_type == 'full_exit'
+        op.tx_type == 'close_account'
         and pubdata == (cur.account, cur.subtree_root)
-        # TODO: check user signature
+        and cur.sig_msg == ('close_account', cur.account, cur.leaf_index, cur.account_nonce, cur.amount, cur.fee)
+        and cur.signer_pubkey == cur.owner_pub_key
 
     if tx_valid:
         op.clear_account = True
@@ -310,7 +308,7 @@ def partial_exit(op, cur, computed):
         and computed.compact_amount_correct
         and pubdata == (op.tx_type, cur.account, cur.token, op.args.amount, op.args.fee)
         and computed.range_checked and (op.a == cur.balance) and (op.b == (op.args.amount + op.args.fee) )
-        and cur.sig_msg == ('partial_exit', cur.account, cur.leaf_index, cur.account_nonce, cur.amount, cur.fee)
+        and cur.sig_msg == ('partial_exit', cur.account, cur.token, cur.account_nonce, cur.amount, cur.fee)
         and cur.signer_pubkey == cur.owner_pub_key
         and no_nonce_overflow(cur.leaf_nonce)
 
@@ -380,7 +378,7 @@ def create_subaccount(op, cur, computed):
         and cur.sig_msg == (
             'create_subaccount', 
             cur.account,        # cur = rhs
-            lhs.account_pubkey, # co-signer pubkey on the lhs
+            lhs.account,        # co-signer account on the lhs
             cur.token, 
             cur.account_nonce, 
             op.args.amount_packed, 
@@ -404,3 +402,4 @@ def create_subaccount(op, cur, computed):
         cur.account_nonce = cur.account_nonce + 1
 
     return lhs_valid or rhs_valid
+

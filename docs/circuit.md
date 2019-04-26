@@ -186,3 +186,4 @@ This circuit can be used by individual users only when the network enters a term
 - bitmask: explicit control of transfer permission for subaccounts (by Brecht)?
 - commit-reveal against frontrunning?
 - expiration for subaccounts
+- replay protection after clearing an account: add global creation nonce?
