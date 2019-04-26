@@ -5,29 +5,28 @@
 struct op:
     
     # operation data
-    code:
-    type:
-    chunk:
-    pubdata_chunk:          # 8 bytes long
-    args:
+    tx_type:        # type of transaction, see the list: https://docs.google.com/spreadsheets/d/1ejK1MJfVehcwjgjVDFD3E2k1EZ7auqbG_y0DKidS9nA/edit#gid=0
+    chunk:          # op chunk number (0..3)
+    pubdata_chunk:  # current chunk of the pubdata (always 8 bytes)
+    args:           # arguments for the operation
     
     # Merkle branch data
-    lhs:
-    rhs:
+    lhs:            # left Merkle branch data
+    rhs:            # right Merkle branch data
 
     # precomputed witness:
-    a:
-    b:
-    new_root:
-    account_merkle_path:
-    subtree_merkle_path:
+    a:              # depends on the optype, used for range checks
+    b:              # depends on the optype, used for range checks
+    new_root:       # new state root after the operation is applied
+    account_path:   # Merkle path witness for the account in the current branch
+    subtree_path:   # Merkle path witness for the subtree in the current branch
 
 struct computed:
     last_chunk: bool        # whether the current chunk is the last one in sequence
     pubdata:                # pubdata accumulated over all chunks
     subtractable:           # wheather a >= b
-    new_pubkey_hash:
-    cosigner_pubkey_hash:
+    new_pubkey_hash:        # hash of the new pubkey, truncated to 20 bytes (used only for deposits)
+    cosigner_pubkey_hash:   # hash of the cosigner pubkey in the current branch, truncated to 20 bytes
 
 
 # Circuit functions
@@ -44,8 +43,12 @@ def circuit:
 
     for op in operations:
 
+        # enfore correct bitlentgh for every input in witness
+        # TODO: for this create a macro gadget via struct member annotations
+        enforce_bitlength(op)
+
         enforce_correct_chunking(op, computed)
-        accumulate_sha256((op.code, op.pubdata_chunk))
+        accumulate_sha256(op.pubdata_chunk)
         accumulate_pubdata(op, computed)
 
         # prepare Merkle branch
@@ -58,11 +61,11 @@ def circuit:
 
         cur.subtree_root := merkle_root(
             index = full_leaf_index,
-            witness = op.subtree_merkle_path,
+            witness = op.subtree_path,
             leaf_data = (cur.leaf_balance, cur.leaf_nonce, cur.creation_nonce, computed.cosigner_pubkey_hash, cur.cosigner_balance, cur.token))
         root := merkle_root(
             index = cur.account, 
-            witness = op.account_merkle_path,
+            witness = op.account_path,
             leaf_data = hash(cur.owner_pub_key, cur.subtree_root, cur.account_nonce))
 
         enforce root == current_root
@@ -75,11 +78,11 @@ def circuit:
 
         subtree_root := merkle_root(
             index = full_leaf_index,
-            witness = op.subtree_merkle_path,
+            witness = op.subtree_path,
             leaf_data = (cur.leaf_balance, cur.leaf_nonce, cur.creation_nonce, computed.cosigner_pubkey_hash, cur.cosigner_balance, cur.token))
         new_root := merkle_root(
             index = cur.account,
-            witness = intersection(op.account_merkle_path, lhs.account, rhs.account, lhs.intersection_hash, rhs.intersection_hash, current_side),
+            witness = intersection(op.account_path, lhs.account, rhs.account, lhs.intersection_hash, rhs.intersection_hash, current_side),
             leaf_data = hash(cur.owner_pub_key, cur.subtree_root, cur.account_nonce))
 
         # verify and update root on the last op chunk
@@ -109,25 +112,15 @@ def circuit:
 # make sure that operation chunks are passed correctly
 def enforce_correct_chunking(op, computed):
 
-    # enfore correct bit lentgh for every input in witness
-
-    # TODO: for this create a macro gadget via struct member annotations
-    enforce_bitlength(op)
-
-    # enforce opcode correctness
-
-    enforce op.chunk < 4
-    enforce op.type < 16
-    enforce op.code == op.chunk * 0x10 + op.type
-
     # enforce chunk sequence correctness
 
     enforce (op.chunk == 0) or (op.chunk == prev.chunk + 1) # ensure that chunks come in sequence 
-    max_chunks := switch op.type
-        'deposit' => 4,
-        'transfer_to_new'=> 1,
-        'transfer' => 2,
-        # ...
+    max_chunks := switch op.tx_type
+        deposit => 4,
+        transfer_to_new=> 1,
+        transfer => 2,
+        # ...and so on
+        
     enforce op.chunk < max_chunks # 4 constraints
     computed.last_chunk = op.chunk == max_chunks-1 # flag to mark the last op chunk
 
@@ -239,7 +232,7 @@ def transfer_to_new(op, cur, computed):
         and op.chunk == 1
 
         # pubdata contains correct data from both branches, so we verify it agains `lhs` and `rhs`
-        and pubdata == (lhs.account, lhs.leaf_index, lhs.amount, cur.new_pubkey_hash, rhs.account, rhs.fee)
+        and pubdata == (op.tx_type, lhs.account, lhs.leaf_index, lhs.amount, cur.new_pubkey_hash, rhs.account, rhs.fee)
 
         # new account branch is empty
         and (rhs.owner_pub_key, rhs.subtree_root, rhs.account_nonce) == EMPTY_ACCOUNT
@@ -292,7 +285,7 @@ def full_exit(op, cur, computed):
 def partial_exit(op, cur, computed):
     partial_exit := 
         op.type == 'partial_exit' and
-        pubdata == (cur.account, cur.leaf_index, op.args.amount, op.args.fee) and
+        pubdata == (op.tx_type, cur.account, cur.leaf_index, op.args.amount, op.args.fee) and
         subtractable and
         cur.leaf_is_token and
         cur.sig_msg == ('partial_exit', cur.account, cur.leaf_index, cur.account_nonce, cur.amount, cur.fee) and
@@ -308,7 +301,7 @@ def partial_exit(op, cur, computed):
 def escalation(op, cur, computed):
     escalation := 
         op.type == 'escalation' and
-        pubdata == (cur.account, cur.leaf_index, cur.creation_nonce, cur.leaf_nonce) and
+        pubdata == (op.tx_type, cur.account, cur.leaf_index, cur.creation_nonce, cur.leaf_nonce) and
         not cur.leaf_is_token and
         cur.sig_msg == ('escalation', cur.account, cur.leaf_index, cur.creation_nonce) and
         (cur.signer_pubkey == cur.owner_pub_key or cur.signer_pubkey == cosigner_pubkey)
