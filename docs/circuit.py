@@ -208,12 +208,16 @@ def execute_op(op, cur, computed):
 
     op_valid := False
 
+    op_valid = op_valid or op.tx_type == 'noop'
     op_valid = op_valid or transfer_to_new(op, cur, computed)
     op_valid = op_valid or deposit(op, cur, computed)
     op_valid = op_valid or close_account(op, cur, computed)
     op_valid = op_valid or partial_exit(op, cur, computed)
     op_valid = op_valid or escalation(op, cur, computed)
-    op_valid = op_valid or op.tx_type == 'noop'
+
+    op_valid = op_valid or create_subaccount(op, cur, computed)
+    op_valid = op_valid or close_subaccount(op, cur, computed)
+    op_valid = op_valid or fill_orders(op, cur, computed)
 
     # `op` MUST be one of the operations and MUST be valid
 
@@ -403,3 +407,8 @@ def create_subaccount(op, cur, computed):
 
     return lhs_valid or rhs_valid
 
+def close_subaccount(op, cur, computed):
+    # tbd
+
+def fill_orders(op, cur, computed):
+    # tbd
