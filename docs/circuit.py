@@ -120,7 +120,7 @@ def enforce_correct_chunking(op, computed):
         transfer_to_new=> 1,
         transfer => 2,
         # ...and so on
-        
+
     enforce op.chunk < max_chunks # 4 constraints
     computed.last_chunk = op.chunk == max_chunks-1 # flag to mark the last op chunk
 
@@ -175,7 +175,13 @@ def execute_op(op, cur, computed):
     op.args.amount  := unpack(op.args.amount_packed)
     op.args.fee     := unpack(op.args.fee_packed)
 
-    computed.new_pubkey_hash := hash(cur.new_pubkey) # new pubkey for deposits
+    # some operations require tighter amount packing (with less precision)
+
+    computed.compact_amount_correct := op.args.amount == op.args.compact_amount * 256
+
+    # new pubkey hash for deposits
+
+    computed.new_pubkey_hash := hash(cur.new_pubkey)
 
     # signature check
 
@@ -231,8 +237,11 @@ def transfer_to_new(op, cur, computed):
         # here we process the second (last) chunk
         and op.chunk == 1
 
+        # compact amount is passed to pubdata for this operation
+        and computed.compact_amount_correct
+
         # pubdata contains correct data from both branches, so we verify it agains `lhs` and `rhs`
-        and pubdata == (op.tx_type, lhs.account, lhs.leaf_index, lhs.amount, cur.new_pubkey_hash, rhs.account, rhs.fee)
+        and pubdata == (op.tx_type, lhs.account, lhs.leaf_index, lhs.compact_amount, cur.new_pubkey_hash, rhs.account, rhs.fee)
 
         # new account branch is empty
         and (rhs.owner_pub_key, rhs.subtree_root, rhs.account_nonce) == EMPTY_ACCOUNT
@@ -253,9 +262,10 @@ def deposit(op, cur, computed):
     ignore_pubdata := not last_chunk
     deposit := 
         op.type == 'deposit'
-        and (ignore_pubdata or pubdata == (cur.account, cur.leaf_index, args.amount, cur.new_pubkey_hash, args.fee))
+        and (ignore_pubdata or pubdata == (cur.account, cur.leaf_index, args.compact_amount, cur.new_pubkey_hash, args.fee))
         and (cur.account_pubkey, cur.subtree_root, cur.account_nonce) == EMPTY_ACCOUNT
         and cur.leaf_is_token
+        and computed.compact_amount_correct
         and computed.subtractable and (op.a == op.args.amount) and (op.b == op.args.fee )
 
     if deposit:
@@ -265,8 +275,8 @@ def deposit(op, cur, computed):
 
 def full_exit(op, cur, computed):
     full_exit :=
-        op.type == 'full_exit' and
-        pubdata == (cur.account, cur.subtree_root)
+        op.type == 'full_exit'
+        and pubdata == (cur.account, cur.subtree_root)
 
     if full_exit:
         cur.owner_pub_key = 0
@@ -284,12 +294,13 @@ def full_exit(op, cur, computed):
 
 def partial_exit(op, cur, computed):
     partial_exit := 
-        op.type == 'partial_exit' and
-        pubdata == (op.tx_type, cur.account, cur.leaf_index, op.args.amount, op.args.fee) and
-        subtractable and
-        cur.leaf_is_token and
-        cur.sig_msg == ('partial_exit', cur.account, cur.leaf_index, cur.account_nonce, cur.amount, cur.fee) and
-        cur.signer_pubkey == cur.owner_pub_key
+        op.type == 'partial_exit'
+        and computed.compact_amount_correct
+        and pubdata == (op.tx_type, cur.account, cur.leaf_index, op.args.amount, op.args.fee)
+        and subtractable
+        and cur.leaf_is_token
+        and cur.sig_msg == ('partial_exit', cur.account, cur.leaf_index, cur.account_nonce, cur.amount, cur.fee)
+        and cur.signer_pubkey == cur.owner_pub_key
 
     if partial_exit:
         cur.leaf_balance = cur.leaf_balance - (op.args.amount + op.args.fee)
@@ -300,10 +311,10 @@ def partial_exit(op, cur, computed):
 
 def escalation(op, cur, computed):
     escalation := 
-        op.type == 'escalation' and
-        pubdata == (op.tx_type, cur.account, cur.leaf_index, cur.creation_nonce, cur.leaf_nonce) and
-        not cur.leaf_is_token and
-        cur.sig_msg == ('escalation', cur.account, cur.leaf_index, cur.creation_nonce) and
+        op.type == 'escalation'
+        and pubdata == (op.tx_type, cur.account, cur.leaf_index, cur.creation_nonce, cur.leaf_nonce)
+        and not cur.leaf_is_token
+        and cur.sig_msg == ('escalation', cur.account, cur.leaf_index, cur.creation_nonce)
         (cur.signer_pubkey == cur.owner_pub_key or cur.signer_pubkey == cosigner_pubkey)
 
     if escalation:
