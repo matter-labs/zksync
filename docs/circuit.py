@@ -5,31 +5,31 @@
 struct op:
     
     # operation data
-    tx_type:        # type of transaction, see the list: https://docs.google.com/spreadsheets/d/1ejK1MJfVehcwjgjVDFD3E2k1EZ7auqbG_y0DKidS9nA/edit#gid=0
-    chunk:          # op chunk number (0..3)
-    pubdata_chunk:  # current chunk of the pubdata (always 8 bytes)
-    args:           # arguments for the operation
+    tx_type:            # type of transaction, see the list: https://docs.google.com/spreadsheets/d/1ejK1MJfVehcwjgjVDFD3E2k1EZ7auqbG_y0DKidS9nA/edit#gid=0
+    chunk:              # op chunk number (0..3)
+    pubdata_chunk:      # current chunk of the pubdata (always 8 bytes)
+    args:               # arguments for the operation
     
     # Merkle branches
-    lhs:            # left Merkle branch data
-    rhs:            # right Merkle branch data
-    clear_subtree:  # bool: instruction to clear the account subtree in the current branch
+    lhs:                # left Merkle branch data
+    rhs:                # right Merkle branch data
+    clear_account:      # bool: instruction to clear the account in the current branch
+    clear_subaccount:   # bool: instruction to clear the subaccount in the current branch
 
     # precomputed witness:
-    a:              # depends on the optype, used for range checks
-    b:              # depends on the optype, used for range checks
-    new_root:       # new state root after the operation is applied
-    account_path:   # Merkle path witness for the account in the current branch
-    subtree_path:   # Merkle path witness for the subtree in the current branch
+    a:                  # depends on the optype, used for range checks
+    b:                  # depends on the optype, used for range checks
+    new_root:           # new state root after the operation is applied
+    account_path:       # Merkle path witness for the account in the current branch
+    subtree_path:       # Merkle path witness for the subtree in the current branch
 
-struct cur:         # current Merkle branch data
+struct cur:             # current Merkle branch data
 
 struct computed:
-    last_chunk:             # bool: whether the current chunk is the last one in sequence
-    pubdata:                # pubdata accumulated over all chunks
-    subtractable:           # wheather a >= b
-    new_pubkey_hash:        # hash of the new pubkey, truncated to 20 bytes (used only for deposits)
-    cosigner_pubkey_hash:   # hash of the cosigner pubkey in the current branch, truncated to 20 bytes
+    last_chunk:         # bool: whether the current chunk is the last one in sequence
+    pubdata:            # pubdata accumulated over all chunks
+    subtractable:       # wheather a >= b
+    new_pubkey_hash:    # hash of the new pubkey, truncated to 20 bytes (used only for deposits)
 
 
 # Circuit functions
@@ -47,8 +47,9 @@ def circuit:
     for op in operations:
 
         # enfore correct bitlentgh for every input in witness
-        # TODO: for this create a macro gadget via struct member annotations
-        verify_bitlength(op)
+        # TODO: create a macro gadget to recursively iterate over struct member annotations
+        for x in op:
+            verify_bitlength(x)
 
         # check and prepare data
         verify_correct_chunking(op, computed)
@@ -57,18 +58,19 @@ def circuit:
 
         # prepare Merkle branch
         cur := select_branch(op, computed)
-        computed.cosigner_pubkey_hash := hash(cur.cosigner_pubkey)
+        cur.cosigner_pubkey_hash := hash(cur.cosigner_pubkey)
 
         # check initial Merkle paths, before applying the operation
         op.clear_account := False
-        state_root := verify_merkle_paths(op, cur, computed, check_intersection = False)
+        op.clear_subaccount := False
+        state_root := check_account_data(op, cur, computed, check_intersection = False)
         enforce state_root == current_root
 
         # check validity and perform state updates for the current branch by modifying `cur` struct
         execute_op(op, cur, computed)
 
         # check final Merkle paths after applying the operation
-        new_root := verify_merkle_paths(op, cur, computed, check_intersection = True)
+        new_root := check_account_data(op, cur, computed, check_intersection = True)
 
         # NOTE: this is checked separately for each branch side, and we already enforced 
         # that `op.new_root` remains unchanged for both by enforcing that it is shared by all chunks
@@ -140,19 +142,37 @@ def select_branch(op, computed):
 
     return cur
 
-def verify_merkle_paths(op, cur, computed, check_intersection):
+def check_account_data(op, cur, computed, check_intersection):
 
-    balances_root := merkle_root(token, op.balances_path, cur.balance)
+    # leaf data for account and balance leaves
+    subaccount_data := (
+        cur.subaccount_balance, 
+        cur.subaccount_nonce, 
+        cur.creation_nonce, 
+        cur.cosigner_pubkey_hash, 
+        cur.cosigner_balance, 
+        cur.subaccount_token)
+    balance_data := cur.balance
+    
+    # subaccount emptiness check and clearing
+    cur.subaccount_is_empty := subaccount_data == EMPTY_SUBACCOUNT
+    subaccount_data = EMPTY_SUBACCOUNT if clear_subaccount else subaccount_data
 
-    subaccount_data := (cur.leaf_balance, cur.leaf_nonce, cur.creation_nonce, computed.cosigner_pubkey_hash, cur.cosigner_balance, cur.token)
+    # subtree Merkle checks
+    balances_root := merkle_root(token, op.balances_path, balance_data)
     subaccounts_root := merkle_root(token, op.balances_path, subaccount_data)
-    subtree_hash := hash(balances_root, subaccounts_root)
+    subtree_root := hash(balances_root, subaccounts_root)
 
-    subtree_root := EMPTY_SUBTREE if clear_subtree else subtree_hash
-
+    # account data
     account_data := hash(cur.owner_pub_key, cur.subtree_root, cur.account_nonce)
+    
+    # account emptiness check and clearing
+    cur.account_is_empty := account_data == EMPTY_ACCOUNT
+    account_data = EMPTY_ACCOUNT if clear_account else account_data
 
-    intersection_path := intersection(op.account_path, cur.account, lhs.account, rhs.account, lhs.intersection_hash, rhs.intersection_hash)
+    # final state Merkle root verification with conditional intersection check
+    intersection_path := intersection(op.account_path, cur.account, lhs.account, rhs.account, 
+        lhs.intersection_hash, rhs.intersection_hash)
     path_witness := intersection_path if check_intersection else op.account_path
     state_root := merkle_root(cur.account, path_witness, account_data)
 
@@ -165,6 +185,9 @@ def execute_op(op, cur, computed):
     # universal range check; a and b are different depending on the op
 
     computed.subtractable := op.a >= op.b
+
+    # TODO: check overflow
+    # TODO: check nonce overflow
 
     # unpack floating point values and hashes
 
@@ -209,18 +232,16 @@ def transfer_to_new(op, cur, computed):
         # here we process the first chunk
         and op.chunk == 0
 
-        # sender is using a token balance, not subaccount
-        and lhs.leaf_is_token
-
         # sender authorized spending and recepient
-        and lhs.sig_msg == hash('transfer_to_new', lhs.account, lhs.leaf_index, lhs.account_nonce, op.args.amount_packed, op.args.fee_packed, cur.new_pubkey)
+        and lhs.sig_msg == hash('transfer_to_new', lhs.account, lhs.token, lhs.account_nonce, op.args.amount_packed, 
+            op.args.fee_packed, cur.new_pubkey)
 
         # sender is account owner
         and lhs.signer_pubkey == cur.owner_pub_key
 
         # sender has enough balance: we checked above that `op.a >= op.b`
         # NOTE: no need to check overflow for `amount + fee` because their bitlengths are enforced]
-        and computed.subtractable and (op.a == cur.leaf_balance) and (op.b == (op.args.amount + op.args.fee) )
+        and computed.subtractable and (op.a == cur.balance) and (op.b == (op.args.amount + op.args.fee) )
 
     # NOTE: updating the state is done by modifying data in the `cur` branch
     if lhs_valid:
@@ -237,13 +258,10 @@ def transfer_to_new(op, cur, computed):
         and computed.compact_amount_correct
 
         # pubdata contains correct data from both branches, so we verify it agains `lhs` and `rhs`
-        and pubdata == (op.tx_type, lhs.account, lhs.leaf_index, lhs.compact_amount, cur.new_pubkey_hash, rhs.account, rhs.fee)
+        and pubdata == (op.tx_type, lhs.account, lhs.token, lhs.compact_amount, cur.new_pubkey_hash, rhs.account, rhs.fee)
 
         # new account branch is empty
-        and (rhs.owner_pub_key, rhs.subtree_root, rhs.account_nonce) == EMPTY_ACCOUNT
-
-        # deposit is into a token balance, not subaccount
-        and rhs.leaf_is_token
+        and cur.account_is_empty
 
         # sender signed the same recepient pubkey of which the hash was passed to public data
         and lhs.new_pubkey == rhs.new_pubkey
@@ -259,11 +277,10 @@ def deposit(op, cur, computed):
     ignore_pubdata := not last_chunk
     tx_valid := 
         op.tx_type == 'deposit'
-        and (ignore_pubdata or pubdata == (cur.account, cur.leaf_index, args.compact_amount, cur.new_pubkey_hash, args.fee))
+        and (ignore_pubdata or pubdata == (cur.account, cur.token, args.compact_amount, cur.new_pubkey_hash, args.fee))
         and (cur.account_pubkey, cur.subtree_root, cur.account_nonce) == EMPTY_ACCOUNT
-        and cur.leaf_is_token
         and computed.compact_amount_correct
-        and computed.subtractable and (op.a == op.args.amount) and (op.b == op.args.fee )
+        and computed.subtractable and (op.a == op.args.amount) and (op.b == op.args.fee)
 
     if tx_valid:
         cur.leaf_balance = op.args.amount - op.args.fee
@@ -278,9 +295,7 @@ def close_account(op, cur, computed):
         # TODO: check user signature
 
     if tx_valid:
-        cur.owner_pub_key = 0
-        cur.account_nonce = 0
-        op.clear_subtree = True
+        op.clear_account = True
     
     return tx_valid
 
@@ -290,14 +305,13 @@ def partial_exit(op, cur, computed):
     tx_valid := 
         op.tx_type == 'partial_exit'
         and computed.compact_amount_correct
-        and pubdata == (op.tx_type, cur.account, cur.leaf_index, op.args.amount, op.args.fee)
-        and subtractable
-        and cur.leaf_is_token
+        and pubdata == (op.tx_type, cur.account, cur.token, op.args.amount, op.args.fee)
+        and subtractable and (op.a == cur.balance) and (op.b == (op.args.amount + op.args.fee) )
         and cur.sig_msg == ('partial_exit', cur.account, cur.leaf_index, cur.account_nonce, cur.amount, cur.fee)
         and cur.signer_pubkey == cur.owner_pub_key
 
     if tx_valid:
-        cur.leaf_balance = cur.leaf_balance - (op.args.amount + op.args.fee)
+        cur.balance = cur.balance - (op.args.amount + op.args.fee)
         cur.account_nonce = cur.leaf_nonce + 1
     
     return tx_valid
@@ -307,16 +321,12 @@ def escalation(op, cur, computed):
 
     tx_valid := 
         op.tx_type == 'escalation'
-        and pubdata == (op.tx_type, cur.account, cur.leaf_index, cur.creation_nonce, cur.leaf_nonce)
-        and not cur.leaf_is_token
-        and cur.sig_msg == ('escalation', cur.account, cur.leaf_index, cur.creation_nonce)
+        and pubdata == (op.tx_type, cur.account, cur.subaccount, cur.creation_nonce, cur.leaf_nonce)
+        and cur.sig_msg == ('escalation', cur.account, cur.subaccount, cur.creation_nonce)
         (cur.signer_pubkey == cur.owner_pub_key or cur.signer_pubkey == cosigner_pubkey)
 
     if tx_valid:
-        cur.leaf_balance = 0
-        cur.leaf_nonce = 0
-        cur.creation_nonce = 0
-        cur.cosigner_pubkey_hash = EMPTY_HASH
+        cur.clear_subaccount = True
     
     return tx_valid
 
@@ -325,23 +335,24 @@ def transfer(op, cur, computed):
     lhs_valid :=
         op.tx_type == 'transfer'
         and op.chunk == 0
-        and cur.leaf_is_token
-        and lhs.sig_msg == ('transfer', lhs.account, lhs.leaf_index, lhs.account_nonce, op.args.amount_packed, op.args.fee_packed, rhs.account_pubkey)
+        and lhs.sig_msg == ('transfer', lhs.account, lhs.token, lhs.account_nonce, op.args.amount_packed, 
+            op.args.fee_packed, rhs.account_pubkey)
         and lhs.signer_pubkey == cur.owner_pub_key
-        and computed.subtractable and (op.a == cur.leaf_balance) and (op.b == (op.args.amount + op.args.fee) )
+        and computed.subtractable and (op.a == cur.balance) and (op.b == (op.args.amount + op.args.fee) )
 
     if lhs_valid:
-        cur.leaf_balance = cur.leaf_balance - (op.args.amount + op.args.fee)
+        cur.balance = cur.balance - (op.args.amount + op.args.fee)
         cur.account_nonce = cur.account_nonce + 1
 
     rhs_valid := 
         op.tx_type == 'transfer'
         and op.chunk == 1
-        and pubdata == (op.tx_type, lhs.account, lhs.leaf_index, op.args.amount, rhs.account, op.args.fee)
-        and cur.leaf_is_token
+        and not cur.account_is_empty
+        and pubdata == (op.tx_type, lhs.account, lhs.token, op.args.amount, rhs.account, op.args.fee)
+        # TODO: check overflow
 
     if rhs_valid:
-        cur.leaf_balance = op.args.amount
+        cur.balance = cur.balance + op.args.amount
 
     return lhs_valid or rhs_valid
 
@@ -349,27 +360,35 @@ def transfer(op, cur, computed):
 
 def create_subaccount(op, cur, computed):
 
-    # on the LHS we have cosigner, no need to do anything; so we only process the RHS here
+    # On the LHS we have cosigner, no need to do anything apart from normal Merkle path checks in the main loop; 
+    # So we only process the RHS here
 
-    # tx_valid :=
-    #     op.tx_type == 'create_subaccount'
-    #     and op.chunk == 1
-    #     and cur.leaf_is_token
-    #     and lhs.sig_msg == ('create_subaccount', lhs.account, lhs.leaf_index, lhs.account_nonce, op.args.amount_packed, op.args.fee_packed, rhs.account_pubkey)
-    #     and lhs.signer_pubkey == cur.owner_pub_key
-    #     and computed.subtractable and (op.a == cur.leaf_balance) and (op.b == (op.args.amount + op.args.fee) )
+    tx_valid :=
+        op.tx_type == 'create_subaccount'
+        and op.chunk == 1
+        and cur.sig_msg == (
+            'create_subaccount', 
+            cur.account,        # cur = rhs
+            lhs.account_pubkey, # co-signer pubkey on the lhs
+            cur.token, 
+            cur.account_nonce, 
+            op.args.amount_packed, 
+            op.args.fee_packed )
 
-    # if tx_valid:
-    #     cur.leaf_balance = cur.leaf_balance - (op.args.amount + op.args.fee)
-    #     cur.account_nonce = cur.account_nonce + 1
+        and cur.signer_pubkey == cur.owner_pub_key
+        and cur.subaccount_is_empty
+        and pubdata == (op.tx_type, lhs.account, lhs.leaf_index, op.args.amount, rhs.account, op.args.fee)
+        and computed.subtractable and (op.a == cur.balance) and (op.b == (op.args.amount + op.args.fee) )
 
-    # rhs_valid := 
-    #     op.tx_type == 'create_subaccount'
-    #     and op.chunk == 1
-    #     and pubdata == (op.tx_type, lhs.account, lhs.leaf_index, op.args.amount, rhs.account, op.args.fee)
-    #     and cur.leaf_is_token
+    if tx_valid:
+        # initialize subaccount
+        cur.subaccount_balance = cur.subaccount_balance + op.args.amount
+        cur.creation_nonce = cur.account_nonce
+        cur.cosigner_pubkey = lhs.account_pubkey
+        cur.subaccount_token = cur.token
 
-    # if rhs_valid:
-    #     cur.leaf_balance = op.args.amount
+        # update main account
+        cur.balance = cur.balance - (op.args.amount + op.args.fee)
+        cur.account_nonce = cur.account_nonce + 1
 
-    # return lhs_valid or rhs_valid
+    return tx_valid
