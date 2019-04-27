@@ -82,6 +82,52 @@ impl EventsFranklin {
         self.verified_blocks.clone()
     }
 
+    pub fn sort_logs(&mut self, logs: Vec<Log>) -> Result<(Vec<LogBlockData>, Vec<LogBlockData>), &'static str> {
+        if logs.len() == 0 {
+            return Err("No logs in list")
+        }
+        let mut committed_block_data: Vec<LogBlockData> = vec![];
+        let mut verified_block_data: Vec<LogBlockData> = vec![];
+        let block_verified_topic = "BlockVerified(uint32)";
+        let block_committed_topic = "BlockCommitted(uint32)";
+        let block_verified_topic_h256: web3::types::H256 = helpers::get_topic_keccak_hash(block_verified_topic);
+        let block_committed_topic_h256: web3::types::H256 = helpers::get_topic_keccak_hash(block_committed_topic);
+        for log in logs {
+            let mut block: LogBlockData = LogBlockData {
+                block_num: H256::zero(),
+                transaction_hash : H256::zero(),
+                block_type: BlockType::Unknown
+            };
+            // Log data
+            let tx_hash = log.transaction_hash;
+            let topic = log.topics[0];
+            let block_num = log.topics[1];
+
+            match tx_hash {
+                Some(hash) => {
+                    block.block_num = block_num;
+                    block.transaction_hash = hash;
+
+                    if topic == block_verified_topic_h256 {
+                        block.block_type = BlockType::Verified;
+                        verified_block_data.push(block);
+                        // let result = self.check_committed_block_with_same_number_as_verified(&block);
+                        // println!("Block exists: {:?}", result);
+                        // let tx = result.unwrap().clone().transaction_hash;
+                        // println!("--- Starting getting tx");
+                        // let data = FranklinTransaction::get_transaction(InfuraEndpoint::Rinkeby, &tx);
+                        // println!("TX data committed: {:?}", data);
+                    } else if topic == block_committed_topic_h256 {
+                        block.block_type = BlockType::Committed;
+                        committed_block_data.push(block);
+                    }
+                },
+                None    => println!("No tx hash"),
+            };
+        }
+        Ok((committed_block_data, verified_block_data))
+    }
+
     pub fn get_past_logs(&mut self, blocks_delta: u64) -> Result<Vec<Log>, &'static str> {
         // Set web3
         let (_eloop, transport) = match web3::transports::Http::new(self.http_endpoint_string.as_str()) {
@@ -135,10 +181,16 @@ impl EventsFranklin {
         }
 
         // Logs
-        match events_filter_result {
+        let logs = match events_filter_result {
             Err(_) => Err("Wrong events result"),
-            Ok(result) => Ok(result),
-        }
+            Ok(result) => {
+                if result.len() == 0 {
+                    return Err("No logs in list")
+                }
+                Ok(result)
+            }
+        };
+        logs
     }
 
     pub fn subscribe_to_logs(&mut self) {
@@ -178,45 +230,19 @@ impl EventsFranklin {
                 sub.for_each(|log| {
                     println!("---");
                     println!("got log from subscription: {:?}", log);
-                    
-                    // Form block
-                    let mut block: LogBlockData = LogBlockData {
-                        block_num: H256::zero(),
-                        transaction_hash : H256::zero(),
-                        block_type: BlockType::Unknown
-                    };
-                    // Log data
-                    let tx_hash = log.transaction_hash;
-                    let topic = log.topics[0];
-                    let block_num = log.topics[1];
 
-                    match tx_hash {
-                        Some(hash) => {
-                            block.block_num = block_num;
-                            block.transaction_hash = hash;
+                    let mut sorted_blocks = self.sort_logs(vec![log]).unwrap();
+                    self.committed_blocks.append(&mut sorted_blocks.0);
+                    self.verified_blocks.append(&mut sorted_blocks.1);
+                    // let result = self.check_committed_block_with_same_number_as_verified(&block);
+                    // println!("Block exists: {:?}", result);
+                    // let tx = result.unwrap().clone().transaction_hash;
+                    // println!("--- Starting getting tx");
+                    // let data = FranklinTransaction::get_transaction(InfuraEndpoint::Rinkeby, &tx);
+                    // println!("TX data committed: {:?}", data);
 
-                            if topic == block_verified_topic_h256 {
-                                println!("-");
-                                println!("Verified");
-                                block.block_type = BlockType::Verified;
-                                self.verified_blocks.push(block);
-                                // let result = self.check_committed_block_with_same_number_as_verified(&block);
-                                // println!("Block exists: {:?}", result);
-                                // let tx = result.unwrap().clone().transaction_hash;
-                                // println!("--- Starting getting tx");
-                                // let data = FranklinTransaction::get_transaction(InfuraEndpoint::Rinkeby, &tx);
-                                // println!("TX data committed: {:?}", data);
-                            } else if topic == block_committed_topic_h256 {
-                                println!("-");
-                                println!("Committed");
-                                block.block_type = BlockType::Committed;
-                                self.committed_blocks.push(block);
-                            }
-                            println!("Verified blocks in storage: {:?}", self.verified_blocks);
-                            println!("Committed blocks in storage: {:?}", self.committed_blocks);
-                        },
-                        None    => println!("No tx hash"),
-                    };
+                    println!("Verified blocks in storage: {:?}", self.verified_blocks);
+                    println!("Committed blocks in storage: {:?}", self.committed_blocks);
                     Ok(())
                 })
             })
