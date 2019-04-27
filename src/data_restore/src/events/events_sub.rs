@@ -27,9 +27,17 @@ pub struct EventsFranklin {
     pub franklin_contract_address: Address,
     pub committed_blocks: Vec<LogBlockData>,
     pub verified_blocks: Vec<LogBlockData>,
+    pub last_watching_block_number: U256,
 }
 
 impl EventsFranklin {
+    // Set new
+    // Get last block
+    // Get blocks till last - delta, set last watching block
+    // Subscribe on new blocks
+    // New blocks -> last watching block ++
+    // Check if txs in last watching block
+
     pub fn new(network: InfuraEndpoint) -> Self {
         let ws_infura_endpoint_str = match network {
             InfuraEndpoint::Mainnet => "wss://mainnet.infura.io/ws",
@@ -58,15 +66,16 @@ impl EventsFranklin {
             franklin_contract_address: address,
             committed_blocks: vec![],
             verified_blocks: vec![],
+            last_watching_block_number: U256::from(0),
         };
         this
     }
 
-    pub fn subscribe_on_network(network: InfuraEndpoint) -> Self {
-        let mut this = EventsFranklin::new(network);
-        this.subscribe_to_logs();
-        this
-    }
+    // pub fn subscribe_on_network(network: InfuraEndpoint) -> Self {
+    //     let mut this = EventsFranklin::new(network);
+    //     this.subscribe_to_logs();
+    //     this
+    // }
 
     pub fn check_committed_block_with_same_number_as_verified(&self, verified_block: &LogBlockData) -> Option<&LogBlockData> {
         let committed_blocks_iter = &mut self.committed_blocks.iter();
@@ -96,7 +105,22 @@ impl EventsFranklin {
         Ok(result)
     }
 
-    pub fn sort_logs(&mut self, logs: Vec<Log>) -> Result<(Vec<LogBlockData>, Vec<LogBlockData>), &'static str> {
+    // returns (committed blocks logs, verified blocks logs)
+    pub fn get_sorted_past_logs(&mut self, blocks_delta: u64) -> Result<(Vec<LogBlockData>, Vec<LogBlockData>), &'static str> {
+        let logs = match self.get_past_logs(blocks_delta) {
+            Err(_) => return Err("Cant get past logs"),
+            Ok(result) => result,
+        };
+        let sorted_logs = match self.sort_logs(&logs) {
+            Err(_) => return Err("Cant sort_logs"),
+            Ok(result) => result,
+        };
+        Ok(sorted_logs)
+    }
+
+    // returns (committed blocks logs, verified blocks logs)
+    pub fn sort_logs(&mut self, logs: &Vec<Log>) -> Result<(Vec<LogBlockData>, Vec<LogBlockData>), &'static str> {
+        let logs = logs.clone();
         if logs.len() == 0 {
             return Err("No logs in list")
         }
@@ -207,6 +231,53 @@ impl EventsFranklin {
         logs
     }
 
+    pub fn subscribe_to_new_blocks(&mut self) {
+        // Setup loop and web3
+        let mut eloop = Core::new().unwrap();
+        let handle = eloop.handle();
+        let w3 = Rc::new(web3::Web3::new(
+            web3::transports::WebSocket::with_event_loop(self.ws_endpoint_string.as_str(), &handle)
+                .unwrap(),
+        ));
+
+        // Subscription
+        println!("subscribing to new blocks");
+
+        let future = w3.eth_subscribe()
+            .subscribe_new_heads()
+            .and_then(|sub| {
+                sub.for_each(|log| {
+                    println!("---");
+                    println!("Got block number {:?}", log.number);
+                    let number_to_watch = self.last_watching_block_number.clone() + 1;
+                    self.last_watching_block_number = number_to_watch.clone();
+                    println!("Block to watch {:?}", number_to_watch);
+                    let block_to_get_logs = BlockNumber::Number(number_to_watch.as_u64());
+                    match self.get_logs(block_to_get_logs.clone(), block_to_get_logs.clone()) {
+                        Err(_) => println!("No logs in block {:?}", block_to_get_logs.clone()),
+                        Ok(result) => {
+                            println!("Got logs in block {:?} {:?}", block_to_get_logs.clone(), result.clone());
+                            match self.sort_logs(&result) {
+                                Err(_) => println!("Cant sort logs in block {:?}", block_to_get_logs.clone()),
+                                Ok(sorted_logs) => {
+                                    println!("Sorted logs {:?}", sorted_logs.clone());
+                                    self.committed_blocks = sorted_logs.0;
+                                    self.verified_blocks = sorted_logs.1;
+                                }
+                            };
+                        },
+                    };
+                    Ok(())
+                })
+            })
+            .map_err(|e| eprintln!("franklin log err: {}", e));
+
+        // Run eloop
+        if let Err(_err) = eloop.run(future) {
+            eprintln!("ERROR");
+        }
+    }
+
     pub fn subscribe_to_logs(&mut self) {
 
         // Get topic keccak hash
@@ -245,7 +316,7 @@ impl EventsFranklin {
                     println!("---");
                     println!("got log from subscription: {:?}", log);
 
-                    let mut sorted_blocks = self.sort_logs(vec![log]).unwrap();
+                    let mut sorted_blocks = self.sort_logs(&vec![log]).unwrap();
                     self.committed_blocks.append(&mut sorted_blocks.0);
                     self.verified_blocks.append(&mut sorted_blocks.1);
                     // let result = self.check_committed_block_with_same_number_as_verified(&block);
