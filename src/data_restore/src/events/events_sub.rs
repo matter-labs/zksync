@@ -128,7 +128,7 @@ impl EventsFranklin {
         Ok((committed_block_data, verified_block_data))
     }
 
-    pub fn get_past_logs(&mut self, blocks_delta: u64) -> Result<Vec<Log>, &'static str> {
+    pub fn get_logs(&mut self, from_block_number: BlockNumber, to_block_number: BlockNumber) -> Result<Vec<Log>, &'static str> {
         // Set web3
         let (_eloop, transport) = match web3::transports::Http::new(self.http_endpoint_string.as_str()) {
             Err(_) => return Err("Error creating web3 with this endpoint"),
@@ -137,21 +137,6 @@ impl EventsFranklin {
         let web3 = web3::Web3::new(transport);
 
         // let contract = Contract::new(web3.eth(), franklin_address.clone(), franklin_contract.clone());
-
-        // Get last block
-        let last_block_number = web3.eth().block_number().wait();
-        if last_block_number.is_err() {
-            return Err("Error getting last block number")
-        }
-        let last_block_number_u64 = match last_block_number {
-            Err(_) => return Err("Error while last block number to u64"),
-            Ok(result) => result,
-        }.as_u64();
-        // To block = last block - blocks delta
-        let to_block_number_u64 = last_block_number_u64 - blocks_delta;
-        let to_block_number = BlockNumber::Number(to_block_number_u64);
-        // From block
-        let from_block_number = BlockNumber::Earliest;
 
         // Events topics
         let block_verified_topic = "BlockVerified(uint32)";
@@ -184,12 +169,40 @@ impl EventsFranklin {
         let logs = match events_filter_result {
             Err(_) => Err("Wrong events result"),
             Ok(result) => {
-                if result.len() == 0 {
+                if result.len()== 0 {
                     return Err("No logs in list")
                 }
                 Ok(result)
             }
         };
+        logs
+    }
+
+    pub fn get_past_logs(&mut self, blocks_delta: u64) -> Result<Vec<Log>, &'static str> {
+        // Set web3
+        let (_eloop, transport) = match web3::transports::Http::new(self.http_endpoint_string.as_str()) {
+            Err(_) => return Err("Error creating web3 with this endpoint"),
+            Ok(result) => result,
+        };
+        let web3 = web3::Web3::new(transport);
+
+        // let contract = Contract::new(web3.eth(), franklin_address.clone(), franklin_contract.clone());
+
+        // Get last block
+        let last_block_number = web3.eth().block_number().wait();
+        if last_block_number.is_err() {
+            return Err("Error getting last block number")
+        }
+        let last_block_number_u64 = match last_block_number {
+            Err(_) => return Err("Error while last block number to u64"),
+            Ok(result) => result,
+        }.as_u64();
+        // To block = last block - blocks delta
+        let to_block_number_u64 = last_block_number_u64 - blocks_delta;
+        let to_block_number = BlockNumber::Number(to_block_number_u64);
+        // From block
+        let from_block_number = BlockNumber::Earliest;
+        let logs = self.get_logs(from_block_number, to_block_number);
         logs
     }
 
