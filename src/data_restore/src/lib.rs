@@ -4,6 +4,7 @@
 extern crate web3;
 extern crate tiny_keccak;
 extern crate tokio_core;
+extern crate ethabi;
 
 pub mod events;
 pub mod franklin_transaction;

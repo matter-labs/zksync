@@ -1,22 +1,63 @@
 use std::rc::Rc;
 use web3::futures::{Future, Stream};
-use web3::types::{Address, FilterBuilder, H256};
+use web3::types::{Log, Address, FilterBuilder, H256, BlockNumber};
 use tokio_core::reactor::Core;
 use blocks::{BlockType, LogBlockData};
-use helpers::*;
+use helpers;
+use helpers::InfuraEndpoint;
+use ethabi::{Contract, Event, Hash};
+
+type ABI = (&'static [u8], &'static str);
+
+pub const PLASMA_TEST_ABI: ABI = (
+    include_bytes!("../../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.abi"),
+    include_str!("../../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.bin"),
+);
+
+pub const PLASMA_PROD_ABI: ABI = (
+    include_bytes!("../../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.abi"),
+    include_str!("../../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.bin"),
+);
 
 pub struct EventsFranklin {
+    pub http_endpoint_string: String,
+    pub ws_endpoint_string: String,
+    pub franklin_abi: ABI,
+    pub franklin_contract: Contract,
+    pub franklin_contract_address: Address,
     pub committed_blocks: Vec<LogBlockData>,
     pub verified_blocks: Vec<LogBlockData>,
-    pub network: InfuraEndpoint
 }
 
 impl EventsFranklin {
     pub fn new(network: InfuraEndpoint) -> Self {
+        let ws_infura_endpoint_str = match network {
+            InfuraEndpoint::Mainnet => "wss://mainnet.infura.io/ws",
+            InfuraEndpoint::Rinkeby => "wss://rinkeby.infura.io/ws",
+        };
+        let ws_infura_endpoint_string = String::from(ws_infura_endpoint_str);
+        let http_infura_endpoint_str = match network {
+            InfuraEndpoint::Mainnet => "https://mainnet.infura.io/",
+            InfuraEndpoint::Rinkeby => "https://rinkeby.infura.io/",
+        };
+        let http_infura_endpoint_string = String::from(http_infura_endpoint_str);
+        let address: Address = match network {
+            InfuraEndpoint::Mainnet => "fddb8167fef957f7cc72686094fac1d31be5ecfe",
+            InfuraEndpoint::Rinkeby => "fddb8167fef957f7cc72686094fac1d31be5ecfe",
+        }.parse().unwrap();
+        let abi: ABI = match network {
+            InfuraEndpoint::Mainnet => PLASMA_PROD_ABI,
+            InfuraEndpoint::Rinkeby => PLASMA_TEST_ABI,
+        };
+        let contract = ethabi::Contract::load(abi.0).unwrap();
         let this = Self {
+            ws_endpoint_string: ws_infura_endpoint_string,
+            http_endpoint_string: http_infura_endpoint_string,
+            franklin_abi: abi,
+            franklin_contract: contract,
+            franklin_contract_address: address,
             committed_blocks: vec![],
             verified_blocks: vec![],
-            network: network
         };
         this
     }
@@ -41,35 +82,80 @@ impl EventsFranklin {
         self.verified_blocks.clone()
     }
 
-    fn subscribe_to_logs(&mut self) {
-        // Websocket Endpoint
-        let enpoint = match self.network.clone() {
-            InfuraEndpoint::Mainnet => "wss://mainnet.infura.io/ws",
-            InfuraEndpoint::Rinkeby => "wss://rinkeby.infura.io/ws",
+    pub fn get_past_logs(&mut self, blocks_delta: u64) -> Result<Vec<Log>, &'static str> {
+        // Set web3
+        let (_eloop, transport) = match web3::transports::Http::new(self.http_endpoint_string.as_str()) {
+            Err(_) => return Err("Error creating web3 with this endpoint"),
+            Ok(result) => result,
         };
+        let web3 = web3::Web3::new(transport);
 
-        // Contract address
-        let franklin_address: Address = match self.network.clone() {
-            InfuraEndpoint::Mainnet => "fddb8167fef957f7cc72686094fac1d31be5ecfe",
-            InfuraEndpoint::Rinkeby => "fddb8167fef957f7cc72686094fac1d31be5ecfe",
-        }.parse().unwrap();
+        // let contract = Contract::new(web3.eth(), franklin_address.clone(), franklin_contract.clone());
+
+        // Get last block
+        let last_block_number = web3.eth().block_number().wait();
+        if last_block_number.is_err() {
+            return Err("Error getting last block number")
+        }
+        let last_block_number_u64 = match last_block_number {
+            Err(_) => return Err("Error while last block number to u64"),
+            Ok(result) => result,
+        }.as_u64();
+        // To block = last block - blocks delta
+        let to_block_number_u64 = last_block_number_u64 - blocks_delta;
+        let to_block_number = BlockNumber::Number(to_block_number_u64);
+        // From block
+        let from_block_number = BlockNumber::Earliest;
+
+        // Events topics
+        let block_verified_topic = "BlockVerified(uint32)";
+        let block_committed_topic = "BlockCommitted(uint32)";
+        let block_verified_topic_h256: web3::types::H256 = helpers::get_topic_keccak_hash(block_verified_topic);
+        let block_committed_topic_h256: web3::types::H256 = helpers::get_topic_keccak_hash(block_committed_topic);
+
+        let topics_vec_h256: Vec<web3::types::H256> = vec![block_verified_topic_h256, block_committed_topic_h256];
+
+        // Filter
+        let filter = FilterBuilder::default()
+                    .address(vec![self.franklin_contract_address.clone()])
+                    .from_block(from_block_number)
+                    .to_block(to_block_number)
+                    .topics(
+                        Some(topics_vec_h256),
+                        None,
+                        None,
+                        None,
+                    )
+                    .build();
+
+        // Filter result
+        let events_filter_result = web3.eth().logs(filter).wait();
+        if events_filter_result.is_err() {
+            return Err("Error getting filter results")
+        }
+
+        // Logs
+        match events_filter_result {
+            Err(_) => Err("Wrong events result"),
+            Ok(result) => Ok(result),
+        }
+    }
+
+    pub fn subscribe_to_logs(&mut self) {
 
         // Get topic keccak hash
         let block_verified_topic = "BlockVerified(uint32)";
         let block_committed_topic = "BlockCommitted(uint32)";
-        let block_verified_topic_h256: web3::types::H256 = get_topic_keccak_hash(block_verified_topic);
-        let block_committed_topic_h256: web3::types::H256 = get_topic_keccak_hash(block_committed_topic);
+        let block_verified_topic_h256: web3::types::H256 = helpers::get_topic_keccak_hash(block_verified_topic);
+        let block_committed_topic_h256: web3::types::H256 = helpers::get_topic_keccak_hash(block_committed_topic);
 
         let topics_vec_h256: Vec<web3::types::H256> = vec![block_verified_topic_h256, block_committed_topic_h256];
-
-        // TODO: not working genesis block
-        let franklin_genesis_block = 0;
 
         // Setup loop and web3
         let mut eloop = Core::new().unwrap();
         let handle = eloop.handle();
         let w3 = Rc::new(web3::Web3::new(
-            web3::transports::WebSocket::with_event_loop(enpoint, &handle)
+            web3::transports::WebSocket::with_event_loop(self.ws_endpoint_string.as_str(), &handle)
                 .unwrap(),
         ));
 
@@ -77,8 +163,7 @@ impl EventsFranklin {
         println!("subscribing to franklin logs {:?} {:?}...", block_verified_topic, block_committed_topic);
 
         let filter = FilterBuilder::default()
-            .address(vec![franklin_address])
-            .from_block(franklin_genesis_block.into())
+            .address(vec![self.franklin_contract_address.clone()])
             .topics(
                 Some(topics_vec_h256),
                 None,
@@ -119,7 +204,7 @@ impl EventsFranklin {
                                 // println!("Block exists: {:?}", result);
                                 // let tx = result.unwrap().clone().transaction_hash;
                                 // println!("--- Starting getting tx");
-                                // let data = get_transaction_receipt(InfuraEndpoint::Rinkeby, &tx);
+                                // let data = FranklinTransaction::get_transaction(InfuraEndpoint::Rinkeby, &tx);
                                 // println!("TX data committed: {:?}", data);
                             } else if topic == block_committed_topic_h256 {
                                 println!("-");

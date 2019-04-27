@@ -6,3 +6,4 @@ version = "0.1.0"
 tokio-core = "0.1"
 web3 = { git = "https://github.com/tomusdrw/rust-web3" }
 tiny-keccak = "1.4.2"
+ethabi = "7.0.0"
