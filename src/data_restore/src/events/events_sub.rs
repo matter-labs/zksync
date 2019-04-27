@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use web3::futures::{Future, Stream};
-use web3::types::{Log, Address, FilterBuilder, H256, BlockNumber};
+use web3::types::{Log, Address, FilterBuilder, H256, U256, BlockNumber};
 use tokio_core::reactor::Core;
 use blocks::{BlockType, LogBlockData};
 use helpers;
@@ -82,6 +82,20 @@ impl EventsFranklin {
         self.verified_blocks.clone()
     }
 
+    pub fn get_last_block_number(&mut self) -> Result<U256, &'static str> {
+        let (_eloop, transport) = match web3::transports::Http::new(self.http_endpoint_string.as_str()) {
+            Err(_) => return Err("Error creating web3 with this endpoint"),
+            Ok(result) => result,
+        };
+        let web3 = web3::Web3::new(transport);
+        let last_block_number = web3.eth().block_number().wait();
+        let result = match last_block_number {
+            Err(_) => return Err("Error getting last block number"),
+            Ok(result) => result,
+        };
+        Ok(result)
+    }
+
     pub fn sort_logs(&mut self, logs: Vec<Log>) -> Result<(Vec<LogBlockData>, Vec<LogBlockData>), &'static str> {
         if logs.len() == 0 {
             return Err("No logs in list")
@@ -90,8 +104,8 @@ impl EventsFranklin {
         let mut verified_block_data: Vec<LogBlockData> = vec![];
         let block_verified_topic = "BlockVerified(uint32)";
         let block_committed_topic = "BlockCommitted(uint32)";
-        let block_verified_topic_h256: web3::types::H256 = helpers::get_topic_keccak_hash(block_verified_topic);
-        let block_committed_topic_h256: web3::types::H256 = helpers::get_topic_keccak_hash(block_committed_topic);
+        let block_verified_topic_h256: H256 = helpers::get_topic_keccak_hash(block_verified_topic);
+        let block_committed_topic_h256: H256 = helpers::get_topic_keccak_hash(block_committed_topic);
         for log in logs {
             let mut block: LogBlockData = LogBlockData {
                 block_num: H256::zero(),
@@ -141,10 +155,10 @@ impl EventsFranklin {
         // Events topics
         let block_verified_topic = "BlockVerified(uint32)";
         let block_committed_topic = "BlockCommitted(uint32)";
-        let block_verified_topic_h256: web3::types::H256 = helpers::get_topic_keccak_hash(block_verified_topic);
-        let block_committed_topic_h256: web3::types::H256 = helpers::get_topic_keccak_hash(block_committed_topic);
+        let block_verified_topic_h256: H256 = helpers::get_topic_keccak_hash(block_verified_topic);
+        let block_committed_topic_h256: H256 = helpers::get_topic_keccak_hash(block_committed_topic);
 
-        let topics_vec_h256: Vec<web3::types::H256> = vec![block_verified_topic_h256, block_committed_topic_h256];
+        let topics_vec_h256: Vec<H256> = vec![block_verified_topic_h256, block_committed_topic_h256];
 
         // Filter
         let filter = FilterBuilder::default()
@@ -180,26 +194,13 @@ impl EventsFranklin {
 
     pub fn get_past_logs(&mut self, blocks_delta: u64) -> Result<Vec<Log>, &'static str> {
         // Set web3
-        let (_eloop, transport) = match web3::transports::Http::new(self.http_endpoint_string.as_str()) {
-            Err(_) => return Err("Error creating web3 with this endpoint"),
-            Ok(result) => result,
-        };
-        let web3 = web3::Web3::new(transport);
-
-        // let contract = Contract::new(web3.eth(), franklin_address.clone(), franklin_contract.clone());
-
-        // Get last block
-        let last_block_number = web3.eth().block_number().wait();
-        if last_block_number.is_err() {
-            return Err("Error getting last block number")
-        }
-        let last_block_number_u64 = match last_block_number {
-            Err(_) => return Err("Error while last block number to u64"),
+        let last_block_number_u64 = match self.get_last_block_number() {
+            Err(_) => return Err("Cant get last block number"),
             Ok(result) => result,
         }.as_u64();
         // To block = last block - blocks delta
         let to_block_number_u64 = last_block_number_u64 - blocks_delta;
-        let to_block_number = BlockNumber::Number(to_block_number_u64);
+        let to_block_number: BlockNumber = BlockNumber::Number(to_block_number_u64);
         // From block
         let from_block_number = BlockNumber::Earliest;
         let logs = self.get_logs(from_block_number, to_block_number);
@@ -211,10 +212,10 @@ impl EventsFranklin {
         // Get topic keccak hash
         let block_verified_topic = "BlockVerified(uint32)";
         let block_committed_topic = "BlockCommitted(uint32)";
-        let block_verified_topic_h256: web3::types::H256 = helpers::get_topic_keccak_hash(block_verified_topic);
-        let block_committed_topic_h256: web3::types::H256 = helpers::get_topic_keccak_hash(block_committed_topic);
+        let block_verified_topic_h256: H256 = helpers::get_topic_keccak_hash(block_verified_topic);
+        let block_committed_topic_h256: H256 = helpers::get_topic_keccak_hash(block_committed_topic);
 
-        let topics_vec_h256: Vec<web3::types::H256> = vec![block_verified_topic_h256, block_committed_topic_h256];
+        let topics_vec_h256: Vec<H256> = vec![block_verified_topic_h256, block_committed_topic_h256];
 
         // Setup loop and web3
         let mut eloop = Core::new().unwrap();
