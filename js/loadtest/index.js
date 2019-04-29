@@ -12,8 +12,14 @@ const MIN_AMOUNT = ethers.utils.parseEther('0.1') // ~USD 15
 const WITH_MARGIN = MIN_AMOUNT.add(ethers.utils.parseEther('0.04')) // ~USD 6 more for gas
 
 var args = process.argv.slice(2)
-let nClients = args[0] || 7
-let tps = args[1] || 1000
+let nClients = args[0] || 1
+let tps = args[1] || 1
+
+let clients = []
+
+function randomClient() {
+    return clients[ Math.floor(Math.random() * nClients) ]
+}
 
 console.log(`Usage: yarn test -- [nClients] [TPS]`)
 console.log(`Starting loadtest for ${nClients} with ${tps} TPS`)
@@ -29,9 +35,11 @@ class Client {
         let signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/" + this.id + 17)
         this.fra = await franklin.Wallet.fromSigner(signer)
         this.eth = this.fra.ethWallet
-
+        console.log(`${this.eth.address}: prepare`)
+        
         try {
             let fundingRequired = false
+            console.log(`${this.eth.address}: pullState()`)
             await this.fra.pullState()
             if (this.fra.sidechainOpen) {
                 let balance = this.fra.currentBalance
@@ -79,20 +87,28 @@ class Client {
         }
     }
 
-    async send() {
-        let account = await franklin.getAccount(this.id);
-        console.log(`client #${this.id}: tx `, account)
-        return 5
+    async randomTransfer() {
+        console.log(`${this.eth.address}: randomTransfer(), ${this.fra.sidechainAccountId}`)
+        let toAccountId = null
+        while (true) {
+            let client = randomClient().sidechainAccountId
+            if (client.sidechainOpen && client.sidechainAccountId !== this.sidechainAccountId) {
+                toAccountId = client.sidechainAccountId
+                break
+            }
+        }
+
+        console.log(`${this.eth.address}: transfer to ${toAccountId}`)
+        let amount = franklin.truncate(this.fra.currentBalance.div(10))
+        console.log(`${this.eth.address}: transfer(${toAccountId}, ${amount})`)
+        await this.fra.transfer(toAccountId, amount)
+        console.log(`${this.eth.address}: transfer done`)
     }
 }
-
-let clients = []
 
 async function test() {
 
     sourceNonce = await source.getTransactionCount("pending")
-    console.log('sourceNonce', sourceNonce)
-    //return 
 
     console.log('creating clients...')
     for (let i=0; i < nClients; i++) {
@@ -108,18 +124,17 @@ async function test() {
     console.log('waiting until the clients are ready...')
     await Promise.all(promises)
 
-    // console.log('starting the test...')
-    // while(true) {
-    //     var nextTick = new Date(new Date().getTime() + 1000);
-    //     for (let i=0; i<tps; i++) {
-    //         let client = Math.floor(Math.random() * nClients);
-    //         clients[client].send()
-    //     }
-    //     console.log('-')
-    //     while(nextTick > new Date()) {
-    //         await new Promise(resolve => setTimeout(resolve, 1))
-    //     }
-    // }
+    console.log('starting the test...')
+    while(true) {
+        var nextTick = new Date(new Date().getTime() + 1000);
+        for (let i=0; i<tps; i++) {
+            randomClient().randomTransfer()
+        }
+        console.log('-')
+        while(nextTick > new Date()) {
+            await new Promise(resolve => setTimeout(resolve, 1))
+        }
+    }
 }
 
 test()

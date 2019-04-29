@@ -1,7 +1,7 @@
 const axios = require('axios')
 const ethers = require('ethers')
 const {keccak256} = require('js-sha3')
-const {newKey} = require('./transaction.js')
+const transaction = require('./transaction.js')
 const PlasmaContractABI = require('../abi/PlasmaContract.json').abi
 
 const MULTIPLIER = ethers.utils.bigNumberify('1000000000000')
@@ -15,7 +15,7 @@ class FranklinWallet {
         this.ethAddress = ethAddress
 
         if (!privateKeySeed) throw 'Cannot create FranklinWallet: privateKeySeed must be valid'
-        this.key = newKey(privateKeySeed)
+        this.key = transaction.newKey(privateKeySeed)
 
         this.sidechainAccountId = null
         this.sidechainState = null
@@ -23,7 +23,8 @@ class FranklinWallet {
         console.log(`new FranklinWallet(${this.ethAddress})`)
     }
 
-    async pullState() {
+    async pullState(checkAddress) {
+        checkAddress = checkAddress || !this.sidechainAccountId
         this.sidechainAccountId = await this.eth.contract.ethereumAddressToAccountID(this.ethAddress)
         this.sidechainState = this.sidechainAccountId > 0 ?
             await this.fra.pullSidechainState(this.sidechainAccountId) : null
@@ -60,6 +61,35 @@ class FranklinWallet {
 
         let contract = this.eth.contract.connect(this.ethWallet)
         return contract.deposit([pubX, pubY], maxFee, {value})
+    }
+
+    async transfer(to, amount) {
+        if ( !this.sidechainOpen ) {
+            throw ''
+        }
+
+        if (!this.fra.truncate(amount).eq(amount)) {
+            throw 'Amount must be rounded with franklin.truncate(): ' + amount
+        }
+
+        // TODO: if `to` is address, convert it to sidechainAccountId
+
+        const from = this.sidechainAccountId
+        amount = amount.div(MULTIPLIER).toNumber()
+        const privateKey = this.key.privateKey
+        //console.log(this.sidechainState)
+        const nonce = this.sidechainState.current.nonce
+        const good_until_block = 50000 // TODO: add to current block?
+        const fee = 0;
+
+        const apiForm = transaction.createTransaction(from, to, amount, fee, nonce, good_until_block, privateKey);
+        const result = await axios({
+            method:     'post',
+            url:        this.fra.baseUrl + '/submit_tx',
+            data:       apiForm
+        });
+        return result.data
+        await this.pullState(false)
     }
     
 }
@@ -114,11 +144,11 @@ class Franklin {
     }
 
     async pullSidechainState(accountId) {
-        //console.log(`getAccountInfo ${accountId}`)
         let result = (await axios({
             method: 'get',
             url:    this.baseUrl + '/account/' + accountId,
         }))
+
         if(result.status !== 200) {
             throw `Could not load data for account ${accountId}: ${result.error}`
         }
@@ -129,6 +159,10 @@ class Franklin {
             throw `Getting data for account ${accountId} failed: ${result.data.error}`
         }
         return this._parseStateResult(result.data)
+    }
+
+    truncate(amount) {
+        return ethers.utils.bigNumberify(Math.floor(amount.div(MULTIPLIER).toNumber())).mul(MULTIPLIER)
     }
 
 }
