@@ -88,16 +88,14 @@ class Client {
     }
 
     async randomTransfer() {
-        console.log(`${this.eth.address}: randomTransfer(), ${this.fra.sidechainAccountId}`)
         let toAccountId = null
         while (true) {
-            let client = randomClient().sidechainAccountId
-            if (client.sidechainOpen && client.sidechainAccountId !== this.sidechainAccountId) {
-                toAccountId = client.sidechainAccountId
+            let to = randomClient().fra.sidechainAccountId
+            if (to.fra.sidechainOpen && to.fra.sidechainAccountId !== this.fra.sidechainAccountId) {
+                toAccountId = to.fra.sidechainAccountId
                 break
             }
         }
-
         console.log(`${this.eth.address}: transfer to ${toAccountId}`)
         let amount = franklin.truncate(this.fra.currentBalance.div(10))
         console.log(`${this.eth.address}: transfer(${toAccountId}, ${amount})`)
