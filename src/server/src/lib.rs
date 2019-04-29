@@ -33,7 +33,7 @@ extern crate web3;
 
 extern crate hyper;
 extern crate serde;
-extern crate serde_json;
+//extern crate serde_json;
 
 extern crate tokio;
 extern crate actix;

@@ -27,11 +27,13 @@ push: images
 	docker push gluk64/franklin:server
 	docker push gluk64/franklin:prover
 
-up: images
+start: images
 	@docker-compose up -d --scale prover=1 server prover
 
-down:
+stop:
 	@docker-compose stop server prover
+
+restart: stop start
 
 logs:
 	@docker-compose logs -f server prover

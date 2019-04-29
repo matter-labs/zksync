@@ -59,11 +59,11 @@ Client UI will be available at http://localhost:8080
 ## Start server and prover as local docker containers:
 
 - Start:
-```make up```
+```make start```
 - Watch logs:
 ```make logs```
 - Stop:
-```make down```
+```make stop```
 
 ## Build and push images to dockerhub:
 
