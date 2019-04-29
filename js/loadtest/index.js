@@ -26,13 +26,16 @@ class Client {
         let privateKey = keccak256( await this.eth.signMessage( franklin.Wallet.LoginMessage ) )
         this.fra = franklin.Wallet.fromEthAddress(this.eth.address, privateKey)
         await this.fra.pullState()
-        console.log(`this.fra.sidechainAccountId`, this.fra.sidechainAccountId)
-        // if franklin not exists
+        console.log(`this.fra.sidechainAccountId`, this.fra.sidechainAccountId, this.fra.sidechainState)
+
+        if (!this.fra.sidechainOpen) {
+            console.log(`sidechain deposit required for ${this.eth.address}`)
             // if wallet empty
                 // transfer funds from source account
                 // wait for receipt
             // deposit funds into franklin from $FUNDING_ACCOUNT
             // wait for receipt
+        }
     }
 
     async send() {

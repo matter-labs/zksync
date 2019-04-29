@@ -11,13 +11,21 @@ class FranklinWallet {
         this.privateKey = privateKey
 
         this.sidechainAccountId = null
+        this.sidechainState = null
 
         console.log(`new FranklinWallet(${this.ethAddress}, ${this.privateKey})`)
     }
 
     async pullState() {
         this.sidechainAccountId = await this.eth.contract.ethereumAddressToAccountID(this.ethAddress)
+        this.sidechainState = this.sidechainAccountId > 0 ?
+            await fra.pullSidechainState(this.sidechainAccountId) : null
     }
+
+    get sidechainOpen() {
+        return this.sidechainAccountId && true
+    }
+    
 }
 
 class Wallet {
@@ -47,7 +55,7 @@ class Franklin {
         console.log(`Franklin client created for ${serverUrl}`)
     }
 
-    parseStateResult(data) {
+    _parseStateResult(data) {
         if (data.error !== undefined && data.error == "non-existent") {
             data.closing = true
         } else {
@@ -64,7 +72,7 @@ class Franklin {
         return data
     }
 
-    async getPlasmaInfo(accountId) {
+    async pullSidechainState(accountId) {
         //console.log(`getAccountInfo ${accountId}`)
         let result = (await axios({
             method: 'get',
@@ -79,11 +87,7 @@ class Franklin {
         if(result.data.error) {
             throw `Getting data for account ${accountId} failed: ${result.data.error}`
         }
-        return this.parseStateResult(result.data)
-    }
-
-    async getAccount(id) {
-        return this.getPlasmaInfo(id)
+        return this._parseStateResult(result.data)
     }
 
 }
