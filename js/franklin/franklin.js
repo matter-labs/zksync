@@ -15,7 +15,7 @@ class FranklinWallet {
         console.log(`new FranklinWallet(${this.ethAddress}, ${this.privateKey})`)
     }
 
-    async updateStatus() {
+    async pullState() {
         this.sidechainAccountId = await this.eth.contract.ethereumAddressToAccountID(this.ethAddress)
     }
 }

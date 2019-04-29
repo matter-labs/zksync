@@ -25,7 +25,7 @@ class Client {
         console.log( await this.eth.signMessage( franklin.Wallet.LoginMessage ) )
         let privateKey = keccak256( await this.eth.signMessage( franklin.Wallet.LoginMessage ) )
         this.fra = franklin.Wallet.fromEthAddress(this.eth.address, privateKey)
-        await this.fra.updateStatus()
+        await this.fra.pullState()
         console.log(`this.fra.sidechainAccountId`, this.fra.sidechainAccountId)
         // if franklin not exists
             // if wallet empty
