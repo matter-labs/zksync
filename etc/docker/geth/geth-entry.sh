@@ -17,4 +17,5 @@ geth --networkid 9 --mine --minerthreads 1 \
     --rpccorsdomain "*" --nat "any" --rpcapi eth,web3,personal,net \
     --unlock 0 --password "./password.sec" --allow-insecure-unlock \
     --ws --wsport 8546 \
+    --gcmode archive \
     --wsorigins "*" --rpcvhosts=*
