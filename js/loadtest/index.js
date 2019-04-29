@@ -1,17 +1,20 @@
+const {keccak256} = require('js-sha3')
+const ethers = require('ethers')
+const Franklin = require('../franklin')
+
+const provider = new ethers.providers.JsonRpcProvider()
+const franklin = new Franklin(process.env.API_SERVER, provider, process.env.CONTRACT_ADDR)
+
+let source = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/0").connect(provider)
+
+const MIN_AMOUNT = ethers.utils.parseEther('0.5')
+
 var args = process.argv.slice(2)
 let nClients = args[0] || 1
 let tps = args[1] || 1000
 
 console.log(`Usage: yarn test -- [nClients] [TPS]`)
 console.log(`Starting loadtest for ${nClients} with ${tps} TPS`)
-
-const {keccak256} = require('js-sha3')
-const ethers = require('ethers')
-
-const localProvider = new ethers.providers.JsonRpcProvider()
-
-const Franklin = require('../franklin')
-const franklin = new Franklin(process.env.API_SERVER, localProvider, process.env.CONTRACT_ADDR)
 
 class Client {
 
@@ -21,7 +24,7 @@ class Client {
     }
 
     async prepare() {
-        this.eth = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/" + this.id + 10)
+        this.eth = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/" + this.id + 12).connect(provider)
         console.log( await this.eth.signMessage( franklin.Wallet.LoginMessage ) )
         let privateKey = keccak256( await this.eth.signMessage( franklin.Wallet.LoginMessage ) )
         this.fra = franklin.Wallet.fromEthAddress(this.eth.address, privateKey)
@@ -29,10 +32,21 @@ class Client {
         console.log(`this.fra.sidechainAccountId`, this.fra.sidechainAccountId, this.fra.sidechainState)
 
         if (!this.fra.sidechainOpen) {
-            console.log(`sidechain deposit required for ${this.eth.address}`)
-            // if wallet empty
+            console.log(`${this.eth.address}: sidechain account not open, deposit required`)
+
+            let balance = await this.eth.getBalance()
+            console.log(`${this.eth.address}: current balance is ${ethers.utils.formatEther(balance)} ETH`)
+            if (balance.lt(MIN_AMOUNT)) {
+                console.log(`${this.eth.address}: funding required`)
                 // transfer funds from source account
-                // wait for receipt
+                let response = await source.sendTransaction({
+                    to:     this.eth.address,
+                    value:  MIN_AMOUNT,
+                })
+                console.log(`${this.eth.address}: funding tx sent`)
+                let receipt = await response.wait()
+                console.log(`${this.eth.address}: funding tx mined`)
+            }
             // deposit funds into franklin from $FUNDING_ACCOUNT
             // wait for receipt
         }
