@@ -90,7 +90,7 @@ class Client {
     async randomTransfer() {
         let toAccountId = null
         while (true) {
-            let to = randomClient().fra.sidechainAccountId
+            let to = randomClient()
             if (to.fra.sidechainOpen && to.fra.sidechainAccountId !== this.fra.sidechainAccountId) {
                 toAccountId = to.fra.sidechainAccountId
                 break
