@@ -18,7 +18,7 @@ class FranklinWallet {
         this.sidechainAccountId = null
         this.sidechainState = null
 
-        console.log(`new FranklinWallet(${this.ethAddress}, ${this.privateKey})`)
+        console.log(`new FranklinWallet(${this.ethAddress})`)
     }
 
     async pullState() {
