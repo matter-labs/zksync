@@ -25,7 +25,7 @@ class Client {
     }
 
     async prepare() {
-        let signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/" + this.id + 18)
+        let signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/" + this.id + 15)
         this.fra = await franklin.Wallet.fromSigner(signer)
         this.eth = this.fra.ethWallet
 
@@ -59,6 +59,7 @@ class Client {
                     await sleep(500)
                     await this.fra.pullState()
                 }
+                console.log(`${this.eth.address}: sidechain deposit complete`)
             }
         } catch (err) {
             console.log(`${this.eth.address}: ERROR: ${err}`)

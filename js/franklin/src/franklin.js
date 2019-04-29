@@ -4,6 +4,8 @@ const {keccak256} = require('js-sha3')
 const {newKey} = require('./transaction.js')
 const PlasmaContractABI = require('../abi/PlasmaContract.json').abi
 
+const MULTIPLIER = ethers.utils.bigNumberify('1000000000000')
+
 class FranklinWallet {
     constructor(franklin, ethAddress, privateKeySeed, signer) {
         this.fra = franklin
@@ -28,7 +30,7 @@ class FranklinWallet {
     }
 
     get sidechainOpen() {
-        return this.sidechainAccountId && true
+        return this.sidechainAccountId && this.sidechainState.state === 'open'
     }
 
     async deposit(amount) {
@@ -91,17 +93,18 @@ class Franklin {
 
     _parseStateResult(data) {
         if (data.error !== undefined && data.error == "non-existent") {
-            data.closing = true
+            data.state = 'closing'
+        } if (!data.verified) {
+            data.state = 'opening'
         } else {
-            data.closing = false
-        }
-        const multiplier = ethers.utils.bigNumberify('1000000000000')
-        data.verified.balance = ethers.utils.formatEther((ethers.utils.bigNumberify(data.verified.balance)).mul(multiplier))
-        data.committed.balance = ethers.utils.formatEther((ethers.utils.bigNumberify(data.committed.balance)).mul(multiplier))
-        data.pending.balance = ethers.utils.formatEther((ethers.utils.bigNumberify(data.pending.balance)).mul(multiplier))
-        // TODO: remove when server updated
-        if (Number(data.pending_nonce) > Number(data.pending.nonce)) {
-            data.pending.nonce = data.pending_nonce
+            data.state = 'open'
+            data.verified.balance = ethers.utils.formatEther((ethers.utils.bigNumberify(data.verified.balance)).mul(MULTIPLIER))
+            data.committed.balance = ethers.utils.formatEther((ethers.utils.bigNumberify(data.committed.balance)).mul(MULTIPLIER))
+            data.pending.balance = ethers.utils.formatEther((ethers.utils.bigNumberify(data.pending.balance)).mul(MULTIPLIER))
+            // TODO: remove when server updated
+            if (Number(data.pending_nonce) > Number(data.pending.nonce)) {
+                data.pending.nonce = data.pending_nonce
+            }
         }
         return data
     }
