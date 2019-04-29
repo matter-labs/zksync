@@ -2,7 +2,7 @@
   "name": "franklin",
   "version": "1.0.0",
   "description": "Franklin JS client library",
-  "main": "franklin.js",
+  "main": "src/franklin.js",
   "author": "Alex Gluchowski",
   "license": "ISC",
   "dependencies": {

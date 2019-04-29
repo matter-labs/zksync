@@ -1,6 +1,5 @@
-const {keccak256} = require('js-sha3')
 const ethers = require('ethers')
-const Franklin = require('../franklin')
+const Franklin = require('../franklin/src/franklin')
 
 const provider = new ethers.providers.JsonRpcProvider()
 const franklin = new Franklin(process.env.API_SERVER, provider, process.env.CONTRACT_ADDR)
@@ -24,10 +23,10 @@ class Client {
     }
 
     async prepare() {
-        this.eth = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/" + this.id + 12).connect(provider)
-        console.log( await this.eth.signMessage( franklin.Wallet.LoginMessage ) )
-        let privateKey = keccak256( await this.eth.signMessage( franklin.Wallet.LoginMessage ) )
-        this.fra = franklin.Wallet.fromEthAddress(this.eth.address, privateKey)
+        let signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/" + this.id + 13)
+        this.fra = await franklin.Wallet.fromSigner(signer)
+        this.eth = this.fra.ethWallet
+
         await this.fra.pullState()
         console.log(`this.fra.sidechainAccountId`, this.fra.sidechainAccountId, this.fra.sidechainState)
 
@@ -39,16 +38,19 @@ class Client {
             if (balance.lt(MIN_AMOUNT)) {
                 console.log(`${this.eth.address}: funding required`)
                 // transfer funds from source account
-                let response = await source.sendTransaction({
+                let request = await source.sendTransaction({
                     to:     this.eth.address,
                     value:  MIN_AMOUNT,
                 })
                 console.log(`${this.eth.address}: funding tx sent`)
-                let receipt = await response.wait()
+                let receipt = await request.wait()
                 console.log(`${this.eth.address}: funding tx mined`)
             }
-            // deposit funds into franklin from $FUNDING_ACCOUNT
-            // wait for receipt
+            // deposit funds into franklin
+            let request = await this.fra.deposit(MIN_AMOUNT)
+            console.log(`${this.eth.address}: deposit tx sent`)
+            let receipt = await request.wait()
+            console.log(`${this.eth.address}: deposit tx mined`)
         }
     }
 

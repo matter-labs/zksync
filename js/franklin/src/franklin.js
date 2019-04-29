@@ -1,14 +1,19 @@
 const axios = require('axios')
 const ethers = require('ethers')
-const PlasmaContractABI = require('./PlasmaContract.json').abi
+const {keccak256} = require('js-sha3')
+const {newKey} = require('./transaction.js')
+const PlasmaContractABI = require('../abi/PlasmaContract.json').abi
 
 class FranklinWallet {
-    constructor(franklin, ethAddress, privateKey) {
+    constructor(franklin, ethAddress, privateKeySeed, signer) {
         this.fra = franklin
         this.eth = franklin.eth
+        this.ethWallet = signer.connect(franklin.eth.provider)
 
         this.ethAddress = ethAddress
-        this.privateKey = privateKey
+
+        if (!privateKeySeed) throw 'Cannot create FranklinWallet: privateKeySeed must be valid'
+        this.key = newKey(privateKeySeed)
 
         this.sidechainAccountId = null
         this.sidechainState = null
@@ -25,6 +30,28 @@ class FranklinWallet {
     get sidechainOpen() {
         return this.sidechainAccountId && true
     }
+
+    async deposit(amount) {
+        if (!this.ethWallet) {
+            throw 'Can not initiate deposit into Franklin: no wallet connected'
+        }
+
+        // Normally we would let the Wallet populate this for us, but we
+        // need to compute EXACTLY how much value to send
+        let gasPrice = await this.eth.provider.getGasPrice();
+
+        // The exact cost (in gas) to send to an Externally Owned Account (EOA)
+        let gasLimit = 210000;
+
+        // The balance less exactly the txfee in wei
+        let value = amount.sub(gasPrice.mul(gasLimit))
+
+        let pubX = '0x'+this.key.publicKey.x
+        let pubY = '0x'+this.key.publicKey.y
+        let maxFee = ethers.utils.parseEther('0.0')
+
+        return this.eth.contract.deposit([pubX, pubY], maxFee, {value})
+    }
     
 }
 
@@ -34,8 +61,14 @@ class Wallet {
         this.LoginMessage = 'Login Franklin v0.1'
     }
 
-    fromEthAddress(ethAddress, privateKey) {
-        return new FranklinWallet(this.franklin, ethAddress, privateKey)
+    fromAddressAndSeed(ethAddress, privateKeySeed) {
+        return new FranklinWallet(this.franklin, ethAddress, privateKeySeed)
+    }
+
+    async fromSigner(signer) {
+        // console.log( await this.eth.signMessage( franklin.Wallet.LoginMessage ) )
+        let privateKey = keccak256( await signer.signMessage( this.LoginMessage ) )
+        return new FranklinWallet(this.franklin, signer.address, privateKey, signer)
     }
 }
 
