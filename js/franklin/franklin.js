@@ -1,9 +1,49 @@
 const axios = require('axios')
+const ethers = require('ethers')
+const PlasmaContractABI = require('./PlasmaContract.json').abi
+
+class FranklinWallet {
+    constructor(franklin, ethAddress, privateKey) {
+        this.fra = franklin
+        this.eth = franklin.eth
+
+        this.ethAddress = ethAddress
+        this.privateKey = privateKey
+
+        this.sidechainAccountId = null
+
+        console.log(`new FranklinWallet(${this.ethAddress}, ${this.privateKey})`)
+    }
+
+    async updateStatus() {
+        this.sidechainAccountId = await this.eth.contract.ethereumAddressToAccountID(this.ethAddress)
+    }
+}
+
+class Wallet {
+    constructor(franklin) {
+        this.franklin = franklin
+        this.LoginMessage = 'Login Franklin v0.1'
+    }
+
+    fromEthAddress(ethAddress, privateKey) {
+        return new FranklinWallet(this.franklin, ethAddress, privateKey)
+    }
+}
 
 class Franklin {
-
-    constructor(serverUrl) {
+    constructor(serverUrl, provider, contractAddress) {
         this.baseUrl = serverUrl + '/api/v0.1'
+        this.Wallet = new Wallet(this)
+        this.eth = {
+            provider,
+            contractAddress
+        }
+        
+        if (typeof contractAddress !== 'string' || contractAddress.length < 4) throw 'Invalid contract address: ' + contractAddress
+        if (!contractAddress.startsWith('0x')) contractAddress = '0x' + contractAddress
+        console.log('contractAddress', contractAddress)
+        this.eth.contract = new ethers.Contract(contractAddress, PlasmaContractABI, provider)
         console.log(`Franklin client created for ${serverUrl}`)
     }
 

@@ -38,10 +38,13 @@ export default {
                     account = ethereum.selectedAddress
                 }
                 console.log('Logging in with', account)
-                let sig = await eth.personal_sign(ethUtil.fromUtf8(new Buffer('Login to Plasma Wallet')), account)
+                let sig = await eth.personal_sign(ethUtil.fromUtf8(new Buffer('Login Franklin v0.1')), account)
                 store.account.address = account
 
                 let hash = keccak256(sig)
+                console.log('sig', sig)
+                console.log('hash', hash)
+
                 store.account.plasma.key = newKey(sig)
                 console.log(store.account.plasma.key)
 

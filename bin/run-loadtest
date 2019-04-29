@@ -1,5 +1,5 @@
 #!/bin/bash
 
 . .setup_env
-cd loadtest
+cd js/loadtest
 yarn test

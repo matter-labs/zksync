@@ -34,7 +34,7 @@ module.exports = {
           host: "127.0.0.1",
           port: 8545,
           gas: 6800000,
-          //from: "0x5cc401a56a5295709958e07519755a53b0506b1e",
+          from: `0x+${process.env.FUNDING_ACCOUNT}`,
           network_id: 9
         },   
 
