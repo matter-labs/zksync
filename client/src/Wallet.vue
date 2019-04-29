@@ -225,7 +225,7 @@ export default {
     },
     computed: {
         isTestnet() {
-            return this.network === '4' || this.network === '1335'
+            return this.network === '4' || this.network === '9'
         },
         baseUrl() {
             //return (this.isDev ? 'http://localhost:3000' : 'https://api.plasma-winter.io') + '/api/v0.1'

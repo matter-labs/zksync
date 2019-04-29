@@ -7,7 +7,7 @@ services:
       - DATABASE_URL=postgres://postgres@postgres/plasma
       - WEB3_URL=http://geth:8545
     ports:
-      - "80:3000"
+      - "3000:3000"
   prover:
     image: "gluk64/franklin:prover"
     env_file: etc/env/local.env
