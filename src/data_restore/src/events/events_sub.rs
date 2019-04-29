@@ -5,9 +5,11 @@ use tokio_core::reactor::Core;
 use blocks::{BlockType, LogBlockData};
 use helpers;
 use helpers::InfuraEndpoint;
-use ethabi::{Contract, Event, Hash};
+use ethabi::Contract;
 
 type ABI = (&'static [u8], &'static str);
+type ComAndVerBlocksVecs = (Vec<LogBlockData>, Vec<LogBlockData>);
+type BlockNumber256 = U256;
 
 pub const PLASMA_TEST_ABI: ABI = (
     include_bytes!("../../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.abi"),
@@ -27,18 +29,17 @@ pub struct EventsFranklin {
     pub franklin_contract_address: Address,
     pub committed_blocks: Vec<LogBlockData>,
     pub verified_blocks: Vec<LogBlockData>,
-    pub last_watching_block_number: U256,
+    pub last_watched_block_number: BlockNumber256,
 }
 
+// Set new
+// Get last block
+// Get blocks till last - delta, set last watching block
+// Subscribe on new blocks
+// New blocks -> last watching block ++
+// Check if txs in last watching block
 impl EventsFranklin {
-    // Set new
-    // Get last block
-    // Get blocks till last - delta, set last watching block
-    // Subscribe on new blocks
-    // New blocks -> last watching block ++
-    // Check if txs in last watching block
-
-    pub fn new(network: InfuraEndpoint) -> Self {
+    fn new(network: InfuraEndpoint) -> Self {
         let ws_infura_endpoint_str = match network {
             InfuraEndpoint::Mainnet => "wss://mainnet.infura.io/ws",
             InfuraEndpoint::Rinkeby => "wss://rinkeby.infura.io/ws",
@@ -66,63 +67,50 @@ impl EventsFranklin {
             franklin_contract_address: address,
             committed_blocks: vec![],
             verified_blocks: vec![],
-            last_watching_block_number: U256::from(0),
+            last_watched_block_number: U256::from(0),
         };
         this
     }
 
-    // pub fn subscribe_on_network(network: InfuraEndpoint) -> Self {
-    //     let mut this = EventsFranklin::new(network);
-    //     this.subscribe_to_logs();
-    //     this
+    pub fn get_past_state_with_blocks_delta(network: InfuraEndpoint, blocks_delta: U256) -> Result<Self, String> {
+        let mut this = EventsFranklin::new(network);
+        let (blocks, to_block_number): ((Vec<LogBlockData>, Vec<LogBlockData>), BlockNumber256) = match this.get_sorted_past_logs(blocks_delta) {
+            Err(_) => return Err(String::from("Cant get sorted past logs")),
+            Ok(result) => (result.0, result.1)
+        };
+        this.committed_blocks = blocks.0;
+        this.verified_blocks = blocks.1;
+        this.last_watched_block_number = U256::from(to_block_number.as_u64());
+        Ok(this)
+    }
+
+    // pub fn get_committed_blocks(&self) -> Vec<LogBlockData> {
+    //     self.committed_blocks.clone()
     // }
 
-    pub fn check_committed_block_with_same_number_as_verified(&self, verified_block: &LogBlockData) -> Option<&LogBlockData> {
-        let committed_blocks_iter = &mut self.committed_blocks.iter();
-        let committed_block = committed_blocks_iter.find(|&&x| x.block_num == verified_block.block_num);
-        return committed_block
-    }
+    // pub fn get_verified_blocks(&self) -> Vec<LogBlockData> {
+    //     self.verified_blocks.clone()
+    // }
 
-    pub fn get_committed_blocks(&self) -> Vec<LogBlockData> {
-        self.committed_blocks.clone()
-    }
-
-    pub fn get_verified_blocks(&self) -> Vec<LogBlockData> {
-        self.verified_blocks.clone()
-    }
-
-    pub fn get_last_block_number(&mut self) -> Result<U256, &'static str> {
+    fn get_last_block_number(&mut self) -> Result<BlockNumber256, String> {
         let (_eloop, transport) = match web3::transports::Http::new(self.http_endpoint_string.as_str()) {
-            Err(_) => return Err("Error creating web3 with this endpoint"),
+            Err(_) => return Err(String::from("Error creating web3 with this endpoint")),
             Ok(result) => result,
         };
         let web3 = web3::Web3::new(transport);
         let last_block_number = web3.eth().block_number().wait();
         let result = match last_block_number {
-            Err(_) => return Err("Error getting last block number"),
+            Err(_) => return Err(String::from("Error getting last block number")),
             Ok(result) => result,
         };
         Ok(result)
     }
 
     // returns (committed blocks logs, verified blocks logs)
-    pub fn get_sorted_past_logs(&mut self, blocks_delta: u64) -> Result<(Vec<LogBlockData>, Vec<LogBlockData>), &'static str> {
-        let logs = match self.get_past_logs(blocks_delta) {
-            Err(_) => return Err("Cant get past logs"),
-            Ok(result) => result,
-        };
-        let sorted_logs = match self.sort_logs(&logs) {
-            Err(_) => return Err("Cant sort_logs"),
-            Ok(result) => result,
-        };
-        Ok(sorted_logs)
-    }
-
-    // returns (committed blocks logs, verified blocks logs)
-    pub fn sort_logs(&mut self, logs: &Vec<Log>) -> Result<(Vec<LogBlockData>, Vec<LogBlockData>), &'static str> {
+    fn sort_logs(&mut self, logs: &Vec<Log>) -> Result<ComAndVerBlocksVecs, String> {
         let logs = logs.clone();
         if logs.len() == 0 {
-            return Err("No logs in list")
+            return Err(String::from("No logs in list"))
         }
         let mut committed_block_data: Vec<LogBlockData> = vec![];
         let mut verified_block_data: Vec<LogBlockData> = vec![];
@@ -166,10 +154,10 @@ impl EventsFranklin {
         Ok((committed_block_data, verified_block_data))
     }
 
-    pub fn get_logs(&mut self, from_block_number: BlockNumber, to_block_number: BlockNumber) -> Result<Vec<Log>, &'static str> {
+    fn get_logs(&mut self, from_block_number: BlockNumber, to_block_number: BlockNumber) -> Result<Vec<Log>, String> {
         // Set web3
         let (_eloop, transport) = match web3::transports::Http::new(self.http_endpoint_string.as_str()) {
-            Err(_) => return Err("Error creating web3 with this endpoint"),
+            Err(_) => return Err(String::from("Error creating web3 with this endpoint")),
             Ok(result) => result,
         };
         let web3 = web3::Web3::new(transport);
@@ -200,15 +188,15 @@ impl EventsFranklin {
         // Filter result
         let events_filter_result = web3.eth().logs(filter).wait();
         if events_filter_result.is_err() {
-            return Err("Error getting filter results")
+            return Err(String::from("Error getting filter results"))
         }
 
         // Logs
         let logs = match events_filter_result {
-            Err(_) => Err("Wrong events result"),
+            Err(_) => Err(String::from("Wrong events result")),
             Ok(result) => {
                 if result.len()== 0 {
-                    return Err("No logs in list")
+                    return Err(String::from("No logs in list"))
                 }
                 Ok(result)
             }
@@ -216,26 +204,71 @@ impl EventsFranklin {
         logs
     }
 
-    pub fn get_past_logs(&mut self, blocks_delta: u64) -> Result<Vec<Log>, &'static str> {
-        // Set web3
-        let last_block_number_u64 = match self.get_last_block_number() {
-            Err(_) => return Err("Cant get last block number"),
-            Ok(result) => result,
-        }.as_u64();
-        // To block = last block - blocks delta
-        let to_block_number_u64 = last_block_number_u64 - blocks_delta;
-        let to_block_number: BlockNumber = BlockNumber::Number(to_block_number_u64);
-        // From block
-        let from_block_number = BlockNumber::Earliest;
-        let logs = self.get_logs(from_block_number, to_block_number);
-        logs
+    fn get_sorted_logs_in_block(&mut self, block_number: BlockNumber256) -> Result<ComAndVerBlocksVecs, String> {
+        let block_to_get_logs = BlockNumber::Number(block_number.as_u64());
+        match self.get_logs(block_to_get_logs.clone(), block_to_get_logs.clone()) {
+            Err(_) => {
+                let message = String::from("No logs in block ") + &block_number.clone().as_u64().to_string();
+                return Err(message)
+            },
+            Ok(result) => {
+                println!("Got logs in block {:?} {:?}", block_number.clone(), block_number.clone());
+                match self.sort_logs(&result) {
+                    Err(_) => {
+                        let message = String::from("Cant sort logs in block ") + &block_number.clone().as_u64().to_string();
+                        return Err(message)
+                    },
+                    Ok(sorted_logs) => return Ok((sorted_logs.0, sorted_logs.1)),
+                };
+            },
+        };
     }
 
-    pub fn subscribe_to_new_blocks(&mut self) {
+    fn get_past_logs(&mut self, blocks_delta: U256) -> Result<(Vec<Log>, BlockNumber256), String> {
+        // Set web3
+        let last_block_number = match self.get_last_block_number() {
+            Err(_) => return Err(String::from("Cant get last block number")),
+            Ok(result) => result,
+        };
+        let to_block_numer_256 = last_block_number - blocks_delta;
+        let to_block_number: BlockNumber = BlockNumber::Number(to_block_numer_256.as_u64());
+        // let last_block_number_u64 = last_block_number.as_u64();
+        // // To block = last block - blocks delta
+        // let to_block_number_u64 = last_block_number_u64 - blocks_delta;
+        // let to_block_number: BlockNumber = BlockNumber::Number(to_block_number_u64);
+
+        // From block
+        let from_block_number = BlockNumber::Earliest;
+        let logs = match self.get_logs(from_block_number, to_block_number) {
+            Err(_) => return Err(String::from("Cant get past logs")),
+            Ok(result) => result
+        };
+        Ok((logs, to_block_numer_256))
+    }
+
+    // returns (committed blocks logs, verified blocks logs) from genesis to (last block minus delta)
+    pub fn get_sorted_past_logs(&mut self, blocks_delta: U256) -> Result<(ComAndVerBlocksVecs, BlockNumber256), String> {
+        let (logs, to_block_number) = match self.get_past_logs(blocks_delta) {
+            Err(_) => return Err(String::from("Cant get past logs")),
+            Ok(result) => result,
+        };
+        let sorted_logs = match self.sort_logs(&logs) {
+            Err(_) => return Err(String::from("Cant sort_logs")),
+            Ok(result) => result,
+        };
+        Ok((sorted_logs, to_block_number))
+    }
+
+    // - Get new block
+    // - Need to watch block + 1
+    // - Get events from need to watch block
+    // - Sort them to committed and verified
+    // - Write to committed_blocks and verified_blocks
+    pub fn make_new_sorted_logs_subscription(&mut self, eloop: &mut Core) {
         // Setup loop and web3
-        let mut eloop = Core::new().unwrap();
+        // let mut eloop = Core::new().unwrap();
         let handle = eloop.handle();
-        let w3 = Rc::new(web3::Web3::new(
+        let web3_instance = Rc::new(web3::Web3::new(
             web3::transports::WebSocket::with_event_loop(self.ws_endpoint_string.as_str(), &handle)
                 .unwrap(),
         ));
@@ -243,30 +276,18 @@ impl EventsFranklin {
         // Subscription
         println!("subscribing to new blocks");
 
-        let future = w3.eth_subscribe()
+        let future = web3_instance.eth_subscribe()
             .subscribe_new_heads()
             .and_then(|sub| {
                 sub.for_each(|log| {
                     println!("---");
                     println!("Got block number {:?}", log.number);
-                    let number_to_watch = self.last_watching_block_number.clone() + 1;
-                    self.last_watching_block_number = number_to_watch.clone();
-                    println!("Block to watch {:?}", number_to_watch);
-                    let block_to_get_logs = BlockNumber::Number(number_to_watch.as_u64());
-                    match self.get_logs(block_to_get_logs.clone(), block_to_get_logs.clone()) {
-                        Err(_) => println!("No logs in block {:?}", block_to_get_logs.clone()),
-                        Ok(result) => {
-                            println!("Got logs in block {:?} {:?}", block_to_get_logs.clone(), result.clone());
-                            match self.sort_logs(&result) {
-                                Err(_) => println!("Cant sort logs in block {:?}", block_to_get_logs.clone()),
-                                Ok(sorted_logs) => {
-                                    println!("Sorted logs {:?}", sorted_logs.clone());
-                                    self.committed_blocks = sorted_logs.0;
-                                    self.verified_blocks = sorted_logs.1;
-                                }
-                            };
-                        },
-                    };
+                    let number_to_watch = self.last_watched_block_number.clone() + 1;
+                    self.last_watched_block_number = number_to_watch.clone();
+                    println!("Block to watch {:?}", &number_to_watch);
+                    let mut sorted_logs = self.get_sorted_logs_in_block(number_to_watch.clone()).unwrap();
+                    self.committed_blocks.append(&mut sorted_logs.0);
+                    self.verified_blocks.append(&mut sorted_logs.1);
                     Ok(())
                 })
             })
@@ -274,70 +295,76 @@ impl EventsFranklin {
 
         // Run eloop
         if let Err(_err) = eloop.run(future) {
-            eprintln!("ERROR");
+            eprintln!("Cant run eloop");
         }
     }
 
-    pub fn subscribe_to_logs(&mut self) {
-
-        // Get topic keccak hash
-        let block_verified_topic = "BlockVerified(uint32)";
-        let block_committed_topic = "BlockCommitted(uint32)";
-        let block_verified_topic_h256: H256 = helpers::get_topic_keccak_hash(block_verified_topic);
-        let block_committed_topic_h256: H256 = helpers::get_topic_keccak_hash(block_committed_topic);
-
-        let topics_vec_h256: Vec<H256> = vec![block_verified_topic_h256, block_committed_topic_h256];
-
-        // Setup loop and web3
-        let mut eloop = Core::new().unwrap();
-        let handle = eloop.handle();
-        let w3 = Rc::new(web3::Web3::new(
-            web3::transports::WebSocket::with_event_loop(self.ws_endpoint_string.as_str(), &handle)
-                .unwrap(),
-        ));
-
-        // Subscription
-        println!("subscribing to franklin logs {:?} {:?}...", block_verified_topic, block_committed_topic);
-
-        let filter = FilterBuilder::default()
-            .address(vec![self.franklin_contract_address.clone()])
-            .topics(
-                Some(topics_vec_h256),
-                None,
-                None,
-                None,
-            )
-            .build();
-
-        let future = w3.eth_subscribe()
-            .subscribe_logs(filter)
-            .and_then(|sub| {
-                sub.for_each(|log| {
-                    println!("---");
-                    println!("got log from subscription: {:?}", log);
-
-                    let mut sorted_blocks = self.sort_logs(&vec![log]).unwrap();
-                    self.committed_blocks.append(&mut sorted_blocks.0);
-                    self.verified_blocks.append(&mut sorted_blocks.1);
-                    // let result = self.check_committed_block_with_same_number_as_verified(&block);
-                    // println!("Block exists: {:?}", result);
-                    // let tx = result.unwrap().clone().transaction_hash;
-                    // println!("--- Starting getting tx");
-                    // let data = FranklinTransaction::get_transaction(InfuraEndpoint::Rinkeby, &tx);
-                    // println!("TX data committed: {:?}", data);
-
-                    println!("Verified blocks in storage: {:?}", self.verified_blocks);
-                    println!("Committed blocks in storage: {:?}", self.committed_blocks);
-                    Ok(())
-                })
-            })
-            .map_err(|e| eprintln!("franklin log err: {}", e));
-
-        // Run eloop
-        if let Err(_err) = eloop.run(future) {
-            eprintln!("ERROR");
-        }
+    pub fn check_committed_block_with_same_number_as_verified(&self, verified_block: &LogBlockData) -> Option<&LogBlockData> {
+        let committed_blocks_iter = &mut self.committed_blocks.iter();
+        let committed_block = committed_blocks_iter.find(|&&x| x.block_num == verified_block.block_num);
+        return committed_block
     }
+
+    // pub fn subscribe_to_logs(&mut self) {
+
+    //     // Get topic keccak hash
+    //     let block_verified_topic = "BlockVerified(uint32)";
+    //     let block_committed_topic = "BlockCommitted(uint32)";
+    //     let block_verified_topic_h256: H256 = helpers::get_topic_keccak_hash(block_verified_topic);
+    //     let block_committed_topic_h256: H256 = helpers::get_topic_keccak_hash(block_committed_topic);
+
+    //     let topics_vec_h256: Vec<H256> = vec![block_verified_topic_h256, block_committed_topic_h256];
+
+    //     // Setup loop and web3
+    //     let mut eloop = Core::new().unwrap();
+    //     let handle = eloop.handle();
+    //     let w3 = Rc::new(web3::Web3::new(
+    //         web3::transports::WebSocket::with_event_loop(self.ws_endpoint_string.as_str(), &handle)
+    //             .unwrap(),
+    //     ));
+
+    //     // Subscription
+    //     println!("subscribing to franklin logs {:?} {:?}...", block_verified_topic, block_committed_topic);
+
+    //     let filter = FilterBuilder::default()
+    //         .address(vec![self.franklin_contract_address.clone()])
+    //         .topics(
+    //             Some(topics_vec_h256),
+    //             None,
+    //             None,
+    //             None,
+    //         )
+    //         .build();
+
+    //     let future = w3.eth_subscribe()
+    //         .subscribe_logs(filter)
+    //         .and_then(|sub| {
+    //             sub.for_each(|log| {
+    //                 println!("---");
+    //                 println!("got log from subscription: {:?}", log);
+
+    //                 let mut sorted_blocks = self.sort_logs(&vec![log]).unwrap();
+    //                 self.committed_blocks.append(&mut sorted_blocks.0);
+    //                 self.verified_blocks.append(&mut sorted_blocks.1);
+    //                 // let result = self.check_committed_block_with_same_number_as_verified(&block);
+    //                 // println!("Block exists: {:?}", result);
+    //                 // let tx = result.unwrap().clone().transaction_hash;
+    //                 // println!("--- Starting getting tx");
+    //                 // let data = FranklinTransaction::get_transaction(InfuraEndpoint::Rinkeby, &tx);
+    //                 // println!("TX data committed: {:?}", data);
+
+    //                 println!("Verified blocks in storage: {:?}", self.verified_blocks);
+    //                 println!("Committed blocks in storage: {:?}", self.committed_blocks);
+    //                 Ok(())
+    //             })
+    //         })
+    //         .map_err(|e| eprintln!("franklin log err: {}", e));
+
+    //     // Run eloop
+    //     if let Err(_err) = eloop.run(future) {
+    //         eprintln!("ERROR");
+    //     }
+    // }
 }
 
 
