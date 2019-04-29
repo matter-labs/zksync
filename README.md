@@ -31,6 +31,8 @@ To reset the dev environment:
 Seed for Metamask: fine music test violin matrix prize squirrel panther purchase material script deal
 Geth: ```geth attach http://localhost:8545```
 
+NOTE: if you are resetting geth, each Metamask account must be manually reset via Settings > Advanced > Reset account.
+
 # Blockscout (local blockchain explorer)
 
 - Migrate blockscout (do this once to setup database):
