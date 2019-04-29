@@ -12,7 +12,7 @@ const MIN_AMOUNT = ethers.utils.parseEther('0.1') // ~USD 15
 const WITH_MARGIN = MIN_AMOUNT.add(ethers.utils.parseEther('0.04')) // ~USD 6 more for gas
 
 var args = process.argv.slice(2)
-let nClients = args[0] || 1
+let nClients = args[0] || 3
 let tps = args[1] || 1
 
 let clients = []
@@ -39,7 +39,6 @@ class Client {
         
         try {
             let fundingRequired = false
-            console.log(`${this.eth.address}: pullState()`)
             await this.fra.pullState()
             if (this.fra.sidechainOpen) {
                 let balance = this.fra.currentBalance
@@ -129,6 +128,7 @@ async function test() {
             randomClient().randomTransfer()
         }
         console.log('-')
+        break
         while(nextTick > new Date()) {
             await new Promise(resolve => setTimeout(resolve, 1))
         }
