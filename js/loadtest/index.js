@@ -3,6 +3,7 @@ const Franklin = require('../franklin/src/franklin')
 
 const provider = new ethers.providers.JsonRpcProvider()
 const franklin = new Franklin(process.env.API_SERVER, provider, process.env.CONTRACT_ADDR)
+const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms))
 
 let source = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/0").connect(provider)
 
@@ -50,7 +51,11 @@ class Client {
             let request = await this.fra.deposit(MIN_AMOUNT)
             console.log(`${this.eth.address}: deposit tx sent`)
             let receipt = await request.wait()
-            console.log(`${this.eth.address}: deposit tx mined`)
+            console.log(`${this.eth.address}: deposit tx mined, waiting for zk proof`)
+            while (!this.fra.sidechainOpen) {
+                await sleep(500)
+                await this.fra.pullState()
+            }
         }
     }
 

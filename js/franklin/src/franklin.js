@@ -24,7 +24,7 @@ class FranklinWallet {
     async pullState() {
         this.sidechainAccountId = await this.eth.contract.ethereumAddressToAccountID(this.ethAddress)
         this.sidechainState = this.sidechainAccountId > 0 ?
-            await fra.pullSidechainState(this.sidechainAccountId) : null
+            await this.fra.pullSidechainState(this.sidechainAccountId) : null
     }
 
     get sidechainOpen() {
@@ -95,10 +95,10 @@ class Franklin {
         } else {
             data.closing = false
         }
-        const multiplier = new BN('1000000000000')
-        data.verified.balance = Eth.fromWei((new BN(data.verified.balance)).mul(multiplier), 'ether')
-        data.committed.balance = Eth.fromWei((new BN(data.committed.balance)).mul(multiplier), 'ether')
-        data.pending.balance = Eth.fromWei((new BN(data.pending.balance)).mul(multiplier), 'ether')
+        const multiplier = ethers.utils.bigNumberify('1000000000000')
+        data.verified.balance = ethers.utils.formatEther((ethers.utils.bigNumberify(data.verified.balance)).mul(multiplier))
+        data.committed.balance = ethers.utils.formatEther((ethers.utils.bigNumberify(data.committed.balance)).mul(multiplier))
+        data.pending.balance = ethers.utils.formatEther((ethers.utils.bigNumberify(data.pending.balance)).mul(multiplier))
         // TODO: remove when server updated
         if (Number(data.pending_nonce) > Number(data.pending.nonce)) {
             data.pending.nonce = data.pending_nonce
