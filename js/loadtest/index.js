@@ -1,5 +1,6 @@
 const ethers = require('ethers')
 const Franklin = require('../franklin/src/franklin')
+var Prando = require('prando')
 
 const provider = new ethers.providers.JsonRpcProvider()
 const franklin = new Franklin(process.env.API_SERVER, provider, process.env.CONTRACT_ADDR)
@@ -17,8 +18,12 @@ let tps = args[1] || 1
 
 let clients = []
 
+let rng = new Prando(1) // deterministic seed
+
 function randomClient() {
-    return clients[ Math.floor(Math.random() * nClients) ]
+    let i = rng.nextInt(0, nClients-1)
+    console.log('i', i)
+    return clients[ i ]
 }
 
 console.log(`Usage: yarn test -- [nClients] [TPS]`)
@@ -90,6 +95,7 @@ class Client {
         let toAccountId = null
         while (true) {
             let to = randomClient()
+            console.log(to)
             if (to.fra.sidechainOpen && to.fra.sidechainAccountId !== this.fra.sidechainAccountId) {
                 toAccountId = to.fra.sidechainAccountId
                 break
