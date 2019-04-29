@@ -46,11 +46,12 @@ class FranklinWallet {
         // The balance less exactly the txfee in wei
         let value = amount.sub(gasPrice.mul(gasLimit))
 
-        let pubX = '0x'+this.key.publicKey.x
-        let pubY = '0x'+this.key.publicKey.y
+        let pubX = ethers.utils.bigNumberify(this.key.publicKey.x.toString())
+        let pubY = ethers.utils.bigNumberify(this.key.publicKey.y.toString())
         let maxFee = ethers.utils.parseEther('0.0')
 
-        return this.eth.contract.deposit([pubX, pubY], maxFee, {value})
+        let contract = this.eth.contract.connect(this.ethWallet)
+        return contract.deposit([pubX, pubY], maxFee, {value})
     }
     
 }
