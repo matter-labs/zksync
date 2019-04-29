@@ -33,20 +33,26 @@ class FranklinWallet {
         return this.sidechainAccountId && this.sidechainState.state === 'open'
     }
 
+    get currentBalance() {
+        return this.sidechainOpen ? this.sidechainState.current.balance : undefined
+    }
+
     async deposit(amount) {
         if (!this.ethWallet) {
             throw 'Can not initiate deposit into Franklin: no wallet connected'
         }
 
-        // Normally we would let the Wallet populate this for us, but we
-        // need to compute EXACTLY how much value to send
-        let gasPrice = await this.eth.provider.getGasPrice();
+        // // Normally we would let the Wallet populate this for us, but we
+        // // need to compute EXACTLY how much value to send
+        // let gasPrice = await this.eth.provider.getGasPrice();
 
-        // The exact cost (in gas) to send to an Externally Owned Account (EOA)
-        let gasLimit = 210000;
+        // // The exact cost (in gas) to send to an Externally Owned Account (EOA)
+        // let gasLimit = 110000;
 
-        // The balance less exactly the txfee in wei
-        let value = amount.sub(gasPrice.mul(gasLimit))
+        // // The balance less exactly the txfee in wei
+        // let value = amount.sub(gasPrice.mul(gasLimit))
+
+        let value = amount
 
         let pubX = ethers.utils.bigNumberify(this.key.publicKey.x.toString())
         let pubY = ethers.utils.bigNumberify(this.key.publicKey.y.toString())
@@ -98,13 +104,11 @@ class Franklin {
             data.state = 'opening'
         } else {
             data.state = 'open'
-            data.verified.balance = ethers.utils.formatEther((ethers.utils.bigNumberify(data.verified.balance)).mul(MULTIPLIER))
-            data.committed.balance = ethers.utils.formatEther((ethers.utils.bigNumberify(data.committed.balance)).mul(MULTIPLIER))
-            data.pending.balance = ethers.utils.formatEther((ethers.utils.bigNumberify(data.pending.balance)).mul(MULTIPLIER))
-            // TODO: remove when server updated
-            if (Number(data.pending_nonce) > Number(data.pending.nonce)) {
-                data.pending.nonce = data.pending_nonce
-            }
+            data.current = data.pending
+            delete data.pending
+            data.verified.balance = ethers.utils.bigNumberify(data.verified.balance).mul(MULTIPLIER)
+            data.committed.balance = ethers.utils.bigNumberify(data.committed.balance).mul(MULTIPLIER)
+            data.current.balance = ethers.utils.bigNumberify(data.current.balance).mul(MULTIPLIER)
         }
         return data
     }

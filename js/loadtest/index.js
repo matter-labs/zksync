@@ -9,9 +9,10 @@ let source = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/0"
 let sourceNonce = null
 
 const MIN_AMOUNT = ethers.utils.parseEther('0.1') // ~USD 15
+const WITH_MARGIN = MIN_AMOUNT.add(ethers.utils.parseEther('0.04')) // ~USD 6 more for gas
 
 var args = process.argv.slice(2)
-let nClients = args[0] || 10
+let nClients = args[0] || 7
 let tps = args[1] || 1000
 
 console.log(`Usage: yarn test -- [nClients] [TPS]`)
@@ -25,37 +26,48 @@ class Client {
     }
 
     async prepare() {
-        let signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/" + this.id + 15)
+        let signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/" + this.id + 17)
         this.fra = await franklin.Wallet.fromSigner(signer)
         this.eth = this.fra.ethWallet
 
         try {
+            let fundingRequired = false
             await this.fra.pullState()
             if (this.fra.sidechainOpen) {
-                console.log(`${this.eth.address}: sidechain account ${this.fra.sidechainAccountId}`)            
+                let balance = this.fra.currentBalance
+                console.log(`${this.eth.address}: sidechain account ${this.fra.sidechainAccountId}, current balance ${ethers.utils.formatEther(balance)}`)
+                fundingRequired = balance.lt(MIN_AMOUNT)
             } else {
                 console.log(`${this.eth.address}: sidechain account not open, deposit required`)
+                fundingRequired = true
+            }
 
+            if (fundingRequired) {
+                console.log(`${this.eth.address}: Franklin funding required`)
+
+                // is wallet balance enough?
                 let balance = await this.eth.getBalance()
-                console.log(`${this.eth.address}: current balance is ${ethers.utils.formatEther(balance)} ETH`)
-                if (balance.lt(MIN_AMOUNT)) {
-                    console.log(`${this.eth.address}: funding required`)
+                console.log(`${this.eth.address}: eth wallet balance is ${ethers.utils.formatEther(balance)} ETH`)
+                if (balance.lt(WITH_MARGIN)) {
+                    console.log(`${this.eth.address}: wallet funding required`)
                     // transfer funds from source account
                     let request = await source.sendTransaction({
                         to:     this.eth.address,
-                        value:  MIN_AMOUNT,
+                        value:  WITH_MARGIN,
                         nonce:  sourceNonce++,
                     })
                     console.log(`${this.eth.address}: funding tx sent`)
                     let receipt = await request.wait()
                     console.log(`${this.eth.address}: funding tx mined`)
                 }
+
                 // deposit funds into franklin
+                console.log(`${this.eth.address}: depositing ${ethers.utils.formatEther(MIN_AMOUNT)} ETH into Franklin`)
                 let request = await this.fra.deposit(MIN_AMOUNT)
                 console.log(`${this.eth.address}: deposit tx sent`)
                 let receipt = await request.wait()
                 console.log(`${this.eth.address}: deposit tx mined, waiting for zk proof`)
-                while (!this.fra.sidechainOpen) {
+                while (!this.fra.sidechainOpen || this.fra.currentBalance.lt(MIN_AMOUNT)) {
                     await sleep(500)
                     await this.fra.pullState()
                 }
@@ -63,6 +75,7 @@ class Client {
             }
         } catch (err) {
             console.log(`${this.eth.address}: ERROR: ${err}`)
+            console.trace(err.stack)
         }
     }
 
