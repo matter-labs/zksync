@@ -20,12 +20,12 @@ class Client {
     }
 
     async prepare() {
-        // create deterministic wallet by id from seed
+        // create deterministic wallet by id from $MNEMONIC
         // if franklin not exists
             // if wallet empty
                 // transfer funds from source account
                 // wait for receipt
-            // deposit funds into franklin
+            // deposit funds into franklin from $FUNDING_ACCOUNT
             // wait for receipt
     }
 
