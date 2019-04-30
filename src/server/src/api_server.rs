@@ -88,14 +88,23 @@ fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
             let account = key_rx.recv_timeout(std::time::Duration::from_millis(100)).expect("must get public key back");
 
             let pub_key: Option<PublicKey> = account.and_then( |a| a.get_pub_key() );
-            if let Some(pk) = pub_key.clone() {
-                let (x, y) = pk.0.into_xy();
-                println!("Got public key: {:?}, {:?}", x, y);
+            if let None = &pub_key {
+                println!("Not public key!");
+                let resp = TransactionResponse{
+                    accepted:       false,
+                    error:          Some("pubkey expired".to_owned()),
+                    confirmation:   None,
+                };
+                return Ok(HttpResponse::Ok().json(resp));
             }
 
-            let verified = pub_key.as_ref().map( |pk| tx.verify_sig(pk) ).unwrap_or(false);
+            let pub_key = pub_key.unwrap();
+            let (x, y) = pub_key.0.into_xy();
+            println!("Got public key: {:?}, {:?}", x, y);
+
+            let verified = tx.verify_sig(&pub_key);
             if !verified {
-                println!("Signature is invalid");
+                println!("Signature is invalid: (x,y,s) = ({:?},{:?},{:?})", &tx.signature.r_x, &tx.signature.r_y, &tx.signature.s);
                 let resp = TransactionResponse{
                     accepted:       false,
                     error:          Some("invalid signature".to_owned()),
@@ -107,7 +116,7 @@ fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
             println!("Signature is valid");
             let mut tx = tx.clone();
             let (add_tx, add_rx) = mpsc::channel();
-            tx.cached_pub_key = pub_key;
+            tx.cached_pub_key = Some(pub_key);
 
             tx_for_state.send(StateKeeperRequest::AddTransferTx(tx, add_tx)).expect("must send transaction to sate keeper from rest api");
 

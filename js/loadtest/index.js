@@ -129,12 +129,11 @@ async function test() {
 
     console.log('starting the test...')
     while(true) {
-        var nextTick = new Date(new Date().getTime() + 1000);
+        var nextTick = new Date(new Date().getTime() + 2000);
         for (let i=0; i<tps; i++) {
             randomClient().randomTransfer()
         }
         console.log('-')
-        break
         while(nextTick > new Date()) {
             await new Promise(resolve => setTimeout(resolve, 1))
         }

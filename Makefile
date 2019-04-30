@@ -33,7 +33,7 @@ start: images
 stop:
 	@docker-compose stop server prover
 
-restart: stop start
+restart: stop start logs
 
 logs:
 	@docker-compose logs -f server prover

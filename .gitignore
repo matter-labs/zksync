@@ -9,10 +9,10 @@
 *.bak
 node_modules
 yarn-error.log
+target
 
 *.env
 /contracts/yarn-error.log
-/target
 /deploy.log
 /keys
 /tmp

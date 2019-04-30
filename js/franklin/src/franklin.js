@@ -88,8 +88,8 @@ class FranklinWallet {
             url:        this.fra.baseUrl + '/submit_tx',
             data:       apiForm
         });
-        return result.data
         await this.pullState(false)
+        return result.data
     }
     
 }
