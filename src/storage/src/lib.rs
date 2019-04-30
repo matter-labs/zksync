@@ -101,7 +101,17 @@ impl StoredOperation {
 
     pub fn into_op(self, conn: &StorageProcessor) -> QueryResult<Operation> {
         let meta = self.get_meta();
-        let mut op: Operation = serde_json::from_value(self.data).unwrap();
+
+        let debug_data = format!("data: {}", &self.data);
+        
+        // let op: Result<Operation, serde_json::Error> = serde_json::from_value(self.data);
+        let op: Result<Operation, serde_json::Error> = serde_json::from_str(&self.data.to_string());
+
+        if let Err(err) = &op {
+            println!("Error: {} on {}", err, debug_data)
+        }
+
+        let mut op = op.expect("Operation deserialization");
         op.tx_meta = Some(meta);
 
         if op.accounts_updated.is_none() {

@@ -6,6 +6,6 @@ version = "0.0.1"
 eth_client = { path = "../eth_client" }
 plasma = { path = "../plasma" }
 
-serde = "1.0.80"
-serde_derive = "1.0.80"
-serde_bytes = "0.10.4"
+serde = "1.0.90"
+serde_derive = "1.0.90"
+serde_bytes = "0.11.1"

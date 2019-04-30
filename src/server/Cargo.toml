@@ -19,12 +19,11 @@ num-bigint = "0.2"
 rust-crypto = "0.2"
 fnv = "1.0.3"
 ethabi = "6.1.0"
-web3 = { git = "https://github.com/tomusdrw/rust-web3" }
+web3 = "0.6.0"
 rustc-hex = "2.0.1"
 futures = "0.1.25"
 hyper = "0.12.16"
 serde = "1.0.90"
-#serde_json = {version = "1.0.39", features = ["arbitrary_precision"]}
 serde_derive = "1.0.90"
 serde_bytes = "0.11.1"
 
@@ -36,4 +35,4 @@ tokio = "0.1.18"
 actix = "0.7.9"
 actix-web = "0.7.19"
 
-bigdecimal = { version = "0.0.11", features = ["serde"]}
+bigdecimal = { version = "0.1.0", features = ["serde"]}

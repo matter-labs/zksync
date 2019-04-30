@@ -6,6 +6,8 @@ pub mod tx;
 
 pub use web3::types::{U256, U128, H256};
 
+use bigdecimal::BigDecimal;
+
 use pairing::bn256;
 use crate::merkle_tree::{SparseMerkleTree, PedersenHasher};
 use sapling_crypto::eddsa;
@@ -34,7 +36,7 @@ pub enum BlockData {
     Transfer{
         //#[serde(skip)]
         transactions:   Vec<TransferTx>,
-        total_fees:     u128,
+        total_fees:     BigDecimal,
     },
     Deposit{
         //#[serde(skip)]

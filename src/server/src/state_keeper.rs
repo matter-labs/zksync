@@ -19,9 +19,8 @@ use rand::{SeedableRng, Rng, XorShiftRng};
 
 use std::sync::mpsc::{Sender, Receiver};
 use fnv::{FnvHashMap, FnvHashSet};
-use bigdecimal::{BigDecimal, ToPrimitive};
+use bigdecimal::{BigDecimal, ToPrimitive, FromPrimitive, Zero};
 use ff::{PrimeField, PrimeFieldRepr};
-use bigdecimal::Zero;
 
 use std::io::BufReader;
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
@@ -185,7 +184,11 @@ impl PlasmaStateKeeper {
     fn create_transfer_block(&mut self) -> CommitRequest {
         
         let transactions = std::mem::replace(&mut self.transfer_tx_queue, Vec::default());
-        let mut total_fees: u128 = transactions.iter().map( |tx| tx.fee.to_u128().expect("should not overflow") ).sum();
+        let mut total_fees: u128 = transactions.iter()
+            .map( |tx| tx.fee.to_u128().expect("should not overflow") )
+            .sum();
+
+        let total_fees = BigDecimal::from_u128(total_fees).unwrap();
 
         // collect updated state
         let mut accounts_updated = FnvHashMap::<u32, Account>::default();

@@ -11,6 +11,9 @@ node_modules
 yarn-error.log
 target
 
+Cargo.lock
+!/Cargo.lock
+
 *.env
 /contracts/yarn-error.log
 /deploy.log
