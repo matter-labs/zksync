@@ -6,7 +6,7 @@ use helpers::*;
 pub enum FranklinTransactionType {
     Deposit,
     Transaction,
-    Exit,
+    FullExit,
     Unknown
 }
 
@@ -44,22 +44,20 @@ impl FranklinTransaction {
         let web3_transaction = web3.eth().transaction(tx_id).wait();
         let tx = match web3_transaction {
             Ok(tx) => {
-                println!("Transaction: {:?}", tx);
                 tx
             },
             Err(e) => { 
-                println!("Error: {:?}", e);
                 None
             }
         };
         tx
     }
 
-    pub fn get_input_data_from_ethereum_transaction(transaction: &Transaction) -> Vec<u8> {
+    fn get_input_data_from_ethereum_transaction(transaction: &Transaction) -> Vec<u8> {
         transaction.clone().input.0
     }
 
-    pub fn get_commitment_data_from_input_data(input_data: &Vec<u8>) -> Option<Vec<u8>> {
+    fn get_commitment_data_from_input_data(input_data: &Vec<u8>) -> Option<Vec<u8>> {
         let input_data_contains_more_than_4_bytes = input_data.len() > 4;
         let commitment_data = match input_data_contains_more_than_4_bytes {
             true => Some(input_data[4..input_data.len()].to_vec()),
@@ -68,7 +66,7 @@ impl FranklinTransaction {
         commitment_data
     }
 
-    pub fn get_transaction_type(input_data: &Vec<u8>) -> FranklinTransactionType {
+    fn get_transaction_type(input_data: &Vec<u8>) -> FranklinTransactionType {
         // let input = get_input_data_from_ethereum_transaction(transaction);
         // let input: Vec<u8> = vec![83, 61, 227, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 71, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 29, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 111, 25, 7, 2, 102, 53, 88, 204, 20, 77, 118, 217, 147, 179, 61, 64, 248, 27, 208, 31, 152, 123, 137, 105, 34, 72, 1, 186, 163, 53, 146, 121, 0];
         // let input: Vec<u8> = vec![244, 135, 178, 142, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 112, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 12, 225, 171, 26, 194, 18, 154, 106, 57, 17, 50, 20, 0, 143, 200, 115, 52, 252, 254, 163, 118, 215, 231, 75, 25, 205, 159, 236, 202, 168, 30, 197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 72, 0, 0, 29, 0, 0, 0, 0, 190, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -83,19 +81,15 @@ impl FranklinTransaction {
         let method_bytes: Vec<u8> = input_data[0..4].to_vec();
         let method_type = match method_bytes {
             _ if method_bytes == deposit_method_bytes => {
-                println!("Deposit");
                 FranklinTransactionType::Deposit
             },
             _ if method_bytes == transaction_method_bytes => {
-                println!("Transaction");
                 FranklinTransactionType::Transaction
             },
             _ if method_bytes == full_exit_method_bytes => {
-                println!("Full Exit");
-                FranklinTransactionType::Exit
+                FranklinTransactionType::FullExit
             },
             _ => {
-                println!("Unknown");
                 FranklinTransactionType::Unknown
             }
         };

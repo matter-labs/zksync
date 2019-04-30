@@ -212,8 +212,6 @@ impl EventsFranklin {
                 return Err(message)
             },
             Ok(result) => {
-                println!("Got logs in block {:?}", &block_number);
-                println!("Logs: {:?}", &result);
                 match self.sort_logs(&result) {
                     Err(_) => {
                         let message = String::from("Cant sort logs in block ") + &block_number.as_u64().to_string();
