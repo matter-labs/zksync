@@ -10,6 +10,7 @@ pub enum FranklinTransactionType {
     Unknown
 }
 
+#[derive(Debug, Clone)]
 pub struct FranklinTransaction {
     network: InfuraEndpoint,
     franklin_transaction_type: FranklinTransactionType,
@@ -78,7 +79,7 @@ impl FranklinTransaction {
         }
         let deposit_method_bytes: Vec<u8> = vec![83, 61, 227, 10];
         let transaction_method_bytes: Vec<u8> = vec![244, 135, 178, 142];
-        let exit_method_bytes: Vec<u8> = vec![121, 178, 173, 112];
+        let full_exit_method_bytes: Vec<u8> = vec![121, 178, 173, 112];
         let method_bytes: Vec<u8> = input_data[0..4].to_vec();
         let method_type = match method_bytes {
             _ if method_bytes == deposit_method_bytes => {
@@ -89,7 +90,7 @@ impl FranklinTransaction {
                 println!("Transaction");
                 FranklinTransactionType::Transaction
             },
-            _ if method_bytes == exit_method_bytes => {
+            _ if method_bytes == full_exit_method_bytes => {
                 println!("Full Exit");
                 FranklinTransactionType::Exit
             },
