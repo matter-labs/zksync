@@ -9,12 +9,12 @@ const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms))
 let source = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/0").connect(provider)
 let sourceNonce = null
 
-const MIN_AMOUNT = ethers.utils.parseEther('0.1') // ~USD 15
-const WITH_MARGIN = MIN_AMOUNT.add(ethers.utils.parseEther('0.04')) // ~USD 6 more for gas
+const MIN_AMOUNT = ethers.utils.parseEther('1') // ~USD 15
+const WITH_MARGIN = MIN_AMOUNT.add(ethers.utils.parseEther('0.5')) // ~USD 6 more for gas
 
 var args = process.argv.slice(2)
-let nClients = args[0] || 3
-let tps = args[1] || 1
+let nClients = args[0] || 15
+let tps = args[1] || 5
 
 let clients = []
 
@@ -37,7 +37,7 @@ class Client {
     }
 
     async prepare() {
-        let signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/" + this.id + 17)
+        let signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/1/" + this.id)
         this.fra = await franklin.Wallet.fromSigner(signer)
         this.eth = this.fra.ethWallet
         console.log(`${this.eth.address}: prepare`)
@@ -132,7 +132,7 @@ async function test() {
 
     console.log('starting the test...')
     while(true) {
-        var nextTick = new Date(new Date().getTime() + 2000);
+        var nextTick = new Date(new Date().getTime() + 1000);
         for (let i=0; i<tps; i++) {
             randomClient().randomTransfer()
         }
