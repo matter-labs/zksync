@@ -293,7 +293,7 @@ impl StorageProcessor {
 
     /// loads the state of accounts updated in a specific block
     pub fn load_state_diff_for_block(&self, block_number: u32) -> QueryResult<(u32, AccountMap)> {
-        self.load_state_diff(block_number-1, block_number)
+        self.load_state_diff(block_number, block_number+1)
     }
 
     fn load_state(&self, query: &str) -> QueryResult<(u32, AccountMap)> {
