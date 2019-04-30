@@ -79,20 +79,29 @@ impl PlasmaStateKeeper {
         for req in rx_for_blocks {
             match req {
                 StateKeeperRequest::GetNetworkStatus(sender) => {
-                    sender.send(NetworkStatus{
+                    let r = sender.send(NetworkStatus{
                         next_block_at_max: self.next_block_at_max.map(|t| t.duration_since(UNIX_EPOCH).unwrap().as_secs())
-                    }).expect("sending network status must work");
+                    });
+                    if r.is_err() {
+                        println!("StateKeeperRequest::GetNetworkStatus: channel closed, sending failed");
+                    }
                 },
                 StateKeeperRequest::GetAccount(account_id, sender) => {
                     let account = self.state.get_account(account_id);
-                    sender.send(account).expect("sending account state must work");
+                    let r = sender.send(account);
+                    if r.is_err() {
+                        println!("StateKeeperRequest::GetAccount: channel closed, sending failed");
+                    }
                 },
                 StateKeeperRequest::AddTransferTx(tx, sender) => {
                     let result = self.apply_transfer_tx(tx);
                     if result.is_ok() && self.next_block_at_max.is_none() {
                         self.next_block_at_max = Some(SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL));
                     }
-                    sender.send(result);
+                    let r = sender.send(result);
+                    if r.is_err() {
+                        println!("StateKeeperRequest::AddTransferTx: channel closed, sending failed");
+                    }
 
                     if self.transfer_tx_queue.len() == config::TRANSFER_BATCH_SIZE {
                         self.finalize_current_batch(&tx_for_commitments);

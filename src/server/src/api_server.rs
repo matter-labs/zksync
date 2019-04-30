@@ -85,8 +85,17 @@ fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
             let request = StateKeeperRequest::GetAccount(tx.from, key_tx);
             tx_for_state.send(request).expect("must send a new transaction to queue");
             // now wait for state_keeper to return a result
-            let account = key_rx.recv_timeout(std::time::Duration::from_millis(100)).expect("must get public key back");
+            let r = key_rx.recv_timeout(std::time::Duration::from_millis(250));
+            if r.is_err() {
+                let resp = TransactionResponse{
+                    accepted:       false,
+                    error:          Some("timeout".to_owned()),
+                    confirmation:   None,
+                };
+                return Ok(HttpResponse::Ok().json(resp));
+            }
 
+            let account = r.unwrap();
             let pub_key: Option<PublicKey> = account.and_then( |a| a.get_pub_key() );
             if let None = &pub_key {
                 println!("Not public key!");
@@ -147,7 +156,7 @@ fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
                     println!("Did not get a result from the state keeper");
                     let resp = TransactionResponse{
                         accepted:       false,
-                        error:          Some("internal server error".to_owned()),
+                        error:          Some("result timeout".to_owned()),
                         confirmation:   None,
                     };
                     Ok(HttpResponse::Ok().json(resp))
@@ -184,7 +193,14 @@ fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResp
     let request = StateKeeperRequest::GetAccount(account_id_u32, acc_tx);
     tx_for_state.send(request).expect("must send a request for an account state");
     
-    let pending: Option<Account> = acc_rx.recv_timeout(std::time::Duration::from_millis(100)).expect("must get account info back");
+    let pending: Result<Option<Account>, _> = acc_rx.recv_timeout(std::time::Duration::from_millis(250));
+
+    if pending.is_err() {
+        println!("API request timeout!");
+        return Ok(HttpResponse::RequestTimeout().json(AccountError{error:"account request timeout".to_string()}));
+    }
+
+    let pending = pending.unwrap();
     if pending.is_none() {
         return Ok(HttpResponse::Ok().json(AccountError{error:"non-existing account".to_string()}));
     }
@@ -216,9 +232,13 @@ fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpRes
     let (tx, rx) = mpsc::channel();
     let request = StateKeeperRequest::GetNetworkStatus(tx);
     tx_for_state.send(request).expect("must send a new transaction to queue");
-    let status: NetworkStatus = rx.recv_timeout(std::time::Duration::from_millis(1000)).expect("must get status back");
+    let status: Result<NetworkStatus, _> = rx.recv_timeout(std::time::Duration::from_millis(250));
 
-    Ok(HttpResponse::Ok().json(status))
+    if status.is_err() {
+        return Ok(HttpResponse::RequestTimeout().json("timeout".to_owned()));
+    }
+
+    Ok(HttpResponse::Ok().json(status.unwrap()))
 }
 
 fn handle_get_account_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
