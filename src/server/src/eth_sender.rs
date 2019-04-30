@@ -8,6 +8,9 @@ use super::config;
 use ff::{PrimeField, PrimeFieldRepr};
 
 fn sorted_and_padded_for_deposits(accounts_updated: AccountMap) -> [u64; config::DEPOSIT_BATCH_SIZE] {
+
+    assert!(accounts_updated.len() == config::DEPOSIT_BATCH_SIZE);
+
     let mut tmp = [params::SPECIAL_ACCOUNT_DEPOSIT as u64; config::DEPOSIT_BATCH_SIZE];
     let mut acc: Vec<u64> = accounts_updated.keys()
         .map(|&k| k as u64)
@@ -22,6 +25,9 @@ fn sorted_and_padded_for_deposits(accounts_updated: AccountMap) -> [u64; config:
 }
 
 fn sorted_and_padded_for_exits(accounts_updated: AccountMap) -> [u64; config::EXIT_BATCH_SIZE] {
+
+    assert!(accounts_updated.len() == config::EXIT_BATCH_SIZE);
+
     let mut tmp = [params::SPECIAL_ACCOUNT_EXIT as u64; config::EXIT_BATCH_SIZE];
     let mut acc: Vec<u64> = accounts_updated.keys()
         .map(|&k| k as u64)
@@ -45,7 +51,8 @@ fn keys_sorted(accounts_updated: AccountMap) -> Vec<u64> {
 
 fn run_eth_sender(rx_for_eth: Receiver<Operation>, mut eth_client: ETHClient) {
     for op in rx_for_eth {
-        println!("Operation requested"); // println!("Operation requested: {:?}", &op);
+        //println!("Operation requested"); 
+        println!("Operation requested: {:?}, {}", &op.action, op.block.block_number);
         let tx = match op.action {
             Action::Commit => {
 

@@ -334,10 +334,12 @@ impl EthWatch {
             all_deposits.push(tx);
         }
 
+        let len = all_deposits.len();
         let block = ProtoBlock::Deposit(
             self.last_deposit_batch.as_u32(),
             all_deposits,
         );
+        println!("Deposit batch {}, {} accounts", self.last_deposit_batch, len);
         let request = StateKeeperRequest::AddBlock(block);
 
         let send_result = channel.send(request).map_err(|err| format!("channel.send() failed: {}", err))?;
