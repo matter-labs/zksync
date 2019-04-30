@@ -88,6 +88,7 @@ class FranklinWallet {
             url:        this.fra.baseUrl + '/submit_tx',
             data:       apiForm
         });
+        await new Promise(resolve => setTimeout(resolve, 300))
         await this.pullState(false)
         return result.data
     }
