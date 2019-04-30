@@ -102,7 +102,10 @@ class Client {
             }
         }
         console.log(`${this.eth.address}: transfer to ${toAccountId}`)
-        let amount = franklin.truncate(this.fra.currentBalance.div(10))
+
+        //let amount = franklin.truncate(this.fra.currentBalance.div(10))
+        let amount = ethers.utils.bigNumberify('1000000000000').mul(100)
+
         console.log(`${this.eth.address}: transfer(${toAccountId}, ${amount})`)
         await this.fra.transfer(toAccountId, amount)
         console.log(`${this.eth.address}: transfer done`)

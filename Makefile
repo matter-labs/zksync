@@ -15,6 +15,9 @@ rust-musl-builder = @docker run $(docker-options) -it ekidd/rust-musl-builder
 build-target:
 	$(rust-musl-builder) cargo build --release
 
+clean-target:
+	$(rust-musl-builder) cargo clean
+
 server-image: build-target
 	docker build -t "${SERVER_DOCKER_IMAGE}" -f ./etc/docker/server/Dockerfile .
 
