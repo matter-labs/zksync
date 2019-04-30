@@ -39,7 +39,7 @@ pub struct EventsFranklin {
 // New blocks -> last watching block ++
 // Check if txs in last watching block
 impl EventsFranklin {
-    fn new(network: InfuraEndpoint) -> Self {
+    pub fn new(network: InfuraEndpoint) -> Self {
         let ws_infura_endpoint_str = match network {
             InfuraEndpoint::Mainnet => "wss://mainnet.infura.io/ws",
             InfuraEndpoint::Rinkeby => "wss://rinkeby.infura.io/ws",
@@ -204,7 +204,7 @@ impl EventsFranklin {
         logs
     }
 
-    fn get_sorted_logs_in_block(&mut self, block_number: BlockNumber256) -> Result<ComAndVerBlocksVecs, String> {
+    pub fn get_sorted_logs_in_block(&mut self, block_number: BlockNumber256) -> Result<ComAndVerBlocksVecs, String> {
         let block_to_get_logs = BlockNumber::Number(block_number.as_u64());
         match self.get_logs(block_to_get_logs.clone(), block_to_get_logs.clone()) {
             Err(_) => {
