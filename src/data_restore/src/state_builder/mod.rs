@@ -5,12 +5,12 @@ use std::collections::{HashMap, HashSet};
 use ff::{Field, PrimeField, PrimeFieldRepr};
 use web3::futures::{Future, Stream};
 use web3::types::{Log, Address, FilterBuilder, H256, U256, BlockNumber};
-use tokio_core::reactor::Core;
 use ethabi::Contract;
 use sapling_crypto::jubjub::{edwards, Unknown};
 
 use plasma::models::{Block, BlockData, DepositTx, Engine, Fr, ExitTx};
 use plasma::models::params;
+use plasma::models::circuit::{AccountTree, Account};
 
 use blocks::{BlockType, LogBlockData};
 use helpers;
@@ -72,12 +72,12 @@ pub struct FranklinAccount {
     pub states: Vec<FranklinAccountState>
 }
 
-#[derive(Debug, Clone)]
 pub struct StatesBuilderFranklin {
     pub http_endpoint_string: String,
     pub franklin_abi: ABI,
     pub franklin_contract: Contract,
     pub franklin_contract_address: Address,
+    pub accounts_tree: AccountTree,
     pub accounts_franklin: Vec<FranklinAccount>,
 }
 
@@ -97,11 +97,16 @@ impl StatesBuilderFranklin {
             InfuraEndpoint::Rinkeby => PLASMA_TEST_ABI,
         };
         let contract = ethabi::Contract::load(abi.0).unwrap();
+
+        let tree_depth = params::BALANCE_TREE_DEPTH as u32;
+        let tree = AccountTree::new(tree_depth);
+        
         let this = Self {
             http_endpoint_string: http_infura_endpoint_string,
             franklin_abi: abi,
             franklin_contract: contract,
             franklin_contract_address: address,
+            accounts_tree: tree,
             accounts_franklin: vec![],
         };
         this

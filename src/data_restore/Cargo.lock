@@ -359,12 +359,13 @@ version = "0.1.0"
 dependencies = [
  "ethabi 7.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ff_ce 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "pairing_ce 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "plasma 0.1.1",
  "sapling-crypto_ce 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "tiny-keccak 1.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-core 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio 0.1.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "web3 0.7.0 (git+https://github.com/tomusdrw/rust-web3)",
 ]
 
