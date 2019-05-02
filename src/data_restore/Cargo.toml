@@ -3,8 +3,8 @@ name = "data_restore"
 version = "0.1.0"
 
 [dependencies]
+bigdecimal = { version = "0.0.11", features = ["serde"]}
 futures = "0.1.26"
-tokio = "0.1.19"
 web3 = { git = "https://github.com/tomusdrw/rust-web3" }
 tiny-keccak = "1.4.2"
 ethabi = "7.0.0"

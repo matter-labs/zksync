@@ -8,9 +8,12 @@ use web3::types::{Log, Address, FilterBuilder, H256, U256, BlockNumber};
 use ethabi::Contract;
 use sapling_crypto::jubjub::{edwards, Unknown};
 
-use plasma::models::{Block, BlockData, DepositTx, Engine, Fr, ExitTx};
+use bigdecimal::{Num, BigDecimal, Zero};
+
+use plasma::models::{Account, AccountTree, AccountId};
+use plasma::models::{Block, BlockData, DepositTx, TransferTx, Engine, Fr, ExitTx};
 use plasma::models::params;
-use plasma::models::circuit::{AccountTree, Account};
+
 
 use blocks::{BlockType, LogBlockData};
 use helpers;
@@ -33,43 +36,20 @@ pub const PLASMA_PROD_ABI: ABI = (
 
 #[derive(Debug, Clone)]
 pub struct FullExitTransactionsBlock {
-    pub batch_number: U256,
-    pub exits: Vec<FullExitTransaction>,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct FullExitTransaction {
-    pub account_id: u32,
+    pub batch_number: u32,
+    pub exits: Vec<ExitTx>,
 }
 
 #[derive(Debug, Clone)]
 pub struct DepositTransactionsBlock {
-    pub batch_number: U256,
-    pub deposits: Vec<DepositTransaction>,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct DepositTransaction {
-    pub account_id: u32,
-    pub pub_x: Fr,
-    pub pub_y: Fr,
-    pub amount: U256,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct FranklinAccountState {
-    pub batch_number: U256,
-    pub block_number: U256,
-    pub pub_x: Fr,
-    pub pub_y: Fr,
-    pub balance: U256,
-    pub nonce: U256,
+    pub batch_number: u32,
+    pub deposits: Vec<DepositTx>,
 }
 
 #[derive(Debug, Clone)]
-pub struct FranklinAccount {
-    pub account_id: u32,
-    pub states: Vec<FranklinAccountState>
+pub struct TransferTransactionsBlock {
+    pub batch_number: u32,
+    pub transfers: Vec<TransferTx>,
 }
 
 pub struct StatesBuilderFranklin {
@@ -78,7 +58,6 @@ pub struct StatesBuilderFranklin {
     pub franklin_contract: Contract,
     pub franklin_contract_address: Address,
     pub accounts_tree: AccountTree,
-    pub accounts_franklin: Vec<FranklinAccount>,
 }
 
 impl StatesBuilderFranklin {
@@ -107,7 +86,6 @@ impl StatesBuilderFranklin {
             franklin_contract: contract,
             franklin_contract_address: address,
             accounts_tree: tree,
-            accounts_franklin: vec![],
         };
         this
     }
@@ -127,6 +105,77 @@ impl StatesBuilderFranklin {
         }
     }
 
+    pub fn get_accounts(&self) -> Vec<(u32, Account)> {
+        self.accounts_tree.items.iter().map(|a| (*a.0 as u32, a.1.clone()) ).collect()
+    }
+
+    pub fn root_hash(&self) -> Fr {
+        self.accounts_tree.root_hash().clone()
+    }
+
+    pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
+        self.accounts_tree.items.get(&account_id).cloned()
+    }
+
+    pub fn update_accounts_states_from_transfer_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), String> {
+        let batch_number = self.get_batch_number_from_deposit(transaction);
+        let block_number = self.get_block_number_from_deposit(transaction);
+        let transfer_txs_block = self.get_all_transactions_from_transfer_batch(batch_number);
+        if transfer_txs_block.is_err() {
+            return Err(String::from("No transfer txs in block"));
+        }
+        for tx in transfer_txs_block.unwrap().transfers {
+            if let Some(mut from) = self.accounts_tree.items.get(&tx.from).cloned() {
+                let pub_key = self.get_account(tx.from).and_then(|a| a.get_pub_key()).ok_or(String::from("Unknown signer")).unwrap();
+                if let Some(verified_against) = tx.cached_pub_key.as_ref() {
+                    if pub_key.0 != verified_against.0 { 
+                        return Err(String::from("Invalid signer"));
+                    }
+                } else {
+                    return Err(String::from("Invalid signer"));
+                }
+                
+                let mut transacted_amount = BigDecimal::zero();
+                transacted_amount += &tx.amount;
+                transacted_amount += &tx.fee;
+
+                if from.balance < transacted_amount {
+                    return Err(String::from("Insufficient balance")); 
+                }
+
+                if tx.nonce > from.nonce { 
+                    return Err(String::from("Nonce is too high")); 
+                } else if tx.nonce < from.nonce {
+                    return Err(String::from("Nonce is too low"));  
+                }
+
+                let block_number = transaction.ethereum_transaction.block_number.ok_or(String::from("No block number in transaction")).unwrap();
+                let result = U256::from(tx.good_until_block).checked_sub(block_number);
+                if result.is_none() {
+                    return Err(String::from("Transaction is outdated"));
+                }
+                
+                let mut to = Account::default();
+                if let Some(existing_to) = self.accounts_tree.items.get(&tx.to) {
+                    to = existing_to.clone();
+                }
+
+                from.balance -= transacted_amount;
+
+                from.nonce += 1;
+                if tx.to != 0 {
+                    to.balance += &tx.amount;
+                }
+
+                self.accounts_tree.insert(tx.from, from);
+                self.accounts_tree.insert(tx.to, to);
+            } else {
+                return Err(String::from("Invalid signer"));
+            }
+        }
+        Ok(())
+    }
+
     fn update_accounts_states_from_deposit_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), String> {
         let batch_number = self.get_batch_number_from_deposit(transaction);
         let block_number = self.get_block_number_from_deposit(transaction);
@@ -134,49 +183,23 @@ impl StatesBuilderFranklin {
         if deposit_txs_block.is_err() {
             return Err(String::from("No deposit txs in block"));
         }
-        for deposit in deposit_txs_block.unwrap().deposits {
-            let id = deposit.account_id;
-            let accounts = self.accounts_franklin.clone();
-            let index = accounts.iter().position(|x| x.account_id == id);
-            // let mut account = all_accounts_iter.find(|&&x| x.account_id == id);
-            match index {
-                Some(i) => {
-                    let accs = accounts.clone();
-                    let last_state = accs[i].states.iter().max_by_key(|x| x.batch_number);
-                    if last_state.is_none() {
-                        return Err(String::from("Wrong deposit in list"));
-                    }
-                    let unwraped_last_state = last_state.unwrap();
-                    let last_balance = unwraped_last_state.balance;
-                    let last_nonce = unwraped_last_state.nonce;
-                    let new_balance = last_balance + deposit.amount;
-                    let new_nonce = last_nonce + 1;
-                    let new_state = FranklinAccountState {
-                        batch_number: batch_number,
-                        block_number: block_number,
-                        pub_x: deposit.pub_x,
-                        pub_y: deposit.pub_y,
-                        balance: new_balance,
-                        nonce: new_nonce,
-                    };
-                    self.accounts_franklin[i].states.push(new_state);
-                },
+        for tx in deposit_txs_block.unwrap().deposits {
+            let account = match self.accounts_tree.items.get(&tx.account) {
                 None => {
-                    let state = FranklinAccountState {
-                        batch_number: batch_number,
-                        block_number: block_number,
-                        pub_x: deposit.pub_x,
-                        pub_y: deposit.pub_y,
-                        balance: deposit.amount,
-                        nonce: U256::from(0),
-                    };
-                    let account = FranklinAccount {
-                        account_id: id,
-                        states: vec![state],
-                    };
-                    self.accounts_franklin.push(account);
+                    let mut acc = Account::default();
+                    let tx = tx.clone();
+                    acc.public_key_x = tx.pub_x;
+                    acc.public_key_y = tx.pub_y;
+                    acc.balance = tx.amount;
+                    acc
+                },
+                Some(result) => {
+                    let mut acc = result.clone();
+                    acc.balance += &tx.amount;
+                    acc
                 }
-            }
+            };
+            self.accounts_tree.insert(tx.account, account);
         }
         Ok(())
     }
@@ -186,39 +209,11 @@ impl StatesBuilderFranklin {
         let block_number = self.get_block_number_from_full_exit(transaction);
         let exit_txs_block = self.get_all_transactions_from_full_exit_batch(batch_number);
         if exit_txs_block.is_err() {
-            return Err(String::from("No exit txs in block"));
+            return Err(String::from("Cant get txs from batch"))
         }
-        for exit in exit_txs_block.unwrap().exits {
-            let id = exit.account_id;
-            let accounts = self.accounts_franklin.clone();
-            let index = accounts.iter().position(|x| x.account_id == id);
-            // let mut account = all_accounts_iter.find(|&&x| x.account_id == id);
-            match index {
-                Some(i) => {
-                    let accs = accounts.clone();
-                    let last_state = accs[i].states.iter().max_by_key(|x| x.batch_number);
-                    if last_state.is_none() {
-                        return Err(String::from("Wrong deposit in list"));
-                    }
-                    let unwraped_last_state = last_state.unwrap();
-                    let pub_x = unwraped_last_state.pub_x;
-                    let pub_y = unwraped_last_state.pub_y;
-                    let last_nonce = unwraped_last_state.nonce;
-                    let new_nonce = last_nonce + 1;
-                    let new_state = FranklinAccountState {
-                        batch_number: batch_number,
-                        block_number: block_number,
-                        pub_x: pub_x,
-                        pub_y: pub_y,
-                        balance: U256::zero(),
-                        nonce: new_nonce,
-                    };
-                    self.accounts_franklin[i].states.push(new_state);
-                },
-                None => {
-                    panic!("Cant find account for exit");
-                }
-            }
+        for tx in exit_txs_block.unwrap().exits {
+            let _ = self.accounts_tree.items.get(&tx.account).ok_or(return Err(String::from("Unexisting account"))).unwrap().clone();
+            self.accounts_tree.delete(tx.account);
         }
         Ok(())
     }
@@ -245,6 +240,13 @@ impl StatesBuilderFranklin {
         let block_vec = transaction.commitment_data[64..96].to_vec();
         let block_slice = block_vec.as_slice();
         U256::from(block_slice)
+    }
+
+    fn get_all_transactions_from_transfer_batch(&self, batch_number: U256) -> Result<TransferTransactionsBlock, String> {
+        Ok(TransferTransactionsBlock {
+            batch_number: 0,
+            transfers: vec![],
+        })
     }
 
     fn get_all_transactions_from_deposit_batch(&self, batch_number: U256) -> Result<DepositTransactionsBlock, String> {
@@ -326,16 +328,16 @@ impl StatesBuilderFranklin {
 
             let (pub_x, pub_y) = public_key_point.unwrap().into_xy();
 
-            let deposit: DepositTransaction = DepositTransaction{
-                account_id: k.as_u32(),
-                pub_x:      pub_x,
-                pub_y:      pub_y,
-                amount:     v.0,
+            let tx: DepositTx = DepositTx{ 
+                account: k.as_u32(),
+                amount:  BigDecimal::from_str_radix(&format!("{}", v.0), 10).unwrap(),
+                pub_x:   pub_x,
+                pub_y:   pub_y,
             };
-            all_deposits.push(deposit);
+            all_deposits.push(tx);
         }
         let block = DepositTransactionsBlock {
-            batch_number: batch_number.clone(),
+            batch_number: batch_number.as_u32(),
             deposits: all_deposits,
         };
         Ok(block)
@@ -398,13 +400,14 @@ impl StatesBuilderFranklin {
         }
         let mut all_exits = vec![];
         for k in this_batch.iter() {
-            let exit: FullExitTransaction = FullExitTransaction{
-                account_id: k.as_u32(),
+            let tx: ExitTx = ExitTx {
+                account: k.as_u32(),
+                amount:  BigDecimal::zero(),
             };
-            all_exits.push(exit);
+            all_exits.push(tx);
         }
         let block = FullExitTransactionsBlock {
-            batch_number: batch_number.clone(),
+            batch_number: batch_number.as_u32(),
             exits: all_exits,
         };
         Ok(block)

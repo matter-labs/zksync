@@ -3,7 +3,6 @@
 
 extern crate web3;
 extern crate tiny_keccak;
-extern crate tokio;
 extern crate futures;
 extern crate ethabi;
 
@@ -13,6 +12,8 @@ extern crate pairing;
 extern crate ff;
 extern crate hex;
 extern crate sapling_crypto;
+
+extern crate bigdecimal;
 
 pub mod events;
 pub mod franklin_transaction;
@@ -32,8 +33,6 @@ mod test {
     use std::time::{Duration, Instant};
     use futures::*;
     use web3::types::{U256, H256};
-    use tokio::prelude::*;
-    use tokio::timer::Interval;
 
     // #[test]
     // fn test_past_and_new_events() {
@@ -75,17 +74,10 @@ mod test {
                 continue;
             }
         }
-        println!("Past accounts states: {:?}", state.accounts_franklin);
-
-        // let task = Interval::new(Instant::now(), Duration::from_millis(100))
-        //     .take(10)
-        //     .for_each(|instant| {
-        //         println!("fire; instant={:?}", instant);
-        //         Ok(())
-        //     })
-        //     .map_err(|e| panic!("interval errored; err={:?}", e));
-
-        // tokio::run(task);
+        let accs = state.get_accounts();
+        println!("Accounts: {:?}", accs);
+        let root = state.root_hash();
+        println!("Root: {:?}", root);
 
     }
 }
