@@ -13,9 +13,8 @@ const MIN_AMOUNT_FRA = ethers.utils.parseEther('1') // ~USD 15
 const TO_DEPOSIT = MIN_AMOUNT_FRA.add(ethers.utils.parseEther('0.5')) // ~USD 6 more for margin
 const TO_FUND = TO_DEPOSIT.mul(3)
 
-var args = process.argv.slice(2)
-let nClients = process.env.LOADTEST_N_CLIENTS || 3
-let tps = process.env.LOADTEST_TPS || 50
+let nClients = process.env.LOADTEST_N_CLIENTS
+let tps = process.env.LOADTEST_TPS
 
 let clients = []
 
