@@ -80,7 +80,9 @@ impl PlasmaStateKeeper {
             match req {
                 StateKeeperRequest::GetNetworkStatus(sender) => {
                     let r = sender.send(NetworkStatus{
-                        next_block_at_max: self.next_block_at_max.map(|t| t.duration_since(UNIX_EPOCH).unwrap().as_secs())
+                        next_block_at_max: self.next_block_at_max.map(|t| t.duration_since(UNIX_EPOCH).unwrap().as_secs()),
+                        last_committed: 0,
+                        last_verified: 0,
                     });
                     if r.is_err() {
                         println!("StateKeeperRequest::GetNetworkStatus: channel closed, sending failed");

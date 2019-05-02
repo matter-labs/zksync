@@ -233,12 +233,26 @@ fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpRes
     let request = StateKeeperRequest::GetNetworkStatus(tx);
     tx_for_state.send(request).expect("must send a new transaction to queue");
     let status: Result<NetworkStatus, _> = rx.recv_timeout(std::time::Duration::from_millis(250));
-
     if status.is_err() {
-        return Ok(HttpResponse::Ok().json("timeout".to_owned()));
+        return Ok(HttpResponse::Ok().json(AccountError{error: "timeout".to_owned()}));
     }
+    let status = status.unwrap();
 
-    Ok(HttpResponse::Ok().json(status.unwrap()))
+    let pool = req.state().connection_pool.clone();
+    let storage = pool.access_storage();
+    if storage.is_err() {
+        return Ok(HttpResponse::Ok().json(AccountError{error: "rate limit".to_string()}));
+    }
+    let mut storage = storage.unwrap();
+    
+    // TODO: properly handle failures
+    let status = NetworkStatus{
+        next_block_at_max:  status.next_block_at_max,
+        last_committed:     storage.get_last_committed_block().unwrap_or(0),        
+        last_verified:      storage.get_last_verified_block().unwrap_or(0),
+    };
+
+    Ok(HttpResponse::Ok().json(status))
 }
 
 fn handle_get_account_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {

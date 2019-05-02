@@ -23,6 +23,8 @@ pub type TransferTxResult = Result<TransferTxConfirmation, TransferApplicationEr
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NetworkStatus {
     pub next_block_at_max: Option<u64>,
+    pub last_committed: u32,
+    pub last_verified: u32,
 }
 
 
