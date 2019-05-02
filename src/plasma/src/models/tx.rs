@@ -149,8 +149,8 @@ impl TransferTx {
             return false;
         }
         let as_bytes = pack_bits_into_bytes(message_bits);
-        // let hex: String = as_bytes.clone().to_hex();
-        // println!("Transaction bytes = {}", hex);
+        let hex: String = as_bytes.clone().to_hex();
+        println!("Transaction bytes = {}", hex);
         if let Ok(signature) = self.signature.to_jubjub_eddsa() {
             println!("Successfuly converted to eddsa signature");
             let p_g = FixedGenerators::SpendingKeyGenerator;
