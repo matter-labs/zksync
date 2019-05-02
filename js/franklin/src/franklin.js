@@ -17,6 +17,8 @@ class FranklinWallet {
         if (!privateKeySeed) throw 'Cannot create FranklinWallet: privateKeySeed must be valid'
         this.key = transaction.newKey(privateKeySeed)
 
+        console.log(`Private key for ${signer.address}: ${JSON.stringify(this.key)}`)
+
         this.sidechainAccountId = null
         this.sidechainState = null
 

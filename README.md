@@ -18,6 +18,10 @@ Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 - Deploy contracts:
 ```deploy-contracts``
 
+To redeploy db and contraсts:
+
+```redeploy```
+
 To reset the dev environment:
 
 - Stop services:
