@@ -18,6 +18,19 @@ kubectl get nodes --show-labels
 kubectl get pods -o wide
 ```
 
+## Deploy
+
+1. Upload keys to DO Spaces.
+
+2. Build and push your images to docker hub:
+
+```make push```
+
+3. Scale servers:
+
+kubectl scale deployments/server --replicas=1
+kubectl scale deployments/prover --replicas=3
+
 ## Secrets
 
 View secret:
@@ -27,7 +40,3 @@ View secret:
 Misc:
 
 ```kubectl set env --from=configmap/myconfigmap deployment/myapp```
-
-## Scale provers
-
-kubectl scale deployments/prover --replicas=3
