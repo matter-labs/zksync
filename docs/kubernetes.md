@@ -1,6 +1,9 @@
 ## Connect the cluster
 
-Go to Digital Ocean Dashboard > Kubernetes Clusters > {Your Cluster} > More > Download Config ([like this](https://web.tresorit.com/l#TC88wCaQo01aDGM9SttIDA))
+Go to Digital Ocean Dashboard > Kubernetes Clusters > {Your Cluster} > More > Download Config 
+https://cloud.digitalocean.com/kubernetes/clusters?i=ba0188
+
+([like this](https://web.tresorit.com/l#TC88wCaQo01aDGM9SttIDA))
 
 Save it to `etc/kube/kubeconfig.yaml`
 
