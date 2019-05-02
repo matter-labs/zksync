@@ -98,7 +98,7 @@ function integerToFloat(integer, exp_bits, mantissa_bits, exp_base) {
     if (integer.lte((new BN(maxMantissa)))) {
         exponent = new BN(0);
     } else {
-        while (power.gt(exponentBase)) {
+        while (power.gte(exponentBase)) {
             power = power.div(exponentBase);
             exponent = exponent.addn(1);
         }
@@ -295,7 +295,7 @@ function createTransaction(from, to, amount, fee, nonce, good_until_block, priva
 }
 
 function test_float_parsing() {
-    let bn = new BN(24300);
+    let bn = new BN(213580);
     let enc = integerToFloat(bn, 5, 11, 10);
     console.log(enc.toString("hex"));
     let dec = floatToInteger(enc, 5, 11, 10);
