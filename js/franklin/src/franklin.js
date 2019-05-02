@@ -91,7 +91,11 @@ class FranklinWallet {
             data:       apiForm
         });
         await new Promise(resolve => setTimeout(resolve, 300))
+        let next_nonce = result.data.accepted ? nonce + 1 : nonce
         await this.pullState(false)
+        if (this.sidechainState.current.nonce < next_nonce) {
+            this.sidechainState.current.nonce = next_nonce
+        }
         return result.data
     }
     

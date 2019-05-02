@@ -197,7 +197,7 @@ fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResp
 
     if pending.is_err() {
         println!("API request timeout!");
-        return Ok(HttpResponse::RequestTimeout().json(AccountError{error:"account request timeout".to_string()}));
+        return Ok(HttpResponse::Ok().json(AccountError{error:"account request timeout".to_string()}));
     }
 
     let pending = pending.unwrap();
@@ -235,7 +235,7 @@ fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpRes
     let status: Result<NetworkStatus, _> = rx.recv_timeout(std::time::Duration::from_millis(250));
 
     if status.is_err() {
-        return Ok(HttpResponse::RequestTimeout().json("timeout".to_owned()));
+        return Ok(HttpResponse::Ok().json("timeout".to_owned()));
     }
 
     Ok(HttpResponse::Ok().json(status.unwrap()))
