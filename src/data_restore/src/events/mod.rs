@@ -1,6 +1,6 @@
-use std::rc::Rc;
+// use std::rc::Rc;
 
-use web3::futures::{Future, Stream};
+use web3::futures::Future;
 use web3::types::{Log, Address, FilterBuilder, H256, U256, BlockNumber};
 // use tokio_core::reactor::Core;
 use ethabi::Contract;

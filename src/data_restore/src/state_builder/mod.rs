@@ -1,28 +1,22 @@
-use std::rc::Rc;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
 use ff::{Field, PrimeField, PrimeFieldRepr};
-use web3::futures::{Future, Stream};
-use web3::types::{Log, Address, FilterBuilder, H256, U256, BlockNumber};
+use web3::futures::Future;
+use web3::types::{Address, FilterBuilder, H256, U256, BlockNumber};
 use ethabi::Contract;
 use sapling_crypto::jubjub::{edwards, Unknown};
 
 use bigdecimal::{Num, BigDecimal, Zero};
 
 use plasma::models::{Account, AccountTree, AccountId};
-use plasma::models::{Block, BlockData, DepositTx, TransferTx, Engine, Fr, ExitTx};
+use plasma::models::{DepositTx, TransferTx, Engine, Fr, ExitTx};
 use plasma::models::params;
 
-
-use blocks::{BlockType, LogBlockData};
-use helpers;
 use helpers::InfuraEndpoint;
 use franklin_transaction::{FranklinTransactionType,FranklinTransaction};
 
 type ABI = (&'static [u8], &'static str);
-type ComAndVerBlocksVecs = (Vec<LogBlockData>, Vec<LogBlockData>);
-type BlockNumber256 = U256;
 
 pub const PLASMA_TEST_ABI: ABI = (
     include_bytes!("../../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.abi"),
@@ -119,7 +113,6 @@ impl StatesBuilderFranklin {
 
     pub fn update_accounts_states_from_transfer_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), String> {
         let batch_number = self.get_batch_number_from_deposit(transaction);
-        let block_number = self.get_block_number_from_deposit(transaction);
         let transfer_txs_block = self.get_all_transactions_from_transfer_batch(batch_number);
         if transfer_txs_block.is_err() {
             return Err(String::from("No transfer txs in block"));
@@ -178,7 +171,6 @@ impl StatesBuilderFranklin {
 
     fn update_accounts_states_from_deposit_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), String> {
         let batch_number = self.get_batch_number_from_deposit(transaction);
-        let block_number = self.get_block_number_from_deposit(transaction);
         let deposit_txs_block = self.get_all_transactions_from_deposit_batch(batch_number);
         if deposit_txs_block.is_err() {
             return Err(String::from("No deposit txs in block"));
@@ -206,13 +198,12 @@ impl StatesBuilderFranklin {
 
     fn update_accounts_states_from_full_exit_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), String> {
         let batch_number = self.get_batch_number_from_full_exit(transaction);
-        let block_number = self.get_block_number_from_full_exit(transaction);
         let exit_txs_block = self.get_all_transactions_from_full_exit_batch(batch_number);
         if exit_txs_block.is_err() {
             return Err(String::from("Cant get txs from batch"))
         }
         for tx in exit_txs_block.unwrap().exits {
-            let _ = self.accounts_tree.items.get(&tx.account).ok_or(return Err(String::from("Unexisting account"))).unwrap().clone();
+            let _ = self.accounts_tree.items.get(&tx.account).ok_or(return Err(String::from("Unexisting account")));
             self.accounts_tree.delete(tx.account);
         }
         Ok(())
@@ -228,18 +219,6 @@ impl StatesBuilderFranklin {
         let batch_vec = transaction.commitment_data[0..32].to_vec();
         let batch_slice = batch_vec.as_slice();
         U256::from(batch_slice)
-    }
-
-    fn get_block_number_from_deposit(&self, transaction: &FranklinTransaction) -> U256 {
-        let block_vec = transaction.commitment_data[64..96].to_vec();
-        let block_slice = block_vec.as_slice();
-        U256::from(block_slice)
-    }
-
-    fn get_block_number_from_full_exit(&self, transaction: &FranklinTransaction) -> U256 {
-        let block_vec = transaction.commitment_data[64..96].to_vec();
-        let block_slice = block_vec.as_slice();
-        U256::from(block_slice)
     }
 
     fn get_all_transactions_from_transfer_batch(&self, batch_number: U256) -> Result<TransferTransactionsBlock, String> {
@@ -391,7 +370,7 @@ impl StatesBuilderFranklin {
         for event in exit_events {
             let account_id = U256::from(event.topics[2]);;
             let existing_record = this_batch.get(&account_id).map(|&v| v.clone());
-            if let Some(record) = existing_record {
+            if let Some(_) = existing_record {
                 return Err(String::from("Double exit should not be possible"))
             } else {
                 this_batch.insert(account_id);

@@ -1,4 +1,3 @@
-#![allow(unused_must_use)]
 #![allow(deprecated)]
 
 extern crate web3;
@@ -30,9 +29,7 @@ pub fn get_new_blocks() -> futures::future::FutureResult<(), String> {
 mod test {
 
     use super::*;
-    use std::time::{Duration, Instant};
-    use futures::*;
-    use web3::types::{U256, H256};
+    use web3::types::U256;
 
     // #[test]
     // fn test_past_and_new_events() {
