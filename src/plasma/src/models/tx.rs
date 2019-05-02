@@ -33,7 +33,8 @@ pub struct TransferTx {
 
 impl std::fmt::Debug for TransferTx {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "tx{{ from: {}, to: {}, nonce: {}, amount: {} }}", self.from, self.to, self.nonce, self.amount)
+        write!(f, "tx{{ from: {}, to: {}, nonce: {}, amount: {} }}", self.from, self.to, self.nonce, self.amount)?;
+        write!(f, "tx{{ sigS: {}, sigR_x: {}, sigR_y: {} }}", self.signature.s, self.signature.r_x, self.signature.r_y)
     }
 }
 

@@ -26,12 +26,13 @@ const babyJubjubParams = {
 const altBabyJubjub = new elliptic.curve.edwards(babyJubjubParams);
 
 function sign(message, privateKey, curve) {
-    const r = (new BN(elliptic.rand(32), 16, "be")).umod(curve.n);
+    // const r = (new BN(elliptic.rand(32), 16, "be")).umod(curve.n);
+    const r = new BN(3);
     var R = curve.g.mul(r);
     if (R.isInfinity()) {
         throw Error("R is infinity")
     }
-    var s_ = (new BN(message, 16, "be")).mul(privateKey);
+    var s_ = (new BN(message, 16, "be")).mul(privateKey).umod(curve.n);
     var S = r.add(s_).umod(curve.n);
     return { R: R, S: S};
   };
@@ -141,10 +142,6 @@ function packBnLe(bn, numBits) {
     return buff;
 }
 
-function reverseByte(b) {
-
-}
-
 function serializeTransaction(tx) {
     const {from, to, amount, fee, nonce, good_until_block} = tx;
     assert(from.bitLength() <= 24);
@@ -154,15 +151,8 @@ function serializeTransaction(tx) {
     assert(nonce.bitLength() <= 32);
     assert(good_until_block.bitLength() <= 32);
 
-    // const components = [];
-    // components.push(packBnLe(from, 24));
-    // components.push(packBnLe(to, 24));
     let amountFloatBytes = integerToFloat(amount, 5, 11, 10);
-    // components.push(amountFloatBytes);
     let feeFloatBytes = integerToFloat(fee, 5, 3, 10);
-    // components.push(feeFloatBytes);
-    // components.push(packBnLe(nonce, 32));
-    // components.push(packBnLe(good_until_block, 32));
 
     const components = [
         good_until_block.toArrayLike(Buffer, "be", 4),
@@ -282,6 +272,7 @@ function createTransaction(from, to, amount, fee, nonce, good_until_block, priva
         nonce: new BN(nonce),
         good_until_block: new BN(good_until_block)
     };
+
     const serializedTx = serializeTransaction(tx);
     const message = serializedTx.bytes;
     console.log("Message hex = " + message.toString("hex"));
@@ -294,24 +285,78 @@ function createTransaction(from, to, amount, fee, nonce, good_until_block, priva
     return apiForm;
 }
 
+function createRawTransaction(from, to, amount, fee, nonce, good_until_block, privateKey) {
+    let tx = {
+        from: new BN(from),
+        to: new BN(to),
+        amount: new BN(amount),
+        fee: new BN(fee),
+        nonce: new BN(nonce),
+        good_until_block: new BN(good_until_block)
+    };
+
+    const serializedTx = serializeTransaction(tx);
+    const message = serializedTx.bytes;
+    console.log("Message hex = " + message.toString("hex"));
+    const signature = sign(message, privateKey, altBabyJubjub);
+    const pub = altBabyJubjub.g.mul(privateKey);
+    const isValid = verify(message, signature, pub, altBabyJubjub);
+    assert(isValid);
+    return {raw: message, signature: signature}
+}
+
 function test_float_parsing() {
-    let bn = new BN(213580);
+    let bn = new BN(20474);
     let enc = integerToFloat(bn, 5, 11, 10);
     console.log(enc.toString("hex"));
     let dec = floatToInteger(enc, 5, 11, 10);
     console.log("dec = " + dec.toString(10));
 }
 
-// test_float_parsing();
-
-function main() {
-    for (let i = 0; i < 20; i++) {
+function test_brute() {
+    let MAX = 100000000000000;
+    for (let i = 1; i < MAX; i++) {
         let bn = new BN(i);
         let enc = integerToFloat(bn, 5, 11, 10);
-        console.log(enc.toString("hex"));
+        let dec = floatToInteger(enc, 5, 11, 10);
+        if (bn.sub(dec).gt(bn.divn(10))) {
+            console.log("Original = " + bn.toString(10) + ", decoded = " + dec.toString(10));
+        }
     }
+}
+
+// test_float_parsing();
+// test_brute();
+
+function test_signature_reconstruction() {
+    const sk = (new BN("560fadfc60b49624b27de82891059fc9276def63e3bce85e95819bf9652c9ea", 16)).umod(altBabyJubjub.n);
+    const pub_0 = altBabyJubjub.g.mul(sk);
+    console.log("X = " + pub_0.getX().toString(16));
+    const X = new BN("004009b16535a8058f34a642e98af661807fb8276a72c02cefeb660ffee2e41b", 16);
+    const Y = new BN("1d4032b204f16d3c2a29ff5ba4836705a4c23349ff514f1c055b715e80a6bf1d", 16);
+    const pub = altBabyJubjub.pointFromJSON([X, Y]);
+    console.log("X = " + pub.getX().toString(16));
+    let {raw, signature} = createRawTransaction(4, 3, 20474, 0, 508, 50000, sk)
+    let isValid_local = verify(raw, signature, pub, altBabyJubjub);
+    assert(isValid_local);
+    const parsedSig = parseSignature({
+        R: ["15157418731234bed372c84b4de28c994028f8290689e3a21571ecde49644505",
+            "0d081beb4eaf31a9ba4b86fbfda6225fd65128a1decf53be44d9cab457eec0cd"
+        ],
+        S: "023012a357fe05a3bbd4f0b360dd60436cc54d333173e5bf7dfafd13192df47e"
+    }, altBabyJubjub);
+    let isValid = verify(raw, parsedSig, pub, altBabyJubjub);
+    assert(isValid);
+}
+
+// test_signature_reconstruction();
+
+function main() {
     const sk = (new BN(elliptic.rand(32), 16, "be")).umod(altBabyJubjub.n);
     const pub = altBabyJubjub.g.mul(sk);
+    // const tx = createTransaction(3, 4, 20474, 0, 1, 100, sk);
+
+    // const message = serializeTransaction(tx.from, tx.to, tx.amount, tx.nonce, tx.good_until_block);
     const message = elliptic.rand(16);
     const signature = sign(message, sk, altBabyJubjub);
     const isValid = verify(message, signature, pub, altBabyJubjub);
@@ -320,17 +365,6 @@ function main() {
     const parsedSig = parseSignature(sigJSON, altBabyJubjub);
     const isValidParsed = verify(message, parsedSig, pub, altBabyJubjub);
     assert(isValidParsed);
-
-    // exp = 1, mantissa = 1 => 10
-    // const floatBytes = (new BN("1000010000000000", 2)).toArrayLike(Buffer, );
-    // const integer = floatToInteger(floatBytes, 5, 11, 10);
-    // assert(integer.toString(10) === "10");
-    const someInt = new BN("1234556678")
-    const encoding = integerToFloat(someInt, 5, 11, 10);
-    const decoded = floatToInteger(encoding, 5, 11, 10);
-    assert(decoded.lte(someInt));
-    console.log("encoded-decoded = " + decoded.toString(10));
-    console.log("original = " + someInt.toString(10));
 }
 
 function newKey(seed) {

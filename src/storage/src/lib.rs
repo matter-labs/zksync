@@ -123,6 +123,25 @@ impl StoredOperation {
     }
 }
 
+// #[derive(Debug, Queryable, QueryableByName)]
+// #[table_name="transactions"]
+// pub struct StoredTx {
+//     pub id:             i32,
+//     //pub data:           serde_json::Value,
+
+//     pub tx_type:        String,         // 'transfer', 'deposit', 'exit'
+//     pub from_account:   i32,
+//     pub to_account:     Option<i32>,    // only used for transfers
+//     pub nonce:          Option<i32>,    // only used for transfers
+//     pub amount:         i32,
+//     pub fee:            i32,
+
+//     pub block_number:   i32,
+//     pub state_root:     String,         // unique block id (for possible reorgs)
+
+//     pub created_at:     std::time::SystemTime,
+// }
+
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
 #[table_name="proofs"]
 pub struct NewProof {
