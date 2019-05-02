@@ -88,28 +88,36 @@ function floatToInteger(floatBytes, exp_bits, mantissa_bits, exp_base) {
     return exponent.mul(mantissa);
 }
 
-function integerToFloat(integer, exp_bits, mantissa_bits, exp_base) {
+function integerToFloat(integer, exp_bits, mantissa_bits, exp_base, second_pass) {
+    // change strategy. First try to guess the precision, and then reparse;
     const maxMantissa = (new BN(1)).ushln(mantissa_bits).subn(1);
     const maxExponent = (new BN(exp_base)).pow((new BN(1)).ushln(exp_bits).subn(1));
     assert(integer.lte(maxMantissa.mul(maxExponent)));
     // try to get the best precision
-    let power = integer.div(maxMantissa);
     const exponentBase = new BN(exp_base);
     let exponent = new BN(0);
-    if (integer.lte((new BN(maxMantissa)))) {
-        exponent = new BN(0);
-    } else {
-        while (power.gte(exponentBase)) {
-            power = power.div(exponentBase);
-            exponent = exponent.addn(1);
-        }
-        if (maxMantissa.mul(exponentBase.pow(exponent)).lt(integer)) {
+    let one = new BN(1);
+    if (integer.gt(maxMantissa)) {
+        let exponentGuess = integer.div(maxMantissa);
+        let exponentTmp = exponentGuess;
+
+        while(exponentTmp.gte(exponentBase)) {
+            exponentTmp = exponentTmp.div(exponentBase);
             exponent = exponent.addn(1);
         }
     }
+
+    let exponentTmp = exponentBase.pow(exponent);
+    if (maxMantissa.mul(exponentTmp).lt(integer)) {
+        exponent = exponent.addn(1);
+    }
     
-    power = exponentBase.pow(exponent);
+    let power = exponentBase.pow(exponent);
     let mantissa = integer.div(power);
+    if (!second_pass) {
+        let down_to_precision = mantissa.mul(power);
+        return integerToFloat(down_to_precision, exp_bits, mantissa_bits, exp_base, true);
+    }
     // pack
     assert((mantissa_bits + exp_bits) % 8 === 0);
     const totalBits = mantissa_bits + exp_bits - 1;
@@ -325,7 +333,7 @@ function test_brute() {
     }
 }
 
-// test_float_parsing();
+test_float_parsing();
 // test_brute();
 
 function test_signature_reconstruction() {
