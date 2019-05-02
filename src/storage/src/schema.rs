@@ -1,15 +1,15 @@
 table! {
-    account_updates (account_id, block_number) {
-        account_id -> Int4,
-        block_number -> Int4,
+    accounts (id) {
+        id -> Int4,
+        last_block -> Int4,
         data -> Json,
     }
 }
 
 table! {
-    accounts (id) {
-        id -> Int4,
-        last_block -> Int4,
+    account_updates (account_id, block_number) {
+        account_id -> Int4,
+        block_number -> Int4,
         data -> Json,
     }
 }
@@ -50,11 +50,27 @@ table! {
     }
 }
 
+table! {
+    transactions (id) {
+        id -> Int4,
+        tx_type -> Text,
+        from_account -> Int4,
+        to_account -> Nullable<Int4>,
+        nonce -> Nullable<Int4>,
+        amount -> Int4,
+        fee -> Int4,
+        block_number -> Nullable<Int4>,
+        state_root -> Nullable<Text>,
+        created_at -> Timestamp,
+    }
+}
+
 allow_tables_to_appear_in_same_query!(
-    account_updates,
     accounts,
+    account_updates,
     op_config,
     operations,
     proofs,
     prover_runs,
+    transactions,
 );

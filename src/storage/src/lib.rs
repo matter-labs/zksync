@@ -123,24 +123,38 @@ impl StoredOperation {
     }
 }
 
-// #[derive(Debug, Queryable, QueryableByName)]
-// #[table_name="transactions"]
-// pub struct StoredTx {
-//     pub id:             i32,
-//     //pub data:           serde_json::Value,
+#[derive(Insertable)]
+#[table_name="transactions"]
+struct NewTx {
+    pub tx_type:        String,         // 'transfer', 'deposit', 'exit'
+    pub from_account:   i32,
+    pub to_account:     Option<i32>,    // only used for transfers
+    pub nonce:          Option<i32>,    // only used for transfers
+    pub amount:         i32,
+    pub fee:            i32,
 
-//     pub tx_type:        String,         // 'transfer', 'deposit', 'exit'
-//     pub from_account:   i32,
-//     pub to_account:     Option<i32>,    // only used for transfers
-//     pub nonce:          Option<i32>,    // only used for transfers
-//     pub amount:         i32,
-//     pub fee:            i32,
+    pub block_number:   Option<i32>,
+    pub state_root:     Option<String>, // unique block id (for possible reorgs)
+}
 
-//     pub block_number:   i32,
-//     pub state_root:     String,         // unique block id (for possible reorgs)
+#[derive(Debug, Queryable, QueryableByName)]
+#[table_name="transactions"]
+pub struct StoredTx {
+    pub id:             i32,
+    //pub data:           serde_json::Value,
 
-//     pub created_at:     std::time::SystemTime,
-// }
+    pub tx_type:        String,         // 'transfer', 'deposit', 'exit'
+    pub from_account:   i32,
+    pub to_account:     Option<i32>,    // only used for transfers
+    pub nonce:          Option<i32>,    // only used for transfers
+    pub amount:         i32,
+    pub fee:            i32,
+
+    pub block_number:   Option<i32>,
+    pub state_root:     Option<String>, // unique block id (for possible reorgs)
+
+    pub created_at:     std::time::SystemTime,
+}
 
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
 #[table_name="proofs"]
@@ -534,13 +548,13 @@ mod test {
     use plasma::models;
     use diesel::Connection;
     use bigdecimal::BigDecimal;
-    use diesel::RunQueryDsl;
+    //use diesel::RunQueryDsl;
 
     #[test]
     fn test_store_proof() {
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
-        conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
+        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
 
         assert!(conn.load_proof(1).is_err());
 
@@ -555,15 +569,15 @@ mod test {
     fn test_store_state() {     
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
-        conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
+        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
 
         // uncomment below for debugging to generate initial state
-        diesel::sql_query("delete from accounts")
-        .execute(&conn.conn)
-        .expect("must work");
-        diesel::sql_query("delete from account_updates")
-        .execute(&conn.conn)
-        .expect("must work");
+        // diesel::sql_query("delete from accounts")
+        // .execute(&conn.conn())
+        // .expect("must work");
+        // diesel::sql_query("delete from account_updates")
+        // .execute(&conn.conn())
+        // .expect("must work");
 
         let mut accounts = fnv::FnvHashMap::default();
         let acc = |balance| { 
@@ -630,7 +644,7 @@ mod test {
     fn test_store_txs() {
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
-        conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
+        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
         conn.update_op_config("0x0", 0).unwrap();
 
         let mut accounts = fnv::FnvHashMap::default();
@@ -697,7 +711,7 @@ mod test {
     fn test_store_proof_reqs() {
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
-        conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
+        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
         conn.update_op_config("0x0", 0).unwrap();
 
         conn.execute_operation(&Operation{
@@ -741,7 +755,7 @@ mod test {
     fn test_store_helpers() {
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
-        conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
+        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
 
         assert_eq!(-1, conn.load_last_committed_deposit_batch().unwrap());
         assert_eq!(-1, conn.load_last_committed_exit_batch().unwrap());
