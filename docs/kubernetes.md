@@ -34,7 +34,7 @@ kubectl scale deployments/server --replicas=1
 kubectl scale deployments/prover --replicas=3
 ```
 
-4. Check status:
+## Check status:
 
 1. Nodes:
 ```
