@@ -1,11 +1,13 @@
 use std::rc::Rc;
+
 use web3::futures::{Future, Stream};
 use web3::types::{Log, Address, FilterBuilder, H256, U256, BlockNumber};
 use tokio_core::reactor::Core;
+use ethabi::Contract;
+
 use blocks::{BlockType, LogBlockData};
 use helpers;
 use helpers::InfuraEndpoint;
-use ethabi::Contract;
 
 type ABI = (&'static [u8], &'static str);
 type ComAndVerBlocksVecs = (Vec<LogBlockData>, Vec<LogBlockData>);
@@ -21,7 +23,8 @@ pub const PLASMA_PROD_ABI: ABI = (
     include_str!("../../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.bin"),
 );
 
-pub struct EventsFranklin {
+#[derive(Debug, Clone)]
+pub struct BlockEventsFranklin {
     pub http_endpoint_string: String,
     pub ws_endpoint_string: String,
     pub franklin_abi: ABI,
@@ -38,7 +41,7 @@ pub struct EventsFranklin {
 // Subscribe on new blocks
 // New blocks -> last watching block ++
 // Check if txs in last watching block
-impl EventsFranklin {
+impl BlockEventsFranklin {
     pub fn new(network: InfuraEndpoint) -> Self {
         let ws_infura_endpoint_str = match network {
             InfuraEndpoint::Mainnet => "wss://mainnet.infura.io/ws",
@@ -73,7 +76,7 @@ impl EventsFranklin {
     }
 
     pub fn get_past_state_with_blocks_delta(network: InfuraEndpoint, blocks_delta: U256) -> Result<Self, String> {
-        let mut this = EventsFranklin::new(network);
+        let mut this = BlockEventsFranklin::new(network);
         let (blocks, to_block_number): ((Vec<LogBlockData>, Vec<LogBlockData>), BlockNumber256) = match this.get_sorted_past_logs(blocks_delta) {
             Err(_) => return Err(String::from("Cant get sorted past logs")),
             Ok(result) => (result.0, result.1)
@@ -92,7 +95,7 @@ impl EventsFranklin {
     //     self.verified_blocks.clone()
     // }
 
-    fn get_last_block_number(&mut self) -> Result<BlockNumber256, String> {
+    pub fn get_last_block_number(&mut self) -> Result<BlockNumber256, String> {
         let (_eloop, transport) = match web3::transports::Http::new(self.http_endpoint_string.as_str()) {
             Err(_) => return Err(String::from("Error creating web3 with this endpoint")),
             Ok(result) => result,
@@ -206,7 +209,7 @@ impl EventsFranklin {
 
     pub fn get_sorted_logs_in_block(&mut self, block_number: BlockNumber256) -> Result<ComAndVerBlocksVecs, String> {
         let block_to_get_logs = BlockNumber::Number(block_number.as_u64());
-        match self.get_logs(block_to_get_logs.clone(), block_to_get_logs.clone()) {
+        match self.get_logs(block_to_get_logs, block_to_get_logs) {
             Err(_) => {
                 let message = String::from("No logs in block ") + &block_number.as_u64().to_string();
                 return Err(message)
@@ -281,10 +284,10 @@ impl EventsFranklin {
                 sub.for_each(|log| {
                     println!("---");
                     println!("Got block number {:?}", log.number);
-                    let number_to_watch = self.last_watched_block_number.clone() + 1;
-                    self.last_watched_block_number = number_to_watch.clone();
+                    let number_to_watch = self.last_watched_block_number + 1;
+                    self.last_watched_block_number = number_to_watch;
                     println!("Block to watch {:?}", &number_to_watch);
-                    match self.get_sorted_logs_in_block(number_to_watch.clone()) {
+                    match self.get_sorted_logs_in_block(number_to_watch) {
                         Ok(mut result) => {
                             println!("Old committed blocks array len: {:?}", &self.committed_blocks.len());
                             println!("Old verified blocks array len: {:?}", &self.verified_blocks.len());
@@ -379,7 +382,4 @@ impl EventsFranklin {
     //     }
     // }
 }
-
-
-
 

@@ -1,21 +1,22 @@
 use web3::futures::Future;
-use web3::types::{H256, Transaction, TransactionId};
+use web3::types::{H256, U256, U128, Transaction, TransactionId};
+
 use helpers::*;
 
 #[derive(Debug, Copy, Clone)]
 pub enum FranklinTransactionType {
     Deposit,
-    Transaction,
+    Transfer,
     FullExit,
     Unknown
 }
 
 #[derive(Debug, Clone)]
 pub struct FranklinTransaction {
-    network: InfuraEndpoint,
-    franklin_transaction_type: FranklinTransactionType,
-    ethereum_transaction: Transaction,
-    commitment_data: Vec<u8>,
+    pub network: InfuraEndpoint,
+    pub franklin_transaction_type: FranklinTransactionType,
+    pub ethereum_transaction: Transaction,
+    pub commitment_data: Vec<u8>,
 }
 
 impl FranklinTransaction {
@@ -24,6 +25,33 @@ impl FranklinTransaction {
         let input_data = FranklinTransaction::get_input_data_from_ethereum_transaction(&transaction);
         let tx_type = FranklinTransaction::get_transaction_type(&input_data);
         let commitment_data = FranklinTransaction::get_commitment_data_from_input_data(&input_data)?;
+        // let mut this = Self {
+        //     network: network,
+        //     franklin_transaction_type: tx_type,
+        //     ethereum_transaction: transaction,
+        //     commitment_data: commitment_data,
+        //     batch_number: U256::zero(),
+        //     accound_ids: vec![],
+        //     block_number: 0,
+        //     tx_data: vec![],
+        //     new_root: vec![],
+        // };
+        // let this = match tx_type {
+        //     FranklinTransactionType::Deposit  => {
+        //     },
+        //     FranklinTransactionType::Transfer => {
+        //     },
+        //     FranklinTransactionType::FullExit => {
+        //         this.batch_number = U256::from(&commitment_data.[0..31].to_vec());
+        //         this.accound_ids = U256
+        //         this.block_number = 
+        //         this.tx_data =
+        //         this.new_root =  
+        //     },
+        //     FranklinTransactionType::Unknown  => {
+        //         return None
+        //     },
+        // }
         let this = Self {
             network: network,
             franklin_transaction_type: tx_type,
@@ -33,7 +61,7 @@ impl FranklinTransaction {
         Some(this)
     }
 
-    pub fn get_ethereum_transaction(network: InfuraEndpoint, transaction_hash: &H256) -> Option<Transaction> {
+    fn get_ethereum_transaction(network: InfuraEndpoint, transaction_hash: &H256) -> Option<Transaction> {
         let infura_endpoint = match network {
             InfuraEndpoint::Mainnet => "https://mainnet.infura.io/",
             InfuraEndpoint::Rinkeby => "https://rinkeby.infura.io/",
@@ -84,7 +112,7 @@ impl FranklinTransaction {
                 FranklinTransactionType::Deposit
             },
             _ if method_bytes == transaction_method_bytes => {
-                FranklinTransactionType::Transaction
+                FranklinTransactionType::Transfer
             },
             _ if method_bytes == full_exit_method_bytes => {
                 FranklinTransactionType::FullExit

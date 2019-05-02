@@ -1,5 +1,5 @@
-use web3::types::H256;
 use std::cmp::Ordering;
+use web3::types::H256;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum BlockType {
