@@ -11,6 +11,7 @@ class FranklinWallet {
         this.fra = franklin
         this.eth = franklin.eth
         this.ethWallet = signer.connect(franklin.eth.provider)
+        this.nextNonce = 0
 
         this.ethAddress = ethAddress
 
@@ -30,6 +31,9 @@ class FranklinWallet {
         this.sidechainAccountId = await this.eth.contract.ethereumAddressToAccountID(this.ethAddress)
         this.sidechainState = this.sidechainAccountId > 0 ?
             await this.fra.pullSidechainState(this.sidechainAccountId) : null
+        if (this.sidechainState && this.sidechainState.current && this.sidechainState.current.nonce > this.nextNonce) {
+            this.nextNonce = this.sidechainState.current.nonce
+        }
     }
 
     get sidechainOpen() {
@@ -80,7 +84,7 @@ class FranklinWallet {
         amount = amount.div(MULTIPLIER).toNumber()
         const privateKey = this.key.privateKey
         //console.log(this.sidechainState)
-        const nonce = this.sidechainState.current.nonce
+        const nonce = this.nextNonce++
         const good_until_block = 50000 // TODO: add to current block?
         const fee = 0;
 
@@ -90,11 +94,11 @@ class FranklinWallet {
             url:        this.fra.baseUrl + '/submit_tx',
             data:       apiForm
         });
-        await new Promise(resolve => setTimeout(resolve, 300))
-        let next_nonce = result.data.accepted ? nonce + 1 : nonce
+        await new Promise(resolve => setTimeout(resolve, 500))
         await this.pullState(false)
-        if (this.sidechainState.current.nonce < next_nonce) {
-            this.sidechainState.current.nonce = next_nonce
+        let error = result.data && result.data.error
+        if (error === 'NonceIsTooHigh' && this.sidechainState.current.nonce < nonce) {
+            this.nextNonce = this.sidechainState.current.nonce
         }
         return result.data
     }
