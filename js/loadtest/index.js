@@ -14,7 +14,7 @@ const WITH_MARGIN = MIN_AMOUNT.add(ethers.utils.parseEther('0.5')) // ~USD 6 mor
 
 var args = process.argv.slice(2)
 let nClients = args[0] || 3
-let tps = args[1] || 50
+let tps = args[1] || 1
 
 let clients = []
 
@@ -147,9 +147,11 @@ async function test() {
 
     console.log('xx: starting the test...')
     while(true) {
-        var nextTick = new Date(new Date().getTime() + 1000);
+        var nextTick = new Date(new Date().getTime() + 1000*100000000);
         for (let i=0; i<tps; i++) {
-            randomClient().randomTransfer()
+            let client = clients[0]
+                // randomClient()
+            client.randomTransfer()
         }
         console.log('-')
         while(nextTick > new Date()) {
