@@ -98,7 +98,7 @@ function integerToFloat(integer, exp_bits, mantissa_bits, exp_base) {
     if (integer.lte((new BN(maxMantissa)))) {
         exponent = new BN(0);
     } else {
-        while (power.gt(exponentBase)) {
+        while (power.gte(exponentBase)) {
             power = power.div(exponentBase);
             exponent = exponent.addn(1);
         }
@@ -123,9 +123,6 @@ function integerToFloat(integer, exp_bits, mantissa_bits, exp_base) {
             encoding.bincn(totalBits - exp_bits - i);
         }
     }
-    console.log(encoding.toString())
-    console.log(exp_bits, mantissa_bits)
-    console.log((exp_bits + mantissa_bits)/8)
     return encoding.toArrayLike(Buffer, "be", (exp_bits + mantissa_bits)/8)
 }
 
@@ -297,6 +294,15 @@ function createTransaction(from, to, amount, fee, nonce, good_until_block, priva
     return apiForm;
 }
 
+function test_float_parsing() {
+    let bn = new BN(213580);
+    let enc = integerToFloat(bn, 5, 11, 10);
+    console.log(enc.toString("hex"));
+    let dec = floatToInteger(enc, 5, 11, 10);
+    console.log("dec = " + dec.toString(10));
+}
+
+// test_float_parsing();
 
 function main() {
     for (let i = 0; i < 20; i++) {

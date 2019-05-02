@@ -1,31 +1,36 @@
 #!/bin/bash
 
-cd `dirname $0`/..
-
-if [ -z "$1" ]
+if [ -z "$ENV_FILE" ]
 then
-    export ENV_FILE=./etc/env/local.env
-else
-    export ENV_FILE=./etc/env/$1.env
-fi
 
-if [ ! -f $ENV_FILE ]; then
-    echo "no config file found: $ENV_FILE"
-    #exit
-fi
+    cd `dirname $0`/..
 
-echo Loading config from $ENV_FILE
-
-if [ ! -z "$1" ]
-then
-    echo -n "Type configuration name ('$1') to confirm: "
-    read CONFIRM
-
-    if [ ! "$1" == "$CONFIRM" ]; then
-        exit
+    if [ -z "$1" ]
+    then
+        export ENV_FILE=./etc/env/local.env
+    else
+        export ENV_FILE=./etc/env/$1.env
     fi
-fi
 
-set -o allexport
-eval $(grep -v '^#' $ENV_FILE | sed 's/^/export /')
-set +o allexport
+    if [ ! -f $ENV_FILE ]; then
+        echo "no config file found: $ENV_FILE"
+        #exit
+    fi
+
+    echo Loading config from $ENV_FILE
+
+    if [ ! -z "$1" ]
+    then
+        echo -n "Type configuration name ('$1') to confirm: "
+        read CONFIRM
+
+        if [ ! "$1" == "$CONFIRM" ]; then
+            exit
+        fi
+    fi
+
+    set -o allexport
+    eval $(grep -v '^#' $ENV_FILE | sed 's/^/export /')
+    set +o allexport
+
+fi

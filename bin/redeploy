@@ -1,0 +1,5 @@
+#!/bin/bash
+
+. .setup_env
+. deploy-contracts
+. db-reset

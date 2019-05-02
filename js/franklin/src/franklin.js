@@ -17,6 +17,8 @@ class FranklinWallet {
         if (!privateKeySeed) throw 'Cannot create FranklinWallet: privateKeySeed must be valid'
         this.key = transaction.newKey(privateKeySeed)
 
+        console.log(`Private key for ${signer.address}: ${JSON.stringify(this.key)}`)
+
         this.sidechainAccountId = null
         this.sidechainState = null
 
@@ -77,7 +79,7 @@ class FranklinWallet {
         const from = this.sidechainAccountId
         amount = amount.div(MULTIPLIER).toNumber()
         const privateKey = this.key.privateKey
-        console.log(this.sidechainState)
+        //console.log(this.sidechainState)
         const nonce = this.sidechainState.current.nonce
         const good_until_block = 50000 // TODO: add to current block?
         const fee = 0;
