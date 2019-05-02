@@ -36,9 +36,13 @@ kubectl scale deployments/prover --replicas=3
 
 4. Check status:
 
+1. Nodes:
 ```
 kubectl get pods
 ```
+
+2. Web server:
+https://api1.mattr.network/api/v0.1/status
 
 ## Misc
 
