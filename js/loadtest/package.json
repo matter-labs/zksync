@@ -2,9 +2,9 @@
   "name": "loadtest",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "loadtest.js",
   "scripts": {
-    "test": ".setup_env && node index.js"
+    "test": ".setup_env && node loadtest.js"
   },
   "author": "",
   "license": "ISC",

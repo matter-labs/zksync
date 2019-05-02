@@ -68,7 +68,7 @@ fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
     req.json()
         .from_err() // convert all errors into `Error`
         .and_then(move |tx: TransferTx| {
-            println!("New incoming transaction: {:?}", &tx);
+            //println!("New incoming transaction: {:?}", &tx);
 
             if let Err(error) = tx.validate() {
                 println!("Transaction itself is invalid: {}", error);
@@ -108,11 +108,10 @@ fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
             }
 
             let pub_key = pub_key.unwrap();
-            let (x, y) = pub_key.0.into_xy();
-            println!("Got public key: {:?}, {:?}", x, y);
-
             let verified = tx.verify_sig(&pub_key);
             if !verified {
+                let (x, y) = pub_key.0.into_xy();
+                println!("Got public key: {:?}, {:?}", x, y);
                 println!("Signature is invalid: (x,y,s) = ({:?},{:?},{:?})", &tx.signature.r_x, &tx.signature.r_y, &tx.signature.s);
                 let resp = TransactionResponse{
                     accepted:       false,
@@ -122,7 +121,7 @@ fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
                 return Ok(HttpResponse::Ok().json(resp));
             }
 
-            println!("Signature is valid");
+            //println!("Signature is valid");
             let mut tx = tx.clone();
             let (add_tx, add_rx) = mpsc::channel();
             tx.cached_pub_key = Some(pub_key);
@@ -134,7 +133,7 @@ fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
             match send_result {
                 Ok(result) => match result {
                     Ok(confirmation) => {
-                        println!("Transaction was accepted");
+                        //println!("Transaction was accepted");
                         let resp = TransactionResponse{
                             accepted:       true,
                             error:          None,

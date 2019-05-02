@@ -2,4 +2,4 @@
 
 . .setup_env
 
-cargo run --bin server
+cargo run --release --bin server

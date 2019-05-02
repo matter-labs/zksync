@@ -9,8 +9,9 @@ const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms))
 let source = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/0").connect(provider)
 let sourceNonce = null
 
-const MIN_AMOUNT = ethers.utils.parseEther('1') // ~USD 15
-const WITH_MARGIN = MIN_AMOUNT.add(ethers.utils.parseEther('0.5')) // ~USD 6 more for gas
+const MIN_AMOUNT_FRA = ethers.utils.parseEther('1') // ~USD 15
+const MIN_AMOUNT_ETH = MIN_AMOUNT_FRA.add(ethers.utils.parseEther('0.5')) // ~USD 6 more for margin
+const TO_FUND = MIN_AMOUNT_ETH.mul(2) // ~USD 6 more for gas
 
 var args = process.argv.slice(2)
 let nClients = process.env.LOADTEST_N_CLIENTS || 3
@@ -48,7 +49,7 @@ class Client {
             if (this.fra.sidechainOpen) {
                 let balance = this.fra.currentBalance
                 console.log(`${this.eth.address}: sidechain account ${this.fra.sidechainAccountId}, current balance ${ethers.utils.formatEther(balance)}`)
-                fundingRequired = balance.lt(MIN_AMOUNT)
+                fundingRequired = balance.lt(MIN_AMOUNT_ETH)
             } else {
                 console.log(`${this.eth.address}: sidechain account not open, deposit required`)
                 fundingRequired = true
@@ -60,12 +61,12 @@ class Client {
                 // is wallet balance enough?
                 let balance = await this.eth.getBalance()
                 console.log(`${this.eth.address}: eth wallet balance is ${ethers.utils.formatEther(balance)} ETH`)
-                if (balance.lt(WITH_MARGIN)) {
+                if (balance.lt(MIN_AMOUNT_FRA)) {
                     console.log(`${this.eth.address}: wallet funding required`)
                     // transfer funds from source account
                     let request = await source.sendTransaction({
                         to:     this.eth.address,
-                        value:  WITH_MARGIN,
+                        value:  TO_FUND,
                         nonce:  sourceNonce++,
                     })
                     console.log(`${this.eth.address}: funding tx sent`)
@@ -74,12 +75,12 @@ class Client {
                 }
 
                 // deposit funds into franklin
-                console.log(`${this.eth.address}: depositing ${ethers.utils.formatEther(MIN_AMOUNT)} ETH into Franklin`)
-                let request = await this.fra.deposit(MIN_AMOUNT)
+                console.log(`${this.eth.address}: depositing ${ethers.utils.formatEther(MIN_AMOUNT_FRA)} ETH into Franklin`)
+                let request = await this.fra.deposit(MIN_AMOUNT_FRA)
                 console.log(`${this.eth.address}: deposit tx sent`)
                 let receipt = await request.wait()
                 console.log(`${this.eth.address}: deposit tx mined, waiting for zk proof`)
-                while (!this.fra.sidechainOpen || this.fra.currentBalance.lt(MIN_AMOUNT)) {
+                while (!this.fra.sidechainOpen || this.fra.currentBalance.lt(MIN_AMOUNT_FRA)) {
                     await sleep(500)
                     await this.fra.pullState()
                 }
@@ -92,38 +93,31 @@ class Client {
     }
 
     async randomTransfer() {
+        let fromAccountId = this.fra.sidechainAccountId
         let toAccountId = null
         while (true) {
             let to = randomClient()
             //console.log(to)
-            if (to.fra.sidechainOpen && to.fra.sidechainAccountId !== this.fra.sidechainAccountId) {
+            if (to.fra.sidechainOpen && to.fra.sidechainAccountId !== fromAccountId) {
                 toAccountId = to.fra.sidechainAccountId
                 break
             }
         }
-        console.log(`${this.eth.address}: transfer to ${toAccountId}`)
-
         let balance_int = this.fra.currentBalance.div('1000000000000').div(20).toNumber()
+        let round_amount = rng.nextInt(1, balance_int - 1)
         let amount = 
-            ethers.utils.bigNumberify(rng.nextInt(1, balance_int - 1))
+            ethers.utils.bigNumberify(round_amount)
             //ethers.utils.bigNumberify(20474)
             .mul('1000000000000')
 
-        //let amount = franklin.truncate(this.fra.currentBalance.div(10))
+        console.log(`${this.eth.address}: transfer ${round_amount} from ${fromAccountId} to ${toAccountId}...`);
 
-        console.log(`${this.eth.address}: Transfering ` + amount.div('1000000000000').toString(10));
-        // let amount = ethers.utils.bigNumberify('1000000000000').mul(100)
-
-        console.log(`${this.eth.address}: transfer(${toAccountId}, ${amount})`)
         let r = await this.fra.transfer(toAccountId, amount)
-
-        if (r.error === "invalid signature") {
-            console.log("xx: FAILED " + amount.div('1000000000000').toString(10));
-            await new Promise(resolve => setTimeout(resolve, 100000000))
-        }  else {
-            console.log("xx: ok " + amount.div('1000000000000').toString(10))
+        if (r.accepted) {
+            console.log(`${this.eth.address}: transfer ${round_amount} from ${fromAccountId} to ${toAccountId} ok`)
+        } else {
+            console.log(`${this.eth.address}: transfer failed: ${JSON.stringify(r)}`)
         }
-        console.log(`${this.eth.address}: transfer done: ${JSON.stringify(r)}`)
     }
 }
 
@@ -153,7 +147,7 @@ async function test() {
                 // randomClient()
             client.randomTransfer()
         }
-        console.log('-')
+        //console.log('-')
         while(nextTick > new Date()) {
             await new Promise(resolve => setTimeout(resolve, 1))
         }

@@ -40,7 +40,7 @@ function sign(message, privateKey, curve) {
 function verify(message, signature, publicKey, curve) {
     var key = publicKey;
     var h = new BN(message, 16, "be");
-    console.log("C = " + h.toString(16));
+    //console.log("C = " + h.toString(16));
     var SG = curve.g.mul(signature.S);
     var RplusAh = signature.R.add(key.mul(h));
     return RplusAh.eq(SG);
@@ -174,7 +174,7 @@ function serializeTransaction(tx) {
     let serialized = Buffer.concat(components);
 
     let newAmount = floatToInteger(amountFloatBytes, 5, 11, 10);
-    console.log("Reparsed amount = " + newAmount.toString(10));
+    //console.log("Reparsed amount = " + newAmount.toString(10));
     let newFee = floatToInteger(feeFloatBytes, 5, 3, 10);
 
     return {
@@ -283,12 +283,12 @@ function createTransaction(from, to, amount, fee, nonce, good_until_block, priva
 
     const serializedTx = serializeTransaction(tx);
     const message = serializedTx.bytes;
-    console.log("Message hex = " + message.toString("hex"));
+    //console.log("Message hex = " + message.toString("hex"));
     const signature = sign(message, privateKey, altBabyJubjub);
     const pub = altBabyJubjub.g.mul(privateKey);
     const isValid = verify(message, signature, pub, altBabyJubjub);
     assert(isValid);
-    console.log("Public = " + pub.getX().toString(16) + ", " + pub.getY().toString(16));
+    //console.log("Public = " + pub.getX().toString(16) + ", " + pub.getY().toString(16));
     const apiForm = toApiForm(serializedTx, signature);
     return apiForm;
 }
@@ -305,7 +305,7 @@ function createRawTransaction(from, to, amount, fee, nonce, good_until_block, pr
 
     const serializedTx = serializeTransaction(tx);
     const message = serializedTx.bytes;
-    console.log("Message hex = " + message.toString("hex"));
+    //console.log("Message hex = " + message.toString("hex"));
     const signature = sign(message, privateKey, altBabyJubjub);
     const pub = altBabyJubjub.g.mul(privateKey);
     const isValid = verify(message, signature, pub, altBabyJubjub);
@@ -316,9 +316,9 @@ function createRawTransaction(from, to, amount, fee, nonce, good_until_block, pr
 function test_float_parsing() {
     let bn = new BN(20474);
     let enc = integerToFloat(bn, 5, 11, 10);
-    console.log(enc.toString("hex"));
+    //console.log(enc.toString("hex"));
     let dec = floatToInteger(enc, 5, 11, 10);
-    console.log("dec = " + dec.toString(10));
+    //console.log("dec = " + dec.toString(10));
 }
 
 function test_brute() {
@@ -328,7 +328,7 @@ function test_brute() {
         let enc = integerToFloat(bn, 5, 11, 10);
         let dec = floatToInteger(enc, 5, 11, 10);
         if (bn.sub(dec).gt(bn.divn(10))) {
-            console.log("Original = " + bn.toString(10) + ", decoded = " + dec.toString(10));
+            //console.log("Original = " + bn.toString(10) + ", decoded = " + dec.toString(10));
         }
     }
 }
