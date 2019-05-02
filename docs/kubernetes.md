@@ -13,25 +13,44 @@ Now you can check your setup:
 
 ```
 kubectl config view
+```
+
+## Deploy
+
+1. Upload the keys to DO Spaces:
+
+https://cloud.digitalocean.com/spaces/keys?i=ba0188
+
+2. Build and push your images to DockerHub:
+
+```
+make push
+```
+
+3. Scale nodes:
+
+```
+kubectl scale deployments/server --replicas=1
+kubectl scale deployments/prover --replicas=3
+```
+
+4. Check status:
+
+```
+kubectl get pods
+```
+
+## Misc
+
+### Commands
+
+```
 kubectl get deployments
 kubectl get nodes --show-labels
 kubectl get pods -o wide
 ```
 
-## Deploy
-
-1. Upload keys to DO Spaces.
-
-2. Build and push your images to docker hub:
-
-```make push```
-
-3. Scale servers:
-
-kubectl scale deployments/server --replicas=1
-kubectl scale deployments/prover --replicas=3
-
-## Secrets
+### Secrets
 
 View secret:
 
