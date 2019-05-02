@@ -13,7 +13,7 @@ const MIN_AMOUNT = ethers.utils.parseEther('1') // ~USD 15
 const WITH_MARGIN = MIN_AMOUNT.add(ethers.utils.parseEther('0.5')) // ~USD 6 more for gas
 
 var args = process.argv.slice(2)
-let nClients = args[0] || 15
+let nClients = args[0] || 3
 let tps = args[1] || 5
 
 let clients = []
@@ -22,7 +22,7 @@ let rng = new Prando(1) // deterministic seed
 
 function randomClient() {
     let i = rng.nextInt(0, nClients-1)
-    console.log('i', i)
+    //console.log('i', i)
     return clients[ i ]
 }
 
@@ -95,7 +95,7 @@ class Client {
         let toAccountId = null
         while (true) {
             let to = randomClient()
-            console.log(to)
+            //console.log(to)
             if (to.fra.sidechainOpen && to.fra.sidechainAccountId !== this.fra.sidechainAccountId) {
                 toAccountId = to.fra.sidechainAccountId
                 break
@@ -104,12 +104,12 @@ class Client {
         console.log(`${this.eth.address}: transfer to ${toAccountId}`)
 
         let amount = franklin.truncate(this.fra.currentBalance.div(10))
-        console.log("Transfering " + amount.toString(10));
+        console.log(`${this.eth.address}: Transfering ` + amount.div('1000000000000').toString(10));
         // let amount = ethers.utils.bigNumberify('1000000000000').mul(100)
 
         console.log(`${this.eth.address}: transfer(${toAccountId}, ${amount})`)
-        await this.fra.transfer(toAccountId, amount)
-        console.log(`${this.eth.address}: transfer done`)
+        let r = await this.fra.transfer(toAccountId, amount)
+        console.log(`${this.eth.address}: transfer done: ${JSON.stringify(r)}`)
     }
 }
 
@@ -129,7 +129,7 @@ async function test() {
     }
 
     console.log('waiting until the clients are ready...')
-    await Promise.all(promises)
+    //await Promise.all(promises)
 
     console.log('starting the test...')
     while(true) {

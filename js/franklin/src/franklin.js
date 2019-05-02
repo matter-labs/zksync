@@ -77,7 +77,7 @@ class FranklinWallet {
         const from = this.sidechainAccountId
         amount = amount.div(MULTIPLIER).toNumber()
         const privateKey = this.key.privateKey
-        console.log(this.sidechainState)
+        //console.log(this.sidechainState)
         const nonce = this.sidechainState.current.nonce
         const good_until_block = 50000 // TODO: add to current block?
         const fee = 0;
