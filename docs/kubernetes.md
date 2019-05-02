@@ -17,17 +17,23 @@ kubectl config view
 
 ## Deploy
 
-1. Upload the keys to DO Spaces:
+1. Update keys in .sol files, then deploy contracts:
+
+```
+deploy-contracts prod
+```
+
+2. Upload the .pk key files to DO Spaces:
 
 https://cloud.digitalocean.com/spaces/keys?i=ba0188
 
-2. Build and push your images to DockerHub:
+3. Build and push your images to DockerHub:
 
 ```
 make push
 ```
 
-3. Scale nodes:
+4. Scale nodes:
 
 ```
 kubectl scale deployments/server --replicas=1
