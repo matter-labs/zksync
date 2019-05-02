@@ -13,8 +13,8 @@ const MIN_AMOUNT = ethers.utils.parseEther('1') // ~USD 15
 const WITH_MARGIN = MIN_AMOUNT.add(ethers.utils.parseEther('0.5')) // ~USD 6 more for gas
 
 var args = process.argv.slice(2)
-let nClients = args[0] || 3
-let tps = args[1] || 1
+let nClients = process.env.LOADTEST_N_CLIENTS || 3
+let tps = process.env.LOADTEST_TPS || 50
 
 let clients = []
 
@@ -105,8 +105,8 @@ class Client {
 
         let balance_int = this.fra.currentBalance.div('1000000000000').div(20).toNumber()
         let amount = 
-            //ethers.utils.bigNumberify(rng.nextInt(1, balance_int - 1))
-            ethers.utils.bigNumberify(20474)
+            ethers.utils.bigNumberify(rng.nextInt(1, balance_int - 1))
+            //ethers.utils.bigNumberify(20474)
             .mul('1000000000000')
 
         //let amount = franklin.truncate(this.fra.currentBalance.div(10))
@@ -147,7 +147,7 @@ async function test() {
 
     console.log('xx: starting the test...')
     while(true) {
-        var nextTick = new Date(new Date().getTime() + 1000*100000000);
+        var nextTick = new Date(new Date().getTime() + 1000);
         for (let i=0; i<tps; i++) {
             let client = clients[0]
                 // randomClient()
