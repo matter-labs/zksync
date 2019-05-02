@@ -14,7 +14,7 @@ const WITH_MARGIN = MIN_AMOUNT.add(ethers.utils.parseEther('0.5')) // ~USD 6 mor
 
 var args = process.argv.slice(2)
 let nClients = args[0] || 3
-let tps = args[1] || 5
+let tps = args[1] || 50
 
 let clients = []
 
@@ -103,12 +103,26 @@ class Client {
         }
         console.log(`${this.eth.address}: transfer to ${toAccountId}`)
 
-        let amount = franklin.truncate(this.fra.currentBalance.div(10))
+        let balance_int = this.fra.currentBalance.div('1000000000000').div(20).toNumber()
+        let amount = 
+            //ethers.utils.bigNumberify(rng.nextInt(1, balance_int - 1))
+            ethers.utils.bigNumberify(20474)
+            .mul('1000000000000')
+
+        //let amount = franklin.truncate(this.fra.currentBalance.div(10))
+
         console.log(`${this.eth.address}: Transfering ` + amount.div('1000000000000').toString(10));
         // let amount = ethers.utils.bigNumberify('1000000000000').mul(100)
 
         console.log(`${this.eth.address}: transfer(${toAccountId}, ${amount})`)
         let r = await this.fra.transfer(toAccountId, amount)
+
+        if (r.error === "invalid signature") {
+            console.log("xx: FAILED " + amount.div('1000000000000').toString(10));
+            await new Promise(resolve => setTimeout(resolve, 100000000))
+        }  else {
+            console.log("xx: ok " + amount.div('1000000000000').toString(10))
+        }
         console.log(`${this.eth.address}: transfer done: ${JSON.stringify(r)}`)
     }
 }
@@ -122,16 +136,16 @@ async function test() {
         clients.push(new Client(i))
     }
 
-    console.log('preparing clients...')
+    console.log('xx: preparing clients...')
     let promises = []
     for (let i=0; i < nClients; i++) {
         promises.push( clients[i].prepare() )
     }
 
-    console.log('waiting until the clients are ready...')
-    //await Promise.all(promises)
+    // console.log('waiting until the clients are ready...')
+    await Promise.all(promises)
 
-    console.log('starting the test...')
+    console.log('xx: starting the test...')
     while(true) {
         var nextTick = new Date(new Date().getTime() + 1000);
         for (let i=0; i<tps; i++) {
