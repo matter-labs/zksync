@@ -48,10 +48,11 @@ https://api1.mattr.network/api/v0.1/status
 
 ### Commands
 
+https://kubernetes.io/docs/reference/kubectl/cheatsheet/
+
 ```
-kubectl get deployments
-kubectl get nodes --show-labels
 kubectl get pods -o wide
+kubectl logs -f <pod id>
 ```
 
 ### Secrets
