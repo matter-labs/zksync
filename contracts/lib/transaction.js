@@ -302,7 +302,7 @@ function test_float_parsing() {
     console.log("dec = " + dec.toString(10));
 }
 
-test_float_parsing();
+// test_float_parsing();
 
 function main() {
     for (let i = 0; i < 20; i++) {
