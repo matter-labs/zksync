@@ -10,7 +10,7 @@ let source = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/0"
 let sourceNonce = null
 
 const TX_FEE = ethers.utils.parseEther('0.1')
-const MIN_AMOUNT_FRA = ethers.utils.parseEther('0.0001')
+const MIN_AMOUNT_FRA = ethers.utils.parseEther('0.001')
 const TO_DEPOSIT = MIN_AMOUNT_FRA // MIN_AMOUNT_FRA.add(TX_FEE)
 const TO_FUND = TO_DEPOSIT.add(TX_FEE)
 
@@ -61,7 +61,7 @@ class Client {
                 // is wallet balance enough?
                 let balance = await this.eth.getBalance()
                 console.log(`${this.eth.address}: eth wallet balance is ${ethers.utils.formatEther(balance)} ETH`)
-                if (balance.lt(TO_DEPOSIT)) {
+                if (balance.lt(TO_DEPOSIT.add(TX_FEE))) {
                     console.log(`${this.eth.address}: wallet funding required`)
                     // transfer funds from source account
                     let request = await source.sendTransaction({
