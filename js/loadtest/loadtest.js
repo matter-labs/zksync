@@ -104,7 +104,7 @@ class Client {
             }
         }
         let balance_int = this.fra.currentBalance.div('1000000000000').div(2).toNumber()
-        let round_amount = rng.nextInt(1, balance_int - 1)
+        let round_amount = rng.nextInt(11, balance_int - 1)
         let amount = 
             ethers.utils.bigNumberify(round_amount)
             //ethers.utils.bigNumberify(20474)
@@ -145,7 +145,7 @@ async function test() {
         for (let i=0; i<tps; i++) {
             let client = randomClient()
             client.randomTransfer()
-            await new Promise(resolve => setTimeout(resolve, 5))
+            await new Promise(resolve => setTimeout(resolve, 20))
         }
         console.log('-')
         while(nextTick > new Date()) {
