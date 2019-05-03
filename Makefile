@@ -13,7 +13,7 @@ docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.ca
 rust-musl-builder = @docker run $(docker-options) -it ekidd/rust-musl-builder
 
 build-target:
-	$(rust-musl-builder) sudo cargo build --release
+	$(rust-musl-builder) cargo build --release
 
 clean-target:
 	$(rust-musl-builder) cargo clean
