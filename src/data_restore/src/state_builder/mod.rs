@@ -10,7 +10,7 @@ use sapling_crypto::jubjub::{edwards, Unknown};
 use bigdecimal::{Num, BigDecimal, Zero};
 
 use plasma::models::{Account, AccountTree, AccountId};
-use plasma::models::{DepositTx, TransferTx, Engine, Fr, ExitTx};
+use plasma::models::{DepositTx, TransferTx, Engine, Fr, ExitTx, TxSignature};
 use plasma::models::params;
 
 use helpers::InfuraEndpoint;
@@ -42,7 +42,7 @@ pub struct DepositTransactionsBlock {
 
 #[derive(Debug, Clone)]
 pub struct TransferTransactionsBlock {
-    pub batch_number: u32,
+    pub block_number: u32,
     pub transfers: Vec<TransferTx>,
 }
 
@@ -95,6 +95,10 @@ impl StatesBuilderFranklin {
                 let _ = self.update_accounts_states_from_full_exit_transaction(transaction);
                 Ok(())
             },
+            FranklinTransactionType::Transfer => {
+                let _ = self.update_accounts_states_from_transfer_transaction(transaction);
+                Ok(())
+            },
             _ => return Err(String::from("Wrong tx type"))
         }
     }
@@ -112,40 +116,18 @@ impl StatesBuilderFranklin {
     }
 
     pub fn update_accounts_states_from_transfer_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), String> {
-        let batch_number = self.get_batch_number_from_deposit(transaction);
-        let transfer_txs_block = self.get_all_transactions_from_transfer_batch(batch_number);
+        let transfer_txs_block = self.get_all_transactions_from_transfer_block(transaction);
         if transfer_txs_block.is_err() {
             return Err(String::from("No transfer txs in block"));
         }
         for tx in transfer_txs_block.unwrap().transfers {
             if let Some(mut from) = self.accounts_tree.items.get(&tx.from).cloned() {
-                let pub_key = self.get_account(tx.from).and_then(|a| a.get_pub_key()).ok_or(String::from("Unknown signer")).unwrap();
-                if let Some(verified_against) = tx.cached_pub_key.as_ref() {
-                    if pub_key.0 != verified_against.0 { 
-                        return Err(String::from("Invalid signer"));
-                    }
-                } else {
-                    return Err(String::from("Invalid signer"));
-                }
-                
                 let mut transacted_amount = BigDecimal::zero();
                 transacted_amount += &tx.amount;
                 transacted_amount += &tx.fee;
 
                 if from.balance < transacted_amount {
                     return Err(String::from("Insufficient balance")); 
-                }
-
-                if tx.nonce > from.nonce { 
-                    return Err(String::from("Nonce is too high")); 
-                } else if tx.nonce < from.nonce {
-                    return Err(String::from("Nonce is too low"));  
-                }
-
-                let block_number = transaction.ethereum_transaction.block_number.ok_or(String::from("No block number in transaction")).unwrap();
-                let result = U256::from(tx.good_until_block).checked_sub(block_number);
-                if result.is_none() {
-                    return Err(String::from("Transaction is outdated"));
                 }
                 
                 let mut to = Account::default();
@@ -221,10 +203,49 @@ impl StatesBuilderFranklin {
         U256::from(batch_slice)
     }
 
-    fn get_all_transactions_from_transfer_batch(&self, batch_number: U256) -> Result<TransferTransactionsBlock, String> {
+    fn get_all_transactions_from_transfer_block(&self, transaction: &FranklinTransaction) -> Result<TransferTransactionsBlock, String> {
+        let mut tx_data_vec = transaction.commitment_data.clone();
+        let block_number = &transaction.commitment_data.clone()[0..32];
+        let mut tx_data_len = tx_data_vec.len();
+        tx_data_vec.truncate(tx_data_len-24);
+        tx_data_vec.reverse();
+        tx_data_len = tx_data_vec.len();
+        tx_data_vec.truncate(tx_data_len-160);
+        tx_data_vec.reverse();
+        
+        let (txs0l, txs0r) = tx_data_vec.split_at(36);
+        let (txs1l, txs1r) = txs0l.split_at(18);
+        let (txs2l, txs2r) = txs1l.split_at(9);
+        let (txs3l, txs3r) = txs1r.split_at(9);
+        let (txs4l, txs4r) = txs0r.split_at(18);
+        let (txs5l, txs5r) = txs4l.split_at(9);
+        let (txs6l, txs6r) = txs4r.split_at(9);
+
+        let txs = vec![txs2l, txs2r, txs3l, txs3r, txs5l, txs5r, txs6l, txs6r];
+        let mut transfers: Vec<TransferTx> = vec![];
+        for tx in txs {
+            if tx != [0, 0, 2, 0, 0, 0, 0, 0, 0] {
+                let from = U256::from(&tx[0..3]);
+                let to = U256::from(&tx[3..6]);
+                let amount = U256::from(&tx[6..8]);
+                let fee = U256::from(tx[8]);
+                let transfer_tx = TransferTx {
+                    from: from.as_u32(),
+                    to: to.as_u32(),
+                    amount: BigDecimal::from_str_radix(&format!("{}", amount), 10).unwrap(),
+                    fee: BigDecimal::from_str_radix(&format!("{}", fee), 10).unwrap(),
+                    nonce: 0,
+                    good_until_block: 0,
+                    signature: TxSignature::default(),
+                    cached_pub_key: None,
+                };
+                transfers.push(transfer_tx);
+            }
+        }
+        
         Ok(TransferTransactionsBlock {
-            batch_number: 0,
-            transfers: vec![],
+            block_number: U256::from(block_number).as_u32(),
+            transfers: transfers,
         })
     }
 

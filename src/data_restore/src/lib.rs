@@ -41,7 +41,7 @@ mod test {
     // }
 
     // #[test]
-    // fn test_build_state() {
+    // fn test_build_state_deposit_exit() {
     //     let mut events = events::BlockEventsFranklin::new(helpers::InfuraEndpoint::Rinkeby);
     //     let deposit_hash = events.get_sorted_logs_in_block(U256::from(4308277)).unwrap().0[0].transaction_hash;
     //     let deposit_tx = franklin_transaction::FranklinTransaction::get_transaction(helpers::InfuraEndpoint::Rinkeby, &deposit_hash).unwrap();
@@ -50,14 +50,29 @@ mod test {
     //     let mut state = state_builder::StatesBuilderFranklin::new(helpers::InfuraEndpoint::Rinkeby);
     //     let _ = state.update_accounts_states_from_transaction(&deposit_tx).unwrap();
     //     let _ = state.update_accounts_states_from_transaction(&exit_tx).unwrap();
-    //     println!("Accounts states: {:?}", state.accounts_franklin);
+    //     let accs = state.get_accounts();
+    //     println!("Accounts: {:?}", accs);
+    // }
+
+    // #[test]
+    // fn test_build_state_deposit_transfer() {
+    //     let mut events = events::BlockEventsFranklin::new(helpers::InfuraEndpoint::Rinkeby);
+    //     let deposit_hash = events.get_sorted_logs_in_block(U256::from(4313380)).unwrap().0[0].transaction_hash;
+    //     let deposit_tx = franklin_transaction::FranklinTransaction::get_transaction(helpers::InfuraEndpoint::Rinkeby, &deposit_hash).unwrap();
+    //     let transfer_hash = events.get_sorted_logs_in_block(U256::from(4313487)).unwrap().0[0].transaction_hash;
+    //     let transfer_tx = franklin_transaction::FranklinTransaction::get_transaction(helpers::InfuraEndpoint::Rinkeby, &transfer_hash).unwrap();
+    //     let mut state = state_builder::StatesBuilderFranklin::new(helpers::InfuraEndpoint::Rinkeby);
+    //     let _ = state.update_accounts_states_from_transaction(&deposit_tx).unwrap();
+    //     let _ = state.update_accounts_states_from_transaction(&transfer_tx).unwrap();
+    //     let accs = state.get_accounts();
+    //     println!("Accounts: {:?}", accs);
     // }
 
     #[test]
     fn test_get_past_events_and_build_state() {
         let endpoint = helpers::InfuraEndpoint::Rinkeby;
         let mut state = state_builder::StatesBuilderFranklin::new(endpoint);
-        let mut events = events::BlockEventsFranklin::get_past_state_from_genesis_with_blocks_delta(endpoint, U256::from(3972344), U256::from(15)).unwrap();
+        let events = events::BlockEventsFranklin::get_past_state_from_genesis_with_blocks_delta(endpoint, U256::from(3972344), U256::from(15)).unwrap();
         let events_clone = events.clone();
         for v_ev in events_clone.verified_blocks {
             let c_ev = events.check_committed_block_with_same_number_as_verified(&v_ev);
@@ -75,6 +90,5 @@ mod test {
         println!("Accounts: {:?}", accs);
         let root = state.root_hash();
         println!("Root: {:?}", root);
-
     }
 }
