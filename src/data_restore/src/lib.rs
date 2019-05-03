@@ -85,5 +85,7 @@ mod test {
         println!("Accounts: {:?}", accs);
         let root = state.root_hash();
         println!("Root: {:?}", root);
+
+        // TODO : - Make timer with interval to get new blocks via update_state_from_last_watched_block_with_blocks_delta
     }
 }
