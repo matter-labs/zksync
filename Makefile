@@ -9,8 +9,7 @@ export SERVER_DOCKER_IMAGE ?= gluk64/franklin:server
 export PROVER_DOCKER_IMAGE ?=gluk64/franklin:prover
 export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
 
-#docker-options = --rm -v $(shell pwd):/home/rust/src-v cargo-git:/home/rust/.cargo/git:Z -v cargo-registry:/home/rust/.cargo/registry:Z
-docker-options = --rm -v $(shell pwd):/home/rust/src
+docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
 rust-musl-builder = @docker run $(docker-options) -it ekidd/rust-musl-builder
 
 build-target:
