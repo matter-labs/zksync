@@ -9,9 +9,10 @@ const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms))
 let source = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/0").connect(provider)
 let sourceNonce = null
 
-const MIN_AMOUNT_FRA = ethers.utils.parseEther('0.01') // ~USD 15
-const TO_DEPOSIT = MIN_AMOUNT_FRA.add(ethers.utils.parseEther('0.01'))
-const TO_FUND = TO_DEPOSIT.add(ethers.utils.parseEther('0.01'))
+const TX_FEE = ethers.utils.parseEther('0.0003')
+const MIN_AMOUNT_FRA = ethers.utils.parseEther('0.0001')
+const TO_DEPOSIT = MIN_AMOUNT_FRA // MIN_AMOUNT_FRA.add(TX_FEE)
+const TO_FUND = TO_DEPOSIT.add(TX_FEE)
 
 let nClients = process.env.LOADTEST_N_CLIENTS
 let tps = process.env.LOADTEST_TPS
@@ -109,7 +110,7 @@ class Client {
             //ethers.utils.bigNumberify(20474)
             .mul('1000000000000')
 
-        //console.log(`${this.eth.address}: transfer ${round_amount} from ${fromAccountId} to ${toAccountId}...`);
+        console.log(`${this.eth.address}: transfer ${round_amount} from ${fromAccountId} to ${toAccountId}...`);
 
         let r = await this.fra.transfer(toAccountId, amount)
         if (r.accepted) {
