@@ -24,13 +24,13 @@ use super::storage::{ConnectionPool, StorageProcessor};
 type ABI = (&'static [u8], &'static str);
 
 pub const TEST_PLASMA_ALWAYS_VERIFY: ABI = (
-    include_bytes!("../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.abi"),
-    include_str!("../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.bin"),
+    include_bytes!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.abi"),
+    include_str!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.bin"),
 );
 
 pub const PROD_PLASMA: ABI = (
-    include_bytes!("../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.abi"),
-    include_str!("../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.bin"),
+    include_bytes!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.abi"),
+    include_str!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.bin"),
 );
 
 

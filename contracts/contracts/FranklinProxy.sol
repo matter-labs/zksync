@@ -8,7 +8,7 @@ import {PlasmaExitor} from "./PlasmaExitor.sol";
 contract FranklinProxy is Plasma {
     // Well, technically it's not :)
 
-    constructor(address _depositor, address _transactor, address _exitor, uint256[2] _paddingPubKey) public {
+    constructor(address _depositor, address _transactor, address _exitor) public {
         nextAccountToRegister = 2;
         lastVerifiedRoot = EMPTY_TREE_ROOT;
         operators[msg.sender] = true;
@@ -17,31 +17,31 @@ contract FranklinProxy is Plasma {
         exitor = _exitor;
 
         // make the first deposit to install pub_key for padding
-        deposit(_paddingPubKey, 0);
+        // deposit(_paddingPubKey, 0);
     }
 
     function deposit(uint256[2] memory publicKey, uint128 maxFee) public payable 
     {
-        PlasmaDepositor(depositor).deposit(publicKey, maxFee);
+        callExternal(depositor);
     }
 
     function depositInto(uint24 accountID, uint128 maxFee) public payable
     {
-        PlasmaDepositor(depositor).depositInto(accountID, maxFee);
+        callExternal(depositor);
     }
 
     function cancelDeposit() public 
     {
-        PlasmaDepositor(depositor).cancelDeposit();
+        callExternal(depositor);
     }
 
     function startNextDepositBatch() public {
-        PlasmaDepositor(depositor).startNextDepositBatch();
+        callExternal(depositor);
     }
 
     function changeDepositBatchFee(uint128 newBatchFee) public  
     {
-        PlasmaDepositor(depositor).changeDepositBatchFee(newBatchFee);
+        callExternal(depositor);
     }
     function commitDepositBlock(
         uint256 batchNumber,
@@ -50,7 +50,7 @@ contract FranklinProxy is Plasma {
         bytes32 newRoot
     ) public 
     {
-        PlasmaDepositor(depositor).commitDepositBlock(batchNumber, accoundIDs, blockNumber, newRoot);
+        callExternal(depositor);
     }
 
     function verifyDepositBlock(
@@ -60,7 +60,7 @@ contract FranklinProxy is Plasma {
         uint256[8] memory proof
     ) public
     {
-        PlasmaDepositor(depositor).verifyDepositBlock(batchNumber, accoundIDs, blockNumber, proof);
+        callExternal(depositor);
     } 
 
     function commitTransferBlock(
@@ -70,33 +70,33 @@ contract FranklinProxy is Plasma {
         bytes32 newRoot
     ) public 
     {
-        PlasmaTransactor(transactor).commitTransferBlock(blockNumber, totalFees, txDataPacked, newRoot);
+        callExternal(transactor);
     }
 
     function verifyTransferBlock(uint32 blockNumber, uint256[8] memory proof) public 
     {
-        PlasmaTransactor(transactor).verifyTransferBlock(blockNumber, proof);
+        callExternal(transactor);
     }
 
 
     function exit() public payable 
     {
-        PlasmaExitor(exitor).exit();
+        callExternal(exitor);
     }
 
     function cancelExit() public
     {
-        PlasmaExitor(exitor).cancelExit();
+        callExternal(exitor);
     }
 
     function startNextExitBatch() public 
     {
-        PlasmaExitor(exitor).startNextExitBatch();
+        callExternal(exitor);
     }
 
     function changeExitBatchFee(uint128 newBatchFee) public 
     {
-        PlasmaExitor(exitor).changeExitBatchFee(newBatchFee);
+        callExternal(exitor);
     }
 
     function commitExitBlock(
@@ -107,7 +107,7 @@ contract FranklinProxy is Plasma {
         bytes32 newRoot
     ) public 
     {
-        PlasmaExitor(exitor).commitExitBlock(batchNumber, accoundIDs, blockNumber, txDataPacked, newRoot);
+        callExternal(exitor);
     }
 
     function verifyExitBlock(
@@ -116,14 +116,26 @@ contract FranklinProxy is Plasma {
         uint256[8] memory proof
     ) public 
     {
-        PlasmaExitor(exitor).verifyExitBlock(batchNumber, blockNumber, proof);
+        callExternal(exitor);
     }
 
     function withdrawUserBalance(
         uint256 iterationsLimit
     ) public 
     {
-        PlasmaExitor(exitor).withdrawUserBalance(iterationsLimit);
+        callExternal(exitor);
     }
 
+    function callExternal(address callee) internal {
+        assembly {
+            let memoryPointer := mload(0x40)
+            calldatacopy(memoryPointer, 0, calldatasize)
+            let newFreeMemoryPointer := add(memoryPointer, calldatasize)
+            mstore(0x40, newFreeMemoryPointer)
+            let retVal := delegatecall(sub(gas, 2000), callee, memoryPointer, calldatasize, newFreeMemoryPointer, 0x40)
+            let retDataSize := returndatasize
+            returndatacopy(newFreeMemoryPointer, 0, retDataSize)
+            switch retVal case 0 { revert(0,0) } default { return(newFreeMemoryPointer, retDataSize) }
+        }
+    }
 }

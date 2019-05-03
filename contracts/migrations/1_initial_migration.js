@@ -17,5 +17,9 @@ module.exports = async function(deployer) {
     let dep = await Depositor.deployed();
 
     let paddingPubKey = JSON.parse(process.env.PADDING_PUB_KEY);
-    let plasma = await deployer.deploy(FranklinContract, dep.address, tr.address, ex.address, paddingPubKey);
+    // console.log("FranklinContract size = " + (FranklinContract.bytecode.length - 2)/2 );
+    await deployer.deploy(FranklinContract, dep.address, tr.address, ex.address);
+    let franklin = await FranklinContract.deployed();
+
+    await franklin.deposit(paddingPubKey, 0);
 };
