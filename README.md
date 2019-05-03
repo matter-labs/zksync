@@ -16,7 +16,7 @@ Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 - Create `plasma` database:
 ```db-setup```
 - Deploy contracts:
-```deploy-contracts``
+```deploy-contracts```
 
 To redeploy db and contraсts:
 
