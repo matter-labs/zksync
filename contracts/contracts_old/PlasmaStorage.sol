@@ -155,7 +155,6 @@ contract PlasmaStorage {
     // mapping ethereum address => block number => balance
     // mapping (address => mapping (uint32 => uint128)) public exitAmounts;
     // Delegates chain
-    address public depositor;
     address public transactor;
     address public exitor;
 }

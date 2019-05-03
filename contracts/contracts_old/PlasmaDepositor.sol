@@ -3,27 +3,6 @@ pragma solidity ^0.4.24;
 import {Plasma} from "./Plasma.sol";
 import {TwistedEdwards} from "./TwistedEdwards.sol";
 
-// interface DepositorInterface {
-//     function deposit(uint256[2] publicKey, uint128 maxFee) external payable;
-//     function depositInto(uint24 accountID, uint128 maxFee) external payable;
-//     function cancelDeposit() external;
-//     function startNextDepositBatch() external;
-//     function changeDepositBatchFee(uint128 newBatchFee) external;
-//     function commitDepositBlock(
-//         uint256 batchNumber,
-//         uint24[DEPOSIT_BATCH_SIZE] accoundIDs,
-//         uint32 blockNumber, 
-//         bytes32 newRoot
-//     ) external;
-    
-//     function verifyDepositBlock(
-//         uint256 batchNumber, 
-//         uint24[DEPOSIT_BATCH_SIZE] accoundIDs, 
-//         uint32 blockNumber, 
-//         uint256[8] proof
-//     ) external; 
-// }
-
 contract PlasmaDepositor is Plasma {
     
     function deposit(uint256[2] memory publicKey, uint128 maxFee) 
@@ -314,7 +293,7 @@ contract PlasmaDepositor is Plasma {
             }
             require(i == 0 || accountIDs[i] > accountIDs[i-1], "accountID are not properly ordered");
             DepositRequest storage request = depositRequests[batchNumber][accountIDs[i]];
-            require(request.amount != 0, "trying to process an empty request and collect fees");
+            //require(request.amount != 0, "trying to process an empty request and collect fees");
             delete depositRequests[batchNumber][accountIDs[i]];
             totalFees += batchFee;
         }
@@ -331,17 +310,18 @@ contract PlasmaDepositor is Plasma {
         return packed;
     }
 
-    // function () external payable {
-    //     address callee = transactor;
-    //     assembly {
-    //         let memoryPointer := mload(0x40)
-    //         calldatacopy(memoryPointer, 0, calldatasize)
-    //         let newFreeMemoryPointer := add(memoryPointer, calldatasize)
-    //         mstore(0x40, newFreeMemoryPointer)
-    //         let retVal := delegatecall(sub(gas, 2000), callee, memoryPointer, calldatasize, newFreeMemoryPointer, 0x40)
-    //         let retDataSize := returndatasize
-    //         returndatacopy(newFreeMemoryPointer, 0, retDataSize)
-    //         switch retVal case 0 { revert(0,0) } default { return(newFreeMemoryPointer, retDataSize) }
-    //     }
-    // }
+    function () external payable {
+        address callee = transactor;
+        assembly {
+            let memoryPointer := mload(0x40)
+            calldatacopy(memoryPointer, 0, calldatasize)
+            let newFreeMemoryPointer := add(memoryPointer, calldatasize)
+            mstore(0x40, newFreeMemoryPointer)
+            let retVal := delegatecall(sub(gas, 2000), callee, memoryPointer, calldatasize, newFreeMemoryPointer, 0x40)
+            let retDataSize := returndatasize
+            returndatacopy(newFreeMemoryPointer, 0, retDataSize)
+            switch retVal case 0 { revert(0,0) } default { return(newFreeMemoryPointer, retDataSize) }
+        }
+    }
+
 }

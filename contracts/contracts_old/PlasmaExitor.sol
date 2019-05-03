@@ -2,28 +2,6 @@ pragma solidity ^0.4.24;
 
 import {Plasma} from "./Plasma.sol";
 
-// interface ExitorInterface {
-//     function exit() external payable;
-//     function cancelExit() external;
-//     function startNextExitBatch() external;
-//     function changeExitBatchFee(uint128 newBatchFee) external;
-//     function commitExitBlock(
-//         uint256 batchNumber,
-//         uint24[EXIT_BATCH_SIZE] accoundIDs, 
-//         uint32 blockNumber, 
-//         bytes txDataPacked, 
-//         bytes32 newRoot
-//     ) external;
-//     function verifyExitBlock(
-//         uint256 batchNumber, 
-//         uint32 blockNumber, 
-//         uint256[8] proof
-//     ) external;
-//     function withdrawUserBalance(
-//         uint256 iterationsLimit
-//     ) external;
-// }
-
 // this procedure is a one-time full exit with a removal 
 // of the public key from the tree
 contract PlasmaExitor is Plasma {

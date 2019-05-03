@@ -2,17 +2,6 @@ pragma solidity ^0.4.24;
 
 import {Plasma} from "./Plasma.sol";
 
-// interface TransactorInterface {
-//     function commitTransferBlock(
-//         uint32 blockNumber, 
-//         uint128 totalFees, 
-//         bytes txDataPacked, 
-//         bytes32 newRoot
-//     ) external;
-
-//     function verifyTransferBlock(uint32 blockNumber, uint256[8] proof) external;
-// }
-
 contract PlasmaTransactor is Plasma {
 
     function commitTransferBlock(
@@ -185,17 +174,17 @@ contract PlasmaTransactor is Plasma {
         return exponent * mantissa;
     }
 
-    // function () external payable {
-    //     address callee = exitor;
-    //     assembly {
-    //         let memoryPointer := mload(0x40)
-    //         calldatacopy(memoryPointer, 0, calldatasize)
-    //         let newFreeMemoryPointer := add(memoryPointer, calldatasize)
-    //         mstore(0x40, newFreeMemoryPointer)
-    //         let retVal := delegatecall(sub(gas, 2000), callee, memoryPointer, calldatasize, newFreeMemoryPointer, 0x40)
-    //         let retDataSize := returndatasize
-    //         returndatacopy(newFreeMemoryPointer, 0, retDataSize)
-    //         switch retVal case 0 { revert(0,0) } default { return(newFreeMemoryPointer, retDataSize) }
-    //     }
-    // }
+    function () external payable {
+        address callee = exitor;
+        assembly {
+            let memoryPointer := mload(0x40)
+            calldatacopy(memoryPointer, 0, calldatasize)
+            let newFreeMemoryPointer := add(memoryPointer, calldatasize)
+            mstore(0x40, newFreeMemoryPointer)
+            let retVal := delegatecall(sub(gas, 2000), callee, memoryPointer, calldatasize, newFreeMemoryPointer, 0x40)
+            let retDataSize := returndatasize
+            returndatacopy(newFreeMemoryPointer, 0, retDataSize)
+            switch retVal case 0 { revert(0,0) } default { return(newFreeMemoryPointer, retDataSize) }
+        }
+    }
 }
