@@ -13,20 +13,8 @@ use plasma::models::{Account, AccountTree, AccountId};
 use plasma::models::{DepositTx, TransferTx, Engine, Fr, ExitTx, TxSignature};
 use plasma::models::params;
 
-use helpers::InfuraEndpoint;
+use helpers::*;
 use franklin_transaction::{FranklinTransactionType,FranklinTransaction};
-
-type ABI = (&'static [u8], &'static str);
-
-pub const PLASMA_TEST_ABI: ABI = (
-    include_bytes!("../../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.abi"),
-    include_str!("../../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.bin"),
-);
-
-pub const PLASMA_PROD_ABI: ABI = (
-    include_bytes!("../../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.abi"),
-    include_str!("../../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.bin"),
-);
 
 #[derive(Debug, Clone)]
 pub struct FullExitTransactionsBlock {
@@ -59,17 +47,17 @@ pub struct FranklinAccountsStates {
 impl FranklinAccountsStates {
     pub fn new(network: InfuraEndpoint) -> Self {
         let http_infura_endpoint_str = match network {
-            InfuraEndpoint::Mainnet => "https://mainnet.infura.io/",
-            InfuraEndpoint::Rinkeby => "https://rinkeby.infura.io/",
+            InfuraEndpoint::Mainnet => INFURA_MAINNET_ENDPOINT,
+            InfuraEndpoint::Rinkeby => INFURA_RINKEBY_ENDPOINT,
         };
         let http_infura_endpoint_string = String::from(http_infura_endpoint_str);
         let address: Address = match network {
-            InfuraEndpoint::Mainnet => "fddb8167fef957f7cc72686094fac1d31be5ecfe",
-            InfuraEndpoint::Rinkeby => "fddb8167fef957f7cc72686094fac1d31be5ecfe",
+            InfuraEndpoint::Mainnet => FRANKLIN_MAINNET_ADDRESS,
+            InfuraEndpoint::Rinkeby => FRANKLIN_RINKEBY_ADDRESS,
         }.parse().unwrap();
         let abi: ABI = match network {
-            InfuraEndpoint::Mainnet => PLASMA_PROD_ABI,
-            InfuraEndpoint::Rinkeby => PLASMA_TEST_ABI,
+            InfuraEndpoint::Mainnet => PLASMA_MAINNET_ABI,
+            InfuraEndpoint::Rinkeby => PLASMA_RINKEBY_ABI,
         };
         let contract = ethabi::Contract::load(abi.0).unwrap();
 

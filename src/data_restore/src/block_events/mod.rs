@@ -6,22 +6,10 @@ use web3::types::{Log, Address, FilterBuilder, H256, U256, BlockNumber};
 use ethabi::Contract;
 
 use blocks::{BlockType, LogBlockData};
-use helpers;
-use helpers::InfuraEndpoint;
+use helpers::*;
 
-type ABI = (&'static [u8], &'static str);
 type ComAndVerBlocksVecs = (Vec<LogBlockData>, Vec<LogBlockData>);
 type BlockNumber256 = U256;
-
-pub const PLASMA_TEST_ABI: ABI = (
-    include_bytes!("../../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.abi"),
-    include_str!("../../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.bin"),
-);
-
-pub const PLASMA_PROD_ABI: ABI = (
-    include_bytes!("../../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.abi"),
-    include_str!("../../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.bin"),
-);
 
 #[derive(Debug, Clone)]
 pub struct BlockEventsFranklin {
@@ -50,17 +38,17 @@ impl BlockEventsFranklin {
         // };
         // let ws_infura_endpoint_string = String::from(ws_infura_endpoint_str);
         let http_infura_endpoint_str = match network {
-            InfuraEndpoint::Mainnet => "https://mainnet.infura.io/",
-            InfuraEndpoint::Rinkeby => "https://rinkeby.infura.io/",
+            InfuraEndpoint::Mainnet => INFURA_MAINNET_ENDPOINT,
+            InfuraEndpoint::Rinkeby => INFURA_RINKEBY_ENDPOINT,
         };
         let http_infura_endpoint_string = String::from(http_infura_endpoint_str);
         let address: Address = match network {
-            InfuraEndpoint::Mainnet => "fddb8167fef957f7cc72686094fac1d31be5ecfe",
-            InfuraEndpoint::Rinkeby => "fddb8167fef957f7cc72686094fac1d31be5ecfe",
+            InfuraEndpoint::Mainnet => FRANKLIN_MAINNET_ADDRESS,
+            InfuraEndpoint::Rinkeby => FRANKLIN_RINKEBY_ADDRESS,
         }.parse().unwrap();
         let abi: ABI = match network {
-            InfuraEndpoint::Mainnet => PLASMA_PROD_ABI,
-            InfuraEndpoint::Rinkeby => PLASMA_TEST_ABI,
+            InfuraEndpoint::Mainnet => PLASMA_MAINNET_ABI,
+            InfuraEndpoint::Rinkeby => PLASMA_RINKEBY_ABI,
         };
         let contract = ethabi::Contract::load(abi.0).unwrap();
         let this = Self {
@@ -133,8 +121,8 @@ impl BlockEventsFranklin {
         let mut verified_blocks: Vec<LogBlockData> = vec![];
         let block_verified_topic = "BlockVerified(uint32)";
         let block_committed_topic = "BlockCommitted(uint32)";
-        let block_verified_topic_h256: H256 = helpers::get_topic_keccak_hash(block_verified_topic);
-        let block_committed_topic_h256: H256 = helpers::get_topic_keccak_hash(block_committed_topic);
+        let block_verified_topic_h256: H256 = get_topic_keccak_hash(block_verified_topic);
+        let block_committed_topic_h256: H256 = get_topic_keccak_hash(block_committed_topic);
         for log in logs {
             let mut block: LogBlockData = LogBlockData {
                 block_num: 0,
@@ -186,8 +174,8 @@ impl BlockEventsFranklin {
         // Events topics
         let block_verified_topic = "BlockVerified(uint32)";
         let block_committed_topic = "BlockCommitted(uint32)";
-        let block_verified_topic_h256: H256 = helpers::get_topic_keccak_hash(block_verified_topic);
-        let block_committed_topic_h256: H256 = helpers::get_topic_keccak_hash(block_committed_topic);
+        let block_verified_topic_h256: H256 = get_topic_keccak_hash(block_verified_topic);
+        let block_committed_topic_h256: H256 = get_topic_keccak_hash(block_committed_topic);
 
         let topics_vec_h256: Vec<H256> = vec![block_verified_topic_h256, block_committed_topic_h256];
 

@@ -39,8 +39,8 @@ impl FranklinTransaction {
 
     fn get_ethereum_transaction(network: InfuraEndpoint, transaction_hash: &H256) -> Option<Transaction> {
         let infura_endpoint = match network {
-            InfuraEndpoint::Mainnet => "https://mainnet.infura.io/",
-            InfuraEndpoint::Rinkeby => "https://rinkeby.infura.io/",
+            InfuraEndpoint::Mainnet => INFURA_MAINNET_ENDPOINT,
+            InfuraEndpoint::Rinkeby => INFURA_RINKEBY_ENDPOINT,
         };
         let (_eloop, transport) = web3::transports::Http::new(infura_endpoint).unwrap();
         let web3 = web3::Web3::new(transport);

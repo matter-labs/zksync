@@ -1,6 +1,20 @@
 use web3::types::H256;
 use tiny_keccak::keccak256;
 
+pub type ABI = (&'static [u8], &'static str);
+pub const FRANKLIN_MAINNET_ADDRESS: &'static str = "fddb8167fef957f7cc72686094fac1d31be5ecfe";
+pub const FRANKLIN_RINKEBY_ADDRESS: &'static str = "fddb8167fef957f7cc72686094fac1d31be5ecfe";
+pub const INFURA_MAINNET_ENDPOINT: &'static str = "https://mainnet.infura.io/";
+pub const INFURA_RINKEBY_ENDPOINT: &'static str = "https://rinkeby.infura.io/";
+pub const PLASMA_RINKEBY_ABI: ABI = (
+    include_bytes!("../../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.abi"),
+    include_str!("../../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.bin"),
+);
+pub const PLASMA_MAINNET_ABI: ABI = (
+    include_bytes!("../../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.abi"),
+    include_str!("../../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.bin"),
+);
+
 #[derive(Debug, Copy, Clone)]
 pub enum InfuraEndpoint {
     Mainnet,
