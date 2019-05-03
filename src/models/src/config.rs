@@ -3,13 +3,15 @@ pub const DEPOSIT_BATCH_SIZE: usize = 1;
 pub const EXIT_BATCH_SIZE: usize = 1;
 pub const PADDING_INTERVAL: u64 = 1*60; // 1 min
 pub const PROVER_TIMEOUT: usize = 20*60; // 20 min
+pub const DEFAULT_KEYS_PATH: &str = "keys";
 
 lazy_static! {
     pub static ref RUNTIME_CONFIG: RuntimeConfig = RuntimeConfig::new();
 }
 
 pub struct RuntimeConfig {
-    pub transfer_batch_size: usize
+    pub transfer_batch_size: usize,
+    pub keys_path: String,
 }
 
 impl RuntimeConfig {
@@ -22,8 +24,11 @@ impl RuntimeConfig {
             }
         }
 
+        let keys_path = std::env::var("KEYS_PATHS").ok().unwrap_or(DEFAULT_KEYS_PATH.to_string());
+
         Self {
-            transfer_batch_size: transfer_size
+            transfer_batch_size:    transfer_size,
+            keys_path:              keys_path
         }
     }
 }

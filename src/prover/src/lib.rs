@@ -190,21 +190,23 @@ impl BabyProver {
 
         println!("Reading proving key, may take a while");
 
-        let transfer_circuit_params = read_parameters("keys/transfer_pk.key");
+        let keys_path = &RUNTIME_CONFIG.keys_path;
+
+        let transfer_circuit_params = read_parameters(&format!("{}/transfer_pk.key", keys_path));
         if transfer_circuit_params.is_err() {
             return Err(transfer_circuit_params.err().unwrap());
         }
 
         println!("Done reading transfer key");
 
-        let deposit_circuit_params = read_parameters("keys/deposit_pk.key");
+        let deposit_circuit_params = read_parameters(&format!("{}/deposit_pk.key", keys_path));
         if deposit_circuit_params.is_err() {
             return Err(deposit_circuit_params.err().unwrap());
         }
 
         println!("Done reading deposit key");
 
-        let exit_circuit_params = read_parameters("keys/exit_pk.key");
+        let exit_circuit_params = read_parameters(&format!("{}/exit_pk.key", keys_path));
         if exit_circuit_params.is_err() {
             return Err(exit_circuit_params.err().unwrap());
         }
