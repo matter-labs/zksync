@@ -48,7 +48,7 @@ pub struct TransferTransactionsBlock {
     pub transfers: Vec<TransferTx>,
 }
 
-pub struct StatesBuilderFranklin {
+pub struct FranklinAccountsStates {
     pub http_endpoint_string: String,
     pub franklin_abi: ABI,
     pub franklin_contract: Contract,
@@ -56,7 +56,7 @@ pub struct StatesBuilderFranklin {
     pub accounts_tree: AccountTree,
 }
 
-impl StatesBuilderFranklin {
+impl FranklinAccountsStates {
     pub fn new(network: InfuraEndpoint) -> Self {
         let http_infura_endpoint_str = match network {
             InfuraEndpoint::Mainnet => "https://mainnet.infura.io/",

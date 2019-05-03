@@ -89,16 +89,15 @@ impl BlockEventsFranklin {
         Ok(this)
     }
 
-    pub fn update_state_from_last_watched_block_with_blocks_delta_and_return_new_blocks(network: InfuraEndpoint, blocks_delta: U256) -> Result<ComAndVerBlocksVecs, String> {
-        let mut this = BlockEventsFranklin::new(network);
-        let (blocks, to_block_number): (ComAndVerBlocksVecs, BlockNumber256) = match this.get_sorted_past_logs_from_last_watched_block(blocks_delta) {
+    pub fn update_state_from_last_watched_block_with_blocks_delta_and_return_new_blocks(&mut self, blocks_delta: U256) -> Result<ComAndVerBlocksVecs, String> {
+        let (blocks, to_block_number): (ComAndVerBlocksVecs, BlockNumber256) = match self.get_sorted_past_logs_from_last_watched_block(blocks_delta) {
             Err(_) => return Err(String::from("Cant get sorted past logs")),
             Ok(result) => (result.0, result.1)
         };
         let blocks_for_return = blocks.clone();
-        this.committed_blocks.extend(blocks.0);
-        this.verified_blocks.extend(blocks.1);
-        this.last_watched_block_number = U256::from(to_block_number.as_u64());
+        self.committed_blocks.extend(blocks.0);
+        self.verified_blocks.extend(blocks.1);
+        self.last_watched_block_number = U256::from(to_block_number.as_u64());
         Ok(blocks_for_return)
     }
 
