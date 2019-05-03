@@ -20,11 +20,6 @@ pub mod blocks;
 pub mod helpers;
 pub mod state_builder;
 
-pub fn get_new_blocks() -> futures::future::FutureResult<(), String> {
-    println!("Repeating");
-    futures::future::ok(())
-}
-
 #[cfg(test)]
 mod test {
 
