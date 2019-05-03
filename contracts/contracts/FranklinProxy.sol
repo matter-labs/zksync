@@ -126,6 +126,7 @@ contract FranklinProxy is Plasma {
         callExternal(exitor);
     }
 
+    // this is inline delegate-call to dispatch functions to subcontracts that are responsible for execution
     function callExternal(address callee) internal {
         assembly {
             let memoryPointer := mload(0x40)
