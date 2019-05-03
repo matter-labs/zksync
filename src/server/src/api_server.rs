@@ -63,6 +63,8 @@ pub struct AppState {
     connection_pool: ConnectionPool
 }
 
+const TIMEOUT: u64 = 500;
+
 fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let tx_for_state = req.state().tx_for_state.clone();
     req.json()
@@ -85,7 +87,7 @@ fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
             let request = StateKeeperRequest::GetAccount(tx.from, key_tx);
             tx_for_state.send(request).expect("must send a new transaction to queue");
             // now wait for state_keeper to return a result
-            let r = key_rx.recv_timeout(std::time::Duration::from_millis(250));
+            let r = key_rx.recv_timeout(std::time::Duration::from_millis(TIMEOUT));
             if r.is_err() {
                 let resp = TransactionResponse{
                     accepted:       false,
@@ -192,7 +194,7 @@ fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResp
     let request = StateKeeperRequest::GetAccount(account_id_u32, acc_tx);
     tx_for_state.send(request).expect("must send a request for an account state");
     
-    let pending: Result<Option<Account>, _> = acc_rx.recv_timeout(std::time::Duration::from_millis(250));
+    let pending: Result<Option<Account>, _> = acc_rx.recv_timeout(std::time::Duration::from_millis(TIMEOUT));
 
     if pending.is_err() {
         println!("API request timeout!");
@@ -231,7 +233,7 @@ fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpRes
     let (tx, rx) = mpsc::channel();
     let request = StateKeeperRequest::GetNetworkStatus(tx);
     tx_for_state.send(request).expect("must send a new transaction to queue");
-    let status: Result<NetworkStatus, _> = rx.recv_timeout(std::time::Duration::from_millis(250));
+    let status: Result<NetworkStatus, _> = rx.recv_timeout(std::time::Duration::from_millis(TIMEOUT));
     if status.is_err() {
         return Ok(HttpResponse::Ok().json(AccountError{error: "timeout".to_owned()}));
     }
