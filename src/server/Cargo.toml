@@ -31,6 +31,8 @@ im = "12.2.0"
 priority-queue = "0.5.2"
 num-traits = "0.2"
 
+rayon = "1.0.3"
+
 tokio = "0.1.18"
 actix = "0.7.9"
 actix-web = "0.7.19"

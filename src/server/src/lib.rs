@@ -30,6 +30,7 @@ extern crate fnv;
 
 extern crate futures;
 extern crate web3;
+extern crate rayon;
 
 extern crate hyper;
 extern crate serde;

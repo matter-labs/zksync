@@ -8,6 +8,7 @@ use rand::{OsRng};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 use web3::types::{U128, H256, U256};
 use std::str::FromStr;
+use rayon::prelude::*;
 
 use plasma::models::{self, *};
 
@@ -105,7 +106,7 @@ impl PlasmaStateKeeper {
                         println!("StateKeeperRequest::AddTransferTx: channel closed, sending failed");
                     }
 
-                    if self.transfer_tx_queue.len() == config::TRANSFER_BATCH_SIZE {
+                    if self.transfer_tx_queue.len() == config::RUNTIME_CONFIG.transfer_batch_size {
                         self.finalize_current_batch(&tx_for_commitments);
                     }
                 },
@@ -171,8 +172,11 @@ impl PlasmaStateKeeper {
             let private_key: PrivateKey<Bn256> = PrivateKey::read(BufReader::new(pk_bytes.as_slice())).unwrap();
             let padding_account_id = 2; // TODO: 1
 
-            for i in 0..to_pad {
-                let nonce = self.account(padding_account_id).nonce;
+            let base_nonce = self.account(padding_account_id).nonce;
+            let pub_key = self.state.get_account(padding_account_id).and_then(|a| a.get_pub_key()).expect("public key must exist for padding account");
+
+            let prepared_transactions: Vec<TransferTx> = (0..(to_pad as u32)).into_par_iter().map(|i| {
+                let nonce = base_nonce + i;
                 let tx = TransferTx::create_signed_tx(
                     padding_account_id, // from
                     0,                  // to
@@ -182,13 +186,34 @@ impl PlasmaStateKeeper {
                     2147483647,         // good until max_block
                     &private_key
                 );
-
-                let pub_key = self.state.get_account(padding_account_id).and_then(|a| a.get_pub_key()).expect("public key must exist for padding account");
                 assert!( tx.verify_sig(&pub_key) );
 
+                tx
+            }).collect();
+
+            for tx in prepared_transactions.into_iter() {
                 self.state.apply_transfer(&tx).expect("padding must always be applied correctly");
                 self.transfer_tx_queue.push(tx);
             }
+
+            // for i in 0..to_pad {
+            //     let nonce = self.account(padding_account_id).nonce;
+            //     let tx = TransferTx::create_signed_tx(
+            //         padding_account_id, // from
+            //         0,                  // to
+            //         BigDecimal::zero(), // amount
+            //         BigDecimal::zero(), // fee
+            //         nonce,              // nonce
+            //         2147483647,         // good until max_block
+            //         &private_key
+            //     );
+
+            //     let pub_key = self.state.get_account(padding_account_id).and_then(|a| a.get_pub_key()).expect("public key must exist for padding account");
+            //     assert!( tx.verify_sig(&pub_key) );
+
+            //     self.state.apply_transfer(&tx).expect("padding must always be applied correctly");
+            //     self.transfer_tx_queue.push(tx);
+            // }
         }
     }
 
