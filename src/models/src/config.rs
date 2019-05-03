@@ -24,7 +24,7 @@ impl RuntimeConfig {
             }
         }
 
-        let keys_path = std::env::var("KEYS_DIR").ok().unwrap_or(DEFAULT_KEYS_PATH.to_string());
+        let keys_path = std::env::var("KEY_DIR").ok().unwrap_or(DEFAULT_KEYS_PATH.to_string());
 
         Self {
             transfer_batch_size:    transfer_size,

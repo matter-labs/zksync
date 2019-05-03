@@ -5,7 +5,7 @@ import {PlasmaDepositor} from "./PlasmaDepositor.sol";
 import {PlasmaTransactor} from "./PlasmaTransactor.sol";
 import {PlasmaExitor} from "./PlasmaExitor.sol";
 
-contract Franklin is Plasma {
+contract FranklinProxy is Plasma {
     // Well, technically it's not :)
 
     constructor(address _depositor, address _transactor, address _exitor, uint256[2] _paddingPubKey) public {
