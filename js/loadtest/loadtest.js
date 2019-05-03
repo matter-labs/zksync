@@ -103,20 +103,20 @@ class Client {
                 break
             }
         }
-        let balance_int = this.fra.currentBalance.div('1000000000000').div(20).toNumber()
+        let balance_int = this.fra.currentBalance.div('1000000000000').div(2).toNumber()
         let round_amount = rng.nextInt(1, balance_int - 1)
         let amount = 
             ethers.utils.bigNumberify(round_amount)
             //ethers.utils.bigNumberify(20474)
             .mul('1000000000000')
 
-        console.log(`${this.eth.address}: transfer ${round_amount} from ${fromAccountId} to ${toAccountId}...`);
+        //console.log(`${this.eth.address}: transfer ${round_amount} from ${fromAccountId} to ${toAccountId}...`);
 
         let r = await this.fra.transfer(toAccountId, amount)
         if (r.accepted) {
             console.log(`${this.eth.address}: transfer ${round_amount} from ${fromAccountId} to ${toAccountId} ok`)
         } else {
-            console.log(`${this.eth.address}: transfer failed: ${JSON.stringify(r)}`)
+            console.log(`${this.eth.address}: transfer ${round_amount} failed: ${JSON.stringify(r)}`)
         }
     }
 }
