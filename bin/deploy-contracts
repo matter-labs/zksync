@@ -2,6 +2,10 @@
 
 . .setup_env
 
+.load_keys
+
+cp -f $KEY_DIR/*.sol contracts/contracts/
+
 echo redeploying for the db $DATABASE_URL
 
 cd contracts
