@@ -17,6 +17,8 @@ kubectl config view
 
 ## Deploy
 
+0. Make sure to have file `etc/kube/franklin.yaml`
+
 1. Update keys in .sol files, then deploy contracts:
 
 ```
