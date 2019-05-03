@@ -1196,6 +1196,7 @@ name = "models"
 version = "0.0.1"
 dependencies = [
  "eth_client 0.1.0",
+ "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "plasma 0.1.1",
  "serde 1.0.90 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_bytes 0.11.1 (registry+https://github.com/rust-lang/crates.io-index)",

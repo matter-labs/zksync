@@ -3,6 +3,8 @@ extern crate serde_derive;
 extern crate serde_bytes;
 extern crate plasma;
 extern crate eth_client;
+#[macro_use]
+extern crate lazy_static;
 
 pub mod config;
 pub mod encoder;

@@ -163,7 +163,7 @@ impl PlasmaStateKeeper {
     }
 
     fn apply_padding(&mut self) {
-        let to_pad = config::TRANSFER_BATCH_SIZE - self.transfer_tx_queue.len();
+        let to_pad = config::RUNTIME_CONFIG.transfer_batch_size - self.transfer_tx_queue.len();
         if to_pad > 0 {
             println!("padding transactions");
             // TODO: move to env vars

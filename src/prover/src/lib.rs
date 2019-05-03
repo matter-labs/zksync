@@ -32,7 +32,7 @@ use plasma::models::{params, Block, PlasmaState};
 use plasma::models::circuit::{Account, AccountTree};
 
 use models::encoder;
-use models::config::{TRANSFER_BATCH_SIZE, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE, PROVER_TIMEOUT};
+use models::config::{RUNTIME_CONFIG, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE, PROVER_TIMEOUT};
 use models::{EncodedProof};
 use storage::StorageProcessor;
 
@@ -241,7 +241,7 @@ impl BabyProver {
         let jubjub_params = AltJubjubBn256::new();
 
         Ok(Self{
-            transfer_batch_size:    TRANSFER_BATCH_SIZE,
+            transfer_batch_size:    RUNTIME_CONFIG.transfer_batch_size,
             deposit_batch_size:     DEPOSIT_BATCH_SIZE,
             exit_batch_size:        EXIT_BATCH_SIZE,
             current_block_number:   state_block_number,

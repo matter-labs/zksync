@@ -9,3 +9,4 @@ plasma = { path = "../plasma" }
 serde = "1.0.90"
 serde_derive = "1.0.90"
 serde_bytes = "0.11.1"
+lazy_static = "1.2.0"
