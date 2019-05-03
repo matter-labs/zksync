@@ -9,10 +9,10 @@ const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms))
 let source = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/0").connect(provider)
 let sourceNonce = null
 
-const TX_FEE = ethers.utils.parseEther('0.1')
-const MIN_AMOUNT_FRA = ethers.utils.parseEther('0.001')
+const TX_FEE = ethers.utils.parseEther('0.2')
+const MIN_AMOUNT_FRA = ethers.utils.parseEther('0.01')
 const TO_DEPOSIT = MIN_AMOUNT_FRA // MIN_AMOUNT_FRA.add(TX_FEE)
-const TO_FUND = TO_DEPOSIT.add(TX_FEE)
+const TO_FUND = ethers.utils.parseEther('1') //TO_DEPOSIT.add(TX_FEE)
 
 let nClients = process.env.LOADTEST_N_CLIENTS
 let tps = process.env.LOADTEST_TPS
