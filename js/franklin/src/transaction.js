@@ -26,8 +26,8 @@ const babyJubjubParams = {
 const altBabyJubjub = new elliptic.curve.edwards(babyJubjubParams);
 
 function sign(message, privateKey, curve) {
-    // const r = (new BN(elliptic.rand(32), 16, "be")).umod(curve.n);
-    const r = new BN(3);
+    const r = (new BN(elliptic.rand(32), 16, "be")).umod(curve.n);
+    // const r = new BN(3);
     var R = curve.g.mul(r);
     if (R.isInfinity()) {
         throw Error("R is infinity")
