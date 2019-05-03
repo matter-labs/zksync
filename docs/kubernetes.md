@@ -33,7 +33,13 @@ https://cloud.digitalocean.com/spaces/keys?i=ba0188
 make push
 ```
 
-4. Scale nodes:
+4. Deploy kubernetes and/or update env vars
+
+```
+deploy-kube prod
+```
+
+5. Scale nodes:
 
 ```
 kubectl scale deployments/server --replicas=1
