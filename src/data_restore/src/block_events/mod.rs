@@ -25,6 +25,7 @@ pub const PLASMA_PROD_ABI: ABI = (
 
 #[derive(Debug, Clone)]
 pub struct BlockEventsFranklin {
+    pub endpoint: InfuraEndpoint,
     pub http_endpoint_string: String,
     // pub ws_endpoint_string: String,
     pub franklin_abi: ABI,
@@ -64,6 +65,7 @@ impl BlockEventsFranklin {
         let contract = ethabi::Contract::load(abi.0).unwrap();
         let this = Self {
             // ws_endpoint_string: ws_infura_endpoint_string,
+            endpoint: network,
             http_endpoint_string: http_infura_endpoint_string,
             franklin_abi: abi,
             franklin_contract: contract,
@@ -77,7 +79,7 @@ impl BlockEventsFranklin {
 
     pub fn get_past_state_from_genesis_with_blocks_delta(network: InfuraEndpoint, genesis_block: U256, blocks_delta: U256) -> Result<Self, String> {
         let mut this = BlockEventsFranklin::new(network);
-        let (blocks, to_block_number): ((Vec<LogBlockData>, Vec<LogBlockData>), BlockNumber256) = match this.get_sorted_past_logs_from_genesis(genesis_block, blocks_delta) {
+        let (blocks, to_block_number): (ComAndVerBlocksVecs, BlockNumber256) = match this.get_sorted_past_logs_from_genesis(genesis_block, blocks_delta) {
             Err(_) => return Err(String::from("Cant get sorted past logs")),
             Ok(result) => (result.0, result.1)
         };
@@ -87,25 +89,26 @@ impl BlockEventsFranklin {
         Ok(this)
     }
 
-    pub fn update_state_from_last_watched_block_with_blocks_delta(network: InfuraEndpoint, blocks_delta: U256) -> Result<Self, String> {
+    pub fn update_state_from_last_watched_block_with_blocks_delta_and_return_new_blocks(network: InfuraEndpoint, blocks_delta: U256) -> Result<ComAndVerBlocksVecs, String> {
         let mut this = BlockEventsFranklin::new(network);
-        let (blocks, to_block_number): ((Vec<LogBlockData>, Vec<LogBlockData>), BlockNumber256) = match this.get_sorted_past_logs_from_last_watched_block(blocks_delta) {
+        let (blocks, to_block_number): (ComAndVerBlocksVecs, BlockNumber256) = match this.get_sorted_past_logs_from_last_watched_block(blocks_delta) {
             Err(_) => return Err(String::from("Cant get sorted past logs")),
             Ok(result) => (result.0, result.1)
         };
-        this.committed_blocks = blocks.0;
-        this.verified_blocks = blocks.1;
+        let blocks_for_return = blocks.clone();
+        this.committed_blocks.extend(blocks.0);
+        this.verified_blocks.extend(blocks.1);
         this.last_watched_block_number = U256::from(to_block_number.as_u64());
-        Ok(this)
+        Ok(blocks_for_return)
     }
 
-    // pub fn get_committed_blocks(&self) -> Vec<LogBlockData> {
-    //     self.committed_blocks.clone()
-    // }
+    pub fn get_committed_blocks(&self) -> &Vec<LogBlockData> {
+        &self.committed_blocks
+    }
 
-    // pub fn get_verified_blocks(&self) -> Vec<LogBlockData> {
-    //     self.verified_blocks.clone()
-    // }
+    pub fn get_verified_blocks(&self) -> &Vec<LogBlockData> {
+        &self.verified_blocks
+    }
 
     pub fn get_last_block_number(&mut self) -> Result<BlockNumber256, String> {
         let (_eloop, transport) = match web3::transports::Http::new(self.http_endpoint_string.as_str()) {
@@ -127,15 +130,15 @@ impl BlockEventsFranklin {
         if logs.len() == 0 {
             return Err(String::from("No logs in list"))
         }
-        let mut committed_block_data: Vec<LogBlockData> = vec![];
-        let mut verified_block_data: Vec<LogBlockData> = vec![];
+        let mut committed_blocks: Vec<LogBlockData> = vec![];
+        let mut verified_blocks: Vec<LogBlockData> = vec![];
         let block_verified_topic = "BlockVerified(uint32)";
         let block_committed_topic = "BlockCommitted(uint32)";
         let block_verified_topic_h256: H256 = helpers::get_topic_keccak_hash(block_verified_topic);
         let block_committed_topic_h256: H256 = helpers::get_topic_keccak_hash(block_committed_topic);
         for log in logs {
             let mut block: LogBlockData = LogBlockData {
-                block_num: H256::zero(),
+                block_num: 0,
                 transaction_hash : H256::zero(),
                 block_type: BlockType::Unknown
             };
@@ -146,12 +149,12 @@ impl BlockEventsFranklin {
 
             match tx_hash {
                 Some(hash) => {
-                    block.block_num = block_num;
+                    block.block_num = U256::from(block_num).as_u32();
                     block.transaction_hash = hash;
 
                     if topic == block_verified_topic_h256 {
                         block.block_type = BlockType::Verified;
-                        verified_block_data.push(block);
+                        verified_blocks.push(block);
                         // let result = self.check_committed_block_with_same_number_as_verified(&block);
                         // println!("Block exists: {:?}", result);
                         // let tx = result.unwrap().clone().transaction_hash;
@@ -160,13 +163,15 @@ impl BlockEventsFranklin {
                         // println!("TX data committed: {:?}", data);
                     } else if topic == block_committed_topic_h256 {
                         block.block_type = BlockType::Committed;
-                        committed_block_data.push(block);
+                        committed_blocks.push(block);
                     }
                 },
                 None    => println!("No tx hash"),
             };
         }
-        Ok((committed_block_data, verified_block_data))
+        committed_blocks.sort_by_key(|x| x.block_num);
+        verified_blocks.sort_by_key(|x| x.block_num);
+        Ok((committed_blocks, verified_blocks))
     }
 
     fn get_logs(&mut self, from_block_number: BlockNumber, to_block_number: BlockNumber) -> Result<Vec<Log>, String> {
@@ -291,6 +296,27 @@ impl BlockEventsFranklin {
         Ok((sorted_logs, to_block_number))
     }
 
+    pub fn get_only_verified_committed_blocks(&self) -> Vec<&LogBlockData> {
+        let ver_blocks = &mut self.verified_blocks.iter();
+        // let committed_blocks_iter = &mut self.com_blocks.iter();
+        let mut ver_com_blocks = vec![];
+        for block in ver_blocks {
+            let find_com_block = self.check_committed_block_with_same_number_as_verified(block);
+            if find_com_block.is_none() {
+                continue;
+            }
+            ver_com_blocks.push(find_com_block.unwrap())
+        }
+        ver_com_blocks.sort_by_key(|&x| x.block_num);
+        ver_com_blocks
+    }
+
+    pub fn check_committed_block_with_same_number_as_verified(&self, verified_block: &LogBlockData) -> Option<&LogBlockData> {
+        let committed_blocks_iter = &mut self.committed_blocks.iter();
+        let committed_block = committed_blocks_iter.find(|&&x| x.block_num == verified_block.block_num);
+        return committed_block
+    }
+
     // // - Get new block
     // // - Need to watch block + 1
     // // - Get events from need to watch block
@@ -344,12 +370,6 @@ impl BlockEventsFranklin {
     //         eprintln!("Cant run eloop");
     //     }
     // }
-
-    pub fn check_committed_block_with_same_number_as_verified(&self, verified_block: &LogBlockData) -> Option<&LogBlockData> {
-        let committed_blocks_iter = &mut self.committed_blocks.iter();
-        let committed_block = committed_blocks_iter.find(|&&x| x.block_num == verified_block.block_num);
-        return committed_block
-    }
 
     // pub fn subscribe_to_logs(&mut self) {
 

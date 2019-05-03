@@ -2,6 +2,7 @@ use web3::futures::Future;
 use web3::types::{H256, Transaction, TransactionId};
 
 use helpers::*;
+use blocks::LogBlockData;
 
 #[derive(Debug, Copy, Clone)]
 pub enum FranklinTransactionType {
@@ -15,19 +16,21 @@ pub enum FranklinTransactionType {
 pub struct FranklinTransaction {
     pub network: InfuraEndpoint,
     pub franklin_transaction_type: FranklinTransactionType,
+    pub block_number: u32,
     pub ethereum_transaction: Transaction,
     pub commitment_data: Vec<u8>,
 }
 
 impl FranklinTransaction {
-    pub fn get_transaction(network: InfuraEndpoint, transaction_hash: &H256) -> Option<Self> {
-        let transaction = FranklinTransaction::get_ethereum_transaction(network, transaction_hash)?;
+    pub fn get_transaction(network: InfuraEndpoint, franklin_block: &LogBlockData) -> Option<Self> {
+        let transaction = FranklinTransaction::get_ethereum_transaction(network, &franklin_block.transaction_hash)?;
         let input_data = FranklinTransaction::get_input_data_from_ethereum_transaction(&transaction);
         let tx_type = FranklinTransaction::get_transaction_type(&input_data);
         let commitment_data = FranklinTransaction::get_commitment_data_from_input_data(&input_data)?;
         let this = Self {
             network: network,
             franklin_transaction_type: tx_type,
+            block_number: franklin_block.block_num,
             ethereum_transaction: transaction,
             commitment_data: commitment_data,
         };

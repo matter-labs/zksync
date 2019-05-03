@@ -31,12 +31,14 @@ pub const PLASMA_PROD_ABI: ABI = (
 #[derive(Debug, Clone)]
 pub struct FullExitTransactionsBlock {
     pub batch_number: u32,
+    pub block_number: u32,
     pub exits: Vec<ExitTx>,
 }
 
 #[derive(Debug, Clone)]
 pub struct DepositTransactionsBlock {
     pub batch_number: u32,
+    pub block_number: u32,
     pub deposits: Vec<DepositTx>,
 }
 
@@ -116,13 +118,16 @@ impl StatesBuilderFranklin {
     }
 
     pub fn update_accounts_states_from_transfer_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), String> {
+        // println!("tx: {:?}", transaction.ethereum_transaction.hash);
         let transfer_txs_block = self.get_all_transactions_from_transfer_block(transaction);
         if transfer_txs_block.is_err() {
             return Err(String::from("No transfer txs in block"));
         }
-        for tx in transfer_txs_block.unwrap().transfers {
+        let unwraped_transfer_txs_block = transfer_txs_block.unwrap();
+        for tx in unwraped_transfer_txs_block.transfers {
             if let Some(mut from) = self.accounts_tree.items.get(&tx.from).cloned() {
                 let mut transacted_amount = BigDecimal::zero();
+                // println!("amount tx: {:?}", &tx.amount);
                 transacted_amount += &tx.amount;
                 transacted_amount += &tx.fee;
 
@@ -153,11 +158,13 @@ impl StatesBuilderFranklin {
 
     fn update_accounts_states_from_deposit_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), String> {
         let batch_number = self.get_batch_number_from_deposit(transaction);
-        let deposit_txs_block = self.get_all_transactions_from_deposit_batch(batch_number);
+        let block_number = self.get_block_number_from_deposit(transaction);
+        let deposit_txs_block = self.get_all_transactions_from_deposit_batch(batch_number, block_number);
         if deposit_txs_block.is_err() {
             return Err(String::from("No deposit txs in block"));
         }
-        for tx in deposit_txs_block.unwrap().deposits {
+        let unwraped_deposit_txs_block = deposit_txs_block.unwrap();
+        for tx in unwraped_deposit_txs_block.deposits {
             let account = match self.accounts_tree.items.get(&tx.account) {
                 None => {
                     let mut acc = Account::default();
@@ -180,11 +187,13 @@ impl StatesBuilderFranklin {
 
     fn update_accounts_states_from_full_exit_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), String> {
         let batch_number = self.get_batch_number_from_full_exit(transaction);
-        let exit_txs_block = self.get_all_transactions_from_full_exit_batch(batch_number);
+        let block_number = self.get_block_number_from_full_exit(transaction);
+        let exit_txs_block = self.get_all_transactions_from_full_exit_batch(batch_number, block_number);
         if exit_txs_block.is_err() {
             return Err(String::from("Cant get txs from batch"))
         }
-        for tx in exit_txs_block.unwrap().exits {
+        let unwraped_exit_txs_block = exit_txs_block.unwrap();
+        for tx in unwraped_exit_txs_block.exits {
             let _ = self.accounts_tree.items.get(&tx.account).ok_or(return Err(String::from("Unexisting account")));
             self.accounts_tree.delete(tx.account);
         }
@@ -201,6 +210,18 @@ impl StatesBuilderFranklin {
         let batch_vec = transaction.commitment_data[0..32].to_vec();
         let batch_slice = batch_vec.as_slice();
         U256::from(batch_slice)
+    }
+
+    fn get_block_number_from_deposit(&self, transaction: &FranklinTransaction) -> U256 {
+        let block_vec = transaction.commitment_data[64..96].to_vec();
+        let block_slice = block_vec.as_slice();
+        U256::from(block_slice)
+    }
+
+    fn get_block_number_from_full_exit(&self, transaction: &FranklinTransaction) -> U256 {
+        let block_vec = transaction.commitment_data[64..96].to_vec();
+        let block_slice = block_vec.as_slice();
+        U256::from(block_slice)
     }
 
     fn get_all_transactions_from_transfer_block(&self, transaction: &FranklinTransaction) -> Result<TransferTransactionsBlock, String> {
@@ -249,7 +270,7 @@ impl StatesBuilderFranklin {
         })
     }
 
-    fn get_all_transactions_from_deposit_batch(&self, batch_number: U256) -> Result<DepositTransactionsBlock, String> {
+    fn get_all_transactions_from_deposit_batch(&self, batch_number: U256, block_number: U256) -> Result<DepositTransactionsBlock, String> {
         let (_eloop, transport) = match web3::transports::Http::new(self.http_endpoint_string.as_str()) {
             Err(_) => return Err(String::from("Error creating web3 with this endpoint")),
             Ok(result) => result,
@@ -338,12 +359,13 @@ impl StatesBuilderFranklin {
         }
         let block = DepositTransactionsBlock {
             batch_number: batch_number.as_u32(),
+            block_number: block_number.as_u32(),
             deposits: all_deposits,
         };
         Ok(block)
     }
 
-    fn get_all_transactions_from_full_exit_batch(&self, batch_number: U256) -> Result<FullExitTransactionsBlock, String> {
+    fn get_all_transactions_from_full_exit_batch(&self, batch_number: U256, block_number: U256) -> Result<FullExitTransactionsBlock, String> {
         let (_eloop, transport) = match web3::transports::Http::new(self.http_endpoint_string.as_str()) {
             Err(_) => return Err(String::from("Error creating web3 with this endpoint")),
             Ok(result) => result,
@@ -408,6 +430,7 @@ impl StatesBuilderFranklin {
         }
         let block = FullExitTransactionsBlock {
             batch_number: batch_number.as_u32(),
+            block_number: block_number.as_u32(),
             exits: all_exits,
         };
         Ok(block)
