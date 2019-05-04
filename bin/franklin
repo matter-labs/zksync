@@ -1,0 +1,27 @@
+#!/bin/bash
+
+cd `dirname $0`/..
+
+if [ -f etc/env/current ]; then
+    export FRANKLIN_ENV=`cat etc/env/current`
+else 
+    export FRANKLIN_ENV=dev
+fi
+
+export ENV_FILE=./etc/env/$FRANKLIN_ENV.env
+if [ ! -f $ENV_FILE ]; then
+    echo "Franklin config file not found: $ENV_FILE"
+    #exit
+fi
+
+# Load env vars
+set -o allexport
+eval $(grep -v '^#' $ENV_FILE | sed 's/^/export /')
+set +o allexport
+
+if [ -f bin/$1 ]; then
+    $1 "${@:2}"
+else
+    echo $API_SERVER
+    make "$@"
+fi

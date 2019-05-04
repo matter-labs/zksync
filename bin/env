@@ -1,0 +1,25 @@
+#!/bin/bash
+
+if [ -z $1 ]
+then
+    for i in `ls etc/env | grep -v .bak | grep -v example`; do
+        ENV=${i%.*}
+        if [ "$ENV" == "$FRANKLIN_ENV" ]
+        then
+            echo -n " * "
+        else
+            echo -n "   "
+        fi
+        echo $ENV
+    done
+else
+    ENV_FILE=etc/env/$1.env
+    if [ ! -f "$ENV_FILE" ]
+    then
+        echo "$ENV_FILE not found"
+        exit 1
+    fi
+
+    echo $1 > etc/env/current
+    echo "Franklin environment switched to: $1"
+fi

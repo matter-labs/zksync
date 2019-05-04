@@ -36,6 +36,9 @@ start: images
 stop:
 	@docker-compose stop server prover
 
+status:
+	@curl $(API_SERVER)/api/v0.1/status; echo
+
 restart: stop start logs
 
 logs:

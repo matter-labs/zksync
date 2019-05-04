@@ -1,6 +1,0 @@
-#!/bin/bash
-
-. .setup_env
-
-curl $API_SERVER/api/v0.1/status
-echo
