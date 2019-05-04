@@ -12,6 +12,17 @@ export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
 rust-musl-builder = @docker run $(docker-options) -it ekidd/rust-musl-builder
 
+env:
+	bin/env
+
+confirm_action:
+	@bin/.confirm_action
+
+db-reset: confirm_action
+	@cd src/storage
+	@echo Resetting $(DATABASE_URL)
+	@diesel database reset
+
 build-target:
 	$(rust-musl-builder) cargo build --release
 
