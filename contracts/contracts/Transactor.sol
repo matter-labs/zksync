@@ -1,6 +1,7 @@
 pragma solidity ^0.4.24;
 
-import {Plasma} from "./Plasma.sol";
+import {FranklinCommon} from "./common/FranklinCommon.sol";
+import {TwistedEdwards} from "./common/TwistedEdwards.sol";
 
 // interface TransactorInterface {
 //     function commitTransferBlock(
@@ -13,7 +14,7 @@ import {Plasma} from "./Plasma.sol";
 //     function verifyTransferBlock(uint32 blockNumber, uint256[8] proof) external;
 // }
 
-contract PlasmaTransactor is Plasma {
+contract Transactor is FranklinCommon {
 
     function commitTransferBlock(
         uint32 blockNumber, 

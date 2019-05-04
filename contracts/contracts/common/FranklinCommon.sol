@@ -2,11 +2,9 @@ pragma solidity ^0.4.24;
 
 import "./Verifier.sol";
 import "./VerificationKeys.sol";
-import "./PlasmaStorage.sol";
+import "./FranklinStorage.sol";
 
-// Single operator mode
-
-contract PlasmaStub is VerificationKeys, PlasmaStorage {
+contract FranklinCommon is VerificationKeys, FranklinStorage, Verifier {
 
     modifier active_only() {
         require(!stopped, "contract should not be globally stopped");
@@ -30,21 +28,12 @@ contract PlasmaStub is VerificationKeys, PlasmaStorage {
         return uint128(scaled);
     }
 
-
     function scaleFromPlasmaUnitsIntoWei(uint128 value)
     public
     pure
     returns (uint256) {
         return uint256(value) * DENOMINATOR;
     }
-
-    // stubs
-    // verification
-    function verifyProof(Circuit, uint256[8] memory, bytes32, bytes32, bytes32) internal view returns (bool valid);
-}
-
-contract Plasma is PlasmaStub, Verifier {
-    // Implementation
 
     function verifyProof(Circuit circuitType, uint256[8] memory proof, bytes32 oldRoot, bytes32 newRoot, bytes32 finalHash)
         internal view returns (bool valid)

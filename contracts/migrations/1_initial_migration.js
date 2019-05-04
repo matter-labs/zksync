@@ -1,8 +1,8 @@
 var Migrations = artifacts.require("./Migrations.sol");
-var FranklinContract = artifacts.require("./FranklinProxy.sol");
-var Depositor = artifacts.require("./PlasmaDepositor.sol");
-var Exitor = artifacts.require("./PlasmaExitor.sol");
-var Transactor = artifacts.require("./PlasmaTransactor.sol");
+var FranklinProxy = artifacts.require("./FranklinProxy.sol");
+var Depositor = artifacts.require("./Depositor.sol");
+var Exitor = artifacts.require("./Exitor.sol");
+var Transactor = artifacts.require("./Transactor.sol");
 
 module.exports = async function(deployer) {
     let m = await deployer.deploy(Migrations);
@@ -17,9 +17,7 @@ module.exports = async function(deployer) {
     let dep = await Depositor.deployed();
 
     let paddingPubKey = JSON.parse(process.env.PADDING_PUB_KEY);
-    // console.log("FranklinContract size = " + (FranklinContract.bytecode.length - 2)/2 );
-    await deployer.deploy(FranklinContract, dep.address, tr.address, ex.address);
-    let franklin = await FranklinContract.deployed();
-
+    await deployer.deploy(FranklinProxy, dep.address, tr.address, ex.address);
+    let franklin = await FranklinProxy.deployed();
     await franklin.deposit(paddingPubKey, 0);
 };

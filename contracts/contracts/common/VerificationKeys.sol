@@ -2,9 +2,9 @@
 // This contract is generated programmatically
 
 pragma solidity ^0.4.24;
-import "./DepositVerificationKey.sol";
-import "./TransferVerificationKey.sol";
-import "./ExitVerificationKey.sol";
+import "../keys/DepositVerificationKey.sol";
+import "../keys/TransferVerificationKey.sol";
+import "../keys/ExitVerificationKey.sol";
 
 
 // Hardcoded constants to avoid accessing store

@@ -4,7 +4,7 @@
 
 .load_keys
 
-cp -f $KEY_DIR/*.sol contracts/contracts/
+cp -f $KEY_DIR/*.sol contracts/contracts/keys/
 
 echo redeploying for the db $DATABASE_URL
 

@@ -1,6 +1,7 @@
 pragma solidity ^0.4.24;
 
-import {Plasma} from "./Plasma.sol";
+import {FranklinCommon} from "./common/FranklinCommon.sol";
+import {TwistedEdwards} from "./common/TwistedEdwards.sol";
 
 // interface ExitorInterface {
 //     function exit() external payable;
@@ -26,7 +27,7 @@ import {Plasma} from "./Plasma.sol";
 
 // this procedure is a one-time full exit with a removal 
 // of the public key from the tree
-contract PlasmaExitor is Plasma {
+contract Exitor is FranklinCommon {
 
     function exit() 
     public 

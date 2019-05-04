@@ -26,21 +26,21 @@ module.exports = {
         dev: {
           host: "127.0.0.1",
           port: 8545,
-          gas: 6800000,
+          gas: 8000000,
           network_id: "*" // match any network
         },
 
         geth: {
           host: "127.0.0.1",
           port: 8545,
-          gas: 6800000,
+          gas: 8000000,
           from: `0x+${process.env.FUNDING_ACCOUNT}`,
           network_id: 9
         },   
 
       rinkeby:{
         network_id: 4,
-        gas: 6800000,
+        gas: 8000000,
         provider: function() { 
           const HDWalletProvider = require("truffle-hdwallet-provider");
           //let url = `https://rinkeby.infura.io/v3/${process.env.INFURA_PROJECT_ID}`

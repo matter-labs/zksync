@@ -1,7 +1,7 @@
 pragma solidity ^0.4.24;
 
-import {Plasma} from "./Plasma.sol";
-import {TwistedEdwards} from "./TwistedEdwards.sol";
+import {FranklinCommon} from "./common/FranklinCommon.sol";
+import {TwistedEdwards} from "./common/TwistedEdwards.sol";
 
 // interface DepositorInterface {
 //     function deposit(uint256[2] publicKey, uint128 maxFee) external payable;
@@ -24,7 +24,7 @@ import {TwistedEdwards} from "./TwistedEdwards.sol";
 //     ) external; 
 // }
 
-contract PlasmaDepositor is Plasma {
+contract Depositor is FranklinCommon {
     
     function deposit(uint256[2] memory publicKey, uint128 maxFee) 
     public 

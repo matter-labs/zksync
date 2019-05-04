@@ -1,11 +1,8 @@
 pragma solidity ^0.4.24;
 
-import {Plasma} from "./Plasma.sol";
-import {PlasmaDepositor} from "./PlasmaDepositor.sol";
-import {PlasmaTransactor} from "./PlasmaTransactor.sol";
-import {PlasmaExitor} from "./PlasmaExitor.sol";
+import {FranklinCommon} from "./common/FranklinCommon.sol";
 
-contract FranklinProxy is Plasma {
+contract FranklinProxy is FranklinCommon {
     // Well, technically it's not :)
 
     constructor(address _depositor, address _transactor, address _exitor) public {
@@ -15,23 +12,17 @@ contract FranklinProxy is Plasma {
         depositor = _depositor;
         transactor = _transactor;
         exitor = _exitor;
-
-        // make the first deposit to install pub_key for padding
-        // deposit(_paddingPubKey, 0);
     }
 
-    function deposit(uint256[2] memory publicKey, uint128 maxFee) public payable 
-    {
+    function deposit(uint256[2] memory, uint128) public payable {
         callExternal(depositor);
     }
 
-    function depositInto(uint24 accountID, uint128 maxFee) public payable
-    {
+    function depositInto(uint24, uint128) public payable {
         callExternal(depositor);
     }
 
-    function cancelDeposit() public 
-    {
+    function cancelDeposit() public {
         callExternal(depositor);
     }
 
@@ -39,90 +30,52 @@ contract FranklinProxy is Plasma {
         callExternal(depositor);
     }
 
-    function changeDepositBatchFee(uint128 newBatchFee) public  
-    {
-        callExternal(depositor);
-    }
-    function commitDepositBlock(
-        uint256 batchNumber,
-        uint24[DEPOSIT_BATCH_SIZE] memory accoundIDs,
-        uint32 blockNumber, 
-        bytes32 newRoot
-    ) public 
-    {
+    function changeDepositBatchFee(uint128) public {
         callExternal(depositor);
     }
 
-    function verifyDepositBlock(
-        uint256 batchNumber, 
-        uint24[DEPOSIT_BATCH_SIZE] memory accoundIDs, 
-        uint32 blockNumber, 
-        uint256[8] memory proof
-    ) public
-    {
+    function commitDepositBlock(uint256, uint24[DEPOSIT_BATCH_SIZE] memory, uint32, bytes32) public {
+        callExternal(depositor);
+    }
+
+    function verifyDepositBlock(uint256, uint24[DEPOSIT_BATCH_SIZE] memory, uint32, uint256[8] memory) public {
         callExternal(depositor);
     } 
 
-    function commitTransferBlock(
-        uint32 blockNumber, 
-        uint128 totalFees, 
-        bytes memory txDataPacked, 
-        bytes32 newRoot
-    ) public 
-    {
+    function commitTransferBlock(uint32, uint128, bytes memory, bytes32) public {
         callExternal(transactor);
     }
 
-    function verifyTransferBlock(uint32 blockNumber, uint256[8] memory proof) public 
-    {
+    function verifyTransferBlock(uint32, uint256[8] memory) public {
         callExternal(transactor);
     }
 
+    function exit() public payable {
+        callExternal(exitor);
+    }
 
-    function exit() public payable 
+    function cancelExit() public {
+        callExternal(exitor);
+    }
+
+    function startNextExitBatch() public {
+        callExternal(exitor);
+    }
+
+    function changeExitBatchFee(uint128) public {
+        callExternal(exitor);
+    }
+
+    function commitExitBlock(uint256, uint24[EXIT_BATCH_SIZE] memory, uint32, bytes memory, bytes32) public 
     {
         callExternal(exitor);
     }
 
-    function cancelExit() public
-    {
+    function verifyExitBlock(uint256, uint32, uint256[8] memory) public {
         callExternal(exitor);
     }
 
-    function startNextExitBatch() public 
-    {
-        callExternal(exitor);
-    }
-
-    function changeExitBatchFee(uint128 newBatchFee) public 
-    {
-        callExternal(exitor);
-    }
-
-    function commitExitBlock(
-        uint256 batchNumber,
-        uint24[EXIT_BATCH_SIZE] memory accoundIDs, 
-        uint32 blockNumber, 
-        bytes memory txDataPacked, 
-        bytes32 newRoot
-    ) public 
-    {
-        callExternal(exitor);
-    }
-
-    function verifyExitBlock(
-        uint256 batchNumber, 
-        uint32 blockNumber, 
-        uint256[8] memory proof
-    ) public 
-    {
-        callExternal(exitor);
-    }
-
-    function withdrawUserBalance(
-        uint256 iterationsLimit
-    ) public 
-    {
+    function withdrawUserBalance(uint256) public {
         callExternal(exitor);
     }
 

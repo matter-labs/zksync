@@ -1,15 +1,11 @@
-// This contract is generated programmatically
-
 pragma solidity ^0.4.24;
 
 // storage variable to later use in delegates chain.
 // Also defines all structures
-contract PlasmaStorage {
+contract FranklinStorage {
 
     // For tree depth 24
     bytes32 constant EMPTY_TREE_ROOT = 0x003f7e15e4de3453fe13e11fb4b007f1fce6a5b0f0353b3b8208910143aaa2f7;
-
-    // Plasma itself
 
     uint256 public constant DEADLINE = 3600;
 
@@ -108,10 +104,6 @@ contract PlasmaStorage {
 
     event LogDepositRequest(uint256 indexed batchNumber, uint24 indexed accountID, uint256 indexed publicKey, uint128 amount);
     event LogCancelDepositRequest(uint256 indexed batchNumber, uint24 indexed accountID);
-
-    // Transfers
-
-    uint256 public constant TRANSFER_BLOCK_SIZE = 128;
 
     // Exits 
 
