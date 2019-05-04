@@ -12,14 +12,7 @@ contract FranklinProxy is FranklinCommon {
         depositor = _depositor;
         transactor = _transactor;
         exitor = _exitor;
-    }
 
-    function x() public payable 
-        returns (bytes) 
-    {
-        callExternal(depositor);
-        //revert("hello");
-        //return "test";
     }
 
     function deposit(uint256[2] memory, uint128) public payable {
@@ -96,8 +89,8 @@ contract FranklinProxy is FranklinCommon {
             let retVal := delegatecall(sub(gas, 2000), callee, memoryPointer, calldatasize, newFreeMemoryPointer, 0x40)
             let retDataSize := returndatasize
             returndatacopy(newFreeMemoryPointer, 0, retDataSize)
-            //switch retVal case 0 { return(newFreeMemoryPointer, returndatasize) } default { return(newFreeMemoryPointer, retDataSize) }
-            return(newFreeMemoryPointer, retDataSize)
+            switch retVal case 0 { revert(newFreeMemoryPointer, returndatasize) } default { return(newFreeMemoryPointer, retDataSize) }
+            //return(newFreeMemoryPointer, retDataSize)
         }
     }
 }
