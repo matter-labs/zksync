@@ -1,0 +1,14 @@
+#!/bin/bash
+
+if [ -z "$1" ]
+then
+    echo "Usage: revert-reason <tx-hash>"
+    exit
+fi
+
+TX=$1
+SCRIPT=" tx = eth.getTransaction( \"$TX\" ); tx.data = tx.input; eth.call(tx, tx.blockNumber)"
+
+#docker-compose run --entrypoint=geth geth --exec "$SCRIPT" attach http://geth:8545
+geth --exec "$SCRIPT" attach http://localhost:8545
+
