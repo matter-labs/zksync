@@ -1,6 +1,7 @@
 #!/bin/bash
 
 . .setup_env
+. .confirm_action
 cd src/storage
 
 echo DATABASE_URL=$DATABASE_URL

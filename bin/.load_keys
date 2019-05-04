@@ -4,8 +4,6 @@ KEY_DIR=`pwd`/$KEY_DIR
 echo "Checking keys in $KEY_DIR/"
 mkdir -p $KEY_DIR
 
-echo "Checking keys in $KEY_DIR/"
-
 for i in $KEY_FILES; do
     if ! [ -f $KEY_DIR/$i ]; then
         echo "Downloading $SPACE_URL/$i to $KEY_DIR/"

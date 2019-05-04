@@ -2,7 +2,7 @@
 
 if [ -z $1 ]
 then
-    for i in `ls etc/env | grep -v .bak | grep -v example`; do
+    for i in `ls etc/env | grep -v .bak | grep -v example | grep -v current`; do
         ENV=${i%.*}
         if [ "$ENV" == "$FRANKLIN_ENV" ]
         then
