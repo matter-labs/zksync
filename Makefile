@@ -23,6 +23,13 @@ db-reset: confirm_action
 	@echo Resetting $(DATABASE_URL)
 	@diesel database reset
 
+db-drop: confirm_action
+	@cd src/storage
+	@echo DATABASE_URL=$DATABASE_URL
+	# this is used to clear the produciton db; cannot do `diesel database reset` because we don't own the db
+	@psql $DATABASE_URL -c 'DROP OWNED BY CURRENT_USER CASCADE'
+	@diesel migration run
+
 build-target:
 	$(rust-musl-builder) cargo build --release
 

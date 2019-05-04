@@ -1,13 +1,10 @@
 #!/bin/bash
 
-if [ -z $CONFIRMED ] && [ ! "$FRANKLIN_ENV" == "dev2" ]
+if [ ! "$FRANKLIN_ENV" == "dev2" ]
 then
     echo -n "Dangerous action. Type environment name ('$FRANKLIN_ENV') to confirm: "
     read CONFIRMED
-
     if [ ! "$FRANKLIN_ENV" == "$CONFIRMED" ]; then
         exit
     fi
-    
-    export CONFIRMED
 fi
