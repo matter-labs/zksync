@@ -12,7 +12,7 @@ Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 - Start the dev environment services:
 ```make dev-up```
 - Setup env config:
-```cp etc/env/local.env.example etc/env/local.env```
+```cp etc/env/dev.env.example etc/env/dev.env```
 - Create `plasma` database:
 ```db-setup```
 - Deploy contracts:
@@ -29,6 +29,16 @@ To reset the dev environment:
 - Remove mounted container data:
 ```rm -rf ./volumes```
 - Repeat the setup procedure above
+
+## Environments
+
+```
+# List
+franklin env
+
+# Switch
+franklin env <ENV_NAME>
+```
 
 ## Monitoring & management:
 
