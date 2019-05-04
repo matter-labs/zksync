@@ -66,8 +66,7 @@ contract FranklinProxy is FranklinCommon {
         callExternal(exitor);
     }
 
-    function commitExitBlock(uint256, uint24[EXIT_BATCH_SIZE] memory, uint32, bytes memory, bytes32) public 
-    {
+    function commitExitBlock(uint256, uint24[EXIT_BATCH_SIZE] memory, uint32, bytes memory, bytes32) public {
         callExternal(exitor);
     }
 
