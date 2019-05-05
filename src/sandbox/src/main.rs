@@ -6,6 +6,7 @@ extern crate serde;
 extern crate serde_derive;
 
 use persistent::Read;
+use iron::typemap::Key;
 use iron::status;
 use iron::prelude::*;
 
@@ -14,6 +15,13 @@ struct MyStructure {
     a: String,
     b: Option<String>,
 }
+
+#[derive(Copy, Clone, Debug)]
+pub struct State {
+    a: u32
+}
+impl Key for State { type Value = Self; }
+
 
 fn log_body(req: &mut Request) -> IronResult<Response> {
     let body = req.get::<bodyparser::Raw>();
@@ -37,6 +45,10 @@ fn log_body(req: &mut Request) -> IronResult<Response> {
         Err(err) => println!("Error: {:?}", err)
     }
 
+    let arc = req.get::<Read<State>>().unwrap();
+    let state = arc.as_ref();
+    println!("state = {:?}", state);
+
     Ok(Response::with(status::Ok))
 }
 
@@ -49,7 +61,10 @@ const MAX_BODY_LENGTH: usize = 1024 * 1024 * 10;
 // `curl -i "localhost:3000/" -H "application/json" -d '{"a":"jason","b":"2"}'`
 // `curl -i "localhost:3000/" -H "application/json" -d '{"a":"jason"}'`
 fn main() {
+
+    
     let mut chain = Chain::new(log_body);
     chain.link_before(Read::<bodyparser::MaxBodyLength>::one(MAX_BODY_LENGTH));
+    chain.link(Read::<State>::both(State{a: 5}));
     Iron::new(chain).http("localhost:3000").unwrap();
 }
