@@ -11,36 +11,53 @@ extern crate futures;
 
 use futures::{Future, Async, Poll};
 use tokio::prelude::*;
+use futures::task::{self, Task};
+use future::Shared;
 use tokio::timer::{self, Interval};
 use std::time::{Duration, Instant};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, Mutex};
 use std::collections::HashMap;
 
 #[derive(Default, Clone)]
 struct AsyncNonceMap{
-    nonces:     Arc<RwLock<HashMap<u32, u32>>>
+    nonces:     Arc<RwLock<HashMap<u32, u32>>>,
+    futures:    Arc<RwLock<HashMap<(u32, u32), Shared<NonceReadyFuture>>>>,
+    tasks:      Arc<RwLock<HashMap<(u32, u32), Task>>>,
+}
+
+impl AsyncNonceMap {
+    fn await(&self, account: u32, nonce: u32) -> Shared<NonceReadyFuture> {
+        let futures = &mut self.futures.as_ref().write().unwrap();
+        let key = (account, nonce);
+        futures.get(&key)
+        .map(|f| f.clone())
+        .unwrap_or_else( || {
+            let future = NonceReadyFuture{
+                account,
+                nonce,
+                nonce_map: self.clone(),
+            }.shared();
+            let r = future.clone();
+            futures.insert(key, future);
+            r
+        })
+    }
+
+    fn set(&mut self, account: u32, nonce: u32) {
+        let mut map = &mut self.nonces.as_ref().write().unwrap();
+        map.insert(account, nonce);
+        let tasks = &mut self.tasks.as_ref().write().unwrap();
+        let key = (account, nonce);
+        if let Some(task) = tasks.remove(&key) {
+            task.notify();
+        }
+    }
 }
 
 struct NonceReadyFuture{
     account:    u32,
     nonce:      u32,
     nonce_map:  AsyncNonceMap,
-}
-
-impl AsyncNonceMap {
-    fn await(&self, account: u32, nonce: u32) -> NonceReadyFuture {
-        NonceReadyFuture{
-            account,
-            nonce,
-            nonce_map: self.clone(),
-        }
-    }
-
-    fn set(&mut self, account: u32, nonce: u32) {
-        let mut map = &mut self.nonces.as_ref().write().unwrap();
-        map.insert(account, nonce);
-        // TODO: notify runtime
-    }
 }
 
 impl Future for NonceReadyFuture
@@ -54,6 +71,9 @@ impl Future for NonceReadyFuture
         if next == self.nonce {
             Ok(Async::Ready(()))
         } else {
+            let tasks = &mut self.nonce_map.tasks.as_ref().write().unwrap();
+            let key = (self.account, self.nonce);
+            tasks.insert(key, task::current());
             Ok(Async::NotReady)
         }
     }
@@ -78,12 +98,13 @@ fn main() {
     tokio::run(future::lazy(move || {
         tokio::spawn(task.map(|_| ()));
 
-        let task = nm.await(1, 2)
-            .timeout(Duration::from_millis(5000))
-            .map(|_| println!("success!"))
-            .or_else(|_| {println!("timout"); future::ok(())} );
-
-        tokio::spawn(task);
+        for i in 0..2 {
+            let task = nm.await(1, 2)
+                .timeout(Duration::from_millis(5000))
+                .map(|_| println!("success!"))
+                .or_else(|_| {println!("timout"); future::ok(())} );
+            tokio::spawn(task);
+        }
 
         future::ok(())
     }));
