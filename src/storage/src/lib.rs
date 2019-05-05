@@ -437,7 +437,7 @@ impl StorageProcessor {
         ")
     }
 
-    pub fn last_committed_state_for_account(&self, account_id: u32) -> QueryResult<Option<plasma::models::Account>> {
+    pub fn last_committed_state_for_account(&self, account_id: AccountId) -> QueryResult<Option<plasma::models::Account>> {
         let query = format!("
             SELECT account_id AS id, block_number AS last_block, data
             FROM account_updates WHERE account_id = {}
@@ -449,12 +449,21 @@ impl StorageProcessor {
         Ok( r.map(|acc: Account| serde_json::from_value(acc.data).unwrap()) )
     }
 
-    pub fn last_verified_state_for_account(&self, account_id: u32) -> QueryResult<Option<plasma::models::Account>> {
+    pub fn last_verified_state_for_account(&self, account_id: AccountId) -> QueryResult<Option<plasma::models::Account>> {
         use crate::schema::accounts::dsl::*;
         let mut r = accounts
             .filter(id.eq(account_id as i32))
             .load(self.conn())?;
         Ok( r.pop().map(|acc: Account| serde_json::from_value(acc.data).unwrap()) )
+    }
+
+    pub fn count_outstanding_proofs(&self, after_block: BlockNumber) -> QueryResult<u32> {
+        use crate::schema::account_updates::dsl::*;
+        let count: i64 = account_updates
+            .select(count_star())
+            .filter(block_number.gt(after_block as i32))
+            .first(self.conn())?;
+        Ok( count as u32 )
     }
 
     pub fn get_last_committed_block(&self) -> QueryResult<BlockNumber> {

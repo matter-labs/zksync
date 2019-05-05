@@ -247,10 +247,15 @@ fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpRes
     let mut storage = storage.unwrap();
     
     // TODO: properly handle failures
+    let last_committed = storage.get_last_committed_block().unwrap_or(0);
+    let last_verified = storage.get_last_verified_block().unwrap_or(0);
+    let outstanding_txs = storage.count_outstanding_proofs(last_verified).unwrap_or(0);
+
     let status = NetworkStatus{
-        next_block_at_max:  status.next_block_at_max,
-        last_committed:     storage.get_last_committed_block().unwrap_or(0),        
-        last_verified:      storage.get_last_verified_block().unwrap_or(0),
+        next_block_at_max: status.next_block_at_max,
+        last_committed,
+        last_verified,  
+        outstanding_txs,
     };
 
     Ok(HttpResponse::Ok().json(status))

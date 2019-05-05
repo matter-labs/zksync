@@ -54,10 +54,13 @@ impl PlasmaStateKeeper {
         // here we should insert default accounts into the tree
         let storage = pool.access_storage().expect("db connection failed for statekeeper");
         
-        let (last_block, accounts) = storage.load_committed_state().expect("db must be functional");
-        let state = PlasmaState::new(accounts, last_block + 1);
+        let (last_committed, accounts) = storage.load_committed_state().expect("db failed");
+        let last_verified = storage.get_last_verified_block().expect("db failed");
+        let state = PlasmaState::new(accounts, last_committed + 1);
+        //let outstanding_txs = storage.count_outstanding_proofs(last_verified).expect("db failed");
 
-        println!("Last committed block to before the start of state keeper = {}", last_block);
+        println!("last_committed = {}, last_verified = {}", last_committed, last_verified);
+
         // Keeper starts with the NEXT block
         let keeper = PlasmaStateKeeper {
             state,
@@ -84,6 +87,7 @@ impl PlasmaStateKeeper {
                         next_block_at_max: self.next_block_at_max.map(|t| t.duration_since(UNIX_EPOCH).unwrap().as_secs()),
                         last_committed: 0,
                         last_verified: 0,
+                        outstanding_txs: 0,
                     });
                     if r.is_err() {
                         println!("StateKeeperRequest::GetNetworkStatus: channel closed, sending failed");
