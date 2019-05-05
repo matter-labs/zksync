@@ -4,6 +4,13 @@ extern crate persistent;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+extern crate tokio;
+
+use tokio::prelude::*;
+use tokio::runtime::Runtime;
+use tokio::timer::Interval;
+
+use std::time::{Duration, Instant};
 
 use persistent::Read;
 use iron::typemap::Key;
@@ -62,7 +69,19 @@ const MAX_BODY_LENGTH: usize = 1024 * 1024 * 10;
 // `curl -i "localhost:3000/" -H "application/json" -d '{"a":"jason"}'`
 fn main() {
 
-    
+    let task = Interval::new(Instant::now(), Duration::from_millis(1000))
+    //.take(10)
+    .for_each(|instant| {
+        println!("fire; instant={:?}", instant);
+        Ok(())
+    })
+    .map_err(|e| panic!("interval errored; err={:?}", e));
+
+    // Create the runtime
+    let mut rt = Runtime::new().unwrap();
+    rt.spawn(task);
+    //tokio::run(task);
+
     let mut chain = Chain::new(log_body);
     chain.link_before(Read::<bodyparser::MaxBodyLength>::one(MAX_BODY_LENGTH));
     chain.link(Read::<State>::both(State{a: 5}));
