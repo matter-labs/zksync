@@ -10,8 +10,9 @@ lazy_static! {
 }
 
 pub struct RuntimeConfig {
-    pub transfer_batch_size: usize,
-    pub keys_path: String,
+    pub transfer_batch_size:    usize,
+    pub keys_path:              String,
+    pub max_outstanding_txs:    u32,
 }
 
 impl RuntimeConfig {
@@ -28,7 +29,10 @@ impl RuntimeConfig {
 
         Self {
             transfer_batch_size:    transfer_size,
-            keys_path:              keys_path
+            keys_path:              keys_path,
+            max_outstanding_txs:    std::env::var("MAX_OUTSTANDING_TXS").ok()
+                                    .and_then(|v| v.parse::<u32>().ok())
+                                    .expect("MAX_OUTSTANDING_TXS env var not set"),
         }
     }
 }

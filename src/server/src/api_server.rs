@@ -2,6 +2,7 @@
 
 use std::sync::mpsc;
 use plasma::models::{TransferTx, PublicKey, Account, Nonce};
+use models::config::RUNTIME_CONFIG;
 use super::models::{StateKeeperRequest, NetworkStatus, TransferTxConfirmation};
 use super::storage::{ConnectionPool, StorageProcessor};
 
@@ -344,6 +345,9 @@ pub fn start_api_server(
                 };
 
                 println!("status from db: {:?}", status);
+                let max_outstanding_txs = &RUNTIME_CONFIG.max_outstanding_txs;
+                println!("max_outstanding_txs: {}", max_outstanding_txs);
+
                 Delay::new(Instant::now() + Duration::from_millis(5000)).and_then(move |_| Ok(state))
             })
             .map(|_| ())
