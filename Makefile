@@ -12,23 +12,25 @@ export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
 rust-musl-builder = @docker run $(docker-options) -it ekidd/rust-musl-builder
 
-# Scripts (for shell autocomplete)
-env:
-
 confirm_action:
 	@bin/.confirm_action
 
+# Scripts (for shell autocomplete)
+env:
+
+deploy-contracts: confirm_action
+	@bin/deploy-contracts
+
 db-reset: confirm_action
-	@cd src/storage
 	@echo Resetting $(DATABASE_URL)
-	@diesel database reset
+	@cd src/storage; diesel database reset
+
+redeploy: deploy-contracts db-reset
 
 db-drop: confirm_action
-	@cd src/storage
-	@echo DATABASE_URL=$DATABASE_URL
 	# this is used to clear the produciton db; cannot do `diesel database reset` because we don't own the db
 	@psql $DATABASE_URL -c 'DROP OWNED BY CURRENT_USER CASCADE'
-	@diesel migration run
+	@src/storage; diesel migration run
 
 build-target:
 	$(rust-musl-builder) cargo build --release

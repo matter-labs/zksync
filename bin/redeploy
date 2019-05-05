@@ -1,7 +1,0 @@
-#!/bin/bash
-
-. .setup_env
-. .confirm_action
-echo redeploying
-. deploy-contracts
-. db-reset
