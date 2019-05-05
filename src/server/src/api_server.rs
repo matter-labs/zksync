@@ -20,9 +20,11 @@ use actix_web::{
 };
 
 use futures::Future;
-
 use std::env;
-use std::time::Instant;
+use tokio::prelude::*;
+use tokio::runtime::Runtime;
+use tokio::timer::{Interval, Delay};
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct TransactionRequest {
@@ -269,54 +271,89 @@ pub fn start_api_server(
     tx_for_state: mpsc::Sender<StateKeeperRequest>,
     connection_pool: ConnectionPool) 
 {
-    
     let address = env::var("BIND_TO").unwrap_or("127.0.0.1".to_string());
     let port = env::var("PORT").unwrap_or("8080".to_string());
     let contract_address = env::var("CONTRACT_ADDR").unwrap();
-
     ::std::env::set_var("RUST_LOG", "actix_web=info");
-    let sys = actix::System::new("api-server");
-    let server_config = format!("{}:{}", address, port);
+    std::thread::Builder::new().name("actix".to_string()).spawn(move || {
 
-    //move is necessary to give closure below ownership
-    server::new(move || {
-        App::with_state(
-            AppState {
-                tx_for_state: tx_for_state.clone(),
-                contract_address: contract_address.clone(),
-                connection_pool: connection_pool.clone(),
-            }.clone()
-        ) // <- create app with shared state
-        .middleware( middleware::Logger::default() )
-        .middleware(
-            Cors::build()
-                .send_wildcard()
-                .max_age(3600)
-                .finish()
-        )
-        .scope("/api/v0.1", |api_scope| {
-            api_scope
-            .resource("/testnet_config", |r| {
-                r.method(Method::GET).f(handle_get_testnet_config);
-            })
-            .resource("/status", |r| {
-                r.method(Method::GET).f(handle_get_network_status);
-            })
-            .resource("/submit_tx", |r| {
-                r.method(Method::POST).f(handle_submit_tx);
-            })
-            .resource("/account/{id}", |r| {
-                r.method(Method::GET).f(handle_get_account_state);
-            })
-            .resource("/account/{id}/transactions", |r| {
-                r.method(Method::GET).f(handle_get_account_transactions);
-            })
-        })
-    }).bind(&server_config)
-    .unwrap()
-    .shutdown_timeout(1)
-    .start();
+        let sys = actix::System::new("api-server");
+        let server_config = format!("{}:{}", address, port);
 
-    println!("Started http server: {}", server_config);
-    //sys.run();
+        let state = AppState {
+            tx_for_state: tx_for_state.clone(),
+            contract_address: contract_address.clone(),
+            connection_pool: connection_pool.clone(),
+        };
+        let state2 = std::sync::Arc::new(state.clone());
+
+        //move is necessary to give closure below ownership
+        server::new(move || {
+            App::with_state(state.clone()) // <- create app with shared state
+            .middleware( middleware::Logger::default() )
+            .middleware(
+                Cors::build()
+                    .send_wildcard()
+                    .max_age(3600)
+                    .finish()
+            )
+            .scope("/api/v0.1", |api_scope| {
+                api_scope
+                .resource("/testnet_config", |r| {
+                    r.method(Method::GET).f(handle_get_testnet_config);
+                })
+                .resource("/status", |r| {
+                    r.method(Method::GET).f(handle_get_network_status);
+                })
+                .resource("/submit_tx", |r| {
+                    r.method(Method::POST).f(handle_submit_tx);
+                })
+                .resource("/account/{id}", |r| {
+                    r.method(Method::GET).f(handle_get_account_state);
+                })
+                .resource("/account/{id}/transactions", |r| {
+                    r.method(Method::GET).f(handle_get_account_transactions);
+                })
+            })
+        }).bind(&server_config)
+        .unwrap()
+        .shutdown_timeout(1)
+        .start();
+
+        let state_checker = Interval::new(Instant::now(), Duration::from_millis(1000))
+            .fold(state2, |mut state, instant| {
+                let state = state.clone();
+                let pool = state.connection_pool.clone();
+
+                let storage = pool.access_storage();
+                if storage.is_err() {
+                    panic!("oops");
+                }
+                let mut storage = storage.unwrap();
+                
+                // TODO: properly handle failures
+                let last_committed = storage.get_last_committed_block().unwrap_or(0);
+                let last_verified = storage.get_last_verified_block().unwrap_or(0);
+                let outstanding_txs = storage.count_outstanding_proofs(last_verified).unwrap_or(0);
+
+                let status = NetworkStatus{
+                    next_block_at_max: None,
+                    last_committed,
+                    last_verified,  
+                    outstanding_txs,
+                };
+
+                println!("status from db: {:?}", status);
+                Delay::new(Instant::now() + Duration::from_millis(5000)).and_then(move |_| Ok(state))
+            })
+            .map(|_| ())
+            .map_err(|e| panic!("interval errored; err={:?}", e));
+
+        println!("Started http server: {}", server_config);
+        actix::System::with_current( |_| {
+            actix::spawn(state_checker);
+        });
+
+        sys.run();
+    });
 }
