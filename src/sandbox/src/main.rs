@@ -37,6 +37,8 @@ impl AsyncNonceMap {
     }
 
     fn set(&mut self, account: u32, nonce: u32) {
+        let mut map = &mut self.nonces.as_ref().write().unwrap();
+        map.insert(account, nonce);
         // TODO: notify runtime
     }
 }
@@ -47,8 +49,13 @@ impl Future for NonceReadyFuture
     type Error = ();
 
     fn poll(&mut self) -> Poll<(), Self::Error> {
-        // TODO: if nonce equals, return Async::Ready(())
-        Ok(Async::NotReady)
+        let map = &self.nonce_map.nonces.as_ref().read().unwrap();
+        let next = *map.get(&self.account).unwrap_or(&0);
+        if next == self.nonce {
+            Ok(Async::Ready(()))
+        } else {
+            Ok(Async::NotReady)
+        }
     }
 }
 
