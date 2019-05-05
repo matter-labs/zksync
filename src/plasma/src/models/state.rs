@@ -54,17 +54,17 @@ impl PlasmaState {
             transacted_amount += &tx.amount;
             transacted_amount += &tx.fee;
 
-            if from.balance < transacted_amount { 
-                println!("Insufficient balance");
-                return Err(TransferApplicationError::InsufficientBalance); 
-            }
-
             if tx.nonce > from.nonce { 
                 println!("Nonce is too high");
                 return Err(TransferApplicationError::NonceIsTooHigh); 
             } else if tx.nonce < from.nonce {
                 println!("Nonce is too low");
                 return Err(TransferApplicationError::NonceIsTooLow); 
+            }
+
+            if from.balance < transacted_amount { 
+                println!("Insufficient balance");
+                return Err(TransferApplicationError::InsufficientBalance); 
             }
 
             if tx.good_until_block < self.block_number {

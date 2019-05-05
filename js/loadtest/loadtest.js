@@ -40,7 +40,7 @@ class Client {
     }
 
     async prepare() {
-        let signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/2/" + this.id)
+        let signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/3/" + this.id)
         this.fra = await franklin.Wallet.fromSigner(signer)
         this.eth = this.fra.ethWallet
         console.log(`${this.eth.address}: prepare`)
@@ -128,8 +128,11 @@ class Client {
 
 async function test() {
 
+    let sourceBalanceBefore = await source.getBalance()
     sourceNonce = await source.getTransactionCount("pending")
     gasPrice = await provider.getGasPrice()
+
+    console.log(`Current gas price: ${gasPrice.div(1000000000).toNumber()} GWEI`)
     transferPrice = gasPrice.mul(DEPOSIT_GAS_LIMIT)
 
     console.log('creating clients...')
@@ -145,6 +148,9 @@ async function test() {
 
     // console.log('waiting until the clients are ready...')
     await Promise.all(promises)
+
+    let sourceBalanceAfter = await source.getBalance()
+    console.log('Total spent: ', format(sourceBalanceAfter.sub(sourceBalanceBefore)))
 
     console.log('xx: starting the test...')
     while(true) {
