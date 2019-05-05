@@ -36,7 +36,7 @@ impl AsyncNonceMap {
         }
     }
 
-    fn set(account: u32, nonce: u32) {
+    fn set(&mut self, account: u32, nonce: u32) {
         // TODO: notify runtime
     }
 }
@@ -44,7 +44,7 @@ impl AsyncNonceMap {
 impl Future for NonceReadyFuture
 {
     type Item = ();
-    type Error = timer::Error;
+    type Error = ();
 
     fn poll(&mut self) -> Poll<(), Self::Error> {
         // TODO: if nonce equals, return Async::Ready(())
@@ -55,11 +55,29 @@ impl Future for NonceReadyFuture
 fn main() {
     let nm = AsyncNonceMap::default();
     let task = Interval::new(Instant::now(), Duration::from_millis(1000))
-    .fold((0, nm), |acc, _| {
-        let (i, nm) = acc;
+    .fold((0, nm.clone()), |acc, _| {
+        let (i, mut nm) = acc;
         println!("i = {}", i);
-        Ok((i + 1, nm))
+
+        if i == 3 {
+            nm.set(1, 2);
+        }
+
+        let next = (i + 1, nm);
+        future::ok(next)
     })
     .map_err(|e| panic!("err={:?}", e));
-    tokio::run(task.map(|_| ()));
+
+    tokio::run(future::lazy(move || {
+        tokio::spawn(task.map(|_| ()));
+
+        let task = nm.await(1, 2)
+            .timeout(Duration::from_millis(5000))
+            .map(|_| println!("success!"))
+            .or_else(|_| {println!("timout"); future::ok(())} );
+
+        tokio::spawn(task);
+
+        future::ok(())
+    }));
 }
