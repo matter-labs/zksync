@@ -6,13 +6,18 @@ const provider = new ethers.providers.JsonRpcProvider()
 const franklin = new Franklin(process.env.API_SERVER, provider, process.env.CONTRACT_ADDR)
 const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms))
 
-let source = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/0").connect(provider)
-let sourceNonce = null
+const bn = ethers.utils.bigNumberify
+const format = ethers.utils.formatEther
 
-const TX_FEE = ethers.utils.parseEther('0.2')
+let source = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/0").connect(provider)
+
+const DEPOSIT_GAS_LIMIT = bn(100000)
 const MIN_AMOUNT_FRA = ethers.utils.parseEther('0.01')
-const TO_DEPOSIT = MIN_AMOUNT_FRA // MIN_AMOUNT_FRA.add(TX_FEE)
-const TO_FUND = ethers.utils.parseEther('1') //TO_DEPOSIT.add(TX_FEE)
+
+// to populate from promises
+let sourceNonce = null
+let gasPrice = null
+let transferPrice = null
 
 let nClients = process.env.LOADTEST_N_CLIENTS
 let tps = process.env.LOADTEST_TPS
@@ -27,9 +32,6 @@ function randomClient() {
     return clients[ i ]
 }
 
-console.log(`Usage: yarn test -- [nClients] [TPS]`)
-console.log(`Starting loadtest for ${nClients} with ${tps} TPS`)
-
 class Client {
 
     constructor(id) {
@@ -38,35 +40,38 @@ class Client {
     }
 
     async prepare() {
-        let signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/1/" + this.id)
+        let signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/2/" + this.id)
         this.fra = await franklin.Wallet.fromSigner(signer)
         this.eth = this.fra.ethWallet
         console.log(`${this.eth.address}: prepare`)
         
         try {
-            let fundingRequired = false
+            let toAddFranklin = bn(0)
             await this.fra.pullState()
             if (this.fra.sidechainOpen) {
                 let balance = this.fra.currentBalance
-                console.log(`${this.eth.address}: sidechain account ${this.fra.sidechainAccountId}, current balance ${ethers.utils.formatEther(balance)}`)
-                fundingRequired = balance.lt(MIN_AMOUNT_FRA)
+                console.log(`${this.eth.address}: sidechain account ${this.fra.sidechainAccountId}, `,
+                    `current balance ${format(balance)}`)
+                if (balance.lt(MIN_AMOUNT_FRA)) toAddFranklin = MIN_AMOUNT_FRA.sub(balance)
             } else {
                 console.log(`${this.eth.address}: sidechain account not open, deposit required`)
-                fundingRequired = true
+                toAddFranklin = MIN_AMOUNT_FRA
             }
 
-            if (fundingRequired) {
-                console.log(`${this.eth.address}: Franklin funding required`)
+            if ( toAddFranklin.gt(0) ) {
+                console.log(`${this.eth.address}: adding ${format(toAddFranklin)} to Franklin`)
 
                 // is wallet balance enough?
                 let balance = await this.eth.getBalance()
-                console.log(`${this.eth.address}: eth wallet balance is ${ethers.utils.formatEther(balance)} ETH`)
-                if (balance.lt(TO_DEPOSIT.add(TX_FEE))) {
-                    console.log(`${this.eth.address}: wallet funding required`)
+                console.log(`${this.eth.address}: eth wallet balance is ${format(balance)} ETH`)
+                let minBalance = MIN_AMOUNT_FRA.add(transferPrice.mul(2))
+                if (balance.lt(minBalance)) {
+                    let toAdd = minBalance.sub(balance)
+                    console.log(`${this.eth.address}: adding ${format(toAdd)} to eth wallet`)
                     // transfer funds from source account
                     let request = await source.sendTransaction({
                         to:     this.eth.address,
-                        value:  TO_FUND,
+                        value:  toAdd,
                         nonce:  sourceNonce++,
                     })
                     console.log(`${this.eth.address}: funding tx sent`)
@@ -75,12 +80,12 @@ class Client {
                 }
 
                 // deposit funds into franklin
-                console.log(`${this.eth.address}: depositing ${ethers.utils.formatEther(TO_DEPOSIT)} ETH into Franklin`)
-                let request = await this.fra.deposit(TO_DEPOSIT)
+                console.log(`${this.eth.address}: depositing ${format(MIN_AMOUNT_FRA)} ETH into Franklin`)
+                let request = await this.fra.deposit(MIN_AMOUNT_FRA)
                 console.log(`${this.eth.address}: deposit tx sent`)
                 let receipt = await request.wait()
                 console.log(`${this.eth.address}: deposit tx mined, waiting for zk proof`)
-                while (!this.fra.sidechainOpen || this.fra.currentBalance.lt(TO_DEPOSIT)) {
+                while (!this.fra.sidechainOpen || this.fra.currentBalance.lt(MIN_AMOUNT_FRA)) {
                     await sleep(500)
                     await this.fra.pullState()
                 }
@@ -124,6 +129,8 @@ class Client {
 async function test() {
 
     sourceNonce = await source.getTransactionCount("pending")
+    gasPrice = await provider.getGasPrice()
+    transferPrice = gasPrice.mul(DEPOSIT_GAS_LIMIT)
 
     console.log('creating clients...')
     for (let i=0; i < nClients; i++) {

@@ -12,8 +12,8 @@ export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
 rust-musl-builder = @docker run $(docker-options) -it ekidd/rust-musl-builder
 
+# Scripts (for shell autocomplete)
 env:
-	bin/env
 
 confirm_action:
 	@bin/.confirm_action
@@ -83,3 +83,8 @@ blockscout-up:
 
 blockscout-down:
 	@docker-compose stop blockscout blockscout_postgres
+
+# Loadtest
+
+run-loadtest:
+	cd js/loadtest; yarn test

@@ -2,7 +2,7 @@ version: '3.2'
 services:
   server:
     image: "gluk64/franklin:server"
-    env_file: etc/env/local.env
+    env_file: $ENV_FILE
     environment:
       - DATABASE_URL=postgres://postgres@postgres/plasma
       - WEB3_URL=http://geth:8545
@@ -10,7 +10,7 @@ services:
       - "3000:3000"
   prover:
     image: "gluk64/franklin:prover"
-    env_file: etc/env/local.env
+    env_file: $ENV_FILE
     environment:
       - PROVER_DATABASE_URL=postgres://postgres@postgres/plasma
     volumes:

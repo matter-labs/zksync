@@ -133,9 +133,9 @@ class Franklin {
         
         if (typeof contractAddress !== 'string' || contractAddress.length < 4) throw 'Invalid contract address: ' + contractAddress
         if (!contractAddress.startsWith('0x')) contractAddress = '0x' + contractAddress
-        console.log('contractAddress', contractAddress)
+        //console.log('contractAddress', contractAddress)
         this.eth.contract = new ethers.Contract(contractAddress, PlasmaContractABI, provider)
-        console.log(`Franklin client created for ${serverUrl}`)
+        //console.log(`Franklin client created for ${serverUrl}`)
     }
 
     _parseStateResult(data) {
