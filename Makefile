@@ -18,6 +18,9 @@ confirm_action:
 # Scripts (for shell autocomplete)
 env:
 
+sandbox:
+	@cd src/sandbox; cargo run
+
 deploy-contracts: confirm_action
 	@bin/deploy-contracts
 
