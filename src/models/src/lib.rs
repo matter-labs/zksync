@@ -22,7 +22,7 @@ pub struct TransferTxConfirmation {
 
 pub type TransferTxResult = Result<TransferTxConfirmation, TransferApplicationError>;
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkStatus {
     pub next_block_at_max:  Option<u64>,
     pub last_committed:     BlockNumber,
