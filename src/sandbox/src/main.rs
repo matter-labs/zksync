@@ -57,7 +57,6 @@ impl NonceFutures {
             data.nonces.insert(account, nonce);
         }
         let next_nonce = record.unwrap_or(0);
-        //println!("nonce = {}, next_nonce = {}", nonce, next_nonce);
 
         // return immediate result if it can be deducted now
         if next_nonce > nonce {
@@ -105,10 +104,8 @@ impl NonceFutures {
 
         // notify all tasks which are waiting
         for nonce in old_nonce ..= new_nonce {
-            println!("notify {}?", nonce);
             let key = (account, nonce);
             if let Some(task) = data.tasks.remove(&key) {
-                println!("yes");
                 task.notify();
                 data.futures.remove(&key);
             }
@@ -131,7 +128,6 @@ impl Future for NonceReadyFuture{
         let data = &mut self.futures.0.as_ref().write().unwrap();
 
         let next = *data.nonces.get(&self.account).unwrap_or(&0);
-        //println!("poll next = {}, self.nonce = {}", next, self.nonce);
 
         if next > self.nonce {
             Err(CurrentNonceIsHigher)
@@ -167,7 +163,7 @@ fn main() {
 
         for i in 0..=4 {
             let task = nm.await(1, i)
-                .timeout(Duration::from_millis(3000))
+                .timeout(Duration::from_millis(5000))
                 .map(|_| println!("success!"))
                 .or_else(|e| {println!("error: {:?}", e); future::ok(())} );
             tokio::spawn(task);
