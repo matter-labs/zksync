@@ -1,13 +1,5 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
-use std::sync::mpsc;
-use plasma::models::{TransferTx, PublicKey, Account, Nonce};
-use models::config::RUNTIME_CONFIG;
-use super::models::{StateKeeperRequest, NetworkStatus, TransferTxConfirmation};
-use super::storage::{ConnectionPool, StorageProcessor};
-
-use super::nonce_futures::{NonceFutures, NonceReadyFuture};
-
 use actix_web::{
     middleware, 
     server, 
@@ -22,12 +14,20 @@ use actix_web::{
     http::StatusCode,
 };
 
+use std::sync::mpsc;
+use plasma::models::{TransferTx, PublicKey, Account, Nonce};
+use models::config::RUNTIME_CONFIG;
+use super::models::{StateKeeperRequest, NetworkStatus, TransferTxConfirmation};
+use super::storage::{ConnectionPool, StorageProcessor};
+use super::nonce_futures::{NonceFutures, NonceReadyFuture};
+
 use futures::Future;
 use std::env;
 use tokio::prelude::*;
 use tokio::runtime::Runtime;
 use tokio::timer::{Interval, Delay};
 use std::time::{Duration, Instant};
+use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct TransactionRequest {
@@ -60,13 +60,17 @@ struct AccountDetailsResponse {
     committed:      Option<Account>,
 }
 
-// singleton to keep info about channels required for Http server
+#[derive(Default, Clone)]
+struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
+
+/// AppState is a collection of records cloned by each thread to shara data between them
 #[derive(Clone)]
 pub struct AppState {
     tx_for_state:       mpsc::Sender<StateKeeperRequest>,
     contract_address:   String,
     connection_pool:    ConnectionPool,
     nonce_futures:      NonceFutures,
+    network_status:     SharedNetworkStatus,
 }
 
 const TIMEOUT: u64 = 500;
@@ -309,7 +313,7 @@ fn start_server(state: AppState, bind_to: String) {
 pub fn start_status_interval(state: AppState) {
     let state_checker = Interval::new(Instant::now(), Duration::from_millis(1000))
     .fold(state.clone(), |mut state, instant| {
-        let state = state.clone();
+        //let state = state.clone();
         let pool = state.connection_pool.clone();
 
         let storage = pool.access_storage();
@@ -331,10 +335,13 @@ pub fn start_status_interval(state: AppState) {
         };
 
         println!("status from db: {:?}", status);
-        let max_outstanding_txs = &RUNTIME_CONFIG.max_outstanding_txs;
-        println!("max_outstanding_txs: {}", max_outstanding_txs);
+        //let record = { state.network_status.0.as_ref() };
 
-        Delay::new(Instant::now() + Duration::from_millis(5000)).and_then(move |_| Ok(state))
+        //let max_outstanding_txs = &RUNTIME_CONFIG.max_outstanding_txs;
+        //println!("max_outstanding_txs: {}", max_outstanding_txs);
+
+        //Delay::new(Instant::now() + Duration::from_millis(5000)).and_then(move |_| Ok(state))
+        Ok(state)
     })
     .map(|_| ())
     .map_err(|e| panic!("interval errored; err={:?}", e));
@@ -362,6 +369,7 @@ pub fn start_api_server(
             contract_address:   env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR env missing"),
             connection_pool:    connection_pool.clone(),
             nonce_futures:      NonceFutures::default(),
+            network_status:     SharedNetworkStatus::default(),
         };
 
         start_server(state.clone(), bind_to.clone());

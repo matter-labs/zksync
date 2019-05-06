@@ -22,14 +22,13 @@ pub struct TransferTxConfirmation {
 
 pub type TransferTxResult = Result<TransferTxConfirmation, TransferApplicationError>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct NetworkStatus {
-    pub next_block_at_max: Option<u64>,
-    pub last_committed:     u32,
-    pub last_verified:      u32,
+    pub next_block_at_max:  Option<u64>,
+    pub last_committed:     BlockNumber,
+    pub last_verified:      BlockNumber,
     pub outstanding_txs:    u32,
 }
-
 
 pub type EncodedProof = [U256; 8];
 
