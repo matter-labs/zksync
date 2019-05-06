@@ -31,7 +31,8 @@ class FranklinWallet {
         this.sidechainAccountId = await this.eth.contract.ethereumAddressToAccountID(this.ethAddress)
         this.sidechainState = this.sidechainAccountId > 0 ?
             await this.fra.pullSidechainState(this.sidechainAccountId) : null
-        if (this.sidechainState && this.sidechainState.current && this.sidechainState.current.nonce > this.nextNonce) {
+        //console.log(this.sidechainState.current.nonce, this.nextNonce)
+        if (this.sidechainState && this.sidechainState.current) { // && this.sidechainState.current.nonce !== this.nextNonce) {
             this.nextNonce = this.sidechainState.current.nonce
         }
     }
@@ -94,12 +95,14 @@ class FranklinWallet {
             url:        this.fra.baseUrl + '/submit_tx',
             data:       apiForm
         });
-        await new Promise(resolve => setTimeout(resolve, 500))
-        await this.pullState(false)
-        let error = result.data && result.data.error
-        if (error === 'CurrentNonceIsHigher' && this.sidechainState.current.nonce < nonce) {
-            this.nextNonce = this.sidechainState.current.nonce
-        }
+        //await new Promise(resolve => setTimeout(resolve, 500))
+        // let error = result.data && result.data.error
+        // if (error) {
+        //     await this.pullState(false)
+        //     if (this.sidechainState.current.nonce < nonce) {
+        //         this.nextNonce = this.sidechainState.current.nonce
+        //     }
+        // }
         return result.data
     }
     

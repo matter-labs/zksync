@@ -12,7 +12,7 @@ const format = ethers.utils.formatEther
 let source = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/0").connect(provider)
 
 const DEPOSIT_GAS_LIMIT = bn(100000)
-const MIN_AMOUNT_FRA = ethers.utils.parseEther('0.01')
+const MIN_AMOUNT_FRA = ethers.utils.parseEther(process.env.LOADTEST_MIN_AMOUNT)
 
 // to populate from promises
 let sourceNonce = null
@@ -108,7 +108,12 @@ class Client {
                 break
             }
         }
-        let balance_int = this.fra.currentBalance.div('1000000000000').div(2).toNumber()
+        let balance_int = this.fra.currentBalance.div('1000000000000').div(10).toNumber()
+        if (balance_int < 12) {
+            console.log('skip tx')
+            return
+        }
+
         let round_amount = rng.nextInt(11, balance_int - 1)
         let amount = 
             ethers.utils.bigNumberify(round_amount)
@@ -118,7 +123,7 @@ class Client {
         //console.log(`${this.eth.address}: transfer ${round_amount} from ${fromAccountId} to ${toAccountId}...`);
 
         let transferData = `transfer ${round_amount} from ${fromAccountId} to ${toAccountId} nonce ${this.fra.nextNonce}`;
-        console.log(`${this.eth.address}: ${transferData} requesting...`)
+        //console.log(`${this.eth.address}: ${transferData} requesting...`)
         let r = await this.fra.transfer(toAccountId, amount)
         if (r.accepted) {
             console.log(`${this.eth.address}: ${transferData} ok`)
@@ -156,13 +161,23 @@ async function test() {
 
     console.log('xx: starting the test...')
     while(true) {
-        var nextTick = new Date(new Date().getTime() + 1000);
+        let nextTick = new Date(new Date().getTime() + 1000)
+        let promises = []
         for (let i=0; i<tps; i++) {
             let client = randomClient()
-            client.randomTransfer()
-            await new Promise(resolve => setTimeout(resolve, 20))
+            promises.push(client.randomTransfer())
+            //await new Promise(resolve => setTimeout(resolve, 20))
         }
+        await Promise.all(promises)
         console.log('-')
+
+        promises = []
+        for (let i=0; i < nClients; i++) {
+            promises.push(clients[i].fra.pullState())
+        }
+        await Promise.all(promises)
+
+        console.log('--')
         while(nextTick > new Date()) {
             await new Promise(resolve => setTimeout(resolve, 1))
         }

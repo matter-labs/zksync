@@ -80,6 +80,7 @@ pub struct AppState {
 }
 
 const TIMEOUT: u64 = 500;
+const NONCE_ORDER_TIMEOUT: u64 = 800;
 
 fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let tx_for_state = req.state().tx_for_state.clone();
@@ -116,19 +117,25 @@ fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
     })
     .and_then(move |(tx, account, tx_for_state)| {
 
+        //println!("account {}: nonce {} received", tx.from, tx.nonce);
+
         // Wait for nonce
 
         let future = 
             if account.nonce == tx.nonce {
                 nonce_futures.ready(tx.from, tx.nonce)
             } else {
+                //println!("account {}: waiting for nonce {}", tx.from, tx.nonce);
                 nonce_futures.await(tx.from, tx.nonce)
             };
         future
+        .timeout(Duration::from_millis(NONCE_ORDER_TIMEOUT))
         .map(|_| (tx, account, nonce_futures, tx_for_state))
         .or_else(|e| future::err(format!("Nonce error: {:?}", e)))
     })
     .and_then(move |(mut tx, account, mut nonce_futures, tx_for_state)| {
+
+        //println!("account {}: nonce {} ready", tx.from, tx.nonce);
 
         // Verify signature
 
