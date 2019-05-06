@@ -68,16 +68,18 @@ struct NonceReadyFuture{
     futures:    NonceFutures,
 }
 
+struct CurrentNonceIsHigher;
+
 impl Future for NonceReadyFuture{
     type Item = ();
-    type Error = ();
+    type Error = CurrentNonceIsHigher;
 
     fn poll(&mut self) -> Poll<(), Self::Error> {
         let data = &mut self.futures.0.as_ref().write().unwrap();
         let key = (self.account, self.nonce);
         let next = *data.nonces.get(&self.account).unwrap_or(&0);
         if next > self.nonce {
-            Err(()) // TODO: add type?
+            Err(CurrentNonceIsHigher) // TODO: add type?
         } else if next == self.nonce {
             Ok(Async::Ready(()))
         } else {
