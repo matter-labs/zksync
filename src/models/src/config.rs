@@ -17,14 +17,8 @@ pub struct RuntimeConfig {
 
 impl RuntimeConfig {
     fn new() -> Self {
-        let mut transfer_size = TRANSFER_BATCH_SIZE;
-        {
-            let transfer_batch_size_env = std::env::var("TRANSFER_BATCH_SIZE");
-            if transfer_batch_size_env.is_ok() {
-                transfer_size = usize::from_str_radix(&(transfer_batch_size_env.unwrap()), 10).ok().unwrap_or(TRANSFER_BATCH_SIZE);
-            }
-        }
-
+        let transfer_batch_size_env = std::env::var("TRANSFER_BATCH_SIZE").expect("TRANSFER_BATCH_SIZE env missing");
+        let transfer_size = usize::from_str_radix(&(transfer_batch_size_env), 10).ok().expect("TRANSFER_BATCH_SIZE invalid");
         let keys_path = std::env::var("KEY_DIR").ok().unwrap_or(DEFAULT_KEYS_PATH.to_string());
 
         Self {
