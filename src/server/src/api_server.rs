@@ -63,6 +63,12 @@ struct AccountDetailsResponse {
 #[derive(Default, Clone)]
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
 
+impl SharedNetworkStatus {
+    fn read(&self) -> NetworkStatus {
+        ( *self.0.as_ref().read().unwrap() ).clone()
+    }
+}
+
 /// AppState is a collection of records cloned by each thread to shara data between them
 #[derive(Clone)]
 pub struct AppState {
@@ -77,104 +83,76 @@ const TIMEOUT: u64 = 500;
 
 fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let tx_for_state = req.state().tx_for_state.clone();
+    let network_status = req.state().network_status.read();
+
     req.json()
-        .from_err() // convert all errors into `Error`
-        .and_then(move |tx: TransferTx| {
-            //println!("New incoming transaction: {:?}", &tx);
+    //.from_err() // convert all errors into `Error`
+    .map_err(|e| format!("{}", e))
+    .and_then(move |mut tx: TransferTx| {
 
-            if let Err(error) = tx.validate() {
-                println!("Transaction itself is invalid: {}", error);
-                let resp = TransactionResponse{
-                    accepted:       false,
-                    error:          Some(error),
-                    confirmation:   None,
-                };
-                return Ok(HttpResponse::Ok().json(resp));
-            }
+        // Rate limit check
 
-            // TODO: the code below will block the current thread; switch to futures instead
-            let (key_tx, key_rx) = mpsc::channel();
-            let request = StateKeeperRequest::GetAccount(tx.from, key_tx);
-            tx_for_state.send(request).expect("must send a new transaction to queue");
-            // now wait for state_keeper to return a result
-            let r = key_rx.recv_timeout(std::time::Duration::from_millis(TIMEOUT));
-            if r.is_err() {
-                let resp = TransactionResponse{
-                    accepted:       false,
-                    error:          Some("timeout".to_owned()),
-                    confirmation:   None,
-                };
-                return Ok(HttpResponse::Ok().json(resp));
-            }
+        // TODO: check lazy init
+        if network_status.outstanding_txs > RUNTIME_CONFIG.max_outstanding_txs {
+            return Err(format!("Rate limit exceeded"));
+        }
 
-            let account = r.unwrap();
-            let pub_key: Option<PublicKey> = account.and_then( |a| a.get_pub_key() );
-            if let None = &pub_key {
-                println!("Not public key!");
-                let resp = TransactionResponse{
-                    accepted:       false,
-                    error:          Some("pubkey expired".to_owned()),
-                    confirmation:   None,
-                };
-                return Ok(HttpResponse::Ok().json(resp));
-            }
+        // Validate tx input
 
-            let pub_key = pub_key.unwrap();
-            let verified = tx.verify_sig(&pub_key);
-            if !verified {
-                let (x, y) = pub_key.0.into_xy();
-                println!("Got public key: {:?}, {:?}", x, y);
-                println!("Signature is invalid: (x,y,s) = ({:?},{:?},{:?})", &tx.signature.r_x, &tx.signature.r_y, &tx.signature.s);
-                let resp = TransactionResponse{
-                    accepted:       false,
-                    error:          Some("invalid signature".to_owned()),
-                    confirmation:   None,
-                };
-                return Ok(HttpResponse::Ok().json(resp));
-            }
+        tx.validate()?;
 
-            //println!("Signature is valid");
-            let mut tx = tx.clone();
-            let (add_tx, add_rx) = mpsc::channel();
-            tx.cached_pub_key = Some(pub_key);
+        // Fetch account
 
-            tx_for_state.send(StateKeeperRequest::AddTransferTx(tx, add_tx)).expect("must send transaction to sate keeper from rest api");
+        // TODO: the code below will block the current thread; switch to futures instead
+        let (key_tx, key_rx) = mpsc::channel();
+        let request = StateKeeperRequest::GetAccount(tx.from, key_tx);
+        tx_for_state.send(request).expect("must send a new transaction to queue");
+        let account = key_rx.recv_timeout(std::time::Duration::from_millis(TIMEOUT))
+            .map_err(|_|format!("Internal error: timeout on GetAccount"))?;
 
-            // TODO: reconsider timeouts
-            let send_result = add_rx.recv_timeout(std::time::Duration::from_millis(500));
-            match send_result {
-                Ok(result) => match result {
-                    Ok(confirmation) => {
-                        //println!("Transaction was accepted");
-                        let resp = TransactionResponse{
-                            accepted:       true,
-                            error:          None,
-                            confirmation:   Some(confirmation),
-                        };
-                        Ok(HttpResponse::Ok().json(resp))
-                    },
-                    Err(error) => {
-                        println!("State keeper rejected the transaction");
-                        let resp = TransactionResponse{
-                            accepted:       false,
-                            error:          Some(format!("{:?}", error)),
-                            confirmation:   None,
-                        };
-                        Ok(HttpResponse::Ok().json(resp))
-                    },
-                },
-                Err(_) => {
-                    println!("Did not get a result from the state keeper");
-                    let resp = TransactionResponse{
-                        accepted:       false,
-                        error:          Some("result timeout".to_owned()),
-                        confirmation:   None,
-                    };
-                    Ok(HttpResponse::Ok().json(resp))
-                }
-            }
-        })
-        .responder()
+        // Verify signature
+
+        let pub_key: PublicKey = account.and_then(|a| a.get_pub_key()).ok_or(format!("Pubkey expired"))?;
+        let verified = tx.verify_sig(&pub_key);
+        if !verified {
+            let (x, y) = pub_key.0.into_xy();
+            println!("Got public key: {:?}, {:?}", x, y);
+            println!("Signature is invalid: (x,y,s) = ({:?},{:?},{:?})", &tx.signature.r_x, &tx.signature.r_y, &tx.signature.s);
+            return Err(format!("Invalid signature"));
+        }
+
+        // Cache public key we just verified against (to skip verifying again in state keeper)
+
+        tx.cached_pub_key = Some(pub_key);
+
+        // Apply tx
+
+        let (add_tx, add_rx) = mpsc::channel();
+        tx_for_state.send(StateKeeperRequest::AddTransferTx(tx, add_tx)).expect("sending to sate keeper failed");
+        // TODO: reconsider timeouts
+        let confirmation = add_rx.recv_timeout(std::time::Duration::from_millis(500))
+            .map_err(|_|format!("Internal error: timeout on AddTransferTx"))?
+            .map_err(|e|format!("Tx rejected: {:?}", e))?;
+
+        // Return response
+
+        let resp = TransactionResponse{
+            accepted:       true,
+            error:          None,
+            confirmation:   Some(confirmation),
+        };
+        Ok(HttpResponse::Ok().json(resp))
+
+    })
+    .or_else(|err: String| {
+        let resp = TransactionResponse{
+            accepted:       false,
+            error:          Some(err),
+            confirmation:   None,
+        };
+        Ok(HttpResponse::Ok().json(resp))
+    })
+    .responder()
 }
 
 use actix_web::Result as ActixResult;
@@ -237,38 +215,43 @@ fn handle_get_testnet_config(req: &HttpRequest<AppState>) -> ActixResult<HttpRes
     }))
 }
 
-fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-    let tx_for_state = req.state().tx_for_state.clone();
+// fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+//     let tx_for_state = req.state().tx_for_state.clone();
 
-    let (tx, rx) = mpsc::channel();
-    let request = StateKeeperRequest::GetNetworkStatus(tx);
-    tx_for_state.send(request).expect("must send a new transaction to queue");
-    let status: Result<NetworkStatus, _> = rx.recv_timeout(std::time::Duration::from_millis(TIMEOUT));
-    if status.is_err() {
-        return Ok(HttpResponse::Ok().json(AccountError{error: "timeout".to_owned()}));
-    }
-    let status = status.unwrap();
+//     let (tx, rx) = mpsc::channel();
+//     let request = StateKeeperRequest::GetNetworkStatus(tx);
+//     tx_for_state.send(request).expect("must send a new transaction to queue");
+//     let status: Result<NetworkStatus, _> = rx.recv_timeout(std::time::Duration::from_millis(TIMEOUT));
+//     if status.is_err() {
+//         return Ok(HttpResponse::Ok().json(AccountError{error: "timeout".to_owned()}));
+//     }
+//     let status = status.unwrap();
 
-    let pool = req.state().connection_pool.clone();
-    let storage = pool.access_storage();
-    if storage.is_err() {
-        return Ok(HttpResponse::Ok().json(AccountError{error: "rate limit".to_string()}));
-    }
-    let mut storage = storage.unwrap();
+//     let pool = req.state().connection_pool.clone();
+//     let storage = pool.access_storage();
+//     if storage.is_err() {
+//         return Ok(HttpResponse::Ok().json(AccountError{error: "rate limit".to_string()}));
+//     }
+//     let mut storage = storage.unwrap();
     
-    // TODO: properly handle failures
-    let last_committed = storage.get_last_committed_block().unwrap_or(0);
-    let last_verified = storage.get_last_verified_block().unwrap_or(0);
-    let outstanding_txs = storage.count_outstanding_proofs(last_verified).unwrap_or(0);
+//     // TODO: properly handle failures
+//     let last_committed = storage.get_last_committed_block().unwrap_or(0);
+//     let last_verified = storage.get_last_verified_block().unwrap_or(0);
+//     let outstanding_txs = storage.count_outstanding_proofs(last_verified).unwrap_or(0);
 
-    let status = NetworkStatus{
-        next_block_at_max: status.next_block_at_max,
-        last_committed,
-        last_verified,  
-        outstanding_txs,
-    };
+//     let status = NetworkStatus{
+//         next_block_at_max: status.next_block_at_max,
+//         last_committed,
+//         last_verified,  
+//         outstanding_txs,
+//     };
 
-    Ok(HttpResponse::Ok().json(status))
+//     Ok(HttpResponse::Ok().json(status))
+// }
+
+fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    let network_status = req.state().network_status.read();
+    Ok(HttpResponse::Ok().json(network_status))
 }
 
 fn handle_get_account_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
@@ -335,11 +318,14 @@ pub fn start_status_interval(state: AppState) {
         };
 
         println!("status from db: {:?}", status);
-        //let record = { state.network_status.0.as_ref() };
+
+        // save status to state
+        *state.network_status.0.as_ref().write().unwrap() = status;
 
         //let max_outstanding_txs = &RUNTIME_CONFIG.max_outstanding_txs;
         //println!("max_outstanding_txs: {}", max_outstanding_txs);
 
+        // TODO: request `next_block_at_max` from state_keeper in a promise
         //Delay::new(Instant::now() + Duration::from_millis(5000)).and_then(move |_| Ok(state))
         Ok(state)
     })
