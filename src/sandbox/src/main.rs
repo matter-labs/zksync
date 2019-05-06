@@ -49,15 +49,17 @@ impl NonceFutures {
         })
     }
 
-    fn set(&mut self, account: u32, nonce: u32) {
+    fn set(&mut self, account: u32, new_nonce: u32) {
         let data = &mut self.0.as_ref().write().unwrap();
-        data.nonces.insert(account, nonce);
+        let old_nonce = *data.nonces.get(&account).unwrap_or(&0);
+        data.nonces.insert(account, new_nonce);
 
-        // TODO: iterate range
-        let key = (account, nonce);
-        if let Some(task) = data.tasks.remove(&key) {
-            task.notify();
-            data.futures.remove(&key);
+        for nonce in old_nonce ..= new_nonce {
+            let key = (account, nonce);
+            if let Some(task) = data.tasks.remove(&key) {
+                task.notify();
+                data.futures.remove(&key);
+            }
         }
     }
 }
@@ -79,7 +81,7 @@ impl Future for NonceReadyFuture{
         let key = (self.account, self.nonce);
         let next = *data.nonces.get(&self.account).unwrap_or(&0);
         if next > self.nonce {
-            Err(CurrentNonceIsHigher) // TODO: add type?
+            Err(CurrentNonceIsHigher)
         } else if next == self.nonce {
             Ok(Async::Ready(()))
         } else {
