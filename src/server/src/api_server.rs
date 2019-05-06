@@ -84,11 +84,12 @@ const TIMEOUT: u64 = 500;
 fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let tx_for_state = req.state().tx_for_state.clone();
     let network_status = req.state().network_status.read();
+    let nonce_futures = req.state().nonce_futures.clone();
 
     req.json()
     //.from_err() // convert all errors into `Error`
     .map_err(|e| format!("{}", e))
-    .and_then(move |mut tx: TransferTx| {
+    .and_then(move |tx: TransferTx| {
 
         // Rate limit check
 
@@ -109,10 +110,29 @@ fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
         tx_for_state.send(request).expect("must send a new transaction to queue");
         let account = key_rx.recv_timeout(std::time::Duration::from_millis(TIMEOUT))
             .map_err(|_|format!("Internal error: timeout on GetAccount"))?;
+        let account = account.ok_or(format!("Account not found"))?;
+        
+        Ok((tx, account, tx_for_state))
+    })
+    .and_then(move |(tx, account, tx_for_state)| {
+
+        // Wait for nonce
+
+        let future = 
+            if account.nonce == tx.nonce {
+                nonce_futures.ready(tx.from, tx.nonce)
+            } else {
+                nonce_futures.await(tx.from, tx.nonce)
+            };
+        future
+        .map(|_| (tx, account, nonce_futures, tx_for_state))
+        .or_else(|e| future::err(format!("Nonce error: {:?}", e)))
+    })
+    .and_then(move |(mut tx, account, mut nonce_futures, tx_for_state)| {
 
         // Verify signature
 
-        let pub_key: PublicKey = account.and_then(|a| a.get_pub_key()).ok_or(format!("Pubkey expired"))?;
+        let pub_key: PublicKey = account.get_pub_key().ok_or(format!("Pubkey expired"))?;
         let verified = tx.verify_sig(&pub_key);
         if !verified {
             let (x, y) = pub_key.0.into_xy();
@@ -128,11 +148,16 @@ fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
         // Apply tx
 
         let (add_tx, add_rx) = mpsc::channel();
+        let (account, nonce) = (tx.from, tx.nonce);
         tx_for_state.send(StateKeeperRequest::AddTransferTx(tx, add_tx)).expect("sending to sate keeper failed");
         // TODO: reconsider timeouts
         let confirmation = add_rx.recv_timeout(std::time::Duration::from_millis(500))
             .map_err(|_|format!("Internal error: timeout on AddTransferTx"))?
             .map_err(|e|format!("Tx rejected: {:?}", e))?;
+
+        // Notify futures waiting for nonce
+
+        nonce_futures.set_next_nonce(account, nonce + 1);
 
         // Return response
 

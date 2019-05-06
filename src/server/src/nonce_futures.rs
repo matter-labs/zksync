@@ -30,8 +30,17 @@ struct Data{
 pub struct NonceFutures(Arc<RwLock<Data>>);
 
 impl NonceFutures {
+
+    pub fn ready(&self, account: u32, nonce: u32) -> Box<NonceFuture> {
+        Box::new(NonceReadyFuture{
+            account,
+            nonce,
+            futures: self.clone(),
+            immediate_result: Some(Ok(())),
+        })
+    }
     
-    pub fn await(&self, account: u32, nonce: u32) -> impl Future<Item=(), Error=CurrentNonceIsHigher> {
+    pub fn await(&self, account: u32, nonce: u32) -> Box<NonceFuture> {
 
         // get mutex access to inner data
         let data = &mut self.0.as_ref().write().unwrap();
@@ -45,7 +54,7 @@ impl NonceFutures {
         let next_nonce = record.unwrap_or(0);
 
         // return immediate result if it can be deducted now
-        if next_nonce > nonce {
+        let r = if next_nonce > nonce {
             NonceReadyFuture{
                 account,
                 nonce,
@@ -53,7 +62,7 @@ impl NonceFutures {
                 immediate_result: Some(Err(CurrentNonceIsHigher)),
             }.shared()
         } else if next_nonce == nonce {
-                NonceReadyFuture{
+            NonceReadyFuture{
                 account,
                 nonce,
                 futures: self.clone(),
@@ -78,10 +87,11 @@ impl NonceFutures {
             })
         }
         .map_err(|_|CurrentNonceIsHigher)
-        .map(|_|())
+        .map(|_|());
+        Box::new(r)
     }
 
-    pub fn set(&mut self, account: u32, new_nonce: u32) {
+    pub fn set_next_nonce(&mut self, account: u32, new_nonce: u32) {
         // get mutex access to inner data
         let data = &mut self.0.as_ref().write().unwrap();
         
