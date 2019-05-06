@@ -97,7 +97,7 @@ class FranklinWallet {
         await new Promise(resolve => setTimeout(resolve, 500))
         await this.pullState(false)
         let error = result.data && result.data.error
-        if (error === 'NonceIsTooHigh' && this.sidechainState.current.nonce < nonce) {
+        if (error === 'CurrentNonceIsHigher' && this.sidechainState.current.nonce < nonce) {
             this.nextNonce = this.sidechainState.current.nonce
         }
         return result.data

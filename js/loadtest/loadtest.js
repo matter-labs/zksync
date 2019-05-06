@@ -117,11 +117,13 @@ class Client {
 
         //console.log(`${this.eth.address}: transfer ${round_amount} from ${fromAccountId} to ${toAccountId}...`);
 
+        let transferData = `transfer ${round_amount} from ${fromAccountId} to ${toAccountId} nonce ${this.fra.nextNonce}`;
+        console.log(`${this.eth.address}: ${transferData} requesting...`)
         let r = await this.fra.transfer(toAccountId, amount)
         if (r.accepted) {
-            console.log(`${this.eth.address}: transfer ${round_amount} from ${fromAccountId} to ${toAccountId} ok`)
+            console.log(`${this.eth.address}: ${transferData} ok`)
         } else {
-            console.log(`${this.eth.address}: transfer ${round_amount} failed: ${JSON.stringify(r)}`)
+            console.log(`${this.eth.address}: ${transferData} failed: ${JSON.stringify(r)}`)
         }
     }
 }
@@ -150,7 +152,7 @@ async function test() {
     await Promise.all(promises)
 
     let sourceBalanceAfter = await source.getBalance()
-    console.log('Total spent: ', format(sourceBalanceAfter.sub(sourceBalanceBefore)))
+    console.log('Total spent: ', format(sourceBalanceBefore.sub(sourceBalanceAfter)))
 
     console.log('xx: starting the test...')
     while(true) {
