@@ -6,6 +6,8 @@ use models::config::RUNTIME_CONFIG;
 use super::models::{StateKeeperRequest, NetworkStatus, TransferTxConfirmation};
 use super::storage::{ConnectionPool, StorageProcessor};
 
+use super::nonce_futures::{NonceFutures, NonceReadyFuture};
+
 use actix_web::{
     middleware, 
     server, 
@@ -61,9 +63,10 @@ struct AccountDetailsResponse {
 // singleton to keep info about channels required for Http server
 #[derive(Clone)]
 pub struct AppState {
-    tx_for_state: mpsc::Sender<StateKeeperRequest>,
-    contract_address: String,
-    connection_pool: ConnectionPool
+    tx_for_state:       mpsc::Sender<StateKeeperRequest>,
+    contract_address:   String,
+    connection_pool:    ConnectionPool,
+    nonce_futures:      NonceFutures,
 }
 
 const TIMEOUT: u64 = 500;
@@ -282,9 +285,10 @@ pub fn start_api_server(
         let server_config = format!("{}:{}", address, port);
 
         let state = AppState {
-            tx_for_state: tx_for_state.clone(),
-            contract_address: contract_address.clone(),
-            connection_pool: connection_pool.clone(),
+            tx_for_state:       tx_for_state.clone(),
+            contract_address:   contract_address.clone(),
+            connection_pool:    connection_pool.clone(),
+            nonce_futures:      NonceFutures::default(),
         };
         let state2 = std::sync::Arc::new(state.clone());
 
