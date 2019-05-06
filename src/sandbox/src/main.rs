@@ -19,37 +19,45 @@ use std::sync::{Arc, RwLock, Mutex};
 use std::collections::HashMap;
 
 #[derive(Default, Clone)]
-struct AsyncNonceMap{
-    nonces:     Arc<RwLock<HashMap<u32, u32>>>,
-    futures:    Arc<RwLock<HashMap<(u32, u32), Shared<NonceReadyFuture>>>>,
-    tasks:      Arc<RwLock<HashMap<(u32, u32), Task>>>,
+struct Data{
+    nonces:     HashMap<u32, u32>,
+    futures:    HashMap<(u32, u32), Shared<NonceReadyFuture>>,
+    tasks:      HashMap<(u32, u32), Task>,
 }
 
-impl AsyncNonceMap {
+#[derive(Default, Clone)]
+struct NonceFutures(Arc<RwLock<Data>>);
+
+impl NonceFutures {
     fn await(&self, account: u32, nonce: u32) -> Shared<NonceReadyFuture> {
-        let futures = &mut self.futures.as_ref().write().unwrap();
+        let data = &mut self.0.as_ref().write().unwrap();
         let key = (account, nonce);
-        futures.get(&key)
+
+        // TODO: check status, return properly
+
+        data.futures.get(&key)
         .map(|f| f.clone())
         .unwrap_or_else( || {
             let future = NonceReadyFuture{
                 account,
                 nonce,
-                nonce_map: self.clone(),
+                futures: self.clone(),
             }.shared();
             let r = future.clone();
-            futures.insert(key, future);
+            data.futures.insert(key, future);
             r
         })
     }
 
     fn set(&mut self, account: u32, nonce: u32) {
-        let mut map = &mut self.nonces.as_ref().write().unwrap();
-        map.insert(account, nonce);
-        let tasks = &mut self.tasks.as_ref().write().unwrap();
+        let data = &mut self.0.as_ref().write().unwrap();
+        data.nonces.insert(account, nonce);
+
+        // TODO: iterate range
         let key = (account, nonce);
-        if let Some(task) = tasks.remove(&key) {
+        if let Some(task) = data.tasks.remove(&key) {
             task.notify();
+            data.futures.remove(&key);
         }
     }
 }
@@ -57,36 +65,36 @@ impl AsyncNonceMap {
 struct NonceReadyFuture{
     account:    u32,
     nonce:      u32,
-    nonce_map:  AsyncNonceMap,
+    futures:    NonceFutures,
 }
 
-impl Future for NonceReadyFuture
-{
+impl Future for NonceReadyFuture{
     type Item = ();
     type Error = ();
 
     fn poll(&mut self) -> Poll<(), Self::Error> {
-        let map = &self.nonce_map.nonces.as_ref().read().unwrap();
-        let next = *map.get(&self.account).unwrap_or(&0);
-        if next == self.nonce {
+        let data = &mut self.futures.0.as_ref().write().unwrap();
+        let key = (self.account, self.nonce);
+        let next = *data.nonces.get(&self.account).unwrap_or(&0);
+        if next > self.nonce {
+            Err(()) // TODO: add type?
+        } else if next == self.nonce {
             Ok(Async::Ready(()))
         } else {
-            let tasks = &mut self.nonce_map.tasks.as_ref().write().unwrap();
-            let key = (self.account, self.nonce);
-            tasks.insert(key, task::current());
+            data.tasks.insert(key, task::current());
             Ok(Async::NotReady)
         }
     }
 }
 
 fn main() {
-    let nm = AsyncNonceMap::default();
+    let nm = NonceFutures::default();
     let task = Interval::new(Instant::now(), Duration::from_millis(1000))
     .fold((0, nm.clone()), |acc, _| {
         let (i, mut nm) = acc;
         println!("i = {}", i);
 
-        if i == 3 {
+        if i == 1 {
             nm.set(1, 2);
         }
 
