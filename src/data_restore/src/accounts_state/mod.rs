@@ -105,7 +105,7 @@ impl FranklinAccountsStates {
         self.accounts_tree.items.get(&account_id).cloned()
     }
 
-    pub fn update_accounts_states_from_transfer_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), String> {
+    fn update_accounts_states_from_transfer_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), String> {
         // println!("tx: {:?}", transaction.ethereum_transaction.hash);
         let transfer_txs_block = self.get_all_transactions_from_transfer_block(transaction);
         if transfer_txs_block.is_err() {

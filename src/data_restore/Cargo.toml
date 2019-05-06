@@ -12,6 +12,7 @@ hex = "0.3.2"
 sapling-crypto = { package = "sapling-crypto_ce", version = "0.0.5" }
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
 pairing = { package = "pairing_ce", version = "0.17.0" }
+tokio = "0.1"
 
 plasma = { path = "../plasma" }
 

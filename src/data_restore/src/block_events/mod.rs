@@ -89,6 +89,42 @@ impl BlockEventsFranklin {
         Ok(blocks_for_return)
     }
 
+    pub fn get_only_verified_committed_blocks(&self, verified_blocks: &Vec<LogBlockData>) -> Vec<&LogBlockData> {
+        let iter_ver_blocks = verified_blocks.iter();
+        // let committed_blocks_iter = &mut self.com_blocks.iter();
+        let mut ver_com_blocks = vec![];
+        for block in iter_ver_blocks {
+            let find_com_block = self.check_committed_block_with_same_number_as_verified(block);
+            if find_com_block.is_none() {
+                continue;
+            }
+            ver_com_blocks.push(find_com_block.unwrap())
+        }
+        ver_com_blocks.sort_by_key(|&x| x.block_num);
+        ver_com_blocks
+    }
+
+    // pub fn get_only_verified_committed_blocks(&self) -> Vec<&LogBlockData> {
+    //     let ver_blocks = &mut self.verified_blocks.iter();
+    //     // let committed_blocks_iter = &mut self.com_blocks.iter();
+    //     let mut ver_com_blocks = vec![];
+    //     for block in ver_blocks {
+    //         let find_com_block = self.check_committed_block_with_same_number_as_verified(block);
+    //         if find_com_block.is_none() {
+    //             continue;
+    //         }
+    //         ver_com_blocks.push(find_com_block.unwrap())
+    //     }
+    //     ver_com_blocks.sort_by_key(|&x| x.block_num);
+    //     ver_com_blocks
+    // }
+
+    pub fn check_committed_block_with_same_number_as_verified(&self, verified_block: &LogBlockData) -> Option<&LogBlockData> {
+        let committed_blocks_iter = &mut self.committed_blocks.iter();
+        let committed_block = committed_blocks_iter.find(|&&x| x.block_num == verified_block.block_num);
+        return committed_block
+    }
+
     pub fn get_committed_blocks(&self) -> &Vec<LogBlockData> {
         &self.committed_blocks
     }
@@ -256,7 +292,7 @@ impl BlockEventsFranklin {
     }
 
     // returns (committed blocks logs, verified blocks logs) from genesis to (last block minus delta)
-    pub fn get_sorted_past_logs_from_last_watched_block(&mut self, blocks_delta: U256) -> Result<(ComAndVerBlocksVecs, BlockNumber256), String> {
+    fn get_sorted_past_logs_from_last_watched_block(&mut self, blocks_delta: U256) -> Result<(ComAndVerBlocksVecs, BlockNumber256), String> {
         let from_block_number = self.last_watched_block_number + 1;
         let (logs, to_block_number) = match self.get_past_logs(from_block_number, blocks_delta) {
             Err(_) => return Err(String::from("Cant get past logs")),
@@ -270,7 +306,7 @@ impl BlockEventsFranklin {
     }
 
     // returns (committed blocks logs, verified blocks logs) from genesis to (last block minus delta)
-    pub fn get_sorted_past_logs_from_genesis(&mut self, genesis_block: U256, blocks_delta: U256) -> Result<(ComAndVerBlocksVecs, BlockNumber256), String> {
+    fn get_sorted_past_logs_from_genesis(&mut self, genesis_block: U256, blocks_delta: U256) -> Result<(ComAndVerBlocksVecs, BlockNumber256), String> {
         let from_block_number = U256::from(genesis_block);
         let (logs, to_block_number) = match self.get_past_logs(from_block_number, blocks_delta) {
             Err(_) => return Err(String::from("Cant get past logs")),
@@ -281,27 +317,6 @@ impl BlockEventsFranklin {
             Ok(result) => result,
         };
         Ok((sorted_logs, to_block_number))
-    }
-
-    pub fn get_only_verified_committed_blocks(&self) -> Vec<&LogBlockData> {
-        let ver_blocks = &mut self.verified_blocks.iter();
-        // let committed_blocks_iter = &mut self.com_blocks.iter();
-        let mut ver_com_blocks = vec![];
-        for block in ver_blocks {
-            let find_com_block = self.check_committed_block_with_same_number_as_verified(block);
-            if find_com_block.is_none() {
-                continue;
-            }
-            ver_com_blocks.push(find_com_block.unwrap())
-        }
-        ver_com_blocks.sort_by_key(|&x| x.block_num);
-        ver_com_blocks
-    }
-
-    pub fn check_committed_block_with_same_number_as_verified(&self, verified_block: &LogBlockData) -> Option<&LogBlockData> {
-        let committed_blocks_iter = &mut self.committed_blocks.iter();
-        let committed_block = committed_blocks_iter.find(|&&x| x.block_num == verified_block.block_num);
-        return committed_block
     }
 
     // // - Get new block
