@@ -50,12 +50,13 @@ impl NonceFutures {
         // get mutex access to inner data
         let data = &mut self.0.as_ref().write().unwrap();
 
-        let next_nonce = *data.nonces.get(&account).unwrap_or(&0);
-        // if next_nonce.is_none() {
-        //     // so that we iterate through the notify listing starting not with 0, 
-        //     // but with the first requested nonce
-        //     data.nonces.insert(account, nonce);
-        // }
+        let record = data.nonces.get(&account).map(|&v|v).clone();
+        if record.is_none() {
+            // so that we iterate through the notify listing starting not with 0, 
+            // but with the first requested nonce
+            data.nonces.insert(account, nonce);
+        }
+        let next_nonce = record.unwrap_or(0);
         //println!("nonce = {}, next_nonce = {}", nonce, next_nonce);
 
         // return immediate result if it can be deducted now
