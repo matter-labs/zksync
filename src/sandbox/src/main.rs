@@ -18,6 +18,20 @@ use std::time::{Duration, Instant};
 use std::sync::{Arc, RwLock, Mutex};
 use std::collections::HashMap;
 
+struct NonceReadyFuture{
+    account:    u32,
+    nonce:      u32,
+    futures:    NonceFutures,
+}
+
+pub struct CurrentNonceIsHigher;
+
+type NonceFuture = Future<Item=(), Error=CurrentNonceIsHigher>;
+
+// pub trait NonceFuture: Future<Item=(), Error=CurrentNonceIsHigher> {
+
+// }
+
 #[derive(Default, Clone)]
 struct Data{
     nonces:     HashMap<u32, u32>,
@@ -29,7 +43,7 @@ struct Data{
 struct NonceFutures(Arc<RwLock<Data>>);
 
 impl NonceFutures {
-    fn await(&self, account: u32, nonce: u32) -> Shared<NonceReadyFuture> {
+    fn await(&self, account: u32, nonce: u32) -> impl Future<Item=(), Error=CurrentNonceIsHigher> {
         let data = &mut self.0.as_ref().write().unwrap();
         let key = (account, nonce);
 
@@ -42,16 +56,18 @@ impl NonceFutures {
                 account,
                 nonce,
                 futures: self.clone(),
-            }.shared();
+            }
+            .shared();
             let r = future.clone();
             data.futures.insert(key, future);
             r
         })
+        .map(|_|()).map_err(|_|CurrentNonceIsHigher) // map to original Future types
     }
 
     fn set(&mut self, account: u32, new_nonce: u32) {
         let data = &mut self.0.as_ref().write().unwrap();
-        let old_nonce = *data.nonces.get(&account).unwrap_or(&0);
+        let old_nonce = *data.nonces.get(&account).unwrap_or(&new_nonce);
         data.nonces.insert(account, new_nonce);
 
         for nonce in old_nonce ..= new_nonce {
@@ -63,14 +79,6 @@ impl NonceFutures {
         }
     }
 }
-
-struct NonceReadyFuture{
-    account:    u32,
-    nonce:      u32,
-    futures:    NonceFutures,
-}
-
-struct CurrentNonceIsHigher;
 
 impl Future for NonceReadyFuture{
     type Item = ();
