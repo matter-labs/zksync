@@ -59,10 +59,10 @@ clean-target:
 	$(rust-musl-builder) cargo clean
 
 server-image: build-target
-	docker build -t "${SERVER_DOCKER_IMAGE}" -f ./etc/docker/server/Dockerfile .
+	docker build -t "${SERVER_DOCKER_IMAGE}" -f ./docker/server/Dockerfile .
 
 prover-image: build-target
-	docker build -t "${PROVER_DOCKER_IMAGE}" -f ./etc/docker/prover/Dockerfile .
+	docker build -t "${PROVER_DOCKER_IMAGE}" -f ./docker/prover/Dockerfile .
 
 images: server-image prover-image
 
@@ -91,7 +91,7 @@ dev-down:
 	@docker-compose stop postgres geth
 
 geth:
-	@docker build -t "${GETH_DOCKER_IMAGE}" ./etc/docker/geth
+	@docker build -t "${GETH_DOCKER_IMAGE}" ./docker/geth
 
 geth-up: geth
 	@docker-compose up geth

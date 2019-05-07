@@ -1,4 +1,4 @@
 *
 !target/x86_64-unknown-linux-musl/release/server
 !target/x86_64-unknown-linux-musl/release/prover
-!etc/docker/prover/prover-entry.sh
+!docker/prover/prover-entry.sh
