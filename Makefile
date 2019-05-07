@@ -67,11 +67,7 @@ db-drop: confirm_action
 	@# this is used to clear the produciton db; cannot do `diesel database reset` because we don't own the db
 	@echo DATABASE_URL=$(DATABASE_URL)
 	@$(sql) 'DROP OWNED BY CURRENT_USER CASCADE' || \
-		(( $(sql) 'DROP SCHEMA IF EXISTS public CASCADE' && $(sql)'CREATE SCHEMA public' ))
-
-	@#psql $(DATABASE_URL) -c 'DROP OWNED BY CURRENT_USER CASCADE'
-	@#psql $(DATABASE_URL) -c 'DROP SCHEMA IF EXISTS public CASCADE'
-	@#psql $(DATABASE_URL) -c 'CREATE SCHEMA public'
+		{ $(sql) 'DROP SCHEMA IF EXISTS public CASCADE' && $(sql)'CREATE SCHEMA public'; }
 
 build-target:
 	$(rust-musl-builder) cargo build --release
