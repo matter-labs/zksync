@@ -11,6 +11,7 @@ export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
 
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
 rust-musl-builder = @docker run $(docker-options) -it ekidd/rust-musl-builder
+sql = psql $(DATABASE_URL) -c 
 
 confirm_action:
 	@bin/.confirm_action
@@ -22,7 +23,7 @@ env:
 db-test:
 	@bin/db-test
 
-db-setup:
+db-setup: confirm_action
 	@bin/db-setup
 
 init: dev-up env yarn db-setup redeploy
@@ -52,6 +53,12 @@ sandbox:
 deploy-contracts: confirm_action
 	@bin/deploy-contracts
 
+deploy-kube: confirm_action
+	@bin/deploy-contracts
+
+deploy-client: confirm_action
+	@bin/deploy-client
+
 db-reset: confirm_action db-drop db-setup
 
 redeploy: deploy-contracts db-reset
@@ -59,9 +66,12 @@ redeploy: deploy-contracts db-reset
 db-drop: confirm_action
 	@# this is used to clear the produciton db; cannot do `diesel database reset` because we don't own the db
 	@echo DATABASE_URL=$(DATABASE_URL)
+	@$(sql) 'DROP OWNED BY CURRENT_USER CASCADE' || \
+		(( $(sql) 'DROP SCHEMA IF EXISTS public CASCADE' && $(sql)'CREATE SCHEMA public' ))
+
 	@#psql $(DATABASE_URL) -c 'DROP OWNED BY CURRENT_USER CASCADE'
-	@psql $(DATABASE_URL) -c 'DROP SCHEMA IF EXISTS public CASCADE'
-	@psql $(DATABASE_URL) -c 'CREATE SCHEMA public'
+	@#psql $(DATABASE_URL) -c 'DROP SCHEMA IF EXISTS public CASCADE'
+	@#psql $(DATABASE_URL) -c 'CREATE SCHEMA public'
 
 build-target:
 	$(rust-musl-builder) cargo build --release
