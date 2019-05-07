@@ -1,6 +1,6 @@
 #!/bin/bash
 
-KEY_DIR=`pwd`/$KEY_DIR
+KEY_DIR=`pwd`$KEY_DIR
 echo "Checking keys in $KEY_DIR/"
 mkdir -p $KEY_DIR
 
