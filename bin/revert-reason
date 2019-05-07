@@ -8,10 +8,9 @@ then
     exit
 fi
 
-TX=$1
-SCRIPT=" tx = eth.getTransaction( \"$TX\" ); tx.data = tx.input; eth.call(tx, tx.blockNumber)"
+# TX=$1
+# SCRIPT=" tx = eth.getTransaction( \"$TX\" ); tx.data = tx.input; eth.call(tx, tx.blockNumber)"
+# geth --exec "$SCRIPT" attach http://localhost:8545 | cut -d '"' -f 2 | cut -c139- | xxd -r -p
+# echo
 
-#docker-compose run --entrypoint=geth geth --exec "$SCRIPT" attach http://geth:8545
-geth --exec "$SCRIPT" attach http://localhost:8545 | cut -d '"' -f 2 | cut -c139- | xxd -r -p
-echo
-
+node `dirname $0`/../js/franklin/src/revert-reason.js $1
