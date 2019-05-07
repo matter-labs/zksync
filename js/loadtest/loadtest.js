@@ -9,7 +9,8 @@ const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms))
 const bn = ethers.utils.bigNumberify
 const format = ethers.utils.formatEther
 
-let source = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/0").connect(provider)
+// taking the second account from the mnemonic
+let source = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider)
 
 const DEPOSIT_GAS_LIMIT = bn(100000)
 const MIN_AMOUNT_FRA = ethers.utils.parseEther(process.env.LOADTEST_MIN_AMOUNT)
