@@ -20,14 +20,20 @@ env:
 db-setup:
 db-test:
 
+init: dev-up env yarn db-setup redeploy
+
 yarn:
 	@cd contracts; yarn
 	@cd js/franklin; yarn
 	@cd js/client; yarn
 	@cd js/loadtest; yarn
+	@cd js/explorer; yarn
 
 client:
 	@cd js/client; yarn dev
+
+explorer:
+	@cd js/explorer; yarn dev
 
 prover:
 	@bin/.load_keys; cargo run --release --bin prover

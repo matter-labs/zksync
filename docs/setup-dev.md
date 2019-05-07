@@ -33,29 +33,14 @@ complete -W "\`grep -oE '^[a-zA-Z0-9_.-]+:([^=]|$)' $FRANKLIN_HOME/Makefile | se
 # cd $FRANKLIN_HOME
 ```
 
-## Env configuration
-
 ## First-time setup
 
-- Start the dev environment services:
-```franklin dev-up```
+```franklin init```
 
-- Install dependencies:
-```franklin yarn```
-
-- Setup env config:
-```cp etc/env/dev.env.example etc/env/dev.env```
-
-This will show the current config:
-```franklin env```
-
-- Create `plasma` database:
-```franklin db-setup```
-
-To reset the dev environment:
+To completely reset the dev environment:
 
 - Stop services:
-```franklin  dev-down```
+```franklin dev-down```
 - Remove mounted container data:
 ```rm -rf ./volumes```
 - Repeat the setup procedure above
