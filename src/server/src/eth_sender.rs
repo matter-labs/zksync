@@ -143,6 +143,7 @@ pub fn start_eth_sender(pool: ConnectionPool) -> Sender<Operation> {
 
     // TODO: this is for test only, introduce a production switch (as we can not rely on debug/release mode because performance is required for circuits)
     let addr = std::env::var("SENDER_ACCOUNT").expect("SENDER_ACCOUNT env var not found");
+    println!("Starting eth_sender: sender = {}, current_nonce = {}", addr, current_nonce);
     storage.update_op_config(&addr, current_nonce.as_u32());
 
     // execute pending transactions
