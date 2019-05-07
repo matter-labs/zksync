@@ -18,7 +18,7 @@ List:
 
 Switch:
 ```franklin env <ENV_NAME>```
-    
+
 ## Monitoring & management:
 
 Seed for Metamask: fine music test violin matrix prize squirrel panther purchase material script deal
@@ -42,9 +42,9 @@ It generates quite some CPU load, use with caution.
 ## Build and run server + prover locally:
 
 ```
-run-server
-run-prover
-run-client
+franklin server
+franklin prover
+franklin client
 ```
 
 Client UI will be available at http://localhost:8080
