@@ -6,39 +6,36 @@ Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 
 ## Setup local dev environment
 
-- Install prerequisites: see [docs/setup-dev.md](docs/setup-dev.md)
-- Add `./bin` to `PATH`
+- Prepare dev environment prerequisites: see [docs/setup-dev.md](docs/setup-dev.md)
 
 - Start the dev environment services:
-```make dev-up```
+```franklin dev-up```
 - Setup env config:
 ```cp etc/env/dev.env.example etc/env/dev.env```
 - Create `plasma` database:
-```db-setup```
+```franklin db-setup```
 - Deploy contracts:
-```deploy-contracts```
+```franklin deploy-contracts```
 
 To redeploy db and contraсts:
 
-```redeploy```
+```franklin redeploy```
 
 To reset the dev environment:
 
 - Stop services:
-```make dev-down```
+```franklin  dev-down```
 - Remove mounted container data:
 ```rm -rf ./volumes```
 - Repeat the setup procedure above
 
 ## Environments
 
-```
-# List
-franklin env
+List:
+```franklin env```
 
-# Switch
-franklin env <ENV_NAME>
-```
+Switch:
+```franklin env <ENV_NAME>```
 
 ## Monitoring & management:
 
