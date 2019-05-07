@@ -32,15 +32,3 @@ complete -W "\`grep -oE '^[a-zA-Z0-9_.-]+:([^=]|$)' $FRANKLIN_HOME/Makefile | se
 # If you're like me, uncomment:
 # cd $FRANKLIN_HOME
 ```
-
-## First-time setup
-
-```franklin init```
-
-To completely reset the dev environment:
-
-- Stop services:
-```franklin dev-down```
-- Remove mounted container data:
-```rm -rf ./volumes```
-- Repeat the setup procedure above

@@ -4,9 +4,23 @@ Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 
 # Basics
 
-## Setup local dev environment
+## Prerequisites
 
 Prepare dev environment prerequisites: see [docs/setup-dev.md](docs/setup-dev.md)
+
+## Setup local dev environment
+
+First-time setup:
+
+```franklin init```
+
+To completely reset the dev environment:
+
+- Stop services:
+```franklin dev-down```
+- Remove mounted container data:
+```rm -rf ./volumes```
+- Repeat the setup procedure above
 
 # (Re)deploy db and contraсts:
 
