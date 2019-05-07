@@ -13,4 +13,6 @@ fi
 # geth --exec "$SCRIPT" attach http://localhost:8545 | cut -d '"' -f 2 | cut -c139- | xxd -r -p
 # echo
 
+. `dirname $0`/.setup_env
+
 node `dirname $0`/../js/franklin/src/revert-reason.js $1
