@@ -1,7 +1,0 @@
-#!/bin/bash
-
-. .setup_env
-
-.load_keys
-
-cargo run --release --bin prover

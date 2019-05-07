@@ -1,5 +1,9 @@
 # Prerequisites
 
+## Docker
+
+Install docker.
+
 ## Rust
 
 Install the latest rust version (>= 1.32):
@@ -29,6 +33,29 @@ complete -W "\`grep -oE '^[a-zA-Z0-9_.-]+:([^=]|$)' $FRANKLIN_HOME/Makefile | se
 # cd $FRANKLIN_HOME
 ```
 
-## Docker
+## Env configuration
 
-Install docker.
+## First-time setup
+
+- Start the dev environment services:
+```franklin dev-up```
+
+- Install dependencies:
+```franklin yarn```
+
+- Setup env config:
+```cp etc/env/dev.env.example etc/env/dev.env```
+
+This will show the current config:
+```franklin env```
+
+- Create `plasma` database:
+```franklin db-setup```
+
+To reset the dev environment:
+
+- Stop services:
+```franklin  dev-down```
+- Remove mounted container data:
+```rm -rf ./volumes```
+- Repeat the setup procedure above

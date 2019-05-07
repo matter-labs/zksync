@@ -17,6 +17,23 @@ confirm_action:
 
 # Scripts (for shell autocomplete)
 env:
+db-setup:
+db-test:
+
+yarn:
+	@cd contracts; yarn
+	@cd js/franklin; yarn
+	@cd js/client; yarn
+	@cd js/loadtest; yarn
+
+client:
+	@cd js/client; yarn dev
+
+prover:
+	@bin/.load_keys; cargo run --release --bin prover
+
+server:
+	@cargo run --release --bin server
 
 sandbox:
 	@cd src/sandbox; cargo run

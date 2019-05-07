@@ -1,7 +1,0 @@
-#!/bin/bash
-
-. .setup_env
-
-cd js/franklin
-
-node src/test.js
