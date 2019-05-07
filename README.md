@@ -8,15 +8,20 @@ Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 
 Prepare dev environment prerequisites: see [docs/setup-dev.md](docs/setup-dev.md)
 
-To redeploy db and contraсts:
+# (Re)deploy db and contraсts:
+
 ```franklin redeploy```
 
 ## Environment configurations
 
-List:
+Env config files are held in `etc/env/`
+
+List configurations:
+
 ```franklin env```
 
-Switch:
+Switch between configurations:
+
 ```franklin env <ENV_NAME>```
 
 ## Monitoring & management:
@@ -28,6 +33,8 @@ NOTE: if you are resetting geth, each Metamask account must be manually reset vi
 
 # Blockscout (local blockchain explorer)
 
+It generates quite some CPU load, but might be useful to visualize blockchain activity. Use with caution.
+
 - Migrate blockscout (do this once to setup database):
 ```make blockscout-migrate```
 - Start:
@@ -36,8 +43,6 @@ NOTE: if you are resetting geth, each Metamask account must be manually reset vi
 ```make blockscout-down```
 
 Blockscout will be available at http://localhost:4000/txs
-
-It generates quite some CPU load, use with caution.
 
 ## Build and run server + prover locally:
 

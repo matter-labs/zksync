@@ -2,6 +2,11 @@
 
 if [ -z $1 ]
 then
+    if [ "dev" == "$FRANKLIN_ENV" ] and [ ! -f etc/env/dev.env]
+    then
+        cp etc/env/dev.env.example dev.env
+    fi
+
     for i in `ls etc/env | grep -v .bak | grep -v example | grep -v current`; do
         ENV=${i%.*}
         if [ "$ENV" == "$FRANKLIN_ENV" ]

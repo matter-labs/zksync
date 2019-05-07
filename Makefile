@@ -20,6 +20,8 @@ env:
 db-setup:
 db-test:
 
+init: dev-up env yarn db-setup redeploy
+
 yarn:
 	@cd contracts; yarn
 	@cd js/franklin; yarn
