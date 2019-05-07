@@ -1,7 +1,6 @@
 #!/bin/bash
 
 . .setup_env
-. .confirm_action
 
 .load_keys
 
@@ -28,4 +27,5 @@ then
 
 else
     echo "Contract deployment failed"
+    exit 1
 fi
