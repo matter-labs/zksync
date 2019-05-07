@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SRC=cd `dirname $0`/../client
+SRC=cd `dirname $0`/../js/client
 DST=$CLIENT_GITHUB_DIR
 
 cd $SRC
