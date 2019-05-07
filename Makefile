@@ -25,9 +25,13 @@ yarn:
 	@cd js/franklin; yarn
 	@cd js/client; yarn
 	@cd js/loadtest; yarn
+	@cd js/explorer; yarn
 
 client:
 	@cd js/client; yarn dev
+
+explorer:
+	@cd js/explorer; yarn dev
 
 prover:
 	@bin/.load_keys; cargo run --release --bin prover

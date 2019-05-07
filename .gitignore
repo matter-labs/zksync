@@ -11,6 +11,9 @@ node_modules
 yarn-error.log
 target
 
+dist
+npm-debug.log
+
 Cargo.lock
 !/Cargo.lock
 

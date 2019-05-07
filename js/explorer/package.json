@@ -1,0 +1,40 @@
+{
+  "name": "plasma-client",
+  "description": "Plasma client app",
+  "version": "1.0.0",
+  "author": "Alex <gluk64@gmail.com>",
+  "private": true,
+  "scripts": {
+    "dev": "echo \"$API_SERVER\"; cross-env NODE_ENV=development webpack-dev-server --open --hot --define process.env.NODE_ENV='\"development\"' --define process.env.API_SERVER=\"\\\"$API_SERVER\"\\\"",
+    "build": "cross-env NODE_ENV=production webpack --progress --hide-modules"
+  },
+  "dependencies": {
+    "axios": "^0.18.0",
+    "babel-plugin-transform-runtime": "^6.23.0",
+    "bn.js": "^4.11.8",
+    "bootstrap": "^4.0.0-beta.2",
+    "bootstrap-vue": "^1.2.0",
+    "buffer": "^5.2.1",
+    "ethers": "^4.0.20",
+    "ethjs": "^0.4.0",
+    "ethjs-util": "^0.1.6",
+    "js-sha3": "^0.8.0",
+    "popper.js": "^1.12.9",
+    "vue": "^2.5.3",
+    "vue-router": "^3.0.2"
+  },
+  "devDependencies": {
+    "babel-core": "^6.26.0",
+    "babel-loader": "^6.0.0",
+    "babel-preset-env": "^1.6.1",
+    "cross-env": "^5.2.0",
+    "css-loader": "^0.28.7",
+    "extract-text-webpack-plugin": "^3.0.2",
+    "file-loader": "^1.1.5",
+    "style-loader": "^0.19.0",
+    "vue-loader": "^13.5.0",
+    "vue-template-compiler": "^2.5.3",
+    "webpack": "^3.8.1",
+    "webpack-dev-server": "^2.9.4"
+  }
+}
