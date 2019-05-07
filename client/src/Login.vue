@@ -19,7 +19,7 @@
 
 import store from './store'
 import ethUtil from 'ethjs-util'
-import {newKey} from '../../contracts/lib/transaction.js'
+import {newKey} from '../../js/franklin/src/transaction.js'
 import {keccak256} from 'js-sha3'
 
 export default {
