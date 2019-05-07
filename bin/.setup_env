@@ -12,6 +12,12 @@ then
     fi
 
     export ENV_FILE=./etc/env/$FRANKLIN_ENV.env
+
+    if [ "dev" == "$FRANKLIN_ENV" ] && [ ! -f etc/env/dev.env ]
+    then
+        cp etc/env/dev.env.example etc/env/dev.env
+    fi
+
     if [ ! -f $ENV_FILE ]; then
         echo "Franklin config file not found: $ENV_FILE"
         #exit
