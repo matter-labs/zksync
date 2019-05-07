@@ -124,4 +124,5 @@ blockscout-down:
 	@docker-compose stop blockscout blockscout_postgres
 
 loadtest:
-	cd js/loadtest; yarn test
+	@cd js/loadtest; yarn test
+
