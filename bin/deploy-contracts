@@ -27,4 +27,5 @@ then
 
 else
     echo "Contract deployment failed"
+    exit 1
 fi
