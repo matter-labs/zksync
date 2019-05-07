@@ -14,7 +14,8 @@ target
 Cargo.lock
 !/Cargo.lock
 
-/etc/env/
+/etc/env/*
+!/etc/env/dev.env.example
 /contracts/yarn-error.log
 /deploy.log
 /keys
