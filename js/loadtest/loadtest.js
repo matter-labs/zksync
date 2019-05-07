@@ -2,7 +2,7 @@ const ethers = require('ethers')
 const Franklin = require('../franklin/src/franklin')
 var Prando = require('prando')
 
-const provider = new ethers.providers.JsonRpcProvider()
+const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL)
 const franklin = new Franklin(process.env.API_SERVER, provider, process.env.CONTRACT_ADDR)
 const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms))
 
