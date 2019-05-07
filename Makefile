@@ -16,9 +16,14 @@ confirm_action:
 	@bin/.confirm_action
 
 # Scripts (for shell autocomplete)
-env:
-db-setup:
+env:	
+	@bin/env
+
 db-test:
+	@bin/db-test
+
+db-setup:
+	@bin/db-setup
 
 init: dev-up env yarn db-setup redeploy
 
@@ -47,16 +52,16 @@ sandbox:
 deploy-contracts: confirm_action
 	@bin/deploy-contracts
 
-db-reset: confirm_action
-	@echo Resetting $(DATABASE_URL)
-	@cd src/storage; diesel database reset
+db-reset: confirm_action db-drop db-setup
 
 redeploy: deploy-contracts db-reset
 
 db-drop: confirm_action
-	# this is used to clear the produciton db; cannot do `diesel database reset` because we don't own the db
-	@psql $DATABASE_URL -c 'DROP OWNED BY CURRENT_USER CASCADE'
-	@src/storage; diesel migration run
+	@# this is used to clear the produciton db; cannot do `diesel database reset` because we don't own the db
+	@echo DATABASE_URL=$(DATABASE_URL)
+	@#psql $(DATABASE_URL) -c 'DROP OWNED BY CURRENT_USER CASCADE'
+	@psql $(DATABASE_URL) -c 'DROP SCHEMA IF EXISTS public CASCADE'
+	@psql $(DATABASE_URL) -c 'CREATE SCHEMA public'
 
 build-target:
 	$(rust-musl-builder) cargo build --release
