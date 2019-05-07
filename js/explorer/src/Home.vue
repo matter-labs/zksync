@@ -3,7 +3,7 @@
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
         <b-navbar-brand>Franklin Block Explorer</b-navbar-brand>
-        <b-navbar-brand right>{{apiServer}}</b-navbar-brand>
+        <b-navbar-brand right>API server: {{apiServer}}</b-navbar-brand>
     </b-container>
     </b-navbar>
     <br>
