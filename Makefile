@@ -53,9 +53,6 @@ sandbox:
 deploy-contracts: confirm_action
 	@bin/deploy-contracts
 
-deploy-kube: confirm_action
-	@bin/deploy-contracts
-
 deploy-client: confirm_action
 	@bin/deploy-client
 
@@ -126,3 +123,19 @@ blockscout-down:
 loadtest:
 	@cd js/loadtest; yarn test
 
+# Kubernetes
+
+kube-deploy: confirm_action
+	@bin/deploy-kube
+
+pods:
+	kubectl get pods -o wide
+
+nodes:
+	kubectl get nodes -o wide
+
+logs-server:
+	kubectl logs deployments/server
+
+logs-prover:
+	kubectl logs deployments/prover

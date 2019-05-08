@@ -21,7 +21,7 @@ metadata:
 spec:
   strategy:
     type: Recreate
-  replicas: 1
+  replicas: 0
   selector:
     matchLabels:
       app: server
@@ -39,8 +39,17 @@ spec:
           envFrom:
             - secretRef:
                 name: franklin-secret
+          env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
       nodeSelector:
-        doks.digitalocean.com/node-pool: k8s-ams3-81r8to7yx
+        doks.digitalocean.com/node-pool: server
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -63,5 +72,15 @@ spec:
           envFrom:
           - secretRef:
               name: franklin-secret
+          env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
       nodeSelector:
-        doks.digitalocean.com/node-pool: k8s-ams3-1
+        doks.digitalocean.com/node-pool: prover
+      
