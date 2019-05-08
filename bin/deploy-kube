@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. .setup_env prod
+. .setup_env
 
 # Configure cluster
 kubectl --kubeconfig etc/kube/kubeconfig.yaml apply -f etc/kube/franklin.yaml
