@@ -7,6 +7,8 @@ extern crate diesel;
 extern crate bigdecimal;
 extern crate serde_json;
 
+extern crate ff;
+
 use plasma::models::*;
 use diesel::dsl::*;
 use models::{Operation, Action, EncodedProof, TxMeta};
@@ -23,6 +25,8 @@ use diesel::r2d2::{PoolError, ConnectionManager, Pool, PooledConnection};
 use serde_json::{to_value, value::Value};
 use std::env;
 use std::iter::FromIterator;
+
+use ff::PrimeField;
 
 use diesel::sql_types::{Nullable, Integer};
 sql_function!(coalesce, Coalesce, (x: Nullable<Integer>, y: Integer) -> Integer);
@@ -241,27 +245,27 @@ impl StorageProcessor {
     }
 
     fn save_transactions(&self, op: &Operation) -> QueryResult<()> {
-        let block_data = op.block.BlockData;
+        let block_data = &op.block.block_data;
         match block_data {
-            Transfer { txs, total_fees } => self.save_transfer_transactions(op, &txs)?,
-            Deposit { txs, total_fees } => self.save_deposit_transactions(op, &txs)?,
-            Exit { txs, total_fees } => self.save_exit_transactions(op, &txs)?,
+            BlockData::Transfer { transactions, total_fees: _ } => self.save_transfer_transactions(op, &transactions)?,
+            BlockData::Deposit { transactions, batch_number: _ } => self.save_deposit_transactions(op, &transactions)?,
+            BlockData::Exit { transactions, batch_number: _ } => self.save_exit_transactions(op, &transactions)?,
         }
         Ok(())
     }
 
     fn save_transfer_transactions(&self, op: &Operation, txs: &Vec<TransferTx>) -> QueryResult<()> {
-        for (&tx_id, tx) in txs.iter() {
-            let inserted: StoredTx = diesel::insert_into(account_updates::table)
+        for tx in txs.iter() {
+            let inserted = diesel::insert_into(transactions::table)
                 .values(&NewTx{
                     tx_type: String::from("transfer"),
                     from_account: tx.from as i32,
                     to_account: Some(tx.to as i32),
                     nonce: Some(tx.nonce as i32),
-                    amount: i32::from_str(tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().unwrap()),
-                    fee: i32::from_str(tx.fee.as_bigint_and_exponent().0.to_str_radix(10).as_str().unwrap()),
+                    amount: tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
+                    fee: tx.fee.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
                     block_number: Some(op.block.block_number as i32),
-                    state_root: Some(op.block.new_root_hash as str),
+                    state_root: Some(op.block.new_root_hash.into_repr().to_string()),
                 })
                 .execute(self.conn())?;
             if 0 == inserted {
@@ -273,17 +277,17 @@ impl StorageProcessor {
     }
 
     fn save_deposit_transactions(&self, op: &Operation, txs: &Vec<DepositTx>) -> QueryResult<()> {
-        for (&tx_id, tx) in txs.iter() {
-            let inserted: StoredTx = diesel::insert_into(account_updates::table)
+        for tx in txs.iter() {
+            let inserted = diesel::insert_into(transactions::table)
                 .values(&NewTx{
                     tx_type: String::from("deposit"),
                     from_account: tx.account as i32,
                     to_account: None,
                     nonce: None,
-                    amount: i32::from_str(tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().unwrap()),
+                    amount: tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
                     fee: 0,
                     block_number: Some(op.block.block_number as i32),
-                    state_root: Some(op.block.new_root_hash as str),
+                    state_root: Some(op.block.new_root_hash.into_repr().to_string()),
                 })
                 .execute(self.conn())?;
             if 0 == inserted {
@@ -295,17 +299,17 @@ impl StorageProcessor {
     }
 
     fn save_exit_transactions(&self, op: &Operation, txs: &Vec<ExitTx>) -> QueryResult<()> {
-        for (&tx_id, tx) in txs.iter() {
-            let inserted: StoredTx = diesel::insert_into(account_updates::table)
+        for tx in txs.iter() {
+            let inserted = diesel::insert_into(transactions::table)
                 .values(&NewTx{
                     tx_type: String::from("exit"),
                     from_account: tx.account as i32,
                     to_account: None,
                     nonce: None,
-                    amount: i32::from_str(tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().unwrap()),
+                    amount: tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
                     fee: 0,
                     block_number: Some(op.block.block_number as i32),
-                    state_root: Some(op.block.new_root_hash as str),
+                    state_root: Some(op.block.new_root_hash.into_repr().to_string()),
                 })
                 .execute(self.conn())?;
             if 0 == inserted {
