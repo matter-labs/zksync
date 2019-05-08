@@ -5,6 +5,6 @@ then
     echo -n "Dangerous action. Type environment name ('$FRANKLIN_ENV') to confirm: "
     read CONFIRMED
     if [ ! "$FRANKLIN_ENV" == "$CONFIRMED" ]; then
-        exit
+        exit 1
     fi
 fi

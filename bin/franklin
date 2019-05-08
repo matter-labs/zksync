@@ -3,7 +3,9 @@
 . .setup_env
 
 if [ -f bin/$1 ]; then
-    $1 "${@:2}"
+    bin/$1 "${@:2}"
 else
     make "$@"
 fi
+
+#make "$@"
