@@ -185,6 +185,13 @@ pub struct IntegerNumber {
     pub integer_value: i32,
 }
 
+#[derive(Debug, Queryable, QueryableByName)]
+#[table_name="server_config"]
+pub struct ServerConfig {
+    pub id:             bool,
+    pub contract_addr:  Option<String>,
+}
+
 enum ConnectionHolder {
     Pooled(PooledConnection<ConnectionManager<PgConnection>>),
     Direct(PgConnection),
@@ -213,6 +220,11 @@ impl StorageProcessor {
             ConnectionHolder::Pooled(ref conn) => conn,
             ConnectionHolder::Direct(ref conn) => conn,
         }
+    }
+
+    pub fn load_config(&self) -> QueryResult<ServerConfig> {
+        use schema::server_config::dsl::*;
+        server_config.first(self.conn())
     }
 
     /// Execute an operation: store op, modify state accordingly, load additional data and meta tx info

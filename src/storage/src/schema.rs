@@ -52,8 +52,8 @@ table! {
 
 table! {
     server_config (id) {
-        contract_addr -> Nullable<Text>,
         id -> Bool,
+        contract_addr -> Nullable<Text>,
     }
 }
 
