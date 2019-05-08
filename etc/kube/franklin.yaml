@@ -71,6 +71,10 @@ spec:
         - name: prover
           image: gluk64/franklin:prover
           imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "2"
           envFrom:
           - secretRef:
               name: franklin-secret
@@ -83,6 +87,6 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
+      terminationGracePeriodSeconds: 5
       nodeSelector:
         doks.digitalocean.com/node-pool: prover
-      

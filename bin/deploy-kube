@@ -6,7 +6,7 @@
 kubectl --kubeconfig etc/kube/kubeconfig.yaml apply -f etc/kube/franklin.yaml
 
 # Generate and apply secrets configuration from prod env
-. .kube_gen_secret | kubectl apply -f -
+. bin/.kube_gen_secret | kubectl apply -f -
 
 # Restart deployments (this will re-pull images)
 kubectl patch deployment server -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(date +%s)\"}}}}}"

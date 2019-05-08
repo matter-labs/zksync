@@ -38,7 +38,10 @@ fn main() {
         .into_async()
         .unwrap()
         .map_err(|_|())
-        .for_each(|_| {println!("Termination signal received. Prover will finish the job and shut down gracefully"); Ok(())})
+        .for_each(|_| {
+            println!("Termination signal received. Prover will finish the job and shut down gracefully"); 
+            Ok(())
+        })
     );
     rt.block_on(shutdown_rx).unwrap();
 
