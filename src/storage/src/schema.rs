@@ -51,6 +51,13 @@ table! {
 }
 
 table! {
+    server_config (id) {
+        contract_addr -> Nullable<Text>,
+        id -> Bool,
+    }
+}
+
+table! {
     transactions (id) {
         id -> Int4,
         tx_type -> Text,
@@ -72,5 +79,6 @@ allow_tables_to_appear_in_same_query!(
     operations,
     proofs,
     prover_runs,
+    server_config,
     transactions,
 );

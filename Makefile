@@ -29,26 +29,26 @@ db-setup: confirm_action
 init: dev-up env yarn db-setup redeploy
 
 yarn:
-	@cd contracts; yarn
-	@cd js/franklin; yarn
-	@cd js/client; yarn
-	@cd js/loadtest; yarn
-	@cd js/explorer; yarn
+	@cd contracts && yarn
+	@cd js/franklin && yarn
+	@cd js/client && yarn
+	@cd js/loadtest && yarn
+	@cd js/explorer && yarn
 
 client:
-	@cd js/client; yarn dev
+	@cd js/client && yarn dev
 
 explorer:
-	@cd js/explorer; yarn dev
+	@cd js/explorer && yarn dev
 
 prover:
-	@bin/.load_keys; cargo run --release --bin prover
+	@bin/.load_keys && cargo run --release --bin prover
 
 server:
 	@cargo run --release --bin server
 
 sandbox:
-	@cd src/sandbox; cargo run
+	@cd src/sandbox && cargo run
 
 deploy-contracts: confirm_action
 	@bin/deploy-contracts
@@ -57,6 +57,9 @@ deploy-client: confirm_action
 	@bin/deploy-client
 
 db-reset: confirm_action db-drop db-setup
+
+migrate: confirm_action
+	@cd src/storage && diesel migration run
 
 redeploy: deploy-contracts db-reset
 
@@ -121,7 +124,7 @@ blockscout-down:
 	@docker-compose stop blockscout blockscout_postgres
 
 loadtest:
-	@cd js/loadtest; yarn test
+	@cd js/loadtest && yarn test
 
 # Kubernetes
 
