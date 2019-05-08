@@ -640,38 +640,38 @@ impl StorageProcessor {
         //self.load_number("SELECT COALESCE(max(last_block), 0) AS integer_value FROM accounts")
     }
 
-    pub fn load_last_saved_transaction(&self) -> QueryResult<Option<StoredTx>> {
+    pub fn load_last_saved_transactions(&self, count: i32) -> QueryResult<Vec<StoredTx>> {
         let query = format!("
             SELECT * FROM transactions
-            ORDER BY block_number DESC LIMIT 1
-        ");
+            ORDER BY block_number DESC
+            LIMIT {}
+        ", count);
         let r = diesel::sql_query(query)
-            .get_result(self.conn())
-            .optional()?;
+            .load(self.conn())?;
         Ok( r )
     }
 
-    pub fn load_last_saved_tx_transaction_for_account(&self, account_id: AccountId) -> QueryResult<Option<StoredTx>> {
+    pub fn load_tx_transactions_for_account(&self, account_id: AccountId, count: i32) -> QueryResult<Vec<StoredTx>> {
         let query = format!("
             SELECT * FROM transactions
             WHERE from_account = {}
-            ORDER BY block_number DESC LIMIT 1
-        ", account_id);
+            ORDER BY block_number DESC
+            LIMIT {}
+        ", account_id, count);
         let r = diesel::sql_query(query)
-            .get_result(self.conn())
-            .optional()?;
+            .load(self.conn())?;
         Ok( r )
     }
 
-    pub fn load_last_saved_rx_transaction_for_account(&self, account_id: AccountId) -> QueryResult<Option<StoredTx>> {
+    pub fn load_rx_transactions_for_account(&self, account_id: AccountId, count: i32) -> QueryResult<Vec<StoredTx>> {
         let query = format!("
             SELECT * FROM transactions
             WHERE to_account = {}
-            ORDER BY block_number DESC LIMIT 1
-        ", account_id);
+            ORDER BY block_number DESC
+            LIMIT {}
+        ", account_id, count);
         let r = diesel::sql_query(query)
-            .get_result(self.conn())
-            .optional()?;
+            .load(self.conn())?;
         Ok( r )
     }
 
@@ -693,28 +693,6 @@ impl StorageProcessor {
             WHERE block_number = {}
             ORDER BY block_number
         ", block_number as i32);
-        let r = diesel::sql_query(query)
-            .load(self.conn())?;
-        Ok( r )
-    }
-
-    pub fn load_rx_transactions_for_account(&self, account_id: AccountId) -> QueryResult<Vec<StoredTx>> {
-        let query = format!("
-            SELECT * FROM transactions
-            WHERE from_account = {}
-            ORDER BY block_number
-        ", account_id);
-        let r = diesel::sql_query(query)
-            .load(self.conn())?;
-        Ok( r )
-    }
-
-    pub fn load_tx_transactions_for_account(&self, account_id: AccountId) -> QueryResult<Vec<StoredTx>> {
-        let query = format!("
-            SELECT * FROM transactions
-            WHERE to_account = {}
-            ORDER BY block_number
-        ", account_id);
         let r = diesel::sql_query(query)
             .load(self.conn())?;
         Ok( r )
@@ -777,6 +755,8 @@ mod test {
     use plasma::models;
     use diesel::Connection;
     use bigdecimal::BigDecimal;
+    use ff::Field;
+    use bigdecimal::Num;
     //use diesel::RunQueryDsl;
 
     #[test]
@@ -900,7 +880,6 @@ mod test {
             accounts_updated:   Some(accounts.clone()),
             tx_meta:            None,
         }).unwrap();
-
         assert_eq!(conn.last_verified_state_for_account(5).unwrap(), None);
         assert_eq!(conn.last_committed_state_for_account(5).unwrap().unwrap().balance, BigDecimal::from(2));
 
@@ -1022,6 +1001,82 @@ mod test {
             tx_meta:            None,
         }).unwrap();
         assert_eq!(2, conn.load_last_committed_exit_batch().unwrap());
+    }
+
+    #[test]
+    fn test_store_txs_2() {
+        let pool = ConnectionPool::new();
+        let conn = pool.access_storage().unwrap();
+        conn.conn().begin_test_transaction().unwrap();
+
+
+        let deposit_tx: DepositTx = DepositTx {
+            account: 1,
+            amount:  BigDecimal::from_str_radix(&format!("{}", 10000), 10).unwrap(),
+            pub_x:   Fr::zero(),
+            pub_y:   Fr::zero(),
+        };
+
+        let transfer_tx: TransferTx = TransferTx {
+            from:               1,
+            to:                 2,
+            amount:             BigDecimal::from_str_radix(&format!("{}", 5000), 10).unwrap(),
+            fee:                BigDecimal::from_str_radix(&format!("{}", 0), 10).unwrap(),
+            nonce:              1,
+            good_until_block:   100000,
+            signature: TxSignature::default(),
+            cached_pub_key: None, 
+        };
+
+        let exit_tx: ExitTx = ExitTx {
+            account:            1,
+            amount:             BigDecimal::from_str_radix(&format!("{}", 5000), 10).unwrap(),
+        };
+
+        conn.execute_operation(&Operation{
+            action: Action::Commit,
+            block:  Block{
+                block_number:   1,
+                new_root_hash:  Fr::default(),
+                block_data:     BlockData::Deposit{
+                    batch_number: 1,
+                    transactions: vec![deposit_tx.clone(), deposit_tx.clone()],
+                }
+            }, 
+            accounts_updated:   Some(fnv::FnvHashMap::default()),
+            tx_meta:            None,
+        }).unwrap();
+
+        conn.execute_operation(&Operation{
+            action: Action::Commit,
+            block:  Block{
+                block_number:   2,
+                new_root_hash:  Fr::default(),
+                block_data:     BlockData::Transfer{
+                    total_fees: BigDecimal::from_str_radix(&format!("{}", 0), 10).unwrap(),
+                    transactions: vec![transfer_tx.clone(), transfer_tx.clone()],
+                }
+            }, 
+            accounts_updated:   Some(fnv::FnvHashMap::default()),
+            tx_meta:            None,
+        }).unwrap();
+
+        conn.execute_operation(&Operation{
+            action: Action::Commit,
+            block:  Block{
+                block_number:   3,
+                new_root_hash:  Fr::default(),
+                block_data:     BlockData::Exit{
+                    batch_number: 2,
+                    transactions: vec![exit_tx.clone(), exit_tx.clone()],
+                }
+            }, 
+            accounts_updated:   Some(fnv::FnvHashMap::default()),
+            tx_meta:            None,
+        }).unwrap();
+
+        let txs = conn.load_last_saved_transactions(10);
+        assert_eq!(txs.unwrap().len(), 6);
     }
 
 }
