@@ -542,6 +542,18 @@ impl StorageProcessor {
         })
     }
 
+    pub fn update_prover_job(&self, w: &String, bn: BlockNumber) -> QueryResult<()> {
+        use crate::schema::prover_runs::dsl::*;
+        use diesel::expression::dsl::now;
+
+        diesel::update(prover_runs)
+            .filter(block_number.eq(bn as i32))
+            .filter(worker.eq(w))
+            .set(updated_at.eq(now))
+            .execute(self.conn())
+            .map(|_|())
+    }
+
     /// Store the timestamp of the prover finish and the proof
     pub fn store_proof(&self, block_number: BlockNumber, proof: &EncodedProof) -> QueryResult<usize> {
         let to_store = NewProof{

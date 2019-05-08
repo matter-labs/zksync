@@ -47,6 +47,7 @@ table! {
         block_number -> Int4,
         worker -> Nullable<Text>,
         created_at -> Timestamp,
+        updated_at -> Timestamp,
     }
 }
 
