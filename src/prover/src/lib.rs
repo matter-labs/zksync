@@ -2,6 +2,7 @@ extern crate rustc_hex;
 extern crate plasma;
 extern crate models;
 extern crate storage;
+extern crate tokio;
 
 extern crate rand;
 extern crate crypto;
@@ -14,6 +15,10 @@ use std::fmt;
 use std::thread;
 use std::time::Duration;
 use rand::{OsRng};
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+
+use tokio::prelude::*;
+use tokio::timer;
 
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
@@ -980,6 +985,15 @@ impl BabyProver {
         let storage = StorageProcessor::establish_connection().map_err(|e| format!("establish_connection failed: {}", e))?;
         let job = storage.fetch_prover_job(worker, PROVER_TIMEOUT).map_err(|e| format!("fetch_prover_job failed: {}", e))?;
 
+        // TODO: start interval
+        let _ping = timer::Interval::new_interval(Duration::from_millis(1000))
+        .map(|_| {
+            println!(".");
+            if let Ok(_storage) = StorageProcessor::establish_connection() {
+
+            }
+        });
+
         if let Some(block_number) = job {
             println!("prover {} got a new job for block {}", worker, block_number);
 
@@ -1007,23 +1021,18 @@ impl BabyProver {
         }
         Ok(())
     }
-
-    fn run(&mut self, worker: &String) {
-        loop {
-            if let Err(err) = self.make_proving_attempt(worker) {
-                eprint!("Error: {}", err);
-            }
-        }
-    }
 }
 
-pub fn start_prover(worker: String) {
-    thread::Builder::new().name(worker.clone()).spawn(move || {
-        println!("prover worker: {}", worker);
-        let mut prover = BabyProver::create().unwrap();
-        println!("prover started");
-        prover.run(&worker)
-    }).expect("prover thread must start");
+pub fn run_prover(stop_signal: Arc<AtomicBool>, worker: String) {
+    println!("creating prover, worker: {}", worker);
+    let mut prover = BabyProver::create().unwrap();
+    println!("prover started");
+    
+    while !stop_signal.load(Ordering::SeqCst) {
+        if let Err(err) = prover.make_proving_attempt(&worker) {
+            eprint!("Error: {}", err);
+        }
+    } 
 }
 
 // #[test]

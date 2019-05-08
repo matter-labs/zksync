@@ -1,16 +1,18 @@
 extern crate storage;
 extern crate prover;
 extern crate signal_hook;
+extern crate tokio;
+extern crate futures;
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::thread;
-use std::time::Duration;
+use std::sync::{Arc, atomic::{AtomicBool}};
 use std::env;
-
-use prover::start_prover;
+use prover::run_prover;
+use signal_hook::iterator::Signals;
+use futures::Stream;
 
 fn main() {
+
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     // handle ctrl+c
     let stop_signal = Arc::new(AtomicBool::new(false));
@@ -18,12 +20,17 @@ fn main() {
     signal_hook::flag::register(signal_hook::SIGINT, Arc::clone(&stop_signal)).expect("Error setting SIGINT handler");
     signal_hook::flag::register(signal_hook::SIGQUIT, Arc::clone(&stop_signal)).expect("Error setting SIGQUIT handler");
 
-    let args: Vec<String> = env::args().collect();
-    start_prover(args.get(1).unwrap_or(&"default".to_string()).clone());
+    rt.spawn(
+        Signals::new(&[signal_hook::SIGTERM, signal_hook::SIGINT, signal_hook::SIGQUIT])
+        .unwrap()
+        .into_async()
+        .unwrap()
+        .map_err(|_|())
+        .for_each(|_| {println!("termination signal received"); Ok(())})
+    );
 
-    while !stop_signal.load(Ordering::SeqCst) {
-        thread::sleep(Duration::from_secs(1));
-    }
+    run_prover(stop_signal, env::var("POD_NAME").unwrap_or("default".to_string()).clone());    
 
-    println!("terminate signal received");
+    rt.shutdown_now();
+    println!("prover terminated");
 }
