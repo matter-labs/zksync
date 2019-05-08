@@ -160,6 +160,63 @@ pub struct StoredTx {
     pub created_at:     std::time::SystemTime,
 }
 
+// impl StoredTx {
+//     pub fn into_block_data(self, conn: &StorageProcessor) -> QueryResult<BlockData> {
+//         match &self.tx_type {
+//             return Ok(BlockData::Transfer {
+                
+//             })
+//         }
+//         let debug_data = format!("data: {}", &self.data);
+        
+//         // let op: Result<Operation, serde_json::Error> = serde_json::from_value(self.data);
+//         let op: Result<Operation, serde_json::Error> = serde_json::from_str(&self.data.to_string());
+
+//         if let Err(err) = &op {
+//             println!("Error: {} on {}", err, debug_data)
+//         }
+
+//         let mut op = op.expect("Operation deserialization");
+//         op.tx_meta = Some(meta);
+
+//         if op.accounts_updated.is_none() {
+//             let (_, updates) = conn.load_state_diff_for_block(op.block.block_number)?;
+//             op.accounts_updated = Some(updates);
+//         };
+
+//         Ok(op)
+//     }
+
+//     pub fn into_transfer_transaction(&self) -> TransferTx {
+//         TransferTx {
+//             from: self.from.clone() as u32,
+//             to: self.to.unwrap().clone() as u32,
+//             amount: BigDecimal::from(self.amount.clone()),
+//             fee: BigDecimal::from(self.fee.unwrap().clone()),
+//             nonce: self.nonce.unwrap().clone() as u32,
+//             good_until_block: self.good_until_block.clone() as u32,
+//             signature: TxSignature::default(),
+//             cached_pub_key: None,  
+//         }
+//     }
+
+//     pub fn into_deposit_transaction(&self) -> DepositTx {
+//         DepositTx {
+//             account: self.from.clone() as u32,
+//             amount: BigDecimal::from(self.amount.clone()),
+//             pub_x: Fr::zero(),
+//             pub_y: Fr::zero(),
+//         }
+//     }
+
+//     pub fn into_exit_transaction(&self) -> ExitTx {
+//         ExitTx {
+//             account: self.from.clone() as u32,
+//             amount: BigDecimal::from(self.amount.clone()),
+//         }
+//     }
+// }
+
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
 #[table_name="proofs"]
 pub struct NewProof {
@@ -581,6 +638,86 @@ impl StorageProcessor {
             .map(|max| max.unwrap_or(0) as BlockNumber)
 
         //self.load_number("SELECT COALESCE(max(last_block), 0) AS integer_value FROM accounts")
+    }
+
+    pub fn load_last_saved_transaction(&self) -> QueryResult<Option<StoredTx>> {
+        let query = format!("
+            SELECT * FROM transactions
+            ORDER BY block_number DESC LIMIT 1
+        ");
+        let r = diesel::sql_query(query)
+            .get_result(self.conn())
+            .optional()?;
+        Ok( r )
+    }
+
+    pub fn load_last_saved_tx_transaction_for_account(&self, account_id: AccountId) -> QueryResult<Option<StoredTx>> {
+        let query = format!("
+            SELECT * FROM transactions
+            WHERE from_account = {}
+            ORDER BY block_number DESC LIMIT 1
+        ", account_id);
+        let r = diesel::sql_query(query)
+            .get_result(self.conn())
+            .optional()?;
+        Ok( r )
+    }
+
+    pub fn load_last_saved_rx_transaction_for_account(&self, account_id: AccountId) -> QueryResult<Option<StoredTx>> {
+        let query = format!("
+            SELECT * FROM transactions
+            WHERE to_account = {}
+            ORDER BY block_number DESC LIMIT 1
+        ", account_id);
+        let r = diesel::sql_query(query)
+            .get_result(self.conn())
+            .optional()?;
+        Ok( r )
+    }
+
+    pub fn load_transaction_with_id(&self, tx_id: u32) -> QueryResult<Option<StoredTx>> {
+        let query = format!("
+            SELECT * FROM transactions
+            WHERE id = {}
+            DESC LIMIT 1
+        ", tx_id as i32);
+        let r = diesel::sql_query(query)
+            .get_result(self.conn())
+            .optional()?;
+        Ok( r )
+    }
+
+    pub fn load_transactions_in_block(&self, block_number: u32) -> QueryResult<Vec<StoredTx>> {
+        let query = format!("
+            SELECT * FROM transactions
+            WHERE block_number = {}
+            ORDER BY block_number
+        ", block_number as i32);
+        let r = diesel::sql_query(query)
+            .load(self.conn())?;
+        Ok( r )
+    }
+
+    pub fn load_rx_transactions_for_account(&self, account_id: AccountId) -> QueryResult<Vec<StoredTx>> {
+        let query = format!("
+            SELECT * FROM transactions
+            WHERE from_account = {}
+            ORDER BY block_number
+        ", account_id);
+        let r = diesel::sql_query(query)
+            .load(self.conn())?;
+        Ok( r )
+    }
+
+    pub fn load_tx_transactions_for_account(&self, account_id: AccountId) -> QueryResult<Vec<StoredTx>> {
+        let query = format!("
+            SELECT * FROM transactions
+            WHERE to_account = {}
+            ORDER BY block_number
+        ", account_id);
+        let r = diesel::sql_query(query)
+            .load(self.conn())?;
+        Ok( r )
     }
 
     pub fn fetch_prover_job(&self, worker: &String, timeout_seconds: usize) -> QueryResult<Option<BlockNumber>> {
