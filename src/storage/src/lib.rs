@@ -131,7 +131,7 @@ struct NewTx {
     pub to_account:     Option<i32>,    // only used for transfers
     pub nonce:          Option<i32>,    // only used for transfers
     pub amount:         i32,
-    pub fee:            Option<i32>,    // only used for transfers
+    pub fee:            i32,
 
     pub block_number:   Option<i32>,
     pub state_root:     Option<String>, // unique block id (for possible reorgs)
@@ -148,7 +148,7 @@ pub struct StoredTx {
     pub to_account:     Option<i32>,    // only used for transfers
     pub nonce:          Option<i32>,    // only used for transfers
     pub amount:         i32,
-    pub fee:            Option<i32>,    // only used for transfers
+    pub fee:            i32,
 
     pub block_number:   Option<i32>,
     pub state_root:     Option<String>, // unique block id (for possible reorgs)
@@ -259,7 +259,7 @@ impl StorageProcessor {
                     to_account: Some(tx.to as i32),
                     nonce: Some(tx.nonce as i32),
                     amount: i32::from_str(tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().unwrap()),
-                    fee: Some(i32::from_str(tx.fee.as_bigint_and_exponent().0.to_str_radix(10).as_str().unwrap())),
+                    fee: i32::from_str(tx.fee.as_bigint_and_exponent().0.to_str_radix(10).as_str().unwrap()),
                     block_number: Some(op.block.block_number as i32),
                     state_root: Some(op.block.new_root_hash as str),
                 })
@@ -281,7 +281,7 @@ impl StorageProcessor {
                     to_account: None,
                     nonce: None,
                     amount: i32::from_str(tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().unwrap()),
-                    fee: None,
+                    fee: 0,
                     block_number: Some(op.block.block_number as i32),
                     state_root: Some(op.block.new_root_hash as str),
                 })
@@ -303,7 +303,7 @@ impl StorageProcessor {
                     to_account: None,
                     nonce: None,
                     amount: i32::from_str(tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().unwrap()),
-                    fee: None,
+                    fee: 0,
                     block_number: Some(op.block.block_number as i32),
                     state_root: Some(op.block.new_root_hash as str),
                 })
