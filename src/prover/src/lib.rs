@@ -6,7 +6,7 @@ extern crate tokio;
 
 extern crate rand;
 extern crate crypto;
-
+extern crate futures;
 extern crate ff;
 extern crate bellman;
 extern crate sapling_crypto;
@@ -16,9 +16,12 @@ use std::thread;
 use std::time::Duration;
 use rand::{OsRng};
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::iter::Iterator;
 
-use tokio::prelude::*;
 use tokio::timer;
+use tokio::runtime::current_thread::Handle;
+use futures::Stream;
+use tokio::prelude::*;
 
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
@@ -981,21 +984,26 @@ impl BabyProver {
         Ok(())
     }
 
-    fn make_proving_attempt(&mut self, worker: &String) -> Result<(), String> {
+    fn make_proving_attempt(&mut self, rt: &Handle, worker: &String) -> Result<(), String> {
         let storage = StorageProcessor::establish_connection().map_err(|e| format!("establish_connection failed: {}", e))?;
         let job = storage.fetch_prover_job(worker, PROVER_TIMEOUT).map_err(|e| format!("fetch_prover_job failed: {}", e))?;
 
-        // TODO: start interval
-        let _ping = timer::Interval::new_interval(Duration::from_millis(1000))
-        .map(|_| {
-            println!(".");
-            if let Ok(_storage) = StorageProcessor::establish_connection() {
-
-            }
-        });
-
         if let Some(block_number) = job {
             println!("prover {} got a new job for block {}", worker, block_number);
+
+            // TODO: start interval
+            let ping = timer::Interval::new_interval(Duration::from_millis(1000))
+            .fold(block_number, |block_number, _| {
+                println!("{}", block_number);
+                if let Ok(_storage) = StorageProcessor::establish_connection() {
+
+                }
+                Ok(block_number)
+            })
+            .map(|_|())
+            .map_err(|_|());
+            
+            rt.spawn(ping).unwrap();
 
             // load state delta self.current_block_number => block_number (can go both forwards and backwards)
             let expected_current_block = block_number;
@@ -1023,16 +1031,18 @@ impl BabyProver {
     }
 }
 
-pub fn run_prover(stop_signal: Arc<AtomicBool>, worker: String) {
+pub fn run_prover(rt: &Handle, stop_signal: Arc<AtomicBool>, worker: String) {
     println!("creating prover, worker: {}", worker);
     let mut prover = BabyProver::create().unwrap();
     println!("prover started");
     
     while !stop_signal.load(Ordering::SeqCst) {
-        if let Err(err) = prover.make_proving_attempt(&worker) {
+        if let Err(err) = prover.make_proving_attempt(rt, &worker) {
             eprint!("Error: {}", err);
         }
-    } 
+    }
+    println!("prover terminated");
+    std::process::exit(0);
 }
 
 // #[test]
