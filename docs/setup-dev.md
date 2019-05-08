@@ -29,7 +29,7 @@ Edit the lines below and add them to your shell profile file (e.g. `~/.bash_prof
 # Add path here:
 export FRANKLIN_HOME=/path/to/franklin
 
-export PATH=$PATH:$FRANKLIN_HOME/bin
+export PATH=$FRANKLIN_HOME/bin:$PATH
 complete -W "\`grep -oE '^[a-zA-Z0-9_.-]+:([^=]|$)' $FRANKLIN_HOME/Makefile | sed 's/[^a-zA-Z0-9_.-]*$//'\`" franklin
 
 # If you're like me, uncomment:
