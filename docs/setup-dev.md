@@ -13,6 +13,10 @@ rustc --version
 rustc 1.32.0-nightly (21f268495 2018-12-02)
 ```
 
+# PSQL
+
+Install `psql` CLI tool to interact with postgres.
+
 ## Diesel
 
 ```cargo install diesel_cli --no-default-features --features postgres```
