@@ -65,4 +65,6 @@ fn main() {
     while !stop_signal.load(Ordering::SeqCst) {
         thread::sleep(Duration::from_secs(1));
     }
+
+    println!("terminate signal received");
 }
