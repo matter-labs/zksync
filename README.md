@@ -4,9 +4,23 @@ Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 
 # Basics
 
-## Setup local dev environment
+## Prerequisites
 
 Prepare dev environment prerequisites: see [docs/setup-dev.md](docs/setup-dev.md)
+
+## Setup local dev environment
+
+First-time setup:
+
+```franklin init```
+
+To completely reset the dev environment:
+
+- Stop services:
+```franklin dev-down```
+- Remove mounted container data:
+```rm -rf ./volumes```
+- Repeat the setup procedure above
 
 # (Re)deploy db and contraсts:
 
@@ -36,11 +50,13 @@ NOTE: if you are resetting geth, each Metamask account must be manually reset vi
 It generates quite some CPU load, but might be useful to visualize blockchain activity. Use with caution.
 
 - Migrate blockscout (do this once to setup database):
-```make blockscout-migrate```
+```franklin blockscout-migrate```
+
 - Start:
-```make blockscout-up```
+```franklin blockscout-up```
+
 - Stop:
-```make blockscout-down```
+```franklin blockscout-down```
 
 Blockscout will be available at http://localhost:4000/txs
 
@@ -57,36 +73,26 @@ Client UI will be available at http://localhost:8080
 ## Start server and prover as local docker containers:
 
 - Start:
-```make start```
+```franklin start```
+
 - Watch logs:
-```make logs```
+```franklin logs```
+
 - Stop:
-```make stop```
+```franklin stop```
 
 ## Build and push images to dockerhub:
 
-```make push```
+```franklin push```
 
 # Development
 
 ## Database migrations
 
-```
-cd src/storage
-diesel database setup
-```
-
-This will create database 'plasma' (db url is set in [server/.env] file) with our schema.
-
-- Rename `server/storage/schema.rs.generated` to `schema.rs`
-
-- To reset migrations (will reset the db), run:
-
-```diesel migration reset```
-
-- Run tests:
-
-```db-test```
+- ```cd src/storage```
+- Add diesel migration
+- Rename `src/storage/schema.rs.generated` to `schema.rs`
+- Run tests: ```franklin db-tests```
 
 ## Generating keys
 
@@ -112,22 +118,12 @@ If the pregenerated leaf format changes, replace the `EMPTY_TREE_ROOT` constant 
 ### Re-build contracts:
 
 ```
-yarn build
+cd contracts; yarn build
 ```
 
 IMPORTANT! Generated `.abi` and `.bin` files are fed to cargo to build module `plasma::eth`. 
 
-So you need to rebuild the code on every change (to be automated soon).
-
-### Deploy contracts
-
-After the keys have been generated and copied to contracts:
-
-- run `redeploy`
-
-Update addresses (make sure to exclude 0x !):
-
-- copy contracts address of `PlasmaContract` to `CONTRACT_ADDR` in `/env` 
+So you need to rebuild the code on every change (to be automated).
 
 ### Publish source
 
