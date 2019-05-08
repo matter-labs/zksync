@@ -131,7 +131,7 @@ struct NewTx {
     pub to_account:     Option<i32>,    // only used for transfers
     pub nonce:          Option<i32>,    // only used for transfers
     pub amount:         i32,
-    pub fee:            i32,
+    pub fee:            Option<i32>,    // only used for transfers
 
     pub block_number:   Option<i32>,
     pub state_root:     Option<String>, // unique block id (for possible reorgs)
@@ -148,7 +148,7 @@ pub struct StoredTx {
     pub to_account:     Option<i32>,    // only used for transfers
     pub nonce:          Option<i32>,    // only used for transfers
     pub amount:         i32,
-    pub fee:            i32,
+    pub fee:            Option<i32>,    // only used for transfers
 
     pub block_number:   Option<i32>,
     pub state_root:     Option<String>, // unique block id (for possible reorgs)
@@ -222,7 +222,10 @@ impl StorageProcessor {
         self.conn().transaction(|| {
             match &op.action {
                 Action::Commit => 
-                    self.commit_state_update(op.block.block_number, op.accounts_updated.as_ref().unwrap())?,
+                    {
+                        self.commit_state_update(op.block.block_number, op.accounts_updated.as_ref().unwrap())?;
+                        self.save_transactions(op)?;
+                    },
                 Action::Verify{proof: _} => 
                     self.apply_state_update(op.block.block_number)?,
             };
@@ -235,6 +238,82 @@ impl StorageProcessor {
                 .get_result(self.conn())?;
             stored.into_op(self)
         })
+    }
+
+    fn save_transactions(&self, op: &Operation) -> QueryResult<()> {
+        let block_data = op.block.BlockData;
+        match block_data {
+            Transfer { txs, total_fees } => self.save_transfer_transactions(op, &txs)?,
+            Deposit { txs, total_fees } => self.save_deposit_transactions(op, &txs)?,
+            Exit { txs, total_fees } => self.save_exit_transactions(op, &txs)?,
+        }
+        Ok(())
+    }
+
+    fn save_transfer_transactions(&self, op: &Operation, txs: &Vec<TransferTx>) -> QueryResult<()> {
+        for (&tx_id, tx) in txs.iter() {
+            let inserted: StoredTx = diesel::insert_into(account_updates::table)
+                .values(&NewTx{
+                    tx_type: String::from("transfer"),
+                    from_account: tx.from as i32,
+                    to_account: Some(tx.to as i32),
+                    nonce: Some(tx.nonce as i32),
+                    amount: i32::from_str(tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().unwrap()),
+                    fee: Some(i32::from_str(tx.fee.as_bigint_and_exponent().0.to_str_radix(10).as_str().unwrap())),
+                    block_number: Some(op.block.block_number as i32),
+                    state_root: Some(op.block.new_root_hash as str),
+                })
+                .execute(self.conn())?;
+            if 0 == inserted {
+                eprintln!("Error: could not commit all new transactions!");
+                return Err(Error::RollbackTransaction)
+            }
+        }
+        Ok(())
+    }
+
+    fn save_deposit_transactions(&self, op: &Operation, txs: &Vec<DepositTx>) -> QueryResult<()> {
+        for (&tx_id, tx) in txs.iter() {
+            let inserted: StoredTx = diesel::insert_into(account_updates::table)
+                .values(&NewTx{
+                    tx_type: String::from("deposit"),
+                    from_account: tx.account as i32,
+                    to_account: None,
+                    nonce: None,
+                    amount: i32::from_str(tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().unwrap()),
+                    fee: None,
+                    block_number: Some(op.block.block_number as i32),
+                    state_root: Some(op.block.new_root_hash as str),
+                })
+                .execute(self.conn())?;
+            if 0 == inserted {
+                eprintln!("Error: could not commit all new transactions!");
+                return Err(Error::RollbackTransaction)
+            }
+        }
+        Ok(())
+    }
+
+    fn save_exit_transactions(&self, op: &Operation, txs: &Vec<ExitTx>) -> QueryResult<()> {
+        for (&tx_id, tx) in txs.iter() {
+            let inserted: StoredTx = diesel::insert_into(account_updates::table)
+                .values(&NewTx{
+                    tx_type: String::from("exit"),
+                    from_account: tx.account as i32,
+                    to_account: None,
+                    nonce: None,
+                    amount: i32::from_str(tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().unwrap()),
+                    fee: None,
+                    block_number: Some(op.block.block_number as i32),
+                    state_root: Some(op.block.new_root_hash as str),
+                })
+                .execute(self.conn())?;
+            if 0 == inserted {
+                eprintln!("Error: could not commit all new transactions!");
+                return Err(Error::RollbackTransaction)
+            }
+        }
+        Ok(())
     }
 
     fn commit_state_update(&self, block_number: u32, accounts_updated: &AccountMap) -> QueryResult<()> {
