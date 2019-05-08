@@ -86,7 +86,7 @@ This will create database 'plasma' (db url is set in [server/.env] file) with ou
 
 - Run tests:
 
-```db-tests```
+```db-test```
 
 ## Generating keys
 
