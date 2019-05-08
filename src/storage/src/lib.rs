@@ -524,7 +524,7 @@ impl StorageProcessor {
                         (SELECT * FROM proofs WHERE block_number = o.block_number)
                     AND NOT EXISTS
                         (SELECT * FROM prover_runs 
-                            WHERE block_number = o.block_number AND (now() - created_at) < interval '{} seconds')
+                            WHERE block_number = o.block_number AND (now() - updated_at) < interval '{} seconds')
                 ", timeout_seconds))
                 .get_result::<Option<IntegerNumber>>(self.conn())?
                 .map(|i| i.integer_value as BlockNumber);

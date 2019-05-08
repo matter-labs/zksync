@@ -10,10 +10,10 @@ use prover::run_prover;
 use signal_hook::iterator::Signals;
 use futures::Stream;
 use tokio::runtime::current_thread::Runtime;
+use tokio::sync::oneshot;
+use std::thread;
 
 fn main() {
-
-    let mut rt = Runtime::new().unwrap();
 
     // handle ctrl+c
     let stop_signal = Arc::new(AtomicBool::new(false));
@@ -21,29 +21,25 @@ fn main() {
     signal_hook::flag::register(signal_hook::SIGINT, Arc::clone(&stop_signal)).expect("Error setting SIGINT handler");
     signal_hook::flag::register(signal_hook::SIGQUIT, Arc::clone(&stop_signal)).expect("Error setting SIGQUIT handler");
 
+    let mut rt = Runtime::new().unwrap();
+    let handle = rt.handle();
+    let (shutdown_tx, shutdown_rx) = oneshot::channel();
+
+    // Run tokio timeline in a new thread
+    thread::spawn(move || {
+        let name = env::var("POD_NAME").unwrap_or("default".to_string());
+        run_prover(shutdown_tx, &handle, stop_signal, name);        
+    });
+
+    // this just prints info message
     rt.spawn(
         Signals::new(&[signal_hook::SIGTERM, signal_hook::SIGINT, signal_hook::SIGQUIT])
         .unwrap()
         .into_async()
         .unwrap()
         .map_err(|_|())
-        .for_each(|_| {println!("termination signal received"); Ok(())})
+        .for_each(|_| {println!("Termination signal received. Prover will finish the job and shut down gracefully"); Ok(())})
     );
+    rt.block_on(shutdown_rx).unwrap();
 
-    // let ping = timer::Interval::new_interval(Duration::from_millis(1000))
-    //     .map_err(|_|())
-    //     .for_each(|_| {
-    //         println!(".");
-    //         if let Ok(_storage) = StorageProcessor::establish_connection() {
-
-    //         }
-    //         Ok(())
-    //     });
-    //     rt.spawn(ping).unwrap();
-
-    let handle = rt.handle();
-    std::thread::spawn(move || {
-        run_prover(&handle, stop_signal, env::var("POD_NAME").unwrap_or("default".to_string()).clone());        
-    });
-    rt.run().unwrap();
 }

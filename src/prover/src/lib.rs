@@ -6,7 +6,6 @@ extern crate tokio;
 
 extern crate rand;
 extern crate crypto;
-extern crate futures;
 extern crate ff;
 extern crate bellman;
 extern crate sapling_crypto;
@@ -15,13 +14,13 @@ use std::fmt;
 use std::thread;
 use std::time::Duration;
 use rand::{OsRng};
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::sync::{Arc, atomic::{AtomicBool, Ordering, AtomicUsize}};
 use std::iter::Iterator;
 
 use tokio::timer;
 use tokio::runtime::current_thread::Handle;
-use futures::Stream;
 use tokio::prelude::*;
+use tokio::sync::oneshot::Sender;
 
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
@@ -68,6 +67,7 @@ pub struct Prover<E:JubjubEngine> {
     pub deposit_parameters:     BabyParameters,
     pub exit_parameters:        BabyParameters,
     pub jubjub_params:          E::Params,
+    pub current_job:            Arc<AtomicUsize>,
 }
 
 pub type BabyProof = Proof<Engine>;
@@ -266,6 +266,7 @@ impl BabyProver {
             deposit_parameters:     deposit_circuit_params.unwrap(),
             exit_parameters:        exit_circuit_params.unwrap(),
             jubjub_params,
+            current_job:            Arc::new(AtomicUsize::new(0)),
         })
     }
 }
@@ -984,26 +985,13 @@ impl BabyProver {
         Ok(())
     }
 
-    fn make_proving_attempt(&mut self, rt: &Handle, worker: &String) -> Result<(), String> {
+    fn make_proving_attempt(&mut self, worker: &String) -> Result<(), String> {
         let storage = StorageProcessor::establish_connection().map_err(|e| format!("establish_connection failed: {}", e))?;
         let job = storage.fetch_prover_job(worker, PROVER_TIMEOUT).map_err(|e| format!("fetch_prover_job failed: {}", e))?;
 
         if let Some(block_number) = job {
             println!("prover {} got a new job for block {}", worker, block_number);
-
-            // TODO: start interval
-            let ping = timer::Interval::new_interval(Duration::from_millis(1000))
-            .fold(block_number, |block_number, _| {
-                println!("{}", block_number);
-                if let Ok(_storage) = StorageProcessor::establish_connection() {
-
-                }
-                Ok(block_number)
-            })
-            .map(|_|())
-            .map_err(|_|());
-            
-            rt.spawn(ping).unwrap();
+            self.current_job.store(block_number as usize, Ordering::Relaxed);
 
             // load state delta self.current_block_number => block_number (can go both forwards and backwards)
             let expected_current_block = block_number;
@@ -1029,20 +1017,44 @@ impl BabyProver {
         }
         Ok(())
     }
+
+    fn start_timer_interval(&self, worker: String, rt: &Handle) {
+        let current_job_ref = self.current_job.clone();
+        let params = (current_job_ref, worker);
+        rt.spawn(
+            timer::Interval::new_interval(Duration::from_millis(1000))
+            .fold(params, |params, _| {
+                let (current_job_ref, worker) = params;
+                let job = current_job_ref.load(Ordering::Relaxed);
+                if job > 0 {
+                    //println!("prover is working on block {}", job);
+                    if let Ok(storage) = StorageProcessor::establish_connection() {
+                        let _ = storage.update_prover_job(&worker, job as BlockNumber);
+                    }
+                }
+                Ok((current_job_ref, worker))
+            })
+            .map(|_|())
+            .map_err(|_|())
+        ).unwrap();
+    }
 }
 
-pub fn run_prover(rt: &Handle, stop_signal: Arc<AtomicBool>, worker: String) {
+pub fn run_prover(shutdown_tx: Sender<()>, rt: &Handle, stop_signal: Arc<AtomicBool>, worker: String) {
     println!("creating prover, worker: {}", worker);
     let mut prover = BabyProver::create().unwrap();
     println!("prover started");
     
+    prover.start_timer_interval(worker.clone(), rt);
+    
     while !stop_signal.load(Ordering::SeqCst) {
-        if let Err(err) = prover.make_proving_attempt(rt, &worker) {
+        if let Err(err) = prover.make_proving_attempt(&worker) {
             eprint!("Error: {}", err);
         }
+        prover.current_job.store(0, Ordering::Relaxed);
     }
-    println!("prover terminated");
-    std::process::exit(0);
+    println!("prover stopped");
+    shutdown_tx.send(()).unwrap();
 }
 
 // #[test]
