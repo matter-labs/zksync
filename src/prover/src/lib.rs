@@ -989,9 +989,10 @@ impl BabyProver {
         let storage = StorageProcessor::establish_connection().map_err(|e| format!("establish_connection failed: {}", e))?;
         let job = storage.fetch_prover_job(worker, PROVER_TIMEOUT).map_err(|e| format!("fetch_prover_job failed: {}", e))?;
 
-        if let Some(block_number) = job {
+        if let Some(job) = job {
+            let block_number = job.block_number as BlockNumber;
             println!("prover {} got a new job for block {}", worker, block_number);
-            self.current_job.store(block_number as usize, Ordering::Relaxed);
+            self.current_job.store(job.id as usize, Ordering::Relaxed);
 
             // load state delta self.current_block_number => block_number (can go both forwards and backwards)
             let expected_current_block = block_number;
@@ -1018,21 +1019,19 @@ impl BabyProver {
         Ok(())
     }
 
-    fn start_timer_interval(&self, worker: String, rt: &Handle) {
-        let current_job_ref = self.current_job.clone();
-        let params = (current_job_ref, worker);
+    fn start_timer_interval(&self, rt: &Handle) {
+        let job_ref = self.current_job.clone();
         rt.spawn(
             timer::Interval::new_interval(Duration::from_millis(1000))
-            .fold(params, |params, _| {
-                let (current_job_ref, worker) = params;
-                let job = current_job_ref.load(Ordering::Relaxed);
+            .fold(job_ref, |job_ref, _| {
+                let job = job_ref.load(Ordering::Relaxed);
                 if job > 0 {
                     //println!("prover is working on block {}", job);
                     if let Ok(storage) = StorageProcessor::establish_connection() {
-                        let _ = storage.update_prover_job(&worker, job as BlockNumber);
+                        let _ = storage.update_prover_job(job as i32);
                     }
                 }
-                Ok((current_job_ref, worker))
+                Ok(job_ref)
             })
             .map(|_|())
             .map_err(|_|())
@@ -1045,7 +1044,7 @@ pub fn run_prover(shutdown_tx: Sender<()>, rt: &Handle, stop_signal: Arc<AtomicB
     let mut prover = BabyProver::create().unwrap();
     println!("prover started");
     
-    prover.start_timer_interval(worker.clone(), rt);
+    prover.start_timer_interval(rt);
     
     while !stop_signal.load(Ordering::SeqCst) {
         if let Err(err) = prover.make_proving_attempt(&worker) {

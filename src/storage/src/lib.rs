@@ -174,9 +174,12 @@ pub struct StoredProof {
 // Every time before a prover worker starts generating the proof, a prover run is recorded for monitoring purposes
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
 #[table_name="prover_runs"]
-pub struct NewProverRun {
+pub struct ProverRun {
+    pub id:             i32,
     pub block_number:   i32,
-    pub worker:         String,
+    pub worker:         Option<String>,
+    pub created_at:     std::time::SystemTime,
+    pub updated_at:     std::time::SystemTime,
 }
 
 #[derive(Debug, QueryableByName)]
@@ -512,7 +515,7 @@ impl StorageProcessor {
         //self.load_number("SELECT COALESCE(max(last_block), 0) AS integer_value FROM accounts")
     }
 
-    pub fn fetch_prover_job(&self, worker: &String, timeout_seconds: usize) -> QueryResult<Option<BlockNumber>> {
+    pub fn fetch_prover_job(&self, worker_: &String, timeout_seconds: usize) -> QueryResult<Option<ProverRun>> {
         self.conn().transaction(|| {
             sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.conn())?;
             let job: Option<BlockNumber> = diesel::sql_query(format!("
@@ -529,26 +532,31 @@ impl StorageProcessor {
                 .get_result::<Option<IntegerNumber>>(self.conn())?
                 .map(|i| i.integer_value as BlockNumber);
             
-            if let Some(block_number) = job {
-                let to_store = NewProverRun{
-                    block_number: block_number as i32,
-                    worker: worker.to_string(),
-                };
-                use schema::prover_runs::dsl::prover_runs;
-                insert_into(prover_runs).values(&to_store).execute(self.conn())?;
+            if let Some(block_number_) = job {
+                // let to_store = NewProverRun{
+                //     block_number: block_number as i32,
+                //     worker: worker.to_string(),
+                // };
+                use schema::prover_runs::dsl::*;
+                let inserted: ProverRun = insert_into(prover_runs)
+                .values(&vec![(
+                    block_number.eq(block_number_ as i32), 
+                    worker.eq(worker_.to_string())
+                )])
+                .get_result(self.conn())?;
+                Ok(Some(inserted))
+            } else {
+                Ok(None)
             }
-
-            Ok(job)
         })
     }
 
-    pub fn update_prover_job(&self, w: &String, bn: BlockNumber) -> QueryResult<()> {
+    pub fn update_prover_job(&self, job_id: i32) -> QueryResult<()> {
         use crate::schema::prover_runs::dsl::*;
         use diesel::expression::dsl::now;
 
-        diesel::update(prover_runs)
-            .filter(block_number.eq(bn as i32))
-            .filter(worker.eq(w))
+        let target = prover_runs.filter(id.eq(job_id));
+        diesel::update(target)
             .set(updated_at.eq(now))
             .execute(self.conn())
             .map(|_|())
