@@ -217,7 +217,7 @@ export default {
         window.contract = contract
 
         window.ethersContract = new ethers.Contract(window.contractAddress, ABI, window.ethersProvider)
-        window.c = window.ethersContract
+        //window.c = window.ethersContract
 
         this.updateAccountInfo()
         window.t = this
