@@ -163,14 +163,14 @@ impl EthWatch {
         contract: &Contract<T>)
     -> Result<(), String>
     {
-        println!("Processing deposits for block {}", block_number);
+        //println!("Processing deposits for block {}", block_number);
         let total_deposit_requests_result: U256 = 
             contract.query("totalDepositRequests", (), None, Options::default(), Some(BlockNumber::Number(block_number)))
             .wait()
             .map_err(|err| format!("Error getting total deposit requests {}", err))?;
 
         let total_deposit_requests = total_deposit_requests_result;
-        println!("total_deposit_requests = {}", total_deposit_requests);
+        //println!("total_deposit_requests = {}", total_deposit_requests);
 
         let max_batch_number = total_deposit_requests / self.deposit_batch_size;
 
