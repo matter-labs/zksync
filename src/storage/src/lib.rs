@@ -6,13 +6,16 @@ extern crate fnv;
 extern crate diesel;
 extern crate bigdecimal;
 extern crate serde_json;
+extern crate sapling_crypto;
 
 extern crate ff;
 
 use plasma::models::*;
+use plasma::primitives::{get_bits_le_fixed_u128, pack_bits_into_bytes};
 use diesel::dsl::*;
 use models::{Operation, Action, EncodedProof, TxMeta};
 use std::cmp;
+use std::convert::TryFrom;
 
 mod schema;
 use schema::*;
@@ -27,6 +30,7 @@ use std::env;
 use std::iter::FromIterator;
 
 use ff::PrimeField;
+use sapling_crypto::circuit::float_point::{convert_to_float};
 
 use diesel::sql_types::{Nullable, Integer};
 sql_function!(coalesce, Coalesce, (x: Nullable<Integer>, y: Integer) -> Integer);
@@ -161,6 +165,58 @@ pub struct StoredTx {
 
     pub created_at:     std::time::SystemTime,
 }
+
+impl StoredTx {
+    pub fn message_bits(&self) -> Vec<bool> {
+        let mut r: Vec<bool> = vec![];
+
+        let from_bits = get_bits_le_fixed_u128(u128::try_from(self.from_account).unwrap(), params::BALANCE_TREE_DEPTH);
+        let to_bits = match self.to_account {
+            None     => get_bits_le_fixed_u128(u128::min_value(), params::BALANCE_TREE_DEPTH),
+            Some(to) => get_bits_le_fixed_u128(u128::try_from(to).unwrap(), params::BALANCE_TREE_DEPTH),
+        };
+        let nonce_bits = match self.nonce {
+            None     => get_bits_le_fixed_u128(u128::min_value(), params::NONCE_BIT_WIDTH),
+            Some(nonce) => get_bits_le_fixed_u128(u128::try_from(nonce).unwrap(), params::NONCE_BIT_WIDTH),
+        };
+        let amount_bits = convert_to_float(
+                                    u128::try_from(self.amount).unwrap(), 
+                                    params::AMOUNT_EXPONENT_BIT_WIDTH,
+                                    params::AMOUNT_MANTISSA_BIT_WIDTH,
+                                    10).unwrap();
+        let fee_bits = convert_to_float(
+                            u128::try_from(self.fee).unwrap(), 
+                            params::FEE_EXPONENT_BIT_WIDTH,
+                            params::FEE_MANTISSA_BIT_WIDTH,
+                            10).unwrap();
+        let block_number_bits = match self.block_number {
+            None     => get_bits_le_fixed_u128(u128::min_value(), params::BLOCK_NUMBER_BIT_WIDTH),
+            Some(block_number) => get_bits_le_fixed_u128(u128::try_from(block_number).unwrap(), params::BLOCK_NUMBER_BIT_WIDTH),
+        };
+
+        r.extend(from_bits.into_iter());
+        r.extend(to_bits.into_iter());
+        r.extend(nonce_bits.into_iter());
+        r.extend(amount_bits.into_iter());
+        r.extend(fee_bits.into_iter());
+        r.extend(block_number_bits.into_iter());
+
+        r
+    }
+
+    pub fn tx_data(&self) -> Option<Vec<u8>> {
+        let message_bits = self.message_bits();
+
+        if message_bits.len() % 8 != 0 {
+            return None;
+        }
+        let as_bytes = pack_bits_into_bytes(message_bits);
+
+        Some(as_bytes)
+    }
+}
+
+
 
 // impl StoredTx {
 //     pub fn into_block_data(self, conn: &StorageProcessor) -> QueryResult<BlockData> {

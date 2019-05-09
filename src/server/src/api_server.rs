@@ -18,7 +18,7 @@ use std::sync::mpsc;
 use plasma::models::{TransferTx, PublicKey, Account, Nonce};
 use models::config::RUNTIME_CONFIG;
 use super::models::{StateKeeperRequest, NetworkStatus, TransferTxConfirmation};
-use super::storage::{ConnectionPool, StorageProcessor};
+use super::storage::{ConnectionPool, StorageProcessor, StoredTx};
 use super::nonce_futures::{NonceFutures, NonceReadyFuture};
 
 use futures::Future;
@@ -45,6 +45,11 @@ struct TransactionResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct AccountError {
+    error: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ExplorerError {
     error: String,
 }
 
@@ -290,6 +295,60 @@ fn handle_get_account_transactions(req: &HttpRequest<AppState>) -> ActixResult<H
     Ok(HttpResponse::Ok().json("{}"))
 }
 
+fn handle_get_transaction_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    let pool = req.state().connection_pool.clone();
+
+    let storage = pool.access_storage();
+    if storage.is_err() {
+        return Ok(HttpResponse::Ok().json(ExplorerError{error:"rate limit".to_string()}));
+    }
+    let storage = storage.unwrap();
+
+    let transaction_id_string = req.match_info().get("tx_id");
+    if transaction_id_string.is_none() {
+        return Ok(HttpResponse::Ok().json(ExplorerError{error:"invalid parameters".to_string()}));
+    }
+    let transaction_id = transaction_id_string.unwrap().parse::<u32>();
+    if transaction_id.is_err(){
+        return Ok(HttpResponse::Ok().json(ExplorerError{error:"invalid transaction_id".to_string()}));
+    }
+
+    let transaction_id_u32 = transaction_id.unwrap();
+
+    let tx = storage.load_transaction_with_id(transaction_id_u32).expect("load_transaction_with_id: db must work");
+    
+    let response = tx.unwrap().tx_data().expect("something is wrong with tx data");
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    let pool = req.state().connection_pool.clone();
+
+    let storage = pool.access_storage();
+    if storage.is_err() {
+        return Ok(HttpResponse::Ok().json(ExplorerError{error:"rate limit".to_string()}));
+    }
+    let storage = storage.unwrap();
+
+    let block_id_string = req.match_info().get("block_id");
+    if block_id_string.is_none() {
+        return Ok(HttpResponse::Ok().json(ExplorerError{error:"invalid parameters".to_string()}));
+    }
+    let block_id = block_id_string.unwrap().parse::<u32>();
+    if block_id.is_err(){
+        return Ok(HttpResponse::Ok().json(ExplorerError{error:"invalid block_id".to_string()}));
+    }
+
+    let block_id_u32 = block_id.unwrap();
+
+    let txs = storage.load_transactions_in_block(block_id_u32).expect("load_transactions_in_block: db must work");
+    
+    let response: Vec<Vec<u8>> = txs.iter().map(|tx| tx.tx_data().expect("something is wrong with tx data")).collect();
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
 fn start_server(state: AppState, bind_to: String) {
     server::new(move || {
         App::with_state(state.clone()) // <- create app with shared state
@@ -317,6 +376,18 @@ fn start_server(state: AppState, bind_to: String) {
             .resource("/account/{id}/transactions", |r| {
                 r.method(Method::GET).f(handle_get_account_transactions);
             })
+            .resource("/blocks/transactions/{tx_id}", |r| {
+                r.method(Method::GET).f(handle_get_transaction_by_id);
+            })
+            .resource("/blocks/{block_id}/transactions", |r| {
+                r.method(Method::GET).f(handle_get_block_transactions);
+            })
+            // .resource("/blocks?[min={from_block}][&max={to_block}][&type=commit|verify]", |r| {
+            //     r.method(Method::GET).f(handle_get_blocks);
+            // })
+            // .resource("/blocks/{block_id}", |r| {
+            //     r.method(Method::GET).f(handle_get_block_by_id);
+            // })
         })
     })
     .bind(&bind_to)
