@@ -47,6 +47,14 @@ table! {
         block_number -> Int4,
         worker -> Nullable<Text>,
         created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+table! {
+    server_config (id) {
+        id -> Bool,
+        contract_addr -> Nullable<Text>,
     }
 }
 
@@ -72,5 +80,6 @@ allow_tables_to_appear_in_same_query!(
     operations,
     proofs,
     prover_runs,
+    server_config,
     transactions,
 );

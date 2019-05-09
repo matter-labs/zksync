@@ -331,11 +331,7 @@ pub fn start_status_interval(state: AppState) {
         //let state = state.clone();
         let pool = state.connection_pool.clone();
 
-        let storage = pool.access_storage();
-        if storage.is_err() {
-            panic!("oops");
-        }
-        let mut storage = storage.unwrap();
+        let storage = pool.access_storage().expect("db failed");
         
         // TODO: properly handle failures
         let last_committed = storage.get_last_committed_block().unwrap_or(0);
@@ -349,7 +345,7 @@ pub fn start_status_interval(state: AppState) {
             outstanding_txs,
         };
 
-        println!("status from db: {:?}", status);
+        //println!("status from db: {:?}", status);
 
         // save status to state
         *state.network_status.0.as_ref().write().unwrap() = status;

@@ -29,31 +29,28 @@ db-setup: confirm_action
 init: dev-up env yarn db-setup redeploy
 
 yarn:
-	@cd contracts; yarn
-	@cd js/franklin; yarn
-	@cd js/client; yarn
-	@cd js/loadtest; yarn
-	@cd js/explorer; yarn
+	@cd contracts && yarn
+	@cd js/franklin && yarn
+	@cd js/client && yarn
+	@cd js/loadtest && yarn
+	@cd js/explorer && yarn
 
 client:
-	@cd js/client; yarn dev
+	@cd js/client && yarn dev
 
 explorer:
-	@cd js/explorer; yarn dev
+	@cd js/explorer && yarn dev
 
 prover:
-	@bin/.load_keys; cargo run --release --bin prover
+	@bin/.load_keys && cargo run --release --bin prover
 
 server:
 	@cargo run --release --bin server
 
 sandbox:
-	@cd src/sandbox; cargo run
+	@cd src/sandbox && cargo run
 
 deploy-contracts: confirm_action
-	@bin/deploy-contracts
-
-deploy-kube: confirm_action
 	@bin/deploy-contracts
 
 deploy-client: confirm_action
@@ -61,7 +58,10 @@ deploy-client: confirm_action
 
 db-reset: confirm_action db-drop db-setup
 
-redeploy: deploy-contracts db-reset
+migrate: confirm_action
+	@cd src/storage && diesel migration run
+
+redeploy: confirm_action deploy-contracts db-reset
 
 db-drop: confirm_action
 	@# this is used to clear the produciton db; cannot do `diesel database reset` because we don't own the db
@@ -88,10 +88,20 @@ push: images
 	docker push gluk64/franklin:prover
 
 start: images
+ifeq (,$(KUBECONFIG))
 	@docker-compose up -d --scale prover=1 server prover
+else
+	@kubectl scale deployments/server --replicas=1
+	@kubectl scale deployments/prover --replicas=2
+endif
 
-stop:
+stop: confirm_action
+ifeq (,$(KUBECONFIG))
 	@docker-compose stop server prover
+else
+	@kubectl scale deployments/server --replicas=0
+	@kubectl scale deployments/prover --replicas=0
+endif
 
 status:
 	@curl $(API_SERVER)/api/v0.1/status; echo
@@ -99,7 +109,11 @@ status:
 restart: stop start logs
 
 logs:
+ifeq (,$(KUBECONFIG))
 	@docker-compose logs -f server prover
+else
+	kubectl logs -f deployments/server
+endif
 
 dev-up:
 	@docker-compose up -d postgres geth
@@ -123,7 +137,19 @@ blockscout-up:
 blockscout-down:
 	@docker-compose stop blockscout blockscout_postgres
 
-# Loadtest
+loadtest:
+	@cd js/loadtest && yarn test
 
-run-loadtest:
-	cd js/loadtest; yarn test
+# Kubernetes
+
+kube-deploy: confirm_action
+	@bin/deploy-kube
+
+pods:
+	kubectl get pods -o wide
+
+nodes:
+	kubectl get nodes -o wide
+
+proverlogs:
+	kubectl logs -f deployments/prover

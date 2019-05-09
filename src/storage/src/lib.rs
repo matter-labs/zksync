@@ -235,15 +235,25 @@ pub struct StoredProof {
 // Every time before a prover worker starts generating the proof, a prover run is recorded for monitoring purposes
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
 #[table_name="prover_runs"]
-pub struct NewProverRun {
+pub struct ProverRun {
+    pub id:             i32,
     pub block_number:   i32,
-    pub worker:         String,
+    pub worker:         Option<String>,
+    pub created_at:     std::time::SystemTime,
+    pub updated_at:     std::time::SystemTime,
 }
 
 #[derive(Debug, QueryableByName)]
 pub struct IntegerNumber {
     #[sql_type="Integer"]
     pub integer_value: i32,
+}
+
+#[derive(Debug, Queryable, QueryableByName)]
+#[table_name="server_config"]
+pub struct ServerConfig {
+    pub id:             bool,
+    pub contract_addr:  Option<String>,
 }
 
 enum ConnectionHolder {
@@ -274,6 +284,11 @@ impl StorageProcessor {
             ConnectionHolder::Pooled(ref conn) => conn,
             ConnectionHolder::Direct(ref conn) => conn,
         }
+    }
+
+    pub fn load_config(&self) -> QueryResult<ServerConfig> {
+        use schema::server_config::dsl::*;
+        server_config.first(self.conn())
     }
 
     /// Execute an operation: store op, modify state accordingly, load additional data and meta tx info
@@ -698,7 +713,7 @@ impl StorageProcessor {
         Ok( r )
     }
 
-    pub fn fetch_prover_job(&self, worker: &String, timeout_seconds: usize) -> QueryResult<Option<BlockNumber>> {
+    pub fn fetch_prover_job(&self, worker_: &String, timeout_seconds: usize) -> QueryResult<Option<ProverRun>> {
         self.conn().transaction(|| {
             sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.conn())?;
             let job: Option<BlockNumber> = diesel::sql_query(format!("
@@ -710,22 +725,39 @@ impl StorageProcessor {
                         (SELECT * FROM proofs WHERE block_number = o.block_number)
                     AND NOT EXISTS
                         (SELECT * FROM prover_runs 
-                            WHERE block_number = o.block_number AND (now() - created_at) < interval '{} seconds')
+                            WHERE block_number = o.block_number AND (now() - updated_at) < interval '{} seconds')
                 ", timeout_seconds))
                 .get_result::<Option<IntegerNumber>>(self.conn())?
                 .map(|i| i.integer_value as BlockNumber);
             
-            if let Some(block_number) = job {
-                let to_store = NewProverRun{
-                    block_number: block_number as i32,
-                    worker: worker.to_string(),
-                };
-                use schema::prover_runs::dsl::prover_runs;
-                insert_into(prover_runs).values(&to_store).execute(self.conn())?;
+            if let Some(block_number_) = job {
+                // let to_store = NewProverRun{
+                //     block_number: block_number as i32,
+                //     worker: worker.to_string(),
+                // };
+                use schema::prover_runs::dsl::*;
+                let inserted: ProverRun = insert_into(prover_runs)
+                .values(&vec![(
+                    block_number.eq(block_number_ as i32), 
+                    worker.eq(worker_.to_string())
+                )])
+                .get_result(self.conn())?;
+                Ok(Some(inserted))
+            } else {
+                Ok(None)
             }
-
-            Ok(job)
         })
+    }
+
+    pub fn update_prover_job(&self, job_id: i32) -> QueryResult<()> {
+        use crate::schema::prover_runs::dsl::*;
+        use diesel::expression::dsl::now;
+
+        let target = prover_runs.filter(id.eq(job_id));
+        diesel::update(target)
+            .set(updated_at.eq(now))
+            .execute(self.conn())
+            .map(|_|())
     }
 
     /// Store the timestamp of the prover finish and the proof

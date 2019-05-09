@@ -2,10 +2,10 @@ extern crate rustc_hex;
 extern crate plasma;
 extern crate models;
 extern crate storage;
+extern crate tokio;
 
 extern crate rand;
 extern crate crypto;
-
 extern crate ff;
 extern crate bellman;
 extern crate sapling_crypto;
@@ -14,6 +14,13 @@ use std::fmt;
 use std::thread;
 use std::time::Duration;
 use rand::{OsRng};
+use std::sync::{Arc, atomic::{AtomicBool, Ordering, AtomicUsize}};
+use std::iter::Iterator;
+
+use tokio::timer;
+use tokio::runtime::current_thread::Handle;
+use tokio::prelude::*;
+use tokio::sync::oneshot::Sender;
 
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
@@ -60,6 +67,7 @@ pub struct Prover<E:JubjubEngine> {
     pub deposit_parameters:     BabyParameters,
     pub exit_parameters:        BabyParameters,
     pub jubjub_params:          E::Params,
+    pub current_job:            Arc<AtomicUsize>,
 }
 
 pub type BabyProof = Proof<Engine>;
@@ -258,6 +266,7 @@ impl BabyProver {
             deposit_parameters:     deposit_circuit_params.unwrap(),
             exit_parameters:        exit_circuit_params.unwrap(),
             jubjub_params,
+            current_job:            Arc::new(AtomicUsize::new(0)),
         })
     }
 }
@@ -980,8 +989,10 @@ impl BabyProver {
         let storage = StorageProcessor::establish_connection().map_err(|e| format!("establish_connection failed: {}", e))?;
         let job = storage.fetch_prover_job(worker, PROVER_TIMEOUT).map_err(|e| format!("fetch_prover_job failed: {}", e))?;
 
-        if let Some(block_number) = job {
+        if let Some(job) = job {
+            let block_number = job.block_number as BlockNumber;
             println!("prover {} got a new job for block {}", worker, block_number);
+            self.current_job.store(job.id as usize, Ordering::Relaxed);
 
             // load state delta self.current_block_number => block_number (can go both forwards and backwards)
             let expected_current_block = block_number;
@@ -1008,22 +1019,41 @@ impl BabyProver {
         Ok(())
     }
 
-    fn run(&mut self, worker: &String) {
-        loop {
-            if let Err(err) = self.make_proving_attempt(worker) {
-                eprint!("Error: {}", err);
-            }
-        }
+    fn start_timer_interval(&self, rt: &Handle) {
+        let job_ref = self.current_job.clone();
+        rt.spawn(
+            timer::Interval::new_interval(Duration::from_millis(1000))
+            .fold(job_ref, |job_ref, _| {
+                let job = job_ref.load(Ordering::Relaxed);
+                if job > 0 {
+                    //println!("prover is working on block {}", job);
+                    if let Ok(storage) = StorageProcessor::establish_connection() {
+                        let _ = storage.update_prover_job(job as i32);
+                    }
+                }
+                Ok(job_ref)
+            })
+            .map(|_|())
+            .map_err(|_|())
+        ).unwrap();
     }
 }
 
-pub fn start_prover(worker: String) {
-    thread::Builder::new().name(worker.clone()).spawn(move || {
-        println!("prover worker: {}", worker);
-        let mut prover = BabyProver::create().unwrap();
-        println!("prover started");
-        prover.run(&worker)
-    }).expect("prover thread must start");
+pub fn run_prover(shutdown_tx: Sender<()>, rt: &Handle, stop_signal: Arc<AtomicBool>, worker: String) {
+    println!("creating prover, worker: {}", worker);
+    let mut prover = BabyProver::create().unwrap();
+    println!("prover started");
+    
+    prover.start_timer_interval(rt);
+    
+    while !stop_signal.load(Ordering::SeqCst) {
+        if let Err(err) = prover.make_proving_attempt(&worker) {
+            eprint!("Error: {}", err);
+        }
+        prover.current_job.store(0, Ordering::Relaxed);
+    }
+    println!("prover stopped");
+    shutdown_tx.send(()).unwrap();
 }
 
 // #[test]
