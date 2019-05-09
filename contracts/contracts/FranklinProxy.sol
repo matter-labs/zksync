@@ -3,7 +3,6 @@ pragma solidity ^0.4.24;
 import {FranklinCommon} from "./common/FranklinCommon.sol";
 
 contract FranklinProxy is FranklinCommon {
-    // Well, technically it's not :)
 
     constructor(address _depositor, address _transactor, address _exitor) public {
         nextAccountToRegister = 2;

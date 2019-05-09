@@ -784,12 +784,14 @@ name = "franlklin"
 version = "0.1.0"
 dependencies = [
  "eth_client 0.1.0",
+ "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "models 0.0.1",
  "plasma 0.1.1",
  "prover 0.0.1",
  "server 0.0.1",
  "signal-hook 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "storage 0.0.1",
+ "tokio 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1482,6 +1484,7 @@ version = "0.0.1"
 dependencies = [
  "bellman_ce 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ff_ce 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "models 0.0.1",
  "pairing_ce 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "plasma 0.1.1",
@@ -1491,6 +1494,7 @@ dependencies = [
  "sapling-crypto_ce 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "signal-hook 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "storage 0.0.1",
+ "tokio 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2002,7 +2006,11 @@ version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "arc-swap 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mio 0.6.16 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mio-uds 0.6.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-reactor 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

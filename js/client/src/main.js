@@ -35,6 +35,8 @@ Vue.mixin({
     },
 })
 
+import ABI from './contract'
+
 window.app = new Vue({
     el: '#app',
     router,
@@ -46,6 +48,13 @@ window.app = new Vue({
         if (typeof window.web3 !== 'undefined') {
             window.eth = new Eth(web3.currentProvider)
             window.ethersProvider = new ethers.providers.Web3Provider(web3.currentProvider)
+
+            // const provider = new ethers.providers.JsonRpcProvider('http://localhost:8545')
+            // window.c = new ethers.Contract(
+            //     '0x2a1780C1EDbE60f6667818bc4b3402004A9e9559',  // proxy
+            //     //'0x2AeBa6973B6D0104e927D945321cE8ddFDE7c5a6', // depositor
+            //     //'0xbcB1385a441464345040F33E59e166fCC2720F04', // tx
+            //     ABI, provider)
         }
         if (!store.account.address) {
             this.$router.push('/login')

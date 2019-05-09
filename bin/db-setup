@@ -1,8 +1,13 @@
 #!/bin/bash
 
+# Force read env
+FRANKLIN_ENV=
 . .setup_env
 cd src/storage
 
 echo DATABASE_URL=$DATABASE_URL
 diesel database setup
 diesel migration run
+
+echo "insert config: CONTRACT_ADDR=$CONTRACT_ADDR"
+psql $DATABASE_URL -c "INSERT INTO server_config (contract_addr) VALUES ('$CONTRACT_ADDR')"

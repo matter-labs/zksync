@@ -217,6 +217,7 @@ export default {
         window.contract = contract
 
         window.ethersContract = new ethers.Contract(window.contractAddress, ABI, window.ethersProvider)
+        //window.c = window.ethersContract
 
         this.updateAccountInfo()
         window.t = this
@@ -491,7 +492,7 @@ export default {
             let onchain = {}
             try {
                 newData.address = window.ethereum ? ethereum.selectedAddress : (await eth.accounts())[0]
-                console.log('1', newData.address)
+                //console.log('1', newData.address)
                 let balance = (await eth.getBalance(newData.address)).toString(10)
 
                 newData.balance = Eth.fromWei(new BN(balance), 'ether')

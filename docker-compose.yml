@@ -6,6 +6,8 @@ services:
     environment:
       - DATABASE_URL=postgres://postgres@postgres/plasma
       - WEB3_URL=http://geth:8545
+      - NODE_NAME=docker
+      - POD_NAME=docker/server
     ports:
       - "3000:3000"
   prover:
@@ -13,6 +15,8 @@ services:
     env_file: $ENV_FILE
     environment:
       - PROVER_DATABASE_URL=postgres://postgres@postgres/plasma
+      - NODE_NAME=docker
+      - POD_NAME=docker/prover
     volumes:
       - type: bind
         source: ./keys
