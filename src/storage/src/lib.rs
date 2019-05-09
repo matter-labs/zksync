@@ -92,7 +92,7 @@ pub struct StoredOperation {
     pub nonce:          i32,
     pub block_number:   i32,
     pub action_type:    String,
-    pub hash:           Option<String>,
+    pub tx_hash:        Option<String>,
     pub created_at:     std::time::SystemTime,
 }
 

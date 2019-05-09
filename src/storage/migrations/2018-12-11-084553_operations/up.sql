@@ -29,7 +29,7 @@ CREATE TABLE operations (
     nonce           integer not null default op_config_next_nonce(),
     block_number    integer not null,
     action_type     text not null,
-    hash            text,
+    tx_hash         text,
     created_at      timestamp not null default now()
 );
 
