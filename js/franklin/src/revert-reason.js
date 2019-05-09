@@ -22,9 +22,18 @@ async function reason() {
     if (!tx) {
         console.log('tx not found')
     } else {
-        let code = await provider.call(tx, tx.blockNumber)
-        let reason = hex_to_ascii(code.substr(138))
-        console.log('revert reason:', reason)
+        //console.log('tx:', tx)
+
+        let receipt = await provider.getTransactionReceipt(hash)
+        //console.log('receipt:', receipt)
+
+        if (receipt.status) {
+            console.log('tx success')
+        } else {
+            let code = await provider.call(tx, tx.blockNumber)
+            let reason = hex_to_ascii(code.substr(138))
+            console.log('revert reason:', reason)
+        }
     }
 }
 
