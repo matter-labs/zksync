@@ -88,10 +88,20 @@ push: images
 	docker push gluk64/franklin:prover
 
 start: images
+ifeq (,$(KUBECONFIG))
 	@docker-compose up -d --scale prover=1 server prover
+else
+	@kubectl scale deployments/server --replicas=1
+	@kubectl scale deployments/prover --replicas=2
+endif
 
-stop:
+stop: confirm_action
+ifeq (,$(KUBECONFIG))
 	@docker-compose stop server prover
+else
+	@kubectl scale deployments/server --replicas=0
+	@kubectl scale deployments/prover --replicas=0
+endif
 
 status:
 	@curl $(API_SERVER)/api/v0.1/status; echo
@@ -99,7 +109,11 @@ status:
 restart: stop start logs
 
 logs:
+ifeq (,$(KUBECONFIG))
 	@docker-compose logs -f server prover
+else
+	kubectl logs -f deployments/server
+endif
 
 dev-up:
 	@docker-compose up -d postgres geth
@@ -137,8 +151,5 @@ pods:
 nodes:
 	kubectl get nodes -o wide
 
-logs-server:
-	kubectl logs deployments/server
-
-logs-prover:
-	kubectl logs deployments/prover
+proverlogs:
+	kubectl logs -f deployments/prover

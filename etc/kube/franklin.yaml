@@ -73,7 +73,7 @@ spec:
           imagePullPolicy: Always
           resources:
             requests:
-              memory: "1Gi"
+              memory: "0.5Gi"
           envFrom:
           - secretRef:
               name: franklin-secret
