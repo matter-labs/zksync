@@ -23,22 +23,28 @@ module.exports = {
 
     networks: {
         // truffle test --network dev
-        dev: {
-          host: "127.0.0.1",
-          port: 8545,
-          gas: 6900000,
-          network_id: "*" // match any network
+        // dev0: {
+        //   host: "127.0.0.1",
+        //   port: 8545,
+        //   gas: 6900000,
+        //   from: `0x${process.env.SENDER_ACCOUNT}`,
+        //   network_id: 9
+        //   //network_id: "*" // match any network
+        // },
+
+      dev: {
+        network_id: 4,
+        gas: 6900000,
+        provider: function() { 
+          const HDWalletProvider = require("truffle-hdwallet-provider");
+          let url = `${process.env.WEB3_URL}`
+          let mnemonic = process.env.MNEMONIC
+          return new HDWalletProvider(mnemonic, url) 
         },
+        network_id: "*"
+      },
 
-        geth: {
-          host: "127.0.0.1",
-          port: 8545,
-          gas: 6900000,
-          from: `0x+${process.env.FUNDING_ACCOUNT}`,
-          network_id: 9
-        },   
-
-      rinkeby:{
+      rinkeby: {
         network_id: 4,
         gas: 6900000,
         provider: function() { 
