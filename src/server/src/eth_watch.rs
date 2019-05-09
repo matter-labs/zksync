@@ -356,7 +356,7 @@ impl EthWatch {
     -> Result<(), String>
     {
         use bigdecimal::Zero;
-        println!("Processing exits for block {}", block_number);
+        //println!("Processing exits for block {}", block_number);
         let total_requests_result: U256 = contract.query("totalExitRequests", (), None, Options::default(), Some(BlockNumber::Number(block_number)))
             .wait()
             .map_err(|err| format!("Error getting total exit requests {}", err))?;
