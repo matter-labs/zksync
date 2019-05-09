@@ -41,7 +41,8 @@ fn run_committer(
                 action: Action::Commit, 
                 block, 
                 accounts_updated: Some(accounts_updated), 
-                tx_meta: None
+                tx_meta: None,
+                id:      None,
             };
             println!("commit block #{}", op.block.block_number);
             let op = storage.execute_operation(&op).expect("committer must commit the op into db");
@@ -59,7 +60,8 @@ fn run_committer(
                         action: Action::Verify{proof}, 
                         block, 
                         accounts_updated: None, 
-                        tx_meta: None
+                        tx_meta: None,
+                        id: None
                     };
                     let op = storage.execute_operation(&op).expect("committer must commit the op into db");
                     tx_for_eth.send(op).expect("must send an operation for commitment to ethereum");

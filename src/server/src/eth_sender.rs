@@ -49,7 +49,8 @@ fn keys_sorted(accounts_updated: AccountMap) -> Vec<u64> {
     acc
 } 
 
-fn run_eth_sender(rx_for_eth: Receiver<Operation>, mut eth_client: ETHClient) {
+fn run_eth_sender(pool: ConnectionPool, rx_for_eth: Receiver<Operation>, mut eth_client: ETHClient) {
+    let storage = pool.access_storage().expect("db connection failed for eth sender");
     for op in rx_for_eth {
         //println!("Operation requested"); 
         println!("Operation requested: {:?}, {}", &op.action, op.block.block_number);
@@ -124,13 +125,15 @@ fn run_eth_sender(rx_for_eth: Receiver<Operation>, mut eth_client: ETHClient) {
             _ => unimplemented!(),
         };
         // TODO: process tx sending failure
-        if tx.is_err() {
-            println!("Error sending tx {}", tx.err().unwrap());
-
-        } else {
-            println!("Commitment tx hash = {:?}", tx.unwrap());
+        match tx {
+            Ok(hash) => {
+                println!("Commitment tx hash = {:?}", hash);
+                storage.save_operation_tx_hash(
+                    op.id.expect("trying to send not stored op?"), 
+                    format!("0x{}", hash));
+            },
+            Err(err) => println!("Error sending tx {}", err),
         }
-
     }
 }
 
@@ -138,7 +141,7 @@ pub fn start_eth_sender(pool: ConnectionPool) -> Sender<Operation> {
     let (tx_for_eth, rx_for_eth) = channel::<Operation>();
     let mut eth_client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
 
-    let storage = pool.access_storage().expect("db connection failed for eth sender");;
+    let storage = pool.access_storage().expect("db connection failed for eth sender");
 
     // TODO: this is for test only, introduce a production switch (as we can not rely on debug/release mode because performance is required for circuits)
     let addr = std::env::var("SENDER_ACCOUNT").expect("SENDER_ACCOUNT env var not found");
@@ -154,7 +157,7 @@ pub fn start_eth_sender(pool: ConnectionPool) -> Sender<Operation> {
     }
 
     std::thread::Builder::new().name("eth_sender".to_string()).spawn(move || {
-        run_eth_sender(rx_for_eth, eth_client);
+        run_eth_sender(pool, rx_for_eth, eth_client);
     });
 
     tx_for_eth

@@ -118,6 +118,7 @@ impl StoredOperation {
 
         let mut op = op.expect("Operation deserialization");
         op.tx_meta = Some(meta);
+        op.id = Some(self.id);
 
         if op.accounts_updated.is_none() {
             let (_, updates) = conn.load_state_diff_for_block(op.block.block_number)?;
@@ -315,6 +316,16 @@ impl StorageProcessor {
                 .get_result(self.conn())?;
             stored.into_op(self)
         })
+    }
+
+    pub fn save_operation_tx_hash(&self, op_id: i32, hash: String) -> QueryResult<()> {
+        use crate::schema::operations::dsl::*;
+        let target = operations
+            .filter(id.eq(op_id));
+        diesel::update(target)
+            .set(tx_hash.eq(hash))
+            .execute(self.conn())
+            .map(|_|())
     }
 
     fn save_transactions(&self, op: &Operation) -> QueryResult<()> {
