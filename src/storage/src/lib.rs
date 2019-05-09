@@ -7,6 +7,8 @@ extern crate diesel;
 extern crate bigdecimal;
 extern crate serde_json;
 
+extern crate ff;
+
 use plasma::models::*;
 use diesel::dsl::*;
 use models::{Operation, Action, EncodedProof, TxMeta};
@@ -23,6 +25,8 @@ use diesel::r2d2::{PoolError, ConnectionManager, Pool, PooledConnection};
 use serde_json::{to_value, value::Value};
 use std::env;
 use std::iter::FromIterator;
+
+use ff::PrimeField;
 
 use diesel::sql_types::{Nullable, Integer};
 sql_function!(coalesce, Coalesce, (x: Nullable<Integer>, y: Integer) -> Integer);
@@ -88,6 +92,7 @@ pub struct StoredOperation {
     pub nonce:          i32,
     pub block_number:   i32,
     pub action_type:    String,
+    pub tx_hash:        Option<String>,
     pub created_at:     std::time::SystemTime,
 }
 
@@ -155,6 +160,63 @@ pub struct StoredTx {
 
     pub created_at:     std::time::SystemTime,
 }
+
+// impl StoredTx {
+//     pub fn into_block_data(self, conn: &StorageProcessor) -> QueryResult<BlockData> {
+//         match &self.tx_type {
+//             return Ok(BlockData::Transfer {
+                
+//             })
+//         }
+//         let debug_data = format!("data: {}", &self.data);
+        
+//         // let op: Result<Operation, serde_json::Error> = serde_json::from_value(self.data);
+//         let op: Result<Operation, serde_json::Error> = serde_json::from_str(&self.data.to_string());
+
+//         if let Err(err) = &op {
+//             println!("Error: {} on {}", err, debug_data)
+//         }
+
+//         let mut op = op.expect("Operation deserialization");
+//         op.tx_meta = Some(meta);
+
+//         if op.accounts_updated.is_none() {
+//             let (_, updates) = conn.load_state_diff_for_block(op.block.block_number)?;
+//             op.accounts_updated = Some(updates);
+//         };
+
+//         Ok(op)
+//     }
+
+//     pub fn into_transfer_transaction(&self) -> TransferTx {
+//         TransferTx {
+//             from: self.from.clone() as u32,
+//             to: self.to.unwrap().clone() as u32,
+//             amount: BigDecimal::from(self.amount.clone()),
+//             fee: BigDecimal::from(self.fee.unwrap().clone()),
+//             nonce: self.nonce.unwrap().clone() as u32,
+//             good_until_block: self.good_until_block.clone() as u32,
+//             signature: TxSignature::default(),
+//             cached_pub_key: None,  
+//         }
+//     }
+
+//     pub fn into_deposit_transaction(&self) -> DepositTx {
+//         DepositTx {
+//             account: self.from.clone() as u32,
+//             amount: BigDecimal::from(self.amount.clone()),
+//             pub_x: Fr::zero(),
+//             pub_y: Fr::zero(),
+//         }
+//     }
+
+//     pub fn into_exit_transaction(&self) -> ExitTx {
+//         ExitTx {
+//             account: self.from.clone() as u32,
+//             amount: BigDecimal::from(self.amount.clone()),
+//         }
+//     }
+// }
 
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
 #[table_name="proofs"]
@@ -237,7 +299,10 @@ impl StorageProcessor {
         self.conn().transaction(|| {
             match &op.action {
                 Action::Commit => 
-                    self.commit_state_update(op.block.block_number, op.accounts_updated.as_ref().unwrap())?,
+                    {
+                        self.commit_state_update(op.block.block_number, op.accounts_updated.as_ref().unwrap())?;
+                        self.save_transactions(op)?;
+                    },
                 Action::Verify{proof: _} => 
                     self.apply_state_update(op.block.block_number)?,
             };
@@ -250,6 +315,82 @@ impl StorageProcessor {
                 .get_result(self.conn())?;
             stored.into_op(self)
         })
+    }
+
+    fn save_transactions(&self, op: &Operation) -> QueryResult<()> {
+        let block_data = &op.block.block_data;
+        match block_data {
+            BlockData::Transfer { transactions, total_fees: _ } => self.save_transfer_transactions(op, &transactions)?,
+            BlockData::Deposit { transactions, batch_number: _ } => self.save_deposit_transactions(op, &transactions)?,
+            BlockData::Exit { transactions, batch_number: _ } => self.save_exit_transactions(op, &transactions)?,
+        }
+        Ok(())
+    }
+
+    fn save_transfer_transactions(&self, op: &Operation, txs: &Vec<TransferTx>) -> QueryResult<()> {
+        for tx in txs.iter() {
+            let inserted = diesel::insert_into(transactions::table)
+                .values(&NewTx{
+                    tx_type: String::from("transfer"),
+                    from_account: tx.from as i32,
+                    to_account: Some(tx.to as i32),
+                    nonce: Some(tx.nonce as i32),
+                    amount: tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
+                    fee: tx.fee.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
+                    block_number: Some(op.block.block_number as i32),
+                    state_root: Some(op.block.new_root_hash.into_repr().to_string()),
+                })
+                .execute(self.conn())?;
+            if 0 == inserted {
+                eprintln!("Error: could not commit all new transactions!");
+                return Err(Error::RollbackTransaction)
+            }
+        }
+        Ok(())
+    }
+
+    fn save_deposit_transactions(&self, op: &Operation, txs: &Vec<DepositTx>) -> QueryResult<()> {
+        for tx in txs.iter() {
+            let inserted = diesel::insert_into(transactions::table)
+                .values(&NewTx{
+                    tx_type: String::from("deposit"),
+                    from_account: tx.account as i32,
+                    to_account: None,
+                    nonce: None,
+                    amount: tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
+                    fee: 0,
+                    block_number: Some(op.block.block_number as i32),
+                    state_root: Some(op.block.new_root_hash.into_repr().to_string()),
+                })
+                .execute(self.conn())?;
+            if 0 == inserted {
+                eprintln!("Error: could not commit all new transactions!");
+                return Err(Error::RollbackTransaction)
+            }
+        }
+        Ok(())
+    }
+
+    fn save_exit_transactions(&self, op: &Operation, txs: &Vec<ExitTx>) -> QueryResult<()> {
+        for tx in txs.iter() {
+            let inserted = diesel::insert_into(transactions::table)
+                .values(&NewTx{
+                    tx_type: String::from("exit"),
+                    from_account: tx.account as i32,
+                    to_account: None,
+                    nonce: None,
+                    amount: tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
+                    fee: 0,
+                    block_number: Some(op.block.block_number as i32),
+                    state_root: Some(op.block.new_root_hash.into_repr().to_string()),
+                })
+                .execute(self.conn())?;
+            if 0 == inserted {
+                eprintln!("Error: could not commit all new transactions!");
+                return Err(Error::RollbackTransaction)
+            }
+        }
+        Ok(())
     }
 
     fn commit_state_update(&self, block_number: u32, accounts_updated: &AccountMap) -> QueryResult<()> {
@@ -515,6 +656,64 @@ impl StorageProcessor {
         //self.load_number("SELECT COALESCE(max(last_block), 0) AS integer_value FROM accounts")
     }
 
+    pub fn load_last_saved_transactions(&self, count: i32) -> QueryResult<Vec<StoredTx>> {
+        let query = format!("
+            SELECT * FROM transactions
+            ORDER BY block_number DESC
+            LIMIT {}
+        ", count);
+        let r = diesel::sql_query(query)
+            .load(self.conn())?;
+        Ok( r )
+    }
+
+    pub fn load_tx_transactions_for_account(&self, account_id: AccountId, count: i32) -> QueryResult<Vec<StoredTx>> {
+        let query = format!("
+            SELECT * FROM transactions
+            WHERE from_account = {}
+            ORDER BY block_number DESC
+            LIMIT {}
+        ", account_id, count);
+        let r = diesel::sql_query(query)
+            .load(self.conn())?;
+        Ok( r )
+    }
+
+    pub fn load_rx_transactions_for_account(&self, account_id: AccountId, count: i32) -> QueryResult<Vec<StoredTx>> {
+        let query = format!("
+            SELECT * FROM transactions
+            WHERE to_account = {}
+            ORDER BY block_number DESC
+            LIMIT {}
+        ", account_id, count);
+        let r = diesel::sql_query(query)
+            .load(self.conn())?;
+        Ok( r )
+    }
+
+    pub fn load_transaction_with_id(&self, tx_id: u32) -> QueryResult<Option<StoredTx>> {
+        let query = format!("
+            SELECT * FROM transactions
+            WHERE id = {}
+            DESC LIMIT 1
+        ", tx_id as i32);
+        let r = diesel::sql_query(query)
+            .get_result(self.conn())
+            .optional()?;
+        Ok( r )
+    }
+
+    pub fn load_transactions_in_block(&self, block_number: u32) -> QueryResult<Vec<StoredTx>> {
+        let query = format!("
+            SELECT * FROM transactions
+            WHERE block_number = {}
+            ORDER BY block_number
+        ", block_number as i32);
+        let r = diesel::sql_query(query)
+            .load(self.conn())?;
+        Ok( r )
+    }
+
     pub fn fetch_prover_job(&self, worker_: &String, timeout_seconds: usize) -> QueryResult<Option<ProverRun>> {
         self.conn().transaction(|| {
             sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.conn())?;
@@ -589,6 +788,8 @@ mod test {
     use plasma::models;
     use diesel::Connection;
     use bigdecimal::BigDecimal;
+    use ff::Field;
+    use bigdecimal::Num;
     //use diesel::RunQueryDsl;
 
     #[test]
@@ -712,7 +913,6 @@ mod test {
             accounts_updated:   Some(accounts.clone()),
             tx_meta:            None,
         }).unwrap();
-
         assert_eq!(conn.last_verified_state_for_account(5).unwrap(), None);
         assert_eq!(conn.last_committed_state_for_account(5).unwrap().unwrap().balance, BigDecimal::from(2));
 
@@ -834,6 +1034,82 @@ mod test {
             tx_meta:            None,
         }).unwrap();
         assert_eq!(2, conn.load_last_committed_exit_batch().unwrap());
+    }
+
+    #[test]
+    fn test_store_txs_2() {
+        let pool = ConnectionPool::new();
+        let conn = pool.access_storage().unwrap();
+        conn.conn().begin_test_transaction().unwrap();
+
+
+        let deposit_tx: DepositTx = DepositTx {
+            account: 1,
+            amount:  BigDecimal::from_str_radix(&format!("{}", 10000), 10).unwrap(),
+            pub_x:   Fr::zero(),
+            pub_y:   Fr::zero(),
+        };
+
+        let transfer_tx: TransferTx = TransferTx {
+            from:               1,
+            to:                 2,
+            amount:             BigDecimal::from_str_radix(&format!("{}", 5000), 10).unwrap(),
+            fee:                BigDecimal::from_str_radix(&format!("{}", 0), 10).unwrap(),
+            nonce:              1,
+            good_until_block:   100000,
+            signature: TxSignature::default(),
+            cached_pub_key: None, 
+        };
+
+        let exit_tx: ExitTx = ExitTx {
+            account:            1,
+            amount:             BigDecimal::from_str_radix(&format!("{}", 5000), 10).unwrap(),
+        };
+
+        conn.execute_operation(&Operation{
+            action: Action::Commit,
+            block:  Block{
+                block_number:   1,
+                new_root_hash:  Fr::default(),
+                block_data:     BlockData::Deposit{
+                    batch_number: 1,
+                    transactions: vec![deposit_tx.clone(), deposit_tx.clone()],
+                }
+            }, 
+            accounts_updated:   Some(fnv::FnvHashMap::default()),
+            tx_meta:            None,
+        }).unwrap();
+
+        conn.execute_operation(&Operation{
+            action: Action::Commit,
+            block:  Block{
+                block_number:   2,
+                new_root_hash:  Fr::default(),
+                block_data:     BlockData::Transfer{
+                    total_fees: BigDecimal::from_str_radix(&format!("{}", 0), 10).unwrap(),
+                    transactions: vec![transfer_tx.clone(), transfer_tx.clone()],
+                }
+            }, 
+            accounts_updated:   Some(fnv::FnvHashMap::default()),
+            tx_meta:            None,
+        }).unwrap();
+
+        conn.execute_operation(&Operation{
+            action: Action::Commit,
+            block:  Block{
+                block_number:   3,
+                new_root_hash:  Fr::default(),
+                block_data:     BlockData::Exit{
+                    batch_number: 2,
+                    transactions: vec![exit_tx.clone(), exit_tx.clone()],
+                }
+            }, 
+            accounts_updated:   Some(fnv::FnvHashMap::default()),
+            tx_meta:            None,
+        }).unwrap();
+
+        let txs = conn.load_last_saved_transactions(10);
+        assert_eq!(txs.unwrap().len(), 6);
     }
 
 }

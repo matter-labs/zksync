@@ -87,7 +87,7 @@ push: images
 	docker push gluk64/franklin:server
 	docker push gluk64/franklin:prover
 
-start: images
+start: confirm_action images
 ifeq (,$(KUBECONFIG))
 	@docker-compose up -d --scale prover=1 server prover
 else

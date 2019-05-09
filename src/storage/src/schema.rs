@@ -29,6 +29,7 @@ table! {
         nonce -> Int4,
         block_number -> Int4,
         action_type -> Text,
+        tx_hash -> Nullable<Text>,
         created_at -> Timestamp,
     }
 }
