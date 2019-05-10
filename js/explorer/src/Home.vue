@@ -8,37 +8,23 @@
     </b-navbar>
     <br>
     <b-container>
-        <b-row>
-            <b-col sm="6" class="col-xl-6 col-lg-6 col-md-6 col-sm-12">
-                  <b-card no-body header="<b>Blocks</b>">
-                    <b-list-group flush>
-                    <b-list-group-item href="#">Cras justo odio</b-list-group-item>
-                    <b-list-group-item href="#">Dapibus ac facilisis in</b-list-group-item>
-                    <b-list-group-item href="#">Vestibulum at eros</b-list-group-item>
-                    </b-list-group>
-
-                    <b-card-body>
-                    <b-button block variant="outline-primary">View more</b-button>
-                    </b-card-body>
-                </b-card>        
-            </b-col>
-            <b-col sm="6" class="col-xl-6 col-lg-6 col-md-6 col-sm-12">
-                <b-card no-body header="<b>Transactions</b>">
-                    <b-list-group flush>
-                    <b-list-group-item href="#">Cras justo odio</b-list-group-item>
-                    <b-list-group-item href="#">Dapibus ac facilisis in</b-list-group-item>
-                    <b-list-group-item href="#">Vestibulum at eros</b-list-group-item>
-                    </b-list-group>
-
-                    <b-card-body>
-                    <b-button block variant="outline-primary">View more</b-button>
-                    </b-card-body>
-                </b-card> 
-            </b-col>
-        </b-row>
+        <h5>Blocks</h5>
+        <b-table id="my-table" hover outlined :items="items" @row-clicked="test"></b-table>
+        <b-pagination
+            v-model="currentPage"
+            :total-rows="rows"
+            :per-page="perPage"
+            aria-controls="my-table"
+        ></b-pagination>
     </b-container>
 </div>
 </template>
+
+<style>
+td {
+    cursor: pointer;
+}
+</style>
 
 <script>
 
@@ -47,7 +33,32 @@ import store from './store'
 export default {
     name: 'home',
     methods: {
+        test() {
+            console.log('test')
+        }
     },
+    data() {
+      return {
+        perPage: 3,
+        currentPage: 1,
+        items: [
+          { block_number: 1, type: 'Transfer', transactions: 10, commit_hash: '0x070f6...a62e16f7d', verify_hash: '0x070f6...a62e16f7d', },
+          { block_number: 2, type: 'Transfer', transactions: 10, commit_hash: '0x070f6...a62e16f7d', verify_hash: '0x070f6...a62e16f7d', },
+          { block_number: 3, type: 'Transfer', transactions: 10, commit_hash: '0x070f6...a62e16f7d', verify_hash: '0x070f6...a62e16f7d', },
+          { block_number: 4, type: 'Transfer', transactions: 10, commit_hash: '0x070f6...a62e16f7d', verify_hash: '0x070f6...a62e16f7d', },
+          { block_number: 5, type: 'Transfer', transactions: 10, commit_hash: '0x070f6...a62e16f7d', verify_hash: '0x070f6...a62e16f7d', },
+          { block_number: 6, type: 'Transfer', transactions: 10, commit_hash: '0x070f6...a62e16f7d', verify_hash: '0x070f6...a62e16f7d', },
+          { block_number: 7, type: 'Transfer', transactions: 10, commit_hash: '0x070f6...a62e16f7d', verify_hash: '0x070f6...a62e16f7d', },
+          { block_number: 8, type: 'Transfer', transactions: 10, commit_hash: '0x070f6...a62e16f7d', verify_hash: '0x070f6...a62e16f7d', },
+          { block_number: 9, type: 'Transfer', transactions: 10, commit_hash: '0x070f6...a62e16f7d', verify_hash: '0x070f6...a62e16f7d', }
+        ]
+      }
+    },
+    computed: {
+      rows() {
+        return this.items.length
+      }
+    }
 }
 </script>
 
