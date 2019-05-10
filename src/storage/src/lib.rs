@@ -87,7 +87,7 @@ struct NewOperation {
 pub const ACTION_COMMIT: &'static str = "Commit";
 pub const ACTION_VERIFY: &'static str = "Verify";
 
-#[derive(Debug, Queryable, QueryableByName)]
+#[derive(Debug, Clone, Queryable, QueryableByName)]
 #[table_name="operations"]
 pub struct StoredOperation {
     pub id:             i32,
@@ -147,7 +147,7 @@ struct NewTx {
     pub state_root:     Option<String>, // unique block id (for possible reorgs)
 }
 
-#[derive(Debug, Queryable, QueryableByName)]
+#[derive(Debug, Clone, Queryable, QueryableByName)]
 #[table_name="transactions"]
 pub struct StoredTx {
     pub id:             i32,
@@ -582,6 +582,16 @@ impl StorageProcessor {
             .map(|_|())
     }
 
+    pub fn load_stored_commit_op_with_id(&self, block_id: u32) -> QueryResult<StoredOperation> {
+        use crate::schema::operations::dsl;
+        self.conn().transaction(|| {
+            dsl::operations
+                .filter(dsl::id.eq(block_id as i32))
+                .filter(dsl::action_type.eq(ACTION_COMMIT))
+                .get_result(self.conn())
+        })
+    }
+
     pub fn load_commit_op(&self, block_number: BlockNumber) -> QueryResult<Operation> {
         use crate::schema::operations::dsl;
         self.conn().transaction(|| {
@@ -770,7 +780,12 @@ impl StorageProcessor {
         Ok( r )
     }
 
-    pub fn load_transactions_in_block(&self, block_number: u32) -> QueryResult<Vec<StoredTx>> {
+    pub fn load_transactions_in_block_with_id(&self, block_id: u32) -> QueryResult<Vec<StoredTx>> {
+        let op = self.load_commit_op(block_id)?;
+        self.load_transactions_in_block_with_number(op.block.block_number)
+    }
+
+    pub fn load_transactions_in_block_with_number(&self, block_number: u32) -> QueryResult<Vec<StoredTx>> {
         let query = format!("
             SELECT * FROM transactions
             WHERE block_number = {}
