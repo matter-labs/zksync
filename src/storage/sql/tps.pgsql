@@ -3,8 +3,8 @@ with dat as (
 with blocks as (
     select
         block_number, action_type, created_at,
-        12 as from_block, -- 12
-        265 as to_block   -- 265
+        26 as from_block, -- 12
+        70 as to_block   -- 265
     from operations
     where
         action_type = 'Verify'
@@ -17,5 +17,5 @@ select
     (select created_at from blocks where block_number = to_block) as to_time
 from blocks
 where block_number >= from_block and block_number <= to_block
-) select *, n * 8 as txs, EXTRACT(epoch FROM (to_time - from_time)) as seconds from dat
+) select *, n * 256 as txs, EXTRACT(epoch FROM (to_time - from_time)) as seconds from dat
 ) select *, txs / seconds as tps from d;

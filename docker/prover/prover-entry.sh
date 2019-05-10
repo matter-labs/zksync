@@ -12,4 +12,4 @@ echo POD_NAME=$POD_NAME
 echo key download complete, starting prover
 
 export DATABASE_URL=$PROVER_DATABASE_URL
-exec ./prover
+exec ./prover 2>&1
