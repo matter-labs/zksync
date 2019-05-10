@@ -3,7 +3,7 @@
 . .setup_env
 
 # Configure cluster
-kubectl --kubeconfig etc/kube/kubeconfig.yaml apply -f etc/kube/franklin.yaml
+kubectl apply -f etc/kube/franklin.yaml
 
 # Generate and apply secrets configuration from prod env
 . bin/.kube_gen_secret | kubectl apply -f -
