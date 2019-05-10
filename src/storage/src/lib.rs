@@ -87,6 +87,20 @@ struct NewOperation {
 pub const ACTION_COMMIT: &'static str = "Commit";
 pub const ACTION_VERIFY: &'static str = "Verify";
 
+pub enum ActionType {
+    COMMIT,
+    VERIFY
+}
+
+impl std::string::ToString for ActionType {
+    fn to_string(&self) -> String {
+        match self {
+            ActionType::COMMIT => ACTION_COMMIT.to_owned(),
+            ActionType::VERIFY => ACTION_VERIFY.to_owned(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Queryable, QueryableByName)]
 #[table_name="operations"]
 pub struct StoredOperation {
@@ -582,14 +596,26 @@ impl StorageProcessor {
             .map(|_|())
     }
 
-    pub fn load_stored_commit_op_with_id(&self, block_id: u32) -> QueryResult<StoredOperation> {
+    pub fn load_stored_op_with_block_number(&self, block_number: BlockNumber, action_type: ActionType) -> QueryResult<StoredOperation> {
         use crate::schema::operations::dsl;
         self.conn().transaction(|| {
             dsl::operations
-                .filter(dsl::id.eq(block_id as i32))
-                .filter(dsl::action_type.eq(ACTION_COMMIT))
+                .filter(dsl::block_number.eq(block_number as i32))
+                .filter(dsl::action_type.eq(action_type.to_string().as_str()))
                 .get_result(self.conn())
         })
+    }
+
+    pub fn load_stored_ops_in_blocks_range(&self, from_block_number: BlockNumber, to_block_number: BlockNumber, action_type: ActionType) -> QueryResult<Vec<StoredOperation>> {
+        let query = format!("
+            SELECT * FROM operations
+            WHERE block_number >= {from_block_number} AND block_number <= {to_block_number} AND action_type = '{action_type}'
+            ORDER BY block_number
+            DESC
+        ", from_block_number = from_block_number as i32, to_block_number = to_block_number as i32, action_type = action_type.to_string());
+        let r = diesel::sql_query(query)
+            .load(self.conn())?;
+        Ok( r )
     }
 
     pub fn load_commit_op(&self, block_number: BlockNumber) -> QueryResult<Operation> {
@@ -780,12 +806,7 @@ impl StorageProcessor {
         Ok( r )
     }
 
-    pub fn load_transactions_in_block_with_id(&self, block_id: u32) -> QueryResult<Vec<StoredTx>> {
-        let op = self.load_commit_op(block_id)?;
-        self.load_transactions_in_block_with_number(op.block.block_number)
-    }
-
-    pub fn load_transactions_in_block_with_number(&self, block_number: u32) -> QueryResult<Vec<StoredTx>> {
+    pub fn load_transactions_in_block(&self, block_number: u32) -> QueryResult<Vec<StoredTx>> {
         let query = format!("
             SELECT * FROM transactions
             WHERE block_number = {}

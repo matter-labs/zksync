@@ -18,7 +18,7 @@ use std::sync::mpsc;
 use plasma::models::{TransferTx, PublicKey, Account, Nonce};
 use models::config::RUNTIME_CONFIG;
 use super::models::{StateKeeperRequest, NetworkStatus, TransferTxConfirmation};
-use super::storage::{ConnectionPool, StorageProcessor, StoredTx};
+use super::storage::{ConnectionPool, StorageProcessor, StoredTx, ActionType};
 use super::nonce_futures::{NonceFutures, NonceReadyFuture};
 
 use futures::Future;
@@ -69,7 +69,8 @@ struct AccountDetailsResponse {
 struct BlockDetailsResponse {
     block_number:        u32,
     new_root_hash:       String,
-    tx_hash:             Option<String>,
+    committ_tx_hash:     Option<String>,
+    verify_tx_hash:      Option<String>,
 }
 
 #[derive(Default, Clone)]
@@ -349,7 +350,7 @@ fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<Htt
 
     let block_id_u32 = block_id.unwrap();
 
-    let txs = storage.load_transactions_in_block_with_id(block_id_u32).expect("load_transactions_in_block_with_id: db must work");
+    let txs = storage.load_transactions_in_block(block_id_u32).expect("load_transactions_in_block_with_id: db must work");
     
     let response: Vec<Vec<u8>> = txs.iter().map(|tx| tx.tx_data().expect("something is wrong with tx data")).collect();
 
@@ -376,14 +377,84 @@ fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpRespon
 
     let block_id_u32 = block_id.unwrap();
 
-    let stored_operation = storage.load_stored_commit_op_with_id(block_id_u32).expect("load_stored_commit_op_with_id: db must work");
-    let operation = stored_operation.clone().into_op(&storage).expect("into_op must work");
+    let stored_commit_operation = storage.load_stored_op_with_block_number(block_id_u32, ActionType::COMMIT).expect("load_stored_commit_op_with_id: db must work");
+    let operation = stored_commit_operation.clone().into_op(&storage).expect("into_op must work");
+    let stored_verify_operation = storage.load_stored_op_with_block_number(block_id_u32, ActionType::VERIFY);
+    let verify_tx_hash = match stored_verify_operation {
+        Ok(op) => op.tx_hash,
+        Err(_) => None,
+    };
     
     let response = BlockDetailsResponse {
-        block_number:        stored_operation.clone().block_number as u32,
+        block_number:        stored_commit_operation.clone().block_number as u32,
         new_root_hash:       operation.clone().block.new_root_hash.to_string(),
-        tx_hash:             stored_operation.clone().tx_hash,
+        committ_tx_hash:     stored_commit_operation.clone().tx_hash,
+        verify_tx_hash:      verify_tx_hash,
     };
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+fn handle_get_blocks(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    let pool = req.state().connection_pool.clone();
+
+    let storage = pool.access_storage();
+    if storage.is_err() {
+        return Ok(HttpResponse::Ok().json(ExplorerError{error:"rate limit".to_string()}));
+    }
+    let storage = storage.unwrap();
+
+    let from_block_id_string = req.match_info().get("from_block");
+    if from_block_id_string.is_none() {
+        return Ok(HttpResponse::Ok().json(ExplorerError{error:"invalid parameters".to_string()}));
+    }
+    let from_block_id = from_block_id_string.unwrap().parse::<u32>();
+    if from_block_id.is_err(){
+        return Ok(HttpResponse::Ok().json(ExplorerError{error:"invalid from_block_id".to_string()}));
+    }
+
+    let from_block_id_u32 = from_block_id.unwrap();
+    //
+
+    let to_block_id_string = req.match_info().get("to_block");
+    if to_block_id_string.is_none() {
+        return Ok(HttpResponse::Ok().json(ExplorerError{error:"invalid parameters".to_string()}));
+    }
+    let to_block_id = to_block_id_string.unwrap().parse::<u32>();
+    if to_block_id.is_err(){
+        return Ok(HttpResponse::Ok().json(ExplorerError{error:"invalid to_block_id".to_string()}));
+    }
+
+    let to_block_id_u32 = to_block_id.unwrap();
+    //
+
+    // let type_string = req.match_info().get("type");
+    // if type_string.is_none() {
+    //     return Ok(HttpResponse::Ok().json(ExplorerError{error:"invalid parameters".to_string()}));
+    // }
+
+    let mut response: Vec<BlockDetailsResponse> = vec![];
+
+    for block_id_u32 in from_block_id_u32..=to_block_id_u32 {
+        let stored_commit_operation = storage.load_stored_op_with_block_number(block_id_u32, ActionType::COMMIT);
+        if stored_commit_operation.is_err() {
+            continue
+        }
+        let unwrapped_stored_commit_operation = stored_commit_operation.unwrap();
+        let operation = unwrapped_stored_commit_operation.clone().into_op(&storage).expect("into_op must work");
+        let stored_verify_operation = storage.load_stored_op_with_block_number(block_id_u32, ActionType::VERIFY);
+        let verify_tx_hash = match stored_verify_operation {
+            Ok(op) => op.tx_hash,
+            Err(_) => None,
+        };
+        let bd = BlockDetailsResponse {
+            block_number:        unwrapped_stored_commit_operation.clone().block_number as u32,
+            new_root_hash:       operation.clone().block.new_root_hash.to_string(),
+            committ_tx_hash:     unwrapped_stored_commit_operation.clone().tx_hash,
+            verify_tx_hash:      verify_tx_hash,
+        };
+        response.push(bd);
+    }
 
     Ok(HttpResponse::Ok().json(response))
 }
@@ -424,9 +495,9 @@ fn start_server(state: AppState, bind_to: String) {
             .resource("/blocks/{block_id}", |r| {
                 r.method(Method::GET).f(handle_get_block_by_id);
             })
-            // .resource("/blocks?[min={from_block}][&max={to_block}][&type=commit|verify]", |r| {
-            //     r.method(Method::GET).f(handle_get_blocks);
-            // })
+            .resource("/blocks?min={from_block}&max={to_block}", |r| {
+                r.method(Method::GET).f(handle_get_blocks);
+            })
         })
     })
     .bind(&bind_to)
