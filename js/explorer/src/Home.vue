@@ -8,7 +8,17 @@
     </b-navbar>
     <br>
     <b-container>
-        <h5>Blocks</h5>
+        <b-breadcrumb :items="bc"></b-breadcrumb>
+        <b-card bg-variant="light" >
+            <h6>Franklin Blockchain Explorer</h6>
+            <b-input-group>
+                <b-form-input></b-form-input>
+                <b-input-group-append>
+                <b-button variant="info">Search</b-button>
+                </b-input-group-append>
+            </b-input-group>
+        </b-card>
+        <br>
         <b-table id="my-table" hover outlined :items="items" @row-clicked="test"></b-table>
         <b-pagination
             v-model="currentPage"
@@ -39,6 +49,20 @@ export default {
     },
     data() {
       return {
+          bc: [
+          {
+            text: 'Blocks',
+            href: '#'
+          },
+          {
+            text: 'Manage',
+            href: '#',
+          },
+          {
+            text: 'Library',
+            active: true
+          }
+        ],
         perPage: 3,
         currentPage: 1,
         items: [
