@@ -2,7 +2,7 @@
 <div>
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
-        <b-navbar-brand>Franklin Block Explorer</b-navbar-brand>
+        <b-navbar-brand>Franklin Network (Testnet)</b-navbar-brand>
         <b-navbar-brand right>API server: {{apiServer}}</b-navbar-brand>
     </b-container>
     </b-navbar>
@@ -10,7 +10,7 @@
     <b-container>
         <b-breadcrumb :items="bc"></b-breadcrumb>
         <b-card bg-variant="light" >
-            <h6>Franklin Blockchain Explorer</h6>
+            <h6>Franklin Block Explorer</h6>
             <b-input-group>
                 <b-form-input></b-form-input>
                 <b-input-group-append>
