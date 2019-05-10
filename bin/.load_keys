@@ -6,6 +6,6 @@ mkdir -p $KEY_DIR
 for i in $KEY_FILES; do
     if ! [ -f $KEY_DIR/$i ]; then
         echo "Downloading $SPACE_URL/$i to $KEY_DIR/"
-        curl -o $KEY_DIR/$i $SPACE_URL/$i
+        curl -o $KEY_DIR/$i $SPACE_URL/$i 2>&1
     fi
 done
