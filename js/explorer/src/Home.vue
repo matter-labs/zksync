@@ -19,6 +19,20 @@
             </b-input-group>
         </b-card>
         <br>
+        <b-card>
+        <div class="row" style="color: grey">
+            <div class="col-sm text-center">
+            <i class="fas fa-cube"></i> <b>Total blocks:</b> 328
+            </div>
+            <div class="col-sm text-center">
+            <i class="far fa-check-square"></i> <b>Total transactions:</b> 17230
+            </div>
+            <div class="col-sm text-center">
+            <i class="fas fa-tachometer-alt"></i> <b>Max TPS:</b> 102
+            </div>
+        </div>
+        </b-card>
+        <br>
         <b-table id="my-table" hover outlined :items="items" @row-clicked="test"></b-table>
         <b-pagination
             v-model="currentPage"
