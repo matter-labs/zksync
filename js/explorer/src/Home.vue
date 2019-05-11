@@ -24,12 +24,14 @@
     <b-container>
         <b-card bg-variant="light" >
             <h5>Franklin Block Explorer</h5>
+            <b-form @submit.stop.prevent="search">
             <b-input-group>
-                <b-form-input></b-form-input>
+                <b-form-input placeholder="block number, root hash, tx hash or eth address"></b-form-input>
                 <b-input-group-append>
-                <b-button variant="info">Search</b-button>
+                <b-button @click="search" variant="info">Search</b-button>
                 </b-input-group-append>
             </b-input-group>
+            </b-form>
         </b-card>
         <br>
         <b-card>
@@ -113,6 +115,9 @@ import store from './store'
 export default {
     name: 'home',
     methods: {
+        search() {
+            console.log('search')
+        },
         onRowClicked(item) {
             this.$parent.$router.push('/blocks/' + item.block_number)
         },
