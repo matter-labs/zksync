@@ -9,15 +9,24 @@
     <br>
     <b-container>
         <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
-        <b-card >
-            <h5>Block #{{blockNumber}}</h5>
+        <h5>Block</h5>
+        <b-card no-body>
+            <b-table id="my-table" thead-class="hidden_header" :items="props">
+                <span slot="value" slot-scope="data" v-html="data.value"></span>
+            </b-table>
         </b-card>
         <br>
-        <h6>Block transactions</h6>
+        <h5>Transactions in this block</h5>
         <b-table id="my-table" hover outlined :items="items" @row-clicked="onRowClicked"></b-table>
     </b-container>
 </div>
 </template>
+
+<style>
+.hidden_header {
+  display: none;
+}
+</style>
 
 <script>
 
@@ -45,6 +54,16 @@ export default {
         },
         rows() {
             return this.items.length
+        },
+        props() {
+            return [
+                { name: 'Block #', value: `<b>${this.blockNumber}</b>`, },
+                { name: 'New root hash', value: '0x0d6724d559efd3a85e2aa78e053a73e612dcedb19b09ea1be67e8393a0278bda', },
+                { name: 'Transactions', value: '256', },
+                { name: 'Status', value: 'Verified', },
+                { name: 'Commit tx hash', value: '<a href="#">0x0d6724d559efd3a85e2aa78e053a73e612dcedb19b09ea1be67e8393a0278bda</a>', },
+                { name: 'Verify tx hash', value: '<a href="#">0x0d6724d559efd3a85e2aa78e053a73e612dcedb19b09ea1be67e8393a0278bda</a>', },
+            ]
         }
     },
     data() {
