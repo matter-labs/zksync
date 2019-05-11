@@ -28,8 +28,14 @@
             <b-input-group>
                 <b-form-input placeholder="block number, root hash, tx hash or eth address"></b-form-input>
                 <b-input-group-append>
-                <b-button @click="search" variant="info">Search</b-button>
+                <b-button @click="search" variant="info" :disabled="searching">
+                    <b-spinner v-if="searching" small></b-spinner>
+                    <span>Search</span>
+                </b-button>
                 </b-input-group-append>
+                <b-form-invalid-feedback v-if="notFound" :state="false">
+                    Nothing found for xxx.
+                </b-form-invalid-feedback>
             </b-input-group>
             </b-form>
         </b-card>
@@ -115,8 +121,15 @@ import store from './store'
 export default {
     name: 'home',
     methods: {
-        search() {
-            console.log('search')
+
+        async search() {
+            this.searching = true
+            this.notFound = false
+            await new Promise(resolve => setTimeout(resolve, 600))
+            this.searching = false
+            this.notFound = true
+            await new Promise(resolve => setTimeout(resolve, 3600))
+            this.notFound = false
         },
         onRowClicked(item) {
             this.$parent.$router.push('/blocks/' + item.block_number)
@@ -136,6 +149,9 @@ export default {
           },
         ],
         loadingBlocks:  false,
+        searching:      false,
+        notFound:       false,
+
         perPage:        20,
         rows:           2000,
         currentPage:    1,
