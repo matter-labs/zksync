@@ -16,7 +16,7 @@ Vue.use(BootstrapVue)
 
 const routes = [
     { path: '/', component: Home },
-    { path: '/blocks/:block_number', component: Block },
+    { path: '/blocks/:blockNumber', component: Block },
     { path: '/transactions/:id', component: Transaction },
     //{ path: '*', redirect: '/login' },
 ]

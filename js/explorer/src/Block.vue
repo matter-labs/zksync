@@ -9,7 +9,7 @@
     <br>
     <b-container>
         <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
-        <h5>Block</h5>
+        <h5>Block data</h5>
         <b-card no-body>
             <b-table id="my-table" thead-class="hidden_header" :items="props">
                 <span slot="value" slot-scope="data" v-html="data.value"></span>
@@ -40,14 +40,17 @@ export default {
         }
     },
     computed: {
+        blockNumber() {
+            return this.$route.params.blockNumber
+        },
         breadcrumbs() {
             return [
                 {
-                    text: 'Blocks',
+                    text: 'All blocks',
                     to: '/'
                 },
                 {
-                    text: ''+this.blockNumber,
+                    text: 'Block '+this.blockNumber,
                     active: true
                 },
             ]
@@ -57,7 +60,7 @@ export default {
         },
         props() {
             return [
-                { name: 'Block #', value: `<b>${this.blockNumber}</b>`, },
+                { name: 'Block #', value: `<b>${this.blockNumber}</b>`},
                 { name: 'New root hash', value: '0x0d6724d559efd3a85e2aa78e053a73e612dcedb19b09ea1be67e8393a0278bda', },
                 { name: 'Transactions', value: '256', },
                 { name: 'Status', value: 'Verified', },
@@ -68,7 +71,6 @@ export default {
     },
     data() {
       return {
-        blockNumber: 123,
         items: [
           { id: 1, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
           { id: 2, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },

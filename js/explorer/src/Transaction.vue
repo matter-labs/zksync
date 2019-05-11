@@ -9,8 +9,11 @@
     <br>
     <b-container>
         <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
-        <b-card >
-            <h5>Transaction #{{id}}</h5>
+        <h5>Transaction data</h5>
+        <b-card no-body>
+            <b-table id="my-table" thead-class="hidden_header" :items="props" fixed>
+                <span slot="value" slot-scope="data" v-html="data.value"></span>
+            </b-table>
         </b-card>
         <br>
     </b-container>
@@ -29,25 +32,37 @@ export default {
         }
     },
     computed: {
+        id() {
+            return this.$route.params.id
+        },
         breadcrumbs() {
             return [
                 {
-                    text: 'Blocks',
+                    text: 'All blocks',
                     to: '/'
                 },
                 {
-                    text: ''+this.id,
+                    text: 'Block ' + 123,
+                    to: '/blocks/123'
+                },                
+                {
+                    text: 'Transaction '+this.id,
                     active: true
                 },
             ]
         },
-        rows() {
-            return this.items.length
+        props() {
+            return [
+                { name: 'Id', value: `<b>${this.id}</b>`, empty1: '', empty2: ''},
+                { name: 'From', value: '', },
+                { name: 'To', value: '256', },
+                { name: 'Amount', value: '1200', },
+                { name: 'Nonce', value: '23', },
+            ]
         }
     },
     data() {
       return {
-        id: 123,
         items: [
           { tx_id: 1, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
           { tx_id: 2, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
