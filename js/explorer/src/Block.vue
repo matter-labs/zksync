@@ -11,8 +11,12 @@
         <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
         <h5>Block data</h5>
         <b-card no-body>
-            <b-table id="my-table" thead-class="hidden_header" :items="props">
+            <b-table id="my-table" thead-class="hidden_header" :items="props" :busy="isBusy">
                 <span slot="value" slot-scope="data" v-html="data.value"></span>
+                <div slot="table-busy" class="text-center text-danger my-2">
+                    <b-spinner class="align-middle"></b-spinner>
+                    <strong>Loading...</strong>
+                </div>
             </b-table>
         </b-card>
         <br>
@@ -40,6 +44,7 @@ export default {
         }
     },
     computed: {
+        isBusy: () => false,
         blockNumber() {
             return this.$route.params.blockNumber
         },
@@ -63,7 +68,7 @@ export default {
                 { name: 'Block #', value: `<b>${this.blockNumber}</b>`},
                 { name: 'New root hash', value: '0x0d6724d559efd3a85e2aa78e053a73e612dcedb19b09ea1be67e8393a0278bda', },
                 { name: 'Transactions', value: '256', },
-                { name: 'Status', value: 'Verified', },
+                { name: 'Status', value: '<b-badge>Verified</b-badge>', },
                 { name: 'Commit tx hash', value: '<a href="#">0x0d6724d559efd3a85e2aa78e053a73e612dcedb19b09ea1be67e8393a0278bda</a>', },
                 { name: 'Verify tx hash', value: '<a href="#">0x0d6724d559efd3a85e2aa78e053a73e612dcedb19b09ea1be67e8393a0278bda</a>', },
             ]
