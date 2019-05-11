@@ -6,10 +6,8 @@
         <b-navbar-brand right>API server: {{apiServer}}</b-navbar-brand>
     </b-container>
     </b-navbar>
-            <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
     <br>
     <b-container>
-        <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
         <b-card bg-variant="light" >
             <h5>Franklin Block Explorer</h5>
             <b-input-group>
@@ -23,10 +21,10 @@
         <b-card>
         <div class="row hide-sm" style="color: grey">
             <div class="col-sm text-center">
-            <i class="far fa-square"></i> <b>Last committed</b><br><span class="num">328</span>
+            <i class="far fa-square"></i> <b>Blocks committed</b><br><span class="num">328</span>
             </div>
             <div class="col-sm text-center">
-            <i class="far fa-check-square"></i> <b>Last verified</b><br><span class="num">328</span>
+            <i class="far fa-check-square"></i> <b>Blocks verified</b><br><span class="num">328</span>
             </div>
             <div class="col-sm text-center">
             <i class="fas fa-list"></i> <b>Total transactions</b><br><span class="num">17230</span>
@@ -95,15 +93,15 @@ export default {
         perPage: 3,
         currentPage: 1,
         items: [
-          { block_number: 1, type: 'Transfer', transactions: 10, commit_hash: '0x070f6...a62e16f7d', verify_hash: '0x070f6...a62e16f7d', },
-          { block_number: 2, type: 'Transfer', transactions: 10, commit_hash: '0x070f6...a62e16f7d', verify_hash: '0x070f6...a62e16f7d', },
-          { block_number: 3, type: 'Transfer', transactions: 10, commit_hash: '0x070f6...a62e16f7d', verify_hash: '0x070f6...a62e16f7d', },
-          { block_number: 4, type: 'Transfer', transactions: 10, commit_hash: '0x070f6...a62e16f7d', verify_hash: '0x070f6...a62e16f7d', },
-          { block_number: 5, type: 'Transfer', transactions: 10, commit_hash: '0x070f6...a62e16f7d', verify_hash: '0x070f6...a62e16f7d', },
-          { block_number: 6, type: 'Transfer', transactions: 10, commit_hash: '0x070f6...a62e16f7d', verify_hash: '0x070f6...a62e16f7d', },
-          { block_number: 7, type: 'Transfer', transactions: 10, commit_hash: '0x070f6...a62e16f7d', verify_hash: '0x070f6...a62e16f7d', },
-          { block_number: 8, type: 'Transfer', transactions: 10, commit_hash: '0x070f6...a62e16f7d', verify_hash: '0x070f6...a62e16f7d', },
-          { block_number: 9, type: 'Transfer', transactions: 10, commit_hash: '0x070f6...a62e16f7d', verify_hash: '0x070f6...a62e16f7d', }
+          { block_number: 1, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
+          { block_number: 2, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
+          { block_number: 3, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
+          { block_number: 4, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
+          { block_number: 5, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
+          { block_number: 6, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
+          { block_number: 7, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
+          { block_number: 8, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
+          { block_number: 9, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' }
         ]
       }
     },
