@@ -21,7 +21,8 @@
         </b-card>
         <br>
         <h5>Transactions in this block</h5>
-        <b-table id="my-table" hover outlined :items="items" @row-clicked="onRowClicked"></b-table>
+        <transaction-list :transactions="items"></transaction-list>
+        <!--<b-table id="my-table" hover outlined :items="items" @row-clicked="onRowClicked"></b-table>-->
     </b-container>
 </div>
 </template>
@@ -35,9 +36,13 @@
 <script>
 
 import store from './store'
+import TransactionList from './TransactionList.vue'
 
 export default {
     name: 'block',
+    components: {
+        'transaction-list':  TransactionList
+    },
     methods: {
         onRowClicked(item) {
             this.$parent.$router.push('/transactions/' + item.id)
