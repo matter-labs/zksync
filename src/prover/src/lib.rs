@@ -1000,7 +1000,7 @@ impl BabyProver {
                 self.rewind_state(&storage, expected_current_block)?;
             }
 
-            let block = storage.load_committed_block(block_number).map_err(|e| format!("load_committed_block failed: {}", e))?;
+            let block = storage.load_committed_block(block_number).ok_or("load_committed_block failed")?;
             drop(storage);
 
             let proof = self.apply_and_prove(&block).map_err(|e| format!("apply_and_prove failed: {}", e))?;

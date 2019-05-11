@@ -15,6 +15,27 @@ use crate::models::circuit::exit::{ExitRequest};
 
 use std::cmp::{Ord, PartialEq, PartialOrd, Eq, Ordering};
 
+pub const TRANSFER_TX: &'static str = "Transfer";
+pub const DEPOSIT_TX: &'static str = "Deposit";
+pub const EXIT_TX: &'static str = "Exit";
+
+#[derive(Clone)]
+pub enum TransactionType {
+    Transfer{tx: TransferTx},
+    Deposit{tx: DepositTx},
+    Exit{tx: ExitTx}
+}
+
+impl std::string::ToString for TransactionType {
+    fn to_string(&self) -> String {
+        match self {
+            TransactionType::Transfer{tx: _} => TRANSFER_TX.to_owned(),
+            TransactionType::Deposit{tx: _}  => DEPOSIT_TX.to_owned(),
+            TransactionType::Exit{tx: _}     => EXIT_TX.to_owned(),
+        }
+    }
+}
+
 /// Unpacked transaction data
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct TransferTx {

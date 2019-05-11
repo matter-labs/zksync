@@ -106,3 +106,20 @@ pub struct CommitRequest {
     pub block:              Block, 
     pub accounts_updated:   AccountMap,
 }
+
+pub const ACTION_COMMIT: &'static str = "Commit";
+pub const ACTION_VERIFY: &'static str = "Verify";
+
+pub enum ActionType {
+    COMMIT,
+    VERIFY
+}
+
+impl std::string::ToString for ActionType {
+    fn to_string(&self) -> String {
+        match self {
+            ActionType::COMMIT => ACTION_COMMIT.to_owned(),
+            ActionType::VERIFY => ACTION_VERIFY.to_owned(),
+        }
+    }
+}
