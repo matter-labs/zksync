@@ -8,17 +8,22 @@ import store from './store'
 import Router from 'vue-router'
 import App from './App.vue'
 import Home from './Home.vue'
+import Block from './Block.vue'
+import Transaction from './Transaction.vue'
 
 Vue.use(Router)
 Vue.use(BootstrapVue)
 
 const routes = [
     { path: '/', component: Home },
+    { path: '/blocks/:block_number', component: Block },
+    { path: '/transactions/:id', component: Transaction },
     //{ path: '*', redirect: '/login' },
 ]
 
 const router = new Router({
-    routes // short for `routes: routes`
+    routes, // short for `routes: routes`
+    mode: 'history'
 })
 
 Vue.mixin({

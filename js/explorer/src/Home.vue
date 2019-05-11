@@ -6,11 +6,12 @@
         <b-navbar-brand right>API server: {{apiServer}}</b-navbar-brand>
     </b-container>
     </b-navbar>
+            <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
     <br>
     <b-container>
-        <b-breadcrumb :items="bc"></b-breadcrumb>
+        <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
         <b-card bg-variant="light" >
-            <h6>Franklin Block Explorer</h6>
+            <h5>Franklin Block Explorer</h5>
             <b-input-group>
                 <b-form-input></b-form-input>
                 <b-input-group-append>
@@ -39,7 +40,7 @@
         </div>
         </b-card>
         <br>
-        <b-table id="my-table" hover outlined :items="items" @row-clicked="test"></b-table>
+        <b-table id="my-table" hover outlined :items="items" @row-clicked="onRowClicked"></b-table>
         <b-pagination
             v-model="currentPage"
             :total-rows="rows"
@@ -79,25 +80,17 @@ import store from './store'
 export default {
     name: 'home',
     methods: {
-        test() {
-            console.log('test')
+        onRowClicked(item) {
+            this.$parent.$router.push('/blocks/' + item.block_number)
         }
     },
     data() {
       return {
-          bc: [
+          breadcrumbs: [
           {
             text: 'Blocks',
-            href: '#'
-          },
-          {
-            text: 'Manage',
-            href: '#',
-          },
-          {
-            text: 'Library',
             active: true
-          }
+          },
         ],
         perPage: 3,
         currentPage: 1,
@@ -134,5 +127,9 @@ body {
 
 .btn {
     font-size: 0.8rem;
+}
+
+tr {
+    cursor: pointer;
 }
 </style>
