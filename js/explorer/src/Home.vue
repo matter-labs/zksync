@@ -38,18 +38,39 @@
         </div>
         </b-card>
         <br>
-        <b-table id="my-table" hover outlined :items="items" @row-clicked="onRowClicked"></b-table>
+
+        <div class="table-container">
+        <div class="overlay text-center" v-if="loadingBlocks">
+            <br><br><br>
+            <b-spinner variant="primary"></b-spinner>
+        </div>
+        <b-table id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loadingBlocks"></b-table>
+        </div>
+
         <b-pagination
             v-model="currentPage"
-            :total-rows="rows"
             :per-page="perPage"
-            aria-controls="my-table"
+            :total-rows="rows"
+            @change="onPageChanged"
         ></b-pagination>
     </b-container>
 </div>
 </template>
 
 <style>
+
+.table-container {
+  position: relative;
+}
+
+.overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
 td {
     cursor: pointer;
 }
@@ -80,7 +101,12 @@ export default {
     methods: {
         onRowClicked(item) {
             this.$parent.$router.push('/blocks/' + item.block_number)
-        }
+        },
+        async onPageChanged(page) {
+            this.loadingBlocks = true
+            await new Promise(resolve => setTimeout(resolve, 600))
+            this.loadingBlocks = false
+        },
     },
     data() {
       return {
@@ -90,8 +116,10 @@ export default {
             active: true
           },
         ],
-        perPage: 3,
-        currentPage: 1,
+        loadingBlocks:  false,
+        perPage:        20,
+        rows:           2000,
+        currentPage:    1,
         items: [
           { block_number: 1, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
           { block_number: 2, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
@@ -105,11 +133,6 @@ export default {
         ]
       }
     },
-    computed: {
-      rows() {
-        return this.items.length
-      }
-    }
 }
 </script>
 
