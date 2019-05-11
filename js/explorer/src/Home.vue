@@ -2,7 +2,7 @@
 <div>
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
-        <b-navbar-brand>Franklin Network (Testnet)</b-navbar-brand>
+        <b-navbar-brand>Franklin Network (Rinkeby)</b-navbar-brand>
         <b-navbar-brand right>API server: {{apiServer}}</b-navbar-brand>
     </b-container>
     </b-navbar>
@@ -20,15 +20,21 @@
         </b-card>
         <br>
         <b-card>
-        <div class="row" style="color: grey">
+        <div class="row hide-sm" style="color: grey">
             <div class="col-sm text-center">
-            <i class="fas fa-cube"></i> <b>Total blocks:</b> 328
+            <i class="far fa-square"></i> <b>Last committed</b><br><span class="num">328</span>
             </div>
             <div class="col-sm text-center">
-            <i class="far fa-check-square"></i> <b>Total transactions:</b> 17230
+            <i class="far fa-check-square"></i> <b>Last verified</b><br><span class="num">328</span>
             </div>
             <div class="col-sm text-center">
-            <i class="fas fa-tachometer-alt"></i> <b>Max TPS:</b> 102
+            <i class="fas fa-list"></i> <b>Total transactions</b><br><span class="num">17230</span>
+            </div>
+            <div class="col-sm text-center">
+            <i class="fas fa-archive"></i> <b>Tx per block</b><br><span class="num">256</span>
+            </div>
+            <div class="col-sm hide-lg text-center">
+            <i class="fas fa-tachometer-alt"></i> <b>Max TPS</b><br><span class="num">102</span>
             </div>
         </div>
         </b-card>
@@ -47,6 +53,22 @@
 <style>
 td {
     cursor: pointer;
+}
+
+.num {
+    font-size: 2.5em;
+}
+
+@media (max-width: 720px) {
+.hide-sm {
+    display: none
+}
+}
+
+@media (max-width: 992px) {
+.hide-lg {
+    display: none
+}
 }
 </style>
 
