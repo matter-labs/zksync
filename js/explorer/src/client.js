@@ -13,7 +13,7 @@ let self = {
     
     BASE_URL:       process.env.API_SERVER + '/api/v0.1', //'http://localhost:3000/api/v0.1',
     PAGE_SIZE:      20, // blocks per page
-    TX_PER_BLOCK:   256,
+    TX_PER_BLOCK:   process.env.TRANSFER_BATCH_SIZE,
     
     async status() {
         return fetch({
@@ -37,5 +37,7 @@ let self = {
     },
 
 }
+
+window.client = self
 
 export default self

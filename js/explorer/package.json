@@ -1,11 +1,11 @@
 {
-  "name": "plasma-client",
-  "description": "Plasma client app",
+  "name": "franklin-explorer",
+  "description": "Franklin network explorer",
   "version": "1.0.0",
-  "author": "Alex <gluk64@gmail.com>",
+  "author": "Alex <ag@thematter.io>",
   "private": true,
   "scripts": {
-    "dev": "webpack-dev-server  --port 9000 --open --hot --define process.env.NODE_ENV='\"development\"' --define process.env.API_SERVER=\"\\\"$API_SERVER\"\\\"",
+    "dev": "webpack-dev-server  --port 9000 --open --hot --define process.env.NODE_ENV='\"development\"' --define process.env.TRANSFER_BATCH_SIZE=\"\\\"$TRANSFER_BATCH_SIZE\"\\\" --define process.env.API_SERVER=\"\\\"$API_SERVER\"\\\"",
     "build": "cross-env NODE_ENV=production webpack --progress --hide-modules"
   },
   "dependencies": {

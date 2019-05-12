@@ -2,7 +2,7 @@
 <div>
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
-        <b-navbar-brand>Franklin Network (Rinkeby)</b-navbar-brand>
+        <b-navbar-brand>Matter Testnet</b-navbar-brand>
         <b-navbar-brand right>API server: {{apiServer}}</b-navbar-brand>
     </b-container>
     </b-navbar>
