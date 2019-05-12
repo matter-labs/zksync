@@ -727,15 +727,14 @@ impl StorageProcessor {
         r
     }
 
-    pub fn load_transactions_in_block(&self, block_number: u32) -> Vec<StoredTx> {
+    pub fn load_transactions_in_block(&self, block_number: u32) -> QueryResult<Vec<StoredTx>> {
         let query = format!("
             SELECT * FROM transactions
             WHERE block_number = {}
             ORDER BY block_number
         ", block_number as i32);
-        let r = diesel::sql_query(query)
-            .load(self.conn());
-        r.unwrap_or(vec![])
+        diesel::sql_query(query)
+            .load(self.conn())
     }
 
     pub fn fetch_prover_job(&self, worker_: &String, timeout_seconds: usize) -> QueryResult<Option<ProverRun>> {

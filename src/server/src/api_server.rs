@@ -64,7 +64,7 @@ struct AccountDetailsResponse {
 #[derive(Debug, Serialize, Deserialize)]
 struct BlockDetailsResponse {
     block_number:        u32,
-    new_root_hash:       String,
+    new_state_root:      String,
     commit_tx_hash:      Option<String>,
     verify_tx_hash:      Option<String>,
     committed_at:        Option<NaiveDateTime>,
@@ -346,9 +346,11 @@ fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<Htt
 
     let block_id_u32 = block_id.unwrap();
 
-    let txs = storage.load_transactions_in_block(block_id_u32);
-
-    Ok(HttpResponse::Ok().json(txs))
+    let result = storage.load_transactions_in_block(block_id_u32);
+    match result {
+        Ok(txs) => Ok(HttpResponse::Ok().json(txs)),
+        Err(err) => Ok(HttpResponse::Ok().json(ApiError{error: format!("error: {}", err)})),
+    }
 }
 
 fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
@@ -383,7 +385,7 @@ fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpRespon
     
     let response = BlockDetailsResponse {
         block_number:        commit.block_number as u32,
-        new_root_hash:       format!("0x{}", operation.block.new_root_hash.to_hex()),
+        new_state_root:      operation.block.new_root_hash.to_hex(),
         commit_tx_hash:      commit.tx_hash,
         verify_tx_hash:      verify.as_ref().map_or(None, |op| op.tx_hash.clone()),
         committed_at:        Some(commit.created_at),
