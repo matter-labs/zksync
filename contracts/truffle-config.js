@@ -41,7 +41,6 @@ module.exports = {
           let mnemonic = process.env.MNEMONIC
           return new HDWalletProvider(mnemonic, url) 
         },
-        network_id: "*"
       },
 
       rinkeby: {

@@ -4,6 +4,12 @@
 
 Install docker.
 
+## Node & Yarn
+
+Install Node 8.
+
+Install yarn.
+
 ## Rust
 
 Install the latest rust version (>= 1.32):
