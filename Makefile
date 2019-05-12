@@ -45,7 +45,7 @@ prover:
 	@bin/.load_keys && cargo run --release --bin prover
 
 server:
-	@cargo run --release --bin server
+	@cargo run --bin server
 
 sandbox:
 	@cd src/sandbox && cargo run
