@@ -135,7 +135,6 @@ export default {
     created() {
         console.log('created', this.currentPage)
         this.update()
-        window.t = this
     },
     methods: {
         async search() {
@@ -218,7 +217,7 @@ export default {
             totalTransactions:  0,
             currentPage:        this.$route.query.page || 1,
             
-            txPerBlock:         client.TX_PER_BLOCK,
+            txPerBlock:         client.TX_PER_BLOCK(),
             blocks:             [],
             ready:              false,
 

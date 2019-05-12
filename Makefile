@@ -42,6 +42,10 @@ client:
 explorer:
 	@cd js/explorer && yarn dev
 
+dist-explorer:
+	@cd js/explorer && yarn build
+	@bin/.gen_js_config
+
 prover:
 	@bin/.load_keys && cargo run --release --bin prover
 

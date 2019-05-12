@@ -1,4 +1,5 @@
 import axios from 'axios'
+import store from './store'
 
 async function fetch(req) {
     let r = await axios(req)
@@ -8,31 +9,38 @@ async function fetch(req) {
         return null
     }
 }
- 
+
+function baseUrl() {
+    return store.config.API_SERVER || process.env.API_SERVER + 
+        '/api/v0.1' //'http://localhost:3000/api/v0.1'
+}
+
 let self = {
     
-    BASE_URL:       process.env.API_SERVER + '/api/v0.1', //'http://localhost:3000/api/v0.1',
     PAGE_SIZE:      20, // blocks per page
-    TX_PER_BLOCK:   process.env.TRANSFER_BATCH_SIZE,
+
+    TX_PER_BLOCK() {
+        return store.config.TRANSFER_BATCH_SIZE || process.env.TRANSFER_BATCH_SIZE 
+    },
     
     async status() {
         return fetch({
             method:     'get',
-            url:        `${self.BASE_URL}/status`,
+            url:        `${baseUrl()}/status`,
         })
     },
 
     async loadBlocks(max) {
         return fetch({
             method:     'get',
-            url:        `${self.BASE_URL}/blocks?max_block=${max}&limit=${self.PAGE_SIZE}`,
+            url:        `${baseUrl()}/blocks?max_block=${max}&limit=${self.PAGE_SIZE}`,
         })
     },
 
     async getBlock(number) {
         return fetch({
             method:     'get',
-            url:        `${self.BASE_URL}/blocks/${number}`,
+            url:        `${baseUrl()}/blocks/${number}`,
         })
     },
 

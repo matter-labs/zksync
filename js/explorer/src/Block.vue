@@ -88,7 +88,7 @@ export default {
             return [
                 { name: 'Block #',          value: `<b>${this.blockNumber}</b>`},
                 { name: 'New root hash',    value: this.new_state_root, },
-                { name: 'Transactions',     value: client.TX_PER_BLOCK, },
+                { name: 'Transactions',     value: client.TX_PER_BLOCK(), },
                 { name: 'Status',           value: this.status, },
                 { name: 'Commit tx hash',   value: `<a target="blanc" href="https://rinkeby.etherscan.io/tx/${this.commit_tx_hash}">${this.commit_tx_hash}</a>`, },
                 { name: 'Verify tx hash',   value: `<a target="blanc" href="https://rinkeby.etherscan.io/tx/${this.verify_tx_hash}">${this.verify_tx_hash}</a>`, },
