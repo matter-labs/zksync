@@ -8,6 +8,7 @@ export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
 export SERVER_DOCKER_IMAGE ?= gluk64/franklin:server
 export PROVER_DOCKER_IMAGE ?=gluk64/franklin:prover
 export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
+export FLATTENER_DOCKER_IMAGE ?= gluk64/franklin:flattener
 
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
 rust-musl-builder = @docker run $(docker-options) -it ekidd/rust-musl-builder
@@ -121,9 +122,6 @@ dev-up:
 dev-down:
 	@docker-compose stop postgres geth
 
-geth:
-	@docker build -t "${GETH_DOCKER_IMAGE}" ./docker/geth
-
 geth-up: geth
 	@docker-compose up geth
 
@@ -153,3 +151,20 @@ nodes:
 
 proverlogs:
 	kubectl logs -f deployments/prover
+
+dev-build-geth:
+	@docker build -t "${GETH_DOCKER_IMAGE}" ./docker/geth
+
+dev-build-flattener:
+	@docker build -t "${FLATTENER_DOCKER_IMAGE}" ./docker/flattener
+
+dev-push-geth:
+	@docker push "${GETH_DOCKER_IMAGE}"
+
+dev-push-flattener:
+	@docker push "${FLATTENER_DOCKER_IMAGE}"
+
+flattener = @docker run --rm -v $(shell pwd)/contracts:/home/contracts -it "${FLATTENER_DOCKER_IMAGE}" -c 'solidity_flattener
+flatten:
+	@mkdir -p contracts/flat
+	$(flattener) --output /home/contracts/flat/FranklinProxy.sol /home/contracts/contracts/FranklinProxy.sol'
