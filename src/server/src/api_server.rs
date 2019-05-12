@@ -237,15 +237,21 @@ fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResp
         return Ok(HttpResponse::Ok().json(ApiError{error:"non-existing account".to_string()}));
     }
 
-    let committed = storage.last_committed_state_for_account(account_id_u32).expect("last_committed_state_for_account: db must work");
-    let verified = storage.last_verified_state_for_account(account_id_u32).expect("last_verified_state_for_account: db must work");
+    let committed = storage.last_committed_state_for_account(account_id_u32);
+    if let Err(ref err) = &committed {
+        return Ok(HttpResponse::Ok().json(ApiError{error:format!("db error: {}", err)}));
+    }
+
+    let verified = storage.last_verified_state_for_account(account_id_u32);
+    if let Err(ref err) = &verified {
+        return Ok(HttpResponse::Ok().json(ApiError{error:format!("db error: {}", err)}));
+    }
 
     // QUESTION: why do we need committed here?
-
     let response = AccountDetailsResponse {
         pending,
-        verified,
-        committed,
+        verified:   verified.unwrap(),
+        committed:  committed.unwrap(),
     };
 
     Ok(HttpResponse::Ok().json(response))
@@ -380,7 +386,12 @@ fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpRespon
     }
 
     let commit = stored_commit_operation.unwrap();
-    let operation = commit.clone().into_op(&storage).expect("into_op must work");
+    let operation = commit.clone().into_op(&storage);
+    if let Err(ref err) = &operation {
+        return Ok(HttpResponse::Ok().json(ApiError{error:format!("db error: {}", err)}));
+    }
+    let operation = operation.unwrap();
+    
     let verify = storage.load_stored_op_with_block_number(block_id_u32, ActionType::VERIFY);
     
     let response = BlockDetailsResponse {
