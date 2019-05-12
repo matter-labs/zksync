@@ -502,16 +502,14 @@ pub fn start_status_interval(state: AppState) {
 
         let storage = pool.access_storage().expect("db failed");
         
-        // TODO: properly handle failures
-        let last_committed = storage.get_last_committed_block().unwrap_or(0);
+        // TODO: add flag for failure?
         let last_verified = storage.get_last_verified_block().unwrap_or(0);
-        let outstanding_txs = storage.count_outstanding_proofs(last_verified).unwrap_or(0);
-
         let status = NetworkStatus{
-            next_block_at_max: None,
-            last_committed,
-            last_verified,  
-            outstanding_txs,
+            next_block_at_max:  None,
+            last_committed:     storage.get_last_committed_block().unwrap_or(0),
+            last_verified,
+            total_transactions: storage.count_total_transactions().unwrap_or(0),
+            outstanding_txs:    storage.count_outstanding_proofs(last_verified).unwrap_or(0),
         };
 
         //println!("status from db: {:?}", status);

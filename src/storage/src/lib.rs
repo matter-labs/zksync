@@ -638,10 +638,18 @@ impl StorageProcessor {
     }
 
     pub fn count_outstanding_proofs(&self, after_block: BlockNumber) -> QueryResult<u32> {
-        use crate::schema::account_updates::dsl::*;
-        let count: i64 = account_updates
+        use crate::schema::transactions::dsl::*;
+        let count: i64 = transactions
             .select(count_star())
             .filter(block_number.gt(after_block as i32))
+            .first(self.conn())?;
+        Ok( count as u32 )
+    }
+
+    pub fn count_total_transactions(&self) -> QueryResult<u32> {
+        use crate::schema::transactions::dsl::*;
+        let count: i64 = transactions
+            .select(count_star())
             .first(self.conn())?;
         Ok( count as u32 )
     }
