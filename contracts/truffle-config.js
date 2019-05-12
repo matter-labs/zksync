@@ -32,8 +32,8 @@ module.exports = {
         //   //network_id: "*" // match any network
         // },
 
-      dev: {
-        network_id: 4,
+      universal: {
+        network_id: '*',
         gas: 6900000,
         provider: function() { 
           const HDWalletProvider = require("truffle-hdwallet-provider");
@@ -43,17 +43,17 @@ module.exports = {
         },
       },
 
-      rinkeby: {
-        network_id: 4,
-        gas: 6900000,
-        provider: function() { 
-          const HDWalletProvider = require("truffle-hdwallet-provider");
-          //let url = `https://rinkeby.infura.io/v3/${process.env.INFURA_PROJECT_ID}`
-          let url = `${process.env.WEB3_URL}`
-          let mnemonic = process.env.MNEMONIC
-          return new HDWalletProvider(mnemonic, url) 
-        },
-      },
+      // rinkeby: {
+      //   network_id: 4,
+      //   gas: 6900000,
+      //   provider: function() { 
+      //     const HDWalletProvider = require("truffle-hdwallet-provider");
+      //     //let url = `https://rinkeby.infura.io/v3/${process.env.INFURA_PROJECT_ID}`
+      //     let url = `${process.env.WEB3_URL}`
+      //     let mnemonic = process.env.MNEMONIC
+      //     return new HDWalletProvider(mnemonic, url) 
+      //   },
+      // },
 
     }
 };
