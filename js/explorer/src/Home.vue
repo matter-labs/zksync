@@ -159,7 +159,7 @@ export default {
             //this.updateBlocks()
         },
         async update() {
-            this.loading = false
+            this.loading = true
             const status = await client.status()
             let newBlocks = false
             if (status) {

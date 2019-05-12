@@ -1,5 +1,14 @@
 import axios from 'axios'
 
+async function fetch(req) {
+    let r = await axios(req)
+    if (r.status == 200) {
+        return r.data
+    } else {
+        return null
+    }
+}
+ 
 let self = {
     
     BASE_URL:       'http://localhost:3000/api/v0.1',
@@ -7,27 +16,24 @@ let self = {
     TX_PER_BLOCK:   256,
     
     async status() {
-        let r = await axios({
+        return fetch({
             method:     'get',
             url:        `${self.BASE_URL}/status`,
         })
-        if (r.status == 200) {
-            return r.data
-        } else {
-            return null
-        }
     },
 
     async loadBlocks(max) {
-        let r = await axios({
+        return fetch({
             method:     'get',
             url:        `${self.BASE_URL}/blocks?max_block=${max}&limit=${self.PAGE_SIZE}`,
         })
-        if (r.status == 200) {
-            return r.data
-        } else {
-            return null
-        }
+    },
+
+    async getBlock(number) {
+        return fetch({
+            method:     'get',
+            url:        `${self.BASE_URL}/blocks/${number}`,
+        })
     },
 
 }
