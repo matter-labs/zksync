@@ -374,10 +374,11 @@ fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpRespon
     let verify_tx_hash = stored_verify_operation.map_or(None, |op| op.tx_hash);
     
     let response = BlockDetailsResponse {
-        block_number:        stored_commit_operation.clone().block_number as u32,
-        new_root_hash:       operation.clone().block.new_root_hash.to_string(),
-        commit_tx_hash:      stored_commit_operation.clone().tx_hash,
+        block_number:        stored_commit_operation.block_number as u32,
+        new_root_hash:       format!("0x{}", operation.block.new_root_hash.to_hex()),
+        commit_tx_hash:      stored_commit_operation.tx_hash,
         verify_tx_hash:      verify_tx_hash,
+        
     };
 
     Ok(HttpResponse::Ok().json(response))
