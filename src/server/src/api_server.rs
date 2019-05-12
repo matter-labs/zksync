@@ -13,12 +13,11 @@ use actix_web::{
     http::Method,
     http::StatusCode,
 };
-
 use std::sync::mpsc;
 use plasma::models::{TransferTx, PublicKey, Account, Nonce};
 use models::config::RUNTIME_CONFIG;
 use super::models::{StateKeeperRequest, NetworkStatus, TransferTxConfirmation, ActionType, Operation};
-use super::storage::{ConnectionPool, StorageProcessor, StoredTx};
+use super::storage::{ConnectionPool, StorageProcessor, StoredTx, BlockDetails};
 use super::nonce_futures::{NonceFutures, NonceReadyFuture};
 use chrono::prelude::*;
 
@@ -61,16 +60,6 @@ struct AccountDetailsResponse {
     committed:      Option<Account>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct BlockDetailsResponse {
-    block_number:        u32,
-    new_state_root:      String,
-    commit_tx_hash:      Option<String>,
-    verify_tx_hash:      Option<String>,
-    committed_at:        Option<NaiveDateTime>,
-    verified_at:         Option<NaiveDateTime>,
-}
-
 #[derive(Default, Clone)]
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
 
@@ -99,8 +88,7 @@ fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
     let nonce_futures = req.state().nonce_futures.clone();
 
     req.json()
-    //.from_err() // convert all errors into `Error`
-    .map_err(|e| format!("{}", e))
+    .map_err(|e| format!("{}", e)) // convert all errors to String
     .and_then(move |tx: TransferTx| {
 
         // Rate limit check
@@ -201,6 +189,7 @@ fn handle_submit_tx(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespon
 use actix_web::Result as ActixResult;
 
 fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    
     let tx_for_state = req.state().tx_for_state.clone();
     let pool = req.state().connection_pool.clone();
 
@@ -391,71 +380,77 @@ fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpRespon
         return Ok(HttpResponse::Ok().json(ApiError{error:format!("db error: {}", err)}));
     }
     let operation = operation.unwrap();
-    
+
     let verify = storage.load_stored_op_with_block_number(block_id_u32, ActionType::VERIFY);
     
-    let response = BlockDetailsResponse {
-        block_number:        commit.block_number as u32,
+    let response = BlockDetails {
+        block_number:        commit.block_number as i32,
         new_state_root:      operation.block.new_root_hash.to_hex(),
         commit_tx_hash:      commit.tx_hash,
         verify_tx_hash:      verify.as_ref().map_or(None, |op| op.tx_hash.clone()),
-        committed_at:        Some(commit.created_at),
+        committed_at:        commit.created_at,
         verified_at:         verify.as_ref().map(|op| op.created_at),
     };
 
     Ok(HttpResponse::Ok().json(response))
 }
 
-fn handle_get_blocks(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+struct GetBlocksQuery {
+    pub from_block: Option<u32>,
+}
+
+// ***
+fn handle_get_blocks(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+
     let pool = req.state().connection_pool.clone();
+    
+    let max_block = req.query().get("max_block").cloned().unwrap_or("99999999".to_string());
+    let limit = req.query().get("limit").cloned().unwrap_or("20".to_string());
 
-    let storage = pool.access_storage();
-    if storage.is_err() {
-        return Ok(HttpResponse::Ok().json(ApiError{error:"rate limit".to_string()}));
-    }
-    let storage = storage.unwrap();
+    req.body()
+    .map_err(|err| format!("{}", err) )
+    .and_then(move |_| {     
 
-    let from_block_id_string = req.match_info().get("from_block");
-    if from_block_id_string.is_none() {
-        return Ok(HttpResponse::Ok().json(ApiError{error:"invalid parameters".to_string()}));
-    }
-    let from_block_id = from_block_id_string.unwrap().parse::<u32>();
-    if from_block_id.is_err(){
-        return Ok(HttpResponse::Ok().json(ApiError{error:"invalid from_block_id".to_string()}));
-    }
+        let storage = pool.access_storage().map_err(|err| format!("db err: {}", err) )?;
 
-    let from_block_id_u32 = from_block_id.unwrap();
-
-    let to_block_id_string = req.match_info().get("to_block");
-    if to_block_id_string.is_none() {
-        return Ok(HttpResponse::Ok().json(ApiError{error:"invalid parameters".to_string()}));
-    }
-    let to_block_id = to_block_id_string.unwrap().parse::<u32>();
-    if to_block_id.is_err(){
-        return Ok(HttpResponse::Ok().json(ApiError{error:"invalid to_block_id".to_string()}));
-    }
-
-    let to_block_id_u32 = to_block_id.unwrap();
-
-    let mut response: Vec<BlockDetailsResponse> = vec![];
-
-    let commited_stored_operations = storage.load_stored_ops_in_blocks_range(from_block_id_u32, to_block_id_u32, ActionType::COMMIT);
-    let commited_operations: Vec<Operation> = commited_stored_operations.clone().iter().map(|x| x.clone().into_op(&storage).expect("into_op must work")).collect();
-    let verified_operations = storage.load_stored_ops_in_blocks_range(from_block_id_u32, to_block_id_u32, ActionType::VERIFY);
-
-    // FIXME: oy vey!
-    let response: Vec<BlockDetailsResponse> = commited_stored_operations.into_iter().map(|x| 
-        BlockDetailsResponse {
-            block_number:        x.clone().block_number as u32,
-            new_state_root:      commited_operations.iter().find(|&y| y.id.unwrap() == x.id).unwrap().block.new_root_hash.to_hex(),
-            commit_tx_hash:      x.clone().tx_hash,
-            verify_tx_hash:      verified_operations.iter().find(|&y| y.id == x.id).map_or(None, |x| x.clone().tx_hash),
-            committed_at:        None,
-            verified_at:         None,
+        let max_block: u32 = max_block.parse().map_err(|_| format!("invalid max_block"))?;
+        let limit: u32 = limit.parse().map_err(|_| format!("invalid limit"))?;
+        if limit > 100 {
+            return Err(format!("limit can not exceed 100"));
         }
-    ).collect();
 
-    Ok(HttpResponse::Ok().json(response))
+        let response: Vec<BlockDetails> = storage.load_block_range(max_block, limit).map_err(|e| format!("db err: {}", e))?;
+
+        // let commited_stored_operations = storage.load_stored_ops_in_blocks_range(max_block, limit, ActionType::COMMIT);
+        // let verified_operations = storage.load_stored_ops_in_blocks_range(max_block, limit, ActionType::VERIFY);
+        
+        // let commited_operations: Vec<Operation> = commited_stored_operations.clone().iter()
+        // .map(|x| x.clone().into_op(&storage).expect("into_op must work")).collect();
+
+        // // FIXME: oy vey!
+        // let response: Vec<BlockDetailsResponse> = commited_stored_operations.into_iter().map(|x| 
+        //     BlockDetailsResponse {
+        //         block_number:        x.clone().block_number as u32,
+        //         new_state_root:      commited_operations.iter().find(|&y| y.id.unwrap() == x.id).unwrap().block.new_root_hash.to_hex(),
+        //         commit_tx_hash:      x.clone().tx_hash,
+        //         verify_tx_hash:      verified_operations.iter().find(|&y| y.id == x.id).map_or(None, |x| x.clone().tx_hash),
+        //         committed_at:        None,
+        //         verified_at:         None,
+        //     }
+        // ).collect();
+        Ok(HttpResponse::Ok().json(response))
+
+        //Ok(HttpResponse::Ok().json(format!("offset = {:?}", offset)))
+    })
+    .or_else(|err: String| {
+        let resp = TransactionResponse{
+            accepted:       false,
+            error:          Some(err),
+            confirmation:   None,
+        };
+        Ok(HttpResponse::Ok().json(resp))
+    })
+    .responder()
 }
 
 fn start_server(state: AppState, bind_to: String) {
@@ -494,7 +489,7 @@ fn start_server(state: AppState, bind_to: String) {
             .resource("/blocks/{block_id}", |r| {
                 r.method(Method::GET).f(handle_get_block_by_id);
             })
-            .resource("/blocks?min={from_block}&max={to_block}", |r| {
+            .resource("/blocks", |r| {
                 r.method(Method::GET).f(handle_get_blocks);
             })
         })
@@ -508,9 +503,7 @@ fn start_server(state: AppState, bind_to: String) {
 pub fn start_status_interval(state: AppState) {
     let state_checker = Interval::new(Instant::now(), Duration::from_millis(1000))
     .fold(state.clone(), |mut state, instant| {
-        //let state = state.clone();
         let pool = state.connection_pool.clone();
-
         let storage = pool.access_storage().expect("db failed");
         
         // TODO: add flag for failure?
@@ -523,16 +516,11 @@ pub fn start_status_interval(state: AppState) {
             outstanding_txs:    storage.count_outstanding_proofs(last_verified).unwrap_or(0),
         };
 
-        //println!("status from db: {:?}", status);
+        // TODO: send StateKeeperRequest::GetNetworkStatus(tx) and get result
 
         // save status to state
         *state.network_status.0.as_ref().write().unwrap() = status;
 
-        //let max_outstanding_txs = &RUNTIME_CONFIG.max_outstanding_txs;
-        //println!("max_outstanding_txs: {}", max_outstanding_txs);
-
-        // TODO: request `next_block_at_max` from state_keeper in a promise
-        //Delay::new(Instant::now() + Duration::from_millis(5000)).and_then(move |_| Ok(state))
         Ok(state)
     })
     .map(|_| ())

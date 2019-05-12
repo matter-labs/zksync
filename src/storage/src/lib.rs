@@ -35,7 +35,7 @@ use std::iter::FromIterator;
 
 use ff::{Field};
 
-use diesel::sql_types::{Nullable, Integer};
+use diesel::sql_types::{Nullable, Integer, Timestamp, Text};
 sql_function!(coalesce, Coalesce, (x: Nullable<Integer>, y: Integer) -> Integer);
 
 #[derive(Clone)]
@@ -250,6 +250,27 @@ pub struct IntegerNumber {
 pub struct ServerConfig {
     pub id:             bool,
     pub contract_addr:  Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, QueryableByName)]
+pub struct BlockDetails {
+    #[sql_type="Integer"]
+    pub block_number:        i32,
+
+    #[sql_type="Text"]
+    pub new_state_root:      String,
+
+    #[sql_type="Nullable<Text>"]
+    pub commit_tx_hash:      Option<String>,
+
+    #[sql_type="Nullable<Text>"]
+    pub verify_tx_hash:      Option<String>,
+
+    #[sql_type="Timestamp"]
+    pub committed_at:        NaiveDateTime,
+
+    #[sql_type="Nullable<Timestamp>"]
+    pub verified_at:         Option<NaiveDateTime>,
 }
 
 enum ConnectionHolder {
@@ -529,17 +550,47 @@ impl StorageProcessor {
             .ok()
     }
 
-    pub fn load_stored_ops_in_blocks_range(&self, from_block_number: BlockNumber, to_block_number: BlockNumber, action_type: ActionType) -> Vec<StoredOperation> {
+    pub fn load_block_range(&self, max_block: BlockNumber, limit: u32) -> QueryResult<Vec<BlockDetails>> {
         let query = format!("
-            SELECT * FROM operations
-            WHERE block_number >= {from_block_number} AND block_number <= {to_block_number} AND action_type = '{action_type}'
-            ORDER BY block_number
-            DESC
-        ", from_block_number = from_block_number as i32, to_block_number = to_block_number as i32, action_type = action_type.to_string());
-        let r = diesel::sql_query(query)
-            .load(self.conn());
-        r.unwrap_or(vec![])
+            with committed as (
+                select 
+                    data -> 'block' ->> 'new_root_hash' as new_state_root,    
+                    block_number,
+                    tx_hash as commit_tx_hash,
+                    created_at as committed_at
+                from operations
+                where 
+                    block_number <= {max_block}
+                    and action_type = 'Commit'
+                order by block_number desc
+                limit {limit}
+            )
+            select 
+                committed.*, 
+                verified.tx_hash as verify_tx_hash,
+                verified.created_at as verified_at
+            from committed
+            left join operations verified
+            on
+                committed.block_number = verified.block_number
+                and action_type = 'Verify'
+            order by committed.block_number desc
+        ", max_block = max_block as i32, limit = limit as i32);
+        diesel::sql_query(query).load(self.conn())
     }
+
+    // pub fn load_stored_ops_in_blocks_range(&self, max_block: BlockNumber, limit: u32, action_type: ActionType) -> Vec<StoredOperation> {
+    //     let query = format!("
+    //         SELECT * FROM operations
+    //         WHERE block_number <= {max_block} AND action_type = '{action_type}'
+    //         ORDER BY block_number
+    //         DESC
+    //         LIMIT {limit}
+    //     ", max_block = max_block as i32, limit = limit as i32, action_type = action_type.to_string());
+    //     let r = diesel::sql_query(query)
+    //         .load(self.conn());
+    //     r.unwrap_or(vec![])
+    // }
 
     pub fn load_commit_op(&self, block_number: BlockNumber) -> Option<Operation> {
         let op = self.load_stored_op_with_block_number(block_number, ActionType::COMMIT);
