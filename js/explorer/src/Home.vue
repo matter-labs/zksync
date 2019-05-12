@@ -26,7 +26,7 @@
             <h5>Franklin Block Explorer</h5>
             <b-form @submit.stop.prevent="search">
             <b-input-group>
-                <b-form-input placeholder="block number, root hash, tx hash or eth address"></b-form-input>
+                <b-form-input v-model="query" placeholder="block number, root hash, tx hash or eth address"></b-form-input>
                 <b-input-group-append>
                 <b-button @click="search" variant="info" :disabled="searching">
                     <b-spinner v-if="searching" small></b-spinner>
@@ -34,7 +34,7 @@
                 </b-button>
                 </b-input-group-append>
                 <b-form-invalid-feedback v-if="notFound" :state="false">
-                    Nothing found for xxx.
+                    Nothing found for query '{{query}}'.
                 </b-form-invalid-feedback>
             </b-input-group>
             </b-form>
@@ -141,16 +141,15 @@ export default {
     },
     methods: {
         async search() {
-
-            this.update()
-
-            // this.searching = true
-            // this.notFound = false
-            // await new Promise(resolve => setTimeout(resolve, 200))
-            // this.searching = false
-            // this.notFound = true
-            // await new Promise(resolve => setTimeout(resolve, 3600))
-            // this.notFound = false
+            if (this.query) {
+                this.searching = true
+                this.notFound = false
+                await new Promise(resolve => setTimeout(resolve, 200))
+                this.searching = false
+                this.notFound = true
+                await new Promise(resolve => setTimeout(resolve, 3600))
+                this.notFound = false
+            }
         },
         onRowClicked(item) {
             this.$router.push('/blocks/' + item.block_number)
@@ -225,6 +224,7 @@ export default {
             blocks:             [],
             ready:              false,
 
+            query:              '',
             loading:            true,
             searching:          false,
             notFound:           false,
