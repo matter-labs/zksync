@@ -58,22 +58,20 @@
         </b-card>
         <br>
 
-        <div class="table-container">
         <!--
+        <div class="table-container">
         <div class="overlay text-center" v-if="loading">
             <br><br><br>
             <b-spinner variant="primary"></b-spinner>
         </div>
-        -->
         <b-table id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading"></b-table>
         </div>
+        -->
 
-        <b-pagination
-            v-model="currentPage"
-            :per-page="perPage"
-            :total-rows="rows"
-            @change="onPageChanged"
-        ></b-pagination>
+        <b-pagination v-model="currentPage" :per-page="perPage" :total-rows="lastCommitted" @change="onPageChanged"></b-pagination>
+        <b-table id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading"></b-table>
+        <b-pagination v-model="currentPage" :per-page="perPage" :total-rows="lastCommitted" @change="onPageChanged"></b-pagination>
+
     </b-container>
 </div>
 </template>
@@ -156,8 +154,28 @@ export default {
             this.$parent.$router.push('/blocks/' + item.block_number)
         },
         async onPageChanged(page) {
-            this.loading = true
-            await new Promise(resolve => setTimeout(resolve, 600))
+            //this.loading = true
+            //await new Promise(resolve => setTimeout(resolve, 600))
+            //this.loading = false
+            console.log(page)
+            this.currentPage = page
+            this.updateBlocks()
+        },
+        async updateBlocks() {
+            let max = this.lastCommitted - (client.PAGE_SIZE * (this.currentPage-1))
+            console.log('u', this.lastCommitted, client.PAGE_SIZE, (this.currentPage-1), max)
+
+            let blocks = await client.loadBlocks(max)
+            if (blocks) {
+                this.blocks = blocks.map( b => ({
+                    block_number:   b.block_number,
+                    status:         b.verified_at ? 'Verified' : 'Committed',
+                    new_state_root: b.new_state_root.slice(0, 16) + '...' + b.new_state_root.slice(50, 66),
+                    committed_at:   b.committed_at,
+                    verified_at:    b.verified_at,
+                }))
+                console.log(blocks)
+            }
             this.loading = false
         },
         async update() {
@@ -165,30 +183,26 @@ export default {
             const status = await client.status()
             let newBlocks = false
             if (status) {
+                console.log(status)
                 newBlocks = this.lastCommitted !== status.last_committed || this.lastVerified !== status.last_verified
                 this.lastCommitted = status.last_committed
                 this.lastVerified = status.last_verified
                 this.totalTransactions = status.total_transactions
+
             }
             if (newBlocks) {
-                let max = this.lastCommitted
-                let blocks = await client.loadBlocks(max)
-                if (blocks) {
-                    this.blocks = blocks.map( b => ({
-                        block_number:   b.block_number,
-                        status:         b.verified_at ? 'Verified' : 'Committed',
-                        new_state_root: b.new_state_root.slice(0, 16) + '...' + b.new_state_root.slice(50, 66),
-                        committed_at:   b.committed_at,
-                        verified_at:    b.verified_at,
-                    }))
-                }
+                this.updateBlocks()
+            } else {
+                this.loading = false
             }
-            this.loading = false
         }
     },
     computed: {
         items() {
             return this.blocks
+        },
+        pages() {
+
         }
     },
     data() {
