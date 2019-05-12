@@ -43,27 +43,29 @@
         <b-card>
         <div class="row hide-sm" style="color: grey">
             <div class="col-sm text-center">
-            <i class="far fa-square"></i> <b>Blocks committed</b><br><span class="num">328</span>
+            <i class="far fa-square"></i> <b>Blocks committed</b><br><span class="num">{{lastCommitted}}</span>
             </div>
             <div class="col-sm text-center">
-            <i class="far fa-check-square"></i> <b>Blocks verified</b><br><span class="num">328</span>
+            <i class="far fa-check-square"></i> <b>Blocks verified</b><br><span class="num">{{lastVerified}}</span>
             </div>
             <div class="col-sm text-center">
-            <i class="fas fa-list"></i> <b>Total transactions</b><br><span class="num">17230</span>
+            <i class="fas fa-list"></i> <b>Total transactions</b><br><span class="num">{{totalTransactions}}</span>
             </div>
             <div class="col-sm text-center">
-            <i class="fas fa-archive"></i> <b>Tx per block</b><br><span class="num">256</span>
+            <i class="fas fa-archive"></i> <b>Tx per block</b><br><span class="num">{{txPerBlock}}</span>
             </div>
         </div>
         </b-card>
         <br>
 
         <div class="table-container">
-        <div class="overlay text-center" v-if="loadingBlocks">
+        <!--
+        <div class="overlay text-center" v-if="loading">
             <br><br><br>
             <b-spinner variant="primary"></b-spinner>
         </div>
-        <b-table id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loadingBlocks"></b-table>
+        -->
+        <b-table id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading"></b-table>
         </div>
 
         <b-pagination
@@ -130,55 +132,98 @@ tr {
 <script>
 
 import store from './store'
+import client from './client'
 
 export default {
     name: 'home',
+    created() {
+        this.update()
+    },
     methods: {
-
         async search() {
-            this.searching = true
-            this.notFound = false
-            await new Promise(resolve => setTimeout(resolve, 600))
-            this.searching = false
-            this.notFound = true
-            await new Promise(resolve => setTimeout(resolve, 3600))
-            this.notFound = false
+
+            this.update()
+
+            // this.searching = true
+            // this.notFound = false
+            // await new Promise(resolve => setTimeout(resolve, 200))
+            // this.searching = false
+            // this.notFound = true
+            // await new Promise(resolve => setTimeout(resolve, 3600))
+            // this.notFound = false
         },
         onRowClicked(item) {
             this.$parent.$router.push('/blocks/' + item.block_number)
         },
         async onPageChanged(page) {
-            this.loadingBlocks = true
+            this.loading = true
             await new Promise(resolve => setTimeout(resolve, 600))
-            this.loadingBlocks = false
+            this.loading = false
         },
+        async update() {
+            this.loading = false
+            const status = await client.status()
+            let newBlocks = false
+            if (status) {
+                newBlocks = this.lastCommitted !== status.last_committed || this.lastVerified !== status.last_verified
+                this.lastCommitted = status.last_committed
+                this.lastVerified = status.last_verified
+                this.totalTransactions = status.total_transactions
+            }
+            if (newBlocks) {
+                let max = this.lastCommitted
+                let blocks = await client.loadBlocks(max)
+                if (blocks) {
+                    this.blocks = blocks.map( b => ({
+                        block_number:   b.block_number,
+                        status:         b.verified_at ? 'Verified' : 'Committed',
+                        new_state_root: b.new_state_root.slice(0, 16) + '...' + b.new_state_root.slice(50, 66),
+                        committed_at:   b.committed_at,
+                        verified_at:    b.verified_at,
+                    }))
+                }
+            }
+            this.loading = false
+        }
+    },
+    computed: {
+        items() {
+            return this.blocks
+        }
     },
     data() {
       return {
-          breadcrumbs: [
+        lastCommitted:      0,
+        lastVerified:       0,
+        totalTransactions:  0,
+        
+        txPerBlock:         client.TX_PER_BLOCK,
+        blocks:             [],
+
+        breadcrumbs: [
           {
             text: 'Blocks',
             active: true
           },
         ],
-        loadingBlocks:  false,
+        loading:        true,
         searching:      false,
         notFound:       false,
 
         perPage:        20,
         rows:           2000,
         currentPage:    1,
-        items: [
-          { block_number: 1, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
-          { block_number: 2, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
-          { block_number: 3, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
-          { block_number: 4, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
-          { block_number: 5, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
-          { block_number: 6, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
-          { block_number: 7, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
-          { block_number: 8, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
-          { block_number: 9, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' }
-        ]
+        // items: [
+        //   { block_number: 1, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
+        //   { block_number: 2, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
+        //   { block_number: 3, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
+        //   { block_number: 4, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
+        //   { block_number: 5, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
+        //   { block_number: 6, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
+        //   { block_number: 7, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
+        //   { block_number: 8, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' },
+        //   { block_number: 9, status: 'Verified', type: 'Transfer', transactions: 10, new_root_hash: '0x070f6...a62e16f7d' }
+        // ]
       }
     },
 }
