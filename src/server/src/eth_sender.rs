@@ -130,7 +130,7 @@ fn run_eth_sender(pool: ConnectionPool, rx_for_eth: Receiver<Operation>, mut eth
                 println!("Commitment tx hash = {:?}", hash);
                 storage.save_operation_tx_hash(
                     op.id.expect("trying to send not stored op?"), 
-                    format!("0x{:?}", hash));
+                    format!("{:?}", hash));
             },
             Err(err) => println!("Error sending tx {}", err),
         }

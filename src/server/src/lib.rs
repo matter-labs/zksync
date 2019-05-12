@@ -8,6 +8,7 @@
 extern crate models;
 extern crate storage;
 extern crate eth_client;
+extern crate chrono;
 
 pub mod api_server;
 pub mod state_keeper;

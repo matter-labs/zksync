@@ -1,6 +1,7 @@
 extern crate models;
 extern crate plasma;
 extern crate fnv;
+extern crate chrono;
 
 extern crate serde;
 extern crate serde_derive;
@@ -18,6 +19,7 @@ use diesel::dsl::*;
 use models::{Operation, Action, ActionType, EncodedProof, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
 use std::cmp;
 use serde_derive::{Serialize, Deserialize};
+use chrono::prelude::*;
 
 mod schema;
 use schema::*;
@@ -95,7 +97,7 @@ pub struct StoredOperation {
     pub block_number:   i32,
     pub action_type:    String,
     pub tx_hash:        Option<String>,
-    pub created_at:     std::time::SystemTime,
+    pub created_at:     NaiveDateTime,
 }
 
 impl StoredOperation {
@@ -161,7 +163,7 @@ pub struct StoredTx {
     pub block_number:   Option<i32>,
     pub state_root:     Option<String>, // unique block id (for possible reorgs)
 
-    pub created_at:     std::time::SystemTime,
+    pub created_at:     NaiveDateTime,
 }
 
 impl StoredTx {
@@ -223,7 +225,7 @@ pub struct NewProof {
 pub struct StoredProof {
     pub block_number:   i32,
     pub proof:          serde_json::Value,
-    pub created_at:     std::time::SystemTime,
+    pub created_at:     NaiveDateTime,
 }
 
 // Every time before a prover worker starts generating the proof, a prover run is recorded for monitoring purposes
@@ -233,8 +235,8 @@ pub struct ProverRun {
     pub id:             i32,
     pub block_number:   i32,
     pub worker:         Option<String>,
-    pub created_at:     std::time::SystemTime,
-    pub updated_at:     std::time::SystemTime,
+    pub created_at:     NaiveDateTime,
+    pub updated_at:     NaiveDateTime,
 }
 
 #[derive(Debug, QueryableByName)]

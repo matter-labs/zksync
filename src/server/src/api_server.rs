@@ -20,6 +20,7 @@ use models::config::RUNTIME_CONFIG;
 use super::models::{StateKeeperRequest, NetworkStatus, TransferTxConfirmation, ActionType, Operation};
 use super::storage::{ConnectionPool, StorageProcessor, StoredTx};
 use super::nonce_futures::{NonceFutures, NonceReadyFuture};
+use chrono::prelude::*;
 
 use futures::Future;
 use std::env;
@@ -66,6 +67,8 @@ struct BlockDetailsResponse {
     new_root_hash:       String,
     commit_tx_hash:      Option<String>,
     verify_tx_hash:      Option<String>,
+    committed_at:        Option<NaiveDateTime>,
+    verified_at:         Option<NaiveDateTime>,
 }
 
 #[derive(Default, Clone)]
@@ -368,17 +371,23 @@ fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpRespon
 
     let block_id_u32 = block_id.unwrap();
 
-    let stored_commit_operation = storage.load_stored_op_with_block_number(block_id_u32, ActionType::COMMIT).expect("load_stored_commit_op_with_id: db must work");
-    let operation = stored_commit_operation.clone().into_op(&storage).expect("into_op must work");
-    let stored_verify_operation = storage.load_stored_op_with_block_number(block_id_u32, ActionType::VERIFY);
-    let verify_tx_hash = stored_verify_operation.map_or(None, |op| op.tx_hash);
+    // FIXME: no expects in API server db requests, because they might fail temporarily and bring down the server!
+    let stored_commit_operation = storage.load_stored_op_with_block_number(block_id_u32, ActionType::COMMIT);
+    if stored_commit_operation.is_none() {
+        return Ok(HttpResponse::Ok().json(ApiError{error:"not found".to_string()}));
+    }
+
+    let commit = stored_commit_operation.unwrap();
+    let operation = commit.clone().into_op(&storage).expect("into_op must work");
+    let verify = storage.load_stored_op_with_block_number(block_id_u32, ActionType::VERIFY);
     
     let response = BlockDetailsResponse {
-        block_number:        stored_commit_operation.block_number as u32,
+        block_number:        commit.block_number as u32,
         new_root_hash:       format!("0x{}", operation.block.new_root_hash.to_hex()),
-        commit_tx_hash:      stored_commit_operation.tx_hash,
-        verify_tx_hash:      verify_tx_hash,
-        
+        commit_tx_hash:      commit.tx_hash,
+        verify_tx_hash:      verify.as_ref().map_or(None, |op| op.tx_hash.clone()),
+        committed_at:        Some(commit.created_at),
+        verified_at:         verify.as_ref().map(|op| op.created_at),
     };
 
     Ok(HttpResponse::Ok().json(response))
@@ -421,12 +430,15 @@ fn handle_get_blocks(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let commited_operations: Vec<Operation> = commited_stored_operations.clone().iter().map(|x| x.clone().into_op(&storage).expect("into_op must work")).collect();
     let verified_operations = storage.load_stored_ops_in_blocks_range(from_block_id_u32, to_block_id_u32, ActionType::VERIFY);
 
-    let response: Vec<BlockDetailsResponse> = commited_stored_operations.iter().map(|x| 
+    // FIXME: oy vey!
+    let response: Vec<BlockDetailsResponse> = commited_stored_operations.into_iter().map(|x| 
         BlockDetailsResponse {
             block_number:        x.clone().block_number as u32,
             new_root_hash:       commited_operations.iter().find(|&y| y.id.unwrap() == x.id).unwrap().block.new_root_hash.to_string(),
             commit_tx_hash:      x.clone().tx_hash,
             verify_tx_hash:      verified_operations.iter().find(|&y| y.id == x.id).map_or(None, |x| x.clone().tx_hash),
+            committed_at:        None,
+            verified_at:         None,
         }
     ).collect();
 
