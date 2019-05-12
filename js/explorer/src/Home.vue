@@ -23,7 +23,7 @@
     <br>
     <b-container>
         <b-card bg-variant="light" >
-            <h5>Franklin Block Explorer</h5>
+            <h4>Matter Testnet Block Explorer</h4>
             <b-form @submit.stop.prevent="search">
             <b-input-group>
                 <b-form-input v-model="query" placeholder="block number, root hash, tx hash or eth address"></b-form-input>

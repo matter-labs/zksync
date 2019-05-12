@@ -11,7 +11,7 @@ async function fetch(req) {
  
 let self = {
     
-    BASE_URL:       'http://localhost:3000/api/v0.1',
+    BASE_URL:       process.env.API_SERVER + '/api/v0.1', //'http://localhost:3000/api/v0.1',
     PAGE_SIZE:      20, // blocks per page
     TX_PER_BLOCK:   256,
     
