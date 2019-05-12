@@ -13,7 +13,7 @@ cd contracts
 yarn deploy  | tee ../deploy.log
 cd ..
 
-export TIMESTAMP=`date +%Y-%m-%d-%H%M%S`
+export LABEL=$FRANKLIN_ENV-`date +%Y-%m-%d-%H%M%S`
 
 export NEW_CONTRACT=`grep -A999 "Starting migrations" deploy.log | grep -A4 "'FranklinProxy'" | grep "contract address" | grep -oE '0x(.+)' \
 | sed -n "s/0x//p"`
@@ -25,9 +25,9 @@ then
     OLD_CONTRACT=`grep CONTRACT_ADDR ./$ENV_FILE | grep -oE '=(.+)' | sed -n "s/=//p"`
     echo Old contract at $OLD_CONTRACT
 
-    mkdir -p logs/$TIMESTAMP/
-    cp ../deploy.log logs/$TIMESTAMP/deploy.log
-    cp $ENV_FILE logs/$TIMESTAMP/
+    mkdir -p logs/$LABEL/
+    cp deploy.log logs/$LABEL/deploy.log
+    cp ./$ENV_FILE logs/$LABEL/$FRANKLIN_ENV.bak
 
     sed -i".bak" "s/CONTRACT_ADDR=$OLD_CONTRACT/CONTRACT_ADDR=$NEW_CONTRACT/g" ./$ENV_FILE
 

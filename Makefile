@@ -109,7 +109,7 @@ status:
 
 restart: stop start logs
 
-logs:
+log:
 ifeq (,$(KUBECONFIG))
 	@docker-compose logs -f server prover
 else
