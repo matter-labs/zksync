@@ -164,7 +164,15 @@ dev-push-geth:
 dev-push-flattener:
 	@docker push "${FLATTENER_DOCKER_IMAGE}"
 
-flattener = @docker run --rm -v $(shell pwd)/contracts:/home/contracts -it "${FLATTENER_DOCKER_IMAGE}" -c 'solidity_flattener
+flattener = @docker run --rm -v $(shell pwd)/contracts:/home/contracts -it "${FLATTENER_DOCKER_IMAGE}"
+define flatten_file
+	@echo flattening $(1)
+	$(flattener) -c 'solidity_flattener --output /home/contracts/flat/$(1) /home/contracts/contracts/$(1)'
+endef
+
 flatten:
 	@mkdir -p contracts/flat
-	$(flattener) --output /home/contracts/flat/FranklinProxy.sol /home/contracts/contracts/FranklinProxy.sol'
+	$(call flatten_file,FranklinProxy.sol)
+	$(call flatten_file,Depositor.sol)
+	$(call flatten_file,Exitor.sol)
+	$(call flatten_file,Transactor.sol)
