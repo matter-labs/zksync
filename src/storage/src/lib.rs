@@ -31,7 +31,7 @@ use serde_json::{to_value, value::Value};
 use std::env;
 use std::iter::FromIterator;
 
-use ff::{PrimeField, Field};
+use ff::{Field};
 
 use diesel::sql_types::{Nullable, Integer};
 sql_function!(coalesce, Coalesce, (x: Nullable<Integer>, y: Integer) -> Integer);
@@ -183,10 +183,10 @@ impl StoredTx {
 
     pub fn into_transfer_transaction(&self) -> TransferTx {
         TransferTx {
-            from: self.from_account.clone() as u32,
-            to: self.to_account.unwrap().clone() as u32,
-            amount: BigDecimal::from(self.amount.clone()),
-            fee: BigDecimal::from(self.fee.clone()),
+            from: self.from_account as u32,
+            to: self.to_account.unwrap() as u32,
+            amount: BigDecimal::from(self.amount),
+            fee: BigDecimal::from(self.fee),
             nonce: 0,
             good_until_block: 0,
             signature: TxSignature::default(),
@@ -196,8 +196,8 @@ impl StoredTx {
 
     pub fn into_deposit_transaction(&self) -> DepositTx {
         DepositTx {
-            account: self.from_account.clone() as u32,
-            amount: BigDecimal::from(self.amount.clone()),
+            account: self.from_account as u32,
+            amount: BigDecimal::from(self.amount),
             pub_x: Fr::zero(),
             pub_y: Fr::zero(),
         }
@@ -205,8 +205,8 @@ impl StoredTx {
 
     pub fn into_exit_transaction(&self) -> ExitTx {
         ExitTx {
-            account: self.from_account.clone() as u32,
-            amount: BigDecimal::from(self.amount.clone()),
+            account: self.from_account as u32,
+            amount: BigDecimal::from(self.amount),
         }
     }
 }
@@ -341,7 +341,7 @@ impl StorageProcessor {
                     amount: tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
                     fee: tx.fee.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
                     block_number: Some(op.block.block_number as i32),
-                    state_root: Some(op.block.new_root_hash.into_repr().to_string()),
+                    state_root: Some(op.block.new_root_hash.to_hex()),
                 })
                 .execute(self.conn())?;
             if 0 == inserted {
@@ -363,7 +363,7 @@ impl StorageProcessor {
                     amount: tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
                     fee: 0,
                     block_number: Some(op.block.block_number as i32),
-                    state_root: Some(op.block.new_root_hash.into_repr().to_string()),
+                    state_root: Some(op.block.new_root_hash.to_hex()),
                 })
                 .execute(self.conn())?;
             if 0 == inserted {
@@ -385,7 +385,7 @@ impl StorageProcessor {
                     amount: tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
                     fee: 0,
                     block_number: Some(op.block.block_number as i32),
-                    state_root: Some(op.block.new_root_hash.into_repr().to_string()),
+                    state_root: Some(op.block.new_root_hash.to_hex()),
                 })
                 .execute(self.conn())?;
             if 0 == inserted {
