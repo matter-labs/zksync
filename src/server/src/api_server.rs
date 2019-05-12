@@ -385,7 +385,7 @@ fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpRespon
     
     let response = BlockDetails {
         block_number:        commit.block_number as i32,
-        new_state_root:      operation.block.new_root_hash.to_hex(),
+        new_state_root:      format!("0x{}", operation.block.new_root_hash.to_hex()),
         commit_tx_hash:      commit.tx_hash,
         verify_tx_hash:      verify.as_ref().map_or(None, |op| op.tx_hash.clone()),
         committed_at:        commit.created_at,
