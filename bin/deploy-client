@@ -1,7 +1,9 @@
 #!/bin/bash
 
-SRC=cd `dirname $0`/../client
+SRC=`dirname $0`/../js/client
 DST=$CLIENT_GITHUB_DIR
+
+echo "$DST <= $SRC"
 
 cd $SRC
 yarn run build

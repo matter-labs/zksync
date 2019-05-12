@@ -2,85 +2,97 @@
 
 Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
 
+# Basics
+
+## Prerequisites
+
+Prepare dev environment prerequisites: see [docs/setup-dev.md](docs/setup-dev.md)
+
 ## Setup local dev environment
 
-- Install prerequisites: see [docs/setup-dev.md](docs/setup-dev.md)
-- Add `./bin` to `PATH`
+First-time setup:
 
-- Migrate blockscout (do this before starting `make dev-up`):
-```make migrate-blockscout```
+```franklin init```
 
-- Start the dev environment:
-```make dev-up```
-- Create `plasma` database:
-```db-setup```
-- Deploy contracts:
-```deploy-contracts``
+To completely reset the dev environment:
 
-## Management:
+- Stop services:
+```franklin dev-down```
+- Remove mounted container data:
+```rm -rf ./volumes```
+- Repeat the setup procedure above
+
+# (Re)deploy db and contraсts:
+
+```franklin redeploy```
+
+## Environment configurations
+
+Env config files are held in `etc/env/`
+
+List configurations:
+
+```franklin env```
+
+Switch between configurations:
+
+```franklin env <ENV_NAME>```
+
+## Monitoring & management:
 
 Seed for Metamask: fine music test violin matrix prize squirrel panther purchase material script deal
 Geth: ```geth attach http://localhost:8545```
-Blockscout explorer: http://localhost:4000/txs
+
+NOTE: if you are resetting geth, each Metamask account must be manually reset via Settings > Advanced > Reset account.
+
+# Blockscout (local blockchain explorer)
+
+It generates quite some CPU load, but might be useful to visualize blockchain activity. Use with caution.
+
+- Migrate blockscout (do this once to setup database):
+```franklin blockscout-migrate```
+
+- Start:
+```franklin blockscout-up```
+
+- Stop:
+```franklin blockscout-down```
+
+Blockscout will be available at http://localhost:4000/txs
 
 ## Build and run server + prover locally:
 
 ```
-run-server
-run-prover
+franklin server
+franklin prover
+franklin client
 ```
 
-## Server and prover as local docker containers:
+Client UI will be available at http://localhost:8080
 
-```
-make up
-make logs
-make down
-```
+## Start server and prover as local docker containers:
+
+- Start:
+```franklin start```
+
+- Watch logs:
+```franklin logs```
+
+- Stop:
+```franklin stop```
 
 ## Build and push images to dockerhub:
 
-```
-make push
-```
+```franklin push```
 
----
-
-# Details
-
-## Local geth
-
-1. Follow the instruction here: https://hackernoon.com/hands-on-creating-your-own-local-private-geth-node-beginner-friendly-3d45902cc612
-2. However, set the gaslimit to 8M *before* starting the geth for the first time!
-
-## Config
-
-All environment variables must be located in a single file `/env`.
-
-- Copy `/env.example` to `/env` and set all of them correctly
+# Development
 
 ## Database migrations
 
-```
-cd src/storage
-diesel database setup
-```
-
-This will create database 'plasma' (db url is set in [server/.env] file) with our schema.
-
-- Rename `server/storage/schema.rs.generated` to `schema.rs`
-
-- To reset migrations (will reset the db), run:
-
-```diesel migration redo```
-
-- Run tests:
-
-```db-tests```
-
-### Production
-
-For production, `DATABSE_URL` env var must be set properly.
+- ```cd src/storage```
+- Add diesel migration
+- Rename `src/storage/schema.rs.generated` to `schema.rs`
+- Run tests: ```franklin db-tests```
 
 ## Generating keys
 
@@ -101,40 +113,17 @@ mv -f *_pk.key ./prover/keys/
 
 If the pregenerated leaf format changes, replace the `EMPTY_TREE_ROOT` constant in `contracts/contracts/PlasmaStorage.sol`.
 
-## Web3 provider
-
-In the `server/.env` set up `CHAIN_ID` and `WEB3_URL` accordingly.
-
 ## Contratcs
-
-### Install truffle and dependencies:
-
-```
-cd contracts
-yarn
-```
-
-NOTE: Python >= 3.5 and pip is required for solidity flattener. You might want to run `brew upgrade python`
 
 ### Re-build contracts:
 
 ```
-yarn build
+cd contracts; yarn build
 ```
 
 IMPORTANT! Generated `.abi` and `.bin` files are fed to cargo to build module `plasma::eth`. 
 
-So you need to rebuild the code on every change (to be automated soon).
-
-### Deploy contracts
-
-After the keys have been generated and copied to contracts:
-
-- run `redeploy`
-
-Update addresses (make sure to exclude 0x !):
-
-- copy contracts address of `PlasmaContract` to `CONTRACT_ADDR` in `/env` 
+So you need to rebuild the code on every change (to be automated).
 
 ### Publish source
 
@@ -142,47 +131,4 @@ Update addresses (make sure to exclude 0x !):
 yarn flatten
 ```
 
-## Server
-
-### Running locally
-
-```shell
-run
-```
-
-### Running in production
-
-To launch and restart:
-
-```shell
-launch
-```
-
-To stop (Note, that Ctrl+C won't work! You need to run stop from a new terminal):
-
-```shell
-stop
-```
-
-## Client UI
-
-### Run locally
-
-``` bash
-# install dependencies
-yarn
-
-# serve with hot reload at localhost:8080; API server will be queried at localhost:3000
-yarn run dev
-
-# build for production with minification
-yarn run build
-```
-
-### Deploy client publicly
-
-Single command to build and deploy to github pages:
-
-```
-update-client
-```
+NOTE: Python >= 3.5 and pip is required for solidity flattener. You might want to run `brew upgrade python`

@@ -8,6 +8,9 @@ use super::config;
 use ff::{PrimeField, PrimeFieldRepr};
 
 fn sorted_and_padded_for_deposits(accounts_updated: AccountMap) -> [u64; config::DEPOSIT_BATCH_SIZE] {
+
+    assert!(accounts_updated.len() == config::DEPOSIT_BATCH_SIZE);
+
     let mut tmp = [params::SPECIAL_ACCOUNT_DEPOSIT as u64; config::DEPOSIT_BATCH_SIZE];
     let mut acc: Vec<u64> = accounts_updated.keys()
         .map(|&k| k as u64)
@@ -22,6 +25,9 @@ fn sorted_and_padded_for_deposits(accounts_updated: AccountMap) -> [u64; config:
 }
 
 fn sorted_and_padded_for_exits(accounts_updated: AccountMap) -> [u64; config::EXIT_BATCH_SIZE] {
+
+    assert!(accounts_updated.len() == config::EXIT_BATCH_SIZE);
+
     let mut tmp = [params::SPECIAL_ACCOUNT_EXIT as u64; config::EXIT_BATCH_SIZE];
     let mut acc: Vec<u64> = accounts_updated.keys()
         .map(|&k| k as u64)
@@ -43,9 +49,11 @@ fn keys_sorted(accounts_updated: AccountMap) -> Vec<u64> {
     acc
 } 
 
-fn run_eth_sender(rx_for_eth: Receiver<Operation>, mut eth_client: ETHClient) {
+fn run_eth_sender(pool: ConnectionPool, rx_for_eth: Receiver<Operation>, mut eth_client: ETHClient) {
+    let storage = pool.access_storage().expect("db connection failed for eth sender");
     for op in rx_for_eth {
-        println!("Operation requested"); // println!("Operation requested: {:?}", &op);
+        //println!("Operation requested"); 
+        println!("Operation requested: {:?}, {}", &op.action, op.block.block_number);
         let tx = match op.action {
             Action::Commit => {
 
@@ -117,25 +125,29 @@ fn run_eth_sender(rx_for_eth: Receiver<Operation>, mut eth_client: ETHClient) {
             _ => unimplemented!(),
         };
         // TODO: process tx sending failure
-        if tx.is_err() {
-            println!("Error sending tx {}", tx.err().unwrap());
-
-        } else {
-            println!("Commitment tx hash = {}", tx.unwrap());
+        match tx {
+            Ok(hash) => {
+                println!("Commitment tx hash = {:?}", hash);
+                storage.save_operation_tx_hash(
+                    op.id.expect("trying to send not stored op?"), 
+                    format!("0x{}", hash));
+            },
+            Err(err) => println!("Error sending tx {}", err),
         }
-
     }
 }
 
 pub fn start_eth_sender(pool: ConnectionPool) -> Sender<Operation> {
     let (tx_for_eth, rx_for_eth) = channel::<Operation>();
     let mut eth_client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
-    let current_nonce = eth_client.get_nonce(&eth_client.default_account()).unwrap();
 
-    let storage = pool.access_storage().expect("db connection failed for eth sender");;
+    let storage = pool.access_storage().expect("db connection failed for eth sender");
 
     // TODO: this is for test only, introduce a production switch (as we can not rely on debug/release mode because performance is required for circuits)
     let addr = std::env::var("SENDER_ACCOUNT").expect("SENDER_ACCOUNT env var not found");
+    let current_nonce = eth_client.get_nonce(&format!("0x{}", addr)).unwrap();
+
+    println!("Starting eth_sender: sender = {}, current_nonce = {}", addr, current_nonce);
     storage.update_op_config(&addr, current_nonce.as_u32());
 
     // execute pending transactions
@@ -145,7 +157,7 @@ pub fn start_eth_sender(pool: ConnectionPool) -> Sender<Operation> {
     }
 
     std::thread::Builder::new().name("eth_sender".to_string()).spawn(move || {
-        run_eth_sender(rx_for_eth, eth_client);
+        run_eth_sender(pool, rx_for_eth, eth_client);
     });
 
     tx_for_eth

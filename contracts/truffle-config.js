@@ -23,24 +23,30 @@ module.exports = {
 
     networks: {
         // truffle test --network dev
-        dev: {
-          host: "127.0.0.1",
-          port: 8545,
-          gas: 6800000,
-          network_id: "*" // match any network
-        },
+        // dev0: {
+        //   host: "127.0.0.1",
+        //   port: 8545,
+        //   gas: 6900000,
+        //   from: `0x${process.env.SENDER_ACCOUNT}`,
+        //   network_id: 9
+        //   //network_id: "*" // match any network
+        // },
 
-        geth: {
-          host: "127.0.0.1",
-          port: 8545,
-          gas: 6800000,
-          //from: "0x5cc401a56a5295709958e07519755a53b0506b1e",
-          network_id: 9
-        },   
-
-      rinkeby:{
+      dev: {
         network_id: 4,
-        gas: 6800000,
+        gas: 6900000,
+        provider: function() { 
+          const HDWalletProvider = require("truffle-hdwallet-provider");
+          let url = `${process.env.WEB3_URL}`
+          let mnemonic = process.env.MNEMONIC
+          return new HDWalletProvider(mnemonic, url) 
+        },
+        network_id: "*"
+      },
+
+      rinkeby: {
+        network_id: 4,
+        gas: 6900000,
         provider: function() { 
           const HDWalletProvider = require("truffle-hdwallet-provider");
           //let url = `https://rinkeby.infura.io/v3/${process.env.INFURA_PROJECT_ID}`

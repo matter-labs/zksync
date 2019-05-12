@@ -23,9 +23,10 @@
   },
   "scripts": {
     "build": "solcjs -o bin --bin --abi contracts/*.sol",
+    "build-common-interface": "solcjs -o bin --bin --abi commonInterfaceVariant/*.sol",
     "ganache": "ganache-cli -l 7000000 -i 4 -m \"cliff flag flag fence mesh quarter coyote mechanic cash draw remain priority\" ",
     "start-geth": "geth --rpc --rpcapi \"eth,net,web3,personal\" --dev --miner.gastarget 8000000 --dev.period=1",
-    "deploy": "yarn truffle migrate --reset --network dev",
+    "deploy": "yarn truffle migrate --reset --network $TRUFFLE_NETWORK",
     "geth": "node scripts/setup-geth.js 2& yarn start-geth",
     "geth-deployed": "(sleep 10 && node scripts/setup-geth.js && yarn deploy-geth)& yarn start-geth > /dev/null",
     "start-parity": "parity --config dev --jsonrpc-apis all",

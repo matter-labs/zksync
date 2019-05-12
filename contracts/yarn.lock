@@ -3680,7 +3680,7 @@ solc@0.5.0:
     semver "^5.5.0"
     yargs "^11.0.0"
 
-solc@^0.4.2, solc@^0.4.25:
+solc@^0.4.2, solc@^0.4.24:
   version "0.4.25"
   resolved "https://registry.yarnpkg.com/solc/-/solc-0.4.25.tgz#06b8321f7112d95b4b903639b1138a4d292f5faa"
   dependencies:

@@ -24,13 +24,13 @@ use super::storage::{ConnectionPool, StorageProcessor};
 type ABI = (&'static [u8], &'static str);
 
 pub const TEST_PLASMA_ALWAYS_VERIFY: ABI = (
-    include_bytes!("../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.abi"),
-    include_str!("../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.bin"),
+    include_bytes!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.abi"),
+    include_str!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.bin"),
 );
 
 pub const PROD_PLASMA: ABI = (
-    include_bytes!("../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.abi"),
-    include_str!("../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.bin"),
+    include_bytes!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.abi"),
+    include_str!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.bin"),
 );
 
 
@@ -137,12 +137,14 @@ impl EthWatch {
 
             // process deposits BEFORE exits for a rare case of deposit + full exit in the same block
             let deposits_result = self.process_deposits(block_number, &tx_for_blocks, &web3, &contract);
-            if deposits_result.is_err() {
+            if let Err(err) = deposits_result {
+                println!("Failed to process deposit logs: {}", err);
                 continue
             }
 
             let exits_result = self.process_exits(block_number, &tx_for_blocks, &web3, &contract);
-            if exits_result.is_err() {
+            if let Err(err) = exits_result {
+                println!("Failed to process exit logs: {}", err);
                 continue
             }
         
@@ -159,18 +161,16 @@ impl EthWatch {
         channel: &Sender<StateKeeperRequest>,
         web3: &web3::Web3<T>,
         contract: &Contract<T>)
-    -> Result<(), ()>
+    -> Result<(), String>
     {
-        println!("Processing deposits for block {}", block_number);
-        let total_deposit_requests_result: Result<U256, _> = contract.query("totalDepositRequests", (), None, Options::default(), Some(BlockNumber::Number(block_number))).wait();
+        //println!("Processing deposits for block {}", block_number);
+        let total_deposit_requests_result: U256 = 
+            contract.query("totalDepositRequests", (), None, Options::default(), Some(BlockNumber::Number(block_number)))
+            .wait()
+            .map_err(|err| format!("Error getting total deposit requests {}", err))?;
 
-        if total_deposit_requests_result.is_err() {
-            println!("Error getting total deposit requests {}", total_deposit_requests_result.err().unwrap());
-            return Err(());
-        }
-
-        let total_deposit_requests = total_deposit_requests_result.unwrap();
-        println!("total_deposit_requests = {}", total_deposit_requests);
+        let total_deposit_requests = total_deposit_requests_result;
+        //println!("total_deposit_requests = {}", total_deposit_requests);
 
         let max_batch_number = total_deposit_requests / self.deposit_batch_size;
 
@@ -183,15 +183,12 @@ impl EthWatch {
         let to_batch_number = (max_batch_number + U256::from(1)).as_u64();
 
         for batch_number in form_batch_number..to_batch_number {
-            let res = self.process_single_deposit_batch(
+            self.process_single_deposit_batch(
                 batch_number, 
                 channel, 
                 web3,
                 contract
-            );
-            if res.is_err() {
-                return res;
-            }
+            )?;
             self.last_deposit_batch = self.last_deposit_batch + U256::from(1);
         }
 
@@ -204,7 +201,7 @@ impl EthWatch {
         channel: &Sender<StateKeeperRequest>,
         web3: &web3::Web3<T>,
         contract: &Contract<T>)
-    -> Result<(), ()> {
+    -> Result<(), String> {
         let deposit_event = self.contract.event("LogDepositRequest").unwrap().clone();
         let deposit_event_topic = deposit_event.signature();
 
@@ -237,16 +234,13 @@ impl EthWatch {
             )
             .build();
 
-        let deposit_events_filter_result = web3.eth().logs(deposits_filter).wait();
-        let cancel_events_filter_result = web3.eth().logs(cancels_filter).wait();
+        let deposit_events_filter_result = web3.eth().logs(deposits_filter).wait()
+            .map_err(|err| format!("deposit_events_filter error: {}", err))?;
+        let cancel_events_filter_result = web3.eth().logs(cancels_filter).wait()
+            .map_err(|err| format!("deposits: cancel_events_filter_result error: {}", err))?;
 
-        if deposit_events_filter_result.is_err() || cancel_events_filter_result.is_err() {
-            println!("Error getting filter results");
-            return Err(());
-        }
-
-        let deposit_events = deposit_events_filter_result.unwrap();
-        let cancel_events = cancel_events_filter_result.unwrap();
+        let deposit_events = deposit_events_filter_result;
+        let cancel_events = cancel_events_filter_result;
 
         // now we have to merge and apply
         let mut all_events = vec![];
@@ -302,11 +296,12 @@ impl EthWatch {
                 },
                 () if topic == deposit_canceled_topic => {
                     let account_id = U256::from(event.topics[2]);
-                    let existing_record = this_batch.get(&account_id).map(|&v| v.clone()).ok_or(())?;
+                    let existing_record = this_batch.get(&account_id).map(|&v| v.clone())
+                        .ok_or("existing_record not found for deposits")?;
                     this_batch.remove(&account_id);
                     continue;
                 },
-                _ => return Err(()),
+                _ => return Err("unexpected topic".to_owned()),
             }
         }
 
@@ -321,11 +316,11 @@ impl EthWatch {
             fe_repr.read_be(public_key_bytes.as_slice()).expect("read public key point");
             let y = Fr::from_repr(fe_repr);
             if y.is_err() {
-                return Err(());
+                return Err("could not parse y".to_owned());
             }
             let public_key_point = edwards::Point::<Engine, Unknown>::get_for_y(y.unwrap(), x_sign, &params::JUBJUB_PARAMS);
             if public_key_point.is_none() {
-                return Err(());
+                return Err("public_key_point conversion error".to_owned());
             }
 
             let (pub_x, pub_y) = public_key_point.unwrap().into_xy();
@@ -339,17 +334,15 @@ impl EthWatch {
             all_deposits.push(tx);
         }
 
+        let len = all_deposits.len();
         let block = ProtoBlock::Deposit(
             self.last_deposit_batch.as_u32(),
             all_deposits,
         );
+        println!("Deposit batch {}, {} accounts", self.last_deposit_batch, len);
         let request = StateKeeperRequest::AddBlock(block);
 
-        let send_result = channel.send(request);
-
-        if send_result.is_err() {
-            return Err(());
-        }
+        let send_result = channel.send(request).map_err(|err| format!("channel.send() failed: {}", err))?;
 
         Ok(())
 
@@ -360,18 +353,15 @@ impl EthWatch {
         channel: &Sender<StateKeeperRequest>,
         web3: &web3::Web3<T>,
         contract: &Contract<T>)
-    -> Result<(), ()>
+    -> Result<(), String>
     {
         use bigdecimal::Zero;
-        println!("Processing exits for block {}", block_number);
-        let total_requests_result: Result<U256, _> = contract.query("totalExitRequests", (), None, Options::default(), Some(BlockNumber::Number(block_number))).wait();
+        //println!("Processing exits for block {}", block_number);
+        let total_requests_result: U256 = contract.query("totalExitRequests", (), None, Options::default(), Some(BlockNumber::Number(block_number)))
+            .wait()
+            .map_err(|err| format!("Error getting total exit requests {}", err))?;
 
-        if total_requests_result.is_err() {
-            println!("Error getting total exit requests {}", total_requests_result.err().unwrap());
-            return Err(());
-        }
-
-        let total_requests = total_requests_result.unwrap();
+        let total_requests = total_requests_result;
 
         let max_batch_number = total_requests / self.exit_batch_size;
 
@@ -389,10 +379,7 @@ impl EthWatch {
                 channel, 
                 web3,
                 contract
-            );
-            if res.is_err() {
-                return res;
-            }
+            )?;
             self.last_exit_batch = self.last_exit_batch + U256::from(1);
         }
 
@@ -405,7 +392,7 @@ impl EthWatch {
         channel: &Sender<StateKeeperRequest>,
         web3: &web3::Web3<T>,
         contract: &Contract<T>)
-    -> Result<(), ()>
+    -> Result<(), String>
     {
         use bigdecimal::Zero;
 
@@ -441,16 +428,13 @@ impl EthWatch {
             )
             .build();
 
-        let exit_events_filter_result = web3.eth().logs(exits_filter).wait();
-        let cancel_events_filter_result = web3.eth().logs(cancels_filter).wait();
+        let exit_events_filter_result = web3.eth().logs(exits_filter).wait()
+            .map_err(|err| format!("exit_events_filter_result error: {}", err))?;
+        let cancel_events_filter_result = web3.eth().logs(cancels_filter).wait()
+            .map_err(|err| format!("exits: cancel_events_filter_result error: {}", err))?;
 
-        if exit_events_filter_result.is_err() || cancel_events_filter_result.is_err() {
-            println!("Error getting filter results");
-            return Err(());
-        }
-
-        let exit_events = exit_events_filter_result.unwrap();
-        let cancel_events = cancel_events_filter_result.unwrap();
+        let exit_events = exit_events_filter_result;
+        let cancel_events = cancel_events_filter_result;
 
         // now we have to merge and apply
         let mut all_events = vec![];
@@ -494,7 +478,7 @@ impl EthWatch {
                     let existing_record = this_batch.get(&account_id).map(|&v| v.clone());
                     if let Some(record) = existing_record {
                         // double exit should not be possible due to SC
-                        return Err(());
+                        return Err("double exit should not be possible due to SC".to_owned());
                     } else {
                         this_batch.insert(account_id);
                     }
@@ -502,11 +486,11 @@ impl EthWatch {
                 },
                 () if topic == exit_canceled_topic => {
                     let account_id = U256::from(event.topics[2]);
-                    let existing_record = this_batch.get(&account_id).map(|&v| v.clone()).ok_or(())?;
+                    let existing_record = this_batch.get(&account_id).map(|&v| v.clone()).ok_or("existing_record fetch failed".to_owned())?;
                     this_batch.remove(&account_id);
                     continue;
                 },
-                _ => return Err(()),
+                _ => return Err("exit logs: unexpected topic".to_owned()),
             }
         }
 
@@ -530,8 +514,7 @@ impl EthWatch {
         let send_result = channel.send(request);
 
         if send_result.is_err() {
-            println!("Couldn't send for processing");
-            return Err(());
+            return Err("Couldn't send for processing".to_owned());
         }
 
         Ok(())

@@ -22,3 +22,5 @@ rust-crypto = "0.2"
 rustc-hex = "2.0.1"
 
 signal-hook = "0.1.8"
+tokio = "0.1.18"
+futures = "0.1.25"

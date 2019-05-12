@@ -3,6 +3,8 @@ extern crate serde_derive;
 extern crate serde_bytes;
 extern crate plasma;
 extern crate eth_client;
+#[macro_use]
+extern crate lazy_static;
 
 pub mod config;
 pub mod encoder;
@@ -20,11 +22,13 @@ pub struct TransferTxConfirmation {
 
 pub type TransferTxResult = Result<TransferTxConfirmation, TransferApplicationError>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkStatus {
-    pub next_block_at_max: Option<u64>,
+    pub next_block_at_max:  Option<u64>,
+    pub last_committed:     BlockNumber,
+    pub last_verified:      BlockNumber,
+    pub outstanding_txs:    u32,
 }
-
 
 pub type EncodedProof = [U256; 8];
 
@@ -74,6 +78,7 @@ impl std::fmt::Debug for Action {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Operation {
+    pub id:                 Option<i32>,
     pub action:             Action,
     pub block:              Block, 
     pub accounts_updated:   Option<AccountMap>,
@@ -100,4 +105,21 @@ pub enum StateKeeperRequest{
 pub struct CommitRequest {
     pub block:              Block, 
     pub accounts_updated:   AccountMap,
+}
+
+pub const ACTION_COMMIT: &'static str = "Commit";
+pub const ACTION_VERIFY: &'static str = "Verify";
+
+pub enum ActionType {
+    COMMIT,
+    VERIFY
+}
+
+impl std::string::ToString for ActionType {
+    fn to_string(&self) -> String {
+        match self {
+            ActionType::COMMIT => ACTION_COMMIT.to_owned(),
+            ActionType::VERIFY => ACTION_VERIFY.to_owned(),
+        }
+    }
 }

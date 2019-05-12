@@ -7,4 +7,5 @@ export DATABASE_URL=$TEST_DATABASE_URL
 
 diesel database setup
 
-cargo test
+cd ../..
+cargo test -p storage

@@ -4,11 +4,11 @@ version = "0.1.0"
 
 [dependencies]
 
-serde = "1.0.80"
-serde_derive = "1.0.80"
+serde = "1.0.90"
+serde_derive = "1.0.90"
 ethereum-types = "0.4.0"
 ethabi = "6.1.0"
-web3 = { git = "https://github.com/tomusdrw/rust-web3" }
+web3 = "0.6.0"
 ethereum-tx-sign = "0.0.2"
 hex = "0.3.2"
 reqwest = "0.9.5"

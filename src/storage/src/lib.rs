@@ -2,15 +2,22 @@ extern crate models;
 extern crate plasma;
 extern crate fnv;
 
+extern crate serde;
+extern crate serde_derive;
 #[macro_use]
 extern crate diesel;
 extern crate bigdecimal;
 extern crate serde_json;
+extern crate sapling_crypto;
 
+extern crate ff;
+
+use bigdecimal::BigDecimal;
 use plasma::models::*;
 use diesel::dsl::*;
-use models::{Operation, Action, EncodedProof, TxMeta};
+use models::{Operation, Action, ActionType, EncodedProof, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
 use std::cmp;
+use serde_derive::{Serialize, Deserialize};
 
 mod schema;
 use schema::*;
@@ -23,6 +30,8 @@ use diesel::r2d2::{PoolError, ConnectionManager, Pool, PooledConnection};
 use serde_json::{to_value, value::Value};
 use std::env;
 use std::iter::FromIterator;
+
+use ff::{PrimeField, Field};
 
 use diesel::sql_types::{Nullable, Integer};
 sql_function!(coalesce, Coalesce, (x: Nullable<Integer>, y: Integer) -> Integer);
@@ -76,10 +85,7 @@ struct NewOperation {
     pub action_type:    String,
 }
 
-pub const ACTION_COMMIT: &'static str = "Commit";
-pub const ACTION_VERIFY: &'static str = "Verify";
-
-#[derive(Debug, Queryable, QueryableByName)]
+#[derive(Debug, Clone, Queryable, QueryableByName)]
 #[table_name="operations"]
 pub struct StoredOperation {
     pub id:             i32,
@@ -88,6 +94,7 @@ pub struct StoredOperation {
     pub nonce:          i32,
     pub block_number:   i32,
     pub action_type:    String,
+    pub tx_hash:        Option<String>,
     pub created_at:     std::time::SystemTime,
 }
 
@@ -101,8 +108,19 @@ impl StoredOperation {
 
     pub fn into_op(self, conn: &StorageProcessor) -> QueryResult<Operation> {
         let meta = self.get_meta();
-        let mut op: Operation = serde_json::from_value(self.data).unwrap();
+
+        let debug_data = format!("data: {}", &self.data);
+        
+        // let op: Result<Operation, serde_json::Error> = serde_json::from_value(self.data);
+        let op: Result<Operation, serde_json::Error> = serde_json::from_str(&self.data.to_string());
+
+        if let Err(err) = &op {
+            println!("Error: {} on {}", err, debug_data)
+        }
+
+        let mut op = op.expect("Operation deserialization");
         op.tx_meta = Some(meta);
+        op.id = Some(self.id);
 
         if op.accounts_updated.is_none() {
             let (_, updates) = conn.load_state_diff_for_block(op.block.block_number)?;
@@ -110,6 +128,86 @@ impl StoredOperation {
         };
 
         Ok(op)
+    }
+}
+
+#[derive(Insertable)]
+#[table_name="transactions"]
+struct NewTx {
+    pub tx_type:        String,         // 'transfer', 'deposit', 'exit'
+    pub from_account:   i32,
+    pub to_account:     Option<i32>,    // only used for transfers
+    pub nonce:          Option<i32>,    // only used for transfers
+    pub amount:         i32,
+    pub fee:            i32,
+
+    pub block_number:   Option<i32>,
+    pub state_root:     Option<String>, // unique block id (for possible reorgs)
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
+#[table_name="transactions"]
+pub struct StoredTx {
+    pub id:             i32,
+    //pub data:           serde_json::Value,
+
+    pub tx_type:        String,         // 'transfer', 'deposit', 'exit'
+    pub from_account:   i32,
+    pub to_account:     Option<i32>,    // only used for transfers
+    pub nonce:          Option<i32>,    // only used for transfers
+    pub amount:         i32,
+    pub fee:            i32,
+
+    pub block_number:   Option<i32>,
+    pub state_root:     Option<String>, // unique block id (for possible reorgs)
+
+    pub created_at:     std::time::SystemTime,
+}
+
+impl StoredTx {
+    pub fn into_tx(&self) -> QueryResult<tx::TransactionType> {
+        let res = match &self.tx_type {
+            t if t == tx::TRANSFER_TX  => {
+                tx::TransactionType::Transfer{tx: self.into_transfer_transaction()}
+            },
+            d if d == tx::DEPOSIT_TX   => {
+                tx::TransactionType::Deposit{tx: self.into_deposit_transaction()}
+            },
+            e if e == tx::EXIT_TX      => {
+                tx::TransactionType::Exit{tx: self.into_exit_transaction()}
+            },
+            _ => return Err(Error::NotFound)
+        };
+        Ok(res)
+    }
+
+    pub fn into_transfer_transaction(&self) -> TransferTx {
+        TransferTx {
+            from: self.from_account.clone() as u32,
+            to: self.to_account.unwrap().clone() as u32,
+            amount: BigDecimal::from(self.amount.clone()),
+            fee: BigDecimal::from(self.fee.clone()),
+            nonce: 0,
+            good_until_block: 0,
+            signature: TxSignature::default(),
+            cached_pub_key: None,  
+        }
+    }
+
+    pub fn into_deposit_transaction(&self) -> DepositTx {
+        DepositTx {
+            account: self.from_account.clone() as u32,
+            amount: BigDecimal::from(self.amount.clone()),
+            pub_x: Fr::zero(),
+            pub_y: Fr::zero(),
+        }
+    }
+
+    pub fn into_exit_transaction(&self) -> ExitTx {
+        ExitTx {
+            account: self.from_account.clone() as u32,
+            amount: BigDecimal::from(self.amount.clone()),
+        }
     }
 }
 
@@ -131,15 +229,25 @@ pub struct StoredProof {
 // Every time before a prover worker starts generating the proof, a prover run is recorded for monitoring purposes
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
 #[table_name="prover_runs"]
-pub struct NewProverRun {
+pub struct ProverRun {
+    pub id:             i32,
     pub block_number:   i32,
-    pub worker:         String,
+    pub worker:         Option<String>,
+    pub created_at:     std::time::SystemTime,
+    pub updated_at:     std::time::SystemTime,
 }
 
 #[derive(Debug, QueryableByName)]
 pub struct IntegerNumber {
     #[sql_type="Integer"]
     pub integer_value: i32,
+}
+
+#[derive(Debug, Queryable, QueryableByName)]
+#[table_name="server_config"]
+pub struct ServerConfig {
+    pub id:             bool,
+    pub contract_addr:  Option<String>,
 }
 
 enum ConnectionHolder {
@@ -172,6 +280,11 @@ impl StorageProcessor {
         }
     }
 
+    pub fn load_config(&self) -> QueryResult<ServerConfig> {
+        use schema::server_config::dsl::*;
+        server_config.first(self.conn())
+    }
+
     /// Execute an operation: store op, modify state accordingly, load additional data and meta tx info
     /// - Commit => store account updates
     /// - Verify => apply account updates
@@ -179,7 +292,10 @@ impl StorageProcessor {
         self.conn().transaction(|| {
             match &op.action {
                 Action::Commit => 
-                    self.commit_state_update(op.block.block_number, op.accounts_updated.as_ref().unwrap())?,
+                    {
+                        self.commit_state_update(op.block.block_number, op.accounts_updated.as_ref().unwrap())?;
+                        self.save_transactions(op)?;
+                    },
                 Action::Verify{proof: _} => 
                     self.apply_state_update(op.block.block_number)?,
             };
@@ -192,6 +308,92 @@ impl StorageProcessor {
                 .get_result(self.conn())?;
             stored.into_op(self)
         })
+    }
+
+    pub fn save_operation_tx_hash(&self, op_id: i32, hash: String) -> QueryResult<()> {
+        use crate::schema::operations::dsl::*;
+        let target = operations
+            .filter(id.eq(op_id));
+        diesel::update(target)
+            .set(tx_hash.eq(hash))
+            .execute(self.conn())
+            .map(|_|())
+    }
+
+    fn save_transactions(&self, op: &Operation) -> QueryResult<()> {
+        let block_data = &op.block.block_data;
+        match block_data {
+            BlockData::Transfer { transactions, total_fees: _ } => self.save_transfer_transactions(op, &transactions)?,
+            BlockData::Deposit { transactions, batch_number: _ } => self.save_deposit_transactions(op, &transactions)?,
+            BlockData::Exit { transactions, batch_number: _ } => self.save_exit_transactions(op, &transactions)?,
+        }
+        Ok(())
+    }
+
+    fn save_transfer_transactions(&self, op: &Operation, txs: &Vec<TransferTx>) -> QueryResult<()> {
+        for tx in txs.iter() {
+            let inserted = diesel::insert_into(transactions::table)
+                .values(&NewTx{
+                    tx_type: String::from("transfer"),
+                    from_account: tx.from as i32,
+                    to_account: Some(tx.to as i32),
+                    nonce: Some(tx.nonce as i32),
+                    amount: tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
+                    fee: tx.fee.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
+                    block_number: Some(op.block.block_number as i32),
+                    state_root: Some(op.block.new_root_hash.into_repr().to_string()),
+                })
+                .execute(self.conn())?;
+            if 0 == inserted {
+                eprintln!("Error: could not commit all new transactions!");
+                return Err(Error::RollbackTransaction)
+            }
+        }
+        Ok(())
+    }
+
+    fn save_deposit_transactions(&self, op: &Operation, txs: &Vec<DepositTx>) -> QueryResult<()> {
+        for tx in txs.iter() {
+            let inserted = diesel::insert_into(transactions::table)
+                .values(&NewTx{
+                    tx_type: String::from("deposit"),
+                    from_account: tx.account as i32,
+                    to_account: None,
+                    nonce: None,
+                    amount: tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
+                    fee: 0,
+                    block_number: Some(op.block.block_number as i32),
+                    state_root: Some(op.block.new_root_hash.into_repr().to_string()),
+                })
+                .execute(self.conn())?;
+            if 0 == inserted {
+                eprintln!("Error: could not commit all new transactions!");
+                return Err(Error::RollbackTransaction)
+            }
+        }
+        Ok(())
+    }
+
+    fn save_exit_transactions(&self, op: &Operation, txs: &Vec<ExitTx>) -> QueryResult<()> {
+        for tx in txs.iter() {
+            let inserted = diesel::insert_into(transactions::table)
+                .values(&NewTx{
+                    tx_type: String::from("exit"),
+                    from_account: tx.account as i32,
+                    to_account: None,
+                    nonce: None,
+                    amount: tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
+                    fee: 0,
+                    block_number: Some(op.block.block_number as i32),
+                    state_root: Some(op.block.new_root_hash.into_repr().to_string()),
+                })
+                .execute(self.conn())?;
+            if 0 == inserted {
+                eprintln!("Error: could not commit all new transactions!");
+                return Err(Error::RollbackTransaction)
+            }
+        }
+        Ok(())
     }
 
     fn commit_state_update(&self, block_number: u32, accounts_updated: &AccountMap) -> QueryResult<()> {
@@ -283,7 +485,7 @@ impl StorageProcessor {
 
     /// loads the state of accounts updated in a specific block
     pub fn load_state_diff_for_block(&self, block_number: u32) -> QueryResult<(u32, AccountMap)> {
-        self.load_state_diff(block_number-1, block_number)
+        self.load_state_diff(block_number, block_number+1)
     }
 
     fn load_state(&self, query: &str) -> QueryResult<(u32, AccountMap)> {
@@ -316,20 +518,39 @@ impl StorageProcessor {
             .map(|_|())
     }
 
-    pub fn load_commit_op(&self, block_number: BlockNumber) -> QueryResult<Operation> {
+    pub fn load_stored_op_with_block_number(&self, block_number: BlockNumber, action_type: ActionType) -> Option<StoredOperation> {
         use crate::schema::operations::dsl;
-        self.conn().transaction(|| {
-            let op: StoredOperation = dsl::operations
-                .filter(dsl::block_number.eq(block_number as i32))
-                .filter(dsl::action_type.eq(ACTION_COMMIT))
-                .get_result(self.conn())?;
-            op.into_op(self)
-        })
+        dsl::operations
+            .filter(dsl::block_number.eq(block_number as i32))
+            .filter(dsl::action_type.eq(action_type.to_string().as_str()))
+            .get_result(self.conn())
+            .ok()
     }
 
-    pub fn load_committed_block(&self, block_number: BlockNumber) -> QueryResult<Block> {
-        let op = self.load_commit_op(block_number)?;
-        Ok(op.block)
+    pub fn load_stored_ops_in_blocks_range(&self, from_block_number: BlockNumber, to_block_number: BlockNumber, action_type: ActionType) -> Vec<StoredOperation> {
+        let query = format!("
+            SELECT * FROM operations
+            WHERE block_number >= {from_block_number} AND block_number <= {to_block_number} AND action_type = '{action_type}'
+            ORDER BY block_number
+            DESC
+        ", from_block_number = from_block_number as i32, to_block_number = to_block_number as i32, action_type = action_type.to_string());
+        let r = diesel::sql_query(query)
+            .load(self.conn());
+        r.unwrap_or(vec![])
+    }
+
+    pub fn load_commit_op(&self, block_number: BlockNumber) -> Option<Operation> {
+        let op = self.load_stored_op_with_block_number(block_number, ActionType::COMMIT);
+        op.map_or( None, |r|
+            r.into_op(self).ok()
+        )
+    }
+
+    pub fn load_committed_block(&self, block_number: BlockNumber) -> Option<Block> {
+        let op = self.load_commit_op(block_number);
+        op.map_or( None, |r|
+            Some(r.block)
+        )
     }
 
     pub fn load_unsent_ops(&self, current_nonce: Nonce) -> QueryResult<Vec<Operation>> {
@@ -394,7 +615,7 @@ impl StorageProcessor {
         ")
     }
 
-    pub fn last_committed_state_for_account(&self, account_id: u32) -> QueryResult<Option<plasma::models::Account>> {
+    pub fn last_committed_state_for_account(&self, account_id: AccountId) -> QueryResult<Option<plasma::models::Account>> {
         let query = format!("
             SELECT account_id AS id, block_number AS last_block, data
             FROM account_updates WHERE account_id = {}
@@ -406,12 +627,21 @@ impl StorageProcessor {
         Ok( r.map(|acc: Account| serde_json::from_value(acc.data).unwrap()) )
     }
 
-    pub fn last_verified_state_for_account(&self, account_id: u32) -> QueryResult<Option<plasma::models::Account>> {
+    pub fn last_verified_state_for_account(&self, account_id: AccountId) -> QueryResult<Option<plasma::models::Account>> {
         use crate::schema::accounts::dsl::*;
         let mut r = accounts
             .filter(id.eq(account_id as i32))
             .load(self.conn())?;
         Ok( r.pop().map(|acc: Account| serde_json::from_value(acc.data).unwrap()) )
+    }
+
+    pub fn count_outstanding_proofs(&self, after_block: BlockNumber) -> QueryResult<u32> {
+        use crate::schema::account_updates::dsl::*;
+        let count: i64 = account_updates
+            .select(count_star())
+            .filter(block_number.gt(after_block as i32))
+            .first(self.conn())?;
+        Ok( count as u32 )
     }
 
     pub fn get_last_committed_block(&self) -> QueryResult<BlockNumber> {
@@ -448,7 +678,65 @@ impl StorageProcessor {
         //self.load_number("SELECT COALESCE(max(last_block), 0) AS integer_value FROM accounts")
     }
 
-    pub fn fetch_prover_job(&self, worker: &String, timeout_seconds: usize) -> QueryResult<Option<BlockNumber>> {
+    pub fn load_last_saved_transactions(&self, count: i32) -> Vec<StoredTx> {
+        let query = format!("
+            SELECT * FROM transactions
+            ORDER BY block_number DESC
+            LIMIT {}
+        ", count);
+        let r = diesel::sql_query(query)
+            .load(self.conn());
+        r.unwrap_or(vec![])
+    }
+
+    pub fn load_tx_transactions_for_account(&self, account_id: AccountId, count: i32) -> Vec<StoredTx> {
+        let query = format!("
+            SELECT * FROM transactions
+            WHERE from_account = {}
+            ORDER BY block_number DESC
+            LIMIT {}
+        ", account_id, count);
+        let r = diesel::sql_query(query)
+            .load(self.conn());
+        r.unwrap_or(vec![])
+    }
+
+    pub fn load_rx_transactions_for_account(&self, account_id: AccountId, count: i32) -> Vec<StoredTx> {
+        let query = format!("
+            SELECT * FROM transactions
+            WHERE to_account = {}
+            ORDER BY block_number DESC
+            LIMIT {}
+        ", account_id, count);
+        let r = diesel::sql_query(query)
+            .load(self.conn());
+        r.unwrap_or(vec![])
+    }
+
+    pub fn load_transaction_with_id(&self, tx_id: u32) -> Option<StoredTx> {
+        let query = format!("
+            SELECT * FROM transactions
+            WHERE id = {}
+            DESC LIMIT 1
+        ", tx_id as i32);
+        let r = diesel::sql_query(query)
+            .get_result(self.conn())
+            .ok();
+        r
+    }
+
+    pub fn load_transactions_in_block(&self, block_number: u32) -> Vec<StoredTx> {
+        let query = format!("
+            SELECT * FROM transactions
+            WHERE block_number = {}
+            ORDER BY block_number
+        ", block_number as i32);
+        let r = diesel::sql_query(query)
+            .load(self.conn());
+        r.unwrap_or(vec![])
+    }
+
+    pub fn fetch_prover_job(&self, worker_: &String, timeout_seconds: usize) -> QueryResult<Option<ProverRun>> {
         self.conn().transaction(|| {
             sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.conn())?;
             let job: Option<BlockNumber> = diesel::sql_query(format!("
@@ -460,22 +748,39 @@ impl StorageProcessor {
                         (SELECT * FROM proofs WHERE block_number = o.block_number)
                     AND NOT EXISTS
                         (SELECT * FROM prover_runs 
-                            WHERE block_number = o.block_number AND (now() - created_at) < interval '{} seconds')
+                            WHERE block_number = o.block_number AND (now() - updated_at) < interval '{} seconds')
                 ", timeout_seconds))
                 .get_result::<Option<IntegerNumber>>(self.conn())?
                 .map(|i| i.integer_value as BlockNumber);
             
-            if let Some(block_number) = job {
-                let to_store = NewProverRun{
-                    block_number: block_number as i32,
-                    worker: worker.to_string(),
-                };
-                use schema::prover_runs::dsl::prover_runs;
-                insert_into(prover_runs).values(&to_store).execute(self.conn())?;
+            if let Some(block_number_) = job {
+                // let to_store = NewProverRun{
+                //     block_number: block_number as i32,
+                //     worker: worker.to_string(),
+                // };
+                use schema::prover_runs::dsl::*;
+                let inserted: ProverRun = insert_into(prover_runs)
+                .values(&vec![(
+                    block_number.eq(block_number_ as i32), 
+                    worker.eq(worker_.to_string())
+                )])
+                .get_result(self.conn())?;
+                Ok(Some(inserted))
+            } else {
+                Ok(None)
             }
-
-            Ok(job)
         })
+    }
+
+    pub fn update_prover_job(&self, job_id: i32) -> QueryResult<()> {
+        use crate::schema::prover_runs::dsl::*;
+        use diesel::expression::dsl::now;
+
+        let target = prover_runs.filter(id.eq(job_id));
+        diesel::update(target)
+            .set(updated_at.eq(now))
+            .execute(self.conn())
+            .map(|_|())
     }
 
     /// Store the timestamp of the prover finish and the proof
@@ -505,13 +810,15 @@ mod test {
     use plasma::models;
     use diesel::Connection;
     use bigdecimal::BigDecimal;
-    use diesel::RunQueryDsl;
+    use ff::Field;
+    use bigdecimal::Num;
+    //use diesel::RunQueryDsl;
 
     #[test]
     fn test_store_proof() {
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
-        conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
+        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
 
         assert!(conn.load_proof(1).is_err());
 
@@ -526,15 +833,15 @@ mod test {
     fn test_store_state() {     
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
-        conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
+        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
 
         // uncomment below for debugging to generate initial state
-        diesel::sql_query("delete from accounts")
-        .execute(&conn.conn)
-        .expect("must work");
-        diesel::sql_query("delete from account_updates")
-        .execute(&conn.conn)
-        .expect("must work");
+        // diesel::sql_query("delete from accounts")
+        // .execute(&conn.conn())
+        // .expect("must work");
+        // diesel::sql_query("delete from account_updates")
+        // .execute(&conn.conn())
+        // .expect("must work");
 
         let mut accounts = fnv::FnvHashMap::default();
         let acc = |balance| { 
@@ -601,7 +908,7 @@ mod test {
     fn test_store_txs() {
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
-        conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
+        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
         conn.update_op_config("0x0", 0).unwrap();
 
         let mut accounts = fnv::FnvHashMap::default();
@@ -628,7 +935,6 @@ mod test {
             accounts_updated:   Some(accounts.clone()),
             tx_meta:            None,
         }).unwrap();
-
         assert_eq!(conn.last_verified_state_for_account(5).unwrap(), None);
         assert_eq!(conn.last_committed_state_for_account(5).unwrap().unwrap().balance, BigDecimal::from(2));
 
@@ -668,7 +974,7 @@ mod test {
     fn test_store_proof_reqs() {
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
-        conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
+        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
         conn.update_op_config("0x0", 0).unwrap();
 
         conn.execute_operation(&Operation{
@@ -712,7 +1018,7 @@ mod test {
     fn test_store_helpers() {
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
-        conn.conn.begin_test_transaction().unwrap(); // this will revert db after test
+        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
 
         assert_eq!(-1, conn.load_last_committed_deposit_batch().unwrap());
         assert_eq!(-1, conn.load_last_committed_exit_batch().unwrap());
@@ -750,6 +1056,82 @@ mod test {
             tx_meta:            None,
         }).unwrap();
         assert_eq!(2, conn.load_last_committed_exit_batch().unwrap());
+    }
+
+    #[test]
+    fn test_store_txs_2() {
+        let pool = ConnectionPool::new();
+        let conn = pool.access_storage().unwrap();
+        conn.conn().begin_test_transaction().unwrap();
+
+
+        let deposit_tx: DepositTx = DepositTx {
+            account: 1,
+            amount:  BigDecimal::from_str_radix(&format!("{}", 10000), 10).unwrap(),
+            pub_x:   Fr::zero(),
+            pub_y:   Fr::zero(),
+        };
+
+        let transfer_tx: TransferTx = TransferTx {
+            from:               1,
+            to:                 2,
+            amount:             BigDecimal::from_str_radix(&format!("{}", 5000), 10).unwrap(),
+            fee:                BigDecimal::from_str_radix(&format!("{}", 0), 10).unwrap(),
+            nonce:              1,
+            good_until_block:   100000,
+            signature: TxSignature::default(),
+            cached_pub_key: None, 
+        };
+
+        let exit_tx: ExitTx = ExitTx {
+            account:            1,
+            amount:             BigDecimal::from_str_radix(&format!("{}", 5000), 10).unwrap(),
+        };
+
+        conn.execute_operation(&Operation{
+            action: Action::Commit,
+            block:  Block{
+                block_number:   1,
+                new_root_hash:  Fr::default(),
+                block_data:     BlockData::Deposit{
+                    batch_number: 1,
+                    transactions: vec![deposit_tx.clone(), deposit_tx.clone()],
+                }
+            }, 
+            accounts_updated:   Some(fnv::FnvHashMap::default()),
+            tx_meta:            None,
+        }).unwrap();
+
+        conn.execute_operation(&Operation{
+            action: Action::Commit,
+            block:  Block{
+                block_number:   2,
+                new_root_hash:  Fr::default(),
+                block_data:     BlockData::Transfer{
+                    total_fees: BigDecimal::from_str_radix(&format!("{}", 0), 10).unwrap(),
+                    transactions: vec![transfer_tx.clone(), transfer_tx.clone()],
+                }
+            }, 
+            accounts_updated:   Some(fnv::FnvHashMap::default()),
+            tx_meta:            None,
+        }).unwrap();
+
+        conn.execute_operation(&Operation{
+            action: Action::Commit,
+            block:  Block{
+                block_number:   3,
+                new_root_hash:  Fr::default(),
+                block_data:     BlockData::Exit{
+                    batch_number: 2,
+                    transactions: vec![exit_tx.clone(), exit_tx.clone()],
+                }
+            }, 
+            accounts_updated:   Some(fnv::FnvHashMap::default()),
+            tx_meta:            None,
+        }).unwrap();
+
+        let txs = conn.load_last_saved_transactions(10);
+        assert_eq!(txs.unwrap().len(), 6);
     }
 
 }

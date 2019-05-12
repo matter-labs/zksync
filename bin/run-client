@@ -1,6 +1,0 @@
-#!/bin/bash
-
-. .setup_env
-cd client
-
-yarn dev

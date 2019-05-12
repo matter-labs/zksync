@@ -1,0 +1,5 @@
+#!/bin/bash
+
+. .setup_env
+
+/usr/local/bin/kubectl "$@"

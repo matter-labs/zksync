@@ -2,6 +2,11 @@
 
 . .setup_env
 
+KEY_FILES=$CONTRACT_KEY_FILES
+.load_keys
+
+cp -f $KEY_DIR/*.sol contracts/contracts/keys/
+
 echo redeploying for the db $DATABASE_URL
 
 cd contracts
@@ -9,7 +14,7 @@ echo yarn deploy
 yarn deploy  | tee ../deploy.log
 cd ..
 
-NEW_CONTRACT=`grep -A999 "Starting migrations" deploy.log | grep -A4 "'PlasmaContract'" | grep "contract address" | grep -oE '0x(.+)' \
+export NEW_CONTRACT=`grep -A999 "Starting migrations" deploy.log | grep -A4 "'FranklinProxy'" | grep "contract address" | grep -oE '0x(.+)' \
 | sed -n "s/0x//p"`
 
 if [ ! -z "$NEW_CONTRACT" ]
@@ -23,4 +28,5 @@ then
 
 else
     echo "Contract deployment failed"
+    exit 1
 fi

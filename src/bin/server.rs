@@ -18,7 +18,7 @@ use server::eth_sender;
 use server::eth_watch::{EthWatch, start_eth_watch};
 
 use storage::ConnectionPool;
-use models::{StateKeeperRequest};
+use models::{StateKeeperRequest, config};
 
 fn main() {
 
@@ -36,6 +36,15 @@ fn main() {
     let connection_pool = ConnectionPool::new();
     let state_keeper = PlasmaStateKeeper::new(connection_pool.clone());
     let eth_watch = EthWatch::new(0, 0, connection_pool.clone());
+
+    let storage = connection_pool.access_storage().expect("db connection failed for committer");
+    let contract_addr = storage.load_config().expect("can not load server_config")
+        .contract_addr.expect("contract_addr empty in server_config");
+    if contract_addr != config::RUNTIME_CONFIG.contract_addr {
+        panic!("Contract addresses mismatch! From DB = {}, from env = {}", 
+            contract_addr, config::RUNTIME_CONFIG.contract_addr);
+    }
+    drop(storage);
 
     // spawn threads for different processes
     // see https://docs.google.com/drawings/d/16UeYq7cuZnpkyMWGrgDAbmlaGviN2baY1w1y745Me70/edit?usp=sharing
@@ -65,4 +74,6 @@ fn main() {
     while !stop_signal.load(Ordering::SeqCst) {
         thread::sleep(Duration::from_secs(1));
     }
+
+    println!("terminate signal received");
 }

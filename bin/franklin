@@ -1,0 +1,11 @@
+#!/bin/bash
+
+. .setup_env
+
+if [ -f bin/$1 ]; then
+    bin/$1 "${@:2}"
+else
+    make "$@"
+fi
+
+#make "$@"

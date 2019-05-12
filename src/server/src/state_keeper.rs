@@ -8,6 +8,7 @@ use rand::{OsRng};
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 use web3::types::{U128, H256, U256};
 use std::str::FromStr;
+use rayon::prelude::*;
 
 use plasma::models::{self, *};
 
@@ -19,9 +20,8 @@ use rand::{SeedableRng, Rng, XorShiftRng};
 
 use std::sync::mpsc::{Sender, Receiver};
 use fnv::{FnvHashMap, FnvHashSet};
-use bigdecimal::{BigDecimal, ToPrimitive};
+use bigdecimal::{BigDecimal, ToPrimitive, FromPrimitive, Zero};
 use ff::{PrimeField, PrimeFieldRepr};
-use bigdecimal::Zero;
 
 use std::io::BufReader;
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
@@ -54,10 +54,13 @@ impl PlasmaStateKeeper {
         // here we should insert default accounts into the tree
         let storage = pool.access_storage().expect("db connection failed for statekeeper");
         
-        let (last_block, accounts) = storage.load_committed_state().expect("db must be functional");
-        let state = PlasmaState::new(accounts, last_block + 1);
+        let (last_committed, accounts) = storage.load_committed_state().expect("db failed");
+        let last_verified = storage.get_last_verified_block().expect("db failed");
+        let state = PlasmaState::new(accounts, last_committed + 1);
+        //let outstanding_txs = storage.count_outstanding_proofs(last_verified).expect("db failed");
 
-        println!("Last committed block to before the start of state keeper = {}", last_block);
+        println!("last_committed = {}, last_verified = {}", last_committed, last_verified);
+
         // Keeper starts with the NEXT block
         let keeper = PlasmaStateKeeper {
             state,
@@ -80,22 +83,34 @@ impl PlasmaStateKeeper {
         for req in rx_for_blocks {
             match req {
                 StateKeeperRequest::GetNetworkStatus(sender) => {
-                    sender.send(NetworkStatus{
-                        next_block_at_max: self.next_block_at_max.map(|t| t.duration_since(UNIX_EPOCH).unwrap().as_secs())
-                    }).expect("sending network status must work");
+                    let r = sender.send(NetworkStatus{
+                        next_block_at_max: self.next_block_at_max.map(|t| t.duration_since(UNIX_EPOCH).unwrap().as_secs()),
+                        last_committed: 0,
+                        last_verified: 0,
+                        outstanding_txs: 0,
+                    });
+                    if r.is_err() {
+                        println!("StateKeeperRequest::GetNetworkStatus: channel closed, sending failed");
+                    }
                 },
                 StateKeeperRequest::GetAccount(account_id, sender) => {
                     let account = self.state.get_account(account_id);
-                    sender.send(account).expect("sending account state must work");
+                    let r = sender.send(account);
+                    if r.is_err() {
+                        println!("StateKeeperRequest::GetAccount: channel closed, sending failed");
+                    }
                 },
                 StateKeeperRequest::AddTransferTx(tx, sender) => {
                     let result = self.apply_transfer_tx(tx);
                     if result.is_ok() && self.next_block_at_max.is_none() {
                         self.next_block_at_max = Some(SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL));
                     }
-                    sender.send(result);
+                    let r = sender.send(result);
+                    if r.is_err() {
+                        println!("StateKeeperRequest::AddTransferTx: channel closed, sending failed");
+                    }
 
-                    if self.transfer_tx_queue.len() == config::TRANSFER_BATCH_SIZE {
+                    if self.transfer_tx_queue.len() == config::RUNTIME_CONFIG.transfer_batch_size {
                         self.finalize_current_batch(&tx_for_commitments);
                     }
                 },
@@ -153,7 +168,7 @@ impl PlasmaStateKeeper {
     }
 
     fn apply_padding(&mut self) {
-        let to_pad = config::TRANSFER_BATCH_SIZE - self.transfer_tx_queue.len();
+        let to_pad = config::RUNTIME_CONFIG.transfer_batch_size - self.transfer_tx_queue.len();
         if to_pad > 0 {
             println!("padding transactions");
             // TODO: move to env vars
@@ -161,8 +176,11 @@ impl PlasmaStateKeeper {
             let private_key: PrivateKey<Bn256> = PrivateKey::read(BufReader::new(pk_bytes.as_slice())).unwrap();
             let padding_account_id = 2; // TODO: 1
 
-            for i in 0..to_pad {
-                let nonce = self.account(padding_account_id).nonce;
+            let base_nonce = self.account(padding_account_id).nonce;
+            let pub_key = self.state.get_account(padding_account_id).and_then(|a| a.get_pub_key()).expect("public key must exist for padding account");
+
+            let prepared_transactions: Vec<TransferTx> = (0..(to_pad as u32)).into_par_iter().map(|i| {
+                let nonce = base_nonce + i;
                 let tx = TransferTx::create_signed_tx(
                     padding_account_id, // from
                     0,                  // to
@@ -172,20 +190,45 @@ impl PlasmaStateKeeper {
                     2147483647,         // good until max_block
                     &private_key
                 );
-
-                let pub_key = self.state.get_account(padding_account_id).and_then(|a| a.get_pub_key()).expect("public key must exist for padding account");
                 assert!( tx.verify_sig(&pub_key) );
 
+                tx
+            }).collect();
+
+            for tx in prepared_transactions.into_iter() {
                 self.state.apply_transfer(&tx).expect("padding must always be applied correctly");
                 self.transfer_tx_queue.push(tx);
             }
+
+            // for i in 0..to_pad {
+            //     let nonce = self.account(padding_account_id).nonce;
+            //     let tx = TransferTx::create_signed_tx(
+            //         padding_account_id, // from
+            //         0,                  // to
+            //         BigDecimal::zero(), // amount
+            //         BigDecimal::zero(), // fee
+            //         nonce,              // nonce
+            //         2147483647,         // good until max_block
+            //         &private_key
+            //     );
+
+            //     let pub_key = self.state.get_account(padding_account_id).and_then(|a| a.get_pub_key()).expect("public key must exist for padding account");
+            //     assert!( tx.verify_sig(&pub_key) );
+
+            //     self.state.apply_transfer(&tx).expect("padding must always be applied correctly");
+            //     self.transfer_tx_queue.push(tx);
+            // }
         }
     }
 
     fn create_transfer_block(&mut self) -> CommitRequest {
         
         let transactions = std::mem::replace(&mut self.transfer_tx_queue, Vec::default());
-        let mut total_fees: u128 = transactions.iter().map( |tx| tx.fee.to_u128().expect("should not overflow") ).sum();
+        let mut total_fees: u128 = transactions.iter()
+            .map( |tx| tx.fee.to_u128().expect("should not overflow") )
+            .sum();
+
+        let total_fees = BigDecimal::from_u128(total_fees).unwrap();
 
         // collect updated state
         let mut accounts_updated = FnvHashMap::<u32, Account>::default();

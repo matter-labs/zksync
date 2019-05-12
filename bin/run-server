@@ -1,5 +1,0 @@
-#!/bin/bash
-
-. .setup_env
-
-cargo run --bin server

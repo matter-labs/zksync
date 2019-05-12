@@ -9,10 +9,17 @@
 *.bak
 node_modules
 yarn-error.log
+target
 
-*.env
+dist
+npm-debug.log
+
+Cargo.lock
+!/Cargo.lock
+
+/etc/env/*
+!/etc/env/dev.env.example
 /contracts/yarn-error.log
-/target
 /deploy.log
 /keys
 /tmp

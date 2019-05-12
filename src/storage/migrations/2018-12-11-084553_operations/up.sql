@@ -1,6 +1,7 @@
+-- op_config table is used to keep track of nonce sequences for different sender addresses
 CREATE TABLE op_config(
-    addr        text primary key,
-    next_nonce  integer
+    addr        text primary key,   -- sender address for ETH
+    next_nonce  integer             -- nonce sequence holder
 );
 INSERT INTO op_config VALUES ('0x0', 0);
 CREATE RULE noins_op_config AS ON INSERT TO op_config DO NOTHING;
@@ -28,6 +29,7 @@ CREATE TABLE operations (
     nonce           integer not null default op_config_next_nonce(),
     block_number    integer not null,
     action_type     text not null,
+    tx_hash         text,
     created_at      timestamp not null default now()
 );
 

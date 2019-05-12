@@ -13,10 +13,10 @@ pub mod api_server;
 pub mod state_keeper;
 pub mod committer;
 pub mod eth_sender;
+pub mod eth_watch;
+mod nonce_futures;
 
 pub use models::config;
-
-pub mod eth_watch;
 
 extern crate plasma;
 
@@ -30,10 +30,11 @@ extern crate fnv;
 
 extern crate futures;
 extern crate web3;
+extern crate rayon;
 
 extern crate hyper;
 extern crate serde;
-extern crate serde_json;
+//extern crate serde_json;
 
 extern crate tokio;
 extern crate actix;

@@ -1,7 +1,0 @@
-node_modules/*
-build/*
-*.DS_Store
-*.swp
-npm-debug.log
-scrypt/scrypt-1.1.6/config.h
-scrypt/configuration/config_output

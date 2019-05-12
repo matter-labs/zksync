@@ -1,31 +1,31 @@
 #!/bin/bash
 
-cd `dirname $0`/..
-
-if [ -z "$1" ]
+if [ -z "$FRANKLIN_ENV" ]
 then
-    export ENV_FILE=./etc/env/local.env
-else
-    export ENV_FILE=./etc/env/$1.env
-fi
 
-if [ ! -f $ENV_FILE ]; then
-    echo "no config file found: $ENV_FILE"
-    #exit
-fi
+    cd `dirname $0`/..
 
-echo Loading config from $ENV_FILE
-
-if [ ! -z "$1" ]
-then
-    echo -n "Type configuration name ('$1') to confirm: "
-    read CONFIRM
-
-    if [ ! "$1" == "$CONFIRM" ]; then
-        exit
+    if [ -f etc/env/current ]; then
+        export FRANKLIN_ENV=`cat etc/env/current`
+    else 
+        export FRANKLIN_ENV=dev
     fi
-fi
 
-set -o allexport
-eval $(grep -v '^#' $ENV_FILE | sed 's/^/export /')
-set +o allexport
+    export ENV_FILE=./etc/env/$FRANKLIN_ENV.env
+
+    if [ "dev" == "$FRANKLIN_ENV" ] && [ ! -f etc/env/dev.env ]
+    then
+        cp etc/env/dev.env.example etc/env/dev.env
+    fi
+
+    if [ ! -f $ENV_FILE ]; then
+        echo "Franklin config file not found: $ENV_FILE"
+        #exit
+    fi
+
+    # Load env vars
+    set -o allexport
+    eval $(grep -v '^#' $ENV_FILE | sed 's/^/export /')
+    set +o allexport
+
+fi

@@ -1,8 +1,0 @@
-#!/bin/bash
-
-. .setup_env
-cd src/storage
-
-echo DATABASE_URL=$DATABASE_URL
-
-diesel database reset
