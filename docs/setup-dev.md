@@ -6,7 +6,7 @@ Install docker.
 
 ## Node & Yarn
 
-Install Node 8.
+Install Node.
 
 Install yarn.
 
