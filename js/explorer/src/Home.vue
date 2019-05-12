@@ -54,9 +54,6 @@
             <div class="col-sm text-center">
             <i class="fas fa-archive"></i> <b>Tx per block</b><br><span class="num">256</span>
             </div>
-            <div class="col-sm hide-lg text-center">
-            <i class="fas fa-tachometer-alt"></i> <b>Max TPS</b><br><span class="num">102</span>
-            </div>
         </div>
         </b-card>
         <br>
@@ -98,7 +95,7 @@ td {
 }
 
 .num {
-    font-size: 2.5em;
+    font-size: 3em;
 }
 
 @media (max-width: 720px) {
@@ -111,6 +108,22 @@ td {
 .hide-lg {
     display: none
 }
+}
+
+h1, h2, h3, h4 {
+    font-weight: bold;
+}
+
+body {
+    font-size: 0.9rem;
+}
+
+.btn {
+    font-size: 0.8rem;
+}
+
+tr {
+    cursor: pointer;
 }
 </style>
 
@@ -170,22 +183,3 @@ export default {
     },
 }
 </script>
-
-<style>
-
-h1, h2, h3, h4 {
-    font-weight: bold;
-}
-
-body {
-    font-size: 0.9rem;
-}
-
-.btn {
-    font-size: 0.8rem;
-}
-
-tr {
-    cursor: pointer;
-}
-</style>
