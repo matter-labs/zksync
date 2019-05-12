@@ -436,7 +436,7 @@ fn handle_get_blocks(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let response: Vec<BlockDetailsResponse> = commited_stored_operations.into_iter().map(|x| 
         BlockDetailsResponse {
             block_number:        x.clone().block_number as u32,
-            new_root_hash:       commited_operations.iter().find(|&y| y.id.unwrap() == x.id).unwrap().block.new_root_hash.to_string(),
+            new_state_root:      commited_operations.iter().find(|&y| y.id.unwrap() == x.id).unwrap().block.new_root_hash.to_hex(),
             commit_tx_hash:      x.clone().tx_hash,
             verify_tx_hash:      verified_operations.iter().find(|&y| y.id == x.id).map_or(None, |x| x.clone().tx_hash),
             committed_at:        None,
