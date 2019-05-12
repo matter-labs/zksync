@@ -28,9 +28,13 @@ const router = new Router({
 })
 
 Vue.mixin({
-    computed: {
-        store:  () => store,
-        config: () => store.config,
+    // computed: {
+    //     store:  () => store,
+    // },
+    data() {
+        return {
+            store
+        }
     },
 })
 
@@ -38,16 +42,17 @@ window.app = new Vue({
     el: '#app',
     router,
     async created() {
-        if (process.env.NODE_ENV !== 'development') {
+        if (true) { //if (process.env.NODE_ENV !== 'development') {
             let r = await axios({
                 method:     'get',
-                url:        `${self.BASE_URL}/status`,
+                url:        `/dist/config.json`,
             })
             if (r.status === 200) {
-                this.config = r.data
+                this.store.config = r.data
+                console.log(store.config)
             }
         } else {
-            store.config = {}
+            this.store.config = {}
         }
     },
     render: h => h(App)

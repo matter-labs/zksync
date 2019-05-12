@@ -15,7 +15,6 @@
             </b-nav-item-dropdown>
         </b-navbar-nav>
         </b-collapse>
-        <!--<b-navbar-brand right>API server: {{apiServer}}</b-navbar-brand>-->
     </b-container>
     </b-navbar>
     <br>
@@ -133,7 +132,6 @@ import client from './client'
 export default {
     name: 'home',
     created() {
-        console.log('created', this.currentPage)
         this.update()
     },
     methods: {

@@ -11,8 +11,7 @@ async function fetch(req) {
 }
 
 function baseUrl() {
-    return store.config.API_SERVER || process.env.API_SERVER + 
-        '/api/v0.1' //'http://localhost:3000/api/v0.1'
+    return (store.config.API_SERVER || process.env.API_SERVER) + '/api/v0.1' //'http://localhost:3000/api/v0.1'
 }
 
 let self = {
