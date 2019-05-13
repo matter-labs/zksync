@@ -579,6 +579,53 @@ impl StorageProcessor {
         diesel::sql_query(query).load(self.conn())
     }
 
+    pub fn handle_search(&self, query: String) -> Option<BlockDetails> {
+        let block_number = query.parse::<i32>().unwrap_or(i32::max_value());
+        let l_query = query.to_lowercase();
+        let has_prefix = l_query.starts_with("0x");
+        let prefix = "0x".to_owned();
+        let query_with_prefix = match has_prefix {
+            true  => l_query,
+            false => format!("{}{}", prefix, l_query),
+        };
+        let sql_query = format!("
+            with committed as (
+                select 
+                    data -> 'block' ->> 'new_root_hash' as new_state_root,    
+                    block_number,
+                    tx_hash as commit_tx_hash,
+                    created_at as committed_at
+                from operations
+                where 
+                    (lower(tx_hash) = '{tx_hash}'
+                    or lower(addr) = '{addr}'
+                    or block_number = {block_number})
+                    and action_type = 'Commit'
+                order by block_number desc
+                limit 1
+            )
+            select 
+                committed.*, 
+                verified.tx_hash as verify_tx_hash,
+                verified.created_at as verified_at
+            from committed
+            left join operations verified
+            on
+                committed.block_number = verified.block_number
+                and action_type = 'Verify'
+            order by committed.block_number desc
+            limit 1
+        ",  
+            tx_hash              = query_with_prefix.as_str(), 
+            addr                 = query_with_prefix.as_str(), 
+            block_number         = block_number as i32
+        );
+        let result = diesel::sql_query(sql_query)
+            .get_result(self.conn())
+            .ok();
+        result
+    }
+
     // pub fn load_stored_ops_in_blocks_range(&self, max_block: BlockNumber, limit: u32, action_type: ActionType) -> Vec<StoredOperation> {
     //     let query = format!("
     //         SELECT * FROM operations

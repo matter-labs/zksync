@@ -453,6 +453,23 @@ fn handle_get_blocks(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespo
     .responder()
 }
 
+fn handle_search(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+    let pool = req.state().connection_pool.clone();
+    let query = req.query().get("query").cloned().unwrap_or("".to_string());
+    req.body()
+    .map_err(|err| format!("{}", err) )
+    .and_then(move |_| {     
+        let storage = pool.access_storage().map_err(|err| format!("db err: {}", err) )?;
+        let response: BlockDetails = storage.handle_search(query).ok_or("db err")?;
+        Ok(HttpResponse::Ok().json(response))
+    })
+    .or_else(|err: String| {
+        let resp = ApiError{error:err};
+        Ok(HttpResponse::Ok().json(resp))
+    })
+    .responder()
+}
+
 fn start_server(state: AppState, bind_to: String) {
     server::new(move || {
         App::with_state(state.clone()) // <- create app with shared state
@@ -491,6 +508,9 @@ fn start_server(state: AppState, bind_to: String) {
             })
             .resource("/blocks", |r| {
                 r.method(Method::GET).f(handle_get_blocks);
+            })
+            .resource("/search?q={query}", |r| {
+                r.method(Method::GET).f(handle_search);
             })
         })
     })
