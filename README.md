@@ -128,5 +128,5 @@ So you need to rebuild the code on every change (to be automated).
 ### Publish source code on etherscan
 
 ```
-franklin source
+franklin flatten source
 ```
