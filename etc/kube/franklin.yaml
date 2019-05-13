@@ -7,12 +7,51 @@ metadata:
 spec:
   type: LoadBalancer
   ports:
-  - port: 80
+  - port: 3000
     targetPort: 3000
     protocol: TCP
     name: http
   selector:
     app: server
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: nginx
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: gluk64/franklin:nginx
+          imagePullPolicy: Always
+          ports: 
+            - containerPort: 80
+      nodeSelector:
+        doks.digitalocean.com/node-pool: server
 ---
 apiVersion: apps/v1
 kind: Deployment
