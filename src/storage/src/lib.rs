@@ -592,8 +592,8 @@ impl StorageProcessor {
                     created_at as committed_at
                 from operations
                 where 
-                    (lower(tx_hash) LIKE '{tx_hash}%'
-                    or lower(addr) LIKE '{addr}%'
+                    (lower(tx_hash) LIKE '%{tx_hash}%'
+                    or lower(addr) LIKE '%{addr}%'
                     or block_number = {block_number})
                     and action_type = 'Commit'
                 order by block_number desc
