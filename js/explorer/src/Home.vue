@@ -6,7 +6,7 @@
         <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
         <b-collapse id="nav-collapse" is-nav>
         <b-navbar-nav>
-            <b-nav-item href="https://demo.matter-labs.io" target="blanc">MatterMask</b-nav-item>
+            <b-nav-item href="/client/" target="blanc">MatterMask</b-nav-item>
         </b-navbar-nav>
         <b-navbar-nav class="ml-auto">
             <b-nav-item-dropdown text="Rinkeby" right>
