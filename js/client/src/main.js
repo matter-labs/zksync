@@ -25,7 +25,8 @@ const routes = [
 ]
 
 const router = new Router({
-    routes // short for `routes: routes`
+    routes, // short for `routes: routes`
+    base: '/client'
 })
 
 Vue.mixin({

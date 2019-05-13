@@ -177,7 +177,8 @@ import Eth from 'ethjs'
 import {ethers} from 'ethers'
 import axios from 'axios'
 import ethUtil from 'ethjs-util'
-import transactionLib from '../../franklin/src/transaction.js'
+const transactionLib = require('./transaction')
+
 import ABI from './contract'
 
 const maxExitEntries = 32;

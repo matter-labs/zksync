@@ -24,7 +24,8 @@ const routes = [
 
 const router = new Router({
     routes, // short for `routes: routes`
-    mode: 'history'
+    mode: 'history',
+    base: '/explorer'
 })
 
 Vue.mixin({
@@ -42,10 +43,10 @@ window.app = new Vue({
     el: '#app',
     router,
     async created() {
-        if (true) { //if (process.env.NODE_ENV !== 'development') {
+        if (process.env.NODE_ENV !== 'development') {
             let r = await axios({
                 method:     'get',
-                url:        `/dist/config.json`,
+                url:        'config.json',
             })
             if (r.status === 200) {
                 this.store.config = r.data

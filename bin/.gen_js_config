@@ -3,13 +3,12 @@
 # Generates a json config file with current env var configuration for production
 
 JS_CONFIG="API_SERVER TRANSFER_BATCH_SIZE"
-OUT="js/explorer/dist/config.json"
 
-echo "{" > js/explorer/dist/config.json
+echo "{" 
 
 for VAR in $JS_CONFIG; do
-    echo "  \"$VAR\":\"${!VAR}\"," >> js/explorer/dist/config.json
+    echo "  \"$VAR\":\"${!VAR}\","
 done
 
-echo "  \"trailing\": null" >> $OUT
-echo "}" >> $OUT
+echo "  \"trailing\": null"
+echo "}"

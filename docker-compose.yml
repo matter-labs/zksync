@@ -6,7 +6,7 @@ services:
       - "80:80"
     volumes:
       - type: bind
-        source: ./js/explorer
+        source: ./volumes/html
         target: /usr/share/nginx/html
   server:
     image: "gluk64/franklin:server"
