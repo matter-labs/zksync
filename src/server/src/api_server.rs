@@ -35,12 +35,6 @@ struct ApiError {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct SearchResult {
-    values: Vec<BlockDetails>,
-    error:  Option<ApiError>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 struct TransactionRequest {
     from: u32,
     to: u32,
@@ -462,23 +456,15 @@ fn handle_get_blocks(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpRespo
 fn handle_search(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let pool = req.state().connection_pool.clone();
     let query = req.query().get("query").cloned().unwrap_or("".to_string());
-    let limit = req.query().get("limit").cloned().unwrap_or("20".to_string());
     req.body()
     .map_err(|err| format!("{}", err) )
     .and_then(move |_| {     
         let storage = pool.access_storage().map_err(|err| format!("db err: {}", err) )?;
-        let limit: u32 = limit.parse().map_err(|_| format!("invalid limit"))?;
-        if limit > 100 {
-            return Err(format!("limit can not exceed 100"));
-        }
-        let response: Vec<BlockDetails> = storage.handle_search(query, limit).map_err(|e| format!("db err: {}", e))?;
+        let response: BlockDetails = storage.handle_search(query).ok_or("db err")?;
         Ok(HttpResponse::Ok().json(response))
     })
     .or_else(|err: String| {
-        let resp = SearchResult{
-            values:     vec![],
-            error:      Some(ApiError{error:err}),
-        };
+        let resp = ApiError{error:err};
         Ok(HttpResponse::Ok().json(resp))
     })
     .responder()
@@ -523,7 +509,7 @@ fn start_server(state: AppState, bind_to: String) {
             .resource("/blocks", |r| {
                 r.method(Method::GET).f(handle_get_blocks);
             })
-            .resource("/blocks?term={query}&limit={limit}", |r| {
+            .resource("/search?q={query}", |r| {
                 r.method(Method::GET).f(handle_search);
             })
         })
