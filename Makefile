@@ -96,16 +96,16 @@ start: confirm_action images
 ifeq (,$(KUBECONFIG))
 	@docker-compose up -d --scale prover=1 server prover
 else
-	@kubectl scale deployments/server --replicas=1
-	@kubectl scale deployments/prover --replicas=2
+	@bin/kubectl scale deployments/server --replicas=1
+	@bin/kubectl scale deployments/prover --replicas=2
 endif
 
 stop: confirm_action
 ifeq (,$(KUBECONFIG))
 	@docker-compose stop server prover
 else
-	@kubectl scale deployments/server --replicas=0
-	@kubectl scale deployments/prover --replicas=0
+	@bin/kubectl scale deployments/server --replicas=0
+	@bin/kubectl scale deployments/prover --replicas=0
 endif
 
 status:
