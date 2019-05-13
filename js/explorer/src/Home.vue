@@ -66,7 +66,7 @@
         -->
 
         <b-pagination v-if="ready" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
-        <b-table id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading"></b-table>
+        <b-table id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading" class="clickable"></b-table>
         <b-pagination v-if="ready" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
 
     </b-container>
@@ -87,7 +87,7 @@
   height: 100%;
 }
 
-td {
+.clickable tr {
     cursor: pointer;
 }
 
@@ -119,9 +119,6 @@ body {
     font-size: 0.8rem;
 }
 
-tr {
-    cursor: pointer;
-}
 </style>
 
 <script>

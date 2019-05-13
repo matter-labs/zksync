@@ -36,10 +36,17 @@ let self = {
         })
     },
 
-    async getBlock(number) {
+    async getBlock(blockNumber) {
         return fetch({
             method:     'get',
-            url:        `${baseUrl()}/blocks/${number}`,
+            url:        `${baseUrl()}/blocks/${blockNumber}`,
+        })
+    },
+
+    async getBlockTransactions(blockNumber) {
+        return fetch({
+            method:     'get',
+            url:        `${baseUrl()}/blocks/${blockNumber}/transactions`,
         })
     },
 

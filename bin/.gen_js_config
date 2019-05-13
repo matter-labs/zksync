@@ -2,7 +2,7 @@
 
 # Generates a json config file with current env var configuration for production
 
-JS_CONFIG="API_SERVER TRANSFER_BATCH_SIZE"
+JS_CONFIG="API_SERVER TRANSFER_BATCH_SIZE SENDER_ACCOUNT"
 
 echo "{" 
 
