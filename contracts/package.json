@@ -16,6 +16,7 @@
     "hmac-drbg": "^1.0.1",
     "minimalistic-assert": "^1.0.1",
     "minimalistic-crypto-utils": "^1.0.1",
+    "querystring": "^0.2.0",
     "solc": "^0.4.24",
     "truffle": "^5.0.0",
     "truffle-hdwallet-provider": "^1.0.0-web3one.1",
