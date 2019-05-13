@@ -54,10 +54,8 @@ db-drop: confirm_action
 # Frontend clients
 
 dist-config:
-	@mkdir -p js/client/dist
-	@bin/.gen_js_config > js/client/dist/config.json
-	@mkdir -p js/explorer/dist
-	@bin/.gen_js_config > js/explorer/dist/config.json
+	bin/.gen_js_config > js/client/src/env-config.js
+	bin/.gen_js_config > js/explorer/src/env-config.js
 
 client: dist-config
 	@cd js/client && yarn dev
@@ -152,10 +150,10 @@ loadtest:
 # (Re)deploy contracts and database
 redeploy: confirm_action stop deploy-contracts db-reset
 
-update-clients: nginx push-nginx kube-deploy
+update-clients: nginx push-nginx kube-deploy rollout-clients
 
 # Make sure to update all images and configuration and rollout update
-update-servers: rust-images push-rust kube-deploy
+update-servers: rust-images push-rust kube-deploy rollout-rust
 
 start:
 ifeq (,$(KUBECONFIG))

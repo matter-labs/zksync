@@ -13,6 +13,7 @@ import Transaction from './Transaction.vue'
 
 import axios from 'axios'
 import url from 'url'
+import config from './env-config'
 
 Vue.use(Router)
 Vue.use(BootstrapVue)
@@ -41,21 +42,7 @@ window.app = new Vue({
     el: '#app',
     router,
     async created() {
-        if (process.env.NODE_ENV !== 'development') {
-            let r = await axios({
-                method:     'get',
-                url:        '/explorer/dist/config.json',
-            })
-            if (r.status === 200) {
-                this.store.config = r.data
-            }
-        } else {
-            this.store.config = {
-                API_SERVER:             process.env.API_SERVER,
-                TRANSFER_BATCH_SIZE:    process.env.TRANSFER_BATCH_SIZE,
-                SENDER_ADDRESS:         process.env.SENDER_ADDRESS,
-            }
-        }
+        this.store.config = config
         let regex = /(?:api-)*(\w*)(?:\..*)*/
         this.store.network = 
             regex.exec(url.parse(this.store.config.API_SERVER).host)[1]

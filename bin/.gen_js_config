@@ -4,7 +4,7 @@
 
 JS_CONFIG="API_SERVER TRANSFER_BATCH_SIZE SENDER_ACCOUNT"
 
-echo "{" 
+echo "export default {" 
 
 for VAR in $JS_CONFIG; do
     echo "  \"$VAR\":\"${!VAR}\","
