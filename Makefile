@@ -66,7 +66,7 @@ db-reset: confirm_action db-drop db-setup
 migrate: confirm_action
 	@cd src/storage && diesel migration run
 
-redeploy: confirm_action deploy-contracts db-reset
+redeploy: confirm_action stop deploy-contracts db-reset
 
 db-drop: confirm_action
 	@# this is used to clear the produciton db; cannot do `diesel database reset` because we don't own the db
