@@ -7,7 +7,7 @@ metadata:
 spec:
   type: LoadBalancer
   ports:
-  - port: 3000
+  - port: 80
     targetPort: 3000
     protocol: TCP
     name: http
@@ -48,7 +48,7 @@ spec:
         - name: nginx
           image: gluk64/franklin:nginx
           imagePullPolicy: Always
-          ports: 
+          ports:
             - containerPort: 80
       nodeSelector:
         doks.digitalocean.com/node-pool: server
