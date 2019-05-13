@@ -29,7 +29,7 @@ sql = psql $(DATABASE_URL) -c
 db-test:
 	@bin/db-test
 
-db-setup: confirm_action
+db-setup:
 	@bin/db-setup
 
 db-reset: confirm_action db-drop db-setup
@@ -44,7 +44,7 @@ db-drop: confirm_action
 		{ $(sql) 'DROP SCHEMA IF EXISTS public CASCADE' && $(sql)'CREATE SCHEMA public'; }
 
 
-# JS clients
+# Frontend clients
 
 yarn:
 	@cd contracts && yarn
@@ -143,13 +143,23 @@ loadtest:
 	@cd js/loadtest && yarn test
 
 
-# Devops: universal
+# Devops: main
 
 # (Re)deploy contracts and database
 redeploy: confirm_action stop deploy-contracts db-reset
 
+update-clients: nginx push-nginx kube-deploy
+
 # Make sure to update all images and configuration and rollout update
-update: rust-images nginx push-rust push-nginx kube-deploy rollout
+update-servers: rust-images push-rust kube-deploy
+
+start: rust-images nginx
+ifeq (,$(KUBECONFIG))
+	@docker-compose up -d --scale prover=1 server prover nginx
+else
+	@bin/kubectl scale deployments/server --replicas=1
+	@bin/kubectl scale deployments/prover --replicas=1
+endif
 
 stop: confirm_action
 ifeq (,$(KUBECONFIG))
@@ -159,26 +169,20 @@ else
 	@bin/kubectl scale deployments/prover --replicas=0
 endif
 
-rollout:
-
-
-# Devops: local testing
-
-up: rust-images nginx
-	@docker-compose up -d --scale prover=1 server prover nginx
+restart: stop start
 
 
 # Devops: Kubernetes
 
+rollout-clients:
+	kubectl set image deployment/nginx nginx=gluk64/franklin:nginx
+
+rollout-servers:
+	echo not implemented; exit 1
+
 # Deploy/apply kubernetes config
 kube-deploy:
 	@bin/deploy-kube
-
-start: confirm_action push kube-deploy
-	#@bin/kubectl scale deployments/server --replicas=1
-	#@bin/kubectl scale deployments/prover --replicas=1
-
-restart: stop start
 
 
 # Kubernetes: monitoring shortcuts
