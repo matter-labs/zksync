@@ -48,7 +48,7 @@ window.app = new Vue({
         if (process.env.NODE_ENV !== 'development') {
             let r = await axios({
                 method:     'get',
-                url:        '/config.json',
+                url:        '/dist/config.json',
             })
             if (r.status === 200) {
                 this.store.config = r.data
