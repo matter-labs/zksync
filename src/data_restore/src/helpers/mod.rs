@@ -33,3 +33,32 @@ pub fn get_topic_keccak_hash(topic: &str) -> web3::types::H256 {
     let topic_h256 = H256::from_slice(topic_keccak_data_vec);
     topic_h256
 }
+
+#[derive(Debug)]
+pub enum DataRestoreError {
+    Unknown(String),
+    WrongType,
+    NoData(String),
+    NonexistentAccount,
+    WrongAmount,
+    WrongEndpoint,
+    WrongPubKey,
+    DoubleExit,
+    StateUpdate(String),
+}
+
+impl std::string::ToString for DataRestoreError {
+    fn to_string(&self) -> String {
+        match self {
+            DataRestoreError::Unknown(text)      => format!("Unknown {}", text),
+            DataRestoreError::WrongType          => "Wrong type".to_owned(),
+            DataRestoreError::NoData(text)       => format!("No data {}", text),
+            DataRestoreError::NonexistentAccount => "Nonexistent account".to_owned(),
+            DataRestoreError::WrongAmount        => "Wrong amount".to_owned(),
+            DataRestoreError::WrongEndpoint      => "Wrong endpoint".to_owned(),
+            DataRestoreError::WrongPubKey        => "Wrong pubkey".to_owned(),
+            DataRestoreError::DoubleExit         => "Double exit".to_owned(),
+            DataRestoreError::StateUpdate(text)  => format!("Error during state update {}", text),
+        }
+    }
+}

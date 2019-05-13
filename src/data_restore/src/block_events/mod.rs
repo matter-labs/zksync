@@ -65,23 +65,17 @@ impl BlockEventsFranklin {
         this
     }
 
-    pub fn get_past_state_from_genesis_with_blocks_delta(network: InfuraEndpoint, genesis_block: U256, blocks_delta: U256) -> Result<Self, String> {
+    pub fn get_past_state_from_genesis_with_blocks_delta(network: InfuraEndpoint, genesis_block: U256, blocks_delta: U256) -> Result<Self, DataRestoreError> {
         let mut this = BlockEventsFranklin::new(network);
-        let (blocks, to_block_number): (ComAndVerBlocksVecs, BlockNumber256) = match this.get_sorted_past_logs_from_genesis(genesis_block, blocks_delta) {
-            Err(_) => return Err(String::from("Cant get sorted past logs")),
-            Ok(result) => (result.0, result.1)
-        };
+        let (blocks, to_block_number): (ComAndVerBlocksVecs, BlockNumber256) = this.get_sorted_past_logs_from_genesis(genesis_block, blocks_delta).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         this.committed_blocks = blocks.0;
         this.verified_blocks = blocks.1;
         this.last_watched_block_number = U256::from(to_block_number.as_u64());
         Ok(this)
     }
 
-    pub fn update_state_from_last_watched_block_with_blocks_delta_and_return_new_blocks(&mut self, blocks_delta: U256) -> Result<ComAndVerBlocksVecs, String> {
-        let (blocks, to_block_number): (ComAndVerBlocksVecs, BlockNumber256) = match self.get_sorted_past_logs_from_last_watched_block(blocks_delta) {
-            Err(_) => return Err(String::from("Cant get sorted past logs")),
-            Ok(result) => (result.0, result.1)
-        };
+    pub fn update_state_from_last_watched_block_with_blocks_delta_and_return_new_blocks(&mut self, blocks_delta: U256) -> Result<ComAndVerBlocksVecs, DataRestoreError> {
+        let (blocks, to_block_number): (ComAndVerBlocksVecs, BlockNumber256) = self.get_sorted_past_logs_from_last_watched_block(blocks_delta).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         let blocks_for_return = blocks.clone();
         self.committed_blocks.extend(blocks.0);
         self.verified_blocks.extend(blocks.1);
@@ -133,25 +127,18 @@ impl BlockEventsFranklin {
         &self.verified_blocks
     }
 
-    pub fn get_last_block_number(&mut self) -> Result<BlockNumber256, String> {
-        let (_eloop, transport) = match web3::transports::Http::new(self.http_endpoint_string.as_str()) {
-            Err(_) => return Err(String::from("Error creating web3 with this endpoint")),
-            Ok(result) => result,
-        };
+    pub fn get_last_block_number(&mut self) -> Result<BlockNumber256, DataRestoreError> {
+        let (_eloop, transport) = web3::transports::Http::new(self.http_endpoint_string.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
         let web3 = web3::Web3::new(transport);
-        let last_block_number = web3.eth().block_number().wait();
-        let result = match last_block_number {
-            Err(_) => return Err(String::from("Error getting last block number")),
-            Ok(result) => result,
-        };
-        Ok(result)
+        let last_block_number = web3.eth().block_number().wait().map_err(|e| DataRestoreError::Unknown(e.to_string()))?;
+        Ok(last_block_number)
     }
 
     // returns (committed blocks logs, verified blocks logs)
-    fn sort_logs(&mut self, logs: &Vec<Log>) -> Result<ComAndVerBlocksVecs, String> {
+    fn sort_logs(&mut self, logs: &Vec<Log>) -> Result<ComAndVerBlocksVecs, DataRestoreError> {
         let logs = logs.clone();
         if logs.len() == 0 {
-            return Err(String::from("No logs in list"))
+            return Err(DataRestoreError::NoData("No logs in list".to_string()))
         }
         let mut committed_blocks: Vec<LogBlockData> = vec![];
         let mut verified_blocks: Vec<LogBlockData> = vec![];
@@ -197,12 +184,9 @@ impl BlockEventsFranklin {
         Ok((committed_blocks, verified_blocks))
     }
 
-    fn get_logs(&mut self, from_block_number: BlockNumber, to_block_number: BlockNumber) -> Result<Vec<Log>, String> {
+    fn get_logs(&mut self, from_block_number: BlockNumber, to_block_number: BlockNumber) -> Result<Vec<Log>, DataRestoreError> {
         // Set web3
-        let (_eloop, transport) = match web3::transports::Http::new(self.http_endpoint_string.as_str()) {
-            Err(_) => return Err(String::from("Error creating web3 with this endpoint")),
-            Ok(result) => result,
-        };
+        let (_eloop, transport) = web3::transports::Http::new(self.http_endpoint_string.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
         let web3 = web3::Web3::new(transport);
 
         // let contract = Contract::new(web3.eth(), franklin_address.clone(), franklin_contract.clone());
@@ -229,93 +213,45 @@ impl BlockEventsFranklin {
                     .build();
 
         // Filter result
-        let events_filter_result = web3.eth().logs(filter).wait();
-        if events_filter_result.is_err() {
-            return Err(String::from("Error getting filter results"))
+        let result = web3.eth().logs(filter).wait().map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+        if result.len() == 0 {
+            return Err(DataRestoreError::NoData("No logs in list".to_string()))
         }
-
-        // Logs
-        let logs = match events_filter_result {
-            Err(_) => Err(String::from("Wrong events result")),
-            Ok(result) => {
-                if result.len()== 0 {
-                    return Err(String::from("No logs in list"))
-                }
-                Ok(result)
-            }
-        };
-        logs
+        Ok(result)
     }
 
-    pub fn get_sorted_logs_in_block(&mut self, block_number: BlockNumber256) -> Result<ComAndVerBlocksVecs, String> {
+    pub fn get_sorted_logs_in_block(&mut self, block_number: BlockNumber256) -> Result<ComAndVerBlocksVecs, DataRestoreError> {
         let block_to_get_logs = BlockNumber::Number(block_number.as_u64());
-        match self.get_logs(block_to_get_logs, block_to_get_logs) {
-            Err(_) => {
-                let message = String::from("No logs in block ") + &block_number.as_u64().to_string();
-                return Err(message)
-            },
-            Ok(result) => {
-                match self.sort_logs(&result) {
-                    Err(_) => {
-                        let message = String::from("Cant sort logs in block ") + &block_number.as_u64().to_string();
-                        return Err(message)
-                    },
-                    Ok(sorted_logs) => return Ok((sorted_logs.0, sorted_logs.1)),
-                };
-            },
-        };
+        let logs = self.get_logs(block_to_get_logs, block_to_get_logs).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+        let result = self.sort_logs(&logs).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+        Ok(result)
     }
 
-    fn get_past_logs(&mut self, from_block_number: U256, blocks_delta: U256) -> Result<(Vec<Log>, BlockNumber256), String> {
+    fn get_past_logs(&mut self, from_block_number: U256, blocks_delta: U256) -> Result<(Vec<Log>, BlockNumber256), DataRestoreError> {
         // Set web3
-        let last_block_number = match self.get_last_block_number() {
-            Err(_) => return Err(String::from("Cant get last block number")),
-            Ok(result) => result,
-        };
+        let last_block_number = self.get_last_block_number().map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         let to_block_numer_256 = last_block_number - blocks_delta;
-        let result = to_block_numer_256.checked_sub(from_block_number);
-        if result.is_none() {
-            return Err(String::from("No new blocks"))
-        }
+        let _ = to_block_numer_256.checked_sub(from_block_number).ok_or(DataRestoreError::NoData("No new blocks".to_string()))?;
         let to_block_number = BlockNumber::Number(to_block_numer_256.as_u64());
         let from_block_number = BlockNumber::Number(from_block_number.as_u64());
-        // let last_block_number_u64 = last_block_number.as_u64();
-        // // To block = last block - blocks delta
-        // let to_block_number_u64 = last_block_number_u64 - blocks_delta;
-        // let to_block_number: BlockNumber = BlockNumber::Number(to_block_number_u64);
 
-        let logs = match self.get_logs(from_block_number, to_block_number) {
-            Err(_) => return Err(String::from("Cant get past logs")),
-            Ok(result) => result
-        };
+        let logs = self.get_logs(from_block_number, to_block_number).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         Ok((logs, to_block_numer_256))
     }
 
     // returns (committed blocks logs, verified blocks logs) from genesis to (last block minus delta)
-    fn get_sorted_past_logs_from_last_watched_block(&mut self, blocks_delta: U256) -> Result<(ComAndVerBlocksVecs, BlockNumber256), String> {
+    fn get_sorted_past_logs_from_last_watched_block(&mut self, blocks_delta: U256) -> Result<(ComAndVerBlocksVecs, BlockNumber256), DataRestoreError> {
         let from_block_number = self.last_watched_block_number + 1;
-        let (logs, to_block_number) = match self.get_past_logs(from_block_number, blocks_delta) {
-            Err(_) => return Err(String::from("Cant get past logs")),
-            Ok(result) => result,
-        };
-        let sorted_logs = match self.sort_logs(&logs) {
-            Err(_) => return Err(String::from("Cant sort_logs")),
-            Ok(result) => result,
-        };
+        let (logs, to_block_number) = self.get_past_logs(from_block_number, blocks_delta).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+        let sorted_logs = self.sort_logs(&logs).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         Ok((sorted_logs, to_block_number))
     }
 
     // returns (committed blocks logs, verified blocks logs) from genesis to (last block minus delta)
-    fn get_sorted_past_logs_from_genesis(&mut self, genesis_block: U256, blocks_delta: U256) -> Result<(ComAndVerBlocksVecs, BlockNumber256), String> {
+    fn get_sorted_past_logs_from_genesis(&mut self, genesis_block: U256, blocks_delta: U256) -> Result<(ComAndVerBlocksVecs, BlockNumber256), DataRestoreError> {
         let from_block_number = U256::from(genesis_block);
-        let (logs, to_block_number) = match self.get_past_logs(from_block_number, blocks_delta) {
-            Err(_) => return Err(String::from("Cant get past logs")),
-            Ok(result) => result,
-        };
-        let sorted_logs = match self.sort_logs(&logs) {
-            Err(_) => return Err(String::from("Cant sort_logs")),
-            Ok(result) => result,
-        };
+        let (logs, to_block_number) = self.get_past_logs(from_block_number, blocks_delta).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+        let sorted_logs = self.sort_logs(&logs).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         Ok((sorted_logs, to_block_number))
     }
 
