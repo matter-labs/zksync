@@ -11,7 +11,7 @@ async function fetch(req) {
 }
 
 function baseUrl() {
-    return (store.config.API_SERVER || process.env.API_SERVER) + '/api/v0.1' //'http://localhost:3000/api/v0.1'
+    return store.config.API_SERVER + '/api/v0.1' //'http://localhost:3000/api/v0.1'
 }
 
 let self = {
@@ -19,7 +19,7 @@ let self = {
     PAGE_SIZE:      20, // blocks per page
 
     TX_PER_BLOCK() {
-        return store.config.TRANSFER_BATCH_SIZE || process.env.TRANSFER_BATCH_SIZE 
+        return store.config.TRANSFER_BATCH_SIZE 
     },
     
     async status() {
@@ -36,10 +36,17 @@ let self = {
         })
     },
 
-    async getBlock(number) {
+    async getBlock(blockNumber) {
         return fetch({
             method:     'get',
-            url:        `${baseUrl()}/blocks/${number}`,
+            url:        `${baseUrl()}/blocks/${blockNumber}`,
+        })
+    },
+
+    async getBlockTransactions(blockNumber) {
+        return fetch({
+            method:     'get',
+            url:        `${baseUrl()}/blocks/${blockNumber}/transactions`,
         })
     },
 

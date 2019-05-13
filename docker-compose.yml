@@ -1,13 +1,13 @@
 version: '3.2'
 services:
   nginx:
-    image: "nginx:1.16.0"
+    image: "gluk64/franklin:nginx"
     ports:
       - "80:80"
-    volumes:
-      - type: bind
-        source: ./js/explorer
-        target: /usr/share/nginx/html
+    #volumes:
+    #  - type: bind
+    #    source: ./volumes/html
+    #    target: /usr/share/nginx/html
   server:
     image: "gluk64/franklin:server"
     env_file: $ENV_FILE

@@ -2,7 +2,7 @@
 <div>
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
-        <b-navbar-brand>Matter Testnet</b-navbar-brand>
+        <b-navbar-brand href="/">Matter Network</b-navbar-brand>
     </b-container>
     </b-navbar>
     <br>
@@ -12,16 +12,11 @@
         <b-card no-body>
             <b-table id="my-table" thead-class="hidden_header" :items="props" :busy="isBusy">
                 <span slot="value" slot-scope="data" v-html="data.value"></span>
-                <div slot="table-busy" class="text-center text-danger my-2">
-                    <b-spinner class="align-middle"></b-spinner>
-                    <strong>Loading...</strong>
-                </div>
             </b-table>
         </b-card>
         <br>
         <h5>Transactions in this block</h5>
-        <transaction-list :transactions="items"></transaction-list>
-        <!--<b-table id="my-table" hover outlined :items="items" @row-clicked="onRowClicked"></b-table>-->
+        <transaction-list :transactions="transactions"></transaction-list>
     </b-container>
 </div>
 </template>
@@ -50,18 +45,24 @@ export default {
         async update() {
             this.loading = true
             const block = await client.getBlock(this.blockNumber)
-            if (block) {
-                this.new_state_root  = block.new_state_root
-                this.commit_tx_hash  = block.commit_tx_hash || ''
-                this.verify_tx_hash  = block.verify_tx_hash || ''
-                this.committed_at    = block.committed_at
-                this.verified_at     = block.verified_at
-                this.status          = block.verified_at ? 'Verified' : 'Committed'
-            }
+            if (!block) return
+
+            this.type            = block.tx_type
+            this.new_state_root  = block.new_state_root
+            this.commit_tx_hash  = block.commit_tx_hash || ''
+            this.verify_tx_hash  = block.verify_tx_hash || ''
+            this.committed_at    = block.committed_at
+            this.verified_at     = block.verified_at
+            this.status          = block.verified_at ? 'Verified' : 'Committed'
+
+            let txs = await client.getBlockTransactions(this.blockNumber)
+            this.transactions = txs.map( tx => ({
+                from:       tx.from_account,
+                to:         tx.to_account,
+                amount:     tx.amount,
+                nonce:      tx.nonce,
+            }))
         },
-        onRowClicked(item) {
-            this.$parent.$router.push('/transactions/' + item.id)
-        }
     },
     computed: {
         isBusy: () => false,
@@ -86,6 +87,7 @@ export default {
         props() {
             return [
                 { name: 'Block #',          value: `<b>${this.blockNumber}</b>`},
+                { name: 'Type',             value: this.type, },
                 { name: 'New root hash',    value: this.new_state_root, },
                 { name: 'Transactions',     value: client.TX_PER_BLOCK(), },
                 { name: 'Status',           value: this.status, },
@@ -97,30 +99,14 @@ export default {
     data() {
         return {
             new_state_root: null,
-            commit_tx_hash: '',
-            verify_tx_hash: '',
+            type:           null,
+            commit_tx_hash: null,
+            verify_tx_hash: null,
             committed_at:   null,
             verified_at:    null,
             status:         null,
-
-            items: [
-            { id: 1, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
-            { id: 2, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
-            { id: 3, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
-            { id: 4, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
-            { id: 5, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
-            { id: 6, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
-            { id: 7, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
-            { id: 8, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
-            { id: 9, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, }
-            ]
+            transactions:   [  ],
         }
     }
 }
 </script>
-
-<style>
-tr {
-    cursor: pointer;
-}
-</style>

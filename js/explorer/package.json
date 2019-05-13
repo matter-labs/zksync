@@ -5,9 +5,8 @@
   "author": "Alex <ag@thematter.io>",
   "private": true,
   "scripts": {
-    "dev": "webpack-dev-server --port 9000 --open --hot --define process.env.NODE_ENV='\"development\"' --define process.env.TRANSFER_BATCH_SIZE=\"\\\"$TRANSFER_BATCH_SIZE\"\\\" --define process.env.API_SERVER=\"\\\"$API_SERVER\"\\\"",
-    "prod": "webpack-dev-server -p --define process.env.NODE_ENV='\"production\"' --define process.env.TRANSFER_BATCH_SIZE=\"\\\"$TRANSFER_BATCH_SIZE\"\\\" --define process.env.API_SERVER=\"\\\"$API_SERVER\"\\\"",
-    "build": "cross-env NODE_ENV=production webpack --progress --hide-modules"
+    "dev": "webpack-dev-server --port 9000 --open --hot --define process.env.NODE_ENV='\"development\"'",
+    "build": "NODE_ENV=production webpack --progress --hide-modules"
   },
   "dependencies": {
     "axios": "^0.18.0",

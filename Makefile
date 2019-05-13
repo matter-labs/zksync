@@ -1,33 +1,50 @@
-#export FPCO_CI_REGISTRY_IMAGE ?= registry.gitlab.fpcomplete.com/chrisallen/totto
-#export CI_REGISTRY_IMAGE ?= registry.gitlab.com/bitemyapp/totto
-#export FPCO_DOCKER_IMAGE ?= ${FPCO_CI_REGISTRY_IMAGE}:latest
-#export KUBE_SPEC = etc/kubernetes/totto.yaml
-#export DOCKER_IMAGE ?= ${CI_REGISTRY_IMAGE}:latest
-
 export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
 export SERVER_DOCKER_IMAGE ?= gluk64/franklin:server
 export PROVER_DOCKER_IMAGE ?=gluk64/franklin:prover
 export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
 export FLATTENER_DOCKER_IMAGE ?= gluk64/franklin:flattener
+export NGINX_DOCKER_IMAGE ?= gluk64/franklin:nginx
 
-docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
-rust-musl-builder = @docker run $(docker-options) -it ekidd/rust-musl-builder
-sql = psql $(DATABASE_URL) -c 
 
+# Getting started
+
+# Get everything up and running for the first time
+init: dev-up env yarn db-setup redeploy
+
+# Check and change environment (listed here for autocomplete and documentation only)
+env:	
+
+
+# Helpers
+
+# This will prompt user to confirm an action on production environment
 confirm_action:
 	@bin/.confirm_action
 
-# Scripts (for shell autocomplete)
-env:	
-	@bin/env
+
+# Database tools
+
+sql = psql $(DATABASE_URL) -c 
 
 db-test:
 	@bin/db-test
 
-db-setup: confirm_action
+db-setup:
 	@bin/db-setup
 
-init: dev-up env yarn db-setup redeploy
+db-reset: confirm_action db-drop db-setup
+
+db-migrate: confirm_action
+	@cd src/storage && diesel migration run
+
+db-drop: confirm_action
+	@# this is used to clear the produciton db; cannot do `diesel database reset` because we don't own the db
+	@echo DATABASE_URL=$(DATABASE_URL)
+	@$(sql) 'DROP OWNED BY CURRENT_USER CASCADE' || \
+		{ $(sql) 'DROP SCHEMA IF EXISTS public CASCADE' && $(sql)'CREATE SCHEMA public'; }
+
+
+# Frontend clients
 
 yarn:
 	@cd contracts && yarn
@@ -36,15 +53,38 @@ yarn:
 	@cd js/loadtest && yarn
 	@cd js/explorer && yarn
 
-client:
+dist-config:
+	@mkdir -p js/client/dist
+	@bin/.gen_js_config > js/client/dist/config.json
+	@mkdir -p js/explorer/dist
+	@bin/.gen_js_config > js/explorer/dist/config.json
+
+client: dist-config
 	@cd js/client && yarn dev
 
-explorer:
+explorer: dist-config
 	@cd js/explorer && yarn dev
 
-dist-explorer:
+dist-client: dist-config
+	@cd js/client && yarn build
+
+dist-explorer: dist-config
 	@cd js/explorer && yarn build
-	@bin/.gen_js_config
+
+nginx: dist-client dist-explorer
+	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .
+
+push-nginx: nginx
+	@docker push gluk64/franklin:nginx
+
+
+# Rust: cross-platform rust builder for linus
+
+docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
+rust-musl-builder = @docker run $(docker-options) -it ekidd/rust-musl-builder
+
+
+# Rust: main stuff
 
 prover:
 	@bin/.load_keys && cargo run --release --bin prover
@@ -54,25 +94,6 @@ server:
 
 sandbox:
 	@cd src/sandbox && cargo run
-
-deploy-contracts: confirm_action
-	@bin/deploy-contracts
-
-deploy-client: confirm_action
-	@bin/deploy-client
-
-db-reset: confirm_action db-drop db-setup
-
-migrate: confirm_action
-	@cd src/storage && diesel migration run
-
-redeploy: confirm_action deploy-contracts db-reset
-
-db-drop: confirm_action
-	@# this is used to clear the produciton db; cannot do `diesel database reset` because we don't own the db
-	@echo DATABASE_URL=$(DATABASE_URL)
-	@$(sql) 'DROP OWNED BY CURRENT_USER CASCADE' || \
-		{ $(sql) 'DROP SCHEMA IF EXISTS public CASCADE' && $(sql)'CREATE SCHEMA public'; }
 
 build-target:
 	$(rust-musl-builder) cargo build --release
@@ -86,32 +107,100 @@ server-image: build-target
 prover-image: build-target
 	docker build -t "${PROVER_DOCKER_IMAGE}" -f ./docker/prover/Dockerfile .
 
-images: server-image prover-image
-
-push: images
+push-rust:
 	docker push gluk64/franklin:server
 	docker push gluk64/franklin:prover
 
-start: confirm_action images
+rust-images: server-image prover-image
+
+# Contracts
+
+deploy-contracts: confirm_action
+	@bin/deploy-contracts
+
+flattener = @docker run --rm -v $(shell pwd)/contracts:/home/contracts -it "${FLATTENER_DOCKER_IMAGE}"
+define flatten_file
+	@echo flattening $(1)
+	$(flattener) -c 'solidity_flattener --output /home/contracts/flat/$(1) /home/contracts/contracts/$(1)'
+endef
+
+# Flatten contract source
+flatten:
+	@mkdir -p contracts/flat
+	$(call flatten_file,FranklinProxy.sol)
+	$(call flatten_file,Depositor.sol)
+	$(call flatten_file,Exitor.sol)
+	$(call flatten_file,Transactor.sol)
+
+# Publish source to etherscan.io
+source: #flatten
+	@node contracts/scripts/publish-source.js
+
+
+# Loadtest
+
+loadtest:
+	@cd js/loadtest && yarn test
+
+
+# Devops: main
+
+# (Re)deploy contracts and database
+redeploy: confirm_action stop deploy-contracts db-reset
+
+update-clients: nginx push-nginx kube-deploy
+
+# Make sure to update all images and configuration and rollout update
+update-servers: rust-images push-rust kube-deploy
+
+start: rust-images nginx
 ifeq (,$(KUBECONFIG))
-	@docker-compose up -d --scale prover=1 server prover
+	@docker-compose up -d --scale prover=1 server prover nginx
 else
-	@kubectl scale deployments/server --replicas=1
-	@kubectl scale deployments/prover --replicas=2
+	@bin/kubectl scale deployments/server --replicas=1
+	@bin/kubectl scale deployments/prover --replicas=1
 endif
 
 stop: confirm_action
 ifeq (,$(KUBECONFIG))
 	@docker-compose stop server prover
 else
-	@kubectl scale deployments/server --replicas=0
-	@kubectl scale deployments/prover --replicas=0
+	@bin/kubectl scale deployments/server --replicas=0
+	@bin/kubectl scale deployments/prover --replicas=0
 endif
+
+restart: stop start
+
+
+# Devops: Kubernetes
+
+rollout-clients:
+	kubectl set image deployment/nginx nginx=gluk64/franklin:nginx
+
+rollout-servers:
+	echo not implemented; exit 1
+
+# Deploy/apply kubernetes config
+kube-deploy:
+	@bin/deploy-kube
+
+
+# Kubernetes: monitoring shortcuts
+
+pods:
+	kubectl get pods -o wide
+
+nodes:
+	kubectl get nodes -o wide
+
+proverlogs:
+	kubectl logs -f deployments/prover
+
+
+# Monitoring
 
 status:
 	@curl $(API_SERVER)/api/v0.1/status; echo
-
-restart: stop start logs
 
 log:
 ifeq (,$(KUBECONFIG))
@@ -119,6 +208,9 @@ ifeq (,$(KUBECONFIG))
 else
 	kubectl logs -f deployments/server
 endif
+
+
+# Dev environment
 
 dev-up:
 	@docker-compose up -d postgres geth
@@ -139,22 +231,8 @@ blockscout-up:
 blockscout-down:
 	@docker-compose stop blockscout blockscout_postgres
 
-loadtest:
-	@cd js/loadtest && yarn test
 
-# Kubernetes
-
-kube-deploy: confirm_action
-	@bin/deploy-kube
-
-pods:
-	kubectl get pods -o wide
-
-nodes:
-	kubectl get nodes -o wide
-
-proverlogs:
-	kubectl logs -f deployments/prover
+# Auxillary docker containers for dev environment (usually no need to build, just use images from dockerhub)
 
 dev-build-geth:
 	@docker build -t "${GETH_DOCKER_IMAGE}" ./docker/geth
@@ -168,18 +246,3 @@ dev-push-geth:
 dev-push-flattener:
 	@docker push "${FLATTENER_DOCKER_IMAGE}"
 
-flattener = @docker run --rm -v $(shell pwd)/contracts:/home/contracts -it "${FLATTENER_DOCKER_IMAGE}"
-define flatten_file
-	@echo flattening $(1)
-	$(flattener) -c 'solidity_flattener --output /home/contracts/flat/$(1) /home/contracts/contracts/$(1)'
-endef
-
-flatten:
-	@mkdir -p contracts/flat
-	$(call flatten_file,FranklinProxy.sol)
-	$(call flatten_file,Depositor.sol)
-	$(call flatten_file,Exitor.sol)
-	$(call flatten_file,Transactor.sol)
-
-source: flatten
-	@node contracts/scripts/publish-source.js

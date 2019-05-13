@@ -3,11 +3,11 @@
 . .setup_env
 
 # Configure cluster
-kubectl apply -f etc/kube/franklin.yaml
+kubectl apply -f etc/kube/franklin.yaml || exit 1
 
 # Generate and apply secrets configuration from prod env
-. bin/.kube_gen_secret | kubectl apply -f -
+. bin/.kube_gen_secret | kubectl apply -f - || exit 1
 
 # Restart deployments (this will re-pull images)
-kubectl patch deployment server -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(date +%s)\"}}}}}"
-kubectl patch deployment prover -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(date +%s)\"}}}}}"
+kubectl patch deployment server -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(date +%s)\"}}}}}" || exit 1
+kubectl patch deployment prover -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(date +%s)\"}}}}}" || exit 1

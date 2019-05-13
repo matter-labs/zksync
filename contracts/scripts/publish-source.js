@@ -12,10 +12,11 @@ const fs = require('fs');
 const FILE = 'deploy.log'
 const deployLog = fs.readFileSync(FILE, 'utf8');
 
+const ENV_FILE = process.env.ENV_FILE
+const config = fs.readFileSync(ENV_FILE, 'utf8');
+
 const ABI = JSON.parse(fs.readFileSync('./contracts/build/contracts/FranklinProxy.json', 'utf8')).abi
 const Constructor = ABI.find(i => i.type === 'constructor')
-
-console.log(Constructor)
 
 function addr(name) {
     let part = deployLog
@@ -60,12 +61,14 @@ async function publish(name, contractaddress, constructorArguements) {
 }
 
 async function main() {
-    //console.log('provider:', process.env.WEB3_URL)
-    //console.log('ETHERSCAN_API_KEY:', process.env.ETHERSCAN_API_KEY)
-    
+
+    let regex = /CONTRACT_ADDR=(.*)/g
+    let fromConfig = '0x'+regex.exec(config)[1]
+    console.log(fromConfig)
+
     let FranklinProxy = addr('FranklinProxy')
-    if (FranklinProxy !== '0x'+process.env.CONTRACT_ADDR) {
-        console.error(`FranklinProxy contract addresses mismatch: form env = 0x${process.env.CONTRACT_ADDR}, from ${FILE} = ${FranklinProxy}`)
+    if (FranklinProxy !== fromConfig) {
+        console.error(`FranklinProxy contract addresses mismatch: form env = ${fromConfig}, from ${FILE} = ${FranklinProxy}`)
         process.exit(1)
     }
 

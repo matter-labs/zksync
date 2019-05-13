@@ -6,12 +6,12 @@
         <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
         <b-collapse id="nav-collapse" is-nav>
         <b-navbar-nav>
-            <b-nav-item href="https://demo.matter-labs.io" target="blanc">MatterMask</b-nav-item>
+            <b-nav-item href="/client/" target="blanc">MatterMask</b-nav-item>
         </b-navbar-nav>
         <b-navbar-nav class="ml-auto">
-            <b-nav-item-dropdown text="Rinkeby" right>
-                <b-dropdown-item href="#">Mainnet</b-dropdown-item>
-                <b-dropdown-item href="#">Rinkeby</b-dropdown-item>
+            <b-nav-item-dropdown :text="store.network" class="capitalize" right>
+                <b-dropdown-item href="https://mainnet.matter-labs.io" target="blanc">Mainnet</b-dropdown-item>
+                <b-dropdown-item href="https://rinkeby.matter-labs.io" target="blanc">Rinkeby</b-dropdown-item>
             </b-nav-item-dropdown>
         </b-navbar-nav>
         </b-collapse>
@@ -66,7 +66,7 @@
         -->
 
         <b-pagination v-if="ready" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
-        <b-table id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading"></b-table>
+        <b-table id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading" class="clickable"></b-table>
         <b-pagination v-if="ready" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
 
     </b-container>
@@ -74,6 +74,10 @@
 </template>
 
 <style>
+
+.capitalize:first-letter {
+    text-transform: capitalize;
+}
 
 .table-container {
   position: relative;
@@ -87,7 +91,7 @@
   height: 100%;
 }
 
-td {
+.clickable tr {
     cursor: pointer;
 }
 
@@ -119,9 +123,6 @@ body {
     font-size: 0.8rem;
 }
 
-tr {
-    cursor: pointer;
-}
 </style>
 
 <script>
