@@ -151,7 +151,7 @@ loadtest:
 
 # Kubernetes
 
-kube-deploy: confirm_action
+kube-deploy:
 	@bin/deploy-kube
 
 pods:
