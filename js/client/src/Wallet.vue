@@ -25,13 +25,13 @@
         <b-alert show dismissible :variant="alertType" fade :show="countdown" @dismissed="countdown=0" class="mt-2">
             {{result}}
         </b-alert>
-        <p>Warning: this software is for demo purposes only. Database and smart contracts might be reset from time to time, with all test coins lost!</p>
+        <p>Warning: this software is for demo purposes only. Database and smart contracts will be reset from time to time, with all test coins lost!</p>
         <b-row>
             <b-col sm="6" order="2" class="col-xl-8 col-lg-7 col-md-6 col-sm-12">
                 <b-card title="Transfer in Matter Network" class="mb-4 d-flex">
                     <label for="transferToInput">To (recepient ETH address):</label>
                     <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0" autocomplete="off"></b-form-input>
-                    <p class="mt-2" style="color: grey">Note: your recipient must register in Matter Network first. For testing you can send to 0x153aa9a03a255cc635f00c54666f3686bf881001</p>
+                    <p class="mt-2" style="color: grey">Note: your recipient must register in Matter Network first. For testing, try 0x{{store.config.SENDER_ACCOUNT}}</p>
                     <label for="transferAmountInput" class="mt-4">Amount</label>
                             (max ETH <a href="#" @click="transferAmount=store.account.plasma.committed.balance">{{store.account.plasma.committed.balance || 0}}</a>):
                     <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
@@ -41,8 +41,7 @@
                         <img v-if="transferPending" style="margin-right: 1.5em" src="./assets/loading.gif" width="100em">
                         <b-btn v-else class="mt-4" variant="outline-primary" @click="transfer" :disabled="!!transferProblem">Submit transaction</b-btn>
                     </div>
-                    <p class="mt-2" style="color: grey">Balances will be updated once the block of 8 transactions is full and verified.</p>
-                    <p class="mt-2" style="color: grey"> To force block generation, simply send at least 8 transactions in the correct nonce sequence.</p>
+                    <p class="mt-2" style="color: grey">Balances will be updated once a block of {{store.config.TRANSFER_BATCH_SIZE}} transactions is full and verified.</p>
                     <b-tooltip target="transferBtn" :disabled="transferPending || !transferProblem" triggers="hover">
                         Transfer not possible: {{ transferProblem }}
                     </b-tooltip>
@@ -142,7 +141,7 @@
 
     <b-modal ref="withdrawModal" id="withdrawModal" title="Withdrawal" hide-footer>
         <b-tabs pills card>
-            <b-tab title="Partial withdrawal" active>
+            <!--<b-tab title="Partial withdrawal" active>
                 <label for="withdrawAmountInput" class="mt-4">Amount</label>
                     (max ETH <a href="#" @click="withdrawAmount=store.account.plasma.verified.balance">{{store.account.plasma.verified.balance}}</a>):
                 <b-form-input id="withdrawAmountInput" type="number" placeholder="7.50" v-model="withdrawAmount"></b-form-input>
@@ -154,8 +153,8 @@
                 <b-tooltip target="doWithdrawBtn" :disabled="!doWithdrawProblem" triggers="hover">
                     Withdraw not possible: {{ doWithdrawProblem }}
                 </b-tooltip>
-            </b-tab>
-            <b-tab title="Full exit" class="mb-4">
+            </b-tab>-->
+            <!--<b-tab title="Full exit" class="mb-4">-->
                 <p>This will close your account and withdraw all money from it.</p>
                 <div id="doExitBtn" class="mt-4 float-right">
                     <b-btn variant="danger" :disabled="!!withdrawProblem" @click="withdrawAll">Close & withdraw</b-btn>
@@ -163,7 +162,7 @@
                 <b-tooltip target="doExitBtn" :disabled="!withdrawProblem" triggers="hover">
                     Withdraw not possible: {{ withdrawProblem }}
                 </b-tooltip>
-            </b-tab>
+            <!--</b-tab>-->
         </b-tabs>
     </b-modal>
 </div>
