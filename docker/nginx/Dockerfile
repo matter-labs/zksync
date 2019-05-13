@@ -8,4 +8,4 @@ RUN mkdir -p /usr/share/nginx/html/explorer/dist
 COPY js/explorer/index.html /usr/share/nginx/html/explorer/
 COPY js/explorer/dist/* /usr/share/nginx/html/explorer/dist/
 
-EXPOSE 80
+COPY docker/nginx/nginx.conf /etc/nginx/
