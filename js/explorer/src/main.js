@@ -10,6 +10,7 @@ import App from './App.vue'
 import Home from './Home.vue'
 import Block from './Block.vue'
 import Transaction from './Transaction.vue'
+import axios from 'axios'
 
 Vue.use(Router)
 Vue.use(BootstrapVue)
@@ -27,17 +28,33 @@ const router = new Router({
 })
 
 Vue.mixin({
-    computed: {
-        apiServer: () => process.env.API_SERVER,
+    // computed: {
+    //     store:  () => store,
+    // },
+    data() {
+        return {
+            store
+        }
     },
 })
 
 window.app = new Vue({
     el: '#app',
     router,
-    data: () => ({
-        store
-    }),
+    async created() {
+        if (true) { //if (process.env.NODE_ENV !== 'development') {
+            let r = await axios({
+                method:     'get',
+                url:        `/dist/config.json`,
+            })
+            if (r.status === 200) {
+                this.store.config = r.data
+                console.log(store.config)
+            }
+        } else {
+            this.store.config = {}
+        }
+    },
     render: h => h(App)
 })
 

@@ -38,3 +38,4 @@ actix = "0.7.9"
 actix-web = "0.7.19"
 
 bigdecimal = { version = "0.1.0", features = ["serde"]}
+chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }

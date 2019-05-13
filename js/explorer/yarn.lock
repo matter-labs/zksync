@@ -776,6 +776,7 @@ bonjour@^3.5.0:
 bootstrap-vue@^2.0.0:
   version "2.0.0-rc.19"
   resolved "https://registry.yarnpkg.com/bootstrap-vue/-/bootstrap-vue-2.0.0-rc.19.tgz#a3471ed4acb5ffb4f1174503dae1ddbece6837b5"
+  integrity sha512-OCbRwqKb0F+RGr162m+RyKI4yNM0VjfxOGI32CMgHfCnnc0MZ0wF2Svg2E3Q7AWCq0N8LgD/EsF/K7Vg3kdDyw==
   dependencies:
     "@nuxt/opencollective" "^0.2.2"
     bootstrap "^4.3.1"

@@ -1,0 +1,6 @@
+#!/bin/bash
+
+. .setup_env
+
+echo "${@:1}"
+docker-compose "${@:1}"

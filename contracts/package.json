@@ -32,7 +32,7 @@
     "start-parity": "parity --config dev --jsonrpc-apis all",
     "parity-deployed": "(sleep 2 && node scripts/setup-geth.js && yarn deploy-local)& yarn start-parity > /dev/null",
     "flat": "flat -input contracts/PlasmaContract.sol -output build/PlasmaContractFlattened.sol",
-    "flatten": "solidity_flattener contracts/PlasmaContract.sol",
+    "flatten": "solidity_flattener contracts/FranklinProxy.sol",
     "postinstall": "python -m pip install solidity-flattener"
   }
 }

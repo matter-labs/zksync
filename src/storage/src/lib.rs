@@ -1,6 +1,7 @@
 extern crate models;
 extern crate plasma;
 extern crate fnv;
+extern crate chrono;
 
 extern crate serde;
 extern crate serde_derive;
@@ -18,6 +19,7 @@ use diesel::dsl::*;
 use models::{Operation, Action, ActionType, EncodedProof, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
 use std::cmp;
 use serde_derive::{Serialize, Deserialize};
+use chrono::prelude::*;
 
 mod schema;
 use schema::*;
@@ -31,9 +33,9 @@ use serde_json::{to_value, value::Value};
 use std::env;
 use std::iter::FromIterator;
 
-use ff::{PrimeField, Field};
+use ff::{Field};
 
-use diesel::sql_types::{Nullable, Integer};
+use diesel::sql_types::{Nullable, Integer, Timestamp, Text};
 sql_function!(coalesce, Coalesce, (x: Nullable<Integer>, y: Integer) -> Integer);
 
 #[derive(Clone)]
@@ -95,7 +97,7 @@ pub struct StoredOperation {
     pub block_number:   i32,
     pub action_type:    String,
     pub tx_hash:        Option<String>,
-    pub created_at:     std::time::SystemTime,
+    pub created_at:     NaiveDateTime,
 }
 
 impl StoredOperation {
@@ -161,7 +163,7 @@ pub struct StoredTx {
     pub block_number:   Option<i32>,
     pub state_root:     Option<String>, // unique block id (for possible reorgs)
 
-    pub created_at:     std::time::SystemTime,
+    pub created_at:     NaiveDateTime,
 }
 
 impl StoredTx {
@@ -183,10 +185,10 @@ impl StoredTx {
 
     pub fn into_transfer_transaction(&self) -> TransferTx {
         TransferTx {
-            from: self.from_account.clone() as u32,
-            to: self.to_account.unwrap().clone() as u32,
-            amount: BigDecimal::from(self.amount.clone()),
-            fee: BigDecimal::from(self.fee.clone()),
+            from: self.from_account as u32,
+            to: self.to_account.unwrap() as u32,
+            amount: BigDecimal::from(self.amount),
+            fee: BigDecimal::from(self.fee),
             nonce: 0,
             good_until_block: 0,
             signature: TxSignature::default(),
@@ -196,8 +198,8 @@ impl StoredTx {
 
     pub fn into_deposit_transaction(&self) -> DepositTx {
         DepositTx {
-            account: self.from_account.clone() as u32,
-            amount: BigDecimal::from(self.amount.clone()),
+            account: self.from_account as u32,
+            amount: BigDecimal::from(self.amount),
             pub_x: Fr::zero(),
             pub_y: Fr::zero(),
         }
@@ -205,8 +207,8 @@ impl StoredTx {
 
     pub fn into_exit_transaction(&self) -> ExitTx {
         ExitTx {
-            account: self.from_account.clone() as u32,
-            amount: BigDecimal::from(self.amount.clone()),
+            account: self.from_account as u32,
+            amount: BigDecimal::from(self.amount),
         }
     }
 }
@@ -223,7 +225,7 @@ pub struct NewProof {
 pub struct StoredProof {
     pub block_number:   i32,
     pub proof:          serde_json::Value,
-    pub created_at:     std::time::SystemTime,
+    pub created_at:     NaiveDateTime,
 }
 
 // Every time before a prover worker starts generating the proof, a prover run is recorded for monitoring purposes
@@ -233,8 +235,8 @@ pub struct ProverRun {
     pub id:             i32,
     pub block_number:   i32,
     pub worker:         Option<String>,
-    pub created_at:     std::time::SystemTime,
-    pub updated_at:     std::time::SystemTime,
+    pub created_at:     NaiveDateTime,
+    pub updated_at:     NaiveDateTime,
 }
 
 #[derive(Debug, QueryableByName)]
@@ -248,6 +250,27 @@ pub struct IntegerNumber {
 pub struct ServerConfig {
     pub id:             bool,
     pub contract_addr:  Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, QueryableByName)]
+pub struct BlockDetails {
+    #[sql_type="Integer"]
+    pub block_number:        i32,
+
+    #[sql_type="Text"]
+    pub new_state_root:      String,
+
+    #[sql_type="Nullable<Text>"]
+    pub commit_tx_hash:      Option<String>,
+
+    #[sql_type="Nullable<Text>"]
+    pub verify_tx_hash:      Option<String>,
+
+    #[sql_type="Timestamp"]
+    pub committed_at:        NaiveDateTime,
+
+    #[sql_type="Nullable<Timestamp>"]
+    pub verified_at:         Option<NaiveDateTime>,
 }
 
 enum ConnectionHolder {
@@ -341,7 +364,7 @@ impl StorageProcessor {
                     amount: tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
                     fee: tx.fee.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
                     block_number: Some(op.block.block_number as i32),
-                    state_root: Some(op.block.new_root_hash.into_repr().to_string()),
+                    state_root: Some(op.block.new_root_hash.to_hex()),
                 })
                 .execute(self.conn())?;
             if 0 == inserted {
@@ -363,7 +386,7 @@ impl StorageProcessor {
                     amount: tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
                     fee: 0,
                     block_number: Some(op.block.block_number as i32),
-                    state_root: Some(op.block.new_root_hash.into_repr().to_string()),
+                    state_root: Some(op.block.new_root_hash.to_hex()),
                 })
                 .execute(self.conn())?;
             if 0 == inserted {
@@ -385,7 +408,7 @@ impl StorageProcessor {
                     amount: tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
                     fee: 0,
                     block_number: Some(op.block.block_number as i32),
-                    state_root: Some(op.block.new_root_hash.into_repr().to_string()),
+                    state_root: Some(op.block.new_root_hash.to_hex()),
                 })
                 .execute(self.conn())?;
             if 0 == inserted {
@@ -527,17 +550,47 @@ impl StorageProcessor {
             .ok()
     }
 
-    pub fn load_stored_ops_in_blocks_range(&self, from_block_number: BlockNumber, to_block_number: BlockNumber, action_type: ActionType) -> Vec<StoredOperation> {
+    pub fn load_block_range(&self, max_block: BlockNumber, limit: u32) -> QueryResult<Vec<BlockDetails>> {
         let query = format!("
-            SELECT * FROM operations
-            WHERE block_number >= {from_block_number} AND block_number <= {to_block_number} AND action_type = '{action_type}'
-            ORDER BY block_number
-            DESC
-        ", from_block_number = from_block_number as i32, to_block_number = to_block_number as i32, action_type = action_type.to_string());
-        let r = diesel::sql_query(query)
-            .load(self.conn());
-        r.unwrap_or(vec![])
+            with committed as (
+                select 
+                    data -> 'block' ->> 'new_root_hash' as new_state_root,    
+                    block_number,
+                    tx_hash as commit_tx_hash,
+                    created_at as committed_at
+                from operations
+                where 
+                    block_number <= {max_block}
+                    and action_type = 'Commit'
+                order by block_number desc
+                limit {limit}
+            )
+            select 
+                committed.*, 
+                verified.tx_hash as verify_tx_hash,
+                verified.created_at as verified_at
+            from committed
+            left join operations verified
+            on
+                committed.block_number = verified.block_number
+                and action_type = 'Verify'
+            order by committed.block_number desc
+        ", max_block = max_block as i32, limit = limit as i32);
+        diesel::sql_query(query).load(self.conn())
     }
+
+    // pub fn load_stored_ops_in_blocks_range(&self, max_block: BlockNumber, limit: u32, action_type: ActionType) -> Vec<StoredOperation> {
+    //     let query = format!("
+    //         SELECT * FROM operations
+    //         WHERE block_number <= {max_block} AND action_type = '{action_type}'
+    //         ORDER BY block_number
+    //         DESC
+    //         LIMIT {limit}
+    //     ", max_block = max_block as i32, limit = limit as i32, action_type = action_type.to_string());
+    //     let r = diesel::sql_query(query)
+    //         .load(self.conn());
+    //     r.unwrap_or(vec![])
+    // }
 
     pub fn load_commit_op(&self, block_number: BlockNumber) -> Option<Operation> {
         let op = self.load_stored_op_with_block_number(block_number, ActionType::COMMIT);
@@ -636,10 +689,18 @@ impl StorageProcessor {
     }
 
     pub fn count_outstanding_proofs(&self, after_block: BlockNumber) -> QueryResult<u32> {
-        use crate::schema::account_updates::dsl::*;
-        let count: i64 = account_updates
+        use crate::schema::transactions::dsl::*;
+        let count: i64 = transactions
             .select(count_star())
             .filter(block_number.gt(after_block as i32))
+            .first(self.conn())?;
+        Ok( count as u32 )
+    }
+
+    pub fn count_total_transactions(&self) -> QueryResult<u32> {
+        use crate::schema::transactions::dsl::*;
+        let count: i64 = transactions
+            .select(count_star())
             .first(self.conn())?;
         Ok( count as u32 )
     }
@@ -725,15 +786,14 @@ impl StorageProcessor {
         r
     }
 
-    pub fn load_transactions_in_block(&self, block_number: u32) -> Vec<StoredTx> {
+    pub fn load_transactions_in_block(&self, block_number: u32) -> QueryResult<Vec<StoredTx>> {
         let query = format!("
             SELECT * FROM transactions
             WHERE block_number = {}
             ORDER BY block_number
         ", block_number as i32);
-        let r = diesel::sql_query(query)
-            .load(self.conn());
-        r.unwrap_or(vec![])
+        diesel::sql_query(query)
+            .load(self.conn())
     }
 
     pub fn fetch_prover_job(&self, worker_: &String, timeout_seconds: usize) -> QueryResult<Option<ProverRun>> {
