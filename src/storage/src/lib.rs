@@ -579,6 +579,40 @@ impl StorageProcessor {
         diesel::sql_query(query).load(self.conn())
     }
 
+    pub fn handle_search(&self, query: String, limit: u32) -> QueryResult<Vec<BlockDetails>> {
+        let tx_hash = query.as_str();
+        let addr = query.as_str();
+        let block_number = query.parse::<i32>().unwrap_or(i32::max_value());
+        let query = format!("
+            with committed as (
+                select 
+                    data -> 'block' ->> 'new_root_hash' as new_state_root,    
+                    block_number,
+                    tx_hash as commit_tx_hash,
+                    created_at as committed_at
+                from operations
+                where 
+                    (lower(tx_hash) LIKE '{tx_hash}%'
+                    or lower(addr) LIKE '{addr}%'
+                    or block_number = {block_number})
+                    and action_type = 'Commit'
+                order by block_number desc
+                limit {limit}
+            )
+            select 
+                committed.*, 
+                verified.tx_hash as verify_tx_hash,
+                verified.created_at as verified_at
+            from committed
+            left join operations verified
+            on
+                committed.block_number = verified.block_number
+                and action_type = 'Verify'
+            order by committed.block_number desc
+        ", tx_hash = tx_hash, addr = addr, block_number = block_number as i32, limit = limit as i32);
+        diesel::sql_query(query).load(self.conn())
+    }
+
     // pub fn load_stored_ops_in_blocks_range(&self, max_block: BlockNumber, limit: u32, action_type: ActionType) -> Vec<StoredOperation> {
     //     let query = format!("
     //         SELECT * FROM operations
