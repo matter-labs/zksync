@@ -48,8 +48,10 @@ dist:
 	@cd js/explorer && yarn build
 	@bin/.gen_js_config > js/explorer/dist/config.json
 
-nginx: dist
+nginx: #dist
+	@dc stop nginx
 	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .
+	@dc up -d nginx
 
 prover:
 	@bin/.load_keys && cargo run --release --bin prover
