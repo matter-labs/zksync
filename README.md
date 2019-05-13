@@ -125,10 +125,8 @@ IMPORTANT! Generated `.abi` and `.bin` files are fed to cargo to build module `p
 
 So you need to rebuild the code on every change (to be automated).
 
-### Prepare source for publishing
+### Publish source code on etherscan
 
 ```
-franklin flatten
+franklin source
 ```
-
-NOTE: Python >= 3.5 and pip is required for solidity flattener. You might want to run `brew upgrade python`

@@ -181,5 +181,5 @@ flatten:
 	$(call flatten_file,Exitor.sol)
 	$(call flatten_file,Transactor.sol)
 
-source: # flatten
+source: flatten
 	@node contracts/scripts/publish-source.js
