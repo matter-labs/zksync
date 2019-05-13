@@ -9,6 +9,7 @@ export SERVER_DOCKER_IMAGE ?= gluk64/franklin:server
 export PROVER_DOCKER_IMAGE ?=gluk64/franklin:prover
 export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
 export FLATTENER_DOCKER_IMAGE ?= gluk64/franklin:flattener
+export NGINX_DOCKER_IMAGE ?= gluk64/franklin:nginx
 
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
 rust-musl-builder = @docker run $(docker-options) -it ekidd/rust-musl-builder
@@ -46,6 +47,9 @@ dist:
 	@cd js/client && yarn build
 	@cd js/explorer && yarn build
 	@bin/.gen_js_config > js/explorer/dist/config.json
+
+nginx: dist
+	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .
 
 prover:
 	@bin/.load_keys && cargo run --release --bin prover
@@ -87,14 +91,15 @@ server-image: build-target
 prover-image: build-target
 	docker build -t "${PROVER_DOCKER_IMAGE}" -f ./docker/prover/Dockerfile .
 
-images: server-image prover-image
+images: server-image prover-image nginx
 
 push: images
 	docker push gluk64/franklin:server
 	docker push gluk64/franklin:prover
+	docker push gluk64/franklin:nginx
 
 up: images
-	@docker-compose up -d --scale prover=1 server prover
+	@docker-compose up -d --scale prover=1 server prover nginx
 
 start: confirm_action push kube-deploy
 	#@bin/kubectl scale deployments/server --replicas=1
