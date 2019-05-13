@@ -92,13 +92,12 @@ push: images
 	docker push gluk64/franklin:server
 	docker push gluk64/franklin:prover
 
-start: confirm_action images
-ifeq (,$(KUBECONFIG))
+up: images
 	@docker-compose up -d --scale prover=1 server prover
-else
-	@bin/kubectl scale deployments/server --replicas=1
-	@bin/kubectl scale deployments/prover --replicas=2
-endif
+
+start: confirm_action push kube-deploy
+	#@bin/kubectl scale deployments/server --replicas=1
+	#@bin/kubectl scale deployments/prover --replicas=1
 
 stop: confirm_action
 ifeq (,$(KUBECONFIG))
@@ -111,7 +110,7 @@ endif
 status:
 	@curl $(API_SERVER)/api/v0.1/status; echo
 
-restart: stop start logs
+restart: stop start
 
 log:
 ifeq (,$(KUBECONFIG))
