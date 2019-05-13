@@ -88,7 +88,7 @@
                     </b-row>
                     <b-card class="mt-2">
                         <p class="mb-2"><strong>Matter Network</strong>
-                            (<a href="/explorer/" target="blanc">block explorer</a>)</p>
+                            (<a href="/explorer/" target="_blank">block explorer</a>)</p>
 
                         <img src="./assets/loading.gif" width="100em" v-if="store.account.plasma.id === null">
                         <div v-if="store.account.plasma.id === 0">
