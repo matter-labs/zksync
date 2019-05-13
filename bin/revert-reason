@@ -15,4 +15,4 @@ fi
 
 . `dirname $0`/.setup_env
 
-node `dirname $0`/../js/franklin/src/revert-reason.js $1
+node `dirname $0`/../contracts/scripts/revert-reason.js $1
