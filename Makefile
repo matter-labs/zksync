@@ -8,11 +8,18 @@ export NGINX_DOCKER_IMAGE ?= gluk64/franklin:nginx
 
 # Getting started
 
+# Check and change environment (listed here for autocomplete and documentation only)
+env:	
+
 # Get everything up and running for the first time
 init: dev-up env yarn db-setup redeploy
 
-# Check and change environment (listed here for autocomplete and documentation only)
-env:	
+yarn:
+	@cd contracts && yarn
+	@cd js/franklin && yarn
+	@cd js/client && yarn
+	@cd js/loadtest && yarn
+	@cd js/explorer && yarn
 
 
 # Helpers
@@ -46,13 +53,6 @@ db-drop: confirm_action
 
 # Frontend clients
 
-yarn:
-	@cd contracts && yarn
-	@cd js/franklin && yarn
-	@cd js/client && yarn
-	@cd js/loadtest && yarn
-	@cd js/explorer && yarn
-
 dist-config:
 	@mkdir -p js/client/dist
 	@bin/.gen_js_config > js/client/dist/config.json
@@ -76,6 +76,9 @@ nginx: dist-client dist-explorer
 
 push-nginx: nginx
 	@docker push gluk64/franklin:nginx
+
+dc-nginx: nginx
+	@docker-compose up -d nginx
 
 
 # Rust: cross-platform rust builder for linus
@@ -112,6 +115,7 @@ push-rust:
 	docker push gluk64/franklin:prover
 
 rust-images: server-image prover-image
+
 
 # Contracts
 
@@ -153,12 +157,13 @@ update-clients: nginx push-nginx kube-deploy
 # Make sure to update all images and configuration and rollout update
 update-servers: rust-images push-rust kube-deploy
 
-start: rust-images nginx
+start:
 ifeq (,$(KUBECONFIG))
 	@docker-compose up -d --scale prover=1 server prover nginx
 else
 	@bin/kubectl scale deployments/server --replicas=1
 	@bin/kubectl scale deployments/prover --replicas=1
+	@bin/kubectl scale deployments/nginx --replicas=1
 endif
 
 stop: confirm_action
@@ -167,6 +172,7 @@ ifeq (,$(KUBECONFIG))
 else
 	@bin/kubectl scale deployments/server --replicas=0
 	@bin/kubectl scale deployments/prover --replicas=0
+	@bin/kubectl scale deployments/nginx --replicas=0
 endif
 
 restart: stop start
@@ -175,7 +181,8 @@ restart: stop start
 # Devops: Kubernetes
 
 rollout-clients:
-	kubectl set image deployment/nginx nginx=gluk64/franklin:nginx
+	@kubectl scale deployments/nginx --replicas=0
+	@kubectl scale deployments/nginx --replicas=1
 
 rollout-servers:
 	echo not implemented; exit 1

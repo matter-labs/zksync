@@ -50,7 +50,7 @@ window.app = new Vue({
         // Load config
         let r = await axios({
             method:     'get',
-            url:        '/dist/config.json',
+            url:        '/client/dist/config.json',
         })
         this.store.config = r.data
 
