@@ -1,14 +1,20 @@
 #!/bin/bash
 
-SRC=`dirname $0`/../js/client
+SRC=`dirname $0`/../js/explorer
 DST=$CLIENT_GITHUB_DIR
+
+. bin/.gen_js_config
 
 echo "$DST <= $SRC"
 
 cd $SRC
-yarn run build
-cp index.html $DST
-cp dist/* $DST/dist
+
+mkdir -p $DST/dist
+
+#yarn run build
+cp index.html $DST/
+cp CNAME $DST/
+cp dist/* $DST/dist/
 cd $DST
 git add -A
 git commit -m "deploy"
