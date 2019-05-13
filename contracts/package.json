@@ -20,6 +20,7 @@
     "solc": "^0.4.24",
     "truffle": "^5.0.0",
     "truffle-hdwallet-provider": "^1.0.0-web3one.1",
+    "url": "^0.11.0",
     "web3": "^1.0.0-beta.37"
   },
   "scripts": {

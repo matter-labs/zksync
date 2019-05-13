@@ -53,19 +53,23 @@ yarn:
 	@cd js/loadtest && yarn
 	@cd js/explorer && yarn
 
-client:
+dist-config:
+	@mkdir -p js/client/dist
+	@bin/.gen_js_config > js/client/dist/config.json
+	@mkdir -p js/explorer/dist
+	@bin/.gen_js_config > js/explorer/dist/config.json
+
+client: dist-config
 	@cd js/client && yarn dev
 
-explorer:
+explorer: dist-config
 	@cd js/explorer && yarn dev
 
-dist-client:
+dist-client: dist-config
 	@cd js/client && yarn build
-	@bin/.gen_js_config > js/client/dist/config.json
 
-dist-explorer:
+dist-explorer: dist-config
 	@cd js/explorer && yarn build
-	@bin/.gen_js_config > js/explorer/dist/config.json
 
 nginx: dist-client dist-explorer
 	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .

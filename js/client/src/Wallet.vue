@@ -230,7 +230,6 @@ export default {
             return this.network === '4' || this.network === '9'
         },
         baseUrl() {
-            //return (this.isDev ? 'http://localhost:3000' : 'https://api.plasma-winter.io') + '/api/v0.1'
             return this.apiServer + '/api/v0.1'
         },
         //baseUrl: () => 'https://api.plasma-winter.io',

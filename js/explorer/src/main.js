@@ -21,7 +21,6 @@ const routes = [
     { path: '/', component: Home },
     { path: '/blocks/:blockNumber', component: Block },
     { path: '/transactions/:id', component: Transaction },
-    //{ path: '*', redirect: '/login' },
 ]
 
 const router = new Router({
@@ -31,9 +30,6 @@ const router = new Router({
 })
 
 Vue.mixin({
-    // computed: {
-    //     store:  () => store,
-    // },
     data() {
         return {
             store
@@ -57,6 +53,7 @@ window.app = new Vue({
             this.store.config = {
                 API_SERVER:             process.env.API_SERVER,
                 TRANSFER_BATCH_SIZE:    process.env.TRANSFER_BATCH_SIZE,
+                SENDER_ADDRESS:         process.env.SENDER_ADDRESS,
             }
         }
         let regex = /(?:api-)*(\w*)(?:\..*)*/
