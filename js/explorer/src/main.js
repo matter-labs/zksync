@@ -10,7 +10,9 @@ import App from './App.vue'
 import Home from './Home.vue'
 import Block from './Block.vue'
 import Transaction from './Transaction.vue'
+
 import axios from 'axios'
+import url from 'url'
 
 Vue.use(Router)
 Vue.use(BootstrapVue)
@@ -46,15 +48,20 @@ window.app = new Vue({
         if (process.env.NODE_ENV !== 'development') {
             let r = await axios({
                 method:     'get',
-                url:        'dist/config.json',
+                url:        '/config.json',
             })
             if (r.status === 200) {
                 this.store.config = r.data
-                console.log(store.config)
             }
         } else {
-            this.store.config = {}
+            this.store.config = {
+                API_SERVER:             process.env.API_SERVER,
+                TRANSFER_BATCH_SIZE:    process.env.TRANSFER_BATCH_SIZE,
+            }
         }
+        let regex = /(?:api-)*(\w*)(?:\..*)*/
+        this.store.network = 
+            regex.exec(url.parse(this.store.config.API_SERVER).host)[1]
     },
     render: h => h(App)
 })

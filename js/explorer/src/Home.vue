@@ -9,9 +9,9 @@
             <b-nav-item href="/client/" target="blanc">MatterMask</b-nav-item>
         </b-navbar-nav>
         <b-navbar-nav class="ml-auto">
-            <b-nav-item-dropdown text="Rinkeby" right>
-                <b-dropdown-item href="#">Mainnet</b-dropdown-item>
-                <b-dropdown-item href="#">Rinkeby</b-dropdown-item>
+            <b-nav-item-dropdown :text="store.network" class="capitalize" right>
+                <b-dropdown-item href="https://mainnet.matter-labs.io" target="blanc">Mainnet</b-dropdown-item>
+                <b-dropdown-item href="https://rinkeby.matter-labs.io" target="blanc">Rinkeby</b-dropdown-item>
             </b-nav-item-dropdown>
         </b-navbar-nav>
         </b-collapse>
@@ -74,6 +74,10 @@
 </template>
 
 <style>
+
+.capitalize:first-letter {
+    text-transform: capitalize;
+}
 
 .table-container {
   position: relative;
