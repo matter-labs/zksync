@@ -19,11 +19,18 @@ NODE_POOL_ID=`echo $NODE_POOL | jq '.id' | tr -d '"'`
 
 echo NODE_POOL_ID=$NODE_POOL_ID
 
-DATA='{"name": "prover", "count": '$1'}'
+if [ -z $1 ]; then
 
+R=`do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters/$CLUSTER_ID/node_pools/$NODE_POOL_ID"`
+
+else
+
+DATA='{"name": "prover", "count": '$1'}'
 R=`do-curl -X PUT "https://api.digitalocean.com/v2/kubernetes/clusters/$CLUSTER_ID/node_pools/$NODE_POOL_ID" \
     --data "$DATA"`
 
-echo $R
-echo $R | jq '.node_pool | {id: .id, name: .name, size: .size, count: .count}'
+fi
 
+echo $R
+echo $R | jq '.node_pool | {id: .id, name: .name, size: .size, count: .count, }'
+echo nodes_running: `echo $R | jq '.node_pool | .nodes | length '`
