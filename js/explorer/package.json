@@ -6,22 +6,28 @@
   "private": true,
   "scripts": {
     "dev": "webpack-dev-server --port 9000 --open --hot --define process.env.NODE_ENV='\"development\"'",
-    "build": "NODE_ENV=production webpack --progress --hide-modules"
+    "build": "NODE_ENV=production webpack --config webpack.config.prod.js --progress --hide-modules"
   },
   "dependencies": {
     "axios": "^0.18.0",
     "babel-plugin-transform-runtime": "^6.23.0",
     "bn.js": "^4.11.8",
     "bootstrap": "^4.3.1",
-    "bootstrap-vue": "^2.0.0",
+    "bootstrap-vue": "2.0.0-rc.20",
     "buffer": "^5.2.1",
+    "clean-webpack-plugin": "^2.0.2",
     "ethers": "^4.0.20",
     "ethjs": "^0.4.0",
     "ethjs-util": "^0.1.6",
+    "html-webpack-plugin": "^3.2.0",
     "js-sha3": "^0.8.0",
+    "mini-css-extract-plugin": "^0.6.0",
     "popper.js": "^1.12.9",
     "vue": "^2.6.10",
-    "vue-router": "^3.0.2"
+    "vue-router": "^3.0.2",
+    "webpack-md5-hash": "^0.0.6",
+    "webpack-node-externals": "^1.7.2",
+    "webpack-plugin-hash-output": "^3.2.1"
   },
   "devDependencies": {
     "babel-core": "^6.26.0",

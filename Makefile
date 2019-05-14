@@ -72,7 +72,7 @@ dist-explorer: dist-config
 image-nginx: dist-client dist-explorer
 	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .
 
-explorer-up: dist-explorer
+explorer-up: #dist-explorer
 	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .
 	@docker-compose up -d nginx
 
