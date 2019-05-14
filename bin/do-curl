@@ -3,5 +3,5 @@
 . .setup_env
 
 #echo "${@:1}"
-curl -H "Authorization: Bearer $DO_TOKEN" "${@:1}" 2>/dev/null
+curl -H "Authorization: Bearer $DO_TOKEN" "${@:1}" -H "Content-Type: application/json" 2>/dev/null
 echo
