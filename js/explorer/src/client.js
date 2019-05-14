@@ -50,6 +50,12 @@ let self = {
         })
     },
 
+    async searchBlock(query) {
+        return fetch({
+            method:     'get',
+            url:        `${baseUrl()}/search?query=${query}`,
+        })
+    },
 }
 
 window.client = self

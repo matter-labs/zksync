@@ -7,6 +7,9 @@
         <b-collapse id="nav-collapse" is-nav>
         <b-navbar-nav>
             <b-nav-item href="/client/" target="blanc">MatterMask</b-nav-item>
+            <b-nav-item v-bind:href="`https://${etherscan}/address/0x${store.config.CONTRACT_ADDR}`" target="blanc">
+                Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
+            </b-nav-item>
         </b-navbar-nav>
         <b-navbar-nav class="ml-auto">
             <b-nav-item-dropdown :text="store.network" class="capitalize" right>
@@ -20,10 +23,10 @@
     <br>
     <b-container>
         <b-card bg-variant="light" >
-            <h4>Matter Testnet Block Explorer</h4>
+            <h4>Matter Testnet Block Explorer</h4> 
             <b-form @submit.stop.prevent="search">
             <b-input-group>
-                <b-form-input v-model="query" placeholder="block number, root hash, tx hash or eth address"></b-form-input>
+                <b-form-input v-model="query" placeholder="block number or tx hash"></b-form-input>
                 <b-input-group-append>
                 <b-button @click="search" variant="info" :disabled="searching">
                     <b-spinner v-if="searching" small></b-spinner>
@@ -140,11 +143,15 @@ export default {
             if (this.query) {
                 this.searching = true
                 this.notFound = false
-                await new Promise(resolve => setTimeout(resolve, 200))
+                let block = await client.searchBlock(this.query)
                 this.searching = false
-                this.notFound = true
-                await new Promise(resolve => setTimeout(resolve, 3600))
-                this.notFound = false
+                if (block && block.block_number) {
+                    this.$router.push('/blocks/' + block.block_number)
+                } else {
+                    this.notFound = true
+                    await new Promise(resolve => setTimeout(resolve, 3600))
+                    this.notFound = false
+                }
             }
         },
         onRowClicked(item) {
@@ -207,6 +214,9 @@ export default {
         },
         rows() {
             return this.lastCommitted || 9999
+        },
+        etherscan() {
+            return this.store.network === 'mainnet' ? 'etherscan.io' : this.store.network+'.etherscan.io'
         }
     },
     data() {

@@ -509,7 +509,7 @@ fn start_server(state: AppState, bind_to: String) {
             .resource("/blocks", |r| {
                 r.method(Method::GET).f(handle_get_blocks);
             })
-            .resource("/search?q={query}", |r| {
+            .resource("/search", |r| {
                 r.method(Method::GET).f(handle_search);
             })
         })
