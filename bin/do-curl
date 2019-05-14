@@ -1,0 +1,7 @@
+#!/bin/bash
+
+. .setup_env
+
+#echo "${@:1}"
+curl -H "Authorization: Bearer $DO_TOKEN" "${@:1}"
+echo
