@@ -6,3 +6,12 @@ CLUSTER_ID=`do-curl -X GET -H "Content-Type: application/json" "https://api.digi
 | jq '.kubernetes_clusters[] | select(.name == "rinkeby").id' | tr -d '"' `
 
 echo CLUSTER_ID=$CLUSTER_ID
+
+NODE_POOL=`do-curl -X GET -H "Content-Type: application/json" "https://api.digitalocean.com/v2/kubernetes/clusters/$CLUSTER_ID/node_pools" \
+| jq '.node_pools[] | select(.name == "prover") | {id: .id, name: .name, size: .size, count: .count}'`
+
+echo $NODE_POOL | jq
+
+NODE_POOL_ID=`echo $NODE_POOL | jq '.id' | tr -d '"'`
+
+echo NODE_POOL_ID=$NODE_POOL_ID
