@@ -1,5 +1,5 @@
 <template>
-    <router-view v-if="store.config"></router-view>
+    <router-view></router-view>
 </template>
 
 <script>

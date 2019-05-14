@@ -1,14 +1,15 @@
 var path = require('path')
 var webpack = require('webpack')
-const ExtractTextPlugin = require("extract-text-webpack-plugin")
+const ExtractTextPlugin = require('extract-text-webpack-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
+const CleanWebpackPlugin = require('clean-webpack-plugin');
 
 module.exports = {
   entry: './src/main.js',
   output: {
     path: path.resolve(__dirname, './dist'),
     publicPath: '/explorer/dist/',
-    filename: 'build.js'
+    filename: '[name].[chunkhash].js'
   },
   module: {
     rules: [
@@ -57,10 +58,11 @@ module.exports = {
     hints: false
   },
   plugins: [
-    new ExtractTextPlugin("main.css"),
+    new ExtractTextPlugin("main.[contenthash].css"),
     new HtmlWebpackPlugin({
       template: 'index.html'
     }),
+    new CleanWebpackPlugin(),
   ],
   devtool: '#eval-source-map'
 }

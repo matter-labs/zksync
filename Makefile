@@ -72,6 +72,10 @@ dist-explorer: dist-config
 image-nginx: dist-client dist-explorer
 	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .
 
+explorer-up: #dist-explorer
+	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .
+	@docker-compose up -d nginx
+
 
 # Rust: cross-platform rust builder for linus
 
@@ -142,7 +146,7 @@ redeploy: confirm_action stop deploy-contracts db-reset
 
 dev-ready = docker ps | grep -q "$(GETH_DOCKER_IMAGE)"
 
-start: #image-nginx image-rust
+start: image-nginx image-rust
 ifeq (,$(KUBECONFIG))
 	@docker ps | grep -q "$(GETH_DOCKER_IMAGE)" || { echo "Dev env not ready. Try: 'franklin dev-up'" && exit 1; }
 	@docker-compose up -d --scale prover=1 server prover nginx
@@ -196,6 +200,7 @@ proverlogs:
 # Dev environment
 
 dev-up:
+	@{ docker ps | grep -q "$(GETH_DOCKER_IMAGE)" && echo "Dev env already running" && exit 1; } || echo -n
 	@docker-compose up -d postgres geth
 
 dev-down:
