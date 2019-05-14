@@ -3,7 +3,7 @@ export SERVER_DOCKER_IMAGE ?= gluk64/franklin:server
 export PROVER_DOCKER_IMAGE ?=gluk64/franklin:prover
 export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
 export FLATTENER_DOCKER_IMAGE ?= gluk64/franklin:flattener
-export NGINX_DOCKER_IMAGE ?= gluk64/franklin:nginx
+export NGINX_DOCKER_IMAGE ?= gluk64/franklin-nginx:latest
 
 
 # Getting started
@@ -73,7 +73,7 @@ nginx: dist-client dist-explorer
 	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .
 
 push-nginx: nginx
-	@docker push gluk64/franklin:nginx
+	@docker push "${NGINX_DOCKER_IMAGE}"
 
 dc-nginx: nginx
 	@docker-compose up -d nginx
@@ -150,7 +150,7 @@ loadtest:
 # (Re)deploy contracts and database
 redeploy: confirm_action stop deploy-contracts db-reset
 
-update-clients: nginx push-nginx kube-deploy rollout-clients
+update-nginx: nginx push-nginx kube-deploy rollout-nginx
 
 # Make sure to update all images and configuration and rollout update
 update-servers: rust-images push-rust kube-deploy rollout-rust
@@ -178,11 +178,11 @@ restart: stop start
 
 # Devops: Kubernetes
 
-rollout-clients:
+rollout-nginx: kube-deploy
 	@kubectl scale deployments/nginx --replicas=0
 	@kubectl scale deployments/nginx --replicas=1
 
-rollout-servers:
+rollout-servers: kube-deploy
 	echo not implemented; exit 1
 
 # Deploy/apply kubernetes config
