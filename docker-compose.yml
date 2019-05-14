@@ -1,7 +1,7 @@
 version: '3.2'
 services:
   nginx:
-    image: "gluk64/franklin:nginx"
+    image: "gluk64/franklin-nginx:latest"
     ports:
       - "80:80"
     #volumes:

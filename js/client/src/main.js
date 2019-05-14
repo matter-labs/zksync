@@ -8,6 +8,7 @@ import Eth from 'ethjs'
 import {ethers} from 'ethers'
 import axios from 'axios'
 import url from 'url'
+import config from './env-config'
 
 import Router from 'vue-router'
 import App from './App.vue'
@@ -46,13 +47,7 @@ window.app = new Vue({
         storeMain: store
     }),
     async created() {
-
-        // Load config
-        let r = await axios({
-            method:     'get',
-            url:        '/dist/config.json',
-        })
-        this.store.config = r.data
+        this.store.config = config
 
         let regex = /(?:api-)*(\w*)(?:\..*)*/
         this.store.network = 

@@ -46,7 +46,7 @@ spec:
     spec:
       containers:
         - name: nginx
-          image: gluk64/franklin:nginx
+          image: gluk64/franklin-nginx:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 80
