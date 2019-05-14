@@ -6,6 +6,7 @@ extern crate futures;
 extern crate ethabi;
 
 extern crate plasma;
+// extern crate models;
 
 extern crate pairing;
 extern crate ff;
@@ -26,6 +27,8 @@ use helpers::*;
 use block_events::BlockEventsFranklin;
 use accounts_state::FranklinAccountsStates;
 use blocks::LogBlockData;
+// use models::{StateKeeperRequest, ProtoAccountsState};
+// use std::sync::mpsc::Sender;
 
 pub struct DataRestoreDriver {
     pub endpoint: InfuraEndpoint,
@@ -36,36 +39,72 @@ pub struct DataRestoreDriver {
     pub account_states: FranklinAccountsStates,
 }
 
-impl DataRestoreDriver {
-    pub fn get_past_state(endpoint: InfuraEndpoint, genesis_block: U256, blocks_delta: U256) -> Result<Self, DataRestoreError> {
-        let states = DataRestoreDriver::get_past_franklin_blocks_events_and_accounts_tree_state(endpoint, genesis_block, blocks_delta).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-        let block_events = states.0;
-        let account_states = states.1;
+pub fn start_data_restore_driver(mut driver: DataRestoreDriver) {
+    // let _past_state_load = driver.load_past_state().expect("Cant get past state");
+    // driver.run_state_updates();
+    std::thread::Builder::new().name("data_restore".to_string()).spawn(move || {
+        let _past_state_load = driver.load_past_state().expect("Cant get past state");
+        driver.run_state_updates();
+    });
+}
 
-        let this = Self {
+impl DataRestoreDriver {
+
+    pub fn new(endpoint: InfuraEndpoint, genesis_block: U256, blocks_delta: U256) -> Self {
+        Self {
             endpoint: endpoint,
             genesis_block: genesis_block,
             blocks_delta: blocks_delta,
-            run_updates: true,
-            block_events: block_events,
-            account_states: account_states,
-        };
-        Ok(this)
+            run_updates: false,
+            block_events: BlockEventsFranklin::new(endpoint),
+            account_states: FranklinAccountsStates::new(endpoint),
+        }
     }
 
-    // TODO : - need to make this async
+    pub fn load_past_state(&mut self) -> Result<(), DataRestoreError> {
+        let states = DataRestoreDriver::get_past_franklin_blocks_events_and_accounts_tree_state(self.endpoint, self.genesis_block, self.blocks_delta).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+        self.block_events = states.0;
+        self.account_states = states.1;
+
+        let accs = self.account_states.get_accounts();
+        let root = self.account_states.root_hash();
+        println!("Accs: {:?}", accs);
+        println!("Root: {:?}", root);
+        // let state = ProtoAccountsState {
+        //     errored: false,
+        //     accounts_tree: &self.account_states.accounts_tree,
+        // };
+        // let request = StateKeeperRequest::SetAccountsState(state);
+        // let _send_result = channel.send(request).expect("Cant send through channel last state");
+        Ok(())
+    }
+
+    pub fn stop_state_updates(&mut self) {
+        self.run_updates = false
+    }
+
     pub fn run_state_updates(&mut self) {
+        self.run_updates = true;
         while self.run_updates {
             match DataRestoreDriver::update_franklin_blocks_events_and_accounts_tree_state(&mut self.block_events, &mut self.account_states, self.blocks_delta) {
                 Err(error) => {
                     println!("Something goes wrong: {:?}", error);
+                    self.run_updates = false;
                 },
                 Ok(()) => {
                     println!("Updated!");
-                    println!("Accounts: {:?}", self.account_states.get_accounts());
-                    println!("Root: {:?}", self.account_states.root_hash());
+                    let accs = self.account_states.get_accounts();
+                    let root = self.account_states.root_hash();
+                    println!("Accs: {:?}", accs);
+                    println!("Root: {:?}", root);
                 },
             };
+            // let state = ProtoAccountsState {
+            //     errored: &!self.run_updates,
+            //     accounts_tree: &self.account_states.accounts_tree,
+            // };
+            // let request = StateKeeperRequest::SetAccountsState(state);
+            // let _send_result = channel.send(request).expect("Cant send through channel last state");
         }
     }
 
@@ -118,9 +157,13 @@ impl DataRestoreDriver {
 
     fn update_franklin_blocks_events_and_accounts_tree_state(block_events_state: &mut BlockEventsFranklin, accounts_state: &mut FranklinAccountsStates, blocks_delta: U256) -> Result<(), DataRestoreError> {
         let new_events = block_events_state.update_state_from_last_watched_block_with_blocks_delta_and_return_new_blocks(blocks_delta).map_err(|e| DataRestoreError::StateUpdate(e.to_string()))?;
+        // if new_events.is_err() {
+        //     // Ok(())
+        // }
         println!("Last watched block: {:?}", &block_events_state.last_watched_block_number);
         if new_events.1.is_empty() {
             return Err(DataRestoreError::NoData("No verified blocks".to_string()))
+            // Ok(())
         }
         let verified_blocks = &new_events.1;
         let txs = DataRestoreDriver::get_verified_committed_blocks_transactions_from_blocks_state(&block_events_state, &verified_blocks);
@@ -138,23 +181,10 @@ mod test {
 
     #[test]
     fn test_complete_task() {
-        // get past events
         let endpoint = helpers::InfuraEndpoint::Rinkeby;
         let from = U256::from(3972344);
-        let delta = U256::from(21095);
-        let data_restore_driver = DataRestoreDriver::get_past_state(endpoint, from, delta);
-        if data_restore_driver.is_err() {
-            panic!("Cant get past state");
-        }
-        let mut unwraped_data_restore_driver = data_restore_driver.unwrap();
-        let driver = &mut unwraped_data_restore_driver;
-        {
-            let accounts_states = &driver.account_states;
-            let accs = accounts_states.get_accounts();
-            println!("Accounts: {:?}", accs);
-            let root = accounts_states.root_hash();
-            println!("Root: {:?}", root);
-        }
-        driver.run_state_updates();
+        let delta = U256::from(15);
+        let data_restore_driver = DataRestoreDriver::new(endpoint, from, delta);
+        start_data_restore_driver(data_restore_driver);
     }
 }

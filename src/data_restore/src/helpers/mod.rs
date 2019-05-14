@@ -34,7 +34,7 @@ pub fn get_topic_keccak_hash(topic: &str) -> web3::types::H256 {
     topic_h256
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DataRestoreError {
     Unknown(String),
     WrongType,
