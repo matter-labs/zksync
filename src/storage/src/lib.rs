@@ -596,13 +596,8 @@ impl StorageProcessor {
                     tx_hash as commit_tx_hash,
                     created_at as committed_at
                 from operations
-                where 
-                    (lower(tx_hash) = '{tx_hash}'
-                    or lower(addr) = '{addr}'
-                    or block_number = {block_number})
-                    and action_type = 'Commit'
+                where action_type = 'Commit'
                 order by block_number desc
-                limit 1
             )
             select 
                 committed.*, 
@@ -613,11 +608,15 @@ impl StorageProcessor {
             on
                 committed.block_number = verified.block_number
                 and action_type = 'Verify'
+            where false
+                or lower(commit_tx_hash) = '{tx_hash}'
+                or lower(verified.tx_hash) = '{tx_hash}'
+                or lower(new_state_root) = '{tx_hash}'
+                or committed.block_number = {block_number}
             order by committed.block_number desc
             limit 1
         ",  
             tx_hash              = query_with_prefix.as_str(), 
-            addr                 = query_with_prefix.as_str(), 
             block_number         = block_number as i32
         );
         let result = diesel::sql_query(sql_query)
