@@ -185,12 +185,6 @@ else
 endif
 
 
-# DigitalOcean
-
-do-clusters:
-	@do-curl -X GET -H "Content-Type: application/json" "https://api.digitalocean.com/v2/kubernetes/clusters"
-
-
 # Kubernetes: monitoring shortcuts
 
 pods:
