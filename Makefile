@@ -69,14 +69,8 @@ dist-client: dist-config
 dist-explorer: dist-config
 	@cd js/explorer && yarn build
 
-nginx: dist-client dist-explorer
+image-nginx: dist-client dist-explorer
 	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .
-
-push-nginx: nginx
-	@docker push "${NGINX_DOCKER_IMAGE}"
-
-dc-nginx: nginx
-	@docker-compose up -d nginx
 
 
 # Rust: cross-platform rust builder for linus
@@ -102,17 +96,13 @@ build-target:
 clean-target:
 	$(rust-musl-builder) cargo clean
 
-server-image: build-target
+image-server: build-target
 	docker build -t "${SERVER_DOCKER_IMAGE}" -f ./docker/server/Dockerfile .
 
-prover-image: build-target
+image-prover: build-target
 	docker build -t "${PROVER_DOCKER_IMAGE}" -f ./docker/prover/Dockerfile .
 
-push-rust:
-	docker push gluk64/franklin:server
-	docker push gluk64/franklin:prover
-
-rust-images: server-image prover-image
+image-rust: image-server image-prover
 
 
 # Contracts
@@ -150,15 +140,17 @@ loadtest:
 # (Re)deploy contracts and database
 redeploy: confirm_action stop deploy-contracts db-reset
 
-update-nginx: nginx push-nginx kube-deploy rollout-nginx
+dev-ready = docker ps | grep -q "$(GETH_DOCKER_IMAGE)"
 
-# Make sure to update all images and configuration and rollout update
-update-servers: rust-images push-rust kube-deploy rollout-rust
-
-start:
+start: #image-nginx image-rust
 ifeq (,$(KUBECONFIG))
+	@docker ps | grep -q "$(GETH_DOCKER_IMAGE)" || { echo "Dev env not ready. Try: 'franklin dev-up'" && exit 1; }
 	@docker-compose up -d --scale prover=1 server prover nginx
 else
+	docker push "${SERVER_DOCKER_IMAGE}"
+	docker push "${PROVER_DOCKER_IMAGE}"
+	docker push "${NGINX_DOCKER_IMAGE}"
+	@bin/deploy-kube
 	@bin/kubectl scale deployments/server --replicas=1
 	@bin/kubectl scale deployments/prover --replicas=1
 	@bin/kubectl scale deployments/nginx --replicas=1
@@ -176,18 +168,17 @@ endif
 restart: stop start
 
 
-# Devops: Kubernetes
+# Monitoring
 
-rollout-nginx: kube-deploy
-	@kubectl scale deployments/nginx --replicas=0
-	@kubectl scale deployments/nginx --replicas=1
+status:
+	@curl $(API_SERVER)/api/v0.1/status; echo
 
-rollout-servers: kube-deploy
-	echo not implemented; exit 1
-
-# Deploy/apply kubernetes config
-kube-deploy:
-	@bin/deploy-kube
+log:
+ifeq (,$(KUBECONFIG))
+	@docker-compose logs -f server prover
+else
+	kubectl logs -f deployments/server
+endif
 
 
 # Kubernetes: monitoring shortcuts
@@ -200,19 +191,6 @@ nodes:
 
 proverlogs:
 	kubectl logs -f deployments/prover
-
-
-# Monitoring
-
-status:
-	@curl $(API_SERVER)/api/v0.1/status; echo
-
-log:
-ifeq (,$(KUBECONFIG))
-	@docker-compose logs -f server prover
-else
-	kubectl logs -f deployments/server
-endif
 
 
 # Dev environment
