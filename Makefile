@@ -72,8 +72,9 @@ dist-explorer: dist-config
 image-nginx: dist-client dist-explorer
 	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .
 
-nginx-up: image-nginx
-	@docker-compose up nginx
+explorer-up: dist-explorer
+	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .
+	@docker-compose up -d nginx
 
 # Rust: cross-platform rust builder for linus
 
@@ -198,6 +199,7 @@ proverlogs:
 # Dev environment
 
 dev-up:
+	@{ docker ps | grep -q "$(GETH_DOCKER_IMAGE)" && echo "Dev env already running" && exit 1; } || echo -n
 	@docker-compose up -d postgres geth
 
 dev-down:
