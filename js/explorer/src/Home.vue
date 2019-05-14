@@ -26,7 +26,7 @@
             <h4>Matter Testnet Block Explorer</h4> 
             <b-form @submit.stop.prevent="search">
             <b-input-group>
-                <b-form-input v-model="query" placeholder="block number or tx hash"></b-form-input>
+                <b-form-input v-model="query" placeholder="block number,tx hash or state root hash"></b-form-input>
                 <b-input-group-append>
                 <b-button @click="search" variant="info" :disabled="searching">
                     <b-spinner v-if="searching" small></b-spinner>
