@@ -610,8 +610,8 @@ impl StorageProcessor {
                 and action_type = 'Verify'
             where false
                 or lower(commit_tx_hash) = $1
-                or lower(verified.tx_hash) = $2
-                or lower(new_state_root) = $3
+                or lower(verified.tx_hash) = $1
+                or lower(new_state_root) = $1
                 or committed.block_number = {block_number}
             order by committed.block_number desc
             limit 1
@@ -619,9 +619,7 @@ impl StorageProcessor {
             block_number         = block_number as i32
         );
         let result = diesel::sql_query(sql_query)
-            .bind::<Text, _>(query_with_prefix.clone())
-            .bind::<Text, _>(query_with_prefix.clone())
-            .bind::<Text, _>(query_with_prefix.clone())
+            .bind::<Text, _>(query_with_prefix)
             .get_result(self.conn())
             .ok();
         result
