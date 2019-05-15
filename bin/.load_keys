@@ -2,10 +2,12 @@
 
 echo "Checking keys in $KEY_DIR/"
 mkdir -p $KEY_DIR
+cd $KEY_DIR
 
 for i in $KEY_FILES; do
     if ! [ -f $KEY_DIR/$i ]; then
-        echo "Downloading $SPACE_URL/$i to $KEY_DIR/"
-        curl -o $KEY_DIR/$i $SPACE_URL/$i 2>&1
+        echo "Downloading file $SPACE_URL/$i"
+        axel -a $SPACE_URL/$i 2>&1
+        #curl -o $KEY_DIR/$i $SPACE_URL/$i 2>&1
     fi
 done

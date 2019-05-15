@@ -10,6 +10,12 @@ Install Node.
 
 Install yarn.
 
+## Axel
+
+Install axel for downloading keys:
+
+```brew install axel```
+
 ## Rust
 
 Install the latest rust version (>= 1.32):
