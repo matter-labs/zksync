@@ -2,13 +2,12 @@
 
 . .setup_env
 
-CLUSTER=`do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters" \
-    | jq '.kubernetes_clusters[] | select(.name == "rinkeby")'`
+if [ -z $1 ]; then echo "usage: do-scale <cluster id> [<count>]"; exit 1; fi
 
-#echo $CLUSTER | jq
-
-CLUSTER_ID=`echo $CLUSTER | jq '.id' | tr -d '"'`
-echo CLUSTER_ID=$CLUSTER_ID
+CLUSTER_ID=$1
+echo -n cluster $CLUSTER_ID 
+if [ ! -z $2 ]; then echo ": set count = $2"; fi
+echo
 
 NODE_POOL=`do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters/$CLUSTER_ID/node_pools" \
     | jq '.node_pools[] | select(.name == "prover") | {id: .id, name: .name, size: .size, count: .count}'`
@@ -19,13 +18,13 @@ NODE_POOL_ID=`echo $NODE_POOL | jq '.id' | tr -d '"'`
 
 echo NODE_POOL_ID=$NODE_POOL_ID
 
-if [ -z $1 ]; then
+if [ -z $2 ]; then
 
 R=`do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters/$CLUSTER_ID/node_pools/$NODE_POOL_ID"`
 
 else
 
-DATA='{"name": "prover", "count": '$1'}'
+DATA='{"name": "prover", "count": '$2'}'
 R=`do-curl -X PUT "https://api.digitalocean.com/v2/kubernetes/clusters/$CLUSTER_ID/node_pools/$NODE_POOL_ID" \
     --data "$DATA"`
 

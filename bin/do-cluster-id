@@ -1,0 +1,11 @@
+#!/bin/bash
+
+. .setup_env
+
+CLUSTER=`do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters" \
+    | jq '.kubernetes_clusters[] | select(.name == "rinkeby")'`
+
+#echo $CLUSTER | jq
+
+CLUSTER_ID=`echo $CLUSTER | jq '.id' | tr -d '"'`
+echo $CLUSTER_ID
