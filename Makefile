@@ -138,7 +138,7 @@ price:
 
 # Loadtest
 
-loadtest:
+loadtest: confirm_action
 	@cd js/loadtest && yarn test
 
 

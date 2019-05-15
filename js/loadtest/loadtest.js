@@ -27,6 +27,9 @@ let clients = []
 
 let rng = new Prando(1) // deterministic seed
 
+let TOTAL_TX = 256*250
+let total = 0
+
 function randomClient() {
     let i = rng.nextInt(0, nClients-1)
     //console.log('i', i)
@@ -178,13 +181,14 @@ async function test() {
     console.log('Total spent: ', format(sourceBalanceBefore.sub(sourceBalanceAfter)))
 
     console.log('xx: starting the test...')
-    while(true) {
+    while(total < TOTAL_TX) {
         let nextTick = new Date(new Date().getTime() + 1000)
         let promises = []
         for (let i=0; i<(tps * 2); i++) {
             let client = randomClient()
-            let promise = client.randomTransfer().catch(e => console.log('err1: ' + e))
+            let promise = client.randomTransfer().catch(e => console.log('err1: ', e))
             promises.push(promise)
+            total++
             //await new Promise(resolve => setTimeout(resolve, 20))
         }
         
@@ -196,11 +200,14 @@ async function test() {
         }
         await withTimeout(1500, Promise.all(promises)).catch(e => 'err4: ' + e)
 
-        console.log('--')
+        console.log('-- total: ', total, ' of ', TOTAL_TX)
         while(nextTick > new Date()) {
             await new Promise(resolve => setTimeout(resolve, 1))
         }
     }
+
+    console.log('test complete, total = ', total)
+
 }
 
 test()

@@ -1,9 +1,25 @@
 #!/bin/bash
 . .setup_env
 
-REGIONS=`cat etc/kube/regions.json | jq 'map( . ) | .[]' | tr -d '"'`
 CLUSTERS=`do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters"`
 
+# # Main cluster
+# NAME=$CLUSTER_NAME
+# CLUSTER=`echo $CLUSTERS | jq '.kubernetes_clusters | map(select(.name == "'$NAME'")) | .[0]'`
+# CLUSTER_ID=`echo $CLUSTER | jq '.id' | tr -d '"' | grep -v null`
+# CURRENT_COUNT=`echo $CLUSTER | jq '.node_pools[0] | .count' | grep -v null`
+# NODE_POOL_ID=`echo $CLUSTER | jq '.node_pools[0] | .id' | grep -v null | tr -d '"'`
+# DATA='{ "name": "prover", "count": 30}'
+# echo $CLUSTER_ID $NODE_POOL_ID $DATA
+# RET=`do-curl -X PUT "https://api.digitalocean.com/v2/kubernetes/clusters/$CLUSTER_ID/node_pools/$NODE_POOL_ID" --data "$DATA"`
+# echo $RET
+
+. bin/.kube_gen_secret | kubectl apply -f - || exit 1
+kubectl apply -f etc/kube/prover.yaml || exit 1
+kubectl scale deployments/prover --replicas=$COUNT_PER_REGION || exit 1
+
+# Helpers
+REGIONS=`cat etc/kube/regions.json | jq 'map( . ) | .[]' | tr -d '"'`
 for R in $REGIONS; do
     NAME=$CLUSTER_NAME-$R
     CLUSTER=`echo $CLUSTERS | jq '.kubernetes_clusters | map(select(.name == "'$NAME'" and .region == "'$R'")) | .[0]'`
@@ -17,8 +33,8 @@ for R in $REGIONS; do
         
         DATA='{ "size": "c-32", "name": "prover", "count": '$COUNT_PER_REGION'}'
         echo $DATA
-        CLUSTER=`do-curl -X PUT "https://api.digitalocean.com/v2/kubernetes/clusters/$CLUSTER_ID/node_pools/$NODE_POOL_ID" --data "$DATA"`
-        echo $CLUSTER
+        RET=`do-curl -X PUT "https://api.digitalocean.com/v2/kubernetes/clusters/$CLUSTER_ID/node_pools/$NODE_POOL_ID" --data "$DATA"`
+        echo $RET
 
         KUBECONFIG=etc/kube/kubeconfig-$NAME.yaml
         do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters/$CLUSTER_ID/kubeconfig" > $KUBECONFIG
