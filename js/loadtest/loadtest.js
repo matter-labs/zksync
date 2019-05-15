@@ -33,6 +33,23 @@ function randomClient() {
     return clients[ i ]
 }
 
+const withTimeout = function(ms, promise){
+
+    // Create a promise that rejects in <ms> milliseconds
+    let timeout = new Promise((resolve, reject) => {
+      let id = setTimeout(() => {
+        clearTimeout(id);
+        reject('Timed out in '+ ms + 'ms.')
+      }, ms)
+    })
+  
+    // Returns a race between our timeout and the passed in promise
+    return Promise.race([
+      promise,
+      timeout
+    ])
+  }
+
 class Client {
 
     constructor(id) {
@@ -166,17 +183,18 @@ async function test() {
         let promises = []
         for (let i=0; i<tps; i++) {
             let client = randomClient()
-            promises.push(client.randomTransfer())
+            let promise = client.randomTransfer().catch(e => console.log('err1: ' + e))
+            promises.push(promise)
             //await new Promise(resolve => setTimeout(resolve, 20))
         }
-        await Promise.all(promises)
-        console.log('-')
+        
+        await withTimeout(500, Promise.all(promises)).catch(e => 'err2: ' + e)
 
         promises = []
         for (let i=0; i < nClients; i++) {
-            promises.push(clients[i].fra.pullState())
+            promises.push(clients[i].fra.pullState().catch(e => 'err3: ' + e))
         }
-        await Promise.all(promises)
+        await withTimeout(1500, Promise.all(promises)).catch(e => 'err4: ' + e)
 
         console.log('--')
         while(nextTick > new Date()) {
