@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: prover
 spec:
-  replicas: 1
+  replicas: 30
   selector:
     matchLabels:
       app: prover
