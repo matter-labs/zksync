@@ -1,0 +1,6 @@
+#!/bin/bash
+. .setup_env
+
+CLUSTERS=`do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters"`
+
+echo $CLUSTERS | jq '.kubernetes_clusters | map({id: .id, name: .name, region: .region}) | .[]'

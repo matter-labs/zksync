@@ -1,0 +1,20 @@
+#!/bin/bash
+. .setup_env
+
+REGIONS=`cat etc/kube/regions.json | jq 'map( . ) | .[]' | tr -d '"'`
+CLUSTERS=`do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters"`
+COUNT_PER_REGION=1
+COUNT_TOTAL=4
+
+PROVISIONED=0
+
+for R in $REGIONS; do
+    NAME=$CLUSTER_NAME-$R
+    CLUSTER_ID=`echo $CLUSTERS | jq '.kubernetes_clusters | map(select(.name == "'$NAME'" and .region == "'$R'")) | .[0] | .id' | tr -d '"' | grep -v null`
+    if [ ! -z $CLUSTER_ID ]
+    then
+        echo "Shutting down cluster $NAME, id = $CLUSTER_ID"
+        RET=`do-curl -X DELETE "https://api.digitalocean.com/v2/kubernetes/clusters/$CLUSTER_ID"`
+        echo $RET
+    fi
+done

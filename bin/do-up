@@ -1,0 +1,39 @@
+#!/bin/bash
+. .setup_env
+
+REGIONS=`cat etc/kube/regions.json | jq 'map( . ) | .[]' | tr -d '"'`
+CLUSTERS=`do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters"`
+COUNT_PER_REGION=1
+COUNT_TOTAL=2
+
+PROVISIONED=0
+
+for R in $REGIONS; do
+    NAME=$CLUSTER_NAME-$R
+    CLUSTER=`echo $CLUSTERS | jq '.kubernetes_clusters | map(select(.name == "'$NAME'" and .region == "'$R'")) | .[0]'`
+    CLUSTER_ID=`echo $CLUSTER | jq '.id' | tr -d '"' | grep -v null`
+    CURRENT_COUNT=`echo $CLUSTER | jq '.node_pools[0] | .count' | grep -v null`
+    if [ ! -z $CLUSTER_ID ]
+    then
+        echo "Cluster $NAME exists, id = $CLUSTER_ID, current_count = $CURRENT_COUNT"
+    else
+        echo "Creating cluster $NAME"
+        DATA='{"name": "'$NAME'", "region": "'$R'", "version": "1.14.1-do.2", "tags": [ "massive" ], "node_pools": [ { "size": "c-32", "name": "prover", "count": '$COUNT_PER_REGION'} ] }'
+        echo $DATA
+        CLUSTER=`do-curl -X POST "https://api.digitalocean.com/v2/kubernetes/clusters" --data "$DATA"`
+        echo $CLUSTER
+
+        CLUSTER_ID=`echo $CLUSTER | jq '.kubernetes_cluster | .id' | tr -d '"'`
+        echo "Created cluster $NAME, id = $CLUSTER_ID"
+    fi
+
+    do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters/$CLUSTER_ID/kubeconfig" > etc/kube/kubeconfig-$NAME.yaml
+
+    PROVISIONED=$((PROVISIONED + COUNT_PER_REGION))
+
+    if ((PROVISIONED >= COUNT_TOTAL)) 
+    then
+        echo "provisioned $PROVISIONED, enough!"
+        exit 0
+    fi
+done
