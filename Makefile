@@ -132,6 +132,9 @@ flatten:
 source: #flatten
 	@node contracts/scripts/publish-source.js
 
+# testing
+price:
+	@node contracts/scripts/check-price.js
 
 # Loadtest
 
