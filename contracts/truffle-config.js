@@ -32,6 +32,17 @@ module.exports = {
         //   //network_id: "*" // match any network
         // },
 
+      mainnet: {
+        network_id: '1',
+        gas: 6900000,
+        provider: function() { 
+          const HDWalletProvider = require("truffle-hdwallet-provider");
+          let url = `${process.env.WEB3_URL}`
+          let mnemonic = process.env.MNEMONIC
+          return new HDWalletProvider(mnemonic, url) 
+        },
+      },
+
       universal: {
         network_id: '*',
         gas: 6900000,
@@ -42,6 +53,7 @@ module.exports = {
           return new HDWalletProvider(mnemonic, url) 
         },
       },
+
 
       // rinkeby: {
       //   network_id: 4,
