@@ -155,18 +155,18 @@ else
 	docker push "${PROVER_DOCKER_IMAGE}"
 	docker push "${NGINX_DOCKER_IMAGE}"
 	@bin/deploy-kube
-	@bin/kubectl scale deployments/server --replicas=1
-	@bin/kubectl scale deployments/prover --replicas=1
-	@bin/kubectl scale deployments/nginx --replicas=1
+	@bin/kube scale deployments/server --replicas=1
+	@bin/kube scale deployments/prover --replicas=1
+	@bin/kube scale deployments/nginx --replicas=1
 endif
 
 stop: confirm_action
 ifeq (,$(KUBECONFIG))
 	@docker-compose stop server prover
 else
-	@bin/kubectl scale deployments/server --replicas=0
-	@bin/kubectl scale deployments/prover --replicas=0
-	@bin/kubectl scale deployments/nginx --replicas=0
+	@bin/kube scale deployments/server --replicas=0
+	@bin/kube scale deployments/prover --replicas=0
+	@bin/kube scale deployments/nginx --replicas=0
 endif
 
 restart: stop start
