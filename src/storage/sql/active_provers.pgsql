@@ -1,3 +1,11 @@
-SELECT * FROM prover_runs pr
+with pr as (
+SELECT 
+    *,
+    EXTRACT(seconds FROM (updated_at - created_at)) as since
+FROM prover_runs pr
 WHERE NOT EXISTS (SELECT * FROM proofs p WHERE p.block_number = pr.block_number)
-ORDER BY id desc;
+ORDER BY id desc
+)
+select *
+from pr
+order by block_number asc;
