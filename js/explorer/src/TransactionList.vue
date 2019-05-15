@@ -1,5 +1,5 @@
 <template>
-<b-table id="my-table" hover outlined :items="transactions" @row-clicked="onRowClicked"></b-table>
+<b-table responsive id="my-table" hover outlined :items="transactions" @row-clicked="onRowClicked"></b-table>
 </template>
 
 <script>

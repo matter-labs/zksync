@@ -41,7 +41,7 @@
         </b-card>
         <br>
         <b-card>
-        <div class="row hide-sm" style="color: grey">
+        <div class="row" style="color: grey">
             <div class="col-sm text-center">
             <i class="far fa-square"></i> <b>Blocks committed</b><br><span class="num">{{lastCommitted}}</span>
             </div>
@@ -58,18 +58,8 @@
         </b-card>
         <br>
 
-        <!--
-        <div class="table-container">
-        <div class="overlay text-center" v-if="loading">
-            <br><br><br>
-            <b-spinner variant="primary"></b-spinner>
-        </div>
-        <b-table id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading"></b-table>
-        </div>
-        -->
-
         <b-pagination v-if="ready" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
-        <b-table id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading" class="clickable"></b-table>
+        <b-table responsive id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading" class="clickable"></b-table>
         <b-pagination v-if="ready" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
 
     </b-container>

@@ -10,7 +10,7 @@
         <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
         <h5>Block data</h5>
         <b-card no-body>
-            <b-table id="my-table" thead-class="hidden_header" :items="props" :busy="isBusy">
+            <b-table responsive id="my-table" thead-class="hidden_header" :items="props" :busy="isBusy">
                 <span slot="value" slot-scope="data" v-html="data.value"></span>
             </b-table>
         </b-card>
