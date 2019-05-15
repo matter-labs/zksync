@@ -138,7 +138,13 @@ export default {
     created() {
         this.update()
     },
+    timers: {
+        ticker: { time: 1000, autostart: true, repeat: true }
+    },
     methods: {
+        ticker() {
+            this.update(true)
+        },
         async search() {
             if (this.query) {
                 this.searching = true
@@ -161,8 +167,10 @@ export default {
             this.$router.push(`${this.$route.path}?page=${page}`)
             //this.updateBlocks()
         },
-        async update() {
-            this.loading = true
+        async update(silent) {
+            if (!silent) {
+                this.loading = true
+            }
             const status = await client.status()
             let newBlocks = false
             if (status) {

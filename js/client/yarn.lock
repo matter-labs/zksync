@@ -5318,6 +5318,11 @@ vue-template-es2015-compiler@^1.6.0:
   version "1.6.0"
   resolved "https://registry.yarnpkg.com/vue-template-es2015-compiler/-/vue-template-es2015-compiler-1.6.0.tgz#dc42697133302ce3017524356a6c61b7b69b4a18"
 
+vue-timers@^2.0.2:
+  version "2.0.2"
+  resolved "https://registry.yarnpkg.com/vue-timers/-/vue-timers-2.0.2.tgz#0a4f0900a6fa907e518d2fed1678dece2e8e2430"
+  integrity sha512-R5B2iQZwRqOPNKU5pobJHSqkNFTSik2pRVgD9/Ki2OrFAOiEmD/MqJ82WH+bxk9tcmqoQCs4Ha3MrZG4f58IKg==
+
 vue@^2.5.3:
   version "2.5.21"
   resolved "https://registry.yarnpkg.com/vue/-/vue-2.5.21.tgz#3d33dcd03bb813912ce894a8303ab553699c4a85"

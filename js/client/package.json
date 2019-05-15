@@ -23,7 +23,8 @@
     "js-sha3": "^0.8.0",
     "popper.js": "^1.12.9",
     "vue": "^2.5.3",
-    "vue-router": "^3.0.2"
+    "vue-router": "^3.0.2",
+    "vue-timers": "^2.0.2"
   },
   "devDependencies": {
     "babel-core": "^6.26.0",

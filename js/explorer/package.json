@@ -25,6 +25,7 @@
     "popper.js": "^1.12.9",
     "vue": "^2.6.10",
     "vue-router": "^3.0.2",
+    "vue-timers": "^2.0.2",
     "webpack-md5-hash": "^0.0.6",
     "webpack-node-externals": "^1.7.2",
     "webpack-plugin-hash-output": "^3.2.1"

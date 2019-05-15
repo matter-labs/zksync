@@ -14,7 +14,9 @@ import Transaction from './Transaction.vue'
 import axios from 'axios'
 import url from 'url'
 import config from './env-config'
+import VueTimers from 'vue-timers'
 
+Vue.use(VueTimers)
 Vue.use(Router)
 Vue.use(BootstrapVue)
 
