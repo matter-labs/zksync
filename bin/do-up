@@ -3,8 +3,6 @@
 
 REGIONS=`cat etc/kube/regions.json | jq 'map( . ) | .[]' | tr -d '"'`
 CLUSTERS=`do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters"`
-COUNT_PER_REGION=10
-COUNT_TOTAL=100
 
 PROVISIONED=0
 
@@ -26,12 +24,6 @@ for R in $REGIONS; do
         CLUSTER_ID=`echo $CLUSTER | jq '.kubernetes_cluster | .id' | tr -d '"'`
         echo "Created cluster $NAME, id = $CLUSTER_ID"
     fi
-
-    KUBECONFIG=etc/kube/kubeconfig-$NAME.yaml
-    do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters/$CLUSTER_ID/kubeconfig" > $KUBECONFIG
-
-    . bin/.kube_gen_secret | kubectl apply -f - || exit 1
-    kubectl apply -f etc/kube/prover.yaml || exit 1
 
     PROVISIONED=$((PROVISIONED + COUNT_PER_REGION))
     if ((PROVISIONED >= COUNT_TOTAL)) 

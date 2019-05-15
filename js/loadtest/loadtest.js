@@ -181,7 +181,7 @@ async function test() {
     while(true) {
         let nextTick = new Date(new Date().getTime() + 1000)
         let promises = []
-        for (let i=0; i<tps; i++) {
+        for (let i=0; i<(tps * 2); i++) {
             let client = randomClient()
             let promise = client.randomTransfer().catch(e => console.log('err1: ' + e))
             promises.push(promise)
