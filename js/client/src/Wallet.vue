@@ -18,10 +18,10 @@
     </b-container>
     </b-navbar>
     <br>
-    <b-container v-if="network && !isTestnet">
-        <h3 style="color: red">Please switch to Rinkeby network in Metamask to try this demo.</h3>
+    <b-container v-if="network && !correctNetwork">
+        <h3 style="color: red">Please switch to <b>{{currentNetwork}}</b> network in Metamask to try this demo.</h3>
     </b-container>
-    <b-container v-if="network && isTestnet">
+    <b-container v-if="network && correctNetwork">
         <b-alert show dismissible :variant="alertType" fade :show="countdown" @dismissed="countdown=0" class="mt-2">
             {{result}}
         </b-alert>
@@ -225,7 +225,16 @@ export default {
     },
     computed: {
         isTestnet() {
-            return this.network === '4' || this.network === '9'
+            return this.network === '9'
+        },
+        currentNetwork() {
+            return window.location.hostname.split('.')[0]
+        },
+        correctNetwork() {
+            return this.isTestnet ||
+                window.location.hostname.startsWith('localhost') ||
+                (this.network === '1' && window.location.hostname.startsWith('mainnet')) ||
+                (this.network === '4' && window.location.hostname.startsWith('rinkeby'))
         },
         baseUrl() {
             return this.apiServer + '/api/v0.1'
