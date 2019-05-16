@@ -239,6 +239,15 @@ pub struct ProverRun {
     pub updated_at:     NaiveDateTime,
 }
 
+#[derive(Debug, Insertable, Queryable, QueryableByName)]
+#[table_name="active_provers"]
+pub struct ActiveProver {
+    pub id:             i32,
+    pub worker:         String,
+    pub created_at:     NaiveDateTime,
+    pub stopped_at:     Option<NaiveDateTime>,
+}
+
 #[derive(Debug, QueryableByName)]
 pub struct IntegerNumber {
     #[sql_type="Integer"]
@@ -892,6 +901,27 @@ impl StorageProcessor {
         let target = prover_runs.filter(id.eq(job_id));
         diesel::update(target)
             .set(updated_at.eq(now))
+            .execute(self.conn())
+            .map(|_|())
+    }
+
+    pub fn register_prover(&self, worker_: &String) -> QueryResult<i32> {
+        use schema::active_provers::dsl::*;
+        let inserted: ActiveProver = insert_into(active_provers)
+        .values(&vec![(
+            worker.eq(worker_.to_string())
+        )])
+        .get_result(self.conn())?;
+        Ok(inserted.id)
+    }
+
+    pub fn record_prover_stop(&self, prover_id: i32) -> QueryResult<()> {
+        use schema::active_provers::dsl::*;
+        use diesel::expression::dsl::now;
+
+        let target = active_provers.filter(id.eq(prover_id));
+        diesel::update(target)
+            .set(stopped_at.eq(now))
             .execute(self.conn())
             .map(|_|())
     }

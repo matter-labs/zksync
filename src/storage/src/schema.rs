@@ -15,6 +15,15 @@ table! {
 }
 
 table! {
+    active_provers (id) {
+        id -> Int4,
+        worker -> Text,
+        created_at -> Timestamp,
+        stopped_at -> Nullable<Timestamp>,
+    }
+}
+
+table! {
     op_config (addr) {
         addr -> Text,
         next_nonce -> Nullable<Int4>,
@@ -77,6 +86,7 @@ table! {
 allow_tables_to_appear_in_same_query!(
     accounts,
     account_updates,
+    active_provers,
     op_config,
     operations,
     proofs,

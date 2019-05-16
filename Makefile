@@ -178,12 +178,12 @@ restart-kube-rust:
 restart-kube-nginx:
 	#echo kubectl patch deployment nginx -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(date +%s)\"}}}}}"
 
-start-kube: push-image-nginx push-image-nginx apply-kubeconfig restart-kube-rust restart-kube-nginx
+start-kube: push-image-nginx push-image-rust apply-kubeconfig restart-kube-rust restart-kube-nginx
 
 ifeq (,$(KUBECONFIG))
-	start: image-nginx image-rust start-local
+start: image-nginx image-rust start-local
 else
-	start: start-kube
+start: start-kube
 endif
 
 stop: confirm_action
