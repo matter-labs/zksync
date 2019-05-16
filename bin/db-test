@@ -3,9 +3,9 @@
 . .setup_env
 cd src/storage
 
-export DATABASE_URL=$TEST_DATABASE_URL
-
-diesel database setup
+export DATABASE_URL=postgres://postgres@localhost/plasma_test
+diesel database reset
+diesel migration run
 
 cd ../..
 cargo test -p storage

@@ -1033,6 +1033,7 @@ mod test {
         accounts.insert(7, acc(3));
         accounts.insert(8, acc(4));
         conn.execute_operation(&Operation{
+            id:     None,
             action: Action::Commit,
             block:  Block{
                 block_number:   1,
@@ -1049,6 +1050,7 @@ mod test {
         assert_eq!(conn.last_committed_state_for_account(5).unwrap().unwrap().balance, BigDecimal::from(2));
 
         conn.execute_operation(&Operation{
+            id:     None,
             action: Action::Verify{
                 proof: [U256::zero(); 8], 
             },
@@ -1088,6 +1090,7 @@ mod test {
         conn.fast_forward_op_config("0x0", 0).unwrap();
 
         conn.execute_operation(&Operation{
+            id:     None,
             action: Action::Commit,
             block:  Block{
                 block_number:   1,
@@ -1105,6 +1108,7 @@ mod test {
         assert_eq!(pending.len(), 1);
 
         conn.execute_operation(&Operation{
+            id:     None,
             action: Action::Verify{
                 proof: [U256::zero(); 8], 
             },
@@ -1138,6 +1142,7 @@ mod test {
         assert_eq!(conn.last_verified_state_for_account(9999).unwrap(), None);
 
         conn.execute_operation(&Operation{
+            id:     None,
             action: Action::Commit,
             block:  Block{
                 block_number:   1,
@@ -1153,6 +1158,7 @@ mod test {
         assert_eq!(3, conn.load_last_committed_deposit_batch().unwrap());
 
         conn.execute_operation(&Operation{
+            id:     None,
             action: Action::Commit,
             block:  Block{
                 block_number:   1,
@@ -1199,6 +1205,7 @@ mod test {
         };
 
         conn.execute_operation(&Operation{
+            id:     None,
             action: Action::Commit,
             block:  Block{
                 block_number:   1,
@@ -1213,6 +1220,7 @@ mod test {
         }).unwrap();
 
         conn.execute_operation(&Operation{
+            id:     None,
             action: Action::Commit,
             block:  Block{
                 block_number:   2,
@@ -1227,6 +1235,7 @@ mod test {
         }).unwrap();
 
         conn.execute_operation(&Operation{
+            id:     None,
             action: Action::Commit,
             block:  Block{
                 block_number:   3,
@@ -1241,7 +1250,7 @@ mod test {
         }).unwrap();
 
         let txs = conn.load_last_saved_transactions(10);
-        assert_eq!(txs.unwrap().len(), 6);
+        assert_eq!(txs.len(), 6);
     }
 
 }
