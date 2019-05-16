@@ -3,10 +3,8 @@
 
 REGIONS=`cat etc/kube/regions.json | jq 'map( . ) | .[]' | tr -d '"'`
 CLUSTERS=`do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters"`
-COUNT_PER_REGION=1
-COUNT_TOTAL=4
 
-PROVISIONED=0
+# Delete clusters in regions
 
 for R in $REGIONS; do
     NAME=$CLUSTER_NAME-$R
@@ -18,3 +16,7 @@ for R in $REGIONS; do
         echo $RET
     fi
 done
+
+# Scale down main/prover
+
+kubectl scale deployments/$FRANKLIN_ENV-prover --replicas=1

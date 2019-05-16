@@ -18,7 +18,8 @@ spec:
           imagePullPolicy: Always
           resources:
             requests:
-              memory: "30Gi"
+              memory: "100Gi"
+              cpu: "32"
           envFrom:
           - secretRef:
               name: ${FRANKLIN_ENV}-secret

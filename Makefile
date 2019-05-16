@@ -175,7 +175,9 @@ dockerhub-push: image-nginx image-rust
 apply-kubeconfig:
 	@bin/k8s-apply
 
-restart-kube-rust:
+restart-kube-rust: apply-kubeconfig
+	@kubectl patch deployment $(FRANKLIN_ENV)-server -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
+	@kubectl patch deployment $(FRANKLIN_ENV)-prover -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
 
 update-nginx: push-image-nginx apply-kubeconfig
 	@kubectl patch deployment $(FRANKLIN_ENV)-nginx -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
@@ -216,7 +218,7 @@ endif
 # Kubernetes: monitoring shortcuts
 
 pods:
-	kubectl get pods -o wide
+	kubectl get pods -o wide | grep -v Pending
 
 nodes:
 	kubectl get nodes -o wide
