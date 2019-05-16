@@ -47,7 +47,7 @@ export default {
             const block = await client.getBlock(this.blockNumber)
             if (!block) return
 
-            this.type            = block.tx_type
+            this.type            = block.type
             this.new_state_root  = block.new_state_root
             this.commit_tx_hash  = block.commit_tx_hash || ''
             this.verify_tx_hash  = block.verify_tx_hash || ''
@@ -87,12 +87,12 @@ export default {
         props() {
             return [
                 { name: 'Block #',          value: `<b>${this.blockNumber}</b>`},
-                { name: 'Type',             value: this.type, },
+                //{ name: 'Type',             value: this.type, },
                 { name: 'New root hash',    value: this.new_state_root, },
                 { name: 'Transactions',     value: client.TX_PER_BLOCK(), },
                 { name: 'Status',           value: this.status, },
-                { name: 'Commit tx hash',   value: `<a target="blanc" href="https://rinkeby.etherscan.io/tx/${this.commit_tx_hash}">${this.commit_tx_hash}</a>`, },
-                { name: 'Verify tx hash',   value: `<a target="blanc" href="https://rinkeby.etherscan.io/tx/${this.verify_tx_hash}">${this.verify_tx_hash}</a>`, },
+                { name: 'Commit tx hash',   value: `<a target="blanc" href="${this.etherscan}/tx/${this.commit_tx_hash}">${this.commit_tx_hash}</a>`, },
+                { name: 'Verify tx hash',   value: `<a target="blanc" href="${this.etherscan}/tx/${this.verify_tx_hash}">${this.verify_tx_hash}</a>`, },
             ]
         }
     },

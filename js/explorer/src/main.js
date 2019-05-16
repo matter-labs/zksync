@@ -38,6 +38,12 @@ Vue.mixin({
             store
         }
     },
+    computed: {
+        etherscan() {
+            if (this.store.network === 'localhost') return 'http://localhost:4000'
+            return 'https://' + (this.store.network === 'mainnet' ? '' : `${this.store.network}.`) + 'etherscan.io'
+        },
+    },
 })
 
 window.app = new Vue({

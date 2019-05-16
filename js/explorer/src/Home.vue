@@ -7,7 +7,7 @@
         <b-collapse id="nav-collapse" is-nav>
         <b-navbar-nav>
             <b-nav-item href="/client/" target="blanc">MatterMask</b-nav-item>
-            <b-nav-item v-bind:href="`https://${etherscan}/address/0x${store.config.CONTRACT_ADDR}`" target="blanc">
+            <b-nav-item v-bind:href="`${etherscan}/address/0x${store.config.CONTRACT_ADDR}`" target="blanc">
                 Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
             </b-nav-item>
         </b-navbar-nav>
@@ -213,9 +213,6 @@ export default {
         rows() {
             return this.lastCommitted || 9999
         },
-        etherscan() {
-            return this.store.network === 'mainnet' ? 'etherscan.io' : this.store.network+'.etherscan.io'
-        }
     },
     data() {
         return {
