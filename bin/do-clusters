@@ -4,16 +4,10 @@
 #CLUSTERS=`do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters"`
 #echo $CLUSTERS | jq '.kubernetes_clusters | map({id: .id, name: .name, region: .region, node_pools: .node_pools}) | .[]'
 
+echo $KUBECONFIG
+
 for KUBECONFIG in `ls etc/kube/clusters/kubeconfig*`; do
     echo $KUBECONFIG
+    export KUBECONFIG=$KUBECONFIG
     kubectl get deployments
 done
-
-# KUBECONFIG=etc/kube/kubeconfig256.yaml
-# for KC in `ls etc/kube/kubeconfig-*`; do
-#     KUBECONFIG=$KUBECONFIG:$KC
-# done
-# echo KUBECONFIG=$KUBECONFIG
-
-# /usr/local/bin/kubectl config view
-# /usr/local/bin/kubectl get pods

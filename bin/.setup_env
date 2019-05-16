@@ -30,6 +30,6 @@ then
 
     # Postprocessing for all configs
 
-    KUBECONFIG=etc/kube/kubeconfig.yaml
+    export KUBECONFIG=etc/kube/clusters/kubeconfig-main.yaml
 
 fi
