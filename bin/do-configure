@@ -35,10 +35,10 @@ for CLUSTER_ID in $CLUSTERS_IDS; do
 
     echo "Cluster $NAME, id = $CLUSTER_ID, NODE_POOL_ID = $NODE_POOL_ID, current_count = $CURRENT_COUNT"
     
-    # DATA='{ "size": "c-32", "name": "prover", "count": '$COUNT_PER_REGION'}'
-    # echo $DATA
-    # RET=`do-curl -X PUT "https://api.digitalocean.com/v2/kubernetes/clusters/$CLUSTER_ID/node_pools/$NODE_POOL_ID" --data "$DATA"`
-    # echo $RET
+    DATA='{ "size": "c-32", "name": "prover", "count": '$COUNT_PER_REGION'}'
+    echo $DATA
+    RET=`do-curl -X PUT "https://api.digitalocean.com/v2/kubernetes/clusters/$CLUSTER_ID/node_pools/$NODE_POOL_ID" --data "$DATA"`
+    echo $RET
 
     KUBECONFIG=etc/kube/clusters/kubeconfig-$NAME.yaml
     do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters/$CLUSTER_ID/kubeconfig" > $KUBECONFIG

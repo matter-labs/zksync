@@ -194,9 +194,9 @@ stop: confirm_action
 ifeq (,$(KUBECONFIG))
 	@docker-compose stop server prover
 else
-	@bin/kube scale deployments/server --replicas=0
-	@bin/kube scale deployments/prover --replicas=0
-	@bin/kube scale deployments/nginx --replicas=0
+	@bin/kube scale deployments/$(FRANKLIN_ENV)-server --replicas=0
+	@bin/kube scale deployments/$(FRANKLIN_ENV)-prover --replicas=0
+	@bin/kube scale deployments/$(FRANKLIN_ENV)-nginx --replicas=0
 endif
 
 restart: stop start
