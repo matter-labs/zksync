@@ -177,8 +177,8 @@ apply-kubeconfig:
 
 restart-kube-rust:
 
-restart-kube-nginx:
-	#echo kubectl patch deployment nginx -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(date +%s)\"}}}}}"
+update-nginx: push-image-nginx apply-kubeconfig
+	@kubectl patch deployment $(FRANKLIN_ENV)-nginx -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
 
 start-kube: push-image-nginx push-image-rust apply-kubeconfig restart-kube-rust restart-kube-nginx
 
