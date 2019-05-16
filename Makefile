@@ -185,7 +185,9 @@ update-rust: push-image-rust apply-kubeconfig
 update-nginx: push-image-nginx apply-kubeconfig
 	@kubectl patch deployment $(FRANKLIN_ENV)-nginx -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
 
-start-kube: push-image-nginx push-image-rust apply-kubeconfig update-rust update-nginx
+update-all: update-rust update-nginx
+
+start-kube: apply-kubeconfig
 
 ifeq (,$(KUBECONFIG))
 start: image-nginx image-rust start-local
