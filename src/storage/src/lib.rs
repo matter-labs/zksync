@@ -322,6 +322,9 @@ impl StorageProcessor {
                 Action::Verify{proof: _} => 
                     self.apply_state_update(op.block.block_number)?,
             };
+
+            // NOTE: tx meta is inserted automatically with sender addr and next expected nonce
+            // see SQL migration code for `operations` table
             let stored: StoredOperation = diesel::insert_into(operations::table)
                 .values(&NewOperation{ 
                     block_number:   op.block.block_number as i32,
@@ -525,9 +528,9 @@ impl StorageProcessor {
             r
     }
 
-    /// Updates op_config to new address and fast-forwards the nonce, if its current value 
-    /// from the network is larger than the largest nonce from scheduled operations
-    pub fn fast_forward_op_config(&self, sender: &str, current_nonce: Nonce) -> QueryResult<()> {
+    /// Sets up `op_config` to new address and nonce for scheduling ETH transactions for operations
+    /// If current nonce from ETH netorkw is higher, nonce config is fast-forwarded to the new value
+    pub fn prepare_nonce_scheduling(&self, sender: &str, current_nonce: Nonce) -> QueryResult<()> {
 
         // The code below does this:
         // next_nonce = max( current_nonce, max(nonces from ops scheduled for this sender) + 1 )
@@ -1019,7 +1022,7 @@ mod test {
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
         conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
-        conn.fast_forward_op_config("0x0", 0).unwrap();
+        conn.prepare_nonce_scheduling("0x0", 0).unwrap();
 
         let mut accounts = fnv::FnvHashMap::default();
         let acc = |balance| { 
@@ -1087,7 +1090,7 @@ mod test {
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
         conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
-        conn.fast_forward_op_config("0x0", 0).unwrap();
+        conn.prepare_nonce_scheduling("0x0", 0).unwrap();
 
         conn.execute_operation(&Operation{
             id:     None,
@@ -1251,6 +1254,79 @@ mod test {
 
         let txs = conn.load_last_saved_transactions(10);
         assert_eq!(txs.len(), 6);
+    }
+
+    fn dummy_op(action: Action, block_number: BlockNumber) -> Operation {
+            Operation{
+                id:     None,
+                action,
+                block:  Block{
+                    block_number,
+                    new_root_hash:  Fr::default(),
+                    block_data:     BlockData::Deposit{
+                        batch_number: 1,
+                        transactions: vec![],
+                    }
+                }, 
+                accounts_updated:   Some(fnv::FnvHashMap::default()),
+                tx_meta:            None,
+            }
+    }
+
+    #[test]
+    fn test_nonce_fast_forward() {
+        let pool = ConnectionPool::new();
+        let conn = pool.access_storage().unwrap();
+        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
+
+        conn.prepare_nonce_scheduling("0x123", 0).expect("failed");
+
+        let mut i = 0;
+        let stored_op = loop {
+            let stored_op = conn.execute_operation(&dummy_op(Action::Commit, 1)).unwrap();
+            i = i + 1;
+            if i >= 6 { 
+                break stored_op;
+            }
+        };
+
+        // after 6 iterations starting with nonce = 0, last inserted nonce should be 5
+        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 5);
+
+        // addr for
+        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").addr, "0x123");
+
+        // if the nonce from network is lower than expected, this should not affect the scheduler
+        conn.prepare_nonce_scheduling("0x123", 3).expect("failed");
+        let stored_op = conn.execute_operation(&dummy_op(Action::Commit, 1)).unwrap();
+        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 6);
+
+        // if the nonce from network is same as expected, this should not affect the scheduler
+        conn.prepare_nonce_scheduling("0x123", 7).expect("failed");
+        let stored_op = conn.execute_operation(&dummy_op(Action::Commit, 1)).unwrap();
+        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 7);
+
+        // if the nonce from network is higher than expected, scheduler should be fast-forwarded
+        conn.prepare_nonce_scheduling("0x123", 9).expect("failed");
+        let stored_op = conn.execute_operation(&dummy_op(Action::Commit, 1)).unwrap();
+        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 9);
+
+        // if the address is new, nonces start from the given value
+        conn.prepare_nonce_scheduling("0x456", 2).expect("failed");
+        let stored_op = conn.execute_operation(&dummy_op(Action::Commit, 1)).unwrap();
+        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 2);
+
+        // addr should now switch
+        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").addr, "0x456");
+
+        // if we switch back to existing sender, nonce sequence should continue from where it started with that addr
+        conn.prepare_nonce_scheduling("0x123", 0).expect("failed");
+        let stored_op = conn.execute_operation(&dummy_op(Action::Commit, 1)).unwrap();
+        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 10);
+
+        // add should now switch back
+        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").addr, "0x123");
+
     }
 
 }

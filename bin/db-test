@@ -4,8 +4,11 @@
 cd src/storage
 
 export DATABASE_URL=postgres://postgres@localhost/plasma_test
-diesel database reset
-diesel migration run
+
+if [ "$1" == "reset" ]; then
+    diesel database reset
+    diesel migration run
+fi
 
 cd ../..
 cargo test -p storage

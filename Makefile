@@ -36,6 +36,9 @@ sql = psql "$(DATABASE_URL)" -c
 db-test:
 	@bin/db-test
 
+db-test-reset:
+	@bin/db-test reset
+
 db-setup:
 	@bin/db-setup
 
