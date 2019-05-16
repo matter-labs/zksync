@@ -4,7 +4,7 @@
 CLUSTERS=`do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters"`
 echo $CLUSTERS | jq '.kubernetes_clusters | map({id: .id, name: .name, region: .region, node_pools: .node_pools}) | .[]'
 
-for KUBECONFIG in `ls etc/kube/kubeconfig*`; do
+for KUBECONFIG in `ls etc/kube/clusters/kubeconfig*`; do
     echo $KUBECONFIG
     kubectl get pods
     echo done
