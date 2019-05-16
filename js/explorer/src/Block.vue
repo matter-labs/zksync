@@ -59,7 +59,7 @@ export default {
             this.transactions = txs.map( tx => ({
                 from:       tx.from_account,
                 to:         tx.to_account,
-                amount:     tx.amount,
+                amount:     this.formatFranklin(tx.amount) + ' ETH',
                 nonce:      tx.nonce,
             }))
         },

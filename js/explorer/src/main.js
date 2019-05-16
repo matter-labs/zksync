@@ -16,6 +16,8 @@ import url from 'url'
 import config from './env-config'
 import VueTimers from 'vue-timers'
 
+const ethers = require('ethers')
+
 Vue.use(VueTimers)
 Vue.use(Router)
 Vue.use(BootstrapVue)
@@ -37,6 +39,14 @@ Vue.mixin({
         return {
             store
         }
+    },
+    methods: {
+        formatFranklin(value) {
+            return ethers.utils.formatEther(ethers.utils.bigNumberify(value).mul(1000000000000))
+        },
+        // parseFranklin(value) {
+        //     return ethers.utils.parseEther(value).div(1)
+        // },
     },
     computed: {
         etherscan() {
@@ -61,6 +71,7 @@ window.app = new Vue({
 // debug utils
 
 window.store = store
+window.ethers = ethers
 window.p = {
     // promise printer for debugging in console
     set p(promise) {
