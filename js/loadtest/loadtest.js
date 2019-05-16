@@ -176,7 +176,7 @@ async function test() {
         promises.push( clients[i].prepare() )
     }
 
-    // console.log('waiting until the clients are ready...')
+    //console.log('waiting until the clients are ready...')
     await Promise.all(promises)
 
     if (args[0] === 'prepare' ) process.exit(0);
@@ -186,19 +186,18 @@ async function test() {
     let sourceBalanceAfter = await source.getBalance()
     console.log('Total spent: ', format(sourceBalanceBefore.sub(sourceBalanceAfter)))
 
-    console.log('xx: starting the test...')
+    console.log('starting the test...')
     while(total < TOTAL_TX) {
         let nextTick = new Date(new Date().getTime() + 1000)
         let promises = []
-        for (let i=0; i<(tps * 2); i++) {
+        for (let i=0; i<(tps * 3); i++) {
             let client = randomClient()
             let promise = client.randomTransfer().catch(e => console.log('err1: ', e))
             promises.push(promise)
             total++
-            //await new Promise(resolve => setTimeout(resolve, 20))
         }
         
-        await withTimeout(500, Promise.all(promises)).catch(e => 'err2: ' + e)
+        await withTimeout(1500, Promise.all(promises)).catch(e => 'err2: ' + e)
 
         promises = []
         for (let i=0; i < nClients; i++) {
