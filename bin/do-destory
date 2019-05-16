@@ -7,7 +7,7 @@ CLUSTERS=`do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters"`
 # Delete clusters in regions
 
 for R in $REGIONS; do
-    NAME=$CLUSTER_NAME-$R
+    NAME=$R
     CLUSTER_ID=`echo $CLUSTERS | jq '.kubernetes_clusters | map(select(.name == "'$NAME'" and .region == "'$R'")) | .[0] | .id' | tr -d '"' | grep -v null`
     if [ ! -z $CLUSTER_ID ]
     then
