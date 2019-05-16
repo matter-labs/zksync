@@ -158,6 +158,9 @@ loadtest: confirm_action
 prepare-loadtest: confirm_action
 	@node js/loadtest/loadtest.js prepare
 
+rescue: confirm_action
+	@node js/loadtest/rescue.js
+
 # Devops: main
 
 # (Re)deploy contracts and database
@@ -175,14 +178,14 @@ dockerhub-push: image-nginx image-rust
 apply-kubeconfig:
 	@bin/k8s-apply
 
-restart-kube-rust: apply-kubeconfig
+update-rust: push-image-rust apply-kubeconfig
 	@kubectl patch deployment $(FRANKLIN_ENV)-server -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
 	@kubectl patch deployment $(FRANKLIN_ENV)-prover -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
 
 update-nginx: push-image-nginx apply-kubeconfig
 	@kubectl patch deployment $(FRANKLIN_ENV)-nginx -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
 
-start-kube: push-image-nginx push-image-rust apply-kubeconfig restart-kube-rust restart-kube-nginx
+start-kube: push-image-nginx push-image-rust apply-kubeconfig update-rust update-nginx
 
 ifeq (,$(KUBECONFIG))
 start: image-nginx image-rust start-local
@@ -211,7 +214,7 @@ log:
 ifeq (,$(KUBECONFIG))
 	@docker-compose logs -f server prover
 else
-	kubectl logs -f deployments/server
+	kubectl logs -f deployments/$(FRANKLIN_ENV)-server
 endif
 
 
@@ -224,7 +227,7 @@ nodes:
 	kubectl get nodes -o wide
 
 proverlogs:
-	kubectl logs -f deployments/prover
+	kubectl logs -f deployments/$(FRANKLIN_ENV)-prover
 
 
 # Dev environment
