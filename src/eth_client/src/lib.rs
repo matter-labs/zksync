@@ -46,7 +46,6 @@ pub struct ETHClient {
     contract:       ethabi::Contract,
     reqwest_client: reqwest::Client,       
     chain_id:       u8,
-    nonce:          U256
 }
 
 /// ETH client for Plasma contract
@@ -54,8 +53,7 @@ pub struct ETHClient {
 impl ETHClient {
 
     pub fn new(contract_abi: ABI) -> Self {
-
-        let mut this = Self{
+        Self{
             web3_url:       env::var("WEB3_URL").unwrap_or("http://localhost:8545".to_string()),
             private_key:    H256::from_str(&env::var("PRIVATE_KEY").unwrap_or("aa8564af9bef22f581e99125d1829b76c45d08e4f6f0b74d586911f4318b6776".to_string())).expect("private key must be correct"),
             contract_addr:  H160::from_str(&env::var("CONTRACT_ADDR").unwrap_or("616e08c733fe20e99bf70c5088635694d5e25c54".to_string())).expect("contract address must be correct"),
@@ -63,14 +61,15 @@ impl ETHClient {
             chain_id:       u8::from_str(&env::var("CHAIN_ID").unwrap_or("4".to_string())).expect("chain id must be correct"),
             contract:       ethabi::Contract::load(contract_abi.0).expect("contract must be loaded correctly"),
             reqwest_client: reqwest::Client::new(),
-            nonce:          U256::zero(),
-        };
+        }
+    }
 
-        // TODO: review nonce handling
-        this.nonce = this.get_nonce(&format!("0x{}", &this.sender_account)).unwrap();
-        println!("Starting with nonce = {}", this.nonce);
+    pub fn current_sender(&self) -> String {
+        self.sender_account.clone()
+    }
 
-        this
+    pub fn current_nonce(&self) -> Result<u32> {
+        self.get_nonce(&format!("0x{}", self.sender_account)).map(|nonce|nonce.as_u32())
     }
 
     pub fn default_account(&self) -> String {

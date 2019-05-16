@@ -525,20 +525,24 @@ impl StorageProcessor {
             r
     }
 
-    pub fn update_op_config(&self, addr: &str, nonce: Nonce) -> QueryResult<()> {
+    /// Updates op_config to new address and fast-forwards the nonce, if its current value 
+    /// from the network is larger than the largest nonce from scheduled operations
+    pub fn fast_forward_op_config(&self, sender: &str, current_nonce: Nonce) -> QueryResult<()> {
+
+        // The code below does this:
+        // next_nonce = max( current_nonce, max(nonces from ops scheduled for this sender) + 1 )
         diesel::sql_query(format!("
             UPDATE op_config 
             SET addr = '{addr}', next_nonce = s.next_nonce
             FROM (
-                SELECT max(max_nonce) AS next_nonce
+                SELECT max(t.next_nonce) AS next_nonce
                 FROM (
-                    SELECT max(nonce) AS max_nonce 
-                    FROM operations WHERE addr = '{addr}' 
-                    UNION SELECT {nonce} AS max_nonce
+                    SELECT max(nonce) + 1 AS next_nonce FROM operations WHERE addr = '{addr}' 
+                    UNION SELECT {current_nonce} AS next_nonce
                 ) t
-            ) s", addr = addr, nonce = nonce as i32).as_str())
-            .execute(self.conn())
-            .map(|_|())
+            ) s", addr = sender, current_nonce = current_nonce as i32).as_str())
+        .execute(self.conn())
+        .map(|_|())
     }
 
     pub fn load_stored_op_with_block_number(&self, block_number: BlockNumber, action_type: ActionType) -> Option<StoredOperation> {
@@ -1015,7 +1019,7 @@ mod test {
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
         conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
-        conn.update_op_config("0x0", 0).unwrap();
+        conn.fast_forward_op_config("0x0", 0).unwrap();
 
         let mut accounts = fnv::FnvHashMap::default();
         let acc = |balance| { 
@@ -1081,7 +1085,7 @@ mod test {
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
         conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
-        conn.update_op_config("0x0", 0).unwrap();
+        conn.fast_forward_op_config("0x0", 0).unwrap();
 
         conn.execute_operation(&Operation{
             action: Action::Commit,
