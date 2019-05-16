@@ -1,13 +1,12 @@
 #!/bin/bash
 . .setup_env
 
-CLUSTERS=`do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters"`
-echo $CLUSTERS | jq '.kubernetes_clusters | map({id: .id, name: .name, region: .region, node_pools: .node_pools}) | .[]'
+#CLUSTERS=`do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters"`
+#echo $CLUSTERS | jq '.kubernetes_clusters | map({id: .id, name: .name, region: .region, node_pools: .node_pools}) | .[]'
 
 for KUBECONFIG in `ls etc/kube/clusters/kubeconfig*`; do
     echo $KUBECONFIG
-    kubectl get pods
-    echo done
+    kubectl get deployments
 done
 
 # KUBECONFIG=etc/kube/kubeconfig256.yaml

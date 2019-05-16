@@ -31,4 +31,5 @@ then
     # Postprocessing for all configs
 
     KUBECONFIG=etc/kube/kubeconfig.yaml
+
 fi

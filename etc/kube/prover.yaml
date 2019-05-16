@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ${FRANKLIN_ENV}-prover
+  name: prover
 spec:
   replicas: 30
   selector:

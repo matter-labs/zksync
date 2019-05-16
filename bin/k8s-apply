@@ -1,7 +1,5 @@
 #!/bin/bash
 
-. .setup_env
-
 mkdir -p etc/kube/gen/$FRANKLIN_ENV
 envsubst < etc/kube/prover.yaml > etc/kube/gen/$FRANKLIN_ENV/prover.yaml
 envsubst < etc/kube/server.yaml > etc/kube/gen/$FRANKLIN_ENV/server.yaml
