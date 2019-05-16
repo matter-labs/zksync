@@ -131,6 +131,7 @@ flatten:
 # Publish source to etherscan.io
 source: #flatten
 	@node contracts/scripts/publish-source.js
+	@echo sources published
 
 # testing
 price:
