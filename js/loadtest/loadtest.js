@@ -158,7 +158,7 @@ async function test() {
 
     let sourceBalanceBefore = await source.getBalance()
     sourceNonce = await source.getTransactionCount("pending")
-    gasPrice = await provider.getGasPrice()
+    gasPrice = (await provider.getGasPrice()).mul(2)
 
     console.log(`Current gas price: ${gasPrice.div(1000000000).toNumber()} GWEI`)
     transferPrice = gasPrice.mul(DEPOSIT_GAS_LIMIT)
