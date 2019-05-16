@@ -2,12 +2,13 @@ const ethers = require('ethers')
 
 const bn = ethers.utils.bigNumberify;
 
-const gasPriceScaling = bn(20);
+const gasPriceScaling = bn(11);
 
 async function rescue() {
     console.log("This is intended to run on mainnet only!");
     const web3Url = process.env.WEB3_URL;
     let privateKey = process.env.PRIVATE_KEY;
+    const saveAddress = process.env.FUNDING_ADDR;
 
     // const web3Url = "http://localhost:8545";
     // let privateKey = "27593fea79697e947890ecbecce7901b0008345e5d7259710d0dd5e500d040be";
@@ -30,21 +31,28 @@ async function rescue() {
 
     let latestNonce = await provider.getTransactionCount(address, "latest");
     let pendingNonce = await provider.getTransactionCount(address, "pending");
+    let balance = await provider.getBalance(address, "pending");
 
-    if (latestNonce === pendingNonce) {
-        console.log("No transactions to replace");
-        return;
-    }
+    console.log('Nonce: latest = ', latestNonce, ', pending = ', pendingNonce, ', pending balance = ', ethers.utils.formatEther(balance));
+    console.log('Saving funds to', saveAddress);
 
-    for (let i = latestNonce; i <= pendingNonce; i++) {
+    // if (latestNonce === pendingNonce) {
+    //     console.log("No transactions to replace");
+    //     return;
+    // }
+
+    for (let i = latestNonce; i <= pendingNonce + 10; i++) {
         console.log("Replacing nonce = " + i);
         try {
+            let gasLimit = 21000
+            let value = balance.sub(gasPrice.mul(gasLimit)) //.sub(ethers.utils.parseEther('0.001'))
             let result = await source.sendTransaction(
                 {
-                    to: address,
+                    to: address, // saveAddress,
                     nonce: i,
-                    gasPrice: gasPrice,
-                    gasLimit: 21000,
+                    gasPrice,
+                    gasLimit,
+                    value,
                 }
             );
             console.log("Successfully send with hash " + result.hash);
