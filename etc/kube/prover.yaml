@@ -18,7 +18,7 @@ spec:
           imagePullPolicy: Always
           resources:
             requests:
-              memory: "100Gi"
+              memory: "60Gi"
               cpu: "32"
           envFrom:
           - secretRef:
