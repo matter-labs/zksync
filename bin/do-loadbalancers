@@ -1,0 +1,19 @@
+#!/bin/bash
+. .setup_env
+
+ALL=`do-curl -X GET "https://api.digitalocean.com/v2/load_balancers" | jq '.load_balancers'`
+NOT_AMS3=`echo $ALL | map(select( .region.slug != "ams3"))`
+
+echo $ALL | jq
+
+if [ "$1" == "rm" ]; then
+
+    LIST=`echo $ALL | jq 'map( .id ) | .[]' | tr -d '"'`
+
+    echo Deleting $LIST
+    for LB in $LIST; do
+        echo $LB
+        do-curl -X DELETE "https://api.digitalocean.com/v2/load_balancers/$LB"
+    done
+
+fi

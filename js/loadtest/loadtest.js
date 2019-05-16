@@ -60,7 +60,7 @@ class Client {
         console.log(`creating client #${this.id}`)
     }
 
-    async prepare() {
+    async prepare(fundFranklin) {
         let signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/3/" + this.id)
         this.fra = await franklin.Wallet.fromSigner(signer)
         this.eth = this.fra.ethWallet
@@ -79,7 +79,7 @@ class Client {
                 toAddFranklin = MIN_AMOUNT_FRA
             }
 
-            if ( toAddFranklin.gt(0) ) {
+            if ( fundFranklin && toAddFranklin.gt(0) ) {
                 console.log(`${this.eth.address}: adding ${format(toAddFranklin)} to Franklin`)
 
                 // is wallet balance enough?
@@ -111,6 +111,8 @@ class Client {
                     await this.fra.pullState()
                 }
                 console.log(`${this.eth.address}: sidechain deposit complete`)
+            } else {
+                console.log('${this.eth.address}: prepared')
             }
         } catch (err) {
             console.log(`${this.eth.address}: ERROR: ${err}`)
@@ -157,6 +159,11 @@ class Client {
 async function test() {
 
     var args = process.argv.slice(2);
+    let prepareOnly = args[0] === 'prepare'
+
+    let fundFranklin = !prepareOnly
+
+    console.log(fundFranklin)
 
     let sourceBalanceBefore = await source.getBalance()
     sourceNonce = await source.getTransactionCount("pending")
@@ -173,13 +180,13 @@ async function test() {
     console.log('xx: preparing clients...')
     let promises = []
     for (let i=0; i < nClients; i++) {
-        promises.push( clients[i].prepare() )
+        promises.push( clients[i].prepare(fundFranklin) )
     }
 
     //console.log('waiting until the clients are ready...')
     await Promise.all(promises)
 
-    if (args[0] === 'prepare' ) process.exit(0);
+    if (prepareOnly) process.exit(0);
 
 
 
