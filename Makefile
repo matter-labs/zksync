@@ -77,6 +77,9 @@ dist-explorer: dist-config
 image-nginx: dist-client dist-explorer
 	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .
 
+push-image-nginx: image-nginx
+	docker push "${NGINX_DOCKER_IMAGE}"
+
 explorer-up: #dist-explorer
 	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .
 	@docker-compose up -d nginx
@@ -113,6 +116,9 @@ image-prover: build-target
 
 image-rust: image-server image-prover
 
+push-image-rust: image-rust
+	docker push "${SERVER_DOCKER_IMAGE}"
+	docker push "${PROVER_DOCKER_IMAGE}"
 
 # Contracts
 
@@ -147,7 +153,6 @@ price:
 loadtest: confirm_action
 	@cd js/loadtest && yarn test
 
-
 # Devops: main
 
 # (Re)deploy contracts and database
@@ -155,18 +160,27 @@ redeploy: confirm_action stop deploy-contracts db-reset
 
 dev-ready = docker ps | grep -q "$(GETH_DOCKER_IMAGE)"
 
-start: image-nginx image-rust
-ifeq (,$(KUBECONFIG))
+start-local:
 	@docker ps | grep -q "$(GETH_DOCKER_IMAGE)" || { echo "Dev env not ready. Try: 'franklin dev-up'" && exit 1; }
 	@docker-compose up -d --scale prover=1 server prover nginx
-else
-	docker push "${SERVER_DOCKER_IMAGE}"
-	docker push "${PROVER_DOCKER_IMAGE}"
+
+dockerhub-push: image-nginx image-rust
 	docker push "${NGINX_DOCKER_IMAGE}"
+
+apply-kubeconfig:
 	@bin/deploy-kube
-	@bin/kube scale deployments/server --replicas=1
-	@bin/kube scale deployments/prover --replicas=1
-	@bin/kube scale deployments/nginx --replicas=1
+
+restart-kube-rust:
+
+restart-kube-nginx:
+	#echo kubectl patch deployment nginx -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(date +%s)\"}}}}}"
+
+start-kube: push-image-nginx push-image-nginx apply-kubeconfig restart-kube-rust restart-kube-nginx
+
+ifeq (,$(KUBECONFIG))
+	start: image-nginx image-rust start-local
+else
+	start: start-kube
 endif
 
 stop: confirm_action
