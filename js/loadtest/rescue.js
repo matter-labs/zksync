@@ -21,7 +21,7 @@ async function rescue() {
     }
     const provider = new ethers.providers.JsonRpcProvider(web3Url);
     const source = new ethers.Wallet(privateKey, provider);
-    const address = source.address;
+    const address = source.address; // saveAddress,
     source.connect(provider);
 
     let gasPrice = await provider.getGasPrice();
@@ -41,14 +41,14 @@ async function rescue() {
     //     return;
     // }
 
-    for (let i = latestNonce; i <= pendingNonce + 10; i++) {
+    for (let i = latestNonce; i <= pendingNonce; i++) {
         console.log("Replacing nonce = " + i);
         try {
             let gasLimit = 21000
             let value = balance.sub(gasPrice.mul(gasLimit)) //.sub(ethers.utils.parseEther('0.001'))
             let result = await source.sendTransaction(
                 {
-                    to: address, // saveAddress,
+                    to: address,
                     nonce: i,
                     gasPrice,
                     gasLimit,
@@ -60,6 +60,7 @@ async function rescue() {
         } catch(error) {
             if (error.transactionHash !== undefined) {
                 console.log("There may have been a network erro sending transaction, replacements hash = " + error.transactionHash);
+                console.log('Reason:', error.reason);
             } else {
                 console.log(error);
             }
