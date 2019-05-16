@@ -156,6 +156,8 @@ class Client {
 
 async function test() {
 
+    var args = process.argv.slice(2);
+
     let sourceBalanceBefore = await source.getBalance()
     sourceNonce = await source.getTransactionCount("pending")
     gasPrice = (await provider.getGasPrice()).mul(2)
@@ -176,6 +178,10 @@ async function test() {
 
     // console.log('waiting until the clients are ready...')
     await Promise.all(promises)
+
+    if (args[0] === 'prepare' ) process.exit(0);
+
+
 
     let sourceBalanceAfter = await source.getBalance()
     console.log('Total spent: ', format(sourceBalanceBefore.sub(sourceBalanceAfter)))

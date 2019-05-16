@@ -154,7 +154,10 @@ price:
 # Loadtest
 
 loadtest: confirm_action
-	@cd js/loadtest && yarn test
+	@node js/loadtest/loadtest.js
+
+prepare-loadtest: confirm_action
+	@node js/loadtest/loadtest.js prepare
 
 # Devops: main
 
