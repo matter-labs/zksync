@@ -39,7 +39,7 @@ use plasma::models::{params, Block, PlasmaState};
 use plasma::models::circuit::{Account, AccountTree};
 
 use models::encoder;
-use models::config::{RUNTIME_CONFIG, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE, PROVER_TIMEOUT};
+use models::config::{RUNTIME_CONFIG, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE, PROVER_TIMEOUT, PROVER_TIMER_TICK, PROVER_CYCLE_WAIT};
 use models::{EncodedProof};
 use storage::StorageProcessor;
 
@@ -1014,7 +1014,7 @@ impl BabyProver {
             if self.current_block_number < last_verified_block + 1 {
                 self.rewind_state(&storage, last_verified_block + 1).map_err(|e| format!("rewind_state failed: {}", e))?;
             }
-            thread::sleep(Duration::from_millis(500));
+            thread::sleep(Duration::from_secs(PROVER_CYCLE_WAIT));
         }
         Ok(())
     }
@@ -1022,7 +1022,7 @@ impl BabyProver {
     fn start_timer_interval(&self, rt: &Handle) {
         let job_ref = self.current_job.clone();
         rt.spawn(
-            timer::Interval::new_interval(Duration::from_millis(1000))
+            timer::Interval::new_interval(Duration::from_secs(PROVER_TIMER_TICK))
             .fold(job_ref, |job_ref, _| {
                 let job = job_ref.load(Ordering::Relaxed);
                 if job > 0 {
