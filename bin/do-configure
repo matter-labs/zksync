@@ -43,8 +43,18 @@ for CLUSTER_ID in $CLUSTERS_IDS; do
     KUBECONFIG=etc/kube/clusters/kubeconfig-$NAME.yaml
     do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters/$CLUSTER_ID/kubeconfig" > $KUBECONFIG
 
-    bin/k8s-apply
-    kubectl scale deployments/prover --replicas=$COUNT_PER_REGION
+    # Generate and apply secret for env config
+    . bin/k8s-secret | kubectl apply -f -
+
+    kubectl apply -f etc/kube/gen/$FRANKLIN_ENV/prover.yaml
+    kubectl scale deployments/$FRANKLIN_ENV-prover --replicas=$COUNT_PER_REGION
+
+    # if [ ! "$NAME" == "main" ]; then
+    #     kubectl delete deployments/$FRANKLIN_ENV-nginx
+    #     kubectl delete deployments/$FRANKLIN_ENV-server
+    # fi
+
+    echo
 
     # PROVISIONED=$((PROVISIONED + COUNT_PER_REGION))
     # if ((PROVISIONED >= COUNT_TOTAL)) 
