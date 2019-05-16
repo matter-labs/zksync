@@ -205,6 +205,8 @@ endif
 
 restart: stop start
 
+start-prover:
+	@bin/kube scale deployments/$(FRANKLIN_ENV)-prover --replicas=1
 
 # Monitoring
 
