@@ -3,8 +3,7 @@ export SERVER_DOCKER_IMAGE ?= gluk64/franklin:server
 export PROVER_DOCKER_IMAGE ?=gluk64/franklin:prover
 export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
 export FLATTENER_DOCKER_IMAGE ?= gluk64/franklin:flattener
-export NGINX_DOCKER_IMAGE ?= gluk64/franklin-nginx:latest
-
+export NGINX_DOCKER_IMAGE ?= gluk64/franklin-nginx:$(FRANKLIN_ENV)
 
 # Getting started
 
@@ -174,7 +173,7 @@ dockerhub-push: image-nginx image-rust
 	docker push "${NGINX_DOCKER_IMAGE}"
 
 apply-kubeconfig:
-	@bin/deploy-kube
+	@bin/k8s-apply
 
 restart-kube-rust:
 

@@ -28,4 +28,7 @@ then
     eval $(grep -v '^#' $ENV_FILE | sed 's/^/export /')
     set +o allexport
 
+    # Postprocessing for all configs
+
+    KUBECONFIG=etc/kube/kubeconfig.yaml
 fi

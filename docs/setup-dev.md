@@ -16,6 +16,13 @@ Install axel for downloading keys:
 
 ```brew install axel```
 
+## Envsubst for mac (to transpile k8s yaml files)
+
+```
+brew install gettext
+brew link --force gettext 
+```
+
 ## Rust
 
 Install the latest rust version (>= 1.32):

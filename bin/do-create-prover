@@ -2,4 +2,4 @@
 
 . .setup_env
 
-do-curl -X POST https://api.digitalocean.com/v2/kubernetes/clusters/ /node_pools --data '{ "size": "c-32", "name": "prover", "count": 1 }'
+do-curl -X POST https://api.digitalocean.com/v2/kubernetes/clusters/`do-main-id`/node_pools --data '{ "size": "c-32", "name": "prover", "count": 1 }'

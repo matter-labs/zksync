@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: prover
+  name: ${FRANKLIN_ENV}-prover
 spec:
   replicas: 30
   selector:
     matchLabels:
-      app: prover
+      app: ${FRANKLIN_ENV}-prover
   template:
     metadata:
       labels:
-        app: prover
+        app: ${FRANKLIN_ENV}-prover
     spec:
       containers:
-        - name: prover
+        - name: ${FRANKLIN_ENV}-prover
           image: gluk64/franklin:prover
           imagePullPolicy: Always
           resources:
@@ -21,8 +21,10 @@ spec:
               memory: "30Gi"
           envFrom:
           - secretRef:
-              name: franklin-secret
+              name: ${FRANKLIN_ENV}-secret
           env:
+          - name: FRANKLIN_ENV
+            value: "${FRANKLIN_ENV}"
           - name: NODE_NAME
             valueFrom:
               fieldRef:
@@ -31,6 +33,6 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
-      terminationGracePeriodSeconds: 5
+      terminationGracePeriodSeconds: 20
       nodeSelector:
         doks.digitalocean.com/node-pool: prover
