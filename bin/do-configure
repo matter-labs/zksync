@@ -47,7 +47,7 @@ for CLUSTER_ID in $CLUSTERS_IDS; do
     . bin/k8s-secret | kubectl apply -f -
 
     kubectl apply -f etc/kube/gen/$FRANKLIN_ENV/prover.yaml
-    kubectl scale deployments/$FRANKLIN_ENV-prover --replicas=$COUNT_PER_REGION
+    kubectl scale deployments/$FRANKLIN_ENV-prover --replicas=$ACTIVE_PER_REGION
 
     # if [ ! "$NAME" == "main" ]; then
     #     kubectl delete deployments/$FRANKLIN_ENV-nginx
