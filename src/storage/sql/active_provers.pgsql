@@ -10,4 +10,5 @@
 -- from pr
 -- order by block_number asc;
 
-select * from active_provers;
+select * from active_provers
+where stopped_at is null;

@@ -6,5 +6,5 @@ FRANKLIN_ENV=
 cd src/storage
 
 echo DATABASE_URL=$DATABASE_URL
-diesel database setup
-diesel migration run
+diesel database setup || exit 1
+diesel migration run || exit 1

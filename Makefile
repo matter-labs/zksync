@@ -42,8 +42,7 @@ db-setup:
 	@bin/db-setup
 
 db-insert-contract:
-	@$(sql) "INSERT INTO server_config (contract_addr) VALUES ('$(CONTRACT_ADDR)')"
-	@echo "successfully inserted contract address into the database"
+	@bin/db-insert-contract
 
 db-reset: confirm_action db-drop db-setup db-insert-contract
 	@echo database is ready
