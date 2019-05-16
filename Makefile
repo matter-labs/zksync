@@ -31,7 +31,7 @@ confirm_action:
 
 # Database tools
 
-sql = psql $(DATABASE_URL) -c 
+sql = psql "$(DATABASE_URL)" -c 
 
 db-test:
 	@bin/db-test
@@ -39,7 +39,12 @@ db-test:
 db-setup:
 	@bin/db-setup
 
-db-reset: confirm_action db-drop db-setup
+db-insert-contract:
+	@$(sql) "INSERT INTO server_config (contract_addr) VALUES ('$(CONTRACT_ADDR)')"
+	@echo "successfully inserted contract address into the database"
+
+db-reset: confirm_action db-drop db-setup db-insert-contract
+	@echo database is ready
 
 db-migrate: confirm_action
 	@cd src/storage && diesel migration run

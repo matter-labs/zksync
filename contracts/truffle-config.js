@@ -23,7 +23,7 @@ module.exports = {
 
     networks: {
 
-      dev: {
+      universal: {
         network_id: '9',
         gas: 6900000,
         provider: function() { 

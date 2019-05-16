@@ -31,6 +31,8 @@ then
 
     sed -i".bak" "s/CONTRACT_ADDR=$OLD_CONTRACT/CONTRACT_ADDR=$NEW_CONTRACT/g" ./$ENV_FILE
 
+    echo successfully deployed contracts
+
 else
     echo "Contract deployment failed"
     exit 1
