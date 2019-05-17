@@ -150,7 +150,7 @@ impl PlasmaStateKeeper {
     fn apply_transfer_tx(&mut self, tx: TransferTx) -> TransferTxResult {
         let appication_result = self.state.apply_transfer(&tx);
         if appication_result.is_ok() {
-            println!("accepted transaction for account {}, nonce {}", tx.from, tx.nonce);
+            //println!("accepted transaction for account {}, nonce {}", tx.from, tx.nonce);
             self.transfer_tx_queue.push(tx);
         }
 

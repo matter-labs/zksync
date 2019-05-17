@@ -151,7 +151,7 @@ price:
 
 # Loadtest
 
-loadtest: confirm_action
+run-loadtest: confirm_action
 	@node js/loadtest/loadtest.js
 
 prepare-loadtest: confirm_action
@@ -187,7 +187,7 @@ update-rust: push-image-rust apply-kubeconfig
 update-nginx: push-image-nginx apply-kubeconfig
 	@kubectl patch deployment $(FRANKLIN_ENV)-nginx -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
 
-update-all: update-rust update-nginx
+update-all: update-rust update-nginx apply-kubeconfig
 
 start-kube: apply-kubeconfig
 
@@ -198,7 +198,7 @@ start: start-kube
 endif
 
 stop: confirm_action
-ifeq (,$(KUBECONFIG))
+ifeq (dev,$(FRANKLIN_ENV))
 	@docker-compose stop server prover
 else
 	@bin/kube scale deployments/$(FRANKLIN_ENV)-server --replicas=0
@@ -211,18 +211,28 @@ restart: stop start
 start-prover:
 	@bin/kube scale deployments/$(FRANKLIN_ENV)-prover --replicas=1
 
+start-server:
+	@bin/kube scale deployments/$(FRANKLIN_ENV)-server --replicas=1
+
+stop-prover:
+	@bin/kube scale deployments/$(FRANKLIN_ENV)-prover --replicas=0
+
+stop-server:
+	@bin/kube scale deployments/$(FRANKLIN_ENV)-server --replicas=0
+
 # Monitoring
 
 status:
 	@curl $(API_SERVER)/api/v0.1/status; echo
 
-log:
-ifeq (,$(KUBECONFIG))
+log-dc:
 	@docker-compose logs -f server prover
-else
-	kubectl logs -f deployments/$(FRANKLIN_ENV)-server
-endif
 
+log-server:
+	kubectl logs --tail 300 -f deployments/$(FRANKLIN_ENV)-server
+
+log-prover:
+	kubectl logs --tail 300 -f deployments/$(FRANKLIN_ENV)-prover
 
 # Kubernetes: monitoring shortcuts
 
@@ -231,9 +241,6 @@ pods:
 
 nodes:
 	kubectl get nodes -o wide
-
-proverlogs:
-	kubectl logs -f deployments/$(FRANKLIN_ENV)-prover
 
 
 # Dev environment

@@ -163,7 +163,7 @@ async function test() {
 
     let fundFranklin = !prepareOnly
 
-    console.log(fundFranklin)
+    console.log('Will run:', fundFranklin)
 
     let sourceBalanceBefore = await source.getBalance()
     sourceNonce = await source.getTransactionCount("pending")
@@ -188,34 +188,28 @@ async function test() {
 
     if (prepareOnly) process.exit(0);
 
-
-
     let sourceBalanceAfter = await source.getBalance()
     console.log('Total spent: ', format(sourceBalanceBefore.sub(sourceBalanceAfter)))
 
     console.log('starting the test...')
     while(total < TOTAL_TX) {
-        let nextTick = new Date(new Date().getTime() + 1000)
+
         let promises = []
+        for (let i=0; i < nClients; i++) {
+            promises.push(clients[i].fra.pullState().catch(e => 'err3: ' + e))
+        }
+        await withTimeout(1500, Promise.all(promises)).catch(e => 'err4: ' + e)
+
+        promises = []
         for (let i=0; i<(tps * 3); i++) {
             let client = randomClient()
             let promise = client.randomTransfer().catch(e => console.log('err1: ', e))
             promises.push(promise)
             total++
         }
-        
         await withTimeout(1500, Promise.all(promises)).catch(e => 'err2: ' + e)
 
-        promises = []
-        for (let i=0; i < nClients; i++) {
-            promises.push(clients[i].fra.pullState().catch(e => 'err3: ' + e))
-        }
-        await withTimeout(1500, Promise.all(promises)).catch(e => 'err4: ' + e)
-
         console.log('-- total: ', total, ' of ', TOTAL_TX)
-        while(nextTick > new Date()) {
-            await new Promise(resolve => setTimeout(resolve, 1))
-        }
     }
 
     console.log('test complete, total = ', total)
