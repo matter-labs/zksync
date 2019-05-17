@@ -19,4 +19,6 @@ done
 
 # Scale down main/prover
 
-kubectl scale deployments/$FRANKLIN_ENV-prover --replicas=1
+do-scale-single `do-main-id` 1
+
+#kubectl scale deployments/$FRANKLIN_ENV-prover --replicas=1

@@ -29,6 +29,10 @@ for CLUSTER_ID in $CLUSTERS_IDS; do
     CLUSTER=`echo $CLUSTERS | jq '.kubernetes_clusters | map(select(.id == "'$CLUSTER_ID'")) | .[0]'`
     NAME=`echo $CLUSTER | jq '.name' | tr -d '"'`
 
+    # if [ "$NAME" == "main" ]; then
+    #     continue
+    # fi
+
     PROVER_POOL=`echo $CLUSTER | jq '.node_pools | map(select(.name == "prover")) | .[0]'`
     NODE_POOL_ID=`echo $PROVER_POOL | jq '.id' | grep -v null | tr -d '"'`
     CURRENT_COUNT=`echo $PROVER_POOL | jq '.count'`
