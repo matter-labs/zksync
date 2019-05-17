@@ -2,7 +2,7 @@ const ethers = require('ethers')
 
 const bn = ethers.utils.bigNumberify;
 
-const gasPriceScaling = bn(11);
+const gasPriceScaling = bn(12);
 
 async function rescue() {
     console.log("This is intended to run on mainnet only!");
@@ -21,7 +21,11 @@ async function rescue() {
     }
     const provider = new ethers.providers.JsonRpcProvider(web3Url);
     const source = new ethers.Wallet(privateKey, provider);
-    const address = source.address; // saveAddress,
+    const address = saveAddress
+
+    console.log(address)
+    //process.exit(0)
+
     source.connect(provider);
 
     let gasPrice = await provider.getGasPrice();
@@ -41,11 +45,11 @@ async function rescue() {
     //     return;
     // }
 
-    for (let i = latestNonce; i <= pendingNonce; i++) {
+    for (let i = 218; i <= 218 + 10; i++) {
         console.log("Replacing nonce = " + i);
         try {
             let gasLimit = 21000
-            let value = balance.sub(gasPrice.mul(gasLimit)) //.sub(ethers.utils.parseEther('0.001'))
+            let value = ethers.utils.parseEther('1.8') //balance.sub(gasPrice.mul(gasLimit)).sub(ethers.utils.parseEther('0.1'))
             let result = await source.sendTransaction(
                 {
                     to: address,

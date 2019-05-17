@@ -7,11 +7,13 @@ echo
 
 for KUBECONFIG in `ls etc/kube/clusters/kubeconfig*`; do
     echo $KUBECONFIG
-    export KUBECONFIG=$KUBECONFIG
+    export KUBECONFIG=$KUBECONFIG    
+    kubectl get deployments
     if [[ "$1" == "nodes" ]]; then
         kubectl get nodes
-    else
-        kubectl get deployments
+    fi
+    if [[ "$1" == "pods" ]]; then
+        kubectl get pods
     fi
     echo
 done

@@ -1,5 +1,10 @@
-select count(*) from active_provers
-where stopped_at is null;
+-- update active_provers
+-- set stopped_at = now()
+-- where id <= 118;
+
+select * from active_provers
+where stopped_at is null
+;
 
 with pr as (
 SELECT 
