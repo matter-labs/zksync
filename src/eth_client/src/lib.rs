@@ -88,13 +88,12 @@ impl ETHClient {
         // fetch current gas_price
         let orig_gas_price = self.get_gas_price()?;
         let mut gas_price = orig_gas_price * U256::from(self.gas_price_factor);
-        let min_gas_price = U256::from(self.min_gas_price) * U256::from_str("1000000000").unwrap();
+        let min_gas_price = U256::from(self.min_gas_price) * U256::from_str("3B9ACA00").unwrap(); // gwei x 10^9
 
         if gas_price < min_gas_price {
             gas_price = min_gas_price;
         }
-
-        println!("Sending tx: gas price = {}, factored = {}, nonce = {}", orig_gas_price, gas_price, meta.nonce);
+        println!("Sending tx: gas price = {}, min = {}, factored = {}, nonce = {}", orig_gas_price, min_gas_price, gas_price, meta.nonce);
 
         // form and sign tx
         let tx = signer::RawTransaction {

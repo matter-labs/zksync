@@ -2,7 +2,7 @@ const ethers = require('ethers')
 
 const bn = ethers.utils.bigNumberify;
 
-const gasPriceScaling = bn(12);
+const gasPriceScaling = bn(12).add(bn(1));
 
 async function rescue() {
     console.log("This is intended to run on mainnet only!");
@@ -21,7 +21,7 @@ async function rescue() {
     }
     const provider = new ethers.providers.JsonRpcProvider(web3Url);
     const source = new ethers.Wallet(privateKey, provider);
-    const address = saveAddress
+    const address = source.address, saveAddress
 
     console.log(address)
     //process.exit(0)
@@ -56,7 +56,7 @@ async function rescue() {
                     nonce: i,
                     gasPrice,
                     gasLimit,
-                    value,
+                    //value,
                 }
             );
             console.log("Successfully send with hash " + result.hash);

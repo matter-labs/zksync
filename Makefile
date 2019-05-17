@@ -141,7 +141,7 @@ flatten:
 	$(call flatten_file,Transactor.sol)
 
 # Publish source to etherscan.io
-source: flatten
+source: #flatten
 	@node contracts/scripts/publish-source.js
 	@echo sources published
 
@@ -233,7 +233,7 @@ log-dc:
 	@docker-compose logs -f server prover
 
 log-server:
-	kubectl logs --tail 300 -f deployments/$(FRANKLIN_ENV)-server
+	kubectl logs -f deployments/$(FRANKLIN_ENV)-server
 
 log-prover:
 	kubectl logs --tail 300 -f deployments/$(FRANKLIN_ENV)-prover

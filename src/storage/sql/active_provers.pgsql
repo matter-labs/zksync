@@ -2,7 +2,7 @@
 -- set stopped_at = now()
 -- where id <= 118;
 
-select * from active_provers
+select count(*) from active_provers
 where stopped_at is null
 ;
 

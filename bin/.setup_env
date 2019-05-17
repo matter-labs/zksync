@@ -32,4 +32,7 @@ then
 
     export KUBECONFIG=etc/kube/clusters/kubeconfig-main.yaml
 
+    # if [[ $FIXMODE ]]; then
+    #     export WEB3_URL=http://localhost:8545
+    # fi
 fi
