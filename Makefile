@@ -191,7 +191,7 @@ update-all: update-rust update-nginx
 
 start-kube: apply-kubeconfig
 
-ifeq (,$(KUBECONFIG))
+ifeq (dev,$(FRANKLIN_ENV))
 start: image-nginx image-rust start-local
 else
 start: start-kube

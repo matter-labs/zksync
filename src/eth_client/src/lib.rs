@@ -46,6 +46,7 @@ pub struct ETHClient {
     contract:       ethabi::Contract,
     reqwest_client: reqwest::Client,       
     chain_id:       u8,
+    gas_price_factor: usize,
 }
 
 /// ETH client for Plasma contract
@@ -54,13 +55,14 @@ impl ETHClient {
 
     pub fn new(contract_abi: ABI) -> Self {
         Self{
-            web3_url:       env::var("WEB3_URL").unwrap_or("http://localhost:8545".to_string()),
-            private_key:    H256::from_str(&env::var("PRIVATE_KEY").unwrap_or("aa8564af9bef22f581e99125d1829b76c45d08e4f6f0b74d586911f4318b6776".to_string())).expect("private key must be correct"),
-            contract_addr:  H160::from_str(&env::var("CONTRACT_ADDR").unwrap_or("616e08c733fe20e99bf70c5088635694d5e25c54".to_string())).expect("contract address must be correct"),
-            sender_account: env::var("SENDER_ACCOUNT").unwrap_or("e5d0efb4756bd5cdd4b5140d3d2e08ca7e6cf644".to_string()),
-            chain_id:       u8::from_str(&env::var("CHAIN_ID").unwrap_or("4".to_string())).expect("chain id must be correct"),
-            contract:       ethabi::Contract::load(contract_abi.0).expect("contract must be loaded correctly"),
-            reqwest_client: reqwest::Client::new(),
+            web3_url:           env::var("WEB3_URL").unwrap_or("http://localhost:8545".to_string()),
+            private_key:        H256::from_str(&env::var("PRIVATE_KEY").unwrap_or("aa8564af9bef22f581e99125d1829b76c45d08e4f6f0b74d586911f4318b6776".to_string())).expect("private key must be correct"),
+            contract_addr:      H160::from_str(&env::var("CONTRACT_ADDR").unwrap_or("616e08c733fe20e99bf70c5088635694d5e25c54".to_string())).expect("contract address must be correct"),
+            sender_account:     env::var("SENDER_ACCOUNT").unwrap_or("e5d0efb4756bd5cdd4b5140d3d2e08ca7e6cf644".to_string()),
+            chain_id:           u8::from_str(&env::var("CHAIN_ID").unwrap_or("4".to_string())).expect("chain id must be correct"),
+            contract:           ethabi::Contract::load(contract_abi.0).expect("contract must be loaded correctly"),
+            reqwest_client:     reqwest::Client::new(),
+            gas_price_factor:   usize::from_str(&env::var("GAS_PRICE_FACTOR").unwrap_or("2".to_string())).expect("GAS_PRICE_FACTOR not set"),
         }
     }
 
@@ -81,16 +83,10 @@ impl ETHClient {
         let f = self.contract.function(method).expect("failed to get function parameters");
         let data = f.encode_input( &params.into_tokens() ).expect("failed to encode parameters");
 
-        // fetch current nonce and gas_price
-        let mut gas_price = self.get_gas_price()?;
-        gas_price = gas_price * U256::from(2);
-
-        // let nonce = self.nonce.clone();
-        // let mut new_nonce = self.nonce;
-        // new_nonce = new_nonce + U256::one();
-        // self.nonce = new_nonce;
-
-        println!("Sending with nonce = {}", meta.nonce);
+        // fetch current gas_price
+        let orig_gas_price = self.get_gas_price()?;
+        let gas_price = orig_gas_price * U256::from(self.gas_price_factor);
+        println!("Sending tx: gas price = {}, factored = {}, nonce = {}", orig_gas_price, gas_price, meta.nonce);
 
         // form and sign tx
         let tx = signer::RawTransaction {
