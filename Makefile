@@ -141,7 +141,7 @@ flatten:
 	$(call flatten_file,Transactor.sol)
 
 # Publish source to etherscan.io
-source: #flatten
+source: flatten
 	@node contracts/scripts/publish-source.js
 	@echo sources published
 
