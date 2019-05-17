@@ -27,7 +27,7 @@ let clients = []
 
 let rng = new Prando(1) // deterministic seed
 
-let TOTAL_TX = 256*250
+let TOTAL_TX = 256*200
 let total = 0
 
 function randomClient() {
