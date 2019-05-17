@@ -6,8 +6,8 @@
         <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
         <b-collapse id="nav-collapse" is-nav>
         <b-navbar-nav>
-            <b-nav-item href="/client/" target="blanc">MatterMask</b-nav-item>
-            <b-nav-item v-bind:href="`https://${etherscan}/address/0x${store.config.CONTRACT_ADDR}`" target="blanc">
+            <b-nav-item href="/client/" target="_blanc">MatterMask</b-nav-item>
+            <b-nav-item v-bind:href="`${etherscan}/address/0x${store.config.CONTRACT_ADDR}`" target="_blanc">
                 Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
             </b-nav-item>
         </b-navbar-nav>
@@ -41,7 +41,7 @@
         </b-card>
         <br>
         <b-card>
-        <div class="row hide-sm" style="color: grey">
+        <div class="row" style="color: grey">
             <div class="col-sm text-center">
             <i class="far fa-square"></i> <b>Blocks committed</b><br><span class="num">{{lastCommitted}}</span>
             </div>
@@ -58,18 +58,8 @@
         </b-card>
         <br>
 
-        <!--
-        <div class="table-container">
-        <div class="overlay text-center" v-if="loading">
-            <br><br><br>
-            <b-spinner variant="primary"></b-spinner>
-        </div>
-        <b-table id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading"></b-table>
-        </div>
-        -->
-
         <b-pagination v-if="ready" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
-        <b-table id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading" class="clickable"></b-table>
+        <b-table responsive id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading" class="clickable"></b-table>
         <b-pagination v-if="ready" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
 
     </b-container>
@@ -223,9 +213,6 @@ export default {
         rows() {
             return this.lastCommitted || 9999
         },
-        etherscan() {
-            return this.store.network === 'mainnet' ? 'etherscan.io' : this.store.network+'.etherscan.io'
-        }
     },
     data() {
         return {

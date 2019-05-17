@@ -1,0 +1,7 @@
+#!/bin/bash
+. .setup_env
+
+do-curl -X GET "https://api.digitalocean.com/v2/sizes?page=1" | jq '.sizes | map(select( .vcpus >= 32 ))'
+do-curl -X GET "https://api.digitalocean.com/v2/sizes?page=2" | jq '.sizes | map(select( .vcpus >= 32 ))'
+do-curl -X GET "https://api.digitalocean.com/v2/sizes?page=3" | jq '.sizes | map(select( .vcpus >= 32 ))'
+do-curl -X GET "https://api.digitalocean.com/v2/sizes?page=4" | jq '.sizes | map(select( .vcpus >= 32 ))'

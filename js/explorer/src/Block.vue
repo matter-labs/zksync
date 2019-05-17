@@ -10,7 +10,7 @@
         <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
         <h5>Block data</h5>
         <b-card no-body>
-            <b-table id="my-table" thead-class="hidden_header" :items="props" :busy="isBusy">
+            <b-table responsive id="my-table" thead-class="hidden_header" :items="props" :busy="isBusy">
                 <span slot="value" slot-scope="data" v-html="data.value"></span>
             </b-table>
         </b-card>
@@ -47,7 +47,7 @@ export default {
             const block = await client.getBlock(this.blockNumber)
             if (!block) return
 
-            this.type            = block.tx_type
+            this.type            = block.type
             this.new_state_root  = block.new_state_root
             this.commit_tx_hash  = block.commit_tx_hash || ''
             this.verify_tx_hash  = block.verify_tx_hash || ''
@@ -59,7 +59,7 @@ export default {
             this.transactions = txs.map( tx => ({
                 from:       tx.from_account,
                 to:         tx.to_account,
-                amount:     tx.amount,
+                amount:     this.formatFranklin(tx.amount) + ' ETH',
                 nonce:      tx.nonce,
             }))
         },
@@ -87,12 +87,12 @@ export default {
         props() {
             return [
                 { name: 'Block #',          value: `<b>${this.blockNumber}</b>`},
-                { name: 'Type',             value: this.type, },
+                //{ name: 'Type',             value: this.type, },
                 { name: 'New root hash',    value: this.new_state_root, },
                 { name: 'Transactions',     value: client.TX_PER_BLOCK(), },
                 { name: 'Status',           value: this.status, },
-                { name: 'Commit tx hash',   value: `<a target="blanc" href="https://rinkeby.etherscan.io/tx/${this.commit_tx_hash}">${this.commit_tx_hash}</a>`, },
-                { name: 'Verify tx hash',   value: `<a target="blanc" href="https://rinkeby.etherscan.io/tx/${this.verify_tx_hash}">${this.verify_tx_hash}</a>`, },
+                { name: 'Commit tx hash',   value: `<a target="blanc" href="${this.etherscan}/tx/${this.commit_tx_hash}">${this.commit_tx_hash}</a>`, },
+                { name: 'Verify tx hash',   value: `<a target="blanc" href="${this.etherscan}/tx/${this.verify_tx_hash}">${this.verify_tx_hash}</a>`, },
             ]
         }
     },

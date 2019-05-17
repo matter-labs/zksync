@@ -3,8 +3,7 @@ export SERVER_DOCKER_IMAGE ?= gluk64/franklin:server
 export PROVER_DOCKER_IMAGE ?=gluk64/franklin:prover
 export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
 export FLATTENER_DOCKER_IMAGE ?= gluk64/franklin:flattener
-export NGINX_DOCKER_IMAGE ?= gluk64/franklin-nginx:latest
-
+export NGINX_DOCKER_IMAGE ?= gluk64/franklin-nginx:$(FRANKLIN_ENV)
 
 # Getting started
 
@@ -31,15 +30,22 @@ confirm_action:
 
 # Database tools
 
-sql = psql $(DATABASE_URL) -c 
+sql = psql "$(DATABASE_URL)" -c 
 
 db-test:
 	@bin/db-test
 
+db-test-reset:
+	@bin/db-test reset
+
 db-setup:
 	@bin/db-setup
 
-db-reset: confirm_action db-drop db-setup
+db-insert-contract:
+	@bin/db-insert-contract
+
+db-reset: confirm_action db-drop db-setup db-insert-contract
+	@echo database is ready
 
 db-migrate: confirm_action
 	@cd src/storage && diesel migration run
@@ -71,6 +77,9 @@ dist-explorer: dist-config
 
 image-nginx: dist-client dist-explorer
 	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .
+
+push-image-nginx: image-nginx
+	docker push "${NGINX_DOCKER_IMAGE}"
 
 explorer-up: #dist-explorer
 	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .
@@ -108,6 +117,9 @@ image-prover: build-target
 
 image-rust: image-server image-prover
 
+push-image-rust: image-rust
+	docker push "${SERVER_DOCKER_IMAGE}"
+	docker push "${PROVER_DOCKER_IMAGE}"
 
 # Contracts
 
@@ -131,13 +143,25 @@ flatten:
 # Publish source to etherscan.io
 source: #flatten
 	@node contracts/scripts/publish-source.js
+	@echo sources published
 
+# testing
+price:
+	@node contracts/scripts/check-price.js
 
 # Loadtest
 
-loadtest:
-	@cd js/loadtest && yarn test
+run-loadtest: confirm_action
+	@node js/loadtest/loadtest.js
 
+prepare-loadtest: confirm_action
+	@node js/loadtest/loadtest.js prepare
+
+rescue: confirm_action
+	@node js/loadtest/rescue.js
+
+deposit: confirm_action
+	@node contracts/scripts/deposit.js
 
 # Devops: main
 
@@ -146,55 +170,81 @@ redeploy: confirm_action stop deploy-contracts db-reset
 
 dev-ready = docker ps | grep -q "$(GETH_DOCKER_IMAGE)"
 
-start: image-nginx image-rust
-ifeq (,$(KUBECONFIG))
+start-local:
 	@docker ps | grep -q "$(GETH_DOCKER_IMAGE)" || { echo "Dev env not ready. Try: 'franklin dev-up'" && exit 1; }
 	@docker-compose up -d --scale prover=1 server prover nginx
-else
-	docker push "${SERVER_DOCKER_IMAGE}"
-	docker push "${PROVER_DOCKER_IMAGE}"
+
+dockerhub-push: image-nginx image-rust
 	docker push "${NGINX_DOCKER_IMAGE}"
-	@bin/deploy-kube
-	@bin/kubectl scale deployments/server --replicas=1
-	@bin/kubectl scale deployments/prover --replicas=1
-	@bin/kubectl scale deployments/nginx --replicas=1
+
+apply-kubeconfig:
+	@bin/k8s-apply
+
+update-rust: push-image-rust apply-kubeconfig
+	@kubectl patch deployment $(FRANKLIN_ENV)-server -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
+	@kubectl patch deployment $(FRANKLIN_ENV)-prover -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
+
+update-nginx: push-image-nginx apply-kubeconfig
+	@kubectl patch deployment $(FRANKLIN_ENV)-nginx -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
+
+update-all: update-rust update-nginx apply-kubeconfig
+
+start-kube: apply-kubeconfig
+
+ifeq (dev,$(FRANKLIN_ENV))
+start: image-nginx image-rust start-local
+else
+start: apply-kubeconfig start-prover start-server start-nginx
 endif
 
+ifeq (dev,$(FRANKLIN_ENV))
 stop: confirm_action
-ifeq (,$(KUBECONFIG))
 	@docker-compose stop server prover
 else
-	@bin/kubectl scale deployments/server --replicas=0
-	@bin/kubectl scale deployments/prover --replicas=0
-	@bin/kubectl scale deployments/nginx --replicas=0
+stop: confirm_action stop-prover stop-server stop-nginx
 endif
 
 restart: stop start
 
+start-prover:
+	@bin/kube scale deployments/$(FRANKLIN_ENV)-prover --replicas=1
+
+start-nginx:
+	@bin/kube scale deployments/$(FRANKLIN_ENV)-nginx --replicas=1
+
+start-server:
+	@bin/kube scale deployments/$(FRANKLIN_ENV)-server --replicas=1
+
+stop-prover:
+	@bin/kube scale deployments/$(FRANKLIN_ENV)-prover --replicas=0
+
+stop-server:
+	@bin/kube scale deployments/$(FRANKLIN_ENV)-server --replicas=0
+
+stop-nginx:
+	@bin/kube scale deployments/$(FRANKLIN_ENV)-nginx --replicas=0
 
 # Monitoring
 
 status:
 	@curl $(API_SERVER)/api/v0.1/status; echo
 
-log:
-ifeq (,$(KUBECONFIG))
+log-dc:
 	@docker-compose logs -f server prover
-else
-	kubectl logs -f deployments/server
-endif
 
+log-server:
+	kubectl logs -f deployments/$(FRANKLIN_ENV)-server
+
+log-prover:
+	kubectl logs --tail 300 -f deployments/$(FRANKLIN_ENV)-prover
 
 # Kubernetes: monitoring shortcuts
 
 pods:
-	kubectl get pods -o wide
+	kubectl get pods -o wide | grep -v Pending
 
 nodes:
 	kubectl get nodes -o wide
-
-proverlogs:
-	kubectl logs -f deployments/prover
 
 
 # Dev environment

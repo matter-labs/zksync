@@ -140,18 +140,12 @@ fn run_eth_sender(pool: ConnectionPool, rx_for_eth: Receiver<Operation>, mut eth
 pub fn start_eth_sender(pool: ConnectionPool) -> Sender<Operation> {
     let (tx_for_eth, rx_for_eth) = channel::<Operation>();
     let mut eth_client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
-
     let storage = pool.access_storage().expect("db connection failed for eth sender");
-
-    // TODO: this is for test only, introduce a production switch (as we can not rely on debug/release mode because performance is required for circuits)
-    let addr = std::env::var("SENDER_ACCOUNT").expect("SENDER_ACCOUNT env var not found");
-    let current_nonce = eth_client.get_nonce(&format!("0x{}", addr)).unwrap();
-
-    println!("Starting eth_sender: sender = {}, current_nonce = {}", addr, current_nonce);
-    storage.update_op_config(&addr, current_nonce.as_u32());
+    let current_nonce = eth_client.current_nonce().expect("could not fetch current nonce");
+    println!("Starting eth_sender: sender = {}, current_nonce = {}", eth_client.current_sender(), current_nonce);
 
     // execute pending transactions
-    let ops = storage.load_unsent_ops(current_nonce.as_u32()).expect("db must be functional");
+    let ops = storage.load_unsent_ops(current_nonce).expect("db must be functional");
     for pending_op in ops {
         tx_for_eth.send(pending_op).expect("must send a request for ethereum transaction for pending operations");
     }

@@ -1,0 +1,19 @@
+#!/bin/bash
+. .setup_env
+
+CLUSTERS=`do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters"`
+echo $CLUSTERS | jq '.kubernetes_clusters | map({id: .id, name: .name, region: .region}) | .[]'
+echo
+
+for KUBECONFIG in `ls etc/kube/clusters/kubeconfig*`; do
+    echo $KUBECONFIG
+    export KUBECONFIG=$KUBECONFIG    
+    kubectl get deployments
+    if [[ "$1" == "nodes" ]]; then
+        kubectl get nodes
+    fi
+    if [[ "$1" == "pods" ]]; then
+        kubectl get pods
+    fi
+    echo
+done

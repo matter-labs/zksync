@@ -239,6 +239,15 @@ pub struct ProverRun {
     pub updated_at:     NaiveDateTime,
 }
 
+#[derive(Debug, Insertable, Queryable, QueryableByName)]
+#[table_name="active_provers"]
+pub struct ActiveProver {
+    pub id:             i32,
+    pub worker:         String,
+    pub created_at:     NaiveDateTime,
+    pub stopped_at:     Option<NaiveDateTime>,
+}
+
 #[derive(Debug, QueryableByName)]
 pub struct IntegerNumber {
     #[sql_type="Integer"]
@@ -322,6 +331,9 @@ impl StorageProcessor {
                 Action::Verify{proof: _} => 
                     self.apply_state_update(op.block.block_number)?,
             };
+
+            // NOTE: tx meta is inserted automatically with sender addr and next expected nonce
+            // see SQL migration code for `operations` table
             let stored: StoredOperation = diesel::insert_into(operations::table)
                 .values(&NewOperation{ 
                     block_number:   op.block.block_number as i32,
@@ -525,20 +537,24 @@ impl StorageProcessor {
             r
     }
 
-    pub fn update_op_config(&self, addr: &str, nonce: Nonce) -> QueryResult<()> {
+    /// Sets up `op_config` to new address and nonce for scheduling ETH transactions for operations
+    /// If current nonce from ETH netorkw is higher, nonce config is fast-forwarded to the new value
+    pub fn prepare_nonce_scheduling(&self, sender: &str, current_nonce: Nonce) -> QueryResult<()> {
+
+        // The code below does this:
+        // next_nonce = max( current_nonce, max(nonces from ops scheduled for this sender) + 1 )
         diesel::sql_query(format!("
             UPDATE op_config 
             SET addr = '{addr}', next_nonce = s.next_nonce
             FROM (
-                SELECT max(max_nonce) AS next_nonce
+                SELECT max(t.next_nonce) AS next_nonce
                 FROM (
-                    SELECT max(nonce) AS max_nonce 
-                    FROM operations WHERE addr = '{addr}' 
-                    UNION SELECT {nonce} AS max_nonce
+                    SELECT max(nonce) + 1 AS next_nonce FROM operations WHERE addr = '{addr}' 
+                    UNION SELECT {current_nonce} AS next_nonce
                 ) t
-            ) s", addr = addr, nonce = nonce as i32).as_str())
-            .execute(self.conn())
-            .map(|_|())
+            ) s", addr = sender, current_nonce = current_nonce as i32).as_str())
+        .execute(self.conn())
+        .map(|_|())
     }
 
     pub fn load_stored_op_with_block_number(&self, block_number: BlockNumber, action_type: ActionType) -> Option<StoredOperation> {
@@ -889,6 +905,27 @@ impl StorageProcessor {
             .map(|_|())
     }
 
+    pub fn register_prover(&self, worker_: &String) -> QueryResult<i32> {
+        use schema::active_provers::dsl::*;
+        let inserted: ActiveProver = insert_into(active_provers)
+        .values(&vec![(
+            worker.eq(worker_.to_string())
+        )])
+        .get_result(self.conn())?;
+        Ok(inserted.id)
+    }
+
+    pub fn record_prover_stop(&self, prover_id: i32) -> QueryResult<()> {
+        use schema::active_provers::dsl::*;
+        use diesel::expression::dsl::now;
+
+        let target = active_provers.filter(id.eq(prover_id));
+        diesel::update(target)
+            .set(stopped_at.eq(now))
+            .execute(self.conn())
+            .map(|_|())
+    }
+
     /// Store the timestamp of the prover finish and the proof
     pub fn store_proof(&self, block_number: BlockNumber, proof: &EncodedProof) -> QueryResult<usize> {
         let to_store = NewProof{
@@ -1015,7 +1052,7 @@ mod test {
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
         conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
-        conn.update_op_config("0x0", 0).unwrap();
+        conn.prepare_nonce_scheduling("0x0", 0).unwrap();
 
         let mut accounts = fnv::FnvHashMap::default();
         let acc = |balance| { 
@@ -1029,6 +1066,7 @@ mod test {
         accounts.insert(7, acc(3));
         accounts.insert(8, acc(4));
         conn.execute_operation(&Operation{
+            id:     None,
             action: Action::Commit,
             block:  Block{
                 block_number:   1,
@@ -1045,6 +1083,7 @@ mod test {
         assert_eq!(conn.last_committed_state_for_account(5).unwrap().unwrap().balance, BigDecimal::from(2));
 
         conn.execute_operation(&Operation{
+            id:     None,
             action: Action::Verify{
                 proof: [U256::zero(); 8], 
             },
@@ -1081,9 +1120,10 @@ mod test {
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
         conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
-        conn.update_op_config("0x0", 0).unwrap();
+        conn.prepare_nonce_scheduling("0x0", 0).unwrap();
 
         conn.execute_operation(&Operation{
+            id:     None,
             action: Action::Commit,
             block:  Block{
                 block_number:   1,
@@ -1101,6 +1141,7 @@ mod test {
         assert_eq!(pending.len(), 1);
 
         conn.execute_operation(&Operation{
+            id:     None,
             action: Action::Verify{
                 proof: [U256::zero(); 8], 
             },
@@ -1134,6 +1175,7 @@ mod test {
         assert_eq!(conn.last_verified_state_for_account(9999).unwrap(), None);
 
         conn.execute_operation(&Operation{
+            id:     None,
             action: Action::Commit,
             block:  Block{
                 block_number:   1,
@@ -1149,6 +1191,7 @@ mod test {
         assert_eq!(3, conn.load_last_committed_deposit_batch().unwrap());
 
         conn.execute_operation(&Operation{
+            id:     None,
             action: Action::Commit,
             block:  Block{
                 block_number:   1,
@@ -1195,6 +1238,7 @@ mod test {
         };
 
         conn.execute_operation(&Operation{
+            id:     None,
             action: Action::Commit,
             block:  Block{
                 block_number:   1,
@@ -1209,6 +1253,7 @@ mod test {
         }).unwrap();
 
         conn.execute_operation(&Operation{
+            id:     None,
             action: Action::Commit,
             block:  Block{
                 block_number:   2,
@@ -1223,6 +1268,7 @@ mod test {
         }).unwrap();
 
         conn.execute_operation(&Operation{
+            id:     None,
             action: Action::Commit,
             block:  Block{
                 block_number:   3,
@@ -1237,7 +1283,80 @@ mod test {
         }).unwrap();
 
         let txs = conn.load_last_saved_transactions(10);
-        assert_eq!(txs.unwrap().len(), 6);
+        assert_eq!(txs.len(), 6);
+    }
+
+    fn dummy_op(action: Action, block_number: BlockNumber) -> Operation {
+            Operation{
+                id:     None,
+                action,
+                block:  Block{
+                    block_number,
+                    new_root_hash:  Fr::default(),
+                    block_data:     BlockData::Deposit{
+                        batch_number: 1,
+                        transactions: vec![],
+                    }
+                }, 
+                accounts_updated:   Some(fnv::FnvHashMap::default()),
+                tx_meta:            None,
+            }
+    }
+
+    #[test]
+    fn test_nonce_fast_forward() {
+        let pool = ConnectionPool::new();
+        let conn = pool.access_storage().unwrap();
+        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
+
+        conn.prepare_nonce_scheduling("0x123", 0).expect("failed");
+
+        let mut i = 0;
+        let stored_op = loop {
+            let stored_op = conn.execute_operation(&dummy_op(Action::Commit, 1)).unwrap();
+            i = i + 1;
+            if i >= 6 { 
+                break stored_op;
+            }
+        };
+
+        // after 6 iterations starting with nonce = 0, last inserted nonce should be 5
+        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 5);
+
+        // addr for
+        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").addr, "0x123");
+
+        // if the nonce from network is lower than expected, this should not affect the scheduler
+        conn.prepare_nonce_scheduling("0x123", 3).expect("failed");
+        let stored_op = conn.execute_operation(&dummy_op(Action::Commit, 1)).unwrap();
+        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 6);
+
+        // if the nonce from network is same as expected, this should not affect the scheduler
+        conn.prepare_nonce_scheduling("0x123", 7).expect("failed");
+        let stored_op = conn.execute_operation(&dummy_op(Action::Commit, 1)).unwrap();
+        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 7);
+
+        // if the nonce from network is higher than expected, scheduler should be fast-forwarded
+        conn.prepare_nonce_scheduling("0x123", 9).expect("failed");
+        let stored_op = conn.execute_operation(&dummy_op(Action::Commit, 1)).unwrap();
+        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 9);
+
+        // if the address is new, nonces start from the given value
+        conn.prepare_nonce_scheduling("0x456", 2).expect("failed");
+        let stored_op = conn.execute_operation(&dummy_op(Action::Commit, 1)).unwrap();
+        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 2);
+
+        // addr should now switch
+        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").addr, "0x456");
+
+        // if we switch back to existing sender, nonce sequence should continue from where it started with that addr
+        conn.prepare_nonce_scheduling("0x123", 0).expect("failed");
+        let stored_op = conn.execute_operation(&dummy_op(Action::Commit, 1)).unwrap();
+        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 10);
+
+        // add should now switch back
+        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").addr, "0x123");
+
     }
 
 }

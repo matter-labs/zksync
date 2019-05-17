@@ -5,7 +5,8 @@ const url = require('url')
 const providerUrl = url.parse(process.env.WEB3_URL)
 const network = providerUrl.host.split('.')[0]
 const querystring = require('querystring')
-const etherscanApiUrl = `https://api-${network}.etherscan.io/api`
+
+const etherscanApiUrl = network === 'mainnet' ? 'https://api.etherscan.io/api' : `https://api-${network}.etherscan.io/api`
 
 const fs = require('fs');
 
@@ -21,7 +22,7 @@ const Constructor = ABI.find(i => i.type === 'constructor')
 function addr(name) {
     let part = deployLog
     part = part.split("Starting migrations...")[1]
-    part = part.split(`Replacing '${name}'`)[1]
+    part = part.split(`'${name}'`)[1]
     part = part.split('contract address:    ')[1]
     part = part.split('\n')[0]
     return part

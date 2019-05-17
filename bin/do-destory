@@ -1,0 +1,24 @@
+#!/bin/bash
+. .setup_env
+
+REGIONS=`cat etc/kube/regions.json | jq 'map( . ) | .[]' | tr -d '"'`
+CLUSTERS=`do-curl -X GET "https://api.digitalocean.com/v2/kubernetes/clusters"`
+
+# Delete clusters in regions
+
+for R in $REGIONS; do
+    NAME=$R
+    CLUSTER_ID=`echo $CLUSTERS | jq '.kubernetes_clusters | map(select(.name == "'$NAME'" and .region == "'$R'")) | .[0] | .id' | tr -d '"' | grep -v null`
+    if [ ! -z $CLUSTER_ID ]
+    then
+        echo "Shutting down cluster $NAME, id = $CLUSTER_ID"
+        RET=`do-curl -X DELETE "https://api.digitalocean.com/v2/kubernetes/clusters/$CLUSTER_ID"`
+        echo $RET
+    fi
+done
+
+# Scale down main/prover
+
+do-scale-single `do-main-id` 1
+
+#kubectl scale deployments/$FRANKLIN_ENV-prover --replicas=1
