@@ -194,22 +194,23 @@ start-kube: apply-kubeconfig
 ifeq (dev,$(FRANKLIN_ENV))
 start: image-nginx image-rust start-local
 else
-start: start-kube
+start: apply-kubeconfig start-prover start-server start-nginx
 endif
 
-stop: confirm_action
 ifeq (dev,$(FRANKLIN_ENV))
+stop: confirm_action
 	@docker-compose stop server prover
 else
-	@bin/kube scale deployments/$(FRANKLIN_ENV)-server --replicas=0
-	@bin/kube scale deployments/$(FRANKLIN_ENV)-prover --replicas=0
-	@bin/kube scale deployments/$(FRANKLIN_ENV)-nginx --replicas=0
+stop: confirm_action stop-prover stop-server stop-nginx
 endif
 
 restart: stop start
 
 start-prover:
 	@bin/kube scale deployments/$(FRANKLIN_ENV)-prover --replicas=1
+
+start-nginx:
+	@bin/kube scale deployments/$(FRANKLIN_ENV)-nginx --replicas=1
 
 start-server:
 	@bin/kube scale deployments/$(FRANKLIN_ENV)-server --replicas=1
@@ -219,6 +220,9 @@ stop-prover:
 
 stop-server:
 	@bin/kube scale deployments/$(FRANKLIN_ENV)-server --replicas=0
+
+stop-nginx:
+	@bin/kube scale deployments/$(FRANKLIN_ENV)-nginx --replicas=0
 
 # Monitoring
 
