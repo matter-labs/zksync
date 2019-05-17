@@ -47,6 +47,7 @@ pub struct ETHClient {
     reqwest_client: reqwest::Client,       
     chain_id:       u8,
     gas_price_factor: usize,
+    min_gas_price:  usize,
 }
 
 /// ETH client for Plasma contract
@@ -63,6 +64,7 @@ impl ETHClient {
             contract:           ethabi::Contract::load(contract_abi.0).expect("contract must be loaded correctly"),
             reqwest_client:     reqwest::Client::new(),
             gas_price_factor:   usize::from_str(&env::var("GAS_PRICE_FACTOR").unwrap_or("2".to_string())).expect("GAS_PRICE_FACTOR not set"),
+            min_gas_price:      usize::from_str(&env::var("MIN_GAS_PRICE").unwrap_or("1".to_string())).expect("MIN_GAS_PRICE not set"),
         }
     }
 
@@ -85,7 +87,13 @@ impl ETHClient {
 
         // fetch current gas_price
         let orig_gas_price = self.get_gas_price()?;
-        let gas_price = orig_gas_price * U256::from(self.gas_price_factor);
+        let mut gas_price = orig_gas_price * U256::from(self.gas_price_factor);
+        let min_gas_price = U256::from(self.min_gas_price) * U256::from_str("1000000000").unwrap();
+
+        if gas_price < min_gas_price {
+            gas_price = min_gas_price;
+        }
+
         println!("Sending tx: gas price = {}, factored = {}, nonce = {}", orig_gas_price, gas_price, meta.nonce);
 
         // form and sign tx
