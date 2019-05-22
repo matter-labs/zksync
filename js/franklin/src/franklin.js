@@ -70,6 +70,15 @@ class FranklinWallet {
         return contract.deposit([pubX, pubY], maxFee, {value})
     }
 
+    async fullExit() {
+        if (!this.ethWallet) {
+            throw 'Can not initiate exit from Franklin: no wallet connected'
+        }
+        let iterationsLimit = 256
+        let contract = this.eth.contract.connect(this.ethWallet)
+        return contract.withdrawUserBalance(iterationsLimit)
+    }
+
     async transfer(to, amount) {
         if ( !this.sidechainOpen ) {
             throw ''

@@ -191,7 +191,7 @@ async function test() {
     let sourceBalanceAfter = await source.getBalance()
     console.log('Total spent: ', format(sourceBalanceBefore.sub(sourceBalanceAfter)))
 
-    console.log('starting the test...')
+    console.log('starting the transfers test...')
     while(total < TOTAL_TX) {
 
         let promises = []
@@ -212,8 +212,16 @@ async function test() {
         console.log('-- total: ', total, ' of ', TOTAL_TX)
     }
 
-    console.log('test complete, total = ', total)
+    console.log('transfers test complete, total = ', total)
 
+    console.log('performing exits from clients...')
+
+    for (let i=0; i < nClients; i++) {
+        promises.push(clients[i].fra.fullExit().catch(e => 'err5: ' + e))
+    }
+    await withTimeout(1500, Promise.all(promises)).catch(e => 'err6: ' + e)
+    
+    console.log('exits complete')
 }
 
 test()
