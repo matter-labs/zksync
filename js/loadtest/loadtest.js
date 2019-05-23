@@ -216,6 +216,7 @@ async function test() {
 
     console.log('performing exits from clients...')
 
+    promises = []
     for (let i=0; i < nClients; i++) {
         promises.push(clients[i].fra.fullExit().catch(e => 'err5: ' + e))
     }
