@@ -11,7 +11,8 @@ export NGINX_DOCKER_IMAGE ?= gluk64/franklin-nginx:$(FRANKLIN_ENV)
 env:	
 
 # Get everything up and running for the first time
-init: dev-up env yarn redeploy
+init: dev-up env yarn db-setup deploy-contracts db-insert-contract
+	@echo init finished
 
 yarn:
 	@cd contracts && yarn
