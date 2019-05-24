@@ -11,7 +11,7 @@ export NGINX_DOCKER_IMAGE ?= gluk64/franklin-nginx:$(FRANKLIN_ENV)
 env:	
 
 # Get everything up and running for the first time
-init: dev-up env yarn db-setup redeploy
+init: dev-up env yarn redeploy
 
 yarn:
 	@cd contracts && yarn
@@ -98,7 +98,7 @@ prover:
 	@bin/.load_keys && cargo run --release --bin prover
 
 server:
-	@cargo run --bin server -- --cfg tesseracts.toml -vvv
+	@cargo run --bin server
 
 sandbox:
 	@cd src/sandbox && cargo run
@@ -268,6 +268,11 @@ blockscout-up:
 
 blockscout-down:
 	@docker-compose stop blockscout blockscout_postgres
+
+# # Tessaracts
+
+# tessaracts-up:
+# 	@{ docker ps -q -f name=tesseracts && echo "Container exists, starting..." && docker start tesseracts } || { echo "Container does not exist" && echo "Starting new container..." }
 
 
 # Auxillary docker containers for dev environment (usually no need to build, just use images from dockerhub)
