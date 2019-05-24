@@ -98,7 +98,7 @@ prover:
 	@bin/.load_keys && cargo run --release --bin prover
 
 server:
-	@cargo run --bin server
+	@cargo run --bin server -- --cfg tesseracts.toml -vvv
 
 sandbox:
 	@cd src/sandbox && cargo run

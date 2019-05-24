@@ -1,0 +1,16 @@
+# tesseracts
+ui_title = "Franklin explorer" 
+db_path = "postgresql://postgres:@tesseracts_postgres:5432/explorer?ssl=false" #"postgres://postgres@localhost/plasma"
+scan = true  
+scan_start_block = 0
+# store with tx are contained in addr? (bool)
+db_store_addr = true 
+db_store_tx = true  
+db_store_itx = true 
+db_store_neb = true 
+web3_url = "http://geth:8545"
+web3_client = "geth"
+web3_itx  = "true --syncmode=full --gcmode=archive --rpcapi debug" 
+# solc_path = 
+# solc_bypass = 
+bind = "0.0.0.0:3000"
