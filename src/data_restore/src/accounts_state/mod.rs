@@ -202,44 +202,57 @@ impl FranklinAccountsStates {
         U256::from(block_slice)
     }
 
-    fn get_all_transactions_from_transfer_block(&self, transaction: &FranklinTransaction) -> Result<TransferTransactionsBlock, DataRestoreError> {
+    pub fn get_all_transactions_from_transfer_block(&self, transaction: &FranklinTransaction) -> Result<TransferTransactionsBlock, DataRestoreError> {
         let mut tx_data_vec = transaction.commitment_data.clone();
+        // println!("tx_data_vec: {:?}", tx_data_vec);
         let block_number = &transaction.commitment_data.clone()[0..32];
-        let mut tx_data_len = tx_data_vec.len();
-        tx_data_vec.truncate(tx_data_len-24);
+        // println!("block_number: {:?}", block_number);
+        let tx_data_len = tx_data_vec.len();
+        // println!("tx_data_len: {:?}", tx_data_len);
         tx_data_vec.reverse();
-        tx_data_len = tx_data_vec.len();
         tx_data_vec.truncate(tx_data_len-160);
         tx_data_vec.reverse();
+        // println!("tx_data_vec final: {:?}", tx_data_vec);
+        // tx_data_len = tx_data_vec.len();
+        // println!("tx_data_len final: {:?}", tx_data_len);
+        let txs = tx_data_vec.chunks(9);
         
-        let (txs0l, txs0r) = tx_data_vec.split_at(36);
-        let (txs1l, txs1r) = txs0l.split_at(18);
-        let (txs2l, txs2r) = txs1l.split_at(9);
-        let (txs3l, txs3r) = txs1r.split_at(9);
-        let (txs4l, txs4r) = txs0r.split_at(18);
-        let (txs5l, txs5r) = txs4l.split_at(9);
-        let (txs6l, txs6r) = txs4r.split_at(9);
-
-        let txs = vec![txs2l, txs2r, txs3l, txs3r, txs5l, txs5r, txs6l, txs6r];
         let mut transfers: Vec<TransferTx> = vec![];
+        let mut i = 0;
         for tx in txs {
-            if tx != [0, 0, 2, 0, 0, 0, 0, 0, 0] {
-                let from = U256::from(&tx[0..3]);
-                let to = U256::from(&tx[3..6]);
-                let amount = U256::from(&tx[6..8]);
-                let fee = U256::from(tx[8]);
-                let transfer_tx = TransferTx {
-                    from: from.as_u32(),
-                    to: to.as_u32(),
-                    amount: BigDecimal::from_str_radix(&format!("{}", amount), 10).unwrap(),
-                    fee: BigDecimal::from_str_radix(&format!("{}", fee), 10).unwrap(),
-                    nonce: 0,
-                    good_until_block: 0,
-                    signature: TxSignature::default(),
-                    cached_pub_key: None,
-                };
-                transfers.push(transfer_tx);
-            }
+            // if tx != [0, 0, 2, 0, 0, 0, 0, 0, 0] {
+            //     let from = U256::from(&tx[0..3]);
+            //     let to = U256::from(&tx[3..6]);
+            //     let amount = U256::from(&tx[6..8]);
+            //     let fee = U256::from(tx[8]);
+            //     let transfer_tx = TransferTx {
+            //         from: from.as_u32(),
+            //         to: to.as_u32(),
+            //         amount: BigDecimal::from_str_radix(&format!("{}", amount), 10).unwrap(),
+            //         fee: BigDecimal::from_str_radix(&format!("{}", fee), 10).unwrap(),
+            //         nonce: 0,
+            //         good_until_block: 0,
+            //         signature: TxSignature::default(),
+            //         cached_pub_key: None,
+            //     };
+            //     transfers.push(transfer_tx);
+            // }
+            let from = U256::from(&tx[0..3]);
+            let to = U256::from(&tx[3..6]);
+            let amount = &tx[6..8];
+            let fee = &tx[8];
+            let transfer_tx = TransferTx {
+                from: from.as_u32(),
+                to: to.as_u32(),
+                amount: amount_bytes_slice_to_big_decimal(amount), //BigDecimal::from_str_radix("0", 10).unwrap(), 
+                fee: fee_bytes_slice_to_big_decimal(&fee), //BigDecimal::from_str_radix("0", 10).unwrap(),
+                nonce: 0,
+                good_until_block: 0,
+                signature: TxSignature::default(),
+                cached_pub_key: None,
+            };
+            transfers.push(transfer_tx);
+            i = i + 1;
         }
         
         Ok(TransferTransactionsBlock {
@@ -248,7 +261,7 @@ impl FranklinAccountsStates {
         })
     }
 
-    fn get_all_transactions_from_deposit_batch(&self, batch_number: U256, block_number: U256) -> Result<DepositTransactionsBlock, DataRestoreError> {
+    pub fn get_all_transactions_from_deposit_batch(&self, batch_number: U256, block_number: U256) -> Result<DepositTransactionsBlock, DataRestoreError> {
         let (_eloop, transport) = web3::transports::Http::new(self.http_endpoint_string.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
         let web3 = web3::Web3::new(transport);
         let deposit_event = self.franklin_contract.event("LogDepositRequest").unwrap().clone();
@@ -341,7 +354,7 @@ impl FranklinAccountsStates {
         Ok(block)
     }
 
-    fn get_all_transactions_from_full_exit_batch(&self, batch_number: U256, block_number: U256) -> Result<FullExitTransactionsBlock, DataRestoreError> {
+    pub fn get_all_transactions_from_full_exit_batch(&self, batch_number: U256, block_number: U256) -> Result<FullExitTransactionsBlock, DataRestoreError> {
         let (_eloop, transport) = web3::transports::Http::new(self.http_endpoint_string.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
         let web3 = web3::Web3::new(transport);
         let exit_event = self.franklin_contract.event("LogExitRequest").unwrap().clone();

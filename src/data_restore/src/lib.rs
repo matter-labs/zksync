@@ -14,6 +14,7 @@ extern crate hex;
 extern crate sapling_crypto;
 
 extern crate bigdecimal;
+extern crate bitvec;
 
 pub mod block_events;
 pub mod franklin_transaction;
@@ -40,12 +41,12 @@ pub struct DataRestoreDriver {
 }
 
 pub fn start_data_restore_driver(mut driver: DataRestoreDriver) {
-    // let _past_state_load = driver.load_past_state().expect("Cant get past state");
-    // driver.run_state_updates();
-    std::thread::Builder::new().name("data_restore".to_string()).spawn(move || {
-        let _past_state_load = driver.load_past_state().expect("Cant get past state");
-        driver.run_state_updates();
-    });
+    let _past_state_load = driver.load_past_state().expect("Cant get past state");
+    driver.run_state_updates();
+    // std::thread::Builder::new().name("data_restore".to_string()).spawn(move || {
+    //     let _past_state_load = driver.load_past_state().expect("Cant get past state");
+    //     driver.run_state_updates();
+    // });
 }
 
 impl DataRestoreDriver {
@@ -182,9 +183,26 @@ mod test {
     #[test]
     fn test_complete_task() {
         let endpoint = helpers::InfuraEndpoint::Rinkeby;
-        let from = U256::from(3972344);
+        let from = U256::from(0);
         let delta = U256::from(15);
         let data_restore_driver = DataRestoreDriver::new(endpoint, from, delta);
         start_data_restore_driver(data_restore_driver);
+    }
+
+    use web3::types::{H256, U256};
+
+    #[test]
+    fn test_transfer_transaction_parse() {
+        let endpoint = helpers::InfuraEndpoint::Rinkeby;
+        let hash = "a01852a7105d64674674ec5277b86d1e9f9016528bae2a28513be2f670a80ce6";
+        let block = LogBlockData {
+            block_num: 74,
+            transaction_hash: H256::from(U256::from(hash)),
+            block_type: blocks::BlockType::Committed
+        };
+        let transaction = FranklinTransaction::get_transaction(endpoint, &block).unwrap();
+        let acc = FranklinAccountsStates::new(endpoint);
+        let res = acc.get_all_transactions_from_transfer_block(&transaction);
+        println!("{:?}", res);
     }
 }
