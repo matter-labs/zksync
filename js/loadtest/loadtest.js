@@ -20,14 +20,14 @@ let sourceNonce = null
 let gasPrice = null
 let transferPrice = null
 
-let nClients = process.env.LOADTEST_N_CLIENTS
-let tps = process.env.LOADTEST_TPS
+let nClients = 2 // process.env.LOADTEST_N_CLIENTS
+let tps = 1 //process.env.LOADTEST_TPS
 
 let clients = []
 
 let rng = new Prando(1) // deterministic seed
 
-let TOTAL_TX = 256*120
+let TOTAL_TX = 4 //256*120
 let total = 0
 
 function randomClient() {
@@ -154,6 +154,24 @@ class Client {
             console.log(`${this.eth.address}: ${transferData} failed: ${JSON.stringify(r)}`)
         }
     }
+
+    async performExit() {
+        try {
+            let request = await this.fra.fullExit()
+            console.log(`${this.eth.address}: full exit tx sent`)
+            let receipt = await request.wait()
+            console.log(`${this.eth.address}: full exit tx mined, waiting for zk proof`)
+            while (!this.fra.sidechainOpen || this.fra.currentBalance.lt(ethers.utils.parseEther(0))) {
+                await sleep(500)
+                await this.fra.pullState()
+            }
+            console.log(`${this.eth.address}: sidechain full exit complete`)
+        } catch (err) {
+            console.log(`${this.eth.address}: ERROR: ${err}`)
+            console.trace(err.stack)
+            throw err
+        }
+    }
 }
 
 async function test() {
@@ -218,7 +236,7 @@ async function test() {
 
     promises = []
     for (let i=0; i < nClients; i++) {
-        promises.push(clients[i].fra.fullExit().catch(e => 'err5: ' + e))
+        promises.push( clients[i].performExit().catch(e => 'err5: ' + e) )
     }
     await withTimeout(1500, Promise.all(promises)).catch(e => 'err6: ' + e)
     

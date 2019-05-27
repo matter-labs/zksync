@@ -71,12 +71,13 @@ class FranklinWallet {
     }
 
     async fullExit() {
+        console.log(`Contract: ${this.eth.contract}`)
         if (!this.ethWallet) {
             throw 'Can not initiate exit from Franklin: no wallet connected'
         }
         let iterationsLimit = 256
         let contract = this.eth.contract.connect(this.ethWallet)
-        return contract.withdrawUserBalance(iterationsLimit)
+        await contract.withdrawUserBalance(iterationsLimit)
     }
 
     async transfer(to, amount) {
@@ -167,10 +168,10 @@ class Franklin {
     }
 
     async pullSidechainState(accountId) {
-        let result = (await axios({
+        let result = await axios({
             method: 'get',
             url:    this.baseUrl + '/account/' + accountId,
-        }))
+        })
 
         if(result.status !== 200) {
             throw `Could not load data for account ${accountId}: ${result.error}`

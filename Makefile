@@ -270,11 +270,13 @@ blockscout-up:
 blockscout-down:
 	@docker-compose stop blockscout blockscout_postgres
 
-# # Tessaracts
+# Tessaracts
 
 # tessaracts-up:
-# 	@{ docker ps -q -f name=tesseracts && echo "Container exists, starting..." && docker start tesseracts } || { echo "Container does not exist" && echo "Starting new container..." }
-
+# 	@echo Starting block explorer...
+# @docker-compose up -d tesseracts
+# @{ docker ps -q -f name=tesseracts && echo "Container exists, starting..." && docker start tesseracts ;} || { echo "Container does not exist" && echo "Starting new container..." }
+# @docker run -d --name tesseracts -t adriamb/tesseracts:v0.4 -vvv --cfg /config/tesseracts.toml
 
 # Auxillary docker containers for dev environment (usually no need to build, just use images from dockerhub)
 
