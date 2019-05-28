@@ -4,9 +4,16 @@ use helpers::*;
 use block_events::BlockEventsFranklin;
 use accounts_state::FranklinAccountsStates;
 use blocks::LogBlockData;
-// use models::{StateKeeperRequest, ProtoAccountsState};
+use std::sync::mpsc::Sender;
+use plasma::models::Fr;
+
+pub struct ProtoAccountsState {
+    errored: bool,
+    root_hash: Fr,
+}
 
 pub struct DataRestoreDriver {
+    pub channel: Option<Sender<ProtoAccountsState>>,
     pub endpoint: InfuraEndpoint,
     pub genesis_block: U256,
     pub blocks_delta: U256,
@@ -17,8 +24,9 @@ pub struct DataRestoreDriver {
 
 impl DataRestoreDriver {
 
-    pub fn new(endpoint: InfuraEndpoint, genesis_block: U256, blocks_delta: U256) -> Self {
+    pub fn new(endpoint: InfuraEndpoint, genesis_block: U256, blocks_delta: U256, channel: Option<Sender<ProtoAccountsState>>) -> Self {
         Self {
+            channel: channel,
             endpoint: endpoint,
             genesis_block: genesis_block,
             blocks_delta: blocks_delta,
@@ -28,25 +36,25 @@ impl DataRestoreDriver {
         }
     }
 
-    // pub fn load_past_state(&mut self, channel: &Sender<StateKeeperRequest>) -> Result<(), DataRestoreError> {
     pub fn load_past_state(&mut self) -> Result<(), DataRestoreError> {
         let states = DataRestoreDriver::get_past_franklin_blocks_events_and_accounts_tree_state(self.endpoint, self.genesis_block, self.blocks_delta).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         self.block_events = states.0;
         self.account_states = states.1;
 
-        let accs = &self.account_states.get_accounts();
+        // let accs = &self.account_states.get_accounts();
         let root = &self.account_states.root_hash();
-        println!("Accs: {:?}", accs);
-        println!("Root: {:?}", root);
-        // let state = ProtoAccountsState {
-        //     errored: false,
-        //     accounts_tree: &self.account_states.accounts_tree,
-        // };
-        // let request = StateKeeperRequest::SetAccountsState(state);
-        // let _send_result = channel.send(request);
-        // if send_result.is_err() {
-        //     return DataRestoreError::StateUpdate("Cant send last state".to_string());
-        // }
+        // println!("Accs: {:?}", accs);
+        println!("Root: {:?}", &root);
+        if let Some(ref _channel) = self.channel {
+            let state = ProtoAccountsState {
+                errored: false,
+                root_hash: root.clone(),
+            };
+            let _send_result = _channel.send(state);
+            if _send_result.is_err() {
+                return Err(DataRestoreError::StateUpdate("Cant send last state".to_string()));
+            }
+        }
         Ok(())
     }
 
@@ -54,7 +62,6 @@ impl DataRestoreDriver {
         self.run_updates = false
     }
 
-    // pub fn run_state_updates(&mut self, channel: &Sender<StateKeeperRequest>) -> DataRestoreError {
     pub fn run_state_updates(&mut self) -> Option<DataRestoreError> {
         self.run_updates = true;
         let mut err: Option<DataRestoreError> = None;
@@ -64,26 +71,28 @@ impl DataRestoreDriver {
                     println!("Something goes wrong: {:?}", error);
                     self.run_updates = false;
                     err = Some(DataRestoreError::StateUpdate(format!("Error occured: {:?}", error)));
-                    // return DataRestoreError::StateUpdate(format!("Error occured: {:?}", error));
                 },
                 Ok(()) => {
                     println!("Updated!");
-                    let accs = self.account_states.get_accounts();
-                    let root = self.account_states.root_hash();
-                    println!("Accs: {:?}", accs);
-                    println!("Root: {:?}", root);
+                    // let accs = self.account_states.get_accounts();
+                    // let root = self.account_states.root_hash();
+                    // println!("Accs: {:?}", accs);
+                    // println!("Root: {:?}", &root);
                 },
             };
-            // let state = ProtoAccountsState {
-            //     errored: &!self.run_updates,
-            //     accounts_tree: &self.account_states.accounts_tree,
-            // };
-            // let request = StateKeeperRequest::SetAccountsState(state);
-            // let _send_result = channel.send(request);
-            // if send_result.is_err() {
-            //     self.run_updates = false;
-            //     err = Some(DataRestoreError::StateUpdate("Cant send last state".to_string()));
-            // }
+            let root = self.account_states.root_hash();
+            println!("Root: {:?}", &root);
+            if let Some(ref _channel) = self.channel {
+                let state = ProtoAccountsState {
+                    errored: !self.run_updates,
+                    root_hash: root.clone(),
+                };
+                let _send_result = _channel.send(state);
+                if _send_result.is_err() {
+                    self.run_updates = false;
+                    err = Some(DataRestoreError::StateUpdate("Cant send last state".to_string()));
+                }
+            }
         }
         return err;
     }

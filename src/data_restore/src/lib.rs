@@ -6,7 +6,6 @@ extern crate futures;
 extern crate ethabi;
 
 extern crate plasma;
-// extern crate models;
 
 extern crate pairing;
 extern crate ff;
@@ -24,16 +23,12 @@ pub mod accounts_state;
 pub mod data_restore_driver;
 
 use data_restore_driver::DataRestoreDriver;
-// use models::{StateKeeperRequest, ProtoAccountsState};
-// use std::sync::mpsc::Sender;
 
-// pub fn start_data_restore_driver(mut driver: DataRestoreDriver, channel: &Sender<StateKeeperRequest>) {
+// pub fn start_data_restore_driver(mut driver: DataRestoreDriver) {
 pub fn start_data_restore_driver(driver: &'static mut DataRestoreDriver) {
-    // let _past_state_load = driver.load_past_state().expect("Cant get past state");
-    // driver.run_state_updates();
     std::thread::Builder::new().name("data_restore".to_string()).spawn(move || {
         let _past_state_load = driver.load_past_state().expect("Cant get past state");
-        let result = driver.run_state_updates();
+        let _ = driver.run_state_updates().expect("Cant update state");
     });
 }
 
@@ -51,7 +46,7 @@ mod test {
         let endpoint = helpers::InfuraEndpoint::Rinkeby;
         let from = U256::from(0);
         let delta = U256::from(15);
-        let mut data_restore_driver = DataRestoreDriver::new(endpoint, from, delta);
+        let mut data_restore_driver = DataRestoreDriver::new(endpoint, from, delta, None);
         let _past_state_load = data_restore_driver.load_past_state().expect("Cant get past state");
         data_restore_driver.run_state_updates();
     }
