@@ -29,6 +29,16 @@ use web3::types::U256;
 pub fn create_new_data_restore_driver(endpoint: helpers::InfuraEndpoint, from: U256, delta: U256, channel: Option<Sender<ProtoAccountsState>>) -> DataRestoreDriver {
     DataRestoreDriver::new(endpoint, from, delta, channel)
 }
+
+pub fn load_past_state_for_data_restore_driver(driver: &mut DataRestoreDriver) {
+    driver.load_past_state().expect("Cant get past state");
+}
+
+pub fn load_new_states_for_data_restore_driver(driver: &'static mut DataRestoreDriver) {
+    std::thread::Builder::new().name("data_restore".to_string()).spawn(move || {
+        let _ = driver.run_state_updates().expect("Cant update state");
+    });
+}
     
 pub fn start_data_restore_driver(driver: &'static mut DataRestoreDriver) {
     std::thread::Builder::new().name("data_restore".to_string()).spawn(move || {
