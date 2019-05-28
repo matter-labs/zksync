@@ -22,9 +22,14 @@ pub mod helpers;
 pub mod accounts_state;
 pub mod data_restore_driver;
 
-use data_restore_driver::DataRestoreDriver;
+use data_restore_driver::{DataRestoreDriver,ProtoAccountsState};
+use std::sync::mpsc::Sender;
+use web3::types::U256;
 
-// pub fn start_data_restore_driver(mut driver: DataRestoreDriver) {
+pub fn create_new_data_restore_driver(endpoint: helpers::InfuraEndpoint, from: U256, delta: U256, channel: Option<Sender<ProtoAccountsState>>) -> DataRestoreDriver {
+    DataRestoreDriver::new(endpoint, from, delta, channel)
+}
+    
 pub fn start_data_restore_driver(driver: &'static mut DataRestoreDriver) {
     std::thread::Builder::new().name("data_restore".to_string()).spawn(move || {
         let _past_state_load = driver.load_past_state().expect("Cant get past state");
@@ -36,7 +41,7 @@ pub fn start_data_restore_driver(driver: &'static mut DataRestoreDriver) {
 mod test {
     use super::*;
 
-    use web3::types::{U256, H256};
+    use web3::types::H256;
     use franklin_transaction::FranklinTransaction;
     use accounts_state::FranklinAccountsStates;
     use blocks::LogBlockData;
@@ -46,7 +51,7 @@ mod test {
         let endpoint = helpers::InfuraEndpoint::Rinkeby;
         let from = U256::from(0);
         let delta = U256::from(15);
-        let mut data_restore_driver = DataRestoreDriver::new(endpoint, from, delta, None);
+        let mut data_restore_driver = create_new_data_restore_driver(endpoint, from, delta, None);
         let _past_state_load = data_restore_driver.load_past_state().expect("Cant get past state");
         data_restore_driver.run_state_updates();
     }
