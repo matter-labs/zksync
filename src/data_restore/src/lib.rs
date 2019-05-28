@@ -27,12 +27,13 @@ use data_restore_driver::DataRestoreDriver;
 // use models::{StateKeeperRequest, ProtoAccountsState};
 // use std::sync::mpsc::Sender;
 
-pub fn start_data_restore_driver(mut driver: DataRestoreDriver) {
+// pub fn start_data_restore_driver(mut driver: DataRestoreDriver, channel: &Sender<StateKeeperRequest>) {
+pub fn start_data_restore_driver(driver: &'static mut DataRestoreDriver) {
     // let _past_state_load = driver.load_past_state().expect("Cant get past state");
     // driver.run_state_updates();
     std::thread::Builder::new().name("data_restore".to_string()).spawn(move || {
         let _past_state_load = driver.load_past_state().expect("Cant get past state");
-        driver.run_state_updates();
+        let result = driver.run_state_updates();
     });
 }
 

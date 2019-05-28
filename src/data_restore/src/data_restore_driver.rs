@@ -4,6 +4,7 @@ use helpers::*;
 use block_events::BlockEventsFranklin;
 use accounts_state::FranklinAccountsStates;
 use blocks::LogBlockData;
+// use models::{StateKeeperRequest, ProtoAccountsState};
 
 pub struct DataRestoreDriver {
     pub endpoint: InfuraEndpoint,
@@ -27,13 +28,14 @@ impl DataRestoreDriver {
         }
     }
 
+    // pub fn load_past_state(&mut self, channel: &Sender<StateKeeperRequest>) -> Result<(), DataRestoreError> {
     pub fn load_past_state(&mut self) -> Result<(), DataRestoreError> {
         let states = DataRestoreDriver::get_past_franklin_blocks_events_and_accounts_tree_state(self.endpoint, self.genesis_block, self.blocks_delta).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         self.block_events = states.0;
         self.account_states = states.1;
 
-        let accs = self.account_states.get_accounts();
-        let root = self.account_states.root_hash();
+        let accs = &self.account_states.get_accounts();
+        let root = &self.account_states.root_hash();
         println!("Accs: {:?}", accs);
         println!("Root: {:?}", root);
         // let state = ProtoAccountsState {
@@ -41,7 +43,10 @@ impl DataRestoreDriver {
         //     accounts_tree: &self.account_states.accounts_tree,
         // };
         // let request = StateKeeperRequest::SetAccountsState(state);
-        // let _send_result = channel.send(request).expect("Cant send through channel last state");
+        // let _send_result = channel.send(request);
+        // if send_result.is_err() {
+        //     return DataRestoreError::StateUpdate("Cant send last state".to_string());
+        // }
         Ok(())
     }
 
@@ -49,13 +54,17 @@ impl DataRestoreDriver {
         self.run_updates = false
     }
 
-    pub fn run_state_updates(&mut self) {
+    // pub fn run_state_updates(&mut self, channel: &Sender<StateKeeperRequest>) -> DataRestoreError {
+    pub fn run_state_updates(&mut self) -> Option<DataRestoreError> {
         self.run_updates = true;
+        let mut err: Option<DataRestoreError> = None;
         while self.run_updates {
-            match DataRestoreDriver::update_franklin_blocks_events_and_accounts_tree_state(&mut self.block_events, &mut self.account_states, self.blocks_delta) {
+            match DataRestoreDriver::update_franklin_blocks_events_and_accounts_tree_state(self) {
                 Err(error) => {
                     println!("Something goes wrong: {:?}", error);
                     self.run_updates = false;
+                    err = Some(DataRestoreError::StateUpdate(format!("Error occured: {:?}", error)));
+                    // return DataRestoreError::StateUpdate(format!("Error occured: {:?}", error));
                 },
                 Ok(()) => {
                     println!("Updated!");
@@ -70,8 +79,13 @@ impl DataRestoreDriver {
             //     accounts_tree: &self.account_states.accounts_tree,
             // };
             // let request = StateKeeperRequest::SetAccountsState(state);
-            // let _send_result = channel.send(request).expect("Cant send through channel last state");
+            // let _send_result = channel.send(request);
+            // if send_result.is_err() {
+            //     self.run_updates = false;
+            //     err = Some(DataRestoreError::StateUpdate("Cant send last state".to_string()));
+            // }
         }
+        return err;
     }
 
     fn get_past_franklin_blocks_events_and_accounts_tree_state(endpoint: InfuraEndpoint, genesis_block: U256, blocks_delta: U256) -> Result<(BlockEventsFranklin, FranklinAccountsStates), DataRestoreError> {
@@ -121,21 +135,34 @@ impl DataRestoreDriver {
         Ok(())
     }
 
-    fn update_franklin_blocks_events_and_accounts_tree_state(block_events_state: &mut BlockEventsFranklin, accounts_state: &mut FranklinAccountsStates, blocks_delta: U256) -> Result<(), DataRestoreError> {
-        let new_events = block_events_state.update_state_from_last_watched_block_with_blocks_delta_and_return_new_blocks(blocks_delta).map_err(|e| DataRestoreError::StateUpdate(e.to_string()))?;
-        // if new_events.is_err() {
-        //     // Ok(())
-        // }
-        println!("Last watched block: {:?}", &block_events_state.last_watched_block_number);
-        if new_events.1.is_empty() {
-            return Err(DataRestoreError::NoData("No verified blocks".to_string()))
-            // Ok(())
+    fn update_franklin_blocks_events_and_accounts_tree_state(data_restore_driver: &mut DataRestoreDriver) -> Result<(), DataRestoreError> {
+        let mut new_events: (Vec<LogBlockData>, Vec<LogBlockData>) = (vec![], vec![]);
+        while data_restore_driver.run_updates {
+            let ne = data_restore_driver.block_events.update_state_from_last_watched_block_with_blocks_delta_and_return_new_blocks(data_restore_driver.blocks_delta);
+            match ne {
+                Ok(result) => new_events = result,
+                Err(error) => {
+                    println!("Occured: {:?}", error);
+                    continue
+                },
+            }
+            println!("Last watched ethereum block: {:?}", &data_restore_driver.block_events.last_watched_block_number);
+            if new_events.1.is_empty() {
+                println!("No new verified blocks");
+                continue
+                // return Err(DataRestoreError::NoData("No verified blocks".to_string()))
+            } else {
+                break
+            }
+        }
+        if !data_restore_driver.run_updates {
+            return Err(DataRestoreError::StateUpdate("Stopped getting new blocks".to_string()))
         }
         let verified_blocks = &new_events.1;
-        let txs = DataRestoreDriver::get_verified_committed_blocks_transactions_from_blocks_state(&block_events_state, &verified_blocks);
+        let txs = DataRestoreDriver::get_verified_committed_blocks_transactions_from_blocks_state(&data_restore_driver.block_events, &verified_blocks);
         let sorted_txs = DataRestoreDriver::sort_transactions_by_block_number(txs);
 
-        let _ = DataRestoreDriver::update_accounts_state_from_transactions(accounts_state, &sorted_txs).map_err(|e| DataRestoreError::StateUpdate(e.to_string()))?;
+        let _ = DataRestoreDriver::update_accounts_state_from_transactions(&mut data_restore_driver.account_states, &sorted_txs).map_err(|e| DataRestoreError::StateUpdate(e.to_string()))?;
 
         Ok(())
     }
