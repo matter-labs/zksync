@@ -27,6 +27,7 @@ pub struct NetworkStatus {
     pub next_block_at_max:  Option<u64>,
     pub last_committed:     BlockNumber,
     pub last_verified:      BlockNumber,
+    pub total_transactions: u32,
     pub outstanding_txs:    u32,
 }
 

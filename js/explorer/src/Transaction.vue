@@ -2,8 +2,7 @@
 <div>
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
-        <b-navbar-brand>Franklin Network (Rinkeby)</b-navbar-brand>
-        <b-navbar-brand right>API server: {{apiServer}}</b-navbar-brand>
+        <b-navbar-brand>Matter Testnet</b-navbar-brand>
     </b-container>
     </b-navbar>
     <br>
@@ -11,7 +10,7 @@
         <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
         <h5>Transaction data</h5>
         <b-card no-body>
-            <b-table id="my-table" thead-class="hidden_header" :items="props" fixed>
+            <b-table responsive id="my-table" thead-class="hidden_header" :items="props" fixed>
                 <span slot="value" slot-scope="data" v-html="data.value"></span>
             </b-table>
         </b-card>

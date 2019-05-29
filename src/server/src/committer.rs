@@ -1,7 +1,7 @@
 use std::thread;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::time::Duration;
-use eth_client::{TxMeta};
+use eth_client::{ETHClient, TxMeta, TEST_PLASMA_ALWAYS_VERIFY};
 use super::storage::{ConnectionPool, StorageProcessor};
 use super::models::{Operation, Action, ProverRequest, CommitRequest};
 
@@ -24,14 +24,9 @@ fn run_committer(
     println!("committer started");
     let storage = pool.access_storage().expect("db connection failed for committer");;
 
-    // // request unverified proofs
-    // let ops = storage.load_unverified_commitments().expect("committer must load pending ops from db");
-    // for op in ops {
-    //     //let op: Operation = serde_json::from_value(pending_op.data).unwrap();
-    //     if let Action::Commit = op.action {
-    //         tx_for_proof_requests.send(ProverRequest(op.block.block_number)).expect("must send a proof request for pending operations");
-    //     }
-    // }
+    let mut eth_client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
+    let current_nonce = eth_client.current_nonce().expect("can not get nonce");
+    storage.prepare_nonce_scheduling(&eth_client.current_sender(), current_nonce);
 
     let mut last_verified_block = storage.get_last_verified_block().expect("db failed");
     loop {

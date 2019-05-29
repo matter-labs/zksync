@@ -4,6 +4,25 @@
 
 Install docker.
 
+## Node & Yarn
+
+Install Node.
+
+Install yarn.
+
+## Axel
+
+Install axel for downloading keys:
+
+```brew install axel```
+
+## Envsubst for mac (to transpile k8s yaml files)
+
+```
+brew install gettext
+brew link --force gettext 
+```
+
 ## Rust
 
 Install the latest rust version (>= 1.32):
@@ -12,6 +31,12 @@ Install the latest rust version (>= 1.32):
 rustc --version
 rustc 1.32.0-nightly (21f268495 2018-12-02)
 ```
+
+# JQ
+
+jq is used to work with json when managing DigitalOcean.
+
+```brew install jq```
 
 # PSQL
 

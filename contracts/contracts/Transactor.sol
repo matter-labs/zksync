@@ -113,6 +113,9 @@ contract Transactor is FranklinCommon {
                     continue;
                 }
                 floatValue = uint16((chunk << 48) >> 240);
+                if (floatValue == 0) {
+                    continue;
+                }
                 Account storage account = accounts[from];
                 if (account.owner == address(0)) {
                     continue;

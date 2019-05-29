@@ -2,7 +2,10 @@ pub const TRANSFER_BATCH_SIZE: usize = 8;
 pub const DEPOSIT_BATCH_SIZE: usize = 1;
 pub const EXIT_BATCH_SIZE: usize = 1;
 pub const PADDING_INTERVAL: u64 = 1*60; // 1 min
-pub const PROVER_TIMEOUT: usize = 15; // sec
+pub const PROVER_TIMEOUT: usize = 60; // sec
+pub const PROVER_TIMER_TICK: u64 = 5; // sec
+pub const PROVER_CYCLE_WAIT: u64 = 5; // sec
+
 pub const DEFAULT_KEYS_PATH: &str = "keys";
 
 lazy_static! {

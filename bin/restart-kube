@@ -1,0 +1,8 @@
+#!/bin/bash
+
+. .setup_env
+
+# Restart deployments (this will re-pull images)
+kubectl patch deployment server -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(date +%s)\"}}}}}" || exit 1
+kubectl patch deployment prover -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(date +%s)\"}}}}}" || exit 1
+kubectl patch deployment nginx -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(date +%s)\"}}}}}" || exit 1

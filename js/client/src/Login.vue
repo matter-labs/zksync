@@ -19,7 +19,8 @@
 
 import store from './store'
 import ethUtil from 'ethjs-util'
-import {newKey} from '../../franklin/src/transaction.js'
+import transactionLib from './transaction'
+const newKey = transactionLib.newKey
 import {keccak256} from 'js-sha3'
 
 export default {

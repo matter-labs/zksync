@@ -1,0 +1,12 @@
+#!/bin/bash
+
+mkdir -p etc/kube/gen/$FRANKLIN_ENV
+envsubst < etc/kube/prover.yaml > etc/kube/gen/$FRANKLIN_ENV/prover.yaml
+envsubst < etc/kube/server.yaml > etc/kube/gen/$FRANKLIN_ENV/server.yaml
+
+# Generate and apply secret for env config
+. bin/k8s-secret | kubectl apply -f -
+
+# Apply cluster configuration
+kubectl apply -f etc/kube/gen/$FRANKLIN_ENV/server.yaml
+kubectl apply -f etc/kube/gen/$FRANKLIN_ENV/prover.yaml

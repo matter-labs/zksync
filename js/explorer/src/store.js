@@ -1,5 +1,7 @@
 const store = {
-    contractAddress: null
+    contractAddress: null,
+    config:          null,
+    network:         null,
 }
 
 export default store

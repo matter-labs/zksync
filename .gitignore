@@ -10,6 +10,7 @@
 node_modules
 yarn-error.log
 target
+env-config.js
 
 dist
 npm-debug.log
@@ -24,3 +25,4 @@ Cargo.lock
 /keys
 /tmp
 /volumes
+/logs

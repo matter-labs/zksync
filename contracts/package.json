@@ -16,9 +16,11 @@
     "hmac-drbg": "^1.0.1",
     "minimalistic-assert": "^1.0.1",
     "minimalistic-crypto-utils": "^1.0.1",
+    "querystring": "^0.2.0",
     "solc": "^0.4.24",
     "truffle": "^5.0.0",
     "truffle-hdwallet-provider": "^1.0.0-web3one.1",
+    "url": "^0.11.0",
     "web3": "^1.0.0-beta.37"
   },
   "scripts": {
@@ -32,7 +34,7 @@
     "start-parity": "parity --config dev --jsonrpc-apis all",
     "parity-deployed": "(sleep 2 && node scripts/setup-geth.js && yarn deploy-local)& yarn start-parity > /dev/null",
     "flat": "flat -input contracts/PlasmaContract.sol -output build/PlasmaContractFlattened.sol",
-    "flatten": "solidity_flattener contracts/PlasmaContract.sol",
+    "flatten": "solidity_flattener contracts/FranklinProxy.sol",
     "postinstall": "python -m pip install solidity-flattener"
   }
 }

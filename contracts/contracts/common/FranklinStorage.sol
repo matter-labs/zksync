@@ -4,6 +4,20 @@ pragma solidity ^0.4.24;
 // Also defines all structures
 contract FranklinStorage {
 
+    // NOTE: This is test code! All contracts will be thoughrouhly rewritten for production.
+
+    address public testCreator;
+
+    constructor() public {
+        testCreator = msg.sender;
+    }
+
+    function killThisTestContract() public {
+        require(msg.sender == testCreator, "only creator can clean up test contracts");
+        selfdestruct(testCreator);
+    }
+    
+
     // For tree depth 24
     bytes32 constant EMPTY_TREE_ROOT = 0x003f7e15e4de3453fe13e11fb4b007f1fce6a5b0f0353b3b8208910143aaa2f7;
 

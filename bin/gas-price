@@ -1,0 +1,10 @@
+#!/bin/bash
+
+. .setup_env
+
+R=`curl -X POST -H "Content-Type: application/json" \
+    --data '{"id": 1, "jsonrpc": "2.0", "method": "eth_gasPrice", "params": []}' $WEB3_URL 2>/dev/null`
+
+PRICE=`echo $R | jq '.result' | tr -d '"'`
+
+echo $(($PRICE/1000000000)) GWei

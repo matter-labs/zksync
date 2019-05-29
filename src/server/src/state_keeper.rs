@@ -84,10 +84,11 @@ impl PlasmaStateKeeper {
             match req {
                 StateKeeperRequest::GetNetworkStatus(sender) => {
                     let r = sender.send(NetworkStatus{
-                        next_block_at_max: self.next_block_at_max.map(|t| t.duration_since(UNIX_EPOCH).unwrap().as_secs()),
-                        last_committed: 0,
-                        last_verified: 0,
-                        outstanding_txs: 0,
+                        next_block_at_max:  self.next_block_at_max.map(|t| t.duration_since(UNIX_EPOCH).unwrap().as_secs()),
+                        last_committed:     0,
+                        last_verified:      0,
+                        outstanding_txs:    0,
+                        total_transactions: 0,
                     });
                     if r.is_err() {
                         println!("StateKeeperRequest::GetNetworkStatus: channel closed, sending failed");
@@ -149,7 +150,7 @@ impl PlasmaStateKeeper {
     fn apply_transfer_tx(&mut self, tx: TransferTx) -> TransferTxResult {
         let appication_result = self.state.apply_transfer(&tx);
         if appication_result.is_ok() {
-            println!("accepted transaction for account {}, nonce {}", tx.from, tx.nonce);
+            //println!("accepted transaction for account {}, nonce {}", tx.from, tx.nonce);
             self.transfer_tx_queue.push(tx);
         }
 

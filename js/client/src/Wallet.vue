@@ -18,31 +18,47 @@
     </b-container>
     </b-navbar>
     <br>
-    <b-container v-if="network && !isTestnet">
-        <h3 style="color: red">Please switch to Rinkeby network in Metamask to try this demo.</h3>
+    <b-container v-if="network && !correctNetwork">
+        <h3 style="color: red">Please switch to <b>{{currentNetwork}}</b> network in Metamask to try this demo.</h3>
     </b-container>
-    <b-container v-if="network && isTestnet">
+    <b-container v-if="network && correctNetwork">
         <b-alert show dismissible :variant="alertType" fade :show="countdown" @dismissed="countdown=0" class="mt-2">
             {{result}}
         </b-alert>
-        <p>Warning: this software is for demo purposes only. Database and smart contracts might be reset from time to time, with all test coins lost!</p>
+
+        <p>
+            <b style="color: red">Warning</b>: this app is for demo only. Database and smart contracts will be reset from time to time, 
+            with all coins lost!
+        </p>
+        
         <b-row>
             <b-col sm="6" order="2" class="col-xl-8 col-lg-7 col-md-6 col-sm-12">
                 <b-card title="Transfer in Matter Network" class="mb-4 d-flex">
-                    <label for="transferToInput">To (recepient ETH address):</label>
+                    <label for="transferToInput">To (recepient ETH address): </label>
                     <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0" autocomplete="off"></b-form-input>
-                    <p class="mt-2" style="color: grey">Note: your recipient must register in Matter Network first. For testing you can send to 0x153aa9a03a255cc635f00c54666f3686bf881001</p>
+                    <p class="mt-2" style="color: grey">
+                        Note: your recipient must register in Matter Network first. For testing, try 
+                        <a href="#" @click="transferTo='0x'+store.config.SENDER_ACCOUNT">0x{{store.config.SENDER_ACCOUNT}}</a>
+                    </p>
+
                     <label for="transferAmountInput" class="mt-4">Amount</label>
                             (max ETH <a href="#" @click="transferAmount=store.account.plasma.committed.balance">{{store.account.plasma.committed.balance || 0}}</a>):
                     <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
+
                     <label for="transferNonceInput" class="mt-4">Nonce (autoincrementing):</label>
                     <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
+
                     <div id="transferBtn" class="right">
                         <img v-if="transferPending" style="margin-right: 1.5em" src="./assets/loading.gif" width="100em">
                         <b-btn v-else class="mt-4" variant="outline-primary" @click="transfer" :disabled="!!transferProblem">Submit transaction</b-btn>
                     </div>
-                    <p class="mt-2" style="color: grey">Balances will be updated once the block of 8 transactions is full and verified.</p>
-                    <p class="mt-2" style="color: grey"> To force block generation, simply send at least 8 transactions in the correct nonce sequence.</p>
+
+                    <p class="mt-2" style="color: grey">
+                        To commit a new block, either submit {{store.config.TRANSFER_BATCH_SIZE}} transactions, or wait 1 minute until timer triggers block generation.
+                    </p>
+                    <p class="mt-2" style="color: grey">
+                         Once a block is committed, it takes about 5 minutes to verify it.
+                    </p>
                     <b-tooltip target="transferBtn" :disabled="transferPending || !transferProblem" triggers="hover">
                         Transfer not possible: {{ transferProblem }}
                     </b-tooltip>
@@ -89,8 +105,7 @@
                     </b-row>
                     <b-card class="mt-2">
                         <p class="mb-2"><strong>Matter Network</strong>
-                            (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+store.contractAddress"
-                            target="blanc">contract</a>)</p>
+                            (<a href="/explorer/" target="_blank">block explorer</a>)</p>
 
                         <img src="./assets/loading.gif" width="100em" v-if="store.account.plasma.id === null">
                         <div v-if="store.account.plasma.id === 0">
@@ -142,7 +157,7 @@
 
     <b-modal ref="withdrawModal" id="withdrawModal" title="Withdrawal" hide-footer>
         <b-tabs pills card>
-            <b-tab title="Partial withdrawal" active>
+            <!--<b-tab title="Partial withdrawal" active>
                 <label for="withdrawAmountInput" class="mt-4">Amount</label>
                     (max ETH <a href="#" @click="withdrawAmount=store.account.plasma.verified.balance">{{store.account.plasma.verified.balance}}</a>):
                 <b-form-input id="withdrawAmountInput" type="number" placeholder="7.50" v-model="withdrawAmount"></b-form-input>
@@ -154,8 +169,8 @@
                 <b-tooltip target="doWithdrawBtn" :disabled="!doWithdrawProblem" triggers="hover">
                     Withdraw not possible: {{ doWithdrawProblem }}
                 </b-tooltip>
-            </b-tab>
-            <b-tab title="Full exit" class="mb-4">
+            </b-tab>-->
+            <!--<b-tab title="Full exit" class="mb-4">-->
                 <p>This will close your account and withdraw all money from it.</p>
                 <div id="doExitBtn" class="mt-4 float-right">
                     <b-btn variant="danger" :disabled="!!withdrawProblem" @click="withdrawAll">Close & withdraw</b-btn>
@@ -163,7 +178,7 @@
                 <b-tooltip target="doExitBtn" :disabled="!withdrawProblem" triggers="hover">
                     Withdraw not possible: {{ withdrawProblem }}
                 </b-tooltip>
-            </b-tab>
+            <!--</b-tab>-->
         </b-tabs>
     </b-modal>
 </div>
@@ -177,7 +192,10 @@ import Eth from 'ethjs'
 import {ethers} from 'ethers'
 import axios from 'axios'
 import ethUtil from 'ethjs-util'
-import transactionLib from '../../franklin/src/transaction.js'
+import transactionLib from './transaction'
+
+window.transactionLib = transactionLib
+
 import ABI from './contract'
 
 const maxExitEntries = 32;
@@ -226,10 +244,18 @@ export default {
     },
     computed: {
         isTestnet() {
-            return this.network === '4' || this.network === '9'
+            return this.network === '9'
+        },
+        currentNetwork() {
+            return window.location.hostname.split('.')[0]
+        },
+        correctNetwork() {
+            return this.isTestnet ||
+                window.location.hostname.startsWith('localhost') ||
+                (this.network === '1' && window.location.hostname.startsWith('mainnet')) ||
+                (this.network === '4' && window.location.hostname.startsWith('rinkeby'))
         },
         baseUrl() {
-            //return (this.isDev ? 'http://localhost:3000' : 'https://api.plasma-winter.io') + '/api/v0.1'
             return this.apiServer + '/api/v0.1'
         },
         //baseUrl: () => 'https://api.plasma-winter.io',

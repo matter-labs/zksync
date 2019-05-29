@@ -3,9 +3,12 @@
 . .setup_env
 cd src/storage
 
-export DATABASE_URL=$TEST_DATABASE_URL
+export DATABASE_URL=postgres://postgres@localhost/plasma_test
 
-diesel database setup
+if [ "$1" == "reset" ]; then
+    diesel database reset
+    diesel migration run
+fi
 
 cd ../..
 cargo test -p storage

@@ -58,7 +58,7 @@ mod test {
 
     #[test]
     fn test_complete_task() {
-        let endpoint = helpers::InfuraEndpoint::Rinkeby;
+        let endpoint = helpers::InfuraEndpoint::Mainnet;
         let from = U256::from(0);
         let delta = U256::from(15);
         let mut data_restore_driver = create_new_data_restore_driver(endpoint, from, delta, None);

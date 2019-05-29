@@ -6,9 +6,9 @@ import "bootstrap-vue/dist/bootstrap-vue.css"
 import store from './store'
 import Eth from 'ethjs'
 import {ethers} from 'ethers'
-
-window.ethers = ethers;
-window.Eth = Eth
+import axios from 'axios'
+import url from 'url'
+import config from './env-config'
 
 import Router from 'vue-router'
 import App from './App.vue'
@@ -25,13 +25,16 @@ const routes = [
 ]
 
 const router = new Router({
-    routes // short for `routes: routes`
+    routes,
+    mode:   'history',
+    base:   '/client',
 })
 
 Vue.mixin({
     computed: {
+        store: () => store,
         isDev: () => process.env.NODE_ENV === 'development',
-        apiServer: () => process.env.API_SERVER,
+        apiServer() { return this.store.config.API_SERVER },
     },
 })
 
@@ -41,20 +44,19 @@ window.app = new Vue({
     el: '#app',
     router,
     data: () => ({
-        store
+        storeMain: store
     }),
     async created() {
+        this.store.config = config
+
+        let regex = /(?:api-)*(\w*)(?:\..*)*/
+        this.store.network = 
+            regex.exec(url.parse(this.store.config.API_SERVER).host)[1]
+
         // read store.account from local storage?
         if (typeof window.web3 !== 'undefined') {
             window.eth = new Eth(web3.currentProvider)
             window.ethersProvider = new ethers.providers.Web3Provider(web3.currentProvider)
-
-            // const provider = new ethers.providers.JsonRpcProvider('http://localhost:8545')
-            // window.c = new ethers.Contract(
-            //     '0x2a1780C1EDbE60f6667818bc4b3402004A9e9559',  // proxy
-            //     //'0x2AeBa6973B6D0104e927D945321cE8ddFDE7c5a6', // depositor
-            //     //'0xbcB1385a441464345040F33E59e166fCC2720F04', // tx
-            //     ABI, provider)
         }
         if (!store.account.address) {
             this.$router.push('/login')

@@ -27,11 +27,31 @@ let clients = []
 
 let rng = new Prando(1) // deterministic seed
 
+let TOTAL_TX = 256*120
+let total = 0
+
 function randomClient() {
     let i = rng.nextInt(0, nClients-1)
     //console.log('i', i)
     return clients[ i ]
 }
+
+const withTimeout = function(ms, promise){
+
+    // Create a promise that rejects in <ms> milliseconds
+    let timeout = new Promise((resolve, reject) => {
+      let id = setTimeout(() => {
+        clearTimeout(id);
+        reject('Timed out in '+ ms + 'ms.')
+      }, ms)
+    })
+  
+    // Returns a race between our timeout and the passed in promise
+    return Promise.race([
+      promise,
+      timeout
+    ])
+  }
 
 class Client {
 
@@ -40,7 +60,7 @@ class Client {
         console.log(`creating client #${this.id}`)
     }
 
-    async prepare() {
+    async prepare(fundFranklin) {
         let signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/3/" + this.id)
         this.fra = await franklin.Wallet.fromSigner(signer)
         this.eth = this.fra.ethWallet
@@ -59,7 +79,7 @@ class Client {
                 toAddFranklin = MIN_AMOUNT_FRA
             }
 
-            if ( toAddFranklin.gt(0) ) {
+            if ( fundFranklin && toAddFranklin.gt(0) ) {
                 console.log(`${this.eth.address}: adding ${format(toAddFranklin)} to Franklin`)
 
                 // is wallet balance enough?
@@ -91,6 +111,8 @@ class Client {
                     await this.fra.pullState()
                 }
                 console.log(`${this.eth.address}: sidechain deposit complete`)
+            } else {
+                console.log('${this.eth.address}: prepared')
             }
         } catch (err) {
             console.log(`${this.eth.address}: ERROR: ${err}`)
@@ -136,9 +158,16 @@ class Client {
 
 async function test() {
 
+    var args = process.argv.slice(2);
+    let prepareOnly = args[0] === 'prepare'
+
+    let fundFranklin = !prepareOnly
+
+    console.log('Will run:', fundFranklin)
+
     let sourceBalanceBefore = await source.getBalance()
     sourceNonce = await source.getTransactionCount("pending")
-    gasPrice = await provider.getGasPrice()
+    gasPrice = (await provider.getGasPrice()).mul(2)
 
     console.log(`Current gas price: ${gasPrice.div(1000000000).toNumber()} GWEI`)
     transferPrice = gasPrice.mul(DEPOSIT_GAS_LIMIT)
@@ -151,38 +180,40 @@ async function test() {
     console.log('xx: preparing clients...')
     let promises = []
     for (let i=0; i < nClients; i++) {
-        promises.push( clients[i].prepare() )
+        promises.push( clients[i].prepare(fundFranklin) )
     }
 
-    // console.log('waiting until the clients are ready...')
+    //console.log('waiting until the clients are ready...')
     await Promise.all(promises)
+
+    if (prepareOnly) process.exit(0);
 
     let sourceBalanceAfter = await source.getBalance()
     console.log('Total spent: ', format(sourceBalanceBefore.sub(sourceBalanceAfter)))
 
-    console.log('xx: starting the test...')
-    while(true) {
-        let nextTick = new Date(new Date().getTime() + 1000)
+    console.log('starting the test...')
+    while(total < TOTAL_TX) {
+
         let promises = []
-        for (let i=0; i<tps; i++) {
-            let client = randomClient()
-            promises.push(client.randomTransfer())
-            //await new Promise(resolve => setTimeout(resolve, 20))
+        for (let i=0; i < nClients; i++) {
+            promises.push(clients[i].fra.pullState().catch(e => 'err3: ' + e))
         }
-        await Promise.all(promises)
-        console.log('-')
+        await withTimeout(1500, Promise.all(promises)).catch(e => 'err4: ' + e)
 
         promises = []
-        for (let i=0; i < nClients; i++) {
-            promises.push(clients[i].fra.pullState())
+        for (let i=0; i<(tps * 3); i++) {
+            let client = randomClient()
+            let promise = client.randomTransfer().catch(e => console.log('err1: ', e))
+            promises.push(promise)
+            total++
         }
-        await Promise.all(promises)
+        await withTimeout(1500, Promise.all(promises)).catch(e => 'err2: ' + e)
 
-        console.log('--')
-        while(nextTick > new Date()) {
-            await new Promise(resolve => setTimeout(resolve, 1))
-        }
+        console.log('-- total: ', total, ' of ', TOTAL_TX)
     }
+
+    console.log('test complete, total = ', total)
+
 }
 
 test()

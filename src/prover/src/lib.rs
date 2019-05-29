@@ -39,7 +39,7 @@ use plasma::models::{params, Block, PlasmaState};
 use plasma::models::circuit::{Account, AccountTree};
 
 use models::encoder;
-use models::config::{RUNTIME_CONFIG, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE, PROVER_TIMEOUT};
+use models::config::{RUNTIME_CONFIG, DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE, PROVER_TIMEOUT, PROVER_TIMER_TICK, PROVER_CYCLE_WAIT};
 use models::{EncodedProof};
 use storage::StorageProcessor;
 
@@ -67,6 +67,8 @@ pub struct Prover<E:JubjubEngine> {
     pub deposit_parameters:     BabyParameters,
     pub exit_parameters:        BabyParameters,
     pub jubjub_params:          E::Params,
+    pub worker:                 String,
+    pub prover_id:              i32,
     pub current_job:            Arc<AtomicUsize>,
 }
 
@@ -189,7 +191,7 @@ impl BabyProver {
         Ok(p)
     }
 
-    pub fn create() -> Result<BabyProver, BabyProverErr> {
+    pub fn create(worker: String) -> Result<BabyProver, BabyProverErr> {
 
         let storage = StorageProcessor::establish_connection().expect("db connection failed for prover");
 
@@ -256,6 +258,8 @@ impl BabyProver {
 
         let jubjub_params = AltJubjubBn256::new();
 
+        let prover_id = storage.register_prover(&worker).expect("getting prover id failed");
+
         Ok(Self{
             transfer_batch_size:    RUNTIME_CONFIG.transfer_batch_size,
             deposit_batch_size:     DEPOSIT_BATCH_SIZE,
@@ -267,6 +271,8 @@ impl BabyProver {
             exit_parameters:        exit_circuit_params.unwrap(),
             jubjub_params,
             current_job:            Arc::new(AtomicUsize::new(0)),
+            worker,
+            prover_id,
         })
     }
 }
@@ -985,13 +991,13 @@ impl BabyProver {
         Ok(())
     }
 
-    fn make_proving_attempt(&mut self, worker: &String) -> Result<(), String> {
+    fn make_proving_attempt(&mut self) -> Result<(), String> {
         let storage = StorageProcessor::establish_connection().map_err(|e| format!("establish_connection failed: {}", e))?;
-        let job = storage.fetch_prover_job(worker, PROVER_TIMEOUT).map_err(|e| format!("fetch_prover_job failed: {}", e))?;
+        let job = storage.fetch_prover_job(&self.worker, PROVER_TIMEOUT).map_err(|e| format!("fetch_prover_job failed: {}", e))?;
 
         if let Some(job) = job {
             let block_number = job.block_number as BlockNumber;
-            println!("prover {} got a new job for block {}", worker, block_number);
+            println!("prover {} got a new job for block {}", &self.worker, block_number);
             self.current_job.store(job.id as usize, Ordering::Relaxed);
 
             // load state delta self.current_block_number => block_number (can go both forwards and backwards)
@@ -1014,15 +1020,15 @@ impl BabyProver {
             if self.current_block_number < last_verified_block + 1 {
                 self.rewind_state(&storage, last_verified_block + 1).map_err(|e| format!("rewind_state failed: {}", e))?;
             }
-            thread::sleep(Duration::from_millis(500));
+            thread::sleep(Duration::from_secs(PROVER_CYCLE_WAIT));
         }
         Ok(())
     }
 
-    fn start_timer_interval(&self, rt: &Handle) {
+    pub fn start_timer_interval(&self, rt: &Handle) {
         let job_ref = self.current_job.clone();
         rt.spawn(
-            timer::Interval::new_interval(Duration::from_millis(1000))
+            timer::Interval::new_interval(Duration::from_secs(PROVER_TIMER_TICK))
             .fold(job_ref, |job_ref, _| {
                 let job = job_ref.load(Ordering::Relaxed);
                 if job > 0 {
@@ -1037,23 +1043,19 @@ impl BabyProver {
             .map_err(|_|())
         ).unwrap();
     }
-}
 
-pub fn run_prover(shutdown_tx: Sender<()>, rt: &Handle, stop_signal: Arc<AtomicBool>, worker: String) {
-    println!("creating prover, worker: {}", worker);
-    let mut prover = BabyProver::create().unwrap();
-    println!("prover started");
-    
-    prover.start_timer_interval(rt);
-    
-    while !stop_signal.load(Ordering::SeqCst) {
-        if let Err(err) = prover.make_proving_attempt(&worker) {
-            eprint!("Error: {}", err);
+    pub fn run(&mut self, shutdown_tx: Sender<()>, stop_signal: Arc<AtomicBool>) {
+        println!("prover is running");        
+        while !stop_signal.load(Ordering::SeqCst) {
+            if let Err(err) = self.make_proving_attempt() {
+                eprint!("Error: {}", err);
+            }
+            self.current_job.store(0, Ordering::Relaxed);
         }
-        prover.current_job.store(0, Ordering::Relaxed);
+        println!("prover stopped");
+        shutdown_tx.send(()).unwrap();
     }
-    println!("prover stopped");
-    shutdown_tx.send(()).unwrap();
+
 }
 
 // #[test]
