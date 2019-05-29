@@ -3,6 +3,7 @@ const ethers = require('ethers')
 const {keccak256} = require('js-sha3')
 const transaction = require('./transaction.js')
 const PlasmaContractABI = require('../abi/PlasmaContract.json').abi
+const bn = ethers.utils.bigNumberify
 
 const MULTIPLIER = ethers.utils.bigNumberify('1000000000000')
 
@@ -71,13 +72,12 @@ class FranklinWallet {
     }
 
     async fullExit() {
-        console.log(`Contract: ${this.eth.contract}`)
         if (!this.ethWallet) {
             throw 'Can not initiate exit from Franklin: no wallet connected'
         }
-        let iterationsLimit = 256
+        let iterationsLimit = bn(256)
         let contract = this.eth.contract.connect(this.ethWallet)
-        await contract.withdrawUserBalance(iterationsLimit)
+        return contract.withdrawUserBalance(iterationsLimit)
     }
 
     async transfer(to, amount) {

@@ -106,7 +106,7 @@ class Client {
                 console.log(`${this.eth.address}: deposit tx sent`)
                 let receipt = await request.wait()
                 console.log(`${this.eth.address}: deposit tx mined, waiting for zk proof`)
-                while (!this.fra.sidechainOpen || this.fra.currentBalance.lt(MIN_AMOUNT_FRA)) {
+                while (!this.fra.sidechainOpen || this.fra.currentBalance > 0) {
                     await sleep(500)
                     await this.fra.pullState()
                 }
@@ -167,8 +167,8 @@ class Client {
             }
             console.log(`${this.eth.address}: sidechain full exit complete`)
         } catch (err) {
-            console.log(`${this.eth.address}: ERROR: ${err}`)
-            console.trace(err.stack)
+            console.log(`${this.eth.address}: EXIT ERROR: ${err}`)
+            // console.trace(err.stack)
             throw err
         }
     }
@@ -239,8 +239,6 @@ async function test() {
         promises.push( clients[i].performExit().catch(e => 'err5: ' + e) )
     }
     await withTimeout(1500, Promise.all(promises)).catch(e => 'err6: ' + e)
-    
-    console.log('exits complete')
 }
 
 test()
