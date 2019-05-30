@@ -1,3 +1,4 @@
+const axios = require('axios')
 const ethers = require('ethers')
 const Franklin = require('../franklin/src/franklin')
 var Prando = require('prando')
@@ -87,7 +88,7 @@ class Client {
                 console.log(`${this.eth.address}: eth wallet balance is ${format(balance)} ETH`)
                 let minBalance = MIN_AMOUNT_FRA.add(transferPrice.mul(2))
                 if (balance.lt(minBalance)) {
-                    let toAdd = minBalance.sub(balance)
+                    let toAdd = bn("80000000000000000") //minBalance.sub(balance)
                     console.log(`${this.eth.address}: adding ${format(toAdd)} to eth wallet`)
                     // transfer funds from source account
                     let request = await source.sendTransaction({
@@ -157,19 +158,39 @@ class Client {
 
     async performExit() {
         try {
-            let request = await this.fra.withdraw()
+            let request = await this.fra.exit()
             console.log(`${this.eth.address}: full exit tx sent`)
             let receipt = await request.wait()
-            console.log(`${this.eth.address}: full exit tx mined, waiting for zk proof`)
-            while (!this.fra.sidechainOpen || this.fra.currentBalance == ethers.utils.parseEther('0.0')) {
-                await sleep(500)
-                await this.fra.pullState()
-            }
-            console.log(`${this.eth.address}: sidechain exit complete`)
         } catch (err) {
             console.log(`${this.eth.address}: EXIT ERROR: ${err}`)
             console.trace(err.stack)
             throw err
+        }
+    }
+}
+
+async function waitForVerifyBlocksPromise() {
+    while(true){
+        try {
+            let response = await axios({
+                method:     'get',
+                url:        clients[0].fra.fra.baseUrl + '/blocks',
+            });
+            let blocks = response.data
+            let unverified_found = false
+            for (let i=0; i < blocks.length; i++) {
+                if (blocks[i].verify_tx_hash == null) {
+                    unverified_found = true
+                    break
+                }
+            }
+            if (!unverified_found) {
+                break
+            }
+            await sleep(1500)
+        } catch (err) {
+            console.log(`Get blocks request error: ${err}`)
+            continue
         }
     }
 }
@@ -232,8 +253,9 @@ async function test() {
 
     console.log('transfers test complete, total = ', total)
 
-    console.log('waiting 5 mins for all proofs')
-    await sleep(300000)
+    console.log('waiting for all blocks verification')
+    let promise = waitForVerifyBlocksPromise()
+    await promise.catch(e => 'err7: ' + e)
 
     console.log('performing exits from clients...')
 
@@ -242,6 +264,11 @@ async function test() {
         promises.push( clients[i].performExit().catch(e => 'err5: ' + e) )
     }
     await withTimeout(1500, Promise.all(promises)).catch(e => 'err6: ' + e)
+
+    console.log('waiting for all blocks verification')
+    await promise.catch(e => 'err7: ' + e)
+    
+    console.log('loadtest finished')
 }
 
 test()

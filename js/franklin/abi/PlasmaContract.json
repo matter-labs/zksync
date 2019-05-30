@@ -657,18 +657,27 @@
       "signature": "0xa315c91b"
     },
     {
-    "constant": false,
-    "inputs": [
-      {
-        "name": "iterationsLimit",
-        "type": "uint256"
-      }
-    ],
-    "name": "withdrawUserBalance",
-    "outputs": [],
-    "payable": false,
-    "stateMutability": "nonpayable",
-    "type": "function"
+      "constant": false,
+      "inputs": [
+        {
+          "name": "iterationsLimit",
+          "type": "uint256"
+        }
+      ],
+      "name": "withdrawUserBalance",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [],
+      "name": "exit",
+      "outputs": [],
+      "payable": true,
+      "stateMutability": "payable",
+      "type": "function"
     },
     {
       "constant": true,
