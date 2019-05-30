@@ -14,11 +14,11 @@ env:
 init: dev-up env yarn db-setup redeploy
 
 yarn:
-	@cd contracts && yarn
-	@cd js/franklin && yarn
-	@cd js/client && yarn
-	@cd js/loadtest && yarn
-	@cd js/explorer && yarn
+	-@cd contracts && yarn
+	-@cd js/franklin && yarn
+	-@cd js/client && yarn
+	-@cd js/loadtest && yarn
+	-@cd js/explorer && yarn
 
 
 # Helpers
