@@ -5,6 +5,7 @@
 KEY_FILES=$CONTRACT_KEY_FILES
 .load_keys
 
+[ -d contracts/contracts/keys/ ] || mkdir contracts/contracts/keys/
 cp -f $KEY_DIR/*.sol contracts/contracts/keys/
 
 echo redeploying for the db $DATABASE_URL
