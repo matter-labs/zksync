@@ -20,14 +20,14 @@ let sourceNonce = null
 let gasPrice = null
 let transferPrice = null
 
-let nClients = 2 // process.env.LOADTEST_N_CLIENTS
-let tps = 1 //process.env.LOADTEST_TPS
+let nClients = process.env.LOADTEST_N_CLIENTS
+let tps = process.env.LOADTEST_TPS
 
 let clients = []
 
 let rng = new Prando(1) // deterministic seed
 
-let TOTAL_TX = 4 //256*120
+let TOTAL_TX = 256*120
 let total = 0
 
 function randomClient() {
@@ -106,7 +106,7 @@ class Client {
                 console.log(`${this.eth.address}: deposit tx sent`)
                 let receipt = await request.wait()
                 console.log(`${this.eth.address}: deposit tx mined, waiting for zk proof`)
-                while (!this.fra.sidechainOpen || this.fra.currentBalance > 0) {
+                while (!this.fra.sidechainOpen || this.fra.currentBalance.lt(MIN_AMOUNT_FRA)) {
                     await sleep(500)
                     await this.fra.pullState()
                 }
@@ -157,18 +157,18 @@ class Client {
 
     async performExit() {
         try {
-            let request = await this.fra.fullExit()
+            let request = await this.fra.withdraw()
             console.log(`${this.eth.address}: full exit tx sent`)
             let receipt = await request.wait()
             console.log(`${this.eth.address}: full exit tx mined, waiting for zk proof`)
-            while (!this.fra.sidechainOpen || this.fra.currentBalance.lt(ethers.utils.parseEther(0))) {
+            while (!this.fra.sidechainOpen || this.fra.currentBalance == ethers.utils.parseEther('0.0')) {
                 await sleep(500)
                 await this.fra.pullState()
             }
-            console.log(`${this.eth.address}: sidechain full exit complete`)
+            console.log(`${this.eth.address}: sidechain exit complete`)
         } catch (err) {
             console.log(`${this.eth.address}: EXIT ERROR: ${err}`)
-            // console.trace(err.stack)
+            console.trace(err.stack)
             throw err
         }
     }
@@ -231,6 +231,9 @@ async function test() {
     }
 
     console.log('transfers test complete, total = ', total)
+
+    console.log('waiting 5 mins for all proofs')
+    await sleep(300000)
 
     console.log('performing exits from clients...')
 

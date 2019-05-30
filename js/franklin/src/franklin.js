@@ -71,7 +71,7 @@ class FranklinWallet {
         return contract.deposit([pubX, pubY], maxFee, {value})
     }
 
-    async fullExit() {
+    async withdraw() {
         if (!this.ethWallet) {
             throw 'Can not initiate exit from Franklin: no wallet connected'
         }
