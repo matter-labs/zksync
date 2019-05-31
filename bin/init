@@ -4,7 +4,7 @@ set -e
 
 franklin dev-up
 franklin env
-franklin yarn
+franklin yarn || true # It can fail.
 franklin db-wait
 franklin db-setup
 franklin redeploy
