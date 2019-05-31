@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -e
+
+franklin dev-up
+franklin env
+franklin yarn || true # It can fail.
+franklin db-wait
+franklin db-setup
+franklin redeploy
