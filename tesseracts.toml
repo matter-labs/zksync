@@ -6,30 +6,30 @@ ui_title         = "Franklin explorer"
 # database ----------------------------------------
 
 # where the database is located
-db_path          = "postgresql://postgres:@tesseracts_postgres:5432/explorer?ssl=false" 
+db_path          = "tesseracts_db/" 
 
 # true|false if we want to scan blocks and save it into db
-scan             = true 
+scan             = false 
 
 # the starting block to start to retrieve blocks (only iff scan==true)
 scan_start_block = 1
 
 # store with tx are contained in addr? (bool)
-db_store_addr    = true
+db_store_addr    = false
 
 # store the transactions and receipts? (bool)
 db_store_tx      = false 
 
 # store internal transactions? (bool)
-db_store_itx     = true 
+db_store_itx     = false 
 
 # store list of last non empty blocks? (bool)
-db_store_neb     = true 
+db_store_neb     = false 
 
 # web3 ----------------------------------------------
 
 # web3 json-rpc port, e.g. http://localhost:8545
-web3_url         = "http://geth:8545" 
+web3_url         = "http://localhost:8545" 
 
 # client type
 # "geth_clique" for geth PoS
@@ -42,7 +42,7 @@ web3_client      = "geth"
 #   --syncmode=full
 #   --gcmode=archive
 #   --rpcapi debug 
-web3_itx  = true 
+web3_itx  = false 
 
 # compiler ------------------------------------------
 
@@ -55,6 +55,4 @@ solc_bypass = true
 # server --------------------------------------------
 
 # http server binding (e.g. "0.0.0.0:8000")
-bind         = "0.0.0.0:3000" 
-
-
+bind         = "localhost:3000" 
