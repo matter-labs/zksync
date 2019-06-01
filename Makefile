@@ -11,15 +11,15 @@ export NGINX_DOCKER_IMAGE ?= gluk64/franklin-nginx:$(FRANKLIN_ENV)
 env:	
 
 # Get everything up and running for the first time
-init: dev-up env yarn db-setup deploy-contracts db-insert-contract
-	@echo init finished
+init:
+	@bin/init
 
 yarn:
-	@cd contracts && yarn
 	@cd js/franklin && yarn
 	@cd js/client && yarn
 	@cd js/loadtest && yarn
 	@cd js/explorer && yarn
+	@cd contracts && yarn
 
 
 # Helpers
@@ -57,6 +57,8 @@ db-drop: confirm_action
 	@$(sql) 'DROP OWNED BY CURRENT_USER CASCADE' || \
 		{ $(sql) 'DROP SCHEMA IF EXISTS public CASCADE' && $(sql)'CREATE SCHEMA public'; }
 
+db-wait:
+	@bin/db-wait
 
 # Frontend clients
 
@@ -270,13 +272,6 @@ blockscout-up:
 blockscout-down:
 	@docker-compose stop blockscout blockscout_postgres
 
-# Tessaracts
-
-# tessaracts-up:
-# 	@echo Starting block explorer...
-# @docker-compose up -d tesseracts
-# @{ docker ps -q -f name=tesseracts && echo "Container exists, starting..." && docker start tesseracts ;} || { echo "Container does not exist" && echo "Starting new container..." }
-# @docker run -d --name tesseracts -t adriamb/tesseracts:v0.4 -vvv --cfg /config/tesseracts.toml
 
 # Auxillary docker containers for dev environment (usually no need to build, just use images from dockerhub)
 
