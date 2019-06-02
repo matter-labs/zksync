@@ -65,3 +65,8 @@ services:
       - ETHEREUM_JSONRPC_VARIANT=geth
       - ETHEREUM_JSONRPC_HTTP_URL=http://geth:8545
       - COIN=DAI
+  tessaracts:
+    image: "gluk64/franklin:tessaracts"
+    ports:
+      - "8080:80"
+    

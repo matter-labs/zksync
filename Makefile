@@ -4,6 +4,7 @@ export PROVER_DOCKER_IMAGE ?=gluk64/franklin:prover
 export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
 export FLATTENER_DOCKER_IMAGE ?= gluk64/franklin:flattener
 export NGINX_DOCKER_IMAGE ?= gluk64/franklin-nginx:$(FRANKLIN_ENV)
+export TESSARACTS_DOCKER_IMAGE ?= gluk64/franklin:tessaracts
 
 # Getting started
 
@@ -286,4 +287,12 @@ dev-push-geth:
 
 dev-push-flattener:
 	@docker push "${FLATTENER_DOCKER_IMAGE}"
+
+# Tessaracts
+
+tessaracts-build:
+	@docker build -t "${TESSARACTS_DOCKER_IMAGE}" ./docker/tessaracts
+
+tessaracts-run:
+	@docker run "${TESSARACTS_DOCKER_IMAGE}"
 
