@@ -1,9 +1,8 @@
 // use std::rc::Rc;
 
 use web3::futures::Future;
-use web3::types::{Log, Address, FilterBuilder, H256, U256, BlockNumber};
+use web3::types::{Log, FilterBuilder, H256, U256, BlockNumber};
 // use tokio_core::reactor::Core;
-use ethabi::Contract;
 
 use blocks::{BlockType, LogBlockData};
 use helpers::*;
@@ -13,12 +12,7 @@ type BlockNumber256 = U256;
 
 #[derive(Debug, Clone)]
 pub struct BlockEventsFranklin {
-    pub endpoint: InfuraEndpoint,
-    pub http_endpoint_string: String,
-    // pub ws_endpoint_string: String,
-    pub franklin_abi: ABI,
-    pub franklin_contract: Contract,
-    pub franklin_contract_address: Address,
+    pub config: DataRestoreConfig,
     pub committed_blocks: Vec<LogBlockData>,
     pub verified_blocks: Vec<LogBlockData>,
     pub last_watched_block_number: BlockNumber256,
@@ -31,33 +25,10 @@ pub struct BlockEventsFranklin {
 // New blocks -> last watching block ++
 // Check if txs in last watching block
 impl BlockEventsFranklin {
-    pub fn new(network: InfuraEndpoint) -> Self {
-        // let ws_infura_endpoint_str = match network {
-        //     InfuraEndpoint::Mainnet => "wss://mainnet.infura.io/ws",
-        //     InfuraEndpoint::Rinkeby => "wss://rinkeby.infura.io/ws",
-        // };
-        // let ws_infura_endpoint_string = String::from(ws_infura_endpoint_str);
-        let http_infura_endpoint_str = match network {
-            InfuraEndpoint::Mainnet => INFURA_MAINNET_ENDPOINT,
-            InfuraEndpoint::Rinkeby => INFURA_RINKEBY_ENDPOINT,
-        };
-        let http_infura_endpoint_string = String::from(http_infura_endpoint_str);
-        let address: Address = match network {
-            InfuraEndpoint::Mainnet => FRANKLIN_MAINNET_ADDRESS,
-            InfuraEndpoint::Rinkeby => FRANKLIN_RINKEBY_ADDRESS,
-        }.parse().unwrap();
-        let abi: ABI = match network {
-            InfuraEndpoint::Mainnet => PLASMA_MAINNET_ABI,
-            InfuraEndpoint::Rinkeby => PLASMA_RINKEBY_ABI,
-        };
-        let contract = ethabi::Contract::load(abi.0).unwrap();
+    pub fn new(config: DataRestoreConfig) -> Self {
         let this = Self {
             // ws_endpoint_string: ws_infura_endpoint_string,
-            endpoint: network,
-            http_endpoint_string: http_infura_endpoint_string,
-            franklin_abi: abi,
-            franklin_contract: contract,
-            franklin_contract_address: address,
+            config: config,
             committed_blocks: vec![],
             verified_blocks: vec![],
             last_watched_block_number: U256::from(0),
@@ -65,8 +36,8 @@ impl BlockEventsFranklin {
         this
     }
 
-    pub fn get_past_state_from_genesis_with_blocks_delta(network: InfuraEndpoint, genesis_block: U256, blocks_delta: U256) -> Result<Self, DataRestoreError> {
-        let mut this = BlockEventsFranklin::new(network);
+    pub fn get_past_state_from_genesis_with_blocks_delta(config: DataRestoreConfig, genesis_block: U256, blocks_delta: U256) -> Result<Self, DataRestoreError> {
+        let mut this = BlockEventsFranklin::new(config);
         let (blocks, to_block_number): (ComAndVerBlocksVecs, BlockNumber256) = this.get_sorted_past_logs_from_genesis(genesis_block, blocks_delta).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         this.committed_blocks = blocks.0;
         this.verified_blocks = blocks.1;
@@ -128,7 +99,7 @@ impl BlockEventsFranklin {
     }
 
     pub fn get_last_block_number(&mut self) -> Result<BlockNumber256, DataRestoreError> {
-        let (_eloop, transport) = web3::transports::Http::new(self.http_endpoint_string.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
+        let (_eloop, transport) = web3::transports::Http::new(self.config.http_endpoint_string.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
         let web3 = web3::Web3::new(transport);
         let last_block_number = web3.eth().block_number().wait().map_err(|e| DataRestoreError::Unknown(e.to_string()))?;
         Ok(last_block_number)
@@ -186,7 +157,7 @@ impl BlockEventsFranklin {
 
     fn get_logs(&mut self, from_block_number: BlockNumber, to_block_number: BlockNumber) -> Result<Vec<Log>, DataRestoreError> {
         // Set web3
-        let (_eloop, transport) = web3::transports::Http::new(self.http_endpoint_string.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
+        let (_eloop, transport) = web3::transports::Http::new(self.config.http_endpoint_string.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
         let web3 = web3::Web3::new(transport);
 
         // let contract = Contract::new(web3.eth(), franklin_address.clone(), franklin_contract.clone());
@@ -201,7 +172,7 @@ impl BlockEventsFranklin {
 
         // Filter
         let filter = FilterBuilder::default()
-                    .address(vec![self.franklin_contract_address.clone()])
+                    .address(vec![self.config.franklin_contract_address])
                     .from_block(from_block_number)
                     .to_block(to_block_number)
                     .topics(

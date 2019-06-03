@@ -7,6 +7,7 @@ eth_client = { path = "../eth_client" }
 plasma = { path = "../plasma" }
 models = { path = "../models" }
 storage = { path = "../storage" }
+commons = { path = "../commons" }
 
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
 pairing = { package = "pairing_ce", version = "0.17.0" }

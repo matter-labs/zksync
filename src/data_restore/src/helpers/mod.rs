@@ -1,22 +1,40 @@
-use web3::types::H256;
+use web3::types::{H256,Address};
 use tiny_keccak::keccak256;
 use bigdecimal::BigDecimal;
 use bitvec::prelude::*;
 use sapling_crypto::circuit::float_point::parse_float_to_u128;
+use std::env;
+use ethabi::Contract;
+use super::commons::{PROD_PLASMA, TEST_PLASMA_ALWAYS_VERIFY};
 
-pub type ABI = (&'static [u8], &'static str);
-pub const FRANKLIN_MAINNET_ADDRESS: &'static str = "4a89f998dce2453e96b795d47603c4b5a16144b0";
-pub const FRANKLIN_RINKEBY_ADDRESS: &'static str = "4fbf331db438c88a83b1316d072b7d73d8366367";
-pub const INFURA_MAINNET_ENDPOINT: &'static str = "https://mainnet.infura.io/";
-pub const INFURA_RINKEBY_ENDPOINT: &'static str = "https://rinkeby.infura.io/";
-pub const PLASMA_RINKEBY_ABI: ABI = (
-    include_bytes!("../../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.abi"),
-    include_str!("../../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.bin"),
-);
-pub const PLASMA_MAINNET_ABI: ABI = (
-    include_bytes!("../../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.abi"),
-    include_str!("../../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.bin"),
-);
+#[derive(Debug, Clone)]
+pub struct DataRestoreConfig {
+    pub http_endpoint_string: String,
+    pub franklin_contract: Contract,
+    pub franklin_contract_address: Address,
+}
+
+impl DataRestoreConfig {
+    pub fn new(network: InfuraEndpoint) -> Self {
+        match network {
+            InfuraEndpoint::Mainnet => {
+                Self {
+                    http_endpoint_string:      env::var("TREE_RESTORE_MAINNET_ENDPOINT").expect("TREE_RESTORE_MAINNET_ENDPOINT env missing"),
+                    franklin_contract:         ethabi::Contract::load(PROD_PLASMA.0).unwrap(),
+                    franklin_contract_address: env::var("TREE_RESTORE_MAINNET_CONTRACT_ADDR").expect("TREE_RESTORE_MAINNET_CONTRACT_ADDR env missing").as_str().parse().unwrap(),
+                }
+            },
+            InfuraEndpoint::Rinkeby => {
+                Self {
+                    http_endpoint_string:      env::var("TREE_RESTORE_RINKEBY_ENDPOINT").expect("TREE_RESTORE_RINKEBY_ENDPOINT env missing"),
+                    franklin_contract:         ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap(),
+                    franklin_contract_address: env::var("TREE_RESTORE_RINKEBY_CONTRACT_ADDR").expect("TREE_RESTORE_RINKEBY_CONTRACT_ADDR env missing").as_str().parse().unwrap(),
+                }
+            },
+        }
+    }
+}
+
 /// Amount bit widths
 pub const AMOUNT_EXPONENT_BIT_WIDTH: usize = 5;
 pub const AMOUNT_MANTISSA_BIT_WIDTH: usize = 11;

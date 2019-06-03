@@ -3,13 +3,12 @@ use std::collections::{HashMap, HashSet};
 
 use ff::{Field, PrimeField, PrimeFieldRepr};
 use web3::futures::Future;
-use web3::types::{Address, FilterBuilder, H256, U256, BlockNumber};
-use ethabi::Contract;
+use web3::types::{FilterBuilder, H256, U256, BlockNumber};
 use sapling_crypto::jubjub::{edwards, Unknown};
 
 use bigdecimal::{Num, BigDecimal, Zero};
 
-use plasma::models::{Account, AccountTree, AccountId};
+use plasma::models::{Account, AccountId, PlasmaState};
 use plasma::models::{DepositTx, TransferTx, Engine, Fr, ExitTx, TxSignature};
 use plasma::models::params;
 
@@ -37,41 +36,16 @@ pub struct TransferTransactionsBlock {
 }
 
 pub struct FranklinAccountsStates {
-    pub http_endpoint_string: String,
-    pub franklin_abi: ABI,
-    pub franklin_contract: Contract,
-    pub franklin_contract_address: Address,
-    pub accounts_tree: AccountTree,
+    pub config: DataRestoreConfig,
+    pub plasma_state: PlasmaState,
 }
 
 impl FranklinAccountsStates {
-    pub fn new(network: InfuraEndpoint) -> Self {
-        let http_infura_endpoint_str = match network {
-            InfuraEndpoint::Mainnet => INFURA_MAINNET_ENDPOINT,
-            InfuraEndpoint::Rinkeby => INFURA_RINKEBY_ENDPOINT,
-        };
-        let http_infura_endpoint_string = String::from(http_infura_endpoint_str);
-        let address: Address = match network {
-            InfuraEndpoint::Mainnet => FRANKLIN_MAINNET_ADDRESS,
-            InfuraEndpoint::Rinkeby => FRANKLIN_RINKEBY_ADDRESS,
-        }.parse().unwrap();
-        let abi: ABI = match network {
-            InfuraEndpoint::Mainnet => PLASMA_MAINNET_ABI,
-            InfuraEndpoint::Rinkeby => PLASMA_RINKEBY_ABI,
-        };
-        let contract = ethabi::Contract::load(abi.0).unwrap();
-
-        let tree_depth = params::BALANCE_TREE_DEPTH as u32;
-        let tree = AccountTree::new(tree_depth);
-        
-        let this = Self {
-            http_endpoint_string: http_infura_endpoint_string,
-            franklin_abi: abi,
-            franklin_contract: contract,
-            franklin_contract_address: address,
-            accounts_tree: tree,
-        };
-        this
+    pub fn new(config: DataRestoreConfig) -> Self {
+        Self {
+            config: config,
+            plasma_state: PlasmaState::empty(),
+        }
     }
 
     pub fn update_accounts_states_from_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), DataRestoreError> {
@@ -94,22 +68,22 @@ impl FranklinAccountsStates {
     }
 
     pub fn get_accounts(&self) -> Vec<(u32, Account)> {
-        self.accounts_tree.items.iter().map(|a| (*a.0 as u32, a.1.clone()) ).collect()
+        self.plasma_state.get_accounts()
     }
 
     pub fn root_hash(&self) -> Fr {
-        self.accounts_tree.root_hash().clone()
+        self.plasma_state.root_hash()
     }
 
     pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
-        self.accounts_tree.items.get(&account_id).cloned()
+        self.plasma_state.get_account(account_id)
     }
 
     fn update_accounts_states_from_transfer_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), DataRestoreError> {
         // println!("tx: {:?}", transaction.ethereum_transaction.hash);
         let transfer_txs_block = self.get_all_transactions_from_transfer_block(transaction).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         for tx in transfer_txs_block.transfers {
-            if let Some(mut from) = self.accounts_tree.items.get(&tx.from).cloned() {
+            if let Some(mut from) = self.plasma_state.balance_tree.items.get(&tx.from).cloned() {
                 let mut transacted_amount = BigDecimal::zero();
                 // println!("amount tx: {:?}", &tx.amount);
                 transacted_amount += &tx.amount;
@@ -120,7 +94,7 @@ impl FranklinAccountsStates {
                 }
                 
                 let mut to = Account::default();
-                if let Some(existing_to) = self.accounts_tree.items.get(&tx.to) {
+                if let Some(existing_to) = self.plasma_state.balance_tree.items.get(&tx.to) {
                     to = existing_to.clone();
                 }
 
@@ -131,8 +105,8 @@ impl FranklinAccountsStates {
                     to.balance += &tx.amount;
                 }
 
-                self.accounts_tree.insert(tx.from, from);
-                self.accounts_tree.insert(tx.to, to);
+                self.plasma_state.balance_tree.insert(tx.from, from);
+                self.plasma_state.balance_tree.insert(tx.to, to);
             } else {
                 return Err(DataRestoreError::NonexistentAccount)
             }
@@ -145,7 +119,7 @@ impl FranklinAccountsStates {
         let block_number = self.get_block_number_from_deposit(transaction);
         let deposit_txs_block = self.get_all_transactions_from_deposit_batch(batch_number, block_number).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         for tx in deposit_txs_block.deposits {
-            let account = match self.accounts_tree.items.get(&tx.account) {
+            let account = match self.plasma_state.balance_tree.items.get(&tx.account) {
                 None => {
                     let mut acc = Account::default();
                     let tx = tx.clone();
@@ -160,7 +134,7 @@ impl FranklinAccountsStates {
                     acc
                 }
             };
-            self.accounts_tree.insert(tx.account, account);
+            self.plasma_state.balance_tree.insert(tx.account, account);
         }
         Ok(())
     }
@@ -170,10 +144,10 @@ impl FranklinAccountsStates {
         let block_number = self.get_block_number_from_full_exit(transaction);
         let exit_txs_block = self.get_all_transactions_from_full_exit_batch(batch_number, block_number).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         for tx in exit_txs_block.exits {
-            if let None = self.accounts_tree.items.get(&tx.account).cloned() {
+            if let None = self.plasma_state.balance_tree.items.get(&tx.account).cloned() {
                 return Err(DataRestoreError::NonexistentAccount)
             }
-            self.accounts_tree.delete(tx.account);
+            self.plasma_state.balance_tree.delete(tx.account);
         }
         Ok(())
     }
@@ -262,12 +236,12 @@ impl FranklinAccountsStates {
     }
 
     pub fn get_all_transactions_from_deposit_batch(&self, batch_number: U256, block_number: U256) -> Result<DepositTransactionsBlock, DataRestoreError> {
-        let (_eloop, transport) = web3::transports::Http::new(self.http_endpoint_string.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
+        let (_eloop, transport) = web3::transports::Http::new(self.config.http_endpoint_string.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
         let web3 = web3::Web3::new(transport);
-        let deposit_event = self.franklin_contract.event("LogDepositRequest").unwrap().clone();
+        let deposit_event = self.config.franklin_contract.event("LogDepositRequest").unwrap().clone();
         let deposit_event_topic = deposit_event.signature();
         let deposits_filter = FilterBuilder::default()
-            .address(vec![self.franklin_contract_address.clone()])
+            .address(vec![self.config.franklin_contract_address.clone()])
             .from_block(BlockNumber::Earliest)
             .to_block(BlockNumber::Latest)
             .topics(
@@ -355,12 +329,12 @@ impl FranklinAccountsStates {
     }
 
     pub fn get_all_transactions_from_full_exit_batch(&self, batch_number: U256, block_number: U256) -> Result<FullExitTransactionsBlock, DataRestoreError> {
-        let (_eloop, transport) = web3::transports::Http::new(self.http_endpoint_string.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
+        let (_eloop, transport) = web3::transports::Http::new(self.config.http_endpoint_string.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
         let web3 = web3::Web3::new(transport);
-        let exit_event = self.franklin_contract.event("LogExitRequest").unwrap().clone();
+        let exit_event = self.config.franklin_contract.event("LogExitRequest").unwrap().clone();
         let exit_event_topic = exit_event.signature();
         let exits_filter = FilterBuilder::default()
-            .address(vec![self.franklin_contract_address.clone()])
+            .address(vec![self.config.franklin_contract_address])
             .from_block(BlockNumber::Earliest)
             .to_block(BlockNumber::Latest)
             .topics(

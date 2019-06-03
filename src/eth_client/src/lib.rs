@@ -6,11 +6,15 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
+extern crate commons;
+
 mod signer;
 
 use reqwest::header::{CONTENT_TYPE};
 use web3::contract::tokens::Tokenize;
 use ethereum_types::{U256, H160, H256};
+
+use commons::{ABI, TEST_PLASMA_ALWAYS_VERIFY};
 
 // used
 use std::env;
@@ -19,18 +23,6 @@ use std::str::FromStr;
 type Result<T> = std::result::Result<T, Box<std::error::Error>>;
 
 pub type U32 = u64; // because missing in web3::types; u64 is fine since only used for tokenization
-
-type ABI = (&'static [u8], &'static str);
-
-pub const TEST_PLASMA_ALWAYS_VERIFY: ABI = (
-    include_bytes!("../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.abi"),
-    include_str!("../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.bin"),
-);
-
-pub const PROD_PLASMA: ABI = (
-    include_bytes!("../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.abi"),
-    include_str!("../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.bin"),
-);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxMeta{

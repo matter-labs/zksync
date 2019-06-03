@@ -1,11 +1,12 @@
 use std::sync::mpsc::{channel, Sender, Receiver};
-use eth_client::{ETHClient, TxMeta, TEST_PLASMA_ALWAYS_VERIFY};
+use eth_client::{ETHClient, TxMeta};
 use plasma::models::{Block, BlockData, AccountMap, params};
 use super::storage::{ConnectionPool, StorageProcessor};
 use super::models::*;
 use web3::types::{U128, U256, H256};
 use super::config;
 use ff::{PrimeField, PrimeFieldRepr};
+use super::commons::{TEST_PLASMA_ALWAYS_VERIFY};
 
 fn sorted_and_padded_for_deposits(accounts_updated: AccountMap) -> [u64; config::DEPOSIT_BATCH_SIZE] {
 

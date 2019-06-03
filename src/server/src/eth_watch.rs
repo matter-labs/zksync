@@ -11,6 +11,7 @@ use super::models::{StateKeeperRequest, ProtoBlock};
 use plasma::models::{Block, BlockData, DepositTx, Engine, Fr, ExitTx};
 use bigdecimal::{Num, BigDecimal};
 use plasma::models::params;
+use super::commons::{TEST_PLASMA_ALWAYS_VERIFY};
 
 use std::time;
 use web3::contract::{Contract, Options};
@@ -20,19 +21,6 @@ use sapling_crypto::jubjub::{edwards, Unknown};
 use super::config;
 
 use super::storage::{ConnectionPool, StorageProcessor};
-
-type ABI = (&'static [u8], &'static str);
-
-pub const TEST_PLASMA_ALWAYS_VERIFY: ABI = (
-    include_bytes!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.abi"),
-    include_str!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.bin"),
-);
-
-pub const PROD_PLASMA: ABI = (
-    include_bytes!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.abi"),
-    include_str!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.bin"),
-);
-
 
 fn u64_from_environment(name: &str) -> Option<u64> {
     let candidate = env::var(name);

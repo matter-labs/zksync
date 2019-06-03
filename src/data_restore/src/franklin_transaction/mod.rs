@@ -14,7 +14,6 @@ pub enum FranklinTransactionType {
 
 #[derive(Debug, Clone)]
 pub struct FranklinTransaction {
-    pub network: InfuraEndpoint,
     pub franklin_transaction_type: FranklinTransactionType,
     pub block_number: u32,
     pub ethereum_transaction: Transaction,
@@ -22,13 +21,12 @@ pub struct FranklinTransaction {
 }
 
 impl FranklinTransaction {
-    pub fn get_transaction(network: InfuraEndpoint, franklin_block: &LogBlockData) -> Option<Self> {
-        let transaction = FranklinTransaction::get_ethereum_transaction(network, &franklin_block.transaction_hash)?;
+    pub fn get_transaction(config: &DataRestoreConfig, franklin_block: &LogBlockData) -> Option<Self> {
+        let transaction = FranklinTransaction::get_ethereum_transaction(config, &franklin_block.transaction_hash)?;
         let input_data = FranklinTransaction::get_input_data_from_ethereum_transaction(&transaction);
         let tx_type = FranklinTransaction::get_transaction_type(&input_data);
         let commitment_data = FranklinTransaction::get_commitment_data_from_input_data(&input_data)?;
         let this = Self {
-            network: network,
             franklin_transaction_type: tx_type,
             block_number: franklin_block.block_num,
             ethereum_transaction: transaction,
@@ -37,12 +35,8 @@ impl FranklinTransaction {
         Some(this)
     }
 
-    fn get_ethereum_transaction(network: InfuraEndpoint, transaction_hash: &H256) -> Option<Transaction> {
-        let infura_endpoint = match network {
-            InfuraEndpoint::Mainnet => INFURA_MAINNET_ENDPOINT,
-            InfuraEndpoint::Rinkeby => INFURA_RINKEBY_ENDPOINT,
-        };
-        let (_eloop, transport) = web3::transports::Http::new(infura_endpoint).unwrap();
+    fn get_ethereum_transaction(config: &DataRestoreConfig, transaction_hash: &H256) -> Option<Transaction> {
+        let (_eloop, transport) = web3::transports::Http::new(config.http_endpoint_string.as_str()).unwrap();
         let web3 = web3::Web3::new(transport);
         let tx_id = TransactionId::Hash(transaction_hash.clone());
         let web3_transaction = web3.eth().transaction(tx_id).wait();

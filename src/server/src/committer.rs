@@ -1,9 +1,10 @@
 use std::thread;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::time::Duration;
-use eth_client::{ETHClient, TxMeta, TEST_PLASMA_ALWAYS_VERIFY};
+use eth_client::{ETHClient, TxMeta};
 use super::storage::{ConnectionPool, StorageProcessor};
 use super::models::{Operation, Action, ProverRequest, CommitRequest};
+use super::commons::{TEST_PLASMA_ALWAYS_VERIFY};
 
 pub fn start_committer(
     rx_for_ops: Receiver<CommitRequest>, 
