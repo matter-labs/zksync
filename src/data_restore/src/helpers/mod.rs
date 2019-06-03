@@ -6,6 +6,7 @@ use sapling_crypto::circuit::float_point::parse_float_to_u128;
 use std::env;
 use ethabi::Contract;
 use super::commons::{PROD_PLASMA, TEST_PLASMA_ALWAYS_VERIFY};
+use super::models::config::RuntimeConfig;
 
 #[derive(Debug, Clone)]
 pub struct DataRestoreConfig {
@@ -16,19 +17,20 @@ pub struct DataRestoreConfig {
 
 impl DataRestoreConfig {
     pub fn new(network: InfuraEndpoint) -> Self {
+        let config = RuntimeConfig::new();
         match network {
             InfuraEndpoint::Mainnet => {
                 Self {
-                    http_endpoint_string:      env::var("TREE_RESTORE_MAINNET_ENDPOINT").expect("TREE_RESTORE_MAINNET_ENDPOINT env missing"),
+                    http_endpoint_string:      config.mainnet_http_endpoint_string,
                     franklin_contract:         ethabi::Contract::load(PROD_PLASMA.0).unwrap(),
-                    franklin_contract_address: env::var("TREE_RESTORE_MAINNET_CONTRACT_ADDR").expect("TREE_RESTORE_MAINNET_CONTRACT_ADDR env missing").as_str().parse().unwrap(),
+                    franklin_contract_address: config.mainnet_franklin_contract_address.as_str().parse().unwrap(),
                 }
             },
             InfuraEndpoint::Rinkeby => {
                 Self {
-                    http_endpoint_string:      env::var("TREE_RESTORE_RINKEBY_ENDPOINT").expect("TREE_RESTORE_RINKEBY_ENDPOINT env missing"),
+                    http_endpoint_string:      config.rinkeby_http_endpoint_string,
                     franklin_contract:         ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap(),
-                    franklin_contract_address: env::var("TREE_RESTORE_RINKEBY_CONTRACT_ADDR").expect("TREE_RESTORE_RINKEBY_CONTRACT_ADDR env missing").as_str().parse().unwrap(),
+                    franklin_contract_address: config.rinkeby_franklin_contract_address.as_str().parse().unwrap(),
                 }
             },
         }
