@@ -11,14 +11,15 @@ export NGINX_DOCKER_IMAGE ?= gluk64/franklin-nginx:$(FRANKLIN_ENV)
 env:	
 
 # Get everything up and running for the first time
-init: dev-up env yarn db-setup redeploy
+init:
+	@bin/init
 
 yarn:
-	@cd contracts && yarn
 	@cd js/franklin && yarn
 	@cd js/client && yarn
 	@cd js/loadtest && yarn
 	@cd js/explorer && yarn
+	@cd contracts && yarn
 
 
 # Helpers
@@ -56,6 +57,8 @@ db-drop: confirm_action
 	@$(sql) 'DROP OWNED BY CURRENT_USER CASCADE' || \
 		{ $(sql) 'DROP SCHEMA IF EXISTS public CASCADE' && $(sql)'CREATE SCHEMA public'; }
 
+db-wait:
+	@bin/db-wait
 
 # Frontend clients
 
