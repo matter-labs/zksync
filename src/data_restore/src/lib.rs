@@ -1,5 +1,3 @@
-#![allow(deprecated)]
-
 extern crate web3;
 extern crate tiny_keccak;
 extern crate futures;
