@@ -3,10 +3,10 @@ use tiny_keccak::keccak256;
 use bigdecimal::BigDecimal;
 use bitvec::prelude::*;
 use sapling_crypto::circuit::float_point::parse_float_to_u128;
-use std::env;
 use ethabi::Contract;
 use super::commons::{PROD_PLASMA, TEST_PLASMA_ALWAYS_VERIFY};
 use super::models::config::RuntimeConfig;
+use super::plasma::models::params as plasma_constants;
 
 #[derive(Debug, Clone)]
 pub struct DataRestoreConfig {
@@ -37,14 +37,6 @@ impl DataRestoreConfig {
     }
 }
 
-/// Amount bit widths
-pub const AMOUNT_EXPONENT_BIT_WIDTH: usize = 5;
-pub const AMOUNT_MANTISSA_BIT_WIDTH: usize = 11;
-
-/// Fee bit widths
-pub const FEE_EXPONENT_BIT_WIDTH: usize = 5;
-pub const FEE_MANTISSA_BIT_WIDTH: usize = 3;
-
 #[derive(Debug, Copy, Clone)]
 pub enum InfuraEndpoint {
     Mainnet,
@@ -73,8 +65,8 @@ pub fn amount_bytes_slice_to_big_decimal(bytes: &[u8]) -> BigDecimal {
     }
     let amount_u128: u128 = parse_float_to_u128(
         bool_vec,
-        AMOUNT_EXPONENT_BIT_WIDTH,
-        AMOUNT_MANTISSA_BIT_WIDTH,
+        plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+        plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH,
         10
     ).unwrap_or(0);
     let amount_u64 = amount_u128 as u64;
@@ -90,8 +82,8 @@ pub fn fee_bytes_slice_to_big_decimal(byte: &u8) -> BigDecimal {
     }
     let fee_u128: u128 = parse_float_to_u128(
         bool_vec,
-        FEE_EXPONENT_BIT_WIDTH,
-        FEE_MANTISSA_BIT_WIDTH,
+        plasma_constants::FEE_EXPONENT_BIT_WIDTH,
+        plasma_constants::FEE_MANTISSA_BIT_WIDTH,
         10
     ).unwrap_or(0);
     let fee_u64 = fee_u128 as u64;
