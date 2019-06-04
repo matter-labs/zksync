@@ -36,9 +36,9 @@ impl FranklinTransaction {
     }
 
     fn get_ethereum_transaction(config: &DataRestoreConfig, transaction_hash: &H256) -> Option<Transaction> {
-        let (_eloop, transport) = web3::transports::Http::new(config.http_endpoint_string.as_str()).unwrap();
-        let web3 = web3::Web3::new(transport);
         let tx_id = TransactionId::Hash(transaction_hash.clone());
+        let (_eloop, transport) = web3::transports::Http::new(config.web3_endpoint.as_str()).ok()?;
+        let web3 = web3::Web3::new(transport);
         let web3_transaction = web3.eth().transaction(tx_id).wait();
         let tx = match web3_transaction {
             Ok(tx) => {

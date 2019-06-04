@@ -15,26 +15,6 @@ use plasma::models::params;
 use helpers::*;
 use franklin_transaction::{FranklinTransactionType,FranklinTransaction};
 
-#[derive(Debug, Clone)]
-pub struct FullExitTransactionsBlock {
-    pub batch_number: u32,
-    pub block_number: u32,
-    pub exits: Vec<ExitTx>,
-}
-
-#[derive(Debug, Clone)]
-pub struct DepositTransactionsBlock {
-    pub batch_number: u32,
-    pub block_number: u32,
-    pub deposits: Vec<DepositTx>,
-}
-
-#[derive(Debug, Clone)]
-pub struct TransferTransactionsBlock {
-    pub block_number: u32,
-    pub transfers: Vec<TransferTx>,
-}
-
 pub struct FranklinAccountsStates {
     pub config: DataRestoreConfig,
     pub plasma_state: PlasmaState,
@@ -82,7 +62,7 @@ impl FranklinAccountsStates {
     fn update_accounts_states_from_transfer_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), DataRestoreError> {
         // println!("tx: {:?}", transaction.ethereum_transaction.hash);
         let transfer_txs_block = self.get_all_transactions_from_transfer_block(transaction).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-        for tx in transfer_txs_block.transfers {
+        for tx in transfer_txs_block {
             if let Some(mut from) = self.plasma_state.balance_tree.items.get(&tx.from).cloned() {
                 let mut transacted_amount = BigDecimal::zero();
                 // println!("amount tx: {:?}", &tx.amount);
@@ -116,9 +96,9 @@ impl FranklinAccountsStates {
 
     fn update_accounts_states_from_deposit_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), DataRestoreError> {
         let batch_number = self.get_batch_number_from_deposit(transaction);
-        let block_number = self.get_block_number_from_deposit(transaction);
-        let deposit_txs_block = self.get_all_transactions_from_deposit_batch(batch_number, block_number).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-        for tx in deposit_txs_block.deposits {
+        // let block_number = self.get_block_number_from_deposit(transaction);
+        let deposit_txs_block = self.get_all_transactions_from_deposit_batch(batch_number).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+        for tx in deposit_txs_block {
             let account = match self.plasma_state.balance_tree.items.get(&tx.account) {
                 None => {
                     let mut acc = Account::default();
@@ -141,9 +121,9 @@ impl FranklinAccountsStates {
 
     fn update_accounts_states_from_full_exit_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), DataRestoreError> {
         let batch_number = self.get_batch_number_from_full_exit(transaction);
-        let block_number = self.get_block_number_from_full_exit(transaction);
-        let exit_txs_block = self.get_all_transactions_from_full_exit_batch(batch_number, block_number).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-        for tx in exit_txs_block.exits {
+        // let block_number = self.get_block_number_from_full_exit(transaction);
+        let exit_txs_block = self.get_all_transactions_from_full_exit_batch(batch_number).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+        for tx in exit_txs_block {
             if let None = self.plasma_state.balance_tree.items.get(&tx.account).cloned() {
                 return Err(DataRestoreError::NonexistentAccount)
             }
@@ -164,22 +144,22 @@ impl FranklinAccountsStates {
         U256::from(batch_slice)
     }
 
-    fn get_block_number_from_deposit(&self, transaction: &FranklinTransaction) -> U256 {
-        let block_vec = transaction.commitment_data[64..96].to_vec();
-        let block_slice = block_vec.as_slice();
-        U256::from(block_slice)
-    }
+    // fn get_block_number_from_deposit(&self, transaction: &FranklinTransaction) -> U256 {
+    //     let block_vec = transaction.commitment_data[64..96].to_vec();
+    //     let block_slice = block_vec.as_slice();
+    //     U256::from(block_slice)
+    // }
 
-    fn get_block_number_from_full_exit(&self, transaction: &FranklinTransaction) -> U256 {
-        let block_vec = transaction.commitment_data[64..96].to_vec();
-        let block_slice = block_vec.as_slice();
-        U256::from(block_slice)
-    }
+    // fn get_block_number_from_full_exit(&self, transaction: &FranklinTransaction) -> U256 {
+    //     let block_vec = transaction.commitment_data[64..96].to_vec();
+    //     let block_slice = block_vec.as_slice();
+    //     U256::from(block_slice)
+    // }
 
-    pub fn get_all_transactions_from_transfer_block(&self, transaction: &FranklinTransaction) -> Result<TransferTransactionsBlock, DataRestoreError> {
+    pub fn get_all_transactions_from_transfer_block(&self, transaction: &FranklinTransaction) -> Result<Vec<TransferTx>, DataRestoreError> {
         let mut tx_data_vec = transaction.commitment_data.clone();
         // println!("tx_data_vec: {:?}", tx_data_vec);
-        let block_number = &transaction.commitment_data.clone()[0..32];
+        // let block_number = &transaction.commitment_data.clone()[0..32];
         // println!("block_number: {:?}", block_number);
         let tx_data_len = tx_data_vec.len();
         // println!("tx_data_len: {:?}", tx_data_len);
@@ -211,37 +191,37 @@ impl FranklinAccountsStates {
             //     };
             //     transfers.push(transfer_tx);
             // }
-            let from = U256::from(&tx[0..3]);
-            let to = U256::from(&tx[3..6]);
-            let amount = &tx[6..8];
-            let fee = &tx[8];
+            let from = U256::from(&tx[0..3]).as_u32();
+            let to = U256::from(&tx[3..6]).as_u32();
+            let amount = amount_bytes_slice_to_big_decimal(&tx[6..8]);
+            let fee = fee_bytes_slice_to_big_decimal(&tx[8]);
             let transfer_tx = TransferTx {
-                from: from.as_u32(),
-                to: to.as_u32(),
-                amount: amount_bytes_slice_to_big_decimal(amount), //BigDecimal::from_str_radix("0", 10).unwrap(), 
-                fee: fee_bytes_slice_to_big_decimal(&fee), //BigDecimal::from_str_radix("0", 10).unwrap(),
-                nonce: 0,
+                from: from,
+                to: to,
+                amount: amount.clone(), //BigDecimal::from_str_radix("0", 10).unwrap(), 
+                fee: fee, //BigDecimal::from_str_radix("0", 10).unwrap(),
+                nonce: i,
                 good_until_block: 0,
                 signature: TxSignature::default(),
                 cached_pub_key: None,
             };
+            println!("Transaction from account {:?} to account {:?}, amount = {:?}", from, to, amount);
             transfers.push(transfer_tx);
             i = i + 1;
         }
         
-        Ok(TransferTransactionsBlock {
-            block_number: U256::from(block_number).as_u32(),
-            transfers: transfers,
-        })
+        Ok(transfers)
     }
 
-    pub fn get_all_transactions_from_deposit_batch(&self, batch_number: U256, block_number: U256) -> Result<DepositTransactionsBlock, DataRestoreError> {
-        let (_eloop, transport) = web3::transports::Http::new(self.config.http_endpoint_string.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
-        let web3 = web3::Web3::new(transport);
+    pub fn get_all_transactions_from_deposit_batch(&self, batch_number: U256) -> Result<Vec<DepositTx>, DataRestoreError> {
         let deposit_event = self.config.franklin_contract.event("LogDepositRequest").unwrap().clone();
         let deposit_event_topic = deposit_event.signature();
+        
+        let deposit_canceled_event = self.config.franklin_contract.event("LogCancelDepositRequest").unwrap().clone();
+        let deposit_canceled_topic = deposit_canceled_event.signature();
+        
         let deposits_filter = FilterBuilder::default()
-            .address(vec![self.config.franklin_contract_address.clone()])
+            .address(vec![self.config.franklin_contract_address])
             .from_block(BlockNumber::Earliest)
             .to_block(BlockNumber::Latest)
             .topics(
@@ -251,9 +231,35 @@ impl FranklinAccountsStates {
                 None,
             )
             .build();
-        let mut deposit_events_filter_result = web3.eth().logs(deposits_filter).wait().map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+        let cancels_filter = FilterBuilder::default()
+            .address(vec![self.config.franklin_contract_address])
+            .from_block(BlockNumber::Earliest)
+            .to_block(BlockNumber::Latest)
+            .topics(
+                Some(vec![deposit_canceled_topic]),
+                Some(vec![H256::from(batch_number.clone())]),
+                None,
+                None,
+            )
+            .build();
+
+        let (_eloop, transport) = web3::transports::Http::new(self.config.web3_endpoint.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
+        let web3 = web3::Web3::new(transport);
+        let deposit_events_filter_result = web3.eth().logs(deposits_filter).wait().map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+        let cancel_events_filter_result = web3.eth().logs(cancels_filter).wait()
+            .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+
+        let deposit_events = deposit_events_filter_result;
+        let cancel_events = cancel_events_filter_result;
+        
+        let mut all_events = vec![];
+        all_events.extend(deposit_events.into_iter());
+        all_events.extend(cancel_events.into_iter());
+
+        all_events = all_events.into_iter().filter(|el| el.is_removed() == false).collect();
+
         let mut error_flag = false;
-        deposit_events_filter_result.sort_by(|l, r| {
+        all_events.sort_by(|l, r| {
             let l_block = l.block_number.unwrap();
             let r_block = r.block_number.unwrap();
 
@@ -276,25 +282,41 @@ impl FranklinAccountsStates {
         if error_flag {
             return Err(DataRestoreError::Unknown("Logs can not have same indexes".to_string()));
         }
+
         let mut this_batch: HashMap<U256, (U256, U256)> = HashMap::new();
 
-        for event in deposit_events_filter_result {
-            let data_bytes: Vec<u8> = event.data.0;
-            let account_id = U256::from(event.topics[2]);
-            let public_key = U256::from(event.topics[3]);
-            let deposit_amount = U256::from_big_endian(&data_bytes);
-            let existing_record = this_batch.get(&account_id).map(|&v| v.clone());
-            if let Some(record) = existing_record {
-                let mut existing_balance = record.0;
-                existing_balance = existing_balance + deposit_amount;
-                this_batch.insert(account_id, (existing_balance, record.1));
-            } else {
-                this_batch.insert(account_id, (deposit_amount, public_key));
+        for event in all_events {
+            let topic = event.topics[0];
+            match () {
+                () if topic == deposit_event_topic => {
+                    let data_bytes: Vec<u8> = event.data.0;
+                    let account_id = U256::from(event.topics[2]);
+                    let public_key = U256::from(event.topics[3]);
+                    let deposit_amount = U256::from_big_endian(&data_bytes);
+                    let _existing_record = this_batch.get(&account_id).map(|&v| v.clone());
+                    if let Some(record) = _existing_record {
+                        let mut existing_balance = record.0;
+                        existing_balance = existing_balance + deposit_amount;
+                        this_batch.insert(account_id, (existing_balance, record.1));
+                    } else {
+                        this_batch.insert(account_id, (deposit_amount, public_key));
+                    }
+                    continue;
+                },
+                () if topic == deposit_canceled_topic => {
+                    let account_id = U256::from(event.topics[2]);
+                    let _existing_record = this_batch.get(&account_id).map(|&v| v.clone())
+                        .ok_or("existing_record not found for deposits")?;
+                    this_batch.remove(&account_id);
+                    continue;
+                },
+                _ => return Err(DataRestoreError::Unknown("unexpected topic".to_string())),
             }
-            continue;
         }
+
         let mut all_deposits = vec![];
         for (k, v) in this_batch.iter() {
+            println!("Into account {:?} with public key {:x}, deposit amount = {:?}", k, v.1, v.0);
             let mut public_key_bytes = vec![0u8; 32];
             v.1.to_big_endian(& mut public_key_bytes);
             let x_sign = public_key_bytes[0] & 0x80 > 0;
@@ -312,7 +334,7 @@ impl FranklinAccountsStates {
 
             let (pub_x, pub_y) = public_key_point.unwrap().into_xy();
 
-            let tx: DepositTx = DepositTx{ 
+            let tx: DepositTx = DepositTx{
                 account: k.as_u32(),
                 amount:  BigDecimal::from_str_radix(&format!("{}", v.0), 10).unwrap(),
                 pub_x:   pub_x,
@@ -320,19 +342,16 @@ impl FranklinAccountsStates {
             };
             all_deposits.push(tx);
         }
-        let block = DepositTransactionsBlock {
-            batch_number: batch_number.as_u32(),
-            block_number: block_number.as_u32(),
-            deposits: all_deposits,
-        };
-        Ok(block)
+        Ok(all_deposits)
     }
 
-    pub fn get_all_transactions_from_full_exit_batch(&self, batch_number: U256, block_number: U256) -> Result<FullExitTransactionsBlock, DataRestoreError> {
-        let (_eloop, transport) = web3::transports::Http::new(self.config.http_endpoint_string.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
-        let web3 = web3::Web3::new(transport);
+    pub fn get_all_transactions_from_full_exit_batch(&self, batch_number: U256) -> Result<Vec<ExitTx>, DataRestoreError> {
         let exit_event = self.config.franklin_contract.event("LogExitRequest").unwrap().clone();
         let exit_event_topic = exit_event.signature();
+
+        let exit_canceled_event = self.config.franklin_contract.event("LogCancelExitRequest").unwrap().clone();
+        let exit_canceled_topic = exit_canceled_event.signature();
+
         let exits_filter = FilterBuilder::default()
             .address(vec![self.config.franklin_contract_address])
             .from_block(BlockNumber::Earliest)
@@ -344,9 +363,40 @@ impl FranklinAccountsStates {
                 None,
             )
             .build();
-        let mut exit_events_filter_result = web3.eth().logs(exits_filter).wait().map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+
+        let cancels_filter = FilterBuilder::default()
+            .address(vec![self.config.franklin_contract_address])
+            .from_block(BlockNumber::Earliest)
+            .to_block(BlockNumber::Latest)
+            .topics(
+                Some(vec![exit_canceled_topic]),
+                Some(vec![H256::from(batch_number.clone())]),
+                None,
+                None,
+            )
+            .build();
+
+        let (_eloop, transport) = web3::transports::Http::new(self.config.web3_endpoint.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
+        let web3 = web3::Web3::new(transport);
+        let exit_events_filter_result = web3.eth().logs(exits_filter).wait()
+            .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+        let cancel_events_filter_result = web3.eth().logs(cancels_filter).wait()
+            .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+
+        let exit_events = exit_events_filter_result;
+        let cancel_events = cancel_events_filter_result;
+
+        // now we have to merge and apply
+        let mut all_events = vec![];
+        all_events.extend(exit_events.into_iter());
+        all_events.extend(cancel_events.into_iter());
+
+        all_events = all_events.into_iter().filter(|el| el.is_removed() == false).collect();
+
+        // sort by index
+
         let mut error_flag = false;
-        exit_events_filter_result.sort_by(|l, r| {
+        all_events.sort_by(|l, r| {
             let l_block = l.block_number.unwrap();
             let r_block = r.block_number.unwrap();
 
@@ -369,31 +419,43 @@ impl FranklinAccountsStates {
         if error_flag {
             return Err(DataRestoreError::Unknown("Logs can not have same indexes".to_string()));
         }
+        
         let mut this_batch: HashSet<U256> = HashSet::new();
 
-        for event in exit_events_filter_result {
-            let account_id = U256::from(event.topics[2]);;
-            let existing_record = this_batch.get(&account_id).map(|&v| v.clone());
-            if let Some(_) = existing_record {
-                return Err(DataRestoreError::DoubleExit)
-            } else {
-                this_batch.insert(account_id);
+        for event in all_events {
+            let topic = event.topics[0];
+            match () {
+                () if topic == exit_event_topic => {
+                    let account_id = U256::from(event.topics[2]);
+                    let existing_record = this_batch.get(&account_id).map(|&v| v.clone());
+                    if let Some(_) = existing_record {
+                        return Err(DataRestoreError::DoubleExit)
+                    } else {
+                        this_batch.insert(account_id);
+                    }
+                    continue;
+                },
+                () if topic == exit_canceled_topic => {
+                    let account_id = U256::from(event.topics[2]);
+                    let _existing_record = this_batch.get(&account_id).map(|&v| v.clone()).ok_or("existing_record fetch failed".to_owned())?;
+                    this_batch.remove(&account_id);
+                    continue;
+                },
+                _ => return Err(DataRestoreError::Unknown("unexpected topic".to_string())),
             }
-            continue;
         }
+
         let mut all_exits = vec![];
         for k in this_batch.iter() {
+            println!("Exit from account {:?}", k);
+
             let tx: ExitTx = ExitTx {
                 account: k.as_u32(),
                 amount:  BigDecimal::zero(),
             };
             all_exits.push(tx);
         }
-        let block = FullExitTransactionsBlock {
-            batch_number: batch_number.as_u32(),
-            block_number: block_number.as_u32(),
-            exits: all_exits,
-        };
-        Ok(block)
+
+        Ok(all_exits)
     }
 }

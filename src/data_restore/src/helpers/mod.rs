@@ -10,7 +10,7 @@ use super::plasma::models::params as plasma_constants;
 
 #[derive(Debug, Clone)]
 pub struct DataRestoreConfig {
-    pub http_endpoint_string: String,
+    pub web3_endpoint: String,
     pub franklin_contract: Contract,
     pub franklin_contract_address: Address,
 }
@@ -21,16 +21,16 @@ impl DataRestoreConfig {
         match network {
             InfuraEndpoint::Mainnet => {
                 Self {
-                    http_endpoint_string:      config.mainnet_http_endpoint_string,
-                    franklin_contract:         ethabi::Contract::load(PROD_PLASMA.0).unwrap(),
-                    franklin_contract_address: config.mainnet_franklin_contract_address.as_str().parse().unwrap(),
+                    web3_endpoint:              config.mainnet_http_endpoint_string,//"https://rinkeby.infura.io/".to_string(),
+                    franklin_contract:          ethabi::Contract::load(PROD_PLASMA.0).unwrap(),
+                    franklin_contract_address:  config.mainnet_franklin_contract_address.as_str().parse().unwrap(),//"4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()        
                 }
             },
             InfuraEndpoint::Rinkeby => {
                 Self {
-                    http_endpoint_string:      config.rinkeby_http_endpoint_string,
-                    franklin_contract:         ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap(),
-                    franklin_contract_address: config.rinkeby_franklin_contract_address.as_str().parse().unwrap(),
+                    web3_endpoint:              config.rinkeby_http_endpoint_string,//"https://rinkeby.infura.io/".to_string(),
+                    franklin_contract:          ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap(),
+                    franklin_contract_address:  config.rinkeby_franklin_contract_address.as_str().parse().unwrap(),//"4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()
                 }
             },
         }
@@ -117,5 +117,17 @@ impl std::string::ToString for DataRestoreError {
             DataRestoreError::DoubleExit         => "Double exit".to_owned(),
             DataRestoreError::StateUpdate(text)  => format!("Error during state update {}", text),
         }
+    }
+}
+
+impl std::convert::From<&str> for DataRestoreError {
+    fn from(a: &str) -> Self {
+        DataRestoreError::Unknown(a.to_string())
+    }
+}
+
+impl std::convert::From<String> for DataRestoreError {
+    fn from(a: String) -> Self {
+        DataRestoreError::Unknown(a)
     }
 }

@@ -99,7 +99,7 @@ impl BlockEventsFranklin {
     }
 
     pub fn get_last_block_number(&mut self) -> Result<BlockNumber256, DataRestoreError> {
-        let (_eloop, transport) = web3::transports::Http::new(self.config.http_endpoint_string.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
+        let (_eloop, transport) = web3::transports::Http::new(self.config.web3_endpoint.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
         let web3 = web3::Web3::new(transport);
         let last_block_number = web3.eth().block_number().wait().map_err(|e| DataRestoreError::Unknown(e.to_string()))?;
         Ok(last_block_number)
@@ -156,9 +156,6 @@ impl BlockEventsFranklin {
     }
 
     fn get_logs(&mut self, from_block_number: BlockNumber, to_block_number: BlockNumber) -> Result<Vec<Log>, DataRestoreError> {
-        // Set web3
-        let (_eloop, transport) = web3::transports::Http::new(self.config.http_endpoint_string.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
-        let web3 = web3::Web3::new(transport);
 
         // let contract = Contract::new(web3.eth(), franklin_address.clone(), franklin_contract.clone());
 
@@ -184,6 +181,8 @@ impl BlockEventsFranklin {
                     .build();
 
         // Filter result
+        let (_eloop, transport) = web3::transports::Http::new(self.config.web3_endpoint.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
+        let web3 = web3::Web3::new(transport);
         let result = web3.eth().logs(filter).wait().map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         if result.len() == 0 {
             return Err(DataRestoreError::NoData("No logs in list".to_string()))
@@ -235,7 +234,7 @@ impl BlockEventsFranklin {
     //     // Setup loop and web3
     //     // let mut eloop = Core::new().unwrap();
     //     let handle = eloop.handle();
-    //     let web3_instance = Rc::new(web3::Web3::new(
+    //     let web3_endpoint = Rc::new(web3::Web3::new(
     //         web3::transports::WebSocket::with_event_loop(self.ws_endpoint_string.as_str(), &handle)
     //             .unwrap(),
     //     ));
@@ -243,7 +242,7 @@ impl BlockEventsFranklin {
     //     // Subscription
     //     println!("subscribing to new blocks");
 
-    //     let future = web3_instance.eth_subscribe()
+    //     let future = web3_endpoint.eth_subscribe()
     //         .subscribe_new_heads()
     //         .and_then(|sub| {
     //             sub.for_each(|log| {
