@@ -5,48 +5,71 @@ use bitvec::prelude::*;
 use sapling_crypto::circuit::float_point::parse_float_to_u128;
 use ethabi::Contract;
 use super::commons::{PROD_PLASMA, TEST_PLASMA_ALWAYS_VERIFY};
-use super::models::config::RuntimeConfig;
+// use super::models::config::RuntimeConfig;
 use super::plasma::models::params as plasma_constants;
 
+/// Configuratoin of DataRestore driver
 #[derive(Debug, Clone)]
 pub struct DataRestoreConfig {
+    /// Web3 endpoint url string
     pub web3_endpoint: String,
+    /// Provides Ethereum Franklin contract unterface
     pub franklin_contract: Contract,
+    /// Ethereum Franklin contract address is type of H160
     pub franklin_contract_address: Address,
 }
 
 impl DataRestoreConfig {
+    /// Return the configuration for setted Infura web3 endpoint
+    /// 
+    /// # Arguments
+    ///
+    /// * `network` - Infura web3 endpoint
+    /// 
     pub fn new(network: InfuraEndpoint) -> Self {
-        let config = RuntimeConfig::new();
+        // let config = RuntimeConfig::new();
         match network {
             InfuraEndpoint::Mainnet => {
                 Self {
-                    web3_endpoint:              config.mainnet_http_endpoint_string,//"https://rinkeby.infura.io/".to_string(),
+                    web3_endpoint:             "https://rinkeby.infura.io/".to_string(),//config.mainnet_http_endpoint_string,
                     franklin_contract:          ethabi::Contract::load(PROD_PLASMA.0).unwrap(),
-                    franklin_contract_address:  config.mainnet_franklin_contract_address.as_str().parse().unwrap(),//"4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()        
+                    franklin_contract_address:  "4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()//config.mainnet_franklin_contract_address.as_str().parse().unwrap(),        
                 }
             },
             InfuraEndpoint::Rinkeby => {
                 Self {
-                    web3_endpoint:              config.rinkeby_http_endpoint_string,//"https://rinkeby.infura.io/".to_string(),
+                    web3_endpoint:              "https://rinkeby.infura.io/".to_string(),//config.rinkeby_http_endpoint_string,
                     franklin_contract:          ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap(),
-                    franklin_contract_address:  config.rinkeby_franklin_contract_address.as_str().parse().unwrap(),//"4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()
+                    franklin_contract_address:  "4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()//config.rinkeby_franklin_contract_address.as_str().parse().unwrap(),
                 }
             },
         }
     }
 }
 
+/// Infura web3 endpoint
 #[derive(Debug, Copy, Clone)]
 pub enum InfuraEndpoint {
     Mainnet,
     Rinkeby
 }
 
+/// Returns bytes vec of keccak256 hash from bytes
+/// 
+/// # Arguments
+///
+/// * `bytes` - ref to bytes array
+/// 
 pub fn keccak256_hash(bytes: &[u8]) -> Vec<u8> {
     keccak256(bytes).into_iter().cloned().collect()
 }
 
+/// Returns keccak256 topic hash (H256) from topic str
+/// 
+/// # Arguments
+///
+/// * `topic` - indexed func name and args, represented in ref to str
+/// 
 pub fn get_topic_keccak_hash(topic: &str) -> web3::types::H256 {
     let topic_data: Vec<u8> = From::from(topic);
     let topic_data_vec: &[u8] = topic_data.as_slice();
@@ -56,6 +79,12 @@ pub fn get_topic_keccak_hash(topic: &str) -> web3::types::H256 {
     topic_h256
 }
 
+/// Returns BigDecimal repr of amount bytes slice
+/// 
+/// # Arguments
+///
+/// * `bytes` - amount bytes slice
+/// 
 pub fn amount_bytes_slice_to_big_decimal(bytes: &[u8]) -> BigDecimal {
     let vec = bytes.to_vec();
     let bit_vec: BitVec = vec.into();
@@ -74,6 +103,12 @@ pub fn amount_bytes_slice_to_big_decimal(bytes: &[u8]) -> BigDecimal {
     BigDecimal::from(amount_u64)
 }
 
+/// Returns BigDecimal repr of fee bytes slice
+/// 
+/// # Arguments
+///
+/// * `bytes` - fee bytes slice
+/// 
 pub fn fee_bytes_slice_to_big_decimal(byte: &u8) -> BigDecimal {
     let bit_vec: BitVec = BitVec::from_element(*byte);
     let mut bool_vec: Vec<bool> = vec![];
@@ -91,6 +126,7 @@ pub fn fee_bytes_slice_to_big_decimal(byte: &u8) -> BigDecimal {
     BigDecimal::from(fee_u64)
 }
 
+/// Specific errors that may occure during data restoring
 #[derive(Debug, Clone)]
 pub enum DataRestoreError {
     Unknown(String),
