@@ -1,31 +1,21 @@
-use ff::{
-    PrimeField,
-    Field,
-};
+use ff::{Field, PrimeField};
 
-use bellman::{
-    SynthesisError,
-    ConstraintSystem,
-    Circuit
-};
+use bellman::{Circuit, ConstraintSystem, SynthesisError};
 
-use sapling_crypto::jubjub::{
-    JubjubEngine,
-};
+use sapling_crypto::jubjub::JubjubEngine;
 
-use super::Assignment;
 use super::boolean;
 use super::ecc;
-use super::pedersen_hash;
-use super::sha256;
 use super::num;
 use super::num::{AllocatedNum, Num};
+use super::pedersen_hash;
+use super::sha256;
+use super::Assignment;
 
-
-use crate::models::params as plasma_constants;
-use super::super::leaf::{LeafWitness, make_leaf_content};
+use super::super::leaf::{make_leaf_content, LeafWitness};
+use super::deposit_request::DepositRequest;
 use crate::circuit::utils::{allocate_audit_path, append_packed_public_key};
-use super::deposit_request::{DepositRequest};
+use crate::models::params as plasma_constants;
 
 #[derive(Clone)]
 pub struct DepositWitness<E: JubjubEngine> {
@@ -65,31 +55,25 @@ pub struct Deposit<'a, E: JubjubEngine> {
 }
 
 impl<'a, E: JubjubEngine> Circuit<E> for Deposit<'a, E> {
-    fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError>
-    {
+    fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         // Check that transactions are in a right quantity
         assert!(self.number_of_deposits == self.requests.len());
 
         let old_root_value = self.old_root;
         // Expose inputs and do the bits decomposition of hash
-        let mut old_root = AllocatedNum::alloc(
-            cs.namespace(|| "old root"),
-            || Ok(*old_root_value.get()?)
-        )?;
+        let mut old_root =
+            AllocatedNum::alloc(cs.namespace(|| "old root"), || Ok(*old_root_value.get()?))?;
         old_root.inputize(cs.namespace(|| "old root input"))?;
 
         let new_root_value = self.new_root;
-        let new_root = AllocatedNum::alloc(
-            cs.namespace(|| "new root"),
-            || Ok(*new_root_value.get()?)
-        )?;
+        let new_root =
+            AllocatedNum::alloc(cs.namespace(|| "new root"), || Ok(*new_root_value.get()?))?;
         new_root.inputize(cs.namespace(|| "new root input"))?;
 
         let rolling_hash_value = self.public_data_commitment;
-        let rolling_hash = AllocatedNum::alloc(
-            cs.namespace(|| "rolling hash"),
-            || Ok(*rolling_hash_value.get()?)
-        )?;
+        let rolling_hash = AllocatedNum::alloc(cs.namespace(|| "rolling hash"), || {
+            Ok(*rolling_hash_value.get()?)
+        })?;
         rolling_hash.inputize(cs.namespace(|| "rolling hash input"))?;
 
         let mut public_data_vector: Vec<boolean::Boolean> = vec![];
@@ -103,7 +87,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Deposit<'a, E> {
                 cs.namespace(|| format!("applying transaction {}", i)),
                 old_root,
                 request,
-                witness, 
+                witness,
                 self.params,
             )?;
             old_root = intermediate_root;
@@ -117,10 +101,10 @@ impl<'a, E: JubjubEngine> Circuit<E> for Deposit<'a, E> {
             || "enforce new root equal to recalculated one",
             |lc| lc + new_root.get_variable(),
             |lc| lc + CS::one(),
-            |lc| lc + old_root.get_variable()
+            |lc| lc + old_root.get_variable(),
         );
 
-        // Inside the circuit with work with LE bit order, 
+        // Inside the circuit with work with LE bit order,
         // so an account number "1" that would have a natural representation of e.g. 0x000001
         // will have a bit decomposition [1, 0, 0, 0, ......]
 
@@ -133,19 +117,19 @@ impl<'a, E: JubjubEngine> Circuit<E> for Deposit<'a, E> {
 
         let mut initial_hash_data: Vec<boolean::Boolean> = vec![];
 
-        let block_number_allocated = AllocatedNum::alloc(
-            cs.namespace(|| "allocate block number"),
-            || {
+        let block_number_allocated =
+            AllocatedNum::alloc(cs.namespace(|| "allocate block number"), || {
                 Ok(*self.block_number.get()?)
-            }
-        )?;
+            })?;
 
         // make initial hash as sha256(uint256(block_number))
-        let mut block_number_bits = block_number_allocated.into_bits_le(
-            cs.namespace(|| "unpack block number for hashing")
-        )?;
+        let mut block_number_bits = block_number_allocated
+            .into_bits_le(cs.namespace(|| "unpack block number for hashing"))?;
 
-        block_number_bits.resize(plasma_constants::FR_BIT_WIDTH, boolean::Boolean::Constant(false));
+        block_number_bits.resize(
+            plasma_constants::FR_BIT_WIDTH,
+            boolean::Boolean::Constant(false),
+        );
         block_number_bits.reverse();
         initial_hash_data.extend(block_number_bits.into_iter());
 
@@ -153,7 +137,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Deposit<'a, E> {
 
         let mut hash_block = sha256::sha256(
             cs.namespace(|| "initial rolling sha256"),
-            &initial_hash_data
+            &initial_hash_data,
         )?;
 
         // now pack the public data and do the final hash
@@ -162,10 +146,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Deposit<'a, E> {
         pack_bits.extend(hash_block);
         pack_bits.extend(public_data_vector.into_iter());
 
-        hash_block = sha256::sha256(
-            cs.namespace(|| "hash public data"),
-            &pack_bits
-        )?;
+        hash_block = sha256::sha256(cs.namespace(|| "hash public data"), &pack_bits)?;
 
         // // now pack and enforce equality to the input
 
@@ -183,7 +164,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Deposit<'a, E> {
             || "enforce external data hash equality",
             |lc| lc + rolling_hash.get_variable(),
             |lc| lc + CS::one(),
-            |_| packed_hash_lc.lc(E::Fr::one())
+            |_| packed_hash_lc.lc(E::Fr::one()),
         );
 
         Ok(())
@@ -197,45 +178,39 @@ fn apply_request<E, CS>(
     old_root: AllocatedNum<E>,
     request: DepositRequest<E>,
     witness: DepositWitness<E>,
-    params: &E::Params
+    params: &E::Params,
 ) -> Result<(AllocatedNum<E>, Vec<boolean::Boolean>), SynthesisError>
-    where E: JubjubEngine,
-          CS: ConstraintSystem<E>
+where
+    E: JubjubEngine,
+    CS: ConstraintSystem<E>,
 {
     // Calculate leaf value commitment
 
-    let leaf = make_leaf_content(
-        cs.namespace(|| "create leaf"),
-        witness.clone().leaf
-    )?;
+    let leaf = make_leaf_content(cs.namespace(|| "create leaf"), witness.clone().leaf)?;
 
     // Compute the hash of the from leaf
     let mut leaf_hash = pedersen_hash::pedersen_hash(
         cs.namespace(|| "leaf content hash"),
         pedersen_hash::Personalization::NoteCommitment,
         &leaf.leaf_bits,
-        params
+        params,
     )?;
 
-    // Constraint that "into" field in transaction is 
+    // Constraint that "into" field in transaction is
     // equal to the merkle proof path
 
-    let address_allocated = AllocatedNum::alloc(
-        cs.namespace(|| "deposit into address"),
-        || {
-            Ok(*request.into.get()?)
-        }
-    )?;
+    let address_allocated = AllocatedNum::alloc(cs.namespace(|| "deposit into address"), || {
+        Ok(*request.into.get()?)
+    })?;
 
-    let mut path_bits = address_allocated.into_bits_le(
-        cs.namespace(|| "into address bit decomposition")
-    )?;
+    let mut path_bits =
+        address_allocated.into_bits_le(cs.namespace(|| "into address bit decomposition"))?;
 
     path_bits.truncate(plasma_constants::BALANCE_TREE_DEPTH);
 
     let audit_path = allocate_audit_path(
-        cs.namespace(|| "allocate audit path"), 
-        witness.clone().auth_path
+        cs.namespace(|| "allocate audit path"),
+        witness.clone().auth_path,
     )?;
 
     {
@@ -259,7 +234,7 @@ fn apply_request<E, CS>(
                 cs.namespace(|| "conditional reversal of preimage"),
                 &cur,
                 path_element,
-                &direction_bit
+                &direction_bit,
             )?;
 
             // We don't need to be strict, because the function is
@@ -275,9 +250,10 @@ fn apply_request<E, CS>(
                 cs.namespace(|| "computation of pedersen hash"),
                 pedersen_hash::Personalization::MerkleTree(i),
                 &preimage,
-                params
-            )?.get_x().clone(); // Injective encoding
-
+                params,
+            )?
+            .get_x()
+            .clone(); // Injective encoding
         }
 
         // enforce old root before update
@@ -285,7 +261,7 @@ fn apply_request<E, CS>(
             || "enforce correct old root for leaf",
             |lc| lc + cur.get_variable(),
             |lc| lc + CS::one(),
-            |lc| lc + old_root.get_variable()
+            |lc| lc + old_root.get_variable(),
         );
     }
 
@@ -295,12 +271,10 @@ fn apply_request<E, CS>(
     // but we also check that pub_x and pub_y are zeroes.
     // External witness is used whether leaf is empty or not
 
-    let leaf_is_empty = boolean::Boolean::from(
-        boolean::AllocatedBit::alloc(
-            cs.namespace(|| "Allocate leaf is empty"),
-            witness.leaf_is_empty
-        )?
-    );
+    let leaf_is_empty = boolean::Boolean::from(boolean::AllocatedBit::alloc(
+        cs.namespace(|| "Allocate leaf is empty"),
+        witness.leaf_is_empty,
+    )?);
 
     // constraint it
     // balance * leaf_is_empty == 0 -> balance == 0 || leaf_is_empty != 1
@@ -308,66 +282,59 @@ fn apply_request<E, CS>(
         || "boolean constraint for balance is zero for empty leaf",
         |lc| lc + leaf.value.get_variable(),
         |_| leaf_is_empty.lc(CS::one(), E::Fr::one()),
-        |lc| lc
+        |lc| lc,
     );
 
     cs.enforce(
         || "boolean constraint for nonce is zero for empty leaf",
         |lc| lc + leaf.nonce.get_variable(),
         |_| leaf_is_empty.lc(CS::one(), E::Fr::one()),
-        |lc| lc
+        |lc| lc,
     );
 
     cs.enforce(
         || "boolean constraint for pub_x is zero for empty leaf",
         |lc| lc + leaf.pub_x.get_variable(),
         |_| leaf_is_empty.lc(CS::one(), E::Fr::one()),
-        |lc| lc
+        |lc| lc,
     );
 
     cs.enforce(
         || "boolean constraint for pub_y is zero for empty leaf",
         |lc| lc + leaf.pub_y.get_variable(),
         |_| leaf_is_empty.lc(CS::one(), E::Fr::one()),
-        |lc| lc
+        |lc| lc,
     );
 
     // reconstruct a new leaf structure
     // first decompress the input public key using the y point
-    // and conditionally select either existing value or 
+    // and conditionally select either existing value or
     // a value from witness
     // In any case this value should be a valid public key in the correct group!
 
     // witness new public key
-    let new_pk_x = num::AllocatedNum::alloc(
-        cs.namespace(|| "updated public key x"),
-        || {
-            Ok(*witness.new_pub_x.get()?)
-        }
-    )?;
+    let new_pk_x = num::AllocatedNum::alloc(cs.namespace(|| "updated public key x"), || {
+        Ok(*witness.new_pub_x.get()?)
+    })?;
 
-    let new_pk_y = num::AllocatedNum::alloc(
-        cs.namespace(|| "updated public key y"),
-        || {
-            Ok(*witness.new_pub_y.get()?)
-        }
-    )?;
-
+    let new_pk_y = num::AllocatedNum::alloc(cs.namespace(|| "updated public key y"), || {
+        Ok(*witness.new_pub_y.get()?)
+    })?;
 
     // if leaf is empty - use witness, other wise use existing
     let leaf_pk_x = num::AllocatedNum::conditionally_select(
         cs.namespace(|| "conditional select public key x"),
         &new_pk_x,
-        &leaf.pub_x, 
-        &leaf_is_empty
+        &leaf.pub_x,
+        &leaf_is_empty,
     )?;
 
     // if leaf is empty - use witness, other wise use existing
     let leaf_pk_y = num::AllocatedNum::conditionally_select(
         cs.namespace(|| "conditional select public key y"),
         &new_pk_y,
-        &leaf.pub_y, 
-        &leaf_is_empty
+        &leaf.pub_y,
+        &leaf_is_empty,
     )?;
 
     // interpret as point, check on curve
@@ -375,7 +342,7 @@ fn apply_request<E, CS>(
         cs.namespace(|| "witness updated leaf public key"),
         &leaf_pk_x,
         &leaf_pk_y,
-        params
+        params,
     )?;
 
     // order check here is not implemented by design
@@ -394,47 +361,38 @@ fn apply_request<E, CS>(
         coeff.double();
     }
 
-    let old_balance = AllocatedNum::alloc(
-        cs.namespace(|| "allocate old leaf balance"),
-        || Ok(*old_balance_lc.get_value().get()?)
-    )?;
+    let old_balance = AllocatedNum::alloc(cs.namespace(|| "allocate old leaf balance"), || {
+        Ok(*old_balance_lc.get_value().get()?)
+    })?;
 
     cs.enforce(
         || "pack old leaf balance",
         |lc| lc + old_balance.get_variable(),
         |lc| lc + CS::one(),
-        |_| old_balance_lc.lc(E::Fr::one())
+        |_| old_balance_lc.lc(E::Fr::one()),
     );
 
     // witness the deposit amount
-    let amount = AllocatedNum::alloc(
-        cs.namespace(|| "allocate deposit amount"),
-        || {
-            Ok(*request.amount.get()?)
-        }
-    )?;
+    let amount = AllocatedNum::alloc(cs.namespace(|| "allocate deposit amount"), || {
+        Ok(*request.amount.get()?)
+    })?;
 
-    let mut amount_bits = amount.into_bits_le(
-        cs.namespace(|| "decompose deposit amount bits")
-    )?;
+    let mut amount_bits = amount.into_bits_le(cs.namespace(|| "decompose deposit amount bits"))?;
     amount_bits.truncate(plasma_constants::BALANCE_BIT_WIDTH);
 
-    let new_balance = AllocatedNum::alloc(
-        cs.namespace(|| "new balance from"),
-        || {
-            let old_balance_value = old_balance.get_value().get()?.clone();
-            let deposit_value = amount.clone().get_value().get()?.clone();
-            let mut new_balance_value = old_balance_value;
-            new_balance_value.add_assign(&deposit_value);
+    let new_balance = AllocatedNum::alloc(cs.namespace(|| "new balance from"), || {
+        let old_balance_value = old_balance.get_value().get()?.clone();
+        let deposit_value = amount.clone().get_value().get()?.clone();
+        let mut new_balance_value = old_balance_value;
+        new_balance_value.add_assign(&deposit_value);
 
-            Ok(new_balance_value)
-        }
-    )?;
+        Ok(new_balance_value)
+    })?;
 
     // constraint no overflow
     new_balance.limit_number_of_bits(
         cs.namespace(|| "limit number of bits for new balance from"),
-        plasma_constants::BALANCE_BIT_WIDTH
+        plasma_constants::BALANCE_BIT_WIDTH,
     )?;
 
     // enforce increase of balance
@@ -442,31 +400,32 @@ fn apply_request<E, CS>(
         || "enforce new balance",
         |lc| lc + new_balance.get_variable(),
         |lc| lc + CS::one(),
-        |lc| lc + old_balance.get_variable() + amount.get_variable()
+        |lc| lc + old_balance.get_variable() + amount.get_variable(),
     );
 
     // Now we should assemble a new root by wrapping a tree backwards
 
-    let mut pub_x_content_new = updated_pk.get_x().into_bits_le(
-        cs.namespace(|| "updated pub_x bits")
-    )?;
+    let mut pub_x_content_new = updated_pk
+        .get_x()
+        .into_bits_le(cs.namespace(|| "updated pub_x bits"))?;
     pub_x_content_new.truncate(1);
 
-    let mut pub_y_content_new = updated_pk.get_y().into_bits_le(
-        cs.namespace(|| "updated pub_y bits")
-    )?;
-    pub_y_content_new.resize(plasma_constants::FR_BIT_WIDTH - 1, boolean::Boolean::Constant(false));
+    let mut pub_y_content_new = updated_pk
+        .get_y()
+        .into_bits_le(cs.namespace(|| "updated pub_y bits"))?;
+    pub_y_content_new.resize(
+        plasma_constants::FR_BIT_WIDTH - 1,
+        boolean::Boolean::Constant(false),
+    );
 
     // make leaf
     {
-
         let mut leaf_content = vec![];
 
         // change balance and nonce
 
-        let mut value_content = new_balance.into_bits_le(
-            cs.namespace(|| "from leaf updated amount bits")
-        )?;
+        let mut value_content =
+            new_balance.into_bits_le(cs.namespace(|| "from leaf updated amount bits"))?;
 
         value_content.truncate(plasma_constants::BALANCE_BIT_WIDTH);
         leaf_content.extend(value_content.clone());
@@ -475,18 +434,25 @@ fn apply_request<E, CS>(
 
         // update public keys
 
-        append_packed_public_key(& mut leaf_content, pub_x_content_new.clone(), pub_y_content_new.clone());
+        append_packed_public_key(
+            &mut leaf_content,
+            pub_x_content_new.clone(),
+            pub_y_content_new.clone(),
+        );
 
-        assert_eq!(leaf_content.len(), plasma_constants::BALANCE_BIT_WIDTH 
-                                    + plasma_constants::NONCE_BIT_WIDTH
-                                    + plasma_constants::FR_BIT_WIDTH);
+        assert_eq!(
+            leaf_content.len(),
+            plasma_constants::BALANCE_BIT_WIDTH
+                + plasma_constants::NONCE_BIT_WIDTH
+                + plasma_constants::FR_BIT_WIDTH
+        );
 
         // Compute the hash of the from leaf
         leaf_hash = pedersen_hash::pedersen_hash(
             cs.namespace(|| "leaf content hash updated"),
             pedersen_hash::Personalization::NoteCommitment,
             &leaf_content,
-            params
+            params,
         )?;
     }
 
@@ -508,7 +474,7 @@ fn apply_request<E, CS>(
             cs.namespace(|| "conditional reversal of preimage"),
             &cur,
             path_element,
-            &direction_bit
+            &direction_bit,
         )?;
 
         // We don't need to be strict, because the function is
@@ -524,9 +490,10 @@ fn apply_request<E, CS>(
             cs.namespace(|| "computation of pedersen hash"),
             pedersen_hash::Personalization::MerkleTree(i),
             &preimage,
-            params
-        )?.get_x().clone(); // Injective encoding
-
+            params,
+        )?
+        .get_x()
+        .clone(); // Injective encoding
     }
 
     // the last step - we expose public data for later commitment
@@ -549,45 +516,38 @@ fn apply_request<E, CS>(
     pub_bits_be.reverse();
     public_data.extend(pub_bits_be);
 
-    assert_eq!(public_data.len(), plasma_constants::BALANCE_TREE_DEPTH 
-                                    + plasma_constants::BALANCE_BIT_WIDTH
-                                    + plasma_constants::FR_BIT_WIDTH);
+    assert_eq!(
+        public_data.len(),
+        plasma_constants::BALANCE_TREE_DEPTH
+            + plasma_constants::BALANCE_BIT_WIDTH
+            + plasma_constants::FR_BIT_WIDTH
+    );
 
     Ok((cur, public_data))
 }
 
 #[cfg(test)]
 mod test {
-        
+
     use super::*;
     use ff::PrimeFieldRepr;
-    use sapling_crypto::jubjub::{
-        JubjubEngine,
-        FixedGenerators,
-        Unknown,
-        edwards,
-        JubjubParams
-    };
+    use sapling_crypto::jubjub::{edwards, FixedGenerators, JubjubEngine, JubjubParams, Unknown};
 
-    use sapling_crypto::eddsa::{
-        Signature,
-        PrivateKey,
-        PublicKey
-    };
+    use sapling_crypto::eddsa::{PrivateKey, PublicKey, Signature};
 
     #[test]
     fn test_deposit_in_empty_leaf() {
-        use ff::{Field, BitIterator};
+        use crate::models::circuit::{Account, AccountTree};
+        use ff::{BitIterator, Field};
         use pairing::bn256::*;
-        use rand::{SeedableRng, Rng, XorShiftRng, Rand};
+        use rand::{Rand, Rng, SeedableRng, XorShiftRng};
+        use sapling_crypto::alt_babyjubjub::{edwards, fs, AltJubjubBn256, PrimeOrder};
         use sapling_crypto::circuit::test::*;
-        use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
-        use crate::models::circuit::{AccountTree, Account};
         // use super::super::account_tree::{AccountTree, Account};
-        use crypto::sha2::Sha256;
-        use crypto::digest::Digest;
-        use crate::circuit::utils::{encode_fs_into_fr, be_bit_vector_into_bytes};
+        use crate::circuit::utils::{be_bit_vector_into_bytes, encode_fs_into_fr};
         use crate::primitives::GetBits;
+        use crypto::digest::Digest;
+        use crypto::sha2::Sha256;
         extern crate hex;
 
         let params = &AltJubjubBn256::new();
@@ -612,34 +572,41 @@ mod test {
 
         // let sender_leaf_number = 1;
 
-        let mut sender_leaf_number : u32 = rng.gen();
+        let mut sender_leaf_number: u32 = rng.gen();
         sender_leaf_number = sender_leaf_number % capacity;
-        
-        let transfer_amount : u128 = 1234567890;
+
+        let transfer_amount: u128 = 1234567890;
 
         let transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
 
         let sender_leaf = Account {
-                balance:    transfer_amount_as_field_element.clone(),
-                nonce:      Fr::zero(),
-                pub_x:      sender_x,
-                pub_y:      sender_y,
+            balance: transfer_amount_as_field_element.clone(),
+            nonce: Fr::zero(),
+            pub_x: sender_x,
+            pub_y: sender_y,
         };
 
         tree.insert(sender_leaf_number, sender_leaf.clone());
 
-        print!("Sender leaf hash is {}\n", tree.get_hash((tree_depth, sender_leaf_number)));
+        print!(
+            "Sender leaf hash is {}\n",
+            tree.get_hash((tree_depth, sender_leaf_number))
+        );
 
         //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-        
-        let path_from : Vec<Option<Fr>> = tree.merkle_path(sender_leaf_number).into_iter().map(|e| Some(e.0)).collect();
+
+        let path_from: Vec<Option<Fr>> = tree
+            .merkle_path(sender_leaf_number)
+            .into_iter()
+            .map(|e| Some(e.0))
+            .collect();
 
         let from = Fr::from_str(&sender_leaf_number.to_string());
 
-        let request : DepositRequest<Bn256> = DepositRequest {
+        let request: DepositRequest<Bn256> = DepositRequest {
             into: from,
             amount: Some(transfer_amount_as_field_element),
-            public_key: Some(sender_pk.0)
+            public_key: Some(sender_pk.0),
         };
 
         let leaf_witness = LeafWitness {
@@ -671,7 +638,7 @@ mod test {
             // these two are BE encodings because an iterator is BE. This is also an Ethereum standard behavior
 
             let block_number_bits: Vec<bool> = BitIterator::new(Fr::one().into_repr()).collect();
-            for _ in 0..256-block_number_bits.len() {
+            for _ in 0..256 - block_number_bits.len() {
                 public_data_initial_bits.push(false);
             }
             public_data_initial_bits.extend(block_number_bits.into_iter());
@@ -697,7 +664,10 @@ mod test {
 
             let packed_transaction_data_bytes = be_bit_vector_into_bytes(&packed_transaction_data);
 
-            print!("Packed transaction data hex {}\n", hex::encode(packed_transaction_data_bytes.clone()));
+            print!(
+                "Packed transaction data hex {}\n",
+                hex::encode(packed_transaction_data_bytes.clone())
+            );
 
             let mut next_round_hash_bytes = vec![];
             next_round_hash_bytes.extend(hash_result.iter());
@@ -713,11 +683,15 @@ mod test {
             hash_result[0] &= 0x1f; // temporary solution
 
             let mut repr = Fr::zero().into_repr();
-            repr.read_be(&hash_result[..]).expect("pack hash as field element");
+            repr.read_be(&hash_result[..])
+                .expect("pack hash as field element");
 
             let public_data_commitment = Fr::from_repr(repr).unwrap();
 
-            print!("Final data commitment as field element = {}\n", public_data_commitment);
+            print!(
+                "Final data commitment as field element = {}\n",
+                public_data_commitment
+            );
 
             let instance = Deposit {
                 params: params,
@@ -746,17 +720,17 @@ mod test {
 
     #[test]
     fn test_deposit_into_existing_leaf() {
-        use ff::{Field, BitIterator};
+        use crate::models::circuit::{Account, AccountTree};
+        use ff::{BitIterator, Field};
         use pairing::bn256::*;
-        use rand::{SeedableRng, Rng, XorShiftRng, Rand};
+        use rand::{Rand, Rng, SeedableRng, XorShiftRng};
+        use sapling_crypto::alt_babyjubjub::{edwards, fs, AltJubjubBn256, PrimeOrder};
         use sapling_crypto::circuit::test::*;
-        use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
-        use crate::models::circuit::{AccountTree, Account};
         // use super::super::account_tree::{AccountTree, Account};
-        use crypto::sha2::Sha256;
-        use crypto::digest::Digest;
-        use crate::circuit::utils::{encode_fs_into_fr, be_bit_vector_into_bytes};
+        use crate::circuit::utils::{be_bit_vector_into_bytes, encode_fs_into_fr};
         use crate::primitives::GetBits;
+        use crypto::digest::Digest;
+        use crypto::sha2::Sha256;
         extern crate hex;
 
         let params = &AltJubjubBn256::new();
@@ -778,49 +752,56 @@ mod test {
 
         // let sender_leaf_number = 1;
 
-        let mut sender_leaf_number : u32 = rng.gen();
+        let mut sender_leaf_number: u32 = rng.gen();
         sender_leaf_number = sender_leaf_number % capacity;
-        
-        let transfer_amount : u128 = 1234567890;
+
+        let transfer_amount: u128 = 1234567890;
 
         let transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
 
         let sender_leaf = Account {
-                balance:    transfer_amount_as_field_element.clone(),
-                nonce:      Fr::zero(),
-                pub_x:      sender_x,
-                pub_y:      sender_y,
+            balance: transfer_amount_as_field_element.clone(),
+            nonce: Fr::zero(),
+            pub_x: sender_x,
+            pub_y: sender_y,
         };
 
         tree.insert(sender_leaf_number, sender_leaf.clone());
 
-        print!("Sender leaf hash is {}\n", tree.get_hash((tree_depth, sender_leaf_number)));
+        print!(
+            "Sender leaf hash is {}\n",
+            tree.get_hash((tree_depth, sender_leaf_number))
+        );
 
         //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-        
+
         let initial_root = tree.root_hash();
         print!("Initial root = {}\n", initial_root);
 
         let mut double_the_amount = transfer_amount_as_field_element;
         double_the_amount.double();
 
-        let sender_leaf_redeposited = Account{
-                balance:    double_the_amount.clone(),
-                nonce:      Fr::zero(),
-                pub_x:      sender_x,
-                pub_y:      sender_y,
+        let sender_leaf_redeposited = Account {
+            balance: double_the_amount.clone(),
+            nonce: Fr::zero(),
+            pub_x: sender_x,
+            pub_y: sender_y,
         };
 
         tree.insert(sender_leaf_number, sender_leaf_redeposited);
 
-        let path_from : Vec<Option<Fr>> = tree.merkle_path(sender_leaf_number).into_iter().map(|e| Some(e.0)).collect();
+        let path_from: Vec<Option<Fr>> = tree
+            .merkle_path(sender_leaf_number)
+            .into_iter()
+            .map(|e| Some(e.0))
+            .collect();
 
         let from = Fr::from_str(&sender_leaf_number.to_string());
 
-        let request : DepositRequest<Bn256> = DepositRequest {
+        let request: DepositRequest<Bn256> = DepositRequest {
             into: from,
             amount: Some(transfer_amount_as_field_element),
-            public_key: Some(sender_pk.0)
+            public_key: Some(sender_pk.0),
         };
 
         let leaf_witness = LeafWitness {
@@ -852,7 +833,7 @@ mod test {
             // these two are BE encodings because an iterator is BE. This is also an Ethereum standard behavior
 
             let block_number_bits: Vec<bool> = BitIterator::new(Fr::one().into_repr()).collect();
-            for _ in 0..256-block_number_bits.len() {
+            for _ in 0..256 - block_number_bits.len() {
                 public_data_initial_bits.push(false);
             }
             public_data_initial_bits.extend(block_number_bits.into_iter());
@@ -878,7 +859,10 @@ mod test {
 
             let packed_transaction_data_bytes = be_bit_vector_into_bytes(&packed_transaction_data);
 
-            print!("Packed transaction data hex {}\n", hex::encode(packed_transaction_data_bytes.clone()));
+            print!(
+                "Packed transaction data hex {}\n",
+                hex::encode(packed_transaction_data_bytes.clone())
+            );
 
             let mut next_round_hash_bytes = vec![];
             next_round_hash_bytes.extend(hash_result.iter());
@@ -894,11 +878,15 @@ mod test {
             hash_result[0] &= 0x1f; // temporary solution
 
             let mut repr = Fr::zero().into_repr();
-            repr.read_be(&hash_result[..]).expect("pack hash as field element");
+            repr.read_be(&hash_result[..])
+                .expect("pack hash as field element");
 
             let public_data_commitment = Fr::from_repr(repr).unwrap();
 
-            print!("Final data commitment as field element = {}\n", public_data_commitment);
+            print!(
+                "Final data commitment as field element = {}\n",
+                public_data_commitment
+            );
 
             let instance = Deposit {
                 params: params,

@@ -1,13 +1,13 @@
 extern crate rlp;
-extern crate tiny_keccak;
 extern crate secp256k1;
+extern crate tiny_keccak;
 
-use ethereum_types::{H160, H256, U256};
 use self::rlp::RlpStream;
-use self::tiny_keccak::keccak256;
 use self::secp256k1::key::SecretKey;
 use self::secp256k1::Message;
 use self::secp256k1::Secp256k1;
+use self::tiny_keccak::keccak256;
+use ethereum_types::{H160, H256, U256};
 
 /// Description of a Transaction, pending or in the chain.
 #[derive(Debug, Default, Clone, PartialEq, Deserialize, Serialize)]
@@ -26,10 +26,10 @@ pub struct RawTransaction {
     /// Gas amount
     pub gas: U256,
     /// Input data
-    pub data: Vec<u8>
+    pub data: Vec<u8>,
 }
 
-fn find_first_nonzero(vector: & Vec<u8>) -> usize {
+fn find_first_nonzero(vector: &Vec<u8>) -> usize {
     let mut result: usize = 0;
     for el in vector {
         if *el == 0 {
@@ -47,16 +47,16 @@ impl RawTransaction {
     pub fn sign(&self, private_key: &H256) -> Vec<u8> {
         let hash = self.hash();
         let sig = ecdsa_sign(&hash, &private_key.0, self.chain_id);
-        let mut tx = RlpStream::new(); 
+        let mut tx = RlpStream::new();
         tx.begin_unbounded_list();
         self.encode(&mut tx);
-        tx.append(&sig.v); 
+        tx.append(&sig.v);
         let r_start = find_first_nonzero(&sig.r);
         let r = &sig.r.clone()[r_start..];
-        tx.append(&r); 
+        tx.append(&r);
         let s_start = find_first_nonzero(&sig.s);
         let s = &sig.s.clone()[s_start..];
-        tx.append(&s); 
+        tx.append(&s);
 
         // tx.append(&sig.r);
         // tx.append(&sig.s);
@@ -66,7 +66,7 @@ impl RawTransaction {
     }
 
     fn hash(&self) -> Vec<u8> {
-        let mut hash = RlpStream::new(); 
+        let mut hash = RlpStream::new();
         hash.begin_unbounded_list();
         self.encode(&mut hash);
         hash.append(&mut vec![self.chain_id]);
@@ -112,7 +112,7 @@ fn ecdsa_sign(hash: &[u8], private_key: &[u8], chain_id: u8) -> EcdsaSig {
 pub struct EcdsaSig {
     v: Vec<u8>,
     r: Vec<u8>,
-    s: Vec<u8>
+    s: Vec<u8>,
 }
 
 // mod test {
@@ -128,7 +128,7 @@ pub struct EcdsaSig {
 //         #[derive(Deserialize)]
 //         struct Signing {
 //             signed: Vec<u8>,
-//             private_key: H256 
+//             private_key: H256
 //         }
 
 //         let mut file = File::open("./test/test_txs.json").unwrap();
@@ -141,4 +141,3 @@ pub struct EcdsaSig {
 //         }
 //     }
 // }
-

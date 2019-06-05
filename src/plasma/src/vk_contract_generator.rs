@@ -1,24 +1,30 @@
 // Library to generate a EVM verifier contract
 
-use pairing::{Engine, CurveAffine};
-use bellman::{groth16};
+use bellman::groth16;
+use pairing::{CurveAffine, Engine};
 
 // fn unpack<T: CurveAffine>(t: &T) -> Vec<String>
 // {
 //     t.into_uncompressed().as_ref().chunks(32).map(|c| "0x".to_owned() + &hex::encode(c)).collect()
 // }
 
-fn unpack_g1<E: Engine>(point: & E::G1Affine) -> Vec<String> {
+fn unpack_g1<E: Engine>(point: &E::G1Affine) -> Vec<String> {
     let uncompressed = point.into_uncompressed();
     let uncompressed_slice = uncompressed.as_ref();
 
-    uncompressed_slice.chunks(32).map(|c| "0x".to_owned() + &hex::encode(c)).collect()
+    uncompressed_slice
+        .chunks(32)
+        .map(|c| "0x".to_owned() + &hex::encode(c))
+        .collect()
 }
 
-fn unpack_g2<E: Engine>(point: & E::G2Affine) -> Vec<String> {
+fn unpack_g2<E: Engine>(point: &E::G2Affine) -> Vec<String> {
     let uncompressed = point.into_uncompressed();
     let uncompressed_slice = uncompressed.as_ref();
-    uncompressed_slice.chunks(32).map(|c| "0x".to_owned() + &hex::encode(c)).collect()
+    uncompressed_slice
+        .chunks(32)
+        .map(|c| "0x".to_owned() + &hex::encode(c))
+        .collect()
 
     // let to_reorder: Vec<String> = uncompressed_slice.chunks(32).map(|c| "0x".to_owned() + &hex::encode(c)).collect();
 
@@ -32,7 +38,12 @@ fn render_array(name: &str, allocate: bool, values: &[Vec<String>]) -> String {
     out.push('\n');
     let flattened: Vec<&String> = values.into_iter().flatten().collect();
     if allocate {
-        out.push_str(&format!("{}{} = new uint256[]({});\n", SHIFT, name, flattened.len()));
+        out.push_str(&format!(
+            "{}{} = new uint256[]({});\n",
+            SHIFT,
+            name,
+            flattened.len()
+        ));
     }
     for (i, s) in flattened.iter().enumerate() {
         out.push_str(&format!("{}{}[{}] = {};\n", SHIFT, name, i, s));
@@ -57,7 +68,11 @@ pub fn hardcode_vk<E: Engine>(vk: &groth16::VerifyingKey<E>) -> String {
     out
 }
 
-pub fn generate_vk_contract<E: Engine>(vk: &groth16::VerifyingKey<E>, contract_name: String, function_name: String) -> String {
+pub fn generate_vk_contract<E: Engine>(
+    vk: &groth16::VerifyingKey<E>,
+    contract_name: String,
+    function_name: String,
+) -> String {
     format!(
         r#"
 // This contract is generated programmatically

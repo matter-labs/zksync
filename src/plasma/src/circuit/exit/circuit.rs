@@ -1,27 +1,20 @@
-use ff::{
-    PrimeField,
-    Field,
-};
+use ff::{Field, PrimeField};
 
-use bellman::{
-    SynthesisError,
-    ConstraintSystem,
-    Circuit
-};
+use bellman::{Circuit, ConstraintSystem, SynthesisError};
 
-use sapling_crypto::jubjub::{JubjubEngine};
+use sapling_crypto::jubjub::JubjubEngine;
 
-use super::Assignment;
 use super::boolean;
-use super::pedersen_hash;
-use super::sha256;
 use super::num;
 use super::num::{AllocatedNum, Num};
+use super::pedersen_hash;
+use super::sha256;
+use super::Assignment;
 
+use super::super::leaf::{make_leaf_content, LeafWitness};
+use super::exit_request::ExitRequest;
+use crate::circuit::utils::allocate_audit_path;
 use crate::models::params as plasma_constants;
-use super::super::leaf::{LeafWitness, make_leaf_content};
-use crate::circuit::utils::{allocate_audit_path};
-use super::exit_request::{ExitRequest};
 
 #[derive(Clone)]
 pub struct ExitWitness<E: JubjubEngine> {
@@ -55,36 +48,29 @@ pub struct Exit<'a, E: JubjubEngine> {
     pub requests: Vec<(ExitRequest<E>, ExitWitness<E>)>,
 }
 
-
-// for now there is no check in this gadget that exit is done from leaf with 
+// for now there is no check in this gadget that exit is done from leaf with
 // non-zero public key. It's intended on application level for exited leafs to be non-empty
 
 impl<'a, E: JubjubEngine> Circuit<E> for Exit<'a, E> {
-    fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError>
-    {
+    fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         // Check that transactions are in a right quantity
         assert!(self.number_of_exits == self.requests.len());
 
         let old_root_value = self.old_root;
         // Expose inputs and do the bits decomposition of hash
-        let mut old_root = AllocatedNum::alloc(
-            cs.namespace(|| "old root"),
-            || Ok(*old_root_value.get()?)
-        )?;
+        let mut old_root =
+            AllocatedNum::alloc(cs.namespace(|| "old root"), || Ok(*old_root_value.get()?))?;
         old_root.inputize(cs.namespace(|| "old root input"))?;
 
         let new_root_value = self.new_root;
-        let new_root = AllocatedNum::alloc(
-            cs.namespace(|| "new root"),
-            || Ok(*new_root_value.get()?)
-        )?;
+        let new_root =
+            AllocatedNum::alloc(cs.namespace(|| "new root"), || Ok(*new_root_value.get()?))?;
         new_root.inputize(cs.namespace(|| "new root input"))?;
 
         let rolling_hash_value = self.public_data_commitment;
-        let rolling_hash = AllocatedNum::alloc(
-            cs.namespace(|| "rolling hash"),
-            || Ok(*rolling_hash_value.get()?)
-        )?;
+        let rolling_hash = AllocatedNum::alloc(cs.namespace(|| "rolling hash"), || {
+            Ok(*rolling_hash_value.get()?)
+        })?;
         rolling_hash.inputize(cs.namespace(|| "rolling hash input"))?;
 
         let mut public_data_vector: Vec<boolean::Boolean> = vec![];
@@ -95,7 +81,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Exit<'a, E> {
 
         let empty_leaf = make_leaf_content(
             cs.namespace(|| "create leaf"),
-            self.empty_leaf_witness.clone()
+            self.empty_leaf_witness.clone(),
         )?;
 
         // constraint empty balance, nonce, pub_x and pub_y
@@ -104,28 +90,28 @@ impl<'a, E: JubjubEngine> Circuit<E> for Exit<'a, E> {
             || "boolean constraint for balance is zero for empty leaf",
             |lc| lc + empty_leaf.value.get_variable(),
             |lc| lc + CS::one(),
-            |lc| lc
+            |lc| lc,
         );
 
         cs.enforce(
             || "boolean constraint for nonce is zero for empty leaf",
             |lc| lc + empty_leaf.nonce.get_variable(),
             |lc| lc + CS::one(),
-            |lc| lc
+            |lc| lc,
         );
 
         cs.enforce(
             || "boolean constraint for pub_x is zero for empty leaf",
             |lc| lc + empty_leaf.pub_x.get_variable(),
             |lc| lc + CS::one(),
-            |lc| lc
+            |lc| lc,
         );
 
         cs.enforce(
             || "boolean constraint for pub_y is zero for empty leaf",
             |lc| lc + empty_leaf.pub_y.get_variable(),
             |lc| lc + CS::one(),
-            |lc| lc
+            |lc| lc,
         );
 
         // Compute the hash of the from leaf
@@ -133,7 +119,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Exit<'a, E> {
             cs.namespace(|| "leaf content hash"),
             pedersen_hash::Personalization::NoteCommitment,
             &empty_leaf.leaf_bits,
-            self.params
+            self.params,
         )?;
 
         // Ok, now we need to update the old root by applying requests in sequence
@@ -162,10 +148,10 @@ impl<'a, E: JubjubEngine> Circuit<E> for Exit<'a, E> {
             || "enforce new root equal to recalculated one",
             |lc| lc + new_root.get_variable(),
             |lc| lc + CS::one(),
-            |lc| lc + old_root.get_variable()
+            |lc| lc + old_root.get_variable(),
         );
 
-        // Inside the circuit with work with LE bit order, 
+        // Inside the circuit with work with LE bit order,
         // so an account number "1" that would have a natural representation of e.g. 0x000001
         // will have a bit decomposition [1, 0, 0, 0, ......]
 
@@ -178,19 +164,19 @@ impl<'a, E: JubjubEngine> Circuit<E> for Exit<'a, E> {
 
         let mut initial_hash_data: Vec<boolean::Boolean> = vec![];
 
-        let block_number_allocated = AllocatedNum::alloc(
-            cs.namespace(|| "allocate block number"),
-            || {
+        let block_number_allocated =
+            AllocatedNum::alloc(cs.namespace(|| "allocate block number"), || {
                 Ok(*self.block_number.get()?)
-            }
-        )?;
+            })?;
 
         // make initial hash as sha256(uint256(block_number))
-        let mut block_number_bits = block_number_allocated.into_bits_le(
-            cs.namespace(|| "unpack block number for hashing")
-        )?;
+        let mut block_number_bits = block_number_allocated
+            .into_bits_le(cs.namespace(|| "unpack block number for hashing"))?;
 
-        block_number_bits.resize(plasma_constants::FR_BIT_WIDTH, boolean::Boolean::Constant(false));
+        block_number_bits.resize(
+            plasma_constants::FR_BIT_WIDTH,
+            boolean::Boolean::Constant(false),
+        );
         block_number_bits.reverse();
         initial_hash_data.extend(block_number_bits.into_iter());
 
@@ -198,7 +184,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Exit<'a, E> {
 
         let mut hash_block = sha256::sha256(
             cs.namespace(|| "initial rolling sha256"),
-            &initial_hash_data
+            &initial_hash_data,
         )?;
 
         // now pack the public data and do the final hash
@@ -207,10 +193,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Exit<'a, E> {
         pack_bits.extend(hash_block);
         pack_bits.extend(public_data_vector.into_iter());
 
-        hash_block = sha256::sha256(
-            cs.namespace(|| "hash public data"),
-            &pack_bits
-        )?;
+        hash_block = sha256::sha256(cs.namespace(|| "hash public data"), &pack_bits)?;
 
         // // now pack and enforce equality to the input
 
@@ -228,7 +211,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Exit<'a, E> {
             || "enforce external data hash equality",
             |lc| lc + rolling_hash.get_variable(),
             |lc| lc + CS::one(),
-            |_| packed_hash_lc.lc(E::Fr::one())
+            |_| packed_hash_lc.lc(E::Fr::one()),
         );
 
         Ok(())
@@ -243,45 +226,39 @@ fn apply_request<E, CS>(
     empty_leaf_x: &AllocatedNum<E>,
     request: ExitRequest<E>,
     witness: ExitWitness<E>,
-    params: &E::Params
+    params: &E::Params,
 ) -> Result<(AllocatedNum<E>, Vec<boolean::Boolean>), SynthesisError>
-    where E: JubjubEngine,
-          CS: ConstraintSystem<E>
+where
+    E: JubjubEngine,
+    CS: ConstraintSystem<E>,
 {
     // Calculate leaf value commitment
 
-    let leaf = make_leaf_content(
-        cs.namespace(|| "create leaf"),
-        witness.clone().leaf
-    )?;
+    let leaf = make_leaf_content(cs.namespace(|| "create leaf"), witness.clone().leaf)?;
 
     // Compute the hash of the from leaf
     let leaf_hash = pedersen_hash::pedersen_hash(
         cs.namespace(|| "leaf content hash"),
         pedersen_hash::Personalization::NoteCommitment,
         &leaf.leaf_bits,
-        params
+        params,
     )?;
 
-    // Constraint that "int" field in transaction is 
+    // Constraint that "int" field in transaction is
     // equal to the merkle proof path
 
-    let address_allocated = AllocatedNum::alloc(
-        cs.namespace(|| "exit from address"),
-        || {
-            Ok(*request.from.get()?)
-        }
-    )?;
+    let address_allocated = AllocatedNum::alloc(cs.namespace(|| "exit from address"), || {
+        Ok(*request.from.get()?)
+    })?;
 
-    let mut path_bits = address_allocated.into_bits_le(
-        cs.namespace(|| "address bit decomposition")
-    )?;
+    let mut path_bits =
+        address_allocated.into_bits_le(cs.namespace(|| "address bit decomposition"))?;
 
     path_bits.truncate(plasma_constants::BALANCE_TREE_DEPTH);
 
     let audit_path = allocate_audit_path(
-        cs.namespace(|| "allocate audit path"), 
-        witness.clone().auth_path
+        cs.namespace(|| "allocate audit path"),
+        witness.clone().auth_path,
     )?;
 
     {
@@ -305,7 +282,7 @@ fn apply_request<E, CS>(
                 cs.namespace(|| "conditional reversal of preimage"),
                 &cur,
                 path_element,
-                &direction_bit
+                &direction_bit,
             )?;
 
             // We don't need to be strict, because the function is
@@ -321,9 +298,10 @@ fn apply_request<E, CS>(
                 cs.namespace(|| "computation of pedersen hash"),
                 pedersen_hash::Personalization::MerkleTree(i),
                 &preimage,
-                params
-            )?.get_x().clone(); // Injective encoding
-
+                params,
+            )?
+            .get_x()
+            .clone(); // Injective encoding
         }
 
         // enforce old root before update
@@ -331,9 +309,8 @@ fn apply_request<E, CS>(
             || "enforce correct old root for from leaf",
             |lc| lc + cur.get_variable(),
             |lc| lc + CS::one(),
-            |lc| lc + old_root.get_variable()
+            |lc| lc + old_root.get_variable(),
         );
-
     }
 
     let mut cur = empty_leaf_x.clone();
@@ -354,7 +331,7 @@ fn apply_request<E, CS>(
             cs.namespace(|| "conditional reversal of preimage"),
             &cur,
             path_element,
-            &direction_bit
+            &direction_bit,
         )?;
 
         // We don't need to be strict, because the function is
@@ -370,9 +347,10 @@ fn apply_request<E, CS>(
             cs.namespace(|| "computation of pedersen hash"),
             pedersen_hash::Personalization::MerkleTree(i),
             &preimage,
-            params
-        )?.get_x().clone(); // Injective encoding
-
+            params,
+        )?
+        .get_x()
+        .clone(); // Injective encoding
     }
 
     // the last step - we expose public data for later commitment
@@ -386,44 +364,37 @@ fn apply_request<E, CS>(
     amount_bits_be.reverse();
     public_data.extend(amount_bits_be);
 
-    assert_eq!(public_data.len(), plasma_constants::BALANCE_TREE_DEPTH 
-                                    + plasma_constants::BALANCE_BIT_WIDTH);
+    assert_eq!(
+        public_data.len(),
+        plasma_constants::BALANCE_TREE_DEPTH + plasma_constants::BALANCE_BIT_WIDTH
+    );
 
     Ok((cur, public_data))
 }
 
 #[cfg(test)]
 mod test {
-        
+
     use super::*;
     use ff::PrimeFieldRepr;
 
-    use sapling_crypto::jubjub::{
-        FixedGenerators,
-        Unknown,
-        edwards,
-        JubjubParams
-    };
+    use sapling_crypto::jubjub::{edwards, FixedGenerators, JubjubParams, Unknown};
 
-    use sapling_crypto::eddsa::{
-        Signature,
-        PrivateKey,
-        PublicKey
-    };
-        
+    use sapling_crypto::eddsa::{PrivateKey, PublicKey, Signature};
+
     #[test]
     fn test_exit_from_existing_leaf() {
-        use ff::{Field, BitIterator};
+        use crate::models::circuit::{Account, AccountTree};
+        use ff::{BitIterator, Field};
         use pairing::bn256::*;
-        use rand::{SeedableRng, Rng, XorShiftRng, Rand};
+        use rand::{Rand, Rng, SeedableRng, XorShiftRng};
+        use sapling_crypto::alt_babyjubjub::{edwards, fs, AltJubjubBn256, PrimeOrder};
         use sapling_crypto::circuit::test::*;
-        use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
-        use crate::models::circuit::{AccountTree, Account};
         // use super::super::account_tree::{AccountTree, Account};
-        use crypto::sha2::Sha256;
-        use crypto::digest::Digest;
-        use crate::circuit::utils::{encode_fs_into_fr, be_bit_vector_into_bytes};
+        use crate::circuit::utils::{be_bit_vector_into_bytes, encode_fs_into_fr};
         use crate::primitives::GetBits;
+        use crypto::digest::Digest;
+        use crypto::sha2::Sha256;
         extern crate hex;
 
         let params = &AltJubjubBn256::new();
@@ -445,36 +416,43 @@ mod test {
 
         // let sender_leaf_number = 1;
 
-        let mut sender_leaf_number : u32 = rng.gen();
+        let mut sender_leaf_number: u32 = rng.gen();
         sender_leaf_number = sender_leaf_number % capacity;
-        
-        let transfer_amount : u128 = 1234567890;
+
+        let transfer_amount: u128 = 1234567890;
 
         let transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
 
         let sender_leaf = Account {
-                balance:    transfer_amount_as_field_element.clone(),
-                nonce:      Fr::zero(),
-                pub_x:      sender_x,
-                pub_y:      sender_y,
+            balance: transfer_amount_as_field_element.clone(),
+            nonce: Fr::zero(),
+            pub_x: sender_x,
+            pub_y: sender_y,
         };
 
         tree.insert(sender_leaf_number, sender_leaf.clone());
 
-        print!("Sender leaf hash is {}\n", tree.get_hash((tree_depth, sender_leaf_number)));
+        print!(
+            "Sender leaf hash is {}\n",
+            tree.get_hash((tree_depth, sender_leaf_number))
+        );
 
         //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-        
+
         let initial_root = tree.root_hash();
         print!("Initial root = {}\n", initial_root);
 
-        let path_from : Vec<Option<Fr>> = tree.merkle_path(sender_leaf_number).into_iter().map(|e| Some(e.0)).collect();
+        let path_from: Vec<Option<Fr>> = tree
+            .merkle_path(sender_leaf_number)
+            .into_iter()
+            .map(|e| Some(e.0))
+            .collect();
 
         let from = Fr::from_str(&sender_leaf_number.to_string());
 
-        let request : ExitRequest<Bn256> = ExitRequest {
+        let request: ExitRequest<Bn256> = ExitRequest {
             from: from,
-            amount: Some(transfer_amount_as_field_element)
+            amount: Some(transfer_amount_as_field_element),
         };
 
         let leaf_witness = LeafWitness {
@@ -497,10 +475,10 @@ mod test {
         };
 
         let emptied_leaf = Account {
-                balance:    Fr::zero(),
-                nonce:      Fr::zero(),
-                pub_x:      Fr::zero(),
-                pub_y:      Fr::zero(),
+            balance: Fr::zero(),
+            nonce: Fr::zero(),
+            pub_x: Fr::zero(),
+            pub_y: Fr::zero(),
         };
 
         tree.insert(sender_leaf_number, emptied_leaf);
@@ -519,7 +497,7 @@ mod test {
             // these two are BE encodings because an iterator is BE. This is also an Ethereum standard behavior
 
             let block_number_bits: Vec<bool> = BitIterator::new(Fr::one().into_repr()).collect();
-            for _ in 0..256-block_number_bits.len() {
+            for _ in 0..256 - block_number_bits.len() {
                 public_data_initial_bits.push(false);
             }
             public_data_initial_bits.extend(block_number_bits.into_iter());
@@ -545,7 +523,10 @@ mod test {
 
             let packed_transaction_data_bytes = be_bit_vector_into_bytes(&packed_transaction_data);
 
-            print!("Packed transaction data hex {}\n", hex::encode(packed_transaction_data_bytes.clone()));
+            print!(
+                "Packed transaction data hex {}\n",
+                hex::encode(packed_transaction_data_bytes.clone())
+            );
 
             let mut next_round_hash_bytes = vec![];
             next_round_hash_bytes.extend(hash_result.iter());
@@ -561,11 +542,15 @@ mod test {
             hash_result[0] &= 0x1f; // temporary solution
 
             let mut repr = Fr::zero().into_repr();
-            repr.read_be(&hash_result[..]).expect("pack hash as field element");
+            repr.read_be(&hash_result[..])
+                .expect("pack hash as field element");
 
             let public_data_commitment = Fr::from_repr(repr).unwrap();
 
-            print!("Final data commitment as field element = {}\n", public_data_commitment);
+            print!(
+                "Final data commitment as field element = {}\n",
+                public_data_commitment
+            );
 
             let instance = Exit {
                 params: params,

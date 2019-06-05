@@ -1,20 +1,18 @@
-use ff::{PrimeField, BitIterator};
-use sapling_crypto::jubjub::JubjubEngine;
 use crate::models::params;
+use ff::{BitIterator, PrimeField};
+use sapling_crypto::jubjub::JubjubEngine;
 
 #[derive(Clone)]
 pub struct DepositRequest<E: JubjubEngine> {
-    pub into:       E::Fr,
-    pub amount:     E::Fr,
-    pub pub_x:      E::Fr,
-    pub pub_y:      E::Fr,
+    pub into: E::Fr,
+    pub amount: E::Fr,
+    pub pub_x: E::Fr,
+    pub pub_y: E::Fr,
 }
 
 impl<E: JubjubEngine> DepositRequest<E> {
     // this function returns public data in Ethereum compatible format
-    pub fn public_data_into_bits(
-        &self
-    ) -> Vec<bool> {
+    pub fn public_data_into_bits(&self) -> Vec<bool> {
         // fields are
         // - into
         // - amount

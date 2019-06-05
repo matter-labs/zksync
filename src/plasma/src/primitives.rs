@@ -1,10 +1,10 @@
-use ff::{Field, PrimeField, PrimeFieldRepr, BitIterator};
-use web3::types::U256;
-use ff::{ScalarEngine};
-use pairing::{Engine, CurveAffine};
-use pairing::bn256::{Bn256};
 use bigdecimal::{BigDecimal, ToPrimitive};
-use sapling_crypto::jubjub::{JubjubEngine, edwards, Unknown};
+use ff::ScalarEngine;
+use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
+use pairing::bn256::Bn256;
+use pairing::{CurveAffine, Engine};
+use sapling_crypto::jubjub::{edwards, JubjubEngine, Unknown};
+use web3::types::U256;
 
 // TODO: replace Vec with Iterator?
 
@@ -13,7 +13,6 @@ pub trait GetBits {
 }
 
 pub trait GetBitsFixed {
-
     /// Get exactly `n` bits from the value in little endian order
     /// If `n` is larger than value bit length, it is padded with `false`
     /// for the result to exactly match `n`
@@ -36,12 +35,11 @@ pub fn get_bits_le_fixed_u128(num: u128, n: usize) -> Vec<bool> {
 
 pub fn get_bits_le_fixed_big_decimal(num: BigDecimal, n: usize) -> Vec<bool> {
     let as_u128 = num.to_u128().unwrap();
-    
+
     get_bits_le_fixed_u128(as_u128, n)
 }
 
 impl<Fr: PrimeField> GetBitsFixed for Fr {
-
     fn get_bits_le_fixed(&self, n: usize) -> Vec<bool> {
         let mut r: Vec<bool> = Vec::with_capacity(n);
         r.extend(BitIteratorLe::new(self.into_repr()).take(n));
@@ -90,37 +88,43 @@ pub fn serialize_g1_for_ethereum(point: <Bn256 as Engine>::G1Affine) -> (U256, U
 
     // bellman serializes points as big endian and in the form x, y
     // ethereum expects the same order in memory
-    let x = U256::from_big_endian(& uncompressed_slice[0..32]);
-    let y = U256::from_big_endian(& uncompressed_slice[32..64]);
+    let x = U256::from_big_endian(&uncompressed_slice[0..32]);
+    let y = U256::from_big_endian(&uncompressed_slice[32..64]);
 
     (x, y)
 }
 
-pub fn serialize_g2_for_ethereum(point: <Bn256 as Engine>::G2Affine) -> ((U256, U256), (U256, U256)) {
+pub fn serialize_g2_for_ethereum(
+    point: <Bn256 as Engine>::G2Affine,
+) -> ((U256, U256), (U256, U256)) {
     let uncompressed = point.into_uncompressed();
 
     let uncompressed_slice = uncompressed.as_ref();
 
     // bellman serializes points as big endian and in the form x1*u, x0, y1*u, y0
     // ethereum expects the same order in memory
-    let x_1 = U256::from_big_endian(& uncompressed_slice[0..32]);
-    let x_0 = U256::from_big_endian(& uncompressed_slice[32..64]);
-    let y_1 = U256::from_big_endian(& uncompressed_slice[64..96]);
-    let y_0 = U256::from_big_endian(& uncompressed_slice[96..128]);
+    let x_1 = U256::from_big_endian(&uncompressed_slice[0..32]);
+    let x_0 = U256::from_big_endian(&uncompressed_slice[32..64]);
+    let y_1 = U256::from_big_endian(&uncompressed_slice[64..96]);
+    let y_0 = U256::from_big_endian(&uncompressed_slice[96..128]);
 
     ((x_1, x_0), (y_1, y_0))
 }
 
 pub fn serialize_fe_for_ethereum(field_element: <Bn256 as ScalarEngine>::Fr) -> U256 {
     let mut be_bytes = [0u8; 32];
-    field_element.into_repr().write_be(& mut be_bytes[..]).expect("get new root BE bytes");
-    let u256 = U256::from_big_endian(&be_bytes[..]);     
+    field_element
+        .into_repr()
+        .write_be(&mut be_bytes[..])
+        .expect("get new root BE bytes");
+    let u256 = U256::from_big_endian(&be_bytes[..]);
     u256
 }
 
-pub fn unpack_edwards_point<E: JubjubEngine>(serialized: [u8; 32], params: & E::Params)
-    -> Result<edwards::Point<E, Unknown>, String> 
-{
+pub fn unpack_edwards_point<E: JubjubEngine>(
+    serialized: [u8; 32],
+    params: &E::Params,
+) -> Result<edwards::Point<E, Unknown>, String> {
     // TxSignature has S and R in compressed form serialized as BE
     let x_sign = serialized[0] & 0x80 > 0;
     let mut tmp = serialized.clone();
@@ -141,12 +145,12 @@ pub fn unpack_edwards_point<E: JubjubEngine>(serialized: [u8; 32], params: & E::
     Ok(r.unwrap())
 }
 
-pub fn pack_edwards_point<E: JubjubEngine>(point: edwards::Point<E, Unknown>)
-    -> Result<[u8; 32], String> 
-{   
+pub fn pack_edwards_point<E: JubjubEngine>(
+    point: edwards::Point<E, Unknown>,
+) -> Result<[u8; 32], String> {
     let mut tmp = [0u8; 32];
     let (y, sign) = point.compress_into_y();
-    y.into_repr().write_be(& mut tmp[..]).expect("write y");
+    y.into_repr().write_be(&mut tmp[..]).expect("write y");
     if sign {
         tmp[0] |= 0x80
     }
@@ -156,14 +160,14 @@ pub fn pack_edwards_point<E: JubjubEngine>(point: edwards::Point<E, Unknown>)
 
 #[test]
 fn test_get_bits() {
-    use pairing::bn256::{Fr};
+    use pairing::bn256::Fr;
 
     // 12 = b1100, 3 lowest bits in little endian encoding are: 0, 0, 1.
     let bits = Fr::from_str("12").unwrap().get_bits_le_fixed(3);
     assert_eq!(bits, vec![false, false, true]);
 
     let bits = Fr::from_str("0").unwrap().get_bits_le_fixed(512);
-    assert_eq!(bits, vec!(false; 512));
+    assert_eq!(bits, vec!(false, 512));
 }
 
 //
@@ -201,18 +205,14 @@ impl<E: AsRef<[u64]>> Iterator for BitIteratorLe<E> {
     }
 }
 
-pub fn pack_bits_into_bytes(
-    bits: Vec<bool>
-) -> Vec<u8> {
+pub fn pack_bits_into_bytes(bits: Vec<bool>) -> Vec<u8> {
     assert_eq!(bits.len() % 8, 0);
     let mut message_bytes: Vec<u8> = vec![];
 
     let byte_chunks = bits.chunks(8);
-    for byte_chunk in byte_chunks
-    {
+    for byte_chunk in byte_chunks {
         let mut byte = 0u8;
-        for (i, bit) in byte_chunk.into_iter().enumerate()
-        {
+        for (i, bit) in byte_chunk.into_iter().enumerate() {
             if *bit {
                 byte |= 1 << i;
             }

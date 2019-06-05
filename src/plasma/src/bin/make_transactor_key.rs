@@ -1,29 +1,27 @@
-extern crate rand;
-extern crate pairing;
-extern crate sapling_crypto;
+extern crate bellman;
+extern crate crypto;
 extern crate ff;
 extern crate hex;
-extern crate crypto;
+extern crate pairing;
 extern crate plasma;
+extern crate rand;
+extern crate sapling_crypto;
 extern crate time;
-extern crate bellman;
 
 use time::PreciseTime;
 
 use pairing::bn256::*;
-use rand::{OsRng};
-use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
+use rand::OsRng;
+use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
 
-use bellman::groth16::{
-    generate_random_parameters,
-};
+use bellman::groth16::generate_random_parameters;
 
-use plasma::vk_contract_generator::{generate_vk_contract};
+use plasma::vk_contract_generator::generate_vk_contract;
 
-use plasma::models::params as plasma_constants;
-use plasma::circuit::transfer::transaction::{Transaction};
-use plasma::circuit::leaf::{LeafWitness};
+use plasma::circuit::leaf::LeafWitness;
 use plasma::circuit::transfer::circuit::{TransactionWitness, Transfer};
+use plasma::circuit::transfer::transaction::Transaction;
+use plasma::models::params as plasma_constants;
 
 const TRANSFER_BATCH_SIZE: usize = 8;
 const FILENAME: &str = "transfer_pk.key";
@@ -35,7 +33,7 @@ fn main() {
     // let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &AltJubjubBn256::new();
     // let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
-    let rng = & mut OsRng::new().unwrap();
+    let rng = &mut OsRng::new().unwrap();
 
     let empty_transaction = Transaction {
         from: None,
@@ -44,7 +42,7 @@ fn main() {
         fee: None,
         nonce: None,
         good_until_block: None,
-        signature: None
+        signature: None,
     };
 
     let empty_leaf_witness = LeafWitness {
@@ -75,27 +73,39 @@ fn main() {
     println!("generating setup...");
     let start = PreciseTime::now();
     let tmp_cirtuit_params = generate_random_parameters(instance_for_generation, rng).unwrap();
-    println!("setup generated in {} s", start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0);
+    println!(
+        "setup generated in {} s",
+        start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0
+    );
 
     use std::fs::File;
     use std::io::{BufWriter, Write};
     {
         let f = File::create(FILENAME).expect("Unable to create file");
         let mut f = BufWriter::new(f);
-        tmp_cirtuit_params.write(& mut f).expect("Unable to write proving key");
+        tmp_cirtuit_params
+            .write(&mut f)
+            .expect("Unable to write proving key");
     }
 
-    use std::io::{BufReader};
+    use std::io::BufReader;
 
     let f_r = File::open(FILENAME).expect("Unable to open file");
     let mut r = BufReader::new(f_r);
-    let circuit_params = bellman::groth16::Parameters::<Bn256>::read(& mut r, true).expect("Unable to read proving key");
+    let circuit_params = bellman::groth16::Parameters::<Bn256>::read(&mut r, true)
+        .expect("Unable to read proving key");
 
-    let contract_content = generate_vk_contract(&circuit_params.vk, CONTRACT_NAME.to_string(), CONTRACT_FUNCTION_NAME.to_string());
+    let contract_content = generate_vk_contract(
+        &circuit_params.vk,
+        CONTRACT_NAME.to_string(),
+        CONTRACT_FUNCTION_NAME.to_string(),
+    );
 
     let f_cont = File::create(CONTRACT_FILENAME).expect("Unable to create file");
     let mut f_cont = BufWriter::new(f_cont);
-    f_cont.write_all(contract_content.as_bytes()).expect("Unable to write contract");
-    
+    f_cont
+        .write_all(contract_content.as_bytes())
+        .expect("Unable to write contract");
+
     println!("Done");
 }

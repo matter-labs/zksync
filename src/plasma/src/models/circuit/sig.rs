@@ -1,6 +1,6 @@
-use sapling_crypto::alt_babyjubjub::{JubjubEngine};
-use ff::{Field};
-use sapling_crypto::jubjub::{Unknown, edwards};
+use ff::Field;
+use sapling_crypto::alt_babyjubjub::JubjubEngine;
+use sapling_crypto::jubjub::{edwards, Unknown};
 
 // use crate::models::params;
 
@@ -15,9 +15,9 @@ impl<E: JubjubEngine> TransactionSignature<E> {
     pub fn empty() -> Self {
         let empty_point: edwards::Point<E, Unknown> = edwards::Point::zero();
 
-        Self{
+        Self {
             r: empty_point,
-            s: E::Fr::zero()
+            s: E::Fr::zero(),
         }
     }
 }

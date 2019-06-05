@@ -4,7 +4,7 @@ use ff::PrimeField;
 use sapling_crypto::pedersen_hash::{baby_pedersen_hash, Personalization};
 
 use pairing::bn256::Bn256;
-use sapling_crypto::alt_babyjubjub::{JubjubEngine, AltJubjubBn256};
+use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, JubjubEngine};
 
 use super::super::primitives::BitIteratorLe;
 use super::hasher::Hasher;
@@ -14,9 +14,10 @@ pub struct PedersenHasher<E: JubjubEngine> {
 }
 
 impl<E: JubjubEngine> Hasher<E::Fr> for PedersenHasher<E> {
-
-    fn hash_bits<I: IntoIterator<Item=bool>>(&self, input: I) -> E::Fr {
-        let hash = baby_pedersen_hash::<E, _>(Personalization::NoteCommitment, input, &self.params).into_xy().0;
+    fn hash_bits<I: IntoIterator<Item = bool>>(&self, input: I) -> E::Fr {
+        let hash = baby_pedersen_hash::<E, _>(Personalization::NoteCommitment, input, &self.params)
+            .into_xy()
+            .0;
         // print!("Leaf hash = {}\n", hash.clone());
 
         hash
@@ -26,16 +27,17 @@ impl<E: JubjubEngine> Hasher<E::Fr> for PedersenHasher<E> {
         let lhs = BitIteratorLe::new(lhs.into_repr()).take(E::Fr::NUM_BITS as usize);
         let rhs = BitIteratorLe::new(rhs.into_repr()).take(E::Fr::NUM_BITS as usize);
         let input = lhs.chain(rhs);
-        baby_pedersen_hash::<E, _>(Personalization::MerkleTree(i), input, &self.params).into_xy().0
+        baby_pedersen_hash::<E, _>(Personalization::MerkleTree(i), input, &self.params)
+            .into_xy()
+            .0
     }
-
 }
 
 pub type BabyPedersenHasher = PedersenHasher<Bn256>;
 
 impl Default for PedersenHasher<Bn256> {
     fn default() -> Self {
-        Self{
+        Self {
             params: AltJubjubBn256::new(),
         }
     }

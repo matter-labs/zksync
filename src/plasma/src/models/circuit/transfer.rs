@@ -1,31 +1,28 @@
-use sapling_crypto::alt_babyjubjub::{JubjubEngine};
-use ff::{PrimeField, BitIterator};
-use sapling_crypto::eddsa::{PrivateKey, PublicKey};
-use sapling_crypto::jubjub::{FixedGenerators};
+use crate::circuit::utils::le_bit_vector_into_field_element;
 use crate::models::params;
-use crate::circuit::utils::{le_bit_vector_into_field_element};
+use ff::{BitIterator, PrimeField};
+use sapling_crypto::alt_babyjubjub::JubjubEngine;
+use sapling_crypto::eddsa::{PrivateKey, PublicKey};
+use sapling_crypto::jubjub::FixedGenerators;
 
 use super::sig::TransactionSignature;
 
 /// Packed transaction data
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Tx<E: JubjubEngine> {
-    pub from:               E::Fr,
-    pub to:                 E::Fr,
-    pub amount:             E::Fr, // packed, TODO: document it here
-    pub fee:                E::Fr, // packed
-    pub nonce:              E::Fr,
-    pub good_until_block:   E::Fr,
+    pub from: E::Fr,
+    pub to: E::Fr,
+    pub amount: E::Fr, // packed, TODO: document it here
+    pub fee: E::Fr,    // packed
+    pub nonce: E::Fr,
+    pub good_until_block: E::Fr,
 
     #[serde(bound = "")]
-    pub signature:          TransactionSignature<E>,
+    pub signature: TransactionSignature<E>,
 }
 
-
-impl <E: JubjubEngine> Tx<E> {
-    pub fn public_data_into_bits(
-        &self
-    ) -> Vec<bool> {
+impl<E: JubjubEngine> Tx<E> {
+    pub fn public_data_into_bits(&self) -> Vec<bool> {
         // fields are
         // - from
         // - to
@@ -40,14 +37,14 @@ impl <E: JubjubEngine> Tx<E> {
         to.reverse();
         to.truncate(params::BALANCE_TREE_DEPTH);
         to.reverse();
-        
+
         let mut amount: Vec<bool> = BitIterator::new(self.amount.into_repr()).collect();
         amount.reverse();
         amount.truncate(params::AMOUNT_EXPONENT_BIT_WIDTH + params::AMOUNT_MANTISSA_BIT_WIDTH);
         let mut fee: Vec<bool> = BitIterator::new(self.fee.into_repr()).collect();
         fee.reverse();
         fee.truncate(params::FEE_EXPONENT_BIT_WIDTH + params::FEE_MANTISSA_BIT_WIDTH);
-        
+
         let mut packed: Vec<bool> = vec![];
         packed.extend(from.into_iter());
         packed.extend(to.into_iter());
@@ -57,9 +54,7 @@ impl <E: JubjubEngine> Tx<E> {
         packed
     }
 
-    pub fn data_for_signature_into_bits(
-        &self
-    ) -> Vec<bool> {
+    pub fn data_for_signature_into_bits(&self) -> Vec<bool> {
         // fields are
         // - from
         // - to
@@ -70,11 +65,12 @@ impl <E: JubjubEngine> Tx<E> {
         let mut nonce: Vec<bool> = BitIterator::new(self.nonce.into_repr()).collect();
         nonce.reverse();
         nonce.truncate(params::NONCE_BIT_WIDTH);
-        let mut good_until_block: Vec<bool> = BitIterator::new(self.good_until_block.into_repr()).collect();
+        let mut good_until_block: Vec<bool> =
+            BitIterator::new(self.good_until_block.into_repr()).collect();
         good_until_block.reverse();
         good_until_block.truncate(params::BLOCK_NUMBER_BIT_WIDTH);
         let mut packed: Vec<bool> = vec![];
-        
+
         packed.extend(self.public_data_into_bits().into_iter());
         packed.extend(nonce.into_iter());
         packed.extend(good_until_block.into_iter());
@@ -82,19 +78,15 @@ impl <E: JubjubEngine> Tx<E> {
         packed
     }
 
-    pub fn data_as_bytes(
-        & self
-    ) -> Vec<u8> {
+    pub fn data_as_bytes(&self) -> Vec<u8> {
         let raw_data: Vec<bool> = self.data_for_signature_into_bits();
 
         let mut message_bytes: Vec<u8> = vec![];
 
         let byte_chunks = raw_data.chunks(8);
-        for byte_chunk in byte_chunks
-        {
+        for byte_chunk in byte_chunks {
             let mut byte = 0u8;
-            for (i, bit) in byte_chunk.into_iter().enumerate()
-            {
+            for (i, bit) in byte_chunk.into_iter().enumerate() {
                 if *bit {
                     byte |= 1 << i;
                 }
@@ -106,38 +98,36 @@ impl <E: JubjubEngine> Tx<E> {
     }
 
     pub fn sign<R>(
-        & mut self,
+        &mut self,
         private_key: &PrivateKey<E>,
         p_g: FixedGenerators,
         params: &E::Params,
-        rng: & mut R
-    ) where R: rand::Rng {
-
+        rng: &mut R,
+    ) where
+        R: rand::Rng,
+    {
         let message_bytes = self.data_as_bytes();
 
-        let max_message_len = params::BALANCE_TREE_DEPTH 
-                        + params::BALANCE_TREE_DEPTH 
-                        + params::AMOUNT_EXPONENT_BIT_WIDTH 
-                        + params::AMOUNT_MANTISSA_BIT_WIDTH
-                        + params::FEE_EXPONENT_BIT_WIDTH
-                        + params::FEE_MANTISSA_BIT_WIDTH
-                        + params::NONCE_BIT_WIDTH
-                        + params::BLOCK_NUMBER_BIT_WIDTH;
-        
-        let signature = private_key.sign_raw_message(
-            &message_bytes, 
-            rng, 
-            p_g, 
-            params,
-            max_message_len / 8
-        );
+        let max_message_len = params::BALANCE_TREE_DEPTH
+            + params::BALANCE_TREE_DEPTH
+            + params::AMOUNT_EXPONENT_BIT_WIDTH
+            + params::AMOUNT_MANTISSA_BIT_WIDTH
+            + params::FEE_EXPONENT_BIT_WIDTH
+            + params::FEE_MANTISSA_BIT_WIDTH
+            + params::NONCE_BIT_WIDTH
+            + params::BLOCK_NUMBER_BIT_WIDTH;
+
+        let signature =
+            private_key.sign_raw_message(&message_bytes, rng, p_g, params, max_message_len / 8);
 
         let pk = PublicKey::from_private(&private_key, p_g, params);
-        let is_valid_signature = pk.verify_for_raw_message(&message_bytes, 
-                                        &signature.clone(), 
-                                        p_g, 
-                                        params, 
-                                        max_message_len/8);
+        let is_valid_signature = pk.verify_for_raw_message(
+            &message_bytes,
+            &signature.clone(),
+            p_g,
+            params,
+            max_message_len / 8,
+        );
         if !is_valid_signature {
             return;
         }
@@ -149,10 +139,9 @@ impl <E: JubjubEngine> Tx<E> {
 
         let converted_signature = TransactionSignature {
             r: signature.r,
-            s: sigs_converted
+            s: sigs_converted,
         };
 
         self.signature = converted_signature;
-
     }
 }

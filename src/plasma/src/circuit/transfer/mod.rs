@@ -1,14 +1,7 @@
 use sapling_crypto;
 
 use sapling_crypto::circuit::{
-    Assignment,
-    boolean,
-    ecc,
-    pedersen_hash,
-    sha256,
-    num,
-    baby_eddsa,
-    float_point,
+    baby_eddsa, boolean, ecc, float_point, num, pedersen_hash, sha256, Assignment,
 };
 
 pub mod circuit;
