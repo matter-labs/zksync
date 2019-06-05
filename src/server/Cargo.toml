@@ -1,6 +1,7 @@
 [package]
 name = "server"
 version = "0.0.1"
+edition = "2018"
 
 [dependencies]
 eth_client = { path = "../eth_client" }

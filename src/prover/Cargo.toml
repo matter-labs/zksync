@@ -1,6 +1,7 @@
 [package]
 name = "prover"
 version = "0.0.1"
+edition = "2018"
 
 [dependencies]
 plasma = { path = "../plasma" }

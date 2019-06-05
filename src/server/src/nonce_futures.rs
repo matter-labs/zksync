@@ -39,7 +39,7 @@ impl NonceFutures {
         })
     }
 
-    pub fn await(&self, account: u32, nonce: u32) -> Box<NonceFuture> {
+    pub fn nonce_await(&self, account: u32, nonce: u32) -> Box<NonceFuture> {
         // get mutex access to inner data
         let data = &mut self.0.as_ref().write().unwrap();
 

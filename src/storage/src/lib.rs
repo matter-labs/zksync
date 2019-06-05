@@ -22,7 +22,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::cmp;
 
 mod schema;
-use schema::*;
+use crate::schema::*;
 
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -313,7 +313,7 @@ impl StorageProcessor {
     }
 
     pub fn load_config(&self) -> QueryResult<ServerConfig> {
-        use schema::server_config::dsl::*;
+        use crate::schema::server_config::dsl::*;
         server_config.first(self.conn())
     }
 
@@ -855,7 +855,7 @@ impl StorageProcessor {
         //     .get_result::<Option<i32>>(self.conn())
         //     .map(|max| max.unwrap_or(0))
 
-        use schema::operations::dsl::*;
+        use crate::schema::operations::dsl::*;
         operations
             .select(max(block_number))
             .filter(action_type.eq(ACTION_COMMIT))
@@ -981,7 +981,7 @@ impl StorageProcessor {
                 //     block_number: block_number as i32,
                 //     worker: worker.to_string(),
                 // };
-                use schema::prover_runs::dsl::*;
+                use crate::schema::prover_runs::dsl::*;
                 let inserted: ProverRun = insert_into(prover_runs)
                 .values(&vec![(
                     block_number.eq(block_number_ as i32),
@@ -1007,7 +1007,7 @@ impl StorageProcessor {
     }
 
     pub fn register_prover(&self, worker_: &String) -> QueryResult<i32> {
-        use schema::active_provers::dsl::*;
+        use crate::schema::active_provers::dsl::*;
         let inserted: ActiveProver = insert_into(active_provers)
             .values(&vec![(worker.eq(worker_.to_string()))])
             .get_result(self.conn())?;
@@ -1016,7 +1016,7 @@ impl StorageProcessor {
 
     pub fn record_prover_stop(&self, prover_id: i32) -> QueryResult<()> {
         use diesel::expression::dsl::now;
-        use schema::active_provers::dsl::*;
+        use crate::schema::active_provers::dsl::*;
 
         let target = active_provers.filter(id.eq(prover_id));
         diesel::update(target)

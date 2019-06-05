@@ -43,7 +43,7 @@ fn main() {
 
         for i in 0..=4 {
             let task = nm
-                .await(1, i)
+                .nonce_await(1, i)
                 .timeout(Duration::from_millis(5000))
                 .map(|_| println!("success!"))
                 .or_else(|e| {

@@ -30,7 +30,7 @@ struct Data {
 pub struct NonceFutures(Arc<RwLock<Data>>);
 
 impl NonceFutures {
-    pub fn await(
+    pub fn nonce_await(
         &self,
         account: u32,
         nonce: u32,

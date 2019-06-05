@@ -120,7 +120,7 @@ fn handle_submit_tx(
                 nonce_futures.ready(tx.from, tx.nonce)
             } else {
                 //println!("account {}: waiting for nonce {}", tx.from, tx.nonce);
-                nonce_futures.await(tx.from, tx.nonce)
+                nonce_futures.nonce_await(tx.from, tx.nonce)
             };
             future
                 .timeout(Duration::from_millis(NONCE_ORDER_TIMEOUT))

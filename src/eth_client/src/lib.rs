@@ -271,7 +271,7 @@ fn test_encoding() {
         println!("{} = {}", i.name, i.kind);
     }
     let params = (U256::from(0), [0u64; 1], 1u64, H256::zero());
-    let data = f
+    let _data = f
         .encode_input(&params.into_tokens())
         .expect("failed to encode parameters");
 }
