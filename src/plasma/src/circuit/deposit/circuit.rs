@@ -533,22 +533,22 @@ mod test {
     use ff::PrimeFieldRepr;
     use sapling_crypto::jubjub::{edwards, FixedGenerators, JubjubEngine, JubjubParams, Unknown};
 
-    use sapling_crypto::eddsa::{PrivateKey, PublicKey, Signature};
+    use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 
     #[test]
     fn test_deposit_in_empty_leaf() {
         use crate::models::circuit::{Account, AccountTree};
         use ff::{BitIterator, Field};
         use pairing::bn256::*;
-        use rand::{Rand, Rng, SeedableRng, XorShiftRng};
+        use rand::{Rng, SeedableRng, XorShiftRng};
         use sapling_crypto::alt_babyjubjub::{edwards, fs, AltJubjubBn256, PrimeOrder};
         use sapling_crypto::circuit::test::*;
         // use super::super::account_tree::{AccountTree, Account};
-        use crate::circuit::utils::{be_bit_vector_into_bytes, encode_fs_into_fr};
-        use crate::primitives::GetBits;
+        use crate::circuit::utils::be_bit_vector_into_bytes;
+
         use crypto::digest::Digest;
         use crypto::sha2::Sha256;
-        extern crate hex;
+        use hex;
 
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;
@@ -723,15 +723,15 @@ mod test {
         use crate::models::circuit::{Account, AccountTree};
         use ff::{BitIterator, Field};
         use pairing::bn256::*;
-        use rand::{Rand, Rng, SeedableRng, XorShiftRng};
+        use rand::{Rng, SeedableRng, XorShiftRng};
         use sapling_crypto::alt_babyjubjub::{edwards, fs, AltJubjubBn256, PrimeOrder};
         use sapling_crypto::circuit::test::*;
         // use super::super::account_tree::{AccountTree, Account};
-        use crate::circuit::utils::{be_bit_vector_into_bytes, encode_fs_into_fr};
-        use crate::primitives::GetBits;
+        use crate::circuit::utils::be_bit_vector_into_bytes;
+
         use crypto::digest::Digest;
         use crypto::sha2::Sha256;
-        extern crate hex;
+        use hex;
 
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;

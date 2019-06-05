@@ -1,12 +1,4 @@
-extern crate bellman;
-extern crate crypto;
-extern crate ff;
-extern crate hex;
-extern crate pairing;
-extern crate plasma;
-extern crate rand;
-extern crate sapling_crypto;
-extern crate time;
+use bellman;
 
 use time::PreciseTime;
 
@@ -52,7 +44,7 @@ fn main() {
         auth_path: vec![None; plasma_constants::BALANCE_TREE_DEPTH],
     };
 
-    let instance_for_generation: Exit<Bn256> = Exit {
+    let instance_for_generation: Exit<'_, Bn256> = Exit {
         params: params,
         number_of_exits: EXIT_BATCH_SIZE,
         old_root: None,

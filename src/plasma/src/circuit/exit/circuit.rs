@@ -380,22 +380,22 @@ mod test {
 
     use sapling_crypto::jubjub::{edwards, FixedGenerators, JubjubParams, Unknown};
 
-    use sapling_crypto::eddsa::{PrivateKey, PublicKey, Signature};
+    use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 
     #[test]
     fn test_exit_from_existing_leaf() {
         use crate::models::circuit::{Account, AccountTree};
         use ff::{BitIterator, Field};
         use pairing::bn256::*;
-        use rand::{Rand, Rng, SeedableRng, XorShiftRng};
+        use rand::{Rng, SeedableRng, XorShiftRng};
         use sapling_crypto::alt_babyjubjub::{edwards, fs, AltJubjubBn256, PrimeOrder};
         use sapling_crypto::circuit::test::*;
         // use super::super::account_tree::{AccountTree, Account};
-        use crate::circuit::utils::{be_bit_vector_into_bytes, encode_fs_into_fr};
-        use crate::primitives::GetBits;
+        use crate::circuit::utils::be_bit_vector_into_bytes;
+
         use crypto::digest::Digest;
         use crypto::sha2::Sha256;
-        extern crate hex;
+        use hex;
 
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;

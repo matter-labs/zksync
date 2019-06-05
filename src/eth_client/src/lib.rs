@@ -1,8 +1,6 @@
-extern crate ethereum_types;
-extern crate hex;
-extern crate reqwest;
-extern crate serde;
-extern crate web3;
+use hex;
+use reqwest;
+
 #[macro_use]
 extern crate serde_derive;
 
@@ -16,7 +14,7 @@ use web3::contract::tokens::Tokenize;
 use std::env;
 use std::str::FromStr;
 
-type Result<T> = std::result::Result<T, Box<std::error::Error>>;
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 pub type U32 = u64; // because missing in web3::types; u64 is fine since only used for tokenization
 

@@ -1,17 +1,9 @@
-extern crate chrono;
-extern crate fnv;
-extern crate models;
-extern crate plasma;
+use plasma;
 
-extern crate serde;
-extern crate serde_derive;
 #[macro_use]
 extern crate diesel;
-extern crate bigdecimal;
-extern crate sapling_crypto;
-extern crate serde_json;
 
-extern crate ff;
+use serde_json;
 
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;
@@ -1015,8 +1007,8 @@ impl StorageProcessor {
     }
 
     pub fn record_prover_stop(&self, prover_id: i32) -> QueryResult<()> {
-        use diesel::expression::dsl::now;
         use crate::schema::active_provers::dsl::*;
+        use diesel::expression::dsl::now;
 
         let target = active_provers.filter(id.eq(prover_id));
         diesel::update(target)

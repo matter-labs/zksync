@@ -1148,9 +1148,7 @@ mod test {
 
     #[test]
     fn test_bits_into_fr() {
-        use ff::PrimeField;
         use pairing::bn256::*;
-        use std::str::FromStr;
 
         // representation of 4 + 8 + 256 = 12 + 256 = 268 = 0x010c;
         let bits: Vec<bool> = [false, false, true, true, false, false, false, false, true].to_vec();
@@ -1165,16 +1163,16 @@ mod test {
         use crate::models::circuit::{Account, AccountTree};
         use ff::Field;
         use pairing::bn256::*;
-        use rand::{Rand, Rng, SeedableRng, XorShiftRng};
+        use rand::{Rng, SeedableRng, XorShiftRng};
         use sapling_crypto::alt_babyjubjub::{edwards, fs, AltJubjubBn256, PrimeOrder};
         use sapling_crypto::circuit::test::*;
-        use sapling_crypto::eddsa::{PrivateKey, PublicKey, Signature};
+        use sapling_crypto::eddsa::{PrivateKey, PublicKey};
         // use super::super::account_tree::{AccountTree, Account};
         use crate::circuit::utils::be_bit_vector_into_bytes;
         use crypto::digest::Digest;
         use crypto::sha2::Sha256;
 
-        extern crate hex;
+        use hex;
 
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let params = &AltJubjubBn256::new();

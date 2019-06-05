@@ -86,7 +86,6 @@ impl AccountTree {
 mod tests {
 
     use super::*;
-    use rand::{thread_rng, Rand};
 
     #[test]
     fn test_balance_tree() {

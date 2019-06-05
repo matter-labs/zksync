@@ -1,6 +1,6 @@
-extern crate rlp;
-extern crate secp256k1;
-extern crate tiny_keccak;
+use rlp;
+use secp256k1;
+use tiny_keccak;
 
 use self::rlp::RlpStream;
 use self::secp256k1::key::SecretKey;

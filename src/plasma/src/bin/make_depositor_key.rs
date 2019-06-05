@@ -1,12 +1,4 @@
-extern crate bellman;
-extern crate crypto;
-extern crate ff;
-extern crate hex;
-extern crate pairing;
-extern crate plasma;
-extern crate rand;
-extern crate sapling_crypto;
-extern crate time;
+use bellman;
 
 use time::PreciseTime;
 
@@ -56,7 +48,7 @@ fn main() {
         new_pub_y: None,
     };
 
-    let instance_for_generation: Deposit<Bn256> = Deposit {
+    let instance_for_generation: Deposit<'_, Bn256> = Deposit {
         params: params,
         number_of_deposits: DEPOSIT_BATCH_SIZE,
         old_root: None,

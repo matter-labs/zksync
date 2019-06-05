@@ -1,12 +1,4 @@
-extern crate bellman;
-extern crate crypto;
-extern crate ff;
-extern crate hex;
-extern crate pairing;
-extern crate plasma;
-extern crate rand;
-extern crate sapling_crypto;
-extern crate time;
+use bellman;
 
 use time::PreciseTime;
 
@@ -383,7 +375,7 @@ fn main() {
         auth_path_to: vec![None; plasma_constants::BALANCE_TREE_DEPTH],
     };
 
-    let instance_for_generation: Transfer<Bn256> = Transfer {
+    let instance_for_generation: Transfer<'_, Bn256> = Transfer {
         params: params,
         number_of_transactions: TXES_TO_TEST,
         old_root: None,

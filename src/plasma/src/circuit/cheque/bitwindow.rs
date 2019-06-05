@@ -463,18 +463,14 @@ mod test {
 
     use super::*;
 
-    use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
+    use ff::{BitIterator, Field, PrimeField};
 
     #[test]
     fn test_redeem() {
-        use crate::circuit::utils::{be_bit_vector_into_bytes, encode_fs_into_fr};
-        use crate::primitives::GetBits;
-        use ff::{BitIterator, Field};
         use pairing::bn256::*;
-        use rand::{Rand, Rng, SeedableRng, XorShiftRng};
+        use rand::{Rng, SeedableRng, XorShiftRng};
         use sapling_crypto::alt_babyjubjub::{edwards, fs, AltJubjubBn256, PrimeOrder};
         use sapling_crypto::circuit::test::*;
-        extern crate hex;
 
         let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
@@ -541,14 +537,10 @@ mod test {
 
     #[test]
     fn test_proof_generation() {
-        use crate::circuit::utils::{be_bit_vector_into_bytes, encode_fs_into_fr};
-        use crate::primitives::GetBits;
-        use ff::{BitIterator, Field};
         use pairing::bn256::*;
-        use rand::{Rand, Rng, SeedableRng, XorShiftRng};
+        use rand::{Rng, SeedableRng, XorShiftRng};
         use sapling_crypto::alt_babyjubjub::{edwards, fs, AltJubjubBn256, PrimeOrder};
-        use sapling_crypto::circuit::test::*;
-        extern crate hex;
+
         use bellman::groth16::{
             create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
         };
@@ -628,8 +620,8 @@ mod test {
 
     #[test]
     fn test_bit_shifts() {
-        use pairing::bn256::{Bn256, Fr};
-        use rand::{Rand, Rng, SeedableRng, XorShiftRng};
+        use pairing::bn256::Fr;
+        use rand::{Rng, SeedableRng, XorShiftRng};
 
         let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
         let mut bitmask: Fr = rng.gen();

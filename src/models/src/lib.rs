@@ -1,8 +1,7 @@
 #[macro_use]
 extern crate serde_derive;
-extern crate eth_client;
-extern crate plasma;
-extern crate serde_bytes;
+
+use serde_bytes;
 #[macro_use]
 extern crate lazy_static;
 
@@ -72,7 +71,7 @@ impl std::string::ToString for Action {
 }
 
 impl std::fmt::Debug for Action {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.to_string())
     }
 }

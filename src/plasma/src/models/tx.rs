@@ -55,7 +55,7 @@ pub struct TransferTx {
 }
 
 impl std::fmt::Debug for TransferTx {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "tx{{ from: {}, to: {}, nonce: {}, amount: {} }}",
