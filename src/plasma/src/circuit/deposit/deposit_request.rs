@@ -1,14 +1,6 @@
-use ff::{
-    PrimeField,
-    BitIterator,
-};
+use ff::{BitIterator, PrimeField};
 
-use sapling_crypto::jubjub::{
-    JubjubEngine,
-    Unknown,
-    edwards,
-    edwards::Point,
-};
+use sapling_crypto::jubjub::{edwards, edwards::Point, JubjubEngine, Unknown};
 
 use crate::models::params as plasma_constants;
 
@@ -19,14 +11,11 @@ pub struct DepositRequest<E: JubjubEngine> {
     pub into: Option<E::Fr>,
     pub amount: Option<E::Fr>,
     // here it's only for ease of data encoding
-    pub public_key: Option<edwards::Point<E, Unknown>>
+    pub public_key: Option<edwards::Point<E, Unknown>>,
 }
 
 impl<E: JubjubEngine> DepositRequest<E> {
-    pub fn verify_public_key(
-        &self,
-        params: &E::Params,
-    ) -> bool {
+    pub fn verify_public_key(&self, params: &E::Params) -> bool {
         {
             if self.public_key.is_none() {
                 return false;
@@ -38,20 +27,20 @@ impl<E: JubjubEngine> DepositRequest<E> {
     }
 
     // this function returns public data in Ethereum compatible format
-    pub fn public_data_into_bits(
-        &self
-    ) -> Vec<bool> {
+    pub fn public_data_into_bits(&self) -> Vec<bool> {
         // fields are
         // - into
         // - amount
         // - compressed public key
-        let mut into: Vec<bool> = BitIterator::new(self.into.clone().unwrap().into_repr()).collect();
+        let mut into: Vec<bool> =
+            BitIterator::new(self.into.clone().unwrap().into_repr()).collect();
         into.reverse();
         into.truncate(plasma_constants::BALANCE_TREE_DEPTH);
         // reverse again to have BE as in Ethereum native types
         into.reverse();
 
-        let mut amount: Vec<bool> = BitIterator::new(self.amount.clone().unwrap().into_repr()).collect();
+        let mut amount: Vec<bool> =
+            BitIterator::new(self.amount.clone().unwrap().into_repr()).collect();
         amount.reverse();
         amount.truncate(plasma_constants::BALANCE_BIT_WIDTH);
         // reverse again to have BE as in Ethereum native types
@@ -76,19 +65,15 @@ impl<E: JubjubEngine> DepositRequest<E> {
         packed
     }
 
-    pub fn data_as_bytes(
-        & self
-    ) -> Vec<u8> {
+    pub fn data_as_bytes(&self) -> Vec<u8> {
         let raw_data: Vec<bool> = self.public_data_into_bits();
 
         let mut message_bytes: Vec<u8> = vec![];
 
         let byte_chunks = raw_data.chunks(8);
-        for byte_chunk in byte_chunks
-        {
+        for byte_chunk in byte_chunks {
             let mut byte = 0u8;
-            for (i, bit) in byte_chunk.into_iter().enumerate()
-            {
+            for (i, bit) in byte_chunk.into_iter().enumerate() {
                 if *bit {
                     byte |= 1 << i;
                 }

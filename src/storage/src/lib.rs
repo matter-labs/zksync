@@ -1,60 +1,52 @@
-extern crate models;
-extern crate plasma;
-extern crate fnv;
-extern crate chrono;
+use plasma;
 
-extern crate serde;
-extern crate serde_derive;
 #[macro_use]
 extern crate diesel;
-extern crate bigdecimal;
-extern crate serde_json;
-extern crate sapling_crypto;
 
-extern crate ff;
+use serde_json;
 
 use bigdecimal::BigDecimal;
-use plasma::models::*;
-use diesel::dsl::*;
-use models::{Operation, Action, ActionType, EncodedProof, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
-use std::cmp;
-use serde_derive::{Serialize, Deserialize};
 use chrono::prelude::*;
+use diesel::dsl::*;
+use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
+use plasma::models::*;
+use serde_derive::{Deserialize, Serialize};
+use std::cmp;
 
 mod schema;
-use schema::*;
+use crate::schema::*;
 
-use diesel::prelude::*;
 use diesel::pg::PgConnection;
+use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool, PoolError, PooledConnection};
 use diesel::result::Error;
-use diesel::r2d2::{PoolError, ConnectionManager, Pool, PooledConnection};
 
 use serde_json::{to_value, value::Value};
 use std::env;
 use std::iter::FromIterator;
 
-use ff::{Field};
+use ff::Field;
 
-use diesel::sql_types::{Nullable, Integer, Timestamp, Text};
+use diesel::sql_types::{Integer, Nullable, Text, Timestamp};
 sql_function!(coalesce, Coalesce, (x: Nullable<Integer>, y: Integer) -> Integer);
 
 #[derive(Clone)]
 pub struct ConnectionPool {
-    pool: Pool<ConnectionManager<PgConnection>>, 
+    pool: Pool<ConnectionManager<PgConnection>>,
 }
 
 impl ConnectionPool {
-
     pub fn new() -> Self {
         let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
         let max_size = env::var("DB_POOL_SIZE").unwrap_or("10".to_string());
         let max_size = max_size.parse().expect("DB_POOL_SIZE must be integer");
         let manager = ConnectionManager::<PgConnection>::new(database_url);
-        let pool = Pool::builder().max_size(max_size).build(manager).expect("Failed to create connection pool");
+        let pool = Pool::builder()
+            .max_size(max_size)
+            .build(manager)
+            .expect("Failed to create connection pool");
 
-        Self {
-            pool
-        }
+        Self { pool }
     }
 
     pub fn access_storage(&self) -> Result<StorageProcessor, PoolError> {
@@ -64,47 +56,47 @@ impl ConnectionPool {
 }
 
 #[derive(Insertable, QueryableByName, Queryable)]
-#[table_name="accounts"]
+#[table_name = "accounts"]
 struct Account {
-    pub id:         i32,
+    pub id: i32,
     pub last_block: i32,
-    pub data:       Value,
+    pub data: Value,
 }
 
 #[derive(Insertable, Queryable, QueryableByName)]
-#[table_name="account_updates"]
+#[table_name = "account_updates"]
 struct AccountUpdate {
-    pub account_id:     i32,
-    pub data:           Value,
-    pub block_number:   i32,
+    pub account_id: i32,
+    pub data: Value,
+    pub block_number: i32,
 }
 
 #[derive(Insertable)]
-#[table_name="operations"]
+#[table_name = "operations"]
 struct NewOperation {
-    pub data:           Value,
-    pub block_number:   i32,
-    pub action_type:    String,
+    pub data: Value,
+    pub block_number: i32,
+    pub action_type: String,
 }
 
 #[derive(Debug, Clone, Queryable, QueryableByName)]
-#[table_name="operations"]
+#[table_name = "operations"]
 pub struct StoredOperation {
-    pub id:             i32,
-    pub data:           serde_json::Value,
-    pub addr:           String,
-    pub nonce:          i32,
-    pub block_number:   i32,
-    pub action_type:    String,
-    pub tx_hash:        Option<String>,
-    pub created_at:     NaiveDateTime,
+    pub id: i32,
+    pub data: serde_json::Value,
+    pub addr: String,
+    pub nonce: i32,
+    pub block_number: i32,
+    pub action_type: String,
+    pub tx_hash: Option<String>,
+    pub created_at: NaiveDateTime,
 }
 
 impl StoredOperation {
     pub fn get_meta(&self) -> TxMeta {
-        TxMeta{
-            addr:   self.addr.clone(), 
-            nonce:  self.nonce as u32,
+        TxMeta {
+            addr: self.addr.clone(),
+            nonce: self.nonce as u32,
         }
     }
 
@@ -112,7 +104,7 @@ impl StoredOperation {
         let meta = self.get_meta();
 
         let debug_data = format!("data: {}", &self.data);
-        
+
         // let op: Result<Operation, serde_json::Error> = serde_json::from_value(self.data);
         let op: Result<Operation, serde_json::Error> = serde_json::from_str(&self.data.to_string());
 
@@ -134,51 +126,50 @@ impl StoredOperation {
 }
 
 #[derive(Insertable)]
-#[table_name="transactions"]
+#[table_name = "transactions"]
 struct NewTx {
-    pub tx_type:        String,         // 'transfer', 'deposit', 'exit'
-    pub from_account:   i32,
-    pub to_account:     Option<i32>,    // only used for transfers
-    pub nonce:          Option<i32>,    // only used for transfers
-    pub amount:         i32,
-    pub fee:            i32,
+    pub tx_type: String, // 'transfer', 'deposit', 'exit'
+    pub from_account: i32,
+    pub to_account: Option<i32>, // only used for transfers
+    pub nonce: Option<i32>,      // only used for transfers
+    pub amount: i32,
+    pub fee: i32,
 
-    pub block_number:   Option<i32>,
-    pub state_root:     Option<String>, // unique block id (for possible reorgs)
+    pub block_number: Option<i32>,
+    pub state_root: Option<String>, // unique block id (for possible reorgs)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
-#[table_name="transactions"]
+#[table_name = "transactions"]
 pub struct StoredTx {
-    pub id:             i32,
+    pub id: i32,
     //pub data:           serde_json::Value,
+    pub tx_type: String, // 'transfer', 'deposit', 'exit'
+    pub from_account: i32,
+    pub to_account: Option<i32>, // only used for transfers
+    pub nonce: Option<i32>,      // only used for transfers
+    pub amount: i32,
+    pub fee: i32,
 
-    pub tx_type:        String,         // 'transfer', 'deposit', 'exit'
-    pub from_account:   i32,
-    pub to_account:     Option<i32>,    // only used for transfers
-    pub nonce:          Option<i32>,    // only used for transfers
-    pub amount:         i32,
-    pub fee:            i32,
+    pub block_number: Option<i32>,
+    pub state_root: Option<String>, // unique block id (for possible reorgs)
 
-    pub block_number:   Option<i32>,
-    pub state_root:     Option<String>, // unique block id (for possible reorgs)
-
-    pub created_at:     NaiveDateTime,
+    pub created_at: NaiveDateTime,
 }
 
 impl StoredTx {
     pub fn into_tx(&self) -> QueryResult<tx::TransactionType> {
         let res = match &self.tx_type {
-            t if t == tx::TRANSFER_TX  => {
-                tx::TransactionType::Transfer{tx: self.into_transfer_transaction()}
+            t if t == tx::TRANSFER_TX => tx::TransactionType::Transfer {
+                tx: self.into_transfer_transaction(),
             },
-            d if d == tx::DEPOSIT_TX   => {
-                tx::TransactionType::Deposit{tx: self.into_deposit_transaction()}
+            d if d == tx::DEPOSIT_TX => tx::TransactionType::Deposit {
+                tx: self.into_deposit_transaction(),
             },
-            e if e == tx::EXIT_TX      => {
-                tx::TransactionType::Exit{tx: self.into_exit_transaction()}
+            e if e == tx::EXIT_TX => tx::TransactionType::Exit {
+                tx: self.into_exit_transaction(),
             },
-            _ => return Err(Error::NotFound)
+            _ => return Err(Error::NotFound),
         };
         Ok(res)
     }
@@ -192,7 +183,7 @@ impl StoredTx {
             nonce: 0,
             good_until_block: 0,
             signature: TxSignature::default(),
-            cached_pub_key: None,  
+            cached_pub_key: None,
         }
     }
 
@@ -214,72 +205,72 @@ impl StoredTx {
 }
 
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
-#[table_name="proofs"]
+#[table_name = "proofs"]
 pub struct NewProof {
-    pub block_number:   i32,
-    pub proof:          serde_json::Value,
+    pub block_number: i32,
+    pub proof: serde_json::Value,
 }
 
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
-#[table_name="proofs"]
+#[table_name = "proofs"]
 pub struct StoredProof {
-    pub block_number:   i32,
-    pub proof:          serde_json::Value,
-    pub created_at:     NaiveDateTime,
+    pub block_number: i32,
+    pub proof: serde_json::Value,
+    pub created_at: NaiveDateTime,
 }
 
 // Every time before a prover worker starts generating the proof, a prover run is recorded for monitoring purposes
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
-#[table_name="prover_runs"]
+#[table_name = "prover_runs"]
 pub struct ProverRun {
-    pub id:             i32,
-    pub block_number:   i32,
-    pub worker:         Option<String>,
-    pub created_at:     NaiveDateTime,
-    pub updated_at:     NaiveDateTime,
+    pub id: i32,
+    pub block_number: i32,
+    pub worker: Option<String>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
 }
 
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
-#[table_name="active_provers"]
+#[table_name = "active_provers"]
 pub struct ActiveProver {
-    pub id:             i32,
-    pub worker:         String,
-    pub created_at:     NaiveDateTime,
-    pub stopped_at:     Option<NaiveDateTime>,
+    pub id: i32,
+    pub worker: String,
+    pub created_at: NaiveDateTime,
+    pub stopped_at: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, QueryableByName)]
 pub struct IntegerNumber {
-    #[sql_type="Integer"]
+    #[sql_type = "Integer"]
     pub integer_value: i32,
 }
 
 #[derive(Debug, Queryable, QueryableByName)]
-#[table_name="server_config"]
+#[table_name = "server_config"]
 pub struct ServerConfig {
-    pub id:             bool,
-    pub contract_addr:  Option<String>,
+    pub id: bool,
+    pub contract_addr: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, QueryableByName)]
 pub struct BlockDetails {
-    #[sql_type="Integer"]
-    pub block_number:        i32,
+    #[sql_type = "Integer"]
+    pub block_number: i32,
 
-    #[sql_type="Text"]
-    pub new_state_root:      String,
+    #[sql_type = "Text"]
+    pub new_state_root: String,
 
-    #[sql_type="Nullable<Text>"]
-    pub commit_tx_hash:      Option<String>,
+    #[sql_type = "Nullable<Text>"]
+    pub commit_tx_hash: Option<String>,
 
-    #[sql_type="Nullable<Text>"]
-    pub verify_tx_hash:      Option<String>,
+    #[sql_type = "Nullable<Text>"]
+    pub verify_tx_hash: Option<String>,
 
-    #[sql_type="Timestamp"]
-    pub committed_at:        NaiveDateTime,
+    #[sql_type = "Timestamp"]
+    pub committed_at: NaiveDateTime,
 
-    #[sql_type="Nullable<Timestamp>"]
-    pub verified_at:         Option<NaiveDateTime>,
+    #[sql_type = "Nullable<Timestamp>"]
+    pub verified_at: Option<NaiveDateTime>,
 }
 
 enum ConnectionHolder {
@@ -292,16 +283,17 @@ pub struct StorageProcessor {
 }
 
 impl StorageProcessor {
-
     pub fn establish_connection() -> ConnectionResult<Self> {
         let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-        let connection = PgConnection::establish(&database_url)?;//.expect(&format!("Error connecting to {}", database_url));
-        Ok( Self {conn: ConnectionHolder::Direct(connection)} )
+        let connection = PgConnection::establish(&database_url)?; //.expect(&format!("Error connecting to {}", database_url));
+        Ok(Self {
+            conn: ConnectionHolder::Direct(connection),
+        })
     }
 
     pub fn from_pool(conn: PooledConnection<ConnectionManager<PgConnection>>) -> Self {
         Self {
-            conn: ConnectionHolder::Pooled(conn)
+            conn: ConnectionHolder::Pooled(conn),
         }
     }
 
@@ -313,7 +305,7 @@ impl StorageProcessor {
     }
 
     pub fn load_config(&self) -> QueryResult<ServerConfig> {
-        use schema::server_config::dsl::*;
+        use crate::schema::server_config::dsl::*;
         server_config.first(self.conn())
     }
 
@@ -323,22 +315,23 @@ impl StorageProcessor {
     pub fn execute_operation(&self, op: &Operation) -> QueryResult<Operation> {
         self.conn().transaction(|| {
             match &op.action {
-                Action::Commit => 
-                    {
-                        self.commit_state_update(op.block.block_number, op.accounts_updated.as_ref().unwrap())?;
-                        self.save_transactions(op)?;
-                    },
-                Action::Verify{proof: _} => 
-                    self.apply_state_update(op.block.block_number)?,
+                Action::Commit => {
+                    self.commit_state_update(
+                        op.block.block_number,
+                        op.accounts_updated.as_ref().unwrap(),
+                    )?;
+                    self.save_transactions(op)?;
+                }
+                Action::Verify { proof: _ } => self.apply_state_update(op.block.block_number)?,
             };
 
             // NOTE: tx meta is inserted automatically with sender addr and next expected nonce
             // see SQL migration code for `operations` table
             let stored: StoredOperation = diesel::insert_into(operations::table)
-                .values(&NewOperation{ 
-                    block_number:   op.block.block_number as i32,
-                    action_type:    op.action.to_string(),
-                    data:           serde_json::to_value(&op).unwrap(), 
+                .values(&NewOperation {
+                    block_number: op.block.block_number as i32,
+                    action_type: op.action.to_string(),
+                    data: serde_json::to_value(&op).unwrap(),
                 })
                 .get_result(self.conn())?;
             stored.into_op(self)
@@ -347,20 +340,28 @@ impl StorageProcessor {
 
     pub fn save_operation_tx_hash(&self, op_id: i32, hash: String) -> QueryResult<()> {
         use crate::schema::operations::dsl::*;
-        let target = operations
-            .filter(id.eq(op_id));
+        let target = operations.filter(id.eq(op_id));
         diesel::update(target)
             .set(tx_hash.eq(hash))
             .execute(self.conn())
-            .map(|_|())
+            .map(|_| ())
     }
 
     fn save_transactions(&self, op: &Operation) -> QueryResult<()> {
         let block_data = &op.block.block_data;
         match block_data {
-            BlockData::Transfer { transactions, total_fees: _ } => self.save_transfer_transactions(op, &transactions)?,
-            BlockData::Deposit { transactions, batch_number: _ } => self.save_deposit_transactions(op, &transactions)?,
-            BlockData::Exit { transactions, batch_number: _ } => self.save_exit_transactions(op, &transactions)?,
+            BlockData::Transfer {
+                transactions,
+                total_fees: _,
+            } => self.save_transfer_transactions(op, &transactions)?,
+            BlockData::Deposit {
+                transactions,
+                batch_number: _,
+            } => self.save_deposit_transactions(op, &transactions)?,
+            BlockData::Exit {
+                transactions,
+                batch_number: _,
+            } => self.save_exit_transactions(op, &transactions)?,
         }
         Ok(())
     }
@@ -368,20 +369,34 @@ impl StorageProcessor {
     fn save_transfer_transactions(&self, op: &Operation, txs: &Vec<TransferTx>) -> QueryResult<()> {
         for tx in txs.iter() {
             let inserted = diesel::insert_into(transactions::table)
-                .values(&NewTx{
+                .values(&NewTx {
                     tx_type: String::from("transfer"),
                     from_account: tx.from as i32,
                     to_account: Some(tx.to as i32),
                     nonce: Some(tx.nonce as i32),
-                    amount: tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
-                    fee: tx.fee.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
+                    amount: tx
+                        .amount
+                        .as_bigint_and_exponent()
+                        .0
+                        .to_str_radix(10)
+                        .as_str()
+                        .parse()
+                        .unwrap(),
+                    fee: tx
+                        .fee
+                        .as_bigint_and_exponent()
+                        .0
+                        .to_str_radix(10)
+                        .as_str()
+                        .parse()
+                        .unwrap(),
                     block_number: Some(op.block.block_number as i32),
                     state_root: Some(op.block.new_root_hash.to_hex()),
                 })
                 .execute(self.conn())?;
             if 0 == inserted {
                 eprintln!("Error: could not commit all new transactions!");
-                return Err(Error::RollbackTransaction)
+                return Err(Error::RollbackTransaction);
             }
         }
         Ok(())
@@ -390,12 +405,19 @@ impl StorageProcessor {
     fn save_deposit_transactions(&self, op: &Operation, txs: &Vec<DepositTx>) -> QueryResult<()> {
         for tx in txs.iter() {
             let inserted = diesel::insert_into(transactions::table)
-                .values(&NewTx{
+                .values(&NewTx {
                     tx_type: String::from("deposit"),
                     from_account: tx.account as i32,
                     to_account: None,
                     nonce: None,
-                    amount: tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
+                    amount: tx
+                        .amount
+                        .as_bigint_and_exponent()
+                        .0
+                        .to_str_radix(10)
+                        .as_str()
+                        .parse()
+                        .unwrap(),
                     fee: 0,
                     block_number: Some(op.block.block_number as i32),
                     state_root: Some(op.block.new_root_hash.to_hex()),
@@ -403,7 +425,7 @@ impl StorageProcessor {
                 .execute(self.conn())?;
             if 0 == inserted {
                 eprintln!("Error: could not commit all new transactions!");
-                return Err(Error::RollbackTransaction)
+                return Err(Error::RollbackTransaction);
             }
         }
         Ok(())
@@ -412,12 +434,19 @@ impl StorageProcessor {
     fn save_exit_transactions(&self, op: &Operation, txs: &Vec<ExitTx>) -> QueryResult<()> {
         for tx in txs.iter() {
             let inserted = diesel::insert_into(transactions::table)
-                .values(&NewTx{
+                .values(&NewTx {
                     tx_type: String::from("exit"),
                     from_account: tx.account as i32,
                     to_account: None,
                     nonce: None,
-                    amount: tx.amount.as_bigint_and_exponent().0.to_str_radix(10).as_str().parse().unwrap(),
+                    amount: tx
+                        .amount
+                        .as_bigint_and_exponent()
+                        .0
+                        .to_str_radix(10)
+                        .as_str()
+                        .parse()
+                        .unwrap(),
                     fee: 0,
                     block_number: Some(op.block.block_number as i32),
                     state_root: Some(op.block.new_root_hash.to_hex()),
@@ -425,32 +454,40 @@ impl StorageProcessor {
                 .execute(self.conn())?;
             if 0 == inserted {
                 eprintln!("Error: could not commit all new transactions!");
-                return Err(Error::RollbackTransaction)
+                return Err(Error::RollbackTransaction);
             }
         }
         Ok(())
     }
 
-    fn commit_state_update(&self, block_number: u32, accounts_updated: &AccountMap) -> QueryResult<()> {
+    fn commit_state_update(
+        &self,
+        block_number: u32,
+        accounts_updated: &AccountMap,
+    ) -> QueryResult<()> {
         for (&account_id, a) in accounts_updated.iter() {
-            println!("Committing state update for account {} in block {}", account_id, block_number);
+            println!(
+                "Committing state update for account {} in block {}",
+                account_id, block_number
+            );
             let inserted = diesel::insert_into(account_updates::table)
-                .values(&AccountUpdate{
-                    account_id:     account_id as i32,
-                    block_number:   block_number as i32,
-                    data:           to_value(a).unwrap(),
+                .values(&AccountUpdate {
+                    account_id: account_id as i32,
+                    block_number: block_number as i32,
+                    data: to_value(a).unwrap(),
                 })
                 .execute(self.conn())?;
             if 0 == inserted {
                 eprintln!("Error: could not commit all state updates!");
-                return Err(Error::RollbackTransaction)
+                return Err(Error::RollbackTransaction);
             }
         }
         Ok(())
     }
 
     fn apply_state_update(&self, block_number: u32) -> QueryResult<()> {
-        let update = format!("
+        let update = format!(
+            "
             INSERT INTO accounts (id, last_block, data)
             SELECT 
                 account_id AS id, 
@@ -459,10 +496,12 @@ impl StorageProcessor {
             WHERE account_updates.block_number = {}
             ON CONFLICT (id) 
             DO UPDATE 
-            SET data = EXCLUDED.data, last_block = EXCLUDED.last_block", block_number);
+            SET data = EXCLUDED.data, last_block = EXCLUDED.last_block",
+            block_number
+        );
         diesel::sql_query(update.as_str())
             .execute(self.conn())
-            .map(|_|())
+            .map(|_| ())
     }
 
     pub fn load_committed_state(&self) -> QueryResult<(u32, AccountMap)> {
@@ -489,7 +528,11 @@ impl StorageProcessor {
     }
 
     /// loads the state of accounts updated between two blocks
-    pub fn load_state_diff(&self, from_block: u32, to_block: u32) -> QueryResult<(u32, AccountMap)> {
+    pub fn load_state_diff(
+        &self,
+        from_block: u32,
+        to_block: u32,
+    ) -> QueryResult<(u32, AccountMap)> {
         let start_block = cmp::min(from_block, to_block);
         let end_block = cmp::max(from_block, to_block);
 
@@ -497,7 +540,7 @@ impl StorageProcessor {
         // and then takes the latest updated for each before `to_block`
         //
         // argument block numbers point at the next expected block, i.e. empty state starts at block 1
-        
+
         let select = format!("
             WITH upd AS (
                 WITH s AS (
@@ -520,30 +563,36 @@ impl StorageProcessor {
 
     /// loads the state of accounts updated in a specific block
     pub fn load_state_diff_for_block(&self, block_number: u32) -> QueryResult<(u32, AccountMap)> {
-        self.load_state_diff(block_number, block_number+1)
+        self.load_state_diff(block_number, block_number + 1)
     }
 
     fn load_state(&self, query: &str) -> QueryResult<(u32, AccountMap)> {
-            let r = diesel::sql_query(query)
-                .load(self.conn())
-                .map(|accounts: Vec<Account>| {
-                    let last_block = accounts.iter().map(|a| a.last_block as u32).max().unwrap_or(0);
-                    let result = AccountMap::from_iter(accounts.into_iter().map(|a| (
-                            a.id as u32, 
-                            serde_json::from_value(a.data).unwrap()
-                        )));
-                    (last_block, result)
-                });
-            r
+        let r = diesel::sql_query(query)
+            .load(self.conn())
+            .map(|accounts: Vec<Account>| {
+                let last_block = accounts
+                    .iter()
+                    .map(|a| a.last_block as u32)
+                    .max()
+                    .unwrap_or(0);
+                let result = AccountMap::from_iter(
+                    accounts
+                        .into_iter()
+                        .map(|a| (a.id as u32, serde_json::from_value(a.data).unwrap())),
+                );
+                (last_block, result)
+            });
+        r
     }
 
     /// Sets up `op_config` to new address and nonce for scheduling ETH transactions for operations
     /// If current nonce from ETH netorkw is higher, nonce config is fast-forwarded to the new value
     pub fn prepare_nonce_scheduling(&self, sender: &str, current_nonce: Nonce) -> QueryResult<()> {
-
         // The code below does this:
         // next_nonce = max( current_nonce, max(nonces from ops scheduled for this sender) + 1 )
-        diesel::sql_query(format!("
+        diesel::sql_query(
+            format!(
+                "
             UPDATE op_config 
             SET addr = '{addr}', next_nonce = s.next_nonce
             FROM (
@@ -552,12 +601,21 @@ impl StorageProcessor {
                     SELECT max(nonce) + 1 AS next_nonce FROM operations WHERE addr = '{addr}' 
                     UNION SELECT {current_nonce} AS next_nonce
                 ) t
-            ) s", addr = sender, current_nonce = current_nonce as i32).as_str())
+            ) s",
+                addr = sender,
+                current_nonce = current_nonce as i32
+            )
+            .as_str(),
+        )
         .execute(self.conn())
-        .map(|_|())
+        .map(|_| ())
     }
 
-    pub fn load_stored_op_with_block_number(&self, block_number: BlockNumber, action_type: ActionType) -> Option<StoredOperation> {
+    pub fn load_stored_op_with_block_number(
+        &self,
+        block_number: BlockNumber,
+        action_type: ActionType,
+    ) -> Option<StoredOperation> {
         use crate::schema::operations::dsl;
         dsl::operations
             .filter(dsl::block_number.eq(block_number as i32))
@@ -566,8 +624,13 @@ impl StorageProcessor {
             .ok()
     }
 
-    pub fn load_block_range(&self, max_block: BlockNumber, limit: u32) -> QueryResult<Vec<BlockDetails>> {
-        let query = format!("
+    pub fn load_block_range(
+        &self,
+        max_block: BlockNumber,
+        limit: u32,
+    ) -> QueryResult<Vec<BlockDetails>> {
+        let query = format!(
+            "
             with committed as (
                 select 
                     data -> 'block' ->> 'new_root_hash' as new_state_root,    
@@ -591,7 +654,10 @@ impl StorageProcessor {
                 committed.block_number = verified.block_number
                 and action_type = 'Verify'
             order by committed.block_number desc
-        ", max_block = max_block as i32, limit = limit as i32);
+        ",
+            max_block = max_block as i32,
+            limit = limit as i32
+        );
         diesel::sql_query(query).load(self.conn())
     }
 
@@ -601,10 +667,11 @@ impl StorageProcessor {
         let has_prefix = l_query.starts_with("0x");
         let prefix = "0x".to_owned();
         let query_with_prefix = match has_prefix {
-            true  => l_query,
+            true => l_query,
             false => format!("{}{}", prefix, l_query),
         };
-        let sql_query = format!("
+        let sql_query = format!(
+            "
             with committed as (
                 select 
                     data -> 'block' ->> 'new_root_hash' as new_state_root,    
@@ -631,8 +698,8 @@ impl StorageProcessor {
                 or committed.block_number = {block_number}
             order by committed.block_number desc
             limit 1
-        ",  
-            block_number         = block_number as i32
+        ",
+            block_number = block_number as i32
         );
         let result = diesel::sql_query(sql_query)
             .bind::<Text, _>(query_with_prefix)
@@ -656,16 +723,12 @@ impl StorageProcessor {
 
     pub fn load_commit_op(&self, block_number: BlockNumber) -> Option<Operation> {
         let op = self.load_stored_op_with_block_number(block_number, ActionType::COMMIT);
-        op.map_or( None, |r|
-            r.into_op(self).ok()
-        )
+        op.map_or(None, |r| r.into_op(self).ok())
     }
 
     pub fn load_committed_block(&self, block_number: BlockNumber) -> Option<Block> {
         let op = self.load_commit_op(block_number);
-        op.map_or( None, |r|
-            Some(r.block)
-        )
+        op.map_or(None, |r| Some(r.block))
     }
 
     pub fn load_unsent_ops(&self, current_nonce: Nonce) -> QueryResult<Vec<Operation>> {
@@ -680,7 +743,6 @@ impl StorageProcessor {
 
     pub fn load_unverified_commitments(&self) -> QueryResult<Vec<Operation>> {
         self.conn().transaction(|| {
-
             // // https://docs.diesel.rs/diesel/query_dsl/trait.QueryDsl.html
             // use crate::schema::operations::dsl::{*};
             // let ops: Vec<StoredOperation> = operations
@@ -695,7 +757,8 @@ impl StorageProcessor {
             //     )
             //     .load(self.conn())?;
 
-            let ops: Vec<StoredOperation> = diesel::sql_query("
+            let ops: Vec<StoredOperation> = diesel::sql_query(
+                "
                 SELECT * FROM operations
                 WHERE action_type = 'Commit'
                 AND block_number > (
@@ -703,7 +766,9 @@ impl StorageProcessor {
                     FROM operations 
                     WHERE action_type = 'Verify'
                 )
-            ").load(self.conn())?;
+            ",
+            )
+            .load(self.conn())?;
             ops.into_iter().map(|o| o.into_op(self)).collect()
         })
     }
@@ -730,24 +795,34 @@ impl StorageProcessor {
         ")
     }
 
-    pub fn last_committed_state_for_account(&self, account_id: AccountId) -> QueryResult<Option<plasma::models::Account>> {
-        let query = format!("
+    pub fn last_committed_state_for_account(
+        &self,
+        account_id: AccountId,
+    ) -> QueryResult<Option<plasma::models::Account>> {
+        let query = format!(
+            "
             SELECT account_id AS id, block_number AS last_block, data
             FROM account_updates WHERE account_id = {}
             ORDER BY block_number DESC LIMIT 1
-        ", account_id);
+        ",
+            account_id
+        );
         let r = diesel::sql_query(query)
             .get_result(self.conn())
             .optional()?;
-        Ok( r.map(|acc: Account| serde_json::from_value(acc.data).unwrap()) )
+        Ok(r.map(|acc: Account| serde_json::from_value(acc.data).unwrap()))
     }
 
-    pub fn last_verified_state_for_account(&self, account_id: AccountId) -> QueryResult<Option<plasma::models::Account>> {
+    pub fn last_verified_state_for_account(
+        &self,
+        account_id: AccountId,
+    ) -> QueryResult<Option<plasma::models::Account>> {
         use crate::schema::accounts::dsl::*;
         let mut r = accounts
             .filter(id.eq(account_id as i32))
             .load(self.conn())?;
-        Ok( r.pop().map(|acc: Account| serde_json::from_value(acc.data).unwrap()) )
+        Ok(r.pop()
+            .map(|acc: Account| serde_json::from_value(acc.data).unwrap()))
     }
 
     pub fn count_outstanding_proofs(&self, after_block: BlockNumber) -> QueryResult<u32> {
@@ -756,15 +831,13 @@ impl StorageProcessor {
             .select(count_star())
             .filter(block_number.gt(after_block as i32))
             .first(self.conn())?;
-        Ok( count as u32 )
+        Ok(count as u32)
     }
 
     pub fn count_total_transactions(&self) -> QueryResult<u32> {
         use crate::schema::transactions::dsl::*;
-        let count: i64 = transactions
-            .select(count_star())
-            .first(self.conn())?;
-        Ok( count as u32 )
+        let count: i64 = transactions.select(count_star()).first(self.conn())?;
+        Ok(count as u32)
     }
 
     pub fn get_last_committed_block(&self) -> QueryResult<BlockNumber> {
@@ -774,14 +847,14 @@ impl StorageProcessor {
         //     .get_result::<Option<i32>>(self.conn())
         //     .map(|max| max.unwrap_or(0))
 
-        use schema::operations::dsl::*;
+        use crate::schema::operations::dsl::*;
         operations
             .select(max(block_number))
             .filter(action_type.eq(ACTION_COMMIT))
             .get_result::<Option<i32>>(self.conn())
             .map(|max| max.unwrap_or(0) as BlockNumber)
 
-        //self.load_number("SELECT COALESCE(max(block_number), 0) AS integer_value FROM account_updates")        
+        //self.load_number("SELECT COALESCE(max(block_number), 0) AS integer_value FROM account_updates")
     }
 
     pub fn get_last_verified_block(&self) -> QueryResult<BlockNumber> {
@@ -802,63 +875,84 @@ impl StorageProcessor {
     }
 
     pub fn load_last_saved_transactions(&self, count: i32) -> Vec<StoredTx> {
-        let query = format!("
+        let query = format!(
+            "
             SELECT * FROM transactions
             ORDER BY block_number DESC
             LIMIT {}
-        ", count);
-        let r = diesel::sql_query(query)
-            .load(self.conn());
+        ",
+            count
+        );
+        let r = diesel::sql_query(query).load(self.conn());
         r.unwrap_or(vec![])
     }
 
-    pub fn load_tx_transactions_for_account(&self, account_id: AccountId, count: i32) -> Vec<StoredTx> {
-        let query = format!("
+    pub fn load_tx_transactions_for_account(
+        &self,
+        account_id: AccountId,
+        count: i32,
+    ) -> Vec<StoredTx> {
+        let query = format!(
+            "
             SELECT * FROM transactions
             WHERE from_account = {}
             ORDER BY block_number DESC
             LIMIT {}
-        ", account_id, count);
-        let r = diesel::sql_query(query)
-            .load(self.conn());
+        ",
+            account_id, count
+        );
+        let r = diesel::sql_query(query).load(self.conn());
         r.unwrap_or(vec![])
     }
 
-    pub fn load_rx_transactions_for_account(&self, account_id: AccountId, count: i32) -> Vec<StoredTx> {
-        let query = format!("
+    pub fn load_rx_transactions_for_account(
+        &self,
+        account_id: AccountId,
+        count: i32,
+    ) -> Vec<StoredTx> {
+        let query = format!(
+            "
             SELECT * FROM transactions
             WHERE to_account = {}
             ORDER BY block_number DESC
             LIMIT {}
-        ", account_id, count);
-        let r = diesel::sql_query(query)
-            .load(self.conn());
+        ",
+            account_id, count
+        );
+        let r = diesel::sql_query(query).load(self.conn());
         r.unwrap_or(vec![])
     }
 
     pub fn load_transaction_with_id(&self, tx_id: u32) -> Option<StoredTx> {
-        let query = format!("
+        let query = format!(
+            "
             SELECT * FROM transactions
             WHERE id = {}
             DESC LIMIT 1
-        ", tx_id as i32);
-        let r = diesel::sql_query(query)
-            .get_result(self.conn())
-            .ok();
+        ",
+            tx_id as i32
+        );
+        let r = diesel::sql_query(query).get_result(self.conn()).ok();
         r
     }
 
     pub fn load_transactions_in_block(&self, block_number: u32) -> QueryResult<Vec<StoredTx>> {
-        let query = format!("
+        let query = format!(
+            "
             SELECT * FROM transactions
             WHERE block_number = {}
             ORDER BY block_number
-        ", block_number as i32);
-        diesel::sql_query(query)
-            .load(self.conn())
+        ",
+            block_number as i32
+        );
+        diesel::sql_query(query).load(self.conn())
     }
 
-    pub fn fetch_prover_job(&self, worker_: &String, timeout_seconds: usize) -> QueryResult<Option<ProverRun>> {
+    pub fn fetch_prover_job(
+        &self,
+        worker_: &String,
+        timeout_seconds: usize,
+    ) -> QueryResult<Option<ProverRun>> {
         self.conn().transaction(|| {
             sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.conn())?;
             let job: Option<BlockNumber> = diesel::sql_query(format!("
@@ -874,16 +968,15 @@ impl StorageProcessor {
                 ", timeout_seconds))
                 .get_result::<Option<IntegerNumber>>(self.conn())?
                 .map(|i| i.integer_value as BlockNumber);
-            
             if let Some(block_number_) = job {
                 // let to_store = NewProverRun{
                 //     block_number: block_number as i32,
                 //     worker: worker.to_string(),
                 // };
-                use schema::prover_runs::dsl::*;
+                use crate::schema::prover_runs::dsl::*;
                 let inserted: ProverRun = insert_into(prover_runs)
                 .values(&vec![(
-                    block_number.eq(block_number_ as i32), 
+                    block_number.eq(block_number_ as i32),
                     worker.eq(worker_.to_string())
                 )])
                 .get_result(self.conn())?;
@@ -902,35 +995,37 @@ impl StorageProcessor {
         diesel::update(target)
             .set(updated_at.eq(now))
             .execute(self.conn())
-            .map(|_|())
+            .map(|_| ())
     }
 
     pub fn register_prover(&self, worker_: &String) -> QueryResult<i32> {
-        use schema::active_provers::dsl::*;
+        use crate::schema::active_provers::dsl::*;
         let inserted: ActiveProver = insert_into(active_provers)
-        .values(&vec![(
-            worker.eq(worker_.to_string())
-        )])
-        .get_result(self.conn())?;
+            .values(&vec![(worker.eq(worker_.to_string()))])
+            .get_result(self.conn())?;
         Ok(inserted.id)
     }
 
     pub fn record_prover_stop(&self, prover_id: i32) -> QueryResult<()> {
-        use schema::active_provers::dsl::*;
+        use crate::schema::active_provers::dsl::*;
         use diesel::expression::dsl::now;
 
         let target = active_provers.filter(id.eq(prover_id));
         diesel::update(target)
             .set(stopped_at.eq(now))
             .execute(self.conn())
-            .map(|_|())
+            .map(|_| ())
     }
 
     /// Store the timestamp of the prover finish and the proof
-    pub fn store_proof(&self, block_number: BlockNumber, proof: &EncodedProof) -> QueryResult<usize> {
-        let to_store = NewProof{
-            block_number:   block_number as i32,
-            proof:          serde_json::to_value(proof).unwrap(),
+    pub fn store_proof(
+        &self,
+        block_number: BlockNumber,
+        proof: &EncodedProof,
+    ) -> QueryResult<usize> {
+        let to_store = NewProof {
+            block_number: block_number as i32,
+            proof: serde_json::to_value(proof).unwrap(),
         };
         use crate::schema::proofs::dsl::proofs;
         insert_into(proofs).values(&to_store).execute(self.conn())
@@ -941,20 +1036,19 @@ impl StorageProcessor {
         let stored: StoredProof = dsl::proofs
             .filter(dsl::block_number.eq(block_number as i32))
             .get_result(self.conn())?;
-        Ok( serde_json::from_value(stored.proof).unwrap() )
+        Ok(serde_json::from_value(stored.proof).unwrap())
     }
-
 }
 
 #[cfg(test)]
 mod test {
 
     use super::*;
-    use plasma::models;
-    use diesel::Connection;
     use bigdecimal::BigDecimal;
-    use ff::Field;
     use bigdecimal::Num;
+    use diesel::Connection;
+    use ff::Field;
+    use plasma::models;
     //use diesel::RunQueryDsl;
 
     #[test]
@@ -973,7 +1067,7 @@ mod test {
     }
 
     #[test]
-    fn test_store_state() {     
+    fn test_store_state() {
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
         conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
@@ -987,8 +1081,8 @@ mod test {
         // .expect("must work");
 
         let mut accounts = fnv::FnvHashMap::default();
-        let acc = |balance| { 
-            let mut a = models::Account::default(); 
+        let acc = |balance| {
+            let mut a = models::Account::default();
             a.balance = BigDecimal::from(balance);
             a
         };
@@ -1001,28 +1095,36 @@ mod test {
 
         let (_, state) = conn.load_verified_state().unwrap();
         assert_eq!(state.len(), 0);
-        
+
         // committed state must be computed from updates
         let (last_block, state) = conn.load_committed_state().unwrap();
         assert_eq!(last_block, 1);
         assert_eq!(
-            state.into_iter().collect::<Vec<(u32, models::Account)>>(), 
-            accounts.clone().into_iter().collect::<Vec<(u32, models::Account)>>());
+            state.into_iter().collect::<Vec<(u32, models::Account)>>(),
+            accounts
+                .clone()
+                .into_iter()
+                .collect::<Vec<(u32, models::Account)>>()
+        );
 
         // now apply commitment
         conn.apply_state_update(1).expect("update must work");
-        
+
         // verified state must be equal the commitment
         let (_, state) = conn.load_verified_state().unwrap();
         assert_eq!(
-            state.into_iter().collect::<Vec<(u32, models::Account)>>(), 
-            accounts.clone().into_iter().collect::<Vec<(u32, models::Account)>>());
+            state.into_iter().collect::<Vec<(u32, models::Account)>>(),
+            accounts
+                .clone()
+                .into_iter()
+                .collect::<Vec<(u32, models::Account)>>()
+        );
 
         let (_, state) = conn.load_state_diff(1, 2).expect("load_state_diff failed");
-        assert_eq!( state.get(&2).unwrap(), &acc(2) );
+        assert_eq!(state.get(&2).unwrap(), &acc(2));
 
         let (_, reverse) = conn.load_state_diff(2, 1).unwrap();
-        assert_eq!( reverse.len(), 0 );
+        assert_eq!(reverse.len(), 0);
 
         // commit second state update
         let mut accounts2 = fnv::FnvHashMap::default();
@@ -1034,15 +1136,14 @@ mod test {
         assert_eq!(conn.load_committed_state().unwrap().1.len(), 4);
 
         let (_, state) = conn.load_state_diff(1, 2).unwrap();
-        assert_eq!( state.get(&2).unwrap(), &acc(2) );
+        assert_eq!(state.get(&2).unwrap(), &acc(2));
         let (_, state) = conn.load_state_diff(1, 3).unwrap();
-        assert_eq!( state.get(&2).unwrap(), &acc(23) );
+        assert_eq!(state.get(&2).unwrap(), &acc(23));
         let (_, state) = conn.load_state_diff(2, 3).unwrap();
-        assert_eq!( state.get(&2).unwrap(), &acc(23) );
+        assert_eq!(state.get(&2).unwrap(), &acc(23));
 
         let (_, reverse) = conn.load_state_diff(3, 2).unwrap();
-        assert_eq!( reverse.get(&2).unwrap(), &acc(2) );
-
+        assert_eq!(reverse.get(&2).unwrap(), &acc(2));
     }
 
     use plasma::models::{Block, BlockData, U256};
@@ -1055,8 +1156,8 @@ mod test {
         conn.prepare_nonce_scheduling("0x0", 0).unwrap();
 
         let mut accounts = fnv::FnvHashMap::default();
-        let acc = |balance| { 
-            let mut a = models::Account::default(); 
+        let acc = |balance| {
+            let mut a = models::Account::default();
             a.balance = BigDecimal::from(balance);
             a
         };
@@ -1065,42 +1166,62 @@ mod test {
         accounts.insert(5, acc(2));
         accounts.insert(7, acc(3));
         accounts.insert(8, acc(4));
-        conn.execute_operation(&Operation{
-            id:     None,
+        conn.execute_operation(&Operation {
+            id: None,
             action: Action::Commit,
-            block:  Block{
-                block_number:   1,
-                new_root_hash:  Fr::default(),
-                block_data:     BlockData::Deposit{
+            block: Block {
+                block_number: 1,
+                new_root_hash: Fr::default(),
+                block_data: BlockData::Deposit {
                     batch_number: 0,
                     transactions: vec![],
-                }
-            }, 
-            accounts_updated:   Some(accounts.clone()),
-            tx_meta:            None,
-        }).unwrap();
-        assert_eq!(conn.last_verified_state_for_account(5).unwrap(), None);
-        assert_eq!(conn.last_committed_state_for_account(5).unwrap().unwrap().balance, BigDecimal::from(2));
-
-        conn.execute_operation(&Operation{
-            id:     None,
-            action: Action::Verify{
-                proof: [U256::zero(); 8], 
+                },
             },
-            block:  Block{
-                block_number:   1,
-                new_root_hash:  Fr::default(),
-                block_data:     BlockData::Deposit{
+            accounts_updated: Some(accounts.clone()),
+            tx_meta: None,
+        })
+        .unwrap();
+        assert_eq!(conn.last_verified_state_for_account(5).unwrap(), None);
+        assert_eq!(
+            conn.last_committed_state_for_account(5)
+                .unwrap()
+                .unwrap()
+                .balance,
+            BigDecimal::from(2)
+        );
+
+        conn.execute_operation(&Operation {
+            id: None,
+            action: Action::Verify {
+                proof: [U256::zero(); 8],
+            },
+            block: Block {
+                block_number: 1,
+                new_root_hash: Fr::default(),
+                block_data: BlockData::Deposit {
                     batch_number: 0,
                     transactions: vec![],
-                }
-            }, 
-            accounts_updated:   Some(accounts.clone()),
-            tx_meta:            None,
-        }).unwrap();
+                },
+            },
+            accounts_updated: Some(accounts.clone()),
+            tx_meta: None,
+        })
+        .unwrap();
 
-        assert_eq!(conn.last_verified_state_for_account(7).unwrap().unwrap().balance, BigDecimal::from(3));
-        assert_eq!(conn.last_committed_state_for_account(7).unwrap().unwrap().balance, BigDecimal::from(3));
+        assert_eq!(
+            conn.last_verified_state_for_account(7)
+                .unwrap()
+                .unwrap()
+                .balance,
+            BigDecimal::from(3)
+        );
+        assert_eq!(
+            conn.last_committed_state_for_account(7)
+                .unwrap()
+                .unwrap()
+                .balance,
+            BigDecimal::from(3)
+        );
 
         let pending = conn.load_unsent_ops(0).unwrap();
         assert_eq!(pending.len(), 2);
@@ -1122,40 +1243,42 @@ mod test {
         conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
         conn.prepare_nonce_scheduling("0x0", 0).unwrap();
 
-        conn.execute_operation(&Operation{
-            id:     None,
+        conn.execute_operation(&Operation {
+            id: None,
             action: Action::Commit,
-            block:  Block{
-                block_number:   1,
-                new_root_hash:  Fr::default(),
-                block_data:     BlockData::Deposit{
+            block: Block {
+                block_number: 1,
+                new_root_hash: Fr::default(),
+                block_data: BlockData::Deposit {
                     batch_number: 1,
                     transactions: vec![],
-                }
-            }, 
-            accounts_updated:   Some(fnv::FnvHashMap::default()),
-            tx_meta:            None,
-        }).unwrap();
+                },
+            },
+            accounts_updated: Some(fnv::FnvHashMap::default()),
+            tx_meta: None,
+        })
+        .unwrap();
 
         let pending = conn.load_unverified_commitments().unwrap();
         assert_eq!(pending.len(), 1);
 
-        conn.execute_operation(&Operation{
-            id:     None,
-            action: Action::Verify{
-                proof: [U256::zero(); 8], 
+        conn.execute_operation(&Operation {
+            id: None,
+            action: Action::Verify {
+                proof: [U256::zero(); 8],
             },
-            block:  Block{
-                block_number:   1,
-                new_root_hash:  Fr::default(),
-                block_data:     BlockData::Deposit{
+            block: Block {
+                block_number: 1,
+                new_root_hash: Fr::default(),
+                block_data: BlockData::Deposit {
                     batch_number: 1,
                     transactions: vec![],
-                }
-            }, 
-            accounts_updated:   Some(fnv::FnvHashMap::default()),
-            tx_meta:            None,
-        }).unwrap();
+                },
+            },
+            accounts_updated: Some(fnv::FnvHashMap::default()),
+            tx_meta: None,
+        })
+        .unwrap();
 
         let pending = conn.load_unverified_commitments().unwrap();
         assert_eq!(pending.len(), 0);
@@ -1174,36 +1297,38 @@ mod test {
         assert_eq!(conn.last_committed_state_for_account(9999).unwrap(), None);
         assert_eq!(conn.last_verified_state_for_account(9999).unwrap(), None);
 
-        conn.execute_operation(&Operation{
-            id:     None,
+        conn.execute_operation(&Operation {
+            id: None,
             action: Action::Commit,
-            block:  Block{
-                block_number:   1,
-                new_root_hash:  Fr::default(),
-                block_data:     BlockData::Deposit{
+            block: Block {
+                block_number: 1,
+                new_root_hash: Fr::default(),
+                block_data: BlockData::Deposit {
                     batch_number: 3,
                     transactions: vec![],
-                }
-            }, 
-            accounts_updated:   Some(fnv::FnvHashMap::default()),
-            tx_meta:            None,
-        }).unwrap();
+                },
+            },
+            accounts_updated: Some(fnv::FnvHashMap::default()),
+            tx_meta: None,
+        })
+        .unwrap();
         assert_eq!(3, conn.load_last_committed_deposit_batch().unwrap());
 
-        conn.execute_operation(&Operation{
-            id:     None,
+        conn.execute_operation(&Operation {
+            id: None,
             action: Action::Commit,
-            block:  Block{
-                block_number:   1,
-                new_root_hash:  Fr::default(),
-                block_data:     BlockData::Exit{
+            block: Block {
+                block_number: 1,
+                new_root_hash: Fr::default(),
+                block_data: BlockData::Exit {
                     batch_number: 2,
                     transactions: vec![],
-                }
-            }, 
-            accounts_updated:   Some(fnv::FnvHashMap::default()),
-            tx_meta:            None,
-        }).unwrap();
+                },
+            },
+            accounts_updated: Some(fnv::FnvHashMap::default()),
+            tx_meta: None,
+        })
+        .unwrap();
         assert_eq!(2, conn.load_last_committed_exit_batch().unwrap());
     }
 
@@ -1213,94 +1338,96 @@ mod test {
         let conn = pool.access_storage().unwrap();
         conn.conn().begin_test_transaction().unwrap();
 
-
         let deposit_tx: DepositTx = DepositTx {
             account: 1,
-            amount:  BigDecimal::from_str_radix(&format!("{}", 10000), 10).unwrap(),
-            pub_x:   Fr::zero(),
-            pub_y:   Fr::zero(),
+            amount: BigDecimal::from_str_radix(&format!("{}", 10000), 10).unwrap(),
+            pub_x: Fr::zero(),
+            pub_y: Fr::zero(),
         };
 
         let transfer_tx: TransferTx = TransferTx {
-            from:               1,
-            to:                 2,
-            amount:             BigDecimal::from_str_radix(&format!("{}", 5000), 10).unwrap(),
-            fee:                BigDecimal::from_str_radix(&format!("{}", 0), 10).unwrap(),
-            nonce:              1,
-            good_until_block:   100000,
+            from: 1,
+            to: 2,
+            amount: BigDecimal::from_str_radix(&format!("{}", 5000), 10).unwrap(),
+            fee: BigDecimal::from_str_radix(&format!("{}", 0), 10).unwrap(),
+            nonce: 1,
+            good_until_block: 100000,
             signature: TxSignature::default(),
-            cached_pub_key: None, 
+            cached_pub_key: None,
         };
 
         let exit_tx: ExitTx = ExitTx {
-            account:            1,
-            amount:             BigDecimal::from_str_radix(&format!("{}", 5000), 10).unwrap(),
+            account: 1,
+            amount: BigDecimal::from_str_radix(&format!("{}", 5000), 10).unwrap(),
         };
 
-        conn.execute_operation(&Operation{
-            id:     None,
+        conn.execute_operation(&Operation {
+            id: None,
             action: Action::Commit,
-            block:  Block{
-                block_number:   1,
-                new_root_hash:  Fr::default(),
-                block_data:     BlockData::Deposit{
+            block: Block {
+                block_number: 1,
+                new_root_hash: Fr::default(),
+                block_data: BlockData::Deposit {
                     batch_number: 1,
                     transactions: vec![deposit_tx.clone(), deposit_tx.clone()],
-                }
-            }, 
-            accounts_updated:   Some(fnv::FnvHashMap::default()),
-            tx_meta:            None,
-        }).unwrap();
+                },
+            },
+            accounts_updated: Some(fnv::FnvHashMap::default()),
+            tx_meta: None,
+        })
+        .unwrap();
 
-        conn.execute_operation(&Operation{
-            id:     None,
+        conn.execute_operation(&Operation {
+            id: None,
             action: Action::Commit,
-            block:  Block{
-                block_number:   2,
-                new_root_hash:  Fr::default(),
-                block_data:     BlockData::Transfer{
+            block: Block {
+                block_number: 2,
+                new_root_hash: Fr::default(),
+                block_data: BlockData::Transfer {
                     total_fees: BigDecimal::from_str_radix(&format!("{}", 0), 10).unwrap(),
                     transactions: vec![transfer_tx.clone(), transfer_tx.clone()],
-                }
-            }, 
-            accounts_updated:   Some(fnv::FnvHashMap::default()),
-            tx_meta:            None,
-        }).unwrap();
+                },
+            },
+            accounts_updated: Some(fnv::FnvHashMap::default()),
+            tx_meta: None,
+        })
+        .unwrap();
 
-        conn.execute_operation(&Operation{
-            id:     None,
+        conn.execute_operation(&Operation {
+            id: None,
             action: Action::Commit,
-            block:  Block{
-                block_number:   3,
-                new_root_hash:  Fr::default(),
-                block_data:     BlockData::Exit{
+            block: Block {
+                block_number: 3,
+                new_root_hash: Fr::default(),
+                block_data: BlockData::Exit {
                     batch_number: 2,
                     transactions: vec![exit_tx.clone(), exit_tx.clone()],
-                }
-            }, 
-            accounts_updated:   Some(fnv::FnvHashMap::default()),
-            tx_meta:            None,
-        }).unwrap();
+                },
+            },
+            accounts_updated: Some(fnv::FnvHashMap::default()),
+            tx_meta: None,
+        })
+        .unwrap();
 
         let txs = conn.load_last_saved_transactions(10);
         assert_eq!(txs.len(), 6);
     }
 
     fn dummy_op(action: Action, block_number: BlockNumber) -> Operation {
-            Operation{
-                id:     None,
-                action,
-                block:  Block{
-                    block_number,
-                    new_root_hash:  Fr::default(),
-                    block_data:     BlockData::Deposit{
-                        batch_number: 1,
-                        transactions: vec![],
-                    }
-                }, 
-                accounts_updated:   Some(fnv::FnvHashMap::default()),
-                tx_meta:            None,
-            }
+        Operation {
+            id: None,
+            action,
+            block: Block {
+                block_number,
+                new_root_hash: Fr::default(),
+                block_data: BlockData::Deposit {
+                    batch_number: 1,
+                    transactions: vec![],
+                },
+            },
+            accounts_updated: Some(fnv::FnvHashMap::default()),
+            tx_meta: None,
+        }
     }
 
     #[test]
@@ -1313,9 +1440,11 @@ mod test {
 
         let mut i = 0;
         let stored_op = loop {
-            let stored_op = conn.execute_operation(&dummy_op(Action::Commit, 1)).unwrap();
+            let stored_op = conn
+                .execute_operation(&dummy_op(Action::Commit, 1))
+                .unwrap();
             i = i + 1;
-            if i >= 6 { 
+            if i >= 6 {
                 break stored_op;
             }
         };
@@ -1328,22 +1457,30 @@ mod test {
 
         // if the nonce from network is lower than expected, this should not affect the scheduler
         conn.prepare_nonce_scheduling("0x123", 3).expect("failed");
-        let stored_op = conn.execute_operation(&dummy_op(Action::Commit, 1)).unwrap();
+        let stored_op = conn
+            .execute_operation(&dummy_op(Action::Commit, 1))
+            .unwrap();
         assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 6);
 
         // if the nonce from network is same as expected, this should not affect the scheduler
         conn.prepare_nonce_scheduling("0x123", 7).expect("failed");
-        let stored_op = conn.execute_operation(&dummy_op(Action::Commit, 1)).unwrap();
+        let stored_op = conn
+            .execute_operation(&dummy_op(Action::Commit, 1))
+            .unwrap();
         assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 7);
 
         // if the nonce from network is higher than expected, scheduler should be fast-forwarded
         conn.prepare_nonce_scheduling("0x123", 9).expect("failed");
-        let stored_op = conn.execute_operation(&dummy_op(Action::Commit, 1)).unwrap();
+        let stored_op = conn
+            .execute_operation(&dummy_op(Action::Commit, 1))
+            .unwrap();
         assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 9);
 
         // if the address is new, nonces start from the given value
         conn.prepare_nonce_scheduling("0x456", 2).expect("failed");
-        let stored_op = conn.execute_operation(&dummy_op(Action::Commit, 1)).unwrap();
+        let stored_op = conn
+            .execute_operation(&dummy_op(Action::Commit, 1))
+            .unwrap();
         assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 2);
 
         // addr should now switch
@@ -1351,12 +1488,13 @@ mod test {
 
         // if we switch back to existing sender, nonce sequence should continue from where it started with that addr
         conn.prepare_nonce_scheduling("0x123", 0).expect("failed");
-        let stored_op = conn.execute_operation(&dummy_op(Action::Commit, 1)).unwrap();
+        let stored_op = conn
+            .execute_operation(&dummy_op(Action::Commit, 1))
+            .unwrap();
         assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 10);
 
         // add should now switch back
         assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").addr, "0x123");
-
     }
 
 }

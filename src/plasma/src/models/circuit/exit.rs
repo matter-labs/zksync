@@ -1,4 +1,4 @@
-use ff::{PrimeField, BitIterator};
+use ff::{BitIterator, PrimeField};
 
 use sapling_crypto::jubjub::JubjubEngine;
 
@@ -6,14 +6,12 @@ use crate::models::params;
 
 #[derive(Clone)]
 pub struct ExitRequest<E: JubjubEngine> {
-    pub from:   E::Fr,
+    pub from: E::Fr,
     pub amount: E::Fr,
 }
 
 impl<E: JubjubEngine> ExitRequest<E> {
-    pub fn public_data_into_bits(
-        &self
-    ) -> Vec<bool> {
+    pub fn public_data_into_bits(&self) -> Vec<bool> {
         // fields are
         // - from
         // - amount

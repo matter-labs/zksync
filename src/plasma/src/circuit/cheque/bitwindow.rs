@@ -1,22 +1,13 @@
-use ff::{
-    PrimeField,
-    Field,
-};
+use ff::{Field, PrimeField};
 
-use bellman::{
-    SynthesisError,
-    ConstraintSystem,
-    Circuit
-};
+use bellman::{Circuit, ConstraintSystem, SynthesisError};
 
-use sapling_crypto::jubjub::{
-    JubjubEngine,
-};
+use sapling_crypto::jubjub::JubjubEngine;
 
-use super::Assignment;
 use super::boolean;
 use super::num::{AllocatedNum, Num};
-use super::polynomial_lookup::{generate_powers, do_the_lookup};
+use super::polynomial_lookup::{do_the_lookup, generate_powers};
+use super::Assignment;
 
 #[derive(Clone)]
 pub struct BitWindowWitness<E: JubjubEngine> {
@@ -32,12 +23,10 @@ pub struct BitNumber<E: JubjubEngine> {
     pub number: Option<E::Fr>,
 }
 
-
 pub struct BitSet<'a, E: JubjubEngine> {
     pub params: &'a E::Params,
 
     pub action: (BitNumber<E>, BitWindowWitness<E>),
-
 }
 
 // fn print_boolean_vector(vector: &[boolean::Boolean]) {
@@ -57,46 +46,53 @@ pub struct BitSet<'a, E: JubjubEngine> {
 
 // make a polynomial that it's for a range of `i` [min_with_shift, max_with_shift] outputs `2^(min_with_shift-1)`,
 // forcing to make a lookup in the highest bit, and for i in [min_no_shift, min_with_shift) outputs `2^i` - actual bit
-fn generate_bit_lookup_polynomial<E: JubjubEngine>(min_no_shift: u128, min_with_shift: u128, max_with_shift: u128) -> Vec<E::Fr> {
+fn generate_bit_lookup_polynomial<E: JubjubEngine>(
+    min_no_shift: u128,
+    min_with_shift: u128,
+    max_with_shift: u128,
+) -> Vec<E::Fr> {
     use sapling_crypto::interpolation::interpolate;
 
     let mut points: Vec<(E::Fr, E::Fr)> = vec![];
     let two = E::Fr::from_str("2").unwrap();
     let mut power = E::Fr::one();
-    for i in min_no_shift..(min_with_shift-1) {
+    for i in min_no_shift..(min_with_shift - 1) {
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let y = power;
-        points.push((x,y));
+        points.push((x, y));
 
         power.mul_assign(&two);
     }
 
-    let x = E::Fr::from_str(&(min_with_shift-1).to_string()).unwrap();
+    let x = E::Fr::from_str(&(min_with_shift - 1).to_string()).unwrap();
     let y = power;
-    points.push((x,y));
+    points.push((x, y));
 
     for i in min_with_shift..=max_with_shift {
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let y = power;
-        points.push((x,y));
+        points.push((x, y));
     }
     let interpolation = interpolate::<E>(&points[..]).expect("must interpolate");
-    assert_eq!(interpolation.len(), (max_with_shift+1) as usize);
-
+    assert_eq!(interpolation.len(), (max_with_shift + 1) as usize);
 
     interpolation
 }
 
 // make a polynomial that it's for a range of `i` in [min_with_shift, max_with_shift] outputs `2^(i+1-min_with_shift) - 1`,
 // and for [min_no_shift, min_with_shift) outputs 0
-fn generate_shift_bitmask_polynomial<E: JubjubEngine>(min_no_shift: u128, min_with_shift: u128, max_with_shift: u128) -> Vec<E::Fr> {
+fn generate_shift_bitmask_polynomial<E: JubjubEngine>(
+    min_no_shift: u128,
+    min_with_shift: u128,
+    max_with_shift: u128,
+) -> Vec<E::Fr> {
     use sapling_crypto::interpolation::interpolate;
 
     let mut points: Vec<(E::Fr, E::Fr)> = vec![];
     for i in min_no_shift..min_with_shift {
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let y = E::Fr::zero();
-        points.push((x,y));
+        points.push((x, y));
     }
 
     // the min_with_shift already requires shift by 1, so bitmask is 0x00000...0001
@@ -108,66 +104,73 @@ fn generate_shift_bitmask_polynomial<E: JubjubEngine>(min_no_shift: u128, min_wi
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let mut y = power;
         y.sub_assign(&E::Fr::one());
-        points.push((x,y));
+        points.push((x, y));
     }
     let interpolation = interpolate::<E>(&points[..]).expect("must interpolate");
-    assert_eq!(interpolation.len(), (max_with_shift+1) as usize);
+    assert_eq!(interpolation.len(), (max_with_shift + 1) as usize);
 
     interpolation
 }
 
 // make a lookup with 0 or 1 indicating if distance is correct in [min_valid, max_valid] and 0 in (max_valid, full_range]
-fn generate_correctness_polynomial<E: JubjubEngine>(min_valid: u128, max_valid: u128, full_range: u128) -> Vec<E::Fr> {
+fn generate_correctness_polynomial<E: JubjubEngine>(
+    min_valid: u128,
+    max_valid: u128,
+    full_range: u128,
+) -> Vec<E::Fr> {
     use sapling_crypto::interpolation::interpolate;
 
     let mut points: Vec<(E::Fr, E::Fr)> = vec![];
     for i in min_valid..=max_valid {
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let y = E::Fr::one();
-        points.push((x,y));
+        points.push((x, y));
     }
 
-    for i in (max_valid+1)..=full_range {
+    for i in (max_valid + 1)..=full_range {
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let y = E::Fr::zero();
-        points.push((x,y));
+        points.push((x, y));
     }
 
     let interpolation = interpolate::<E>(&points[..]).expect("must interpolate");
-    assert_eq!(interpolation.len(), (full_range+1) as usize);
+    assert_eq!(interpolation.len(), (full_range + 1) as usize);
 
     interpolation
 }
 
 // make a polynomial that it's for a range of `i` in [min_with_shift, max_with_shift] outputs `2^(i+1-min_with_shift) - 1`,
 // and for [min_no_shift, min_with_shift) outputs 0
-fn generate_start_adjustment_polynomial<E: JubjubEngine>(min_no_shift: u128, min_with_shift: u128, max_with_shift: u128) -> Vec<E::Fr> {
+fn generate_start_adjustment_polynomial<E: JubjubEngine>(
+    min_no_shift: u128,
+    min_with_shift: u128,
+    max_with_shift: u128,
+) -> Vec<E::Fr> {
     use sapling_crypto::interpolation::interpolate;
 
     let mut points: Vec<(E::Fr, E::Fr)> = vec![];
     for i in min_no_shift..min_with_shift {
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let y = E::Fr::zero();
-        points.push((x,y));
+        points.push((x, y));
     }
 
     let mut shift = E::Fr::one();
     for i in min_with_shift..=max_with_shift {
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let y = shift;
-        points.push((x,y));
+        points.push((x, y));
 
         shift.add_assign(&E::Fr::one());
     }
     let interpolation = interpolate::<E>(&points[..]).expect("must interpolate");
-    assert_eq!(interpolation.len(), (max_with_shift+1) as usize);
+    assert_eq!(interpolation.len(), (max_with_shift + 1) as usize);
 
     interpolation
 }
 
 impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
-    fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError>
-    {
+    fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         let bitfield_length = 128u128;
         let shift_length = 64u128;
         // let log_shift_length = 6;
@@ -175,115 +178,118 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
         // distance in range [0, 127] is without shift
         // distance [128, 191] is with shift
         let max_valid_distance = bitfield_length + shift_length - 1u128;
-        let lookup_polynomial_length = bitfield_length*2;
+        let lookup_polynomial_length = bitfield_length * 2;
         let lookup_argument_bit_width = 8;
 
         let (bit_number, witness) = self.action;
-        let current_bits_fe = AllocatedNum::alloc(
-            cs.namespace(|| "allocate bits witness"),
-            || {
+        let current_bits_fe =
+            AllocatedNum::alloc(cs.namespace(|| "allocate bits witness"), || {
                 Ok(*witness.bits.get()?)
-            }
-        )?;
+            })?;
 
         // current bits is in the field and is of predefined bit length
         current_bits_fe.limit_number_of_bits(
             cs.namespace(|| "limit number of bits of the bitfield"),
-            bitfield_length as usize
+            bitfield_length as usize,
         )?;
 
-        let start = AllocatedNum::alloc(
-            cs.namespace(|| "allocate window start witness"),
-            || {
-                Ok(*witness.start.get()?)
-            }
-        )?;
+        let start = AllocatedNum::alloc(cs.namespace(|| "allocate window start witness"), || {
+            Ok(*witness.start.get()?)
+        })?;
 
         let two_inverted = E::Fr::from_str("2").unwrap().inverse().unwrap();
 
-        let current_bits = current_bits_fe.into_bits_le(
-            cs.namespace(|| "get current bits")
-        )?;
+        let current_bits = current_bits_fe.into_bits_le(cs.namespace(|| "get current bits"))?;
 
-        let bit_number = AllocatedNum::alloc(
-            cs.namespace(|| "allocate bit number"),
-            || {
-                Ok(*bit_number.number.get()?)
-            }
-        )?;
+        let bit_number = AllocatedNum::alloc(cs.namespace(|| "allocate bit number"), || {
+            Ok(*bit_number.number.get()?)
+        })?;
 
-        start.limit_number_of_bits(
-            cs.namespace(|| "limit start as 2^32"),
-            32
-        )?;
+        start.limit_number_of_bits(cs.namespace(|| "limit start as 2^32"), 32)?;
 
-        let distance = AllocatedNum::alloc(
-            cs.namespace(|| "allocate distance"),
-            || {
-                let mut num = bit_number.get_value().get()?.clone();
-                let start = start.get_value().get()?.clone();
-                num.sub_assign(&start);
+        let distance = AllocatedNum::alloc(cs.namespace(|| "allocate distance"), || {
+            let mut num = bit_number.get_value().get()?.clone();
+            let start = start.get_value().get()?.clone();
+            num.sub_assign(&start);
 
-                Ok(num)
-            }
-        )?;
+            Ok(num)
+        })?;
 
         cs.enforce(
             || "enforce distance calculation",
             |lc| lc + distance.get_variable(),
             |lc| lc + CS::one(),
-            |lc| lc + bit_number.get_variable() - start.get_variable()
+            |lc| lc + bit_number.get_variable() - start.get_variable(),
         );
 
         // distance must be smaller than 128*2 as a first limit for further use of polynomial tricks
         distance.limit_number_of_bits(
             cs.namespace(|| "limit distance as 2^8"),
-            lookup_argument_bit_width
+            lookup_argument_bit_width,
         )?;
 
         let distance_powers = generate_powers(
             cs.namespace(|| "generate powers of distance variable"),
             &distance,
-            lookup_polynomial_length as usize
+            lookup_polynomial_length as usize,
         )?;
 
         assert_eq!(distance_powers.len(), lookup_polynomial_length as usize);
 
-        let bit_lookup_coeffs = generate_bit_lookup_polynomial::<E>(0u128, bitfield_length, max_valid_distance);
-        assert_eq!(bit_lookup_coeffs.len(), (bitfield_length + shift_length) as usize);
+        let bit_lookup_coeffs =
+            generate_bit_lookup_polynomial::<E>(0u128, bitfield_length, max_valid_distance);
+        assert_eq!(
+            bit_lookup_coeffs.len(),
+            (bitfield_length + shift_length) as usize
+        );
 
-        let mask_lookup_coeffs = generate_shift_bitmask_polynomial::<E>(0u128, bitfield_length, max_valid_distance);
-        assert_eq!(mask_lookup_coeffs.len(), (bitfield_length + shift_length) as usize);
+        let mask_lookup_coeffs =
+            generate_shift_bitmask_polynomial::<E>(0u128, bitfield_length, max_valid_distance);
+        assert_eq!(
+            mask_lookup_coeffs.len(),
+            (bitfield_length + shift_length) as usize
+        );
 
-        let valid_distance_lookup_coeffs = generate_correctness_polynomial::<E>(0u128, bitfield_length + shift_length - 1u128, (1u128 << lookup_argument_bit_width) - 1u128);
-        assert_eq!(valid_distance_lookup_coeffs.len(), lookup_polynomial_length as usize);
+        let valid_distance_lookup_coeffs = generate_correctness_polynomial::<E>(
+            0u128,
+            bitfield_length + shift_length - 1u128,
+            (1u128 << lookup_argument_bit_width) - 1u128,
+        );
+        assert_eq!(
+            valid_distance_lookup_coeffs.len(),
+            lookup_polynomial_length as usize
+        );
 
-        let start_adjustment_lookup_coeffs = generate_start_adjustment_polynomial::<E>(0u128, bitfield_length, max_valid_distance);
-        assert_eq!(start_adjustment_lookup_coeffs.len(), (bitfield_length + shift_length) as usize);
+        let start_adjustment_lookup_coeffs =
+            generate_start_adjustment_polynomial::<E>(0u128, bitfield_length, max_valid_distance);
+        assert_eq!(
+            start_adjustment_lookup_coeffs.len(),
+            (bitfield_length + shift_length) as usize
+        );
 
         let is_valid = do_the_lookup(
-            cs.namespace(|| "lookup distance validity"), 
+            cs.namespace(|| "lookup distance validity"),
             &valid_distance_lookup_coeffs,
-            &distance_powers
+            &distance_powers,
         )?;
 
         let mask_fe = do_the_lookup(
-            cs.namespace(|| "lookup shift mask"), 
+            cs.namespace(|| "lookup shift mask"),
             &mask_lookup_coeffs,
-            &distance_powers[0..((bitfield_length + shift_length) as usize)]
+            &distance_powers[0..((bitfield_length + shift_length) as usize)],
         )?;
 
         let bit_position_fe = do_the_lookup(
-            cs.namespace(|| "lookup bit position"), 
+            cs.namespace(|| "lookup bit position"),
             &bit_lookup_coeffs,
-            &distance_powers[0..((bitfield_length + shift_length) as usize)]
+            &distance_powers[0..((bitfield_length + shift_length) as usize)],
         )?;
 
         cs.enforce(
             || "enforce distance is valid",
             |lc| lc + is_valid.get_variable(),
             |lc| lc + CS::one(),
-            |lc| lc + CS::one()
+            |lc| lc + CS::one(),
         );
 
         let mask_bits = mask_fe.into_bits_le(cs.namespace(|| "bitshift mask bit decomposition"))?;
@@ -299,13 +305,13 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
             let bit = boolean::Boolean::and(
                 cs.namespace(|| format!("mask the field bit {}", i)),
                 mask_bit,
-                field_bit
+                field_bit,
             )?;
-            
+
             masked_bits.push(bit);
         }
 
-        // repack remainder before shifting 
+        // repack remainder before shifting
         let mut masked_lc = Num::<E>::zero();
         let mut coeff = E::Fr::one();
         for bit in &masked_bits {
@@ -315,14 +321,14 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
 
         let remainder = AllocatedNum::alloc(
             cs.namespace(|| "allocate the remainder after bitmask"),
-            || Ok(*masked_lc.get_value().get()?)
+            || Ok(*masked_lc.get_value().get()?),
         )?;
 
         cs.enforce(
             || "pack the remainder after bitmasking",
             |lc| lc + remainder.get_variable(),
             |lc| lc + CS::one(),
-            |_| masked_lc.lc(E::Fr::one())
+            |_| masked_lc.lc(E::Fr::one()),
         );
 
         let quotient = AllocatedNum::alloc(
@@ -333,14 +339,14 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
                 initial.sub_assign(&masked);
 
                 Ok(initial)
-            }
+            },
         )?;
 
         cs.enforce(
             || "enforce top bits after masking",
             |lc| lc + quotient.get_variable(),
             |lc| lc + CS::one(),
-            |lc| lc + current_bits_fe.get_variable() - remainder.get_variable()
+            |lc| lc + current_bits_fe.get_variable() - remainder.get_variable(),
         );
 
         let mut shifted_quotient = quotient.clone();
@@ -356,7 +362,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
                     } else {
                         return Ok(two_inverted);
                     }
-                }
+                },
             )?;
 
             // b*two_inv + (1 - b) * 1 = b(two_inv - i) - 1
@@ -368,22 +374,26 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
                 || format!("enforce multiplier selection {}", i),
                 |lc| lc + multiplier.get_variable(),
                 |lc| lc + CS::one(),
-                |_| mask_bit.lc::<E>(CS::one(), c) + CS::one()
+                |_| mask_bit.lc::<E>(CS::one(), c) + CS::one(),
             );
 
-            shifted_quotient = shifted_quotient.mul(cs.namespace(
-                || format!("do the shift {}", i)),
-                &multiplier
-            )?;
+            shifted_quotient = shifted_quotient
+                .mul(cs.namespace(|| format!("do the shift {}", i)), &multiplier)?;
         }
 
-        // decompose the resulting register state 
+        // decompose the resulting register state
 
-        let shifted_bits = shifted_quotient.into_bits_le(cs.namespace(|| "get shifted register bits"))?;
+        let shifted_bits =
+            shifted_quotient.into_bits_le(cs.namespace(|| "get shifted register bits"))?;
 
-        let bit_position_bits = bit_position_fe.into_bits_le(cs.namespace(|| "get bit of interest mask bits"))?;
+        let bit_position_bits =
+            bit_position_fe.into_bits_le(cs.namespace(|| "get bit of interest mask bits"))?;
 
-        for (i, (reg_bit, position_bit)) in shifted_bits.iter().zip(bit_position_bits.iter()).enumerate() {
+        for (i, (reg_bit, position_bit)) in shifted_bits
+            .iter()
+            .zip(bit_position_bits.iter())
+            .enumerate()
+        {
             // enforce that bit is not set
             // reg_bit * lookup_bit = 0
             // reg_bit = 1, lookup_bit = 0 -> valid
@@ -394,34 +404,31 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
                 || format!("enforce shifted register bit is not set, iteraction {}", i),
                 |_| reg_bit.lc::<E>(CS::one(), E::Fr::one()),
                 |_| position_bit.lc::<E>(CS::one(), E::Fr::one()),
-                |lc| lc 
+                |lc| lc,
             );
         }
 
-        // make a final register state 
+        // make a final register state
 
-        let new_register = AllocatedNum::alloc(
-            cs.namespace(|| "allocate new register"),
-            || {
-                let mut new_val = shifted_quotient.get_value().get()?.clone();
-                let position = bit_position_fe.get_value().get()?.clone();
-                new_val.add_assign(&position);
+        let new_register = AllocatedNum::alloc(cs.namespace(|| "allocate new register"), || {
+            let mut new_val = shifted_quotient.get_value().get()?.clone();
+            let position = bit_position_fe.get_value().get()?.clone();
+            new_val.add_assign(&position);
 
-                Ok(new_val)
-            }
-        )?;
+            Ok(new_val)
+        })?;
 
         cs.enforce(
             || "enforce new register",
             |lc| lc + new_register.get_variable(),
             |lc| lc + CS::one(),
-            |lc| lc + shifted_quotient.get_variable() + bit_position_fe.get_variable()
+            |lc| lc + shifted_quotient.get_variable() + bit_position_fe.get_variable(),
         );
 
         let start_adjustment = do_the_lookup(
             cs.namespace(|| "create start adjustment"),
             &start_adjustment_lookup_coeffs,
-            &distance_powers[0..((bitfield_length + shift_length) as usize)]
+            &distance_powers[0..((bitfield_length + shift_length) as usize)],
         )?;
 
         // start_adjustment.limit_number_of_bits(
@@ -429,28 +436,23 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
         //     log_shift_length + 1
         // )?;
 
-        let new_start = AllocatedNum::alloc(
-            cs.namespace(|| "allocate new start"),
-            || {
-                let mut new_val = start.get_value().get()?.clone();
-                let shift = start_adjustment.get_value().get()?.clone();
-                new_val.add_assign(&shift);
+        let new_start = AllocatedNum::alloc(cs.namespace(|| "allocate new start"), || {
+            let mut new_val = start.get_value().get()?.clone();
+            let shift = start_adjustment.get_value().get()?.clone();
+            new_val.add_assign(&shift);
 
-                Ok(new_val)
-            }
-        )?;
+            Ok(new_val)
+        })?;
 
         cs.enforce(
             || "enforce new start",
             |lc| lc + new_start.get_variable(),
             |lc| lc + CS::one(),
-            |lc| lc + start.get_variable() + start_adjustment.get_variable()
+            |lc| lc + start.get_variable() + start_adjustment.get_variable(),
         );
 
-        new_start.limit_number_of_bits(
-            cs.namespace(|| "limit number of bits for a new start"),
-            32
-        )?;
+        new_start
+            .limit_number_of_bits(cs.namespace(|| "limit number of bits for a new start"), 32)?;
 
         Ok(())
     }
@@ -458,26 +460,17 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
 
 #[cfg(test)]
 mod test {
-        
+
     use super::*;
 
-    use ff::{
-        BitIterator,
-        PrimeFieldRepr,
-        PrimeField,
-        Field
-    };
+    use ff::{BitIterator, Field, PrimeField};
 
     #[test]
     fn test_redeem() {
-        use ff::{Field, BitIterator};
         use pairing::bn256::*;
-        use rand::{SeedableRng, Rng, XorShiftRng, Rand};
+        use rand::{Rng, SeedableRng, XorShiftRng};
+        use sapling_crypto::alt_babyjubjub::{edwards, fs, AltJubjubBn256, PrimeOrder};
         use sapling_crypto::circuit::test::*;
-        use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
-        use crate::circuit::utils::{encode_fs_into_fr, be_bit_vector_into_bytes};
-        use crate::primitives::GetBits;
-        extern crate hex;
 
         let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
@@ -531,7 +524,10 @@ mod test {
 
             let err = cs.which_is_unsatisfied();
             if err.is_some() {
-                println!("Error for bitfield = {:#b}, bit of interest = {}", existing_field, bit_of_interest);
+                println!(
+                    "Error for bitfield = {:#b}, bit of interest = {}",
+                    existing_field, bit_of_interest
+                );
                 panic!("ERROR satisfying in {}\n", err.unwrap());
             } else {
                 println!("Satisfied for bit = {}", bit_of_interest);
@@ -541,15 +537,13 @@ mod test {
 
     #[test]
     fn test_proof_generation() {
-        use ff::{Field, BitIterator};
         use pairing::bn256::*;
-        use rand::{SeedableRng, Rng, XorShiftRng, Rand};
-        use sapling_crypto::circuit::test::*;
-        use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, fs, edwards, PrimeOrder};
-        use crate::circuit::utils::{encode_fs_into_fr, be_bit_vector_into_bytes};
-        use crate::primitives::GetBits;
-        extern crate hex;
-        use bellman::groth16::{generate_random_parameters, create_random_proof, verify_proof, prepare_verifying_key};
+        use rand::{Rng, SeedableRng, XorShiftRng};
+        use sapling_crypto::alt_babyjubjub::{edwards, fs, AltJubjubBn256, PrimeOrder};
+
+        use bellman::groth16::{
+            create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
+        };
 
         let mut rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
@@ -598,9 +592,7 @@ mod test {
                 start: None,
             };
 
-            let n = BitNumber::<Bn256> {
-                number: None
-            };
+            let n = BitNumber::<Bn256> { number: None };
 
             let inst = BitSet::<Bn256> {
                 params: params,
@@ -608,12 +600,14 @@ mod test {
                 action: (n, w),
             };
 
-            let p = generate_random_parameters::<Bn256, _, _>(inst, &mut rng).expect("must generate parameters");
+            let p = generate_random_parameters::<Bn256, _, _>(inst, &mut rng)
+                .expect("must generate parameters");
 
             p
         };
 
-        let proof = create_random_proof::<Bn256, _, _, _>(instance, &parameters, &mut rng).expect("must generate proof");
+        let proof = create_random_proof::<Bn256, _, _, _>(instance, &parameters, &mut rng)
+            .expect("must generate proof");
 
         let pvk = prepare_verifying_key(&parameters.vk);
 
@@ -626,8 +620,8 @@ mod test {
 
     #[test]
     fn test_bit_shifts() {
-        use pairing::bn256::{Bn256, Fr};
-        use rand::{SeedableRng, Rng, XorShiftRng, Rand};
+        use pairing::bn256::Fr;
+        use rand::{Rng, SeedableRng, XorShiftRng};
 
         let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
         let mut bitmask: Fr = rng.gen();
@@ -647,8 +641,6 @@ mod test {
             }
         }
         print!("\n");
-
-        
 
         let bits_before: Vec<bool> = BitIterator::new(bitmask.into_repr()).collect();
         for b in bits_before {
@@ -684,7 +676,11 @@ mod test {
         let min_with_shift = 128u128;
         let max_with_shift = 255u128;
 
-        let interpolation = generate_shift_bitmask_polynomial::<Bn256>(min_no_shift, min_with_shift, max_with_shift);
+        let interpolation = generate_shift_bitmask_polynomial::<Bn256>(
+            min_no_shift,
+            min_with_shift,
+            max_with_shift,
+        );
 
         for i in 0..=max_with_shift {
             let x = Fr::from_str(&i.to_string()).unwrap();
@@ -702,7 +698,8 @@ mod test {
         let min_with_shift = 128u128;
         let max_with_shift = 255u128;
 
-        let interpolation = generate_bit_lookup_polynomial::<Bn256>(min_no_shift, min_with_shift, max_with_shift);
+        let interpolation =
+            generate_bit_lookup_polynomial::<Bn256>(min_no_shift, min_with_shift, max_with_shift);
 
         for i in 0..=max_with_shift {
             let x = Fr::from_str(&i.to_string()).unwrap();
@@ -720,7 +717,8 @@ mod test {
         let max_valid = 128u128 + 64u128;
         let full_range = 255u128;
 
-        let interpolation = generate_correctness_polynomial::<Bn256>(min_valid, max_valid, full_range);
+        let interpolation =
+            generate_correctness_polynomial::<Bn256>(min_valid, max_valid, full_range);
 
         for i in 0..=full_range {
             let x = Fr::from_str(&i.to_string()).unwrap();

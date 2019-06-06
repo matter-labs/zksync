@@ -1,14 +1,14 @@
-use crate::primitives::{GetBits};
-use bigdecimal::BigDecimal;
 use super::circuit;
-use crate::models::params;
-use sapling_crypto::jubjub::{edwards, Unknown};
 use super::{Engine, Fr, PublicKey};
+use crate::models::params;
+use crate::primitives::GetBits;
+use bigdecimal::BigDecimal;
+use sapling_crypto::jubjub::{edwards, Unknown};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Account {
-    pub balance:    BigDecimal,
-    pub nonce:      u32,
+    pub balance: BigDecimal,
+    pub nonce: u32,
     pub public_key_x: Fr,
     pub public_key_y: Fr,
 }
@@ -30,14 +30,13 @@ impl GetBits for Account {
 }
 
 impl Account {
-
     pub fn get_pub_key(&self) -> Option<PublicKey> {
         let point = edwards::Point::<Engine, Unknown>::from_xy(
-            self.public_key_x, 
-            self.public_key_y, 
-            &params::JUBJUB_PARAMS
+            self.public_key_x,
+            self.public_key_y,
+            &params::JUBJUB_PARAMS,
         );
-        point.map( |p| sapling_crypto::eddsa::PublicKey::<Engine>(p) )
+        point.map(|p| sapling_crypto::eddsa::PublicKey::<Engine>(p))
     }
 }
 

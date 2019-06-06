@@ -104,7 +104,7 @@ server:
 	@cargo run --bin server
 
 sandbox:
-	@cd src/sandbox && cargo run
+	@cargo run --bin sandbox
 
 build-target:
 	$(rust-musl-builder) cargo build --release
