@@ -1,7 +1,7 @@
 //use super::{DepositBlock, TransferBlock, ExitBlock};
-use plasma::circuit::utils::be_bit_vector_into_bytes;
-use plasma::models::circuit::{CircuitDepositRequest, CircuitExitRequest, CircuitTransferTx};
-use plasma::models::{self, Block, BlockData};
+use crate::plasma::circuit::utils::be_bit_vector_into_bytes;
+use crate::plasma::circuit::{CircuitDepositRequest, CircuitExitRequest, CircuitTransferTx};
+use crate::plasma::{self, Block, BlockData};
 
 fn convert_transfer(transactions: &Vec<models::TransferTx>) -> Result<Vec<Vec<bool>>, String> {
     transactions

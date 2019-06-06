@@ -1,13 +1,13 @@
-use super::{Engine, Fr};
-use super::{PrivateKey, PublicKey};
-use crate::circuit::utils::{
+use crate::plasma::{Engine, Fr};
+use crate::plasma::{PrivateKey, PublicKey};
+use crate::plasma::circuit::utils::{
     encode_fr_into_fs, encode_fs_into_fr, le_bit_vector_into_field_element,
 };
-use crate::models::circuit::deposit::DepositRequest;
-use crate::models::circuit::exit::ExitRequest;
-use crate::models::circuit::sig::TransactionSignature;
-use crate::models::circuit::transfer::Tx;
-use crate::models::params;
+use crate::plasma::circuit::deposit::DepositRequest;
+use crate::plasma::circuit::exit::ExitRequest;
+use crate::plasma::circuit::sig::TransactionSignature;
+use crate::plasma::circuit::transfer::Tx;
+use crate::plasma::params;
 use crate::primitives::{get_bits_le_fixed_u128, pack_bits_into_bytes};
 use bigdecimal::{BigDecimal, ToPrimitive};
 use ff::PrimeField;
@@ -278,7 +278,7 @@ impl TxSignature {
 }
 
 impl TransactionSignature<Engine> {
-    pub fn try_from(sig: crate::models::tx::TxSignature) -> Result<Self, String> {
+    pub fn try_from(sig: crate::plasma::tx::TxSignature) -> Result<Self, String> {
         let r =
             edwards::Point::<Engine, Unknown>::from_xy(sig.r_x, sig.r_y, &params::JUBJUB_PARAMS)
                 .expect("make R point");
@@ -290,7 +290,7 @@ impl TransactionSignature<Engine> {
 
 impl Tx<Engine> {
     // TODO: introduce errors if necessary
-    pub fn try_from(transaction: &crate::models::TransferTx) -> Result<Self, String> {
+    pub fn try_from(transaction: &crate::plasma::tx::TransferTx) -> Result<Self, String> {
         use bigdecimal::ToPrimitive;
         let encoded_amount_bits = convert_to_float(
             transaction.amount.to_u128().unwrap(), // TODO: use big decimal in convert_to_float() instead
@@ -328,7 +328,7 @@ impl Tx<Engine> {
 
 impl DepositRequest<Engine> {
     // TODO: introduce errors if necessary
-    pub fn try_from(request: &crate::models::DepositTx) -> Result<Self, String> {
+    pub fn try_from(request: &crate::plasma::tx::DepositTx) -> Result<Self, String> {
         let req = Self {
             // TODO: these conversions are ugly and inefficient, replace with idiomatic std::convert::From trait
             into: Fr::from_str(&request.account.to_string()).unwrap(),
@@ -343,7 +343,7 @@ impl DepositRequest<Engine> {
 
 impl ExitRequest<Engine> {
     // TODO: introduce errors if necessary
-    pub fn try_from(request: &crate::models::ExitTx) -> Result<Self, String> {
+    pub fn try_from(request: &crate::plasma::tx::ExitTx) -> Result<Self, String> {
         let req = Self {
             // TODO: these conversions are ugly and inefficient, replace with idiomatic std::convert::From trait
             from: Fr::from_str(&request.account.to_string()).unwrap(),

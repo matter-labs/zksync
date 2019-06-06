@@ -2,7 +2,7 @@ use ff::{BitIterator, PrimeField};
 
 use sapling_crypto::jubjub::JubjubEngine;
 
-use crate::models::params;
+use crate::plasma::params;
 
 #[derive(Clone)]
 pub struct ExitRequest<E: JubjubEngine> {

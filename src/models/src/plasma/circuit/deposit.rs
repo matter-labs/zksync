@@ -1,4 +1,4 @@
-use crate::models::params;
+use crate::plasma::params;
 use ff::{BitIterator, PrimeField};
 use sapling_crypto::jubjub::JubjubEngine;
 

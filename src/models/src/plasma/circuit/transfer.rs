@@ -1,11 +1,10 @@
-use crate::circuit::utils::le_bit_vector_into_field_element;
-use crate::models::params;
+use crate::plasma::circuit::utils::le_bit_vector_into_field_element;
+use crate::plasma::params;
+use crate::plasma::circuit::sig::TransactionSignature;
 use ff::{BitIterator, PrimeField};
 use sapling_crypto::alt_babyjubjub::JubjubEngine;
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 use sapling_crypto::jubjub::FixedGenerators;
-
-use super::sig::TransactionSignature;
 
 /// Packed transaction data
 #[derive(Clone, Serialize, Deserialize)]

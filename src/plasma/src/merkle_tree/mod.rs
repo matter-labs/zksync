@@ -1,9 +1,19 @@
+extern crate models::plasma::account::Account;
+
 pub mod hasher;
 pub mod pedersen_hasher;
 pub mod sequential_smt;
 
 pub type SparseMerkleTree<T, H, HH> = sequential_smt::SparseMerkleTree<T, H, HH>;
 pub type PedersenHasher<T> = pedersen_hasher::PedersenHasher<T>;
+
+pub type AccountTree = SparseMerkleTree<Account, Fr, PedersenHasher<Engine>>;
+
+use pairing::bn256::{Bn256, Fr};
+pub type CircuitAccountTree = SparseMerkleTree<CircuitAccount<Bn256>, Fr, PedersenHasher<Bn256>>;
+pub type CircuitTransferTx = transfer::Tx<Bn256>;
+pub type CircuitDepositRequest = deposit::DepositRequest<Bn256>;
+pub type CircuitExitRequest = exit::ExitRequest<Bn256>;
 
 // TODO: return the code below and uncomment asserts
 

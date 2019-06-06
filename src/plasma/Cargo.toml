@@ -44,3 +44,5 @@ tiny-keccak = "1.4.2"
 secp256k1 = "0.11.1"
 bigdecimal = { version = "0.1.0", features = ["serde"]}
 lazy_static = "1.2.0"
+
+models = { path = "../models" }

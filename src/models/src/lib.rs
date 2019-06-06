@@ -1,17 +1,31 @@
 #[macro_use]
 extern crate serde_derive;
-
-use serde_bytes;
 #[macro_use]
 extern crate lazy_static;
+extern crate ff;
+extern crate bigdecimal;
+extern crate pairing;
+extern crate sapling_crypto;
+extern crate web3;
+extern crate bellman;
+extern crate rand;
+extern crate fnv;
 
 pub mod config;
-pub mod encoder;
+pub mod plasma;
+pub mod primitives;
+pub mod abi;
 
-use plasma::models::*;
+use crate::plasma::*;
+use crate::plasma::block::Block;
 use std::sync::mpsc::Sender;
+use serde_bytes;
 
-pub use eth_client::TxMeta;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TxMeta {
+    pub addr: String,
+    pub nonce: u32,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TransferTxConfirmation {

@@ -1,6 +1,8 @@
-use super::*;
-use crate::models::params;
+use crate::*;
+use crate::plasma::params;
 use bigdecimal::{BigDecimal, Zero};
+use merkle_tree::AccountTree;
+use models::plasma::AccountMap;
 
 pub struct PlasmaState {
     /// Accounts stored in a sparse Merkle tree

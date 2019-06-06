@@ -3,6 +3,7 @@ use reqwest;
 
 #[macro_use]
 extern crate serde_derive;
+extern crate models::{ABI, TEST_PLASMA_ALWAYS_VERIFY}
 
 mod signer;
 
@@ -17,24 +18,6 @@ use std::str::FromStr;
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 pub type U32 = u64; // because missing in web3::types; u64 is fine since only used for tokenization
-
-type ABI = (&'static [u8], &'static str);
-
-pub const TEST_PLASMA_ALWAYS_VERIFY: ABI = (
-    include_bytes!("../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.abi"),
-    include_str!("../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.bin"),
-);
-
-pub const PROD_PLASMA: ABI = (
-    include_bytes!("../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.abi"),
-    include_str!("../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.bin"),
-);
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TxMeta {
-    pub addr: String,
-    pub nonce: u32,
-}
 
 pub struct ETHClient {
     private_key: H256,

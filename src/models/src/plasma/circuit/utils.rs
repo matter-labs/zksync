@@ -1,12 +1,10 @@
 use bellman::{ConstraintSystem, SynthesisError};
 use ff::{BitIterator, Field, PrimeField};
 use sapling_crypto::jubjub::JubjubEngine;
+use sapling_crypto::circuit::{boolean, Assignment};
+use sapling_crypto::circuit::num::{AllocatedNum, Num};
 
-use super::boolean;
-use super::num::{AllocatedNum, Num};
-use super::Assignment;
-
-use crate::models::params as plasma_constants;
+use crate::plasma::params as plasma_constants;
 
 // count a number of non-zero bits in a bit decomposition
 pub fn count_number_of_ones<E, CS>(
