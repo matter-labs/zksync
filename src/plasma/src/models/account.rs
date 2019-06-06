@@ -16,7 +16,7 @@ pub struct Account {
 impl GetBits for Account {
     fn get_bits_le(&self) -> Vec<bool> {
 
-        circuit::Account::<Engine>::from(self.clone()).get_bits_le()
+        circuit::CircuitAccount::<Engine>::from(self.clone()).get_bits_le()
         
         // TODO: make more efficient:
 

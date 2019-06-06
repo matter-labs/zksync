@@ -42,11 +42,11 @@ impl<E: JubjubEngine> Default for Leaf<E> {
 
 // code below is for testing
 
-pub type Account = Leaf<Bn256>;
-pub type AccountTree = SparseMerkleTree<Account, Fr, PedersenHasher<Bn256>>;
+pub type LeafAccount = Leaf<Bn256>;
+pub type LeafAccountTree = SparseMerkleTree<LeafAccount, Fr, PedersenHasher<Bn256>>;
 
-impl AccountTree {
-    pub fn verify_proof(&self, index: u32, item: Account, proof: Vec<(Fr, bool)>) -> bool {
+impl LeafAccountTree {
+    pub fn verify_proof(&self, index: u32, item: LeafAccount, proof: Vec<(Fr, bool)>) -> bool {
         use crate::merkle_tree::hasher::Hasher;
         
         assert!(index < self.capacity());
@@ -81,8 +81,8 @@ mod tests {
 
     #[test]
     fn test_balance_tree() {
-        let mut tree = AccountTree::new(3);
-        let leaf = Account {
+        let mut tree = LeafAccountTree::new(3);
+        let leaf = LeafAccount {
             balance:    Fr::zero(),
             nonce:      Fr::one(),
             pub_x:      Fr::one(),

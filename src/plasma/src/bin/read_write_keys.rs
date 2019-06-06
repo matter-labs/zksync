@@ -16,7 +16,7 @@ use pairing::{Engine};
 use rand::{SeedableRng, Rng, XorShiftRng};
 use sapling_crypto::circuit::test::*;
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
-use plasma::models::circuit::{AccountTree, Account};
+use plasma::models::circuit::{CircuitAccountTree, CircuitAccount};
 use crypto::sha2::Sha256;
 use crypto::digest::Digest;
 use std::collections::HashMap;
@@ -64,7 +64,7 @@ fn main() {
 
     let mut existing_accounts: Vec<(u32, PrivateKey<Bn256>, PublicKey<Bn256>)> = vec![];
 
-    let mut tree = AccountTree::new(tree_depth);
+    let mut tree = CircuitAccountTree::new(tree_depth);
 
     let number_of_accounts = 1000;
 
@@ -89,7 +89,7 @@ fn main() {
 
         existing_accounts.push((leaf_number, sk, pk));
 
-        let leaf = Account {
+        let leaf = CircuitAccount {
             balance:    Fr::from_str(default_balance_string).unwrap(),
             nonce:      Fr::zero(),
             pub_x:      x,
@@ -244,7 +244,7 @@ fn main() {
 
     let final_root = tree.root_hash();
 
-    let final_root_string = format!("{}", AccountTree::new(tree_depth).root_hash().into_repr());
+    let final_root_string = format!("{}", CircuitAccountTree::new(tree_depth).root_hash().into_repr());
 
     println!("Final root = {}", final_root_string);
 
@@ -394,7 +394,7 @@ fn main() {
     let mut r = BufReader::new(f_r);
     let circuit_params = bellman::groth16::Parameters::read(& mut r, true).expect("Unable to read proving key");
 
-    let initial_root_string = format!("{}", AccountTree::new(tree_depth).root_hash().into_repr());
+    let initial_root_string = format!("{}", CircuitAccountTree::new(tree_depth).root_hash().into_repr());
     let contract_content = generate_vk_contract(&circuit_params.vk, initial_root_string.as_ref(), tree_depth);
 
     let f_cont = File::create("VerificationKeys.sol").expect("Unable to create file");

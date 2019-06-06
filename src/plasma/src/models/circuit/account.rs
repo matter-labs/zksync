@@ -4,14 +4,14 @@ use crate::models::params;
 use crate::primitives::{GetBits, GetBitsFixed};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Account<E: JubjubEngine> {
+pub struct CircuitAccount<E: JubjubEngine> {
     pub balance:    E::Fr,
     pub nonce:      E::Fr,
     pub pub_x:      E::Fr,
     pub pub_y:      E::Fr,
 }
 
-impl<E: JubjubEngine> std::default::Default for Account<E> {
+impl<E: JubjubEngine> std::default::Default for CircuitAccount<E> {
     fn default() -> Self{
         Self{
             balance:    E::Fr::zero(),
@@ -22,7 +22,7 @@ impl<E: JubjubEngine> std::default::Default for Account<E> {
     }
 }
 
-impl<E: JubjubEngine> GetBits for Account<E> {
+impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
     fn get_bits_le(&self) -> Vec<bool> {
         let mut leaf_content = Vec::new();
         leaf_content.extend(self.balance.get_bits_le_fixed(params::BALANCE_BIT_WIDTH));
@@ -36,7 +36,7 @@ impl<E: JubjubEngine> GetBits for Account<E> {
 
 // TODO: this is ugly; the correct way is to introduce Serialize/Deserialize interface into JubjubEngine::Fr
 // this requires deduplication of JubjubEngines
-impl std::convert::From<crate::models::Account> for Account<pairing::bn256::Bn256> {
+impl std::convert::From<crate::models::Account> for CircuitAccount<pairing::bn256::Bn256> {
 
     fn from(a: crate::models::Account) -> Self {
         use pairing::bn256::Fr;

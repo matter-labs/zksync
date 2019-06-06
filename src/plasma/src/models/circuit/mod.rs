@@ -4,12 +4,12 @@ pub mod transfer;
 pub mod deposit;
 pub mod exit;
 
-pub use self::account::Account;
+pub use self::account::CircuitAccount;
 
 use crate::merkle_tree::{SparseMerkleTree, PedersenHasher};
 
 use pairing::bn256::{Bn256, Fr};
-pub type AccountTree = SparseMerkleTree<Account<Bn256>, Fr, PedersenHasher<Bn256>>;
-pub type TransferTx = transfer::Tx<Bn256>;
-pub type DepositRequest = deposit::DepositRequest<Bn256>;
-pub type ExitRequest = exit::ExitRequest<Bn256>;
+pub type CircuitAccountTree = SparseMerkleTree<CircuitAccount<Bn256>, Fr, PedersenHasher<Bn256>>;
+pub type CircuitTransferTx = transfer::Tx<Bn256>;
+pub type CircuitDepositRequest = deposit::DepositRequest<Bn256>;
+pub type CircuitExitRequest = exit::ExitRequest<Bn256>;
