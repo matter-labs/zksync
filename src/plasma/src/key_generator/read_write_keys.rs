@@ -1,5 +1,3 @@
-use bellman;
-
 use time::PreciseTime;
 
 use crypto::digest::Digest;
@@ -11,29 +9,26 @@ use pairing::Engine;
 use rand::{Rng, SeedableRng, XorShiftRng};
 use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
 use sapling_crypto::circuit::test::*;
-use models::plasma::circuit::account::CircuitAccount;
+use circuit::leaf::LeafWitness;
 use circuit::CircuitAccountTree;
+use circuit::transfer::circuit::{Transfer, TransactionWitness};
+use circuit::transfer::transaction::Transaction;
 use std::collections::HashMap;
 
 use bellman::Circuit;
-
 use bellman::groth16::{
     create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
     VerifyingKey,
 };
-
-use plasma::vk_contract_generator::hardcode_vk;
+use crate::key_generator::vk_contract_generator::hardcode_vk;
 
 use sapling_crypto::jubjub::FixedGenerators;
-
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
-
-use plasma::circuit::leaf::LeafWitness;
-use plasma::circuit::transfer::circuit::{TransactionWitness, Transfer};
-use plasma::circuit::transfer::transaction::Transaction;
-use plasma::circuit::utils::*;
-use plasma::models::params as plasma_constants;
 use sapling_crypto::circuit::float_point::convert_to_float;
+
+use models::plasma::circuit::utils::{le_bit_vector_into_field_element, be_bit_vector_into_bytes};
+use models::plasma::params as plasma_constants;
+use models::plasma::circuit::account::CircuitAccount;
 
 const TXES_TO_TEST: usize = 128;
 

@@ -8,12 +8,12 @@ use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
 
 use bellman::groth16::generate_random_parameters;
 
-use plasma::vk_contract_generator::generate_vk_contract;
+use crate::key_generator::vk_contract_generator::generate_vk_contract;
 
-use plasma::circuit::deposit::circuit::{Deposit, DepositWitness};
-use plasma::circuit::deposit::deposit_request::DepositRequest;
-use plasma::circuit::leaf::LeafWitness;
-use plasma::models::params as plasma_constants;
+use circuit::deposit::circuit::{Deposit, DepositWitness};
+use circuit::deposit::deposit_request::DepositRequest;
+use circuit::leaf::LeafWitness;
+use models::plasma::params as plasma_constants;
 
 const DEPOSIT_BATCH_SIZE: usize = 1;
 const FILENAME: &str = "deposit_pk.key";

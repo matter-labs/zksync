@@ -8,18 +8,18 @@ use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
 
 use bellman::groth16::generate_random_parameters;
 
-use plasma::vk_contract_generator::generate_vk_contract;
+use crate::key_generator::vk_contract_generator::generate_vk_contract;
 
-use plasma::circuit::leaf::LeafWitness;
-use plasma::circuit::transfer::circuit::{TransactionWitness, Transfer};
-use plasma::circuit::transfer::transaction::Transaction;
-use plasma::models::params as plasma_constants;
+use circuit::exit::circuit::{Exit, ExitWitness};
+use circuit::exit::exit_request::ExitRequest;
+use circuit::leaf::LeafWitness;
+use models::plasma::params as plasma_constants;
 
-const TRANSFER_BATCH_SIZE: usize = 8;
-const FILENAME: &str = "transfer_pk.key";
-const CONTRACT_FILENAME: &str = "TransferVerificationKey.sol";
-const CONTRACT_NAME: &str = "TransferVerificationKey";
-const CONTRACT_FUNCTION_NAME: &str = "getVkTransferCircuit";
+const EXIT_BATCH_SIZE: usize = 1;
+const FILENAME: &str = "exit_pk.key";
+const CONTRACT_FILENAME: &str = "ExitVerificationKey.sol";
+const CONTRACT_NAME: &str = "ExitVerificationKey";
+const CONTRACT_FUNCTION_NAME: &str = "getVkExitCircuit";
 
 fn main() {
     // let p_g = FixedGenerators::SpendingKeyGenerator;
@@ -27,14 +27,9 @@ fn main() {
     // let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
     let rng = &mut OsRng::new().unwrap();
 
-    let empty_transaction = Transaction {
+    let empty_request = ExitRequest {
         from: None,
-        to: None,
         amount: None,
-        fee: None,
-        nonce: None,
-        good_until_block: None,
-        signature: None,
     };
 
     let empty_leaf_witness = LeafWitness {
@@ -44,22 +39,20 @@ fn main() {
         pub_y: None,
     };
 
-    let empty_witness = TransactionWitness {
-        leaf_from: empty_leaf_witness.clone(),
-        auth_path_from: vec![None; plasma_constants::BALANCE_TREE_DEPTH],
-        leaf_to: empty_leaf_witness,
-        auth_path_to: vec![None; plasma_constants::BALANCE_TREE_DEPTH],
+    let empty_witness = ExitWitness {
+        leaf: empty_leaf_witness.clone(),
+        auth_path: vec![None; plasma_constants::BALANCE_TREE_DEPTH],
     };
 
-    let instance_for_generation: Transfer<'_, Bn256> = Transfer {
+    let instance_for_generation: Exit<'_, Bn256> = Exit {
         params: params,
-        number_of_transactions: TRANSFER_BATCH_SIZE,
+        number_of_exits: EXIT_BATCH_SIZE,
         old_root: None,
         new_root: None,
         public_data_commitment: None,
+        empty_leaf_witness: empty_leaf_witness.clone(),
         block_number: None,
-        total_fee: None,
-        transactions: vec![(empty_transaction, empty_witness); TRANSFER_BATCH_SIZE],
+        requests: vec![(empty_request, empty_witness); EXIT_BATCH_SIZE],
     };
 
     println!("generating setup...");
