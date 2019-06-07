@@ -20,7 +20,7 @@ use bellman::groth16::{
     create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
     VerifyingKey,
 };
-use crate::key_generator::vk_contract_generator::hardcode_vk;
+use crate::vk_contract_generator::hardcode_vk;
 
 use sapling_crypto::jubjub::FixedGenerators;
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};

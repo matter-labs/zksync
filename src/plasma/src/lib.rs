@@ -23,6 +23,4 @@
 // extern crate merkle_tree;
 
 pub mod state;
-pub mod key_generator;
-
 

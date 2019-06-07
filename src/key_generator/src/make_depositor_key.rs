@@ -8,7 +8,7 @@ use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
 
 use bellman::groth16::generate_random_parameters;
 
-use crate::key_generator::vk_contract_generator::generate_vk_contract;
+use crate::vk_contract_generator::generate_vk_contract;
 
 use circuit::deposit::circuit::{Deposit, DepositWitness};
 use circuit::deposit::deposit_request::DepositRequest;
