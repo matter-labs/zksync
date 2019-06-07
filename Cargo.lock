@@ -322,6 +322,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "circuit"
+version = "0.1.1"
+dependencies = [
+ "bellman_ce 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ff_ce 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "merkle_tree 0.1.1",
+ "models 0.0.1",
+ "pairing_ce 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sapling-crypto_ce 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "cloudabi"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1125,6 +1140,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "memoffset"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "merkle_tree"
+version = "0.1.1"
+dependencies = [
+ "ff_ce 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "models 0.0.1",
+ "pairing_ce 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rayon 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sapling-crypto_ce 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "mime"

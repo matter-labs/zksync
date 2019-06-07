@@ -2,7 +2,7 @@ use ff::{BitIterator, PrimeField};
 
 use sapling_crypto::jubjub::{edwards, edwards::Point, JubjubEngine, Unknown};
 
-use crate::models::params as plasma_constants;
+use models::plasma::params as plasma_constants;
 
 // This is deposit request
 

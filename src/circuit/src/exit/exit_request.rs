@@ -2,7 +2,7 @@ use ff::{BitIterator, PrimeField};
 
 use sapling_crypto::jubjub::JubjubEngine;
 
-use crate::models::params as plasma_constants;
+use models::plasma::params as plasma_constants;
 
 // This is an exit request
 

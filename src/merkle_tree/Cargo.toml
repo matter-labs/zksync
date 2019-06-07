@@ -1,0 +1,18 @@
+[package]
+name = "merkle_tree"
+version = "0.1.1"
+edition = "2018"
+
+authors = [
+    "Alex Gluchowski <alex@gluchowski.net>",
+    "Alex Vlasov <alex.m.vlasov@gmail.com>"
+]
+
+[dependencies]
+models = { path = "../models" }
+ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
+pairing = { package = "pairing_ce", version = "0.17.0" }
+sapling_crypto = { package = "sapling-crypto_ce", version = "0.0.5" }
+fnv = "1.0.3"
+rayon = "1.0.3"
+

@@ -3,22 +3,18 @@ use ff::{Field, PrimeField};
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 
 use sapling_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
+use sapling_crypto::circuit::{
+    boolean, ecc, num, pedersen_hash, sha256, Assignment,
+};
+use sapling_crypto::circuit::num::{AllocatedNum, Num};
+use sapling_crypto::circuit::baby_eddsa::EddsaSignature;
+use sapling_crypto::circuit::float_point::parse_with_exponent_le;
 
-use super::baby_eddsa::EddsaSignature;
-use super::boolean;
-use super::ecc;
-use super::float_point::parse_with_exponent_le;
-use super::num;
-use super::num::{AllocatedNum, Num};
-use super::pedersen_hash;
-use super::sha256;
-use super::Assignment;
-
-pub use super::super::leaf::LeafWitness;
-use super::super::leaf::{make_leaf_content, LeafContent};
-use super::transaction::{Transaction, TransactionContent};
-use crate::circuit::utils::{allocate_audit_path, append_packed_public_key};
-use crate::models::params as plasma_constants;
+pub use crate::leaf::LeafWitness;
+use crate::leaf::{make_leaf_content, LeafContent};
+use crate::transfer::transaction::{Transaction, TransactionContent};
+use models::plasma::circuit::utils::{allocate_audit_path, append_packed_public_key};
+use models::plasma::params as plasma_constants;
 
 #[derive(Clone)]
 pub struct TransactionWitness<E: JubjubEngine> {
@@ -1141,9 +1137,9 @@ where
 #[cfg(test)]
 mod test {
 
-    use super::super::float_point::convert_to_float;
+    use sapling_crypto::circuit::float_point::convert_to_float;
     use super::*;
-    use crate::circuit::utils::le_bit_vector_into_field_element;
+    use models::plasma::circuit::utils::le_bit_vector_into_field_element;
     use ff::{BitIterator, PrimeFieldRepr};
 
     #[test]
@@ -1160,15 +1156,16 @@ mod test {
 
     #[test]
     fn test_transfer_circuit_with_witness() {
-        use crate::models::circuit::{CircuitAccount, CircuitAccountTree};
+        use models::plasma::circuit::account::CircuitAccount;
+        use crate::CircuitAccountTree;
         use ff::Field;
         use pairing::bn256::*;
         use rand::{Rng, SeedableRng, XorShiftRng};
-        use sapling_crypto::alt_babyjubjub::{edwards, fs, AltJubjubBn256, PrimeOrder};
+        use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
         use sapling_crypto::circuit::test::*;
         use sapling_crypto::eddsa::{PrivateKey, PublicKey};
         // use super::super::account_tree::{AccountTree, Account};
-        use crate::circuit::utils::be_bit_vector_into_bytes;
+        use models::plasma::circuit::utils::be_bit_vector_into_bytes;
         use crypto::digest::Digest;
         use crypto::sha2::Sha256;
 
@@ -1222,7 +1219,7 @@ mod test {
 
             let fee: u128 = 0;
 
-            let fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
+            let _fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
 
             let fee_bits = convert_to_float(
                 fee,

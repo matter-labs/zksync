@@ -1,8 +1,8 @@
 // Sparse Merkle tree with batch updates
 
 use std::fmt::Debug;
-use super::hasher::Hasher;
-use super::super::primitives::GetBits;
+use crate::hasher::Hasher;
+use models::primitives::GetBits;
 use fnv::FnvHashMap;
 
 use std::time::Duration;

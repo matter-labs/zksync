@@ -4,17 +4,13 @@ use bellman::{Circuit, ConstraintSystem, SynthesisError};
 
 use sapling_crypto::jubjub::JubjubEngine;
 
-use super::boolean;
-use super::num;
-use super::num::{AllocatedNum, Num};
-use super::pedersen_hash;
-use super::sha256;
-use super::Assignment;
+use sapling_crypto::circuit::{boolean, num, pedersen_hash, sha256, Assignment};
+use sapling_crypto::circuit::num::{AllocatedNum, Num};
 
-use super::super::leaf::{make_leaf_content, LeafWitness};
-use super::exit_request::ExitRequest;
-use crate::circuit::utils::allocate_audit_path;
-use crate::models::params as plasma_constants;
+use crate::leaf::{make_leaf_content, LeafWitness};
+use crate::exit::exit_request::ExitRequest;
+use models::plasma::circuit::utils::allocate_audit_path;
+use models::plasma::params as plasma_constants;
 
 #[derive(Clone)]
 pub struct ExitWitness<E: JubjubEngine> {
@@ -378,20 +374,21 @@ mod test {
     use super::*;
     use ff::PrimeFieldRepr;
 
-    use sapling_crypto::jubjub::{edwards, FixedGenerators, JubjubParams, Unknown};
+    use sapling_crypto::jubjub::FixedGenerators;
 
     use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 
     #[test]
     fn test_exit_from_existing_leaf() {
-        use crate::models::circuit::{CircuitAccount, CircuitAccountTree};
+        use models::plasma::circuit::account::CircuitAccount;
+        use crate::CircuitAccountTree;
         use ff::{BitIterator, Field};
         use pairing::bn256::*;
         use rand::{Rng, SeedableRng, XorShiftRng};
-        use sapling_crypto::alt_babyjubjub::{edwards, fs, AltJubjubBn256, PrimeOrder};
+        use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
         use sapling_crypto::circuit::test::*;
         // use super::super::account_tree::{AccountTree, Account};
-        use crate::circuit::utils::be_bit_vector_into_bytes;
+        use models::plasma::circuit::utils::be_bit_vector_into_bytes;
 
         use crypto::digest::Digest;
         use crypto::sha2::Sha256;
@@ -519,7 +516,7 @@ mod test {
             let transaction_data = request.public_data_into_bits();
             packed_transaction_data.extend(transaction_data.clone().into_iter());
 
-            let leaf_bits = packed_transaction_data.clone();
+            let _leaf_bits = packed_transaction_data.clone();
 
             let packed_transaction_data_bytes = be_bit_vector_into_bytes(&packed_transaction_data);
 

@@ -1,12 +1,10 @@
 use sapling_crypto::jubjub::JubjubEngine;
+use sapling_crypto::circuit::{boolean, Assignment};
+use sapling_crypto::circuit::num::AllocatedNum;
 
-use super::boolean;
-use super::num::AllocatedNum;
-use super::Assignment;
 use bellman::{ConstraintSystem, SynthesisError};
-
-use crate::circuit::utils::append_packed_public_key;
-use crate::models::params as plasma_constants;
+use models::plasma::circuit::utils::append_packed_public_key;
+use models::plasma::params as plasma_constants;
 
 #[derive(Clone)]
 pub struct LeafWitness<E: JubjubEngine> {

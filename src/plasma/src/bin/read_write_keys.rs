@@ -11,7 +11,8 @@ use pairing::Engine;
 use rand::{Rng, SeedableRng, XorShiftRng};
 use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
 use sapling_crypto::circuit::test::*;
-use plasma::models::circuit::{CircuitAccountTree, CircuitAccount};
+use models::plasma::circuit::account::CircuitAccount;
+use circuit::CircuitAccountTree;
 use std::collections::HashMap;
 
 use bellman::Circuit;

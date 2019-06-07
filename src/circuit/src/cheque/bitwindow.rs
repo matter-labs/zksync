@@ -3,11 +3,9 @@ use ff::{Field, PrimeField};
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 
 use sapling_crypto::jubjub::JubjubEngine;
-
-use super::boolean;
-use super::num::{AllocatedNum, Num};
-use super::polynomial_lookup::{do_the_lookup, generate_powers};
-use super::Assignment;
+use sapling_crypto::circuit::{boolean, Assignment};
+use sapling_crypto::circuit::num::{AllocatedNum, Num};
+use sapling_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
 
 #[derive(Clone)]
 pub struct BitWindowWitness<E: JubjubEngine> {
@@ -469,7 +467,7 @@ mod test {
     fn test_redeem() {
         use pairing::bn256::*;
         use rand::{Rng, SeedableRng, XorShiftRng};
-        use sapling_crypto::alt_babyjubjub::{edwards, fs, AltJubjubBn256, PrimeOrder};
+        use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
         use sapling_crypto::circuit::test::*;
 
         let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
@@ -539,7 +537,7 @@ mod test {
     fn test_proof_generation() {
         use pairing::bn256::*;
         use rand::{Rng, SeedableRng, XorShiftRng};
-        use sapling_crypto::alt_babyjubjub::{edwards, fs, AltJubjubBn256, PrimeOrder};
+        use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
 
         use bellman::groth16::{
             create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
@@ -551,7 +549,7 @@ mod test {
 
         let bitfield_length = 128u128;
         let shift_length = 64u128;
-        let max_valid_distance = bitfield_length + shift_length - 1u128;
+        let _max_valid_distance = bitfield_length + shift_length - 1u128;
 
         let start = 0u128;
 

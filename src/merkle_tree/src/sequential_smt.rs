@@ -1,7 +1,7 @@
 // Sparse Merkle tree with flexible hashing strategy
 
-use super::super::primitives::GetBits;
-use super::hasher::Hasher;
+use models::primitives::GetBits;
+use crate::hasher::Hasher;
 use std::collections::HashMap;
 use std::fmt::Debug;
 
@@ -233,18 +233,6 @@ mod tests {
 
     #[derive(Debug)]
     struct TestHasher {}
-
-    impl GetBits for u64 {
-        fn get_bits_le(&self) -> Vec<bool> {
-            let mut acc = Vec::new();
-            let mut i = *self + 1;
-            for _ in 0..16 {
-                acc.push(i & 1 == 1);
-                i >>= 1;
-            }
-            acc
-        }
-    }
 
     impl Default for TestHasher {
         fn default() -> Self {

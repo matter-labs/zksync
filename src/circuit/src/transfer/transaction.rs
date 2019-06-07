@@ -1,16 +1,14 @@
 use ff::{BitIterator, PrimeField};
 
 use sapling_crypto::jubjub::{FixedGenerators, JubjubEngine};
-
-use super::boolean;
-use super::num::AllocatedNum;
-
+use sapling_crypto::circuit::boolean;
+use sapling_crypto::circuit::num::AllocatedNum;
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 
-use crate::circuit::utils::le_bit_vector_into_field_element;
-use crate::models::params as plasma_constants;
+use models::plasma::circuit::utils::le_bit_vector_into_field_element;
+use models::plasma::params as plasma_constants;
 
-use crate::models::circuit::sig::TransactionSignature;
+use models::plasma::circuit::sig::TransactionSignature;
 // This is transaction data
 
 #[derive(Clone)]
