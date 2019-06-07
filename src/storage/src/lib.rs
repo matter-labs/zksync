@@ -1,15 +1,51 @@
-use plasma;
-
 #[macro_use]
 extern crate diesel;
-
-use serde_json;
+extern crate models;
+extern crate fnv;
+extern crate serde;
+extern crate serde_derive;
+extern crate serde_json;
+extern crate web3;
+extern crate bigdecimal;
+extern crate ff;
+extern crate chrono;
 
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
-use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
-use plasma::models::*;
+use models::{
+    Action,
+    ActionType, 
+    EncodedProof, 
+    Operation, 
+    TxMeta, 
+    ACTION_COMMIT, 
+    ACTION_VERIFY,
+};
+use models::plasma::{
+    Fr, 
+    AccountMap, 
+    BlockNumber, 
+    Nonce,
+    AccountId,
+};
+use models::plasma::block::Block;
+use models::plasma::tx::{
+    TransactionType, 
+    TransferTx, 
+    DepositTx, 
+    ExitTx, 
+    TxSignature,
+    TRANSFER_TX,
+    DEPOSIT_TX,
+    EXIT_TX,
+};
+use models::plasma::tx::TransactionType::{
+    Transfer,
+    Deposit,
+    Exit,
+};
+use models::plasma::block::BlockData;
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
 
@@ -57,7 +93,7 @@ impl ConnectionPool {
 
 #[derive(Insertable, QueryableByName, Queryable)]
 #[table_name = "accounts"]
-struct Account {
+struct StorageAccount {
     pub id: i32,
     pub last_block: i32,
     pub data: Value,
@@ -65,7 +101,7 @@ struct Account {
 
 #[derive(Insertable, Queryable, QueryableByName)]
 #[table_name = "account_updates"]
-struct AccountUpdate {
+struct StorageAccountUpdate {
     pub account_id: i32,
     pub data: Value,
     pub block_number: i32,
@@ -158,15 +194,15 @@ pub struct StoredTx {
 }
 
 impl StoredTx {
-    pub fn into_tx(&self) -> QueryResult<tx::TransactionType> {
+    pub fn into_tx(&self) -> QueryResult<TransactionType> {
         let res = match &self.tx_type {
-            t if t == tx::TRANSFER_TX => tx::TransactionType::Transfer {
+            t if t == TRANSFER_TX => Transfer {
                 tx: self.into_transfer_transaction(),
             },
-            d if d == tx::DEPOSIT_TX => tx::TransactionType::Deposit {
+            d if d == DEPOSIT_TX => Deposit {
                 tx: self.into_deposit_transaction(),
             },
-            e if e == tx::EXIT_TX => tx::TransactionType::Exit {
+            e if e == EXIT_TX => Exit {
                 tx: self.into_exit_transaction(),
             },
             _ => return Err(Error::NotFound),
@@ -471,7 +507,7 @@ impl StorageProcessor {
                 account_id, block_number
             );
             let inserted = diesel::insert_into(account_updates::table)
-                .values(&AccountUpdate {
+                .values(&StorageAccountUpdate {
                     account_id: account_id as i32,
                     block_number: block_number as i32,
                     data: to_value(a).unwrap(),
@@ -569,7 +605,7 @@ impl StorageProcessor {
     fn load_state(&self, query: &str) -> QueryResult<(u32, AccountMap)> {
         let r = diesel::sql_query(query)
             .load(self.conn())
-            .map(|accounts: Vec<Account>| {
+            .map(|accounts: Vec<StorageAccount>| {
                 let last_block = accounts
                     .iter()
                     .map(|a| a.last_block as u32)
@@ -798,7 +834,7 @@ impl StorageProcessor {
     pub fn last_committed_state_for_account(
         &self,
         account_id: AccountId,
-    ) -> QueryResult<Option<plasma::models::Account>> {
+    ) -> QueryResult<Option<models::plasma::account::Account>> {
         let query = format!(
             "
             SELECT account_id AS id, block_number AS last_block, data
@@ -810,19 +846,19 @@ impl StorageProcessor {
         let r = diesel::sql_query(query)
             .get_result(self.conn())
             .optional()?;
-        Ok(r.map(|acc: Account| serde_json::from_value(acc.data).unwrap()))
+        Ok(r.map(|acc: StorageAccount| serde_json::from_value(acc.data).unwrap()))
     }
 
     pub fn last_verified_state_for_account(
         &self,
         account_id: AccountId,
-    ) -> QueryResult<Option<plasma::models::Account>> {
+    ) -> QueryResult<Option<models::plasma::account::Account>> {
         use crate::schema::accounts::dsl::*;
         let mut r = accounts
             .filter(id.eq(account_id as i32))
             .load(self.conn())?;
         Ok(r.pop()
-            .map(|acc: Account| serde_json::from_value(acc.data).unwrap()))
+            .map(|acc: StorageAccount| serde_json::from_value(acc.data).unwrap()))
     }
 
     pub fn count_outstanding_proofs(&self, after_block: BlockNumber) -> QueryResult<u32> {
@@ -1048,7 +1084,7 @@ mod test {
     use bigdecimal::Num;
     use diesel::Connection;
     use ff::Field;
-    use plasma::models;
+    use web3::types::U256;
     //use diesel::RunQueryDsl;
 
     #[test]
@@ -1082,7 +1118,7 @@ mod test {
 
         let mut accounts = fnv::FnvHashMap::default();
         let acc = |balance| {
-            let mut a = models::Account::default();
+            let mut a = models::plasma::account::Account::default();
             a.balance = BigDecimal::from(balance);
             a
         };
@@ -1100,11 +1136,11 @@ mod test {
         let (last_block, state) = conn.load_committed_state().unwrap();
         assert_eq!(last_block, 1);
         assert_eq!(
-            state.into_iter().collect::<Vec<(u32, models::Account)>>(),
+            state.into_iter().collect::<Vec<(u32, models::plasma::account::Account)>>(),
             accounts
                 .clone()
                 .into_iter()
-                .collect::<Vec<(u32, models::Account)>>()
+                .collect::<Vec<(u32, models::plasma::account::Account)>>()
         );
 
         // now apply commitment
@@ -1113,11 +1149,11 @@ mod test {
         // verified state must be equal the commitment
         let (_, state) = conn.load_verified_state().unwrap();
         assert_eq!(
-            state.into_iter().collect::<Vec<(u32, models::Account)>>(),
+            state.into_iter().collect::<Vec<(u32, models::plasma::account::Account)>>(),
             accounts
                 .clone()
                 .into_iter()
-                .collect::<Vec<(u32, models::Account)>>()
+                .collect::<Vec<(u32, models::plasma::account::Account)>>()
         );
 
         let (_, state) = conn.load_state_diff(1, 2).expect("load_state_diff failed");
@@ -1146,8 +1182,6 @@ mod test {
         assert_eq!(reverse.get(&2).unwrap(), &acc(2));
     }
 
-    use plasma::models::{Block, BlockData, U256};
-
     #[test]
     fn test_store_txs() {
         let pool = ConnectionPool::new();
@@ -1157,7 +1191,7 @@ mod test {
 
         let mut accounts = fnv::FnvHashMap::default();
         let acc = |balance| {
-            let mut a = models::Account::default();
+            let mut a = models::plasma::account::Account::default();
             a.balance = BigDecimal::from(balance);
             a
         };
