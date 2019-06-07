@@ -1507,6 +1507,7 @@ dependencies = [
  "bellman_ce 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bigdecimal 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "circuit 0.1.1",
  "diesel 1.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "ff_ce 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",

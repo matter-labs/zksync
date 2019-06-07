@@ -3,7 +3,7 @@ use super::models::*;
 use super::storage::{ConnectionPool, StorageProcessor};
 use eth_client::{ETHClient, TxMeta, TEST_PLASMA_ALWAYS_VERIFY};
 use ff::{PrimeField, PrimeFieldRepr};
-use plasma::models::{params, AccountMap, Block, BlockData};
+use models::plasma::{params, AccountMap, Block, BlockData};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use web3::types::{H256, U128, U256};
 

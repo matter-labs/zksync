@@ -1,5 +1,6 @@
 extern crate models;
 extern crate plasma;
+extern crate circuit;
 extern crate rustc_hex;
 extern crate storage;
 extern crate tokio;
@@ -39,32 +40,42 @@ use bellman::groth16::{
     create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
 };
 
-use plasma::models::circuit::{CircuitAccount, CircuitAccountTree};
-use plasma::models::{params, Block, PlasmaState};
-use plasma::models::{
-    AccountId, BlockData, BlockNumber, DepositTx, Engine, ExitTx, Fr, TransferTx,
+use circuit::CircuitAccountTree;
+use models::plasma::circuit::account::CircuitAccount;
+use models::plasma::block::Block;
+use plasma::state::PlasmaState;
+use models::plasma::params;
+use models::plasma::{
+    AccountId, 
+    BlockNumber, 
+    Engine, 
+    Fr,
 };
+use models::plasma::tx::{DepositTx, TransferTx, ExitTx};
+use models::plasma::block::{BlockData};
 
 use models::config::{
     DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE, PROVER_CYCLE_WAIT, PROVER_TIMEOUT, PROVER_TIMER_TICK,
     RUNTIME_CONFIG,
 };
-use models::encoder;
+use circuit::encoder;
 use models::EncodedProof;
 use storage::StorageProcessor;
 
-use plasma::circuit::deposit::circuit::{Deposit, DepositWitness};
-use plasma::circuit::deposit::deposit_request::DepositRequest;
-use plasma::circuit::exit::circuit::{Exit, ExitWitness};
-use plasma::circuit::exit::exit_request::ExitRequest;
-use plasma::circuit::leaf::LeafWitness;
-use plasma::circuit::transfer::transaction::Transaction;
-use plasma::circuit::utils::be_bit_vector_into_bytes;
+use circuit::deposit::circuit::{Deposit, DepositWitness};
+use circuit::deposit::deposit_request::DepositRequest;
+use circuit::exit::circuit::{Exit, ExitWitness};
+use circuit::exit::exit_request::ExitRequest;
+use circuit::leaf::LeafWitness;
+use circuit::transfer::transaction::Transaction;
+use models::plasma::circuit::utils::be_bit_vector_into_bytes;
 
-use plasma::circuit::transfer::circuit::{TransactionWitness, Transfer};
+use circuit::transfer::circuit::{TransactionWitness, Transfer};
 
-use plasma::primitives::{
-    field_element_to_u32, serialize_g1_for_ethereum, serialize_g2_for_ethereum,
+use models::primitives::{
+    field_element_to_u32, 
+    serialize_g1_for_ethereum, 
+    serialize_g2_for_ethereum,
 };
 
 pub struct Prover<E: JubjubEngine> {
@@ -153,7 +164,7 @@ fn read_parameters(file_name: &str) -> Result<BabyParameters, BabyProverErr> {
     Ok(circuit_params.unwrap())
 }
 
-fn extend_accounts<I: Sized + Iterator<Item = (AccountId, plasma::models::Account)>>(
+fn extend_accounts<I: Sized + Iterator<Item = (AccountId, models::plasma::Account)>>(
     tree: &mut CircuitAccountTree,
     accounts: I,
 ) {
@@ -362,7 +373,7 @@ impl BabyProver {
         let initial_root = self.accounts_tree.root_hash();
 
         for tx in transactions {
-            let tx = plasma::models::circuit::CircuitTransferTx::try_from(tx)
+            let tx = circuit::CircuitTransferTx::try_from(tx)
                 .map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
             let sender_leaf_number = field_element_to_u32(tx.from);
             let recipient_leaf_number = field_element_to_u32(tx.to);
@@ -697,7 +708,7 @@ impl BabyProver {
         let initial_root = self.accounts_tree.root_hash();
 
         for tx in transactions {
-            let tx = plasma::models::circuit::CircuitDepositRequest::try_from(tx)
+            let tx = circuit::CircuitDepositRequest::try_from(tx)
                 .map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
 
             let into_leaf_number = field_element_to_u32(tx.into);
@@ -942,7 +953,7 @@ impl BabyProver {
         let mut public_data: Vec<u8> = vec![];
 
         for tx in transactions {
-            let tx = plasma::models::circuit::CircuitExitRequest::try_from(tx)
+            let tx = circuit::CircuitExitRequest::try_from(tx)
                 .map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
 
             let from_leaf_number = field_element_to_u32(tx.from);
@@ -1247,7 +1258,7 @@ impl BabyProver {
 
 // fn test_exit_encoding() {
 //     extern crate BigDecimal;
-//     use plasma::models::ExitTx;
+//     use models::plasma::ExitTx;
 //     use self::BigDecimal::from_primitive;
 //     let exit_tx = ExitTx {
 //         account: 2,

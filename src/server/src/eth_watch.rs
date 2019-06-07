@@ -5,8 +5,8 @@ use ff::{Field, PrimeField, PrimeFieldRepr};
 
 use super::models::{ProtoBlock, StateKeeperRequest};
 use bigdecimal::{BigDecimal, Num};
-use plasma::models::params;
-use plasma::models::{Block, BlockData, DepositTx, Engine, ExitTx, Fr};
+use models::plasma::params;
+use models::plasma::{Block, BlockData, DepositTx, Engine, ExitTx, Fr};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::str::FromStr;

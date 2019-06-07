@@ -11,7 +11,7 @@ use actix_web::{
 };
 use chrono::prelude::*;
 use models::config::RUNTIME_CONFIG;
-use plasma::models::{Account, Nonce, PublicKey, TransferTx};
+use models::plasma::{Account, Nonce, PublicKey, TransferTx};
 use std::sync::mpsc;
 
 use futures::Future;

@@ -10,7 +10,7 @@ use std::str::FromStr;
 use std::thread;
 use web3::types::{H256, U128, U256};
 
-use plasma::models::{self, *};
+use models::plasma::{self, *};
 
 use super::config;
 use super::models::{
