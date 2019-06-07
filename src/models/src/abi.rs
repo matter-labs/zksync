@@ -1,4 +1,4 @@
-type ABI = (&'static [u8], &'static str);
+pub type ABI = (&'static [u8], &'static str);
 
 pub const TEST_PLASMA_ALWAYS_VERIFY: ABI = (
     include_bytes!("../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.abi"),

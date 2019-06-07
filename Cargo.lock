@@ -666,6 +666,7 @@ dependencies = [
  "ethereum-tx-sign 0.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "ethereum-types 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "models 0.0.1",
  "reqwest 0.9.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "rlp 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "secp256k1 0.11.6 (registry+https://github.com/rust-lang/crates.io-index)",

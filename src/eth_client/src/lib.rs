@@ -3,7 +3,7 @@ use reqwest;
 
 #[macro_use]
 extern crate serde_derive;
-extern crate models::{ABI, TEST_PLASMA_ALWAYS_VERIFY}
+extern crate models;
 
 mod signer;
 
@@ -14,6 +14,9 @@ use web3::contract::tokens::Tokenize;
 // used
 use std::env;
 use std::str::FromStr;
+
+use models::TxMeta;
+use models::abi::ABI;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -243,6 +246,8 @@ fn test_eth() {
 
 #[test]
 fn test_encoding() {
+    use models::abi::TEST_PLASMA_ALWAYS_VERIFY;
+    
     let contract = ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap();
     let f = contract
         .function("commitDepositBlock")
