@@ -2,6 +2,8 @@ extern crate chrono;
 extern crate eth_client;
 extern crate models;
 extern crate storage;
+extern crate circuit;
+extern crate plasma;
 
 pub mod api_server;
 pub mod committer;
@@ -11,8 +13,6 @@ mod nonce_futures;
 pub mod state_keeper;
 
 pub use models::config;
-
-extern crate plasma;
 
 extern crate crypto;
 extern crate ff;

@@ -2012,6 +2012,7 @@ dependencies = [
  "actix-web 0.7.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "bigdecimal 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "circuit 0.1.1",
  "diesel 1.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "eth_client 0.1.0",
  "ethabi 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -1,9 +1,13 @@
 use super::config;
 use super::models::*;
 use super::storage::{ConnectionPool, StorageProcessor};
-use eth_client::{ETHClient, TxMeta, TEST_PLASMA_ALWAYS_VERIFY};
+use models::abi::TEST_PLASMA_ALWAYS_VERIFY;
+use models::TxMeta;
+use eth_client::ETHClient;
 use ff::{PrimeField, PrimeFieldRepr};
-use models::plasma::{params, AccountMap, Block, BlockData};
+use models::plasma::{params, AccountMap};
+use models::plasma::block::{Block, BlockData};
+use circuit::encoder;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use web3::types::{H256, U128, U256};
 

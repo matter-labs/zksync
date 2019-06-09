@@ -9,8 +9,22 @@ use std::collections::{HashMap, VecDeque};
 use std::str::FromStr;
 use std::thread;
 use web3::types::{H256, U128, U256};
-
-use models::plasma::{self, *};
+use plasma::state::PlasmaState;
+use models::plasma::{
+    AccountMap,
+    BatchNumber,
+    AccountId
+};
+use models::plasma::tx::{
+    TransferTx,
+    DepositTx,
+    ExitTx
+};
+use models::plasma::block::{
+    BlockData,
+    Block
+};
+use models::plasma::account::Account;
 
 use super::config;
 use super::models::{
