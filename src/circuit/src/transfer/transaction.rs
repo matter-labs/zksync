@@ -1,13 +1,10 @@
 use ff::{BitIterator, PrimeField};
-
 use sapling_crypto::jubjub::{FixedGenerators, JubjubEngine};
 use sapling_crypto::circuit::boolean;
 use sapling_crypto::circuit::num::AllocatedNum;
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
-
 use models::plasma::circuit::utils::le_bit_vector_into_field_element;
 use models::plasma::params as plasma_constants;
-
 use models::plasma::circuit::sig::TransactionSignature;
 // This is transaction data
 

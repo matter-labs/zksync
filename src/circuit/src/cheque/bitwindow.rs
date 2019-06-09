@@ -1,7 +1,5 @@
 use ff::{Field, PrimeField};
-
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
-
 use sapling_crypto::jubjub::JubjubEngine;
 use sapling_crypto::circuit::{boolean, Assignment};
 use sapling_crypto::circuit::num::{AllocatedNum, Num};

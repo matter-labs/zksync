@@ -1,6 +1,6 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
-use super::models::{
+use models::{
     ActionType, NetworkStatus, Operation, StateKeeperRequest, TransferTxConfirmation,
 };
 use super::nonce_futures::{NonceFutures, NonceReadyFuture};

@@ -1,6 +1,7 @@
-use super::models::{Action, CommitRequest, Operation, ProverRequest};
-use super::storage::{ConnectionPool, StorageProcessor};
-use eth_client::{ETHClient, TxMeta, TEST_PLASMA_ALWAYS_VERIFY};
+use models::{Action, CommitRequest, Operation, ProverRequest, TxMeta};
+use models::abi::TEST_PLASMA_ALWAYS_VERIFY;
+use storage::{ConnectionPool, StorageProcessor};
+use eth_client::ETHClient;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::time::Duration;

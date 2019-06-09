@@ -1,13 +1,7 @@
-extern crate models;
-extern crate ff;
-extern crate pairing;
-extern crate sapling_crypto;
-extern crate fnv;
-extern crate rayon;
-
 pub mod hasher;
 pub mod pedersen_hasher;
 pub mod sequential_smt;
+pub mod parallel_smt;
 
 use models::plasma::account::Account;
 use models::plasma::{Fr, Engine};

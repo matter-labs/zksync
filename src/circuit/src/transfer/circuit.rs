@@ -1,7 +1,5 @@
 use ff::{Field, PrimeField};
-
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
-
 use sapling_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
 use sapling_crypto::circuit::{
     boolean, ecc, num, pedersen_hash, sha256, Assignment,
@@ -9,7 +7,6 @@ use sapling_crypto::circuit::{
 use sapling_crypto::circuit::num::{AllocatedNum, Num};
 use sapling_crypto::circuit::baby_eddsa::EddsaSignature;
 use sapling_crypto::circuit::float_point::parse_with_exponent_le;
-
 pub use crate::leaf::LeafWitness;
 use crate::leaf::{make_leaf_content, LeafContent};
 use crate::transfer::transaction::{Transaction, TransactionContent};

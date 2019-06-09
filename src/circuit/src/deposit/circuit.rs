@@ -1,11 +1,8 @@
 use ff::{Field, PrimeField};
-
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
-
 use sapling_crypto::jubjub::JubjubEngine;
 use sapling_crypto::circuit::{boolean, ecc, num, pedersen_hash, sha256, Assignment};
 use sapling_crypto::circuit::num::{AllocatedNum, Num};
-
 use crate::leaf::{make_leaf_content, LeafWitness};
 use crate::deposit::deposit_request::DepositRequest;
 use models::plasma::circuit::utils::{allocate_audit_path, append_packed_public_key};

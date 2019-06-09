@@ -1129,6 +1129,7 @@ dependencies = [
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "models 0.0.1",
  "pairing_ce 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rayon 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "sapling-crypto_ce 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]

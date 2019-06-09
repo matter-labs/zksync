@@ -1,9 +1,3 @@
-#![allow(proc_macro_derive_resolution_fallback)]
-#![allow(dead_code)]
-#![allow(unused_variables)]
-#![allow(unused_imports)]
-#![allow(unused)]
-
 extern crate chrono;
 extern crate eth_client;
 extern crate models;

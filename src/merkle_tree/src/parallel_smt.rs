@@ -5,9 +5,8 @@ use crate::hasher::Hasher;
 use models::primitives::GetBits;
 use fnv::FnvHashMap;
 
-use std::time::Duration;
-
-use rayon::prelude::*;
+// use std::time::Duration;
+// use rayon::prelude::*;
 
 fn select<T>(condition: bool, a: T, b: T) -> (T, T) {
     if condition { (a, b) } else { (b, a) }

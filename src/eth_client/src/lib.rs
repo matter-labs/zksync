@@ -1,22 +1,17 @@
-use hex;
-use reqwest;
-
 #[macro_use]
 extern crate serde_derive;
-extern crate models;
 
-mod signer;
-
+use hex;
+use reqwest;
 use ethereum_types::{H160, H256, U256};
 use reqwest::header::CONTENT_TYPE;
 use web3::contract::tokens::Tokenize;
-
-// used
 use std::env;
 use std::str::FromStr;
-
 use models::TxMeta;
 use models::abi::ABI;
+
+pub mod signer;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 

@@ -1,12 +1,3 @@
-extern crate pairing;
-extern crate merkle_tree;
-extern crate models;
-extern crate crypto;
-extern crate bellman;
-extern crate sapling_crypto;
-extern crate ff;
-extern crate rand;
-
 pub mod cheque;
 pub mod deposit;
 pub mod exit;

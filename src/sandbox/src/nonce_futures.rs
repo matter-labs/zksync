@@ -2,10 +2,8 @@ use future::Shared;
 use futures::task::{self, Task};
 use futures::{Async, Future, Poll};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, RwLock};
-use std::time::{Duration, Instant};
+use std::sync::{Arc, RwLock};
 use tokio::prelude::*;
-use tokio::timer::{self, Interval};
 
 pub struct NonceReadyFuture {
     account: u32,
@@ -16,8 +14,6 @@ pub struct NonceReadyFuture {
 
 #[derive(Clone, Debug)]
 pub struct CurrentNonceIsHigher;
-
-type NonceFuture = Future<Item = (), Error = CurrentNonceIsHigher>;
 
 #[derive(Default, Clone)]
 struct Data {
