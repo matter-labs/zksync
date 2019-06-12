@@ -1,34 +1,36 @@
-extern crate server;
-extern crate storage;
 extern crate models;
+extern crate server;
 extern crate signal_hook;
+extern crate storage;
 
 //use tokio::runtime::Runtime;
 
-use std::sync::mpsc::{channel};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use server::state_keeper::{PlasmaStateKeeper, start_state_keeper};
 use server::api_server::start_api_server;
 use server::committer::start_committer;
 use server::eth_sender;
-use server::eth_watch::{EthWatch, start_eth_watch};
+use server::eth_watch::{start_eth_watch, EthWatch};
+use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
 
+use models::{config, StateKeeperRequest};
 use storage::ConnectionPool;
-use models::{StateKeeperRequest, config};
 
 fn main() {
-
     println!("starting server");
 
     // handle ctrl+c
     let stop_signal = Arc::new(AtomicBool::new(false));
-    signal_hook::flag::register(signal_hook::SIGTERM, Arc::clone(&stop_signal)).expect("Error setting SIGTERM handler");
-    signal_hook::flag::register(signal_hook::SIGINT, Arc::clone(&stop_signal)).expect("Error setting SIGINT handler");
-    signal_hook::flag::register(signal_hook::SIGQUIT, Arc::clone(&stop_signal)).expect("Error setting SIGQUIT handler");
+    signal_hook::flag::register(signal_hook::SIGTERM, Arc::clone(&stop_signal))
+        .expect("Error setting SIGTERM handler");
+    signal_hook::flag::register(signal_hook::SIGINT, Arc::clone(&stop_signal))
+        .expect("Error setting SIGINT handler");
+    signal_hook::flag::register(signal_hook::SIGQUIT, Arc::clone(&stop_signal))
+        .expect("Error setting SIGQUIT handler");
 
     // create main tokio runtime
     //let rt = Runtime::new().unwrap();
@@ -37,12 +39,20 @@ fn main() {
     let state_keeper = PlasmaStateKeeper::new(connection_pool.clone());
     let eth_watch = EthWatch::new(0, 0, connection_pool.clone());
 
-    let storage = connection_pool.access_storage().expect("db connection failed for committer");
-    let contract_addr = storage.load_config().expect("can not load server_config")
-        .contract_addr.expect("contract_addr empty in server_config");
+    let storage = connection_pool
+        .access_storage()
+        .expect("db connection failed for committer");
+    let contract_addr = storage
+        .load_config()
+        .expect("can not load server_config")
+        .contract_addr
+        .expect("contract_addr empty in server_config");
     if contract_addr != config::RUNTIME_CONFIG.contract_addr {
-        panic!("Contract addresses mismatch! From DB = {}, from env = {}", 
-            contract_addr, config::RUNTIME_CONFIG.contract_addr);
+        panic!(
+            "Contract addresses mismatch! From DB = {}, from env = {}",
+            contract_addr,
+            config::RUNTIME_CONFIG.contract_addr
+        );
     }
     drop(storage);
 
@@ -64,12 +74,15 @@ fn main() {
     // start_prover(connection_pool.clone(), "worker 3");
 
     // Simple timer, pings every 100 ms
-    thread::Builder::new().name("timer".to_string()).spawn(move || {
-        loop {
-            tx_for_state.send(StateKeeperRequest::TimerTick).expect("tx_for_state channel failed");
+    thread::Builder::new()
+        .name("timer".to_string())
+        .spawn(move || loop {
+            tx_for_state
+                .send(StateKeeperRequest::TimerTick)
+                .expect("tx_for_state channel failed");
             thread::sleep(Duration::from_millis(100));
-        }
-    }).expect("thread creation failed");
+        })
+        .expect("thread creation failed");
 
     while !stop_signal.load(Ordering::SeqCst) {
         thread::sleep(Duration::from_secs(1));

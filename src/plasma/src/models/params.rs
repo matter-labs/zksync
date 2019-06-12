@@ -21,7 +21,7 @@ pub const SIGNATURE_S_BIT_WIDTH: usize = 256;
 pub const SIGNATURE_R_X_BIT_WIDTH: usize = 256;
 pub const SIGNATURE_R_Y_BIT_WIDTH: usize = 256;
 
-// Fr element encoding 
+// Fr element encoding
 pub const FR_BIT_WIDTH: usize = 256;
 
 // this account does NOT have a public key, so can not spend
@@ -37,4 +37,3 @@ use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
 }
-

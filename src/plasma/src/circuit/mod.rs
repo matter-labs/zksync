@@ -1,15 +1,11 @@
 use sapling_crypto;
 
-use sapling_crypto::circuit::{
-    Assignment,
-    boolean,
-    num,
-};
+use sapling_crypto::circuit::{boolean, num, Assignment};
 
-pub mod transfer;
+pub mod account_tree;
+pub mod cheque;
 pub mod deposit;
 pub mod exit;
-pub mod cheque;
-pub mod utils;
 pub mod leaf;
-pub mod account_tree;
+pub mod transfer;
+pub mod utils;

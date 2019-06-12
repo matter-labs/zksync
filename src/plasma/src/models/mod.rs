@@ -1,20 +1,20 @@
-pub mod params;
 pub mod account;
-pub mod state;
 pub mod circuit;
+pub mod params;
+pub mod state;
 pub mod tx;
 
-pub use web3::types::{U256, U128, H256};
+pub use web3::types::{H256, U128, U256};
 
 use bigdecimal::BigDecimal;
 
+use crate::merkle_tree::{PedersenHasher, SparseMerkleTree};
 use pairing::bn256;
-use crate::merkle_tree::{SparseMerkleTree, PedersenHasher};
 use sapling_crypto::eddsa;
 
 pub use self::account::Account;
-pub use self::tx::{TransferTx, DepositTx, ExitTx, TxSignature};
 pub use self::state::PlasmaState;
+pub use self::tx::{DepositTx, ExitTx, TransferTx, TxSignature};
 
 pub type Engine = bn256::Bn256;
 pub type Fr = bn256::Fr;
@@ -33,21 +33,21 @@ pub type Nonce = u32;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum BlockData {
-    Transfer{
+    Transfer {
         //#[serde(skip)]
-        transactions:   Vec<TransferTx>,
-        total_fees:     BigDecimal,
+        transactions: Vec<TransferTx>,
+        total_fees: BigDecimal,
     },
-    Deposit{
+    Deposit {
         //#[serde(skip)]
-        transactions: Vec<DepositTx>, 
+        transactions: Vec<DepositTx>,
         batch_number: BatchNumber,
     },
-    Exit{
+    Exit {
         //#[serde(skip)]
-        transactions: Vec<ExitTx>, 
+        transactions: Vec<ExitTx>,
         batch_number: BatchNumber,
-    }
+    },
 }
 
 // #[derive(Clone, Serialize, Deserialize)]
@@ -65,9 +65,9 @@ pub enum BlockData {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Block {
-    pub block_number:   BlockNumber,
-    pub new_root_hash:  Fr,
-    pub block_data:     BlockData,
+    pub block_number: BlockNumber,
+    pub new_root_hash: Fr,
+    pub block_data: BlockData,
 }
 
 #[derive(Debug)]

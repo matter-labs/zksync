@@ -3,31 +3,32 @@ use crate::models::params;
 use bigdecimal::{BigDecimal, Zero};
 
 pub struct PlasmaState {
-
     /// Accounts stored in a sparse Merkle tree
     pub balance_tree: AccountTree,
 
     /// Current block number
     pub block_number: u32,
-    
 }
 
 impl PlasmaState {
-    
     pub fn new(accounts: AccountMap, current_block: u32) -> Self {
         let tree_depth = params::BALANCE_TREE_DEPTH as u32;
         let mut balance_tree = AccountTree::new(tree_depth);
         for (id, account) in accounts {
             balance_tree.insert(id, account);
         }
-        Self{
+        Self {
             balance_tree,
             block_number: current_block,
         }
     }
 
     pub fn get_accounts(&self) -> Vec<(u32, Account)> {
-        self.balance_tree.items.iter().map(|a| (*a.0 as u32, a.1.clone()) ).collect()
+        self.balance_tree
+            .items
+            .iter()
+            .map(|a| (*a.0 as u32, a.1.clone()))
+            .collect()
     }
 
     pub fn root_hash(&self) -> Fr {
@@ -38,33 +39,39 @@ impl PlasmaState {
         self.balance_tree.items.get(&account_id).cloned()
     }
 
-    pub fn apply_transfer(&mut self, tx: &TransferTx) -> Result<BigDecimal, TransferApplicationError> {
+    pub fn apply_transfer(
+        &mut self,
+        tx: &TransferTx,
+    ) -> Result<BigDecimal, TransferApplicationError> {
         if let Some(mut from) = self.balance_tree.items.get(&tx.from).cloned() {
             // TODO: take from `from` instead and uncomment below
-            let pub_key = self.get_account(tx.from).and_then(|a| a.get_pub_key()).ok_or(TransferApplicationError::UnknownSigner)?;
+            let pub_key = self
+                .get_account(tx.from)
+                .and_then(|a| a.get_pub_key())
+                .ok_or(TransferApplicationError::UnknownSigner)?;
             if let Some(verified_against) = tx.cached_pub_key.as_ref() {
-                if pub_key.0 != verified_against.0 { 
+                if pub_key.0 != verified_against.0 {
                     return Err(TransferApplicationError::InvalidSigner);
                 }
             } else {
                 return Err(TransferApplicationError::InvalidSigner);
             }
-            
+
             let mut transacted_amount = BigDecimal::zero();
             transacted_amount += &tx.amount;
             transacted_amount += &tx.fee;
 
-            if tx.nonce > from.nonce { 
+            if tx.nonce > from.nonce {
                 //println!("Nonce is too high");
-                return Err(TransferApplicationError::NonceIsTooHigh); 
+                return Err(TransferApplicationError::NonceIsTooHigh);
             } else if tx.nonce < from.nonce {
                 //println!("Nonce is too low");
-                return Err(TransferApplicationError::NonceIsTooLow); 
+                return Err(TransferApplicationError::NonceIsTooLow);
             }
 
-            if from.balance < transacted_amount { 
+            if from.balance < transacted_amount {
                 //println!("Insufficient balance");
-                return Err(TransferApplicationError::InsufficientBalance); 
+                return Err(TransferApplicationError::InsufficientBalance);
             }
 
             if tx.good_until_block < self.block_number {
@@ -76,7 +83,7 @@ impl PlasmaState {
 
             // allow to send to non-existing accounts
             // let mut to = self.balance_tree.items.get(&tx.to).ok_or(())?.clone();
-            
+
             let mut to = Account::default();
             if let Some(existing_to) = self.balance_tree.items.get(&tx.to) {
                 to = existing_to.clone();
@@ -119,7 +126,6 @@ impl PlasmaState {
     }
 
     pub fn apply_exit(&mut self, tx: &ExitTx) -> Result<ExitTx, ()> {
-
         let acc = self.balance_tree.items.get(&tx.account).ok_or(())?.clone();
 
         let mut agumented_tx = tx.clone();
@@ -132,5 +138,4 @@ impl PlasmaState {
 
         Ok(agumented_tx)
     }
-
 }
