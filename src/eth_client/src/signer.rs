@@ -29,7 +29,7 @@ pub struct RawTransaction {
     pub data: Vec<u8>,
 }
 
-fn find_first_nonzero(vector: &Vec<u8>) -> usize {
+fn find_first_nonzero(vector: &[u8]) -> usize {
     let mut result: usize = 0;
     for el in vector {
         if *el == 0 {
@@ -69,9 +69,9 @@ impl RawTransaction {
         let mut hash = RlpStream::new();
         hash.begin_unbounded_list();
         self.encode(&mut hash);
-        hash.append(&mut vec![self.chain_id]);
-        hash.append(&mut U256::zero());
-        hash.append(&mut U256::zero());
+        hash.append(&vec![self.chain_id]);
+        hash.append(&U256::zero());
+        hash.append(&U256::zero());
         hash.complete_unbounded_list();
         keccak256_hash(&hash.out())
     }
@@ -91,7 +91,7 @@ impl RawTransaction {
 }
 
 fn keccak256_hash(bytes: &[u8]) -> Vec<u8> {
-    keccak256(bytes).into_iter().cloned().collect()
+    keccak256(bytes).iter().cloned().collect()
 }
 
 fn ecdsa_sign(hash: &[u8], private_key: &[u8], chain_id: u8) -> EcdsaSig {
