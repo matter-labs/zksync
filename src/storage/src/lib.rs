@@ -16,7 +16,6 @@ use models::plasma::{AccountId, AccountMap, BlockNumber, Fr, Nonce};
 use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
-use plasma;
 
 mod schema;
 use crate::schema::*;

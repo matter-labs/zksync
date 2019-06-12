@@ -65,9 +65,11 @@ fn run_committer(
                 if let Ok(proof) = proof {
                     let block = storage
                         .load_committed_block(block_number)
-                        .expect(format!("failed to load block #{}", block_number).as_str());
+                        .unwrap_or_else(|| panic!("failed to load block #{}", block_number));
                     let op = Operation {
-                        action: Action::Verify { proof },
+                        action: Action::Verify {
+                            proof: Box::new(proof),
+                        },
                         block,
                         accounts_updated: None,
                         tx_meta: None,

@@ -85,7 +85,7 @@ fn handle_submit_tx(
 
             // TODO: check lazy init
             if network_status.outstanding_txs > RUNTIME_CONFIG.max_outstanding_txs {
-                return Err(format!("Rate limit exceeded"));
+                return Err("Rate limit exceeded".to_string());
             }
 
             // Validate tx input
@@ -102,8 +102,8 @@ fn handle_submit_tx(
                 .expect("must send a new transaction to queue");
             let account = key_rx
                 .recv_timeout(std::time::Duration::from_millis(TIMEOUT))
-                .map_err(|_| format!("Internal error: timeout on GetAccount"))?;
-            let account = account.ok_or(format!("Account not found"))?;
+                .map_err(|_| "Internal error: timeout on GetAccount".to_string())?;
+            let account = account.ok_or_else(|| "Account not found".to_string())?;
 
             Ok((tx, account, tx_for_state))
         })
@@ -128,7 +128,9 @@ fn handle_submit_tx(
 
             // Verify signature
 
-            let pub_key: PublicKey = account.get_pub_key().ok_or(format!("Pubkey expired"))?;
+            let pub_key: PublicKey = account
+                .get_pub_key()
+                .ok_or_else(|| "Pubkey expired".to_string())?;
             let verified = tx.verify_sig(&pub_key);
             if !verified {
                 let (x, y) = pub_key.0.into_xy();
@@ -137,7 +139,7 @@ fn handle_submit_tx(
                     "Signature is invalid: (x,y,s) = ({:?},{:?},{:?})",
                     &tx.signature.r_x, &tx.signature.r_y, &tx.signature.s
                 );
-                return Err(format!("Invalid signature"));
+                return Err("Invalid signature".to_string());
             }
 
             // Cache public key we just verified against (to skip verifying again in state keeper)
@@ -149,12 +151,12 @@ fn handle_submit_tx(
             let (add_tx, add_rx) = mpsc::channel();
             let (account, nonce) = (tx.from, tx.nonce);
             tx_for_state
-                .send(StateKeeperRequest::AddTransferTx(tx, add_tx))
+                .send(StateKeeperRequest::AddTransferTx(Box::new(tx), add_tx))
                 .expect("sending to sate keeper failed");
             // TODO: reconsider timeouts
             let confirmation = add_rx
                 .recv_timeout(std::time::Duration::from_millis(500))
-                .map_err(|_| format!("Internal error: timeout on AddTransferTx"))?
+                .map_err(|_| "Internal error: timeout on AddTransferTx".to_string())?
                 .map_err(|e| format!("Tx rejected: {:?}", e))?;
 
             // Notify futures waiting for nonce
@@ -423,7 +425,7 @@ fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpRespon
         block_number: commit.block_number as i32,
         new_state_root: format!("0x{}", operation.block.new_root_hash.to_hex()),
         commit_tx_hash: commit.tx_hash,
-        verify_tx_hash: verify.as_ref().map_or(None, |op| op.tx_hash.clone()),
+        verify_tx_hash: verify.as_ref().and_then(|op| op.tx_hash.clone()),
         committed_at: commit.created_at,
         verified_at: verify.as_ref().map(|op| op.created_at),
     };
@@ -445,12 +447,12 @@ fn handle_get_blocks(
         .query()
         .get("max_block")
         .cloned()
-        .unwrap_or("99999999".to_string());
+        .unwrap_or_else(|| "99999999".to_string());
     let limit = req
         .query()
         .get("limit")
         .cloned()
-        .unwrap_or("20".to_string());
+        .unwrap_or_else(|| "20".to_string());
 
     req.body()
         .map_err(|err| format!("{}", err))
@@ -461,10 +463,10 @@ fn handle_get_blocks(
 
             let max_block: u32 = max_block
                 .parse()
-                .map_err(|_| format!("invalid max_block"))?;
-            let limit: u32 = limit.parse().map_err(|_| format!("invalid limit"))?;
+                .map_err(|_| "invalid max_block".to_string())?;
+            let limit: u32 = limit.parse().map_err(|_| "invalid limit".to_string())?;
             if limit > 100 {
-                return Err(format!("limit can not exceed 100"));
+                return Err("limit can not exceed 100".to_string());
             }
 
             let response: Vec<BlockDetails> = storage
@@ -505,7 +507,7 @@ fn handle_get_blocks(
 
 fn handle_search(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let pool = req.state().connection_pool.clone();
-    let query = req.query().get("query").cloned().unwrap_or("".to_string());
+    let query = req.query().get("query").cloned().unwrap_or_default();
     req.body()
         .map_err(|err| format!("{}", err))
         .and_then(move |_| {
@@ -607,8 +609,8 @@ pub fn start_api_server(
         .spawn(move || {
             env::set_var("RUST_LOG", "actix_web=info");
 
-            let address = env::var("BIND_TO").unwrap_or("127.0.0.1".to_string());
-            let port = env::var("PORT").unwrap_or("8080".to_string());
+            let address = env::var("BIND_TO").unwrap_or_else(|_| "127.0.0.1".to_string());
+            let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
             let bind_to = format!("{}:{}", address, port);
 
             let sys = actix::System::new("api-server");

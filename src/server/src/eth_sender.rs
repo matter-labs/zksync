@@ -13,10 +13,10 @@ use web3::types::{H256, U128, U256};
 fn sorted_and_padded_for_deposits(
     accounts_updated: AccountMap,
 ) -> [u64; config::DEPOSIT_BATCH_SIZE] {
-    assert!(accounts_updated.len() == config::DEPOSIT_BATCH_SIZE);
+    assert_eq!(accounts_updated.len(), config::DEPOSIT_BATCH_SIZE);
 
-    let mut tmp = [params::SPECIAL_ACCOUNT_DEPOSIT as u64; config::DEPOSIT_BATCH_SIZE];
-    let mut acc: Vec<u64> = accounts_updated.keys().map(|&k| k as u64).collect();
+    let mut tmp = [u64::from(params::SPECIAL_ACCOUNT_DEPOSIT); config::DEPOSIT_BATCH_SIZE];
+    let mut acc: Vec<u64> = accounts_updated.keys().map(|&k| u64::from(k)).collect();
     acc.sort();
 
     for (i, a) in acc.into_iter().enumerate() {
@@ -27,10 +27,10 @@ fn sorted_and_padded_for_deposits(
 }
 
 fn sorted_and_padded_for_exits(accounts_updated: AccountMap) -> [u64; config::EXIT_BATCH_SIZE] {
-    assert!(accounts_updated.len() == config::EXIT_BATCH_SIZE);
+    assert_eq!(accounts_updated.len(), config::EXIT_BATCH_SIZE);
 
-    let mut tmp = [params::SPECIAL_ACCOUNT_EXIT as u64; config::EXIT_BATCH_SIZE];
-    let mut acc: Vec<u64> = accounts_updated.keys().map(|&k| k as u64).collect();
+    let mut tmp = [u64::from(params::SPECIAL_ACCOUNT_EXIT); config::EXIT_BATCH_SIZE];
+    let mut acc: Vec<u64> = accounts_updated.keys().map(|&k| u64::from(k)).collect();
     acc.sort();
 
     for (i, a) in acc.into_iter().enumerate() {
@@ -41,7 +41,7 @@ fn sorted_and_padded_for_exits(accounts_updated: AccountMap) -> [u64; config::EX
 }
 
 fn keys_sorted(accounts_updated: AccountMap) -> Vec<u64> {
-    let mut acc: Vec<u64> = accounts_updated.keys().map(|&k| k as u64).collect();
+    let mut acc: Vec<u64> = accounts_updated.keys().map(|&k| u64::from(k)).collect();
     acc.sort();
     acc
 }
@@ -63,11 +63,7 @@ fn run_eth_sender(
         let tx = match op.action {
             Action::Commit => {
                 let mut be_bytes: Vec<u8> = vec![];
-                &op.block
-                    .new_root_hash
-                    .clone()
-                    .into_repr()
-                    .write_be(&mut be_bytes);
+                op.block.new_root_hash.into_repr().write_be(&mut be_bytes);
                 let root = H256::from(U256::from_big_endian(&be_bytes));
 
                 match &op.block.block_data {
@@ -91,14 +87,16 @@ fn run_eth_sender(
                         eth_client.call(
                             "commitTransferBlock",
                             op.tx_meta.expect("tx meta missing"),
-                            (op.block.block_number as u64, total_fees, public_data, root),
+                            (
+                                u64::from(op.block.block_number),
+                                total_fees,
+                                public_data,
+                                root,
+                            ),
                         )
                     }
 
-                    BlockData::Deposit {
-                        batch_number,
-                        transactions: _,
-                    } => {
+                    BlockData::Deposit { batch_number, .. } => {
                         // let eth_block_data = EthBlockData::Deposit{ batch_number };
                         // let mut be_bytes: Vec<u8> = vec![];
                         // &block.new_root_hash.clone().into_repr().write_be(& mut be_bytes);
@@ -110,7 +108,7 @@ fn run_eth_sender(
                             (
                                 U256::from(*batch_number),
                                 sorted_and_padded_for_deposits(op.accounts_updated.unwrap()),
-                                op.block.block_number as u64,
+                                u64::from(op.block.block_number),
                                 root,
                             ),
                         )
@@ -135,7 +133,7 @@ fn run_eth_sender(
                             (
                                 U256::from(*batch_number),
                                 sorted_and_padded_for_exits(op.accounts_updated.unwrap()),
-                                op.block.block_number as u64,
+                                u64::from(op.block.block_number),
                                 public_data,
                                 root,
                             ),
@@ -143,39 +141,37 @@ fn run_eth_sender(
                     }
                 }
             }
-            Action::Verify { proof } => match op.block.block_data {
-                BlockData::Transfer {
-                    total_fees: _,
-                    transactions: _,
-                } => eth_client.call(
-                    "verifyTransferBlock",
-                    op.tx_meta.expect("tx meta missing"),
-                    (op.block.block_number as u64, proof),
-                ),
-
-                BlockData::Deposit {
-                    batch_number,
-                    transactions: _,
-                } => eth_client.call(
-                    "verifyDepositBlock",
-                    op.tx_meta.expect("tx meta missing"),
-                    (
-                        U256::from(batch_number),
-                        sorted_and_padded_for_deposits(op.accounts_updated.unwrap()),
-                        op.block.block_number as u64,
-                        proof,
+            Action::Verify { proof } => {
+                let proof = *proof;
+                match op.block.block_data {
+                    BlockData::Transfer { .. } => eth_client.call(
+                        "verifyTransferBlock",
+                        op.tx_meta.expect("tx meta missing"),
+                        (u64::from(op.block.block_number), proof),
                     ),
-                ),
 
-                BlockData::Exit {
-                    batch_number,
-                    transactions: _,
-                } => eth_client.call(
-                    "verifyExitBlock",
-                    op.tx_meta.expect("tx meta missing"),
-                    (batch_number as u64, op.block.block_number as u64, proof),
-                ),
-            },
+                    BlockData::Deposit { batch_number, .. } => eth_client.call(
+                        "verifyDepositBlock",
+                        op.tx_meta.expect("tx meta missing"),
+                        (
+                            U256::from(batch_number),
+                            sorted_and_padded_for_deposits(op.accounts_updated.unwrap()),
+                            u64::from(op.block.block_number),
+                            proof,
+                        ),
+                    ),
+
+                    BlockData::Exit { batch_number, .. } => eth_client.call(
+                        "verifyExitBlock",
+                        op.tx_meta.expect("tx meta missing"),
+                        (
+                            u64::from(batch_number),
+                            u64::from(op.block.block_number),
+                            proof,
+                        ),
+                    ),
+                }
+            }
         };
         // TODO: process tx sending failure
         match tx {

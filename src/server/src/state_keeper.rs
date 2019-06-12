@@ -109,7 +109,7 @@ impl PlasmaStateKeeper {
                     }
                 }
                 StateKeeperRequest::AddTransferTx(tx, sender) => {
-                    let result = self.apply_transfer_tx(tx);
+                    let result = self.apply_transfer_tx(*tx);
                     if result.is_ok() && self.next_block_at_max.is_none() {
                         self.next_block_at_max =
                             Some(SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL));
@@ -128,7 +128,7 @@ impl PlasmaStateKeeper {
                 StateKeeperRequest::AddBlock(block) => {
                     self.block_queue.push_back(block);
                     //println!("new protoblock, transfer_tx_queue.len() = {}", self.transfer_tx_queue.len());
-                    if self.transfer_tx_queue.len() == 0 {
+                    if self.transfer_tx_queue.is_empty() {
                         self.process_block_queue(&tx_for_commitments);
                     }
                 }
@@ -213,7 +213,7 @@ impl PlasmaStateKeeper {
                         BigDecimal::zero(), // amount
                         BigDecimal::zero(), // fee
                         nonce,              // nonce
-                        2147483647,         // good until max_block
+                        2_147_483_647,      // good until max_block
                         &private_key,
                     );
                     assert!(tx.verify_sig(&pub_key));
@@ -348,34 +348,18 @@ impl PlasmaStateKeeper {
 
     // sorting is required to ensure that all accounts affected are unique, see the smart contract
     fn sort_deposit_block(mut txes: Vec<DepositTx>) -> Vec<DepositTx> {
-        txes.sort_by(|l, r| {
-            if l.account < r.account {
-                return std::cmp::Ordering::Less;
-            } else if r.account > l.account {
-                return std::cmp::Ordering::Greater;
-            }
-            std::cmp::Ordering::Equal
-        });
+        txes.sort_by_key(|l| l.account);
         txes
     }
 
     // sorting is required to ensure that all accounts affected are unique, see the smart contract
     fn sort_exit_block(mut txes: Vec<ExitTx>) -> Vec<ExitTx> {
-        txes.sort_by(|l, r| {
-            if l.account < r.account {
-                return std::cmp::Ordering::Less;
-            } else if r.account > l.account {
-                return std::cmp::Ordering::Greater;
-            }
-            std::cmp::Ordering::Equal
-        });
+        txes.sort_by_key(|l| l.account);
         txes
     }
 
     fn account(&self, account_id: AccountId) -> Account {
-        self.state
-            .get_account(account_id)
-            .unwrap_or(Account::default())
+        self.state.get_account(account_id).unwrap_or_default()
     }
 }
 
@@ -405,7 +389,7 @@ fn test_read_private_key() {
         BigDecimal::zero(), // amount
         BigDecimal::zero(), // fee
         nonce,              // nonce
-        2147483647,         // good until max_block
+        2_147_483_647,      // good until max_block
         &private_key,
     );
 
