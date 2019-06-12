@@ -108,7 +108,7 @@ impl BabyProverErr {
 
 impl fmt::Display for BabyProverErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        if let &BabyProverErr::IoError(ref e) = self {
+        if let BabyProverErr::IoError(ref e) = *self {
             write!(f, "I/O error: ")?;
             e.fmt(f)
         } else {
@@ -298,23 +298,14 @@ impl BabyProver {
         // let new_root_hash = block.new_root_hash;
         match block.block_data {
             BlockData::Deposit {
-                batch_number: _,
-                ref transactions,
-            } => {
-                return self.apply_and_prove_deposit(&block, transactions);
-            }
+                ref transactions, ..
+            } => self.apply_and_prove_deposit(&block, transactions),
             BlockData::Exit {
-                batch_number: _,
-                ref transactions,
-            } => {
-                return self.apply_and_prove_exit(&block, transactions);
-            }
+                ref transactions, ..
+            } => self.apply_and_prove_exit(&block, transactions),
             BlockData::Transfer {
-                total_fees: _,
-                ref transactions,
-            } => {
-                return self.apply_and_prove_transfer(&block, &transactions);
-            }
+                ref transactions, ..
+            } => self.apply_and_prove_transfer(&block, &transactions),
         }
     }
 
@@ -322,7 +313,7 @@ impl BabyProver {
     pub fn apply_and_prove_transfer(
         &mut self,
         block: &Block,
-        transactions: &Vec<TransferTx>,
+        transactions: &[TransferTx],
     ) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.current_block_number {
@@ -332,7 +323,7 @@ impl BabyProver {
             );
             return Err(BabyProverErr::Other("incorrect block".to_owned()));
         }
-        let block_final_root = block.new_root_hash.clone();
+        let block_final_root = block.new_root_hash;
 
         let public_data: Vec<u8> =
             encoder::encode_transactions(&block).expect("encoding transactions failed");
@@ -420,12 +411,12 @@ impl BabyProver {
                 .collect();
 
             let transaction = Transaction {
-                from: Some(tx.from.clone()),
-                to: Some(tx.to.clone()),
-                amount: Some(tx.amount.clone()),
-                fee: Some(tx.fee.clone()),
-                nonce: Some(tx.nonce.clone()),
-                good_until_block: Some(tx.good_until_block.clone()),
+                from: Some(tx.from),
+                to: Some(tx.to),
+                amount: Some(tx.amount),
+                fee: Some(tx.fee),
+                nonce: Some(tx.nonce),
+                good_until_block: Some(tx.good_until_block),
                 signature: Some(tx.signature.clone()),
             };
 
@@ -616,7 +607,7 @@ impl BabyProver {
             "Made a proof for initial root = {}, final root = {}, public data = {}",
             initial_root,
             final_root,
-            public_data_commitment.clone().to_hex()
+            public_data_commitment.to_hex()
         );
         let success = verify_proof(
             &pvk,
@@ -632,7 +623,7 @@ impl BabyProver {
                 "Proof is verification failed".to_owned(),
             ));
         }
-        if success.unwrap() == false {
+        if !success.unwrap() {
             println!("Proof is invalid");
             return Err(BabyProverErr::Other("Proof is invalid".to_owned()));
         }
@@ -642,9 +633,9 @@ impl BabyProver {
         let full_proof = FullBabyProof {
             proof: p,
             inputs: [initial_root, final_root, public_data_commitment],
-            total_fees: total_fees,
-            block_number: block_number,
-            public_data: public_data,
+            total_fees,
+            block_number,
+            public_data,
         };
 
         Ok(full_proof)
@@ -654,7 +645,7 @@ impl BabyProver {
     pub fn apply_and_prove_deposit(
         &mut self,
         block: &Block,
-        transactions: &Vec<DepositTx>,
+        transactions: &[DepositTx],
     ) -> Result<FullBabyProof, Err> {
         // println!("block: {:?}", &block.block_data);
         // println!("transactions: {:?}", &transactions);
@@ -669,7 +660,7 @@ impl BabyProver {
                 "block_number != self.current_block_number".to_owned(),
             ));
         }
-        let block_final_root = block.new_root_hash.clone();
+        let block_final_root = block.new_root_hash;
 
         let public_data: Vec<u8> =
             encoder::encode_transactions(block).expect("prover: encoding failed");
@@ -701,7 +692,7 @@ impl BabyProver {
 
             let (old_leaf, new_leaf) = if existing_leaf.is_none() {
                 let mut new_leaf = CircuitAccount::default();
-                new_leaf.balance = tx.amount.clone();
+                new_leaf.balance = tx.amount;
                 new_leaf.pub_x = tx.pub_x;
                 new_leaf.pub_y = tx.pub_y;
 
@@ -721,11 +712,8 @@ impl BabyProver {
                 .map(|e| Some(e.0))
                 .collect();
 
-            let public_key = edwards::Point::from_xy(
-                new_leaf.pub_x.clone(),
-                new_leaf.pub_y.clone(),
-                &self.jubjub_params,
-            );
+            let public_key =
+                edwards::Point::from_xy(new_leaf.pub_x, new_leaf.pub_y, &self.jubjub_params);
 
             if public_key.is_none() {
                 return Err(BabyProverErr::Other("public_key.is_none()".to_owned()));
@@ -734,7 +722,7 @@ impl BabyProver {
             let request = DepositRequest {
                 into: Fr::from_str(&into_leaf_number.to_string()),
                 amount: Some(tx.amount),
-                public_key: public_key,
+                public_key,
             };
 
             tree.insert(into_leaf_number, new_leaf.clone());
@@ -811,7 +799,7 @@ impl BabyProver {
         let mut hash_result = [0u8; 32];
         h.result(&mut hash_result[..]);
 
-        let initial_hash: String = hash_result.clone().to_hex();
+        let initial_hash: String = hash_result.to_hex();
         println!("Block number hash in deposit = {}", initial_hash);
 
         {
@@ -866,7 +854,7 @@ impl BabyProver {
             "Made an deposit proof for initial root = {}, final root = {}, public data = {}",
             initial_root,
             final_root,
-            public_data_commitment.clone().to_hex()
+            public_data_commitment.to_hex()
         );
         let success = verify_proof(
             &pvk,
@@ -881,7 +869,7 @@ impl BabyProver {
             );
             return Err(BabyProverErr::Other("Proof verification failed".to_owned()));
         }
-        if success.unwrap() == false {
+        if !success.unwrap() {
             println!("Proof is invalid");
             return Err(BabyProverErr::Other("Proof is invalid".to_owned()));
         }
@@ -891,8 +879,8 @@ impl BabyProver {
             proof: p,
             inputs: [initial_root, final_root, public_data_commitment],
             total_fees: Fr::zero(),
-            block_number: block_number,
-            public_data: public_data,
+            block_number,
+            public_data,
         };
 
         Ok(full_proof)
@@ -902,7 +890,7 @@ impl BabyProver {
     pub fn apply_and_prove_exit(
         &mut self,
         block: &Block,
-        transactions: &Vec<ExitTx>,
+        transactions: &[ExitTx],
     ) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.current_block_number {
@@ -914,7 +902,7 @@ impl BabyProver {
                 "block_number != self.current_block_number".to_owned(),
             ));
         }
-        let block_final_root = block.new_root_hash.clone();
+        let block_final_root = block.new_root_hash;
 
         //let transactions = &block.transactions;
         let num_txes = transactions.len();
@@ -1082,7 +1070,7 @@ impl BabyProver {
             old_root: Some(initial_root),
             new_root: Some(final_root),
             public_data_commitment: Some(public_data_commitment),
-            empty_leaf_witness: empty_leaf_witness,
+            empty_leaf_witness,
             block_number: Some(block_number),
             requests: witnesses.clone(),
         };
@@ -1102,7 +1090,7 @@ impl BabyProver {
             "Made an exit proof for initial root = {}, final root = {}, public data = {}",
             initial_root,
             final_root,
-            public_data_commitment.clone().to_hex()
+            public_data_commitment.to_hex()
         );
         let success = verify_proof(
             &pvk,
@@ -1117,7 +1105,7 @@ impl BabyProver {
             );
             return Err(BabyProverErr::Other("Proof verification failed".to_owned()));
         }
-        if success.unwrap() == false {
+        if !success.unwrap() {
             println!("Proof is invalid");
             return Err(BabyProverErr::Other("Proof is invalid".to_owned()));
         }
