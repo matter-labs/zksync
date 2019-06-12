@@ -35,7 +35,7 @@ const TXES_TO_TEST: usize = 128;
 pub fn read_write_keys() {
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &AltJubjubBn256::new();
-    let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+    let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let tree_depth = plasma_constants::BALANCE_TREE_DEPTH as u32;
 
     let capacity: u32 = 1 << tree_depth;
@@ -54,7 +54,7 @@ pub fn read_write_keys() {
 
     for _ in 0..number_of_accounts {
         let mut leaf_number: u32 = rng.gen();
-        leaf_number = leaf_number % capacity;
+        leaf_number %= capacity;
         if existing_account_hm.get(&leaf_number).is_some() {
             continue;
         } else {
@@ -114,21 +114,17 @@ pub fn read_write_keys() {
 
     for _ in 0..TXES_TO_TEST {
         let mut sender_account_number: usize = rng.gen();
-        sender_account_number = sender_account_number % num_accounts;
-        let sender_account_info: &(u32, PrivateKey<Bn256>, PublicKey<Bn256>) = existing_accounts
-            .get(sender_account_number)
-            .clone()
-            .unwrap();
+        sender_account_number %= num_accounts;
+        let sender_account_info: &(u32, PrivateKey<Bn256>, PublicKey<Bn256>) =
+            existing_accounts.get(sender_account_number).unwrap();
 
         let mut recipient_account_number: usize = rng.gen();
-        recipient_account_number = recipient_account_number % num_accounts;
+        recipient_account_number %= num_accounts;
         if recipient_account_number == sender_account_number {
-            recipient_account_number = recipient_account_number + 1 % num_accounts;
+            recipient_account_number += 1 % num_accounts;
         }
-        let recipient_account_info: &(u32, PrivateKey<Bn256>, PublicKey<Bn256>) = existing_accounts
-            .get(recipient_account_number)
-            .clone()
-            .unwrap();
+        let recipient_account_info: &(u32, PrivateKey<Bn256>, PublicKey<Bn256>) =
+            existing_accounts.get(recipient_account_number).unwrap();
 
         let sender_leaf_number = sender_account_info.0;
         let recipient_leaf_number = recipient_account_info.0;
@@ -155,10 +151,10 @@ pub fn read_write_keys() {
         let to = Fr::from_str(&recipient_leaf_number.to_string());
 
         let mut transaction: Transaction<Bn256> = Transaction {
-            from: from,
-            to: to,
-            amount: Some(transfer_amount_encoded.clone()),
-            fee: Some(fee_encoded.clone()),
+            from,
+            to,
+            amount: Some(transfer_amount_encoded),
+            fee: Some(fee_encoded),
             nonce: Some(sender_leaf.nonce),
             good_until_block: Some(Fr::one()),
             signature: None,
@@ -301,13 +297,13 @@ pub fn read_write_keys() {
 
     println!("Total fees = {}", total_fees.into_repr());
 
-    print!(
-        "Final data commitment as field element = {}\n",
+    println!(
+        "Final data commitment as field element = {}",
         public_data_commitment
     );
 
     let instance_for_test_cs = Transfer {
-        params: params,
+        params,
         number_of_transactions: TXES_TO_TEST,
         old_root: Some(initial_root),
         new_root: Some(final_root),
@@ -375,7 +371,7 @@ pub fn read_write_keys() {
     };
 
     let instance_for_generation: Transfer<'_, Bn256> = Transfer {
-        params: params,
+        params,
         number_of_transactions: TXES_TO_TEST,
         old_root: None,
         new_root: None,
@@ -426,7 +422,7 @@ pub fn read_write_keys() {
     let pvk = prepare_verifying_key(&circuit_params.vk);
 
     let instance_for_proof = Transfer {
-        params: params,
+        params,
         number_of_transactions: TXES_TO_TEST,
         old_root: Some(initial_root),
         new_root: Some(final_root),

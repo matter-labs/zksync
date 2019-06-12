@@ -45,7 +45,7 @@ pub fn make_exitor_key() {
     };
 
     let instance_for_generation: Exit<'_, Bn256> = Exit {
-        params: params,
+        params,
         number_of_exits: EXIT_BATCH_SIZE,
         old_root: None,
         new_root: None,

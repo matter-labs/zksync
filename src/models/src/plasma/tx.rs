@@ -17,13 +17,13 @@ use sapling_crypto::jubjub::{edwards, FixedGenerators, JubjubEngine, Unknown};
 
 use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
 
-pub const TRANSFER_TX: &'static str = "Transfer";
-pub const DEPOSIT_TX: &'static str = "Deposit";
-pub const EXIT_TX: &'static str = "Exit";
+pub const TRANSFER_TX: &str = "Transfer";
+pub const DEPOSIT_TX: &str = "Deposit";
+pub const EXIT_TX: &str = "Exit";
 
 #[derive(Clone)]
 pub enum TransactionType {
-    Transfer { tx: TransferTx },
+    Transfer { tx: Box<TransferTx> },
     Deposit { tx: DepositTx },
     Exit { tx: ExitTx },
 }
@@ -31,9 +31,9 @@ pub enum TransactionType {
 impl std::string::ToString for TransactionType {
     fn to_string(&self) -> String {
         match self {
-            TransactionType::Transfer { tx: _ } => TRANSFER_TX.to_owned(),
-            TransactionType::Deposit { tx: _ } => DEPOSIT_TX.to_owned(),
-            TransactionType::Exit { tx: _ } => EXIT_TX.to_owned(),
+            TransactionType::Transfer { .. } => TRANSFER_TX.to_owned(),
+            TransactionType::Deposit { .. } => DEPOSIT_TX.to_owned(),
+            TransactionType::Exit { .. } => EXIT_TX.to_owned(),
         }
     }
 }
@@ -92,8 +92,8 @@ impl Eq for TransferTx {}
 impl TransferTx {
     pub fn message_bits(&self) -> Vec<bool> {
         let mut r: Vec<bool> = vec![];
-        let from_bits = get_bits_le_fixed_u128(self.from as u128, params::BALANCE_TREE_DEPTH);
-        let to_bits = get_bits_le_fixed_u128(self.to as u128, params::BALANCE_TREE_DEPTH);
+        let from_bits = get_bits_le_fixed_u128(u128::from(self.from), params::BALANCE_TREE_DEPTH);
+        let to_bits = get_bits_le_fixed_u128(u128::from(self.to), params::BALANCE_TREE_DEPTH);
         let amount_bits = convert_to_float(
             self.amount.to_u128().unwrap(),
             params::AMOUNT_EXPONENT_BIT_WIDTH,
@@ -109,9 +109,9 @@ impl TransferTx {
         )
         .unwrap();
 
-        let nonce_bits = get_bits_le_fixed_u128(self.nonce as u128, params::NONCE_BIT_WIDTH);
+        let nonce_bits = get_bits_le_fixed_u128(u128::from(self.nonce), params::NONCE_BIT_WIDTH);
         let good_until_block_bits = get_bits_le_fixed_u128(
-            self.good_until_block as u128,
+            u128::from(self.good_until_block),
             params::BLOCK_NUMBER_BIT_WIDTH,
         );
 
@@ -221,7 +221,7 @@ impl TransferTx {
             return Err(format!("tx.from may not equal tx.to: {}", self.from));
         }
         if self.amount == BigDecimal::zero() {
-            return Err(format!("zero amount is not allowed"));
+            return Err("zero amount is not allowed".to_string());
         }
 
         Ok(())
@@ -273,7 +273,7 @@ impl TxSignature {
                 .expect("make point from X and Y");
         let s: <Engine as JubjubEngine>::Fs = encode_fr_into_fs::<Engine>(self.s);
 
-        Ok(Signature::<Engine> { r: r, s: s })
+        Ok(Signature::<Engine> { r, s })
     }
 }
 
@@ -284,7 +284,7 @@ impl TransactionSignature<Engine> {
                 .expect("make R point");
         let s = sig.s;
 
-        Ok(Self { r: r, s: s })
+        Ok(Self { r, s })
     }
 }
 
@@ -332,8 +332,8 @@ impl DepositRequest<Engine> {
             // TODO: these conversions are ugly and inefficient, replace with idiomatic std::convert::From trait
             into: Fr::from_str(&request.account.to_string()).unwrap(),
             amount: Fr::from_str(&request.amount.to_string()).unwrap(),
-            pub_x: request.pub_x.clone(),
-            pub_y: request.pub_y.clone(),
+            pub_x: request.pub_x,
+            pub_y: request.pub_y,
         };
 
         Ok(req)

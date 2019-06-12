@@ -98,8 +98,8 @@ mod tests {
             pub_y:      Fr::one(),
         };
         tree.insert(3, leaf);
-        let root = tree.root_hash();
-        let path = tree.merkle_path(0);
+        let _root = tree.root_hash();
+        let _path = tree.merkle_path(0);
     }
 
 }

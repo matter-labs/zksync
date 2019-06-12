@@ -254,9 +254,8 @@ mod tests {
         }
 
         fn compress(&self, lhs: &u64, rhs: &u64, i: usize) -> u64 {
-            let r = 11 * lhs + 17 * rhs + 1 + i as u64;
+            11 * lhs + 17 * rhs + 1 + i as u64
             //println!("compress {} {}, {} => {}", lhs, rhs, i, r);
-            r
         }
     }
 
@@ -279,15 +278,15 @@ mod tests {
 
         tree.insert(0, 1);
         println!("{:?}", tree);
-        assert_eq!(tree.root_hash(), 697516875);
+        assert_eq!(tree.root_hash(), 697_516_875);
 
         tree.insert(0, 2);
         println!("{:?}", tree);
-        assert_eq!(tree.root_hash(), 741131083);
+        assert_eq!(tree.root_hash(), 741_131_083);
 
         tree.insert(3, 2);
         //println!("{:?}", tree);
-        assert_eq!(tree.root_hash(), 793215819);
+        assert_eq!(tree.root_hash(), 793_215_819);
     }
 
     #[test]
@@ -296,6 +295,6 @@ mod tests {
         tree.insert(2, 1);
         let path = tree.merkle_path(2);
         //println!("{:?}", tree);
-        assert_eq!(path, [(32768, false), (917505, true), (25690142, false)]);
+        assert_eq!(path, [(32768, false), (917_505, true), (25_690_142, false)]);
     }
 }

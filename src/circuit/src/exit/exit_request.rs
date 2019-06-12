@@ -18,15 +18,13 @@ impl<E: JubjubEngine> ExitRequest<E> {
         // - from
         // - amount
         // - compressed public key
-        let mut from: Vec<bool> =
-            BitIterator::new(self.from.clone().unwrap().into_repr()).collect();
+        let mut from: Vec<bool> = BitIterator::new(self.from.unwrap().into_repr()).collect();
         from.reverse();
         from.truncate(plasma_constants::BALANCE_TREE_DEPTH);
         // reverse again to have BE as in Ethereum native types
         from.reverse();
 
-        let mut amount: Vec<bool> =
-            BitIterator::new(self.amount.clone().unwrap().into_repr()).collect();
+        let mut amount: Vec<bool> = BitIterator::new(self.amount.unwrap().into_repr()).collect();
         amount.reverse();
         amount.truncate(plasma_constants::BALANCE_BIT_WIDTH);
         // reverse again to have BE as in Ethereum native types
@@ -47,7 +45,7 @@ impl<E: JubjubEngine> ExitRequest<E> {
         let byte_chunks = raw_data.chunks(8);
         for byte_chunk in byte_chunks {
             let mut byte = 0u8;
-            for (i, bit) in byte_chunk.into_iter().enumerate() {
+            for (i, bit) in byte_chunk.iter().enumerate() {
                 if *bit {
                     byte |= 1 << i;
                 }

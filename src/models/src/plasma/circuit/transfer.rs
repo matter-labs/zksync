@@ -85,7 +85,7 @@ impl<E: JubjubEngine> Tx<E> {
         let byte_chunks = raw_data.chunks(8);
         for byte_chunk in byte_chunks {
             let mut byte = 0u8;
-            for (i, bit) in byte_chunk.into_iter().enumerate() {
+            for (i, bit) in byte_chunk.iter().enumerate() {
                 if *bit {
                     byte |= 1 << i;
                 }

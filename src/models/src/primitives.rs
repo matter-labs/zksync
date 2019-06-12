@@ -72,7 +72,7 @@ pub fn field_element_to_u32<P: PrimeField>(fr: P) -> u32 {
         if bit {
             res += base;
         }
-        base = base << 1;
+        base <<= 1;
     }
 
     res
@@ -88,7 +88,7 @@ pub fn field_element_to_u128<P: PrimeField>(fr: P) -> u128 {
         if bit {
             res += base;
         }
-        base = base << 1;
+        base <<= 1;
     }
 
     res
@@ -130,8 +130,7 @@ pub fn serialize_fe_for_ethereum(field_element: <Bn256 as ScalarEngine>::Fr) -> 
         .into_repr()
         .write_be(&mut be_bytes[..])
         .expect("get new root BE bytes");
-    let u256 = U256::from_big_endian(&be_bytes[..]);
-    u256
+    U256::from_big_endian(&be_bytes[..])
 }
 
 pub fn unpack_edwards_point<E: JubjubEngine>(
@@ -140,7 +139,7 @@ pub fn unpack_edwards_point<E: JubjubEngine>(
 ) -> Result<edwards::Point<E, Unknown>, String> {
     // TxSignature has S and R in compressed form serialized as BE
     let x_sign = serialized[0] & 0x80 > 0;
-    let mut tmp = serialized.clone();
+    let mut tmp = serialized;
     tmp[0] &= 0x7f; // strip the top bit
 
     // read from byte array
@@ -225,7 +224,7 @@ pub fn pack_bits_into_bytes(bits: Vec<bool>) -> Vec<u8> {
     let byte_chunks = bits.chunks(8);
     for byte_chunk in byte_chunks {
         let mut byte = 0u8;
-        for (i, bit) in byte_chunk.into_iter().enumerate() {
+        for (i, bit) in byte_chunk.iter().enumerate() {
             if *bit {
                 byte |= 1 << i;
             }
@@ -238,7 +237,7 @@ pub fn pack_bits_into_bytes(bits: Vec<bool>) -> Vec<u8> {
 
 #[test]
 fn test_bit_iterator_e() {
-    let test_vector = [0xa953d79b83f6ab59, 0x6dea2059e200bd39];
+    let test_vector = [0xa953_d79b_83f6_ab59, 0x6dea_2059_e200_bd39];
     let mut reference: Vec<bool> = BitIterator::new(&test_vector).collect();
     reference.reverse();
     let out: Vec<bool> = BitIteratorLe::new(&test_vector).collect();

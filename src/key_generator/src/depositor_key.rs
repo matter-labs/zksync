@@ -49,7 +49,7 @@ pub fn make_depositor_key() {
     };
 
     let instance_for_generation: Deposit<'_, Bn256> = Deposit {
-        params: params,
+        params,
         number_of_deposits: DEPOSIT_BATCH_SIZE,
         old_root: None,
         new_root: None,

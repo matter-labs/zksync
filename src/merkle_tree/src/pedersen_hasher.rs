@@ -15,12 +15,10 @@ pub struct PedersenHasher<E: JubjubEngine> {
 
 impl<E: JubjubEngine> Hasher<E::Fr> for PedersenHasher<E> {
     fn hash_bits<I: IntoIterator<Item = bool>>(&self, input: I) -> E::Fr {
-        let hash = baby_pedersen_hash::<E, _>(Personalization::NoteCommitment, input, &self.params)
+        baby_pedersen_hash::<E, _>(Personalization::NoteCommitment, input, &self.params)
             .into_xy()
-            .0;
+            .0
         // print!("Leaf hash = {}\n", hash.clone());
-
-        hash
     }
 
     fn compress(&self, lhs: &E::Fr, rhs: &E::Fr, i: usize) -> E::Fr {
