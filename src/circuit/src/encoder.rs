@@ -1,16 +1,20 @@
 //use super::{DepositBlock, TransferBlock, ExitBlock};
-use models::plasma::circuit::utils::be_bit_vector_into_bytes;
 use crate::{CircuitDepositRequest, CircuitExitRequest, CircuitTransferTx};
 use models::plasma::block::{Block, BlockData};
+use models::plasma::circuit::utils::be_bit_vector_into_bytes;
 
-fn convert_transfer(transactions: &Vec<models::plasma::tx::TransferTx>) -> Result<Vec<Vec<bool>>, String> {
+fn convert_transfer(
+    transactions: &Vec<models::plasma::tx::TransferTx>,
+) -> Result<Vec<Vec<bool>>, String> {
     transactions
         .iter()
         .map(|tx| CircuitTransferTx::try_from(tx).map(|tx| tx.public_data_into_bits()))
         .collect()
 }
 
-fn convert_deposit(transactions: &Vec<models::plasma::tx::DepositTx>) -> Result<Vec<Vec<bool>>, String> {
+fn convert_deposit(
+    transactions: &Vec<models::plasma::tx::DepositTx>,
+) -> Result<Vec<Vec<bool>>, String> {
     transactions
         .iter()
         .map(|tx| CircuitDepositRequest::try_from(tx).map(|tx| tx.public_data_into_bits()))

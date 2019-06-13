@@ -5,19 +5,19 @@ use sapling_crypto::alt_babyjubjub::JubjubEngine;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CircuitAccount<E: JubjubEngine> {
-    pub balance:    E::Fr,
-    pub nonce:      E::Fr,
-    pub pub_x:      E::Fr,
-    pub pub_y:      E::Fr,
+    pub balance: E::Fr,
+    pub nonce: E::Fr,
+    pub pub_x: E::Fr,
+    pub pub_y: E::Fr,
 }
 
 impl<E: JubjubEngine> std::default::Default for CircuitAccount<E> {
-    fn default() -> Self{
-        Self{
-            balance:    E::Fr::zero(),
-            nonce:      E::Fr::zero(),
-            pub_x:      E::Fr::zero(),
-            pub_y:      E::Fr::zero(),
+    fn default() -> Self {
+        Self {
+            balance: E::Fr::zero(),
+            nonce: E::Fr::zero(),
+            pub_x: E::Fr::zero(),
+            pub_y: E::Fr::zero(),
         }
     }
 }

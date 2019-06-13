@@ -2,24 +2,24 @@
 extern crate serde_derive;
 #[macro_use]
 extern crate lazy_static;
-extern crate ff;
+extern crate bellman;
 extern crate bigdecimal;
+extern crate ff;
+extern crate fnv;
 extern crate pairing;
+extern crate rand;
 extern crate sapling_crypto;
 extern crate web3;
-extern crate bellman;
-extern crate rand;
-extern crate fnv;
 
+pub mod abi;
 pub mod config;
 pub mod plasma;
 pub mod primitives;
-pub mod abi;
 
-use crate::plasma::*;
 use crate::plasma::block::Block;
-use std::sync::mpsc::Sender;
+use crate::plasma::*;
 use serde_bytes;
+use std::sync::mpsc::Sender;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxMeta {

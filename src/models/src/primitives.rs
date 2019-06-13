@@ -13,16 +13,16 @@ pub trait GetBits {
 }
 
 impl GetBits for u64 {
-        fn get_bits_le(&self) -> Vec<bool> {
-            let mut acc = Vec::new();
-            let mut i = *self + 1;
-            for _ in 0..16 {
-                acc.push(i & 1 == 1);
-                i >>= 1;
-            }
-            acc
+    fn get_bits_le(&self) -> Vec<bool> {
+        let mut acc = Vec::new();
+        let mut i = *self + 1;
+        for _ in 0..16 {
+            acc.push(i & 1 == 1);
+            i >>= 1;
         }
+        acc
     }
+}
 
 pub trait GetBitsFixed {
     /// Get exactly `n` bits from the value in little endian order

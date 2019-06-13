@@ -1,9 +1,9 @@
 extern crate chrono;
+extern crate circuit;
 extern crate eth_client;
 extern crate models;
-extern crate storage;
-extern crate circuit;
 extern crate plasma;
+extern crate storage;
 
 pub mod api_server;
 pub mod committer;

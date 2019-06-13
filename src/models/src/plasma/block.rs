@@ -1,6 +1,6 @@
-use bigdecimal::BigDecimal;
 pub use crate::plasma::tx::{DepositTx, ExitTx, TransferTx, TxSignature};
 use crate::plasma::{BatchNumber, BlockNumber, Fr};
+use bigdecimal::BigDecimal;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]

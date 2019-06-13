@@ -1,15 +1,15 @@
 #[macro_use]
 extern crate serde_derive;
 
-use hex;
-use reqwest;
 use ethereum_types::{H160, H256, U256};
+use hex;
+use models::abi::ABI;
+use models::TxMeta;
+use reqwest;
 use reqwest::header::CONTENT_TYPE;
-use web3::contract::tokens::Tokenize;
 use std::env;
 use std::str::FromStr;
-use models::TxMeta;
-use models::abi::ABI;
+use web3::contract::tokens::Tokenize;
 
 pub mod signer;
 
@@ -242,7 +242,7 @@ fn test_eth() {
 #[test]
 fn test_encoding() {
     use models::abi::TEST_PLASMA_ALWAYS_VERIFY;
-    
+
     let contract = ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap();
     let f = contract
         .function("commitDepositBlock")

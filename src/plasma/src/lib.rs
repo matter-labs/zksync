@@ -23,4 +23,3 @@
 // extern crate merkle_tree;
 
 pub mod state;
-

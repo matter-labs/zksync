@@ -1,8 +1,5 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
-use models::{
-    ActionType, NetworkStatus, Operation, StateKeeperRequest, TransferTxConfirmation,
-};
 use super::nonce_futures::{NonceFutures, NonceReadyFuture};
 use super::storage::{BlockDetails, ConnectionPool, StorageProcessor, StoredTx};
 use actix_web::{
@@ -12,6 +9,7 @@ use actix_web::{
 use chrono::prelude::*;
 use models::config::RUNTIME_CONFIG;
 use models::plasma::{Account, Nonce, PublicKey, TransferTx};
+use models::{ActionType, NetworkStatus, Operation, StateKeeperRequest, TransferTxConfirmation};
 use std::sync::mpsc;
 
 use futures::Future;

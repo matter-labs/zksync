@@ -1,13 +1,13 @@
-use crate::plasma::{Engine, Fr};
-use crate::plasma::{PrivateKey, PublicKey};
-use crate::plasma::circuit::utils::{
-    encode_fr_into_fs, encode_fs_into_fr, le_bit_vector_into_field_element,
-};
 use crate::plasma::circuit::deposit::DepositRequest;
 use crate::plasma::circuit::exit::ExitRequest;
 use crate::plasma::circuit::sig::TransactionSignature;
 use crate::plasma::circuit::transfer::Tx;
+use crate::plasma::circuit::utils::{
+    encode_fr_into_fs, encode_fs_into_fr, le_bit_vector_into_field_element,
+};
 use crate::plasma::params;
+use crate::plasma::{Engine, Fr};
+use crate::plasma::{PrivateKey, PublicKey};
 use crate::primitives::{get_bits_le_fixed_u128, pack_bits_into_bytes};
 use bigdecimal::{BigDecimal, ToPrimitive};
 use ff::PrimeField;

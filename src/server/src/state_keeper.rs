@@ -2,6 +2,11 @@ use pairing::bn256::Bn256;
 // use sapling_crypto::jubjub::{FixedGenerators};
 // use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 
+use models::plasma::account::Account;
+use models::plasma::block::{Block, BlockData};
+use models::plasma::tx::{DepositTx, ExitTx, TransferTx};
+use models::plasma::{AccountId, AccountMap, BatchNumber};
+use plasma::state::PlasmaState;
 use rand::OsRng;
 use rayon::prelude::*;
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};
@@ -9,22 +14,6 @@ use std::collections::{HashMap, VecDeque};
 use std::str::FromStr;
 use std::thread;
 use web3::types::{H256, U128, U256};
-use plasma::state::PlasmaState;
-use models::plasma::{
-    AccountMap,
-    BatchNumber,
-    AccountId
-};
-use models::plasma::tx::{
-    TransferTx,
-    DepositTx,
-    ExitTx
-};
-use models::plasma::block::{
-    BlockData,
-    Block
-};
-use models::plasma::account::Account;
 
 use super::config;
 use super::models::{
