@@ -65,18 +65,18 @@ mod test {
         data_restore_driver.run_state_updates();
     }
 
-    #[test]
-    fn test_transfer_transaction_parse() {
-        let config = helpers::DataRestoreConfig::new(helpers::InfuraEndpoint::Rinkeby);
-        let hash = "a01852a7105d64674674ec5277b86d1e9f9016528bae2a28513be2f670a80ce6";
-        let block = LogBlockData {
-            block_num: 74,
-            transaction_hash: H256::from(U256::from(hash)),
-            block_type: blocks::BlockType::Committed
-        };
-        let transaction = FranklinTransaction::get_transaction(&config, &block).unwrap();
-        let acc = FranklinAccountsStates::new(config);
-        let res = acc.get_all_transactions_from_transfer_block(&transaction);
-        println!("{:?}", res);
-    }
+    // #[test]
+    // fn test_transfer_transaction_parse() {
+    //     let config = helpers::DataRestoreConfig::new(helpers::InfuraEndpoint::Rinkeby);
+    //     let hash = "a01852a7105d64674674ec5277b86d1e9f9016528bae2a28513be2f670a80ce6";
+    //     let block = LogBlockData {
+    //         block_num: 74,
+    //         transaction_hash: H256::from(U256::from(hash)),
+    //         block_type: blocks::BlockType::Committed
+    //     };
+    //     let transaction = FranklinTransaction::get_transaction(&config, &block).unwrap();
+    //     let acc = FranklinAccountsStates::new(config);
+    //     let res = acc.get_all_transactions_from_transfer_block(&transaction);
+    //     println!("{:?}", res);
+    // }
 }
