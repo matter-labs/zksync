@@ -4,9 +4,9 @@ use bigdecimal::BigDecimal;
 use bitvec::prelude::*;
 use sapling_crypto::circuit::float_point::parse_float_to_u128;
 use ethabi::Contract;
-use super::commons::{PROD_PLASMA, TEST_PLASMA_ALWAYS_VERIFY};
-use super::models::config::RuntimeConfig;
-use super::plasma::models::params as plasma_constants;
+use models::abi::{PROD_PLASMA, TEST_PLASMA_ALWAYS_VERIFY};
+use models::config::RuntimeConfig;
+use models::plasma::params as plasma_constants;
 
 /// Configuratoin of DataRestore driver
 #[derive(Debug, Clone)]
@@ -27,20 +27,20 @@ impl DataRestoreConfig {
     /// * `network` - Infura web3 endpoint
     /// 
     pub fn new(network: InfuraEndpoint) -> Self {
-        let config = RuntimeConfig::new();
+        // let config = RuntimeConfig::new();
         match network {
             InfuraEndpoint::Mainnet => {
                 Self {
-                    web3_endpoint:             config.mainnet_http_endpoint_string,//"https://rinkeby.infura.io/".to_string(),
+                    web3_endpoint:              "https://rinkeby.infura.io/".to_string(),//config.mainnet_http_endpoint_string,//
                     franklin_contract:          ethabi::Contract::load(PROD_PLASMA.0).unwrap(),
-                    franklin_contract_address:  config.mainnet_franklin_contract_address.as_str().parse().unwrap(),//"4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()        
+                    franklin_contract_address:  "4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap(),//config.mainnet_franklin_contract_address.as_str().parse().unwrap(),        
                 }
             },
             InfuraEndpoint::Rinkeby => {
                 Self {
-                    web3_endpoint:              config.rinkeby_http_endpoint_string,//"https://rinkeby.infura.io/".to_string()
+                    web3_endpoint:              "https://rinkeby.infura.io/".to_string(),//config.rinkeby_http_endpoint_string,
                     franklin_contract:          ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap(),
-                    franklin_contract_address:  config.rinkeby_franklin_contract_address.as_str().parse().unwrap(),//"4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()
+                    franklin_contract_address:  "4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap(),//config.rinkeby_franklin_contract_address.as_str().parse().unwrap(),
                 }
             },
         }

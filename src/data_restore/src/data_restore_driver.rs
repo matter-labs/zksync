@@ -5,7 +5,7 @@ use block_events::BlockEventsFranklin;
 use accounts_state::FranklinAccountsStates;
 use blocks::LogBlockData;
 use std::sync::mpsc::Sender;
-use plasma::models::Fr;
+use models::plasma::Fr;
 
 pub struct ProtoAccountsState {
     errored: bool,

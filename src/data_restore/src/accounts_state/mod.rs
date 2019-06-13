@@ -8,9 +8,11 @@ use sapling_crypto::jubjub::{edwards, Unknown};
 
 use bigdecimal::{Num, BigDecimal, Zero};
 
-use plasma::models::{Account, AccountId, PlasmaState};
-use plasma::models::{DepositTx, TransferTx, Engine, Fr, ExitTx, TxSignature};
-use plasma::models::params;
+use plasma::state::PlasmaState;
+use models::plasma::{Account, AccountId};
+use models::plasma::tx::{DepositTx, TransferTx, ExitTx, TxSignature};
+use models::plasma::{Engine, Fr}; 
+use models::plasma::params;
 
 use helpers::*;
 use franklin_transaction::{FranklinTransactionType,FranklinTransaction};

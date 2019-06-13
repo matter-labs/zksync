@@ -1,9 +1,10 @@
 [package]
 name = "eth_client"
 version = "0.1.0"
+edition = "2018"
 
 [dependencies]
-
+models = { path = "../models" }
 serde = "1.0.90"
 serde_derive = "1.0.90"
 ethereum-types = "0.4.0"
@@ -15,5 +16,3 @@ reqwest = "0.9.5"
 rlp = "0.3.0"
 tiny-keccak = "1.4.2"
 secp256k1 = "0.11.1"
-
-commons = { path = "../commons" }

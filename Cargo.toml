@@ -1,23 +1,14 @@
-[package]
-
-name = "franlklin"
-version = "0.1.0"
-edition = "2018"
-
-authors = [
-    "Alex Gluchowski <alex@gluchowski.net>",
-    "Alex Vlasov <alex.m.vlasov@gmail.com>"
+[workspace]
+members = [
+    "src/data_restore",
+    "src/key_generator",
+    "src/merkle_tree",
+    "src/eth_client",
+    "src/models",
+    "src/plasma",
+    "src/prover",
+    "src/sandbox",
+    "src/server",
+    "src/storage",
+    "src/circuit",
 ]
-
-[dependencies]
-data_restore = { path = "src/data_restore" }
-eth_client = { path = "src/eth_client" }
-plasma = { path = "src/plasma" }
-models = { path = "src/models" }
-storage = { path = "src/storage" }
-prover = { path = "src/prover" }
-server = { path = "src/server" }
-
-signal-hook = { version = "0.1.8", features = ["tokio-support"] }
-tokio = "0.1.18"
-futures = "0.1.25"

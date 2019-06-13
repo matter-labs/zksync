@@ -5,7 +5,6 @@ extern crate ethabi;
 
 extern crate plasma;
 extern crate models;
-extern crate commons;
 
 extern crate pairing;
 extern crate ff;

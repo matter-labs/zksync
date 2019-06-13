@@ -17,4 +17,3 @@ bitvec = "0.11"
 
 plasma = { path = "../plasma" }
 models = { path = "../models" }
-commons = { path = "../commons" }
