@@ -5,14 +5,14 @@ use web3::types::H256;
 pub enum BlockType {
     Committed,
     Verified,
-    Unknown
+    Unknown,
 }
 
 #[derive(Debug, Copy, Clone, Eq)]
 pub struct LogBlockData {
     pub block_num: u32,
     pub transaction_hash: H256,
-    pub block_type: BlockType
+    pub block_type: BlockType,
 }
 
 impl PartialOrd for LogBlockData {

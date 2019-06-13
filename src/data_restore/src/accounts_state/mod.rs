@@ -2,20 +2,20 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
 use ff::{Field, PrimeField, PrimeFieldRepr};
-use web3::futures::Future;
-use web3::types::{FilterBuilder, H256, U256, BlockNumber};
 use sapling_crypto::jubjub::{edwards, Unknown};
+use web3::futures::Future;
+use web3::types::{BlockNumber, FilterBuilder, H256, U256};
 
-use bigdecimal::{Num, BigDecimal, Zero};
+use bigdecimal::{BigDecimal, Num, Zero};
 
-use plasma::state::PlasmaState;
-use models::plasma::{Account, AccountId};
-use models::plasma::tx::{DepositTx, TransferTx, ExitTx, TxSignature};
-use models::plasma::{Engine, Fr}; 
 use models::plasma::params;
+use models::plasma::tx::{DepositTx, ExitTx, TransferTx, TxSignature};
+use models::plasma::{Account, AccountId};
+use models::plasma::{Engine, Fr};
+use plasma::state::PlasmaState;
 
+use franklin_transaction::{FranklinTransaction, FranklinTransactionType};
 use helpers::*;
-use franklin_transaction::{FranklinTransactionType,FranklinTransaction};
 
 pub struct FranklinAccountsStates {
     pub config: DataRestoreConfig,
@@ -30,22 +30,25 @@ impl FranklinAccountsStates {
         }
     }
 
-    pub fn update_accounts_states_from_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), DataRestoreError> {
+    pub fn update_accounts_states_from_transaction(
+        &mut self,
+        transaction: &FranklinTransaction,
+    ) -> Result<(), DataRestoreError> {
         let tx_type = transaction.franklin_transaction_type;
         match tx_type {
             FranklinTransactionType::Deposit => {
                 let _ = self.update_accounts_states_from_deposit_transaction(transaction);
                 Ok(())
-            },
+            }
             FranklinTransactionType::FullExit => {
                 let _ = self.update_accounts_states_from_full_exit_transaction(transaction);
                 Ok(())
-            },
+            }
             FranklinTransactionType::Transfer => {
                 let _ = self.update_accounts_states_from_transfer_transaction(transaction);
                 Ok(())
-            },
-            _ => return Err(DataRestoreError::WrongType)
+            }
+            _ => return Err(DataRestoreError::WrongType),
         }
     }
 
@@ -61,9 +64,14 @@ impl FranklinAccountsStates {
         self.plasma_state.get_account(account_id)
     }
 
-    fn update_accounts_states_from_transfer_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), DataRestoreError> {
+    fn update_accounts_states_from_transfer_transaction(
+        &mut self,
+        transaction: &FranklinTransaction,
+    ) -> Result<(), DataRestoreError> {
         // println!("tx: {:?}", transaction.ethereum_transaction.hash);
-        let transfer_txs_block = self.get_all_transactions_from_transfer_block(transaction).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+        let transfer_txs_block = self
+            .get_all_transactions_from_transfer_block(transaction)
+            .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         for tx in transfer_txs_block {
             if let Some(mut from) = self.plasma_state.balance_tree.items.get(&tx.from).cloned() {
                 let mut transacted_amount = BigDecimal::zero();
@@ -72,9 +80,9 @@ impl FranklinAccountsStates {
                 transacted_amount += &tx.fee;
 
                 if from.balance < transacted_amount {
-                    return Err(DataRestoreError::WrongAmount)
+                    return Err(DataRestoreError::WrongAmount);
                 }
-                
+
                 let mut to = Account::default();
                 if let Some(existing_to) = self.plasma_state.balance_tree.items.get(&tx.to) {
                     to = existing_to.clone();
@@ -90,16 +98,21 @@ impl FranklinAccountsStates {
                 self.plasma_state.balance_tree.insert(tx.from, from);
                 self.plasma_state.balance_tree.insert(tx.to, to);
             } else {
-                return Err(DataRestoreError::NonexistentAccount)
+                return Err(DataRestoreError::NonexistentAccount);
             }
         }
         Ok(())
     }
 
-    fn update_accounts_states_from_deposit_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), DataRestoreError> {
+    fn update_accounts_states_from_deposit_transaction(
+        &mut self,
+        transaction: &FranklinTransaction,
+    ) -> Result<(), DataRestoreError> {
         let batch_number = self.get_batch_number_from_deposit(transaction);
         // let block_number = self.get_block_number_from_deposit(transaction);
-        let deposit_txs_block = self.get_all_transactions_from_deposit_batch(batch_number).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+        let deposit_txs_block = self
+            .get_all_transactions_from_deposit_batch(batch_number)
+            .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         for tx in deposit_txs_block {
             let account = match self.plasma_state.balance_tree.items.get(&tx.account) {
                 None => {
@@ -109,7 +122,7 @@ impl FranklinAccountsStates {
                     acc.public_key_y = tx.pub_y;
                     acc.balance = tx.amount;
                     acc
-                },
+                }
                 Some(result) => {
                     let mut acc = result.clone();
                     acc.balance += &tx.amount;
@@ -121,13 +134,24 @@ impl FranklinAccountsStates {
         Ok(())
     }
 
-    fn update_accounts_states_from_full_exit_transaction(&mut self, transaction: &FranklinTransaction) -> Result<(), DataRestoreError> {
+    fn update_accounts_states_from_full_exit_transaction(
+        &mut self,
+        transaction: &FranklinTransaction,
+    ) -> Result<(), DataRestoreError> {
         let batch_number = self.get_batch_number_from_full_exit(transaction);
         // let block_number = self.get_block_number_from_full_exit(transaction);
-        let exit_txs_block = self.get_all_transactions_from_full_exit_batch(batch_number).map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+        let exit_txs_block = self
+            .get_all_transactions_from_full_exit_batch(batch_number)
+            .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         for tx in exit_txs_block {
-            if let None = self.plasma_state.balance_tree.items.get(&tx.account).cloned() {
-                return Err(DataRestoreError::NonexistentAccount)
+            if let None = self
+                .plasma_state
+                .balance_tree
+                .items
+                .get(&tx.account)
+                .cloned()
+            {
+                return Err(DataRestoreError::NonexistentAccount);
             }
             self.plasma_state.balance_tree.delete(tx.account);
         }
@@ -158,7 +182,10 @@ impl FranklinAccountsStates {
     //     U256::from(block_slice)
     // }
 
-    pub fn get_all_transactions_from_transfer_block(&self, transaction: &FranklinTransaction) -> Result<Vec<TransferTx>, DataRestoreError> {
+    pub fn get_all_transactions_from_transfer_block(
+        &self,
+        transaction: &FranklinTransaction,
+    ) -> Result<Vec<TransferTx>, DataRestoreError> {
         let mut tx_data_vec = transaction.commitment_data.clone();
         // println!("tx_data_vec: {:?}", tx_data_vec);
         // let block_number = &transaction.commitment_data.clone()[0..32];
@@ -166,13 +193,13 @@ impl FranklinAccountsStates {
         let tx_data_len = tx_data_vec.len();
         // println!("tx_data_len: {:?}", tx_data_len);
         tx_data_vec.reverse();
-        tx_data_vec.truncate(tx_data_len-160);
+        tx_data_vec.truncate(tx_data_len - 160);
         tx_data_vec.reverse();
         // println!("tx_data_vec final: {:?}", tx_data_vec);
         // tx_data_len = tx_data_vec.len();
         // println!("tx_data_len final: {:?}", tx_data_len);
         let txs = tx_data_vec.chunks(9);
-        
+
         let mut transfers: Vec<TransferTx> = vec![];
         let mut i = 0;
         for tx in txs {
@@ -200,28 +227,44 @@ impl FranklinAccountsStates {
             let transfer_tx = TransferTx {
                 from: from,
                 to: to,
-                amount: amount.clone(), //BigDecimal::from_str_radix("0", 10).unwrap(), 
-                fee: fee, //BigDecimal::from_str_radix("0", 10).unwrap(),
+                amount: amount.clone(), //BigDecimal::from_str_radix("0", 10).unwrap(),
+                fee: fee,               //BigDecimal::from_str_radix("0", 10).unwrap(),
                 nonce: i,
                 good_until_block: 0,
                 signature: TxSignature::default(),
                 cached_pub_key: None,
             };
-            println!("Transaction from account {:?} to account {:?}, amount = {:?}", from, to, amount);
+            println!(
+                "Transaction from account {:?} to account {:?}, amount = {:?}",
+                from, to, amount
+            );
             transfers.push(transfer_tx);
             i = i + 1;
         }
-        
+
         Ok(transfers)
     }
 
-    pub fn get_all_transactions_from_deposit_batch(&self, batch_number: U256) -> Result<Vec<DepositTx>, DataRestoreError> {
-        let deposit_event = self.config.franklin_contract.event("LogDepositRequest").unwrap().clone();
+    pub fn get_all_transactions_from_deposit_batch(
+        &self,
+        batch_number: U256,
+    ) -> Result<Vec<DepositTx>, DataRestoreError> {
+        let deposit_event = self
+            .config
+            .franklin_contract
+            .event("LogDepositRequest")
+            .unwrap()
+            .clone();
         let deposit_event_topic = deposit_event.signature();
-        
-        let deposit_canceled_event = self.config.franklin_contract.event("LogCancelDepositRequest").unwrap().clone();
+
+        let deposit_canceled_event = self
+            .config
+            .franklin_contract
+            .event("LogCancelDepositRequest")
+            .unwrap()
+            .clone();
         let deposit_canceled_topic = deposit_canceled_event.signature();
-        
+
         let deposits_filter = FilterBuilder::default()
             .address(vec![self.config.franklin_contract_address])
             .from_block(BlockNumber::Earliest)
@@ -245,20 +288,31 @@ impl FranklinAccountsStates {
             )
             .build();
 
-        let (_eloop, transport) = web3::transports::Http::new(self.config.web3_endpoint.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
+        let (_eloop, transport) = web3::transports::Http::new(self.config.web3_endpoint.as_str())
+            .map_err(|_| DataRestoreError::WrongEndpoint)?;
         let web3 = web3::Web3::new(transport);
-        let deposit_events_filter_result = web3.eth().logs(deposits_filter).wait().map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-        let cancel_events_filter_result = web3.eth().logs(cancels_filter).wait()
+        let deposit_events_filter_result = web3
+            .eth()
+            .logs(deposits_filter)
+            .wait()
+            .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+        let cancel_events_filter_result = web3
+            .eth()
+            .logs(cancels_filter)
+            .wait()
             .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
 
         let deposit_events = deposit_events_filter_result;
         let cancel_events = cancel_events_filter_result;
-        
+
         let mut all_events = vec![];
         all_events.extend(deposit_events.into_iter());
         all_events.extend(cancel_events.into_iter());
 
-        all_events = all_events.into_iter().filter(|el| el.is_removed() == false).collect();
+        all_events = all_events
+            .into_iter()
+            .filter(|el| el.is_removed() == false)
+            .collect();
 
         let mut error_flag = false;
         all_events.sort_by(|l, r| {
@@ -282,7 +336,9 @@ impl FranklinAccountsStates {
             return Ordering::Equal; // Need to rewrite
         });
         if error_flag {
-            return Err(DataRestoreError::Unknown("Logs can not have same indexes".to_string()));
+            return Err(DataRestoreError::Unknown(
+                "Logs can not have same indexes".to_string(),
+            ));
         }
 
         let mut this_batch: HashMap<U256, (U256, U256)> = HashMap::new();
@@ -304,54 +360,78 @@ impl FranklinAccountsStates {
                         this_batch.insert(account_id, (deposit_amount, public_key));
                     }
                     continue;
-                },
+                }
                 () if topic == deposit_canceled_topic => {
                     let account_id = U256::from(event.topics[2]);
-                    let _existing_record = this_batch.get(&account_id).map(|&v| v.clone())
+                    let _existing_record = this_batch
+                        .get(&account_id)
+                        .map(|&v| v.clone())
                         .ok_or("existing_record not found for deposits")?;
                     this_batch.remove(&account_id);
                     continue;
-                },
+                }
                 _ => return Err(DataRestoreError::Unknown("unexpected topic".to_string())),
             }
         }
 
         let mut all_deposits = vec![];
         for (k, v) in this_batch.iter() {
-            println!("Into account {:?} with public key {:x}, deposit amount = {:?}", k, v.1, v.0);
+            println!(
+                "Into account {:?} with public key {:x}, deposit amount = {:?}",
+                k, v.1, v.0
+            );
             let mut public_key_bytes = vec![0u8; 32];
-            v.1.to_big_endian(& mut public_key_bytes);
+            v.1.to_big_endian(&mut public_key_bytes);
             let x_sign = public_key_bytes[0] & 0x80 > 0;
             public_key_bytes[0] &= 0x7f;
             let mut fe_repr = Fr::zero().into_repr();
-            fe_repr.read_be(public_key_bytes.as_slice()).expect("read public key point");
+            fe_repr
+                .read_be(public_key_bytes.as_slice())
+                .expect("read public key point");
             let y = Fr::from_repr(fe_repr);
             if y.is_err() {
-                return Err(DataRestoreError::WrongPubKey)
+                return Err(DataRestoreError::WrongPubKey);
             }
-            let public_key_point = edwards::Point::<Engine, Unknown>::get_for_y(y.unwrap(), x_sign, &params::JUBJUB_PARAMS);
+            let public_key_point = edwards::Point::<Engine, Unknown>::get_for_y(
+                y.unwrap(),
+                x_sign,
+                &params::JUBJUB_PARAMS,
+            );
             if public_key_point.is_none() {
-                return Err(DataRestoreError::WrongPubKey)
+                return Err(DataRestoreError::WrongPubKey);
             }
 
             let (pub_x, pub_y) = public_key_point.unwrap().into_xy();
 
-            let tx: DepositTx = DepositTx{
+            let tx: DepositTx = DepositTx {
                 account: k.as_u32(),
-                amount:  BigDecimal::from_str_radix(&format!("{}", v.0), 10).unwrap(),
-                pub_x:   pub_x,
-                pub_y:   pub_y,
+                amount: BigDecimal::from_str_radix(&format!("{}", v.0), 10).unwrap(),
+                pub_x: pub_x,
+                pub_y: pub_y,
             };
             all_deposits.push(tx);
         }
         Ok(all_deposits)
     }
 
-    pub fn get_all_transactions_from_full_exit_batch(&self, batch_number: U256) -> Result<Vec<ExitTx>, DataRestoreError> {
-        let exit_event = self.config.franklin_contract.event("LogExitRequest").unwrap().clone();
+    pub fn get_all_transactions_from_full_exit_batch(
+        &self,
+        batch_number: U256,
+    ) -> Result<Vec<ExitTx>, DataRestoreError> {
+        let exit_event = self
+            .config
+            .franklin_contract
+            .event("LogExitRequest")
+            .unwrap()
+            .clone();
         let exit_event_topic = exit_event.signature();
 
-        let exit_canceled_event = self.config.franklin_contract.event("LogCancelExitRequest").unwrap().clone();
+        let exit_canceled_event = self
+            .config
+            .franklin_contract
+            .event("LogCancelExitRequest")
+            .unwrap()
+            .clone();
         let exit_canceled_topic = exit_canceled_event.signature();
 
         let exits_filter = FilterBuilder::default()
@@ -378,11 +458,18 @@ impl FranklinAccountsStates {
             )
             .build();
 
-        let (_eloop, transport) = web3::transports::Http::new(self.config.web3_endpoint.as_str()).map_err(|_| DataRestoreError::WrongEndpoint)?;
+        let (_eloop, transport) = web3::transports::Http::new(self.config.web3_endpoint.as_str())
+            .map_err(|_| DataRestoreError::WrongEndpoint)?;
         let web3 = web3::Web3::new(transport);
-        let exit_events_filter_result = web3.eth().logs(exits_filter).wait()
+        let exit_events_filter_result = web3
+            .eth()
+            .logs(exits_filter)
+            .wait()
             .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-        let cancel_events_filter_result = web3.eth().logs(cancels_filter).wait()
+        let cancel_events_filter_result = web3
+            .eth()
+            .logs(cancels_filter)
+            .wait()
             .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
 
         let exit_events = exit_events_filter_result;
@@ -393,7 +480,10 @@ impl FranklinAccountsStates {
         all_events.extend(exit_events.into_iter());
         all_events.extend(cancel_events.into_iter());
 
-        all_events = all_events.into_iter().filter(|el| el.is_removed() == false).collect();
+        all_events = all_events
+            .into_iter()
+            .filter(|el| el.is_removed() == false)
+            .collect();
 
         // sort by index
 
@@ -419,9 +509,11 @@ impl FranklinAccountsStates {
             return Ordering::Equal; // Need to rewrite
         });
         if error_flag {
-            return Err(DataRestoreError::Unknown("Logs can not have same indexes".to_string()));
+            return Err(DataRestoreError::Unknown(
+                "Logs can not have same indexes".to_string(),
+            ));
         }
-        
+
         let mut this_batch: HashSet<U256> = HashSet::new();
 
         for event in all_events {
@@ -431,18 +523,21 @@ impl FranklinAccountsStates {
                     let account_id = U256::from(event.topics[2]);
                     let existing_record = this_batch.get(&account_id).map(|&v| v.clone());
                     if let Some(_) = existing_record {
-                        return Err(DataRestoreError::DoubleExit)
+                        return Err(DataRestoreError::DoubleExit);
                     } else {
                         this_batch.insert(account_id);
                     }
                     continue;
-                },
+                }
                 () if topic == exit_canceled_topic => {
                     let account_id = U256::from(event.topics[2]);
-                    let _existing_record = this_batch.get(&account_id).map(|&v| v.clone()).ok_or("existing_record fetch failed".to_owned())?;
+                    let _existing_record = this_batch
+                        .get(&account_id)
+                        .map(|&v| v.clone())
+                        .ok_or("existing_record fetch failed".to_owned())?;
                     this_batch.remove(&account_id);
                     continue;
-                },
+                }
                 _ => return Err(DataRestoreError::Unknown("unexpected topic".to_string())),
             }
         }
@@ -453,7 +548,7 @@ impl FranklinAccountsStates {
 
             let tx: ExitTx = ExitTx {
                 account: k.as_u32(),
-                amount:  BigDecimal::zero(),
+                amount: BigDecimal::zero(),
             };
             all_exits.push(tx);
         }
