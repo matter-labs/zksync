@@ -67,6 +67,7 @@ services:
       - COIN=DAI
   tessaracts:
     image: "gluk64/franklin:tessaracts"
+    build: ./build
     ports:
       - "8080:8080"
     volumes:

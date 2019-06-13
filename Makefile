@@ -294,6 +294,8 @@ tessaracts-build:
 	@docker build -t "${TESSARACTS_DOCKER_IMAGE}" ./docker/tessaracts
 
 tessaracts-up:
+	@rm -rf build
+	@mkdir build
 	@docker-compose up "${TESSARACTS_DOCKER_IMAGE}"
 
 tessaracts-down:
