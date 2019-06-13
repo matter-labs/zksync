@@ -20,7 +20,7 @@ WORKDIR /
 COPY --from=builder /tesseracts.toml .
 COPY --from=builder /tesseracts/target/release/tesseracts .
 
-EXPOSE 80
+EXPOSE 8080
 
 RUN apk add clang clang-libs ca-certificates
 

@@ -29,7 +29,7 @@ db_store_neb     = false
 # web3 ----------------------------------------------
 
 # web3 json-rpc port, e.g. http://localhost:8545
-web3_url         = "http://localhost:8545" 
+web3_url         = "http://geth:8545" 
 
 # client type
 # "geth_clique" for geth PoS

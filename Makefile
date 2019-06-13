@@ -293,6 +293,12 @@ dev-push-flattener:
 tessaracts-build:
 	@docker build -t "${TESSARACTS_DOCKER_IMAGE}" ./docker/tessaracts
 
-tessaracts-run:
-	@docker run "${TESSARACTS_DOCKER_IMAGE}"
+tessaracts-up:
+	@docker-compose up "${TESSARACTS_DOCKER_IMAGE}"
+
+tessaracts-down:
+	@docker-compose stop "${TESSARACTS_DOCKER_IMAGE}"
+
+# tessaracts-run:
+# 	@docker run "${TESSARACTS_DOCKER_IMAGE}"
 

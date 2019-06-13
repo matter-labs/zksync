@@ -68,5 +68,9 @@ services:
   tessaracts:
     image: "gluk64/franklin:tessaracts"
     ports:
-      - "8080:80"
+      - "8080:8080"
+    volumes:
+    - type: bind
+      source: ./volumes/tessaracts
+      target: /var/lib/tessaracts/data
     
