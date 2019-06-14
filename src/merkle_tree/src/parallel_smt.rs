@@ -442,14 +442,14 @@ mod tests {
         //        //println!("{:?}\n", tree);
 
         let mut n = 1000;
-        for i in 0..3 {
+        for _i in 0..3 {
             let mut tree = TestSMT::new(24);
             let capacity = tree.capacity();
             unsafe {
                 HN = 0;
                 HC = 0;
             }
-            for j in 0..n {
+            for _j in 0..n {
                 let insert_into = usize::rand(rng) % capacity;
                 tree.insert(insert_into, TestLeaf(2));
             }

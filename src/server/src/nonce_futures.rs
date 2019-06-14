@@ -2,10 +2,7 @@ use futures::future::Shared;
 use futures::task::{self, Task};
 use futures::{Async, Future, Poll};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, RwLock};
-use std::time::{Duration, Instant};
-use tokio::prelude::*;
-use tokio::timer::{self, Interval};
+use std::sync::{Arc, RwLock};
 
 pub struct NonceReadyFuture {
     account: u32,

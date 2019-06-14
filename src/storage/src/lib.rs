@@ -991,7 +991,6 @@ impl StorageProcessor {
 
     pub fn update_prover_job(&self, job_id: i32) -> QueryResult<()> {
         use crate::schema::prover_runs::dsl::*;
-        use diesel::expression::dsl::now;
 
         let target = prover_runs.filter(id.eq(job_id));
         diesel::update(target)
@@ -1010,7 +1009,6 @@ impl StorageProcessor {
 
     pub fn record_prover_stop(&self, prover_id: i32) -> QueryResult<()> {
         use crate::schema::active_provers::dsl::*;
-        use diesel::expression::dsl::now;
 
         let target = active_provers.filter(id.eq(prover_id));
         diesel::update(target)

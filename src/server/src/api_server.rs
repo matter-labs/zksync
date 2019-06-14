@@ -1,15 +1,14 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
-use crate::nonce_futures::{NonceFutures, NonceReadyFuture};
-use storage::{BlockDetails, ConnectionPool, StorageProcessor, StoredTx};
+use crate::nonce_futures::NonceFutures;
+use storage::{BlockDetails, ConnectionPool};
 use actix_web::{
-    http::Method, http::StatusCode, middleware, middleware::cors::Cors, server, App,
+    http::Method, middleware, middleware::cors::Cors, server, App,
     AsyncResponder, Error, HttpMessage, HttpRequest, HttpResponse,
 };
-use chrono::prelude::*;
 use models::config::RUNTIME_CONFIG;
-use models::plasma::{Account, Nonce, PublicKey, TransferTx};
-use models::{ActionType, NetworkStatus, Operation, StateKeeperRequest, TransferTxConfirmation};
+use models::plasma::{Account, PublicKey, TransferTx};
+use models::{ActionType, NetworkStatus, StateKeeperRequest, TransferTxConfirmation};
 use std::sync::mpsc;
 
 use futures::Future;
@@ -17,8 +16,7 @@ use std::env;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use tokio::prelude::*;
-use tokio::runtime::Runtime;
-use tokio::timer::{Delay, Interval};
+use tokio::timer::Interval;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ApiError {
@@ -571,7 +569,7 @@ fn start_server(state: AppState, bind_to: String) {
 
 pub fn start_status_interval(state: AppState) {
     let state_checker = Interval::new(Instant::now(), Duration::from_millis(1000))
-        .fold(state.clone(), |mut state, instant| {
+        .fold(state.clone(), |state, _instant| {
             let pool = state.connection_pool.clone();
             let storage = pool.access_storage().expect("db failed");
 

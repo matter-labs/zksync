@@ -1,10 +1,10 @@
 use eth_client::ETHClient;
 use models::abi::TEST_PLASMA_ALWAYS_VERIFY;
-use models::{Action, CommitRequest, Operation, ProverRequest, TxMeta};
-use std::sync::mpsc::{channel, Receiver, Sender};
+use models::{Action, CommitRequest, Operation};
+use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 use std::time::Duration;
-use storage::{ConnectionPool, StorageProcessor};
+use storage::ConnectionPool;
 
 pub fn start_committer(
     rx_for_ops: Receiver<CommitRequest>,
@@ -29,7 +29,7 @@ fn run_committer(
         .access_storage()
         .expect("db connection failed for committer");;
 
-    let mut eth_client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
+    let eth_client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
     let current_nonce = eth_client.current_nonce().expect("can not get nonce");
     storage.prepare_nonce_scheduling(&eth_client.current_sender(), current_nonce);
 

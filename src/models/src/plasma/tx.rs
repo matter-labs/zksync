@@ -291,7 +291,6 @@ impl TransactionSignature<Engine> {
 impl Tx<Engine> {
     // TODO: introduce errors if necessary
     pub fn try_from(transaction: &crate::plasma::tx::TransferTx) -> Result<Self, String> {
-        use bigdecimal::ToPrimitive;
         let encoded_amount_bits = convert_to_float(
             transaction.amount.to_u128().unwrap(), // TODO: use big decimal in convert_to_float() instead
             params::AMOUNT_EXPONENT_BIT_WIDTH,
