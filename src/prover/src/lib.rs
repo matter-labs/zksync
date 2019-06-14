@@ -1,16 +1,3 @@
-extern crate circuit;
-extern crate models;
-extern crate plasma;
-extern crate rustc_hex;
-extern crate storage;
-extern crate tokio;
-
-extern crate bellman;
-extern crate crypto;
-extern crate ff;
-extern crate rand;
-extern crate sapling_crypto;
-
 use rand::OsRng;
 use std::fmt;
 use std::iter::Iterator;
@@ -34,7 +21,7 @@ use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
 use sapling_crypto::circuit::float_point::parse_float_to_u128;
 use sapling_crypto::jubjub::{edwards, JubjubEngine};
 
-use self::rustc_hex::ToHex;
+use rustc_hex::ToHex;
 
 use bellman::groth16::{
     create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,

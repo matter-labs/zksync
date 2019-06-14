@@ -1,14 +1,5 @@
 #[macro_use]
 extern crate diesel;
-extern crate bigdecimal;
-extern crate chrono;
-extern crate ff;
-extern crate fnv;
-extern crate models;
-extern crate serde;
-extern crate serde_derive;
-extern crate serde_json;
-extern crate web3;
 
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;

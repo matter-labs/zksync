@@ -1,6 +1,6 @@
-use super::config;
-use super::models::*;
-use super::storage::{ConnectionPool, StorageProcessor};
+use config;
+use models::*;
+use storage::{ConnectionPool, StorageProcessor};
 use circuit::encoder;
 use eth_client::ETHClient;
 use ff::{PrimeField, PrimeFieldRepr};

@@ -179,7 +179,7 @@ fn test_get_bits() {
     assert_eq!(bits, vec![false, false, true]);
 
     let bits = Fr::from_str("0").unwrap().get_bits_le_fixed(512);
-    assert_eq!(bits.len(), 512);
+    assert_eq!(bits, vec![false; 512]);
 }
 
 //

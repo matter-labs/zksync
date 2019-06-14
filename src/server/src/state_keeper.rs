@@ -15,12 +15,13 @@ use std::str::FromStr;
 use std::thread;
 use web3::types::{H256, U128, U256};
 
-use super::config;
-use super::models::{
+use models::config;
+
+use models::{
     CommitRequest, NetworkStatus, ProtoBlock, StateKeeperRequest, TransferTxConfirmation,
     TransferTxResult,
 };
-use super::storage::{ConnectionPool, StorageProcessor};
+use storage::{ConnectionPool, StorageProcessor};
 
 use rand::{Rng, SeedableRng, XorShiftRng};
 

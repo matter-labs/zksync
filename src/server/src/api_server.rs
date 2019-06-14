@@ -1,7 +1,7 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
-use super::nonce_futures::{NonceFutures, NonceReadyFuture};
-use super::storage::{BlockDetails, ConnectionPool, StorageProcessor, StoredTx};
+use crate::nonce_futures::{NonceFutures, NonceReadyFuture};
+use storage::{BlockDetails, ConnectionPool, StorageProcessor, StoredTx};
 use actix_web::{
     http::Method, http::StatusCode, middleware, middleware::cors::Cors, server, App,
     AsyncResponder, Error, HttpMessage, HttpRequest, HttpResponse,

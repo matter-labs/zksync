@@ -2,14 +2,6 @@
 extern crate serde_derive;
 #[macro_use]
 extern crate lazy_static;
-extern crate bellman;
-extern crate bigdecimal;
-extern crate ff;
-extern crate fnv;
-extern crate pairing;
-extern crate rand;
-extern crate sapling_crypto;
-extern crate web3;
 
 pub mod abi;
 pub mod config;

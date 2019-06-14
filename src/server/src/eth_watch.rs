@@ -1,9 +1,6 @@
-extern crate rustc_hex;
-extern crate web3;
-
 use ff::{Field, PrimeField, PrimeFieldRepr};
 
-use super::models::{ProtoBlock, StateKeeperRequest};
+use models::{ProtoBlock, StateKeeperRequest};
 use bigdecimal::{BigDecimal, Num};
 use models::plasma::block::{Block, BlockData};
 use models::plasma::params;
@@ -14,14 +11,14 @@ use std::env;
 use std::str::FromStr;
 use std::sync::mpsc::Sender;
 
-use super::config;
+use models::config;
 use sapling_crypto::jubjub::{edwards, Unknown};
 use std::time;
 use web3::contract::{Contract, Options};
 use web3::futures::Future;
 use web3::types::{BlockNumber, FilterBuilder, H160, H256, U128, U256};
 
-use super::storage::{ConnectionPool, StorageProcessor};
+use storage::{ConnectionPool, StorageProcessor};
 
 type ABI = (&'static [u8], &'static str);
 
