@@ -1,13 +1,13 @@
-use config;
-use models::*;
-use storage::ConnectionPool;
 use circuit::encoder;
+use config;
 use eth_client::ETHClient;
 use ff::{PrimeField, PrimeFieldRepr};
 use models::abi::TEST_PLASMA_ALWAYS_VERIFY;
 use models::plasma::block::BlockData;
 use models::plasma::{params, AccountMap};
+use models::*;
 use std::sync::mpsc::{channel, Receiver, Sender};
+use storage::ConnectionPool;
 use web3::types::{H256, U128, U256};
 
 fn sorted_and_padded_for_deposits(

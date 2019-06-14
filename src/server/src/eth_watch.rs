@@ -1,10 +1,10 @@
 use ff::{Field, PrimeField, PrimeFieldRepr};
 
-use models::{ProtoBlock, StateKeeperRequest};
 use bigdecimal::{BigDecimal, Num};
 use models::plasma::params;
 use models::plasma::tx::{DepositTx, ExitTx};
 use models::plasma::{Engine, Fr};
+use models::{ProtoBlock, StateKeeperRequest};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::str::FromStr;

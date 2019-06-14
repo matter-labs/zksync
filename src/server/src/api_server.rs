@@ -1,15 +1,15 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
 use crate::nonce_futures::NonceFutures;
-use storage::{BlockDetails, ConnectionPool};
 use actix_web::{
-    http::Method, middleware, middleware::cors::Cors, server, App,
-    AsyncResponder, Error, HttpMessage, HttpRequest, HttpResponse,
+    http::Method, middleware, middleware::cors::Cors, server, App, AsyncResponder, Error,
+    HttpMessage, HttpRequest, HttpResponse,
 };
 use models::config::RUNTIME_CONFIG;
 use models::plasma::{Account, PublicKey, TransferTx};
 use models::{ActionType, NetworkStatus, StateKeeperRequest, TransferTxConfirmation};
 use std::sync::mpsc;
+use storage::{BlockDetails, ConnectionPool};
 
 use futures::Future;
 use std::env;
