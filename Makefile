@@ -107,6 +107,7 @@ sandbox:
 	@cd src/sandbox && cargo run
 
 build-target:
+	$(rust-musl-builder) sudo chown -R rust:rust /home/rust/.cargo/git /home/rust/.cargo/registry
 	$(rust-musl-builder) cargo build --release
 
 clean-target:
