@@ -92,7 +92,7 @@ explorer-up: #dist-explorer
 # Rust: cross-platform rust builder for linus
 
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
-rust-musl-builder = @docker run $(docker-options) -t ekidd/rust-musl-builder
+rust-musl-builder = @docker run $(docker-options) ekidd/rust-musl-builder
 
 
 # Rust: main stuff
