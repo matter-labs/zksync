@@ -1,6 +1,6 @@
+use crate::plasma::circuit::sig::TransactionSignature;
 use crate::plasma::circuit::utils::le_bit_vector_into_field_element;
 use crate::plasma::params;
-use crate::plasma::circuit::sig::TransactionSignature;
 use ff::{BitIterator, PrimeField};
 use sapling_crypto::alt_babyjubjub::JubjubEngine;
 use sapling_crypto::eddsa::{PrivateKey, PublicKey};

@@ -2,42 +2,26 @@ use pairing::bn256::Bn256;
 // use sapling_crypto::jubjub::{FixedGenerators};
 // use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 
-use rand::OsRng;
-use rayon::prelude::*;
-use sapling_crypto::eddsa::{PrivateKey, PublicKey};
-use std::collections::{HashMap, VecDeque};
-use std::str::FromStr;
-use std::thread;
-use web3::types::{H256, U128, U256};
-use plasma::state::PlasmaState;
-use models::plasma::{
-    AccountMap,
-    BatchNumber,
-    AccountId
-};
-use models::plasma::tx::{
-    TransferTx,
-    DepositTx,
-    ExitTx
-};
-use models::plasma::block::{
-    BlockData,
-    Block
-};
 use models::plasma::account::Account;
+use models::plasma::block::{Block, BlockData};
+use models::plasma::tx::{DepositTx, ExitTx, TransferTx};
+use models::plasma::{AccountId, AccountMap, BatchNumber};
+use plasma::state::PlasmaState;
+use rayon::prelude::*;
+use sapling_crypto::eddsa::PrivateKey;
+use std::collections::VecDeque;
+use web3::types::H256;
 
-use super::config;
-use super::models::{
+use models::config;
+
+use models::{
     CommitRequest, NetworkStatus, ProtoBlock, StateKeeperRequest, TransferTxConfirmation,
     TransferTxResult,
 };
-use super::storage::{ConnectionPool, StorageProcessor};
-
-use rand::{Rng, SeedableRng, XorShiftRng};
+use storage::ConnectionPool;
 
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive, Zero};
-use ff::{PrimeField, PrimeFieldRepr};
-use fnv::{FnvHashMap, FnvHashSet};
+use fnv::FnvHashMap;
 use std::sync::mpsc::{Receiver, Sender};
 
 use std::io::BufReader;
@@ -141,7 +125,7 @@ impl PlasmaStateKeeper {
                         self.finalize_current_batch(&tx_for_commitments);
                     }
                 }
-                StateKeeperRequest::AddBlock(mut block) => {
+                StateKeeperRequest::AddBlock(block) => {
                     self.block_queue.push_back(block);
                     //println!("new protoblock, transfer_tx_queue.len() = {}", self.transfer_tx_queue.len());
                     if self.transfer_tx_queue.len() == 0 {
@@ -160,8 +144,8 @@ impl PlasmaStateKeeper {
     }
 
     fn process_block_queue(&mut self, tx_for_commitments: &Sender<CommitRequest>) {
-        let mut blocks = std::mem::replace(&mut self.block_queue, VecDeque::default());
-        for mut block in blocks.into_iter() {
+        let blocks = std::mem::replace(&mut self.block_queue, VecDeque::default());
+        for block in blocks.into_iter() {
             let req = match block {
                 ProtoBlock::Transfer => self.create_transfer_block(),
                 ProtoBlock::Deposit(batch_number, transactions) => {
@@ -268,7 +252,7 @@ impl PlasmaStateKeeper {
 
     fn create_transfer_block(&mut self) -> CommitRequest {
         let transactions = std::mem::replace(&mut self.transfer_tx_queue, Vec::default());
-        let mut total_fees: u128 = transactions
+        let total_fees: u128 = transactions
             .iter()
             .map(|tx| tx.fee.to_u128().expect("should not overflow"))
             .sum();
@@ -415,7 +399,7 @@ fn test_read_private_key() {
     let padding_account_id = 2;
 
     let nonce = 0;
-    let tx = TransferTx::create_signed_tx(
+    let _tx = TransferTx::create_signed_tx(
         padding_account_id, // from
         0,                  // to
         BigDecimal::zero(), // amount

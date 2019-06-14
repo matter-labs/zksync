@@ -288,19 +288,7 @@ dev-push-geth:
 dev-push-flattener:
 	@docker push "${FLATTENER_DOCKER_IMAGE}"
 
-# Tessaracts
+# Key generator 
 
-tessaracts-build:
-	@docker build -t "${TESSARACTS_DOCKER_IMAGE}" ./docker/tessaracts
-
-tessaracts-up:
-	@rm -rf build
-	@mkdir build
-	@docker-compose up "${TESSARACTS_DOCKER_IMAGE}"
-
-tessaracts-down:
-	@docker-compose stop "${TESSARACTS_DOCKER_IMAGE}"
-
-# tessaracts-run:
-# 	@docker run "${TESSARACTS_DOCKER_IMAGE}"
-
+make-keys:
+	@cd key_generator && cargo run --release

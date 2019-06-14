@@ -1,15 +1,19 @@
 // Sparse Merkle tree with batch updates
 
-use std::fmt::Debug;
 use crate::hasher::Hasher;
-use models::primitives::GetBits;
 use fnv::FnvHashMap;
+use models::primitives::GetBits;
+use std::fmt::Debug;
 
 // use std::time::Duration;
 // use rayon::prelude::*;
 
 fn select<T>(condition: bool, a: T, b: T) -> (T, T) {
-    if condition { (a, b) } else { (b, a) }
+    if condition {
+        (a, b)
+    } else {
+        (b, a)
+    }
 }
 
 // Nodes enumarated starting with index(root) = 1
@@ -37,9 +41,10 @@ pub struct Node {
 
 #[derive(Clone)]
 pub struct SparseMerkleTree<T, Hash, H>
-    where T: GetBits + Default + Sync,
-          Hash: Clone + Debug + Sync + Send,
-          H: Hasher<Hash> + Sync
+where
+    T: GetBits + Default + Sync,
+    Hash: Clone + Debug + Sync + Send,
+    H: Hasher<Hash> + Sync,
 {
     pub items: FnvHashMap<ItemIndex, T>,
 
@@ -53,18 +58,18 @@ pub struct SparseMerkleTree<T, Hash, H>
     cache: FnvHashMap<NodeIndex, Hash>,
 }
 
-impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
-    where T: GetBits + Default + Sync,
-          Hash: Clone + Debug + Sync + Send,
-          H: Hasher<Hash> + Default + Sync,
+impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
+where
+    T: GetBits + Default + Sync,
+    Hash: Clone + Debug + Sync + Send,
+    H: Hasher<Hash> + Default + Sync,
 {
-
     pub fn new(tree_depth: Depth) -> Self {
         assert!(tree_depth > 1);
         let hasher = H::default();
         let items = FnvHashMap::default();
         let mut nodes = Vec::new();
-        nodes.push(Node{
+        nodes.push(Node {
             index: 1,
             depth: 0,
             left: None,
@@ -82,8 +87,16 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
 
         let cache = FnvHashMap::default();
 
-        Self{tree_depth, prehashed, items, hasher, nodes, cache, root: 0 }
- }
+        Self {
+            tree_depth,
+            prehashed,
+            items,
+            hasher,
+            nodes,
+            cache,
+            root: 0,
+        }
+    }
 
     #[inline(always)]
     fn depth(index: NodeIndex) -> Depth {
@@ -167,8 +180,13 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
 
                     // add a split node at intersection and insert the leaf
                     let leaf_ref = self.insert_node(leaf_index, tree_depth, None, None);
-                    let (lhs, rhs) = select(leaf_index_normalized > next.index, Some(next_ref), Some(leaf_ref));
-                    let inter_ref = self.insert_node(inter_index, Self::depth(inter_index), lhs, rhs);
+                    let (lhs, rhs) = select(
+                        leaf_index_normalized > next.index,
+                        Some(next_ref),
+                        Some(leaf_ref),
+                    );
+                    let inter_ref =
+                        self.insert_node(inter_index, Self::depth(inter_index), lhs, rhs);
                     self.add_child_node(cur_ref, dir, inter_ref);
                     break;
                 }
@@ -181,8 +199,19 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
         }
     }
 
-    fn insert_node(&mut self, index: NodeIndex, depth: Depth, left: Option<NodeRef>, right: Option<NodeRef>) -> NodeRef {
-        self.nodes.push(Node{index, depth, left, right});
+    fn insert_node(
+        &mut self,
+        index: NodeIndex,
+        depth: Depth,
+        left: Option<NodeRef>,
+        right: Option<NodeRef>,
+    ) -> NodeRef {
+        self.nodes.push(Node {
+            index,
+            depth,
+            left,
+            right,
+        });
         self.nodes.len() - 1
     }
 
@@ -206,27 +235,40 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
         let mut cur_i = child.index;
 
         while cur_depth > parent.depth {
-            unsafe { HC += 1; }
+            unsafe {
+                HC += 1;
+            }
             let swap = (cur_i & 1) == 0;
             let (lhs, rhs) = select(swap, cur_hash, self.prehashed[cur_depth + 1].clone());
-            cur_hash = self.hasher.compress(&lhs, &rhs, self.tree_depth - cur_depth - 1);
+            cur_hash = self
+                .hasher
+                .compress(&lhs, &rhs, self.tree_depth - cur_depth - 1);
             cur_depth -= 1;
             cur_i >>= 1;
             //self.cache.insert(cur_i, cur_hash.clone());
-            updates.push(( cur_i, cur_hash.clone() ));
+            updates.push((cur_i, cur_hash.clone()));
         }
         (cur_hash, updates)
     }
 
-    fn get_child_hash(&self, child_ref: Option<NodeRef>, parent: &Node, dir: usize) -> (Hash, Vec<(NodeIndex, Hash)>) {
+    fn get_child_hash(
+        &self,
+        child_ref: Option<NodeRef>,
+        parent: &Node,
+        dir: usize,
+    ) -> (Hash, Vec<(NodeIndex, Hash)>) {
         let neighbour_index = parent.index * 2 + dir as NodeIndex;
         match self.cache.get(&neighbour_index) {
-            Some(cached) => {
-                (cached.clone(), Vec::with_capacity((self.tree_depth+1)*2))
-            },
+            Some(cached) => (
+                cached.clone(),
+                Vec::with_capacity((self.tree_depth + 1) * 2),
+            ),
             None => match child_ref {
                 Some(child_ref) => self.get_hash_line(child_ref, parent),
-                None => (self.prehashed[parent.depth + 1].clone(), Vec::with_capacity((self.tree_depth+1)*2)),
+                None => (
+                    self.prehashed[parent.depth + 1].clone(),
+                    Vec::with_capacity((self.tree_depth + 1) * 2),
+                ),
             },
         }
     }
@@ -237,7 +279,9 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
             if node.depth == self.tree_depth {
                 // leaf node: return item hash
                 let item_index: ItemIndex = (node.index - (1 << self.tree_depth)) as ItemIndex;
-                unsafe { HN += 1; }
+                unsafe {
+                    HN += 1;
+                }
                 let item_hash = self.hasher.hash_bits(self.items[&item_index].get_bits_le());
                 (item_hash, vec![])
             } else {
@@ -264,7 +308,7 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
         let acc = self.get_hash(0);
         for v in acc.1 {
             self.cache.insert(v.0, v.1);
-        };
+        }
         acc.0
     }
 
@@ -277,43 +321,41 @@ impl<T, Hash, H> SparseMerkleTree< T, Hash, H>
 
     pub fn print_stats() {
         // unsafe {
-//            println!("leaf hashes: {}", HN);
-//            println!("tree hashes: {}", HC);
+        //            println!("leaf hashes: {}", HN);
+        //            println!("tree hashes: {}", HC);
         // }
     }
 
-
     pub fn make_a_future(&self) {
 
-//        let pool = CpuPool::new_num_cpus();
-//
-//        let r = thread::scope(|scope| {
-//            scope.spawn(move |_| {
-//                println!("Hello! {:?}", self.root_hash());
-//                std::thread::sleep(Duration::from_millis(1400));
-//                println!("done");
-//                3 + 5
-//            });
-//        }).unwrap();
-//        println!("r {:?}", r);
+        //        let pool = CpuPool::new_num_cpus();
+        //
+        //        let r = thread::scope(|scope| {
+        //            scope.spawn(move |_| {
+        //                println!("Hello! {:?}", self.root_hash());
+        //                std::thread::sleep(Duration::from_millis(1400));
+        //                println!("done");
+        //                3 + 5
+        //            });
+        //        }).unwrap();
+        //        println!("r {:?}", r);
 
-//        println!("testing cpu");
-//        crossbeam_utils::thread::scope(|scope| {
-//            scope.spawn(move || {
-//                println!("begin");
-//            })
-//        });
+        //        println!("testing cpu");
+        //        crossbeam_utils::thread::scope(|scope| {
+        //            scope.spawn(move || {
+        //                println!("begin");
+        //            })
+        //        });
 
-//        Box::new(self.pool.spawn(future::lazy(move || {
-//            println!("begin");
-//            let r = self.root_hash();
-//            println!("end: {:?}", r);
-//            future::ok::<(), ()>(())
-//        })))/*.then(|result| {
-//            println!("result {:?}", result);
-//            future::ok::<(), ()>(())
-//        }));*/
-
+        //        Box::new(self.pool.spawn(future::lazy(move || {
+        //            println!("begin");
+        //            let r = self.root_hash();
+        //            println!("end: {:?}", r);
+        //            future::ok::<(), ()>(())
+        //        })))/*.then(|result| {
+        //            println!("result {:?}", result);
+        //            future::ok::<(), ()>(())
+        //        }));*/
         //f.wait();
     }
 }
@@ -334,7 +376,9 @@ mod tests {
     struct TestLeaf(u64);
 
     impl Default for TestLeaf {
-        fn default() -> Self { TestLeaf(0) }
+        fn default() -> Self {
+            TestLeaf(0)
+        }
     }
 
     impl GetBits for TestLeaf {
@@ -350,17 +394,20 @@ mod tests {
     }
 
     impl Default for TestHasher {
-        fn default() -> Self { Self {} }
+        fn default() -> Self {
+            Self {}
+        }
     }
 
     impl Hasher<u64> for TestHasher {
-
-        fn hash_bits<I: IntoIterator<Item=bool>>(&self, value: I) -> u64 {
+        fn hash_bits<I: IntoIterator<Item = bool>>(&self, value: I) -> u64 {
             let mut acc = 0;
             let v: Vec<bool> = value.into_iter().collect();
             for i in v.iter() {
                 acc <<= 1;
-                if *i {acc |= 1};
+                if *i {
+                    acc |= 1
+                };
             }
             acc
         }
@@ -370,40 +417,39 @@ mod tests {
             //println!("compress {} {}, {} => {}", lhs, rhs, i, r);
             r
         }
-
     }
 
     type TestSMT = SparseMerkleTree<TestLeaf, u64, TestHasher>;
 
-    use rand::{Rand, thread_rng};
+    use rand::{thread_rng, Rand};
 
     #[test]
     fn test_batching_tree_insert1() {
         let rng = &mut thread_rng();
-//        tree.insert(0, TestLeaf(0));
-//        tree.insert(3, TestLeaf(2));
-//        tree.insert(1, TestLeaf(1));
-//        tree.insert(3, TestLeaf(2));
-//        tree.insert(5, TestLeaf(2));
-//        tree.insert(7, TestLeaf(2));
-//
-//        for _ in 0..1000 {
-//            let insert_into = usize::rand(rng) % capacity;
-//            tree.insert(insert_into, TestLeaf(u64::rand(rng)));
-//            tree.root_hash();
-//        }
-//        tree.insert(usize::rand(rng) % capacity, TestLeaf(2));
-//        //println!("{:?}\n", tree);
+        //        tree.insert(0, TestLeaf(0));
+        //        tree.insert(3, TestLeaf(2));
+        //        tree.insert(1, TestLeaf(1));
+        //        tree.insert(3, TestLeaf(2));
+        //        tree.insert(5, TestLeaf(2));
+        //        tree.insert(7, TestLeaf(2));
+        //
+        //        for _ in 0..1000 {
+        //            let insert_into = usize::rand(rng) % capacity;
+        //            tree.insert(insert_into, TestLeaf(u64::rand(rng)));
+        //            tree.root_hash();
+        //        }
+        //        tree.insert(usize::rand(rng) % capacity, TestLeaf(2));
+        //        //println!("{:?}\n", tree);
 
         let mut n = 1000;
-        for i in 0..3 {
+        for _i in 0..3 {
             let mut tree = TestSMT::new(24);
             let capacity = tree.capacity();
             unsafe {
                 HN = 0;
                 HC = 0;
             }
-            for j in 0..n {
+            for _j in 0..n {
                 let insert_into = usize::rand(rng) % capacity;
                 tree.insert(insert_into, TestLeaf(2));
             }
@@ -418,7 +464,7 @@ mod tests {
     #[test]
     fn test_batching_tree_insert_comparative() {
         let mut tree = TestSMT::new(3);
-        tree.insert(0,  TestLeaf(1));
+        tree.insert(0, TestLeaf(1));
         assert_eq!(tree.root_hash(), 697516875);
         tree.insert(0, TestLeaf(2));
         assert_eq!(tree.root_hash(), 741131083);
@@ -432,14 +478,13 @@ mod tests {
 
         tree.make_a_future();
 
-//        tree.insert(0,  TestLeaf(1));
-//        println!("{}", tree.root_hash());
-//        println!("{:?}", tree.prehashed);
-//        println!("{:?}", tree.nodes);
-//
-//        tree.insert(0, TestLeaf(2));
-//        println!("{}", tree.root_hash());
-//        println!("{:?}", tree.nodes);
-
+        //        tree.insert(0,  TestLeaf(1));
+        //        println!("{}", tree.root_hash());
+        //        println!("{:?}", tree.prehashed);
+        //        println!("{:?}", tree.nodes);
+        //
+        //        tree.insert(0, TestLeaf(2));
+        //        println!("{}", tree.root_hash());
+        //        println!("{:?}", tree.nodes);
     }
 }

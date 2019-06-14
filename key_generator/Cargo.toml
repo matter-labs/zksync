@@ -14,11 +14,8 @@ time = "0.1"
 pairing = { package = "pairing_ce", version = "0.17.0" }
 sapling_crypto = { package = "sapling-crypto_ce", version = "0.0.5" }
 bellman = { package = "bellman_ce", version = "0.3.0" }
-circuit = { path = "../circuit" }
-models = { path = "../models" }
+circuit = { path = "../src/circuit" }
+models = { path = "../src/models" }
 hex = "0.3.2"
 rust-crypto = "0.2"
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
-
-
-

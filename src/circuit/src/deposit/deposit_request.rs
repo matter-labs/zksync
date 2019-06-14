@@ -1,6 +1,6 @@
 use ff::{BitIterator, PrimeField};
-use sapling_crypto::jubjub::{edwards, edwards::Point, JubjubEngine, Unknown};
 use models::plasma::params as plasma_constants;
+use sapling_crypto::jubjub::{edwards, edwards::Point, JubjubEngine, Unknown};
 
 // This is deposit request
 

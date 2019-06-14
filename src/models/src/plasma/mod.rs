@@ -1,8 +1,8 @@
 pub mod account;
+pub mod block;
 pub mod circuit;
 pub mod params;
 pub mod tx;
-pub mod block;
 
 pub use web3::types::{H256, U128, U256};
 

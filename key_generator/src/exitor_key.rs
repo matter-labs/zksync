@@ -21,7 +21,7 @@ const CONTRACT_FILENAME: &str = "ExitVerificationKey.sol";
 const CONTRACT_NAME: &str = "ExitVerificationKey";
 const CONTRACT_FUNCTION_NAME: &str = "getVkExitCircuit";
 
-fn main() {
+pub fn make_exitor_key() {
     // let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &AltJubjubBn256::new();
     // let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);

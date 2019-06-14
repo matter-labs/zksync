@@ -1,7 +1,7 @@
 use crate::circuit;
-use crate::{Engine, Fr, PublicKey};
 use crate::plasma::params;
 use crate::primitives::GetBits;
+use crate::{Engine, Fr, PublicKey};
 use bigdecimal::BigDecimal;
 use sapling_crypto::jubjub::{edwards, Unknown};
 
@@ -15,9 +15,8 @@ pub struct Account {
 
 impl GetBits for Account {
     fn get_bits_le(&self) -> Vec<bool> {
-
         circuit::account::CircuitAccount::<Engine>::from(self.clone()).get_bits_le()
-        
+
         // TODO: make more efficient:
 
         // let mut leaf_content = Vec::new();

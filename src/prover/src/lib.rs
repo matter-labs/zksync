@@ -1,16 +1,3 @@
-extern crate models;
-extern crate plasma;
-extern crate circuit;
-extern crate rustc_hex;
-extern crate storage;
-extern crate tokio;
-
-extern crate bellman;
-extern crate crypto;
-extern crate ff;
-extern crate rand;
-extern crate sapling_crypto;
-
 use rand::OsRng;
 use std::fmt;
 use std::iter::Iterator;
@@ -34,31 +21,26 @@ use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
 use sapling_crypto::circuit::float_point::parse_float_to_u128;
 use sapling_crypto::jubjub::{edwards, JubjubEngine};
 
-use self::rustc_hex::ToHex;
+use rustc_hex::ToHex;
 
 use bellman::groth16::{
     create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
 };
 
 use circuit::CircuitAccountTree;
-use models::plasma::circuit::account::CircuitAccount;
 use models::plasma::block::Block;
-use plasma::state::PlasmaState;
+use models::plasma::block::BlockData;
+use models::plasma::circuit::account::CircuitAccount;
 use models::plasma::params;
-use models::plasma::{
-    AccountId, 
-    BlockNumber, 
-    Engine, 
-    Fr,
-};
-use models::plasma::tx::{DepositTx, TransferTx, ExitTx};
-use models::plasma::block::{BlockData};
+use models::plasma::tx::{DepositTx, ExitTx, TransferTx};
+use models::plasma::{AccountId, BlockNumber, Engine, Fr};
+use plasma::state::PlasmaState;
 
+use circuit::encoder;
 use models::config::{
     DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE, PROVER_CYCLE_WAIT, PROVER_TIMEOUT, PROVER_TIMER_TICK,
     RUNTIME_CONFIG,
 };
-use circuit::encoder;
 use models::EncodedProof;
 use storage::StorageProcessor;
 
@@ -73,9 +55,7 @@ use models::plasma::circuit::utils::be_bit_vector_into_bytes;
 use circuit::transfer::circuit::{TransactionWitness, Transfer};
 
 use models::primitives::{
-    field_element_to_u32, 
-    serialize_g1_for_ethereum, 
-    serialize_g2_for_ethereum,
+    field_element_to_u32, serialize_g1_for_ethereum, serialize_g2_for_ethereum,
 };
 
 pub struct Prover<E: JubjubEngine> {
