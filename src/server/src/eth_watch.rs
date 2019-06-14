@@ -1,6 +1,7 @@
 use ff::{Field, PrimeField, PrimeFieldRepr};
 
 use bigdecimal::{BigDecimal, Num};
+use models::abi::TEST_PLASMA_ALWAYS_VERIFY;
 use models::plasma::params;
 use models::plasma::tx::{DepositTx, ExitTx};
 use models::plasma::{Engine, Fr};
@@ -18,18 +19,6 @@ use web3::futures::Future;
 use web3::types::{BlockNumber, FilterBuilder, H160, H256, U256};
 
 use storage::ConnectionPool;
-
-type ABI = (&'static [u8], &'static str);
-
-pub const TEST_PLASMA_ALWAYS_VERIFY: ABI = (
-    include_bytes!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.abi"),
-    include_str!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.bin"),
-);
-
-pub const PROD_PLASMA: ABI = (
-    include_bytes!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.abi"),
-    include_str!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.bin"),
-);
 
 fn u64_from_environment(name: &str) -> Option<u64> {
     let candidate = env::var(name);
