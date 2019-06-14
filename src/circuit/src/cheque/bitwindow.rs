@@ -1,9 +1,9 @@
-use ff::{Field, PrimeField};
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
-use sapling_crypto::jubjub::JubjubEngine;
-use sapling_crypto::circuit::{boolean, Assignment};
+use ff::{Field, PrimeField};
 use sapling_crypto::circuit::num::{AllocatedNum, Num};
 use sapling_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
+use sapling_crypto::circuit::{boolean, Assignment};
+use sapling_crypto::jubjub::JubjubEngine;
 
 #[derive(Clone)]
 pub struct BitWindowWitness<E: JubjubEngine> {

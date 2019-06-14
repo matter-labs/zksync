@@ -1,9 +1,3 @@
-extern crate futures;
-extern crate prover;
-extern crate signal_hook;
-extern crate storage;
-extern crate tokio;
-
 use prover::BabyProver;
 use signal_hook::iterator::Signals;
 use std::env;

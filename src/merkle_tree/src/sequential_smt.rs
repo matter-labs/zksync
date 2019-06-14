@@ -1,7 +1,7 @@
 // Sparse Merkle tree with flexible hashing strategy
 
-use models::primitives::GetBits;
 use crate::hasher::Hasher;
+use models::primitives::GetBits;
 use std::collections::HashMap;
 use std::fmt::Debug;
 

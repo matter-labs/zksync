@@ -1,5 +1,9 @@
 use time::PreciseTime;
 
+use circuit::leaf::LeafWitness;
+use circuit::transfer::circuit::{TransactionWitness, Transfer};
+use circuit::transfer::transaction::Transaction;
+use circuit::CircuitAccountTree;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
@@ -9,30 +13,26 @@ use pairing::Engine;
 use rand::{Rng, SeedableRng, XorShiftRng};
 use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
 use sapling_crypto::circuit::test::*;
-use circuit::leaf::LeafWitness;
-use circuit::CircuitAccountTree;
-use circuit::transfer::circuit::{Transfer, TransactionWitness};
-use circuit::transfer::transaction::Transaction;
 use std::collections::HashMap;
 
-use bellman::Circuit;
+use crate::vk_contract_generator::hardcode_vk;
 use bellman::groth16::{
     create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
     VerifyingKey,
 };
-use crate::vk_contract_generator::hardcode_vk;
+use bellman::Circuit;
 
-use sapling_crypto::jubjub::FixedGenerators;
-use sapling_crypto::eddsa::{PrivateKey, PublicKey};
 use sapling_crypto::circuit::float_point::convert_to_float;
+use sapling_crypto::eddsa::{PrivateKey, PublicKey};
+use sapling_crypto::jubjub::FixedGenerators;
 
-use models::plasma::circuit::utils::{le_bit_vector_into_field_element, be_bit_vector_into_bytes};
-use models::plasma::params as plasma_constants;
 use models::plasma::circuit::account::CircuitAccount;
+use models::plasma::circuit::utils::{be_bit_vector_into_bytes, le_bit_vector_into_field_element};
+use models::plasma::params as plasma_constants;
 
 const TXES_TO_TEST: usize = 128;
 
-fn main() {
+pub fn read_write_keys() {
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &AltJubjubBn256::new();
     let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
@@ -68,10 +68,10 @@ fn main() {
         existing_accounts.push((leaf_number, sk, pk));
 
         let leaf = CircuitAccount {
-            balance:    Fr::from_str(default_balance_string).unwrap(),
-            nonce:      Fr::zero(),
-            pub_x:      x,
-            pub_y:      y,
+            balance: Fr::from_str(default_balance_string).unwrap(),
+            nonce: Fr::zero(),
+            pub_x: x,
+            pub_y: y,
         };
 
         tree.insert(leaf_number, leaf.clone());
@@ -238,7 +238,10 @@ fn main() {
 
     let final_root = tree.root_hash();
 
-    let final_root_string = format!("{}", CircuitAccountTree::new(tree_depth).root_hash().into_repr());
+    let final_root_string = format!(
+        "{}",
+        CircuitAccountTree::new(tree_depth).root_hash().into_repr()
+    );
 
     println!("Final root = {}", final_root_string);
 
@@ -407,8 +410,12 @@ fn main() {
     let circuit_params =
         bellman::groth16::Parameters::read(&mut r, true).expect("Unable to read proving key");
 
-    let initial_root_string = format!("{}", CircuitAccountTree::new(tree_depth).root_hash().into_repr());
-    let contract_content = generate_vk_contract(&circuit_params.vk, initial_root_string.as_ref(), tree_depth);
+    let initial_root_string = format!(
+        "{}",
+        CircuitAccountTree::new(tree_depth).root_hash().into_repr()
+    );
+    let contract_content =
+        generate_vk_contract(&circuit_params.vk, initial_root_string.as_ref(), tree_depth);
 
     let f_cont = File::create("VerificationKeys.sol").expect("Unable to create file");
     let mut f_cont = BufWriter::new(f_cont);

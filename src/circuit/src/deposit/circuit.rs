@@ -1,12 +1,12 @@
-use ff::{Field, PrimeField};
-use bellman::{Circuit, ConstraintSystem, SynthesisError};
-use sapling_crypto::jubjub::JubjubEngine;
-use sapling_crypto::circuit::{boolean, ecc, num, pedersen_hash, sha256, Assignment};
-use sapling_crypto::circuit::num::{AllocatedNum, Num};
-use crate::leaf::{make_leaf_content, LeafWitness};
 use crate::deposit::deposit_request::DepositRequest;
+use crate::leaf::{make_leaf_content, LeafWitness};
+use bellman::{Circuit, ConstraintSystem, SynthesisError};
+use ff::{Field, PrimeField};
 use models::plasma::circuit::utils::{allocate_audit_path, append_packed_public_key};
 use models::plasma::params as plasma_constants;
+use sapling_crypto::circuit::num::{AllocatedNum, Num};
+use sapling_crypto::circuit::{boolean, ecc, num, pedersen_hash, sha256, Assignment};
+use sapling_crypto::jubjub::JubjubEngine;
 
 #[derive(Clone)]
 pub struct DepositWitness<E: JubjubEngine> {
@@ -528,9 +528,9 @@ mod test {
 
     #[test]
     fn test_deposit_in_empty_leaf() {
-        use models::plasma::circuit::account::CircuitAccount;
         use crate::CircuitAccountTree;
         use ff::{BitIterator, Field};
+        use models::plasma::circuit::account::CircuitAccount;
         use pairing::bn256::*;
         use rand::{Rng, SeedableRng, XorShiftRng};
         use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
@@ -712,9 +712,9 @@ mod test {
 
     #[test]
     fn test_deposit_into_existing_leaf() {
-        use models::plasma::circuit::account::CircuitAccount;
         use crate::CircuitAccountTree;
         use ff::{BitIterator, Field};
+        use models::plasma::circuit::account::CircuitAccount;
         use pairing::bn256::*;
         use rand::{Rng, SeedableRng, XorShiftRng};
         use sapling_crypto::alt_babyjubjub::AltJubjubBn256;

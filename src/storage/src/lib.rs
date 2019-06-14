@@ -1,51 +1,17 @@
 #[macro_use]
 extern crate diesel;
-extern crate models;
-extern crate fnv;
-extern crate serde;
-extern crate serde_derive;
-extern crate serde_json;
-extern crate web3;
-extern crate bigdecimal;
-extern crate ff;
-extern crate chrono;
 
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
-use models::{
-    Action,
-    ActionType, 
-    EncodedProof, 
-    Operation, 
-    TxMeta, 
-    ACTION_COMMIT, 
-    ACTION_VERIFY,
-};
-use models::plasma::{
-    Fr, 
-    AccountMap, 
-    BlockNumber, 
-    Nonce,
-    AccountId,
-};
 use models::plasma::block::Block;
-use models::plasma::tx::{
-    TransactionType, 
-    TransferTx, 
-    DepositTx, 
-    ExitTx, 
-    TxSignature,
-    TRANSFER_TX,
-    DEPOSIT_TX,
-    EXIT_TX,
-};
-use models::plasma::tx::TransactionType::{
-    Transfer,
-    Deposit,
-    Exit,
-};
 use models::plasma::block::BlockData;
+use models::plasma::tx::TransactionType::{Deposit, Exit, Transfer};
+use models::plasma::tx::{
+    DepositTx, ExitTx, TransactionType, TransferTx, TxSignature, DEPOSIT_TX, EXIT_TX, TRANSFER_TX,
+};
+use models::plasma::{AccountId, AccountMap, BlockNumber, Fr, Nonce};
+use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
 
@@ -1025,7 +991,6 @@ impl StorageProcessor {
 
     pub fn update_prover_job(&self, job_id: i32) -> QueryResult<()> {
         use crate::schema::prover_runs::dsl::*;
-        use diesel::expression::dsl::now;
 
         let target = prover_runs.filter(id.eq(job_id));
         diesel::update(target)
@@ -1044,7 +1009,6 @@ impl StorageProcessor {
 
     pub fn record_prover_stop(&self, prover_id: i32) -> QueryResult<()> {
         use crate::schema::active_provers::dsl::*;
-        use diesel::expression::dsl::now;
 
         let target = active_provers.filter(id.eq(prover_id));
         diesel::update(target)
@@ -1136,7 +1100,9 @@ mod test {
         let (last_block, state) = conn.load_committed_state().unwrap();
         assert_eq!(last_block, 1);
         assert_eq!(
-            state.into_iter().collect::<Vec<(u32, models::plasma::account::Account)>>(),
+            state
+                .into_iter()
+                .collect::<Vec<(u32, models::plasma::account::Account)>>(),
             accounts
                 .clone()
                 .into_iter()
@@ -1149,7 +1115,9 @@ mod test {
         // verified state must be equal the commitment
         let (_, state) = conn.load_verified_state().unwrap();
         assert_eq!(
-            state.into_iter().collect::<Vec<(u32, models::plasma::account::Account)>>(),
+            state
+                .into_iter()
+                .collect::<Vec<(u32, models::plasma::account::Account)>>(),
             accounts
                 .clone()
                 .into_iter()

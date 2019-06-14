@@ -1,10 +1,10 @@
 pub mod hasher;
+pub mod parallel_smt;
 pub mod pedersen_hasher;
 pub mod sequential_smt;
-pub mod parallel_smt;
 
 use models::plasma::account::Account;
-use models::plasma::{Fr, Engine};
+use models::plasma::{Engine, Fr};
 
 pub type SparseMerkleTree<T, H, HH> = sequential_smt::SparseMerkleTree<T, H, HH>;
 pub type PedersenHasher<T> = pedersen_hasher::PedersenHasher<T>;

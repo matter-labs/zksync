@@ -6,8 +6,8 @@ use sapling_crypto::pedersen_hash::{baby_pedersen_hash, Personalization};
 use pairing::bn256::Bn256;
 use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, JubjubEngine};
 
-use models::primitives::BitIteratorLe;
 use crate::hasher::Hasher;
+use models::primitives::BitIteratorLe;
 
 pub struct PedersenHasher<E: JubjubEngine> {
     params: E::Params,

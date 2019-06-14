@@ -19,9 +19,9 @@ pub const FEE_EXPONENT_BIT_WIDTH: &'static usize = &5;
 pub const FEE_MANTISSA_BIT_WIDTH: &'static usize = &3;
 
 // Signature data
-pub const SIGNATURE_S_BIT_WIDTH : &'static usize = &256;
-pub const SIGNATURE_R_X_BIT_WIDTH : &'static usize = &256;
-pub const SIGNATURE_R_Y_BIT_WIDTH : &'static usize = &256;
+pub const SIGNATURE_S_BIT_WIDTH: &'static usize = &256;
+pub const SIGNATURE_R_X_BIT_WIDTH: &'static usize = &256;
+pub const SIGNATURE_R_Y_BIT_WIDTH: &'static usize = &256;
 
-// Fr element encoding 
-pub const FR_BIT_WIDTH : &'static usize = &256;
+// Fr element encoding
+pub const FR_BIT_WIDTH: &'static usize = &256;

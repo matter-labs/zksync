@@ -1,13 +1,13 @@
-use crate::plasma::{Engine, Fr};
-use crate::plasma::{PrivateKey, PublicKey};
-use crate::plasma::circuit::utils::{
-    encode_fr_into_fs, encode_fs_into_fr, le_bit_vector_into_field_element,
-};
 use crate::plasma::circuit::deposit::DepositRequest;
 use crate::plasma::circuit::exit::ExitRequest;
 use crate::plasma::circuit::sig::TransactionSignature;
 use crate::plasma::circuit::transfer::Tx;
+use crate::plasma::circuit::utils::{
+    encode_fr_into_fs, encode_fs_into_fr, le_bit_vector_into_field_element,
+};
 use crate::plasma::params;
+use crate::plasma::{Engine, Fr};
+use crate::plasma::{PrivateKey, PublicKey};
 use crate::primitives::{get_bits_le_fixed_u128, pack_bits_into_bytes};
 use bigdecimal::{BigDecimal, ToPrimitive};
 use ff::PrimeField;
@@ -291,7 +291,6 @@ impl TransactionSignature<Engine> {
 impl Tx<Engine> {
     // TODO: introduce errors if necessary
     pub fn try_from(transaction: &crate::plasma::tx::TransferTx) -> Result<Self, String> {
-        use bigdecimal::ToPrimitive;
         let encoded_amount_bits = convert_to_float(
             transaction.amount.to_u128().unwrap(), // TODO: use big decimal in convert_to_float() instead
             params::AMOUNT_EXPONENT_BIT_WIDTH,

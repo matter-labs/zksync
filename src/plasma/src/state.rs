@@ -1,18 +1,9 @@
-use models::plasma::params;
 use bigdecimal::{BigDecimal, Zero};
 use merkle_tree::AccountTree;
 use models::plasma::account::Account;
-use models::plasma::{
-    Fr, 
-    AccountMap,
-    AccountId,
-    TransferApplicationError,
-};
-use models::plasma::tx::{
-    TransferTx, 
-    DepositTx, 
-    ExitTx, 
-};
+use models::plasma::params;
+use models::plasma::tx::{DepositTx, ExitTx, TransferTx};
+use models::plasma::{AccountId, AccountMap, Fr, TransferApplicationError};
 
 pub struct PlasmaState {
     /// Accounts stored in a sparse Merkle tree
