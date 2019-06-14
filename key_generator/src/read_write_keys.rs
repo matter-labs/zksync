@@ -32,7 +32,7 @@ use models::plasma::params as plasma_constants;
 
 const TXES_TO_TEST: usize = 128;
 
-fn main() {
+pub fn read_write_keys() {
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &AltJubjubBn256::new();
     let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
