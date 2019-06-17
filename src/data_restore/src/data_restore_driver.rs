@@ -103,7 +103,9 @@ impl DataRestoreDriver {
             //         // println!("Root: {:?}", &root);
             //     }
             // };
-            if let Err(error) = DataRestoreDriver::update_franklin_blocks_events_and_accounts_tree_state(self) {
+            if let Err(error) =
+                DataRestoreDriver::update_franklin_blocks_events_and_accounts_tree_state(self)
+            {
                 println!("Something goes wrong: {:?}", error);
                 self.run_updates = false;
                 err = Some(DataRestoreError::StateUpdate(format!(

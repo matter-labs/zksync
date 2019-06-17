@@ -235,7 +235,11 @@ impl FranklinAccountsStates {
         Ok(transfers)
     }
 
-    fn load_sorted_events(&self, action_filter: Filter, cancel_filter: Filter) -> Result<Vec<Log>, DataRestoreError> {
+    fn load_sorted_events(
+        &self,
+        action_filter: Filter,
+        cancel_filter: Filter,
+    ) -> Result<Vec<Log>, DataRestoreError> {
         let (_eloop, transport) = web3::transports::Http::new(self.config.web3_endpoint.as_str())
             .map_err(|_| DataRestoreError::WrongEndpoint)?;
         let web3 = web3::Web3::new(transport);
@@ -269,11 +273,10 @@ impl FranklinAccountsStates {
             let l_index = l.log_index.unwrap();
             let r_index = r.log_index.unwrap();
 
-            let ordering = l_block.cmp(&r_block)
-                .then(l_index.cmp(&r_index));
+            let ordering = l_block.cmp(&r_block).then(l_index.cmp(&r_index));
             if ordering == Ordering::Equal {
                 error_flag = true;
-            } 
+            }
             return ordering;
         });
         if error_flag {
