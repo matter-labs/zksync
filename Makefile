@@ -290,4 +290,4 @@ dev-push-flattener:
 # Key generator 
 
 make-keys:
-	@cd key_generator && cargo run --release
+	@cargo run -p key_generator --release --bin key_generator
