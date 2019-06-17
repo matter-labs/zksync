@@ -21,7 +21,7 @@ pub mod data_restore_driver;
 pub mod franklin_transaction;
 pub mod helpers;
 
-use data_restore_driver::{DataRestoreDriver, ProtoAccountsState};
+use crate::data_restore_driver::{DataRestoreDriver, ProtoAccountsState};
 use std::sync::mpsc::Sender;
 use web3::types::U256;
 

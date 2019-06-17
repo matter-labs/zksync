@@ -1,8 +1,8 @@
-use accounts_state::FranklinAccountsStates;
-use block_events::BlockEventsFranklin;
-use blocks::LogBlockData;
-use franklin_transaction::FranklinTransaction;
-use helpers::*;
+use crate::accounts_state::FranklinAccountsStates;
+use crate::block_events::BlockEventsFranklin;
+use crate::blocks::LogBlockData;
+use crate::franklin_transaction::FranklinTransaction;
+use crate::helpers::*;
 use models::plasma::Fr;
 use std::sync::mpsc::Sender;
 use web3::types::U256;

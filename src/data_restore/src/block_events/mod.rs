@@ -4,8 +4,8 @@ use web3::futures::Future;
 use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
 // use tokio_core::reactor::Core;
 
-use blocks::{BlockType, LogBlockData};
-use helpers::*;
+use crate::blocks::{BlockType, LogBlockData};
+use crate::helpers::*;
 
 type ComAndVerBlocksVecs = (Vec<LogBlockData>, Vec<LogBlockData>);
 type BlockNumber256 = U256;

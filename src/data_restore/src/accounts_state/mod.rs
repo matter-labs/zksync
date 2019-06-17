@@ -14,8 +14,8 @@ use models::plasma::{Account, AccountId};
 use models::plasma::{Engine, Fr};
 use plasma::state::PlasmaState;
 
-use franklin_transaction::{FranklinTransaction, FranklinTransactionType};
-use helpers::*;
+use crate::franklin_transaction::{FranklinTransaction, FranklinTransactionType};
+use crate::helpers::*;
 
 pub struct FranklinAccountsStates {
     pub config: DataRestoreConfig,
