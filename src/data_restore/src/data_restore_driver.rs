@@ -30,7 +30,7 @@ impl DataRestoreDriver {
         channel: Option<Sender<ProtoAccountsState>>,
     ) -> Self {
         Self {
-            channel: channel,
+            channel,
             config: config.clone(),
             genesis_block: genesis_block,
             blocks_delta: blocks_delta,
@@ -82,27 +82,35 @@ impl DataRestoreDriver {
         self.run_updates = true;
         let mut err: Option<DataRestoreError> = None;
         while self.run_updates {
-            match DataRestoreDriver::update_franklin_blocks_events_and_accounts_tree_state(self) {
-                Err(error) => {
-                    println!("Something goes wrong: {:?}", error);
-                    self.run_updates = false;
-                    err = Some(DataRestoreError::StateUpdate(format!(
-                        "Error occured: {:?}",
-                        error
-                    )));
-                }
-                Ok(()) => {
-                    // println!("Updated, last watched ethereum block: {:?}", &self.block_events.last_watched_block_number);
-                    // println!("Committed franklin blocks count: {:?}", &self.block_events.committed_blocks.len());
-                    // println!("Last committed franklin block: {:?}", &self.block_events.committed_blocks.last());
-                    // println!("Verified franklin blocks count: {:?}", &self.block_events.verified_blocks.len());
-                    // println!("Last verified franklin block: {:?}", &self.block_events.verified_blocks.last());
-                    // let accs = self.account_states.get_accounts();
-                    // let root = self.account_states.root_hash();
-                    // println!("Accs: {:?}", accs);
-                    // println!("Root: {:?}", &root);
-                }
-            };
+            // match DataRestoreDriver::update_franklin_blocks_events_and_accounts_tree_state(self) {
+            //     Err(error) => {
+            //         println!("Something goes wrong: {:?}", error);
+            //         self.run_updates = false;
+            //         err = Some(DataRestoreError::StateUpdate(format!(
+            //             "Error occured: {:?}",
+            //             error
+            //         )));
+            //     }
+            //     Ok(()) => {
+            //         // println!("Updated, last watched ethereum block: {:?}", &self.block_events.last_watched_block_number);
+            //         // println!("Committed franklin blocks count: {:?}", &self.block_events.committed_blocks.len());
+            //         // println!("Last committed franklin block: {:?}", &self.block_events.committed_blocks.last());
+            //         // println!("Verified franklin blocks count: {:?}", &self.block_events.verified_blocks.len());
+            //         // println!("Last verified franklin block: {:?}", &self.block_events.verified_blocks.last());
+            //         // let accs = self.account_states.get_accounts();
+            //         // let root = self.account_states.root_hash();
+            //         // println!("Accs: {:?}", accs);
+            //         // println!("Root: {:?}", &root);
+            //     }
+            // };
+            if let Err(error) = DataRestoreDriver::update_franklin_blocks_events_and_accounts_tree_state(self) {
+                println!("Something goes wrong: {:?}", error);
+                self.run_updates = false;
+                err = Some(DataRestoreError::StateUpdate(format!(
+                    "Error occured: {:?}",
+                    error
+                )));
+            }
             let root = self.account_states.root_hash();
             println!("New root: {:?}", &root);
             println!("______________");
@@ -220,7 +228,7 @@ impl DataRestoreDriver {
         // let mut state = accounts_state::FranklinAccountsStates::new(config);
         println!("Start accounts state updating");
         for transaction in transactions {
-            let _ = state
+            state
                 .update_accounts_states_from_transaction(&transaction)
                 .map_err(|e| DataRestoreError::StateUpdate(e.to_string()))?;
         }
@@ -285,7 +293,7 @@ impl DataRestoreDriver {
         );
         let sorted_txs = DataRestoreDriver::sort_transactions_by_block_number(txs);
 
-        let _ = DataRestoreDriver::update_accounts_state_from_transactions(
+        DataRestoreDriver::update_accounts_state_from_transactions(
             &mut data_restore_driver.account_states,
             &sorted_txs,
         )

@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use ff::{Field, PrimeField, PrimeFieldRepr};
 use sapling_crypto::jubjub::{edwards, Unknown};
 use web3::futures::Future;
-use web3::types::{BlockNumber, FilterBuilder, H256, U256};
+use web3::types::{BlockNumber, Filter, FilterBuilder, H256, U256};
 
 use bigdecimal::{BigDecimal, Num, Zero};
 
@@ -13,6 +13,7 @@ use models::plasma::tx::{DepositTx, ExitTx, TransferTx, TxSignature};
 use models::plasma::{Account, AccountId};
 use models::plasma::{Engine, Fr};
 use plasma::state::PlasmaState;
+use web3::types::Log;
 
 use crate::franklin_transaction::{FranklinTransaction, FranklinTransactionType};
 use crate::helpers::*;
@@ -37,15 +38,15 @@ impl FranklinAccountsStates {
         let tx_type = transaction.franklin_transaction_type;
         match tx_type {
             FranklinTransactionType::Deposit => {
-                let _ = self.update_accounts_states_from_deposit_transaction(transaction);
+                let _ = self.update_accounts_states_from_deposit_transaction(transaction)?;
                 Ok(())
             }
             FranklinTransactionType::FullExit => {
-                let _ = self.update_accounts_states_from_full_exit_transaction(transaction);
+                let _ = self.update_accounts_states_from_full_exit_transaction(transaction)?;
                 Ok(())
             }
             FranklinTransactionType::Transfer => {
-                let _ = self.update_accounts_states_from_transfer_transaction(transaction);
+                let _ = self.update_accounts_states_from_transfer_transaction(transaction)?;
                 Ok(())
             }
             _ => return Err(DataRestoreError::WrongType),
@@ -108,27 +109,24 @@ impl FranklinAccountsStates {
         &mut self,
         transaction: &FranklinTransaction,
     ) -> Result<(), DataRestoreError> {
-        let batch_number = self.get_batch_number_from_deposit(transaction);
+        let batch_number = self.get_batch_number(transaction);
         // let block_number = self.get_block_number_from_deposit(transaction);
         let deposit_txs_block = self
             .get_all_transactions_from_deposit_batch(batch_number)
             .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         for tx in deposit_txs_block {
-            let account = match self.plasma_state.balance_tree.items.get(&tx.account) {
-                None => {
-                    let mut acc = Account::default();
-                    let tx = tx.clone();
-                    acc.public_key_x = tx.pub_x;
-                    acc.public_key_y = tx.pub_y;
-                    acc.balance = tx.amount;
-                    acc
-                }
-                Some(result) => {
-                    let mut acc = result.clone();
-                    acc.balance += &tx.amount;
-                    acc
-                }
-            };
+            let mut new_account = Account::default();
+            new_account.public_key_x = tx.pub_x;
+            new_account.public_key_y = tx.pub_y;
+            new_account.balance = BigDecimal::zero();
+            let mut account = self
+                .plasma_state
+                .balance_tree
+                .items
+                .get(&tx.account)
+                .unwrap_or_else(|| &new_account)
+                .clone();
+            account.balance += tx.amount;
             self.plasma_state.balance_tree.insert(tx.account, account);
         }
         Ok(())
@@ -138,19 +136,19 @@ impl FranklinAccountsStates {
         &mut self,
         transaction: &FranklinTransaction,
     ) -> Result<(), DataRestoreError> {
-        let batch_number = self.get_batch_number_from_full_exit(transaction);
+        let batch_number = self.get_batch_number(transaction);
         // let block_number = self.get_block_number_from_full_exit(transaction);
         let exit_txs_block = self
             .get_all_transactions_from_full_exit_batch(batch_number)
             .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         for tx in exit_txs_block {
-            if let None = self
+            let _acc = self
                 .plasma_state
                 .balance_tree
                 .items
                 .get(&tx.account)
-                .cloned()
-            {
+                .cloned();
+            if _acc.is_none() {
                 return Err(DataRestoreError::NonexistentAccount);
             }
             self.plasma_state.balance_tree.delete(tx.account);
@@ -158,16 +156,8 @@ impl FranklinAccountsStates {
         Ok(())
     }
 
-    fn get_batch_number_from_deposit(&self, transaction: &FranklinTransaction) -> U256 {
-        let batch_vec = transaction.commitment_data[0..32].to_vec();
-        let batch_slice = batch_vec.as_slice();
-        U256::from(batch_slice)
-    }
-
-    fn get_batch_number_from_full_exit(&self, transaction: &FranklinTransaction) -> U256 {
-        let batch_vec = transaction.commitment_data[0..32].to_vec();
-        let batch_slice = batch_vec.as_slice();
-        U256::from(batch_slice)
+    fn get_batch_number(&self, transaction: &FranklinTransaction) -> U256 {
+        U256::from(&transaction.commitment_data[0..32])
     }
 
     // fn get_block_number_from_deposit(&self, transaction: &FranklinTransaction) -> U256 {
@@ -225,8 +215,8 @@ impl FranklinAccountsStates {
             let amount = amount_bytes_slice_to_big_decimal(&tx[6..8]);
             let fee = fee_bytes_slice_to_big_decimal(&tx[8]);
             let transfer_tx = TransferTx {
-                from: from,
-                to: to,
+                from,
+                to,
                 amount: amount.clone(), //BigDecimal::from_str_radix("0", 10).unwrap(),
                 fee: fee,               //BigDecimal::from_str_radix("0", 10).unwrap(),
                 nonce: i,
@@ -243,6 +233,55 @@ impl FranklinAccountsStates {
         }
 
         Ok(transfers)
+    }
+
+    fn load_sorted_events(&self, action_filter: Filter, cancel_filter: Filter) -> Result<Vec<Log>, DataRestoreError> {
+        let (_eloop, transport) = web3::transports::Http::new(self.config.web3_endpoint.as_str())
+            .map_err(|_| DataRestoreError::WrongEndpoint)?;
+        let web3 = web3::Web3::new(transport);
+        let action_events = web3
+            .eth()
+            .logs(action_filter)
+            .wait()
+            .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+        let cancel_events = web3
+            .eth()
+            .logs(cancel_filter)
+            .wait()
+            .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+
+        // now we have to merge and apply
+        let mut all_events = vec![];
+        all_events.extend(action_events.into_iter());
+        all_events.extend(cancel_events.into_iter());
+
+        all_events = all_events
+            .into_iter()
+            .filter(|el| !el.is_removed())
+            .collect();
+
+        // sort by index
+        let mut error_flag = false;
+        all_events.sort_by(|l, r| {
+            let l_block = l.block_number.unwrap();
+            let r_block = r.block_number.unwrap();
+
+            let l_index = l.log_index.unwrap();
+            let r_index = r.log_index.unwrap();
+
+            let ordering = l_block.cmp(&r_block)
+                .then(l_index.cmp(&r_index));
+            if ordering == Ordering::Equal {
+                error_flag = true;
+            } 
+            return ordering;
+        });
+        if error_flag {
+            return Err(DataRestoreError::Unknown(
+                "Logs can not have same indexes".to_string(),
+            ));
+        }
+        Ok(all_events)
     }
 
     pub fn get_all_transactions_from_deposit_batch(
@@ -288,58 +327,7 @@ impl FranklinAccountsStates {
             )
             .build();
 
-        let (_eloop, transport) = web3::transports::Http::new(self.config.web3_endpoint.as_str())
-            .map_err(|_| DataRestoreError::WrongEndpoint)?;
-        let web3 = web3::Web3::new(transport);
-        let deposit_events_filter_result = web3
-            .eth()
-            .logs(deposits_filter)
-            .wait()
-            .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-        let cancel_events_filter_result = web3
-            .eth()
-            .logs(cancels_filter)
-            .wait()
-            .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-
-        let deposit_events = deposit_events_filter_result;
-        let cancel_events = cancel_events_filter_result;
-
-        let mut all_events = vec![];
-        all_events.extend(deposit_events.into_iter());
-        all_events.extend(cancel_events.into_iter());
-
-        all_events = all_events
-            .into_iter()
-            .filter(|el| el.is_removed() == false)
-            .collect();
-
-        let mut error_flag = false;
-        all_events.sort_by(|l, r| {
-            let l_block = l.block_number.unwrap();
-            let r_block = r.block_number.unwrap();
-
-            if l_block > r_block {
-                return Ordering::Greater;
-            } else if l_block < r_block {
-                return Ordering::Less;
-            }
-
-            let l_index = l.log_index.unwrap();
-            let r_index = r.log_index.unwrap();
-            if l_index > r_index {
-                return Ordering::Greater;
-            } else if l_index < r_index {
-                return Ordering::Less;
-            }
-            error_flag = true;
-            return Ordering::Equal; // Need to rewrite
-        });
-        if error_flag {
-            return Err(DataRestoreError::Unknown(
-                "Logs can not have same indexes".to_string(),
-            ));
-        }
+        let all_events = self.load_sorted_events(deposits_filter, cancels_filter)?;
 
         let mut this_batch: HashMap<U256, (U256, U256)> = HashMap::new();
 
@@ -351,7 +339,7 @@ impl FranklinAccountsStates {
                     let account_id = U256::from(event.topics[2]);
                     let public_key = U256::from(event.topics[3]);
                     let deposit_amount = U256::from_big_endian(&data_bytes);
-                    let _existing_record = this_batch.get(&account_id).map(|&v| v.clone());
+                    let _existing_record = this_batch.get(&account_id).cloned();
                     if let Some(record) = _existing_record {
                         let mut existing_balance = record.0;
                         existing_balance = existing_balance + deposit_amount;
@@ -365,7 +353,7 @@ impl FranklinAccountsStates {
                     let account_id = U256::from(event.topics[2]);
                     let _existing_record = this_batch
                         .get(&account_id)
-                        .map(|&v| v.clone())
+                        .cloned()
                         .ok_or("existing_record not found for deposits")?;
                     this_batch.remove(&account_id);
                     continue;
@@ -458,61 +446,7 @@ impl FranklinAccountsStates {
             )
             .build();
 
-        let (_eloop, transport) = web3::transports::Http::new(self.config.web3_endpoint.as_str())
-            .map_err(|_| DataRestoreError::WrongEndpoint)?;
-        let web3 = web3::Web3::new(transport);
-        let exit_events_filter_result = web3
-            .eth()
-            .logs(exits_filter)
-            .wait()
-            .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-        let cancel_events_filter_result = web3
-            .eth()
-            .logs(cancels_filter)
-            .wait()
-            .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-
-        let exit_events = exit_events_filter_result;
-        let cancel_events = cancel_events_filter_result;
-
-        // now we have to merge and apply
-        let mut all_events = vec![];
-        all_events.extend(exit_events.into_iter());
-        all_events.extend(cancel_events.into_iter());
-
-        all_events = all_events
-            .into_iter()
-            .filter(|el| el.is_removed() == false)
-            .collect();
-
-        // sort by index
-
-        let mut error_flag = false;
-        all_events.sort_by(|l, r| {
-            let l_block = l.block_number.unwrap();
-            let r_block = r.block_number.unwrap();
-
-            if l_block > r_block {
-                return Ordering::Greater;
-            } else if l_block < r_block {
-                return Ordering::Less;
-            }
-
-            let l_index = l.log_index.unwrap();
-            let r_index = r.log_index.unwrap();
-            if l_index > r_index {
-                return Ordering::Greater;
-            } else if l_index < r_index {
-                return Ordering::Less;
-            }
-            error_flag = true;
-            return Ordering::Equal; // Need to rewrite
-        });
-        if error_flag {
-            return Err(DataRestoreError::Unknown(
-                "Logs can not have same indexes".to_string(),
-            ));
-        }
+        let all_events = self.load_sorted_events(exits_filter, cancels_filter)?;
 
         let mut this_batch: HashSet<U256> = HashSet::new();
 
@@ -521,7 +455,7 @@ impl FranklinAccountsStates {
             match () {
                 () if topic == exit_event_topic => {
                     let account_id = U256::from(event.topics[2]);
-                    let existing_record = this_batch.get(&account_id).map(|&v| v.clone());
+                    let existing_record = this_batch.get(&account_id).cloned();
                     if let Some(_) = existing_record {
                         return Err(DataRestoreError::DoubleExit);
                     } else {
@@ -533,7 +467,7 @@ impl FranklinAccountsStates {
                     let account_id = U256::from(event.topics[2]);
                     let _existing_record = this_batch
                         .get(&account_id)
-                        .map(|&v| v.clone())
+                        .cloned()
                         .ok_or("existing_record fetch failed".to_owned())?;
                     this_batch.remove(&account_id);
                     continue;

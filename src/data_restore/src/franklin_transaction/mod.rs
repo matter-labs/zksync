@@ -63,30 +63,27 @@ impl FranklinTransaction {
         transaction.clone().input.0
     }
 
-    fn get_commitment_data_from_input_data(input_data: &Vec<u8>) -> Option<Vec<u8>> {
-        let input_data_contains_more_than_4_bytes = input_data.len() > 4;
-        let commitment_data = match input_data_contains_more_than_4_bytes {
-            true => Some(input_data[4..input_data.len()].to_vec()),
-            false => None,
-        };
-        commitment_data
+    fn get_commitment_data_from_input_data(input_data: &[u8]) -> Option<Vec<u8>> {
+        if input_data.len() > 4 {
+            Some(input_data[4..input_data.len()].to_vec())
+        } else {
+            None
+        }
     }
 
-    fn get_transaction_type(input_data: &Vec<u8>) -> FranklinTransactionType {
-        let input_data_contains_more_than_4_bytes = input_data.len() > 4;
-        if input_data_contains_more_than_4_bytes == false {
+    fn get_transaction_type(input_data: &[u8]) -> FranklinTransactionType {
+        if input_data.len() <= 4 {
             return FranklinTransactionType::Unknown;
         }
         let deposit_method_bytes: Vec<u8> = vec![83, 61, 227, 10];
         let transaction_method_bytes: Vec<u8> = vec![244, 135, 178, 142];
         let full_exit_method_bytes: Vec<u8> = vec![121, 178, 173, 112];
         let method_bytes: Vec<u8> = input_data[0..4].to_vec();
-        let method_type = match method_bytes {
+        match method_bytes {
             _ if method_bytes == deposit_method_bytes => FranklinTransactionType::Deposit,
             _ if method_bytes == transaction_method_bytes => FranklinTransactionType::Transfer,
             _ if method_bytes == full_exit_method_bytes => FranklinTransactionType::FullExit,
             _ => FranklinTransactionType::Unknown,
-        };
-        method_type
+        }
     }
 }

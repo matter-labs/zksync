@@ -34,8 +34,8 @@ pub fn start_data_restore_driver(driver: &'static mut DataRestoreDriver) {
     std::thread::Builder::new()
         .name("data_restore".to_string())
         .spawn(move || {
-            let _past_state_load = driver.load_past_state().expect("Cant get past state");
-            let _ = driver.run_state_updates().expect("Cant update state");
+            driver.load_past_state().expect("Cant get past state");
+            driver.run_state_updates().expect("Cant update state");
         });
 }
 
@@ -49,7 +49,7 @@ mod test {
         let from = U256::from(0);
         let delta = U256::from(15);
         let mut data_restore_driver = create_new_data_restore_driver(config, from, delta, None);
-        let _past_state_load = data_restore_driver
+        data_restore_driver
             .load_past_state()
             .expect("Cant get past state");
         data_restore_driver.run_state_updates();

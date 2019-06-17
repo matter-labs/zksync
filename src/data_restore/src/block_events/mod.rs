@@ -131,7 +131,7 @@ impl BlockEventsFranklin {
     // returns (committed blocks logs, verified blocks logs)
     fn sort_logs(&mut self, logs: &Vec<Log>) -> Result<ComAndVerBlocksVecs, DataRestoreError> {
         let logs = logs.clone();
-        if logs.len() == 0 {
+        if logs.is_empty() {
             return Err(DataRestoreError::NoData("No logs in list".to_string()));
         }
         let mut committed_blocks: Vec<LogBlockData> = vec![];
@@ -241,7 +241,7 @@ impl BlockEventsFranklin {
             .get_last_block_number()
             .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         let to_block_numer_256 = last_block_number - blocks_delta;
-        let _ = to_block_numer_256
+        to_block_numer_256
             .checked_sub(from_block_number)
             .ok_or(DataRestoreError::NoData("No new blocks".to_string()))?;
         let to_block_number = BlockNumber::Number(to_block_numer_256.as_u64());
