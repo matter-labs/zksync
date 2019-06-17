@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "src/data_restore",
+    "src/key_generator",
     "src/merkle_tree",
     "src/eth_client",
     "src/models",
@@ -10,7 +11,4 @@ members = [
     "src/server",
     "src/storage",
     "src/circuit",
-]
-exclude = [
-    "key_generator"
 ]
