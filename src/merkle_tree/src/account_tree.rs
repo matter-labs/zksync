@@ -1,4 +1,5 @@
 // Plasma account (Merkle tree leaf)
+// TODO: - Not used in project
 
 use ff::Field;
 use pairing::bn256::{Bn256, Fr};

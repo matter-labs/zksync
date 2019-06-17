@@ -14,6 +14,7 @@ pub trait GetBits {
 
 impl GetBits for u64 {
     fn get_bits_le(&self) -> Vec<bool> {
+        // TODO: - Check function because it may be wrong
         let mut acc = Vec::new();
         let mut i = *self + 1;
         for _ in 0..16 {
