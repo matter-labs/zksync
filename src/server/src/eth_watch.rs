@@ -1,37 +1,24 @@
-extern crate rustc_hex;
-extern crate web3;
-
 use ff::{Field, PrimeField, PrimeFieldRepr};
 
-use super::models::{ProtoBlock, StateKeeperRequest};
 use bigdecimal::{BigDecimal, Num};
-use plasma::models::params;
-use plasma::models::{Block, BlockData, DepositTx, Engine, ExitTx, Fr};
+use models::abi::TEST_PLASMA_ALWAYS_VERIFY;
+use models::plasma::params;
+use models::plasma::tx::{DepositTx, ExitTx};
+use models::plasma::{Engine, Fr};
+use models::{ProtoBlock, StateKeeperRequest};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::str::FromStr;
 use std::sync::mpsc::Sender;
 
-use super::config;
+use models::config;
 use sapling_crypto::jubjub::{edwards, Unknown};
 use std::time;
 use web3::contract::{Contract, Options};
 use web3::futures::Future;
-use web3::types::{BlockNumber, FilterBuilder, H160, H256, U128, U256};
+use web3::types::{BlockNumber, FilterBuilder, H160, H256, U256};
 
-use super::storage::{ConnectionPool, StorageProcessor};
-
-type ABI = (&'static [u8], &'static str);
-
-pub const TEST_PLASMA_ALWAYS_VERIFY: ABI = (
-    include_bytes!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.abi"),
-    include_str!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.bin"),
-);
-
-pub const PROD_PLASMA: ABI = (
-    include_bytes!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.abi"),
-    include_str!("../../../contracts/bin/contracts_FranklinProxy_sol_Franklin.bin"),
-);
+use storage::ConnectionPool;
 
 fn u64_from_environment(name: &str) -> Option<u64> {
     let candidate = env::var(name);
@@ -322,7 +309,7 @@ impl EthWatch {
                 }
                 () if topic == deposit_canceled_topic => {
                     let account_id = U256::from(event.topics[2]);
-                    let existing_record = this_batch
+                    let _existing_record = this_batch
                         .get(&account_id)
                         .map(|&v| v.clone())
                         .ok_or("existing_record not found for deposits")?;
@@ -379,7 +366,7 @@ impl EthWatch {
         );
         let request = StateKeeperRequest::AddBlock(block);
 
-        let send_result = channel
+        let _send_result = channel
             .send(request)
             .map_err(|err| format!("channel.send() failed: {}", err))?;
 
@@ -393,7 +380,6 @@ impl EthWatch {
         web3: &web3::Web3<T>,
         contract: &Contract<T>,
     ) -> Result<(), String> {
-        use bigdecimal::Zero;
         //println!("Processing exits for block {}", block_number);
         let total_requests_result: U256 = contract
             .query(
@@ -419,7 +405,7 @@ impl EthWatch {
         let to_batch_number = (max_batch_number + U256::from(1)).as_u64();
 
         for batch_number in form_batch_number..to_batch_number {
-            let res = self.process_single_exit_batch(batch_number, channel, web3, contract)?;
+            let _res = self.process_single_exit_batch(batch_number, channel, web3, contract)?;
             self.last_exit_batch = self.last_exit_batch + U256::from(1);
         }
 
@@ -523,7 +509,7 @@ impl EthWatch {
                 () if topic == exit_event_topic => {
                     let account_id = U256::from(event.topics[2]);
                     let existing_record = this_batch.get(&account_id).map(|&v| v.clone());
-                    if let Some(record) = existing_record {
+                    if let Some(_record) = existing_record {
                         // double exit should not be possible due to SC
                         return Err("double exit should not be possible due to SC".to_owned());
                     } else {
@@ -533,7 +519,7 @@ impl EthWatch {
                 }
                 () if topic == exit_canceled_topic => {
                     let account_id = U256::from(event.topics[2]);
-                    let existing_record = this_batch
+                    let _existing_record = this_batch
                         .get(&account_id)
                         .map(|&v| v.clone())
                         .ok_or("existing_record fetch failed".to_owned())?;

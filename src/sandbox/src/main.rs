@@ -1,22 +1,7 @@
-#![allow(warnings)]
-
-extern crate bodyparser;
-extern crate iron;
-extern crate persistent;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-extern crate futures;
-extern crate tokio;
-
-use future::Shared;
-use futures::task::{self, Task};
-use futures::{Async, Future, Poll};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex, RwLock};
+use futures::Future;
 use std::time::{Duration, Instant};
 use tokio::prelude::*;
-use tokio::timer::{self, Interval};
+use tokio::timer::Interval;
 
 mod nonce_futures;
 

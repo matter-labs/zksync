@@ -1,15 +1,3 @@
-extern crate models;
-extern crate plasma;
-extern crate rustc_hex;
-extern crate storage;
-extern crate tokio;
-
-extern crate bellman;
-extern crate crypto;
-extern crate ff;
-extern crate rand;
-extern crate sapling_crypto;
-
 use rand::OsRng;
 use std::fmt;
 use std::iter::Iterator;
@@ -33,37 +21,40 @@ use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
 use sapling_crypto::circuit::float_point::parse_float_to_u128;
 use sapling_crypto::jubjub::{edwards, JubjubEngine};
 
-use self::rustc_hex::ToHex;
+use rustc_hex::ToHex;
 
 use bellman::groth16::{
     create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
 };
 
-use plasma::models::circuit::{Account, AccountTree};
-use plasma::models::{params, Block, PlasmaState};
-use plasma::models::{
-    AccountId, BlockData, BlockNumber, DepositTx, Engine, ExitTx, Fr, TransferTx,
-};
+use circuit::CircuitAccountTree;
+use models::plasma::block::Block;
+use models::plasma::block::BlockData;
+use models::plasma::circuit::account::CircuitAccount;
+use models::plasma::params;
+use models::plasma::tx::{DepositTx, ExitTx, TransferTx};
+use models::plasma::{AccountId, BlockNumber, Engine, Fr};
+use plasma::state::PlasmaState;
 
+use circuit::encoder;
 use models::config::{
     DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE, PROVER_CYCLE_WAIT, PROVER_TIMEOUT, PROVER_TIMER_TICK,
     RUNTIME_CONFIG,
 };
-use models::encoder;
 use models::EncodedProof;
 use storage::StorageProcessor;
 
-use plasma::circuit::deposit::circuit::{Deposit, DepositWitness};
-use plasma::circuit::deposit::deposit_request::DepositRequest;
-use plasma::circuit::exit::circuit::{Exit, ExitWitness};
-use plasma::circuit::exit::exit_request::ExitRequest;
-use plasma::circuit::leaf::LeafWitness;
-use plasma::circuit::transfer::transaction::Transaction;
-use plasma::circuit::utils::be_bit_vector_into_bytes;
+use circuit::deposit::circuit::{Deposit, DepositWitness};
+use circuit::deposit::deposit_request::DepositRequest;
+use circuit::exit::circuit::{Exit, ExitWitness};
+use circuit::exit::exit_request::ExitRequest;
+use circuit::leaf::LeafWitness;
+use circuit::transfer::transaction::Transaction;
+use models::plasma::circuit::utils::be_bit_vector_into_bytes;
 
-use plasma::circuit::transfer::circuit::{TransactionWitness, Transfer};
+use circuit::transfer::circuit::{TransactionWitness, Transfer};
 
-use plasma::primitives::{
+use models::primitives::{
     field_element_to_u32, serialize_g1_for_ethereum, serialize_g2_for_ethereum,
 };
 
@@ -72,7 +63,7 @@ pub struct Prover<E: JubjubEngine> {
     pub deposit_batch_size: usize,
     pub exit_batch_size: usize,
     pub current_block_number: BlockNumber,
-    pub accounts_tree: AccountTree,
+    pub accounts_tree: CircuitAccountTree,
     pub transfer_parameters: BabyParameters,
     pub deposit_parameters: BabyParameters,
     pub exit_parameters: BabyParameters,
@@ -153,13 +144,13 @@ fn read_parameters(file_name: &str) -> Result<BabyParameters, BabyProverErr> {
     Ok(circuit_params.unwrap())
 }
 
-fn extend_accounts<I: Sized + Iterator<Item = (AccountId, plasma::models::Account)>>(
-    tree: &mut AccountTree,
+fn extend_accounts<I: Sized + Iterator<Item = (AccountId, models::plasma::Account)>>(
+    tree: &mut CircuitAccountTree,
     accounts: I,
 ) {
     for e in accounts {
         let acc_number = e.0;
-        let leaf_copy = Account::from(e.1.clone());
+        let leaf_copy = CircuitAccount::from(e.1.clone());
         tree.insert(acc_number, leaf_copy);
     }
 }
@@ -249,7 +240,7 @@ impl BabyProver {
         println!("Copying states to balance tree");
 
         // TODO: replace with .clone() by moving PedersenHasher to static context
-        let mut tree = AccountTree::new(params::BALANCE_TREE_DEPTH as u32);
+        let mut tree = CircuitAccountTree::new(params::BALANCE_TREE_DEPTH as u32);
         extend_accounts(&mut tree, initial_state.get_accounts().into_iter());
         // {
         //     let iter = initial_state.get_accounts().into_iter();
@@ -362,12 +353,12 @@ impl BabyProver {
         let initial_root = self.accounts_tree.root_hash();
 
         for tx in transactions {
-            let tx = plasma::models::circuit::TransferTx::try_from(tx)
+            let tx = circuit::CircuitTransferTx::try_from(tx)
                 .map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
             let sender_leaf_number = field_element_to_u32(tx.from);
             let recipient_leaf_number = field_element_to_u32(tx.to);
 
-            let empty_account = Account::default();
+            let empty_account = CircuitAccount::default();
 
             let tree = &mut self.accounts_tree;
             let items = tree.items.clone();
@@ -697,7 +688,7 @@ impl BabyProver {
         let initial_root = self.accounts_tree.root_hash();
 
         for tx in transactions {
-            let tx = plasma::models::circuit::DepositRequest::try_from(tx)
+            let tx = circuit::CircuitDepositRequest::try_from(tx)
                 .map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
 
             let into_leaf_number = field_element_to_u32(tx.into);
@@ -709,12 +700,12 @@ impl BabyProver {
             let mut leaf_is_empty = true;
 
             let (old_leaf, new_leaf) = if existing_leaf.is_none() {
-                let mut new_leaf = Account::default();
+                let mut new_leaf = CircuitAccount::default();
                 new_leaf.balance = tx.amount.clone();
                 new_leaf.pub_x = tx.pub_x;
                 new_leaf.pub_y = tx.pub_y;
 
-                (Account::default(), new_leaf)
+                (CircuitAccount::default(), new_leaf)
             } else {
                 let old_leaf = existing_leaf.unwrap().clone();
                 let mut new_leaf = old_leaf.clone();
@@ -942,7 +933,7 @@ impl BabyProver {
         let mut public_data: Vec<u8> = vec![];
 
         for tx in transactions {
-            let tx = plasma::models::circuit::ExitRequest::try_from(tx)
+            let tx = circuit::CircuitExitRequest::try_from(tx)
                 .map_err(|e| BabyProverErr::InvalidTransaction(e.to_string()))?;
 
             let from_leaf_number = field_element_to_u32(tx.from);
@@ -958,7 +949,7 @@ impl BabyProver {
 
             let old_leaf = existing_leaf.unwrap();
 
-            let new_leaf = Account::default();
+            let new_leaf = CircuitAccount::default();
 
             let path: Vec<Option<Fr>> = tree
                 .merkle_path(from_leaf_number)
@@ -1247,7 +1238,7 @@ impl BabyProver {
 
 // fn test_exit_encoding() {
 //     extern crate BigDecimal;
-//     use plasma::models::ExitTx;
+//     use models::plasma::ExitTx;
 //     use self::BigDecimal::from_primitive;
 //     let exit_tx = ExitTx {
 //         account: 2,

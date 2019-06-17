@@ -1,17 +1,23 @@
 #[macro_use]
 extern crate serde_derive;
-
-use serde_bytes;
 #[macro_use]
 extern crate lazy_static;
 
+pub mod abi;
 pub mod config;
-pub mod encoder;
+pub mod plasma;
+pub mod primitives;
 
-use plasma::models::*;
+use crate::plasma::block::Block;
+use crate::plasma::*;
+use serde_bytes;
 use std::sync::mpsc::Sender;
 
-pub use eth_client::TxMeta;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TxMeta {
+    pub addr: String,
+    pub nonce: u32,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TransferTxConfirmation {

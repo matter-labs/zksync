@@ -1,0 +1,20 @@
+[package]
+name = "circuit"
+version = "0.1.1"
+edition = "2018"
+
+authors = [
+    "Alex Gluchowski <alex@gluchowski.net>",
+    "Alex Vlasov <alex.m.vlasov@gmail.com>"
+]
+
+[dependencies]
+merkle_tree = { path = "../merkle_tree" }
+models = { path = "../models" }
+pairing = { package = "pairing_ce", version = "0.17.0" }
+bellman = { package = "bellman_ce", version = "0.3.0" }
+sapling_crypto = { package = "sapling-crypto_ce", version = "0.0.5" }
+ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
+rand = "0.4"
+rust-crypto = "0.2"
+hex = "0.3.2"

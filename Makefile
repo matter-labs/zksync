@@ -288,3 +288,7 @@ dev-push-geth:
 dev-push-flattener:
 	@docker push "${FLATTENER_DOCKER_IMAGE}"
 
+# Key generator 
+
+make-keys:
+	@cargo run -p key_generator --release --bin key_generator

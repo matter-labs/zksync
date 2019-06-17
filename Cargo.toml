@@ -1,5 +1,7 @@
 [workspace]
 members = [
+    "src/key_generator",
+    "src/merkle_tree",
     "src/eth_client",
     "src/models",
     "src/plasma",
@@ -7,4 +9,5 @@ members = [
     "src/sandbox",
     "src/server",
     "src/storage",
+    "src/circuit",
 ]

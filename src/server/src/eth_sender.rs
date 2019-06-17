@@ -1,10 +1,13 @@
-use super::config;
-use super::models::*;
-use super::storage::{ConnectionPool, StorageProcessor};
-use eth_client::{ETHClient, TxMeta, TEST_PLASMA_ALWAYS_VERIFY};
+use circuit::encoder;
+use config;
+use eth_client::ETHClient;
 use ff::{PrimeField, PrimeFieldRepr};
-use plasma::models::{params, AccountMap, Block, BlockData};
+use models::abi::TEST_PLASMA_ALWAYS_VERIFY;
+use models::plasma::block::BlockData;
+use models::plasma::{params, AccountMap};
+use models::*;
 use std::sync::mpsc::{channel, Receiver, Sender};
+use storage::ConnectionPool;
 use web3::types::{H256, U128, U256};
 
 fn sorted_and_padded_for_deposits(
@@ -70,7 +73,7 @@ fn run_eth_sender(
                 match &op.block.block_data {
                     BlockData::Transfer {
                         total_fees,
-                        transactions,
+                        transactions: _,
                     } => {
                         // let eth_block_data = EthBlockData::Transfer{
                         //     total_fees:     U128::from_dec_str(&total_fees.to_string()).expect("fee should fit into U128 Ethereum type"),
@@ -115,7 +118,7 @@ fn run_eth_sender(
 
                     BlockData::Exit {
                         batch_number,
-                        transactions,
+                        transactions: _,
                     } => {
                         // let eth_block_data = EthBlockData::Exit{
                         //     batch_number,
@@ -173,7 +176,6 @@ fn run_eth_sender(
                     (batch_number as u64, op.block.block_number as u64, proof),
                 ),
             },
-            _ => unimplemented!(),
         };
         // TODO: process tx sending failure
         match tx {
@@ -191,7 +193,7 @@ fn run_eth_sender(
 
 pub fn start_eth_sender(pool: ConnectionPool) -> Sender<Operation> {
     let (tx_for_eth, rx_for_eth) = channel::<Operation>();
-    let mut eth_client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
+    let eth_client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
     let storage = pool
         .access_storage()
         .expect("db connection failed for eth sender");

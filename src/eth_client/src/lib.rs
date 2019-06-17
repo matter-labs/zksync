@@ -1,40 +1,21 @@
-use hex;
-use reqwest;
-
 #[macro_use]
 extern crate serde_derive;
 
-mod signer;
-
 use ethereum_types::{H160, H256, U256};
+use hex;
+use models::abi::ABI;
+use models::TxMeta;
+use reqwest;
 use reqwest::header::CONTENT_TYPE;
-use web3::contract::tokens::Tokenize;
-
-// used
 use std::env;
 use std::str::FromStr;
+use web3::contract::tokens::Tokenize;
+
+pub mod signer;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 pub type U32 = u64; // because missing in web3::types; u64 is fine since only used for tokenization
-
-type ABI = (&'static [u8], &'static str);
-
-pub const TEST_PLASMA_ALWAYS_VERIFY: ABI = (
-    include_bytes!("../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.abi"),
-    include_str!("../../../contracts/bin/contracts_PlasmaTester_sol_PlasmaTester.bin"),
-);
-
-pub const PROD_PLASMA: ABI = (
-    include_bytes!("../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.abi"),
-    include_str!("../../../contracts/bin/contracts_PlasmaContract_sol_PlasmaContract.bin"),
-);
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TxMeta {
-    pub addr: String,
-    pub nonce: u32,
-}
 
 pub struct ETHClient {
     private_key: H256,
@@ -260,6 +241,8 @@ fn test_eth() {
 
 #[test]
 fn test_encoding() {
+    use models::abi::TEST_PLASMA_ALWAYS_VERIFY;
+
     let contract = ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap();
     let f = contract
         .function("commitDepositBlock")
