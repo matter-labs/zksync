@@ -1,19 +1,3 @@
-extern crate ethabi;
-extern crate futures;
-extern crate tiny_keccak;
-extern crate web3;
-
-extern crate models;
-extern crate plasma;
-
-extern crate ff;
-extern crate hex;
-extern crate pairing;
-extern crate sapling_crypto;
-
-extern crate bigdecimal;
-extern crate bitvec;
-
 pub mod accounts_state;
 pub mod block_events;
 pub mod blocks;
