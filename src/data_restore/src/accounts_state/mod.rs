@@ -115,17 +115,18 @@ impl FranklinAccountsStates {
             .get_all_transactions_from_deposit_batch(batch_number)
             .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         for tx in deposit_txs_block {
-            let mut new_account = Account::default();
-            new_account.public_key_x = tx.pub_x;
-            new_account.public_key_y = tx.pub_y;
-            new_account.balance = BigDecimal::zero();
             let mut account = self
                 .plasma_state
                 .balance_tree
                 .items
-                .get(&tx.account)
-                .unwrap_or_else(|| &new_account)
-                .clone();
+                .remove(&tx.account)
+                .unwrap_or_else(|| {
+                    let mut new_account = Account::default();
+                    new_account.public_key_x = tx.pub_x;
+                    new_account.public_key_y = tx.pub_y;
+                    new_account.balance = BigDecimal::zero();
+                    new_account
+                });
             account.balance += tx.amount;
             self.plasma_state.balance_tree.insert(tx.account, account);
         }
