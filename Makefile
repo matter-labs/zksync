@@ -296,7 +296,7 @@ make-keys:
 # Tesseracts
 
 tesseracts-up:
-	@docker-compose up tesseracts
+	@docker-compose up -d tesseracts
 
 tesseracts-down:
 	@docker-compose stop tesseracts
