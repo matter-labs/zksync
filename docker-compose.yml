@@ -67,7 +67,7 @@ services:
       - COIN=DAI
   tesseracts:
     image: "adria0/tesseracts"
-    command: --cfg /tesseracts.toml
+    command: --cfg /tesseracts.toml -vvv
     ports:
       - "8000:8000"
     volumes:
