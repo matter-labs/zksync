@@ -66,11 +66,12 @@ services:
       - ETHEREUM_JSONRPC_HTTP_URL=http://geth:8545
       - COIN=DAI
   tesseracts:
-    image: "gluk64/franklin-tesseracts"
-    build: ./build
+    image: "adria0/tesseracts"
+    command: --cfg /tesseracts.toml
     ports:
       - "8000:8000"
     volumes:
+    - ./docker/tesseracts/tesseracts.toml:/tesseracts.toml
     - type: bind
       source: ./volumes/tesseracts
       target: /var/lib/tesseracts/data

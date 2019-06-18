@@ -6,7 +6,7 @@ ui_title         = "Franklin"
 # database ----------------------------------------
 
 # where the database is located
-db_path          = "/tmp/db" 
+db_path          = "/var/lib/tesseracts/data" 
 
 # true|false if we want to scan blocks and save it into db
 scan             = false 
@@ -55,4 +55,4 @@ solc_bypass = true
 # server --------------------------------------------
 
 # http server binding (e.g. "0.0.0.0:8000")
-bind         = "0.0.0.0:8000" 
+bind         = "localhost:8000" 

@@ -300,8 +300,6 @@ tesseracts-build:
 	@docker build -t "${TESSERACTS_DOCKER_IMAGE}" ./docker/tesseracts
 
 tesseracts-up:
-	@rm -rf build
-	@mkdir build
 	@docker-compose up "${TESSERACTS_DOCKER_IMAGE}"
 
 tesseracts-down:
