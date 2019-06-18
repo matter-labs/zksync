@@ -4,6 +4,7 @@ export PROVER_DOCKER_IMAGE ?=gluk64/franklin:prover
 export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
 export FLATTENER_DOCKER_IMAGE ?= gluk64/franklin:flattener
 export NGINX_DOCKER_IMAGE ?= gluk64/franklin-nginx:$(FRANKLIN_ENV)
+export TESSERACTS_DOCKER_IMAGE ?= gluk64/franklin-tesseracts
 
 # Getting started
 
@@ -292,3 +293,16 @@ dev-push-flattener:
 
 make-keys:
 	@cargo run -p key_generator --release --bin key_generator
+
+# Tesseracts
+
+tesseracts-build:
+	@docker build -t "${TESSERACTS_DOCKER_IMAGE}" ./docker/tesseracts
+
+tesseracts-up:
+	@rm -rf build
+	@mkdir build
+	@docker-compose up "${TESSERACTS_DOCKER_IMAGE}"
+
+tesseracts-down:
+	@docker-compose stop "${TESSERACTS_DOCKER_IMAGE}"
