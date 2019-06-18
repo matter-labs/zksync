@@ -71,7 +71,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-    - ./docker/tesseracts/tesseracts.toml:/tesseracts.toml
+    - ./etc/tesseracts/tesseracts.toml:/tesseracts.toml
     - type: bind
       source: ./volumes/tesseracts
       target: /var/lib/tesseracts/data
