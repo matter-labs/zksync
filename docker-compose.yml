@@ -65,4 +65,14 @@ services:
       - ETHEREUM_JSONRPC_VARIANT=geth
       - ETHEREUM_JSONRPC_HTTP_URL=http://geth:8545
       - COIN=DAI
-    
+  tesseracts:
+    image: "adria0/tesseracts"
+    command: --cfg /tesseracts.toml -vvv
+    ports:
+      - "8000:8000"
+    volumes:
+    - ./etc/tesseracts/tesseracts.toml:/tesseracts.toml
+    - type: bind
+      source: ./volumes/tesseracts
+      target: /var/lib/tesseracts/data
+

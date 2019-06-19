@@ -292,3 +292,11 @@ dev-push-flattener:
 
 make-keys:
 	@cargo run -p key_generator --release --bin key_generator
+
+# Tesseracts
+
+tesseracts-up:
+	@docker-compose up -d tesseracts
+
+tesseracts-down:
+	@docker-compose stop tesseracts

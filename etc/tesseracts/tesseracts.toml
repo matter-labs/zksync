@@ -1,0 +1,58 @@
+# user iterface -----------------------------------
+
+# title of the page, e.g. "tesseracts"
+ui_title         = "Franklin" 
+
+# database ----------------------------------------
+
+# where the database is located
+db_path          = "/var/lib/tesseracts/data" 
+
+# true|false if we want to scan blocks and save it into db
+scan             = false 
+
+# the starting block to start to retrieve blocks (only iff scan==true)
+scan_start_block = 1
+
+# store with tx are contained in addr? (bool)
+db_store_addr    = false
+
+# store the transactions and receipts? (bool)
+db_store_tx      = false 
+
+# store internal transactions? (bool)
+db_store_itx     = false 
+
+# store list of last non empty blocks? (bool)
+db_store_neb     = false 
+
+# web3 ----------------------------------------------
+
+# web3 json-rpc port, e.g. http://localhost:8545
+web3_url         = "http://geth:8545" 
+
+# client type
+# "geth_clique" for geth PoS
+# "geth_pow"    for geth PoW
+# "geth"        to autodetect geth_clique and geth_pow
+web3_client      = "geth"
+
+# process internal txs, true or false
+# in geth requieres:
+#   --syncmode=full
+#   --gcmode=archive
+#   --rpcapi debug 
+web3_itx  = false 
+
+# compiler ------------------------------------------
+
+# the path where solc binaries are stored (optional)
+#solc_path = 
+
+# solidity compiler can be bypassedi, by specifing the abi
+solc_bypass = true 
+
+# server --------------------------------------------
+
+# http server binding (e.g. "0.0.0.0:8000")
+bind         = "0.0.0.0:8000" 
