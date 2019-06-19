@@ -93,7 +93,7 @@ explorer-up: #dist-explorer
 # Rust: cross-platform rust builder for linus
 
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
-rust-musl-builder = @docker run $(docker-options) -it ekidd/rust-musl-builder
+rust-musl-builder = @docker run $(docker-options) ekidd/rust-musl-builder
 
 
 # Rust: main stuff
@@ -108,6 +108,7 @@ sandbox:
 	@cargo run --bin sandbox
 
 build-target:
+	$(rust-musl-builder) sudo chown -R rust:rust /home/rust/.cargo/git /home/rust/.cargo/registry
 	$(rust-musl-builder) cargo build --release
 
 clean-target:
@@ -291,4 +292,4 @@ dev-push-flattener:
 # Key generator 
 
 make-keys:
-	@cd key_generator && cargo run --release
+	@cargo run -p key_generator --release --bin key_generator
