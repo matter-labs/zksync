@@ -3,6 +3,7 @@ const ethers = require('ethers')
 const {keccak256} = require('js-sha3')
 const transaction = require('./transaction.js')
 const PlasmaContractABI = require('../abi/PlasmaContract.json').abi
+const bn = ethers.utils.bigNumberify
 
 const MULTIPLIER = ethers.utils.bigNumberify('1000000000000')
 
@@ -68,6 +69,14 @@ class FranklinWallet {
 
         let contract = this.eth.contract.connect(this.ethWallet)
         return contract.deposit([pubX, pubY], maxFee, {value})
+    }
+
+    async exit() {
+        if (!this.ethWallet) {
+            throw 'Can not initiate exit from Franklin: no wallet connected'
+        }
+        let contract = this.eth.contract.connect(this.ethWallet)
+        return contract.exit()
     }
 
     async transfer(to, amount) {
@@ -158,10 +167,10 @@ class Franklin {
     }
 
     async pullSidechainState(accountId) {
-        let result = (await axios({
+        let result = await axios({
             method: 'get',
             url:    this.baseUrl + '/account/' + accountId,
-        }))
+        })
 
         if(result.status !== 200) {
             throw `Could not load data for account ${accountId}: ${result.error}`

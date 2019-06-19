@@ -75,4 +75,4 @@ services:
     - type: bind
       source: ./volumes/tesseracts
       target: /var/lib/tesseracts/data
-    
+

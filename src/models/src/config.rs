@@ -14,15 +14,20 @@ lazy_static! {
 
 use std::env;
 
+#[derive(Debug, Clone)]
 pub struct RuntimeConfig {
     pub transfer_batch_size: usize,
     pub keys_path: String,
     pub max_outstanding_txs: u32,
     pub contract_addr: String,
+    pub mainnet_http_endpoint_string:      String,
+    pub rinkeby_http_endpoint_string:      String,
+    pub mainnet_franklin_contract_address: String,
+    pub rinkeby_franklin_contract_address: String,
 }
 
 impl RuntimeConfig {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let transfer_batch_size_env =
             env::var("TRANSFER_BATCH_SIZE").expect("TRANSFER_BATCH_SIZE env missing");
         let transfer_size = usize::from_str_radix(&(transfer_batch_size_env), 10)
@@ -40,6 +45,10 @@ impl RuntimeConfig {
                 .ok()
                 .and_then(|v| v.parse::<u32>().ok())
                 .expect("MAX_OUTSTANDING_TXS env var not set"),
+            mainnet_http_endpoint_string:      env::var("TREE_RESTORE_MAINNET_ENDPOINT").expect("TREE_RESTORE_MAINNET_ENDPOINT env missing"),
+            rinkeby_http_endpoint_string:      env::var("TREE_RESTORE_RINKEBY_ENDPOINT").expect("TREE_RESTORE_RINKEBY_ENDPOINT env missing"),
+            mainnet_franklin_contract_address: env::var("TREE_RESTORE_MAINNET_CONTRACT_ADDR").expect("TREE_RESTORE_MAINNET_CONTRACT_ADDR env missing"),
+            rinkeby_franklin_contract_address: env::var("TREE_RESTORE_RINKEBY_CONTRACT_ADDR").expect("TREE_RESTORE_RINKEBY_CONTRACT_ADDR env missing"),
         }
     }
 }

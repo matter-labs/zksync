@@ -1,3 +1,4 @@
+const axios = require('axios')
 const ethers = require('ethers')
 const Franklin = require('../franklin/src/franklin')
 var Prando = require('prando')
@@ -30,6 +31,28 @@ let rng = new Prando(1) // deterministic seed
 let TOTAL_TX = 256*120
 let total = 0
 
+class PrepareError extends Error {
+    constructor(message) {
+        super(message)
+        this.name = 'PrepareError'
+        this.message = message
+    }
+}
+class TransferError extends Error {
+    constructor(message) {
+        super(message)
+        this.name = 'TransferError'
+        this.message = message
+    }
+}
+class ExitError extends Error {
+    constructor(message) {
+        super(message)
+        this.name = 'ExitError'
+        this.message = message
+    }
+}
+
 function randomClient() {
     let i = rng.nextInt(0, nClients-1)
     //console.log('i', i)
@@ -51,7 +74,7 @@ const withTimeout = function(ms, promise){
       promise,
       timeout
     ])
-  }
+}
 
 class Client {
 
@@ -61,12 +84,12 @@ class Client {
     }
 
     async prepare(fundFranklin) {
-        let signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/3/" + this.id)
-        this.fra = await franklin.Wallet.fromSigner(signer)
-        this.eth = this.fra.ethWallet
-        console.log(`${this.eth.address}: prepare`)
-        
         try {
+            let signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/3/" + this.id)
+            this.fra = await franklin.Wallet.fromSigner(signer)
+            this.eth = this.fra.ethWallet
+            console.log(`${this.eth.address}: prepare`)
+        
             let toAddFranklin = bn(0)
             await this.fra.pullState()
             if (this.fra.sidechainOpen) {
@@ -87,7 +110,7 @@ class Client {
                 console.log(`${this.eth.address}: eth wallet balance is ${format(balance)} ETH`)
                 let minBalance = MIN_AMOUNT_FRA.add(transferPrice.mul(2))
                 if (balance.lt(minBalance)) {
-                    let toAdd = minBalance.sub(balance)
+                    let toAdd = minBalance.mul(4).sub(balance)
                     console.log(`${this.eth.address}: adding ${format(toAdd)} to eth wallet`)
                     // transfer funds from source account
                     let request = await source.sendTransaction({
@@ -115,105 +138,171 @@ class Client {
                 console.log('${this.eth.address}: prepared')
             }
         } catch (err) {
-            console.log(`${this.eth.address}: ERROR: ${err}`)
+            console.log(`${this.eth.address}: PREPARE ERROR: ${err}`)
             console.trace(err.stack)
+            throw new PrepareError(`${this.eth.address} received PREPARE ERROR: ${err}`)
         }
     }
 
-    async randomTransfer() {
-        let fromAccountId = this.fra.sidechainAccountId
-        let toAccountId = null
-        while (true) {
-            let to = randomClient()
-            //console.log(to)
-            if (to.fra.sidechainOpen && to.fra.sidechainAccountId !== fromAccountId) {
-                toAccountId = to.fra.sidechainAccountId
+    async randomTransfer() { 
+        try {
+            let fromAccountId = this.fra.sidechainAccountId
+            let toAccountId = null
+            while (true) {
+                let to = randomClient()
+                //console.log(to)
+                if (to.fra.sidechainOpen && to.fra.sidechainAccountId !== fromAccountId) {
+                    toAccountId = to.fra.sidechainAccountId
+                    break
+                }
+            }
+            let balance_int = this.fra.currentBalance.div('1000000000000').div(10).toNumber()
+            if (balance_int < 12) {
+                console.log('skip tx')
+                return
+            }
+
+            let round_amount = rng.nextInt(11, balance_int - 1)
+            let amount = 
+                ethers.utils.bigNumberify(round_amount)
+                //ethers.utils.bigNumberify(20474)
+                .mul('1000000000000')
+
+            //console.log(`${this.eth.address}: transfer ${round_amount} from ${fromAccountId} to ${toAccountId}...`);
+
+            let transferData = `transfer ${round_amount} from ${fromAccountId} to ${toAccountId} nonce ${this.fra.nextNonce}`;
+            //console.log(`${this.eth.address}: ${transferData} requesting...`)
+            let r = await this.fra.transfer(toAccountId, amount)
+            if (r.accepted) {
+                console.log(`${this.eth.address}: ${transferData} ok`)
+            } else {
+                console.log(`${this.eth.address}: ${transferData} failed: ${JSON.stringify(r)}`)
+            }
+        } catch (err) {
+            console.log(`${this.eth.address}: TRANSFER ERROR: ${err}`)
+            console.trace(err.stack)
+            throw new TransferError(`${this.eth.address} received TRANSFER ERROR: ${err}`)
+        }
+    }
+
+    async performExit() {
+        try {
+            let request = await this.fra.exit()
+            console.log(`${this.eth.address}: full exit tx sent`)
+            let receipt = await request.wait()
+            await sleep(10000)
+        } catch (err) {
+            console.log(`${this.eth.address}: EXIT ERROR: ${err}`)
+            console.trace(err.stack)
+            throw new ExitError(`${this.eth.address} received EXIT ERROR: ${err}`)
+        }
+    }
+}
+
+async function waitForVerifyBlocksPromise() {
+    while(true){
+        try {
+            let response = await axios({
+                method:     'get',
+                url:        clients[0].fra.fra.baseUrl + '/blocks',
+            });
+            let blocks = response.data
+            let unverified_found = false
+            for (let i=0; i < blocks.length; i++) {
+                if (blocks[i].verify_tx_hash == null) {
+                    unverified_found = true
+                    break
+                }
+            }
+            if (!unverified_found) {
                 break
             }
-        }
-        let balance_int = this.fra.currentBalance.div('1000000000000').div(10).toNumber()
-        if (balance_int < 12) {
-            console.log('skip tx')
-            return
-        }
-
-        let round_amount = rng.nextInt(11, balance_int - 1)
-        let amount = 
-            ethers.utils.bigNumberify(round_amount)
-            //ethers.utils.bigNumberify(20474)
-            .mul('1000000000000')
-
-        //console.log(`${this.eth.address}: transfer ${round_amount} from ${fromAccountId} to ${toAccountId}...`);
-
-        let transferData = `transfer ${round_amount} from ${fromAccountId} to ${toAccountId} nonce ${this.fra.nextNonce}`;
-        //console.log(`${this.eth.address}: ${transferData} requesting...`)
-        let r = await this.fra.transfer(toAccountId, amount)
-        if (r.accepted) {
-            console.log(`${this.eth.address}: ${transferData} ok`)
-        } else {
-            console.log(`${this.eth.address}: ${transferData} failed: ${JSON.stringify(r)}`)
+            await sleep(1500)
+        } catch (err) {
+            console.log(`Get blocks request error: ${err}`)
+            throw err
+            // continue
         }
     }
 }
 
 async function test() {
+    try {
+        var args = process.argv.slice(2);
+        let prepareOnly = args[0] === 'prepare'
 
-    var args = process.argv.slice(2);
-    let prepareOnly = args[0] === 'prepare'
+        let fundFranklin = !prepareOnly
 
-    let fundFranklin = !prepareOnly
+        console.log('Will run:', fundFranklin)
 
-    console.log('Will run:', fundFranklin)
+        let sourceBalanceBefore = await source.getBalance()
+        sourceNonce = await source.getTransactionCount("pending")
+        gasPrice = (await provider.getGasPrice()).mul(2)
 
-    let sourceBalanceBefore = await source.getBalance()
-    sourceNonce = await source.getTransactionCount("pending")
-    gasPrice = (await provider.getGasPrice()).mul(2)
+        console.log(`Current gas price: ${gasPrice.div(1000000000).toNumber()} GWEI`)
+        transferPrice = gasPrice.mul(DEPOSIT_GAS_LIMIT)
 
-    console.log(`Current gas price: ${gasPrice.div(1000000000).toNumber()} GWEI`)
-    transferPrice = gasPrice.mul(DEPOSIT_GAS_LIMIT)
+        console.log('creating clients...')
+        for (let i=0; i < nClients; i++) {
+            clients.push(new Client(i))
+        }
 
-    console.log('creating clients...')
-    for (let i=0; i < nClients; i++) {
-        clients.push(new Client(i))
-    }
-
-    console.log('xx: preparing clients...')
-    let promises = []
-    for (let i=0; i < nClients; i++) {
-        promises.push( clients[i].prepare(fundFranklin) )
-    }
-
-    //console.log('waiting until the clients are ready...')
-    await Promise.all(promises)
-
-    if (prepareOnly) process.exit(0);
-
-    let sourceBalanceAfter = await source.getBalance()
-    console.log('Total spent: ', format(sourceBalanceBefore.sub(sourceBalanceAfter)))
-
-    console.log('starting the test...')
-    while(total < TOTAL_TX) {
-
+        console.log('xx: preparing clients...')
         let promises = []
         for (let i=0; i < nClients; i++) {
-            promises.push(clients[i].fra.pullState().catch(e => 'err3: ' + e))
+            promises.push( clients[i].prepare(fundFranklin) )
         }
-        await withTimeout(1500, Promise.all(promises)).catch(e => 'err4: ' + e)
 
+        //console.log('waiting until the clients are ready...')
+        await Promise.all(promises)
+
+        if (prepareOnly) process.exit(0);
+
+        let sourceBalanceAfter = await source.getBalance()
+        console.log('Total spent: ', format(sourceBalanceBefore.sub(sourceBalanceAfter)))
+
+        console.log('starting the transfers test...')
+        while(total < TOTAL_TX) {
+
+            let promises = []
+            for (let i=0; i < nClients; i++) {
+                promises.push(clients[i].fra.pullState())
+            }
+            await Promise.all(promises)
+
+            promises = []
+            for (let i=0; i<(tps * 3); i++) {
+                let client = randomClient()
+                let promise = client.randomTransfer()
+                promises.push(promise)
+                total++
+            }
+            await Promise.all(promises)
+
+            console.log('-- total: ', total, ' of ', TOTAL_TX)
+        }
+
+        console.log('transfers test complete, total = ', total)
+
+        console.log('waiting for all blocks verification')
+        let promise = waitForVerifyBlocksPromise()
+        await promise
+
+        console.log('performing exits from clients...')
+    
         promises = []
-        for (let i=0; i<(tps * 3); i++) {
-            let client = randomClient()
-            let promise = client.randomTransfer().catch(e => console.log('err1: ', e))
-            promises.push(promise)
-            total++
+        for (let i=0; i < nClients; i++) {
+            promises.push( clients[i].performExit())
         }
-        await withTimeout(1500, Promise.all(promises)).catch(e => 'err2: ' + e)
+        await Promise.all(promises)
 
-        console.log('-- total: ', total, ' of ', TOTAL_TX)
+        console.log('waiting for all blocks verification')
+        await promise
+        console.log('loadtest finished')
+    } catch (err) {
+        console.log(`received ERROR: ${err}`)
+        throw err
     }
-
-    console.log('test complete, total = ', total)
-
 }
 
 test()
