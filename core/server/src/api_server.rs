@@ -108,14 +108,14 @@ fn handle_submit_tx(
             Ok((tx, account, tx_for_state))
         })
         .and_then(move |(tx, account, tx_for_state)| {
-            //println!("account {}: nonce {} received", tx.from, tx.nonce);
+            //debug!("account {}: nonce {} received", tx.from, tx.nonce);
 
             // Wait for nonce
 
             let future = if account.nonce == tx.nonce {
                 nonce_futures.ready(tx.from, tx.nonce)
             } else {
-                //println!("account {}: waiting for nonce {}", tx.from, tx.nonce);
+                //debug!("account {}: waiting for nonce {}", tx.from, tx.nonce);
                 nonce_futures.nonce_await(tx.from, tx.nonce)
             };
             future
@@ -124,7 +124,7 @@ fn handle_submit_tx(
                 .or_else(|e| future::err(format!("Nonce error: {:?}", e)))
         })
         .and_then(move |(mut tx, account, mut nonce_futures, tx_for_state)| {
-            //println!("account {}: nonce {} ready", tx.from, tx.nonce);
+            //debug!("account {}: nonce {} ready", tx.from, tx.nonce);
 
             // Verify signature
 
@@ -134,8 +134,8 @@ fn handle_submit_tx(
             let verified = tx.verify_sig(&pub_key);
             if !verified {
                 let (x, y) = pub_key.0.into_xy();
-                println!("Got public key: {:?}, {:?}", x, y);
-                println!(
+                warn!("Got public key: {:?}, {:?}", x, y);
+                warn!(
                     "Signature is invalid: (x,y,s) = ({:?},{:?},{:?})",
                     &tx.signature.r_x, &tx.signature.r_y, &tx.signature.s
                 );
@@ -222,7 +222,7 @@ fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResp
         acc_rx.recv_timeout(std::time::Duration::from_millis(TIMEOUT));
 
     if pending.is_err() {
-        println!("API request timeout!");
+        warn!("API request timeout!");
         return Ok(HttpResponse::Ok().json(ApiError {
             error: "account request timeout".to_string(),
         }));
@@ -625,7 +625,7 @@ pub fn start_api_server(
             };
 
             start_server(state.clone(), bind_to.clone());
-            println!("Started http server at {}", &bind_to);
+            info!("Started http server at {}", &bind_to);
             start_status_interval(state.clone());
             sys.run();
         })

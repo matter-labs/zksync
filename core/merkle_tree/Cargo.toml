@@ -17,3 +17,6 @@ fnv = "1.0.3"
 rayon = "1.0.3"
 rand = "0.4"
 
+[dev-dependencies]
+log = "0.4"
+

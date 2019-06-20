@@ -67,14 +67,14 @@ impl FranklinAccountsStates {
         &mut self,
         transaction: &FranklinTransaction,
     ) -> Result<(), DataRestoreError> {
-        // println!("tx: {:?}", transaction.ethereum_transaction.hash);
+        // debug!("tx: {:?}", transaction.ethereum_transaction.hash);
         let transfer_txs_block = self
             .get_all_transactions_from_transfer_block(transaction)
             .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         for tx in transfer_txs_block {
             if let Some(mut from) = self.plasma_state.balance_tree.items.get(&tx.from).cloned() {
                 let mut transacted_amount = BigDecimal::zero();
-                // println!("amount tx: {:?}", &tx.amount);
+                // debug!("amount tx: {:?}", &tx.amount);
                 transacted_amount += &tx.amount;
                 transacted_amount += &tx.fee;
 
@@ -176,17 +176,17 @@ impl FranklinAccountsStates {
         transaction: &FranklinTransaction,
     ) -> Result<Vec<TransferTx>, DataRestoreError> {
         let mut tx_data_vec = transaction.commitment_data.clone();
-        // println!("tx_data_vec: {:?}", tx_data_vec);
+        // debug!("tx_data_vec: {:?}", tx_data_vec);
         // let block_number = &transaction.commitment_data.clone()[0..32];
-        // println!("block_number: {:?}", block_number);
+        // debug!("block_number: {:?}", block_number);
         let tx_data_len = tx_data_vec.len();
-        // println!("tx_data_len: {:?}", tx_data_len);
+        // debug!("tx_data_len: {:?}", tx_data_len);
         tx_data_vec.reverse();
         tx_data_vec.truncate(tx_data_len - 160);
         tx_data_vec.reverse();
-        // println!("tx_data_vec final: {:?}", tx_data_vec);
+        // debug!("tx_data_vec final: {:?}", tx_data_vec);
         // tx_data_len = tx_data_vec.len();
-        // println!("tx_data_len final: {:?}", tx_data_len);
+        // debug!("tx_data_len final: {:?}", tx_data_len);
         let txs = tx_data_vec.chunks(9);
 
         let mut transfers: Vec<TransferTx> = vec![];
@@ -222,7 +222,7 @@ impl FranklinAccountsStates {
                 signature: TxSignature::default(),
                 cached_pub_key: None,
             };
-            println!(
+            info!(
                 "Transaction from account {:?} to account {:?}, amount = {:?}",
                 from, to, amount
             );
@@ -364,7 +364,7 @@ impl FranklinAccountsStates {
 
         let mut all_deposits = vec![];
         for (k, v) in this_batch.iter() {
-            println!(
+            info!(
                 "Into account {:?} with public key {:x}, deposit amount = {:?}",
                 k, v.1, v.0
             );
@@ -478,7 +478,7 @@ impl FranklinAccountsStates {
 
         let mut all_exits = vec![];
         for k in this_batch.iter() {
-            println!("Exit from account {:?}", k);
+            info!("Exit from account {:?}", k);
 
             let tx: ExitTx = ExitTx {
                 account: k.as_u32(),

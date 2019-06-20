@@ -456,8 +456,9 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
 
 #[cfg(test)]
 mod test {
-
     use super::*;
+
+    use log::{debug, error};
 
     use bellman::groth16::{
         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
@@ -514,21 +515,21 @@ mod test {
 
             instance.synthesize(&mut cs).expect("must synthesize");
 
-            println!("{}", cs.find_unconstrained());
+            debug!("{}", cs.find_unconstrained());
 
-            println!("{}", cs.num_constraints());
+            debug!("{}", cs.num_constraints());
 
             assert_eq!(cs.num_inputs(), 1);
 
             let err = cs.which_is_unsatisfied();
             if err.is_some() {
-                println!(
+                error!(
                     "Error for bitfield = {:#b}, bit of interest = {}",
                     existing_field, bit_of_interest
                 );
                 panic!("ERROR satisfying in {}", err.unwrap());
             } else {
-                println!("Satisfied for bit = {}", bit_of_interest);
+                debug!("Satisfied for bit = {}", bit_of_interest);
             }
         }
     }
@@ -668,7 +669,7 @@ mod test {
         for i in 0..=max_with_shift {
             let x = Fr::from_str(&i.to_string()).unwrap();
             let val = evaluate_at_x::<Bn256>(&interpolation[..], &x);
-            println!("X = {}, Y = {}", x, val);
+            debug!("X = {}, Y = {}", x, val);
         }
     }
 
@@ -684,7 +685,7 @@ mod test {
         for i in 0..=max_with_shift {
             let x = Fr::from_str(&i.to_string()).unwrap();
             let val = evaluate_at_x::<Bn256>(&interpolation[..], &x);
-            println!("X = {}, Y = {}", x, val);
+            debug!("X = {}, Y = {}", x, val);
         }
     }
 
@@ -700,7 +701,7 @@ mod test {
         for i in 0..=full_range {
             let x = Fr::from_str(&i.to_string()).unwrap();
             let val = evaluate_at_x::<Bn256>(&interpolation[..], &x);
-            println!("X = {}, Y = {}", x, val);
+            debug!("X = {}, Y = {}", x, val);
         }
     }
 }

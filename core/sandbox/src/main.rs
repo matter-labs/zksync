@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate log;
+
 use futures::Future;
 use std::time::{Duration, Instant};
 use tokio::prelude::*;
@@ -8,11 +11,13 @@ mod nonce_futures;
 use nonce_futures::*;
 
 fn main() {
+    env_logger::init();
+
     let nm = NonceFutures::default();
     let task = Interval::new(Instant::now(), Duration::from_millis(1000))
         .fold((0, nm.clone()), |acc, _| {
             let (i, mut nm) = acc;
-            println!("i = {}", i);
+            info!("i = {}", i);
 
             if i == 2 {
                 nm.set(1, 2);
@@ -30,9 +35,9 @@ fn main() {
             let task = nm
                 .nonce_await(1, i)
                 .timeout(Duration::from_millis(5000))
-                .map(|_| println!("success!"))
+                .map(|_| info!("success!"))
                 .or_else(|e| {
-                    println!("error: {:?}", e);
+                    error!("error: {:?}", e);
                     future::ok(())
                 });
             tokio::spawn(task);

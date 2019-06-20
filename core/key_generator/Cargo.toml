@@ -19,3 +19,5 @@ models = { path = "../models" }
 hex = "0.3.2"
 rust-crypto = "0.2"
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
+log = "0.4"
+env_logger = "0.6"

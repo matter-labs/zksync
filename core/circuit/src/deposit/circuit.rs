@@ -519,8 +519,10 @@ where
 
 #[cfg(test)]
 mod test {
-
     use super::*;
+
+    use log::debug;
+
     use ff::PrimeFieldRepr;
     use sapling_crypto::jubjub::FixedGenerators;
 
@@ -550,7 +552,7 @@ mod test {
         let tree_depth = plasma_constants::BALANCE_TREE_DEPTH as u32;
         let mut tree = CircuitAccountTree::new(tree_depth);
         let initial_root = tree.root_hash();
-        println!("Initial root = {}", initial_root);
+        debug!("Initial root = {}", initial_root);
 
         let capacity = tree.capacity();
         assert_eq!(capacity, 1 << plasma_constants::BALANCE_TREE_DEPTH);
@@ -558,7 +560,7 @@ mod test {
         let sender_sk = PrivateKey::<Bn256>(rng.gen());
         let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
         let (sender_x, sender_y) = sender_pk.0.into_xy();
-        println!("x = {}, y = {}", sender_x, sender_y);
+        debug!("x = {}, y = {}", sender_x, sender_y);
 
         // give some funds to sender and make zero balance for recipient
 
@@ -580,7 +582,7 @@ mod test {
 
         tree.insert(sender_leaf_number, sender_leaf.clone());
 
-        println!(
+        debug!(
             "Sender leaf hash is {}",
             tree.get_hash((tree_depth, sender_leaf_number))
         );
@@ -618,14 +620,14 @@ mod test {
 
         let new_root = tree.root_hash();
 
-        println!("New root = {}", new_root);
+        debug!("New root = {}", new_root);
 
-        assert!(initial_root != new_root);
+        assert_ne!(initial_root, new_root);
 
         {
             let mut cs = TestConstraintSystem::<Bn256>::new();
 
-            let mut public_data_initial_bits = vec![];
+            let mut public_data_initial_bits = Vec::new();
 
             // these two are BE encodings because an iterator is BE. This is also an Ethereum standard behavior
 
@@ -646,7 +648,7 @@ mod test {
             let mut hash_result = [0u8; 32];
             h.result(&mut hash_result[..]);
 
-            println!("Initial hash hex {}", hex::encode(hash_result));
+            debug!("Initial hash hex {}", hex::encode(hash_result));
 
             let mut packed_transaction_data = vec![];
             let transaction_data = request.public_data_into_bits();
@@ -656,7 +658,7 @@ mod test {
 
             let packed_transaction_data_bytes = be_bit_vector_into_bytes(&packed_transaction_data);
 
-            println!(
+            debug!(
                 "Packed transaction data hex {}",
                 hex::encode(packed_transaction_data_bytes.clone())
             );
@@ -670,7 +672,7 @@ mod test {
             hash_result = [0u8; 32];
             h.result(&mut hash_result[..]);
 
-            println!("Final hash as hex {}", hex::encode(hash_result));
+            debug!("Final hash as hex {}", hex::encode(hash_result));
 
             hash_result[0] &= 0x1f; // temporary solution
 
@@ -680,7 +682,7 @@ mod test {
 
             let public_data_commitment = Fr::from_repr(repr).unwrap();
 
-            println!(
+            debug!(
                 "Final data commitment as field element = {}",
                 public_data_commitment
             );
@@ -697,9 +699,9 @@ mod test {
 
             instance.synthesize(&mut cs).unwrap();
 
-            println!("{}", cs.find_unconstrained());
+            debug!("{}", cs.find_unconstrained());
 
-            println!("{}", cs.num_constraints());
+            debug!("{}", cs.num_constraints());
 
             assert_eq!(cs.num_inputs(), 4);
 
@@ -761,7 +763,7 @@ mod test {
 
         tree.insert(sender_leaf_number, sender_leaf.clone());
 
-        println!(
+        debug!(
             "Sender leaf hash is {}",
             tree.get_hash((tree_depth, sender_leaf_number))
         );
@@ -769,7 +771,7 @@ mod test {
         //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
         let initial_root = tree.root_hash();
-        println!("Initial root = {}", initial_root);
+        debug!("Initial root = {}", initial_root);
 
         let mut double_the_amount = transfer_amount_as_field_element;
         double_the_amount.double();
@@ -814,7 +816,7 @@ mod test {
 
         let new_root = tree.root_hash();
 
-        println!("New root = {}", new_root);
+        debug!("New root = {}", new_root);
 
         assert!(initial_root != new_root);
 
@@ -842,7 +844,7 @@ mod test {
             let mut hash_result = [0u8; 32];
             h.result(&mut hash_result[..]);
 
-            println!("Initial hash hex {}", hex::encode(hash_result));
+            debug!("Initial hash hex {}", hex::encode(hash_result));
 
             let mut packed_transaction_data = vec![];
             let transaction_data = request.public_data_into_bits();
@@ -852,7 +854,7 @@ mod test {
 
             let packed_transaction_data_bytes = be_bit_vector_into_bytes(&packed_transaction_data);
 
-            println!(
+            debug!(
                 "Packed transaction data hex {}",
                 hex::encode(packed_transaction_data_bytes.clone())
             );
@@ -866,7 +868,7 @@ mod test {
             hash_result = [0u8; 32];
             h.result(&mut hash_result[..]);
 
-            println!("Final hash as hex {}", hex::encode(hash_result));
+            debug!("Final hash as hex {}", hex::encode(hash_result));
 
             hash_result[0] &= 0x1f; // temporary solution
 
@@ -876,7 +878,7 @@ mod test {
 
             let public_data_commitment = Fr::from_repr(repr).unwrap();
 
-            println!(
+            debug!(
                 "Final data commitment as field element = {}",
                 public_data_commitment
             );
@@ -893,9 +895,9 @@ mod test {
 
             instance.synthesize(&mut cs).unwrap();
 
-            println!("{}", cs.find_unconstrained());
+            debug!("{}", cs.find_unconstrained());
 
-            println!("{}", cs.num_constraints());
+            debug!("{}", cs.num_constraints());
 
             assert_eq!(cs.num_inputs(), 4);
 

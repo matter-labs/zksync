@@ -56,8 +56,8 @@ fn run_eth_sender(
         .access_storage()
         .expect("db connection failed for eth sender");
     for op in rx_for_eth {
-        //println!("Operation requested");
-        println!(
+        //debug!("Operation requested");
+        debug!(
             "Operation requested: {:?}, {}",
             &op.action, op.block.block_number
         );
@@ -172,13 +172,13 @@ fn run_eth_sender(
         // TODO: process tx sending failure
         match tx {
             Ok(hash) => {
-                println!("Commitment tx hash = {:?}", hash);
+                debug!("Commitment tx hash = {:?}", hash);
                 let _ = storage.save_operation_tx_hash(
                     op.id.expect("trying to send not stored op?"),
                     format!("{:?}", hash),
                 );
             }
-            Err(err) => println!("Error sending tx {}", err),
+            Err(err) => error!("Error sending tx {}", err),
         }
     }
 }
@@ -192,7 +192,7 @@ pub fn start_eth_sender(pool: ConnectionPool) -> Sender<Operation> {
     let current_nonce = eth_client
         .current_nonce()
         .expect("could not fetch current nonce");
-    println!(
+    info!(
         "Starting eth_sender: sender = {}, current_nonce = {}",
         eth_client.current_sender(),
         current_nonce

@@ -55,10 +55,10 @@ pub fn make_exitor_key() {
         requests: vec![(empty_request, empty_witness); EXIT_BATCH_SIZE],
     };
 
-    println!("generating setup...");
+    info!("generating setup...");
     let start = PreciseTime::now();
     let tmp_cirtuit_params = generate_random_parameters(instance_for_generation, rng).unwrap();
-    println!(
+    info!(
         "setup generated in {} s",
         start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0
     );
@@ -92,5 +92,5 @@ pub fn make_exitor_key() {
         .write_all(contract_content.as_bytes())
         .expect("Unable to write contract");
 
-    println!("Done");
+    info!("Done");
 }

@@ -1,4 +1,6 @@
 //use tokio::runtime::Runtime;
+#[macro_use]
+extern crate log;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::channel;
@@ -16,7 +18,9 @@ use models::{config, StateKeeperRequest};
 use storage::ConnectionPool;
 
 fn main() {
-    println!("starting server");
+    env_logger::init();
+
+    debug!("starting server");
 
     // handle ctrl+c
     let stop_signal = Arc::new(AtomicBool::new(false));
@@ -54,7 +58,7 @@ fn main() {
     // spawn threads for different processes
     // see https://docs.google.com/drawings/d/16UeYq7cuZnpkyMWGrgDAbmlaGviN2baY1w1y745Me70/edit?usp=sharing
 
-    println!("starting actors");
+    info!("starting actors");
 
     let (tx_for_state, rx_for_state) = channel();
     start_api_server(tx_for_state.clone(), connection_pool.clone());
@@ -83,5 +87,5 @@ fn main() {
         thread::sleep(Duration::from_secs(1));
     }
 
-    println!("terminate signal received");
+    info!("terminate signal received");
 }

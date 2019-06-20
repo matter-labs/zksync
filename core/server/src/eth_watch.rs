@@ -95,9 +95,9 @@ impl EthWatch {
         this.last_deposit_batch = U256::from(expecting_deposit_batch);
         this.last_exit_batch = U256::from(expecting_exit_batch);
 
-        println!("Monitoring contract {:x}", this.contract_addr);
-        println!("Starting from deposit batch {}", this.last_deposit_batch);
-        println!("Starting from exit batch {}", this.last_exit_batch);
+        info!("Monitoring contract {:x}", this.contract_addr);
+        info!("Starting from deposit batch {}", this.last_deposit_batch);
+        info!("Starting from exit batch {}", this.last_exit_batch);
 
         this
     }
@@ -134,13 +134,13 @@ impl EthWatch {
             let deposits_result =
                 self.process_deposits(block_number, &tx_for_blocks, &web3, &contract);
             if let Err(err) = deposits_result {
-                println!("Failed to process deposit logs: {}", err);
+                error!("Failed to process deposit logs: {}", err);
                 continue;
             }
 
             let exits_result = self.process_exits(block_number, &tx_for_blocks, &web3, &contract);
             if let Err(err) = exits_result {
-                println!("Failed to process exit logs: {}", err);
+                error!("Failed to process exit logs: {}", err);
                 continue;
             }
 
@@ -159,7 +159,7 @@ impl EthWatch {
         web3: &web3::Web3<T>,
         contract: &Contract<T>,
     ) -> Result<(), String> {
-        //println!("Processing deposits for block {}", block_number);
+        //debug!("Processing deposits for block {}", block_number);
         let total_deposit_requests_result: U256 = contract
             .query(
                 "totalDepositRequests",
@@ -172,7 +172,7 @@ impl EthWatch {
             .map_err(|err| format!("Error getting total deposit requests {}", err))?;
 
         let total_deposit_requests = total_deposit_requests_result;
-        //println!("total_deposit_requests = {}", total_deposit_requests);
+        //debug!("total_deposit_requests = {}", total_deposit_requests);
 
         let max_batch_number = total_deposit_requests / self.deposit_batch_size;
 
@@ -318,7 +318,7 @@ impl EthWatch {
 
         let mut all_deposits = vec![];
         for (k, v) in this_batch.iter() {
-            println!(
+            info!(
                 "Into account {:x} with public key {:x}, deposit amount = {}",
                 k, v.1, v.0
             );
@@ -356,7 +356,7 @@ impl EthWatch {
 
         let len = all_deposits.len();
         let block = ProtoBlock::Deposit(self.last_deposit_batch.as_u32(), all_deposits);
-        println!(
+        info!(
             "Deposit batch {}, {} accounts",
             self.last_deposit_batch, len
         );
@@ -376,7 +376,7 @@ impl EthWatch {
         web3: &web3::Web3<T>,
         contract: &Contract<T>,
     ) -> Result<(), String> {
-        //println!("Processing exits for block {}", block_number);
+        //debug!("Processing exits for block {}", block_number);
         let total_requests_result: U256 = contract
             .query(
                 "totalExitRequests",
@@ -528,7 +528,7 @@ impl EthWatch {
 
         let mut all_exits = vec![];
         for k in this_batch.iter() {
-            println!("Exit from account {:x}", k);
+            info!("Exit from account {:x}", k);
 
             let tx: ExitTx = ExitTx {
                 account: k.as_u32(),

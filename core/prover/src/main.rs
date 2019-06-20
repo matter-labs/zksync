@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate log;
+
 use prover::BabyProver;
 use signal_hook::iterator::Signals;
 use std::env;
@@ -8,6 +11,8 @@ use tokio::runtime::current_thread::Runtime;
 use tokio::sync::oneshot;
 
 fn main() {
+    env_logger::init();
+
     // handle ctrl+c
     let stop_signal = Arc::new(AtomicBool::new(false));
     signal_hook::flag::register(signal_hook::SIGTERM, Arc::clone(&stop_signal))
@@ -18,7 +23,7 @@ fn main() {
         .expect("Error setting SIGQUIT handler");
 
     let worker = env::var("POD_NAME").unwrap_or_else(|_| "default".to_string());
-    println!("creating prover, worker: {}", worker);
+    info!("creating prover, worker: {}", worker);
     let mut prover = BabyProver::create(worker).unwrap();
     let prover_id = prover.prover_id;
 
@@ -39,7 +44,7 @@ fn main() {
     .expect("Signals::new() failed");
     thread::spawn(move || {
         for _ in signals.forever() {
-            println!(
+            info!(
                 "Termination signal received. Prover will finish the job and shut down gracefully"
             );
             let storage =

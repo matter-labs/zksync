@@ -2,6 +2,8 @@
 
 #[macro_use]
 extern crate diesel;
+#[macro_use]
+extern crate log;
 
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;
@@ -119,7 +121,7 @@ impl StoredOperation {
         let op: Result<Operation, serde_json::Error> = serde_json::from_str(&self.data.to_string());
 
         if let Err(err) = &op {
-            println!("Error: {} on {}", err, debug_data)
+            debug!("Error: {} on {}", err, debug_data)
         }
 
         let mut op = op.expect("Operation deserialization");
@@ -402,7 +404,7 @@ impl StorageProcessor {
                 })
                 .execute(self.conn())?;
             if 0 == inserted {
-                eprintln!("Error: could not commit all new transactions!");
+                error!("Error: could not commit all new transactions!");
                 return Err(Error::RollbackTransaction);
             }
         }
@@ -431,7 +433,7 @@ impl StorageProcessor {
                 })
                 .execute(self.conn())?;
             if 0 == inserted {
-                eprintln!("Error: could not commit all new transactions!");
+                error!("Error: could not commit all new transactions!");
                 return Err(Error::RollbackTransaction);
             }
         }
@@ -460,7 +462,7 @@ impl StorageProcessor {
                 })
                 .execute(self.conn())?;
             if 0 == inserted {
-                eprintln!("Error: could not commit all new transactions!");
+                error!("Error: could not commit all new transactions!");
                 return Err(Error::RollbackTransaction);
             }
         }
@@ -473,7 +475,7 @@ impl StorageProcessor {
         accounts_updated: &AccountMap,
     ) -> QueryResult<()> {
         for (&account_id, a) in accounts_updated.iter() {
-            println!(
+            debug!(
                 "Committing state update for account {} in block {}",
                 account_id, block_number
             );
@@ -485,7 +487,7 @@ impl StorageProcessor {
                 })
                 .execute(self.conn())?;
             if 0 == inserted {
-                eprintln!("Error: could not commit all state updates!");
+                error!("Error: could not commit all state updates!");
                 return Err(Error::RollbackTransaction);
             }
         }

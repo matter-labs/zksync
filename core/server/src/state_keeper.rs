@@ -49,7 +49,7 @@ type UpdatedAccounts = AccountMap;
 
 impl PlasmaStateKeeper {
     pub fn new(pool: ConnectionPool) -> Self {
-        println!("constructing state keeper instance");
+        info!("constructing state keeper instance");
 
         // here we should insert default accounts into the tree
         let storage = pool
@@ -61,7 +61,7 @@ impl PlasmaStateKeeper {
         let state = PlasmaState::new(accounts, last_committed + 1);
         //let outstanding_txs = storage.count_outstanding_proofs(last_verified).expect("db failed");
 
-        println!(
+        info!(
             "last_committed = {}, last_verified = {}",
             last_committed, last_verified
         );
@@ -75,7 +75,7 @@ impl PlasmaStateKeeper {
         };
 
         let root = keeper.state.root_hash();
-        println!("created state keeper, root hash = {}", root);
+        info!("created state keeper, root hash = {}", root);
 
         keeper
     }
@@ -98,7 +98,7 @@ impl PlasmaStateKeeper {
                         total_transactions: 0,
                     });
                     if r.is_err() {
-                        println!(
+                        error!(
                             "StateKeeperRequest::GetNetworkStatus: channel closed, sending failed"
                         );
                     }
@@ -107,7 +107,7 @@ impl PlasmaStateKeeper {
                     let account = self.state.get_account(account_id);
                     let r = sender.send(account);
                     if r.is_err() {
-                        println!("StateKeeperRequest::GetAccount: channel closed, sending failed");
+                        error!("StateKeeperRequest::GetAccount: channel closed, sending failed");
                     }
                 }
                 StateKeeperRequest::AddTransferTx(tx, sender) => {
@@ -118,9 +118,7 @@ impl PlasmaStateKeeper {
                     }
                     let r = sender.send(result);
                     if r.is_err() {
-                        println!(
-                            "StateKeeperRequest::AddTransferTx: channel closed, sending failed"
-                        );
+                        error!("StateKeeperRequest::AddTransferTx: channel closed, sending failed");
                     }
 
                     if self.transfer_tx_queue.len() == config::RUNTIME_CONFIG.transfer_batch_size {
@@ -129,7 +127,7 @@ impl PlasmaStateKeeper {
                 }
                 StateKeeperRequest::AddBlock(block) => {
                     self.block_queue.push_back(block);
-                    //println!("new protoblock, transfer_tx_queue.len() = {}", self.transfer_tx_queue.len());
+                    //debug!("new protoblock, transfer_tx_queue.len() = {}", self.transfer_tx_queue.len());
                     if self.transfer_tx_queue.is_empty() {
                         self.process_block_queue(&tx_for_commitments);
                     }
@@ -157,7 +155,7 @@ impl PlasmaStateKeeper {
                     self.create_exit_block(batch_number, transactions)
                 }
             };
-            //println!("sending request to committer {:?}", req);
+            //debug!("sending request to committer {:?}", req);
             tx_for_commitments
                 .send(req)
                 .expect("must send new operation for commitment");
@@ -168,7 +166,7 @@ impl PlasmaStateKeeper {
     fn apply_transfer_tx(&mut self, tx: TransferTx) -> TransferTxResult {
         let appication_result = self.state.apply_transfer(&tx);
         if appication_result.is_ok() {
-            //println!("accepted transaction for account {}, nonce {}", tx.from, tx.nonce);
+            //debug!("accepted transaction for account {}, nonce {}", tx.from, tx.nonce);
             self.transfer_tx_queue.push(tx);
         }
 
@@ -189,7 +187,7 @@ impl PlasmaStateKeeper {
     fn apply_padding(&mut self) {
         let to_pad = config::RUNTIME_CONFIG.transfer_batch_size - self.transfer_tx_queue.len();
         if to_pad > 0 {
-            println!("padding transactions");
+            debug!("padding transactions");
             // TODO: move to env vars
             let pk_bytes =
                 hex::decode("8ea0225bbf7f3689eb8ba6f8d7bef3d8ae2541573d71711a28d5149807b40805")

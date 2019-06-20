@@ -32,6 +32,7 @@ use models::plasma::params as plasma_constants;
 
 const TXES_TO_TEST: usize = 128;
 
+#[allow(clippy::cognitive_complexity)]
 pub fn read_write_keys() {
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &AltJubjubBn256::new();
@@ -79,7 +80,7 @@ pub fn read_write_keys() {
 
     let num_accounts = existing_accounts.len();
 
-    println!("Inserted {} accounts", num_accounts);
+    debug!("Inserted {} accounts", num_accounts);
 
     let initial_root = tree.root_hash();
 
@@ -145,7 +146,7 @@ pub fn read_write_keys() {
             .map(|e| Some(e.0))
             .collect();
 
-        // println!("Making a transfer from {} to {}", sender_leaf_number, recipient_leaf_number);
+        // debug!("Making a transfer from {} to {}", sender_leaf_number, recipient_leaf_number);
 
         let from = Fr::from_str(&sender_leaf_number.to_string());
         let to = Fr::from_str(&recipient_leaf_number.to_string());
@@ -169,8 +170,8 @@ pub fn read_write_keys() {
         //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
         //assert!(tree.verify_proof(recipient_leaf_number, recipient_leaf.clone(), tree.merkle_path(recipient_leaf_number)));
 
-        // println!("Sender: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", sender_leaf.balance, sender_leaf.nonce, sender_leaf.pub_x, sender_leaf.pub_y);
-        // println!("Recipient: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", recipient_leaf.balance, recipient_leaf.nonce, recipient_leaf.pub_x, recipient_leaf.pub_y);
+        // debug!("Sender: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", sender_leaf.balance, sender_leaf.nonce, sender_leaf.pub_x, sender_leaf.pub_y);
+        // debug!("Recipient: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", recipient_leaf.balance, recipient_leaf.nonce, recipient_leaf.pub_x, recipient_leaf.pub_y);
 
         let mut updated_sender_leaf = sender_leaf.clone();
         let mut updated_recipient_leaf = recipient_leaf.clone();
@@ -190,8 +191,8 @@ pub fn read_write_keys() {
 
         total_fees.add_assign(&fee_as_field_element);
 
-        // println!("Updated sender: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", updated_sender_leaf.balance, updated_sender_leaf.nonce, updated_sender_leaf.pub_x, updated_sender_leaf.pub_y);
-        // println!("Updated recipient: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", updated_recipient_leaf.balance, updated_recipient_leaf.nonce, updated_recipient_leaf.pub_x, updated_recipient_leaf.pub_y);
+        // debug!("Updated sender: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", updated_sender_leaf.balance, updated_sender_leaf.nonce, updated_sender_leaf.pub_x, updated_sender_leaf.pub_y);
+        // debug!("Updated recipient: balance: {}, nonce: {}, pub_x: {}, pub_y: {}", updated_recipient_leaf.balance, updated_recipient_leaf.nonce, updated_recipient_leaf.pub_x, updated_recipient_leaf.pub_y);
 
         tree.insert(sender_leaf_number, updated_sender_leaf.clone());
         tree.insert(recipient_leaf_number, updated_recipient_leaf.clone());
@@ -230,7 +231,7 @@ pub fn read_write_keys() {
 
     let block_number = Fr::one();
 
-    println!("Block number = {}", block_number.into_repr());
+    debug!("Block number = {}", block_number.into_repr());
 
     let final_root = tree.root_hash();
 
@@ -239,7 +240,7 @@ pub fn read_write_keys() {
         CircuitAccountTree::new(tree_depth).root_hash().into_repr()
     );
 
-    println!("Final root = {}", final_root_string);
+    debug!("Final root = {}", final_root_string);
 
     let mut public_data_initial_bits = vec![];
 
@@ -275,7 +276,7 @@ pub fn read_write_keys() {
         next_round_hash_bytes.extend(hash_result.iter());
         next_round_hash_bytes.extend(packed_transaction_data_bytes.clone());
 
-        println!("Public data = {}", encode(packed_transaction_data_bytes));
+        debug!("Public data = {}", encode(packed_transaction_data_bytes));
 
         let mut h = Sha256::new();
 
@@ -295,9 +296,9 @@ pub fn read_write_keys() {
 
     let public_data_commitment = Fr::from_repr(repr).unwrap();
 
-    println!("Total fees = {}", total_fees.into_repr());
+    debug!("Total fees = {}", total_fees.into_repr());
 
-    println!(
+    debug!(
         "Final data commitment as field element = {}",
         public_data_commitment
     );
@@ -318,8 +319,8 @@ pub fn read_write_keys() {
 
         instance_for_test_cs.synthesize(&mut cs).unwrap();
 
-        println!("Total of {} constraints", cs.num_constraints());
-        println!(
+        debug!("Total of {} constraints", cs.num_constraints());
+        debug!(
             "{} constraints per TX for {} transactions",
             cs.num_constraints() / TXES_TO_TEST,
             TXES_TO_TEST
@@ -342,7 +343,7 @@ pub fn read_write_keys() {
         if err.is_some() {
             panic!("ERROR satisfying in {}\n", err.unwrap());
         } else {
-            println!("Test constraint system is satisfied");
+            debug!("Test constraint system is satisfied");
         }
     }
 
@@ -381,10 +382,10 @@ pub fn read_write_keys() {
         transactions: vec![(empty_transaction, empty_witness); TXES_TO_TEST],
     };
 
-    println!("generating setup...");
+    debug!("generating setup...");
     let start = PreciseTime::now();
     let tmp_cirtuit_params = generate_random_parameters(instance_for_generation, rng).unwrap();
-    println!(
+    debug!(
         "setup generated in {} s",
         start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0
     );
@@ -432,10 +433,10 @@ pub fn read_write_keys() {
         transactions: witnesses,
     };
 
-    println!("creating proof...");
+    debug!("creating proof...");
     let start = PreciseTime::now();
     let proof = create_random_proof(instance_for_proof, &circuit_params, rng).unwrap();
-    println!(
+    debug!(
         "proof created in {} s",
         start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0
     );

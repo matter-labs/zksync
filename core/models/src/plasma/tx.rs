@@ -190,15 +190,15 @@ impl TransferTx {
     pub fn verify_sig(&self, public_key: &PublicKey) -> bool {
         let message_bits = self.message_bits();
         if message_bits.len() % 8 != 0 {
-            println!("Invalid message length");
+            error!("Invalid message length");
             return false;
         }
         let as_bytes = pack_bits_into_bytes(message_bits);
         //use rustc_hex::ToHex;
         //let hex: String = as_bytes.clone().to_hex();
-        //println!("Transaction bytes = {}", hex);
+        //debug!("Transaction bytes = {}", hex);
         if let Ok(signature) = self.signature.to_jubjub_eddsa() {
-            //println!("Successfuly converted to eddsa signature");
+            //debug!("Successfuly converted to eddsa signature");
             let p_g = FixedGenerators::SpendingKeyGenerator;
             let valid = public_key.verify_for_raw_message(
                 &as_bytes,
@@ -210,7 +210,7 @@ impl TransferTx {
 
             return valid;
         }
-        //println!("Signature was not deserialized");
+        //debug!("Signature was not deserialized");
 
         false
     }

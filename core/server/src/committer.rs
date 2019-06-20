@@ -24,7 +24,7 @@ fn run_committer(
     tx_for_eth: Sender<Operation>,
     pool: ConnectionPool,
 ) {
-    println!("committer started");
+    info!("committer started");
     let storage = pool
         .access_storage()
         .expect("db connection failed for committer");;
@@ -48,7 +48,7 @@ fn run_committer(
                 tx_meta: None,
                 id: None,
             };
-            println!("commit block #{}", op.block.block_number);
+            info!("commit block #{}", op.block.block_number);
             let op = storage
                 .execute_operation(&op)
                 .expect("committer must commit the op into db");

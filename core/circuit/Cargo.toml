@@ -18,3 +18,6 @@ ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
 rand = "0.4"
 rust-crypto = "0.2"
 hex = "0.3.2"
+
+[dev-dependencies]
+log = "0.4"

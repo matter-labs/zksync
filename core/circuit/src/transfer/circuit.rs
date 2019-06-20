@@ -1132,8 +1132,10 @@ where
 
 #[cfg(test)]
 mod test {
-
     use super::*;
+
+    use log::debug;
+
     use ff::{BitIterator, PrimeFieldRepr};
     use models::plasma::circuit::utils::le_bit_vector_into_field_element;
     use sapling_crypto::circuit::float_point::convert_to_float;
@@ -1147,10 +1149,11 @@ mod test {
 
         let fe: Fr = le_bit_vector_into_field_element::<Fr>(&bits);
 
-        println!("{}", fe);
+        debug!("{}", fe);
     }
 
     #[test]
+    #[allow(clippy::cognitive_complexity)]
     fn test_transfer_circuit_with_witness() {
         use crate::CircuitAccountTree;
         use ff::Field;
@@ -1242,19 +1245,19 @@ mod test {
             };
 
             let initial_root = tree.root_hash();
-            println!("Empty root = {}", initial_root);
+            debug!("Empty root = {}", initial_root);
 
             tree.insert(sender_leaf_number, sender_leaf.clone());
             tree.insert(recipient_leaf_number, recipient_leaf.clone());
 
             let old_root = tree.root_hash();
-            println!("Old root = {}", old_root);
+            debug!("Old root = {}", old_root);
 
-            println!(
+            debug!(
                 "Sender leaf hash is {}",
                 tree.get_hash((tree_depth, sender_leaf_number))
             );
-            println!(
+            debug!(
                 "Recipient leaf hash is {}",
                 tree.get_hash((tree_depth, recipient_leaf_number))
             );
@@ -1324,25 +1327,25 @@ mod test {
                 .sub_assign(&transfer_amount_as_field_element);
             updated_sender_leaf.nonce.add_assign(&Fr::one());
 
-            println!("Updated sender:");
-            println!("Amount: {}", updated_sender_leaf.clone().balance);
-            println!("Nonce: {}", updated_sender_leaf.clone().nonce);
+            debug!("Updated sender:");
+            debug!("Amount: {}", updated_sender_leaf.clone().balance);
+            debug!("Nonce: {}", updated_sender_leaf.clone().nonce);
 
             updated_recipient_leaf
                 .balance
                 .add_assign(&transfer_amount_as_field_element);
-            println!("Updated recipient:");
-            println!("Amount: {}", updated_recipient_leaf.clone().balance);
-            println!("Nonce: {}", updated_recipient_leaf.clone().nonce);
+            debug!("Updated recipient:");
+            debug!("Amount: {}", updated_recipient_leaf.clone().balance);
+            debug!("Nonce: {}", updated_recipient_leaf.clone().nonce);
 
             tree.insert(sender_leaf_number, updated_sender_leaf.clone());
             tree.insert(recipient_leaf_number, updated_recipient_leaf.clone());
 
-            println!(
+            debug!(
                 "Final sender leaf hash is {}",
                 tree.get_hash((tree_depth, sender_leaf_number))
             );
-            println!(
+            debug!(
                 "Final recipient leaf hash is {}",
                 tree.get_hash((tree_depth, recipient_leaf_number))
             );
@@ -1352,14 +1355,14 @@ mod test {
 
             let new_root = tree.root_hash();
 
-            println!("New root = {}", new_root);
+            debug!("New root = {}", new_root);
 
-            assert!(old_root != new_root);
+            assert_ne!(old_root, new_root);
 
             {
                 let mut cs = TestConstraintSystem::<Bn256>::new();
 
-                let mut public_data_initial_bits = vec![];
+                let mut public_data_initial_bits = Vec::new();
 
                 // these two are BE encodings because an iterator is BE. This is also an Ethereum standard behavior
 
@@ -1387,21 +1390,21 @@ mod test {
                 let mut hash_result = [0u8; 32];
                 h.result(&mut hash_result[..]);
 
-                println!("Initial hash hex {}", hex::encode(hash_result));
+                debug!("Initial hash hex {}", hex::encode(hash_result));
 
-                let mut packed_transaction_data = vec![];
+                let mut packed_transaction_data = Vec::new();
                 let transaction_data = transaction.public_data_into_bits();
                 packed_transaction_data.extend(transaction_data.clone().into_iter());
 
                 let packed_transaction_data_bytes =
                     be_bit_vector_into_bytes(&packed_transaction_data);
 
-                println!(
+                debug!(
                     "Packed transaction data hex {}",
                     hex::encode(packed_transaction_data_bytes.clone())
                 );
 
-                let mut next_round_hash_bytes = vec![];
+                let mut next_round_hash_bytes = Vec::new();
                 next_round_hash_bytes.extend(hash_result.iter());
                 next_round_hash_bytes.extend(packed_transaction_data_bytes);
                 // assert_eq!(next_round_hash_bytes.len(), 64);
@@ -1411,7 +1414,7 @@ mod test {
                 hash_result = [0u8; 32];
                 h.result(&mut hash_result[..]);
 
-                println!("Final hash as hex {}", hex::encode(hash_result));
+                debug!("Final hash as hex {}", hex::encode(hash_result));
 
                 hash_result[0] &= 0x1f; // temporary solution
 
@@ -1421,7 +1424,7 @@ mod test {
 
                 let public_data_commitment = Fr::from_repr(repr).unwrap();
 
-                println!(
+                debug!(
                     "Final data commitment as field element = {}",
                     public_data_commitment
                 );
@@ -1439,9 +1442,9 @@ mod test {
 
                 instance.synthesize(&mut cs).unwrap();
 
-                println!("{}", cs.find_unconstrained());
+                debug!("{}", cs.find_unconstrained());
 
-                println!("{}", cs.num_constraints());
+                debug!("{}", cs.num_constraints());
 
                 assert_eq!(cs.num_inputs(), 4);
 

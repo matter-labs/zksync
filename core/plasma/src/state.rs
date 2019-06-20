@@ -74,20 +74,20 @@ impl PlasmaState {
             transacted_amount += &tx.fee;
 
             if tx.nonce > from.nonce {
-                //println!("Nonce is too high");
+                //debug!("Nonce is too high");
                 return Err(TransferApplicationError::NonceIsTooHigh);
             } else if tx.nonce < from.nonce {
-                //println!("Nonce is too low");
+                //debug!("Nonce is too low");
                 return Err(TransferApplicationError::NonceIsTooLow);
             }
 
             if from.balance < transacted_amount {
-                //println!("Insufficient balance");
+                //debug!("Insufficient balance");
                 return Err(TransferApplicationError::InsufficientBalance);
             }
 
             if tx.good_until_block < self.block_number {
-                //println!("Transaction is outdated");
+                //debug!("Transaction is outdated");
                 return Err(TransferApplicationError::ExpiredTransaction);
             }
 
@@ -142,7 +142,7 @@ impl PlasmaState {
 
         let mut agumented_tx = tx.clone();
 
-        println!("Adding account balance to ExitTx, value = {}", acc.balance);
+        debug!("Adding account balance to ExitTx, value = {}", acc.balance);
 
         agumented_tx.amount = acc.balance;
 
