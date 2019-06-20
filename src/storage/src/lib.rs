@@ -891,7 +891,7 @@ impl StorageProcessor {
         );
         diesel::sql_query(query)
             .load(self.conn())
-            .unwrap_or_else(|_| vec![])
+            .unwrap_or_default()
     }
 
     pub fn load_tx_transactions_for_account(
@@ -910,7 +910,7 @@ impl StorageProcessor {
         );
         diesel::sql_query(query)
             .load(self.conn())
-            .unwrap_or_else(|_| vec![])
+            .unwrap_or_default()
     }
 
     pub fn load_rx_transactions_for_account(

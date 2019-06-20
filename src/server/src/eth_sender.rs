@@ -63,7 +63,7 @@ fn run_eth_sender(
         );
         let tx = match op.action {
             Action::Commit => {
-                let mut be_bytes: Vec<u8> = vec![];
+                let mut be_bytes: Vec<u8> = Vec::new();
                 op.block
                     .new_root_hash
                     .into_repr()
@@ -140,37 +140,34 @@ fn run_eth_sender(
                     }
                 }
             }
-            Action::Verify { proof } => {
-                let proof = *proof;
-                match op.block.block_data {
-                    BlockData::Transfer { .. } => eth_client.call(
-                        "verifyTransferBlock",
-                        op.tx_meta.expect("tx meta missing"),
-                        (u64::from(op.block.block_number), proof),
-                    ),
+            Action::Verify { proof } => match op.block.block_data {
+                BlockData::Transfer { .. } => eth_client.call(
+                    "verifyTransferBlock",
+                    op.tx_meta.expect("tx meta missing"),
+                    (u64::from(op.block.block_number), *proof),
+                ),
 
-                    BlockData::Deposit { batch_number, .. } => eth_client.call(
-                        "verifyDepositBlock",
-                        op.tx_meta.expect("tx meta missing"),
-                        (
-                            U256::from(batch_number),
-                            sorted_and_padded_for_deposits(op.accounts_updated.unwrap()),
-                            u64::from(op.block.block_number),
-                            proof,
-                        ),
+                BlockData::Deposit { batch_number, .. } => eth_client.call(
+                    "verifyDepositBlock",
+                    op.tx_meta.expect("tx meta missing"),
+                    (
+                        U256::from(batch_number),
+                        sorted_and_padded_for_deposits(op.accounts_updated.unwrap()),
+                        u64::from(op.block.block_number),
+                        *proof,
                     ),
+                ),
 
-                    BlockData::Exit { batch_number, .. } => eth_client.call(
-                        "verifyExitBlock",
-                        op.tx_meta.expect("tx meta missing"),
-                        (
-                            u64::from(batch_number),
-                            u64::from(op.block.block_number),
-                            proof,
-                        ),
+                BlockData::Exit { batch_number, .. } => eth_client.call(
+                    "verifyExitBlock",
+                    op.tx_meta.expect("tx meta missing"),
+                    (
+                        u64::from(batch_number),
+                        u64::from(op.block.block_number),
+                        *proof,
                     ),
-                }
-            }
+                ),
+            },
         };
         // TODO: process tx sending failure
         match tx {
