@@ -30,15 +30,13 @@ impl<E: JubjubEngine> DepositRequest<E> {
         // - into
         // - amount
         // - compressed public key
-        let mut into: Vec<bool> =
-            BitIterator::new(self.into.clone().unwrap().into_repr()).collect();
+        let mut into: Vec<bool> = BitIterator::new(self.into.unwrap().into_repr()).collect();
         into.reverse();
         into.truncate(plasma_constants::BALANCE_TREE_DEPTH);
         // reverse again to have BE as in Ethereum native types
         into.reverse();
 
-        let mut amount: Vec<bool> =
-            BitIterator::new(self.amount.clone().unwrap().into_repr()).collect();
+        let mut amount: Vec<bool> = BitIterator::new(self.amount.unwrap().into_repr()).collect();
         amount.reverse();
         amount.truncate(plasma_constants::BALANCE_BIT_WIDTH);
         // reverse again to have BE as in Ethereum native types
@@ -71,7 +69,7 @@ impl<E: JubjubEngine> DepositRequest<E> {
         let byte_chunks = raw_data.chunks(8);
         for byte_chunk in byte_chunks {
             let mut byte = 0u8;
-            for (i, bit) in byte_chunk.into_iter().enumerate() {
+            for (i, bit) in byte_chunk.iter().enumerate() {
                 if *bit {
                     byte |= 1 << i;
                 }

@@ -34,29 +34,31 @@ pub struct ETHClient {
 impl ETHClient {
     pub fn new(contract_abi: ABI) -> Self {
         Self {
-            web3_url: env::var("WEB3_URL").unwrap_or("http://localhost:8545".to_string()),
-            private_key: H256::from_str(&env::var("PRIVATE_KEY").unwrap_or(
-                "aa8564af9bef22f581e99125d1829b76c45d08e4f6f0b74d586911f4318b6776".to_string(),
-            ))
+            web3_url: env::var("WEB3_URL").unwrap_or_else(|_| "http://localhost:8545".to_string()),
+            private_key: H256::from_str(&env::var("PRIVATE_KEY").unwrap_or_else(|_| {
+                "aa8564af9bef22f581e99125d1829b76c45d08e4f6f0b74d586911f4318b6776".to_string()
+            }))
             .expect("private key must be correct"),
             contract_addr: H160::from_str(
                 &env::var("CONTRACT_ADDR")
-                    .unwrap_or("616e08c733fe20e99bf70c5088635694d5e25c54".to_string()),
+                    .unwrap_or_else(|_| "616e08c733fe20e99bf70c5088635694d5e25c54".to_string()),
             )
             .expect("contract address must be correct"),
             sender_account: env::var("SENDER_ACCOUNT")
-                .unwrap_or("e5d0efb4756bd5cdd4b5140d3d2e08ca7e6cf644".to_string()),
-            chain_id: u8::from_str(&env::var("CHAIN_ID").unwrap_or("4".to_string()))
+                .unwrap_or_else(|_| "e5d0efb4756bd5cdd4b5140d3d2e08ca7e6cf644".to_string()),
+            chain_id: u8::from_str(&env::var("CHAIN_ID").unwrap_or_else(|_| "4".to_string()))
                 .expect("chain id must be correct"),
             contract: ethabi::Contract::load(contract_abi.0)
                 .expect("contract must be loaded correctly"),
             reqwest_client: reqwest::Client::new(),
             gas_price_factor: usize::from_str(
-                &env::var("GAS_PRICE_FACTOR").unwrap_or("2".to_string()),
+                &env::var("GAS_PRICE_FACTOR").unwrap_or_else(|_| "2".to_string()),
             )
             .expect("GAS_PRICE_FACTOR not set"),
-            min_gas_price: usize::from_str(&env::var("MIN_GAS_PRICE").unwrap_or("1".to_string()))
-                .expect("MIN_GAS_PRICE not set"),
+            min_gas_price: usize::from_str(
+                &env::var("MIN_GAS_PRICE").unwrap_or_else(|_| "1".to_string()),
+            )
+            .expect("MIN_GAS_PRICE not set"),
         }
     }
 
@@ -99,11 +101,11 @@ impl ETHClient {
         let tx = signer::RawTransaction {
             chain_id: self.chain_id,
             nonce: U256::from(meta.nonce),
-            to: Some(self.contract_addr.clone()),
+            to: Some(self.contract_addr),
             value: U256::zero(),
             gas_price,
             gas: U256::from(3_000_000),
-            data: data,
+            data,
         };
 
         // TODO: use meta.addr to pick the signing key
@@ -147,7 +149,7 @@ impl ETHClient {
             .json(&request)
             .send()?
             .json()
-            .map_err(|e| From::from(e));
+            .map_err(From::from);
 
         let r = response?;
 
@@ -157,7 +159,7 @@ impl ETHClient {
             Err(r
                 .error
                 .map(|e| From::from(e.message))
-                .unwrap_or(From::from("no result in the response body")))
+                .unwrap_or_else(|| From::from("no result in the response body")))
         }
     }
 

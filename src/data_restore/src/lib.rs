@@ -26,8 +26,9 @@ pub fn load_new_states_for_data_restore_driver(driver: &'static mut DataRestoreD
     std::thread::Builder::new()
         .name("data_restore".to_string())
         .spawn(move || {
-            let _ = driver.run_state_updates().expect("Cant update state");
-        });
+            driver.run_state_updates().expect("Cant update state");
+        })
+        .expect("Load new states for data restore thread");
 }
 
 pub fn start_data_restore_driver(driver: &'static mut DataRestoreDriver) {
@@ -36,7 +37,8 @@ pub fn start_data_restore_driver(driver: &'static mut DataRestoreDriver) {
         .spawn(move || {
             driver.load_past_state().expect("Cant get past state");
             driver.run_state_updates().expect("Cant update state");
-        });
+        })
+        .expect("Data restore driver thread");
 }
 
 #[cfg(test)]

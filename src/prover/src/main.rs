@@ -17,7 +17,7 @@ fn main() {
     signal_hook::flag::register(signal_hook::SIGQUIT, Arc::clone(&stop_signal))
         .expect("Error setting SIGQUIT handler");
 
-    let worker = env::var("POD_NAME").unwrap_or("default".to_string());
+    let worker = env::var("POD_NAME").unwrap_or_else(|_| "default".to_string());
     println!("creating prover, worker: {}", worker);
     let mut prover = BabyProver::create(worker).unwrap();
     let prover_id = prover.prover_id;

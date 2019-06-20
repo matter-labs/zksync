@@ -31,7 +31,7 @@ fn run_committer(
 
     let eth_client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
     let current_nonce = eth_client.current_nonce().expect("can not get nonce");
-    storage.prepare_nonce_scheduling(&eth_client.current_sender(), current_nonce);
+    let _ = storage.prepare_nonce_scheduling(&eth_client.current_sender(), current_nonce);
 
     let mut last_verified_block = storage.get_last_verified_block().expect("db failed");
     loop {
@@ -65,9 +65,11 @@ fn run_committer(
                 if let Ok(proof) = proof {
                     let block = storage
                         .load_committed_block(block_number)
-                        .expect(format!("failed to load block #{}", block_number).as_str());
+                        .unwrap_or_else(|| panic!("failed to load block #{}", block_number));
                     let op = Operation {
-                        action: Action::Verify { proof },
+                        action: Action::Verify {
+                            proof: Box::new(proof),
+                        },
                         block,
                         accounts_updated: None,
                         tx_meta: None,

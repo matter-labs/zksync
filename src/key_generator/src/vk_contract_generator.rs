@@ -36,7 +36,7 @@ const SHIFT: &str = "        ";
 fn render_array(name: &str, allocate: bool, values: &[Vec<String>]) -> String {
     let mut out = String::new();
     out.push('\n');
-    let flattened: Vec<&String> = values.into_iter().flatten().collect();
+    let flattened: Vec<&String> = values.iter().flatten().collect();
     if allocate {
         out.push_str(&format!(
             "{}{} = new uint256[]({});\n",

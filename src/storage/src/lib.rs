@@ -1,3 +1,5 @@
+#![allow(clippy::wrong_self_convention)] // All methods with name into_* must consume self.
+
 #[macro_use]
 extern crate diesel;
 
@@ -40,7 +42,7 @@ pub struct ConnectionPool {
 impl ConnectionPool {
     pub fn new() -> Self {
         let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-        let max_size = env::var("DB_POOL_SIZE").unwrap_or("10".to_string());
+        let max_size = env::var("DB_POOL_SIZE").unwrap_or_else(|_| "10".to_string());
         let max_size = max_size.parse().expect("DB_POOL_SIZE must be integer");
         let manager = ConnectionManager::<PgConnection>::new(database_url);
         let pool = Pool::builder()
@@ -54,6 +56,12 @@ impl ConnectionPool {
     pub fn access_storage(&self) -> Result<StorageProcessor, PoolError> {
         let connection = self.pool.get()?;
         Ok(StorageProcessor::from_pool(connection))
+    }
+}
+
+impl Default for ConnectionPool {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -163,7 +171,7 @@ impl StoredTx {
     pub fn into_tx(&self) -> QueryResult<TransactionType> {
         let res = match &self.tx_type {
             t if t == TRANSFER_TX => Transfer {
-                tx: self.into_transfer_transaction(),
+                tx: Box::new(self.into_transfer_transaction()),
             },
             d if d == DEPOSIT_TX => Deposit {
                 tx: self.into_deposit_transaction(),
@@ -324,7 +332,7 @@ impl StorageProcessor {
                     )?;
                     self.save_transactions(op)?;
                 }
-                Action::Verify { proof: _ } => self.apply_state_update(op.block.block_number)?,
+                Action::Verify { .. } => self.apply_state_update(op.block.block_number)?,
             };
 
             // NOTE: tx meta is inserted automatically with sender addr and next expected nonce
@@ -352,23 +360,20 @@ impl StorageProcessor {
     fn save_transactions(&self, op: &Operation) -> QueryResult<()> {
         let block_data = &op.block.block_data;
         match block_data {
-            BlockData::Transfer {
-                transactions,
-                total_fees: _,
-            } => self.save_transfer_transactions(op, &transactions)?,
-            BlockData::Deposit {
-                transactions,
-                batch_number: _,
-            } => self.save_deposit_transactions(op, &transactions)?,
-            BlockData::Exit {
-                transactions,
-                batch_number: _,
-            } => self.save_exit_transactions(op, &transactions)?,
+            BlockData::Transfer { transactions, .. } => {
+                self.save_transfer_transactions(op, &transactions)?
+            }
+            BlockData::Deposit { transactions, .. } => {
+                self.save_deposit_transactions(op, &transactions)?
+            }
+            BlockData::Exit { transactions, .. } => {
+                self.save_exit_transactions(op, &transactions)?
+            }
         }
         Ok(())
     }
 
-    fn save_transfer_transactions(&self, op: &Operation, txs: &Vec<TransferTx>) -> QueryResult<()> {
+    fn save_transfer_transactions(&self, op: &Operation, txs: &[TransferTx]) -> QueryResult<()> {
         for tx in txs.iter() {
             let inserted = diesel::insert_into(transactions::table)
                 .values(&NewTx {
@@ -404,7 +409,7 @@ impl StorageProcessor {
         Ok(())
     }
 
-    fn save_deposit_transactions(&self, op: &Operation, txs: &Vec<DepositTx>) -> QueryResult<()> {
+    fn save_deposit_transactions(&self, op: &Operation, txs: &[DepositTx]) -> QueryResult<()> {
         for tx in txs.iter() {
             let inserted = diesel::insert_into(transactions::table)
                 .values(&NewTx {
@@ -433,7 +438,7 @@ impl StorageProcessor {
         Ok(())
     }
 
-    fn save_exit_transactions(&self, op: &Operation, txs: &Vec<ExitTx>) -> QueryResult<()> {
+    fn save_exit_transactions(&self, op: &Operation, txs: &[ExitTx]) -> QueryResult<()> {
         for tx in txs.iter() {
             let inserted = diesel::insert_into(transactions::table)
                 .values(&NewTx {
@@ -569,7 +574,7 @@ impl StorageProcessor {
     }
 
     fn load_state(&self, query: &str) -> QueryResult<(u32, AccountMap)> {
-        let r = diesel::sql_query(query)
+        diesel::sql_query(query)
             .load(self.conn())
             .map(|accounts: Vec<StorageAccount>| {
                 let last_block = accounts
@@ -583,8 +588,7 @@ impl StorageProcessor {
                         .map(|a| (a.id as u32, serde_json::from_value(a.data).unwrap())),
                 );
                 (last_block, result)
-            });
-        r
+            })
     }
 
     /// Sets up `op_config` to new address and nonce for scheduling ETH transactions for operations
@@ -668,9 +672,10 @@ impl StorageProcessor {
         let l_query = query.to_lowercase();
         let has_prefix = l_query.starts_with("0x");
         let prefix = "0x".to_owned();
-        let query_with_prefix = match has_prefix {
-            true => l_query,
-            false => format!("{}{}", prefix, l_query),
+        let query_with_prefix = if has_prefix {
+            l_query
+        } else {
+            format!("{}{}", prefix, l_query)
         };
         let sql_query = format!(
             "
@@ -703,11 +708,10 @@ impl StorageProcessor {
         ",
             block_number = block_number as i32
         );
-        let result = diesel::sql_query(sql_query)
+        diesel::sql_query(sql_query)
             .bind::<Text, _>(query_with_prefix)
             .get_result(self.conn())
-            .ok();
-        result
+            .ok()
     }
 
     // pub fn load_stored_ops_in_blocks_range(&self, max_block: BlockNumber, limit: u32, action_type: ActionType) -> Vec<StoredOperation> {
@@ -725,12 +729,12 @@ impl StorageProcessor {
 
     pub fn load_commit_op(&self, block_number: BlockNumber) -> Option<Operation> {
         let op = self.load_stored_op_with_block_number(block_number, ActionType::COMMIT);
-        op.map_or(None, |r| r.into_op(self).ok())
+        op.and_then(|r| r.into_op(self).ok())
     }
 
     pub fn load_committed_block(&self, block_number: BlockNumber) -> Option<Block> {
         let op = self.load_commit_op(block_number);
-        op.map_or(None, |r| Some(r.block))
+        op.and_then(|r| Some(r.block))
     }
 
     pub fn load_unsent_ops(&self, current_nonce: Nonce) -> QueryResult<Vec<Operation>> {
@@ -885,8 +889,9 @@ impl StorageProcessor {
         ",
             count
         );
-        let r = diesel::sql_query(query).load(self.conn());
-        r.unwrap_or(vec![])
+        diesel::sql_query(query)
+            .load(self.conn())
+            .unwrap_or_default()
     }
 
     pub fn load_tx_transactions_for_account(
@@ -903,8 +908,9 @@ impl StorageProcessor {
         ",
             account_id, count
         );
-        let r = diesel::sql_query(query).load(self.conn());
-        r.unwrap_or(vec![])
+        diesel::sql_query(query)
+            .load(self.conn())
+            .unwrap_or_default()
     }
 
     pub fn load_rx_transactions_for_account(
@@ -921,8 +927,9 @@ impl StorageProcessor {
         ",
             account_id, count
         );
-        let r = diesel::sql_query(query).load(self.conn());
-        r.unwrap_or(vec![])
+        diesel::sql_query(query)
+            .load(self.conn())
+            .unwrap_or_else(|_| vec![])
     }
 
     pub fn load_transaction_with_id(&self, tx_id: u32) -> Option<StoredTx> {
@@ -934,8 +941,7 @@ impl StorageProcessor {
         ",
             tx_id as i32
         );
-        let r = diesel::sql_query(query).get_result(self.conn()).ok();
-        r
+        diesel::sql_query(query).get_result(self.conn()).ok()
     }
 
     pub fn load_transactions_in_block(&self, block_number: u32) -> QueryResult<Vec<StoredTx>> {
@@ -952,7 +958,7 @@ impl StorageProcessor {
 
     pub fn fetch_prover_job(
         &self,
-        worker_: &String,
+        worker_: &str,
         timeout_seconds: usize,
     ) -> QueryResult<Option<ProverRun>> {
         self.conn().transaction(|| {
@@ -999,7 +1005,7 @@ impl StorageProcessor {
             .map(|_| ())
     }
 
-    pub fn register_prover(&self, worker_: &String) -> QueryResult<i32> {
+    pub fn register_prover(&self, worker_: &str) -> QueryResult<i32> {
         use crate::schema::active_provers::dsl::*;
         let inserted: ActiveProver = insert_into(active_provers)
             .values(&vec![(worker.eq(worker_.to_string()))])
@@ -1195,7 +1201,7 @@ mod test {
         conn.execute_operation(&Operation {
             id: None,
             action: Action::Verify {
-                proof: [U256::zero(); 8],
+                proof: Box::new([U256::zero(); 8]),
             },
             block: Block {
                 block_number: 1,
@@ -1267,7 +1273,7 @@ mod test {
         conn.execute_operation(&Operation {
             id: None,
             action: Action::Verify {
-                proof: [U256::zero(); 8],
+                proof: Box::new([U256::zero(); 8]),
             },
             block: Block {
                 block_number: 1,
@@ -1353,7 +1359,7 @@ mod test {
             amount: BigDecimal::from_str_radix(&format!("{}", 5000), 10).unwrap(),
             fee: BigDecimal::from_str_radix(&format!("{}", 0), 10).unwrap(),
             nonce: 1,
-            good_until_block: 100000,
+            good_until_block: 100_000,
             signature: TxSignature::default(),
             cached_pub_key: None,
         };
@@ -1445,7 +1451,7 @@ mod test {
             let stored_op = conn
                 .execute_operation(&dummy_op(Action::Commit, 1))
                 .unwrap();
-            i = i + 1;
+            i += 1;
             if i >= 6 {
                 break stored_op;
             }

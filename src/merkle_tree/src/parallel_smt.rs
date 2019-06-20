@@ -117,6 +117,7 @@ where
 
     // How many hashes can the tree hold
     #[inline(always)]
+    #[allow(dead_code)]
     fn nodes_capacity(&self) -> usize {
         (1 << (self.tree_depth + 1)) - 1
     }
@@ -413,9 +414,8 @@ mod tests {
         }
 
         fn compress(&self, lhs: &u64, rhs: &u64, i: usize) -> u64 {
-            let r = (11 * lhs + 17 * rhs + 1 + i as u64) % 1234567891;
+            (11 * lhs + 17 * rhs + 1 + i as u64) % 1_234_567_891
             //println!("compress {} {}, {} => {}", lhs, rhs, i, r);
-            r
         }
     }
 
@@ -457,7 +457,7 @@ mod tests {
             unsafe {
                 println!("{}: HN = {}, HC = {}\n", n, HN, HC);
             }
-            n = n * 10;
+            n *= 10;
         }
     }
 
@@ -465,11 +465,11 @@ mod tests {
     fn test_batching_tree_insert_comparative() {
         let mut tree = TestSMT::new(3);
         tree.insert(0, TestLeaf(1));
-        assert_eq!(tree.root_hash(), 697516875);
+        assert_eq!(tree.root_hash(), 697_516_875);
         tree.insert(0, TestLeaf(2));
-        assert_eq!(tree.root_hash(), 741131083);
+        assert_eq!(tree.root_hash(), 741_131_083);
         tree.insert(3, TestLeaf(2));
-        assert_eq!(tree.root_hash(), 793215819);
+        assert_eq!(tree.root_hash(), 793_215_819);
     }
 
     #[test]

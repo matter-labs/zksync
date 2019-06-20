@@ -35,7 +35,7 @@ impl Account {
             self.public_key_y,
             &params::JUBJUB_PARAMS,
         );
-        point.map(|p| sapling_crypto::eddsa::PublicKey::<Engine>(p))
+        point.map(sapling_crypto::eddsa::PublicKey::<Engine>)
     }
 }
 

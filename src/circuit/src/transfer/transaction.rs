@@ -33,25 +33,23 @@ impl<E: JubjubEngine> Transaction<E> {
         // - to
         // - amount
         // - fee
-        let mut from: Vec<bool> =
-            BitIterator::new(self.from.clone().unwrap().into_repr()).collect();
+        let mut from: Vec<bool> = BitIterator::new(self.from.unwrap().into_repr()).collect();
         from.reverse();
         from.truncate(plasma_constants::BALANCE_TREE_DEPTH);
         // reverse again cause from and to are the only two fields that are kept BE
         from.reverse();
-        let mut to: Vec<bool> = BitIterator::new(self.to.clone().unwrap().into_repr()).collect();
+        let mut to: Vec<bool> = BitIterator::new(self.to.unwrap().into_repr()).collect();
         to.reverse();
         to.truncate(plasma_constants::BALANCE_TREE_DEPTH);
         // reverse again cause from and to are the only two fields that are kept BE
         to.reverse();
-        let mut amount: Vec<bool> =
-            BitIterator::new(self.amount.clone().unwrap().into_repr()).collect();
+        let mut amount: Vec<bool> = BitIterator::new(self.amount.unwrap().into_repr()).collect();
         amount.reverse();
         amount.truncate(
             plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH
                 + plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH,
         );
-        let mut fee: Vec<bool> = BitIterator::new(self.fee.clone().unwrap().into_repr()).collect();
+        let mut fee: Vec<bool> = BitIterator::new(self.fee.unwrap().into_repr()).collect();
         fee.reverse();
         fee.truncate(
             plasma_constants::FEE_EXPONENT_BIT_WIDTH + plasma_constants::FEE_MANTISSA_BIT_WIDTH,
@@ -80,36 +78,33 @@ impl<E: JubjubEngine> Transaction<E> {
         // in data for signature and for latter use in SNARKs everything is LE!
 
         // LE from
-        let mut from: Vec<bool> =
-            BitIterator::new(self.from.clone().unwrap().into_repr()).collect();
+        let mut from: Vec<bool> = BitIterator::new(self.from.unwrap().into_repr()).collect();
         from.reverse();
         from.truncate(plasma_constants::BALANCE_TREE_DEPTH);
         // LE to
-        let mut to: Vec<bool> = BitIterator::new(self.to.clone().unwrap().into_repr()).collect();
+        let mut to: Vec<bool> = BitIterator::new(self.to.unwrap().into_repr()).collect();
         to.reverse();
         to.truncate(plasma_constants::BALANCE_TREE_DEPTH);
         // amount is encoded as float
-        let mut amount: Vec<bool> =
-            BitIterator::new(self.amount.clone().unwrap().into_repr()).collect();
+        let mut amount: Vec<bool> = BitIterator::new(self.amount.unwrap().into_repr()).collect();
         amount.reverse();
         amount.truncate(
             plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH
                 + plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH,
         );
         // same for fee
-        let mut fee: Vec<bool> = BitIterator::new(self.fee.clone().unwrap().into_repr()).collect();
+        let mut fee: Vec<bool> = BitIterator::new(self.fee.unwrap().into_repr()).collect();
         fee.reverse();
         fee.truncate(
             plasma_constants::FEE_EXPONENT_BIT_WIDTH + plasma_constants::FEE_MANTISSA_BIT_WIDTH,
         );
         // nonce is LE encoded
-        let mut nonce: Vec<bool> =
-            BitIterator::new(self.nonce.clone().unwrap().into_repr()).collect();
+        let mut nonce: Vec<bool> = BitIterator::new(self.nonce.unwrap().into_repr()).collect();
         nonce.reverse();
         nonce.truncate(plasma_constants::NONCE_BIT_WIDTH);
         // LE good until block #
         let mut good_until_block: Vec<bool> =
-            BitIterator::new(self.good_until_block.clone().unwrap().into_repr()).collect();
+            BitIterator::new(self.good_until_block.unwrap().into_repr()).collect();
         good_until_block.reverse();
         good_until_block.truncate(plasma_constants::BLOCK_NUMBER_BIT_WIDTH);
 
@@ -133,7 +128,7 @@ impl<E: JubjubEngine> Transaction<E> {
         let byte_chunks = raw_data.chunks(8);
         for byte_chunk in byte_chunks {
             let mut byte = 0u8;
-            for (i, bit) in byte_chunk.into_iter().enumerate() {
+            for (i, bit) in byte_chunk.iter().enumerate() {
                 if *bit {
                     byte |= 1 << i;
                 }

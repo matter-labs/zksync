@@ -15,13 +15,13 @@ impl<E: JubjubEngine> ExitRequest<E> {
         // fields are
         // - from
         // - amount
-        let mut from: Vec<bool> = BitIterator::new(self.from.clone().into_repr()).collect();
+        let mut from: Vec<bool> = BitIterator::new(self.from.into_repr()).collect();
         from.reverse();
         from.truncate(params::BALANCE_TREE_DEPTH);
         // reverse again to have BE as in Ethereum native types
         from.reverse();
 
-        let mut amount: Vec<bool> = BitIterator::new(self.amount.clone().into_repr()).collect();
+        let mut amount: Vec<bool> = BitIterator::new(self.amount.into_repr()).collect();
         amount.reverse();
         amount.truncate(params::BALANCE_BIT_WIDTH);
         // reverse again to have BE as in Ethereum native types

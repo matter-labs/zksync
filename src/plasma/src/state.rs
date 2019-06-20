@@ -14,16 +14,15 @@ pub struct PlasmaState {
 }
 
 impl PlasmaState {
-
     pub fn empty() -> Self {
         let tree_depth = params::BALANCE_TREE_DEPTH as u32;
-        let mut balance_tree = AccountTree::new(tree_depth);
-        Self{
+        let balance_tree = AccountTree::new(tree_depth);
+        Self {
             balance_tree,
             block_number: 0,
         }
     }
-    
+
     pub fn new(accounts: AccountMap, current_block: u32) -> Self {
         let tree_depth = params::BALANCE_TREE_DEPTH as u32;
         let mut balance_tree = AccountTree::new(tree_depth);
@@ -45,7 +44,7 @@ impl PlasmaState {
     }
 
     pub fn root_hash(&self) -> Fr {
-        self.balance_tree.root_hash().clone()
+        self.balance_tree.root_hash()
     }
 
     pub fn get_account(&self, account_id: AccountId) -> Option<Account> {

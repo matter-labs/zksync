@@ -126,7 +126,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for Transfer<'a, E> {
         let total_fee_allocated =
             AllocatedNum::alloc(cs.namespace(|| "allocate total fees"), || {
                 let total_fee = self.total_fee;
-                Ok(*total_fee.clone().get()?)
+                Ok(*total_fee.get()?)
             })?;
 
         cs.enforce(
@@ -499,14 +499,15 @@ where
     )?;
 
     Ok(TransactionContent {
-        amount_bits: amount_bits,
-        fee_bits: fee_bits,
+        amount_bits,
+        fee_bits,
         good_until_block: transaction_max_block_number_allocated,
     })
 }
 
 /// Applies one transaction to the tree,
 /// outputs a new root
+#[allow(clippy::type_complexity)]
 fn apply_transaction<E, CS>(
     mut cs: CS,
     old_root: AllocatedNum<E>,
@@ -786,9 +787,9 @@ where
     );
 
     let new_balance_from = AllocatedNum::alloc(cs.namespace(|| "new balance from"), || {
-        let old_balance_from_value = old_balance_from.get_value().get()?.clone();
-        let transfer_amount_value = amount.clone().get_value().get()?.clone();
-        let fee_value = fee.clone().get_value().get()?.clone();
+        let old_balance_from_value = *old_balance_from.get_value().get()?;
+        let transfer_amount_value = *amount.clone().get_value().get()?;
+        let fee_value = *fee.clone().get_value().get()?;
         let mut new_balance_from_value = old_balance_from_value;
         new_balance_from_value.sub_assign(&transfer_amount_value);
         new_balance_from_value.sub_assign(&fee_value);
@@ -857,8 +858,8 @@ where
             return Ok(E::Fr::zero());
         }
 
-        let transfer_amount_value = amount.clone().get_value().get()?.clone();
-        let old_balance_to_value = old_balance_to.clone().get_value().get()?.clone();
+        let transfer_amount_value = *amount.clone().get_value().get()?;
+        let old_balance_to_value = *old_balance_to.clone().get_value().get()?;
 
         let mut new_balance_to_value = old_balance_to_value;
         new_balance_to_value.add_assign(&transfer_amount_value);
@@ -885,7 +886,7 @@ where
     );
 
     let new_nonce = AllocatedNum::alloc(cs.namespace(|| "new nonce"), || {
-        let mut new_nonce_value = nonce.get_value().get()?.clone();
+        let mut new_nonce_value = *nonce.get_value().get()?;
         new_nonce_value.add_assign(&E::Fr::one());
 
         Ok(new_nonce_value)
@@ -1146,7 +1147,7 @@ mod test {
 
         let fe: Fr = le_bit_vector_into_field_element::<Fr>(&bits);
 
-        print!("{}\n", fe);
+        println!("{}", fe);
     }
 
     #[test]
@@ -1169,7 +1170,7 @@ mod test {
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let params = &AltJubjubBn256::new();
 
-        let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
 
         for _ in 0..1 {
             let tree_depth = plasma_constants::BALANCE_TREE_DEPTH as u32;
@@ -1192,9 +1193,9 @@ mod test {
             // let recipient_leaf_number = 2;
 
             let mut sender_leaf_number: u32 = rng.gen();
-            sender_leaf_number = sender_leaf_number % capacity;
+            sender_leaf_number %= capacity;
             let mut recipient_leaf_number: u32 = rng.gen();
-            recipient_leaf_number = recipient_leaf_number % capacity;
+            recipient_leaf_number %= capacity;
 
             let transfer_amount: u128 = 500;
 
@@ -1241,20 +1242,20 @@ mod test {
             };
 
             let initial_root = tree.root_hash();
-            print!("Empty root = {}\n", initial_root);
+            println!("Empty root = {}", initial_root);
 
             tree.insert(sender_leaf_number, sender_leaf.clone());
             tree.insert(recipient_leaf_number, recipient_leaf.clone());
 
             let old_root = tree.root_hash();
-            print!("Old root = {}\n", old_root);
+            println!("Old root = {}", old_root);
 
-            print!(
-                "Sender leaf hash is {}\n",
+            println!(
+                "Sender leaf hash is {}",
                 tree.get_hash((tree_depth, sender_leaf_number))
             );
-            print!(
-                "Recipient leaf hash is {}\n",
+            println!(
+                "Recipient leaf hash is {}",
                 tree.get_hash((tree_depth, recipient_leaf_number))
             );
 
@@ -1281,8 +1282,8 @@ mod test {
             let to = Fr::from_str(&recipient_leaf_number.to_string());
 
             let mut transaction: Transaction<Bn256> = Transaction {
-                from: from,
-                to: to,
+                from,
+                to,
                 amount: Some(transfer_amount_encoded),
                 fee: Some(fee_encoded),
                 nonce: Some(Fr::zero()),
@@ -1323,26 +1324,26 @@ mod test {
                 .sub_assign(&transfer_amount_as_field_element);
             updated_sender_leaf.nonce.add_assign(&Fr::one());
 
-            print!("Updated sender: \n");
-            print!("Amount: {}\n", updated_sender_leaf.clone().balance);
-            print!("Nonce: {}\n", updated_sender_leaf.clone().nonce);
+            println!("Updated sender:");
+            println!("Amount: {}", updated_sender_leaf.clone().balance);
+            println!("Nonce: {}", updated_sender_leaf.clone().nonce);
 
             updated_recipient_leaf
                 .balance
                 .add_assign(&transfer_amount_as_field_element);
-            print!("Updated recipient: \n");
-            print!("Amount: {}\n", updated_recipient_leaf.clone().balance);
-            print!("Nonce: {}\n", updated_recipient_leaf.clone().nonce);
+            println!("Updated recipient:");
+            println!("Amount: {}", updated_recipient_leaf.clone().balance);
+            println!("Nonce: {}", updated_recipient_leaf.clone().nonce);
 
             tree.insert(sender_leaf_number, updated_sender_leaf.clone());
             tree.insert(recipient_leaf_number, updated_recipient_leaf.clone());
 
-            print!(
-                "Final sender leaf hash is {}\n",
+            println!(
+                "Final sender leaf hash is {}",
                 tree.get_hash((tree_depth, sender_leaf_number))
             );
-            print!(
-                "Final recipient leaf hash is {}\n",
+            println!(
+                "Final recipient leaf hash is {}",
                 tree.get_hash((tree_depth, recipient_leaf_number))
             );
 
@@ -1351,7 +1352,7 @@ mod test {
 
             let new_root = tree.root_hash();
 
-            print!("New root = {}\n", new_root);
+            println!("New root = {}", new_root);
 
             assert!(old_root != new_root);
 
@@ -1386,7 +1387,7 @@ mod test {
                 let mut hash_result = [0u8; 32];
                 h.result(&mut hash_result[..]);
 
-                print!("Initial hash hex {}\n", hex::encode(hash_result.clone()));
+                println!("Initial hash hex {}", hex::encode(hash_result));
 
                 let mut packed_transaction_data = vec![];
                 let transaction_data = transaction.public_data_into_bits();
@@ -1395,8 +1396,8 @@ mod test {
                 let packed_transaction_data_bytes =
                     be_bit_vector_into_bytes(&packed_transaction_data);
 
-                print!(
-                    "Packed transaction data hex {}\n",
+                println!(
+                    "Packed transaction data hex {}",
                     hex::encode(packed_transaction_data_bytes.clone())
                 );
 
@@ -1410,7 +1411,7 @@ mod test {
                 hash_result = [0u8; 32];
                 h.result(&mut hash_result[..]);
 
-                print!("Final hash as hex {}\n", hex::encode(hash_result.clone()));
+                println!("Final hash as hex {}", hex::encode(hash_result));
 
                 hash_result[0] &= 0x1f; // temporary solution
 
@@ -1420,13 +1421,13 @@ mod test {
 
                 let public_data_commitment = Fr::from_repr(repr).unwrap();
 
-                print!(
-                    "Final data commitment as field element = {}\n",
+                println!(
+                    "Final data commitment as field element = {}",
                     public_data_commitment
                 );
 
                 let instance = Transfer {
-                    params: params,
+                    params,
                     number_of_transactions: 1,
                     old_root: Some(old_root),
                     new_root: Some(new_root),
@@ -1438,15 +1439,15 @@ mod test {
 
                 instance.synthesize(&mut cs).unwrap();
 
-                print!("{}\n", cs.find_unconstrained());
+                println!("{}", cs.find_unconstrained());
 
-                print!("{}\n", cs.num_constraints());
+                println!("{}", cs.num_constraints());
 
                 assert_eq!(cs.num_inputs(), 4);
 
                 let err = cs.which_is_unsatisfied();
                 if err.is_some() {
-                    panic!("ERROR satisfying in {}\n", err.unwrap());
+                    panic!("ERROR satisfying in {}", err.unwrap());
                 }
             }
         }

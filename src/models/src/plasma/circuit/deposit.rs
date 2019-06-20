@@ -17,24 +17,24 @@ impl<E: JubjubEngine> DepositRequest<E> {
         // - into
         // - amount
         // - compressed public key
-        let mut into: Vec<bool> = BitIterator::new(self.into.clone().into_repr()).collect();
+        let mut into: Vec<bool> = BitIterator::new(self.into.into_repr()).collect();
         into.reverse();
         into.truncate(params::BALANCE_TREE_DEPTH);
         // reverse again to have BE as in Ethereum native types
         into.reverse();
 
-        let mut amount: Vec<bool> = BitIterator::new(self.amount.clone().into_repr()).collect();
+        let mut amount: Vec<bool> = BitIterator::new(self.amount.into_repr()).collect();
         amount.reverse();
         amount.truncate(params::BALANCE_BIT_WIDTH);
         // reverse again to have BE as in Ethereum native types
         amount.reverse();
 
-        let mut y_bits: Vec<bool> = BitIterator::new(self.pub_y.clone().into_repr()).collect();
+        let mut y_bits: Vec<bool> = BitIterator::new(self.pub_y.into_repr()).collect();
         y_bits.reverse();
         y_bits.truncate(E::Fr::NUM_BITS as usize);
         y_bits.resize(params::FR_BIT_WIDTH - 1, false);
 
-        let mut x_bits: Vec<bool> = BitIterator::new(self.pub_x.clone().into_repr()).collect();
+        let mut x_bits: Vec<bool> = BitIterator::new(self.pub_x.into_repr()).collect();
         x_bits.reverse();
         // push sign bit
         y_bits.push(x_bits[0]);

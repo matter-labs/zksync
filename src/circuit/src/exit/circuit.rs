@@ -393,7 +393,7 @@ mod test {
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;
 
-        let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
 
         let tree_depth = plasma_constants::BALANCE_TREE_DEPTH as u32;
         let mut tree = CircuitAccountTree::new(tree_depth);
@@ -410,14 +410,14 @@ mod test {
         // let sender_leaf_number = 1;
 
         let mut sender_leaf_number: u32 = rng.gen();
-        sender_leaf_number = sender_leaf_number % capacity;
+        sender_leaf_number %= capacity;
 
-        let transfer_amount: u128 = 1234567890;
+        let transfer_amount: u128 = 1_234_567_890;
 
         let transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
 
         let sender_leaf = CircuitAccount {
-            balance: transfer_amount_as_field_element.clone(),
+            balance: transfer_amount_as_field_element,
             nonce: Fr::zero(),
             pub_x: sender_x,
             pub_y: sender_y,
@@ -425,15 +425,15 @@ mod test {
 
         tree.insert(sender_leaf_number, sender_leaf.clone());
 
-        print!(
-            "Sender leaf hash is {}\n",
+        println!(
+            "Sender leaf hash is {}",
             tree.get_hash((tree_depth, sender_leaf_number))
         );
 
         //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
         let initial_root = tree.root_hash();
-        print!("Initial root = {}\n", initial_root);
+        println!("Initial root = {}", initial_root);
 
         let path_from: Vec<Option<Fr>> = tree
             .merkle_path(sender_leaf_number)
@@ -444,7 +444,7 @@ mod test {
         let from = Fr::from_str(&sender_leaf_number.to_string());
 
         let request: ExitRequest<Bn256> = ExitRequest {
-            from: from,
+            from,
             amount: Some(transfer_amount_as_field_element),
         };
 
@@ -478,7 +478,7 @@ mod test {
 
         let new_root = tree.root_hash();
 
-        print!("New root = {}\n", new_root);
+        println!("New root = {}", new_root);
 
         assert!(initial_root != new_root);
 
@@ -506,7 +506,7 @@ mod test {
             let mut hash_result = [0u8; 32];
             h.result(&mut hash_result[..]);
 
-            print!("Initial hash hex {}\n", hex::encode(hash_result.clone()));
+            println!("Initial hash hex {}", hex::encode(hash_result));
 
             let mut packed_transaction_data = vec![];
             let transaction_data = request.public_data_into_bits();
@@ -516,8 +516,8 @@ mod test {
 
             let packed_transaction_data_bytes = be_bit_vector_into_bytes(&packed_transaction_data);
 
-            print!(
-                "Packed transaction data hex {}\n",
+            println!(
+                "Packed transaction data hex {}",
                 hex::encode(packed_transaction_data_bytes.clone())
             );
 
@@ -530,7 +530,7 @@ mod test {
             hash_result = [0u8; 32];
             h.result(&mut hash_result[..]);
 
-            print!("Final hash as hex {}\n", hex::encode(hash_result.clone()));
+            println!("Final hash as hex {}", hex::encode(hash_result));
 
             hash_result[0] &= 0x1f; // temporary solution
 
@@ -540,33 +540,33 @@ mod test {
 
             let public_data_commitment = Fr::from_repr(repr).unwrap();
 
-            print!(
-                "Final data commitment as field element = {}\n",
+            println!(
+                "Final data commitment as field element = {}",
                 public_data_commitment
             );
 
             let instance = Exit {
-                params: params,
+                params,
                 number_of_exits: 1,
                 old_root: Some(initial_root),
                 new_root: Some(new_root),
                 public_data_commitment: Some(public_data_commitment),
-                empty_leaf_witness: empty_leaf_witness,
+                empty_leaf_witness,
                 block_number: Some(Fr::one()),
                 requests: vec![(request, witness)],
             };
 
             instance.synthesize(&mut cs).unwrap();
 
-            print!("{}\n", cs.find_unconstrained());
+            println!("{}", cs.find_unconstrained());
 
-            print!("{}\n", cs.num_constraints());
+            println!("{}", cs.num_constraints());
 
             assert_eq!(cs.num_inputs(), 4);
 
             let err = cs.which_is_unsatisfied();
             if err.is_some() {
-                panic!("ERROR satisfying in {}\n", err.unwrap());
+                panic!("ERROR satisfying in {}", err.unwrap());
             }
         }
     }

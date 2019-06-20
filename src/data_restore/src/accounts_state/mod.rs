@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+use std::convert::TryInto;
 
 use ff::{Field, PrimeField, PrimeFieldRepr};
 use sapling_crypto::jubjub::{edwards, Unknown};
@@ -26,7 +27,7 @@ pub struct FranklinAccountsStates {
 impl FranklinAccountsStates {
     pub fn new(config: DataRestoreConfig) -> Self {
         Self {
-            config: config,
+            config,
             plasma_state: PlasmaState::empty(),
         }
     }
@@ -38,18 +39,15 @@ impl FranklinAccountsStates {
         let tx_type = transaction.franklin_transaction_type;
         match tx_type {
             FranklinTransactionType::Deposit => {
-                let _ = self.update_accounts_states_from_deposit_transaction(transaction)?;
-                Ok(())
+                Ok(self.update_accounts_states_from_deposit_transaction(transaction)?)
             }
             FranklinTransactionType::FullExit => {
-                let _ = self.update_accounts_states_from_full_exit_transaction(transaction)?;
-                Ok(())
+                Ok(self.update_accounts_states_from_full_exit_transaction(transaction)?)
             }
             FranklinTransactionType::Transfer => {
-                let _ = self.update_accounts_states_from_transfer_transaction(transaction)?;
-                Ok(())
+                Ok(self.update_accounts_states_from_transfer_transaction(transaction)?)
             }
-            _ => return Err(DataRestoreError::WrongType),
+            _ => Err(DataRestoreError::WrongType),
         }
     }
 
@@ -192,8 +190,7 @@ impl FranklinAccountsStates {
         let txs = tx_data_vec.chunks(9);
 
         let mut transfers: Vec<TransferTx> = vec![];
-        let mut i = 0;
-        for tx in txs {
+        for (i, tx) in txs.enumerate() {
             // if tx != [0, 0, 2, 0, 0, 0, 0, 0, 0] {
             //     let from = U256::from(&tx[0..3]);
             //     let to = U256::from(&tx[3..6]);
@@ -214,13 +211,13 @@ impl FranklinAccountsStates {
             let from = U256::from(&tx[0..3]).as_u32();
             let to = U256::from(&tx[3..6]).as_u32();
             let amount = amount_bytes_slice_to_big_decimal(&tx[6..8]);
-            let fee = fee_bytes_slice_to_big_decimal(&tx[8]);
+            let fee = fee_bytes_slice_to_big_decimal(tx[8]);
             let transfer_tx = TransferTx {
                 from,
                 to,
                 amount: amount.clone(), //BigDecimal::from_str_radix("0", 10).unwrap(),
-                fee: fee,               //BigDecimal::from_str_radix("0", 10).unwrap(),
-                nonce: i,
+                fee,                    //BigDecimal::from_str_radix("0", 10).unwrap(),
+                nonce: i.try_into().unwrap(),
                 good_until_block: 0,
                 signature: TxSignature::default(),
                 cached_pub_key: None,
@@ -230,7 +227,6 @@ impl FranklinAccountsStates {
                 from, to, amount
             );
             transfers.push(transfer_tx);
-            i = i + 1;
         }
 
         Ok(transfers)
@@ -278,7 +274,7 @@ impl FranklinAccountsStates {
             if ordering == Ordering::Equal {
                 error_flag = true;
             }
-            return ordering;
+            ordering
         });
         if error_flag {
             return Err(DataRestoreError::Unknown(
@@ -314,7 +310,7 @@ impl FranklinAccountsStates {
             .to_block(BlockNumber::Latest)
             .topics(
                 Some(vec![deposit_event_topic]),
-                Some(vec![H256::from(batch_number.clone())]),
+                Some(vec![H256::from(batch_number)]),
                 None,
                 None,
             )
@@ -325,7 +321,7 @@ impl FranklinAccountsStates {
             .to_block(BlockNumber::Latest)
             .topics(
                 Some(vec![deposit_canceled_topic]),
-                Some(vec![H256::from(batch_number.clone())]),
+                Some(vec![H256::from(batch_number)]),
                 None,
                 None,
             )
@@ -346,7 +342,7 @@ impl FranklinAccountsStates {
                     let _existing_record = this_batch.get(&account_id).cloned();
                     if let Some(record) = _existing_record {
                         let mut existing_balance = record.0;
-                        existing_balance = existing_balance + deposit_amount;
+                        existing_balance += deposit_amount;
                         this_batch.insert(account_id, (existing_balance, record.1));
                     } else {
                         this_batch.insert(account_id, (deposit_amount, public_key));
@@ -398,8 +394,8 @@ impl FranklinAccountsStates {
             let tx: DepositTx = DepositTx {
                 account: k.as_u32(),
                 amount: BigDecimal::from_str_radix(&format!("{}", v.0), 10).unwrap(),
-                pub_x: pub_x,
-                pub_y: pub_y,
+                pub_x,
+                pub_y,
             };
             all_deposits.push(tx);
         }
@@ -432,7 +428,7 @@ impl FranklinAccountsStates {
             .to_block(BlockNumber::Latest)
             .topics(
                 Some(vec![exit_event_topic]),
-                Some(vec![H256::from(batch_number.clone())]),
+                Some(vec![H256::from(batch_number)]),
                 None,
                 None,
             )
@@ -444,7 +440,7 @@ impl FranklinAccountsStates {
             .to_block(BlockNumber::Latest)
             .topics(
                 Some(vec![exit_canceled_topic]),
-                Some(vec![H256::from(batch_number.clone())]),
+                Some(vec![H256::from(batch_number)]),
                 None,
                 None,
             )
@@ -460,7 +456,7 @@ impl FranklinAccountsStates {
                 () if topic == exit_event_topic => {
                     let account_id = U256::from(event.topics[2]);
                     let existing_record = this_batch.get(&account_id).cloned();
-                    if let Some(_) = existing_record {
+                    if existing_record.is_some() {
                         return Err(DataRestoreError::DoubleExit);
                     } else {
                         this_batch.insert(account_id);
@@ -469,10 +465,10 @@ impl FranklinAccountsStates {
                 }
                 () if topic == exit_canceled_topic => {
                     let account_id = U256::from(event.topics[2]);
-                    let _existing_record = this_batch
+                    this_batch
                         .get(&account_id)
                         .cloned()
-                        .ok_or("existing_record fetch failed".to_owned())?;
+                        .ok_or_else(|| "existing_record fetch failed".to_owned())?;
                     this_batch.remove(&account_id);
                     continue;
                 }

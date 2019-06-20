@@ -69,7 +69,7 @@ pub enum InfuraEndpoint {
 /// * `bytes` - ref to bytes array
 ///
 pub fn keccak256_hash(bytes: &[u8]) -> Vec<u8> {
-    keccak256(bytes).into_iter().cloned().collect()
+    keccak256(bytes).iter().cloned().collect()
 }
 
 /// Returns keccak256 topic hash (H256) from topic str
@@ -83,8 +83,7 @@ pub fn get_topic_keccak_hash(topic: &str) -> web3::types::H256 {
     let topic_data_vec: &[u8] = topic_data.as_slice();
     let topic_keccak_data: Vec<u8> = keccak256_hash(topic_data_vec);
     let topic_keccak_data_vec: &[u8] = topic_keccak_data.as_slice();
-    let topic_h256 = H256::from_slice(topic_keccak_data_vec);
-    topic_h256
+    H256::from_slice(topic_keccak_data_vec)
 }
 
 /// Returns BigDecimal repr of amount bytes slice
@@ -118,8 +117,8 @@ pub fn amount_bytes_slice_to_big_decimal(bytes: &[u8]) -> BigDecimal {
 ///
 /// * `bytes` - fee bytes slice
 ///
-pub fn fee_bytes_slice_to_big_decimal(byte: &u8) -> BigDecimal {
-    let bit_vec: BitVec = BitVec::from_element(*byte);
+pub fn fee_bytes_slice_to_big_decimal(byte: u8) -> BigDecimal {
+    let bit_vec: BitVec = BitVec::from_element(byte);
     let mut bool_vec: Vec<bool> = vec![];
     for i in bit_vec {
         bool_vec.push(i);

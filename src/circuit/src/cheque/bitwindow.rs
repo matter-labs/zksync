@@ -204,8 +204,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
         start.limit_number_of_bits(cs.namespace(|| "limit start as 2^32"), 32)?;
 
         let distance = AllocatedNum::alloc(cs.namespace(|| "allocate distance"), || {
-            let mut num = bit_number.get_value().get()?.clone();
-            let start = start.get_value().get()?.clone();
+            let mut num = *bit_number.get_value().get()?;
+            let start = *start.get_value().get()?;
             num.sub_assign(&start);
 
             Ok(num)
@@ -330,8 +330,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
         let quotient = AllocatedNum::alloc(
             cs.namespace(|| "allocate top field bits after masking"),
             || {
-                let mut initial = current_bits_fe.get_value().get()?.clone();
-                let masked = remainder.get_value().get()?.clone();
+                let mut initial = *current_bits_fe.get_value().get()?;
+                let masked = *remainder.get_value().get()?;
                 initial.sub_assign(&masked);
 
                 Ok(initial)
@@ -352,11 +352,11 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
             let multiplier = AllocatedNum::alloc(
                 cs.namespace(|| format!("allocate bitshift multiplier {}", i)),
                 || {
-                    let bval = mask_bit.get_value().get()?.clone();
+                    let bval = *mask_bit.get_value().get()?;
                     if !bval {
-                        return Ok(E::Fr::one());
+                        Ok(E::Fr::one())
                     } else {
-                        return Ok(two_inverted);
+                        Ok(two_inverted)
                     }
                 },
             )?;
@@ -407,8 +407,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
         // make a final register state
 
         let new_register = AllocatedNum::alloc(cs.namespace(|| "allocate new register"), || {
-            let mut new_val = shifted_quotient.get_value().get()?.clone();
-            let position = bit_position_fe.get_value().get()?.clone();
+            let mut new_val = *shifted_quotient.get_value().get()?;
+            let position = *bit_position_fe.get_value().get()?;
             new_val.add_assign(&position);
 
             Ok(new_val)
@@ -433,8 +433,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for BitSet<'a, E> {
         // )?;
 
         let new_start = AllocatedNum::alloc(cs.namespace(|| "allocate new start"), || {
-            let mut new_val = start.get_value().get()?.clone();
-            let shift = start_adjustment.get_value().get()?.clone();
+            let mut new_val = *start.get_value().get()?;
+            let shift = *start_adjustment.get_value().get()?;
             new_val.add_assign(&shift);
 
             Ok(new_val)
@@ -459,16 +459,19 @@ mod test {
 
     use super::*;
 
+    use bellman::groth16::{
+        create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
+    };
     use ff::{BitIterator, Field, PrimeField};
+    use pairing::bn256::*;
+    use rand::{Rng, SeedableRng, XorShiftRng};
+    use sapling_crypto::{
+        alt_babyjubjub::AltJubjubBn256, circuit::test::*, interpolation::evaluate_at_x,
+    };
 
     #[test]
     fn test_redeem() {
-        use pairing::bn256::*;
-        use rand::{Rng, SeedableRng, XorShiftRng};
-        use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
-        use sapling_crypto::circuit::test::*;
-
-        let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
 
         let params = &AltJubjubBn256::new();
 
@@ -505,16 +508,15 @@ mod test {
             };
 
             let instance = BitSet {
-                params: params,
-
+                params,
                 action: (number, witness),
             };
 
             instance.synthesize(&mut cs).expect("must synthesize");
 
-            print!("{}\n", cs.find_unconstrained());
+            println!("{}", cs.find_unconstrained());
 
-            print!("{}\n", cs.num_constraints());
+            println!("{}", cs.num_constraints());
 
             assert_eq!(cs.num_inputs(), 1);
 
@@ -524,7 +526,7 @@ mod test {
                     "Error for bitfield = {:#b}, bit of interest = {}",
                     existing_field, bit_of_interest
                 );
-                panic!("ERROR satisfying in {}\n", err.unwrap());
+                panic!("ERROR satisfying in {}", err.unwrap());
             } else {
                 println!("Satisfied for bit = {}", bit_of_interest);
             }
@@ -533,15 +535,8 @@ mod test {
 
     #[test]
     fn test_proof_generation() {
-        use pairing::bn256::*;
-        use rand::{Rng, SeedableRng, XorShiftRng};
-        use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
-
-        use bellman::groth16::{
-            create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
-        };
-
-        let mut rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let mut rng =
+            &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
 
         let params = &AltJubjubBn256::new();
 
@@ -577,7 +572,7 @@ mod test {
         };
 
         let instance = BitSet {
-            params: params,
+            params,
 
             action: (number, witness),
         };
@@ -591,15 +586,13 @@ mod test {
             let n = BitNumber::<Bn256> { number: None };
 
             let inst = BitSet::<Bn256> {
-                params: params,
+                params,
 
                 action: (n, w),
             };
 
-            let p = generate_random_parameters::<Bn256, _, _>(inst, &mut rng)
-                .expect("must generate parameters");
-
-            p
+            generate_random_parameters::<Bn256, _, _>(inst, &mut rng)
+                .expect("must generate parameters")
         };
 
         let proof = create_random_proof::<Bn256, _, _, _>(instance, &parameters, &mut rng)
@@ -616,10 +609,7 @@ mod test {
 
     #[test]
     fn test_bit_shifts() {
-        use pairing::bn256::Fr;
-        use rand::{Rng, SeedableRng, XorShiftRng};
-
-        let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
         let mut bitmask: Fr = rng.gen();
         let power_of_two = 8;
         let mut pow = Fr::one();
@@ -636,7 +626,7 @@ mod test {
                 print!("0");
             }
         }
-        print!("\n");
+        println!();
 
         let bits_before: Vec<bool> = BitIterator::new(bitmask.into_repr()).collect();
         for b in bits_before {
@@ -646,7 +636,7 @@ mod test {
                 print!("0");
             }
         }
-        print!("\n");
+        println!();
 
         pow = pow.inverse().unwrap();
 
@@ -660,14 +650,11 @@ mod test {
                 print!("0");
             }
         }
-        print!("\n");
+        println!();
     }
 
     #[test]
     fn test_bitmask_lookups() {
-        use pairing::bn256::{Bn256, Fr};
-        use sapling_crypto::interpolation::evaluate_at_x;
-
         let min_no_shift = 0u128;
         let min_with_shift = 128u128;
         let max_with_shift = 255u128;
@@ -687,9 +674,6 @@ mod test {
 
     #[test]
     fn test_check_bit_lookups() {
-        use pairing::bn256::{Bn256, Fr};
-        use sapling_crypto::interpolation::evaluate_at_x;
-
         let min_no_shift = 0u128;
         let min_with_shift = 128u128;
         let max_with_shift = 255u128;
@@ -706,9 +690,6 @@ mod test {
 
     #[test]
     fn test_validity_lookups() {
-        use pairing::bn256::{Bn256, Fr};
-        use sapling_crypto::interpolation::evaluate_at_x;
-
         let min_valid = 0u128;
         let max_valid = 128u128 + 64u128;
         let full_range = 255u128;

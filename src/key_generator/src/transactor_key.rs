@@ -52,7 +52,7 @@ pub fn make_transactor_key() {
     };
 
     let instance_for_generation: Transfer<'_, Bn256> = Transfer {
-        params: params,
+        params,
         number_of_transactions: TRANSFER_BATCH_SIZE,
         old_root: None,
         new_root: None,

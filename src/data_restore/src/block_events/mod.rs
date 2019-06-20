@@ -26,14 +26,13 @@ pub struct BlockEventsFranklin {
 // Check if txs in last watching block
 impl BlockEventsFranklin {
     pub fn new(config: DataRestoreConfig) -> Self {
-        let this = Self {
+        Self {
             // ws_endpoint_string: ws_infura_endpoint_string,
-            config: config,
+            config,
             committed_blocks: vec![],
             verified_blocks: vec![],
             last_watched_block_number: U256::from(0),
-        };
-        this
+        }
     }
 
     pub fn get_past_state_from_genesis_with_blocks_delta(
@@ -67,7 +66,7 @@ impl BlockEventsFranklin {
 
     pub fn get_only_verified_committed_blocks(
         &self,
-        verified_blocks: &Vec<LogBlockData>,
+        verified_blocks: &[LogBlockData],
     ) -> Vec<&LogBlockData> {
         let iter_ver_blocks = verified_blocks.iter();
         // let committed_blocks_iter = &mut self.com_blocks.iter();
@@ -103,9 +102,7 @@ impl BlockEventsFranklin {
         verified_block: &LogBlockData,
     ) -> Option<&LogBlockData> {
         let committed_blocks_iter = &mut self.committed_blocks.iter();
-        let committed_block =
-            committed_blocks_iter.find(|&&x| x.block_num == verified_block.block_num);
-        return committed_block;
+        committed_blocks_iter.find(|&&x| x.block_num == verified_block.block_num)
     }
 
     pub fn get_committed_blocks(&self) -> &Vec<LogBlockData> {
@@ -129,8 +126,7 @@ impl BlockEventsFranklin {
     }
 
     // returns (committed blocks logs, verified blocks logs)
-    fn sort_logs(&mut self, logs: &Vec<Log>) -> Result<ComAndVerBlocksVecs, DataRestoreError> {
-        let logs = logs.clone();
+    fn sort_logs(&mut self, logs: &[Log]) -> Result<ComAndVerBlocksVecs, DataRestoreError> {
         if logs.is_empty() {
             return Err(DataRestoreError::NoData("No logs in list".to_string()));
         }
@@ -211,7 +207,7 @@ impl BlockEventsFranklin {
             .logs(filter)
             .wait()
             .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-        if result.len() == 0 {
+        if result.is_empty() {
             return Err(DataRestoreError::NoData("No logs in list".to_string()));
         }
         Ok(result)
@@ -243,7 +239,7 @@ impl BlockEventsFranklin {
         let to_block_numer_256 = last_block_number - blocks_delta;
         to_block_numer_256
             .checked_sub(from_block_number)
-            .ok_or(DataRestoreError::NoData("No new blocks".to_string()))?;
+            .ok_or_else(|| DataRestoreError::NoData("No new blocks".to_string()))?;
         let to_block_number = BlockNumber::Number(to_block_numer_256.as_u64());
         let from_block_number = BlockNumber::Number(from_block_number.as_u64());
 
@@ -274,7 +270,7 @@ impl BlockEventsFranklin {
         genesis_block: U256,
         blocks_delta: U256,
     ) -> Result<(ComAndVerBlocksVecs, BlockNumber256), DataRestoreError> {
-        let from_block_number = U256::from(genesis_block);
+        let from_block_number = genesis_block;
         let (logs, to_block_number) = self
             .get_past_logs(from_block_number, blocks_delta)
             .map_err(|e| DataRestoreError::NoData(e.to_string()))?;

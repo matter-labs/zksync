@@ -64,14 +64,14 @@ pub struct ProverRequest(pub BlockNumber);
 #[serde(tag = "type")]
 pub enum Action {
     Commit,
-    Verify { proof: EncodedProof },
+    Verify { proof: Box<EncodedProof> },
 }
 
 impl std::string::ToString for Action {
     fn to_string(&self) -> String {
         match self {
             Action::Commit => "Commit".to_owned(),
-            Action::Verify { proof: _ } => "Verify".to_owned(),
+            Action::Verify { .. } => "Verify".to_owned(),
         }
     }
 }
@@ -100,7 +100,7 @@ pub enum ProtoBlock {
 }
 
 pub enum StateKeeperRequest {
-    AddTransferTx(TransferTx, Sender<TransferTxResult>),
+    AddTransferTx(Box<TransferTx>, Sender<TransferTxResult>),
     AddBlock(ProtoBlock),
     GetAccount(u32, Sender<Option<Account>>),
     GetNetworkStatus(Sender<NetworkStatus>),
@@ -113,8 +113,8 @@ pub struct CommitRequest {
     pub accounts_updated: AccountMap,
 }
 
-pub const ACTION_COMMIT: &'static str = "Commit";
-pub const ACTION_VERIFY: &'static str = "Verify";
+pub const ACTION_COMMIT: &str = "Commit";
+pub const ACTION_VERIFY: &str = "Verify";
 
 pub enum ActionType {
     COMMIT,

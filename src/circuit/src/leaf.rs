@@ -87,14 +87,14 @@ where
     );
 
     Ok(LeafContent {
-        leaf_bits: leaf_bits,
-        value: value,
-        value_bits: value_bits,
-        nonce: nonce,
-        nonce_bits: nonce_bits,
-        pub_x: pub_x,
-        pub_y: pub_y,
-        pub_x_bit: pub_x_bit,
-        pub_y_bits: pub_y_bits,
+        leaf_bits,
+        value,
+        value_bits,
+        nonce,
+        nonce_bits,
+        pub_x,
+        pub_y,
+        pub_x_bit,
+        pub_y_bits,
     })
 }

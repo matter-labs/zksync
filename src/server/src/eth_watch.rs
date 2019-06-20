@@ -113,11 +113,7 @@ impl EthWatch {
         let web3 = web3::Web3::new(transport);
         // let mut eloop = tokio_core::reactor::Core::new().unwrap();
         // let web3 = web3::Web3::new(web3::transports::Http::with_event_loop("http://localhost:8545", &eloop.handle(), 1).unwrap());
-        let contract = Contract::new(
-            web3.eth(),
-            self.contract_addr.clone(),
-            self.contract.clone(),
-        );
+        let contract = Contract::new(web3.eth(), self.contract_addr, self.contract.clone());
 
         loop {
             std::thread::sleep(time::Duration::from_secs(1));
@@ -190,7 +186,7 @@ impl EthWatch {
 
         for batch_number in form_batch_number..to_batch_number {
             self.process_single_deposit_batch(batch_number, channel, web3, contract)?;
-            self.last_deposit_batch = self.last_deposit_batch + U256::from(1);
+            self.last_deposit_batch += U256::from(1);
         }
 
         Ok(())
@@ -198,7 +194,7 @@ impl EthWatch {
 
     fn process_single_deposit_batch<T: web3::Transport>(
         &mut self,
-        batch_number: u64,
+        _batch_number: u64,
         channel: &Sender<StateKeeperRequest>,
         web3: &web3::Web3<T>,
         contract: &Contract<T>,
@@ -221,7 +217,7 @@ impl EthWatch {
             .to_block(BlockNumber::Latest)
             .topics(
                 Some(vec![deposit_event_topic]),
-                Some(vec![H256::from(self.last_deposit_batch.clone())]),
+                Some(vec![H256::from(self.last_deposit_batch)]),
                 None,
                 None,
             )
@@ -233,7 +229,7 @@ impl EthWatch {
             .to_block(BlockNumber::Latest)
             .topics(
                 Some(vec![deposit_canceled_topic]),
-                Some(vec![H256::from(self.last_deposit_batch.clone())]),
+                Some(vec![H256::from(self.last_deposit_batch)]),
                 None,
                 None,
             )
@@ -260,7 +256,7 @@ impl EthWatch {
 
         all_events = all_events
             .into_iter()
-            .filter(|el| el.is_removed() == false)
+            .filter(|el| !el.is_removed())
             .collect();
 
         // sort by index
@@ -297,10 +293,10 @@ impl EthWatch {
                     let account_id = U256::from(event.topics[2]);
                     let public_key = U256::from(event.topics[3]);
                     let deposit_amount = U256::from_big_endian(&data_bytes);
-                    let existing_record = this_batch.get(&account_id).map(|&v| v.clone());
+                    let existing_record = this_batch.get(&account_id).cloned();
                     if let Some(record) = existing_record {
                         let mut existing_balance = record.0;
-                        existing_balance = existing_balance + deposit_amount;
+                        existing_balance += deposit_amount;
                         this_batch.insert(account_id, (existing_balance, record.1));
                     } else {
                         this_batch.insert(account_id, (deposit_amount, public_key));
@@ -311,7 +307,7 @@ impl EthWatch {
                     let account_id = U256::from(event.topics[2]);
                     let _existing_record = this_batch
                         .get(&account_id)
-                        .map(|&v| v.clone())
+                        .cloned()
                         .ok_or("existing_record not found for deposits")?;
                     this_batch.remove(&account_id);
                     continue;
@@ -352,8 +348,8 @@ impl EthWatch {
             let tx: DepositTx = DepositTx {
                 account: k.as_u32(),
                 amount: BigDecimal::from_str_radix(&format!("{}", v.0), 10).unwrap(),
-                pub_x: pub_x,
-                pub_y: pub_y,
+                pub_x,
+                pub_y,
             };
             all_deposits.push(tx);
         }
@@ -366,7 +362,7 @@ impl EthWatch {
         );
         let request = StateKeeperRequest::AddBlock(block);
 
-        let _send_result = channel
+        channel
             .send(request)
             .map_err(|err| format!("channel.send() failed: {}", err))?;
 
@@ -405,8 +401,8 @@ impl EthWatch {
         let to_batch_number = (max_batch_number + U256::from(1)).as_u64();
 
         for batch_number in form_batch_number..to_batch_number {
-            let _res = self.process_single_exit_batch(batch_number, channel, web3, contract)?;
-            self.last_exit_batch = self.last_exit_batch + U256::from(1);
+            self.process_single_exit_batch(batch_number, channel, web3, contract)?;
+            self.last_exit_batch += U256::from(1);
         }
 
         Ok(())
@@ -414,7 +410,7 @@ impl EthWatch {
 
     fn process_single_exit_batch<T: web3::Transport>(
         &mut self,
-        batch_number: u64,
+        _batch_number: u64,
         channel: &Sender<StateKeeperRequest>,
         web3: &web3::Web3<T>,
         contract: &Contract<T>,
@@ -435,7 +431,7 @@ impl EthWatch {
             .to_block(BlockNumber::Latest)
             .topics(
                 Some(vec![exit_event_topic]),
-                Some(vec![H256::from(self.last_exit_batch.clone())]),
+                Some(vec![H256::from(self.last_exit_batch)]),
                 None,
                 None,
             )
@@ -447,7 +443,7 @@ impl EthWatch {
             .to_block(BlockNumber::Latest)
             .topics(
                 Some(vec![exit_canceled_topic]),
-                Some(vec![H256::from(self.last_exit_batch.clone())]),
+                Some(vec![H256::from(self.last_exit_batch)]),
                 None,
                 None,
             )
@@ -474,7 +470,7 @@ impl EthWatch {
 
         all_events = all_events
             .into_iter()
-            .filter(|el| el.is_removed() == false)
+            .filter(|el| !el.is_removed())
             .collect();
 
         // sort by index
@@ -508,10 +504,10 @@ impl EthWatch {
             match () {
                 () if topic == exit_event_topic => {
                     let account_id = U256::from(event.topics[2]);
-                    let existing_record = this_batch.get(&account_id).map(|&v| v.clone());
-                    if let Some(_record) = existing_record {
+                    let existing_record = this_batch.get(&account_id).cloned();
+                    if existing_record.is_some() {
                         // double exit should not be possible due to SC
-                        return Err("double exit should not be possible due to SC".to_owned());
+                        return Err("double exit should not be possible due to SC".to_string());
                     } else {
                         this_batch.insert(account_id);
                     }
@@ -521,12 +517,12 @@ impl EthWatch {
                     let account_id = U256::from(event.topics[2]);
                     let _existing_record = this_batch
                         .get(&account_id)
-                        .map(|&v| v.clone())
-                        .ok_or("existing_record fetch failed".to_owned())?;
+                        .cloned()
+                        .ok_or_else(|| "existing_record fetch failed".to_string())?;
                     this_batch.remove(&account_id);
                     continue;
                 }
-                _ => return Err("exit logs: unexpected topic".to_owned()),
+                _ => return Err("exit logs: unexpected topic".to_string()),
             }
         }
 
@@ -547,7 +543,7 @@ impl EthWatch {
         let send_result = channel.send(request);
 
         if send_result.is_err() {
-            return Err("Couldn't send for processing".to_owned());
+            return Err("Couldn't send for processing".to_string());
         }
 
         Ok(())
@@ -559,5 +555,6 @@ pub fn start_eth_watch(mut eth_watch: EthWatch, tx_for_blocks: Sender<StateKeepe
         .name("eth_watch".to_string())
         .spawn(move || {
             eth_watch.run(tx_for_blocks);
-        });
+        })
+        .expect("Eth watcher thread");
 }

@@ -65,7 +65,7 @@ pub fn append_packed_public_key(
     content.extend(x_bits);
 }
 
-pub fn le_bit_vector_into_field_element<P: PrimeField>(bits: &Vec<bool>) -> P {
+pub fn le_bit_vector_into_field_element<P: PrimeField>(bits: &[bool]) -> P {
     // double and add
     let mut fe = P::zero();
     let mut base = P::one();
@@ -103,7 +103,7 @@ pub fn le_bit_vector_into_field_element<P: PrimeField>(bits: &Vec<bool>) -> P {
     // field_element
 }
 
-pub fn be_bit_vector_into_bytes(bits: &Vec<bool>) -> Vec<u8> {
+pub fn be_bit_vector_into_bytes(bits: &[bool]) -> Vec<u8> {
     let mut bytes: Vec<u8> = vec![];
 
     let byte_chunks = bits.chunks(8);
@@ -111,7 +111,7 @@ pub fn be_bit_vector_into_bytes(bits: &Vec<bool>) -> Vec<u8> {
     for byte_chunk in byte_chunks {
         let mut byte = 0u8;
         // pack just in order
-        for (i, bit) in byte_chunk.into_iter().enumerate() {
+        for (i, bit) in byte_chunk.iter().enumerate() {
             if *bit {
                 byte |= 1 << (7 - i);
             }
@@ -122,7 +122,7 @@ pub fn be_bit_vector_into_bytes(bits: &Vec<bool>) -> Vec<u8> {
     bytes
 }
 
-pub fn le_bit_vector_into_bytes(bits: &Vec<bool>) -> Vec<u8> {
+pub fn le_bit_vector_into_bytes(bits: &[bool]) -> Vec<u8> {
     let mut bytes: Vec<u8> = vec![];
 
     let byte_chunks = bits.chunks(8);
@@ -130,7 +130,7 @@ pub fn le_bit_vector_into_bytes(bits: &Vec<bool>) -> Vec<u8> {
     for byte_chunk in byte_chunks {
         let mut byte = 0u8;
         // pack just in order
-        for (i, bit) in byte_chunk.into_iter().enumerate() {
+        for (i, bit) in byte_chunk.iter().enumerate() {
             if *bit {
                 byte |= 1 << i;
             }
@@ -145,16 +145,12 @@ pub fn encode_fs_into_fr<E: JubjubEngine>(input: E::Fs) -> E::Fr {
     let mut fs_le_bits: Vec<bool> = BitIterator::new(input.into_repr()).collect();
     fs_le_bits.reverse();
 
-    let converted = le_bit_vector_into_field_element::<E::Fr>(&fs_le_bits);
-
-    converted
+    le_bit_vector_into_field_element::<E::Fr>(&fs_le_bits)
 }
 
 pub fn encode_fr_into_fs<E: JubjubEngine>(input: E::Fr) -> E::Fs {
     let mut fr_le_bits: Vec<bool> = BitIterator::new(input.into_repr()).collect();
     fr_le_bits.reverse();
 
-    let converted = le_bit_vector_into_field_element::<E::Fs>(&fr_le_bits);
-
-    converted
+    le_bit_vector_into_field_element::<E::Fs>(&fr_le_bits)
 }

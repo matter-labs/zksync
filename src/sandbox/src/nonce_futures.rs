@@ -34,7 +34,7 @@ impl NonceFutures {
         // get mutex access to inner data
         let data = &mut self.0.as_ref().write().unwrap();
 
-        let record = data.nonces.get(&account).map(|&v| v).clone();
+        let record = data.nonces.get(&account).cloned();
         if record.is_none() {
             // so that we iterate through the notify listing starting not with 0,
             // but with the first requested nonce
@@ -62,21 +62,18 @@ impl NonceFutures {
         } else {
             // otherwise add future to the list to be notified
             let key = (account, nonce);
-            data.futures
-                .get(&key)
-                .map(|f| f.clone())
-                .unwrap_or_else(|| {
-                    let future = NonceReadyFuture {
-                        account,
-                        nonce,
-                        futures: self.clone(),
-                        immediate_result: None,
-                    }
-                    .shared();
-                    let r = future.clone();
-                    data.futures.insert(key, future);
-                    r
-                })
+            data.futures.get(&key).cloned().unwrap_or_else(|| {
+                let future = NonceReadyFuture {
+                    account,
+                    nonce,
+                    futures: self.clone(),
+                    immediate_result: None,
+                }
+                .shared();
+                let r = future.clone();
+                data.futures.insert(key, future);
+                r
+            })
         }
         .map_err(|_| CurrentNonceIsHigher)
         .map(|_| ())

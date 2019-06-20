@@ -1,7 +1,7 @@
 pub mod depositor_key;
 pub mod exitor_key;
-pub mod transactor_key;
 pub mod read_write_keys;
+pub mod transactor_key;
 pub mod vk_contract_generator;
 
 use depositor_key::make_depositor_key;
