@@ -3,7 +3,7 @@
 # Force read env
 FRANKLIN_ENV=
 . .setup_env
-cd src/storage
+cd core/storage
 
 echo DATABASE_URL=$DATABASE_URL
 diesel database setup || exit 1

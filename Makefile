@@ -49,7 +49,7 @@ db-reset: confirm_action db-drop db-setup db-insert-contract
 	@echo database is ready
 
 db-migrate: confirm_action
-	@cd src/storage && diesel migration run
+	@cd core/storage && diesel migration run
 
 db-drop: confirm_action
 	@# this is used to clear the produciton db; cannot do `diesel database reset` because we don't own the db
