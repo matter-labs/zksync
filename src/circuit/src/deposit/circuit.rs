@@ -572,7 +572,7 @@ mod test {
         let transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
 
         let sender_leaf = CircuitAccount {
-            balance: transfer_amount_as_field_element.clone(),
+            balance: transfer_amount_as_field_element,
             nonce: Fr::zero(),
             pub_x: sender_x,
             pub_y: sender_y,

@@ -7,6 +7,7 @@ use models::plasma::Fr;
 use std::sync::mpsc::Sender;
 use web3::types::U256;
 
+#[allow(dead_code)]
 pub struct ProtoAccountsState {
     errored: bool,
     root_hash: Fr,
@@ -32,8 +33,8 @@ impl DataRestoreDriver {
         Self {
             channel,
             config: config.clone(),
-            genesis_block: genesis_block,
-            blocks_delta: blocks_delta,
+            genesis_block,
+            blocks_delta,
             run_updates: false,
             block_events: BlockEventsFranklin::new(config.clone()),
             account_states: FranklinAccountsStates::new(config.clone()),
@@ -53,14 +54,14 @@ impl DataRestoreDriver {
 
         // let accs = &self.account_states.get_accounts();
         // println!("Accs: {:?}", accs);
-        let root = &self.account_states.root_hash();
+        let root = self.account_states.root_hash();
         println!("Root: {:?}", &root);
         println!("______________");
 
         if let Some(ref _channel) = self.channel {
             let state = ProtoAccountsState {
                 errored: false,
-                root_hash: root.clone(),
+                root_hash: root,
             };
             let _send_result = _channel.send(state);
             if _send_result.is_err() {
@@ -114,12 +115,12 @@ impl DataRestoreDriver {
                 )));
             }
             let root = self.account_states.root_hash();
-            println!("New root: {:?}", &root);
+            println!("New root: {:?}", root);
             println!("______________");
             if let Some(ref _channel) = self.channel {
                 let state = ProtoAccountsState {
                     errored: !self.run_updates,
-                    root_hash: root.clone(),
+                    root_hash: root,
                 };
                 let _send_result = _channel.send(state);
                 if _send_result.is_err() {
@@ -131,7 +132,7 @@ impl DataRestoreDriver {
             }
         }
         println!("Stopped state updates");
-        return err;
+        err
     }
 
     fn get_past_franklin_blocks_events_and_accounts_tree_state(
@@ -152,7 +153,7 @@ impl DataRestoreDriver {
         // println!("Transactions: {:?}", sorted_txs);
 
         let mut accounts_state = FranklinAccountsStates::new(config.clone());
-        let _ = DataRestoreDriver::update_accounts_state_from_transactions(
+        DataRestoreDriver::update_accounts_state_from_transactions(
             &mut accounts_state,
             &sorted_txs,
         )
@@ -197,7 +198,7 @@ impl DataRestoreDriver {
 
     fn get_verified_committed_blocks_transactions_from_blocks_state(
         block_events_state: &BlockEventsFranklin,
-        verified_blocks: &Vec<LogBlockData>,
+        verified_blocks: &[LogBlockData],
     ) -> Vec<FranklinTransaction> {
         let committed_blocks =
             block_events_state.get_only_verified_committed_blocks(verified_blocks);
@@ -225,7 +226,7 @@ impl DataRestoreDriver {
 
     fn update_accounts_state_from_transactions(
         state: &mut FranklinAccountsStates,
-        transactions: &Vec<FranklinTransaction>,
+        transactions: &[FranklinTransaction],
     ) -> Result<(), DataRestoreError> {
         // let mut state = accounts_state::FranklinAccountsStates::new(config);
         println!("Start accounts state updating");

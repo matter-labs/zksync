@@ -38,25 +38,24 @@ impl FranklinTransaction {
             franklin_transaction_type: tx_type,
             block_number: franklin_block.block_num,
             ethereum_transaction: transaction,
-            commitment_data: commitment_data,
+            commitment_data,
         };
         Some(this)
     }
 
     fn get_ethereum_transaction(
         config: &DataRestoreConfig,
-        transaction_hash: &H256,
+        &transaction_hash: &H256,
     ) -> Option<Transaction> {
-        let tx_id = TransactionId::Hash(transaction_hash.clone());
+        let tx_id = TransactionId::Hash(transaction_hash);
         let (_eloop, transport) =
             web3::transports::Http::new(config.web3_endpoint.as_str()).ok()?;
         let web3 = web3::Web3::new(transport);
         let web3_transaction = web3.eth().transaction(tx_id).wait();
-        let tx = match web3_transaction {
+        match web3_transaction {
             Ok(tx) => tx,
             Err(_) => None,
-        };
-        tx
+        }
     }
 
     fn get_input_data_from_ethereum_transaction(transaction: &Transaction) -> Vec<u8> {

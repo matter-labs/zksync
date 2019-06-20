@@ -16,7 +16,7 @@ pub struct PlasmaState {
 impl PlasmaState {
     pub fn empty() -> Self {
         let tree_depth = params::BALANCE_TREE_DEPTH as u32;
-        let mut balance_tree = AccountTree::new(tree_depth);
+        let balance_tree = AccountTree::new(tree_depth);
         Self {
             balance_tree,
             block_number: 0,

@@ -55,3 +55,9 @@ impl RuntimeConfig {
         }
     }
 }
+
+impl Default for RuntimeConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}

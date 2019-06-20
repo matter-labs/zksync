@@ -31,7 +31,7 @@ fn run_committer(
 
     let eth_client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
     let current_nonce = eth_client.current_nonce().expect("can not get nonce");
-    storage.prepare_nonce_scheduling(&eth_client.current_sender(), current_nonce);
+    let _ = storage.prepare_nonce_scheduling(&eth_client.current_sender(), current_nonce);
 
     let mut last_verified_block = storage.get_last_verified_block().expect("db failed");
     loop {

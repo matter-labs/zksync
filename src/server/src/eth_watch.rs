@@ -194,7 +194,7 @@ impl EthWatch {
 
     fn process_single_deposit_batch<T: web3::Transport>(
         &mut self,
-        batch_number: u64,
+        _batch_number: u64,
         channel: &Sender<StateKeeperRequest>,
         web3: &web3::Web3<T>,
         contract: &Contract<T>,
@@ -410,7 +410,7 @@ impl EthWatch {
 
     fn process_single_exit_batch<T: web3::Transport>(
         &mut self,
-        batch_number: u64,
+        _batch_number: u64,
         channel: &Sender<StateKeeperRequest>,
         web3: &web3::Web3<T>,
         contract: &Contract<T>,
@@ -505,7 +505,7 @@ impl EthWatch {
                 () if topic == exit_event_topic => {
                     let account_id = U256::from(event.topics[2]);
                     let existing_record = this_batch.get(&account_id).cloned();
-                    if let Some(record) = existing_record {
+                    if existing_record.is_some() {
                         // double exit should not be possible due to SC
                         return Err("double exit should not be possible due to SC".to_string());
                     } else {
@@ -555,5 +555,6 @@ pub fn start_eth_watch(mut eth_watch: EthWatch, tx_for_blocks: Sender<StateKeepe
         .name("eth_watch".to_string())
         .spawn(move || {
             eth_watch.run(tx_for_blocks);
-        });
+        })
+        .expect("Eth watcher thread");
 }

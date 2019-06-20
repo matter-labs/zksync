@@ -42,7 +42,9 @@ pub struct PlasmaStateKeeper {
     next_block_at_max: Option<SystemTime>,
 }
 
+#[allow(dead_code)]
 type RootHash = H256;
+#[allow(dead_code)]
 type UpdatedAccounts = AccountMap;
 
 impl PlasmaStateKeeper {
@@ -370,7 +372,8 @@ pub fn start_state_keeper(
 ) {
     std::thread::Builder::new()
         .name("state_keeper".to_string())
-        .spawn(move || sk.run(rx_for_blocks, tx_for_commitments));
+        .spawn(move || sk.run(rx_for_blocks, tx_for_commitments))
+        .expect("State keeper thread");
 }
 
 #[test]

@@ -40,6 +40,7 @@ fn sorted_and_padded_for_exits(accounts_updated: AccountMap) -> [u64; config::EX
     tmp
 }
 
+#[allow(dead_code)]
 fn keys_sorted(accounts_updated: AccountMap) -> Vec<u64> {
     let mut acc: Vec<u64> = accounts_updated.keys().map(|&k| u64::from(k)).collect();
     acc.sort();
@@ -63,14 +64,15 @@ fn run_eth_sender(
         let tx = match op.action {
             Action::Commit => {
                 let mut be_bytes: Vec<u8> = vec![];
-                op.block.new_root_hash.into_repr().write_be(&mut be_bytes);
+                op.block
+                    .new_root_hash
+                    .into_repr()
+                    .write_be(&mut be_bytes)
+                    .expect("Write commit bytes");
                 let root = H256::from(U256::from_big_endian(&be_bytes));
 
                 match &op.block.block_data {
-                    BlockData::Transfer {
-                        total_fees,
-                        transactions: _,
-                    } => {
+                    BlockData::Transfer { total_fees, .. } => {
                         // let eth_block_data = EthBlockData::Transfer{
                         //     total_fees:     U128::from_dec_str(&total_fees.to_string()).expect("fee should fit into U128 Ethereum type"),
                         //     public_data:    encoder::encode_transfer_transactions(&block).unwrap(),
@@ -114,10 +116,7 @@ fn run_eth_sender(
                         )
                     }
 
-                    BlockData::Exit {
-                        batch_number,
-                        transactions: _,
-                    } => {
+                    BlockData::Exit { batch_number, .. } => {
                         // let eth_block_data = EthBlockData::Exit{
                         //     batch_number,
                         //     public_data: encoder::encode_exit_transactions(&block).expect("must encode exit block information")
@@ -177,7 +176,7 @@ fn run_eth_sender(
         match tx {
             Ok(hash) => {
                 println!("Commitment tx hash = {:?}", hash);
-                storage.save_operation_tx_hash(
+                let _ = storage.save_operation_tx_hash(
                     op.id.expect("trying to send not stored op?"),
                     format!("{:?}", hash),
                 );
@@ -216,7 +215,8 @@ pub fn start_eth_sender(pool: ConnectionPool) -> Sender<Operation> {
         .name("eth_sender".to_string())
         .spawn(move || {
             run_eth_sender(pool, rx_for_eth, eth_client);
-        });
+        })
+        .expect("Eth sender thread");
 
     tx_for_eth
 }

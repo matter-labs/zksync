@@ -305,7 +305,7 @@ fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpRes
     Ok(HttpResponse::Ok().json(network_status))
 }
 
-fn handle_get_account_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+fn handle_get_account_transactions(_req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     Ok(HttpResponse::Ok().json("{}"))
 }
 
@@ -433,6 +433,7 @@ fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpRespon
     Ok(HttpResponse::Ok().json(response))
 }
 
+#[allow(dead_code)]
 struct GetBlocksQuery {
     pub from_block: Option<u32>,
 }
@@ -627,5 +628,6 @@ pub fn start_api_server(
             println!("Started http server at {}", &bind_to);
             start_status_interval(state.clone());
             sys.run();
-        });
+        })
+        .expect("Api server thread");
 }
