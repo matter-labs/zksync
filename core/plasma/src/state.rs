@@ -1,6 +1,6 @@
 use bigdecimal::{BigDecimal, Zero};
 use merkle_tree::AccountTree;
-use models::plasma::account::Account;
+use models::plasma::account::{Account, ETH_TOKEN_ID};
 use models::plasma::params;
 use models::plasma::tx::{DepositTx, ExitTx, TransferTx};
 use models::plasma::{AccountId, AccountMap, Fr, TransferApplicationError};
@@ -81,7 +81,7 @@ impl PlasmaState {
                 return Err(TransferApplicationError::NonceIsTooLow);
             }
 
-            if from.balance < transacted_amount {
+            if *from.get_balance(ETH_TOKEN_ID) < transacted_amount {
                 //debug!("Insufficient balance");
                 return Err(TransferApplicationError::InsufficientBalance);
             }
@@ -101,11 +101,11 @@ impl PlasmaState {
                 to = existing_to.clone();
             }
 
-            from.balance -= transacted_amount;
+            from.sub_balance(ETH_TOKEN_ID, &transacted_amount);
 
             from.nonce += 1;
             if tx.to != 0 {
-                to.balance += &tx.amount;
+                to.add_balance(ETH_TOKEN_ID, &tx.amount);
             }
 
             self.balance_tree.insert(tx.from, from);
@@ -127,11 +127,11 @@ impl PlasmaState {
             let tx = tx.clone();
             acc.public_key_x = tx.pub_x;
             acc.public_key_y = tx.pub_y;
-            acc.balance = tx.amount;
+            acc.set_balance(ETH_TOKEN_ID, &tx.amount);
             self.balance_tree.insert(tx.account, acc);
         } else {
             let mut acc = existing_acc.unwrap().clone();
-            acc.balance += &tx.amount;
+            acc.add_balance(ETH_TOKEN_ID, &tx.amount);
             self.balance_tree.insert(tx.account, acc);
         }
         Ok(())
@@ -142,9 +142,12 @@ impl PlasmaState {
 
         let mut agumented_tx = tx.clone();
 
-        debug!("Adding account balance to ExitTx, value = {}", acc.balance);
+        debug!(
+            "Adding account balance to ExitTx, value = {}",
+            acc.get_balance(ETH_TOKEN_ID)
+        );
 
-        agumented_tx.amount = acc.balance;
+        agumented_tx.amount = acc.get_balance(ETH_TOKEN_ID).clone();
 
         self.balance_tree.delete(tx.account);
 
