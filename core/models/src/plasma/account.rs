@@ -5,12 +5,28 @@ use crate::{Engine, Fr, PublicKey};
 use bigdecimal::BigDecimal;
 use sapling_crypto::jubjub::{edwards, Unknown};
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub type TokenId = u8;
+
+pub const TOTAL_TOKENS: usize = 256;
+pub const ETH_TOKEN_ID: TokenId = 0;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Account {
-    pub balance: BigDecimal,
+    balances: Vec<BigDecimal>,
     pub nonce: u32,
     pub public_key_x: Fr,
     pub public_key_y: Fr,
+}
+
+impl Default for Account {
+    fn default() -> Self {
+        Self {
+            balances: vec![BigDecimal::default(); TOTAL_TOKENS],
+            nonce: 0,
+            public_key_x: Fr::default(),
+            public_key_y: Fr::default(),
+        }
+    }
 }
 
 impl GetBits for Account {
@@ -36,6 +52,34 @@ impl Account {
             &params::JUBJUB_PARAMS,
         );
         point.map(sapling_crypto::eddsa::PublicKey::<Engine>)
+    }
+
+    fn get_token(&self, token: TokenId) -> &BigDecimal {
+        self.balances
+            .get(usize::from(token))
+            .expect("Token not found")
+    }
+
+    fn get_token_mut(&mut self, token: TokenId) -> &mut BigDecimal {
+        self.balances
+            .get_mut(usize::from(token))
+            .expect("Token not found")
+    }
+
+    pub fn get_balance(&self, token: TokenId) -> &BigDecimal {
+        self.get_token(token)
+    }
+
+    pub fn set_balance(&mut self, token: TokenId, amount: &BigDecimal) {
+        std::mem::replace(self.get_token_mut(token), amount.clone());
+    }
+
+    pub fn add_balance(&mut self, token: TokenId, amount: &BigDecimal) {
+        *self.get_token_mut(token) += amount;
+    }
+
+    pub fn sub_balance(&mut self, token: TokenId, amount: &BigDecimal) {
+        *self.get_token_mut(token) -= amount;
     }
 }
 

@@ -1056,6 +1056,7 @@ mod test {
     use bigdecimal::Num;
     use diesel::Connection;
     use ff::Field;
+    use models::plasma::account::ETH_TOKEN_ID;
     use web3::types::U256;
     //use diesel::RunQueryDsl;
 
@@ -1091,7 +1092,7 @@ mod test {
         let mut accounts = fnv::FnvHashMap::default();
         let acc = |balance| {
             let mut a = models::plasma::account::Account::default();
-            a.balance = BigDecimal::from(balance);
+            a.set_balance(ETH_TOKEN_ID, &BigDecimal::from(balance));
             a
         };
 
@@ -1168,7 +1169,7 @@ mod test {
         let mut accounts = fnv::FnvHashMap::default();
         let acc = |balance| {
             let mut a = models::plasma::account::Account::default();
-            a.balance = BigDecimal::from(balance);
+            a.set_balance(ETH_TOKEN_ID, &BigDecimal::from(balance));
             a
         };
 
@@ -1196,8 +1197,8 @@ mod test {
             conn.last_committed_state_for_account(5)
                 .unwrap()
                 .unwrap()
-                .balance,
-            BigDecimal::from(2)
+                .get_balance(ETH_TOKEN_ID),
+            &BigDecimal::from(2)
         );
 
         conn.execute_operation(&Operation {
@@ -1222,15 +1223,15 @@ mod test {
             conn.last_verified_state_for_account(7)
                 .unwrap()
                 .unwrap()
-                .balance,
-            BigDecimal::from(3)
+                .get_balance(ETH_TOKEN_ID),
+            &BigDecimal::from(3)
         );
         assert_eq!(
             conn.last_committed_state_for_account(7)
                 .unwrap()
                 .unwrap()
-                .balance,
-            BigDecimal::from(3)
+                .get_balance(ETH_TOKEN_ID),
+            &BigDecimal::from(3)
         );
 
         let pending = conn.load_unsent_ops(0).unwrap();
