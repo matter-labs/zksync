@@ -17,6 +17,7 @@ tokio = "0.1"
 bitvec = "0.11"
 log = "0.4"
 env_logger = "0.6"
+signal-hook = { version = "0.1.8", features = ["tokio-support"] }
 
 plasma = { path = "../plasma" }
 models = { path = "../models" }

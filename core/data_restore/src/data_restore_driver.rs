@@ -3,18 +3,13 @@ use crate::block_events::BlockEventsFranklin;
 use crate::blocks::LogBlockData;
 use crate::franklin_transaction::FranklinTransaction;
 use crate::helpers::*;
-use models::plasma::Fr;
-use std::sync::mpsc::Sender;
+use std::fs::File;
+use std::io::{BufWriter, Write};
 use web3::types::U256;
 
-#[allow(dead_code)]
-pub struct ProtoAccountsState {
-    errored: bool,
-    root_hash: Fr,
-}
+const FILENAME: &str = "restored_data.txt";
 
 pub struct DataRestoreDriver {
-    pub channel: Option<Sender<ProtoAccountsState>>,
     pub config: DataRestoreConfig,
     pub genesis_block: U256,
     pub blocks_delta: U256,
@@ -28,10 +23,8 @@ impl DataRestoreDriver {
         config: DataRestoreConfig,
         genesis_block: U256,
         blocks_delta: U256,
-        channel: Option<Sender<ProtoAccountsState>>,
     ) -> Self {
         Self {
-            channel,
             config: config.clone(),
             genesis_block,
             blocks_delta,
@@ -56,20 +49,14 @@ impl DataRestoreDriver {
         // debug!("Accs: {:?}", accs);
         let root = self.account_states.root_hash();
         info!("Root: {:?}", &root);
-        info!("______________");
-
-        if let Some(ref _channel) = self.channel {
-            let state = ProtoAccountsState {
-                errored: false,
-                root_hash: root,
-            };
-            let _send_result = _channel.send(state);
-            if _send_result.is_err() {
-                return Err(DataRestoreError::StateUpdate(
-                    "Cant send last state".to_string(),
-                ));
-            }
+        {
+            let f = File::create(FILENAME).expect("Unable to create file");
+            let mut f = BufWriter::new(f);
+            f
+                .write(format!("Root hash on Franklin block {} is {}\n\nAccounts list: {:?}", self.block_events.verified_blocks.len(), root.to_hex(), self.account_states.plasma_state.get_accounts()).as_bytes())
+                .expect("Unable to write new root");
         }
+        info!("Root saved in file");
         info!("Finished loading past state");
         Ok(())
     }
@@ -113,22 +100,6 @@ impl DataRestoreDriver {
                     "Error occured: {:?}",
                     error
                 )));
-            }
-            let root = self.account_states.root_hash();
-            info!("New root: {:?}", root);
-            info!("______________");
-            if let Some(ref _channel) = self.channel {
-                let state = ProtoAccountsState {
-                    errored: !self.run_updates,
-                    root_hash: root,
-                };
-                let _send_result = _channel.send(state);
-                if _send_result.is_err() {
-                    self.run_updates = false;
-                    err = Some(DataRestoreError::StateUpdate(
-                        "Cant send last state".to_string(),
-                    ));
-                }
             }
         }
         info!("Stopped state updates");
