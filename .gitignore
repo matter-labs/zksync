@@ -12,6 +12,7 @@ yarn-error.log
 target
 env-config.js
 a.out 
+.gitconfig
 
 dist
 npm-debug.log
