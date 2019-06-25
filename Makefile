@@ -300,3 +300,13 @@ tesseracts-up:
 
 tesseracts-down:
 	@docker-compose stop tesseracts
+
+# Key generator 
+
+restore-tree: build-restore-tree run-restore-tree
+
+build-restore-tree:
+	@cargo build -p data_restore --release --bin data_restore
+
+run-restore-tree:
+	@RUST_LOG=INFO ./target/release/data_restore 4 0 15

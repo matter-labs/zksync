@@ -222,7 +222,7 @@ impl FranklinAccountsStates {
                 signature: TxSignature::default(),
                 cached_pub_key: None,
             };
-            info!(
+            debug!(
                 "Transaction from account {:?} to account {:?}, amount = {:?}",
                 from, to, amount
             );
@@ -364,7 +364,7 @@ impl FranklinAccountsStates {
 
         let mut all_deposits = vec![];
         for (k, v) in this_batch.iter() {
-            info!(
+            debug!(
                 "Into account {:?} with public key {:x}, deposit amount = {:?}",
                 k, v.1, v.0
             );
@@ -478,7 +478,7 @@ impl FranklinAccountsStates {
 
         let mut all_exits = vec![];
         for k in this_batch.iter() {
-            info!("Exit from account {:?}", k);
+            debug!("Exit from account {:?}", k);
 
             let tx: ExitTx = ExitTx {
                 account: k.as_u32(),

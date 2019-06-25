@@ -55,8 +55,8 @@ impl DataRestoreDriver {
         // let accs = &self.account_states.get_accounts();
         // debug!("Accs: {:?}", accs);
         let root = self.account_states.root_hash();
-        debug!("Root: {:?}", &root);
-        debug!("______________");
+        info!("Root: {:?}", &root);
+        info!("______________");
 
         if let Some(ref _channel) = self.channel {
             let state = ProtoAccountsState {
@@ -70,7 +70,7 @@ impl DataRestoreDriver {
                 ));
             }
         }
-        debug!("Finished loading past state");
+        info!("Finished loading past state");
         Ok(())
     }
 
@@ -115,8 +115,8 @@ impl DataRestoreDriver {
                 )));
             }
             let root = self.account_states.root_hash();
-            debug!("New root: {:?}", root);
-            debug!("______________");
+            info!("New root: {:?}", root);
+            info!("______________");
             if let Some(ref _channel) = self.channel {
                 let state = ProtoAccountsState {
                     errored: !self.run_updates,
@@ -131,7 +131,7 @@ impl DataRestoreDriver {
                 }
             }
         }
-        debug!("Stopped state updates");
+        info!("Stopped state updates");
         err
     }
 
@@ -173,11 +173,11 @@ impl DataRestoreDriver {
             blocks_delta,
         )
         .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-        debug!(
+        info!(
             "Got past events state till ethereum block: {:?}",
             &events.last_watched_block_number
         );
-        debug!(
+        info!(
             "Committed franklin blocks count: {:?}",
             &events.committed_blocks.len()
         );
@@ -185,7 +185,7 @@ impl DataRestoreDriver {
             "Last committed franklin block: {:?}",
             &events.committed_blocks.last()
         );
-        debug!(
+        info!(
             "Verified franklin blocks count: {:?}",
             &events.verified_blocks.len()
         );
@@ -252,20 +252,20 @@ impl DataRestoreDriver {
             match ne {
                 Ok(result) => new_events = result,
                 Err(error) => {
-                    debug!("Got no events: {:?}", error);
+                    info!("Got no events: {:?}", error);
                     continue;
                 }
             }
             if new_events.1.is_empty() {
-                debug!("No new verified blocks");
+                info!("No new verified blocks");
                 continue;
             // return Err(DataRestoreError::NoData("No verified blocks".to_string()))
             } else {
-                debug!(
+                info!(
                     "Got new events state till ethereum block: {:?}",
                     &data_restore_driver.block_events.last_watched_block_number
                 );
-                debug!(
+                info!(
                     "Committed franklin blocks count: {:?}",
                     &data_restore_driver.block_events.committed_blocks.len()
                 );
@@ -273,7 +273,7 @@ impl DataRestoreDriver {
                     "Last committed franklin block: {:?}",
                     &data_restore_driver.block_events.committed_blocks.last()
                 );
-                debug!(
+                info!(
                     "Verified franklin blocks count: {:?}",
                     &data_restore_driver.block_events.verified_blocks.len()
                 );
