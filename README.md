@@ -89,9 +89,9 @@ Client UI will be available at http://localhost:8080
 
 ## Database migrations
 
-- ```cd src/storage```
+- ```cd core/storage```
 - Add diesel migration
-- Rename `src/storage/schema.rs.generated` to `schema.rs`
+- Rename `core/storage/schema.rs.generated` to `schema.rs`
 - Run tests: ```franklin db-tests```
 
 ## Generating keys

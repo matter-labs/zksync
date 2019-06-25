@@ -1,0 +1,16 @@
+[package]
+name = "plasma"
+version = "0.1.1"
+edition = "2018"
+
+authors = [
+    "Alex Gluchowski <alex@gluchowski.net>",
+    "Alex Vlasov <alex.m.vlasov@gmail.com>"
+]
+
+[dependencies]
+models = { path = "../models" }
+merkle_tree = { path = "../merkle_tree" }
+bigdecimal = { version = "0.1.0", features = ["serde"]}
+log = "0.4"
+
