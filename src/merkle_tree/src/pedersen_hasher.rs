@@ -3,8 +3,8 @@
 use ff::PrimeField;
 use franklin_crypto::pedersen_hash::{baby_pedersen_hash, Personalization};
 
-use pairing::bn256::Bn256;
 use franklin_crypto::alt_babyjubjub::{AltJubjubBn256, JubjubEngine};
+use pairing::bn256::Bn256;
 
 use crate::hasher::Hasher;
 use models::primitives::BitIteratorLe;

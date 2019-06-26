@@ -1,11 +1,11 @@
 use ff::{BitIterator, PrimeField};
-use models::plasma::circuit::sig::TransactionSignature;
-use models::plasma::circuit::utils::le_bit_vector_into_field_element;
-use models::plasma::params as plasma_constants;
 use franklin_crypto::circuit::boolean;
 use franklin_crypto::circuit::num::AllocatedNum;
 use franklin_crypto::eddsa::{PrivateKey, PublicKey};
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
+use models::plasma::circuit::sig::TransactionSignature;
+use models::plasma::circuit::utils::le_bit_vector_into_field_element;
+use models::plasma::params as plasma_constants;
 // This is transaction data
 
 #[derive(Clone)]

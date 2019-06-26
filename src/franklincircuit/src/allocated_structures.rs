@@ -1,8 +1,8 @@
 use crate::account;
 use crate::account::{AccountContentBase, AccountContentBitForm, AccountWitness};
-use franklinmodels::params as franklin_constants;
 use crate::operation::{Operation, OperationBranch, OperationBranchWitness};
 use crate::utils;
+use franklinmodels::params as franklin_constants;
 
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use ff::{Field, PrimeField};

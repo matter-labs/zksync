@@ -7,12 +7,12 @@ use circuit::CircuitAccountTree;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
+use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use franklin_crypto::circuit::test::*;
 use hex::encode;
 use pairing::bn256::*;
 use pairing::Engine;
 use rand::{Rng, SeedableRng, XorShiftRng};
-use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-use franklin_crypto::circuit::test::*;
 use std::collections::HashMap;
 
 use crate::vk_contract_generator::hardcode_vk;

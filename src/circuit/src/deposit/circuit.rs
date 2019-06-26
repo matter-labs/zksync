@@ -2,11 +2,11 @@ use crate::deposit::deposit_request::DepositRequest;
 use crate::leaf::{make_leaf_content, LeafWitness};
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use ff::{Field, PrimeField};
-use models::plasma::circuit::utils::{allocate_audit_path, append_packed_public_key};
-use models::plasma::params as plasma_constants;
 use franklin_crypto::circuit::num::{AllocatedNum, Num};
 use franklin_crypto::circuit::{boolean, ecc, num, pedersen_hash, sha256, Assignment};
 use franklin_crypto::jubjub::JubjubEngine;
+use models::plasma::circuit::utils::{allocate_audit_path, append_packed_public_key};
+use models::plasma::params as plasma_constants;
 
 #[derive(Clone)]
 pub struct DepositWitness<E: JubjubEngine> {
@@ -530,11 +530,11 @@ mod test {
     fn test_deposit_in_empty_leaf() {
         use crate::CircuitAccountTree;
         use ff::{BitIterator, Field};
+        use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+        use franklin_crypto::circuit::test::*;
         use models::plasma::circuit::account::CircuitAccount;
         use pairing::bn256::*;
         use rand::{Rng, SeedableRng, XorShiftRng};
-        use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-        use franklin_crypto::circuit::test::*;
         // use super::super::account_tree::{AccountTree, Account};
         use models::plasma::circuit::utils::be_bit_vector_into_bytes;
 
@@ -714,11 +714,11 @@ mod test {
     fn test_deposit_into_existing_leaf() {
         use crate::CircuitAccountTree;
         use ff::{BitIterator, Field};
+        use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+        use franklin_crypto::circuit::test::*;
         use models::plasma::circuit::account::CircuitAccount;
         use pairing::bn256::*;
         use rand::{Rng, SeedableRng, XorShiftRng};
-        use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-        use franklin_crypto::circuit::test::*;
         // use super::super::account_tree::{AccountTree, Account};
         use models::plasma::circuit::utils::be_bit_vector_into_bytes;
 

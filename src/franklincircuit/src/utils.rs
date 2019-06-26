@@ -1,12 +1,72 @@
 use bellman::{ConstraintSystem, SynthesisError};
 use ff::{BitIterator, Field, PrimeField};
-use franklin_crypto::jubjub::JubjubEngine;
 
 use franklin_crypto::circuit::boolean;
 use franklin_crypto::circuit::num::{AllocatedNum, Num};
 use franklin_crypto::circuit::Assignment;
+use franklin_crypto::eddsa::{PrivateKey, PublicKey};
+use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
 
+use crate::operation::TransactionSignature;
 use franklinmodels::params as franklin_constants;
+
+pub fn sign<R, E>(
+    msg_data: &[bool],
+    private_key: &PrivateKey<E>,
+    p_g: FixedGenerators,
+    params: &E::Params,
+    rng: &mut R,
+) -> Option<TransactionSignature<E>>
+where
+    R: rand::Rng,
+    E: JubjubEngine,
+{
+    let raw_data: Vec<bool> = msg_data.to_vec();
+
+    let mut message_bytes: Vec<u8> = vec![];
+
+    let byte_chunks = raw_data.chunks(8);
+    for byte_chunk in byte_chunks {
+        let mut byte = 0u8;
+        for (i, bit) in byte_chunk.iter().enumerate() {
+            if *bit {
+                byte |= 1 << i;
+            }
+        }
+        message_bytes.push(byte);
+    }
+    println!("message_len {}", message_bytes.len());
+    let max_message_len = 10 as usize; //todo
+    let signature = private_key.sign_raw_message(&message_bytes, rng, p_g, params, max_message_len);
+
+    let pk = PublicKey::from_private(&private_key, p_g, params);
+    let is_valid_signature = pk.verify_for_raw_message(
+        &message_bytes,
+        &signature.clone(),
+        p_g,
+        params,
+        max_message_len,
+    );
+    if !is_valid_signature {
+        return None;
+    }
+
+    let mut sigs_le_bits: Vec<bool> = BitIterator::new(signature.s.into_repr()).collect();
+    sigs_le_bits.reverse();
+
+    let sigs_converted = le_bit_vector_into_field_element(&sigs_le_bits);
+
+    // let mut sigs_bytes = [0u8; 32];
+    // signature.s.into_repr().write_le(& mut sigs_bytes[..]).expect("get LE bytes of signature S");
+    // let mut sigs_repr = E::Fr::zero().into_repr();
+    // sigs_repr.read_le(&sigs_bytes[..]).expect("interpret S as field element representation");
+    // let sigs_converted = E::Fr::from_repr(sigs_repr).unwrap();
+
+    Some(TransactionSignature {
+        r: signature.r,
+        s: sigs_converted,
+    })
+}
 
 // count a number of non-zero bits in a bit decomposition
 pub fn count_number_of_ones<E, CS>(

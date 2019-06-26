@@ -7,8 +7,8 @@ pub mod tx;
 pub use web3::types::{H256, U128, U256};
 
 // use merkle_tree::{PedersenHasher, SparseMerkleTree};
-use pairing::bn256;
 use franklin_crypto::eddsa;
+use pairing::bn256;
 
 pub use crate::plasma::account::Account;
 pub use crate::plasma::tx::{DepositTx, ExitTx, TransferTx, TxSignature};

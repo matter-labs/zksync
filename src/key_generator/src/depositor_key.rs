@@ -2,9 +2,9 @@ use bellman;
 
 use time::PreciseTime;
 
+use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use pairing::bn256::*;
 use rand::OsRng;
-use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 
 use bellman::groth16::generate_random_parameters;
 

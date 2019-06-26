@@ -34,8 +34,6 @@ pub struct Operation<E: JubjubEngine> {
     pub tx_type: Option<E::Fr>,
     pub chunk: Option<E::Fr>,
     pub pubdata_chunk: Option<E::Fr>,
-    pub a: Option<E::Fr>,
-    pub b: Option<E::Fr>,
     pub signer_pub_key_x: Option<E::Fr>,
     pub signer_pub_key_y: Option<E::Fr>,
     pub sig_msg: Option<E::Fr>,

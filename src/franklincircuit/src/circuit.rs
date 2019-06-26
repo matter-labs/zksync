@@ -1,6 +1,7 @@
-use franklinmodels::params as franklin_constants;
 use crate::account::{AccountContentBase, AccountContentBitForm, AccountWitness};
 use crate::allocated_structures::*;
+use crate::operation::{Operation, OperationBranch, OperationBranchWitness};
+use crate::utils::append_packed_public_key;
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use ff::{Field, PrimeField};
 use franklin_crypto::circuit::baby_eddsa::EddsaSignature;
@@ -12,10 +13,9 @@ use franklin_crypto::circuit::pedersen_hash;
 use franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
 use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
-use crate::operation::{Operation, OperationBranch, OperationBranchWitness};
+use franklinmodels::params as franklin_constants;
 use pairing::bn256::Bn256;
 use pairing::Engine;
-use crate::utils::append_packed_public_key;
 
 const OPERATION_NUMBER: usize = 4;
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 11;
@@ -27,9 +27,6 @@ struct FranklinCircuit<'a, E: JubjubEngine> {
 
     /// The new root of the tree
     pub new_root: Option<E::Fr>,
-
-    /// Final truncated rolling SHA256
-    pub public_data_commitment: Option<E::Fr>,
 
     pub operations: Vec<Operation<E>>,
 }
@@ -61,26 +58,10 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         let initial_pubdata =
             AllocatedNum::alloc(cs.namespace(|| "initial pubdata"), || Ok(E::Fr::zero()))?;
         initial_pubdata.assert_zero(cs.namespace(|| "initial pubdata is zero"))?;
-        let mut computed = Computed::<E> {
-            // last_chunk: None,
-            // chunk_number: None,
-            pubdata: initial_pubdata,
-            range_checked: None,
-            new_pubkey_hash: None,
-            cur: None,
-        };
 
-        let rolling_root =
+        let mut rolling_root =
             AllocatedNum::alloc(cs.namespace(|| "rolling_root"), || self.old_root.grab())?;
 
-        let initial_new_root =
-            AllocatedNum::alloc(cs.namespace(|| "zero initial previous new root"), || {
-                Ok(E::Fr::zero())
-            })?;
-        initial_new_root.assert_zero(cs.namespace(|| "initial new_root"))?;
-        let prev = PreviousData {
-            new_root: initial_new_root,
-        };
         let mut next_chunk_number =
             AllocatedNum::alloc(cs.namespace(|| "next_chunk_number"), || Ok(E::Fr::zero()))?;
         next_chunk_number.assert_zero(cs.namespace(|| "initial next_chunk_number"))?;
@@ -90,16 +71,15 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             AllocatedNum::alloc(cs.namespace(|| "initial rolling_pubdata"), || {
                 Ok(E::Fr::zero())
             })?;
-        allocated_rolling_pubdata.assert_zero(cs.namespace(|| "initial next_chunk_number"))?;
+        allocated_rolling_pubdata
+            .assert_zero(cs.namespace(|| "initial allocated_rolling_pubdata"))?;
 
         for (i, operation) in self.operations.iter().enumerate() {
             let cs = &mut cs.namespace(|| format!("chunk number {}", i));
 
             let (next_chunk, chunk_data) = self.verify_correct_chunking(
                 &operation,
-                &prev,
                 &mut next_chunk_number,
-                i,
                 cs.namespace(|| "verify_correct_chunking"),
             )?;
             allocated_chunk_data = chunk_data;
@@ -124,6 +104,11 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             )?;
             let (state_root, is_account_empty) = self
                 .check_account_data(cs.namespace(|| "calculate account root"), &current_branch)?;
+            println!("state_root: {}", state_root.get_value().unwrap());
+            println!(
+                "is_account_empty: {}",
+                is_account_empty.get_value().unwrap()
+            );
             cs.enforce(
                 || "root state before applying operation is valid",
                 |lc| lc + state_root.get_variable(),
@@ -144,6 +129,15 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             )?;
             let operation_new_root =
                 AllocatedNum::alloc(cs.namespace(|| "op_new_root"), || operation.new_root.grab())?;
+            //TODO inputize
+
+            cs.enforce(
+                || "new root is correct",
+                |lc| lc + new_state_root.get_variable(),
+                |lc| lc + CS::one(),
+                |lc| lc + operation_new_root.get_variable(),
+            );
+            rolling_root = new_state_root;
         }
         //TODO enforce correct block new root
         Ok(())
@@ -153,9 +147,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
     fn verify_correct_chunking<CS: ConstraintSystem<E>>(
         &self,
         op: &Operation<E>,
-        _prev: &PreviousData<E>,
         next_chunk_number: &AllocatedNum<E>,
-        _index: usize,
         mut cs: CS,
     ) -> Result<(AllocatedNum<E>, AllocatedChunkData<E>), SynthesisError> {
         let tx_type = AllocatedNum::alloc(cs.namespace(|| "tx_type"), || op.tx_type.grab())?;
@@ -403,17 +395,15 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         cur: &AllocatedOperationBranch<E>,
     ) -> Result<(AllocatedNum<E>, Boolean), SynthesisError> {
         //first we prove calculate root of the subtree to obtain account_leaf_data:
-        let (cur_account_leaf_hash, is_account_empty) = self.allocate_account_leaf_hash(
+        let (cur_account_leaf_bits, is_account_empty) = self.allocate_account_leaf_bits(
             cs.namespace(|| "allocate current_account_leaf_hash"),
             cur,
         )?;
-        let leaf_bits =
-            &cur_account_leaf_hash.into_bits_le(cs.namespace(|| "cur_account_leaf_hash_bits"))?;
 
         Ok((
             allocate_merkle_root(
                 cs.namespace(|| "account_merkle_root"),
-                leaf_bits,
+                &cur_account_leaf_bits,
                 &cur.bits.account_address,
                 &cur.base.account_audit_path,
                 self.params,
@@ -505,7 +495,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             AllocatedNum::alloc(cs.namespace(|| "signer_pub_y"), || {
                 op.signer_pub_key_y.grab()
             })?;
-        
+
         let sender_pk = ecc::EdwardsPoint::interpret(
             cs.namespace(|| "sender public key"),
             &allocated_signer_pubkey_x,
@@ -556,7 +546,10 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         new_pubkey_x_bits.truncate(1);
 
         let mut new_pubkey_y_bits = new_pubkey_y.into_bits_le(cs.namespace(|| "new_pub_y_bits"))?;
-        new_pubkey_y_bits.truncate(franklin_constants::FR_BIT_WIDTH - 1);
+        new_pubkey_y_bits.resize(
+            franklin_constants::FR_BIT_WIDTH - 1,
+            Boolean::Constant(false),
+        );
 
         let mut new_pubkey_bits = vec![];
         append_packed_public_key(&mut new_pubkey_bits, new_pubkey_x_bits, new_pubkey_y_bits);
@@ -761,11 +754,11 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         Ok(tx_valid)
     }
-    fn allocate_account_leaf_hash<CS: ConstraintSystem<E>>(
+    fn allocate_account_leaf_bits<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
         branch: &AllocatedOperationBranch<E>,
-    ) -> Result<(AllocatedNum<E>, Boolean), SynthesisError> {
+    ) -> Result<(Vec<Boolean>, Boolean), SynthesisError> {
         //first we prove calculate root of the subtree to obtain account_leaf_data:
         let mut subtree_data = vec![];
         let balance_data = &branch.bits.balance_value;
@@ -792,7 +785,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let subtree_root = pedersen_hash::pedersen_hash(
             cs.namespace(|| "subtree_root"),
-            pedersen_hash::Personalization::NoteCommitment,
+            pedersen_hash::Personalization::MerkleTree(*franklin_constants::BALANCE_TREE_DEPTH),
             &subtree_data,
             self.params,
         )?
@@ -834,17 +827,17 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         account_data.extend(subtree_root.into_bits_le(cs.namespace(|| "subtree_root_bits"))?);
 
-        //TODO: assert_eq length of account_data
+        // //TODO: assert_eq length of account_data
 
-        let account_leaf_hash = pedersen_hash::pedersen_hash(
-            cs.namespace(|| "account leaf content hash"),
-            pedersen_hash::Personalization::NoteCommitment,//TODO change personalization
-            &account_data,
-            self.params,
-        )?
-        .get_x()
-        .clone();
-        Ok((account_leaf_hash.clone(), Boolean::from(is_account_empty)))
+        // let account_leaf_hash = pedersen_hash::pedersen_hash(
+        //     cs.namespace(|| "account leaf content hash"),
+        //     pedersen_hash::Personalization::NoteCommitment, //TODO change personalization
+        //     &account_data,
+        //     self.params,
+        // )?
+        // .get_x()
+        // .clone();
+        Ok((account_data, Boolean::from(is_account_empty)))
     }
 }
 
@@ -863,10 +856,10 @@ fn allocate_merkle_root<E: JubjubEngine, CS: ConstraintSystem<E>>(
         &leaf_bits,
         params,
     )?;
-
     // This is an injective encoding, as cur is a
     // point in the prime order subgroup.
     let mut cur_hash = account_leaf_hash.get_x().clone();
+    println!("leaf_hash: {}", cur_hash.get_value().unwrap());
 
     // Ascend the merkle tree authentication path
     for (i, direction_bit) in index.clone().into_iter().enumerate() {
@@ -907,154 +900,6 @@ fn allocate_merkle_root<E: JubjubEngine, CS: ConstraintSystem<E>>(
     }
 
     Ok(cur_hash.clone())
-}
-
-// returns a bit vector with ones up to the first point of divergence
-fn find_common_prefix<E, CS>(
-    mut cs: CS,
-    a: &[Boolean],
-    b: &[Boolean],
-) -> Result<Vec<Boolean>, SynthesisError>
-where
-    E: JubjubEngine,
-    CS: ConstraintSystem<E>,
-{
-    assert_eq!(a.len(), b.len());
-
-    // initiall divergence did NOT happen yet
-
-    let mut no_divergence_bool = Boolean::Constant(true);
-
-    let mut mask_bools = vec![];
-
-    for (i, (a_bit, b_bit)) in a.iter().zip(b.iter()).enumerate() {
-        // on common prefix mean a == b AND divergence_bit
-
-        // a == b -> NOT (a XOR b)
-
-        let a_xor_b = Boolean::xor(
-            cs.namespace(|| format!("Common prefix a XOR b {}", i)),
-            &a_bit,
-            &b_bit,
-        )?;
-
-        let mask_bool = Boolean::and(
-            cs.namespace(|| format!("Common prefix mask bit {}", i)),
-            &a_xor_b.not(),
-            &no_divergence_bool,
-        )?;
-
-        // is no_divergence_bool == true: mask_bool = a == b
-        // else: mask_bool == false
-        // -->
-        // if mask_bool == false: divergence = divergence AND mask_bool
-
-        no_divergence_bool = Boolean::and(
-            cs.namespace(|| format!("recalculate divergence bit {}", i)),
-            &no_divergence_bool,
-            &mask_bool,
-        )?;
-
-        mask_bools.push(no_divergence_bool.clone());
-    }
-
-    Ok(mask_bools)
-}
-
-fn find_intersection_point<E, CS>(
-    mut cs: CS,
-    from_path_bits: Vec<Boolean>,
-    to_path_bits: Vec<Boolean>,
-    audit_path_from: &[AllocatedNum<E>],
-    audit_path_to: &[AllocatedNum<E>],
-    tree_depth: usize,
-) -> Result<Vec<Boolean>, SynthesisError>
-where
-    E: JubjubEngine,
-    CS: ConstraintSystem<E>,
-{
-    assert_eq!(audit_path_from.len(), audit_path_to.len());
-    assert_eq!(audit_path_from.len(), tree_depth);
-
-    // Intersection point is the only element required in outside scope
-    let mut intersection_point_lc = Num::<E>::zero();
-
-    let mut bitmap_path_from = from_path_bits.clone();
-    bitmap_path_from.reverse();
-
-    let mut bitmap_path_to = to_path_bits.clone();
-    bitmap_path_to.reverse();
-
-    let common_prefix = find_common_prefix(
-        cs.namespace(|| "common prefix search"),
-        &bitmap_path_from,
-        &bitmap_path_to,
-    )?;
-
-    // common prefix is reversed because it's enumerated from the root, while
-    // audit path is from the leafs
-
-    let mut common_prefix_reversed = common_prefix.clone();
-    common_prefix_reversed.reverse();
-
-    // Common prefix is found, not we enforce equality of
-    // audit path elements on a common prefix
-
-    for (i, bitmask_bit) in common_prefix_reversed.into_iter().enumerate() {
-        let path_element_from = &audit_path_from[i];
-        let path_element_to = &audit_path_to[i];
-
-        cs.enforce(
-            || format!("enforce audit path equality for {}", i),
-            |lc| lc + path_element_from.get_variable() - path_element_to.get_variable(),
-            |_| bitmask_bit.lc(CS::one(), E::Fr::one()),
-            |lc| lc,
-        );
-    }
-
-    // Now we have to find a "point of intersection"
-    // Good for us it's just common prefix interpreted as binary number + 1
-    // and bit decomposed
-
-    let mut coeff = E::Fr::one();
-    for bit in common_prefix.into_iter() {
-        intersection_point_lc = intersection_point_lc.add_bool_with_coeff(CS::one(), &bit, coeff);
-        coeff.double();
-    }
-
-    // and add one
-    intersection_point_lc = intersection_point_lc.add_bool_with_coeff(
-        CS::one(),
-        &Boolean::Constant(true),
-        E::Fr::one(),
-    );
-
-    // Intersection point is a number with a single bit that indicates how far
-    // from the root intersection is
-
-    let intersection_point =
-        AllocatedNum::alloc(cs.namespace(|| "intersection as number"), || {
-            Ok(*intersection_point_lc.get_value().get()?)
-        })?;
-
-    cs.enforce(
-        || "pack intersection",
-        |lc| lc + intersection_point.get_variable(),
-        |lc| lc + CS::one(),
-        |_| intersection_point_lc.lc(E::Fr::one()),
-    );
-
-    // Intersection point into bits to use for root recalculation
-    let mut intersection_point_bits =
-        intersection_point.into_bits_le(cs.namespace(|| "unpack intersection"))?;
-
-    // truncating guarantees that even if the common prefix coincides everywhere
-    // up to the last bit, it can still be properly used in next actions
-    intersection_point_bits.truncate(tree_depth);
-    // reverse cause bits here are counted from root, and later we need from the leaf
-    intersection_point_bits.reverse();
-
-    Ok(intersection_point_bits)
 }
 
 fn select_vec_ifeq<E: JubjubEngine, CS: ConstraintSystem<E>>(
@@ -1146,166 +991,316 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
     interpolation
 }
 
+#[cfg(test)]
+mod test {
 
-// #[cfg(test)]
-// mod tests {
+    use super::*;
+    use ff::PrimeFieldRepr;
+    use franklin_crypto::jubjub::FixedGenerators;
 
-//     use super::*;
-//     use franklin_crypto::circuit::test::TestConstraintSystem;
+    use franklin_crypto::eddsa::{PrivateKey, PublicKey};
 
-//     #[test]
-//     fn test_circuit_success() {
-//         let mut cs = TestConstraintSystem::<Bn256>::new();
+    #[test]
+    fn test_deposit_franklin_in_empty_leaf() {
+        use crate::operation::*;
+        use crate::utils::*;
+        use ff::{BitIterator, Field};
+        use franklin_crypto::alt_babyjubjub::{AltJubjubBn256, JubjubEngine};
+        use franklin_crypto::circuit::test::*;
+        use franklinmodels::circuit::account::{Balance, CircuitAccount, Subaccount};
+        use franklinmodels::{CircuitAccountTree, CircuitBalanceTree, CircuitSubaccountTree};
+        use merkle_tree::hasher::Hasher;
+        use merkle_tree::{PedersenHasher, SparseMerkleTree};
+        use pairing::bn256::*;
+        use rand::{Rng, SeedableRng, XorShiftRng};
+        // use super::super::account_tree::{AccountTree, Account};
+        use franklin_crypto::circuit::float_point::convert_to_float;
 
-//         let c = FranklinCircuit {
-//             old_root: None,
-//             new_root: None,
-//             public_data_commitment: None,
-//             operations: vec![
-//                 Operation::<Bn256>::with_id("0", "1"),
-//                 Operation::<Bn256>::with_id("1", "1"),
-//                 Operation::<Bn256>::with_id("2", "1"),
-//                 Operation::<Bn256>::with_id("3", "1"),
-//             ],
-//         };
+        use crypto::digest::Digest;
+        use crypto::sha2::Sha256;
+        use hex;
 
-//         c.synthesize(&mut cs).expect("synthesis failed");
-//         let unconstrained = cs.find_unconstrained();
-//         println!("{}", unconstrained);
-//         assert!(unconstrained == "");
-//         dbg!(cs.find_unconstrained());
-//         dbg!(cs.num_constraints());
-//         dbg!(cs.num_inputs());
+        let params = &AltJubjubBn256::new();
+        let p_g = FixedGenerators::SpendingKeyGenerator;
 
-//         if let Some(token) = cs.which_is_unsatisfied() {
-//             eprintln!("Error: {} is unsatisfied", token);
-//         }
-//         assert!(cs.is_satisfied());
+        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+        let mut balance_tree =
+            CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
+        let balance_root = balance_tree.root_hash();
+        let mut subaccount_tree =
+            CircuitSubaccountTree::new(*franklin_constants::SUBACCOUNT_TREE_DEPTH as u32);
+        let subaccount_root = subaccount_tree.root_hash();
+        let phasher = PedersenHasher::<Bn256>::default();
+        let default_subtree_hash = phasher.compress(
+            &balance_root,
+            &subaccount_root,
+            *franklin_constants::BALANCE_TREE_DEPTH,
+        );
+        let zero_account = CircuitAccount {
+            nonce: Fr::zero(),
+            pub_x: Fr::zero(),
+            pub_y: Fr::zero(),
+            subtree_root_hash: default_subtree_hash,
+        };
+        let mut tree = CircuitAccountTree::new_with_leaf(
+            *franklin_constants::ACCOUNT_TREE_DEPTH as u32,
+            zero_account,
+        );
+        let initial_root = tree.root_hash();
+        println!("Initial root = {}", initial_root);
 
-//         let mut cs = TestConstraintSystem::<Bn256>::new();
+        let capacity = tree.capacity();
+        assert_eq!(capacity, 1 << *franklin_constants::ACCOUNT_TREE_DEPTH);
 
-//         let c = FranklinCircuit {
-//             old_root: None,
-//             new_root: None,
-//             public_data_commitment: None,
-//             operations: vec![
-//                 Operation::<Bn256>::with_id("0", "7"),
-//                 Operation::<Bn256>::with_id("1", "7"),
-//                 Operation::<Bn256>::with_id("0", "7"),
-//                 Operation::<Bn256>::with_id("1", "7"),
-//             ],
-//         };
+        let sender_sk = PrivateKey::<Bn256>(rng.gen());
+        let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
+        let (sender_x, sender_y) = sender_pk.0.into_xy();
+        println!("x = {}, y = {}", sender_x, sender_y);
 
-//         c.synthesize(&mut cs).expect("synthesis failed");
-//         let unconstrained = cs.find_unconstrained();
-//         println!("{}", unconstrained);
-//         assert!(unconstrained == "");
-//         dbg!(cs.num_constraints());
-//         dbg!(cs.num_inputs());
+        // give some funds to sender and make zero balance for recipient
 
-//         if let Some(token) = cs.which_is_unsatisfied() {
-//             eprintln!("Error: {} is unsatisfied", token);
-//         }
-//         assert!(cs.is_satisfied())
-//     }
-//     #[test]
-//     fn test_circuit_failures() {
-//         let mut cs = TestConstraintSystem::<Bn256>::new();
+        // let sender_leaf_number = 1;
 
-//         let c = FranklinCircuit {
-//             old_root: None,
-//             new_root: None,
-//             public_data_commitment: None,
-//             operations: vec![
-//                 Operation::<Bn256>::with_id("0", "1"),
-//                 Operation::<Bn256>::with_id("1", "1"),
-//                 Operation::<Bn256>::with_id("2", "1"),
-//                 Operation::<Bn256>::with_id("2", "1"),
-//             ],
-//         };
+        let mut sender_leaf_number: u32 = rng.gen();
+        sender_leaf_number %= capacity;
+        let sender_leaf_number_fe = Fr::from_str(&sender_leaf_number.to_string()).unwrap();
+        println!(
+            "old leaf hash is {}",
+            tree.get_hash((
+                *franklin_constants::ACCOUNT_TREE_DEPTH as u32,
+                sender_leaf_number
+            ))
+        );
+        let transfer_amount: u128 = 500;
 
-//         c.synthesize(&mut cs).expect("synthesis failed");
-//         dbg!(cs.find_unconstrained());
-//         dbg!(cs.num_constraints());
-//         dbg!(cs.num_inputs());
+        let transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
 
-//         if let Some(token) = cs.which_is_unsatisfied() {
-//             eprintln!("Error: {} is unsatisfied", token);
-//         }
-//         assert!(!cs.is_satisfied());
+        let transfer_amount_bits = convert_to_float(
+            transfer_amount,
+            *franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+            *franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
+            10,
+        )
+        .unwrap();
 
-//         let mut cs = TestConstraintSystem::<Bn256>::new();
+        let transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
 
-//         let c = FranklinCircuit {
-//             old_root: None,
-//             new_root: None,
-//             public_data_commitment: None,
-//             operations: vec![
-//                 Operation::<Bn256>::with_id("1", "1"),
-//                 Operation::<Bn256>::with_id("2", "1"),
-//                 Operation::<Bn256>::with_id("3", "1"),
-//                 Operation::<Bn256>::with_id("0", "5"),
-//             ],
-//         };
+        let transfer_compact_amount_bits = convert_to_float(
+            transfer_amount,
+            *franklin_constants::COMPACT_AMOUNT_EXPONENT_BIT_WIDTH,
+            *franklin_constants::COMPACT_AMOUNT_MANTISSA_BIT_WIDTH,
+            10,
+        )
+        .unwrap();
 
-//         c.synthesize(&mut cs).expect("synthesis failed");
-//         dbg!(cs.find_unconstrained());
-//         dbg!(cs.num_constraints());
-//         dbg!(cs.num_inputs());
+        let transfer_compact_amount_encoded: Fr =
+            le_bit_vector_into_field_element(&transfer_compact_amount_bits);
 
-//         if let Some(token) = cs.which_is_unsatisfied() {
-//             eprintln!("Error: {} is unsatisfied", token);
-//         }
-//         assert!(!cs.is_satisfied());
+        let fee: u128 = 0;
 
-//         let mut cs = TestConstraintSystem::<Bn256>::new();
+        let fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
 
-//         let c = FranklinCircuit {
-//             old_root: None,
-//             new_root: None,
-//             public_data_commitment: None,
-//             operations: vec![
-//                 Operation::<Bn256>::with_id("0", "1"),
-//                 Operation::<Bn256>::with_id("1", "1"),
-//                 Operation::<Bn256>::with_id("2", "1"),
-//                 Operation::<Bn256>::with_id("4", "1"),
-//             ],
-//         };
+        let fee_bits = convert_to_float(
+            fee,
+            *franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+            *franklin_constants::FEE_MANTISSA_BIT_WIDTH,
+            10,
+        )
+        .unwrap();
 
-//         c.synthesize(&mut cs).expect("synthesis failed");
-//         //NUM.rs
-//         dbg!(cs.find_unconstrained());
-//         dbg!(cs.num_constraints());
-//         dbg!(cs.num_inputs());
+        let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
 
-//         if let Some(token) = cs.which_is_unsatisfied() {
-//             eprintln!("Error: {} is unsatisfied", token);
-//         }
-//         assert!(!cs.is_satisfied());
+        let token: u32 = 2;
+        let token_fe = Fr::from_str(&token.to_string()).unwrap();
 
-//         let mut cs = TestConstraintSystem::<Bn256>::new();
+        let subaccount_number: u32 = 2;
+        let subaccount_number_fe = Fr::from_str(&subaccount_number.to_string()).unwrap();
 
-//         let c = FranklinCircuit {
-//             old_root: None,
-//             new_root: None,
-//             public_data_commitment: None,
-//             operations: vec![
-//                 Operation::<Bn256>::with_id("0", "17"),
-//                 Operation::<Bn256>::with_id("1", "17"),
-//                 Operation::<Bn256>::with_id("2", "17"),
-//                 Operation::<Bn256>::with_id("3", "17"),
-//             ],
-//         };
+        balance_tree.insert(
+            token,
+            Balance {
+                value: transfer_amount_as_field_element,
+            },
+        );
+        let after_deposit_balance_root = balance_tree.root_hash();
 
-//         c.synthesize(&mut cs).expect("synthesis failed");
-//         //NUM.rs
-//         dbg!(cs.find_unconstrained());
-//         dbg!(cs.num_constraints());
-//         dbg!(cs.num_inputs());
+        let after_deposit_subtree_hash = phasher.compress(
+            &after_deposit_balance_root,
+            &subaccount_root,
+            *franklin_constants::BALANCE_TREE_DEPTH,
+        );
 
-//         if let Some(token) = cs.which_is_unsatisfied() {
-//             eprintln!("Error: {} is unsatisfied", token);
-//         }
-//         assert!(!cs.is_satisfied());
-//     }
-// }
+        let sender_leaf = CircuitAccount::<Bn256> {
+            subtree_root_hash: after_deposit_subtree_hash.clone(),
+            nonce: Fr::zero(),
+            pub_x: sender_x.clone(),
+            pub_y: sender_y.clone(),
+        };
+
+        tree.insert(sender_leaf_number, sender_leaf.clone());
+        let new_root = tree.root_hash();
+
+        println!("New root = {}", new_root);
+
+        assert!(initial_root != new_root);
+        println!(
+            "updated leaf hash is {}",
+            tree.get_hash((
+                *franklin_constants::ACCOUNT_TREE_DEPTH as u32,
+                sender_leaf_number
+            ))
+        );
+
+        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
+        let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
+        sig_bits.reverse();
+        sig_bits.truncate(80);
+
+        // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
+        let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
+        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+
+        let audit_path: Vec<Option<Fr>> = tree
+            .merkle_path(sender_leaf_number)
+            .into_iter()
+            .map(|e| Some(e.0))
+            .collect();
+
+        let audit_balance_path: Vec<Option<Fr>> = balance_tree
+            .merkle_path(token)
+            .into_iter()
+            .map(|e| Some(e.0))
+            .collect();
+        let audit_subaccount_path: Vec<Option<Fr>> = subaccount_tree
+            .merkle_path(token)
+            .into_iter()
+            .map(|e| Some(e.0))
+            .collect();
+
+        let op_args = OperationArguments {
+            a: Some(transfer_amount_as_field_element.clone()),
+            b: Some(fee_as_field_element.clone()),
+            amount: Some(transfer_amount_encoded.clone()),
+            fee: Some(fee_encoded.clone()),
+            compact_amount: Some(transfer_compact_amount_encoded.clone()),
+            new_pub_x: Some(sender_x.clone()),
+            new_pub_y: Some(sender_y.clone()),
+        };
+        let operation_branch_before = OperationBranch {
+            address: Some(sender_leaf_number_fe),
+            token: Some(token_fe),
+            subaccount_number: Some(subaccount_number_fe),
+            witness: OperationBranchWitness {
+                account_witness: AccountWitness {
+                    nonce: Some(Fr::zero()),
+                    pub_x: Some(Fr::zero()),
+                    pub_y: Some(Fr::zero()),
+                },
+                account_path: audit_path.clone(),
+                balance_value: Some(Fr::zero()),
+                balance_subtree_path: audit_balance_path.clone(),
+                dummmy_subaccount_value: Some(Fr::zero()),
+                subaccount_path: audit_subaccount_path.clone(),
+            },
+        };
+        let operation_branch_after = OperationBranch::<Bn256> {
+            address: Some(sender_leaf_number_fe),
+            token: Some(token_fe),
+            subaccount_number: Some(subaccount_number_fe),
+            witness: OperationBranchWitness {
+                account_witness: AccountWitness {
+                    nonce: Some(Fr::zero()),
+                    pub_x: Some(sender_x.clone()),
+                    pub_y: Some(sender_y.clone()),
+                },
+                account_path: audit_path.clone(),
+                balance_value: Some(transfer_amount_as_field_element.clone()),
+                balance_subtree_path: audit_balance_path.clone(),
+                dummmy_subaccount_value: Some(Fr::zero()),
+                subaccount_path: audit_subaccount_path.clone(),
+            },
+        };
+        let operation_zero = Operation {
+            new_root: Some(new_root.clone()),
+            tx_type: Some(Fr::from_str("1").unwrap()),
+            chunk: Some(Fr::from_str("0").unwrap()),
+            pubdata_chunk: Some(Fr::from_str("1").unwrap()),
+            sig_msg: Some(sig_msg.clone()),
+            signature: signature.clone(),
+            signer_pub_key_x: Some(sender_x.clone()),
+            signer_pub_key_y: Some(sender_y.clone()),
+            args: op_args.clone(),
+            lhs: operation_branch_before.clone(),
+            rhs: operation_branch_before.clone(),
+        };
+
+        let operation_one = Operation {
+            new_root: Some(new_root.clone()),
+            tx_type: Some(Fr::from_str("1").unwrap()),
+            chunk: Some(Fr::from_str("1").unwrap()),
+            pubdata_chunk: Some(Fr::from_str("1").unwrap()),
+            sig_msg: Some(sig_msg.clone()),
+            signature: signature.clone(),
+            signer_pub_key_x: Some(sender_x.clone()),
+            signer_pub_key_y: Some(sender_y.clone()),
+            args: op_args.clone(),
+            lhs: operation_branch_after.clone(),
+            rhs: operation_branch_after.clone(),
+        };
+
+        let operation_two = Operation {
+            new_root: Some(new_root.clone()),
+            tx_type: Some(Fr::from_str("1").unwrap()),
+            chunk: Some(Fr::from_str("2").unwrap()),
+            pubdata_chunk: Some(Fr::from_str("1").unwrap()),
+            sig_msg: Some(sig_msg.clone()),
+            signature: signature.clone(),
+            signer_pub_key_x: Some(sender_x.clone()),
+            signer_pub_key_y: Some(sender_y.clone()),
+            args: op_args.clone(),
+            lhs: operation_branch_after.clone(),
+            rhs: operation_branch_after.clone(),
+        };
+
+        let operation_three = Operation {
+            new_root: Some(new_root.clone()),
+            tx_type: Some(Fr::from_str("1").unwrap()),
+            chunk: Some(Fr::from_str("3").unwrap()),
+            pubdata_chunk: Some(Fr::from_str("1").unwrap()),
+            sig_msg: Some(sig_msg.clone()),
+            signature: signature.clone(),
+            signer_pub_key_x: Some(sender_x.clone()),
+            signer_pub_key_y: Some(sender_y.clone()),
+            args: op_args.clone(),
+            lhs: operation_branch_after.clone(),
+            rhs: operation_branch_after.clone(),
+        };
+
+        {
+            let mut cs = TestConstraintSystem::<Bn256>::new();
+
+            let instance = FranklinCircuit {
+                params,
+                old_root: Some(initial_root),
+                new_root: Some(new_root),
+                operations: vec![
+                    operation_zero,
+                    operation_one,
+                    operation_two,
+                    operation_three,
+                ],
+            };
+
+            instance.synthesize(&mut cs).unwrap();
+
+            println!("{}", cs.find_unconstrained());
+
+            println!("{}", cs.num_constraints());
+
+            let err = cs.which_is_unsatisfied();
+            if err.is_some() {
+                panic!("ERROR satisfying in {}", err.unwrap());
+            }
+        }
+    }
+}

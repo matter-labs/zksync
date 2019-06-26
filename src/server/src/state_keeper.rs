@@ -2,13 +2,13 @@ use pairing::bn256::Bn256;
 // use franklin_crypto::jubjub::{FixedGenerators};
 // use franklin_crypto::alt_babyjubjub::{AltJubjubBn256};
 
+use franklin_crypto::eddsa::PrivateKey;
 use models::plasma::account::Account;
 use models::plasma::block::{Block, BlockData};
 use models::plasma::tx::{DepositTx, ExitTx, TransferTx};
 use models::plasma::{AccountId, AccountMap, BatchNumber};
 use plasma::state::PlasmaState;
 use rayon::prelude::*;
-use franklin_crypto::eddsa::PrivateKey;
 use std::collections::VecDeque;
 use web3::types::H256;
 

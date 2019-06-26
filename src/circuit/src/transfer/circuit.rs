@@ -3,13 +3,13 @@ use crate::leaf::{make_leaf_content, LeafContent};
 use crate::transfer::transaction::{Transaction, TransactionContent};
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use ff::{Field, PrimeField};
-use models::plasma::circuit::utils::{allocate_audit_path, append_packed_public_key};
-use models::plasma::params as plasma_constants;
 use franklin_crypto::circuit::baby_eddsa::EddsaSignature;
 use franklin_crypto::circuit::float_point::parse_with_exponent_le;
 use franklin_crypto::circuit::num::{AllocatedNum, Num};
 use franklin_crypto::circuit::{boolean, ecc, num, pedersen_hash, sha256, Assignment};
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
+use models::plasma::circuit::utils::{allocate_audit_path, append_packed_public_key};
+use models::plasma::params as plasma_constants;
 
 #[derive(Clone)]
 pub struct TransactionWitness<E: JubjubEngine> {
@@ -1135,8 +1135,8 @@ mod test {
 
     use super::*;
     use ff::{BitIterator, PrimeFieldRepr};
-    use models::plasma::circuit::utils::le_bit_vector_into_field_element;
     use franklin_crypto::circuit::float_point::convert_to_float;
+    use models::plasma::circuit::utils::le_bit_vector_into_field_element;
 
     #[test]
     fn test_bits_into_fr() {
@@ -1154,12 +1154,12 @@ mod test {
     fn test_transfer_circuit_with_witness() {
         use crate::CircuitAccountTree;
         use ff::Field;
-        use models::plasma::circuit::account::CircuitAccount;
-        use pairing::bn256::*;
-        use rand::{Rng, SeedableRng, XorShiftRng};
         use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
         use franklin_crypto::circuit::test::*;
         use franklin_crypto::eddsa::{PrivateKey, PublicKey};
+        use models::plasma::circuit::account::CircuitAccount;
+        use pairing::bn256::*;
+        use rand::{Rng, SeedableRng, XorShiftRng};
         // use super::super::account_tree::{AccountTree, Account};
         use crypto::digest::Digest;
         use crypto::sha2::Sha256;

@@ -11,8 +11,8 @@ use std::env;
 use std::str::FromStr;
 use std::sync::mpsc::Sender;
 
-use models::config;
 use franklin_crypto::jubjub::{edwards, Unknown};
+use models::config;
 use std::time;
 use web3::contract::{Contract, Options};
 use web3::futures::Future;

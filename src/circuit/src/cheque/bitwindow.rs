@@ -463,11 +463,11 @@ mod test {
         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof,
     };
     use ff::{BitIterator, Field, PrimeField};
-    use pairing::bn256::*;
-    use rand::{Rng, SeedableRng, XorShiftRng};
     use franklin_crypto::{
         alt_babyjubjub::AltJubjubBn256, circuit::test::*, interpolation::evaluate_at_x,
     };
+    use pairing::bn256::*;
+    use rand::{Rng, SeedableRng, XorShiftRng};
 
     #[test]
     fn test_redeem() {
