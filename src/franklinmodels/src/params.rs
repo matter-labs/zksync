@@ -6,10 +6,15 @@ pub const ACCOUNT_TREE_DEPTH: &'static usize = &24;
 /// Account subtree depth
 pub const ACCOUNT_SUBTREE_DEPTH: &'static usize = &9;
 
-/// Account subtree hash width
-pub const SUBTREE_HASH_WIDTH: &'static usize = &256; //seems to be equal to Bn256::NUM_BITS
+/// Balance tree depth
+pub const BALANCE_TREE_DEPTH: &'static usize = &8;
 
-/// Account bit width
+/// Balance tree depth
+pub const SUBACCOUNT_TREE_DEPTH: &'static usize = &8;
+/// Account subtree hash width
+pub const SUBTREE_HASH_WIDTH: &'static usize = &256; //seems to be equal to Bn256::NUM_BITS could be replaced
+
+/// balance bit width
 pub const BALANCE_BIT_WIDTH: &'static usize = &128;
 
 pub const NEW_PUBKEY_HASH_WIDTH: &'static usize = &160;

@@ -843,7 +843,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let account_leaf_hash = pedersen_hash::pedersen_hash(
             cs.namespace(|| "account leaf content hash"),
-            pedersen_hash::Personalization::NoteCommitment,
+            pedersen_hash::Personalization::NoteCommitment,//TODO change personalization
             &account_data,
             self.params,
         )?

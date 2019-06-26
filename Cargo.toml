@@ -11,4 +11,6 @@ members = [
     "src/server",
     "src/storage",
     "src/circuit",
+    "src/franklincircuit",
+    "src/franklinmodels",
 ]

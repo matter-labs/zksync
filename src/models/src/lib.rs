@@ -6,7 +6,6 @@ extern crate lazy_static;
 pub mod abi;
 pub mod config;
 pub mod plasma;
-pub mod franklin;
 pub mod primitives;
 
 use crate::plasma::block::Block;

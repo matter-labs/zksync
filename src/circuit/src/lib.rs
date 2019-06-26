@@ -5,7 +5,6 @@ pub mod exit;
 pub mod leaf;
 pub mod plasma_constants;
 pub mod transfer;
-pub mod franklin;
 
 use merkle_tree::{PedersenHasher, SparseMerkleTree};
 use models::plasma::circuit::account::CircuitAccount;
