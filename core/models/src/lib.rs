@@ -96,13 +96,13 @@ pub struct Operation {
 }
 
 pub enum ProtoBlock {
-    Transfer,
+    Transfer(Vec<TransferTx>),
     Deposit(BatchNumber, Vec<DepositTx>),
     Exit(BatchNumber, Vec<ExitTx>),
 }
 
 pub enum StateKeeperRequest {
-    AddTransferTx(Box<TransferTx>, Sender<TransferTxResult>),
+    AddTransferTx(Box<TransferTx>, Sender<Result<(), String>>),
     AddBlock(ProtoBlock),
     GetAccount(u32, Sender<Option<Account>>),
     GetNetworkStatus(Sender<NetworkStatus>),
