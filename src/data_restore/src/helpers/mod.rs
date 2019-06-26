@@ -4,7 +4,7 @@ use ethabi::Contract;
 use models::abi::{PROD_PLASMA, TEST_PLASMA_ALWAYS_VERIFY};
 use models::config::RuntimeConfig;
 use models::plasma::params as plasma_constants;
-use sapling_crypto::circuit::float_point::parse_float_to_u128;
+use franklin_crypto::circuit::float_point::parse_float_to_u128;
 use tiny_keccak::keccak256;
 use web3::types::{Address, H256};
 

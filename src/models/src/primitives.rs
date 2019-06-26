@@ -3,7 +3,7 @@ use ff::ScalarEngine;
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
 use pairing::bn256::Bn256;
 use pairing::{CurveAffine, Engine};
-use sapling_crypto::jubjub::{edwards, JubjubEngine, Unknown};
+use franklin_crypto::jubjub::{edwards, JubjubEngine, Unknown};
 use web3::types::U256;
 
 // TODO: replace Vec with Iterator?

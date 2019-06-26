@@ -20,7 +20,7 @@ impl<E: JubjubEngine> std::default::Default for CircuitAccount<E> {
         let subaccount_tree = CircuitSubaccountTree::new(*params::SUBACCOUNT_TREE_DEPTH as u32);
         let balance_root = balance_tree.root_hash();
         let subaccount_root = subaccount_tree.root_hash();
-        let hasher =PedersenHasher::<E>::default();
+        // let hasher = PedersenHasher::<E>::default();
         Self {
             subtree_root_hash: E::Fr::zero(),
             nonce: E::Fr::zero(),

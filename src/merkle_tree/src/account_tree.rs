@@ -3,7 +3,7 @@
 
 use ff::Field;
 use pairing::bn256::{Bn256, Fr};
-use sapling_crypto::alt_babyjubjub::JubjubEngine;
+use franklin_crypto::alt_babyjubjub::JubjubEngine;
 
 use crate::merkle_tree::PedersenHasher;
 use crate::merkle_tree::SparseMerkleTree;

@@ -12,7 +12,7 @@ authors = [
 models = { path = "../models" }
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
 pairing = { package = "pairing_ce", version = "0.17.0" }
-sapling_crypto = { package = "sapling-crypto_ce", version = "0.0.5" }
+franklin_crypto = { package = "franklin-crypto", git = "ssh://git@github.com/matter-labs/franklin-crypto.git" }
 fnv = "1.0.3"
 rayon = "1.0.3"
 rand = "0.4"

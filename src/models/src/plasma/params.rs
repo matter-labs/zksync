@@ -32,7 +32,7 @@ pub const SPECIAL_ACCOUNT_EXIT: u32 = 0;
 // to this account virtually padded by the smart-contract
 pub const SPECIAL_ACCOUNT_DEPOSIT: u32 = 1;
 
-use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
+use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();

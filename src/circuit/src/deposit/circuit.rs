@@ -4,9 +4,9 @@ use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use ff::{Field, PrimeField};
 use models::plasma::circuit::utils::{allocate_audit_path, append_packed_public_key};
 use models::plasma::params as plasma_constants;
-use sapling_crypto::circuit::num::{AllocatedNum, Num};
-use sapling_crypto::circuit::{boolean, ecc, num, pedersen_hash, sha256, Assignment};
-use sapling_crypto::jubjub::JubjubEngine;
+use franklin_crypto::circuit::num::{AllocatedNum, Num};
+use franklin_crypto::circuit::{boolean, ecc, num, pedersen_hash, sha256, Assignment};
+use franklin_crypto::jubjub::JubjubEngine;
 
 #[derive(Clone)]
 pub struct DepositWitness<E: JubjubEngine> {
@@ -522,9 +522,9 @@ mod test {
 
     use super::*;
     use ff::PrimeFieldRepr;
-    use sapling_crypto::jubjub::FixedGenerators;
+    use franklin_crypto::jubjub::FixedGenerators;
 
-    use sapling_crypto::eddsa::{PrivateKey, PublicKey};
+    use franklin_crypto::eddsa::{PrivateKey, PublicKey};
 
     #[test]
     fn test_deposit_in_empty_leaf() {
@@ -533,8 +533,8 @@ mod test {
         use models::plasma::circuit::account::CircuitAccount;
         use pairing::bn256::*;
         use rand::{Rng, SeedableRng, XorShiftRng};
-        use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
-        use sapling_crypto::circuit::test::*;
+        use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+        use franklin_crypto::circuit::test::*;
         // use super::super::account_tree::{AccountTree, Account};
         use models::plasma::circuit::utils::be_bit_vector_into_bytes;
 
@@ -717,8 +717,8 @@ mod test {
         use models::plasma::circuit::account::CircuitAccount;
         use pairing::bn256::*;
         use rand::{Rng, SeedableRng, XorShiftRng};
-        use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
-        use sapling_crypto::circuit::test::*;
+        use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+        use franklin_crypto::circuit::test::*;
         // use super::super::account_tree::{AccountTree, Account};
         use models::plasma::circuit::utils::be_bit_vector_into_bytes;
 

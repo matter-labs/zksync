@@ -1,6 +1,6 @@
 use ff::{BitIterator, PrimeField};
 use models::plasma::params as plasma_constants;
-use sapling_crypto::jubjub::JubjubEngine;
+use franklin_crypto::jubjub::JubjubEngine;
 
 // This is an exit request
 

@@ -1,6 +1,6 @@
 use pairing::bn256::Bn256;
-// use sapling_crypto::jubjub::{FixedGenerators};
-// use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
+// use franklin_crypto::jubjub::{FixedGenerators};
+// use franklin_crypto::alt_babyjubjub::{AltJubjubBn256};
 
 use models::plasma::account::Account;
 use models::plasma::block::{Block, BlockData};
@@ -8,7 +8,7 @@ use models::plasma::tx::{DepositTx, ExitTx, TransferTx};
 use models::plasma::{AccountId, AccountMap, BatchNumber};
 use plasma::state::PlasmaState;
 use rayon::prelude::*;
-use sapling_crypto::eddsa::PrivateKey;
+use franklin_crypto::eddsa::PrivateKey;
 use std::collections::VecDeque;
 use web3::types::H256;
 
@@ -396,6 +396,6 @@ fn test_read_private_key() {
         &private_key,
     );
 
-    //let pub_key = PublicKey::from_private(private_key, FixedGenerators::SpendingKeyGenerator, &params::JUBJUB_PARAMS as &sapling_crypto::alt_babyjubjub::AltJubjubBn256);
+    //let pub_key = PublicKey::from_private(private_key, FixedGenerators::SpendingKeyGenerator, &params::JUBJUB_PARAMS as &franklin_crypto::alt_babyjubjub::AltJubjubBn256);
     //assert!( tx.verify_sig(&pub_key) );
 }

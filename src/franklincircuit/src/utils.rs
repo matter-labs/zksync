@@ -6,7 +6,7 @@ use franklin_crypto::circuit::boolean;
 use franklin_crypto::circuit::num::{AllocatedNum, Num};
 use franklin_crypto::circuit::Assignment;
 
-use crate::franklin::franklin_constants;
+use franklinmodels::params as franklin_constants;
 
 // count a number of non-zero bits in a bit decomposition
 pub fn count_number_of_ones<E, CS>(

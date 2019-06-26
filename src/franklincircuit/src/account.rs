@@ -1,5 +1,5 @@
-use crate::franklin::franklin_constants;
-use crate::franklin::utils::append_packed_public_key;
+use franklinmodels::params as franklin_constants;
+use crate::utils::append_packed_public_key;
 use franklin_crypto::jubjub::JubjubEngine;
 
 use bellman::{ConstraintSystem, SynthesisError};

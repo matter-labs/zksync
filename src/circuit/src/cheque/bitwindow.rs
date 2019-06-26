@@ -1,9 +1,9 @@
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use ff::{Field, PrimeField};
-use sapling_crypto::circuit::num::{AllocatedNum, Num};
-use sapling_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
-use sapling_crypto::circuit::{boolean, Assignment};
-use sapling_crypto::jubjub::JubjubEngine;
+use franklin_crypto::circuit::num::{AllocatedNum, Num};
+use franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
+use franklin_crypto::circuit::{boolean, Assignment};
+use franklin_crypto::jubjub::JubjubEngine;
 
 #[derive(Clone)]
 pub struct BitWindowWitness<E: JubjubEngine> {
@@ -47,7 +47,7 @@ fn generate_bit_lookup_polynomial<E: JubjubEngine>(
     min_with_shift: u128,
     max_with_shift: u128,
 ) -> Vec<E::Fr> {
-    use sapling_crypto::interpolation::interpolate;
+    use franklin_crypto::interpolation::interpolate;
 
     let mut points: Vec<(E::Fr, E::Fr)> = vec![];
     let two = E::Fr::from_str("2").unwrap();
@@ -82,7 +82,7 @@ fn generate_shift_bitmask_polynomial<E: JubjubEngine>(
     min_with_shift: u128,
     max_with_shift: u128,
 ) -> Vec<E::Fr> {
-    use sapling_crypto::interpolation::interpolate;
+    use franklin_crypto::interpolation::interpolate;
 
     let mut points: Vec<(E::Fr, E::Fr)> = vec![];
     for i in min_no_shift..min_with_shift {
@@ -114,7 +114,7 @@ fn generate_correctness_polynomial<E: JubjubEngine>(
     max_valid: u128,
     full_range: u128,
 ) -> Vec<E::Fr> {
-    use sapling_crypto::interpolation::interpolate;
+    use franklin_crypto::interpolation::interpolate;
 
     let mut points: Vec<(E::Fr, E::Fr)> = vec![];
     for i in min_valid..=max_valid {
@@ -142,7 +142,7 @@ fn generate_start_adjustment_polynomial<E: JubjubEngine>(
     min_with_shift: u128,
     max_with_shift: u128,
 ) -> Vec<E::Fr> {
-    use sapling_crypto::interpolation::interpolate;
+    use franklin_crypto::interpolation::interpolate;
 
     let mut points: Vec<(E::Fr, E::Fr)> = vec![];
     for i in min_no_shift..min_with_shift {
@@ -465,7 +465,7 @@ mod test {
     use ff::{BitIterator, Field, PrimeField};
     use pairing::bn256::*;
     use rand::{Rng, SeedableRng, XorShiftRng};
-    use sapling_crypto::{
+    use franklin_crypto::{
         alt_babyjubjub::AltJubjubBn256, circuit::test::*, interpolation::evaluate_at_x,
     };
 

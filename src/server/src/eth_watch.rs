@@ -12,7 +12,7 @@ use std::str::FromStr;
 use std::sync::mpsc::Sender;
 
 use models::config;
-use sapling_crypto::jubjub::{edwards, Unknown};
+use franklin_crypto::jubjub::{edwards, Unknown};
 use std::time;
 use web3::contract::{Contract, Options};
 use web3::futures::Future;

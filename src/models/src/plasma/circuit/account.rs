@@ -1,7 +1,7 @@
 use crate::plasma::params;
 use crate::primitives::{GetBits, GetBitsFixed};
 use ff::{Field, PrimeField};
-use sapling_crypto::alt_babyjubjub::JubjubEngine;
+use franklin_crypto::alt_babyjubjub::JubjubEngine;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CircuitAccount<E: JubjubEngine> {

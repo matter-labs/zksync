@@ -1,4 +1,4 @@
-use crate::franklin::account::{AccountContentBase, AccountContentBitForm, AccountWitness};
+use crate::account::{AccountContentBase, AccountContentBitForm, AccountWitness};
 use ff::{Field, PrimeField};
 use franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
 use franklin_crypto::circuit::num::AllocatedNum;

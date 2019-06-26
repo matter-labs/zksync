@@ -5,11 +5,11 @@ use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use ff::{Field, PrimeField};
 use models::plasma::circuit::utils::{allocate_audit_path, append_packed_public_key};
 use models::plasma::params as plasma_constants;
-use sapling_crypto::circuit::baby_eddsa::EddsaSignature;
-use sapling_crypto::circuit::float_point::parse_with_exponent_le;
-use sapling_crypto::circuit::num::{AllocatedNum, Num};
-use sapling_crypto::circuit::{boolean, ecc, num, pedersen_hash, sha256, Assignment};
-use sapling_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
+use franklin_crypto::circuit::baby_eddsa::EddsaSignature;
+use franklin_crypto::circuit::float_point::parse_with_exponent_le;
+use franklin_crypto::circuit::num::{AllocatedNum, Num};
+use franklin_crypto::circuit::{boolean, ecc, num, pedersen_hash, sha256, Assignment};
+use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
 
 #[derive(Clone)]
 pub struct TransactionWitness<E: JubjubEngine> {
@@ -1136,7 +1136,7 @@ mod test {
     use super::*;
     use ff::{BitIterator, PrimeFieldRepr};
     use models::plasma::circuit::utils::le_bit_vector_into_field_element;
-    use sapling_crypto::circuit::float_point::convert_to_float;
+    use franklin_crypto::circuit::float_point::convert_to_float;
 
     #[test]
     fn test_bits_into_fr() {
@@ -1157,9 +1157,9 @@ mod test {
         use models::plasma::circuit::account::CircuitAccount;
         use pairing::bn256::*;
         use rand::{Rng, SeedableRng, XorShiftRng};
-        use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
-        use sapling_crypto::circuit::test::*;
-        use sapling_crypto::eddsa::{PrivateKey, PublicKey};
+        use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+        use franklin_crypto::circuit::test::*;
+        use franklin_crypto::eddsa::{PrivateKey, PublicKey};
         // use super::super::account_tree::{AccountTree, Account};
         use crypto::digest::Digest;
         use crypto::sha2::Sha256;

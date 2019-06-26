@@ -4,7 +4,7 @@ use time::PreciseTime;
 
 use pairing::bn256::*;
 use rand::OsRng;
-use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
+use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 
 use bellman::groth16::generate_random_parameters;
 

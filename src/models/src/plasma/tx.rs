@@ -11,9 +11,9 @@ use crate::plasma::{PrivateKey, PublicKey};
 use crate::primitives::{get_bits_le_fixed_u128, pack_bits_into_bytes};
 use bigdecimal::{BigDecimal, ToPrimitive};
 use ff::PrimeField;
-use sapling_crypto::circuit::float_point::convert_to_float;
-use sapling_crypto::eddsa::Signature;
-use sapling_crypto::jubjub::{edwards, FixedGenerators, JubjubEngine, Unknown};
+use franklin_crypto::circuit::float_point::convert_to_float;
+use franklin_crypto::eddsa::Signature;
+use franklin_crypto::jubjub::{edwards, FixedGenerators, JubjubEngine, Unknown};
 
 use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
 

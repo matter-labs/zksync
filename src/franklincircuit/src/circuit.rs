@@ -1,11 +1,6 @@
-mod account;
-mod allocated_structures;
-mod operation;
-mod utils;
-
-use models::franklin::params as franklin_constants;
-use account::{AccountContentBase, AccountContentBitForm, AccountWitness};
-use allocated_structures::*;
+use franklinmodels::params as franklin_constants;
+use crate::account::{AccountContentBase, AccountContentBitForm, AccountWitness};
+use crate::allocated_structures::*;
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use ff::{Field, PrimeField};
 use franklin_crypto::circuit::baby_eddsa::EddsaSignature;
@@ -17,10 +12,10 @@ use franklin_crypto::circuit::pedersen_hash;
 use franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
 use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
-use operation::{Operation, OperationBranch, OperationBranchWitness};
+use crate::operation::{Operation, OperationBranch, OperationBranchWitness};
 use pairing::bn256::Bn256;
 use pairing::Engine;
-use utils::append_packed_public_key;
+use crate::utils::append_packed_public_key;
 
 const OPERATION_NUMBER: usize = 4;
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 11;

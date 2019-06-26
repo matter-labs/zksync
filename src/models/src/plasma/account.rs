@@ -3,7 +3,7 @@ use crate::plasma::params;
 use crate::primitives::GetBits;
 use crate::{Engine, Fr, PublicKey};
 use bigdecimal::BigDecimal;
-use sapling_crypto::jubjub::{edwards, Unknown};
+use franklin_crypto::jubjub::{edwards, Unknown};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Account {
@@ -35,7 +35,7 @@ impl Account {
             self.public_key_y,
             &params::JUBJUB_PARAMS,
         );
-        point.map(sapling_crypto::eddsa::PublicKey::<Engine>)
+        point.map(franklin_crypto::eddsa::PublicKey::<Engine>)
     }
 }
 
