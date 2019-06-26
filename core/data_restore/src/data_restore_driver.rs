@@ -19,11 +19,7 @@ pub struct DataRestoreDriver {
 }
 
 impl DataRestoreDriver {
-    pub fn new(
-        config: DataRestoreConfig,
-        genesis_block: U256,
-        blocks_delta: U256,
-    ) -> Self {
+    pub fn new(config: DataRestoreConfig, genesis_block: U256, blocks_delta: U256) -> Self {
         Self {
             config: config.clone(),
             genesis_block,
@@ -52,9 +48,16 @@ impl DataRestoreDriver {
         {
             let f = File::create(FILENAME).expect("Unable to create file");
             let mut f = BufWriter::new(f);
-            f
-                .write(format!("Root hash on Franklin block {} is {}\n\nAccounts list: {:?}", self.block_events.verified_blocks.len(), root.to_hex(), self.account_states.plasma_state.get_accounts()).as_bytes())
-                .expect("Unable to write new root");
+            f.write(
+                format!(
+                    "Root hash on Franklin block {} is {}\n\nAccounts list: {:?}",
+                    self.block_events.verified_blocks.len(),
+                    root.to_hex(),
+                    self.account_states.plasma_state.get_accounts()
+                )
+                .as_bytes(),
+            )
+            .expect("Unable to write new root");
         }
         info!("Root saved in file");
         info!("Finished loading past state");

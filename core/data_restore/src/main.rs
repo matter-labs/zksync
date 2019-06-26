@@ -54,13 +54,19 @@ fn main() {
 
     let args: Vec<String> = env::args().collect();
 
-    let infura_endpoint_id = u8::from_str(&args[1]).expect("Network endpoint should be convertible to u8");
+    let infura_endpoint_id =
+        u8::from_str(&args[1]).expect("Network endpoint should be convertible to u8");
     info!("Network number is {}", &infura_endpoint_id);
     let config = match infura_endpoint_id {
-        1 => Some(helpers::DataRestoreConfig::new(helpers::InfuraEndpoint::Mainnet)),
-        4 => Some(helpers::DataRestoreConfig::new(helpers::InfuraEndpoint::Rinkeby)),
+        1 => Some(helpers::DataRestoreConfig::new(
+            helpers::InfuraEndpoint::Mainnet,
+        )),
+        4 => Some(helpers::DataRestoreConfig::new(
+            helpers::InfuraEndpoint::Rinkeby,
+        )),
         _ => None,
-    }.expect("It's acceptable only 1 for Mainnet and 4 for Rinkeby networks");
+    }
+    .expect("It's acceptable only 1 for Mainnet and 4 for Rinkeby networks");
     let from = U256::from(0); // It's better not to allow external users to set "from block" parameter. In 99% cases 0(zero) is correct
     let delta = U256::from_str(&args[2]).expect("Blocks delta should be convertible to u256");
     info!("Blocks delta is {}", &delta);
@@ -69,8 +75,6 @@ fn main() {
     load_past_state_for_data_restore_driver(&mut data_restore_driver);
     load_new_states_for_data_restore_driver(&mut data_restore_driver);
 }
-
-
 
 #[cfg(test)]
 mod test {
