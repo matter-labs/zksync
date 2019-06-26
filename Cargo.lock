@@ -538,6 +538,7 @@ dependencies = [
  "plasma 0.1.1",
  "sapling-crypto_ce 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "signal-hook 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "storage 0.0.1",
  "tiny-keccak 1.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "web3 0.7.0 (git+https://github.com/tomusdrw/rust-web3)",

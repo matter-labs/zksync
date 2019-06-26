@@ -19,6 +19,7 @@ use web3::types::Log;
 use crate::franklin_transaction::{FranklinTransaction, FranklinTransactionType};
 use crate::helpers::*;
 
+#[derive(Debug, Clone)]
 pub struct FranklinAccountsStates {
     pub config: DataRestoreConfig,
     pub plasma_state: PlasmaState,

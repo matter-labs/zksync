@@ -21,3 +21,4 @@ signal-hook = { version = "0.1.8", features = ["tokio-support"] }
 
 plasma = { path = "../plasma" }
 models = { path = "../models" }
+storage = { path = "../storage" }

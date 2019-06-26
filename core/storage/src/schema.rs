@@ -69,6 +69,45 @@ table! {
 }
 
 table! {
+    tree_restore_network (id) {
+        id -> Int4,
+    }
+}
+
+table! {
+    tree_restore_last_watched_eth_block (number) {
+        number -> Int4,
+    }
+}
+
+table! {
+    block_events (block_num) {
+        block_type -> Text,
+        transaction_hash -> Text,
+        block_num -> Int4,
+    }
+}
+
+table! {
+    franklin_transactions (block_number) {
+        franklin_transaction_type -> Text,
+        block_number -> Int4,
+        eth_tx_hash -> Text,
+        eth_tx_nonce -> Text,
+        eth_tx_block_hash -> Nullable<Text>,
+        eth_tx_block_number -> Nullable<Text>,
+        eth_tx_transaction_index -> Nullable<Text>,
+        eth_tx_from -> Text,
+        eth_tx_to -> Nullable<Text>,
+        eth_tx_value -> Text,
+        eth_tx_gas_price -> Text,
+        eth_tx_gas -> Text,
+        eth_tx_input -> Bytea,
+        commitment_data -> Bytea,
+    }
+}
+
+table! {
     transactions (id) {
         id -> Int4,
         tx_type -> Text,
@@ -92,5 +131,9 @@ allow_tables_to_appear_in_same_query!(
     proofs,
     prover_runs,
     server_config,
+    tree_restore_network,
+    tree_restore_last_watched_eth_block,
+    block_events,
+    franklin_transactions,
     transactions,
 );
