@@ -76,7 +76,7 @@ table! {
 
 table! {
     tree_restore_last_watched_eth_block (number) {
-        number -> Int4,
+        number -> Text,
     }
 }
 

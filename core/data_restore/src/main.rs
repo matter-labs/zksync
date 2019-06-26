@@ -11,8 +11,12 @@ pub mod helpers;
 use crate::data_restore_driver::DataRestoreDriver;
 use std::env;
 use std::str::FromStr;
+use storage::StoredBlockLog;
+use franklin_transaction::{FranklinTransactionType, FranklinTransaction};
 use storage::ConnectionPool;
-use web3::types::U256;
+use web3::types::{U256, H256, H160, U128, Transaction, Bytes};
+use blocks::{BlockType, LogBlockData};
+use block_events::BlockEventsFranklin;
 
 fn create_new_data_restore_driver(
     config: helpers::DataRestoreConfig,
@@ -94,8 +98,7 @@ fn load_config_from_storage(connection_pool: ConnectionPool) -> Option<helpers::
     let network_id = storage
         .load_tree_restore_network()
         .expect("can not load network")
-        .id
-        .expect("id empty in tree restore network");
+        .id;
     match network_id {
         1 => Some(helpers::DataRestoreConfig::new(
             helpers::InfuraEndpoint::Mainnet,
@@ -111,7 +114,7 @@ fn load_past_state_from_storage(driver: &mut DataRestoreDriver, connection_pool:
     driver.block_events = get_block_events_from_storage(driver.config.clone(), connection_pool.clone());
     let transactions = get_transactions_from_storage(connection_pool.clone());
     for tx in transactions {
-        driver.accounts_state.update_accounts_states_from_transaction(&tx)
+        driver.account_states.update_accounts_states_from_transaction(&tx)
             .expect("Cant update accounts state");
     }
 }
@@ -122,9 +125,9 @@ fn get_transactions_from_storage(connection_pool: ConnectionPool) -> Vec<Frankli
         .expect("db connection failed for past events");
     let committed_txs = storage
         .load_franklin_transactions();
-    let txs: Vec<FranklinTransaction> = vec![];
+    let mut txs: Vec<FranklinTransaction> = vec![];
     for tx in committed_txs {
-        let franklin_transaction_type = match tx.franklin_transaction_type {
+        let franklin_transaction_type = match tx.franklin_transaction_type.as_str() {
             d if d == "Deposit" => FranklinTransactionType::Deposit,
             t if t == "Transfer" => FranklinTransactionType::Transfer,
             e if e == "FullExit" => FranklinTransactionType::FullExit,
@@ -151,7 +154,7 @@ fn get_transactions_from_storage(connection_pool: ConnectionPool) -> Vec<Frankli
                 U128::from_str(x.as_str()).unwrap()
             ),
         };
-        let from = H160::from_str(x.as_str()).unwrap();
+        let from = H160::from_str(tx.eth_tx_from.as_str()).unwrap();
         let to = match tx.eth_tx_to {
             None => None,
             Some(x) => Some(
@@ -190,18 +193,18 @@ fn get_transactions_from_storage(connection_pool: ConnectionPool) -> Vec<Frankli
     txs
 }
 
-pub fn into_block_log(block: &StoredBlockLog) -> Result<LogBlockData> {
+pub fn into_block_log(block: &StoredBlockLog) -> Option<LogBlockData> {
     let mut block_log = LogBlockData {
         block_num: block.block_num as u32,
         transaction_hash: H256::from_str(block.transaction_hash.as_str()).unwrap(),
         block_type: BlockType::Unknown,
     };
-    block_log.block_type = match &block.tx_type {
+    block_log.block_type = match &block.block_type {
         c if c == "Committed" => BlockType::Committed,
         v if v == "Verified" => BlockType::Verified,
-        _ => return Err(Error::NotFound),
+        _ => return None,
     };
-    Ok(block_log)
+    Some(block_log)
 }
 
 fn get_block_events_from_storage(config: helpers::DataRestoreConfig, connection_pool: ConnectionPool) -> BlockEventsFranklin {
@@ -225,11 +228,11 @@ fn get_block_events_from_storage(config: helpers::DataRestoreConfig, connection_
         verified_blocks.push(block_log);
     }
 
-    let last_watched_block_number = storage
+    let last_watched_block_number_string = storage
         .load_last_watched_block_number()
         .expect("load_blocks_events: db must work")
-        .number
-        .expect("number empty last watched eth block number");
+        .number;
+    let last_watched_block_number = U256::from_str(last_watched_block_number_string.as_str()).unwrap();
     
     BlockEventsFranklin {
         config,

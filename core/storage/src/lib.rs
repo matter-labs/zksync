@@ -296,7 +296,7 @@ pub struct TreeRestoreNetwork {
 #[derive(Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
 #[table_name = "tree_restore_last_watched_eth_block"]
 pub struct LastWatchedEthBlockNumber {
-    pub number: i32,
+    pub number: String,
 }
 
 // #[derive(Insertable)]
