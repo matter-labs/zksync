@@ -93,7 +93,8 @@ fn handle_submit_tx(
             tx.validate()?;
 
             // Fetch account
-
+            unreachable!("Account check moved to statekeeper/mempool");
+            //
             // TODO: the code below will block the current thread; switch to futures instead
             let (key_tx, key_rx) = mpsc::channel();
             let request = StateKeeperRequest::GetAccount(tx.from, key_tx);
@@ -108,6 +109,7 @@ fn handle_submit_tx(
             Ok((tx, account, tx_for_state))
         })
         .and_then(move |(tx, account, tx_for_state)| {
+            unreachable!("Nonce check moved to state keeper/mempool");
             //debug!("account {}: nonce {} received", tx.from, tx.nonce);
 
             // Wait for nonce
@@ -124,6 +126,7 @@ fn handle_submit_tx(
                 .or_else(|e| future::err(format!("Nonce error: {:?}", e)))
         })
         .and_then(move |(mut tx, account, mut nonce_futures, tx_for_state)| {
+            unreachable!("Tx application moved to state keeper");
             //debug!("account {}: nonce {} ready", tx.from, tx.nonce);
 
             // Verify signature
@@ -159,6 +162,11 @@ fn handle_submit_tx(
                 .map_err(|_| "Internal error: timeout on AddTransferTx".to_string())?
                 .map_err(|e| format!("Tx rejected: {:?}", e))?;
 
+            unimplemented!("Check result of adding tx to mempool here");
+            //            if let Err(reason) = result {
+            //                warn!("Failed to add tx to mempool: {:?}", reason);
+            //            }
+
             // Notify futures waiting for nonce
 
             nonce_futures.set_next_nonce(account, nonce + 1);
@@ -168,7 +176,7 @@ fn handle_submit_tx(
             let resp = TransactionResponse {
                 accepted: true,
                 error: None,
-                confirmation: Some(confirmation),
+                confirmation: None,
             };
             Ok(HttpResponse::Ok().json(resp))
         })

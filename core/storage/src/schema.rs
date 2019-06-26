@@ -24,6 +24,14 @@ table! {
 }
 
 table! {
+    mempool (id) {
+        id -> Int4,
+        tx -> Jsonb,
+        created_at -> Timestamp,
+    }
+}
+
+table! {
     op_config (addr) {
         addr -> Text,
         next_nonce -> Nullable<Int4>,
@@ -87,6 +95,7 @@ allow_tables_to_appear_in_same_query!(
     accounts,
     account_updates,
     active_provers,
+    mempool,
     op_config,
     operations,
     proofs,

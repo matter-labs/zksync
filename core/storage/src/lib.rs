@@ -36,6 +36,10 @@ use ff::Field;
 use diesel::sql_types::{Integer, Nullable, Text, Timestamp};
 sql_function!(coalesce, Coalesce, (x: Nullable<Integer>, y: Integer) -> Integer);
 
+mod mempool;
+
+pub use mempool::Mempool;
+
 #[derive(Clone)]
 pub struct ConnectionPool {
     pool: Pool<ConnectionManager<PgConnection>>,
@@ -58,6 +62,10 @@ impl ConnectionPool {
     pub fn access_storage(&self) -> Result<StorageProcessor, PoolError> {
         let connection = self.pool.get()?;
         Ok(StorageProcessor::from_pool(connection))
+    }
+
+    pub fn access_mempool(&self) -> Result<Mempool, PoolError> {
+        Ok(Mempool::from_db_connect_pool(self.pool.get()?))
     }
 }
 
