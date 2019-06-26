@@ -4,19 +4,22 @@ use eth_client::ETHClient;
 use ff::{PrimeField, PrimeFieldRepr};
 use models::abi::TEST_PLASMA_ALWAYS_VERIFY;
 use models::plasma::block::BlockData;
-use models::plasma::{params, AccountMap};
+use models::plasma::{params, AccountMap, AccountUpdate};
 use models::*;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use storage::ConnectionPool;
 use web3::types::{H256, U128, U256};
 
 fn sorted_and_padded_for_deposits(
-    accounts_updated: AccountMap,
+    accounts_updated: &[AccountUpdate],
 ) -> [u64; config::DEPOSIT_BATCH_SIZE] {
     assert_eq!(accounts_updated.len(), config::DEPOSIT_BATCH_SIZE);
 
     let mut tmp = [u64::from(params::SPECIAL_ACCOUNT_DEPOSIT); config::DEPOSIT_BATCH_SIZE];
-    let mut acc: Vec<u64> = accounts_updated.keys().map(|&k| u64::from(k)).collect();
+    let mut acc: Vec<u64> = accounts_updated
+        .iter()
+        .map(|acc| u64::from(acc.get_account_id()))
+        .collect();
     acc.sort();
 
     for (i, a) in acc.into_iter().enumerate() {
@@ -26,11 +29,16 @@ fn sorted_and_padded_for_deposits(
     tmp
 }
 
-fn sorted_and_padded_for_exits(accounts_updated: AccountMap) -> [u64; config::EXIT_BATCH_SIZE] {
+fn sorted_and_padded_for_exits(
+    accounts_updated: &[AccountUpdate],
+) -> [u64; config::EXIT_BATCH_SIZE] {
     assert_eq!(accounts_updated.len(), config::EXIT_BATCH_SIZE);
 
     let mut tmp = [u64::from(params::SPECIAL_ACCOUNT_EXIT); config::EXIT_BATCH_SIZE];
-    let mut acc: Vec<u64> = accounts_updated.keys().map(|&k| u64::from(k)).collect();
+    let mut acc: Vec<u64> = accounts_updated
+        .iter()
+        .map(|acc| u64::from(acc.get_account_id()))
+        .collect();
     acc.sort();
 
     for (i, a) in acc.into_iter().enumerate() {
@@ -109,7 +117,7 @@ fn run_eth_sender(
                             op.tx_meta.expect("tx meta missing"),
                             (
                                 U256::from(*batch_number),
-                                sorted_and_padded_for_deposits(op.accounts_updated.unwrap()),
+                                sorted_and_padded_for_deposits(&op.accounts_updated.unwrap()),
                                 u64::from(op.block.block_number),
                                 root,
                             ),
@@ -131,7 +139,7 @@ fn run_eth_sender(
                             op.tx_meta.expect("tx meta missing"),
                             (
                                 U256::from(*batch_number),
-                                sorted_and_padded_for_exits(op.accounts_updated.unwrap()),
+                                sorted_and_padded_for_exits(&op.accounts_updated.unwrap()),
                                 u64::from(op.block.block_number),
                                 public_data,
                                 root,
@@ -152,7 +160,7 @@ fn run_eth_sender(
                     op.tx_meta.expect("tx meta missing"),
                     (
                         U256::from(batch_number),
-                        sorted_and_padded_for_deposits(op.accounts_updated.unwrap()),
+                        sorted_and_padded_for_deposits(&op.accounts_updated.unwrap()),
                         u64::from(op.block.block_number),
                         *proof,
                     ),

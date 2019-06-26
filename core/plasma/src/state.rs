@@ -1,8 +1,8 @@
 use bigdecimal::{BigDecimal, Zero};
 use merkle_tree::AccountTree;
 use models::plasma::account::{Account, ETH_TOKEN_ID};
-use models::plasma::params;
 use models::plasma::tx::{DepositTx, ExitTx, TransferTx};
+use models::plasma::{params, AccountUpdate};
 use models::plasma::{AccountId, AccountMap, Fr, TransferApplicationError};
 
 pub struct PlasmaState {
@@ -51,10 +51,11 @@ impl PlasmaState {
         self.balance_tree.items.get(&account_id).cloned()
     }
 
+    // TODO (Drogan) Maybe simplify signature checking?
     pub fn apply_transfer(
         &mut self,
         tx: &TransferTx,
-    ) -> Result<BigDecimal, TransferApplicationError> {
+    ) -> Result<(BigDecimal, Vec<AccountUpdate>), TransferApplicationError> {
         if let Some(mut from) = self.balance_tree.items.get(&tx.from).cloned() {
             // TODO: take from `from` instead and uncomment below
             let pub_key = self
@@ -96,61 +97,120 @@ impl PlasmaState {
             // allow to send to non-existing accounts
             // let mut to = self.balance_tree.items.get(&tx.to).ok_or(())?.clone();
 
-            let mut to = Account::default();
-            if let Some(existing_to) = self.balance_tree.items.get(&tx.to) {
-                to = existing_to.clone();
-            }
+            let from_account_update = {
+                let from_old_balance = from.get_balance(ETH_TOKEN_ID).clone();
+                from.sub_balance(ETH_TOKEN_ID, &transacted_amount);
+                let from_new_balance = from.get_balance(ETH_TOKEN_ID).clone();
+                from.nonce += 1;
 
-            from.sub_balance(ETH_TOKEN_ID, &transacted_amount);
+                self.balance_tree.insert(tx.from, from);
 
-            from.nonce += 1;
-            if tx.to != 0 {
-                to.add_balance(ETH_TOKEN_ID, &tx.amount);
-            }
+                AccountUpdate::UpdateBalance {
+                    id: tx.from,
+                    balance_update: vec![(ETH_TOKEN_ID, from_old_balance, from_new_balance)],
+                }
+            };
 
-            self.balance_tree.insert(tx.from, from);
-            self.balance_tree.insert(tx.to, to);
+            let to_account_updates = {
+                let mut to_account_updates = Vec::new();
+                let mut to = self.balance_tree.items.remove(&tx.to).unwrap_or_else(|| {
+                    let new_acc = Account::default();
+
+                    let create_acc_update = AccountUpdate::Create {
+                        id: tx.to,
+                        public_key_x: new_acc.public_key_x.clone(),
+                        public_key_y: new_acc.public_key_y.clone(),
+                    };
+                    to_account_updates.push(create_acc_update);
+
+                    new_acc
+                });
+
+                // TODO (Drogan) Why? Document somewhere.
+                if tx.to != 0 {
+                    let to_old_balance = to.get_balance(ETH_TOKEN_ID).clone();
+                    to.add_balance(ETH_TOKEN_ID, &tx.amount);
+                    let to_new_balance = to.get_balance(ETH_TOKEN_ID).clone();
+
+                    let balance_update = AccountUpdate::UpdateBalance {
+                        id: tx.to,
+                        balance_update: vec![(ETH_TOKEN_ID, to_old_balance, to_new_balance)],
+                    };
+                    to_account_updates.push(balance_update);
+                }
+
+                self.balance_tree.insert(tx.to, to);
+                to_account_updates
+            };
 
             let collected_fee = tx.fee.clone();
 
-            return Ok(collected_fee);
+            let mut account_updates = vec![from_account_update];
+            account_updates.extend(to_account_updates.into_iter());
+
+            return Ok((collected_fee, account_updates));
         }
 
         Err(TransferApplicationError::InvalidSigner)
     }
 
-    pub fn apply_deposit(&mut self, tx: &DepositTx) -> Result<(), ()> {
-        let existing_acc = self.balance_tree.items.get(&tx.account);
+    pub fn apply_deposit(&mut self, tx: &DepositTx) -> Result<Vec<AccountUpdate>, ()> {
+        let existing_account = self.balance_tree.items.contains_key(&tx.account);
 
-        if existing_acc.is_none() {
-            let mut acc = Account::default();
-            let tx = tx.clone();
-            acc.public_key_x = tx.pub_x;
-            acc.public_key_y = tx.pub_y;
-            acc.set_balance(ETH_TOKEN_ID, &tx.amount);
-            self.balance_tree.insert(tx.account, acc);
-        } else {
-            let mut acc = existing_acc.unwrap().clone();
-            acc.add_balance(ETH_TOKEN_ID, &tx.amount);
-            self.balance_tree.insert(tx.account, acc);
+        let mut acc = self
+            .balance_tree
+            .items
+            .remove(&tx.account)
+            .unwrap_or_else(|| {
+                let mut acc = Account::default();
+                acc.public_key_x = tx.pub_x.clone();
+                acc.public_key_y = tx.pub_y.clone();
+                acc
+            });
+
+        let old_amount = acc.get_balance(ETH_TOKEN_ID).clone();
+        acc.add_balance(ETH_TOKEN_ID, &tx.amount);
+        let new_amount = acc.get_balance(ETH_TOKEN_ID).clone();
+
+        self.balance_tree.insert(tx.account, acc);
+
+        let mut updates = Vec::new();
+        if !existing_account {
+            updates.push(AccountUpdate::Create {
+                id: tx.account,
+                public_key_x: tx.pub_x.clone(),
+                public_key_y: tx.pub_y.clone(),
+            });
         }
-        Ok(())
+        updates.push(AccountUpdate::UpdateBalance {
+            id: tx.account,
+            balance_update: vec![(ETH_TOKEN_ID, old_amount, new_amount)],
+        });
+
+        Ok(updates)
     }
 
-    pub fn apply_exit(&mut self, tx: &ExitTx) -> Result<ExitTx, ()> {
-        let acc = self.balance_tree.items.get(&tx.account).ok_or(())?.clone();
-
-        let mut agumented_tx = tx.clone();
+    pub fn apply_exit(&mut self, tx: &mut ExitTx) -> Result<Vec<AccountUpdate>, ()> {
+        let acc = self.balance_tree.items.remove(&tx.account).ok_or(())?;
 
         debug!(
             "Adding account balance to ExitTx, value = {}",
             acc.get_balance(ETH_TOKEN_ID)
         );
 
-        agumented_tx.amount = acc.get_balance(ETH_TOKEN_ID).clone();
+        let old_amount = acc.get_balance(ETH_TOKEN_ID).clone();
+        tx.amount = old_amount.clone();
 
-        self.balance_tree.delete(tx.account);
-
-        Ok(agumented_tx)
+        let mut updates = Vec::new();
+        updates.push(AccountUpdate::UpdateBalance {
+            id: tx.account,
+            balance_update: vec![(ETH_TOKEN_ID, old_amount, BigDecimal::zero())],
+        });
+        updates.push(AccountUpdate::Delete {
+            id: tx.account,
+            public_key_x: acc.public_key_x,
+            public_key_y: acc.public_key_y,
+        });
+        Ok(updates)
     }
 }

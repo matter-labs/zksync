@@ -10,7 +10,7 @@ pub use web3::types::{H256, U128, U256};
 use pairing::bn256;
 use sapling_crypto::eddsa;
 
-pub use crate::plasma::account::Account;
+pub use crate::plasma::account::{Account, AccountUpdate};
 pub use crate::plasma::tx::{DepositTx, ExitTx, TransferTx, TxSignature};
 
 pub type Engine = bn256::Bn256;

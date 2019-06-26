@@ -3,6 +3,7 @@ use crate::plasma::params;
 use crate::primitives::GetBits;
 use crate::{Engine, Fr, PublicKey};
 use bigdecimal::BigDecimal;
+use fnv::FnvHashMap;
 use sapling_crypto::jubjub::{edwards, Unknown};
 
 pub type TokenId = u8;
@@ -16,6 +17,35 @@ pub struct Account {
     pub nonce: u32,
     pub public_key_x: Fr,
     pub public_key_y: Fr,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AccountUpdate {
+    Create {
+        id: u32,
+        public_key_x: Fr,
+        public_key_y: Fr,
+    },
+    Delete {
+        id: u32,
+        public_key_x: Fr,
+        public_key_y: Fr,
+    },
+    UpdateBalance {
+        id: u32,
+        // (token, old, new)
+        balance_update: Vec<(TokenId, BigDecimal, BigDecimal)>,
+    },
+}
+
+impl AccountUpdate {
+    pub fn get_account_id(&self) -> u32 {
+        match *self {
+            AccountUpdate::Create { id, .. } => id,
+            AccountUpdate::Delete { id, .. } => id,
+            AccountUpdate::UpdateBalance { id, .. } => id,
+        }
+    }
 }
 
 impl Default for Account {
@@ -68,6 +98,10 @@ impl Account {
 
     pub fn get_balance(&self, token: TokenId) -> &BigDecimal {
         self.get_token(token)
+    }
+
+    pub fn balances(&self) -> Vec<BigDecimal> {
+        self.balances.clone()
     }
 
     pub fn set_balance(&mut self, token: TokenId, amount: &BigDecimal) {
