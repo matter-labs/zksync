@@ -279,35 +279,37 @@ impl PlasmaStateKeeper {
     }
 
     fn create_transfer_block(&mut self, transactions: Vec<TransferTx>) -> CommitRequest {
-        unimplemented!("Apply txs here and create diff");
-        //        let transactions = std::mem::replace(&mut self.transfer_tx_queue, Vec::default());
-        //        let total_fees: u128 = transactions
-        //            .iter()
-        //            .map(|tx| tx.fee.to_u128().expect("should not overflow"))
-        //            .sum();
-        //
-        //        let total_fees = BigDecimal::from_u128(total_fees).unwrap();
-        //
-        //        // collect updated state
-        //        let mut accounts_updated = FnvHashMap::<u32, Account>::default();
-        //        for tx in transactions.iter() {
-        //            accounts_updated.insert(tx.from, self.account(tx.from));
-        //            accounts_updated.insert(tx.to, self.account(tx.to));
-        //        }
-        //
-        //        let block = Block {
-        //            block_number: self.state.block_number,
-        //            new_root_hash: self.state.root_hash(),
-        //            block_data: BlockData::Transfer {
-        //                total_fees,
-        //                transactions,
-        //            },
-        //        };
-        //
-        //        CommitRequest {
-        //            block,
-        //            accounts_updated,
-        //        }
+        // collect updated state
+        let mut accounts_updated = Vec::new();
+
+        // TODO (Drogan) Why not big decimal? Fee is the same currency as amount.
+        let mut total_fees = 0u128;
+
+        for tx in transactions.iter() {
+            // TODO: (Drogan) How to properly transfer tx error? Maybe do padding tx instead?
+            let (fee, mut tx_updates) = self
+                .state
+                .apply_transfer(&tx)
+                .expect("must apply transfer transaction");
+
+            accounts_updated.append(&mut tx_updates);
+
+            total_fees += fee.to_u128().expect("Should not overflow");
+        }
+
+        let block = Block {
+            block_number: self.state.block_number,
+            new_root_hash: self.state.root_hash(),
+            block_data: BlockData::Transfer {
+                total_fees: BigDecimal::from_u128(total_fees).unwrap(),
+                transactions,
+            },
+        };
+
+        CommitRequest {
+            block,
+            accounts_updated,
+        }
     }
 
     fn create_deposit_block(
@@ -316,14 +318,14 @@ impl PlasmaStateKeeper {
         transactions: Vec<DepositTx>,
     ) -> CommitRequest {
         let transactions = Self::sort_deposit_block(transactions);
-        let mut accounts_updated = FnvHashMap::<u32, Account>::default();
+        let mut accounts_updated = Vec::new();
         for tx in transactions.iter() {
-            self.state
+            let mut tx_updates = self
+                .state
                 .apply_deposit(&tx)
                 .expect("must apply deposit transaction");
 
-            // collect updated state
-            accounts_updated.insert(tx.account, self.account(tx.account));
+            accounts_updated.append(&mut tx_updates);
         }
 
         let block = Block {
@@ -347,17 +349,15 @@ impl PlasmaStateKeeper {
         batch_number: BatchNumber,
         transactions: Vec<ExitTx>,
     ) -> CommitRequest {
-        let transactions = Self::sort_exit_block(transactions);
-        let mut accounts_updated = FnvHashMap::<u32, Account>::default();
-        let mut augmented_txes = vec![];
-        for tx in transactions.iter() {
-            let augmented_tx = self
+        let mut transactions = Self::sort_exit_block(transactions);
+        let mut accounts_updated = Vec::new();
+        for tx in transactions.iter_mut() {
+            let mut tx_updates = self
                 .state
-                .apply_exit(&tx)
+                .apply_exit(tx)
                 .expect("must augment exit transaction information");
-            augmented_txes.push(augmented_tx);
             // collect updated state
-            accounts_updated.insert(tx.account, self.account(tx.account));
+            accounts_updated.append(&mut tx_updates);
         }
 
         let block = Block {
@@ -365,7 +365,7 @@ impl PlasmaStateKeeper {
             new_root_hash: self.state.root_hash(),
             block_data: BlockData::Exit {
                 batch_number,
-                transactions: augmented_txes,
+                transactions,
             },
         };
 

@@ -89,7 +89,7 @@ pub struct Operation {
     pub id: Option<i32>,
     pub action: Action,
     pub block: Block,
-    pub accounts_updated: Option<AccountMap>,
+    pub accounts_updated: Option<Vec<AccountUpdate>>,
 
     #[serde(skip)]
     pub tx_meta: Option<TxMeta>,
@@ -112,7 +112,7 @@ pub enum StateKeeperRequest {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CommitRequest {
     pub block: Block,
-    pub accounts_updated: AccountMap,
+    pub accounts_updated: Vec<AccountUpdate>,
 }
 
 pub const ACTION_COMMIT: &str = "Commit";

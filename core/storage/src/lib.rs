@@ -14,7 +14,7 @@ use models::plasma::tx::TransactionType::{Deposit, Exit, Transfer};
 use models::plasma::tx::{
     DepositTx, ExitTx, TransactionType, TransferTx, TxSignature, DEPOSIT_TX, EXIT_TX, TRANSFER_TX,
 };
-use models::plasma::{AccountId, AccountMap, BlockNumber, Fr, Nonce};
+use models::plasma::{AccountId, AccountMap, AccountUpdate, BlockNumber, Fr, Nonce};
 use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
@@ -137,7 +137,7 @@ impl StoredOperation {
         op.id = Some(self.id);
 
         if op.accounts_updated.is_none() {
-            let (_, updates) = conn.load_state_diff_for_block(op.block.block_number)?;
+            let updates = conn.load_state_diff_for_block(op.block.block_number)?;
             op.accounts_updated = Some(updates);
         };
 
@@ -338,6 +338,7 @@ impl StorageProcessor {
                 Action::Commit => {
                     self.commit_state_update(
                         op.block.block_number,
+                        // TODO: (Drogan) make shure that this unwrap is ok(i.e. we always update accounts when commiting)
                         op.accounts_updated.as_ref().unwrap(),
                     )?;
                     self.save_transactions(op)?;
@@ -480,26 +481,27 @@ impl StorageProcessor {
     fn commit_state_update(
         &self,
         block_number: u32,
-        accounts_updated: &AccountMap,
+        accounts_updated: &[AccountUpdate],
     ) -> QueryResult<()> {
-        for (&account_id, a) in accounts_updated.iter() {
-            debug!(
-                "Committing state update for account {} in block {}",
-                account_id, block_number
-            );
-            let inserted = diesel::insert_into(account_updates::table)
-                .values(&StorageAccountUpdate {
-                    account_id: account_id as i32,
-                    block_number: block_number as i32,
-                    data: to_value(a).unwrap(),
-                })
-                .execute(self.conn())?;
-            if 0 == inserted {
-                error!("Error: could not commit all state updates!");
-                return Err(Error::RollbackTransaction);
-            }
-        }
-        Ok(())
+        unimplemented!("Properly update accounts.");
+        //        for (&account_id, a) in accounts_updated.iter() {
+        //            debug!(
+        //                "Committing state update for account {} in block {}",
+        //                account_id, block_number
+        //            );
+        //            let inserted = diesel::insert_into(account_updates::table)
+        //                .values(&StorageAccountUpdate {
+        //                    account_id: account_id as i32,
+        //                    block_number: block_number as i32,
+        //                    data: to_value(a).unwrap(),
+        //                })
+        //                .execute(self.conn())?;
+        //            if 0 == inserted {
+        //                error!("Error: could not commit all state updates!");
+        //                return Err(Error::RollbackTransaction);
+        //            }
+        //        }
+        //        Ok(())
     }
 
     fn apply_state_update(&self, block_number: u32) -> QueryResult<()> {
@@ -579,8 +581,9 @@ impl StorageProcessor {
     }
 
     /// loads the state of accounts updated in a specific block
-    pub fn load_state_diff_for_block(&self, block_number: u32) -> QueryResult<(u32, AccountMap)> {
-        self.load_state_diff(block_number, block_number + 1)
+    pub fn load_state_diff_for_block(&self, block_number: u32) -> QueryResult<Vec<AccountUpdate>> {
+        //        self.load_state_diff(block_number, block_number + 1)
+        unimplemented!()
     }
 
     fn load_state(&self, query: &str) -> QueryResult<(u32, AccountMap)> {
