@@ -8,13 +8,14 @@ extern crate log;
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
+use models::plasma::account::{TokenId, ETH_TOKEN_ID};
 use models::plasma::block::Block;
 use models::plasma::block::BlockData;
 use models::plasma::tx::TransactionType::{Deposit, Exit, Transfer};
 use models::plasma::tx::{
     DepositTx, ExitTx, TransactionType, TransferTx, TxSignature, DEPOSIT_TX, EXIT_TX, TRANSFER_TX,
 };
-use models::plasma::{AccountId, AccountMap, AccountUpdate, BlockNumber, Fr, Nonce};
+use models::plasma::{Account, AccountId, AccountMap, AccountUpdate, BlockNumber, Fr, Nonce};
 use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
@@ -75,20 +76,53 @@ impl Default for ConnectionPool {
     }
 }
 
-#[derive(Insertable, QueryableByName, Queryable)]
+#[derive(Identifiable, Insertable, QueryableByName, Queryable)]
 #[table_name = "accounts"]
 struct StorageAccount {
     pub id: i32,
     pub last_block: i32,
-    pub data: Value,
+    pub nonce: i64,
+    pub pk_x: Vec<u8>,
+    pub pk_y: Vec<u8>,
+}
+
+#[derive(Identifiable, Insertable, QueryableByName, Queryable, Associations)]
+#[belongs_to(StorageAccount, foreign_key = "account_id")]
+#[primary_key(account_id, coin_id)]
+#[table_name = "balances"]
+struct StorageBalance {
+    pub account_id: i32,
+    pub coin_id: i32,
+    pub balance: BigDecimal,
+}
+
+#[derive(Insertable, QueryableByName, Queryable)]
+#[table_name = "tokens"]
+struct Token {
+    pub id: i32,
+    pub address: String,
 }
 
 #[derive(Insertable, Queryable, QueryableByName)]
-#[table_name = "account_updates"]
+#[table_name = "account_balance_updates"]
 struct StorageAccountUpdate {
     pub account_id: i32,
-    pub data: Value,
     pub block_number: i32,
+    pub coin_id: i32,
+    pub old_balance: BigDecimal,
+    pub new_balance: BigDecimal,
+    // TODO (Drogan) add nonce reconstruction.
+}
+
+#[derive(Insertable, Queryable, QueryableByName)]
+#[table_name = "account_creates"]
+struct StorageAccountCreation {
+    account_id: i32,
+    is_create: bool,
+    block_number: i32,
+    pk_x: Vec<u8>,
+    pk_y: Vec<u8>,
+    // TODO (Drogan) add nonce reconstruction.
 }
 
 #[derive(Insertable)]
@@ -302,6 +336,37 @@ pub struct StorageProcessor {
     conn: ConnectionHolder,
 }
 
+// TODO: (Drogan) move this tmp methods
+fn fr_to_bytes(fr: &Fr) -> Vec<u8> {
+    use ff::{PrimeField, PrimeFieldRepr};
+    let mut buff: Vec<u8> = Vec::new();
+    fr.into_repr().write_be(&mut buff).unwrap();
+    buff
+}
+
+// TODO: (Drogan) move this tmp methods
+fn fr_from_bytes(mut bytes: Vec<u8>) -> Fr {
+    use ff::{PrimeField, PrimeFieldRepr};
+    let mut fr_repr = <Fr as PrimeField>::Repr::default();
+    fr_repr.read_be(&*bytes).unwrap();
+    Fr::from_repr(fr_repr).unwrap()
+}
+
+fn restore_account(
+    stored_account: StorageAccount,
+    stored_balances: Vec<StorageBalance>,
+) -> (u32, Account) {
+    let mut account = Account::default();
+    for b in stored_balances.into_iter() {
+        assert_eq!(b.account_id, stored_account.id);
+        account.set_balance(b.coin_id as TokenId, &b.balance);
+    }
+    account.nonce = stored_account.nonce as u32;
+    account.public_key_x = fr_from_bytes(stored_account.pk_x);
+    account.public_key_y = fr_from_bytes(stored_account.pk_y);
+    (stored_account.id as u32, account)
+}
+
 impl StorageProcessor {
     pub fn establish_connection() -> ConnectionResult<Self> {
         let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
@@ -483,67 +548,112 @@ impl StorageProcessor {
         block_number: u32,
         accounts_updated: &[AccountUpdate],
     ) -> QueryResult<()> {
-        unimplemented!("Properly update accounts.");
-        //        for (&account_id, a) in accounts_updated.iter() {
-        //            debug!(
-        //                "Committing state update for account {} in block {}",
-        //                account_id, block_number
-        //            );
-        //            let inserted = diesel::insert_into(account_updates::table)
-        //                .values(&StorageAccountUpdate {
-        //                    account_id: account_id as i32,
-        //                    block_number: block_number as i32,
-        //                    data: to_value(a).unwrap(),
-        //                })
-        //                .execute(self.conn())?;
-        //            if 0 == inserted {
-        //                error!("Error: could not commit all state updates!");
-        //                return Err(Error::RollbackTransaction);
-        //            }
-        //        }
-        //        Ok(())
+        for upd in accounts_updated.iter() {
+            unimplemented!();
+            debug!(
+                "Committing state update for account {} in block {}",
+                upd.get_account_id(),
+                block_number
+            );
+            match *upd {
+                AccountUpdate::Create {
+                    id,
+                    public_key_x,
+                    public_key_y,
+                } => {
+                    diesel::insert_into(account_creates::table)
+                        .values(&StorageAccountCreation {
+                            account_id: id as i32,
+                            is_create: true,
+                            block_number: block_number as i32,
+                            pk_x: fr_to_bytes(&public_key_x),
+                            pk_y: fr_to_bytes(&public_key_y),
+                        })
+                        .execute(self.conn())?;
+                }
+                AccountUpdate::Delete {
+                    id,
+                    public_key_x,
+                    public_key_y,
+                } => {
+                    diesel::insert_into(account_creates::table)
+                        .values(&StorageAccountCreation {
+                            account_id: id as i32,
+                            is_create: false,
+                            block_number: block_number as i32,
+                            pk_x: fr_to_bytes(&public_key_x),
+                            pk_y: fr_to_bytes(&public_key_y),
+                        })
+                        .execute(self.conn())?;
+                }
+                AccountUpdate::UpdateBalance {
+                    id,
+                    balance_update: (token, old_balance, new_balance),
+                } => {
+                    diesel::insert_into(account_balance_updates::table)
+                        .values(&StorageAccountUpdate {
+                            account_id: id as i32,
+                            block_number: block_number as i32,
+                            coin_id: token as i32,
+                            old_balance: old_balance.clone(),
+                            new_balance: new_balance.clone(),
+                        })
+                        .execute(self.conn())?;
+                }
+            }
+            // TODO: (Drogan) was this check necessary?
+            //             let inserted = ;
+            //             if 0 == inserted {
+            //                 error!("Error: could not commit all state updates!");
+            //                 return Err(Error::RollbackTransaction);
+            //             }
+        }
+        Ok(())
     }
 
     fn apply_state_update(&self, block_number: u32) -> QueryResult<()> {
-        let update = format!(
-            "
-            INSERT INTO accounts (id, last_block, data)
-            SELECT 
-                account_id AS id, 
-                block_number as last_block, 
-                data FROM account_updates
-            WHERE account_updates.block_number = {}
-            ON CONFLICT (id) 
-            DO UPDATE 
-            SET data = EXCLUDED.data, last_block = EXCLUDED.last_block",
-            block_number
-        );
-        diesel::sql_query(update.as_str())
-            .execute(self.conn())
-            .map(|_| ())
+        unimplemented!();
+        //        let update = format!(
+        //            "
+        //            INSERT INTO accounts (id, last_block, data)
+        //            SELECT
+        //                account_id AS id,
+        //                block_number as last_block,
+        //                data FROM account_updates
+        //            WHERE account_updates.block_number = {}
+        //            ON CONFLICT (id)
+        //            DO UPDATE
+        //            SET data = EXCLUDED.data, last_block = EXCLUDED.last_block",
+        //            block_number
+        //        );
+        //        diesel::sql_query(update.as_str())
+        //            .execute(self.conn())
+        //            .map(|_| ())
     }
 
     pub fn load_committed_state(&self) -> QueryResult<(u32, AccountMap)> {
-        const SELECT: &str = "
-        WITH upd AS (
-            WITH s AS (
-                SELECT account_id as id, max(block_number) as last_block 
-                FROM account_updates u 
-                WHERE u.block_number > (SELECT COALESCE(max(last_block), 0) FROM accounts) 
-                GROUP BY account_id
-            ) 
-            SELECT u.account_id AS id, u.block_number AS last_block, u.data FROM s, account_updates u WHERE s.id = u.account_id AND u.block_number = s.last_block
-        )
-        SELECT COALESCE(u.id, a.id) AS id, COALESCE(u.last_block, a.last_block) AS last_block, COALESCE (u.data, a.data) AS data
-        FROM upd u
-        FULL JOIN accounts a ON a.id = u.id
-        ORDER BY id";
-
-        self.load_state(SELECT)
+        unimplemented!();
+        //        const SELECT: &str = "
+        //        WITH upd AS (
+        //            WITH s AS (
+        //                SELECT account_id as id, max(block_number) as last_block
+        //                FROM account_updates u
+        //                WHERE u.block_number > (SELECT COALESCE(max(last_block), 0) FROM accounts)
+        //                GROUP BY account_id
+        //            )
+        //            SELECT u.account_id AS id, u.block_number AS last_block, u.data FROM s, account_updates u WHERE s.id = u.account_id AND u.block_number = s.last_block
+        //        )
+        //        SELECT COALESCE(u.id, a.id) AS id, COALESCE(u.last_block, a.last_block) AS last_block, COALESCE (u.data, a.data) AS data
+        //        FROM upd u
+        //        FULL JOIN accounts a ON a.id = u.id
+        //        ORDER BY id";
+        //
+        //        self.load_state(SELECT)
     }
 
     pub fn load_verified_state(&self) -> QueryResult<(u32, AccountMap)> {
-        self.load_state("SELECT * FROM accounts a")
+        unimplemented!();
+        //        self.load_state("SELECT * FROM accounts a")
     }
 
     /// loads the state of accounts updated between two blocks
@@ -552,32 +662,33 @@ impl StorageProcessor {
         from_block: u32,
         to_block: u32,
     ) -> QueryResult<(u32, AccountMap)> {
-        let start_block = cmp::min(from_block, to_block);
-        let end_block = cmp::max(from_block, to_block);
-
-        // this takes all blocks changed between `start_block` and `end_block`
-        // and then takes the latest updated for each before `to_block`
+        unimplemented!();
+        //        let start_block = cmp::min(from_block, to_block);
+        //        let end_block = cmp::max(from_block, to_block);
         //
-        // argument block numbers point at the next expected block, i.e. empty state starts at block 1
-
-        let select = format!("
-            WITH upd AS (
-                WITH s AS (
-                    SELECT 
-                        account_id as id, 
-                        (SELECT max(block_number) FROM account_updates 
-                            WHERE block_number < {to_block}
-                            AND account_id = u.account_id) as last_block 
-                    FROM account_updates u 
-                    WHERE u.block_number >= {start_block} AND u.block_number < {end_block}
-                    GROUP BY account_id
-                ) 
-                SELECT u.account_id AS id, u.block_number AS last_block, u.data FROM s, account_updates u WHERE s.id = u.account_id AND u.block_number = s.last_block
-            )
-            SELECT u.id, u.last_block, u.data
-            FROM upd u
-            ORDER BY id", to_block=to_block, start_block=start_block, end_block=end_block);
-        self.load_state(select.as_str())
+        //        // this takes all blocks changed between `start_block` and `end_block`
+        //        // and then takes the latest updated for each before `to_block`
+        //        //
+        //        // argument block numbers point at the next expected block, i.e. empty state starts at block 1
+        //
+        //        let select = format!("
+        //            WITH upd AS (
+        //                WITH s AS (
+        //                    SELECT
+        //                        account_id as id,
+        //                        (SELECT max(block_number) FROM account_updates
+        //                            WHERE block_number < {to_block}
+        //                            AND account_id = u.account_id) as last_block
+        //                    FROM account_updates u
+        //                    WHERE u.block_number >= {start_block} AND u.block_number < {end_block}
+        //                    GROUP BY account_id
+        //                )
+        //                SELECT u.account_id AS id, u.block_number AS last_block, u.data FROM s, account_updates u WHERE s.id = u.account_id AND u.block_number = s.last_block
+        //            )
+        //            SELECT u.id, u.last_block, u.data
+        //            FROM upd u
+        //            ORDER BY id", to_block=to_block, start_block=start_block, end_block=end_block);
+        //        self.load_state(select.as_str())
     }
 
     /// loads the state of accounts updated in a specific block
@@ -587,21 +698,27 @@ impl StorageProcessor {
     }
 
     fn load_state(&self, query: &str) -> QueryResult<(u32, AccountMap)> {
-        diesel::sql_query(query)
-            .load(self.conn())
-            .map(|accounts: Vec<StorageAccount>| {
-                let last_block = accounts
-                    .iter()
-                    .map(|a| a.last_block as u32)
-                    .max()
-                    .unwrap_or(0);
-                let result = AccountMap::from_iter(
-                    accounts
-                        .into_iter()
-                        .map(|a| (a.id as u32, serde_json::from_value(a.data).unwrap())),
-                );
-                (last_block, result)
+        let accounts: Vec<StorageAccount> = accounts::table.load(self.conn())?;
+        let balances: Vec<Vec<StorageBalance>> = StorageBalance::belonging_to(&accounts)
+            .load(self.conn())?
+            .grouped_by(&accounts);
+
+        let last_block = accounts
+            .iter()
+            .map(|a| a.last_block as u32)
+            .max()
+            .unwrap_or(0);
+
+        let account_map: AccountMap = accounts
+            .into_iter()
+            .zip(balances.into_iter())
+            .map(|(stored_account, balances)| {
+                let (id, account) = restore_account(stored_account, balances);
+                (id, account)
             })
+            .collect();
+
+        Ok((last_block, account_map))
     }
 
     /// Sets up `op_config` to new address and nonce for scheduling ETH transactions for operations
@@ -818,18 +935,19 @@ impl StorageProcessor {
         &self,
         account_id: AccountId,
     ) -> QueryResult<Option<models::plasma::account::Account>> {
-        let query = format!(
-            "
-            SELECT account_id AS id, block_number AS last_block, data
-            FROM account_updates WHERE account_id = {}
-            ORDER BY block_number DESC LIMIT 1
-        ",
-            account_id
-        );
-        let r = diesel::sql_query(query)
-            .get_result(self.conn())
-            .optional()?;
-        Ok(r.map(|acc: StorageAccount| serde_json::from_value(acc.data).unwrap()))
+        unimplemented!();
+        //        let query = format!(
+        //            "
+        //            SELECT account_id AS id, block_number AS last_block, data
+        //            FROM account_updates WHERE account_id = {}
+        //            ORDER BY block_number DESC LIMIT 1
+        //        ",
+        //            account_id
+        //        );
+        //        let r = diesel::sql_query(query)
+        //            .get_result(self.conn())
+        //            .optional()?;
+        //        Ok(r.map(|acc: StorageAccount| serde_json::from_value(acc.data).unwrap()))
     }
 
     pub fn last_verified_state_for_account(
@@ -837,11 +955,22 @@ impl StorageProcessor {
         account_id: AccountId,
     ) -> QueryResult<Option<models::plasma::account::Account>> {
         use crate::schema::accounts::dsl::*;
-        let mut r = accounts
-            .filter(id.eq(account_id as i32))
-            .load(self.conn())?;
-        Ok(r.pop()
-            .map(|acc: StorageAccount| serde_json::from_value(acc.data).unwrap()))
+
+        Ok(
+            if let Some(account) = accounts
+                .find(account_id as i32)
+                .first::<StorageAccount>(self.conn())
+                .optional()?
+            {
+                let balances: Vec<StorageBalance> =
+                    StorageBalance::belonging_to(&account).load(self.conn())?;
+
+                let (_, account) = restore_account(account, balances);
+                Some(account)
+            } else {
+                None
+            },
+        )
     }
 
     pub fn count_outstanding_proofs(&self, after_block: BlockNumber) -> QueryResult<u32> {
@@ -1519,4 +1648,28 @@ mod test {
         assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").addr, "0x123");
     }
 
+    #[test]
+    fn test_fr_binary_serialization() {
+        use ff::{PrimeField, PrimeFieldRepr};
+
+        let mut buff: Vec<u8> = Vec::new();
+        Fr::one().into_repr().write_be(&mut buff).unwrap();
+        println!("{:?}", buff);
+        assert_eq!(32, buff.len());
+
+        let mut buff: Vec<u8> = Vec::new();
+        Fr::one().into_repr().write_le(&mut buff).unwrap();
+        println!("{:?}", buff);
+        assert_eq!(32, buff.len());
+
+        let mut buff: Vec<u8> = Vec::new();
+        Fr::zero().into_repr().write_be(&mut buff).unwrap();
+        println!("{:?}", buff);
+        assert_eq!(32, buff.len());
+
+        let mut buff: Vec<u8> = Vec::new();
+        Fr::zero().into_repr().write_le(&mut buff).unwrap();
+        println!("{:?}", buff);
+        assert_eq!(32, buff.len());
+    }
 }

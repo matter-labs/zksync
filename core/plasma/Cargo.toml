@@ -11,6 +11,6 @@ authors = [
 [dependencies]
 models = { path = "../models" }
 merkle_tree = { path = "../merkle_tree" }
-bigdecimal = { version = "0.1.0", features = ["serde"]}
+bigdecimal = { version = "0.0.14", features = ["serde"]}
 log = "0.4"
 
