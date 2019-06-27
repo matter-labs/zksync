@@ -287,13 +287,13 @@ pub struct BlockDetails {
 
 /// MARK: - Tree restore part
 
-#[derive(Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
+#[derive(Insertable, Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
 #[table_name = "tree_restore_network"]
 pub struct TreeRestoreNetwork {
     pub id: i32, // 1 - Mainnet, 4 - Rinkeby
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
+#[derive(Insertable, Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
 #[table_name = "tree_restore_last_watched_eth_block"]
 pub struct LastWatchedEthBlockNumber {
     pub number: String,
@@ -307,7 +307,7 @@ pub struct LastWatchedEthBlockNumber {
 //     pub block_num: i32,
 // }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
+#[derive(Insertable, Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
 #[table_name = "block_events"]
 pub struct StoredBlockLog {
     pub block_type: String, // 'Committed', 'Verified'
@@ -331,7 +331,7 @@ pub struct StoredBlockLog {
 //     }
 // }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
+#[derive(Insertable, Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
 #[table_name = "franklin_transactions"]
 pub struct StoredFranklinTransaction {
     pub franklin_transaction_type: String, // Deposit, Transfer, FullExit
@@ -1113,6 +1113,94 @@ impl StorageProcessor {
     }
 
     /// MARK: - Tree restore part
+    
+    pub fn save_tree_restore_network(&self, network: &TreeRestoreNetwork) -> QueryResult<()> {
+        let inserted = diesel::insert_into(tree_restore_network::table)
+            .values(network)
+            .execute(self.conn())?;
+        if 0 == inserted {
+            error!("Error: could not save network!");
+            return Err(Error::RollbackTransaction);
+        }
+        Ok(())
+    }
+    
+    pub fn save_block_events(&self, events: &[StoredBlockLog]) -> QueryResult<()> {
+        for event in events.iter() {
+            let inserted = diesel::insert_into(block_events::table)
+                .values(event)
+                .execute(self.conn())?;
+            if 0 == inserted {
+                error!("Error: could not commit all new events!");
+                return Err(Error::RollbackTransaction);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn save_last_watched_block_number(&self, number: &LastWatchedEthBlockNumber) -> QueryResult<()> {
+        let inserted = diesel::insert_into(tree_restore_last_watched_eth_block::table)
+            .values(number)
+            .execute(self.conn())?;
+        if 0 == inserted {
+            error!("Error: could not save last watched eth block number!");
+            return Err(Error::RollbackTransaction);
+        }
+        Ok(())
+    }
+
+    pub fn save_franklin_transactions(&self, txs: &[StoredFranklinTransaction]) -> QueryResult<()> {
+        for tx in txs.iter() {
+            let inserted = diesel::insert_into(franklin_transactions::table)
+                .values(tx)
+                .execute(self.conn())?;
+            if 0 == inserted {
+                error!("Error: could not commit all new transactions!");
+                return Err(Error::RollbackTransaction);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn delete_tree_restore_network(&self) -> QueryResult<()> {
+        let deleted = diesel::delete(tree_restore_network::table)
+            .execute(self.conn())?;
+        if 0 == deleted {
+            error!("Error: could not delete network!");
+            return Err(Error::RollbackTransaction);
+        }
+        Ok(())
+    }
+    
+    pub fn delete_block_events(&self) -> QueryResult<()> {
+        let deleted = diesel::delete(block_events::table)
+            .execute(self.conn())?;
+        if 0 == deleted {
+            error!("Error: could not delete block events!");
+            return Err(Error::RollbackTransaction);
+        }
+        Ok(())
+    }
+
+    pub fn delete_last_watched_block_number(&self) -> QueryResult<()> {
+        let deleted = diesel::delete(tree_restore_last_watched_eth_block::table)
+            .execute(self.conn())?;
+        if 0 == deleted {
+            error!("Error: could not delete last watched eth block number!");
+            return Err(Error::RollbackTransaction);
+        }
+        Ok(())
+    }
+
+    pub fn delete_franklin_transactions(&self) -> QueryResult<()> {
+        let deleted = diesel::delete(franklin_transactions::table)
+            .execute(self.conn())?;
+        if 0 == deleted {
+            error!("Error: could not delete franklin transactions!");
+            return Err(Error::RollbackTransaction);
+        }
+        Ok(())
+    }
 
     pub fn load_tree_restore_network(&self) -> QueryResult<TreeRestoreNetwork> {
         use crate::schema::tree_restore_network::dsl::*;

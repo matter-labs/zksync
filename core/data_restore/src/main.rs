@@ -72,7 +72,7 @@ fn load_states_from_beginning(args: Vec<String>) {
     info!("Blocks delta is {}", &delta);
 
     let connection_pool = ConnectionPool::new();
-
+    
     let mut data_restore_driver = create_new_data_restore_driver(config, from, delta);
     load_past_state_for_data_restore_driver(&mut data_restore_driver, connection_pool.clone());
     load_new_states_for_data_restore_driver(&mut data_restore_driver, connection_pool.clone());
@@ -247,11 +247,13 @@ fn main() {
     info!("Hello, lets build Franklin accounts state");
 
     let args: Vec<String> = env::args().collect();
-
-    if args[1] == "storage" {
-        load_states_from_beginning(args);
-    } else {
+    println!("{}", &args[1]);
+    if args[1].clone() == format!("storage") {
+        info!("Loading states from storage");
         load_states_from_storage(args);
+    } else {
+        info!("Loading states from beginning");
+        load_states_from_beginning(args);
     }
 }
 
