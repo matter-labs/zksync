@@ -1113,7 +1113,7 @@ impl StorageProcessor {
     }
 
     /// MARK: - Tree restore part
-    
+
     pub fn save_tree_restore_network(&self, network: &TreeRestoreNetwork) -> QueryResult<()> {
         let inserted = diesel::insert_into(tree_restore_network::table)
             .values(network)
@@ -1124,7 +1124,7 @@ impl StorageProcessor {
         }
         Ok(())
     }
-    
+
     pub fn save_block_events(&self, events: &[StoredBlockLog]) -> QueryResult<()> {
         for event in events.iter() {
             let inserted = diesel::insert_into(block_events::table)
@@ -1138,7 +1138,10 @@ impl StorageProcessor {
         Ok(())
     }
 
-    pub fn save_last_watched_block_number(&self, number: &LastWatchedEthBlockNumber) -> QueryResult<()> {
+    pub fn save_last_watched_block_number(
+        &self,
+        number: &LastWatchedEthBlockNumber,
+    ) -> QueryResult<()> {
         let inserted = diesel::insert_into(tree_restore_last_watched_eth_block::table)
             .values(number)
             .execute(self.conn())?;
@@ -1163,18 +1166,16 @@ impl StorageProcessor {
     }
 
     pub fn delete_tree_restore_network(&self) -> QueryResult<()> {
-        let deleted = diesel::delete(tree_restore_network::table)
-            .execute(self.conn())?;
+        let deleted = diesel::delete(tree_restore_network::table).execute(self.conn())?;
         if 0 == deleted {
             error!("Error: could not delete network!");
             return Err(Error::RollbackTransaction);
         }
         Ok(())
     }
-    
+
     pub fn delete_block_events(&self) -> QueryResult<()> {
-        let deleted = diesel::delete(block_events::table)
-            .execute(self.conn())?;
+        let deleted = diesel::delete(block_events::table).execute(self.conn())?;
         if 0 == deleted {
             error!("Error: could not delete block events!");
             return Err(Error::RollbackTransaction);
@@ -1183,8 +1184,8 @@ impl StorageProcessor {
     }
 
     pub fn delete_last_watched_block_number(&self) -> QueryResult<()> {
-        let deleted = diesel::delete(tree_restore_last_watched_eth_block::table)
-            .execute(self.conn())?;
+        let deleted =
+            diesel::delete(tree_restore_last_watched_eth_block::table).execute(self.conn())?;
         if 0 == deleted {
             error!("Error: could not delete last watched eth block number!");
             return Err(Error::RollbackTransaction);
@@ -1193,8 +1194,7 @@ impl StorageProcessor {
     }
 
     pub fn delete_franklin_transactions(&self) -> QueryResult<()> {
-        let deleted = diesel::delete(franklin_transactions::table)
-            .execute(self.conn())?;
+        let deleted = diesel::delete(franklin_transactions::table).execute(self.conn())?;
         if 0 == deleted {
             error!("Error: could not delete franklin transactions!");
             return Err(Error::RollbackTransaction);

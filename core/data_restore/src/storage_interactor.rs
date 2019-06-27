@@ -1,11 +1,14 @@
-use std::str::FromStr;
-use storage::{StoredBlockLog, TreeRestoreNetwork, ConnectionPool, LastWatchedEthBlockNumber, StoredFranklinTransaction};
-use crate::franklin_transaction::{FranklinTransactionType, FranklinTransaction};
-use web3::types::{U256, H256, H160, U128, Transaction, Bytes};
-use crate::blocks::{BlockType, LogBlockData};
 use crate::block_events::BlockEventsFranklin;
+use crate::blocks::{BlockType, LogBlockData};
+use crate::franklin_transaction::{FranklinTransaction, FranklinTransactionType};
 use crate::helpers;
 use std::convert::TryFrom;
+use std::str::FromStr;
+use storage::{
+    ConnectionPool, LastWatchedEthBlockNumber, StoredBlockLog, StoredFranklinTransaction,
+    TreeRestoreNetwork,
+};
+use web3::types::{Bytes, Transaction, H160, H256, U128, U256};
 
 pub fn remove_storage_data(connection_pool: ConnectionPool) {
     let storage = connection_pool
@@ -22,19 +25,20 @@ pub fn remove_storage_data(connection_pool: ConnectionPool) {
         .expect("error in deleting network data");
     storage
         .delete_franklin_transactions()
-        .expect("error in deleting network data");    
+        .expect("error in deleting network data");
 }
 
-pub fn save_tree_restore_from_config(config: &helpers::DataRestoreConfig, connection_pool: ConnectionPool) {
-    let network = TreeRestoreNetwork{
+pub fn save_tree_restore_from_config(
+    config: &helpers::DataRestoreConfig,
+    connection_pool: ConnectionPool,
+) {
+    let network = TreeRestoreNetwork {
         id: config.network_id,
     };
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for tree restore save network");
-    storage
-        .save_tree_restore_network(&network)
-        .unwrap();
+    storage.save_tree_restore_network(&network).unwrap();
 }
 
 pub fn save_block_events(events: &Vec<LogBlockData>, connection_pool: ConnectionPool) {
@@ -45,14 +49,12 @@ pub fn save_block_events(events: &Vec<LogBlockData>, connection_pool: Connection
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for tree restore save events");
-    storage
-        .save_block_events(stored_logs.as_slice())
-        .unwrap();
+    storage.save_block_events(stored_logs.as_slice()).unwrap();
 }
 
 pub fn save_last_watched_block_number(number: &U256, connection_pool: ConnectionPool) {
     let block_number = LastWatchedEthBlockNumber {
-        number: number.to_string()
+        number: number.to_string(),
     };
     let storage = connection_pool
         .access_storage()
@@ -61,7 +63,6 @@ pub fn save_last_watched_block_number(number: &U256, connection_pool: Connection
         .save_last_watched_block_number(&block_number)
         .unwrap();
 }
-
 
 pub fn save_franklin_transactions(txs: &Vec<FranklinTransaction>, connection_pool: ConnectionPool) {
     let mut stored_txs: Vec<StoredFranklinTransaction> = vec![];
@@ -77,34 +78,32 @@ pub fn save_franklin_transactions(txs: &Vec<FranklinTransaction>, connection_poo
 }
 
 pub fn stored_block_log_into_block_log(block: &StoredBlockLog) -> Option<LogBlockData> {
-    Some( 
-        LogBlockData {
-            block_num: u32::try_from(block.block_num).unwrap(),
-            transaction_hash: H256::from_str(block.transaction_hash.as_str()).unwrap(),
-            block_type: match &block.block_type {
-                c if c == "Committed" => BlockType::Committed,
-                v if v == "Verified" => BlockType::Verified,
-                _ => return None,
-            },
-        }
-    )
+    Some(LogBlockData {
+        block_num: u32::try_from(block.block_num).unwrap(),
+        transaction_hash: H256::from_str(block.transaction_hash.as_str()).unwrap(),
+        block_type: match &block.block_type {
+            c if c == "Committed" => BlockType::Committed,
+            v if v == "Verified" => BlockType::Verified,
+            _ => return None,
+        },
+    })
 }
 
 pub fn block_log_into_stored_block_log(block: &LogBlockData) -> Option<StoredBlockLog> {
-    Some(
-        StoredBlockLog {
-            block_type: match block.block_type {
-                BlockType::Committed => "Committed".to_string(),
-                BlockType::Verified => "Verified".to_string(),
-                BlockType::Unknown => return None,
-            },
-            transaction_hash: block.transaction_hash.to_string(),
-            block_num: i64::from(block.block_num),
-        }
-    )
+    Some(StoredBlockLog {
+        block_type: match block.block_type {
+            BlockType::Committed => "Committed".to_string(),
+            BlockType::Verified => "Verified".to_string(),
+            BlockType::Unknown => return None,
+        },
+        transaction_hash: block.transaction_hash.to_string(),
+        block_num: i64::from(block.block_num),
+    })
 }
 
-pub fn get_config_from_storage(connection_pool: ConnectionPool) -> Option<helpers::DataRestoreConfig> {
+pub fn get_config_from_storage(
+    connection_pool: ConnectionPool,
+) -> Option<helpers::DataRestoreConfig> {
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for tree restore config");
@@ -134,11 +133,23 @@ pub fn transaction_into_stored_transaction(tx: &FranklinTransaction) -> StoredFr
 
     let eth_tx_hash = tx.ethereum_transaction.hash.to_string();
     let eth_tx_nonce = tx.ethereum_transaction.nonce.to_string();
-    let eth_tx_block_hash = tx.ethereum_transaction.block_hash.map_or(None, |x| Some(x.to_string()));
-    let eth_tx_block_number = tx.ethereum_transaction.block_number.map_or(None, |x| Some(x.to_string()));
-    let eth_tx_transaction_index = tx.ethereum_transaction.transaction_index.map_or(None, |x| Some(x.to_string()));
+    let eth_tx_block_hash = tx
+        .ethereum_transaction
+        .block_hash
+        .map_or(None, |x| Some(x.to_string()));
+    let eth_tx_block_number = tx
+        .ethereum_transaction
+        .block_number
+        .map_or(None, |x| Some(x.to_string()));
+    let eth_tx_transaction_index = tx
+        .ethereum_transaction
+        .transaction_index
+        .map_or(None, |x| Some(x.to_string()));
     let eth_tx_from = tx.ethereum_transaction.from.to_string();
-    let eth_tx_to = tx.ethereum_transaction.to.map_or(None, |x| Some(x.to_string()));
+    let eth_tx_to = tx
+        .ethereum_transaction
+        .to
+        .map_or(None, |x| Some(x.to_string()));
     let eth_tx_value = tx.ethereum_transaction.value.to_string();
     let eth_tx_gas_price = tx.ethereum_transaction.gas_price.to_string();
     let eth_tx_gas = tx.ethereum_transaction.gas.to_string();
@@ -176,28 +187,20 @@ pub fn stored_transaction_into_transaction(tx: &StoredFranklinTransaction) -> Fr
     let nonce = U256::from_str(tx.eth_tx_nonce.as_str()).unwrap();
     let block_hash = match &tx.eth_tx_block_hash {
         None => None,
-        Some(x) => Some(
-            H256::from_str(x.as_str()).unwrap()
-        ),
+        Some(x) => Some(H256::from_str(x.as_str()).unwrap()),
     };
     let block_number = match &tx.eth_tx_block_number {
         None => None,
-        Some(x) => Some(
-            U256::from_str(x.as_str()).unwrap()
-        ),
+        Some(x) => Some(U256::from_str(x.as_str()).unwrap()),
     };
     let transaction_index = match &tx.eth_tx_transaction_index {
         None => None,
-        Some(x) => Some(
-            U128::from_str(x.as_str()).unwrap()
-        ),
+        Some(x) => Some(U128::from_str(x.as_str()).unwrap()),
     };
     let from = H160::from_str(tx.eth_tx_from.as_str()).unwrap();
     let to = match &tx.eth_tx_to {
         None => None,
-        Some(x) => Some(
-            H160::from_str(x.as_str()).unwrap()
-        ),
+        Some(x) => Some(H160::from_str(x.as_str()).unwrap()),
     };
     let value = U256::from_str(tx.eth_tx_value.as_str()).unwrap();
     let gas_price = U256::from_str(tx.eth_tx_gas_price.as_str()).unwrap();
@@ -231,8 +234,7 @@ pub fn get_transactions_from_storage(connection_pool: ConnectionPool) -> Vec<Fra
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for past events");
-    let committed_txs = storage
-        .load_franklin_transactions();
+    let committed_txs = storage.load_franklin_transactions();
     let mut txs: Vec<FranklinTransaction> = vec![];
     for tx in committed_txs {
         txs.push(stored_transaction_into_transaction(&tx));
@@ -244,7 +246,7 @@ pub fn get_last_watched_block_number_from_storage(connection_pool: ConnectionPoo
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for past events");
-    
+
     let last_watched_block_number_string = storage
         .load_last_watched_block_number()
         .expect("load_blocks_events: db must work")
@@ -254,28 +256,27 @@ pub fn get_last_watched_block_number_from_storage(connection_pool: ConnectionPoo
 
 pub fn get_block_events_from_storage(connection_pool: ConnectionPool) -> BlockEventsFranklin {
     let config = get_config_from_storage(connection_pool.clone()).unwrap();
-    let last_watched_block_number = get_last_watched_block_number_from_storage(connection_pool.clone());
+    let last_watched_block_number =
+        get_last_watched_block_number_from_storage(connection_pool.clone());
 
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for past events");
-    
-    let committed_logs = storage
-        .load_committed_block_events();
+
+    let committed_logs = storage.load_committed_block_events();
     let mut committed_blocks: Vec<LogBlockData> = vec![];
     for log in committed_logs {
         let block_log = stored_block_log_into_block_log(&log).expect("block logs db is broken");
         committed_blocks.push(block_log);
     }
 
-    let verified_logs = storage
-        .load_verified_block_events();
+    let verified_logs = storage.load_verified_block_events();
     let mut verified_blocks: Vec<LogBlockData> = vec![];
     for log in verified_logs {
         let block_log = stored_block_log_into_block_log(&log).expect("block logs db is broken");
         verified_blocks.push(block_log);
     }
-    
+
     BlockEventsFranklin {
         config,
         committed_blocks,
