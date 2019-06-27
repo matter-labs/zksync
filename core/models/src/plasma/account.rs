@@ -34,7 +34,7 @@ pub enum AccountUpdate {
     UpdateBalance {
         id: u32,
         // (token, old, new)
-        balance_update: Vec<(TokenId, BigDecimal, BigDecimal)>,
+        balance_update: (TokenId, BigDecimal, BigDecimal),
     },
 }
 
