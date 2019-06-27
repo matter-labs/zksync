@@ -312,7 +312,7 @@ pub struct LastWatchedEthBlockNumber {
 pub struct StoredBlockLog {
     pub block_type: String, // 'Committed', 'Verified'
     pub transaction_hash: String,
-    pub block_num: i32,
+    pub block_num: i64,
 }
 
 // impl StoredBlockLog {
@@ -335,7 +335,7 @@ pub struct StoredBlockLog {
 #[table_name = "franklin_transactions"]
 pub struct StoredFranklinTransaction {
     pub franklin_transaction_type: String, // Deposit, Transfer, FullExit
-    pub block_number: i32,
+    pub block_number: i64,
     pub eth_tx_hash: String,
     pub eth_tx_nonce: String,
     pub eth_tx_block_hash: Option<String>,

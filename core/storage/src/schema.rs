@@ -84,14 +84,14 @@ table! {
     block_events (block_num) {
         block_type -> Text,
         transaction_hash -> Text,
-        block_num -> Int4,
+        block_num -> Int8,
     }
 }
 
 table! {
     franklin_transactions (block_number) {
         franklin_transaction_type -> Text,
-        block_number -> Int4,
+        block_number -> Int8,
         eth_tx_hash -> Text,
         eth_tx_nonce -> Text,
         eth_tx_block_hash -> Nullable<Text>,

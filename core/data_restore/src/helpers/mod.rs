@@ -11,6 +11,7 @@ use web3::types::{Address, H256};
 /// Configuratoin of DataRestore driver
 #[derive(Debug, Clone)]
 pub struct DataRestoreConfig {
+    pub network_id: i32,
     /// Web3 endpoint url string
     pub web3_endpoint: String,
     /// Provides Ethereum Franklin contract unterface
@@ -31,6 +32,7 @@ impl DataRestoreConfig {
         match network {
             InfuraEndpoint::Mainnet => {
                 Self {
+                    network_id: 1,
                     web3_endpoint: config.mainnet_http_endpoint_string, //"https://rinkeby.infura.io/".to_string(),
                     franklin_contract: ethabi::Contract::load(PROD_PLASMA.0).unwrap(),
                     franklin_contract_address: config
@@ -42,6 +44,7 @@ impl DataRestoreConfig {
             }
             InfuraEndpoint::Rinkeby => {
                 Self {
+                    network_id: 4,
                     web3_endpoint: config.rinkeby_http_endpoint_string, //"https://rinkeby.infura.io/".to_string()
                     franklin_contract: ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap(),
                     franklin_contract_address: config

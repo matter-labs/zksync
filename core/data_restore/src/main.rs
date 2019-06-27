@@ -20,15 +20,16 @@ fn create_new_data_restore_driver(
     config: helpers::DataRestoreConfig,
     from: U256,
     delta: U256,
+    connection_pool: ConnectionPool
 ) -> DataRestoreDriver {
-    DataRestoreDriver::new(config, from, delta)
+    DataRestoreDriver::new(config, from, delta, connection_pool)
 }
 
-fn load_past_state_for_data_restore_driver(driver: &mut DataRestoreDriver, pool: ConnectionPool) {
+fn load_past_state_for_data_restore_driver(driver: &mut DataRestoreDriver) {
     driver.load_past_state().expect("Cant get past state");
 }
 
-fn load_new_states_for_data_restore_driver(driver: &mut DataRestoreDriver, pool: ConnectionPool) {
+fn load_new_states_for_data_restore_driver(driver: &mut DataRestoreDriver) {
     driver.run_state_updates().expect("Cant update state");
 }
 
@@ -52,7 +53,6 @@ fn load_new_states_for_data_restore_driver(driver: &mut DataRestoreDriver, pool:
 // }
 
 fn load_states_from_beginning(args: Vec<String>) {
-    
     let infura_endpoint_id =
         u8::from_str(&args[1]).expect("Network endpoint should be convertible to u8");
     info!("Network number is {}", &infura_endpoint_id);
@@ -74,26 +74,26 @@ fn load_states_from_beginning(args: Vec<String>) {
 
     remove_storage_data(connection_pool.clone());
     
-    let mut data_restore_driver = create_new_data_restore_driver(config, from, delta);
-    load_past_state_for_data_restore_driver(&mut data_restore_driver, connection_pool.clone());
-    load_new_states_for_data_restore_driver(&mut data_restore_driver, connection_pool.clone());
+    let mut data_restore_driver = create_new_data_restore_driver(config, from, delta, connection_pool.clone());
+    load_past_state_for_data_restore_driver(&mut data_restore_driver);
+    load_new_states_for_data_restore_driver(&mut data_restore_driver);
 }
 
 fn load_states_from_storage(args: Vec<String>) {
     let connection_pool = ConnectionPool::new();
 
-    let config = load_config_from_storage(connection_pool.clone()).expect("Network id is broken in storage");
+    let config = get_config_from_storage(connection_pool.clone()).expect("Network id is broken in storage");
     let from = U256::from(0); // It's better not to allow external users to set "from block" parameter. In 99% cases 0(zero) is correct
     let delta = U256::from_str(&args[2]).expect("Blocks delta should be convertible to u256");
     info!("Blocks delta is {}", &delta);
 
-    let mut data_restore_driver = create_new_data_restore_driver(config, from, delta);
+    let mut data_restore_driver = create_new_data_restore_driver(config, from, delta, connection_pool.clone());
     load_past_state_from_storage(&mut data_restore_driver, connection_pool.clone());
-    load_new_states_for_data_restore_driver(&mut data_restore_driver, connection_pool.clone());
+    load_new_states_for_data_restore_driver(&mut data_restore_driver);
 }
 
 fn load_past_state_from_storage(driver: &mut DataRestoreDriver, connection_pool: ConnectionPool) {
-    driver.block_events = get_block_events_from_storage(driver.config.clone(), connection_pool.clone());
+    driver.block_events = get_block_events_from_storage(connection_pool.clone());
     let transactions = get_transactions_from_storage(connection_pool.clone());
     for tx in transactions {
         driver.account_states.update_accounts_states_from_transaction(&tx)
@@ -116,19 +116,19 @@ fn main() {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
+// #[cfg(test)]
+// mod test {
+//     use super::*;
 
-    #[test]
-    fn test_complete_task() {
-        let config = helpers::DataRestoreConfig::new(helpers::InfuraEndpoint::Rinkeby);
-        let from = U256::from(0);
-        let delta = U256::from(15);
-        let mut data_restore_driver = create_new_data_restore_driver(config, from, delta);
-        data_restore_driver
-            .load_past_state()
-            .expect("Cant get past state");
-        data_restore_driver.run_state_updates();
-    }
-}
+//     #[test]
+//     fn test_complete_task() {
+//         let config = helpers::DataRestoreConfig::new(helpers::InfuraEndpoint::Rinkeby);
+//         let from = U256::from(0);
+//         let delta = U256::from(15);
+//         let mut data_restore_driver = create_new_data_restore_driver(config, from, delta);
+//         data_restore_driver
+//             .load_past_state()
+//             .expect("Cant get past state");
+//         data_restore_driver.run_state_updates();
+//     }
+// }
