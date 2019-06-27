@@ -56,13 +56,15 @@ impl<E: JubjubEngine> AllocatedOperationBranchBase<E> {
             .account
             .make_bit_form(cs.namespace(|| "account_bit_form"))?;
 
-        let balance_bit_form = self
+        let mut balance_bit_form = self
             .balance_value
             .into_bits_le(cs.namespace(|| "balance_value_bits"))?;
+        balance_bit_form.truncate(*franklin_constants::BALANCE_BIT_WIDTH);
 
-        let subaccount_data_bit_form = self
+        let mut subaccount_data_bit_form = self
             .dummmy_subaccount_value
             .into_bits_le(cs.namespace(|| "subaccount_data_bits_value"))?;
+        subaccount_data_bit_form.truncate(*franklin_constants::SUBACCOUNT_BIT_WIDTH);
         Ok(AllocatedOperationBranchBitForm {
             account: account_bit_form,
             account_address: account_address_bits,

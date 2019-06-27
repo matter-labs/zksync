@@ -75,6 +75,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             .assert_zero(cs.namespace(|| "initial allocated_rolling_pubdata"))?;
 
         for (i, operation) in self.operations.iter().enumerate() {
+            println!("operation numer {} started \n", i);
             let cs = &mut cs.namespace(|| format!("chunk number {}", i));
 
             let (next_chunk, chunk_data) = self.verify_correct_chunking(
@@ -130,7 +131,11 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             let operation_new_root =
                 AllocatedNum::alloc(cs.namespace(|| "op_new_root"), || operation.new_root.grab())?;
             //TODO inputize
-
+            println!("new state_root: {}", new_state_root.get_value().unwrap());
+            println!(
+                "op new state_root: {}",
+                operation_new_root.get_value().unwrap()
+            );
             cs.enforce(
                 || "new root is correct",
                 |lc| lc + new_state_root.get_variable(),
@@ -399,7 +404,16 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "allocate current_account_leaf_hash"),
             cur,
         )?;
-
+        let temp = pedersen_hash::pedersen_hash(
+            cs.namespace(|| "account leaf content hash"),
+            pedersen_hash::Personalization::NoteCommitment,
+            &cur_account_leaf_bits,
+            self.params,
+        )?
+        .clone()
+        .get_x()
+        .clone();
+        println!("acc_leaf_hash: {}", temp.get_value().unwrap());
         Ok((
             allocate_merkle_root(
                 cs.namespace(|| "account_merkle_root"),
@@ -541,7 +555,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let new_pubkey_x =
             AllocatedNum::alloc(cs.namespace(|| "new_pub_x"), || op.args.new_pub_x.grab())?;
         let new_pubkey_y =
-            AllocatedNum::alloc(cs.namespace(|| "new_pub_y"), || op.args.new_pub_x.grab())?;
+            AllocatedNum::alloc(cs.namespace(|| "new_pub_y"), || op.args.new_pub_y.grab())?;
         let mut new_pubkey_x_bits = new_pubkey_x.into_bits_le(cs.namespace(|| "new_pub_x_bits"))?;
         new_pubkey_x_bits.truncate(1);
 
@@ -594,7 +608,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &operation_data,
             &pubdata,
         )?;
-
+        println!("op_valid {}", op_valid.get_value().unwrap());
         cs.enforce(
             || "op is valid",
             |_| op_valid.lc(CS::one(), E::Fr::one()),
@@ -622,7 +636,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &chunk_data.tx_type,
             &allocated_deposit_tx_type,
         )?;
-        let mut is_pubkey_correct = Boolean::Constant(false);
+        let mut is_pubkey_correct = Boolean::Constant(true);
         let is_pub_x_correct = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "new_pub_x equals old_x"),
             &op_data.new_pubkey_x,
@@ -695,14 +709,22 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let mut tx_valid = Boolean::and(
             cs.namespace(|| "deposit and pubkey_corect"),
-            &Boolean::from(is_deposit),
+            &Boolean::from(is_deposit.clone()),
             &is_pubkey_correct,
         )?;
-        tx_valid = Boolean::and(
-            cs.namespace(|| "and pubdata_correct"),
-            &tx_valid,
-            &is_pubdata_correct,
-        )?;
+        println!("is deposit {}", is_deposit.get_value().unwrap());
+        println!(
+            "is pubkeycorrect {}",
+            is_pubkey_correct.get_value().unwrap()
+        );
+
+        //TODO: uncommet pubdata_check
+        // tx_valid = Boolean::and(
+        //     cs.namespace(|| "and pubdata_correct"),
+        //     &tx_valid,
+        //     &is_pubdata_correct,
+        // )?;
+        println!("tx_valid {}", tx_valid.get_value().unwrap());
 
         //TODO precompute
         let zero = AllocatedNum::alloc(cs.namespace(|| "zero"), || Ok(E::Fr::zero()))?;
@@ -712,7 +734,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &chunk_data.chunk_number,
             &zero,
         )?);
-
+        println!("is_first  chunk {}", is_first_chunk.get_value().unwrap());
         let is_valid_first = Boolean::and(
             cs.namespace(|| "is valid and first"),
             &tx_valid,
@@ -729,7 +751,10 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             || "correct_updated_balance",
             |lc| lc + updated_balance_value.get_variable(),
             |lc| lc + CS::one(),
-            |lc| lc + op_data.amount.get_variable() - op_data.fee.get_variable(),
+            |lc| {
+                lc + cur.base.balance_value.get_variable() + op_data.amount.get_variable()
+                    - op_data.fee.get_variable()
+            },
         );
 
         //mutate current branch if it is first chunk of valid deposit transaction
@@ -739,19 +764,33 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &cur.base.balance_value,
             &is_valid_first,
         )?;
+        println!(
+            "changed bal data: {}",
+            cur.base.balance_value.get_value().unwrap()
+        );
         cur.base.account.pub_x = AllocatedNum::conditionally_select(
             cs.namespace(|| "update pub_x if valid first"),
             &op_data.new_pubkey_x,
             &cur.base.account.pub_x,
             &is_valid_first,
         )?;
-
+        println!(
+            "changed pubx data: {}",
+            cur.base.account.pub_x.get_value().unwrap()
+        );
         cur.base.account.pub_y = AllocatedNum::conditionally_select(
             cs.namespace(|| "update pub_y if valid first"),
             &op_data.new_pubkey_y,
             &cur.base.account.pub_y,
             &is_valid_first,
         )?;
+        println!(
+            "changed puby data: {}",
+            cur.base.account.pub_y.get_value().unwrap()
+        );
+        cur.bits = cur
+            .base
+            .make_bit_form(cs.namespace(|| "update bit form of branch"))?;
         Ok(tx_valid)
     }
     fn allocate_account_leaf_bits<CS: ConstraintSystem<E>>(
@@ -771,7 +810,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         subtree_data
             .extend(balance_root.into_bits_le(cs.namespace(|| "balance_subtree_root_bits"))?);
-
+        // println!("balance root: {}", balance_root.get_value().unwrap());
         let subaccount_data = &branch.bits.subaccount_data;
         let subaccount_root = allocate_merkle_root(
             cs.namespace(|| "subaccount_subtree_root"),
@@ -782,7 +821,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         subtree_data
             .extend(subaccount_root.into_bits_le(cs.namespace(|| "subaccount_subtree_root_bits"))?);
-
+        // println!("subaccount root: {}", subaccount_root.get_value().unwrap());
         let subtree_root = pedersen_hash::pedersen_hash(
             cs.namespace(|| "subtree_root"),
             pedersen_hash::Personalization::MerkleTree(*franklin_constants::BALANCE_TREE_DEPTH),
@@ -791,7 +830,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?
         .get_x()
         .clone();
-
+        // println!("subtree root: {}", subtree_root.get_value().unwrap());
         let mut account_data = vec![];
         account_data.extend(branch.bits.account.nonce_bits.clone());
         append_packed_public_key(
@@ -824,19 +863,14 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let is_account_empty =
             AllocatedNum::equals(cs.namespace(|| "is_account_empty"), &account_packed, &zero)?;
+        let mut subtree_root_bits =
+            subtree_root.into_bits_le(cs.namespace(|| "subtree_root_bits"))?;
+        subtree_root_bits.resize(*franklin_constants::FR_BIT_WIDTH, Boolean::Constant(false));
 
-        account_data.extend(subtree_root.into_bits_le(cs.namespace(|| "subtree_root_bits"))?);
-
+        account_data.extend(subtree_root_bits);
+        // println!("acc len {}", account_data.len());
         // //TODO: assert_eq length of account_data
 
-        // let account_leaf_hash = pedersen_hash::pedersen_hash(
-        //     cs.namespace(|| "account leaf content hash"),
-        //     pedersen_hash::Personalization::NoteCommitment, //TODO change personalization
-        //     &account_data,
-        //     self.params,
-        // )?
-        // .get_x()
-        // .clone();
         Ok((account_data, Boolean::from(is_account_empty)))
     }
 }
@@ -859,7 +893,7 @@ fn allocate_merkle_root<E: JubjubEngine, CS: ConstraintSystem<E>>(
     // This is an injective encoding, as cur is a
     // point in the prime order subgroup.
     let mut cur_hash = account_leaf_hash.get_x().clone();
-    println!("leaf_hash: {}", cur_hash.get_value().unwrap());
+    // println!("leaf_hash: {}", cur_hash.get_value().unwrap());
 
     // Ascend the merkle tree authentication path
     for (i, direction_bit) in index.clone().into_iter().enumerate() {
@@ -1027,15 +1061,18 @@ mod test {
         let mut balance_tree =
             CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
         let balance_root = balance_tree.root_hash();
+        // println!("test balance root: {}", balance_root);
         let mut subaccount_tree =
             CircuitSubaccountTree::new(*franklin_constants::SUBACCOUNT_TREE_DEPTH as u32);
         let subaccount_root = subaccount_tree.root_hash();
+        // println!("test subaccount root: {}", subaccount_root);
         let phasher = PedersenHasher::<Bn256>::default();
         let default_subtree_hash = phasher.compress(
             &balance_root,
             &subaccount_root,
             *franklin_constants::BALANCE_TREE_DEPTH,
         );
+        // println!("test subtree root: {}", default_subtree_hash);
         let zero_account = CircuitAccount {
             nonce: Fr::zero(),
             pub_x: Fr::zero(),

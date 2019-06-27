@@ -106,8 +106,6 @@ where
         Ok(*witness.pub_y.get()?)
     })?;
 
-    let mut pub_y_bits = pub_y.into_bits_le(cs.namespace(|| "pub_y bits"))?;
-
     Ok(AccountContentBase {
         nonce: nonce,
         pub_x: pub_x,

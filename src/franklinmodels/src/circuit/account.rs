@@ -42,6 +42,8 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
             self.subtree_root_hash
                 .get_bits_le_fixed(*params::FR_BIT_WIDTH),
         );
+        println!("test acc len {}", leaf_content.len());
+
         leaf_content
     }
 }
@@ -76,7 +78,7 @@ pub struct Subaccount<E: JubjubEngine> {
 impl<E: JubjubEngine> GetBits for Subaccount<E> {
     fn get_bits_le(&self) -> Vec<bool> {
         let mut leaf_content = Vec::new();
-        leaf_content.extend(self.value.get_bits_le_fixed(*params::FR_BIT_WIDTH));
+        leaf_content.extend(self.value.get_bits_le_fixed(*params::SUBACCOUNT_BIT_WIDTH));
 
         leaf_content
     }
