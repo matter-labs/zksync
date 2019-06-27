@@ -1,6 +1,6 @@
-use crate::account::{AccountContentBase, AccountContentBitForm, AccountWitness};
+use crate::account::AccountContentBase;
 use crate::allocated_structures::*;
-use crate::operation::{Operation, OperationBranch, OperationBranchWitness};
+use crate::operation::{Operation, OperationBranch};
 use crate::utils::append_packed_public_key;
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use ff::{Field, PrimeField};
@@ -14,8 +14,6 @@ use franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers
 use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
 use franklinmodels::params as franklin_constants;
-use pairing::bn256::Bn256;
-use pairing::Engine;
 
 const OPERATION_NUMBER: usize = 4;
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 11;
@@ -37,15 +35,6 @@ struct PreviousData<E: JubjubEngine> {
     new_root: AllocatedNum<E>,
 }
 
-struct Computed<E: JubjubEngine> {
-    // pub last_chunk: Option<AllocatedBit>,
-    // pub chunk_number: Option<AllocatedNum<E>>,
-    pub pubdata: AllocatedNum<E>,
-    pub range_checked: Option<AllocatedBit>,
-    pub new_pubkey_hash: Option<AllocatedNum<E>>,
-    pub cur: Option<OperationBranch<E>>,
-}
-
 macro_rules! csprintln {
     ($x:expr,$($arg:tt)*) => (if $x {println!($($arg)*)});
 }
@@ -54,7 +43,6 @@ macro_rules! csprintln {
 //
 impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
     fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
-        let mut _running_hash: Option<E::Fr>; // TODO: should be initial hash (verify)
         let initial_pubdata =
             AllocatedNum::alloc(cs.namespace(|| "initial pubdata"), || Ok(E::Fr::zero()))?;
         initial_pubdata.assert_zero(cs.namespace(|| "initial pubdata is zero"))?;
@@ -86,7 +74,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             allocated_chunk_data = chunk_data;
             next_chunk_number = next_chunk;
 
-            // mutates computed.pubdata
             allocated_rolling_pubdata = self.accumulate_pubdata(
                 cs.namespace(|| "accumulate_pubdata"),
                 &operation,
@@ -124,7 +111,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &is_account_empty,
                 &allocated_rolling_pubdata,
             )?;
-            let (new_state_root, is_account_empty) = self.check_account_data(
+            let (new_state_root, _is_account_empty) = self.check_account_data(
                 cs.namespace(|| "calculate new account root"),
                 &current_branch,
             )?;
@@ -287,7 +274,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         mut cs: CS,
         first: &AllocatedOperationBranch<E>,
         second: &AllocatedOperationBranch<E>,
-        op: &Operation<E>,
+        _op: &Operation<E>,
         chunk_data: &AllocatedChunkData<E>,
     ) -> Result<AllocatedOperationBranch<E>, SynthesisError> {
         let deposit_allocated =
@@ -495,6 +482,11 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             *franklin_constants::COMPACT_AMOUNT_MANTISSA_BIT_WIDTH,
             10,
         )?;
+        let is_compact_amount_correct = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "compact amount correct"),
+            &amount,
+            &compact_amount,
+        )?);
 
         let allocated_message =
             AllocatedNum::alloc(cs.namespace(|| "signature_message_x"), || op.sig_msg.grab())?;
@@ -602,9 +594,9 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let op_valid = self.deposit(
             cs.namespace(|| "deposit"),
             &mut cur,
-            &op,
             &chunk_data,
             &is_account_empty,
+            &is_compact_amount_correct,
             &operation_data,
             &pubdata,
         )?;
@@ -621,9 +613,9 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         &self,
         mut cs: CS,
         cur: &mut AllocatedOperationBranch<E>,
-        op: &Operation<E>,
         chunk_data: &AllocatedChunkData<E>,
         is_account_empty: &Boolean,
+        is_compact_amount_correct: &Boolean,
         op_data: &AllocatedOperationData<E>,
         pubdata: &AllocatedNum<E>,
     ) -> Result<Boolean, SynthesisError> {
@@ -699,7 +691,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &supposed_pubdata_packed,
             pubdata,
         )?);
-        let is_pubdata_correct = Boolean::and(
+        let _is_pubdata_correct = Boolean::and(
             cs.namespace(|| "is_pubdata_correct"),
             &Boolean::from(chunk_data.is_chunk_last.clone()),
             &is_pubdata_equal.not(),
@@ -708,7 +700,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         //TODO a and b correct
 
         let mut tx_valid = Boolean::and(
-            cs.namespace(|| "deposit and pubkey_corect"),
+            cs.namespace(|| "tx_valid and deposit and pubkey_correct"),
             &Boolean::from(is_deposit.clone()),
             &is_pubkey_correct,
         )?;
@@ -718,7 +710,12 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             is_pubkey_correct.get_value().unwrap()
         );
 
-        //TODO: uncommet pubdata_check
+        tx_valid = Boolean::and(
+            cs.namespace(|| "tx_valid and is_compact_amount_correct"),
+            &tx_valid,
+            &is_compact_amount_correct,
+        )?;
+        //TODO: uncomment pubdata_check
         // tx_valid = Boolean::and(
         //     cs.namespace(|| "and pubdata_correct"),
         //     &tx_valid,
@@ -1025,34 +1022,75 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
     interpolation
 }
 
+// allocates a>=b
+fn allocate_geq<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    a: &AllocatedNum<E>,
+    b: &AllocatedNum<E>,
+) -> Result<Boolean, SynthesisError> {
+    let c = AllocatedNum::alloc(cs.namespace(|| "a-b"), || {
+        let mut a_val = a.get_value().grab()?;
+        a_val.sub_assign(b.get_value().get()?);
+        Ok(a_val)
+    })?;
+    cs.enforce(
+        || "a-b is correct",
+        |lc| lc + a.get_variable() - b.get_variable(),
+        |lc| lc + CS::one(),
+        |lc| lc + c.get_variable(),
+    );
+    unimplemented!();
+    // c.into_bits_le(mut cs: CS)
+}
+fn pack_bits_to_element<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    bits: &[Boolean],
+) -> Result<AllocatedNum<E>, SynthesisError> {
+    let mut data_from_lc = Num::<E>::zero();
+    let mut coeff = E::Fr::one();
+    for bit in bits {
+        data_from_lc = data_from_lc.add_bool_with_coeff(CS::one(), &bit, coeff);
+        coeff.double();
+    }
+
+    let data_packed = AllocatedNum::alloc(cs.namespace(|| "allocate account data packed"), || {
+        Ok(*data_from_lc.get_value().get()?)
+    })?;
+
+    cs.enforce(
+        || "pack account data",
+        |lc| lc + data_packed.get_variable(),
+        |lc| lc + CS::one(),
+        |_| data_from_lc.lc(E::Fr::one()),
+    );
+
+    Ok(data_packed)
+}
 #[cfg(test)]
 mod test {
 
     use super::*;
-    use ff::PrimeFieldRepr;
+
     use franklin_crypto::jubjub::FixedGenerators;
 
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
 
     #[test]
     fn test_deposit_franklin_in_empty_leaf() {
+        use crate::account::*;
         use crate::operation::*;
         use crate::utils::*;
         use ff::{BitIterator, Field};
-        use franklin_crypto::alt_babyjubjub::{AltJubjubBn256, JubjubEngine};
+        use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
         use franklin_crypto::circuit::test::*;
-        use franklinmodels::circuit::account::{Balance, CircuitAccount, Subaccount};
+        use franklinmodels::circuit::account::{Balance, CircuitAccount};
         use franklinmodels::{CircuitAccountTree, CircuitBalanceTree, CircuitSubaccountTree};
         use merkle_tree::hasher::Hasher;
-        use merkle_tree::{PedersenHasher, SparseMerkleTree};
+        use merkle_tree::PedersenHasher;
         use pairing::bn256::*;
         use rand::{Rng, SeedableRng, XorShiftRng};
         // use super::super::account_tree::{AccountTree, Account};
         use franklin_crypto::circuit::float_point::convert_to_float;
-
-        use crypto::digest::Digest;
-        use crypto::sha2::Sha256;
-        use hex;
 
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;
@@ -1062,7 +1100,7 @@ mod test {
             CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
         let balance_root = balance_tree.root_hash();
         // println!("test balance root: {}", balance_root);
-        let mut subaccount_tree =
+        let subaccount_tree =
             CircuitSubaccountTree::new(*franklin_constants::SUBACCOUNT_TREE_DEPTH as u32);
         let subaccount_root = subaccount_tree.root_hash();
         // println!("test subaccount root: {}", subaccount_root);

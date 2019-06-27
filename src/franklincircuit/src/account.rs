@@ -1,4 +1,3 @@
-use crate::utils::append_packed_public_key;
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::params as franklin_constants;
 

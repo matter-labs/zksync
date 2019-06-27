@@ -1,5 +1,3 @@
-use pairing::bn256::Bn256;
-
 /// Account tree depth
 pub const ACCOUNT_TREE_DEPTH: &'static usize = &24;
 

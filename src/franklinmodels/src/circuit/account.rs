@@ -1,8 +1,8 @@
 use crate::params;
-use crate::{CircuitBalanceTree, CircuitSubaccountTree};
-use ff::{Field, PrimeField};
+
+use ff::Field;
 use franklin_crypto::alt_babyjubjub::JubjubEngine;
-use merkle_tree::{PedersenHasher, SparseMerkleTree};
+
 use models::primitives::{GetBits, GetBitsFixed};
 #[derive(Debug, Clone)]
 pub struct CircuitAccount<E: JubjubEngine> {

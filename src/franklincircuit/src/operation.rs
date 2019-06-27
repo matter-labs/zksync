@@ -1,7 +1,6 @@
-use crate::account::{AccountContentBase, AccountContentBitForm, AccountWitness};
-use ff::{Field, PrimeField};
-use franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
-use franklin_crypto::circuit::num::AllocatedNum;
+use crate::account::AccountWitness;
+use ff::Field;
+
 use franklin_crypto::jubjub::{edwards, Unknown};
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
 

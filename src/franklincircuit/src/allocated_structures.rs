@@ -1,18 +1,16 @@
 use crate::account;
-use crate::account::{AccountContentBase, AccountContentBitForm, AccountWitness};
+use crate::account::{AccountContentBase, AccountContentBitForm};
 use crate::operation::{Operation, OperationBranch, OperationBranchWitness};
 use crate::utils;
 use franklinmodels::params as franklin_constants;
 
-use bellman::{Circuit, ConstraintSystem, SynthesisError};
-use ff::{Field, PrimeField};
+use bellman::{ConstraintSystem, SynthesisError};
+
 use franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
 use franklin_crypto::circuit::num::AllocatedNum;
-use franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
+
 use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
-use pairing::bn256::Bn256;
-use pairing::Engine;
 
 pub struct AllocatedOperationBranch<E: JubjubEngine> {
     pub base: AllocatedOperationBranchBase<E>,
