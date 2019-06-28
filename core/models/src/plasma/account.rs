@@ -50,6 +50,46 @@ impl AccountUpdate {
             AccountUpdate::UpdateBalance { id, .. } => id,
         }
     }
+
+    pub fn reverse_update(&self) -> Self {
+        match self {
+            AccountUpdate::Create {
+                id,
+                public_key_x,
+                public_key_y,
+                nonce,
+            } => AccountUpdate::Delete {
+                id: *id,
+                public_key_x: public_key_x.clone(),
+                public_key_y: public_key_y.clone(),
+                nonce: *nonce,
+            },
+            AccountUpdate::Delete {
+                id,
+                public_key_x,
+                public_key_y,
+                nonce,
+            } => AccountUpdate::Create {
+                id: *id,
+                public_key_x: public_key_x.clone(),
+                public_key_y: public_key_y.clone(),
+                nonce: *nonce,
+            },
+            AccountUpdate::UpdateBalance {
+                id,
+                nonce,
+                balance_update,
+            } => AccountUpdate::UpdateBalance {
+                id: *id,
+                nonce: *nonce,
+                balance_update: (
+                    balance_update.0,
+                    balance_update.2.clone(),
+                    balance_update.1.clone(),
+                ),
+            },
+        }
+    }
 }
 
 impl Default for Account {
