@@ -739,40 +739,50 @@ impl StorageProcessor {
         &self,
         from_block: u32,
         to_block: u32,
-    ) -> QueryResult<(u32, AccountMap)> {
-        unimplemented!();
-        //        let start_block = cmp::min(from_block, to_block);
-        //        let end_block = cmp::max(from_block, to_block);
-        //
-        //        // this takes all blocks changed between `start_block` and `end_block`
-        //        // and then takes the latest updated for each before `to_block`
-        //        //
-        //        // argument block numbers point at the next expected block, i.e. empty state starts at block 1
-        //
-        //        let select = format!("
-        //            WITH upd AS (
-        //                WITH s AS (
-        //                    SELECT
-        //                        account_id as id,
-        //                        (SELECT max(block_number) FROM account_updates
-        //                            WHERE block_number < {to_block}
-        //                            AND account_id = u.account_id) as last_block
-        //                    FROM account_updates u
-        //                    WHERE u.block_number >= {start_block} AND u.block_number < {end_block}
-        //                    GROUP BY account_id
-        //                )
-        //                SELECT u.account_id AS id, u.block_number AS last_block, u.data FROM s, account_updates u WHERE s.id = u.account_id AND u.block_number = s.last_block
-        //            )
-        //            SELECT u.id, u.last_block, u.data
-        //            FROM upd u
-        //            ORDER BY id", to_block=to_block, start_block=start_block, end_block=end_block);
-        //        self.load_state(select.as_str())
+    ) -> QueryResult<Vec<AccountUpdate>> {
+        let time_forward = from_block <= to_block;
+        let start_block = cmp::min(from_block, to_block);
+        let end_block = cmp::max(from_block, to_block);
+
+        let account_balance_diff = account_balance_updates::table
+            .filter(account_balance_updates::block_number.ge(&(start_block as i32)))
+            .filter(account_balance_updates::block_number.lt(&(end_block as i32)))
+            .load::<StorageAccountUpdate>(self.conn())?;
+
+        let account_creation_diff = account_creates::table
+            .filter(account_creates::block_number.ge(&(start_block as i32)))
+            .filter(account_creates::block_number.lt(&(end_block as i32)))
+            .load::<StorageAccountCreation>(self.conn())?;
+
+        let mut account_updates: Vec<AccountUpdate> = {
+            let mut account_diff = Vec::new();
+            account_diff.extend(
+                account_balance_diff
+                    .into_iter()
+                    .map(StorageAccountDiff::from),
+            );
+            account_diff.extend(
+                account_creation_diff
+                    .into_iter()
+                    .map(StorageAccountDiff::from),
+            );
+            account_diff.sort_by(|l, r| l.cmp_nonce(r));
+            account_diff.into_iter().map(|d| d.into()).collect()
+        };
+
+        if !time_forward {
+            account_updates.reverse();
+            for acc_upd in account_updates.iter_mut() {
+                acc_upd.reverse_update();
+            }
+        }
+
+        Ok(account_updates)
     }
 
     /// loads the state of accounts updated in a specific block
     pub fn load_state_diff_for_block(&self, block_number: u32) -> QueryResult<Vec<AccountUpdate>> {
-        //        self.load_state_diff(block_number, block_number + 1)
-        unimplemented!()
+        self.load_state_diff(block_number, block_number + 1)
     }
 
     fn load_state(&self, query: &str) -> QueryResult<(u32, AccountMap)> {
