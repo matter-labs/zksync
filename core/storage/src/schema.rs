@@ -71,17 +71,20 @@ table! {
 table! {
     tree_restore_network (id) {
         id -> Int4,
+        network_id -> Int2,
     }
 }
 
 table! {
-    tree_restore_last_watched_eth_block (number) {
-        number -> Text,
+    tree_restore_last_watched_eth_block (id) {
+        id -> Int4,
+        block_number -> Text,
     }
 }
 
 table! {
-    block_events (block_num) {
+    block_events (id) {
+        id -> Int4,
         block_type -> Text,
         transaction_hash -> Text,
         block_num -> Int8,
@@ -89,7 +92,8 @@ table! {
 }
 
 table! {
-    franklin_transactions (block_number) {
+    franklin_transactions (id) {
+        id -> Int4,
         franklin_transaction_type -> Text,
         block_number -> Int8,
         eth_tx_hash -> Text,

@@ -5,8 +5,8 @@ use crate::helpers;
 use std::convert::TryFrom;
 use std::str::FromStr;
 use storage::{
-    ConnectionPool, LastWatchedEthBlockNumber, StoredBlockLog, StoredFranklinTransaction,
-    TreeRestoreNetwork,
+    ConnectionPool, NewLastWatchedEthBlockNumber, NewBlockLog, StoredBlockLog, NewFranklinTransaction, StoredFranklinTransaction,
+    NewTreeRestoreNetwork,
 };
 use web3::types::{Bytes, Transaction, H160, H256, U128, U256};
 
@@ -32,8 +32,8 @@ pub fn save_tree_restore_from_config(
     config: &helpers::DataRestoreConfig,
     connection_pool: ConnectionPool,
 ) {
-    let network = TreeRestoreNetwork {
-        id: config.network_id,
+    let network = NewTreeRestoreNetwork {
+        network_id: config.network_id,
     };
     let storage = connection_pool
         .access_storage()
@@ -42,19 +42,19 @@ pub fn save_tree_restore_from_config(
 }
 
 pub fn save_block_events(events: &Vec<LogBlockData>, connection_pool: ConnectionPool) {
-    let mut stored_logs: Vec<StoredBlockLog> = vec![];
+    let mut new_logs: Vec<NewBlockLog> = vec![];
     for log in events {
-        stored_logs.push(block_log_into_stored_block_log(log).unwrap());
+        new_logs.push(block_log_into_stored_block_log(log).unwrap());
     }
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for tree restore save events");
-    storage.save_block_events(stored_logs.as_slice()).unwrap();
+    storage.save_block_events(new_logs.as_slice()).unwrap();
 }
 
 pub fn save_last_watched_block_number(number: &U256, connection_pool: ConnectionPool) {
-    let block_number = LastWatchedEthBlockNumber {
-        number: number.to_string(),
+    let block_number = NewLastWatchedEthBlockNumber {
+        block_number: number.to_string(),
     };
     let storage = connection_pool
         .access_storage()
@@ -65,7 +65,7 @@ pub fn save_last_watched_block_number(number: &U256, connection_pool: Connection
 }
 
 pub fn save_franklin_transactions(txs: &Vec<FranklinTransaction>, connection_pool: ConnectionPool) {
-    let mut stored_txs: Vec<StoredFranklinTransaction> = vec![];
+    let mut stored_txs: Vec<NewFranklinTransaction> = vec![];
     for tx in txs {
         stored_txs.push(transaction_into_stored_transaction(&tx));
     }
@@ -89,8 +89,8 @@ pub fn stored_block_log_into_block_log(block: &StoredBlockLog) -> Option<LogBloc
     })
 }
 
-pub fn block_log_into_stored_block_log(block: &LogBlockData) -> Option<StoredBlockLog> {
-    Some(StoredBlockLog {
+pub fn block_log_into_stored_block_log(block: &LogBlockData) -> Option<NewBlockLog> {
+    Some(NewBlockLog {
         block_type: match block.block_type {
             BlockType::Committed => "Committed".to_string(),
             BlockType::Verified => "Verified".to_string(),
@@ -110,7 +110,7 @@ pub fn get_config_from_storage(
     let network_id = storage
         .load_tree_restore_network()
         .expect("can not load network")
-        .id;
+        .network_id;
     match network_id {
         1 => Some(helpers::DataRestoreConfig::new(
             helpers::InfuraEndpoint::Mainnet,
@@ -122,7 +122,7 @@ pub fn get_config_from_storage(
     }
 }
 
-pub fn transaction_into_stored_transaction(tx: &FranklinTransaction) -> StoredFranklinTransaction {
+pub fn transaction_into_stored_transaction(tx: &FranklinTransaction) -> NewFranklinTransaction {
     let franklin_transaction_type = match tx.franklin_transaction_type {
         FranklinTransactionType::Deposit => format!("Deposit"),
         FranklinTransactionType::Transfer => format!("Transfer"),
@@ -157,7 +157,7 @@ pub fn transaction_into_stored_transaction(tx: &FranklinTransaction) -> StoredFr
 
     let commitment_data = tx.commitment_data.clone();
 
-    StoredFranklinTransaction {
+    NewFranklinTransaction {
         franklin_transaction_type,
         block_number,
         eth_tx_hash,
@@ -250,7 +250,7 @@ pub fn get_last_watched_block_number_from_storage(connection_pool: ConnectionPoo
     let last_watched_block_number_string = storage
         .load_last_watched_block_number()
         .expect("load_blocks_events: db must work")
-        .number;
+        .block_number;
     U256::from_str(last_watched_block_number_string.as_str()).unwrap()
 }
 

@@ -287,16 +287,30 @@ pub struct BlockDetails {
 
 /// MARK: - Tree restore part
 
-#[derive(Insertable, Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
+#[derive(Insertable)]
 #[table_name = "tree_restore_network"]
-pub struct TreeRestoreNetwork {
-    pub id: i32, // 1 - Mainnet, 4 - Rinkeby
+pub struct NewTreeRestoreNetwork {
+    pub network_id: i16, // 1 - Mainnet, 4 - Rinkeby
 }
 
-#[derive(Insertable, Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
+#[derive(Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
+#[table_name = "tree_restore_network"]
+pub struct StoredTreeRestoreNetwork {
+    pub id: i32,
+    pub network_id: i16, // 1 - Mainnet, 4 - Rinkeby
+}
+
+#[derive(Insertable)]
 #[table_name = "tree_restore_last_watched_eth_block"]
-pub struct LastWatchedEthBlockNumber {
-    pub number: String,
+pub struct NewLastWatchedEthBlockNumber {
+    pub block_number: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
+#[table_name = "tree_restore_last_watched_eth_block"]
+pub struct StoredLastWatchedEthBlockNumber {
+    pub id: i32,
+    pub block_number: String,
 }
 
 // #[derive(Insertable)]
@@ -307,9 +321,18 @@ pub struct LastWatchedEthBlockNumber {
 //     pub block_num: i32,
 // }
 
+#[derive(Insertable)]
+#[table_name = "block_events"]
+pub struct NewBlockLog {
+    pub block_type: String, // 'Committed', 'Verified'
+    pub transaction_hash: String,
+    pub block_num: i64,
+}
+
 #[derive(Insertable, Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
 #[table_name = "block_events"]
 pub struct StoredBlockLog {
+    pub id: i32,
     pub block_type: String, // 'Committed', 'Verified'
     pub transaction_hash: String,
     pub block_num: i64,
@@ -331,9 +354,29 @@ pub struct StoredBlockLog {
 //     }
 // }
 
-#[derive(Insertable, Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
+#[derive(Insertable)]
+#[table_name = "franklin_transactions"]
+pub struct NewFranklinTransaction {
+    pub franklin_transaction_type: String, // Deposit, Transfer, FullExit
+    pub block_number: i64,
+    pub eth_tx_hash: String,
+    pub eth_tx_nonce: String,
+    pub eth_tx_block_hash: Option<String>,
+    pub eth_tx_block_number: Option<String>,
+    pub eth_tx_transaction_index: Option<String>,
+    pub eth_tx_from: String,
+    pub eth_tx_to: Option<String>,
+    pub eth_tx_value: String,
+    pub eth_tx_gas_price: String,
+    pub eth_tx_gas: String,
+    pub eth_tx_input: Vec<u8>,
+    pub commitment_data: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
 #[table_name = "franklin_transactions"]
 pub struct StoredFranklinTransaction {
+    pub id: i32,
     pub franklin_transaction_type: String, // Deposit, Transfer, FullExit
     pub block_number: i64,
     pub eth_tx_hash: String,
@@ -1114,7 +1157,7 @@ impl StorageProcessor {
 
     /// MARK: - Tree restore part
 
-    pub fn save_tree_restore_network(&self, network: &TreeRestoreNetwork) -> QueryResult<()> {
+    pub fn save_tree_restore_network(&self, network: &NewTreeRestoreNetwork) -> QueryResult<()> {
         let inserted = diesel::insert_into(tree_restore_network::table)
             .values(network)
             .execute(self.conn())?;
@@ -1125,7 +1168,7 @@ impl StorageProcessor {
         Ok(())
     }
 
-    pub fn save_block_events(&self, events: &[StoredBlockLog]) -> QueryResult<()> {
+    pub fn save_block_events(&self, events: &[NewBlockLog]) -> QueryResult<()> {
         for event in events.iter() {
             let inserted = diesel::insert_into(block_events::table)
                 .values(event)
@@ -1140,7 +1183,7 @@ impl StorageProcessor {
 
     pub fn save_last_watched_block_number(
         &self,
-        number: &LastWatchedEthBlockNumber,
+        number: &NewLastWatchedEthBlockNumber,
     ) -> QueryResult<()> {
         let inserted = diesel::insert_into(tree_restore_last_watched_eth_block::table)
             .values(number)
@@ -1152,7 +1195,7 @@ impl StorageProcessor {
         Ok(())
     }
 
-    pub fn save_franklin_transactions(&self, txs: &[StoredFranklinTransaction]) -> QueryResult<()> {
+    pub fn save_franklin_transactions(&self, txs: &[NewFranklinTransaction]) -> QueryResult<()> {
         for tx in txs.iter() {
             let inserted = diesel::insert_into(franklin_transactions::table)
                 .values(tx)
@@ -1202,7 +1245,7 @@ impl StorageProcessor {
         Ok(())
     }
 
-    pub fn load_tree_restore_network(&self) -> QueryResult<TreeRestoreNetwork> {
+    pub fn load_tree_restore_network(&self) -> QueryResult<StoredTreeRestoreNetwork> {
         use crate::schema::tree_restore_network::dsl::*;
         tree_restore_network.first(self.conn())
     }
@@ -1233,7 +1276,7 @@ impl StorageProcessor {
             .unwrap_or_else(|_| vec![])
     }
 
-    pub fn load_last_watched_block_number(&self) -> QueryResult<LastWatchedEthBlockNumber> {
+    pub fn load_last_watched_block_number(&self) -> QueryResult<StoredLastWatchedEthBlockNumber> {
         use crate::schema::tree_restore_last_watched_eth_block::dsl::*;
         tree_restore_last_watched_eth_block.first(self.conn())
     }

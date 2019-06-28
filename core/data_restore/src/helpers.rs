@@ -11,7 +11,7 @@ use web3::types::{Address, H256};
 /// Configuratoin of DataRestore driver
 #[derive(Debug, Clone)]
 pub struct DataRestoreConfig {
-    pub network_id: i32,
+    pub network_id: i16,
     /// Web3 endpoint url string
     pub web3_endpoint: String,
     /// Provides Ethereum Franklin contract unterface
