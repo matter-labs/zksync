@@ -29,6 +29,7 @@ create TABLE account_balance_updates (
     coin_id integer not null references tokens (id) on update cascade,
     old_balance numeric not null,
     new_balance numeric not null,
+    nonce bigint not null,
     PRIMARY KEY (account_id, block_number)
 );
 
@@ -37,6 +38,7 @@ CREATE TABLE account_creates (
     is_create bool not null,
     block_number integer not null,
     pk_x bytea not null,
-    pk_y bytea not null
-    id serial primary key,
+    pk_y bytea not null,
+    nonce bigint not null,
+    PRIMARY KEY (account_id, block_number)
 );

@@ -5,17 +5,18 @@ table! {
         coin_id -> Int4,
         old_balance -> Numeric,
         new_balance -> Numeric,
+        nonce -> Int8,
     }
 }
 
 table! {
-    account_creates (id) {
-        id -> Int4,
+    account_creates (account_id, block_number) {
         account_id -> Int4,
         is_create -> Bool,
         block_number -> Int4,
         pk_x -> Bytea,
         pk_y -> Bytea,
+        nonce -> Int8,
     }
 }
 
