@@ -67,14 +67,14 @@ fn load_states_from_beginning(args: Vec<String>) {
     }
     .expect("It's acceptable only 1 for Mainnet and 4 for Rinkeby networks");
     let from = U256::from(0); // It's better not to allow external users to set "from block" parameter. In 99% cases 0(zero) is correct
-    let delta = U256::from_str(&args[2]).expect("Blocks delta should be convertible to u256");
+    let delta = U256::from_dec_str(&args[2]).expect("Blocks delta should be convertible to u256");
     info!("Blocks delta is {}", &delta);
 
     let connection_pool = ConnectionPool::new();
 
     let remove_storage_data_res = remove_storage_data(connection_pool.clone());
     if remove_storage_data_res.is_err() {
-        error!("Error occured: {:?}", remove_storage_data_res);
+        error!("Storage data is missing, but its not a problem");
     }
 
     let mut data_restore_driver =
@@ -90,7 +90,7 @@ fn load_states_from_storage(args: Vec<String>) {
     let config =
         get_config_from_storage(connection_pool.clone()).expect("Network id is broken in storage");
     let from = U256::from(0); // It's better not to allow external users to set "from block" parameter. In 99% cases 0(zero) is correct
-    let delta = U256::from_str(&args[2]).expect("Blocks delta should be convertible to u256");
+    let delta = U256::from_dec_str(&args[2]).expect("Blocks delta should be convertible to u256");
     info!("Blocks delta is {}", &delta);
 
     let mut data_restore_driver =
@@ -104,14 +104,14 @@ fn load_past_state_from_storage(driver: &mut DataRestoreDriver, connection_pool:
     info!("Loading stored state");
     driver.block_events = get_block_events_from_storage(connection_pool.clone());
     let transactions = get_transactions_from_storage(connection_pool.clone());
-    for tx in transactions {
-        driver
-            .account_states
-            .update_accounts_states_from_transaction(&tx)
-            .expect("Cant update accounts state");
-    }
-    let root = driver.account_states.root_hash();
-    info!("Root: {:?}", &root);
+    driver.update_accounts_state_from_transactions(transactions.as_slice()).expect("Cant update accounts state from transactions in load_past_state_from_storage");
+    // for tx in transactions {
+    //     driver
+    //         .account_states
+    //         .update_accounts_states_from_transaction(&tx)
+    //         .expect("Cant update accounts state");
+    // }
+    info!("Stored state loaded");
 }
 
 fn main() {
@@ -119,7 +119,6 @@ fn main() {
     info!("Hello, lets build Franklin accounts state");
 
     let args: Vec<String> = env::args().collect();
-    println!("{}", &args[1]);
     if args[1].clone() == format!("storage") {
         info!("Loading states from storage");
         load_states_from_storage(args);

@@ -3,7 +3,6 @@ use crate::blocks::{BlockType, LogBlockData};
 use crate::franklin_transaction::{FranklinTransaction, FranklinTransactionType};
 use crate::helpers;
 use std::convert::TryFrom;
-use std::str::FromStr;
 use storage::{
     ConnectionPool, NewLastWatchedEthBlockNumber, NewBlockLog, StoredBlockLog, NewFranklinTransaction, StoredFranklinTransaction,
     NewTreeRestoreNetwork,
@@ -47,6 +46,10 @@ pub fn save_tree_restore_from_config(
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for tree restore save network");
+    if let Err(_) = storage
+        .delete_tree_restore_network() {
+        info!("First time saving tree restore network");
+    }
     storage.save_tree_restore_network(&network).expect("cant save tree restore network");
 }
 
@@ -68,6 +71,10 @@ pub fn save_last_watched_block_number(number: &U256, connection_pool: Connection
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for tree restore save block number");
+    if let Err(_) = storage
+        .delete_last_watched_block_number() {
+        info!("First time saving last watched block number");
+    }
     storage
         .save_last_watched_block_number(&block_number)
         .expect("cant save last watched block number");
@@ -193,27 +200,27 @@ pub fn stored_transaction_into_transaction(tx: &StoredFranklinTransaction) -> Fr
     };
     let bn = u32::try_from(tx.block_number).expect("cant make bn in stored_transaction_into_transaction");
     let hash = H256::from_slice(tx.eth_tx_hash.as_slice());
-    let nonce = U256::from_str(tx.eth_tx_nonce.as_str()).expect("cant make nonce in stored_transaction_into_transaction");
+    let nonce = U256::from_dec_str(tx.eth_tx_nonce.as_str()).expect("cant make nonce in stored_transaction_into_transaction");
     let block_hash = match &tx.eth_tx_block_hash {
         None => None,
         Some(x) => Some(H256::from_slice(x.as_slice())),
     };
     let block_number = match &tx.eth_tx_block_number {
         None => None,
-        Some(x) => Some(U256::from_str(x.as_str()).expect("cant make block_number in stored_transaction_into_transaction")),
+        Some(x) => Some(U256::from_dec_str(x.as_str()).expect("cant make block_number in stored_transaction_into_transaction")),
     };
     let transaction_index = match &tx.eth_tx_transaction_index {
         None => None,
-        Some(x) => Some(U128::from_str(x.as_str()).expect("cant make transaction_index in stored_transaction_into_transaction")),
+        Some(x) => Some(U128::from_dec_str(x.as_str()).expect("cant make transaction_index in stored_transaction_into_transaction")),
     };
     let from = H160::from_slice(tx.eth_tx_from.as_slice());
     let to = match &tx.eth_tx_to {
         None => None,
         Some(x) => Some(H160::from_slice(x.as_slice())),
     };
-    let value = U256::from_str(tx.eth_tx_value.as_str()).expect("cant make value in stored_transaction_into_transaction");
-    let gas_price = U256::from_str(tx.eth_tx_gas_price.as_str()).expect("cant make gas_price in stored_transaction_into_transaction");
-    let gas = U256::from_str(tx.eth_tx_gas.as_str()).expect("cant make gas in stored_transaction_into_transaction");
+    let value = U256::from_dec_str(tx.eth_tx_value.as_str()).expect("cant make value in stored_transaction_into_transaction");
+    let gas_price = U256::from_dec_str(tx.eth_tx_gas_price.as_str()).expect("cant make gas_price in stored_transaction_into_transaction");
+    let gas = U256::from_dec_str(tx.eth_tx_gas.as_str()).expect("cant make gas in stored_transaction_into_transaction");
     let input = Bytes(tx.eth_tx_input.clone());
     let commitment_data = tx.commitment_data.clone();
 
@@ -260,7 +267,7 @@ pub fn get_last_watched_block_number_from_storage(connection_pool: ConnectionPoo
         .load_last_watched_block_number()
         .expect("load_blocks_events: db must work")
         .block_number;
-    U256::from_str(last_watched_block_number_string.as_str()).expect("cant make u256 block_number in get_last_watched_block_number_from_storage")
+    U256::from_dec_str(last_watched_block_number_string.as_str()).expect("cant make u256 block_number in get_last_watched_block_number_from_storage")
 }
 
 pub fn get_block_events_from_storage(connection_pool: ConnectionPool) -> BlockEventsFranklin {
