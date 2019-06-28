@@ -20,19 +20,23 @@ pub struct Account {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+// TODO (Drogan) remove id from here up.
 pub enum AccountUpdate {
     Create {
         id: u32,
         public_key_x: Fr,
         public_key_y: Fr,
+        nonce: u32,
     },
     Delete {
         id: u32,
         public_key_x: Fr,
         public_key_y: Fr,
+        nonce: u32,
     },
     UpdateBalance {
         id: u32,
+        nonce: u32,
         // (token, old, new)
         balance_update: (TokenId, BigDecimal, BigDecimal),
     },
@@ -114,6 +118,35 @@ impl Account {
 
     pub fn sub_balance(&mut self, token: TokenId, amount: &BigDecimal) {
         *self.get_token_mut(token) -= amount;
+    }
+
+    pub fn apply_update(account: Option<Self>, update: AccountUpdate) -> Option<Self> {
+        match account {
+            Some(mut account) => match update {
+                AccountUpdate::Delete { .. } => None,
+                AccountUpdate::UpdateBalance {
+                    balance_update: (token, _, amount),
+                    ..
+                } => {
+                    account.set_balance(token, &amount);
+                    Some(account)
+                }
+                _ => None,
+            },
+            None => match update {
+                AccountUpdate::Create {
+                    public_key_x,
+                    public_key_y,
+                    ..
+                } => {
+                    let mut new_account = Account::default();
+                    new_account.public_key_y = public_key_y;
+                    new_account.public_key_x = public_key_x;
+                    Some(new_account)
+                }
+                _ => None,
+            },
+        }
     }
 }
 

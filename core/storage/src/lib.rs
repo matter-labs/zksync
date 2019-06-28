@@ -111,6 +111,7 @@ struct StorageAccountUpdate {
     pub coin_id: i32,
     pub old_balance: BigDecimal,
     pub new_balance: BigDecimal,
+    pub nonce: i64,
     // TODO (Drogan) add nonce reconstruction.
 }
 
@@ -122,7 +123,78 @@ struct StorageAccountCreation {
     block_number: i32,
     pk_x: Vec<u8>,
     pk_y: Vec<u8>,
+    nonce: i64,
     // TODO (Drogan) add nonce reconstruction.
+}
+
+enum StorageAccountDiff {
+    BalanceUpdate(StorageAccountUpdate),
+    Create(StorageAccountCreation),
+    Delete(StorageAccountCreation),
+}
+
+impl From<StorageAccountUpdate> for StorageAccountDiff {
+    fn from(update: StorageAccountUpdate) -> Self {
+        StorageAccountDiff::BalanceUpdate(update)
+    }
+}
+
+impl From<StorageAccountCreation> for StorageAccountDiff {
+    fn from(create: StorageAccountCreation) -> Self {
+        if create.is_create {
+            StorageAccountDiff::Create(create)
+        } else {
+            StorageAccountDiff::Delete(create)
+        }
+    }
+}
+
+impl Into<AccountUpdate> for StorageAccountDiff {
+    fn into(self) -> AccountUpdate {
+        match self {
+            StorageAccountDiff::BalanceUpdate(upd) => AccountUpdate::UpdateBalance {
+                id: 0,
+                nonce: upd.nonce as u32,
+                balance_update: (upd.coin_id as TokenId, upd.old_balance, upd.new_balance),
+            },
+            StorageAccountDiff::Create(upd) => AccountUpdate::Create {
+                id: 0,
+                nonce: upd.nonce as u32,
+                public_key_x: fr_from_bytes(upd.pk_x),
+                public_key_y: fr_from_bytes(upd.pk_y),
+            },
+            StorageAccountDiff::Delete(upd) => AccountUpdate::Delete {
+                id: 0,
+                nonce: upd.nonce as u32,
+                public_key_x: fr_from_bytes(upd.pk_x),
+                public_key_y: fr_from_bytes(upd.pk_y),
+            },
+        }
+    }
+}
+
+impl StorageAccountDiff {
+    fn nonce(&self) -> i64 {
+        *match self {
+            StorageAccountDiff::BalanceUpdate(StorageAccountUpdate { nonce, .. }) => nonce,
+            StorageAccountDiff::Create(StorageAccountCreation { nonce, .. }) => nonce,
+            StorageAccountDiff::Delete(StorageAccountCreation { nonce, .. }) => nonce,
+        }
+    }
+
+    fn cmp_nonce(&self, other: &Self) -> std::cmp::Ordering {
+        let type_cmp_number = |diff: &StorageAccountDiff| -> u32 {
+            match diff {
+                StorageAccountDiff::Create(..) => 0,
+                StorageAccountDiff::BalanceUpdate(..) => 1,
+                StorageAccountDiff::Delete(..) => 2,
+            }
+        };
+
+        self.nonce()
+            .cmp(&other.nonce())
+            .then(type_cmp_number(self).cmp(&type_cmp_number(other)))
+    }
 }
 
 #[derive(Insertable)]
@@ -560,6 +632,7 @@ impl StorageProcessor {
                     id,
                     public_key_x,
                     public_key_y,
+                    nonce,
                 } => {
                     diesel::insert_into(account_creates::table)
                         .values(&StorageAccountCreation {
@@ -568,6 +641,7 @@ impl StorageProcessor {
                             block_number: block_number as i32,
                             pk_x: fr_to_bytes(&public_key_x),
                             pk_y: fr_to_bytes(&public_key_y),
+                            nonce: nonce as i64,
                         })
                         .execute(self.conn())?;
                 }
@@ -575,6 +649,7 @@ impl StorageProcessor {
                     id,
                     public_key_x,
                     public_key_y,
+                    nonce,
                 } => {
                     diesel::insert_into(account_creates::table)
                         .values(&StorageAccountCreation {
@@ -583,12 +658,14 @@ impl StorageProcessor {
                             block_number: block_number as i32,
                             pk_x: fr_to_bytes(&public_key_x),
                             pk_y: fr_to_bytes(&public_key_y),
+                            nonce: nonce as i64,
                         })
                         .execute(self.conn())?;
                 }
                 AccountUpdate::UpdateBalance {
                     id,
                     balance_update: (token, old_balance, new_balance),
+                    nonce,
                 } => {
                     diesel::insert_into(account_balance_updates::table)
                         .values(&StorageAccountUpdate {
@@ -597,6 +674,7 @@ impl StorageProcessor {
                             coin_id: token as i32,
                             old_balance: old_balance.clone(),
                             new_balance: new_balance.clone(),
+                            nonce: nonce as i64,
                         })
                         .execute(self.conn())?;
                 }
@@ -935,19 +1013,55 @@ impl StorageProcessor {
         &self,
         account_id: AccountId,
     ) -> QueryResult<Option<models::plasma::account::Account>> {
-        unimplemented!();
-        //        let query = format!(
-        //            "
-        //            SELECT account_id AS id, block_number AS last_block, data
-        //            FROM account_updates WHERE account_id = {}
-        //            ORDER BY block_number DESC LIMIT 1
-        //        ",
-        //            account_id
-        //        );
-        //        let r = diesel::sql_query(query)
-        //            .get_result(self.conn())
-        //            .optional()?;
-        //        Ok(r.map(|acc: StorageAccount| serde_json::from_value(acc.data).unwrap()))
+        let (last_block, account) = if let Some(account) = accounts::table
+            .find(account_id as i32)
+            .first::<StorageAccount>(self.conn())
+            .optional()?
+        {
+            let balances: Vec<StorageBalance> =
+                StorageBalance::belonging_to(&account).load(self.conn())?;
+
+            let last_block = account.last_block;
+
+            let (_, account) = restore_account(account, balances);
+            (last_block, Some(account))
+        } else {
+            (0, None)
+        };
+
+        let account_balance_diff: Vec<StorageAccountUpdate> = {
+            account_balance_updates::table
+                .filter(account_balance_updates::account_id.eq(&(account_id as i32)))
+                .filter(account_balance_updates::block_number.gt(&last_block))
+                .load::<StorageAccountUpdate>(self.conn())?
+        };
+
+        let account_creation_diff: Vec<StorageAccountCreation> = {
+            account_creates::table
+                .filter(account_creates::account_id.eq(&(account_id as i32)))
+                //                .filter( account_creates::block_number.gt( &last_block ) )
+                .load::<StorageAccountCreation>(self.conn())?
+        };
+
+        let account_diff = {
+            let mut account_diff = Vec::new();
+            account_diff.extend(
+                account_balance_diff
+                    .into_iter()
+                    .map(StorageAccountDiff::from),
+            );
+            account_diff.extend(
+                account_creation_diff
+                    .into_iter()
+                    .map(StorageAccountDiff::from),
+            );
+            account_diff.sort_by(|l, r| l.cmp_nonce(r));
+            account_diff
+        };
+
+        Ok(account_diff.into_iter().fold(account, |account, upd| {
+            Account::apply_update(account, upd.into())
+        }))
     }
 
     pub fn last_verified_state_for_account(
