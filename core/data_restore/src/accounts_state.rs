@@ -217,7 +217,9 @@ impl FranklinAccountsStates {
                 to,
                 amount: amount.clone(), //BigDecimal::from_str_radix("0", 10).unwrap(),
                 fee,                    //BigDecimal::from_str_radix("0", 10).unwrap(),
-                nonce: i.try_into().expect("Cant make nonce in get_all_transactions_from_transfer_block"),
+                nonce: i
+                    .try_into()
+                    .expect("Cant make nonce in get_all_transactions_from_transfer_block"),
                 good_until_block: 0,
                 signature: TxSignature::default(),
                 cached_pub_key: None,
@@ -264,8 +266,12 @@ impl FranklinAccountsStates {
         // sort by index
         let mut error_flag = false;
         all_events.sort_by(|l, r| {
-            let l_block = l.block_number.expect("Cant sort blocks in load_sorted_events");
-            let r_block = r.block_number.expect("Cant sort blocks in load_sorted_events");
+            let l_block = l
+                .block_number
+                .expect("Cant sort blocks in load_sorted_events");
+            let r_block = r
+                .block_number
+                .expect("Cant sort blocks in load_sorted_events");
 
             let l_index = l.log_index.expect("Cant sort logs in load_sorted_events");
             let r_index = r.log_index.expect("Cant sort logs in load_sorted_events");
@@ -389,11 +395,14 @@ impl FranklinAccountsStates {
                 return Err(DataRestoreError::WrongPubKey);
             }
 
-            let (pub_x, pub_y) = public_key_point.expect("Cant create x and y in get_all_transactions_from_deposit_batch").into_xy();
+            let (pub_x, pub_y) = public_key_point
+                .expect("Cant create x and y in get_all_transactions_from_deposit_batch")
+                .into_xy();
 
             let tx: DepositTx = DepositTx {
                 account: k.as_u32(),
-                amount: BigDecimal::from_str_radix(&format!("{}", v.0), 10).expect("Cant create amount in get_all_transactions_from_deposit_batch"),
+                amount: BigDecimal::from_str_radix(&format!("{}", v.0), 10)
+                    .expect("Cant create amount in get_all_transactions_from_deposit_batch"),
                 pub_x,
                 pub_y,
             };

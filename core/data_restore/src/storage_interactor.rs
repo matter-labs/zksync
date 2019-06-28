@@ -4,34 +4,40 @@ use crate::franklin_transaction::{FranklinTransaction, FranklinTransactionType};
 use crate::helpers;
 use std::convert::TryFrom;
 use storage::{
-    ConnectionPool, NewLastWatchedEthBlockNumber, NewBlockLog, StoredBlockLog, NewFranklinTransaction, StoredFranklinTransaction,
-    NewTreeRestoreNetwork,
+    ConnectionPool, NewBlockLog, NewFranklinTransaction, NewLastWatchedEthBlockNumber,
+    NewTreeRestoreNetwork, StoredBlockLog, StoredFranklinTransaction,
 };
 use web3::types::{Bytes, Transaction, H160, H256, U128, U256};
 
-pub fn remove_storage_data(connection_pool: ConnectionPool) -> Result<(), helpers::DataRestoreError> {
+pub fn remove_storage_data(
+    connection_pool: ConnectionPool,
+) -> Result<(), helpers::DataRestoreError> {
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for tree restore remove data");
-    let delete_tree_restore_network_res = storage
-        .delete_tree_restore_network();
-    let delete_block_events_res = storage
-        .delete_block_events();
-    let delete_last_watched_block_number_res = storage
-        .delete_last_watched_block_number();
-    let delete_franklin_transactions_res = storage
-        .delete_franklin_transactions();
+    let delete_tree_restore_network_res = storage.delete_tree_restore_network();
+    let delete_block_events_res = storage.delete_block_events();
+    let delete_last_watched_block_number_res = storage.delete_last_watched_block_number();
+    let delete_franklin_transactions_res = storage.delete_franklin_transactions();
     if delete_tree_restore_network_res.is_err() {
-        return Err(helpers::DataRestoreError::NoData("No network in storage".to_string()))
+        return Err(helpers::DataRestoreError::NoData(
+            "No network in storage".to_string(),
+        ));
     }
     if delete_block_events_res.is_err() {
-        return Err(helpers::DataRestoreError::NoData("No block events in storage".to_string()))
+        return Err(helpers::DataRestoreError::NoData(
+            "No block events in storage".to_string(),
+        ));
     }
     if delete_last_watched_block_number_res.is_err() {
-        return Err(helpers::DataRestoreError::NoData("No block number in storage".to_string()))
+        return Err(helpers::DataRestoreError::NoData(
+            "No block number in storage".to_string(),
+        ));
     }
     if delete_franklin_transactions_res.is_err() {
-        return Err(helpers::DataRestoreError::NoData("No franklin txs in storage".to_string()))
+        return Err(helpers::DataRestoreError::NoData(
+            "No franklin txs in storage".to_string(),
+        ));
     }
     Ok(())
 }
@@ -46,22 +52,26 @@ pub fn save_tree_restore_from_config(
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for tree restore save network");
-    if let Err(_) = storage
-        .delete_tree_restore_network() {
+    if let Err(_) = storage.delete_tree_restore_network() {
         info!("First time saving tree restore network");
     }
-    storage.save_tree_restore_network(&network).expect("cant save tree restore network");
+    storage
+        .save_tree_restore_network(&network)
+        .expect("cant save tree restore network");
 }
 
 pub fn save_block_events(events: &Vec<LogBlockData>, connection_pool: ConnectionPool) {
     let mut new_logs: Vec<NewBlockLog> = vec![];
     for log in events {
-        new_logs.push(block_log_into_stored_block_log(log).expect("cant perform bock log into stored"));
+        new_logs
+            .push(block_log_into_stored_block_log(log).expect("cant perform bock log into stored"));
     }
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for tree restore save events");
-    storage.save_block_events(new_logs.as_slice()).expect("cant save tree restore network");
+    storage
+        .save_block_events(new_logs.as_slice())
+        .expect("cant save tree restore network");
 }
 
 pub fn save_last_watched_block_number(number: &U256, connection_pool: ConnectionPool) {
@@ -71,8 +81,7 @@ pub fn save_last_watched_block_number(number: &U256, connection_pool: Connection
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for tree restore save block number");
-    if let Err(_) = storage
-        .delete_last_watched_block_number() {
+    if let Err(_) = storage.delete_last_watched_block_number() {
         info!("First time saving last watched block number");
     }
     storage
@@ -95,7 +104,8 @@ pub fn save_franklin_transactions(txs: &Vec<FranklinTransaction>, connection_poo
 
 pub fn stored_block_log_into_block_log(block: &StoredBlockLog) -> Option<LogBlockData> {
     Some(LogBlockData {
-        block_num: u32::try_from(block.block_num).expect("cant make block_num in stored_block_log_into_block_log"),
+        block_num: u32::try_from(block.block_num)
+            .expect("cant make block_num in stored_block_log_into_block_log"),
         transaction_hash: H256::from_slice(block.transaction_hash.as_slice()),
         block_type: match &block.block_type {
             c if c == "Committed" => BlockType::Committed,
@@ -198,29 +208,40 @@ pub fn stored_transaction_into_transaction(tx: &StoredFranklinTransaction) -> Fr
         e if e == "FullExit" => FranklinTransactionType::FullExit,
         _ => FranklinTransactionType::Unknown,
     };
-    let bn = u32::try_from(tx.block_number).expect("cant make bn in stored_transaction_into_transaction");
+    let bn = u32::try_from(tx.block_number)
+        .expect("cant make bn in stored_transaction_into_transaction");
     let hash = H256::from_slice(tx.eth_tx_hash.as_slice());
-    let nonce = U256::from_dec_str(tx.eth_tx_nonce.as_str()).expect("cant make nonce in stored_transaction_into_transaction");
+    let nonce = U256::from_dec_str(tx.eth_tx_nonce.as_str())
+        .expect("cant make nonce in stored_transaction_into_transaction");
     let block_hash = match &tx.eth_tx_block_hash {
         None => None,
         Some(x) => Some(H256::from_slice(x.as_slice())),
     };
     let block_number = match &tx.eth_tx_block_number {
         None => None,
-        Some(x) => Some(U256::from_dec_str(x.as_str()).expect("cant make block_number in stored_transaction_into_transaction")),
+        Some(x) => Some(
+            U256::from_dec_str(x.as_str())
+                .expect("cant make block_number in stored_transaction_into_transaction"),
+        ),
     };
     let transaction_index = match &tx.eth_tx_transaction_index {
         None => None,
-        Some(x) => Some(U128::from_dec_str(x.as_str()).expect("cant make transaction_index in stored_transaction_into_transaction")),
+        Some(x) => Some(
+            U128::from_dec_str(x.as_str())
+                .expect("cant make transaction_index in stored_transaction_into_transaction"),
+        ),
     };
     let from = H160::from_slice(tx.eth_tx_from.as_slice());
     let to = match &tx.eth_tx_to {
         None => None,
         Some(x) => Some(H160::from_slice(x.as_slice())),
     };
-    let value = U256::from_dec_str(tx.eth_tx_value.as_str()).expect("cant make value in stored_transaction_into_transaction");
-    let gas_price = U256::from_dec_str(tx.eth_tx_gas_price.as_str()).expect("cant make gas_price in stored_transaction_into_transaction");
-    let gas = U256::from_dec_str(tx.eth_tx_gas.as_str()).expect("cant make gas in stored_transaction_into_transaction");
+    let value = U256::from_dec_str(tx.eth_tx_value.as_str())
+        .expect("cant make value in stored_transaction_into_transaction");
+    let gas_price = U256::from_dec_str(tx.eth_tx_gas_price.as_str())
+        .expect("cant make gas_price in stored_transaction_into_transaction");
+    let gas = U256::from_dec_str(tx.eth_tx_gas.as_str())
+        .expect("cant make gas in stored_transaction_into_transaction");
     let input = Bytes(tx.eth_tx_input.clone());
     let commitment_data = tx.commitment_data.clone();
 
@@ -267,11 +288,13 @@ pub fn get_last_watched_block_number_from_storage(connection_pool: ConnectionPoo
         .load_last_watched_block_number()
         .expect("load_blocks_events: db must work")
         .block_number;
-    U256::from_dec_str(last_watched_block_number_string.as_str()).expect("cant make u256 block_number in get_last_watched_block_number_from_storage")
+    U256::from_dec_str(last_watched_block_number_string.as_str())
+        .expect("cant make u256 block_number in get_last_watched_block_number_from_storage")
 }
 
 pub fn get_block_events_from_storage(connection_pool: ConnectionPool) -> BlockEventsFranklin {
-    let config = get_config_from_storage(connection_pool.clone()).expect("cant get config from storage in get_block_events_from_storage");
+    let config = get_config_from_storage(connection_pool.clone())
+        .expect("cant get config from storage in get_block_events_from_storage");
     let last_watched_block_number =
         get_last_watched_block_number_from_storage(connection_pool.clone());
 

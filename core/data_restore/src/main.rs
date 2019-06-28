@@ -104,7 +104,9 @@ fn load_past_state_from_storage(driver: &mut DataRestoreDriver, connection_pool:
     info!("Loading stored state");
     driver.block_events = get_block_events_from_storage(connection_pool.clone());
     let transactions = get_transactions_from_storage(connection_pool.clone());
-    driver.update_accounts_state_from_transactions(transactions.as_slice()).expect("Cant update accounts state from transactions in load_past_state_from_storage");
+    driver
+        .update_accounts_state_from_transactions(transactions.as_slice())
+        .expect("Cant update accounts state from transactions in load_past_state_from_storage");
     // for tx in transactions {
     //     driver
     //         .account_states

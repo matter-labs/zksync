@@ -34,7 +34,8 @@ impl DataRestoreConfig {
                 Self {
                     network_id: 1,
                     web3_endpoint: config.mainnet_http_endpoint_string, //"https://rinkeby.infura.io/".to_string(),
-                    franklin_contract: ethabi::Contract::load(PROD_PLASMA.0).expect("Cant get plasma contract in data restore config"),
+                    franklin_contract: ethabi::Contract::load(PROD_PLASMA.0)
+                        .expect("Cant get plasma contract in data restore config"),
                     franklin_contract_address: config
                         .mainnet_franklin_contract_address
                         .as_str()
@@ -46,7 +47,8 @@ impl DataRestoreConfig {
                 Self {
                     network_id: 4,
                     web3_endpoint: config.rinkeby_http_endpoint_string, //"https://rinkeby.infura.io/".to_string()
-                    franklin_contract: ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).expect("Cant get plasma contract in data restore config"),
+                    franklin_contract: ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0)
+                        .expect("Cant get plasma contract in data restore config"),
                     franklin_contract_address: config
                         .rinkeby_franklin_contract_address
                         .as_str()

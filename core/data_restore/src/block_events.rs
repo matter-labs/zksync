@@ -76,7 +76,10 @@ impl BlockEventsFranklin {
             if find_com_block.is_none() {
                 continue;
             }
-            ver_com_blocks.push(find_com_block.expect("Cant find committed block in get_only_verified_committed_blocks"))
+            ver_com_blocks.push(
+                find_com_block
+                    .expect("Cant find committed block in get_only_verified_committed_blocks"),
+            )
         }
         ver_com_blocks.sort_by_key(|&x| x.block_num);
         ver_com_blocks
