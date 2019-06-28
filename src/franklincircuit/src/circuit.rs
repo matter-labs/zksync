@@ -574,6 +574,28 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let a = AllocatedNum::alloc(cs.namespace(|| "a"), || op.args.a.grab())?;
         let b = AllocatedNum::alloc(cs.namespace(|| "b"), || op.args.b.grab())?;
+
+        let diff_a_b = AllocatedNum::alloc(cs.namespace(|| "a-b"), || {
+            let mut a_val = a.get_value().grab()?;
+            a_val.sub_assign(b.get_value().get()?);
+            Ok(a_val)
+        })?;
+        cs.enforce(
+            || "a-b is correct",
+            |lc| lc + a.get_variable() - b.get_variable(),
+            |lc| lc + CS::one(),
+            |lc| lc + diff_a_b.get_variable(),
+        );
+        let mut diff_a_b_bits = diff_a_b.into_bits_le(cs.namespace(|| "a - b bits"))?;
+        diff_a_b_bits.truncate(*franklin_constants::BALANCE_BIT_WIDTH);
+        let diff_a_b_repacked =
+            pack_bits_to_element(cs.namespace(|| "pack a-b bits"), &diff_a_b_bits)?;
+        let is_a_geq_b = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "diff equal to repacked"),
+            &diff_a_b,
+            &diff_a_b_repacked,
+        )?);
+
         let operation_data = AllocatedOperationData {
             new_pubkey_x: new_pubkey_x,
             new_pubkey_y: new_pubkey_y,
@@ -595,6 +617,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "deposit"),
             &mut cur,
             &chunk_data,
+            &is_a_geq_b,
             &is_account_empty,
             &is_compact_amount_correct,
             &operation_data,
@@ -614,6 +637,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         mut cs: CS,
         cur: &mut AllocatedOperationBranch<E>,
         chunk_data: &AllocatedChunkData<E>,
+        is_a_geq_b: &Boolean,
         is_account_empty: &Boolean,
         is_compact_amount_correct: &Boolean,
         op_data: &AllocatedOperationData<E>,
@@ -659,8 +683,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &is_account_empty.not(),
         )?
         .not();
-        //TODO rangechecked
-        //TODO compact amount correct
 
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(cur.bits.account_address.clone());
@@ -697,7 +719,16 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &is_pubdata_equal.not(),
         )?
         .not();
-        //TODO a and b correct
+        let is_a_correct = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "a == amount"),
+            &op_data.amount,
+            &op_data.a,
+        )?);
+        let is_b_correct = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "b == fee"),
+            &op_data.fee,
+            &op_data.b,
+        )?);
 
         let mut tx_valid = Boolean::and(
             cs.namespace(|| "tx_valid and deposit and pubkey_correct"),
@@ -714,6 +745,24 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "tx_valid and is_compact_amount_correct"),
             &tx_valid,
             &is_compact_amount_correct,
+        )?;
+
+        tx_valid = Boolean::and(
+            cs.namespace(|| "tx_valid and is_a_geq_b"),
+            &tx_valid,
+            &is_a_geq_b,
+        )?;
+
+        tx_valid = Boolean::and(
+            cs.namespace(|| "tx_valid and is_a_correct"),
+            &tx_valid,
+            &is_a_correct,
+        )?;
+
+        tx_valid = Boolean::and(
+            cs.namespace(|| "tx_valid and is_b_correct"),
+            &tx_valid,
+            &is_b_correct,
         )?;
         //TODO: uncomment pubdata_check
         // tx_valid = Boolean::and(
@@ -785,6 +834,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             "changed puby data: {}",
             cur.base.account.pub_y.get_value().unwrap()
         );
+
         cur.bits = cur
             .base
             .make_bit_form(cs.namespace(|| "update bit form of branch"))?;
@@ -1082,6 +1132,7 @@ mod test {
         use crate::utils::*;
         use ff::{BitIterator, Field};
         use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+        use franklin_crypto::circuit::float_point::convert_to_float;
         use franklin_crypto::circuit::test::*;
         use franklinmodels::circuit::account::{Balance, CircuitAccount};
         use franklinmodels::{CircuitAccountTree, CircuitBalanceTree, CircuitSubaccountTree};
@@ -1089,8 +1140,6 @@ mod test {
         use merkle_tree::PedersenHasher;
         use pairing::bn256::*;
         use rand::{Rng, SeedableRng, XorShiftRng};
-        // use super::super::account_tree::{AccountTree, Account};
-        use franklin_crypto::circuit::float_point::convert_to_float;
 
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;

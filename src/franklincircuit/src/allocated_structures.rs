@@ -31,7 +31,7 @@ pub struct AllocatedOperationBranchBase<E: JubjubEngine> {
     pub subaccount_number: AllocatedNum<E>,
 }
 
-//TODO: we should limit bit_widths here.
+//TODO: we should limit bit_widths here. yes, constraint bit lengths
 impl<E: JubjubEngine> AllocatedOperationBranchBase<E> {
     pub fn make_bit_form<CS: ConstraintSystem<E>>(
         &self,
