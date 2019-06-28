@@ -325,7 +325,7 @@ pub struct StoredLastWatchedEthBlockNumber {
 #[table_name = "block_events"]
 pub struct NewBlockLog {
     pub block_type: String, // 'Committed', 'Verified'
-    pub transaction_hash: String,
+    pub transaction_hash: Vec<u8>,
     pub block_num: i64,
 }
 
@@ -334,7 +334,7 @@ pub struct NewBlockLog {
 pub struct StoredBlockLog {
     pub id: i32,
     pub block_type: String, // 'Committed', 'Verified'
-    pub transaction_hash: String,
+    pub transaction_hash: Vec<u8>,
     pub block_num: i64,
 }
 
@@ -359,13 +359,13 @@ pub struct StoredBlockLog {
 pub struct NewFranklinTransaction {
     pub franklin_transaction_type: String, // Deposit, Transfer, FullExit
     pub block_number: i64,
-    pub eth_tx_hash: String,
+    pub eth_tx_hash: Vec<u8>,
     pub eth_tx_nonce: String,
-    pub eth_tx_block_hash: Option<String>,
+    pub eth_tx_block_hash: Option<Vec<u8>>,
     pub eth_tx_block_number: Option<String>,
     pub eth_tx_transaction_index: Option<String>,
-    pub eth_tx_from: String,
-    pub eth_tx_to: Option<String>,
+    pub eth_tx_from: Vec<u8>,
+    pub eth_tx_to: Option<Vec<u8>>,
     pub eth_tx_value: String,
     pub eth_tx_gas_price: String,
     pub eth_tx_gas: String,
@@ -379,13 +379,13 @@ pub struct StoredFranklinTransaction {
     pub id: i32,
     pub franklin_transaction_type: String, // Deposit, Transfer, FullExit
     pub block_number: i64,
-    pub eth_tx_hash: String,
+    pub eth_tx_hash: Vec<u8>,
     pub eth_tx_nonce: String,
-    pub eth_tx_block_hash: Option<String>,
+    pub eth_tx_block_hash: Option<Vec<u8>>,
     pub eth_tx_block_number: Option<String>,
     pub eth_tx_transaction_index: Option<String>,
-    pub eth_tx_from: String,
-    pub eth_tx_to: Option<String>,
+    pub eth_tx_from: Vec<u8>,
+    pub eth_tx_to: Option<Vec<u8>>,
     pub eth_tx_value: String,
     pub eth_tx_gas_price: String,
     pub eth_tx_gas: String,

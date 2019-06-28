@@ -217,7 +217,7 @@ impl FranklinAccountsStates {
                 to,
                 amount: amount.clone(), //BigDecimal::from_str_radix("0", 10).unwrap(),
                 fee,                    //BigDecimal::from_str_radix("0", 10).unwrap(),
-                nonce: i.try_into().unwrap(),
+                nonce: i.try_into().expect("Cant make nonce in get_all_transactions_from_transfer_block"),
                 good_until_block: 0,
                 signature: TxSignature::default(),
                 cached_pub_key: None,
@@ -264,11 +264,11 @@ impl FranklinAccountsStates {
         // sort by index
         let mut error_flag = false;
         all_events.sort_by(|l, r| {
-            let l_block = l.block_number.unwrap();
-            let r_block = r.block_number.unwrap();
+            let l_block = l.block_number.expect("Cant sort blocks in load_sorted_events");
+            let r_block = r.block_number.expect("Cant sort blocks in load_sorted_events");
 
-            let l_index = l.log_index.unwrap();
-            let r_index = r.log_index.unwrap();
+            let l_index = l.log_index.expect("Cant sort logs in load_sorted_events");
+            let r_index = r.log_index.expect("Cant sort logs in load_sorted_events");
 
             let ordering = l_block.cmp(&r_block).then(l_index.cmp(&r_index));
             if ordering == Ordering::Equal {
@@ -292,7 +292,7 @@ impl FranklinAccountsStates {
             .config
             .franklin_contract
             .event("LogDepositRequest")
-            .unwrap()
+            .expect("Cant create deposit event in get_all_transactions_from_deposit_batch")
             .clone();
         let deposit_event_topic = deposit_event.signature();
 
@@ -300,7 +300,7 @@ impl FranklinAccountsStates {
             .config
             .franklin_contract
             .event("LogCancelDepositRequest")
-            .unwrap()
+            .expect("Cant create deposit canceled event in get_all_transactions_from_deposit_batch")
             .clone();
         let deposit_canceled_topic = deposit_canceled_event.signature();
 
@@ -381,7 +381,7 @@ impl FranklinAccountsStates {
                 return Err(DataRestoreError::WrongPubKey);
             }
             let public_key_point = edwards::Point::<Engine, Unknown>::get_for_y(
-                y.unwrap(),
+                y.expect("Cant create public_key_point in get_all_transactions_from_deposit_batch"),
                 x_sign,
                 &params::JUBJUB_PARAMS,
             );
@@ -389,11 +389,11 @@ impl FranklinAccountsStates {
                 return Err(DataRestoreError::WrongPubKey);
             }
 
-            let (pub_x, pub_y) = public_key_point.unwrap().into_xy();
+            let (pub_x, pub_y) = public_key_point.expect("Cant create x and y in get_all_transactions_from_deposit_batch").into_xy();
 
             let tx: DepositTx = DepositTx {
                 account: k.as_u32(),
-                amount: BigDecimal::from_str_radix(&format!("{}", v.0), 10).unwrap(),
+                amount: BigDecimal::from_str_radix(&format!("{}", v.0), 10).expect("Cant create amount in get_all_transactions_from_deposit_batch"),
                 pub_x,
                 pub_y,
             };
@@ -410,7 +410,7 @@ impl FranklinAccountsStates {
             .config
             .franklin_contract
             .event("LogExitRequest")
-            .unwrap()
+            .expect("Cant create exit event in get_all_transactions_from_full_exit_batch")
             .clone();
         let exit_event_topic = exit_event.signature();
 
@@ -418,7 +418,7 @@ impl FranklinAccountsStates {
             .config
             .franklin_contract
             .event("LogCancelExitRequest")
-            .unwrap()
+            .expect("Cant create exit canceled event in get_all_transactions_from_full_exit_batch")
             .clone();
         let exit_canceled_topic = exit_canceled_event.signature();
 

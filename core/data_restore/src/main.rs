@@ -72,10 +72,14 @@ fn load_states_from_beginning(args: Vec<String>) {
 
     let connection_pool = ConnectionPool::new();
 
-    remove_storage_data(connection_pool.clone());
+    let remove_storage_data_res = remove_storage_data(connection_pool.clone());
+    if remove_storage_data_res.is_err() {
+        error!("Error occured: {:?}", remove_storage_data_res);
+    }
 
     let mut data_restore_driver =
         create_new_data_restore_driver(config, from, delta, connection_pool.clone());
+    info!("Driver created");
     load_past_state_for_data_restore_driver(&mut data_restore_driver);
     load_new_states_for_data_restore_driver(&mut data_restore_driver);
 }
@@ -91,11 +95,13 @@ fn load_states_from_storage(args: Vec<String>) {
 
     let mut data_restore_driver =
         create_new_data_restore_driver(config, from, delta, connection_pool.clone());
+    info!("Driver created");
     load_past_state_from_storage(&mut data_restore_driver, connection_pool.clone());
     load_new_states_for_data_restore_driver(&mut data_restore_driver);
 }
 
 fn load_past_state_from_storage(driver: &mut DataRestoreDriver, connection_pool: ConnectionPool) {
+    info!("Loading stored state");
     driver.block_events = get_block_events_from_storage(connection_pool.clone());
     let transactions = get_transactions_from_storage(connection_pool.clone());
     for tx in transactions {
@@ -104,6 +110,8 @@ fn load_past_state_from_storage(driver: &mut DataRestoreDriver, connection_pool:
             .update_accounts_states_from_transaction(&tx)
             .expect("Cant update accounts state");
     }
+    let root = driver.account_states.root_hash();
+    info!("Root: {:?}", &root);
 }
 
 fn main() {

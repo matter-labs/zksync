@@ -310,3 +310,6 @@ build-restore-tree:
 
 run-restore-tree:
 	@RUST_LOG=INFO ./target/release/data_restore 4 15
+
+continue-restore-tree:
+	@RUST_LOG=INFO ./target/release/data_restore storage 15

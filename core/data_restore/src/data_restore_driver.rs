@@ -214,7 +214,7 @@ impl DataRestoreDriver {
             if tx.is_none() {
                 continue;
             }
-            transactions.push(tx.unwrap());
+            transactions.push(tx.expect("No franklin transaction in get_verified_committed_blocks_transactions_from_blocks_state"));
         }
         debug!("Transactions sorted: only verified commited");
         transactions

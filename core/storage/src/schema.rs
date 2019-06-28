@@ -86,7 +86,7 @@ table! {
     block_events (id) {
         id -> Int4,
         block_type -> Text,
-        transaction_hash -> Text,
+        transaction_hash -> Bytea,
         block_num -> Int8,
     }
 }
@@ -96,13 +96,13 @@ table! {
         id -> Int4,
         franklin_transaction_type -> Text,
         block_number -> Int8,
-        eth_tx_hash -> Text,
+        eth_tx_hash -> Bytea,
         eth_tx_nonce -> Text,
-        eth_tx_block_hash -> Nullable<Text>,
+        eth_tx_block_hash -> Nullable<Bytea>,
         eth_tx_block_number -> Nullable<Text>,
         eth_tx_transaction_index -> Nullable<Text>,
-        eth_tx_from -> Text,
-        eth_tx_to -> Nullable<Text>,
+        eth_tx_from -> Bytea,
+        eth_tx_to -> Nullable<Bytea>,
         eth_tx_value -> Text,
         eth_tx_gas_price -> Text,
         eth_tx_gas -> Text,
