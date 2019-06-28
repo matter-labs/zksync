@@ -303,7 +303,7 @@ tesseracts-down:
 
 # Key generator 
 
-restore-tree: build-restore-tree run-restore-tree
+restore-tree: db-drop db-wait db-setup build-restore-tree run-restore-tree
 
 build-restore-tree:
 	@cargo build -p data_restore --release --bin data_restore

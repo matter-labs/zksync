@@ -2,21 +2,21 @@
 CREATE TABLE tree_restore_network (
     id SERIAL PRIMARY KEY,
     network_id SMALLINT NOT NULL
-)
+);
 
-CREATE TABLE tree_restore_last_watched_eth_block {
+CREATE TABLE tree_restore_last_watched_eth_block (
     id SERIAL PRIMARY KEY,
     block_number TEXT NOT NULL
-}
+);
 
-CREATE TABLE block_events {
+CREATE TABLE block_events (
     id SERIAL PRIMARY KEY,
     block_type TEXT NOT NULL,
     transaction_hash TEXT NOT NULL,
-    block_num BIGINT NOT NULL,
-}
+    block_num BIGINT NOT NULL
+);
 
-CREATE TABLE franklin_transactions {
+CREATE TABLE franklin_transactions (
     id SERIAL PRIMARY KEY,
     franklin_transaction_type TEXT NOT NULL,
     block_number BIGINT NOT NULL,
@@ -30,6 +30,6 @@ CREATE TABLE franklin_transactions {
     eth_tx_value TEXT NOT NULL,
     eth_tx_gas_price TEXT NOT NULL,
     eth_tx_gas TEXT NOT NULL,
-    eth_tx_input BINARY NOT NULL,
-    commitment_data BINARY NOT NULL,
-}
+    eth_tx_input BYTEA NOT NULL,
+    commitment_data BYTEA NOT NULL
+);
