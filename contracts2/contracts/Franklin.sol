@@ -1,7 +1,12 @@
 pragma solidity ^0.5.8;
 
+import "./IERC20.sol";
 
 contract Franklin {
+
+    uint constant BLOCK_SIZE = 1000;        // transactions per block
+    uint constant MAX_VALUE = 2**112-1;     // must fit into uint112
+    uint constant LOCK_DEPOSITS_FOR = 8*60; // ETH blocks
 
     // ==== STORAGE ====
 
@@ -16,7 +21,10 @@ contract Franklin {
     uint32 public totalTokens;
 
     // List of registered tokens by tokenId
-    mapping (uint32 => address) public tokens;
+    mapping (uint32 => address) public tokenAddresses;
+
+    // List of registered tokens by address
+    mapping (address => uint32) public tokenIds;
 
     // List of permitted validators
     mapping (address => bool) public validators;
@@ -29,10 +37,9 @@ contract Franklin {
     struct Balance {
         uint112 balance;
 
-        // Locked amount is necessary for deposits, see docs
-        uint112 amountLocked;
-
-        // Locked amount becomes free at ETH blockNumber = lockedUntilBlock
+        // Balance can be locked in order to let validators deposit some of it into Franklin
+        // Locked balances becomes free at ETH blockNumber = lockedUntilBlock
+        // To re-lock, users can make a deposit with zero amount
         uint32  lockedUntilBlock;
     }
 
@@ -128,6 +135,22 @@ contract Franklin {
     mapping (address => mapping (uint32 => bool)) public exited;
 
 
+    // Migration
+
+    // Address of the new version of the contract to migrate accounts to
+    // Can be proposed by network governor
+    address public migrateTo;
+
+    // Migration deadline: after this ETH block number migration may happen with the contract
+    // entering exodus mode for all users who have not opted in for migration
+    uint32  public migrateByBlock;
+
+    // Flag for the new contract to indicate that the migration has been sealed
+    bool    public migrationSealed;
+
+    mapping (uint32 => bool) tokenMigrated;
+
+
     // ==== IMPLEMENTATION ====
 
     // Constructor
@@ -151,7 +174,9 @@ contract Franklin {
 
     function addToken(address _token) external {
         requireGovernor();
-        tokens[totalTokens + 1] = _token; // Adding one because tokenId = 0 is reserved for ETH
+        require(tokenIds[_token] == 0, "token exists");
+        tokenAddresses[totalTokens + 1] = _token; // Adding one because tokenId = 0 is reserved for ETH
+        tokenIds[_token] = totalTokens + 1;
         totalTokens++;
     }
 
@@ -160,38 +185,70 @@ contract Franklin {
         validators[_validator] = _active;
     }
 
-    // TODO: implement migration by moving ETH and all token balances to a new contract, triggered by networkGovernor
+    function scheduleMigration(address _migrateTo, uint32 _migrateByBlock) external {
+        requireGovernor();
+        require(migrateByBlock == 0, "migration in progress");
+        migrateTo = _migrateTo;
+        migrateByBlock = _migrateByBlock;
+    }
+
+    // Anybody MUST be able to call this function
+    function sealMigration() external {
+        require(migrateByBlock > 0, "no migration scheduled");
+        migrationSealed = true;
+        exodusMode = true;
+    }
+
+    // Anybody MUST be able to call this function
+    function migrateToken(uint32 _tokenId, uint112 /*_amount*/, bytes calldata /*_proof*/) external {
+        require(migrationSealed, "migration not sealed");
+        requireValidToken(_tokenId);
+        require(tokenMigrated[_tokenId]==false, "token already migrated");
+        // TODO: check the proof for the amount
+        // TODO: transfer ERC20 or ETH to the `migrateTo` address
+        tokenMigrated[_tokenId] = true;
+
+        require(false, "unimplemented");
+    }
 
 
     // Root-chain balances
 
     // Deposit ETH (simply by sending it to the contract)
-    function() external {
-        requireActive();
-        revert("unimplemented");
+    function() external payable {
+        require(msg.value <= MAX_VALUE, "sorry Joe");
+        registerDeposit(0, uint112(msg.value));
     }
 
     function withdrawETH(uint112 _amount) external {
-        requireActive();
-        revert("unimplemented");
+        registerWithdrawal(0, _amount);
+        msg.sender.transfer(_amount);
     }
 
     function depositERC20(address _token, uint112 _amount) external {
-        requireActive();
-        revert("unimplemented");
+        require(IERC20(_token).transferFrom(msg.sender, address(this), _amount), "transfer failed");
+        registerDeposit(tokenIds[_token], _amount);
     }
 
     function withdrawERC20(address _token, uint112 _amount) external {
+        registerWithdrawal(tokenIds[_token], _amount);
+        require(IERC20(_token).transfer(msg.sender, _amount), "transfer failed");
+    }
+
+    function registerDeposit(uint32 _tokenId, uint112 _amount) internal {
         requireActive();
-        revert("unimplemented");
+        requireValidToken(_tokenId);
+        require(uint256(_amount) + balances[msg.sender][_tokenId].balance < MAX_VALUE, "overflow");
+        balances[msg.sender][_tokenId].balance += _amount;
+        balances[msg.sender][_tokenId].lockedUntilBlock = uint32(block.number + LOCK_DEPOSITS_FOR);
     }
 
-    function registerDeposit(address token, uint112 _amount) internal {
-        revert("unimplemented");
-    }
-
-    function registerWithdrawal(address token, uint112 _amount) internal {
-        revert("unimplemented");
+    function registerWithdrawal(uint32 _tokenId, uint112 _amount) internal {
+        requireActive();
+        requireValidToken(_tokenId);
+        require(block.number >= balances[msg.sender][_tokenId].lockedUntilBlock, "balance locked");
+        require(balances[msg.sender][_tokenId].balance >= _amount, "insufficient balance");
+        balances[msg.sender][_tokenId].balance -= _amount;
     }
 
 
@@ -247,7 +304,7 @@ contract Franklin {
         exodusMode = true;
     }
 
-    function exit(uint32 _tokenId, address[] calldata _owners, uint112[] calldata _amounts, bytes calldata _proof) external {
+    function exit(uint32 _tokenId, address[] calldata _owners, uint112[] calldata _amounts, bytes calldata /*_proof*/) external {
         require(exodusMode, "must be in exodus mode");
         require(_owners.length == _amounts.length, "|owners| != |amounts|");
 
@@ -255,7 +312,7 @@ contract Franklin {
             require(exited[_owners[i]][_tokenId] == false, "already exited");
         }
 
-        // TODO: verify SNARK proof that all users have the specified amounts of this token in the latest state
+        // TODO: verify the proof that all users have the specified amounts of this token in the latest state
 
         for(uint256 i = 0; i < _owners.length; i++) {
             balances [_owners[i]][_tokenId].balance += _amounts[i];
@@ -272,6 +329,10 @@ contract Franklin {
 
     function requireActive() internal view {
         require(!exodusMode, "exodus mode");
+    }
+
+    function requireValidToken(uint32 _tokenId) internal view {
+        require(_tokenId < totalTokens + 1, "unknown token");
     }
 
 }
