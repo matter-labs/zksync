@@ -8,12 +8,14 @@
 
 # Todo
 
-- add tokens
+- add tokens+
 - priority queue / full exit mechanism
 - update mechanism
-- manage validators
+- manage validators+
 - key hash
 - deploy key separately?
+
+# Governance
 
 # Functions
 
@@ -32,3 +34,29 @@
 
 - deposits
 - withdraws
+
+
+# Contract docs
+
+## Deployment+
+
+## Governance+
+### Validators+
+### Updgrade mechanism+
+### Token+
+
+## Deposits and withdrawals
+### Root-chain balances+
+### Deposits and withdrawals workflow
+
+## Block committment
+### Franklin operations
+### Root-chain holders
+
+## Block verification
+
+## Reverting expired blocks
+
+## Exit queue & exodus mode
+### Exit queue
+### Exodus mode
