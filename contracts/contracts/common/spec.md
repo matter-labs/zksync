@@ -9,8 +9,8 @@
 # Todo
 
 - add tokens+
-- priority queue / full exit mechanism
-- update mechanism
+- priority queue full exit mechanism
+- update mechanism: strict opt-in only! (integrate into our circuit)
 - manage validators+
 - key hash
 - deploy key separately?
