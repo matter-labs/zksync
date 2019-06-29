@@ -1,4 +1,4 @@
-- unit conversion
+- unit conversion: different by token?
 - lock funds after deposit
 - authorization for ERC20 transferFrom
 
@@ -12,6 +12,8 @@
 - priority queue / full exit mechanism
 - update mechanism
 - manage validators
+- key hash
+- deploy key separately?
 
 # Functions
 
@@ -19,7 +21,7 @@
 - doWithdraw
 
 - depositERC20
-- depositETH
+- depositETH / default()
 - withdrawERC20
 - withdrawETH
 
