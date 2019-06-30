@@ -16,7 +16,7 @@ contract Franklin is Verifier, VerificationKey {
     event BlockVerified(uint32 indexed blockNumber);
     event BlocksReverted(uint32 indexed totalBlocksVerified, uint32 indexed totalBlocksCommitted);
 
-    event OnchainDeposit(address indexed owner, uint32 tokenId, uint112 amount);
+    event OnchainDeposit(address indexed owner, uint32 tokenId, uint112 amount, uint32 lockedUntilBlock);
     event OnchainWithdrawal(address indexed owner, uint32 tokenId, uint112 amount);
 
     // ==== STORAGE ====
@@ -247,8 +247,9 @@ contract Franklin is Verifier, VerificationKey {
         requireValidToken(_tokenId);
         require(uint256(_amount) + balances[msg.sender][_tokenId].balance < MAX_VALUE, "overflow");
         balances[msg.sender][_tokenId].balance += _amount;
-        balances[msg.sender][_tokenId].lockedUntilBlock = uint32(block.number + LOCK_DEPOSITS_FOR);
-        emit OnchainDeposit(msg.sender, _tokenId, _amount);
+        uint32 lockedUntilBlock = uint32(block.number + LOCK_DEPOSITS_FOR);
+        balances[msg.sender][_tokenId].lockedUntilBlock = lockedUntilBlock;
+        emit OnchainDeposit(msg.sender, _tokenId, _amount, lockedUntilBlock);
     }
 
     function registerWithdrawal(uint32 _tokenId, uint112 _amount) internal {
@@ -295,6 +296,7 @@ contract Franklin is Verifier, VerificationKey {
             totalProcessed
         );
 
+        totalBlocksCommitted += 1;
         emit BlockCommitted(_blockNumber);
     }
 
@@ -350,7 +352,7 @@ contract Franklin is Verifier, VerificationKey {
             uint112 amount = unpack(amountPacked, tokenId);
 
             requireValidToken(tokenId);
-            require(block.number >= balances[account][tokenId].lockedUntilBlock, "balance locked");
+            require(block.number < balances[account][tokenId].lockedUntilBlock, "balance must be locked");
             require(balances[account][tokenId].balance >= amount, "balance insuffcient");
 
             balances[account][tokenId].balance -= amount;
@@ -392,7 +394,6 @@ contract Franklin is Verifier, VerificationKey {
         requireActive();
         require(validators[msg.sender], "only by validator");
         require(_blockNumber == totalBlocksVerified + 1, "only verify next block");
-        require(blockCommitmentExpired() == false, "committment expired");
 
         require(verifyBlockProof(proof, blocks[_blockNumber].commitment), "verification failed");
 
