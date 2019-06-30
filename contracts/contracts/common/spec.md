@@ -3,6 +3,7 @@
 - authorization for ERC20 transferFrom
 
 - max deposits/exits per block
+- return money on verification
 
 # Events
 
