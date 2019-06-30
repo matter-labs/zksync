@@ -690,23 +690,72 @@ impl StorageProcessor {
     }
 
     fn apply_state_update(&self, block_number: u32) -> QueryResult<()> {
-        unimplemented!();
-        //        let update = format!(
-        //            "
-        //            INSERT INTO accounts (id, last_block, data)
-        //            SELECT
-        //                account_id AS id,
-        //                block_number as last_block,
-        //                data FROM account_updates
-        //            WHERE account_updates.block_number = {}
-        //            ON CONFLICT (id)
-        //            DO UPDATE
-        //            SET data = EXCLUDED.data, last_block = EXCLUDED.last_block",
-        //            block_number
-        //        );
-        //        diesel::sql_query(update.as_str())
-        //            .execute(self.conn())
-        //            .map(|_| ())
+        self.conn().transaction(|| {
+            let account_balance_diff = account_balance_updates::table
+                .filter(account_balance_updates::block_number.eq(&(block_number as i32)))
+                .load::<StorageAccountUpdate>(self.conn())?;
+
+            let account_creation_diff = account_creates::table
+                .filter(account_creates::block_number.eq(&(block_number as i32)))
+                .load::<StorageAccountCreation>(self.conn())?;
+
+            let mut account_updates: Vec<StorageAccountDiff> = {
+                let mut account_diff = Vec::new();
+                account_diff.extend(
+                    account_balance_diff
+                        .into_iter()
+                        .map(StorageAccountDiff::from),
+                );
+                account_diff.extend(
+                    account_creation_diff
+                        .into_iter()
+                        .map(StorageAccountDiff::from),
+                );
+                account_diff.sort_by(|l, r| l.cmp_nonce(r));
+                account_diff
+            };
+
+            for acc_update in account_updates.into_iter() {
+                match acc_update {
+                    StorageAccountDiff::BalanceUpdate(upd) => {
+                        update(
+                            balances::table
+                                .filter(balances::coin_id.eq(upd.coin_id))
+                                .filter(balances::account_id.eq(upd.account_id)),
+                        )
+                        .set(balances::balance.eq(upd.new_balance))
+                        .execute(self.conn())?;
+
+                        update(accounts::table.filter(accounts::id.eq(upd.account_id)))
+                            .set((
+                                accounts::last_block.eq(upd.block_number),
+                                accounts::nonce.eq(upd.nonce),
+                            ))
+                            .execute(self.conn())?;
+                    }
+
+                    StorageAccountDiff::Create(upd) => {
+                        let storage_account = StorageAccount {
+                            id: upd.account_id,
+                            last_block: upd.block_number,
+                            nonce: upd.nonce,
+                            pk_x: upd.pk_x,
+                            pk_y: upd.pk_y,
+                        };
+                        insert_into(accounts::table)
+                            .values(&storage_account)
+                            .execute(self.conn())?;
+                    }
+
+                    StorageAccountDiff::Delete(upd) => {
+                        delete(accounts::table.filter(accounts::id.eq(upd.account_id)))
+                            .execute(self.conn())?;
+                    }
+                }
+            }
+
+            Ok(())
+        })
     }
 
     pub fn load_committed_state(&self) -> QueryResult<(u32, AccountMap)> {
