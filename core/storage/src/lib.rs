@@ -15,7 +15,9 @@ use models::plasma::tx::TransactionType::{Deposit, Exit, Transfer};
 use models::plasma::tx::{
     DepositTx, ExitTx, TransactionType, TransferTx, TxSignature, DEPOSIT_TX, EXIT_TX, TRANSFER_TX,
 };
-use models::plasma::{Account, AccountId, AccountMap, AccountUpdate, BlockNumber, Fr, Nonce};
+use models::plasma::{
+    apply_updates, Account, AccountId, AccountMap, AccountUpdate, BlockNumber, Fr, Nonce,
+};
 use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
@@ -195,6 +197,16 @@ impl StorageAccountDiff {
             .cmp(&other.nonce())
             .then(type_cmp_number(self).cmp(&type_cmp_number(other)))
     }
+
+    fn block_number(&self) -> i32 {
+        *match self {
+            StorageAccountDiff::BalanceUpdate(StorageAccountUpdate { block_number, .. }) => {
+                block_number
+            }
+            StorageAccountDiff::Create(StorageAccountCreation { block_number, .. }) => block_number,
+            StorageAccountDiff::Delete(StorageAccountCreation { block_number, .. }) => block_number,
+        }
+    }
 }
 
 #[derive(Insertable)]
@@ -243,7 +255,7 @@ impl StoredOperation {
         op.id = Some(self.id);
 
         if op.accounts_updated.is_none() {
-            let updates = conn.load_state_diff_for_block(op.block.block_number)?;
+            let (_, updates) = conn.load_state_diff_for_block(op.block.block_number)?;
             op.accounts_updated = Some(updates);
         };
 
@@ -621,7 +633,6 @@ impl StorageProcessor {
         accounts_updated: &[AccountUpdate],
     ) -> QueryResult<()> {
         for upd in accounts_updated.iter() {
-            unimplemented!();
             debug!(
                 "Committing state update for account {} in block {}",
                 upd.get_account_id(),
@@ -664,7 +675,7 @@ impl StorageProcessor {
                 }
                 AccountUpdate::UpdateBalance {
                     id,
-                    balance_update: (token, old_balance, new_balance),
+                    balance_update: (token, ref old_balance, ref new_balance),
                     nonce,
                 } => {
                     diesel::insert_into(account_balance_updates::table)
@@ -759,82 +770,13 @@ impl StorageProcessor {
     }
 
     pub fn load_committed_state(&self) -> QueryResult<(u32, AccountMap)> {
-        unimplemented!();
-        //        const SELECT: &str = "
-        //        WITH upd AS (
-        //            WITH s AS (
-        //                SELECT account_id as id, max(block_number) as last_block
-        //                FROM account_updates u
-        //                WHERE u.block_number > (SELECT COALESCE(max(last_block), 0) FROM accounts)
-        //                GROUP BY account_id
-        //            )
-        //            SELECT u.account_id AS id, u.block_number AS last_block, u.data FROM s, account_updates u WHERE s.id = u.account_id AND u.block_number = s.last_block
-        //        )
-        //        SELECT COALESCE(u.id, a.id) AS id, COALESCE(u.last_block, a.last_block) AS last_block, COALESCE (u.data, a.data) AS data
-        //        FROM upd u
-        //        FULL JOIN accounts a ON a.id = u.id
-        //        ORDER BY id";
-        //
-        //        self.load_state(SELECT)
+        let (block, mut accounts) = self.load_verified_state()?;
+        let (block, state_diff) = self.load_state_diff(block, None)?;
+        apply_updates(&mut accounts, state_diff);
+        Ok((block, accounts))
     }
 
     pub fn load_verified_state(&self) -> QueryResult<(u32, AccountMap)> {
-        unimplemented!();
-        //        self.load_state("SELECT * FROM accounts a")
-    }
-
-    /// loads the state of accounts updated between two blocks
-    pub fn load_state_diff(
-        &self,
-        from_block: u32,
-        to_block: u32,
-    ) -> QueryResult<Vec<AccountUpdate>> {
-        let time_forward = from_block <= to_block;
-        let start_block = cmp::min(from_block, to_block);
-        let end_block = cmp::max(from_block, to_block);
-
-        let account_balance_diff = account_balance_updates::table
-            .filter(account_balance_updates::block_number.ge(&(start_block as i32)))
-            .filter(account_balance_updates::block_number.lt(&(end_block as i32)))
-            .load::<StorageAccountUpdate>(self.conn())?;
-
-        let account_creation_diff = account_creates::table
-            .filter(account_creates::block_number.ge(&(start_block as i32)))
-            .filter(account_creates::block_number.lt(&(end_block as i32)))
-            .load::<StorageAccountCreation>(self.conn())?;
-
-        let mut account_updates: Vec<AccountUpdate> = {
-            let mut account_diff = Vec::new();
-            account_diff.extend(
-                account_balance_diff
-                    .into_iter()
-                    .map(StorageAccountDiff::from),
-            );
-            account_diff.extend(
-                account_creation_diff
-                    .into_iter()
-                    .map(StorageAccountDiff::from),
-            );
-            account_diff.sort_by(|l, r| l.cmp_nonce(r));
-            account_diff.into_iter().map(|d| d.into()).collect()
-        };
-
-        if !time_forward {
-            account_updates.reverse();
-            for acc_upd in account_updates.iter_mut() {
-                acc_upd.reverse_update();
-            }
-        }
-
-        Ok(account_updates)
-    }
-
-    /// loads the state of accounts updated in a specific block
-    pub fn load_state_diff_for_block(&self, block_number: u32) -> QueryResult<Vec<AccountUpdate>> {
-        self.load_state_diff(block_number, block_number + 1)
-    }
-
-    fn load_state(&self, query: &str) -> QueryResult<(u32, AccountMap)> {
         let accounts: Vec<StorageAccount> = accounts::table.load(self.conn())?;
         let balances: Vec<Vec<StorageBalance>> = StorageBalance::belonging_to(&accounts)
             .load(self.conn())?
@@ -856,6 +798,85 @@ impl StorageProcessor {
             .collect();
 
         Ok((last_block, account_map))
+    }
+
+    /// loads the state of accounts updated between two blocks
+    pub fn load_state_diff(
+        &self,
+        from_block: u32,
+        to_block: Option<u32>,
+    ) -> QueryResult<(u32, Vec<AccountUpdate>)> {
+        let (to_block, unbounded) = if let Some(to_block) = to_block {
+            (to_block, false)
+        } else {
+            (from_block, true)
+        };
+
+        let time_forward = from_block <= to_block;
+        let start_block = cmp::min(from_block, to_block);
+        let end_block = cmp::max(from_block, to_block);
+
+        let account_balance_diff = account_balance_updates::table
+            .filter(account_balance_updates::block_number.ge(&(start_block as i32)))
+            .filter(
+                account_balance_updates::block_number
+                    .lt(&(end_block as i32))
+                    .or(unbounded),
+            )
+            .load::<StorageAccountUpdate>(self.conn())?;
+
+        let account_creation_diff = account_creates::table
+            .filter(account_creates::block_number.ge(&(start_block as i32)))
+            .filter(
+                account_creates::block_number
+                    .lt(&(end_block as i32))
+                    .or(unbounded),
+            )
+            .load::<StorageAccountCreation>(self.conn())?;
+
+        let (mut account_updates, last_block) = {
+            let mut account_diff = Vec::new();
+            account_diff.extend(
+                account_balance_diff
+                    .into_iter()
+                    .map(StorageAccountDiff::from),
+            );
+            account_diff.extend(
+                account_creation_diff
+                    .into_iter()
+                    .map(StorageAccountDiff::from),
+            );
+            let last_block = account_diff
+                .iter()
+                .map(|acc| acc.block_number())
+                .max()
+                .unwrap_or(0);
+            account_diff.sort_by(|l, r| l.cmp_nonce(r));
+            (
+                account_diff
+                    .into_iter()
+                    .map(|d| d.into())
+                    .collect::<Vec<AccountUpdate>>(),
+                last_block as u32,
+            )
+        };
+
+        if !time_forward {
+            account_updates.reverse();
+            for acc_upd in account_updates.iter_mut() {
+                acc_upd.reverse_update();
+            }
+        }
+
+        Ok((last_block, account_updates))
+    }
+
+    /// loads the state of accounts updated in a specific block
+    pub fn load_state_diff_for_block(
+        &self,
+        block_number: u32,
+    ) -> QueryResult<(u32, Vec<AccountUpdate>)> {
+        self.load_state_diff(block_number, Some(block_number + 1))
     }
 
     /// Sets up `op_config` to new address and nonce for scheduling ETH transactions for operations
