@@ -2,8 +2,9 @@ pragma solidity ^0.5.8;
 
 import "./IERC20.sol";
 import "./Verifier.sol";
+import "./VerificationKey.sol";
 
-contract Franklin is Verifier {
+contract Franklin is Verifier, VerificationKey {
 
     uint constant BLOCK_SIZE = 2000;                // chunks per block; each chunk has 8 bytes of public data
     uint constant MAX_VALUE = 2**112-1;             // must fit into uint112
@@ -376,17 +377,28 @@ contract Franklin is Verifier {
 
     // Block verification
 
-    function verifyBlock(uint32 _blockNumber, uint256[8] calldata /*proof*/) external {
+    function verifyBlock(uint32 _blockNumber, uint256[8] calldata proof) external {
         requireActive();
         require(validators[msg.sender], "only by validator");
         require(_blockNumber == totalBlocksVerified + 1, "only verify next block");
         require(blockCommitmentExpired() == false, "committment expired");
 
-        // TODO: verify proof against commitment
-        require(false, "verification failed");
+        require(verifyBlockProof(proof, blocks[_blockNumber].commitment), "verification failed");
 
         totalBlocksVerified += 1;
         consummateOnchainOps(_blockNumber);
+    }
+
+    function verifyBlockProof(uint256[8] memory proof, bytes32 commitment)
+        internal view returns (bool valid)
+    {
+        uint256 mask = (~uint256(0)) >> 3;
+        uint256[14] memory vk;
+        uint256[] memory gammaABC;
+        (vk, gammaABC) = getVk();
+        uint256[] memory inputs = new uint256[](1);
+        inputs[0] = uint256(commitment) & mask;
+        return Verify(vk, gammaABC, proof, inputs);
     }
 
     function consummateOnchainOps(uint32 _blockNumber) internal {
