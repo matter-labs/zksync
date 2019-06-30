@@ -608,6 +608,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             signer_pub_x: allocated_signer_pubkey_x,
             signer_pub_y: allocated_signer_pubkey_y,
             sig_msg_bits: message_bits,
+            sig_msg: allocated_message,
             new_pubkey_hash: new_pubkey_hash_bits,
             a: a,
             b: b,
@@ -840,6 +841,57 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             .make_bit_form(cs.namespace(|| "update bit form of branch"))?;
         Ok(tx_valid)
     }
+
+fn transfer<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        cur: &mut AllocatedOperationBranch<E>,
+        lhs: &AllocatedOperationBranch<E>,
+        rhs: &AllocatedOperationBranch<E>,
+        chunk_data: &AllocatedChunkData<E>,
+        is_a_geq_b: &Boolean,
+        is_account_empty: &Boolean,
+        is_compact_amount_correct: &Boolean,
+        op_data: &AllocatedOperationData<E>,
+        pubdata: &AllocatedNum<E>,
+    ) -> Result<Boolean, SynthesisError> {
+        let allocated_transfer_tx_type =
+            AllocatedNum::alloc(cs.namespace(|| "transfer_tx_type"), || Ok(E::Fr::one()))?;
+        allocated_transfer_tx_type
+            .assert_number(cs.namespace(|| "transfer_tx_type equals two"), &E::Fr::from_str("two").unwrap())?;
+        let is_transfer = AllocatedNum::equals(
+            cs.namespace(|| "is_transfer"),
+            &chunk_data.tx_type,
+            &allocated_transfer_tx_type,
+        )?;
+       
+        let zero = AllocatedNum::alloc(cs.namespace(|| "zero"), || Ok(E::Fr::zero()))?;
+        zero.assert_zero(cs.namespace(|| "zero is zero"))?;
+        let is_first_chunk = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is_first_chunk"),
+            &chunk_data.chunk_number,
+            &zero,
+        )?);
+
+        // construct signature message
+        let mut sig_bits = vec![];
+        let mut transfer_tx_type_bits = allocated_transfer_tx_type.into_bits_le(cs.namespace(||"transfer_tx_type_bits"))?;
+        transfer_tx_type_bits.truncate(*franklin_constants::TX_TYPE_BIT_WIDTH); 
+        sig_bits.extend(transfer_tx_type_bits);
+        sig_bits.extend(lhs.bits.account_address.clone());
+        sig_bits.extend(lhs.bits.token.clone());
+        sig_bits.extend(lhs.bits.account.nonce_bits.clone());
+        sig_bits.extend(op_data.amount_packed.clone());
+        sig_bits.extend(op_data.fee_packed.clone());
+        append_packed_public_key(&mut sig_bits, rhs.bits.account.pub_x_bit, rhs.bits.account.pub_x_bit);
+        let sig_msg = pack_bits_to_element(cs.namespace(||"sig_msg from bits"), &sig_bits)?;
+        let is_sig_msg_correct = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is_sig_msg_correct"),
+            &op_data.sig_msg_bits,
+            &op_data.a,
+        )?);
+    }
+
     fn allocate_account_leaf_bits<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -1072,26 +1124,6 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
     interpolation
 }
 
-// allocates a>=b
-fn allocate_geq<E: JubjubEngine, CS: ConstraintSystem<E>>(
-    mut cs: CS,
-    a: &AllocatedNum<E>,
-    b: &AllocatedNum<E>,
-) -> Result<Boolean, SynthesisError> {
-    let c = AllocatedNum::alloc(cs.namespace(|| "a-b"), || {
-        let mut a_val = a.get_value().grab()?;
-        a_val.sub_assign(b.get_value().get()?);
-        Ok(a_val)
-    })?;
-    cs.enforce(
-        || "a-b is correct",
-        |lc| lc + a.get_variable() - b.get_variable(),
-        |lc| lc + CS::one(),
-        |lc| lc + c.get_variable(),
-    );
-    unimplemented!();
-    // c.into_bits_le(mut cs: CS)
-}
 fn pack_bits_to_element<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     bits: &[Boolean],

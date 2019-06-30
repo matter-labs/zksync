@@ -1,4 +1,7 @@
 /// Account tree depth
+pub const TX_TYPE_BIT_WIDTH: &'static usize = &8;
+
+/// Account tree depth
 pub const ACCOUNT_TREE_DEPTH: &'static usize = &24;
 
 /// Account subtree depth
