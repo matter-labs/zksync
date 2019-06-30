@@ -335,9 +335,8 @@ contract Franklin is Verifier, VerificationKey {
             // pubdata: to_account: 3, token: 2, amount: 2, fee: 1, new_pubkey_hash: 21
             address account = address(uint(uint8(_publicData[currentPointer + 1])) + uint(uint8(_publicData[currentPointer + 2])) << 8 + uint(uint8(_publicData[currentPointer + 3])) << 16);
             uint16 tokenId = uint16(uint(uint8(_publicData[currentPointer + 4])) + uint(uint8(_publicData[currentPointer + 5])) << 8);
-            uint112 amount = uint112(uint8(_publicData[currentPointer + 6])) + uint112(uint8(_publicData[currentPointer + 7])) << 8;
-
-            amount = amount; // TODO: unpack(amount);
+            uint24 amountPacked = uint24(uint8(_publicData[currentPointer + 6])) + uint24(uint8(_publicData[currentPointer + 7])) << 8;
+            uint112 amount = unpack(amountPacked, tokenId);
 
             requireValidToken(tokenId);
             require(block.number >= balances[account][tokenId].lockedUntilBlock, "balance locked");
@@ -358,7 +357,8 @@ contract Franklin is Verifier, VerificationKey {
             // pubdata: account: 3, token: 2, amount: 2, fee: 1
             address account = address(uint(uint8(_publicData[currentPointer + 1])) + uint(uint8(_publicData[currentPointer + 2])) << 8 + uint(uint8(_publicData[currentPointer + 3])) << 16);
             uint16 tokenId = uint16(uint(uint8(_publicData[currentPointer + 4])) + uint(uint8(_publicData[currentPointer + 5])) << 8);
-            uint112 amount = uint112(uint8(_publicData[currentPointer + 6])) + uint112(uint8(_publicData[currentPointer + 7])) << 8;
+            uint24 amountPacked = uint24(uint8(_publicData[currentPointer + 6])) + uint24(uint8(_publicData[currentPointer + 7])) << 8;
+            uint112 amount = unpack(amountPacked, tokenId);
 
             requireValidToken(tokenId);
 
@@ -486,6 +486,11 @@ contract Franklin is Verifier, VerificationKey {
     function blockCommitmentExpired() internal view returns (bool) {
         return totalBlocksCommitted > totalBlocksVerified &&
             block.number > blocks[totalBlocksVerified + 1].committedAtBlock + EXPECT_VERIFICATION_IN;
+    }
+
+    function unpack(uint24 _amount, uint16 /*_tokenId*/) internal pure returns (uint112) {
+        // TODO: implement depending on the format chosen
+        return uint112(_amount >> 8) * uint112(10) ** (15 + (_amount ^ 0xff));
     }
 
 }
