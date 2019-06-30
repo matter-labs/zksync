@@ -11,6 +11,7 @@ use serde_json::Value;
 use chrono::NaiveDateTime;
 
 use super::schema::*;
+use diesel::insert_into;
 
 pub struct Mempool {
     conn: ConnectionHolder,
