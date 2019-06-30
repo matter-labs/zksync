@@ -1,6 +1,6 @@
 // From https://github.com/OpenZeppelin/openzeppelin-solidity/blob/master/contracts/token/ERC20/IERC20.sol
 
-pragma solidity ^0.5.0;
+pragma solidity ^0.5.8;
 
 /**
  * @dev Interface of the ERC20 standard as defined in the EIP. Does not include
