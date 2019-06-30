@@ -1,0 +1,7 @@
+{
+  "name": "franklin-contracts",
+  "version": "0.1.0",
+  "devDependencies": {
+    "ethereum-waffle": "^2.0.12"
+  }
+}
