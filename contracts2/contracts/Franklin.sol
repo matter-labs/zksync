@@ -1,8 +1,9 @@
 pragma solidity ^0.5.8;
 
 import "./IERC20.sol";
+import "./Verifier.sol";
 
-contract Franklin {
+contract Franklin is Verifier {
 
     uint constant BLOCK_SIZE = 2000;                // chunks per block; each chunk has 8 bytes of public data
     uint constant MAX_VALUE = 2**112-1;             // must fit into uint112
@@ -375,7 +376,7 @@ contract Franklin {
 
     // Block verification
 
-    function verifyBlock(uint32 _blockNumber, bytes calldata _proof) external {
+    function verifyBlock(uint32 _blockNumber, uint256[8] calldata /*proof*/) external {
         requireActive();
         require(validators[msg.sender], "only by validator");
         require(_blockNumber == totalBlocksVerified + 1, "only verify next block");
@@ -439,7 +440,7 @@ contract Franklin {
         exodusMode = true;
     }
 
-    function exit(uint32 _tokenId, address[] calldata _owners, uint112[] calldata _amounts, bytes calldata /*_proof*/) external {
+    function exit(uint32 _tokenId, address[] calldata _owners, uint112[] calldata _amounts, uint256[8] calldata /*_proof*/) external {
         require(exodusMode, "must be in exodus mode");
         require(_owners.length == _amounts.length, "|owners| != |amounts|");
 
