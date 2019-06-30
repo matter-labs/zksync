@@ -4,10 +4,9 @@ import "./IERC20.sol";
 
 contract Franklin {
 
-    uint constant BLOCK_SIZE = 2000;                // loop cycles per block; each cycle has 8 bytes of public data
+    uint constant BLOCK_SIZE = 2000;                // chunks per block; each chunk has 8 bytes of public data
     uint constant MAX_VALUE = 2**112-1;             // must fit into uint112
     uint constant LOCK_DEPOSITS_FOR = 8*60;         // ETH blocks
-    uint constant MAX_ONCHAIN_OPS_PER_BLOCK = 20;   // ETH blocks
 
     // ==== STORAGE ====
 
@@ -103,10 +102,10 @@ contract Franklin {
     }
 
     // Total number of registered OnchainOps
-    uint totalOnchainOps;
+    uint64 totalOnchainOps;
 
     // List of OnchainOps by index
-    mapping (uint64 => OnchainOp) onchainOp;
+    mapping (uint64 => OnchainOp) onchainOps;
 
 
     // Reverting expired blocks
@@ -132,20 +131,20 @@ contract Franklin {
     mapping (address => mapping (uint32 => bool)) public exited;
 
 
-    // Migration
+    // // Migration
 
-    // Address of the new version of the contract to migrate accounts to
-    // Can be proposed by network governor
-    address public migrateTo;
+    // // Address of the new version of the contract to migrate accounts to
+    // // Can be proposed by network governor
+    // address public migrateTo;
 
-    // Migration deadline: after this ETH block number migration may happen with the contract
-    // entering exodus mode for all users who have not opted in for migration
-    uint32  public migrateByBlock;
+    // // Migration deadline: after this ETH block number migration may happen with the contract
+    // // entering exodus mode for all users who have not opted in for migration
+    // uint32  public migrateByBlock;
 
-    // Flag for the new contract to indicate that the migration has been sealed
-    bool    public migrationSealed;
+    // // Flag for the new contract to indicate that the migration has been sealed
+    // bool    public migrationSealed;
 
-    mapping (uint32 => bool) tokenMigrated;
+    // mapping (uint32 => bool) tokenMigrated;
 
 
     // ==== IMPLEMENTATION ====
@@ -182,31 +181,31 @@ contract Franklin {
         validators[_validator] = _active;
     }
 
-    function scheduleMigration(address _migrateTo, uint32 _migrateByBlock) external {
-        requireGovernor();
-        require(migrateByBlock == 0, "migration in progress");
-        migrateTo = _migrateTo;
-        migrateByBlock = _migrateByBlock;
-    }
+    // function scheduleMigration(address _migrateTo, uint32 _migrateByBlock) external {
+    //     requireGovernor();
+    //     require(migrateByBlock == 0, "migration in progress");
+    //     migrateTo = _migrateTo;
+    //     migrateByBlock = _migrateByBlock;
+    // }
 
-    // Anybody MUST be able to call this function
-    function sealMigration() external {
-        require(migrateByBlock > 0, "no migration scheduled");
-        migrationSealed = true;
-        exodusMode = true;
-    }
+    // // Anybody MUST be able to call this function
+    // function sealMigration() external {
+    //     require(migrateByBlock > 0, "no migration scheduled");
+    //     migrationSealed = true;
+    //     exodusMode = true;
+    // }
 
-    // Anybody MUST be able to call this function
-    function migrateToken(uint32 _tokenId, uint112 /*_amount*/, bytes calldata /*_proof*/) external {
-        require(migrationSealed, "migration not sealed");
-        requireValidToken(_tokenId);
-        require(tokenMigrated[_tokenId]==false, "token already migrated");
-        // TODO: check the proof for the amount
-        // TODO: transfer ERC20 or ETH to the `migrateTo` address
-        tokenMigrated[_tokenId] = true;
+    // // Anybody MUST be able to call this function
+    // function migrateToken(uint32 _tokenId, uint112 /*_amount*/, bytes calldata /*_proof*/) external {
+    //     require(migrationSealed, "migration not sealed");
+    //     requireValidToken(_tokenId);
+    //     require(tokenMigrated[_tokenId]==false, "token already migrated");
+    //     // TODO: check the proof for the amount
+    //     // TODO: transfer ERC20 or ETH to the `migrateTo` address
+    //     tokenMigrated[_tokenId] = true;
 
-        require(false, "unimplemented");
-    }
+    //     require(false, "unimplemented");
+    // }
 
 
     // Root-chain balances
@@ -282,12 +281,6 @@ contract Franklin {
         );
     }
 
-    function commitOnchainOps(uint32 _blockNumber, bytes memory _publicData) internal pure returns (uint64 startId, uint64 total) {
-        // for every cycle: check op, keep track, check final...
-        // for deposits and transfers: add OnchainOps
-        return (0, 0);
-    }
-
     function createBlockCommitment(uint32 _blockNumber, address _validator, bytes32 _oldRoot, bytes32 _newRoot, bytes memory _publicData)
         internal pure returns (bytes32)
     {
@@ -299,6 +292,68 @@ contract Franklin {
         return hash;
     }
 
+    function commitOnchainOps(uint32 _blockNumber, bytes memory _publicData) internal returns (uint64 onchainOpsStartId, uint64 processedOnchainOps) {
+        require(_publicData.length % 8 == 0, "pubdata.len % 8 != 0");
+
+        onchainOpsStartId = totalOnchainOps;
+        uint64 currentOnchainOp = totalOnchainOps;
+
+        // NOTE: the stuff below is the most expensive and most frequently used part of the entire contract.
+        // It is highly unoptimized and can be improved by an order of magnitude by getting rid of the subroutine,
+        // using assembly, replacing ifs with mem lookups and other tricks
+        // TODO: optimize
+        uint currentPointer = 0;
+        while(currentPointer < _publicData.length) {
+            bytes1 opType = _publicData[currentPointer];
+            (uint len, uint64 ops) = processOp(_blockNumber, opType, currentPointer, _publicData, currentOnchainOp);
+            currentPointer += len;
+            processedOnchainOps += ops;
+        }
+        require(currentPointer == _publicData.length, "last chunk exceeds pubdata");
+        return (0, 0);
+    }
+
+    function processOp(uint32 _blockNumber, bytes1 opType, uint currentPointer, bytes memory _publicData, uint64 currentOnchainOp) internal returns (uint processedLen, uint64 processedOnchainOps) {
+
+        if (opType == 0x00) return (1*8, 0); // noop
+        if (opType == 0x01) return (4*8, 0); // transfer_to_new
+        if (opType == 0x07) return (2*8, 0); // transfer
+        if (opType == 0x05) return (1*8, 0); // close_account
+
+        // deposit
+        if (opType == 0x01) {
+            // pubdata: to_account: 3, token: 2, compact_amount: 2, fee: 1, new_pubkey_hash: 21
+            address account = address(uint(uint8(_publicData[currentPointer + 1])) + uint(uint8(_publicData[currentPointer + 2])) << 8 + uint(uint8(_publicData[currentPointer + 3])) << 16);
+            uint16 tokenId = uint16(uint(uint8(_publicData[currentPointer + 4])) + uint(uint8(_publicData[currentPointer + 5])) << 8);
+            uint112 amount = uint112(uint8(_publicData[currentPointer + 6])) + uint112(uint8(_publicData[currentPointer + 7])) << 8;
+
+            amount = amount; // TODO: unpack(amount);
+
+            requireValidToken(tokenId);
+            require(block.number >= balances[account][tokenId].lockedUntilBlock, "balance locked");
+            require(balances[account][tokenId].balance >= amount, "balance locked");
+
+            balances[account][tokenId].balance -= amount;
+            onchainOps[currentOnchainOp] = OnchainOp(
+                OnchainOpType.Deposit,
+                tokenId,
+                account,
+                amount
+            );
+            return (4*8, 1);
+        }
+
+        // partial_exit
+        if (opType == 0x04) {
+            // pubdata: account: 3, token: 2, compact_amount: 2, fee: 1
+
+            // TODO: move funds create a new onchain-op for exit
+            return (1*8, 1);
+        }
+
+        require(false, "unsupported op");
+    }
+
 
     // Block verification
 
@@ -306,16 +361,16 @@ contract Franklin {
         requireActive();
         require(validators[msg.sender], "only by validator");
         require(_blockNumber == totalBlocksVerified + 1, "only verify next block");
-
         // TODO: check that committed has not expired yet
 
         // TODO: verify proof against commitment and increment totalBlocksVerified
-        // TODO: post-process holders (up to max number of operation)
-        // TODO: clear holders from the commitment
+
+        consummateOnchainOps(_blockNumber);
     }
 
     function consummateOnchainOps(uint32 _blockNumber) internal pure {
-        // for OnchainOps committed: do...
+        // TODO: post-process onchain ops
+        // TODO: clear onchain ops from the commitment
     }
 
 
@@ -323,7 +378,7 @@ contract Franklin {
 
     function revertExpiredBlocks() external {
         // TODO: check that committed expired
-        // TODO: move blocks to the list of committed
+        // TODO: move blocks to the `blocksToRevert`
     }
 
     function unprocessRevertedBlock(uint32 _revertedBlockId) external {
