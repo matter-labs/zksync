@@ -7,6 +7,8 @@ contract Franklin {
     uint constant BLOCK_SIZE = 2000;                // chunks per block; each chunk has 8 bytes of public data
     uint constant MAX_VALUE = 2**112-1;             // must fit into uint112
     uint constant LOCK_DEPOSITS_FOR = 8*60;         // ETH blocks
+    uint constant EXPECT_VERIFICATION_IN = 8*60;    // ETH blocks
+    uint constant MAX_UNVERIFIED_BLOCKS = 4*60;     // To make sure that all reverted blocks can be copied under block gas limit!
 
     // ==== STORAGE ====
 
@@ -51,11 +53,11 @@ contract Franklin {
 
     // Total number of verified blocks
     // i.e. blocks[totalBlocksVerified] points at the latest verified block (block 0 is genesis)
-    uint256 public totalBlocksVerified;
+    uint32 public totalBlocksVerified;
 
     // Total number of committed blocks
     // i.e. blocks[totalBlocksCommitted] points at the latest committed block
-    uint256 public totalBlocksCommitted;
+    uint32 public totalBlocksCommitted;
 
     // Block data (once per block)
     struct Block {
@@ -90,7 +92,7 @@ contract Franklin {
     // Type of block processing operation holder
     enum OnchainOpType {
         Deposit,
-        Withdraw
+        Withdrawal
     }
 
     // OnchainOp keeps a balance for processing the committed data in blocks, see docs
@@ -254,14 +256,14 @@ contract Franklin {
         requireActive();
         require(validators[msg.sender], "only by validator");
         require(_blockNumber == totalBlocksCommitted + 1, "only commit next block");
-        // TODO: check that first committed has not expired yet
-        // TODO: check that first committed is not more than 300 blocks away
-        // TODO: enforce one commitment per eth block
-        // TODO: check status at exit queue
+        require(blockCommitmentExpired() == false, "committment expired");
+        require(totalBlocksCommitted - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS, "too many committed");
+
+        // TODO: check exit queue: it will require certains records to appear on `_publicData`
 
         // TODO: make efficient padding here
 
-        (uint64 startId, uint64 totalProcessed) = commitOnchainOps(_blockNumber, _publicData);
+        (uint64 startId, uint64 totalProcessed) = commitOnchainOps(_publicData);
 
         bytes32 commitment = createBlockCommitment(
             _blockNumber,
@@ -273,9 +275,11 @@ contract Franklin {
         blocks[_blockNumber] = Block(
             commitment,
             _newRoot,
-            _blockNumber,
-            0,
-            msg.sender,
+            _blockNumber,   // committed at
+            0,              // verified at
+            msg.sender,     // validator
+
+            // onchain-ops
             startId,
             totalProcessed
         );
@@ -292,7 +296,9 @@ contract Franklin {
         return hash;
     }
 
-    function commitOnchainOps(uint32 _blockNumber, bytes memory _publicData) internal returns (uint64 onchainOpsStartId, uint64 processedOnchainOps) {
+    function commitOnchainOps(bytes memory _publicData)
+        internal returns (uint64 onchainOpsStartId, uint64 processedOnchainOps)
+    {
         require(_publicData.length % 8 == 0, "pubdata.len % 8 != 0");
 
         onchainOpsStartId = totalOnchainOps;
@@ -305,7 +311,7 @@ contract Franklin {
         uint currentPointer = 0;
         while(currentPointer < _publicData.length) {
             bytes1 opType = _publicData[currentPointer];
-            (uint len, uint64 ops) = processOp(_blockNumber, opType, currentPointer, _publicData, currentOnchainOp);
+            (uint len, uint64 ops) = processOp(opType, currentPointer, _publicData, currentOnchainOp);
             currentPointer += len;
             processedOnchainOps += ops;
         }
@@ -313,7 +319,9 @@ contract Franklin {
         return (0, 0);
     }
 
-    function processOp(uint32 _blockNumber, bytes1 opType, uint currentPointer, bytes memory _publicData, uint64 currentOnchainOp) internal returns (uint processedLen, uint64 processedOnchainOps) {
+    function processOp(bytes1 opType, uint currentPointer, bytes memory _publicData, uint64 currentOnchainOp)
+        internal returns (uint processedLen, uint64 processedOnchainOps)
+    {
 
         if (opType == 0x00) return (1*8, 0); // noop
         if (opType == 0x01) return (4*8, 0); // transfer_to_new
@@ -322,7 +330,7 @@ contract Franklin {
 
         // deposit
         if (opType == 0x01) {
-            // pubdata: to_account: 3, token: 2, compact_amount: 2, fee: 1, new_pubkey_hash: 21
+            // pubdata: to_account: 3, token: 2, amount: 2, fee: 1, new_pubkey_hash: 21
             address account = address(uint(uint8(_publicData[currentPointer + 1])) + uint(uint8(_publicData[currentPointer + 2])) << 8 + uint(uint8(_publicData[currentPointer + 3])) << 16);
             uint16 tokenId = uint16(uint(uint8(_publicData[currentPointer + 4])) + uint(uint8(_publicData[currentPointer + 5])) << 8);
             uint112 amount = uint112(uint8(_publicData[currentPointer + 6])) + uint112(uint8(_publicData[currentPointer + 7])) << 8;
@@ -331,7 +339,7 @@ contract Franklin {
 
             requireValidToken(tokenId);
             require(block.number >= balances[account][tokenId].lockedUntilBlock, "balance locked");
-            require(balances[account][tokenId].balance >= amount, "balance locked");
+            require(balances[account][tokenId].balance >= amount, "balance insuffcient");
 
             balances[account][tokenId].balance -= amount;
             onchainOps[currentOnchainOp] = OnchainOp(
@@ -345,10 +353,20 @@ contract Franklin {
 
         // partial_exit
         if (opType == 0x04) {
-            // pubdata: account: 3, token: 2, compact_amount: 2, fee: 1
+            // pubdata: account: 3, token: 2, amount: 2, fee: 1
+            address account = address(uint(uint8(_publicData[currentPointer + 1])) + uint(uint8(_publicData[currentPointer + 2])) << 8 + uint(uint8(_publicData[currentPointer + 3])) << 16);
+            uint16 tokenId = uint16(uint(uint8(_publicData[currentPointer + 4])) + uint(uint8(_publicData[currentPointer + 5])) << 8);
+            uint112 amount = uint112(uint8(_publicData[currentPointer + 6])) + uint112(uint8(_publicData[currentPointer + 7])) << 8;
 
-            // TODO: move funds create a new onchain-op for exit
-            return (1*8, 1);
+            requireValidToken(tokenId);
+
+            onchainOps[currentOnchainOp] = OnchainOp(
+                OnchainOpType.Withdrawal,
+                tokenId,
+                account,
+                amount
+            );
+            return (2*8, 1);
         }
 
         require(false, "unsupported op");
@@ -361,28 +379,56 @@ contract Franklin {
         requireActive();
         require(validators[msg.sender], "only by validator");
         require(_blockNumber == totalBlocksVerified + 1, "only verify next block");
-        // TODO: check that committed has not expired yet
+        require(blockCommitmentExpired() == false, "committment expired");
 
-        // TODO: verify proof against commitment and increment totalBlocksVerified
+        // TODO: verify proof against commitment
+        require(false, "verification failed");
 
+        totalBlocksVerified += 1;
         consummateOnchainOps(_blockNumber);
     }
 
-    function consummateOnchainOps(uint32 _blockNumber) internal pure {
-        // TODO: post-process onchain ops
-        // TODO: clear onchain ops from the commitment
+    function consummateOnchainOps(uint32 _blockNumber) internal {
+        uint64 current = blocks[_blockNumber].operationStartId;
+        uint64 end = current + blocks[_blockNumber].totalOperations;
+        while (current < end) {
+            OnchainOp memory op = onchainOps[current];
+            if (op.opType == OnchainOpType.Withdrawal) {
+                // withdrawal was successful, accrue balance
+                balances[op.owner][op.tokenId].balance += op.amount;
+            }
+            delete onchainOps[current];
+        }
     }
 
 
     // Reverting committed blocks
 
     function revertExpiredBlocks() external {
-        // TODO: check that committed expired
-        // TODO: move blocks to the `blocksToRevert`
+        require(blockCommitmentExpired(), "not expirated");
+        uint32 total = totalBlocksCommitted - totalBlocksVerified;
+        for(uint32 i = 0; i < total; i++) {
+            blocksToRevert[totalBlocksToRevert + i] = blocks[totalBlocksVerified + i + 1];
+            delete blocks[totalBlocksVerified + i + 1];
+        }
+        totalBlocksToRevert += total;
     }
 
-    function unprocessRevertedBlock(uint32 _revertedBlockId) external {
-        // TODO: return deposits
+    function revertBlock(uint32 _revertedBlockId) external {
+        Block memory reverted = blocksToRevert[_revertedBlockId];
+        require(reverted.committedAtBlock > 0, "block not found");
+
+        uint64 current = reverted.operationStartId;
+        uint64 end = current + reverted.totalOperations;
+        while (current < end) {
+            OnchainOp memory op = onchainOps[current];
+            if (op.opType == OnchainOpType.Deposit) {
+                // deposit failed, return funds
+                balances[op.owner][op.tokenId].balance += op.amount;
+            }
+            delete onchainOps[current];
+        }
+        delete blocksToRevert[_revertedBlockId];
     }
 
 
@@ -422,6 +468,11 @@ contract Franklin {
 
     function requireValidToken(uint32 _tokenId) internal view {
         require(_tokenId < totalTokens + 1, "unknown token");
+    }
+
+    function blockCommitmentExpired() internal view returns (bool) {
+        return totalBlocksCommitted > totalBlocksVerified &&
+            block.number > blocks[totalBlocksVerified + 1].committedAtBlock + EXPECT_VERIFICATION_IN;
     }
 
 }
