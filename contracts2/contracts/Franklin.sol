@@ -4,9 +4,10 @@ import "./IERC20.sol";
 
 contract Franklin {
 
-    uint constant BLOCK_SIZE = 1000;        // transactions per block
-    uint constant MAX_VALUE = 2**112-1;     // must fit into uint112
-    uint constant LOCK_DEPOSITS_FOR = 8*60; // ETH blocks
+    uint constant BLOCK_SIZE = 2000;                // loop cycles per block; each cycle has 8 bytes of public data
+    uint constant MAX_VALUE = 2**112-1;             // must fit into uint112
+    uint constant LOCK_DEPOSITS_FOR = 8*60;         // ETH blocks
+    uint constant MAX_ONCHAIN_OPS_PER_BLOCK = 20;   // ETH blocks
 
     // ==== STORAGE ====
 
@@ -59,9 +60,8 @@ contract Franklin {
 
     // Block data (once per block)
     struct Block {
-
-        // Hash of committment to public data for the block circuit
-        bytes32 dataCommitment;
+        // Hash of committment the block circuit
+        bytes32 commitment;
 
         // New root hash
         bytes32 stateRoot;
@@ -80,36 +80,33 @@ contract Franklin {
 
         // Total number of operations to process for this block
         uint64  totalOperations;
-
-        // Stored here for reverting expired blocks
-        uint32 blockNumber;
     }
 
     // List of blocks by Franklin blockId
     mapping (uint32 => Block) public blocks;
 
 
-    // Holders of balances for block processing (see docs)
+    // Onchain operations -- processed inside blocks (see docs)
 
     // Type of block processing operation holder
-    enum HolderType {
+    enum OnchainOpType {
         Deposit,
         Withdraw
     }
 
-    // Holders keep balances for processing the committed data in blocks, see docs
-    struct Holder {
-        HolderType  opType;
-        uint32      tokenId;
-        address     owner;
-        uint112     amount;
+    // OnchainOp keeps a balance for processing the committed data in blocks, see docs
+    struct OnchainOp {
+        OnchainOpType   opType;
+        uint32          tokenId;
+        address         owner;
+        uint112         amount;
     }
 
-    // Total number of registered holders
-    uint totalHolders;
+    // Total number of registered OnchainOps
+    uint totalOnchainOps;
 
-    // List of holders by index
-    mapping (uint64 => Holder) holders;
+    // List of OnchainOps by index
+    mapping (uint64 => OnchainOp) onchainOp;
 
 
     // Reverting expired blocks
@@ -254,19 +251,52 @@ contract Franklin {
 
     // Block committment
 
-    function commitBlock(uint32 _blockNumber, bytes32 _newRoot, bytes calldata _dataCommitment) external {
+    function commitBlock(uint32 _blockNumber, bytes32 _newRoot, bytes calldata _publicData) external {
         requireActive();
         require(validators[msg.sender], "only by validator");
-        require(_blockNumber == totalBlocksCommitted + 1, "commit next block");
-
+        require(_blockNumber == totalBlocksCommitted + 1, "only commit next block");
         // TODO: check that first committed has not expired yet
         // TODO: check that first committed is not more than 300 blocks away
         // TODO: enforce one commitment per eth block
-        // TODO: padding
-
         // TODO: check status at exit queue
-        // TODO: store commitment
-        // TODO: pre-process holders (up to max number of operation)
+
+        // TODO: make efficient padding here
+
+        (uint64 startId, uint64 totalProcessed) = commitOnchainOps(_blockNumber, _publicData);
+
+        bytes32 commitment = createBlockCommitment(
+            _blockNumber,
+            msg.sender,
+            blocks[_blockNumber - 1].stateRoot,
+            _newRoot,
+            _publicData);
+
+        blocks[_blockNumber] = Block(
+            commitment,
+            _newRoot,
+            _blockNumber,
+            0,
+            msg.sender,
+            startId,
+            totalProcessed
+        );
+    }
+
+    function commitOnchainOps(uint32 _blockNumber, bytes memory _publicData) internal pure returns (uint64 startId, uint64 total) {
+        // for every cycle: check op, keep track, check final...
+        // for deposits and transfers: add OnchainOps
+        return (0, 0);
+    }
+
+    function createBlockCommitment(uint32 _blockNumber, address _validator, bytes32 _oldRoot, bytes32 _newRoot, bytes memory _publicData)
+        internal pure returns (bytes32)
+    {
+        bytes32 hash = sha256(abi.encodePacked(uint256(_blockNumber), uint256(_validator)));
+        hash = sha256(abi.encodePacked(hash, _oldRoot));
+        hash = sha256(abi.encodePacked(hash, _newRoot));
+        // public data is committed with padding (TODO: check assembly and optimize to avoid copying data)
+        hash = sha256(abi.encodePacked(hash, _publicData, new bytes(BLOCK_SIZE * 8 - _publicData.length)));
+        return hash;
     }
 
 
@@ -275,13 +305,17 @@ contract Franklin {
     function verifyBlock(uint32 _blockNumber, bytes calldata _proof) external {
         requireActive();
         require(validators[msg.sender], "only by validator");
-        require(_blockNumber == totalBlocksVerified + 1, "verify next block");
+        require(_blockNumber == totalBlocksVerified + 1, "only verify next block");
 
         // TODO: check that committed has not expired yet
 
         // TODO: verify proof against commitment and increment totalBlocksVerified
         // TODO: post-process holders (up to max number of operation)
         // TODO: clear holders from the commitment
+    }
+
+    function consummateOnchainOps(uint32 _blockNumber) internal pure {
+        // for OnchainOps committed: do...
     }
 
 
