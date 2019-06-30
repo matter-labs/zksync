@@ -1,50 +1,20 @@
-- unit conversion: different by token?
-- lock funds after deposit
-- authorization for ERC20 transferFrom
-
-- max deposits/exits per block
-- return money on verification
-
-# Events
-
-# Todo
-
-- add tokens+
-- priority queue full exit mechanism
-- update mechanism: strict opt-in only! (integrate into our circuit)
-- manage validators+
-- key hash
-- deploy key separately?
-
-# Governance
-
-# Functions
-
-- doDeposit
-- doWithdraw
-
-- depositERC20
-- depositETH / default()
-- withdrawERC20
-- withdrawETH
-
-- commitBlock
-- verifyBlock
-
-# Tests
-
-- deposits
-- withdraws
-
-
-# Contract docs
+# Contract documentation
 
 ## Deployment
 
+The contract must be deployed specifying the initial ("genesis") state root hash, appointing the network governor (see "Governance" section), and linking the exit queue (see "Cenosorship resistance" section).
+
 ## Governance
-### Validators
-### Tokens
-### Migration (contract upgrade)
+
+Governance of the network will be excerised from a separate contract registered in the Franklin contract as `networkGovernor`. It can:
+
+- Change the set of validators.
+- Add new tokens (tokens can not be removed after being added).
+- Initiate migration to a new contract (see the "Migration" section).
+
+## Migration
+
+(to be implemented later)
 
 Franklin shall always have a strict opt-in policy: we guarantee that user funds are retrievable forever under the conditions a user has opted in when depositing funds, no matter what. A migration to a newer version of the contract shall be easy and cheap, but MUST require a separate opt-in or allow the user to exit.
 
@@ -60,17 +30,30 @@ The update mechanism shall follow this workflow:
 - The new contract will read the latest state root directly from the old one (this is safe, because the root state is frozen and can not be changed).
 
 ## Deposits and withdrawals
-### Root-chain balances
-### Deposits and withdrawals workflow
+
+- Root-chain balances
+- Deposits and withdrawals workflow
 
 ## Block committment
-### Franklin operations
-### Root-chain holders
+
+- Franklin operations
+- Root-chain holders
 
 ## Block verification
 
 ## Reverting expired blocks
 
-## Exit queue & exodus mode
-### Exit queue
-### Exodus mode
+## Cenosorship resistance
+
+- Exit queue
+- Exodus mode
+
+# Todo / Questions / Unsorted
+
+- priority queue full exit mechanism
+- manage validators
+- introduce key hash
+- deploy key separately?
+- unit conversion: different by token?
+- describe authorization for ERC20 transferFrom
+- enforce max deposits/exits per block in the circuit
