@@ -19,12 +19,17 @@ Governance of the network will be excerised from a separate contract registered 
 
 ## Block committment
 
+- Limitations
 - Franklin operations
-- Root-chain holders
+- Committing onchain operations
 
 ## Block verification
 
+- Consummating onchain operations
+
 ## Reverting expired blocks
+
+- Reverting onchain operations
 
 ## Cenosorship resistance
 
