@@ -12,6 +12,13 @@ contract Franklin is Verifier, VerificationKey {
     uint constant EXPECT_VERIFICATION_IN = 8*60;    // ETH blocks
     uint constant MAX_UNVERIFIED_BLOCKS = 4*60;     // To make sure that all reverted blocks can be copied under block gas limit!
 
+    event BlockCommitted(uint32 indexed blockNumber);
+    event BlockVerified(uint32 indexed blockNumber);
+    event BlocksReverted(uint32 indexed totalBlocksVerified, uint32 indexed totalBlocksCommitted);
+
+    event OnchainDeposit(address indexed owner, uint32 tokenId, uint112 amount);
+    event OnchainWithdrawal(address indexed owner, uint32 tokenId, uint112 amount);
+
     // ==== STORAGE ====
 
     // Governance
@@ -241,6 +248,7 @@ contract Franklin is Verifier, VerificationKey {
         require(uint256(_amount) + balances[msg.sender][_tokenId].balance < MAX_VALUE, "overflow");
         balances[msg.sender][_tokenId].balance += _amount;
         balances[msg.sender][_tokenId].lockedUntilBlock = uint32(block.number + LOCK_DEPOSITS_FOR);
+        emit OnchainDeposit(msg.sender, _tokenId, _amount);
     }
 
     function registerWithdrawal(uint32 _tokenId, uint112 _amount) internal {
@@ -249,6 +257,7 @@ contract Franklin is Verifier, VerificationKey {
         require(block.number >= balances[msg.sender][_tokenId].lockedUntilBlock, "balance locked");
         require(balances[msg.sender][_tokenId].balance >= _amount, "insufficient balance");
         balances[msg.sender][_tokenId].balance -= _amount;
+        emit OnchainWithdrawal(msg.sender, _tokenId, _amount);
     }
 
 
@@ -285,6 +294,8 @@ contract Franklin is Verifier, VerificationKey {
             startId,
             totalProcessed
         );
+
+        emit BlockCommitted(_blockNumber);
     }
 
     function createBlockCommitment(uint32 _blockNumber, address _validator, bytes32 _oldRoot, bytes32 _newRoot, bytes memory _publicData)
@@ -387,6 +398,7 @@ contract Franklin is Verifier, VerificationKey {
 
         totalBlocksVerified += 1;
         consummateOnchainOps(_blockNumber);
+        emit BlockVerified(_blockNumber);
     }
 
     function verifyBlockProof(uint256[8] memory proof, bytes32 commitment)
@@ -419,6 +431,7 @@ contract Franklin is Verifier, VerificationKey {
 
     function revertExpiredBlocks() external {
         require(blockCommitmentExpired(), "not expirated");
+        emit BlocksReverted(totalBlocksVerified, totalBlocksCommitted);
         uint32 total = totalBlocksCommitted - totalBlocksVerified;
         for(uint32 i = 0; i < total; i++) {
             blocksToRevert[totalBlocksToRevert + i] = blocks[totalBlocksVerified + i + 1];
