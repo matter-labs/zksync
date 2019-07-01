@@ -1130,17 +1130,20 @@ impl BabyProver {
         storage: &StorageProcessor,
         expected_current_block: BlockNumber,
     ) -> Result<(), String> {
-        unimplemented!("Rewind state")
-        //        info!(
-        //            "rewinding the state from block #{} to #{}",
-        //            self.current_block_number, expected_current_block
-        //        );
-        //        let (_, updated_accounts) = storage
-        //            .load_state_diff(self.current_block_number, Some(expected_current_block))
-        //            .map_err(|e| format!("load_state_diff failed: {}", e))?;
-        //        extend_accounts(&mut self.accounts_tree, updated_accounts.into_iter());
-        //        self.current_block_number = expected_current_block;
-        //        Ok(())
+        info!(
+            "rewinding the state from block #{} to #{}",
+            self.current_block_number, expected_current_block
+        );
+        let (_, new_accounts) = storage
+            .load_committed_state(Some(expected_current_block))
+            .map_err(|e| format!("load_state_diff failed: {}", e))?;
+
+        let mut tree = CircuitAccountTree::new(params::BALANCE_TREE_DEPTH as u32);
+        extend_accounts(&mut tree, new_accounts.into_iter());
+
+        self.accounts_tree = tree;
+        self.current_block_number = expected_current_block;
+        Ok(())
     }
 
     fn make_proving_attempt(&mut self) -> Result<(), String> {

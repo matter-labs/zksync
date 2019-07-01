@@ -61,7 +61,7 @@ impl PlasmaStateKeeper {
             .access_storage()
             .expect("db connection failed for statekeeper");
 
-        let (last_committed, accounts) = storage.load_committed_state().expect("db failed");
+        let (last_committed, accounts) = storage.load_committed_state(None).expect("db failed");
         let last_verified = storage.get_last_verified_block().expect("db failed");
         let state = PlasmaState::new(accounts, last_committed + 1);
         //let outstanding_txs = storage.count_outstanding_proofs(last_verified).expect("db failed");
