@@ -96,7 +96,8 @@ pub struct Operation {
 }
 
 pub enum ProtoBlock {
-    Transfer(Vec<TransferTx>),
+    /// (tx id in mempool, tx) this way we can remove tx from mempool after execution.
+    Transfer(Vec<(i32, TransferTx)>),
     Deposit(BatchNumber, Vec<DepositTx>),
     Exit(BatchNumber, Vec<ExitTx>),
 }
@@ -113,6 +114,7 @@ pub enum StateKeeperRequest {
 pub struct CommitRequest {
     pub block: Block,
     pub accounts_updated: Vec<AccountUpdate>,
+    pub txs_executed: Vec<i32>,
 }
 
 pub const ACTION_COMMIT: &str = "Commit";

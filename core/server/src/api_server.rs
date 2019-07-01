@@ -1,6 +1,5 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
-use crate::nonce_futures::NonceFutures;
 use actix_web::{
     http::Method, middleware, middleware::cors::Cors, server, App, AsyncResponder, Error,
     HttpMessage, HttpRequest, HttpResponse,
@@ -64,7 +63,6 @@ pub struct AppState {
     tx_for_state: mpsc::Sender<StateKeeperRequest>,
     contract_address: String,
     connection_pool: ConnectionPool,
-    nonce_futures: NonceFutures,
     network_status: SharedNetworkStatus,
 }
 
@@ -76,7 +74,6 @@ fn handle_submit_tx(
 ) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let tx_for_state = req.state().tx_for_state.clone();
     let network_status = req.state().network_status.read();
-    let nonce_futures = req.state().nonce_futures.clone();
 
     req.json()
         .map_err(|e| format!("{}", e)) // convert all errors to String
@@ -88,71 +85,12 @@ fn handle_submit_tx(
                 return Err("Rate limit exceeded".to_string());
             }
 
-            // Validate tx input
+            // Validate tx input (only basic consistency check).
 
             tx.validate()?;
 
-            // Fetch account
-            unreachable!("Account check moved to statekeeper/mempool");
-            //
-            // TODO: the code below will block the current thread; switch to futures instead
-            let (key_tx, key_rx) = mpsc::channel();
-            let request = StateKeeperRequest::GetAccount(tx.from, key_tx);
-            tx_for_state
-                .send(request)
-                .expect("must send a new transaction to queue");
-            let account = key_rx
-                .recv_timeout(std::time::Duration::from_millis(TIMEOUT))
-                .map_err(|_| "Internal error: timeout on GetAccount".to_string())?;
-            let account = account.ok_or_else(|| "Account not found".to_string())?;
-
-            Ok((tx, account, tx_for_state))
-        })
-        .and_then(move |(tx, account, tx_for_state)| {
-            unreachable!("Nonce check moved to state keeper/mempool");
-            //debug!("account {}: nonce {} received", tx.from, tx.nonce);
-
-            // Wait for nonce
-
-            let future = if account.nonce == tx.nonce {
-                nonce_futures.ready(tx.from, tx.nonce)
-            } else {
-                //debug!("account {}: waiting for nonce {}", tx.from, tx.nonce);
-                nonce_futures.nonce_await(tx.from, tx.nonce)
-            };
-            future
-                .timeout(Duration::from_millis(NONCE_ORDER_TIMEOUT))
-                .map(|_| (tx, account, nonce_futures, tx_for_state))
-                .or_else(|e| future::err(format!("Nonce error: {:?}", e)))
-        })
-        .and_then(move |(mut tx, account, mut nonce_futures, tx_for_state)| {
-            unreachable!("Tx application moved to state keeper");
-            //debug!("account {}: nonce {} ready", tx.from, tx.nonce);
-
-            // Verify signature
-
-            let pub_key: PublicKey = account
-                .get_pub_key()
-                .ok_or_else(|| "Pubkey expired".to_string())?;
-            let verified = tx.verify_sig(&pub_key);
-            if !verified {
-                let (x, y) = pub_key.0.into_xy();
-                warn!("Got public key: {:?}, {:?}", x, y);
-                warn!(
-                    "Signature is invalid: (x,y,s) = ({:?},{:?},{:?})",
-                    &tx.signature.r_x, &tx.signature.r_y, &tx.signature.s
-                );
-                return Err("Invalid signature".to_string());
-            }
-
-            // Cache public key we just verified against (to skip verifying again in state keeper)
-
-            tx.cached_pub_key = Some(pub_key);
-
-            // Apply tx
-
+            // TODO (Drogan) use oneshot.
             let (add_tx, add_rx) = mpsc::channel();
-            let (account, nonce) = (tx.from, tx.nonce);
             tx_for_state
                 .send(StateKeeperRequest::AddTransferTx(Box::new(tx), add_tx))
                 .expect("sending to sate keeper failed");
@@ -161,16 +99,6 @@ fn handle_submit_tx(
                 .recv_timeout(std::time::Duration::from_millis(500))
                 .map_err(|_| "Internal error: timeout on AddTransferTx".to_string())?
                 .map_err(|e| format!("Tx rejected: {:?}", e))?;
-
-            unimplemented!("Check result of adding tx to mempool here");
-            //            if let Err(reason) = result {
-            //                warn!("Failed to add tx to mempool: {:?}", reason);
-            //            }
-
-            // Notify futures waiting for nonce
-
-            nonce_futures.set_next_nonce(account, nonce + 1);
-
             // Return response
 
             let resp = TransactionResponse {
@@ -628,7 +556,6 @@ pub fn start_api_server(
                 tx_for_state: tx_for_state.clone(),
                 contract_address: env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR env missing"),
                 connection_pool: connection_pool.clone(),
-                nonce_futures: NonceFutures::default(),
                 network_status: SharedNetworkStatus::default(),
             };
 

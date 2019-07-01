@@ -7,7 +7,6 @@ members = [
     "core/models",
     "core/plasma",
     "core/prover",
-    "core/sandbox",
     "core/server",
     "core/storage",
     "core/circuit",

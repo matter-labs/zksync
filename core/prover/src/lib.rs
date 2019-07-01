@@ -1130,16 +1130,17 @@ impl BabyProver {
         storage: &StorageProcessor,
         expected_current_block: BlockNumber,
     ) -> Result<(), String> {
-        info!(
-            "rewinding the state from block #{} to #{}",
-            self.current_block_number, expected_current_block
-        );
-        let (_, updated_accounts) = storage
-            .load_state_diff(self.current_block_number, expected_current_block)
-            .map_err(|e| format!("load_state_diff failed: {}", e))?;
-        extend_accounts(&mut self.accounts_tree, updated_accounts.into_iter());
-        self.current_block_number = expected_current_block;
-        Ok(())
+        unimplemented!("Rewind state")
+        //        info!(
+        //            "rewinding the state from block #{} to #{}",
+        //            self.current_block_number, expected_current_block
+        //        );
+        //        let (_, updated_accounts) = storage
+        //            .load_state_diff(self.current_block_number, Some(expected_current_block))
+        //            .map_err(|e| format!("load_state_diff failed: {}", e))?;
+        //        extend_accounts(&mut self.accounts_tree, updated_accounts.into_iter());
+        //        self.current_block_number = expected_current_block;
+        //        Ok(())
     }
 
     fn make_proving_attempt(&mut self) -> Result<(), String> {
