@@ -769,9 +769,9 @@ impl StorageProcessor {
         })
     }
 
-    pub fn load_committed_state(&self) -> QueryResult<(u32, AccountMap)> {
-        let (block, mut accounts) = self.load_verified_state()?;
-        let (block, state_diff) = self.load_state_diff(block, None)?;
+    pub fn load_committed_state(&self, block: Option<u32>) -> QueryResult<(u32, AccountMap)> {
+        let (verif_block, mut accounts) = self.load_verified_state()?;
+        let (block, state_diff) = self.load_state_diff(verif_block, block)?;
         apply_updates(&mut accounts, state_diff);
         Ok((block, accounts))
     }
