@@ -99,6 +99,7 @@ impl PlasmaState {
 
             let from_account_update = {
                 let from_old_balance = from.get_balance(ETH_TOKEN_ID).clone();
+                let old_nonce = from.nonce;
                 from.sub_balance(ETH_TOKEN_ID, &transacted_amount);
                 let from_new_balance = from.get_balance(ETH_TOKEN_ID).clone();
                 from.nonce += 1;
@@ -107,7 +108,8 @@ impl PlasmaState {
 
                 AccountUpdate::UpdateBalance {
                     id: tx.from,
-                    balance_update: vec![(ETH_TOKEN_ID, from_old_balance, from_new_balance)],
+                    balance_update: (ETH_TOKEN_ID, from_old_balance, from_new_balance),
+                    nonce: old_nonce,
                 }
             };
 
@@ -120,6 +122,7 @@ impl PlasmaState {
                         id: tx.to,
                         public_key_x: new_acc.public_key_x.clone(),
                         public_key_y: new_acc.public_key_y.clone(),
+                        nonce: new_acc.nonce,
                     };
                     to_account_updates.push(create_acc_update);
 
@@ -134,7 +137,8 @@ impl PlasmaState {
 
                     let balance_update = AccountUpdate::UpdateBalance {
                         id: tx.to,
-                        balance_update: vec![(ETH_TOKEN_ID, to_old_balance, to_new_balance)],
+                        balance_update: (ETH_TOKEN_ID, to_old_balance, to_new_balance),
+                        nonce: to.nonce,
                     };
                     to_account_updates.push(balance_update);
                 }
@@ -155,7 +159,7 @@ impl PlasmaState {
     }
 
     pub fn apply_deposit(&mut self, tx: &DepositTx) -> Result<Vec<AccountUpdate>, ()> {
-        let existing_account = self.balance_tree.items.contains_key(&tx.account);
+        let mut updates = Vec::new();
 
         let mut acc = self
             .balance_tree
@@ -165,26 +169,28 @@ impl PlasmaState {
                 let mut acc = Account::default();
                 acc.public_key_x = tx.pub_x.clone();
                 acc.public_key_y = tx.pub_y.clone();
+
+                updates.push(AccountUpdate::Create {
+                    id: tx.account,
+                    public_key_x: acc.public_key_x.clone(),
+                    public_key_y: acc.public_key_y.clone(),
+                    nonce: acc.nonce,
+                });
+
                 acc
             });
 
         let old_amount = acc.get_balance(ETH_TOKEN_ID).clone();
+        let old_nonce = acc.nonce;
         acc.add_balance(ETH_TOKEN_ID, &tx.amount);
         let new_amount = acc.get_balance(ETH_TOKEN_ID).clone();
 
         self.balance_tree.insert(tx.account, acc);
 
-        let mut updates = Vec::new();
-        if !existing_account {
-            updates.push(AccountUpdate::Create {
-                id: tx.account,
-                public_key_x: tx.pub_x.clone(),
-                public_key_y: tx.pub_y.clone(),
-            });
-        }
         updates.push(AccountUpdate::UpdateBalance {
             id: tx.account,
-            balance_update: vec![(ETH_TOKEN_ID, old_amount, new_amount)],
+            balance_update: (ETH_TOKEN_ID, old_amount, new_amount),
+            nonce: old_nonce,
         });
 
         Ok(updates)
@@ -204,12 +210,14 @@ impl PlasmaState {
         let mut updates = Vec::new();
         updates.push(AccountUpdate::UpdateBalance {
             id: tx.account,
-            balance_update: vec![(ETH_TOKEN_ID, old_amount, BigDecimal::zero())],
+            balance_update: (ETH_TOKEN_ID, old_amount, BigDecimal::zero()),
+            nonce: acc.nonce,
         });
         updates.push(AccountUpdate::Delete {
             id: tx.account,
             public_key_x: acc.public_key_x,
             public_key_y: acc.public_key_y,
+            nonce: acc.nonce,
         });
         Ok(updates)
     }

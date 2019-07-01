@@ -50,6 +50,8 @@ type RootHash = H256;
 #[allow(dead_code)]
 type UpdatedAccounts = AccountMap;
 
+const PADDING_TX_ID: i32 = -1;
+
 impl PlasmaStateKeeper {
     pub fn new(pool: ConnectionPool) -> Self {
         info!("constructing state keeper instance");
@@ -201,21 +203,6 @@ impl PlasmaStateKeeper {
         }
     }
 
-    fn apply_transfer_tx(&mut self, tx: TransferTx) -> TransferTxResult {
-        unreachable!();
-        let appication_result = self.state.apply_transfer(&tx);
-        if appication_result.is_ok() {
-            //debug!("accepted transaction for account {}, nonce {}", tx.from, tx.nonce);
-            //            self.transfer_tx_queue.push(tx);
-        }
-
-        // TODO: sign confirmation
-        appication_result.map(|_| TransferTxConfirmation {
-            block_number: self.state.block_number,
-            signature: "0x133sig".to_owned(),
-        })
-    }
-
     fn finalize_current_batch(&mut self, tx_for_commitments: &Sender<CommitRequest>) {
         let transfer_block = ProtoBlock::Transfer(self.prepare_transfer_tx_block());
         self.block_queue.push_front(transfer_block);
@@ -223,7 +210,7 @@ impl PlasmaStateKeeper {
         self.next_block_at_max = None;
     }
 
-    fn prepare_transfer_tx_block(&self) -> Vec<TransferTx> {
+    fn prepare_transfer_tx_block(&self) -> Vec<(i32, TransferTx)> {
         let txs = self
             .db_conn_pool
             .access_mempool()
@@ -232,11 +219,25 @@ impl PlasmaStateKeeper {
                     .expect("Failed to get tx from db")
             })
             .expect("Failed to get txs from mempool");
-        unimplemented!("Filter only valid tx(check nonce)");
-        self.apply_padding(txs)
+        let filtered_txs = self.filter_invalid_txs(txs);
+        self.apply_padding(filtered_txs)
     }
 
-    fn apply_padding(&self, mut transfer_txs: Vec<TransferTx>) -> Vec<TransferTx> {
+    fn filter_invalid_txs(
+        &self,
+        mut transfer_txs: Vec<(i32, TransferTx)>,
+    ) -> Vec<(i32, TransferTx)> {
+        transfer_txs
+            .into_iter()
+            .filter(|(_, tx)| {
+                // TODO (Drogan) check for +/-1 error, nonce.
+                let from_nonce = self.account(tx.from).nonce;
+                from_nonce != tx.nonce
+            })
+            .collect()
+    }
+
+    fn apply_padding(&self, mut transfer_txs: Vec<(i32, TransferTx)>) -> Vec<(i32, TransferTx)> {
         let to_pad = config::RUNTIME_CONFIG.transfer_batch_size - transfer_txs.len();
         if to_pad > 0 {
             debug!("padding transactions");
@@ -270,7 +271,7 @@ impl PlasmaStateKeeper {
                     );
                     assert!(tx.verify_sig(&pub_key));
 
-                    tx
+                    (PADDING_TX_ID, tx)
                 })
                 .collect();
             transfer_txs.append(&mut prepared_transactions);
@@ -278,21 +279,26 @@ impl PlasmaStateKeeper {
         transfer_txs
     }
 
-    fn create_transfer_block(&mut self, transactions: Vec<TransferTx>) -> CommitRequest {
+    fn create_transfer_block(&mut self, transactions: Vec<(i32, TransferTx)>) -> CommitRequest {
         // collect updated state
         let mut accounts_updated = Vec::new();
+        let mut txs_executed = Vec::new();
+        let mut txs = Vec::new();
 
-        // TODO (Drogan) Why not big decimal? Fee is the same currency as amount.
         let mut total_fees = 0u128;
 
-        for tx in transactions.iter() {
-            // TODO: (Drogan) How to properly transfer tx error? Maybe do padding tx instead?
+        for (id, tx) in transactions.into_iter() {
+            // TODO: (Drogan) How to properly handle transfer tx error? Maybe do padding tx instead?
             let (fee, mut tx_updates) = self
                 .state
                 .apply_transfer(&tx)
                 .expect("must apply transfer transaction");
 
             accounts_updated.append(&mut tx_updates);
+            if id != PADDING_TX_ID {
+                txs_executed.push(id);
+            }
+            txs.push(tx);
 
             total_fees += fee.to_u128().expect("Should not overflow");
         }
@@ -302,13 +308,14 @@ impl PlasmaStateKeeper {
             new_root_hash: self.state.root_hash(),
             block_data: BlockData::Transfer {
                 total_fees: BigDecimal::from_u128(total_fees).unwrap(),
-                transactions,
+                transactions: txs,
             },
         };
 
         CommitRequest {
             block,
             accounts_updated,
+            txs_executed,
         }
     }
 
@@ -340,6 +347,7 @@ impl PlasmaStateKeeper {
         CommitRequest {
             block,
             accounts_updated,
+            txs_executed: Vec::new(),
         }
     }
 
@@ -372,6 +380,7 @@ impl PlasmaStateKeeper {
         CommitRequest {
             block,
             accounts_updated,
+            txs_executed: Vec::new(),
         }
     }
 

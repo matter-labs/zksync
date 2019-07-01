@@ -47,14 +47,29 @@ impl Mempool {
     }
 
     pub fn add_tx(&self, tx: &TransferTx) -> QueryResult<()> {
-        unimplemented!()
+        insert_into(mempool::table)
+            .values(&InsertTx {
+                tx: serde_json::to_value(tx).unwrap(),
+            })
+            .execute(self.conn())
+            .map(drop)
     }
 
-    pub fn get_txs(&self, max_size: usize) -> QueryResult<Vec<TransferTx>> {
-        unimplemented!()
+    pub fn get_txs(&self, max_size: usize) -> QueryResult<Vec<(i32, TransferTx)>> {
+        let stored_txs: Vec<ReadTx> = mempool::table
+            .order(mempool::created_at.asc())
+            .limit(max_size as i64)
+            .load(self.conn())?;
+
+        Ok(stored_txs
+            .into_iter()
+            .map(|stored_tx| (stored_tx.id, serde_json::from_value(stored_tx.tx).unwrap()))
+            .collect())
     }
 
     pub fn remove_txs(&self, ids: &[i32]) -> QueryResult<()> {
-        unimplemented!()
+        diesel::delete(mempool::table.filter(mempool::id.eq_any(ids)))
+            .execute(self.conn())
+            .map(drop)
     }
 }
