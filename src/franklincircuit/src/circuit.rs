@@ -842,7 +842,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         Ok(tx_valid)
     }
 
-fn transfer<CS: ConstraintSystem<E>>(
+    fn transfer<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
         cur: &mut AllocatedOperationBranch<E>,
@@ -855,16 +855,20 @@ fn transfer<CS: ConstraintSystem<E>>(
         op_data: &AllocatedOperationData<E>,
         pubdata: &AllocatedNum<E>,
     ) -> Result<Boolean, SynthesisError> {
+        let mut lhs_valid_flags = vec![];
         let allocated_transfer_tx_type =
             AllocatedNum::alloc(cs.namespace(|| "transfer_tx_type"), || Ok(E::Fr::one()))?;
-        allocated_transfer_tx_type
-            .assert_number(cs.namespace(|| "transfer_tx_type equals two"), &E::Fr::from_str("two").unwrap())?;
-        let is_transfer = AllocatedNum::equals(
+        allocated_transfer_tx_type.assert_number(
+            cs.namespace(|| "transfer_tx_type equals two"),
+            &E::Fr::from_str("two").unwrap(),
+        )?;
+        let is_transfer = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_transfer"),
             &chunk_data.tx_type,
             &allocated_transfer_tx_type,
-        )?;
-       
+        )?);
+
+        lhs_valid_flags.push(is_transfer.clone());
         let zero = AllocatedNum::alloc(cs.namespace(|| "zero"), || Ok(E::Fr::zero()))?;
         zero.assert_zero(cs.namespace(|| "zero is zero"))?;
         let is_first_chunk = Boolean::from(AllocatedNum::equals(
@@ -872,24 +876,145 @@ fn transfer<CS: ConstraintSystem<E>>(
             &chunk_data.chunk_number,
             &zero,
         )?);
+        lhs_valid_flags.push(is_first_chunk);
 
         // construct signature message
         let mut sig_bits = vec![];
-        let mut transfer_tx_type_bits = allocated_transfer_tx_type.into_bits_le(cs.namespace(||"transfer_tx_type_bits"))?;
-        transfer_tx_type_bits.truncate(*franklin_constants::TX_TYPE_BIT_WIDTH); 
+        let mut transfer_tx_type_bits =
+            allocated_transfer_tx_type.into_bits_le(cs.namespace(|| "transfer_tx_type_bits"))?;
+        transfer_tx_type_bits.truncate(*franklin_constants::TX_TYPE_BIT_WIDTH);
         sig_bits.extend(transfer_tx_type_bits);
         sig_bits.extend(lhs.bits.account_address.clone());
         sig_bits.extend(lhs.bits.token.clone());
         sig_bits.extend(lhs.bits.account.nonce_bits.clone());
         sig_bits.extend(op_data.amount_packed.clone());
         sig_bits.extend(op_data.fee_packed.clone());
-        append_packed_public_key(&mut sig_bits, rhs.bits.account.pub_x_bit, rhs.bits.account.pub_x_bit);
-        let sig_msg = pack_bits_to_element(cs.namespace(||"sig_msg from bits"), &sig_bits)?;
+        append_packed_public_key(
+            &mut sig_bits,
+            rhs.bits.account.pub_x_bit,
+            rhs.bits.account.pub_x_bit,
+        );
+        let sig_msg = pack_bits_to_element(cs.namespace(|| "sig_msg from bits"), &sig_bits)?;
         let is_sig_msg_correct = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_sig_msg_correct"),
-            &op_data.sig_msg_bits,
-            &op_data.a,
+            &op_data.sig_msg,
+            &sig_msg,
         )?);
+        lhs_valid_flags.push(is_sig_msg_correct);
+
+        // check signer pubkey
+        let is_signer_pub_x_correct = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is_signer_pub_x_correct"),
+            &op_data.signer_pub_x,
+            &lhs.base.account.pub_x,
+        )?);
+
+        let is_signer_pub_y_correct = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is_signer_pub_y_correct"),
+            &op_data.signer_pub_y,
+            &lhs.base.account.pub_y,
+        )?);
+        let is_signer_key_correct = Boolean::and(
+            cs.namespace(|| "is_signer_key_correct"),
+            &is_signer_pub_x_correct,
+            &is_signer_pub_y_correct,
+        )?;
+        lhs_valid_flags.push(is_signer_key_correct);
+
+        // check operation arguments
+        let is_a_correct = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is_a_correct"),
+            &op_data.a,
+            &cur.base.balance_value,
+        )?);
+        lhs_valid_flags.push(is_a_correct);
+
+        let sum_amount_fee = AllocatedNum::alloc(cs.namespace(|| "amount plus fee"), || {
+            let mut bal = op_data.amount.get_value().grab()?;
+            bal.add_assign(op_data.fee.get_value().get()?);
+            Ok(bal)
+        })?;
+
+        let is_b_correct = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is_b_correct"),
+            &op_data.b,
+            &sum_amount_fee,
+        )?);
+        lhs_valid_flags.push(is_b_correct);
+        lhs_valid_flags.push(is_a_geq_b.clone());
+
+        lhs_valid_flags.push(no_nonce_overflow(
+            cs.namespace(|| "no nonce overflow"),
+            &cur.base.account.nonce,
+        )?);
+
+        let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
+
+        //update cur values if lhs is valid
+        let updated_balance_value =
+            AllocatedNum::alloc(cs.namespace(|| "updated_balance_value"), || {
+                let mut bal = cur.base.balance_value.get_value().grab()?;
+                bal.sub_assign(sum_amount_fee.get_value().get()?);
+                Ok(bal)
+            })?;
+        cs.enforce(
+            || "updated_balance_value is correct",
+            |lc| lc + cur.base.balance_value.get_variable() - sum_amount_fee.get_variable(),
+            |lc| lc + CS::one(),
+            |lc| lc + updated_balance_value.get_variable(),
+        );
+
+        let updated_nonce = AllocatedNum::alloc(cs.namespace(|| "updated_nonce_value"), || {
+            let mut nonce = cur.base.account.nonce.get_value().grab()?;
+            nonce.add_assign(&E::Fr::from_str("1").unwrap());
+            Ok(nonce)
+        })?;
+        cs.enforce(
+            || "updated_balance_value is correct",
+            |lc| lc + updated_nonce.get_variable() - CS::one(),
+            |lc| lc + CS::one(),
+            |lc| lc + cur.base.account.nonce.get_variable(),
+        );
+
+        //update nonce
+        cur.base.account.nonce = AllocatedNum::conditionally_select(
+            cs.namespace(|| "update nonce if lhs_valid"),
+            &updated_nonce,
+            &cur.base.account.nonce,
+            &lhs_valid,
+        )?;
+
+        cur.base.account.nonce = AllocatedNum::conditionally_select(
+            cs.namespace(|| "update balance if lhs_valid"),
+            &updated_balance_value,
+            &cur.base.balance_value,
+            &lhs_valid,
+        )?;
+
+        cur.bits = cur
+            .base
+            .make_bit_form(cs.namespace(|| "update bit form of branch"))?;
+
+        let mut rhs_valid_flags = vec![];
+        rhs_valid_flags.push(is_transfer);
+
+        let one =
+            AllocatedNum::alloc(
+                cs.namespace(|| "one"),
+                || Ok(E::Fr::from_str("1").unwrap()),
+            )?;
+        one.assert_number(
+            cs.namespace(|| "one is correct"),
+            &E::Fr::from_str("1").unwrap(),
+        );
+        let is_chunk_second = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is_chunk_second"),
+            &chunk_data.chunk_number,
+            &one,
+        )?);
+        rhs_valid_flags.push(is_chunk_second);
+
+
     }
 
     fn allocate_account_leaf_bits<CS: ConstraintSystem<E>>(
@@ -1051,6 +1176,24 @@ fn select_vec_ifeq<E: JubjubEngine, CS: ConstraintSystem<E>>(
     }
     Ok(resulting_vector)
 }
+
+fn multi_and<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    x: &[Boolean],
+) -> Result<Boolean, SynthesisError> {
+    let mut result = Boolean::constant(true);
+
+    for (i, bool_x) in x.iter().enumerate() {
+        result = Boolean::and(
+            cs.namespace(|| format!("and number {}", i)),
+            &result,
+            bool_x,
+        )?;
+    }
+
+    Ok(result)
+}
+
 fn enforce_lies_between<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     number: &AllocatedNum<E>,
@@ -1147,6 +1290,25 @@ fn pack_bits_to_element<E: JubjubEngine, CS: ConstraintSystem<E>>(
     );
 
     Ok(data_packed)
+}
+
+fn no_nonce_overflow<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    nonce: &AllocatedNum<E>,
+) -> Result<Boolean, SynthesisError> {
+    let max_nonce = AllocatedNum::alloc(cs.namespace(|| "max_nonce"), || {
+        Ok(E::Fr::from_str(&(256 * 256 - 1).to_string()).unwrap())
+    })?;
+    max_nonce.assert_number(
+        cs.namespace(|| "max_nonce is correct"),
+        &E::Fr::from_str(&(256 * 256 - 1).to_string()).unwrap(),
+    );
+    Ok(Boolean::from(AllocatedNum::equals(
+        cs.namespace(|| "is nonce at max"),
+        nonce,
+        &max_nonce,
+    )?)
+    .not())
 }
 #[cfg(test)]
 mod test {

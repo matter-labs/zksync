@@ -162,6 +162,7 @@ pub struct AllocatedOperationData<E: JubjubEngine> {
     pub amount: AllocatedNum<E>,
     pub fee: AllocatedNum<E>,
     pub compact_amount: AllocatedNum<E>,
+    pub sig_msg: AllocatedNum<E>,
     pub sig_msg_bits: Vec<Boolean>,
     pub new_pubkey_hash: Vec<Boolean>,
     pub compact_amount_packed: Vec<Boolean>,
