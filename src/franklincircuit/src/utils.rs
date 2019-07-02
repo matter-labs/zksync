@@ -36,7 +36,7 @@ where
         message_bytes.push(byte);
     }
     println!("message_len {}", message_bytes.len());
-    let max_message_len = 10 as usize; //todo
+    let max_message_len = 20 as usize; //todo
     let signature = private_key.sign_raw_message(&message_bytes, rng, p_g, params, max_message_len);
 
     let pk = PublicKey::from_private(&private_key, p_g, params);
@@ -125,6 +125,13 @@ pub fn append_packed_public_key(
     assert_eq!(1, x_bits.len());
     content.extend(y_bits);
     content.extend(x_bits);
+}
+
+pub fn append_le_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, width: usize) {
+    let mut token_bits: Vec<bool> = BitIterator::new(x.into_repr()).collect();
+    token_bits.reverse();
+    token_bits.truncate(width);
+    content.extend(token_bits.clone());
 }
 
 pub fn le_bit_vector_into_field_element<P: PrimeField>(bits: &Vec<bool>) -> P {

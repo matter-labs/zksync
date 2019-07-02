@@ -71,24 +71,3 @@ impl<E: JubjubEngine> std::default::Default for Balance<E> {
     }
 }
 
-pub struct Subaccount<E: JubjubEngine> {
-    pub value: E::Fr,
-}
-
-impl<E: JubjubEngine> GetBits for Subaccount<E> {
-    fn get_bits_le(&self) -> Vec<bool> {
-        let mut leaf_content = Vec::new();
-        leaf_content.extend(self.value.get_bits_le_fixed(*params::SUBACCOUNT_BIT_WIDTH));
-
-        leaf_content
-    }
-}
-
-impl<E: JubjubEngine> std::default::Default for Subaccount<E> {
-    //default should be changed: since subtree_root_hash is not zero for all zero balances and subaccounts
-    fn default() -> Self {
-        Self {
-            value: E::Fr::zero(),
-        }
-    }
-}

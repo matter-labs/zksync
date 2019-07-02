@@ -11,9 +11,6 @@ pub struct OperationBranchWitness<E: JubjubEngine> {
 
     pub balance_value: Option<E::Fr>,
     pub balance_subtree_path: Vec<Option<E::Fr>>,
-
-    pub dummmy_subaccount_value: Option<E::Fr>,
-    pub subaccount_path: Vec<Option<E::Fr>>,
 }
 
 #[derive(Clone)]
@@ -21,8 +18,6 @@ pub struct OperationBranch<E: JubjubEngine> {
     pub address: Option<E::Fr>,
     // pub signature //probably signature should be here
     pub token: Option<E::Fr>,
-
-    pub subaccount_number: Option<E::Fr>,
 
     pub witness: OperationBranchWitness<E>,
 }
@@ -42,52 +37,6 @@ pub struct Operation<E: JubjubEngine> {
     pub rhs: OperationBranch<E>,
 }
 
-// impl<E: JubjubEngine> Operation<E> {
-//     pub fn with_id(string_id: &str, string_tx_type: &str) -> Operation<E> {
-//         Operation {
-//             tx_type: E::Fr::from_str(string_tx_type),
-//             chunk: E::Fr::from_str(string_id),
-//             pubdata_chunk: None,
-//             args: None,
-//             lhs: OperationBranch {
-//                 address: None,
-//                 token: None,
-//                 subaccount_number: None,
-//                 witness: OperationBranchWitness {
-//                     account_witness: AccountWitness {
-//                         nonce: None,
-//                         // x coordinate is supplied and parity is constrained
-//                         pub_x: None,
-//                         pub_y: None,
-//                     },
-//                     account_path: vec![],
-//                     balance_value: None,
-//                     balance_subtree_path: vec![],
-//                     dummmy_subaccount_value: None,
-//                     subaccount_path: vec![],
-//                 },
-//             },
-//             rhs: OperationBranch {
-//                 address: None,
-//                 token: None,
-//                 subaccount_number: None,
-//                 witness: OperationBranchWitness {
-//                     account_witness: AccountWitness {
-//                         nonce: None,
-//                         // x coordinate is supplied and parity is constrained
-//                         pub_x: None,
-//                         pub_y: None,
-//                     },
-//                     account_path: vec![],
-//                     balance_value: None,
-//                     balance_subtree_path: vec![],
-//                     dummmy_subaccount_value: None,
-//                     subaccount_path: vec![],
-//                 },
-//             },
-//         }
-//     }
-// }
 #[derive(Clone, Debug)]
 pub struct OperationArguments<E: JubjubEngine> {
     pub a: Option<E::Fr>,
@@ -98,7 +47,6 @@ pub struct OperationArguments<E: JubjubEngine> {
     pub new_pub_y: Option<E::Fr>,
 }
 
-// use crate::models::params;
 #[derive(Clone)]
 pub struct TransactionSignature<E: JubjubEngine> {
     pub r: edwards::Point<E, Unknown>,

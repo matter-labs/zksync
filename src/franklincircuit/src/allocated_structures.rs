@@ -25,10 +25,6 @@ pub struct AllocatedOperationBranchBase<E: JubjubEngine> {
     pub balance_value: AllocatedNum<E>,
     pub balance_audit_path: Vec<AllocatedNum<E>>,
     pub token: AllocatedNum<E>,
-
-    pub dummmy_subaccount_value: AllocatedNum<E>,
-    pub subaccount_audit_path: Vec<AllocatedNum<E>>,
-    pub subaccount_number: AllocatedNum<E>,
 }
 
 //TODO: we should limit bit_widths here. yes, constraint bit lengths
@@ -45,11 +41,6 @@ impl<E: JubjubEngine> AllocatedOperationBranchBase<E> {
         let mut token_bits = self.token.into_bits_le(cs.namespace(|| "token_bits"))?;
         token_bits.truncate(*franklin_constants::ACCOUNT_SUBTREE_DEPTH - 1);
 
-        let mut subaccount_number_bits = self
-            .subaccount_number
-            .into_bits_le(cs.namespace(|| "subaccount_number_bits"))?;
-        subaccount_number_bits.truncate(*franklin_constants::ACCOUNT_SUBTREE_DEPTH - 1);
-
         let account_bit_form = self
             .account
             .make_bit_form(cs.namespace(|| "account_bit_form"))?;
@@ -59,17 +50,11 @@ impl<E: JubjubEngine> AllocatedOperationBranchBase<E> {
             .into_bits_le(cs.namespace(|| "balance_value_bits"))?;
         balance_bit_form.truncate(*franklin_constants::BALANCE_BIT_WIDTH);
 
-        let mut subaccount_data_bit_form = self
-            .dummmy_subaccount_value
-            .into_bits_le(cs.namespace(|| "subaccount_data_bits_value"))?;
-        subaccount_data_bit_form.truncate(*franklin_constants::SUBACCOUNT_BIT_WIDTH);
         Ok(AllocatedOperationBranchBitForm {
             account: account_bit_form,
             account_address: account_address_bits,
             token: token_bits,
             balance_value: balance_bit_form,
-            subaccount_number: subaccount_number_bits,
-            subaccount_data: subaccount_data_bit_form,
         })
     }
 }
@@ -79,9 +64,6 @@ pub struct AllocatedOperationBranchBitForm {
 
     pub token: Vec<Boolean>,
     pub balance_value: Vec<Boolean>,
-
-    pub subaccount_number: Vec<Boolean>,
-    pub subaccount_data: Vec<Boolean>,
 }
 
 pub struct AllocatedChunkData<E: JubjubEngine> {
@@ -125,18 +107,6 @@ pub fn allocate_operation_branch<E: JubjubEngine, CS: ConstraintSystem<E>>(
         &operation_branch.witness.balance_subtree_path,
     )?;
 
-    let subaccount_value_allocated =
-        AllocatedNum::alloc(cs.namespace(|| "subaccount_value"), || {
-            operation_branch.witness.dummmy_subaccount_value.grab()
-        })?;
-    let subaccount_number_allocated =
-        AllocatedNum::alloc(cs.namespace(|| "subaccount_number"), || {
-            operation_branch.subaccount_number.grab()
-        })?;
-    let allocated_subaccount_audit_path = utils::allocate_audit_path(
-        cs.namespace(|| "subaccount_audit_path"),
-        &operation_branch.witness.subaccount_path,
-    )?;
     let operation_branch_data = AllocatedOperationBranchBase {
         account_address: account_address_allocated,
         account: account_base,
@@ -144,9 +114,6 @@ pub fn allocate_operation_branch<E: JubjubEngine, CS: ConstraintSystem<E>>(
         balance_value: balance_value_allocated,
         balance_audit_path: allocated_balance_audit_path,
         token: token_allocated,
-        dummmy_subaccount_value: subaccount_value_allocated,
-        subaccount_number: subaccount_number_allocated,
-        subaccount_audit_path: allocated_subaccount_audit_path,
     };
     let operation_branch_bit_form =
         operation_branch_data.make_bit_form(cs.namespace(|| "operation_branch_data_bit_form"))?;
