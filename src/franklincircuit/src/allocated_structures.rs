@@ -88,6 +88,7 @@ pub struct AllocatedChunkData<E: JubjubEngine> {
     pub is_chunk_last: AllocatedBit,
     pub chunk_number: AllocatedNum<E>,
     pub tx_type: AllocatedNum<E>,
+    pub tx_type_bits: Vec<Boolean>,
 }
 
 pub fn allocate_operation_branch<E: JubjubEngine, CS: ConstraintSystem<E>>(
@@ -161,11 +162,9 @@ pub struct AllocatedOperationData<E: JubjubEngine> {
     pub new_pubkey_y: AllocatedNum<E>,
     pub amount: AllocatedNum<E>,
     pub fee: AllocatedNum<E>,
-    pub compact_amount: AllocatedNum<E>,
     pub sig_msg: AllocatedNum<E>,
     pub sig_msg_bits: Vec<Boolean>,
     pub new_pubkey_hash: Vec<Boolean>,
-    pub compact_amount_packed: Vec<Boolean>,
     pub fee_packed: Vec<Boolean>,
     pub amount_packed: Vec<Boolean>,
     pub signer_pub_x: AllocatedNum<E>,

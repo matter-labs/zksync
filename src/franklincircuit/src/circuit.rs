@@ -106,6 +106,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             self.execute_op(
                 cs.namespace(|| "execute_op"),
                 &mut current_branch,
+                &lhs,
+                &rhs,
                 &operation,
                 &allocated_chunk_data,
                 &is_account_empty,
@@ -149,7 +151,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             0 as i32,
             DIFFERENT_TRANSACTIONS_TYPE_NUMBER as i32,
         )?;
-
+        let mut tx_type_bits = tx_type.into_bits_le(cs.namespace(|| "tx_type_bits"))?;
+        tx_type_bits.truncate(*franklin_constants::TX_TYPE_BIT_WIDTH);
         let max_chunks_powers = generate_powers(
             cs.namespace(|| "generate powers of max chunks"),
             &tx_type,
@@ -221,6 +224,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 chunk_number: operation_chunk_number,
                 is_chunk_last: is_chunk_last,
                 tx_type: tx_type,
+                tx_type_bits: tx_type_bits,
             },
         ))
     }
@@ -417,6 +421,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         &self,
         mut cs: CS,
         mut cur: &mut AllocatedOperationBranch<E>,
+        lhs: &AllocatedOperationBranch<E>,
+        rhs: &AllocatedOperationBranch<E>,
         op: &Operation<E>,
         chunk_data: &AllocatedChunkData<E>,
         is_account_empty: &Boolean,
@@ -437,10 +443,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         })?;
         let allocated_fee =
             AllocatedNum::alloc(cs.namespace(|| "transaction_fee"), || op.args.fee.grab())?;
-        let allocated_compact_amount =
-            AllocatedNum::alloc(cs.namespace(|| "transaction_compact_amount"), || {
-                op.args.compact_amount.grab()
-            })?;
 
         let mut allocated_amount_bits =
             allocated_amount.into_bits_le(cs.namespace(|| "transaction_amount_bits"))?;
@@ -452,12 +454,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             allocated_fee.into_bits_le(cs.namespace(|| "transaction_fee_bits"))?;
         allocated_fee_bits.truncate(
             franklin_constants::FEE_EXPONENT_BIT_WIDTH + franklin_constants::FEE_MANTISSA_BIT_WIDTH,
-        );
-        let mut allocated_compact_amount_bits =
-            allocated_compact_amount.into_bits_le(cs.namespace(|| "compact_amount_fee_bits"))?;
-        allocated_compact_amount_bits.truncate(
-            franklin_constants::COMPACT_AMOUNT_EXPONENT_BIT_WIDTH
-                + franklin_constants::COMPACT_AMOUNT_MANTISSA_BIT_WIDTH,
         );
 
         let amount = parse_with_exponent_le(
@@ -475,18 +471,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             *franklin_constants::FEE_MANTISSA_BIT_WIDTH,
             10,
         )?;
-        let compact_amount = parse_with_exponent_le(
-            cs.namespace(|| "parse compact amount"),
-            &allocated_compact_amount_bits,
-            *franklin_constants::COMPACT_AMOUNT_EXPONENT_BIT_WIDTH,
-            *franklin_constants::COMPACT_AMOUNT_MANTISSA_BIT_WIDTH,
-            10,
-        )?;
-        let is_compact_amount_correct = Boolean::from(AllocatedNum::equals(
-            cs.namespace(|| "compact amount correct"),
-            &amount,
-            &compact_amount,
-        )?);
 
         let allocated_message =
             AllocatedNum::alloc(cs.namespace(|| "signature_message_x"), || op.sig_msg.grab())?;
@@ -603,8 +587,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             amount_packed: allocated_amount_bits,
             fee: fee,
             fee_packed: allocated_fee_bits,
-            compact_amount: compact_amount,
-            compact_amount_packed: allocated_compact_amount_bits,
             signer_pub_x: allocated_signer_pubkey_x,
             signer_pub_y: allocated_signer_pubkey_y,
             sig_msg_bits: message_bits,
@@ -613,17 +595,28 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             a: a,
             b: b,
         };
-
-        let op_valid = self.deposit(
+        let mut op_flags = vec![];
+        op_flags.push(self.deposit(
             cs.namespace(|| "deposit"),
             &mut cur,
             &chunk_data,
             &is_a_geq_b,
             &is_account_empty,
-            &is_compact_amount_correct,
             &operation_data,
             &pubdata,
-        )?;
+        )?);
+        op_flags.push(self.transfer(
+            cs.namespace(|| "transfer"),
+            &mut cur,
+            &lhs,
+            &rhs,
+            &chunk_data,
+            &is_a_geq_b,
+            &is_account_empty,
+            &operation_data,
+            &pubdata,
+        )?);
+        let op_valid = multi_or(cs.namespace(|| "op_valid"), &op_flags)?;
         println!("op_valid {}", op_valid.get_value().unwrap());
         cs.enforce(
             || "op is valid",
@@ -640,7 +633,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         chunk_data: &AllocatedChunkData<E>,
         is_a_geq_b: &Boolean,
         is_account_empty: &Boolean,
-        is_compact_amount_correct: &Boolean,
         op_data: &AllocatedOperationData<E>,
         pubdata: &AllocatedNum<E>,
     ) -> Result<Boolean, SynthesisError> {
@@ -688,7 +680,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(cur.bits.account_address.clone());
         pubdata_bits.extend(cur.bits.token.clone());
-        pubdata_bits.extend(op_data.compact_amount_packed.clone());
+        pubdata_bits.extend(op_data.amount_packed.clone());
         pubdata_bits.extend(op_data.new_pubkey_hash.clone());
         pubdata_bits.extend(op_data.fee_packed.clone());
         let mut pubdata_from_lc = Num::<E>::zero();
@@ -741,12 +733,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             "is pubkeycorrect {}",
             is_pubkey_correct.get_value().unwrap()
         );
-
-        tx_valid = Boolean::and(
-            cs.namespace(|| "tx_valid and is_compact_amount_correct"),
-            &tx_valid,
-            &is_compact_amount_correct,
-        )?;
 
         tx_valid = Boolean::and(
             cs.namespace(|| "tx_valid and is_a_geq_b"),
@@ -841,7 +827,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             .make_bit_form(cs.namespace(|| "update bit form of branch"))?;
         Ok(tx_valid)
     }
-
+    //TODO: verify token equality
     fn transfer<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -851,16 +837,17 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         chunk_data: &AllocatedChunkData<E>,
         is_a_geq_b: &Boolean,
         is_account_empty: &Boolean,
-        is_compact_amount_correct: &Boolean,
         op_data: &AllocatedOperationData<E>,
         pubdata: &AllocatedNum<E>,
     ) -> Result<Boolean, SynthesisError> {
         let mut lhs_valid_flags = vec![];
         let allocated_transfer_tx_type =
-            AllocatedNum::alloc(cs.namespace(|| "transfer_tx_type"), || Ok(E::Fr::one()))?;
+            AllocatedNum::alloc(cs.namespace(|| "transfer_tx_type"), || {
+                Ok(E::Fr::from_str("5").unwrap())
+            })?;
         allocated_transfer_tx_type.assert_number(
-            cs.namespace(|| "transfer_tx_type equals two"),
-            &E::Fr::from_str("two").unwrap(),
+            cs.namespace(|| "transfer_tx_type equals five"),
+            &E::Fr::from_str("5").unwrap(),
         )?;
         let is_transfer = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_transfer"),
@@ -889,11 +876,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         sig_bits.extend(lhs.bits.account.nonce_bits.clone());
         sig_bits.extend(op_data.amount_packed.clone());
         sig_bits.extend(op_data.fee_packed.clone());
-        append_packed_public_key(
-            &mut sig_bits,
-            rhs.bits.account.pub_x_bit,
-            rhs.bits.account.pub_x_bit,
-        );
+
         let sig_msg = pack_bits_to_element(cs.namespace(|| "sig_msg from bits"), &sig_bits)?;
         let is_sig_msg_correct = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_sig_msg_correct"),
@@ -950,15 +933,14 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
 
-        //update cur values if lhs is valid
         let updated_balance_value =
-            AllocatedNum::alloc(cs.namespace(|| "updated_balance_value"), || {
+            AllocatedNum::alloc(cs.namespace(|| "lhs updated_balance_value"), || {
                 let mut bal = cur.base.balance_value.get_value().grab()?;
                 bal.sub_assign(sum_amount_fee.get_value().get()?);
                 Ok(bal)
             })?;
         cs.enforce(
-            || "updated_balance_value is correct",
+            || "lhs updated_balance_value is correct",
             |lc| lc + cur.base.balance_value.get_variable() - sum_amount_fee.get_variable(),
             |lc| lc + CS::one(),
             |lc| lc + updated_balance_value.get_variable(),
@@ -975,6 +957,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             |lc| lc + CS::one(),
             |lc| lc + cur.base.account.nonce.get_variable(),
         );
+        //update cur values if lhs is valid
 
         //update nonce
         cur.base.account.nonce = AllocatedNum::conditionally_select(
@@ -984,7 +967,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &lhs_valid,
         )?;
 
-        cur.base.account.nonce = AllocatedNum::conditionally_select(
+        //update balance
+        cur.base.balance_value = AllocatedNum::conditionally_select(
             cs.namespace(|| "update balance if lhs_valid"),
             &updated_balance_value,
             &cur.base.balance_value,
@@ -995,14 +979,12 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             .base
             .make_bit_form(cs.namespace(|| "update bit form of branch"))?;
 
+        // rhs
         let mut rhs_valid_flags = vec![];
         rhs_valid_flags.push(is_transfer);
 
         let one =
-            AllocatedNum::alloc(
-                cs.namespace(|| "one"),
-                || Ok(E::Fr::from_str("1").unwrap()),
-            )?;
+            AllocatedNum::alloc(cs.namespace(|| "one"), || Ok(E::Fr::from_str("1").unwrap()))?;
         one.assert_number(
             cs.namespace(|| "one is correct"),
             &E::Fr::from_str("1").unwrap(),
@@ -1013,8 +995,59 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &one,
         )?);
         rhs_valid_flags.push(is_chunk_second);
+        rhs_valid_flags.push(is_account_empty.not());
 
+        // construct pubdata
+        let mut pubdata_bits = vec![];
+        pubdata_bits.extend(chunk_data.tx_type_bits.clone());
+        pubdata_bits.extend(lhs.bits.account_address.clone());
+        pubdata_bits.extend(lhs.bits.token.clone());
+        pubdata_bits.extend(rhs.bits.account_address.clone());
+        pubdata_bits.extend(op_data.amount_packed.clone());
+        pubdata_bits.extend(op_data.fee_packed.clone());
 
+        let pubdata_element =
+            pack_bits_to_element(cs.namespace(|| "pubdata as field element"), &pubdata_bits)?;
+        let is_pubdata_correct = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is_pubdata_correct"),
+            &pubdata_element,
+            &pubdata,
+        )?);
+        rhs_valid_flags.push(is_pubdata_correct);
+        let is_rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
+
+        // calculate new rhs balance value
+        let updated_balance_value =
+            AllocatedNum::alloc(cs.namespace(|| "updated_balance_value"), || {
+                let mut bal = cur.base.balance_value.get_value().grab()?;
+                bal.add_assign(op_data.amount.get_value().get()?);
+                Ok(bal)
+            })?;
+        cs.enforce(
+            || "rhs updated_balance_value is correct",
+            |lc| lc + cur.base.balance_value.get_variable() + op_data.amount.get_variable(),
+            |lc| lc + CS::one(),
+            |lc| lc + updated_balance_value.get_variable(),
+        );
+
+        //update balance
+        cur.base.balance_value = AllocatedNum::conditionally_select(
+            cs.namespace(|| "update balance if rhs_valid"),
+            &updated_balance_value,
+            &cur.base.balance_value,
+            &is_rhs_valid,
+        )?;
+
+        cur.bits = cur
+            .base
+            .make_bit_form(cs.namespace(|| "rhs update bit form of branch"))?;
+
+        Ok(Boolean::and(
+            cs.namespace(|| "lhs_valid nand rhs_valid"),
+            &lhs_valid.not(),
+            &is_rhs_valid.not(),
+        )?
+        .not())
     }
 
     fn allocate_account_leaf_bits<CS: ConstraintSystem<E>>(
@@ -1185,10 +1218,28 @@ fn multi_and<E: JubjubEngine, CS: ConstraintSystem<E>>(
 
     for (i, bool_x) in x.iter().enumerate() {
         result = Boolean::and(
-            cs.namespace(|| format!("and number {}", i)),
+            cs.namespace(|| format!("multi and iteration number: {}", i)),
             &result,
             bool_x,
         )?;
+    }
+
+    Ok(result)
+}
+
+fn multi_or<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    x: &[Boolean],
+) -> Result<Boolean, SynthesisError> {
+    let mut result = Boolean::constant(false);
+
+    for (i, bool_x) in x.iter().enumerate() {
+        result = Boolean::and(
+            cs.namespace(|| format!("multi or iteration number: {}", i)),
+            &result.not(),
+            &bool_x.not(),
+        )?
+        .not();
     }
 
     Ok(result)
@@ -1403,17 +1454,6 @@ mod test {
 
         let transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
 
-        let transfer_compact_amount_bits = convert_to_float(
-            transfer_amount,
-            *franklin_constants::COMPACT_AMOUNT_EXPONENT_BIT_WIDTH,
-            *franklin_constants::COMPACT_AMOUNT_MANTISSA_BIT_WIDTH,
-            10,
-        )
-        .unwrap();
-
-        let transfer_compact_amount_encoded: Fr =
-            le_bit_vector_into_field_element(&transfer_compact_amount_bits);
-
         let fee: u128 = 0;
 
         let fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
@@ -1500,7 +1540,6 @@ mod test {
             b: Some(fee_as_field_element.clone()),
             amount: Some(transfer_amount_encoded.clone()),
             fee: Some(fee_encoded.clone()),
-            compact_amount: Some(transfer_compact_amount_encoded.clone()),
             new_pub_x: Some(sender_x.clone()),
             new_pub_y: Some(sender_y.clone()),
         };
