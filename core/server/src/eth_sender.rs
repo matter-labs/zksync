@@ -13,10 +13,18 @@ use web3::types::{H256, U128, U256};
 fn sorted_and_padded_for_deposits(
     accounts_updated: &[AccountUpdate],
 ) -> [u64; config::DEPOSIT_BATCH_SIZE] {
-    assert_eq!(accounts_updated.len(), config::DEPOSIT_BATCH_SIZE);
+    let balance_updates: Vec<_> = accounts_updated
+        .iter()
+        .filter(|upd| match upd {
+            AccountUpdate::UpdateBalance { .. } => true,
+            _ => false,
+        })
+        .collect();
+
+    assert_eq!(balance_updates.len(), config::DEPOSIT_BATCH_SIZE);
 
     let mut tmp = [u64::from(params::SPECIAL_ACCOUNT_DEPOSIT); config::DEPOSIT_BATCH_SIZE];
-    let mut acc: Vec<u64> = accounts_updated
+    let mut acc: Vec<u64> = balance_updates
         .iter()
         .map(|acc| u64::from(acc.get_account_id()))
         .collect();
@@ -32,10 +40,17 @@ fn sorted_and_padded_for_deposits(
 fn sorted_and_padded_for_exits(
     accounts_updated: &[AccountUpdate],
 ) -> [u64; config::EXIT_BATCH_SIZE] {
-    assert_eq!(accounts_updated.len(), config::EXIT_BATCH_SIZE);
+    let account_exits: Vec<_> = accounts_updated
+        .iter()
+        .filter(|upd| match upd {
+            AccountUpdate::Delete { .. } => true,
+            _ => false,
+        })
+        .collect();
+    assert_eq!(account_exits.len(), config::EXIT_BATCH_SIZE);
 
     let mut tmp = [u64::from(params::SPECIAL_ACCOUNT_EXIT); config::EXIT_BATCH_SIZE];
-    let mut acc: Vec<u64> = accounts_updated
+    let mut acc: Vec<u64> = account_exits
         .iter()
         .map(|acc| u64::from(acc.get_account_id()))
         .collect();
