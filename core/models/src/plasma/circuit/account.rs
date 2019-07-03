@@ -1,5 +1,4 @@
-use crate::plasma::account::ETH_TOKEN_ID;
-use crate::plasma::params;
+use crate::plasma::params::{self, ETH_TOKEN_ID};
 use crate::primitives::{GetBits, GetBitsFixed};
 use ff::{Field, PrimeField};
 use sapling_crypto::alt_babyjubjub::JubjubEngine;
