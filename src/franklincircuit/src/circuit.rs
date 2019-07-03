@@ -817,8 +817,24 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         is_a_geq_b: &Boolean,
         is_account_empty: &Boolean,
         op_data: &AllocatedOperationData<E>,
-        pubdata: &AllocatedNum<E>,
+        ext_pubdata_chunk: &AllocatedNum<E>,
     ) -> Result<Boolean, SynthesisError> {
+        // construct pubdata
+        let mut pubdata_bits = vec![];
+        let mut pub_token_bits = lhs.bits.token.clone();
+        pub_token_bits.resize(
+            *franklin_constants::TOKEN_EXT_BIT_WIDTH,
+            Boolean::constant(false),
+        );
+        pubdata_bits.extend(chunk_data.tx_type_bits.clone());
+        pubdata_bits.extend(lhs.bits.account_address.clone());
+        pubdata_bits.extend(pub_token_bits.clone());
+        pubdata_bits.extend(rhs.bits.account_address.clone());
+        pubdata_bits.extend(op_data.amount_packed.clone());
+        pubdata_bits.extend(op_data.fee_packed.clone());
+        assert_eq!(pubdata_bits.len(), 2 * franklin_constants::CHUNK_BIT_WIDTH);
+        let pubdata_chunk = select_pubdata_chunk(cs.namespace(||"select_pubdata_chunk"), &pubdata_bits, &chunk_data.chunk_number, 2)?;
+
         let mut lhs_valid_flags = vec![];
         let allocated_transfer_tx_type =
             AllocatedNum::alloc(cs.namespace(|| "transfer_tx_type"), || {
@@ -858,16 +874,21 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         //TODO: rhs_pubkey
         let sig_msg = pack_bits_to_element(cs.namespace(|| "sig_msg from bits"), &sig_bits)?;
 
-        println!("sig_msg={} sig_bits.len={}", sig_msg.get_value().grab()?, sig_bits.len());
-
-    
+        println!(
+            "sig_msg={} sig_bits.len={}",
+            sig_msg.get_value().grab()?,
+            sig_bits.len()
+        );
 
         let is_sig_msg_correct = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_sig_msg_correct"),
             &op_data.sig_msg,
             &sig_msg,
         )?);
-        println!("is_sig_msg_correct={} ", is_sig_msg_correct.get_value().grab()?);
+        println!(
+            "is_sig_msg_correct={} ",
+            is_sig_msg_correct.get_value().grab()?
+        );
 
         lhs_valid_flags.push(is_sig_msg_correct);
 
@@ -985,21 +1006,10 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         rhs_valid_flags.push(is_chunk_second);
         rhs_valid_flags.push(is_account_empty.not());
 
-        // construct pubdata
-        let mut pubdata_bits = vec![];
-        pubdata_bits.extend(chunk_data.tx_type_bits.clone());
-        pubdata_bits.extend(lhs.bits.account_address.clone());
-        pubdata_bits.extend(lhs.bits.token.clone());
-        pubdata_bits.extend(rhs.bits.account_address.clone());
-        pubdata_bits.extend(op_data.amount_packed.clone());
-        pubdata_bits.extend(op_data.fee_packed.clone());
-
-        let pubdata_element =
-            pack_bits_to_element(cs.namespace(|| "pubdata as field element"), &pubdata_bits)?;
         let is_pubdata_correct = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_pubdata_correct"),
-            &pubdata_element,
-            &pubdata,
+            &pubdata_chunk,
+            &ext_pubdata_chunk,
         )?);
         // todo: uncomment
         // rhs_valid_flags.push(is_pubdata_correct);
@@ -1200,6 +1210,48 @@ fn multi_and<E: JubjubEngine, CS: ConstraintSystem<E>>(
     Ok(result)
 }
 
+fn select_pubdata_chunk<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    pubdata_bits: &[Boolean],
+    chunk_number: &AllocatedNum<E>,
+    total_chunks: usize,
+) -> Result<AllocatedNum<E>, SynthesisError> {
+    assert_eq!(
+        pubdata_bits.len(),
+        total_chunks * franklin_constants::CHUNK_BIT_WIDTH
+    );
+    let result = AllocatedNum::alloc(
+        cs.namespace(|| "result pubdata chunk"),
+        || Ok(E::Fr::zero()),
+    )?;
+
+    for i in 0..total_chunks {
+        let cs = &mut cs.namespace(|| format!("chunk number {}", i));
+        let pub_chunk_bits = pubdata_bits[i * franklin_constants::CHUNK_BIT_WIDTH
+            ..(i + 1) * franklin_constants::CHUNK_BIT_WIDTH]
+            .to_vec();
+        let current_chunk =
+            pack_bits_to_element(cs.namespace(|| "chunk as field element"), &pub_chunk_bits)?;
+        let current_chunk_number_allocated =
+            AllocatedNum::alloc(cs.namespace(|| "chunk number"), || {
+                Ok(E::Fr::from_str(&i.to_string()).unwrap())
+            })?;
+        current_chunk_number_allocated.assert_number(
+            cs.namespace(|| "number is correct"),
+            &E::Fr::from_str(&i.to_string()).unwrap(),
+        )?;
+        let result = AllocatedNum::select_ifeq(
+            cs.namespace(|| "select if correct chunk number"),
+            &current_chunk_number_allocated,
+            &chunk_number,
+            &current_chunk,
+            &result,
+        )?;
+    }
+
+    Ok(result)
+}
+
 fn multi_or<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     x: &[Boolean],
@@ -1265,7 +1317,7 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
     use franklin_crypto::interpolation::interpolate;
 
     let mut points: Vec<(E::Fr, E::Fr)> = vec![];
-    for i in &[0,  4] {
+    for i in &[0, 4] {
         //noop, increment_nonce, partial_exit, close_account, escalation
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let y = E::Fr::zero();
@@ -1580,7 +1632,19 @@ mod test {
             lhs: operation_branch_after.clone(),
             rhs: operation_branch_after.clone(),
         };
-
+        let operation_four = Operation {
+            new_root: Some(new_root.clone()),
+            tx_type: Some(Fr::from_str("1").unwrap()),
+            chunk: Some(Fr::from_str("4").unwrap()),
+            pubdata_chunk: Some(Fr::from_str("1").unwrap()),
+            sig_msg: Some(sig_msg.clone()),
+            signature: signature.clone(),
+            signer_pub_key_x: Some(sender_x.clone()),
+            signer_pub_key_y: Some(sender_y.clone()),
+            args: op_args.clone(),
+            lhs: operation_branch_after.clone(),
+            rhs: operation_branch_after.clone(),
+        };
         {
             let mut cs = TestConstraintSystem::<Bn256>::new();
 
@@ -1593,6 +1657,7 @@ mod test {
                     operation_one,
                     operation_two,
                     operation_three,
+                    operation_four,
                 ],
             };
 
@@ -1671,7 +1736,7 @@ mod test {
         let mut from_leaf_number: u32 = rng.gen();
         from_leaf_number %= capacity;
         let from_leaf_number_fe = Fr::from_str(&from_leaf_number.to_string()).unwrap();
-  
+
         let mut to_leaf_number: u32 = rng.gen();
         to_leaf_number %= capacity;
         let to_leaf_number_fe = Fr::from_str(&to_leaf_number.to_string()).unwrap();
@@ -1872,6 +1937,7 @@ mod test {
             &transfer_tx_type,
             *franklin_constants::TX_TYPE_BIT_WIDTH,
         );
+
         append_le_fixed_width(
             &mut pubdata_bits,
             &from_leaf_number_fe,
@@ -1893,12 +1959,14 @@ mod test {
             franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
                 + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
         );
+
         append_le_fixed_width(
             &mut pubdata_bits,
             &fee_encoded,
             franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         );
         assert_eq!(pubdata_bits.len(), 13 * 8);
+        pubdata_bits.resize(16 * 8, false);
 
         // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
         let signature = sign(&sig_bits, &from_sk, p_g, params, rng);
@@ -2036,10 +2104,7 @@ mod test {
                 params,
                 old_root: Some(initial_root),
                 new_root: Some(final_root),
-                operations: vec![
-                    operation_zero,
-                    operation_one,
-                ],
+                operations: vec![operation_zero, operation_one],
             };
 
             instance.synthesize(&mut cs).unwrap();

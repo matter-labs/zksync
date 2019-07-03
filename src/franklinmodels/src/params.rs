@@ -21,6 +21,8 @@ pub const NEW_PUBKEY_HASH_WIDTH: &'static usize = &160;
 pub const NONCE_BIT_WIDTH: &'static usize = &32;
 //
 pub const TOKEN_EXT_BIT_WIDTH: &'static usize = &16;
+//
+pub const CHUNK_BIT_WIDTH: usize = 64;
 
 /// Block number bit width
 pub const BLOCK_NUMBER_BIT_WIDTH: &'static usize = &32;

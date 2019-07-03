@@ -39,7 +39,7 @@ impl<E: JubjubEngine> AllocatedOperationBranchBase<E> {
         account_address_bits.truncate(*franklin_constants::ACCOUNT_TREE_DEPTH);
 
         let mut token_bits = self.token.into_bits_le(cs.namespace(|| "token_bits"))?;
-        token_bits.truncate(*franklin_constants::ACCOUNT_SUBTREE_DEPTH - 1);
+        token_bits.truncate(*franklin_constants::BALANCE_TREE_DEPTH);
 
         let account_bit_form = self
             .account

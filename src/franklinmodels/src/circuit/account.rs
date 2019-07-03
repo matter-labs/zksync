@@ -70,4 +70,3 @@ impl<E: JubjubEngine> std::default::Default for Balance<E> {
         }
     }
 }
-
