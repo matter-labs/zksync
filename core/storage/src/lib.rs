@@ -1089,11 +1089,11 @@ impl StorageProcessor {
         ")
     }
 
-    pub fn last_committed_state_for_account(
+    fn get_account_and_last_block(
         &self,
         account_id: AccountId,
-    ) -> QueryResult<Option<models::plasma::account::Account>> {
-        let (last_block, account) = if let Some(account) = accounts::table
+    ) -> QueryResult<(i32, Option<Account>)> {
+        if let Some(account) = accounts::table
             .find(account_id as i32)
             .first::<StorageAccount>(self.conn())
             .optional()?
@@ -1102,12 +1102,18 @@ impl StorageProcessor {
                 StorageBalance::belonging_to(&account).load(self.conn())?;
 
             let last_block = account.last_block;
-
             let (_, account) = restore_account(account, balances);
-            (last_block, Some(account))
+            Ok((0, Some(account)))
         } else {
-            (0, None)
-        };
+            Ok((0, None))
+        }
+    }
+
+    pub fn last_committed_state_for_account(
+        &self,
+        account_id: AccountId,
+    ) -> QueryResult<Option<models::plasma::account::Account>> {
+        let (last_block, account) = self.get_account_and_last_block(account_id)?;
 
         let account_balance_diff: Vec<StorageAccountUpdate> = {
             account_balance_updates::table
@@ -1119,7 +1125,7 @@ impl StorageProcessor {
         let account_creation_diff: Vec<StorageAccountCreation> = {
             account_creates::table
                 .filter(account_creates::account_id.eq(&(account_id as i32)))
-                //                .filter( account_creates::block_number.gt( &last_block ) )
+                .filter(account_creates::block_number.gt(&last_block))
                 .load::<StorageAccountCreation>(self.conn())?
         };
 
@@ -1137,34 +1143,22 @@ impl StorageProcessor {
             );
             account_diff.sort_by(|l, r| l.cmp_nonce(r));
             account_diff
+                .into_iter()
+                .map(|upd| upd.into())
+                .collect::<Vec<AccountUpdate>>()
         };
 
-        Ok(account_diff.into_iter().fold(account, |account, upd| {
-            Account::apply_update(account, upd.into())
-        }))
+        Ok(account_diff
+            .into_iter()
+            .fold(account, |account, upd| Account::apply_update(account, upd)))
     }
 
     pub fn last_verified_state_for_account(
         &self,
         account_id: AccountId,
     ) -> QueryResult<Option<models::plasma::account::Account>> {
-        use crate::schema::accounts::dsl::*;
-
-        Ok(
-            if let Some(account) = accounts
-                .find(account_id as i32)
-                .first::<StorageAccount>(self.conn())
-                .optional()?
-            {
-                let balances: Vec<StorageBalance> =
-                    StorageBalance::belonging_to(&account).load(self.conn())?;
-
-                let (_, account) = restore_account(account, balances);
-                Some(account)
-            } else {
-                None
-            },
-        )
+        let (_, account) = self.get_account_and_last_block(account_id)?;
+        Ok(account)
     }
 
     pub fn count_outstanding_proofs(&self, after_block: BlockNumber) -> QueryResult<u32> {

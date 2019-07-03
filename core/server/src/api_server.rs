@@ -5,7 +5,7 @@ use actix_web::{
     HttpMessage, HttpRequest, HttpResponse,
 };
 use models::config::RUNTIME_CONFIG;
-use models::plasma::{Account, PublicKey, TransferTx};
+use models::plasma::{Account as PAccount, PublicKey, TransferTx};
 use models::{ActionType, NetworkStatus, StateKeeperRequest, TransferTxConfirmation};
 use std::sync::mpsc;
 use storage::{BlockDetails, ConnectionPool};
@@ -120,6 +120,27 @@ fn handle_submit_tx(
 }
 
 use actix_web::Result as ActixResult;
+use bigdecimal::BigDecimal;
+use models::plasma::Fr;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Account {
+    pub balance: BigDecimal,
+    pub nonce: u32,
+    pub public_key_x: Fr,
+    pub public_key_y: Fr,
+}
+
+impl From<PAccount> for Account {
+    fn from(a: PAccount) -> Account {
+        Self {
+            balance: a.get_balance(0).clone(),
+            nonce: a.nonce,
+            public_key_x: a.public_key_x,
+            public_key_y: a.public_key_y,
+        }
+    }
+}
 
 fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let tx_for_state = req.state().tx_for_state.clone();
@@ -154,7 +175,7 @@ fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResp
         .send(request)
         .expect("must send a request for an account state");
 
-    let pending: Result<Option<Account>, _> =
+    let pending: Result<Option<PAccount>, _> =
         acc_rx.recv_timeout(std::time::Duration::from_millis(TIMEOUT));
 
     if pending.is_err() {
@@ -187,9 +208,9 @@ fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResp
 
     // QUESTION: why do we need committed here?
     let response = AccountDetailsResponse {
-        pending,
-        verified: verified.unwrap(),
-        committed: committed.unwrap(),
+        pending: pending.map(|i| i.into()),
+        verified: verified.unwrap().map(|i| i.into()),
+        committed: committed.unwrap().map(|i| i.into()),
     };
 
     Ok(HttpResponse::Ok().json(response))
