@@ -171,7 +171,13 @@ impl Account {
                     account.set_balance(token, &amount);
                     Some(account)
                 }
-                _ => None,
+                _ => {
+                    error!(
+                        "Incorrect update received {:?} for account {:?}",
+                        update, account
+                    );
+                    Some(account)
+                }
             },
             None => match update {
                 AccountUpdate::Create {
@@ -184,7 +190,10 @@ impl Account {
                     new_account.public_key_x = public_key_x;
                     Some(new_account)
                 }
-                _ => None,
+                _ => {
+                    error!("Incorrect update received {:?} for empty account", update);
+                    None
+                }
             },
         }
     }
