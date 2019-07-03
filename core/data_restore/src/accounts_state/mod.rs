@@ -18,7 +18,7 @@ use web3::types::Log;
 
 use crate::franklin_transaction::{FranklinTransaction, FranklinTransactionType};
 use crate::helpers::*;
-use models::plasma::account::ETH_TOKEN_ID;
+use models::plasma::params::ETH_TOKEN_ID;
 
 pub struct FranklinAccountsStates {
     pub config: DataRestoreConfig,

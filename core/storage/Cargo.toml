@@ -15,3 +15,6 @@ bigdecimal = { version = "0.0.14", features = ["serde"]}
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 log = "0.4"
+
+[dev-dependencies]
+env_logger = "0.6"

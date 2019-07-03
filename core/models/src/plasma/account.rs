@@ -1,15 +1,11 @@
 use crate::circuit;
-use crate::plasma::params;
+use crate::plasma::params::{self, ETH_TOKEN_ID, TOTAL_TOKENS, TokenId};
 use crate::primitives::GetBits;
 use crate::{Engine, Fr, PublicKey};
 use bigdecimal::BigDecimal;
 use fnv::FnvHashMap;
 use sapling_crypto::jubjub::{edwards, Unknown};
 
-pub type TokenId = u8;
-
-pub const TOTAL_TOKENS: usize = 256;
-pub const ETH_TOKEN_ID: TokenId = 0;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Account {

@@ -1,8 +1,8 @@
 use bigdecimal::{BigDecimal, Zero};
 use merkle_tree::AccountTree;
-use models::plasma::account::{Account, ETH_TOKEN_ID};
+use models::plasma::account::Account;
 use models::plasma::tx::{DepositTx, ExitTx, TransferTx};
-use models::plasma::{params, AccountUpdate};
+use models::plasma::{params::{self, ETH_TOKEN_ID}, AccountUpdate};
 use models::plasma::{AccountId, AccountMap, Fr, TransferApplicationError};
 
 pub struct PlasmaState {
