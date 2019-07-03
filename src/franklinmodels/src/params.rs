@@ -16,7 +16,7 @@ pub const SUBTREE_HASH_WIDTH: &'static usize = &256; //seems to be equal to Bn25
 /// balance bit width
 pub const BALANCE_BIT_WIDTH: &'static usize = &128;
 
-pub const NEW_PUBKEY_HASH_WIDTH: &'static usize = &160;
+pub const NEW_PUBKEY_HASH_WIDTH: &'static usize = &224;
 /// Nonce bit width
 pub const NONCE_BIT_WIDTH: &'static usize = &32;
 //
