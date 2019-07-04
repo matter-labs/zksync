@@ -1,5 +1,6 @@
 table! {
-    account_balance_updates (account_id, block_number) {
+    account_balance_updates (balance_update_id) {
+        balance_update_id -> Int4,
         account_id -> Int4,
         block_number -> Int4,
         coin_id -> Int4,

@@ -2,7 +2,10 @@ use bigdecimal::{BigDecimal, Zero};
 use merkle_tree::AccountTree;
 use models::plasma::account::Account;
 use models::plasma::tx::{DepositTx, ExitTx, TransferTx};
-use models::plasma::{params::{self, ETH_TOKEN_ID}, AccountUpdate};
+use models::plasma::{
+    params::{self, ETH_TOKEN_ID},
+    AccountUpdate,
+};
 use models::plasma::{AccountId, AccountMap, Fr, TransferApplicationError};
 
 pub struct PlasmaState {
@@ -51,7 +54,6 @@ impl PlasmaState {
         self.balance_tree.items.get(&account_id).cloned()
     }
 
-    // TODO (Drogan) Maybe simplify signature checking?
     pub fn apply_transfer(
         &mut self,
         tx: &TransferTx,
@@ -62,11 +64,7 @@ impl PlasmaState {
                 .get_account(tx.from)
                 .and_then(|a| a.get_pub_key())
                 .ok_or(TransferApplicationError::UnknownSigner)?;
-            if let Some(verified_against) = tx.cached_pub_key.as_ref() {
-                if pub_key.0 != verified_against.0 {
-                    return Err(TransferApplicationError::InvalidSigner);
-                }
-            } else {
+            if !tx.verify_sig(&pub_key) {
                 return Err(TransferApplicationError::InvalidSigner);
             }
 

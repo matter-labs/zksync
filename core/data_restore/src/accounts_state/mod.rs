@@ -220,7 +220,6 @@ impl FranklinAccountsStates {
                 nonce: i.try_into().unwrap(),
                 good_until_block: 0,
                 signature: TxSignature::default(),
-                cached_pub_key: None,
             };
             info!(
                 "Transaction from account {:?} to account {:?}, amount = {:?}",

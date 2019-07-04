@@ -1,11 +1,10 @@
 use crate::circuit;
-use crate::plasma::params::{self, ETH_TOKEN_ID, TOTAL_TOKENS, TokenId};
+use crate::plasma::params::{self, TokenId, ETH_TOKEN_ID, TOTAL_TOKENS};
 use crate::primitives::GetBits;
 use crate::{Engine, Fr, PublicKey};
 use bigdecimal::BigDecimal;
 use fnv::FnvHashMap;
 use sapling_crypto::jubjub::{edwards, Unknown};
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Account {
@@ -162,9 +161,11 @@ impl Account {
                 AccountUpdate::Delete { .. } => None,
                 AccountUpdate::UpdateBalance {
                     balance_update: (token, _, amount),
+                    nonce,
                     ..
                 } => {
                     account.set_balance(token, &amount);
+                    account.nonce = nonce;
                     Some(account)
                 }
                 _ => {
@@ -179,11 +180,13 @@ impl Account {
                 AccountUpdate::Create {
                     public_key_x,
                     public_key_y,
+                    nonce,
                     ..
                 } => {
                     let mut new_account = Account::default();
                     new_account.public_key_y = public_key_y;
                     new_account.public_key_x = public_key_x;
+                    new_account.nonce = nonce;
                     Some(new_account)
                 }
                 _ => {

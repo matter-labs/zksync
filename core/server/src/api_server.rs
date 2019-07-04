@@ -10,7 +10,7 @@ use models::{ActionType, NetworkStatus, StateKeeperRequest, TransferTxConfirmati
 use std::sync::mpsc;
 use storage::{BlockDetails, ConnectionPool};
 
-use futures::Future;
+use futures::{oneshot, Future};
 use std::env;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
