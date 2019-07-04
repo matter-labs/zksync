@@ -790,7 +790,7 @@ impl StorageProcessor {
     pub fn load_committed_state(&self, block: Option<u32>) -> QueryResult<(u32, AccountMap)> {
         self.conn().transaction(|| {
             let (verif_block, mut accounts) = self.load_verified_state()?;
-            let (block, state_diff) = self.load_state_diff(verif_block, block)?;
+            let (block, state_diff) = self.load_state_diff(verif_block + 1, block)?;
             debug!("Loaded state diff: {:?}", state_diff);
             apply_updates(&mut accounts, state_diff);
             Ok((block, accounts))
@@ -1415,7 +1415,7 @@ mod test {
     use bigdecimal::Num;
     use diesel::Connection;
     use ff::Field;
-    use models::plasma::account::ETH_TOKEN_ID;
+    use models::plasma::params::ETH_TOKEN_ID;
     use web3::types::U256;
     //use diesel::RunQueryDsl;
 
@@ -1432,6 +1432,77 @@ mod test {
 
         let loaded = conn.load_proof(1).expect("must load proof");
         assert_eq!(loaded, proof);
+    }
+
+    #[test]
+    fn test_store_commited_updates() {
+        let _ = env_logger::try_init();
+
+        let pool = ConnectionPool::new();
+        let conn = pool.access_storage().unwrap();
+        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
+
+        let mut account_map = AccountMap::default();
+
+        let (_, state) = conn.load_committed_state(None).unwrap();
+        assert_eq!(
+            state
+                .into_iter()
+                .collect::<Vec<(u32, models::plasma::account::Account)>>(),
+            account_map
+                .clone()
+                .into_iter()
+                .collect::<Vec<(u32, models::plasma::account::Account)>>()
+        );
+
+        let create_account = |id| {
+            let mut a = models::plasma::account::Account::default();
+            vec![AccountUpdate::Create {
+                id,
+                nonce: a.nonce,
+                public_key_x: a.public_key_x,
+                public_key_y: a.public_key_y,
+            }]
+            .into_iter()
+        };
+        let transfer = |id_1, nonce_1, id_2, nonce_2| {
+            let mut a = models::plasma::account::Account::default();
+            vec![
+                AccountUpdate::UpdateBalance {
+                    id: id_1,
+                    nonce: nonce_1,
+                    balance_update: (0, 1.into(), 2.into()),
+                },
+                AccountUpdate::UpdateBalance {
+                    id: id_2,
+                    nonce: nonce_2,
+                    balance_update: (0, 2.into(), 3.into()),
+                },
+            ]
+            .into_iter()
+        };
+
+        let mut updates = Vec::new();
+        updates.extend(create_account(2));
+        updates.extend(create_account(4));
+        updates.extend(transfer(2, 1, 4, 0));
+        updates.extend(transfer(4, 0, 2, 1));
+        updates.extend(transfer(2, 1, 4, 1));
+        updates.extend(create_account(5));
+
+        conn.commit_state_update(1, &updates);
+        apply_updates(&mut account_map, updates);
+
+        let (_, state) = conn.load_committed_state(None).unwrap();
+        assert_eq!(
+            state
+                .into_iter()
+                .collect::<Vec<(u32, models::plasma::account::Account)>>(),
+            account_map
+                .clone()
+                .into_iter()
+                .collect::<Vec<(u32, models::plasma::account::Account)>>()
+        )
     }
 
     #[test]
@@ -1455,17 +1526,17 @@ mod test {
             a.set_balance(ETH_TOKEN_ID, &BigDecimal::from(balance));
             let new_balance = a.get_balance(ETH_TOKEN_ID).clone();
             vec![
-              AccountUpdate::Create {
-                  id,
-                  nonce: a.nonce
-                  public_key_x: a.public_key_x,
-                  public_key_y: a.public_key_y,
-              },
-              AccountUpdate::UpdateBalance {
-                  id,
-                  nonce: a.nonce,
-                  balance_update: (ETH_TOKEN_ID, old_balance, new_balance),
-              },
+                AccountUpdate::Create {
+                    id,
+                    nonce: a.nonce,
+                    public_key_x: a.public_key_x,
+                    public_key_y: a.public_key_y,
+                },
+                AccountUpdate::UpdateBalance {
+                    id,
+                    nonce: a.nonce,
+                    balance_update: (ETH_TOKEN_ID, old_balance, new_balance),
+                },
             ]
             .into_iter()
         };
