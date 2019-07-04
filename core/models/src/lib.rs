@@ -14,6 +14,7 @@ use crate::plasma::block::Block;
 use crate::plasma::*;
 use serde_bytes;
 use std::sync::mpsc::Sender;
+use futures::sync::oneshot;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxMeta {
@@ -103,7 +104,7 @@ pub enum ProtoBlock {
 }
 
 pub enum StateKeeperRequest {
-    AddTransferTx(Box<TransferTx>, Sender<Result<(), String>>),
+    AddTransferTx(Box<TransferTx>, oneshot::Sender<Result<(), String>>),
     AddBlock(ProtoBlock),
     GetAccount(u32, Sender<Option<Account>>),
     GetNetworkStatus(Sender<NetworkStatus>),

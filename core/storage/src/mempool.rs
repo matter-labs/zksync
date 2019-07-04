@@ -12,6 +12,7 @@ use chrono::NaiveDateTime;
 
 use super::schema::*;
 use diesel::insert_into;
+use diesel::expression::dsl::count;
 
 pub struct Mempool {
     conn: ConnectionHolder,
@@ -44,6 +45,10 @@ impl Mempool {
             ConnectionHolder::Pooled(ref conn) => conn,
             ConnectionHolder::Direct(ref conn) => conn,
         }
+    }
+
+    pub fn get_size(&self) -> QueryResult<usize> {
+        mempool::table.select(count(mempool::id)).execute(self.conn())
     }
 
     pub fn add_tx(&self, tx: &TransferTx) -> QueryResult<()> {

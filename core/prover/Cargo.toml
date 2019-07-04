@@ -25,7 +25,7 @@ rustc-hex = "2.0.1"
 
 signal-hook = "0.1.8"
 tokio = "0.1.18"
-futures = "0.1.25"
+futures = "0.1.28"
 
 fnv = "1.0.6"
 serde = "1.0.90"

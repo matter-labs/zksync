@@ -10,7 +10,7 @@ use models::{ActionType, NetworkStatus, StateKeeperRequest, TransferTxConfirmati
 use std::sync::mpsc;
 use storage::{BlockDetails, ConnectionPool};
 
-use futures::{oneshot, Future};
+use futures::{sync::oneshot, Future};
 use std::env;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
@@ -86,21 +86,22 @@ fn handle_submit_tx(
             }
 
             // Validate tx input (only basic consistency check).
-
             tx.validate()?;
 
+            Ok(tx)
+        }
+        ).and_then(move |tx| {
+
             // TODO (Drogan) use oneshot.
-            let (add_tx, add_rx) = mpsc::channel();
+            let (add_tx, add_rx) = oneshot::channel();
             tx_for_state
                 .send(StateKeeperRequest::AddTransferTx(Box::new(tx), add_tx))
                 .expect("sending to sate keeper failed");
-            // TODO: reconsider timeouts
-            let confirmation = add_rx
-                .recv_timeout(std::time::Duration::from_millis(500))
-                .map_err(|_| "Internal error: timeout on AddTransferTx".to_string())?
-                .map_err(|e| format!("Tx rejected: {:?}", e))?;
             // Return response
-
+            add_rx.into_future().map_err(|e| format!("Failed to receive from StateKeeper: {:?}",e))
+        })
+        .and_then( |confirmation| {
+            confirmation.map_err(|e| format!("Tx rejected: {:?}", e))?;
             let resp = TransactionResponse {
                 accepted: true,
                 error: None,
