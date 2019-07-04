@@ -2,7 +2,7 @@
 pub const TX_TYPE_BIT_WIDTH: &'static usize = &8;
 
 /// Account tree depth
-pub const ACCOUNT_TREE_DEPTH: &'static usize = &24;
+pub const ACCOUNT_TREE_DEPTH: usize = 24;
 
 /// Account subtree depth
 pub const ACCOUNT_SUBTREE_DEPTH: &'static usize = &9;
@@ -18,7 +18,7 @@ pub const BALANCE_BIT_WIDTH: &'static usize = &128;
 
 pub const NEW_PUBKEY_HASH_WIDTH: &'static usize = &224;
 /// Nonce bit width
-pub const NONCE_BIT_WIDTH: &'static usize = &32;
+pub const NONCE_BIT_WIDTH: usize = 32;
 //
 pub const TOKEN_EXT_BIT_WIDTH: &'static usize = &16;
 //

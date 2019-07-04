@@ -1,8 +1,8 @@
 use crate::account::AccountWitness;
 use ff::Field;
 
+use franklin_crypto::jubjub::JubjubEngine;
 use franklin_crypto::jubjub::{edwards, Unknown};
-use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
 
 #[derive(Clone)]
 pub struct OperationBranchWitness<E: JubjubEngine> {
@@ -16,7 +16,6 @@ pub struct OperationBranchWitness<E: JubjubEngine> {
 #[derive(Clone)]
 pub struct OperationBranch<E: JubjubEngine> {
     pub address: Option<E::Fr>,
-    // pub signature //probably signature should be here
     pub token: Option<E::Fr>,
 
     pub witness: OperationBranchWitness<E>,

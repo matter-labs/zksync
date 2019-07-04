@@ -1,7 +1,8 @@
-use crate::account::AccountContentBase;
+use crate::account::AccountContent;
 use crate::allocated_structures::*;
+use crate::element::{CircuitElement, CircuitPubkey};
 use crate::operation::{Operation, OperationBranch};
-use crate::utils::append_packed_public_key;
+use crate::utils::{append_packed_public_key, pack_bits_to_element};
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use ff::{Field, PrimeField};
 use franklin_crypto::circuit::baby_eddsa::EddsaSignature;
@@ -84,8 +85,10 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
             block_pub_data_bits.extend(operation_pub_data_chunk_bits);
 
-            let lhs = allocate_operation_branch(cs.namespace(|| "lhs"), &operation.lhs)?;
-            let rhs = allocate_operation_branch(cs.namespace(|| "rhs"), &operation.rhs)?;
+            let lhs =
+                AllocatedOperationBranch::from_witness(cs.namespace(|| "lhs"), &operation.lhs)?;
+            let rhs =
+                AllocatedOperationBranch::from_witness(cs.namespace(|| "rhs"), &operation.rhs)?;
             let mut current_branch = self.select_branch(
                 cs.namespace(|| "select appropriate branch"),
                 &lhs,
@@ -138,7 +141,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         }
         //TODO enforce correct block new root
 
-
         Ok(())
     }
 }
@@ -149,18 +151,21 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         next_chunk_number: &AllocatedNum<E>,
         mut cs: CS,
     ) -> Result<(AllocatedNum<E>, AllocatedChunkData<E>), SynthesisError> {
-        let tx_type = AllocatedNum::alloc(cs.namespace(|| "tx_type"), || op.tx_type.grab())?;
+        let tx_type = CircuitElement::from_fe_strict(
+            cs.namespace(|| "tx_type"),
+            || op.tx_type.grab(),
+            *franklin_constants::TX_TYPE_BIT_WIDTH,
+        )?;
         enforce_lies_between(
             cs.namespace(|| "tx_type is valid"),
-            &tx_type,
+            &tx_type.get_number(),
             0 as i32,
             DIFFERENT_TRANSACTIONS_TYPE_NUMBER as i32,
         )?;
-        let mut tx_type_bits = tx_type.into_bits_le(cs.namespace(|| "tx_type_bits"))?;
-        tx_type_bits.truncate(*franklin_constants::TX_TYPE_BIT_WIDTH);
+
         let max_chunks_powers = generate_powers(
             cs.namespace(|| "generate powers of max chunks"),
-            &tx_type,
+            &tx_type.get_number(),
             DIFFERENT_TRANSACTIONS_TYPE_NUMBER,
         )?;
         let max_chunks_last_coeffs = generate_maxchunk_polynomial::<E>();
@@ -229,7 +234,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 chunk_number: operation_chunk_number,
                 is_chunk_last: is_chunk_last,
                 tx_type: tx_type,
-                tx_type_bits: tx_type_bits,
             },
         ))
     }
@@ -251,77 +255,89 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let cur_side = AllocatedNum::select_ifeq(
             cs.namespace(|| "select corresponding branch"),
-            &chunk_data.tx_type,
+            &chunk_data.tx_type.get_number(),
             &deposit_allocated,
             &left_side,
             &chunk_data.chunk_number,
         )?;
-        let operation_branch_base = AllocatedOperationBranchBase {
-            account: AccountContentBase {
-                nonce: AllocatedNum::select_ifeq(
-                    cs.namespace(|| "nonce"),
-                    &left_side,
-                    &cur_side,
-                    &first.base.account.nonce,
-                    &second.base.account.nonce,
+        Ok(AllocatedOperationBranch {
+            account: AccountContent {
+                nonce: CircuitElement::from_number(
+                    cs.namespace(|| "chosen nonce"),
+                    AllocatedNum::select_ifeq(
+                        cs.namespace(|| "nonce"),
+                        &left_side,
+                        &cur_side,
+                        &first.account.nonce.get_number(),
+                        &second.account.nonce.get_number(),
+                    )?,
+                    *franklin_constants::NONCE_BIT_WIDTH,
                 )?,
-                pub_x: AllocatedNum::select_ifeq(
-                    cs.namespace(|| "pub_x"),
-                    &left_side,
-                    &cur_side,
-                    &first.base.account.pub_x,
-                    &second.base.account.pub_x,
-                )?,
-                pub_y: AllocatedNum::select_ifeq(
-                    cs.namespace(|| "pub_y"),
-                    &left_side,
-                    &cur_side,
-                    &first.base.account.pub_y,
-                    &second.base.account.pub_y,
+                pub_key: CircuitPubkey::from_xy(
+                    cs.namespace(|| "chosen pubkey"),
+                    AllocatedNum::select_ifeq(
+                        cs.namespace(|| "pub_x"),
+                        &left_side,
+                        &cur_side,
+                        &first.account.pub_key.get_x().get_number(),
+                        &second.account.pub_key.get_y().get_number(),
+                    )?,
+                    AllocatedNum::select_ifeq(
+                        cs.namespace(|| "pub_y"),
+                        &left_side,
+                        &cur_side,
+                        &first.account.pub_key.get_y().get_number(),
+                        &second.account.pub_key.get_y().get_number(),
+                    )?,
                 )?,
             },
             account_audit_path: select_vec_ifeq(
                 cs.namespace(|| "account_audit_path"),
                 &left_side,
                 &cur_side,
-                &first.base.account_audit_path,
-                &second.base.account_audit_path,
+                &first.account_audit_path,
+                &second.account_audit_path,
             )?,
-            account_address: AllocatedNum::select_ifeq(
-                cs.namespace(|| "account_address"),
-                &left_side,
-                &cur_side,
-                &first.base.account_address,
-                &second.base.account_address,
+            account_address: CircuitElement::from_number(
+                cs.namespace(|| "chosen account_address"),
+                AllocatedNum::select_ifeq(
+                    cs.namespace(|| "account_address"),
+                    &left_side,
+                    &cur_side,
+                    &first.account_address.get_number(),
+                    &second.account_address.get_number(),
+                )?,
+                *franklin_constants::ACCOUNT_TREE_DEPTH,
             )?,
-            balance_value: AllocatedNum::select_ifeq(
-                cs.namespace(|| "balance_value"),
-                &left_side,
-                &cur_side,
-                &first.base.balance_value,
-                &second.base.balance_value,
+            balance: CircuitElement::from_number(
+                cs.namespace(|| "chosen balance"),
+                AllocatedNum::select_ifeq(
+                    cs.namespace(|| "balance_value"),
+                    &left_side,
+                    &cur_side,
+                    &first.balance.get_number(),
+                    &second.balance.get_number(),
+                )?,
+                *franklin_constants::BALANCE_BIT_WIDTH,
             )?,
             balance_audit_path: select_vec_ifeq(
                 cs.namespace(|| "balance_audit_path"),
                 &left_side,
                 &cur_side,
-                &first.base.balance_audit_path,
-                &second.base.balance_audit_path,
+                &first.balance_audit_path,
+                &second.balance_audit_path,
             )?,
-            token: AllocatedNum::select_ifeq(
-                cs.namespace(|| "token"),
-                &left_side,
-                &cur_side,
-                &first.base.token,
-                &second.base.token,
+            token: CircuitElement::from_number(
+                cs.namespace(|| "chosen token"),
+                AllocatedNum::select_ifeq(
+                    cs.namespace(|| "token"),
+                    &left_side,
+                    &cur_side,
+                    &first.token.get_number(),
+                    &second.token.get_number(),
+                )?,
+                *franklin_constants::BALANCE_TREE_DEPTH,
             )?,
-        };
-
-        let bit_form = operation_branch_base
-            .make_bit_form(cs.namespace(|| "operation_branch_base_bit_form"))?;
-        Ok(AllocatedOperationBranch {
-            base: operation_branch_base,
-            bits: bit_form,
         })
     }
 
@@ -349,8 +365,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             allocate_merkle_root(
                 cs.namespace(|| "account_merkle_root"),
                 &cur_account_leaf_bits,
-                &cur.bits.account_address,
-                &cur.base.account_audit_path,
+                &cur.account_address.get_bits_le(),
+                &cur.account_audit_path,
                 self.params,
             )?,
             is_account_empty,
@@ -579,13 +595,13 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let mut is_valid_flags = vec![];
         //construct pubdata
         let mut pubdata_bits = vec![];
-        let mut pub_token_bits = cur.bits.token.clone();
+        let mut pub_token_bits = cur.token.get_bits_le().clone();
         pub_token_bits.resize(
             *franklin_constants::TOKEN_EXT_BIT_WIDTH,
             Boolean::constant(false),
         );
-        pubdata_bits.extend(chunk_data.tx_type_bits.clone()); //TX_TYPE_BIT_WIDTH=8
-        pubdata_bits.extend(cur.bits.account_address.clone()); //ACCOUNT_TREE_DEPTH=24
+        pubdata_bits.extend(chunk_data.tx_type.get_bits_le().clone()); //TX_TYPE_BIT_WIDTH=8
+        pubdata_bits.extend(cur.account_address.get_bits_le().clone()); //ACCOUNT_TREE_DEPTH=24
         pubdata_bits.extend(pub_token_bits); //TOKEN_EXT_BIT_WIDTH=16
         pubdata_bits.extend(op_data.amount_packed.clone()); //AMOUNT_PACKED=24
         pubdata_bits.extend(op_data.fee_packed.clone()); //FEE_PACKED=8
@@ -616,23 +632,24 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             .assert_number(cs.namespace(|| "deposit_tx_type equals one"), &E::Fr::one())?;
         let is_deposit = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_deposit"),
-            &chunk_data.tx_type,
+            &chunk_data.tx_type.get_number(),
             &allocated_deposit_tx_type,
         )?);
         is_valid_flags.push(is_deposit.clone());
 
         // verify if new pubkey is equal to previous one (if existed)
+        // TODO: function for pubkeys equality
         let mut is_pubkey_correct = Boolean::Constant(true);
         let is_pub_x_correct = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "new_pub_x equals old_x"),
             &op_data.new_pubkey_x,
-            &cur.base.account.pub_x,
+            &cur.account.pub_key.get_x().get_number(),
         )?);
 
         let is_pub_y_correct = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "new_pub_y equals old_y"),
             &op_data.new_pubkey_y,
-            &cur.base.account.pub_y,
+            &cur.account.pub_key.get_y().get_number(),
         )?);
         is_pubkey_correct = Boolean::and(
             cs.namespace(|| "and pub_x"),
@@ -691,7 +708,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         //calculate updated value on deposit
         let updated_balance_value =
             AllocatedNum::alloc(cs.namespace(|| "updated_balance_value"), || {
-                let mut new_balance = cur.base.balance_value.get_value().grab()?;
+                let mut new_balance = cur.balance.clone().grab()?;
                 new_balance.add_assign(&op_data.amount.get_value().grab()?);
                 new_balance.sub_assign(&op_data.fee.get_value().grab()?);
                 Ok(new_balance)
@@ -701,46 +718,41 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             |lc| lc + updated_balance_value.get_variable(),
             |lc| lc + CS::one(),
             |lc| {
-                lc + cur.base.balance_value.get_variable() + op_data.amount.get_variable()
+                lc + cur.balance.get_number().get_variable() + op_data.amount.get_variable()//TODO: get_number().get_variable() is kinda ugly
                     - op_data.fee.get_variable()
             },
         );
 
         //mutate current branch if it is first chunk of valid deposit transaction
-        cur.base.balance_value = AllocatedNum::conditionally_select(
-            cs.namespace(|| "update balance if valid first"),
-            &updated_balance_value,
-            &cur.base.balance_value,
-            &is_valid_first,
+        cur.balance = CircuitElement::from_number(
+            cs.namespace(|| "mutated balance"),
+            AllocatedNum::conditionally_select(
+                cs.namespace(|| "update balance if valid first"),
+                &updated_balance_value,
+                &cur.balance.get_number(),
+                &is_valid_first,
+            )?,
+            *franklin_constants::BALANCE_BIT_WIDTH,
         )?;
         println!(
             "changed bal data: {}",
-            cur.base.balance_value.get_value().unwrap()
+            cur.balance.get_number().get_value().unwrap()
         );
-        cur.base.account.pub_x = AllocatedNum::conditionally_select(
-            cs.namespace(|| "update pub_x if valid first"),
-            &op_data.new_pubkey_x,
-            &cur.base.account.pub_x,
-            &is_valid_first,
+        cur.account.pub_key = CircuitPubkey::from_xy(
+            cs.namespace(|| "mutated pubkey"),
+            AllocatedNum::conditionally_select(
+                cs.namespace(|| "update pub_x if valid first"),
+                &op_data.new_pubkey_x,
+                &cur.account.pub_key.get_x().get_number(),
+                &is_valid_first,
+            )?,
+            AllocatedNum::conditionally_select(
+                cs.namespace(|| "update pub_y if valid first"),
+                &op_data.new_pubkey_y,
+                &cur.account.pub_key.get_y().get_number(),
+                &is_valid_first,
+            )?,
         )?;
-        println!(
-            "changed pubx data: {}",
-            cur.base.account.pub_x.get_value().unwrap()
-        );
-        cur.base.account.pub_y = AllocatedNum::conditionally_select(
-            cs.namespace(|| "update pub_y if valid first"),
-            &op_data.new_pubkey_y,
-            &cur.base.account.pub_y,
-            &is_valid_first,
-        )?;
-        println!(
-            "changed puby data: {}",
-            cur.base.account.pub_y.get_value().unwrap()
-        );
-
-        cur.bits = cur
-            .base
-            .make_bit_form(cs.namespace(|| "update bit form of branch"))?;
 
         Ok(tx_valid)
     }
@@ -759,15 +771,15 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
     ) -> Result<Boolean, SynthesisError> {
         // construct pubdata
         let mut pubdata_bits = vec![];
-        let mut pub_token_bits = lhs.bits.token.clone();
+        let mut pub_token_bits = lhs.token.get_bits_le().clone();
         pub_token_bits.resize(
             *franklin_constants::TOKEN_EXT_BIT_WIDTH,
             Boolean::constant(false),
         );
-        pubdata_bits.extend(chunk_data.tx_type_bits.clone());
-        pubdata_bits.extend(lhs.bits.account_address.clone());
+        pubdata_bits.extend(chunk_data.tx_type.get_bits_le());
+        pubdata_bits.extend(lhs.account_address.get_bits_le());
         pubdata_bits.extend(pub_token_bits.clone());
-        pubdata_bits.extend(rhs.bits.account_address.clone());
+        pubdata_bits.extend(rhs.account_address.get_bits_le());
         pubdata_bits.extend(op_data.amount_packed.clone());
         pubdata_bits.extend(op_data.fee_packed.clone());
         assert_eq!(pubdata_bits.len(), 13 * 8);
@@ -804,7 +816,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         let is_transfer = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_transfer"),
-            &chunk_data.tx_type,
+            &chunk_data.tx_type.get_number(),
             &allocated_transfer_tx_type,
         )?);
 
@@ -827,17 +839,25 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             allocated_transfer_tx_type.into_bits_le(cs.namespace(|| "transfer_tx_type_bits"))?;
         transfer_tx_type_bits.truncate(*franklin_constants::TX_TYPE_BIT_WIDTH);
         sig_bits.extend(transfer_tx_type_bits);
-        sig_bits.extend(lhs.bits.account_address.clone());
-        sig_bits.extend(lhs.bits.token.clone());
-        sig_bits.extend(lhs.bits.account.nonce_bits.clone());
+        sig_bits.extend(lhs.account_address.get_bits_le());
+        sig_bits.extend(lhs.token.get_bits_le());
+        sig_bits.extend(lhs.account.nonce.get_bits_le());
         sig_bits.extend(op_data.amount_packed.clone());
         sig_bits.extend(op_data.fee_packed.clone());
-        //TODO: rhs_pubkey
         let sig_msg = pack_bits_to_element(cs.namespace(|| "sig_msg from bits"), &sig_bits)?;
 
+        let sig_hash = pedersen_hash::pedersen_hash(
+            cs.namespace(|| "hash_sig_bits"),
+            pedersen_hash::Personalization::NoteCommitment,
+            &sig_bits,
+            self.params,
+        )?
+        .get_x()
+        .clone();
+        //TODO: rhs_pubkey
         println!(
-            "sig_msg={} sig_bits.len={}",
-            sig_msg.get_value().grab()?,
+            "sig_hash={} sig_bits.len={}",
+            sig_hash.get_value().grab()?,
             sig_bits.len()
         );
 
@@ -857,13 +877,13 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let is_signer_pub_x_correct = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_signer_pub_x_correct"),
             &op_data.signer_pub_x,
-            &lhs.base.account.pub_x,
+            &lhs.account.pub_key.get_x().get_number(),
         )?);
 
         let is_signer_pub_y_correct = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_signer_pub_y_correct"),
             &op_data.signer_pub_y,
-            &lhs.base.account.pub_y,
+            &lhs.account.pub_key.get_y().get_number(),
         )?);
         let is_signer_key_correct = Boolean::and(
             cs.namespace(|| "is_signer_key_correct"),
@@ -876,7 +896,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let is_a_correct = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_a_correct"),
             &op_data.a,
-            &cur.base.balance_value,
+            &cur.balance.get_number(),
         )?);
         lhs_valid_flags.push(is_a_correct);
 
@@ -896,7 +916,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         lhs_valid_flags.push(no_nonce_overflow(
             cs.namespace(|| "no nonce overflow"),
-            &cur.base.account.nonce,
+            &cur.account.nonce.get_number(),
         )?);
 
         println!("lhs valid");
@@ -905,19 +925,19 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let updated_balance_value =
             AllocatedNum::alloc(cs.namespace(|| "lhs updated_balance_value"), || {
-                let mut bal = cur.base.balance_value.get_value().grab()?;
+                let mut bal = cur.balance.clone().grab()?;
                 bal.sub_assign(sum_amount_fee.get_value().get()?);
                 Ok(bal)
             })?;
         cs.enforce(
             || "lhs updated_balance_value is correct",
-            |lc| lc + cur.base.balance_value.get_variable() - sum_amount_fee.get_variable(),
+            |lc| lc + cur.balance.get_number().get_variable() - sum_amount_fee.get_variable(),
             |lc| lc + CS::one(),
             |lc| lc + updated_balance_value.get_variable(),
         );
 
         let updated_nonce = AllocatedNum::alloc(cs.namespace(|| "updated_nonce_value"), || {
-            let mut nonce = cur.base.account.nonce.get_value().grab()?;
+            let mut nonce = cur.account.nonce.clone().grab()?;
             nonce.add_assign(&E::Fr::from_str("1").unwrap());
             Ok(nonce)
         })?;
@@ -925,30 +945,27 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             || "updated_balance_value is correct",
             |lc| lc + updated_nonce.get_variable() - CS::one(),
             |lc| lc + CS::one(),
-            |lc| lc + cur.base.account.nonce.get_variable(),
+            |lc| lc + cur.account.nonce.get_number().get_variable(),
         );
         //update cur values if lhs is valid
 
         //update nonce
-        cur.base.account.nonce = AllocatedNum::conditionally_select(
+        cur.account.nonce = CircuitElement::from_number(cs.namespace(||"updated nonce"),AllocatedNum::conditionally_select(
             cs.namespace(|| "update nonce if lhs_valid"),
             &updated_nonce,
-            &cur.base.account.nonce,
+            &cur.account.nonce.get_number(),
             &lhs_valid,
-        )?;
+        )?, *franklin_constants::NONCE_BIT_WIDTH)?;
 
         //update balance
-        cur.base.balance_value = AllocatedNum::conditionally_select(
+        cur.balance = CircuitElement::from_number(cs.namespace(||"updated_balance"), AllocatedNum::conditionally_select(
             cs.namespace(|| "update balance if lhs_valid"),
             &updated_balance_value,
-            &cur.base.balance_value,
+            &cur.balance.get_number(),
             &lhs_valid,
-        )?;
+        )?, *franklin_constants::BALANCE_BIT_WIDTH)?;
 
-        cur.bits = cur
-            .base
-            .make_bit_form(cs.namespace(|| "update bit form of branch"))?;
-
+      
         // rhs
         let mut rhs_valid_flags = vec![];
         rhs_valid_flags.push(is_transfer);
@@ -973,30 +990,26 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         // calculate new rhs balance value
         let updated_balance_value =
             AllocatedNum::alloc(cs.namespace(|| "updated_balance_value"), || {
-                let mut bal = cur.base.balance_value.get_value().grab()?;
+                let mut bal = cur.balance.clone().grab()?;
                 bal.add_assign(op_data.amount.get_value().get()?);
                 Ok(bal)
             })?;
         cs.enforce(
             || "rhs updated_balance_value is correct",
-            |lc| lc + cur.base.balance_value.get_variable() + op_data.amount.get_variable(),
+            |lc| lc + cur.balance.get_number().get_variable() + op_data.amount.get_variable(),
             |lc| lc + CS::one(),
             |lc| lc + updated_balance_value.get_variable(),
         );
 
         //update balance
-        cur.base.balance_value = AllocatedNum::conditionally_select(
+        cur.balance = CircuitElement::from_number(cs.namespace(||"updated_balance rhs"), AllocatedNum::conditionally_select(
             cs.namespace(|| "update balance if rhs_valid"),
             &updated_balance_value,
-            &cur.base.balance_value,
+            &cur.balance.get_number(),
             &is_rhs_valid,
-        )?;
+        )?, *franklin_constants::BALANCE_BIT_WIDTH)?;
 
-        cur.bits = cur
-            .base
-            .make_bit_form(cs.namespace(|| "rhs update bit form of branch"))?;
-
-        Ok(Boolean::and(
+       Ok(Boolean::and(
             cs.namespace(|| "lhs_valid nand rhs_valid"),
             &lhs_valid.not(),
             &is_rhs_valid.not(),
@@ -1011,12 +1024,12 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
     ) -> Result<(Vec<Boolean>, Boolean), SynthesisError> {
         //first we prove calculate root of the subtree to obtain account_leaf_data:
         let mut subtree_data = vec![];
-        let balance_data = &branch.bits.balance_value;
+        let balance_data = &branch.balance.get_bits_le();
         let balance_root = allocate_merkle_root(
             cs.namespace(|| "balance_subtree_root"),
             balance_data,
-            &branch.bits.token,
-            &branch.base.balance_audit_path,
+            &branch.token.get_bits_le(),
+            &branch.balance_audit_path,
             self.params,
         )?;
         subtree_data
@@ -1026,37 +1039,34 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let subtree_root = balance_root.clone();
         // println!("subtree root: {}", subtree_root.get_value().unwrap());
         let mut account_data = vec![];
-        account_data.extend(branch.bits.account.nonce_bits.clone());
-        append_packed_public_key(
-            &mut account_data,
-            branch.bits.account.pub_x_bit.clone(),
-            branch.bits.account.pub_y_bits.clone(),
-        );
+        account_data.extend(branch.account.nonce.get_bits_le().clone());
+        account_data.extend(branch.account.pub_key.get_packed_key());
 
-        let mut account_data_from_lc = Num::<E>::zero();
-        let mut coeff = E::Fr::one();
-        for bit in &account_data {
-            account_data_from_lc = account_data_from_lc.add_bool_with_coeff(CS::one(), &bit, coeff);
-            coeff.double();
-        }
+        let account_data_packed = pack_bits_to_element(cs.namespace(||"account_data_packed"), &account_data)?;
+        // let mut account_data_from_lc = Num::<E>::zero();
+        // let mut coeff = E::Fr::one();
+        // for bit in &account_data {
+        //     account_data_from_lc = account_data_from_lc.add_bool_with_coeff(CS::one(), &bit, coeff);
+        //     coeff.double();
+        // }
 
-        let account_packed =
-            AllocatedNum::alloc(cs.namespace(|| "allocate account data packed"), || {
-                Ok(*account_data_from_lc.get_value().get()?)
-            })?;
+        // let account_packed =
+        //     AllocatedNum::alloc(cs.namespace(|| "allocate account data packed"), || {
+        //         Ok(*account_data_from_lc.get_value().get()?)
+        //     })?;
 
-        cs.enforce(
-            || "pack account data",
-            |lc| lc + account_packed.get_variable(),
-            |lc| lc + CS::one(),
-            |_| account_data_from_lc.lc(E::Fr::one()),
-        );
+        // cs.enforce(
+        //     || "pack account data",
+        //     |lc| lc + account_packed.get_variable(),
+        //     |lc| lc + CS::one(),
+        //     |_| account_data_from_lc.lc(E::Fr::one()),
+        // );
 
         let zero = AllocatedNum::alloc(cs.namespace(|| "zero"), || Ok(E::Fr::zero()))?;
         zero.assert_zero(cs.namespace(|| "zero is zero"))?;
 
         let is_account_empty =
-            AllocatedNum::equals(cs.namespace(|| "is_account_empty"), &account_packed, &zero)?;
+            AllocatedNum::equals(cs.namespace(|| "is_account_empty"), &account_data_packed, &zero)?;
         let mut subtree_root_bits =
             subtree_root.into_bits_le(cs.namespace(|| "subtree_root_bits"))?;
         subtree_root_bits.resize(*franklin_constants::FR_BIT_WIDTH, Boolean::Constant(false));
@@ -1225,7 +1235,7 @@ fn multi_or<E: JubjubEngine, CS: ConstraintSystem<E>>(
 
     Ok(result)
 }
-
+// TODO: actually it is redundant due to circuit design
 fn enforce_lies_between<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     number: &AllocatedNum<E>,
@@ -1297,31 +1307,6 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
     assert_eq!(interpolation.len(), DIFFERENT_TRANSACTIONS_TYPE_NUMBER);
 
     interpolation
-}
-
-fn pack_bits_to_element<E: JubjubEngine, CS: ConstraintSystem<E>>(
-    mut cs: CS,
-    bits: &[Boolean],
-) -> Result<AllocatedNum<E>, SynthesisError> {
-    let mut data_from_lc = Num::<E>::zero();
-    let mut coeff = E::Fr::one();
-    for bit in bits {
-        data_from_lc = data_from_lc.add_bool_with_coeff(CS::one(), &bit, coeff);
-        coeff.double();
-    }
-
-    let data_packed = AllocatedNum::alloc(cs.namespace(|| "allocate account data packed"), || {
-        Ok(*data_from_lc.get_value().get()?)
-    })?;
-
-    cs.enforce(
-        || "pack account data",
-        |lc| lc + data_packed.get_variable(),
-        |lc| lc + CS::one(),
-        |_| data_from_lc.lc(E::Fr::one()),
-    );
-
-    Ok(data_packed)
 }
 
 fn no_nonce_overflow<E: JubjubEngine, CS: ConstraintSystem<E>>(
@@ -1687,6 +1672,8 @@ mod test {
         use crate::account::*;
         use crate::operation::*;
         use crate::utils::*;
+        use crypto::digest::Digest;
+        use crypto::sha2::Sha256;
         use ff::{BitIterator, Field};
         use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
         use franklin_crypto::circuit::float_point::convert_to_float;
@@ -1697,8 +1684,6 @@ mod test {
         use merkle_tree::PedersenHasher;
         use pairing::bn256::*;
         use rand::{Rng, SeedableRng, XorShiftRng};
-        use crypto::digest::Digest;
-        use crypto::sha2::Sha256;
 
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;
@@ -1931,7 +1916,19 @@ mod test {
             franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         );
         let sig_msg = le_bit_vector_into_field_element::<Fr>(&sig_bits);
-        println!("test sig_msg={} sig_bits.len={}", sig_msg, sig_bits.len());
+        let sig_msg_hash = phasher.hash_bits(sig_bits.clone());
+        let mut sig_msg_hash_bits = vec![];
+        append_le_fixed_width(
+            &mut sig_msg_hash_bits,
+            &sig_msg_hash,
+            *franklin_constants::FR_BIT_WIDTH - 8,
+        ); //TODO: not clear what capacity is
+
+        println!(
+            "test sig_msg_hash={} sig_msg_hash_bits.len={}",
+            sig_msg_hash,
+            sig_msg_hash_bits.len()
+        );
 
         // construct pubdata
         let mut pubdata_bits = vec![];
@@ -2109,38 +2106,38 @@ mod test {
 
         // let mut h = Sha256::new();
 
-        // let bytes_to_hash = be_bit_vector_into_bytes(&pubdata_bits);        
-        // h.input(&bytes_to_hash);        
+        // let bytes_to_hash = be_bit_vector_into_bytes(&pubdata_bits);
+        // h.input(&bytes_to_hash);
         // let mut hash_result = [0u8; 32];
-        // h.result(&mut hash_result[..]);     
-        // println!("Initial hash hex {}", hex::encode(hash_result));      
+        // h.result(&mut hash_result[..]);
+        // println!("Initial hash hex {}", hex::encode(hash_result));
         // let mut packed_transaction_data = vec![];
         // let transaction_data = transaction.public_data_into_bits();
-        // packed_transaction_data.extend(transaction_data.clone().into_iter());       
+        // packed_transaction_data.extend(transaction_data.clone().into_iter());
         // let packed_transaction_data_bytes =
-        //     be_bit_vector_into_bytes(&packed_transaction_data);     
+        //     be_bit_vector_into_bytes(&packed_transaction_data);
         // println!(
         //     "Packed transaction data hex {}",
         //     hex::encode(packed_transaction_data_bytes.clone())
-        // );      
+        // );
         // let mut next_round_hash_bytes = vec![];
         // next_round_hash_bytes.extend(hash_result.iter());
         // next_round_hash_bytes.extend(packed_transaction_data_bytes);
-        // // assert_eq!(next_round_hash_bytes.len(), 64);     
+        // // assert_eq!(next_round_hash_bytes.len(), 64);
         // h = Sha256::new();
         // h.input(&next_round_hash_bytes);
         // hash_result = [0u8; 32];
-        // h.result(&mut hash_result[..]);     
-        // println!("Final hash as hex {}", hex::encode(hash_result));     
-        // hash_result[0] &= 0x1f; // temporary solution       
+        // h.result(&mut hash_result[..]);
+        // println!("Final hash as hex {}", hex::encode(hash_result));
+        // hash_result[0] &= 0x1f; // temporary solution
         // let mut repr = Fr::zero().into_repr();
         // repr.read_be(&hash_result[..])
-        //     .expect("pack hash as field element");      
-        // let public_data_commitment = Fr::from_repr(repr).unwrap();      
+        //     .expect("pack hash as field element");
+        // let public_data_commitment = Fr::from_repr(repr).unwrap();
         // println!(
         //     "Final data commitment as field element = {}",
         //     public_data_commitment
-        // );      
+        // );
 
         {
             let mut cs = TestConstraintSystem::<Bn256>::new();

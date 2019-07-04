@@ -1,5 +1,6 @@
 use crate::account;
-use crate::account::{AccountContentBase, AccountContentBitForm};
+use crate::account::AccountContent;
+use crate::element::CircuitElement;
 use crate::operation::{Operation, OperationBranch, OperationBranchWitness};
 use crate::utils;
 use franklinmodels::params as franklin_constants;
@@ -13,116 +14,172 @@ use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
 
 pub struct AllocatedOperationBranch<E: JubjubEngine> {
-    pub base: AllocatedOperationBranchBase<E>,
-    pub bits: AllocatedOperationBranchBitForm,
-}
-
-pub struct AllocatedOperationBranchBase<E: JubjubEngine> {
-    pub account: AccountContentBase<E>,
-    pub account_audit_path: Vec<AllocatedNum<E>>,
-    pub account_address: AllocatedNum<E>,
-
-    pub balance_value: AllocatedNum<E>,
+    pub account: AccountContent<E>,
+    pub account_audit_path: Vec<AllocatedNum<E>>, //we do not need their bit representations
+    pub account_address: CircuitElement<E>,
+    pub balance: CircuitElement<E>,
     pub balance_audit_path: Vec<AllocatedNum<E>>,
-    pub token: AllocatedNum<E>,
+    pub token: CircuitElement<E>,
+    // pub base: AllocatedOperationBranchBase<E>,
+    // pub bits: AllocatedOperationBranchBitForm,
 }
 
-//TODO: we should limit bit_widths here. yes, constraint bit lengths
-impl<E: JubjubEngine> AllocatedOperationBranchBase<E> {
-    pub fn make_bit_form<CS: ConstraintSystem<E>>(
-        &self,
+impl<E: JubjubEngine> AllocatedOperationBranch<E> {
+    pub fn from_witness<CS: ConstraintSystem<E>>(
         mut cs: CS,
-    ) -> Result<AllocatedOperationBranchBitForm, SynthesisError> {
-        let mut account_address_bits = self
-            .account_address
-            .into_bits_le(cs.namespace(|| "account_address_bits"))?;
-        account_address_bits.truncate(*franklin_constants::ACCOUNT_TREE_DEPTH);
+        operation_branch: &OperationBranch<E>,
+    ) -> Result<AllocatedOperationBranch<E>, SynthesisError> {
+        let account_address = CircuitElement::from_fe_strict(
+            cs.namespace(|| "account_address"),
+            || Ok(operation_branch.address.grab()?),
+            *franklin_constants::ACCOUNT_TREE_DEPTH,
+        )?;
 
-        let mut token_bits = self.token.into_bits_le(cs.namespace(|| "token_bits"))?;
-        token_bits.truncate(*franklin_constants::BALANCE_TREE_DEPTH);
+        let account_audit_path = utils::allocate_audit_path(
+            cs.namespace(|| "account_audit_path"),
+            &operation_branch.witness.account_path,
+        )?;
+        assert_eq!(
+            account_audit_path.len(),
+            *franklin_constants::ACCOUNT_TREE_DEPTH
+        );
 
-        let account_bit_form = self
-            .account
-            .make_bit_form(cs.namespace(|| "account_bit_form"))?;
+        let account = account::AccountContent::from_witness(
+            cs.namespace(|| "allocate account_content"),
+            &operation_branch.witness.account_witness,
+        )?;
 
-        let mut balance_bit_form = self
-            .balance_value
-            .into_bits_le(cs.namespace(|| "balance_value_bits"))?;
-        balance_bit_form.truncate(*franklin_constants::BALANCE_BIT_WIDTH);
+        let balance = CircuitElement::from_fe_strict(
+            cs.namespace(|| "balance"),
+            || Ok(operation_branch.witness.balance_value.grab()?),
+            *franklin_constants::ACCOUNT_TREE_DEPTH,
+        )?;
+        let token = CircuitElement::from_fe_strict(
+            cs.namespace(|| "token"),
+            || Ok(operation_branch.token.grab()?),
+            *franklin_constants::BALANCE_TREE_DEPTH,
+        )?;
+        let balance_audit_path = utils::allocate_audit_path(
+            cs.namespace(|| "balance_audit_path"),
+            &operation_branch.witness.balance_subtree_path,
+        )?;
 
-        Ok(AllocatedOperationBranchBitForm {
-            account: account_bit_form,
-            account_address: account_address_bits,
-            token: token_bits,
-            balance_value: balance_bit_form,
+        Ok(AllocatedOperationBranch {
+            account: account,
+            account_audit_path: account_audit_path,
+            account_address: account_address,
+            balance: balance,
+            token: token,
+            balance_audit_path: balance_audit_path,
         })
     }
 }
-pub struct AllocatedOperationBranchBitForm {
-    pub account: AccountContentBitForm,
-    pub account_address: Vec<Boolean>,
 
-    pub token: Vec<Boolean>,
-    pub balance_value: Vec<Boolean>,
-}
+// pub struct AllocatedOperationBranchBase<E: JubjubEngine> {
+//     pub account: AccountContentBase<E>,
+//     pub account_audit_path: Vec<AllocatedNum<E>>,
+//     pub account_address: AllocatedNum<E>,
+
+//     pub balance_value: AllocatedNum<E>,
+//     pub balance_audit_path: Vec<AllocatedNum<E>>,
+//     pub token: AllocatedNum<E>,
+// }
+
+// //TODO: we should limit bit_widths here. yes, constraint bit lengths
+// impl<E: JubjubEngine> AllocatedOperationBranchBase<E> {
+//     pub fn make_bit_form<CS: ConstraintSystem<E>>(
+//         &self,
+//         mut cs: CS,
+//     ) -> Result<AllocatedOperationBranchBitForm, SynthesisError> {
+//         let mut account_address_bits = self
+//             .account_address
+//             .into_bits_le(cs.namespace(|| "account_address_bits"))?;
+//         account_address_bits.truncate(*franklin_constants::ACCOUNT_TREE_DEPTH);
+
+//         let mut token_bits = self.token.into_bits_le(cs.namespace(|| "token_bits"))?;
+//         token_bits.truncate(*franklin_constants::BALANCE_TREE_DEPTH);
+
+//         let account_bit_form = self
+//             .account
+//             .make_bit_form(cs.namespace(|| "account_bit_form"))?;
+
+//         let mut balance_bit_form = self
+//             .balance_value
+//             .into_bits_le(cs.namespace(|| "balance_value_bits"))?;
+//         balance_bit_form.truncate(*franklin_constants::BALANCE_BIT_WIDTH);
+
+//         Ok(AllocatedOperationBranchBitForm {
+//             account: account_bit_form,
+//             account_address: account_address_bits,
+//             token: token_bits,
+//             balance_value: balance_bit_form,
+//         })
+//     }
+// }
+// pub struct AllocatedOperationBranchBitForm {
+//     pub account: AccountContentBitForm,
+//     pub account_address: Vec<Boolean>,
+
+//     pub token: Vec<Boolean>,
+//     pub balance_value: Vec<Boolean>,
+// }
 
 pub struct AllocatedChunkData<E: JubjubEngine> {
     pub is_chunk_last: AllocatedBit,
-    pub chunk_number: AllocatedNum<E>,
-    pub tx_type: AllocatedNum<E>,
-    pub tx_type_bits: Vec<Boolean>,
+    pub chunk_number: AllocatedNum<E>, //TODO: don't need bit representation here, though make sense to unify probably
+    pub tx_type: CircuitElement<E>,
 }
 
-pub fn allocate_operation_branch<E: JubjubEngine, CS: ConstraintSystem<E>>(
-    mut cs: CS,
-    operation_branch: &OperationBranch<E>,
-) -> Result<AllocatedOperationBranch<E>, SynthesisError> {
-    let account_address_allocated =
-        AllocatedNum::alloc(cs.namespace(|| "account_address"), || {
-            operation_branch.address.grab()
-        })?;
+// pub fn allocate_operation_branch<E: JubjubEngine, CS: ConstraintSystem<E>>(
+//     mut cs: CS,
+//     operation_branch: &OperationBranch<E>,
+// ) -> Result<AllocatedOperationBranch<E>, SynthesisError> {
+//     let account_address_allocated =
+//         AllocatedNum::alloc(cs.namespace(|| "account_address"), || {
+//             operation_branch.address.grab()
+//         })?;
 
-    let allocated_account_audit_path = utils::allocate_audit_path(
-        cs.namespace(|| "account_audit_path"),
-        &operation_branch.witness.account_path,
-    )?;
-    assert_eq!(
-        allocated_account_audit_path.len(),
-        *franklin_constants::ACCOUNT_TREE_DEPTH
-    );
+//     let allocated_account_audit_path = utils::allocate_audit_path(
+//         cs.namespace(|| "account_audit_path"),
+//         &operation_branch.witness.account_path,
+//     )?;
+//     assert_eq!(
+//         allocated_account_audit_path.len(),
+//         *franklin_constants::ACCOUNT_TREE_DEPTH
+//     );
 
-    let account_base = account::make_account_content_base(
-        cs.namespace(|| "allocate account_content"),
-        &operation_branch.witness.account_witness,
-    )?;
+//     let account = account::AccountContent::from_witness(
+//         cs.namespace(|| "allocate account_content"),
+//         &operation_branch.witness.account_witness,
+//     )?;
 
-    let balance_value_allocated = AllocatedNum::alloc(cs.namespace(|| "balance_value"), || {
-        operation_branch.witness.balance_value.grab()
-    })?;
-    let token_allocated =
-        AllocatedNum::alloc(cs.namespace(|| "token"), || operation_branch.token.grab())?;
+//     let balance_value_allocated = AllocatedNum::alloc(cs.namespace(|| "balance_value"), || {
+//         operation_branch.witness.balance_value.grab()
+//     })?;
+//     let token_allocated =
+//         AllocatedNum::alloc(cs.namespace(|| "token"), || operation_branch.token.grab())?;
 
-    let allocated_balance_audit_path = utils::allocate_audit_path(
-        cs.namespace(|| "balance_audit_path"),
-        &operation_branch.witness.balance_subtree_path,
-    )?;
+//     let allocated_balance_audit_path = utils::allocate_audit_path(
+//         cs.namespace(|| "balance_audit_path"),
+//         &operation_branch.witness.balance_subtree_path,
+//     )?;
 
-    let operation_branch_data = AllocatedOperationBranchBase {
-        account_address: account_address_allocated,
-        account: account_base,
-        account_audit_path: allocated_account_audit_path,
-        balance_value: balance_value_allocated,
-        balance_audit_path: allocated_balance_audit_path,
-        token: token_allocated,
-    };
-    let operation_branch_bit_form =
-        operation_branch_data.make_bit_form(cs.namespace(|| "operation_branch_data_bit_form"))?;
+//     let operation_branch_data = AllocatedOperationBranchBase {
+//         account_address: account_address_allocated,
+//         account: account_base,
+//         account_audit_path: allocated_account_audit_path,
+//         balance_value: balance_value_allocated,
+//         balance_audit_path: allocated_balance_audit_path,
+//         token: token_allocated,
+//     };
+//     let operation_branch_bit_form =
+//         operation_branch_data.make_bit_form(cs.namespace(|| "operation_branch_data_bit_form"))?;
 
-    Ok(AllocatedOperationBranch {
-        base: operation_branch_data,
-        bits: operation_branch_bit_form,
-    })
-}
+//     Ok(AllocatedOperationBranch {
+//         base: operation_branch_data,
+//         bits: operation_branch_bit_form,
+//     })
+// }
 
 pub struct AllocatedOperationData<E: JubjubEngine> {
     pub new_pubkey_x: AllocatedNum<E>,

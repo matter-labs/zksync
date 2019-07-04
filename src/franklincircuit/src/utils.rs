@@ -36,7 +36,7 @@ where
         message_bytes.push(byte);
     }
     println!("message_len {}", message_bytes.len());
-    let max_message_len = 20 as usize; //todo
+    let max_message_len = 31 as usize; //todo
     let signature = private_key.sign_raw_message(&message_bytes, rng, p_g, params, max_message_len);
 
     let pk = PublicKey::from_private(&private_key, p_g, params);
@@ -66,6 +66,31 @@ where
         r: signature.r,
         s: sigs_converted,
     })
+}
+
+pub fn pack_bits_to_element<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    bits: &[boolean::Boolean],
+) -> Result<AllocatedNum<E>, SynthesisError> {
+    let mut data_from_lc = Num::<E>::zero();
+    let mut coeff = E::Fr::one();
+    for bit in bits {
+        data_from_lc = data_from_lc.add_bool_with_coeff(CS::one(), &bit, coeff);
+        coeff.double();
+    }
+
+    let data_packed = AllocatedNum::alloc(cs.namespace(|| "allocate account data packed"), || {
+        Ok(*data_from_lc.get_value().get()?)
+    })?;
+
+    cs.enforce(
+        || "pack account data",
+        |lc| lc + data_packed.get_variable(),
+        |lc| lc + CS::one(),
+        |_| data_from_lc.lc(E::Fr::one()),
+    );
+
+    Ok(data_packed)
 }
 
 // count a number of non-zero bits in a bit decomposition
