@@ -174,7 +174,7 @@ impl PlasmaStateKeeper {
             .add_tx(tx)
             .map_err(|e| format!("Mempool query error:  {:?}", e))?;
 
-        self.txs_since_last_block.saturating_add(1);
+        self.txs_since_last_block += 1;
         if self.next_block_at_max.is_none() {
             self.next_block_at_max =
                 Some(SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL));
@@ -185,6 +185,7 @@ impl PlasmaStateKeeper {
 
     fn process_block_queue(&mut self, tx_for_commitments: &Sender<CommitRequest>) {
         let blocks = std::mem::replace(&mut self.block_queue, VecDeque::default());
+        info!("Processing block queue, len: {}", blocks.len());
         for block in blocks.into_iter() {
             let req = match block {
                 ProtoBlock::Transfer(transactions) => self.create_transfer_block(transactions),
@@ -230,9 +231,8 @@ impl PlasmaStateKeeper {
         transfer_txs
             .into_iter()
             .filter(|(_, tx)| {
-                // TODO (Drogan) check for +/-1 error, nonce.
                 let from_nonce = self.account(tx.from).nonce;
-                from_nonce != tx.nonce
+                from_nonce == tx.nonce
             })
             .collect()
     }
@@ -280,6 +280,7 @@ impl PlasmaStateKeeper {
     }
 
     fn create_transfer_block(&mut self, transactions: Vec<(i32, TransferTx)>) -> CommitRequest {
+        info!("Creating transfer block");
         // collect updated state
         let mut accounts_updated = Vec::new();
         let mut txs_executed = Vec::new();
@@ -288,7 +289,6 @@ impl PlasmaStateKeeper {
         let mut total_fees = 0u128;
 
         for (id, tx) in transactions.into_iter() {
-            // TODO: (Drogan) How to properly handle transfer tx error? Maybe do padding tx instead?
             let (fee, mut tx_updates) = self
                 .state
                 .apply_transfer(&tx)
@@ -311,6 +311,8 @@ impl PlasmaStateKeeper {
                 transactions: txs,
             },
         };
+
+        self.txs_since_last_block = 0;
 
         CommitRequest {
             block,

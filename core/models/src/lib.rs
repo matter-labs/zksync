@@ -84,7 +84,7 @@ impl std::fmt::Debug for Action {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Operation {
     pub id: Option<i32>,
     pub action: Action,

@@ -48,10 +48,6 @@ pub struct TransferTx {
     pub nonce: u32,
     pub good_until_block: u32,
     pub signature: TxSignature,
-
-    /// If present, it means that the signature has been verified against this key
-    #[serde(skip)]
-    pub cached_pub_key: Option<PublicKey>,
 }
 
 impl std::fmt::Debug for TransferTx {
@@ -153,7 +149,6 @@ impl TransferTx {
             nonce,
             good_until_block,
             signature: TxSignature::default(),
-            cached_pub_key: None,
         };
 
         let message_bits = tx.message_bits();
@@ -183,7 +178,6 @@ impl TransferTx {
             nonce,
             good_until_block,
             signature,
-            cached_pub_key,
         }
     }
 

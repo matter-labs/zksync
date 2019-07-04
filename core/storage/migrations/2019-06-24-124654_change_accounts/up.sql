@@ -24,13 +24,14 @@ CREATE TABLE balances (
 DROP TABLE account_updates cascade;
 
 create TABLE account_balance_updates (
+    balance_update_id serial not null,
     account_id      integer not null,
     block_number    integer not null,
     coin_id integer not null references tokens (id) on update cascade,
     old_balance numeric not null,
     new_balance numeric not null,
     nonce bigint not null,
-    PRIMARY KEY (account_id, block_number)
+    PRIMARY KEY (balance_update_id)
 );
 
 CREATE TABLE account_creates (

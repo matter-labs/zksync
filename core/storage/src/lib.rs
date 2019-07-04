@@ -8,9 +8,9 @@ extern crate log;
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
-use models::plasma::params::{TokenId, ETH_TOKEN_ID};
 use models::plasma::block::Block;
 use models::plasma::block::BlockData;
+use models::plasma::params::{TokenId, ETH_TOKEN_ID};
 use models::plasma::tx::TransactionType::{Deposit, Exit, Transfer};
 use models::plasma::tx::{
     DepositTx, ExitTx, TransactionType, TransferTx, TxSignature, DEPOSIT_TX, EXIT_TX, TRANSFER_TX,
@@ -105,16 +105,27 @@ struct Token {
     pub address: String,
 }
 
-#[derive(Debug, Insertable, Queryable, QueryableByName)]
+#[derive(Debug, Insertable)]
 #[table_name = "account_balance_updates"]
-struct StorageAccountUpdate {
+struct StorageAccountUpdateInsert {
     pub account_id: i32,
     pub block_number: i32,
     pub coin_id: i32,
     pub old_balance: BigDecimal,
     pub new_balance: BigDecimal,
     pub nonce: i64,
-    // TODO (Drogan) add nonce reconstruction.
+}
+
+#[derive(Debug, Queryable, QueryableByName)]
+#[table_name = "account_balance_updates"]
+struct StorageAccountUpdate {
+    balance_update_id: i32,
+    pub account_id: i32,
+    pub block_number: i32,
+    pub coin_id: i32,
+    pub old_balance: BigDecimal,
+    pub new_balance: BigDecimal,
+    pub nonce: i64,
 }
 
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
@@ -126,7 +137,6 @@ struct StorageAccountCreation {
     pk_x: Vec<u8>,
     pk_y: Vec<u8>,
     nonce: i64,
-    // TODO (Drogan) add nonce reconstruction.
 }
 
 #[derive(Debug)]
@@ -322,7 +332,6 @@ impl StoredTx {
             nonce: 0,
             good_until_block: 0,
             signature: TxSignature::default(),
-            cached_pub_key: None,
         }
     }
 
@@ -440,7 +449,7 @@ fn fr_from_bytes(mut bytes: Vec<u8>) -> Fr {
 fn restore_account(
     stored_account: StorageAccount,
     stored_balances: Vec<StorageBalance>,
-) -> (u32, Account) {
+) -> (AccountId, Account) {
     let mut account = Account::default();
     for b in stored_balances.into_iter() {
         assert_eq!(b.account_id, stored_account.id);
@@ -633,72 +642,74 @@ impl StorageProcessor {
         block_number: u32,
         accounts_updated: &[AccountUpdate],
     ) -> QueryResult<()> {
-        for upd in accounts_updated.iter() {
-            debug!(
-                "Committing state update for account {} in block {}",
-                upd.get_account_id(),
-                block_number
-            );
-            match *upd {
-                AccountUpdate::Create {
-                    id,
-                    public_key_x,
-                    public_key_y,
-                    nonce,
-                } => {
-                    diesel::insert_into(account_creates::table)
-                        .values(&StorageAccountCreation {
-                            account_id: id as i32,
-                            is_create: true,
-                            block_number: block_number as i32,
-                            pk_x: fr_to_bytes(&public_key_x),
-                            pk_y: fr_to_bytes(&public_key_y),
-                            nonce: nonce as i64,
-                        })
-                        .execute(self.conn())?;
+        self.conn().transaction(|| {
+            for upd in accounts_updated.iter() {
+                debug!(
+                    "Committing state update for account {} in block {}",
+                    upd.get_account_id(),
+                    block_number
+                );
+                match *upd {
+                    AccountUpdate::Create {
+                        id,
+                        public_key_x,
+                        public_key_y,
+                        nonce,
+                    } => {
+                        diesel::insert_into(account_creates::table)
+                            .values(&StorageAccountCreation {
+                                account_id: id as i32,
+                                is_create: true,
+                                block_number: block_number as i32,
+                                pk_x: fr_to_bytes(&public_key_x),
+                                pk_y: fr_to_bytes(&public_key_y),
+                                nonce: nonce as i64,
+                            })
+                            .execute(self.conn())?;
+                    }
+                    AccountUpdate::Delete {
+                        id,
+                        public_key_x,
+                        public_key_y,
+                        nonce,
+                    } => {
+                        diesel::insert_into(account_creates::table)
+                            .values(&StorageAccountCreation {
+                                account_id: id as i32,
+                                is_create: false,
+                                block_number: block_number as i32,
+                                pk_x: fr_to_bytes(&public_key_x),
+                                pk_y: fr_to_bytes(&public_key_y),
+                                nonce: nonce as i64,
+                            })
+                            .execute(self.conn())?;
+                    }
+                    AccountUpdate::UpdateBalance {
+                        id,
+                        balance_update: (token, ref old_balance, ref new_balance),
+                        nonce,
+                    } => {
+                        diesel::insert_into(account_balance_updates::table)
+                            .values(&StorageAccountUpdateInsert {
+                                account_id: id as i32,
+                                block_number: block_number as i32,
+                                coin_id: token as i32,
+                                old_balance: old_balance.clone(),
+                                new_balance: new_balance.clone(),
+                                nonce: nonce as i64,
+                            })
+                            .execute(self.conn())?;
+                    }
                 }
-                AccountUpdate::Delete {
-                    id,
-                    public_key_x,
-                    public_key_y,
-                    nonce,
-                } => {
-                    diesel::insert_into(account_creates::table)
-                        .values(&StorageAccountCreation {
-                            account_id: id as i32,
-                            is_create: false,
-                            block_number: block_number as i32,
-                            pk_x: fr_to_bytes(&public_key_x),
-                            pk_y: fr_to_bytes(&public_key_y),
-                            nonce: nonce as i64,
-                        })
-                        .execute(self.conn())?;
-                }
-                AccountUpdate::UpdateBalance {
-                    id,
-                    balance_update: (token, ref old_balance, ref new_balance),
-                    nonce,
-                } => {
-                    diesel::insert_into(account_balance_updates::table)
-                        .values(&StorageAccountUpdate {
-                            account_id: id as i32,
-                            block_number: block_number as i32,
-                            coin_id: token as i32,
-                            old_balance: old_balance.clone(),
-                            new_balance: new_balance.clone(),
-                            nonce: nonce as i64,
-                        })
-                        .execute(self.conn())?;
-                }
+                // TODO: (Drogan) was this check necessary?
+                //             let inserted = ;
+                //             if 0 == inserted {
+                //                 error!("Error: could not commit all state updates!");
+                //                 return Err(Error::RollbackTransaction);
+                //             }
             }
-            // TODO: (Drogan) was this check necessary?
-            //             let inserted = ;
-            //             if 0 == inserted {
-            //                 error!("Error: could not commit all state updates!");
-            //                 return Err(Error::RollbackTransaction);
-            //             }
-        }
-        Ok(())
+            Ok(())
+        })
     }
 
     fn apply_state_update(&self, block_number: u32) -> QueryResult<()> {
@@ -737,12 +748,12 @@ impl StorageProcessor {
                             account_id: upd.account_id,
                             balance: upd.new_balance.clone(),
                         };
-                        let rows = insert_into(
-                            balances::table
-                        ).values(&storage_balance).on_conflict((balances::coin_id, balances::account_id))
-                        .do_update()
-                        .set(balances::balance.eq(upd.new_balance))
-                        .execute(self.conn())?;
+                        let rows = insert_into(balances::table)
+                            .values(&storage_balance)
+                            .on_conflict((balances::coin_id, balances::account_id))
+                            .do_update()
+                            .set(balances::balance.eq(upd.new_balance))
+                            .execute(self.conn())?;
 
                         update(accounts::table.filter(accounts::id.eq(upd.account_id)))
                             .set((
@@ -777,35 +788,39 @@ impl StorageProcessor {
     }
 
     pub fn load_committed_state(&self, block: Option<u32>) -> QueryResult<(u32, AccountMap)> {
-        let (verif_block, mut accounts) = self.load_verified_state()?;
-        let (block, state_diff) = self.load_state_diff(verif_block, block)?;
-        debug!("Loaded state diff: {:?}", state_diff);
-        apply_updates(&mut accounts, state_diff);
-        Ok((block, accounts))
+        self.conn().transaction(|| {
+            let (verif_block, mut accounts) = self.load_verified_state()?;
+            let (block, state_diff) = self.load_state_diff(verif_block, block)?;
+            debug!("Loaded state diff: {:?}", state_diff);
+            apply_updates(&mut accounts, state_diff);
+            Ok((block, accounts))
+        })
     }
 
     pub fn load_verified_state(&self) -> QueryResult<(u32, AccountMap)> {
-        let accounts: Vec<StorageAccount> = accounts::table.load(self.conn())?;
-        let balances: Vec<Vec<StorageBalance>> = StorageBalance::belonging_to(&accounts)
-            .load(self.conn())?
-            .grouped_by(&accounts);
+        self.conn().transaction(|| {
+            let accounts: Vec<StorageAccount> = accounts::table.load(self.conn())?;
+            let balances: Vec<Vec<StorageBalance>> = StorageBalance::belonging_to(&accounts)
+                .load(self.conn())?
+                .grouped_by(&accounts);
 
-        let last_block = accounts
-            .iter()
-            .map(|a| a.last_block as u32)
-            .max()
-            .unwrap_or(0);
+            let last_block = accounts
+                .iter()
+                .map(|a| a.last_block as u32)
+                .max()
+                .unwrap_or(0);
 
-        let account_map: AccountMap = accounts
-            .into_iter()
-            .zip(balances.into_iter())
-            .map(|(stored_account, balances)| {
-                let (id, account) = restore_account(stored_account, balances);
-                (id, account)
-            })
-            .collect();
+            let account_map: AccountMap = accounts
+                .into_iter()
+                .zip(balances.into_iter())
+                .map(|(stored_account, balances)| {
+                    let (id, account) = restore_account(stored_account, balances);
+                    (id, account)
+                })
+                .collect();
 
-        Ok((last_block, account_map))
+            Ok((last_block, account_map))
+        })
     }
 
     /// loads the state of accounts updated between two blocks
@@ -814,71 +829,73 @@ impl StorageProcessor {
         from_block: u32,
         to_block: Option<u32>,
     ) -> QueryResult<(u32, Vec<AccountUpdate>)> {
-        let (to_block, unbounded) = if let Some(to_block) = to_block {
-            (to_block, false)
-        } else {
-            (from_block, true)
-        };
+        self.conn().transaction(|| {
+            let (to_block, unbounded) = if let Some(to_block) = to_block {
+                (to_block, false)
+            } else {
+                (from_block, true)
+            };
 
-        let time_forward = from_block <= to_block;
-        let start_block = cmp::min(from_block, to_block);
-        let end_block = cmp::max(from_block, to_block);
+            let time_forward = from_block <= to_block;
+            let start_block = cmp::min(from_block, to_block);
+            let end_block = cmp::max(from_block, to_block);
 
-        let account_balance_diff = account_balance_updates::table
-            .filter(account_balance_updates::block_number.ge(&(start_block as i32)))
-            .filter(
-                account_balance_updates::block_number
-                    .lt(&(end_block as i32))
-                    .or(unbounded),
-            )
-            .load::<StorageAccountUpdate>(self.conn())?;
-        debug!("Loaded account balance diff: {:?}", account_balance_diff);
+            let account_balance_diff = account_balance_updates::table
+                .filter(account_balance_updates::block_number.ge(&(start_block as i32)))
+                .filter(
+                    account_balance_updates::block_number
+                        .lt(&(end_block as i32))
+                        .or(unbounded),
+                )
+                .load::<StorageAccountUpdate>(self.conn())?;
+            debug!("Loaded account balance diff: {:?}", account_balance_diff);
 
-        let account_creation_diff = account_creates::table
-            .filter(account_creates::block_number.ge(&(start_block as i32)))
-            .filter(
-                account_creates::block_number
-                    .lt(&(end_block as i32))
-                    .or(unbounded),
-            )
-            .load::<StorageAccountCreation>(self.conn())?;
-        debug!("Loaded account creation diff: {:?}", account_creation_diff);
+            let account_creation_diff = account_creates::table
+                .filter(account_creates::block_number.ge(&(start_block as i32)))
+                .filter(
+                    account_creates::block_number
+                        .lt(&(end_block as i32))
+                        .or(unbounded),
+                )
+                .load::<StorageAccountCreation>(self.conn())?;
+            debug!("Loaded account creation diff: {:?}", account_creation_diff);
 
-        let (mut account_updates, last_block) = {
-            let mut account_diff = Vec::new();
-            account_diff.extend(
-                account_balance_diff
-                    .into_iter()
-                    .map(StorageAccountDiff::from),
-            );
-            account_diff.extend(
-                account_creation_diff
-                    .into_iter()
-                    .map(StorageAccountDiff::from),
-            );
-            let last_block = account_diff
-                .iter()
-                .map(|acc| acc.block_number())
-                .max()
-                .unwrap_or(0);
-            account_diff.sort_by(|l, r| l.cmp_nonce(r));
-            (
-                account_diff
-                    .into_iter()
-                    .map(|d| d.into())
-                    .collect::<Vec<AccountUpdate>>(),
-                last_block as u32,
-            )
-        };
+            let (mut account_updates, last_block) = {
+                let mut account_diff = Vec::new();
+                account_diff.extend(
+                    account_balance_diff
+                        .into_iter()
+                        .map(StorageAccountDiff::from),
+                );
+                account_diff.extend(
+                    account_creation_diff
+                        .into_iter()
+                        .map(StorageAccountDiff::from),
+                );
+                let last_block = account_diff
+                    .iter()
+                    .map(|acc| acc.block_number())
+                    .max()
+                    .unwrap_or(0);
+                account_diff.sort_by(|l, r| l.cmp_nonce(r));
+                (
+                    account_diff
+                        .into_iter()
+                        .map(|d| d.into())
+                        .collect::<Vec<AccountUpdate>>(),
+                    last_block as u32,
+                )
+            };
 
-        if !time_forward {
-            account_updates.reverse();
-            for acc_upd in account_updates.iter_mut() {
-                acc_upd.reverse_update();
+            if !time_forward {
+                account_updates.reverse();
+                for acc_upd in account_updates.iter_mut() {
+                    acc_upd.reverse_update();
+                }
             }
-        }
 
-        Ok((last_block, account_updates))
+            Ok((last_block, account_updates))
+        })
     }
 
     /// loads the state of accounts updated in a specific block
@@ -1103,64 +1120,68 @@ impl StorageProcessor {
         &self,
         account_id: AccountId,
     ) -> QueryResult<(i32, Option<Account>)> {
-        if let Some(account) = accounts::table
-            .find(account_id as i32)
-            .first::<StorageAccount>(self.conn())
-            .optional()?
-        {
-            let balances: Vec<StorageBalance> =
-                StorageBalance::belonging_to(&account).load(self.conn())?;
+        self.conn().transaction(|| {
+            if let Some(account) = accounts::table
+                .find(account_id as i32)
+                .first::<StorageAccount>(self.conn())
+                .optional()?
+            {
+                let balances: Vec<StorageBalance> =
+                    StorageBalance::belonging_to(&account).load(self.conn())?;
 
-            let last_block = account.last_block;
-            let (_, account) = restore_account(account, balances);
-            Ok((0, Some(account)))
-        } else {
-            Ok((0, None))
-        }
+                let last_block = account.last_block;
+                let (_, account) = restore_account(account, balances);
+                Ok((0, Some(account)))
+            } else {
+                Ok((0, None))
+            }
+        })
     }
 
     pub fn last_committed_state_for_account(
         &self,
         account_id: AccountId,
     ) -> QueryResult<Option<models::plasma::account::Account>> {
-        let (last_block, account) = self.get_account_and_last_block(account_id)?;
+        self.conn().transaction(|| {
+            let (last_block, account) = self.get_account_and_last_block(account_id)?;
 
-        let account_balance_diff: Vec<StorageAccountUpdate> = {
-            account_balance_updates::table
-                .filter(account_balance_updates::account_id.eq(&(account_id as i32)))
-                .filter(account_balance_updates::block_number.gt(&last_block))
-                .load::<StorageAccountUpdate>(self.conn())?
-        };
+            let account_balance_diff: Vec<StorageAccountUpdate> = {
+                account_balance_updates::table
+                    .filter(account_balance_updates::account_id.eq(&(account_id as i32)))
+                    .filter(account_balance_updates::block_number.gt(&last_block))
+                    .load::<StorageAccountUpdate>(self.conn())?
+            };
 
-        let account_creation_diff: Vec<StorageAccountCreation> = {
-            account_creates::table
-                .filter(account_creates::account_id.eq(&(account_id as i32)))
-                .filter(account_creates::block_number.gt(&last_block))
-                .load::<StorageAccountCreation>(self.conn())?
-        };
+            let account_creation_diff: Vec<StorageAccountCreation> = {
+                account_creates::table
+                    .filter(account_creates::account_id.eq(&(account_id as i32)))
+                    .filter(account_creates::block_number.gt(&last_block))
+                    .load::<StorageAccountCreation>(self.conn())?
+            };
 
-        let account_diff = {
-            let mut account_diff = Vec::new();
-            account_diff.extend(
-                account_balance_diff
+            let account_diff = {
+                let mut account_diff = Vec::new();
+                account_diff.extend(
+                    account_balance_diff
+                        .into_iter()
+                        .map(StorageAccountDiff::from),
+                );
+                account_diff.extend(
+                    account_creation_diff
+                        .into_iter()
+                        .map(StorageAccountDiff::from),
+                );
+                account_diff.sort_by(|l, r| l.cmp_nonce(r));
+                account_diff
                     .into_iter()
-                    .map(StorageAccountDiff::from),
-            );
-            account_diff.extend(
-                account_creation_diff
-                    .into_iter()
-                    .map(StorageAccountDiff::from),
-            );
-            account_diff.sort_by(|l, r| l.cmp_nonce(r));
-            account_diff
+                    .map(|upd| upd.into())
+                    .collect::<Vec<AccountUpdate>>()
+            };
+
+            Ok(account_diff
                 .into_iter()
-                .map(|upd| upd.into())
-                .collect::<Vec<AccountUpdate>>()
-        };
-
-        Ok(account_diff
-            .into_iter()
-            .fold(account, |account, upd| Account::apply_update(account, upd)))
+                .fold(account, |account, upd| Account::apply_update(account, upd)))
+        })
     }
 
     pub fn last_verified_state_for_account(
@@ -1445,9 +1466,9 @@ mod test {
                   nonce: a.nonce,
                   balance_update: (ETH_TOKEN_ID, old_balance, new_balance),
               },
-            ].into_iter()
+            ]
+            .into_iter()
         };
-
 
         // commit initial state update
         let updates = {
@@ -1463,7 +1484,6 @@ mod test {
 
             updates
         };
-
 
         conn.commit_state_update(1, &updates).unwrap();
 
@@ -1501,285 +1521,285 @@ mod test {
 
     #[test]
     fn test_store_txs() {
-//        let pool = ConnectionPool::new();
-//        let conn = pool.access_storage().unwrap();
-//        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
-//        conn.prepare_nonce_scheduling("0x0", 0).unwrap();
-//
-//        let mut accounts = fnv::FnvHashMap::default();
-//        let acc = |balance| {
-//            let mut a = models::plasma::account::Account::default();
-//            a.set_balance(ETH_TOKEN_ID, &BigDecimal::from(balance));
-//            a
-//        };
-//
-//        accounts.insert(3, acc(1));
-//        accounts.insert(5, acc(2));
-//        accounts.insert(7, acc(3));
-//        accounts.insert(8, acc(4));
-//        conn.execute_operation(&Operation {
-//            id: None,
-//            action: Action::Commit,
-//            block: Block {
-//                block_number: 1,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Deposit {
-//                    batch_number: 0,
-//                    transactions: vec![],
-//                },
-//            },
-//            accounts_updated: Some(accounts.clone()),
-//            tx_meta: None,
-//        })
-//        .unwrap();
-//        assert_eq!(conn.last_verified_state_for_account(5).unwrap(), None);
-//        assert_eq!(
-//            conn.last_committed_state_for_account(5)
-//                .unwrap()
-//                .unwrap()
-//                .get_balance(ETH_TOKEN_ID),
-//            &BigDecimal::from(2)
-//        );
-//
-//        conn.execute_operation(&Operation {
-//            id: None,
-//            action: Action::Verify {
-//                proof: Box::new([U256::zero(); 8]),
-//            },
-//            block: Block {
-//                block_number: 1,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Deposit {
-//                    batch_number: 0,
-//                    transactions: vec![],
-//                },
-//            },
-//            accounts_updated: Some(accounts.clone()),
-//            tx_meta: None,
-//        })
-//        .unwrap();
-//
-//        assert_eq!(
-//            conn.last_verified_state_for_account(7)
-//                .unwrap()
-//                .unwrap()
-//                .get_balance(ETH_TOKEN_ID),
-//            &BigDecimal::from(3)
-//        );
-//        assert_eq!(
-//            conn.last_committed_state_for_account(7)
-//                .unwrap()
-//                .unwrap()
-//                .get_balance(ETH_TOKEN_ID),
-//            &BigDecimal::from(3)
-//        );
-//
-//        let pending = conn.load_unsent_ops(0).unwrap();
-//        assert_eq!(pending.len(), 2);
-//        assert_eq!(pending[0].tx_meta.as_ref().unwrap().nonce, 0);
-//        assert_eq!(pending[1].tx_meta.as_ref().unwrap().nonce, 1);
-//
-//        let pending = conn.load_unsent_ops(1).unwrap();
-//        assert_eq!(pending.len(), 1);
-//        assert_eq!(pending[0].tx_meta.as_ref().unwrap().nonce, 1);
-//
-//        let pending = conn.load_unsent_ops(2).unwrap();
-//        assert_eq!(pending.len(), 0);
+        //        let pool = ConnectionPool::new();
+        //        let conn = pool.access_storage().unwrap();
+        //        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
+        //        conn.prepare_nonce_scheduling("0x0", 0).unwrap();
+        //
+        //        let mut accounts = fnv::FnvHashMap::default();
+        //        let acc = |balance| {
+        //            let mut a = models::plasma::account::Account::default();
+        //            a.set_balance(ETH_TOKEN_ID, &BigDecimal::from(balance));
+        //            a
+        //        };
+        //
+        //        accounts.insert(3, acc(1));
+        //        accounts.insert(5, acc(2));
+        //        accounts.insert(7, acc(3));
+        //        accounts.insert(8, acc(4));
+        //        conn.execute_operation(&Operation {
+        //            id: None,
+        //            action: Action::Commit,
+        //            block: Block {
+        //                block_number: 1,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Deposit {
+        //                    batch_number: 0,
+        //                    transactions: vec![],
+        //                },
+        //            },
+        //            accounts_updated: Some(accounts.clone()),
+        //            tx_meta: None,
+        //        })
+        //        .unwrap();
+        //        assert_eq!(conn.last_verified_state_for_account(5).unwrap(), None);
+        //        assert_eq!(
+        //            conn.last_committed_state_for_account(5)
+        //                .unwrap()
+        //                .unwrap()
+        //                .get_balance(ETH_TOKEN_ID),
+        //            &BigDecimal::from(2)
+        //        );
+        //
+        //        conn.execute_operation(&Operation {
+        //            id: None,
+        //            action: Action::Verify {
+        //                proof: Box::new([U256::zero(); 8]),
+        //            },
+        //            block: Block {
+        //                block_number: 1,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Deposit {
+        //                    batch_number: 0,
+        //                    transactions: vec![],
+        //                },
+        //            },
+        //            accounts_updated: Some(accounts.clone()),
+        //            tx_meta: None,
+        //        })
+        //        .unwrap();
+        //
+        //        assert_eq!(
+        //            conn.last_verified_state_for_account(7)
+        //                .unwrap()
+        //                .unwrap()
+        //                .get_balance(ETH_TOKEN_ID),
+        //            &BigDecimal::from(3)
+        //        );
+        //        assert_eq!(
+        //            conn.last_committed_state_for_account(7)
+        //                .unwrap()
+        //                .unwrap()
+        //                .get_balance(ETH_TOKEN_ID),
+        //            &BigDecimal::from(3)
+        //        );
+        //
+        //        let pending = conn.load_unsent_ops(0).unwrap();
+        //        assert_eq!(pending.len(), 2);
+        //        assert_eq!(pending[0].tx_meta.as_ref().unwrap().nonce, 0);
+        //        assert_eq!(pending[1].tx_meta.as_ref().unwrap().nonce, 1);
+        //
+        //        let pending = conn.load_unsent_ops(1).unwrap();
+        //        assert_eq!(pending.len(), 1);
+        //        assert_eq!(pending[0].tx_meta.as_ref().unwrap().nonce, 1);
+        //
+        //        let pending = conn.load_unsent_ops(2).unwrap();
+        //        assert_eq!(pending.len(), 0);
     }
 
     #[test]
     fn test_store_proof_reqs() {
-//        let pool = ConnectionPool::new();
-//        let conn = pool.access_storage().unwrap();
-//        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
-//        conn.prepare_nonce_scheduling("0x0", 0).unwrap();
-//
-//        conn.execute_operation(&Operation {
-//            id: None,
-//            action: Action::Commit,
-//            block: Block {
-//                block_number: 1,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Deposit {
-//                    batch_number: 1,
-//                    transactions: vec![],
-//                },
-//            },
-//            accounts_updated: Some(fnv::FnvHashMap::default()),
-//            tx_meta: None,
-//        })
-//        .unwrap();
-//
-//        let pending = conn.load_unverified_commitments().unwrap();
-//        assert_eq!(pending.len(), 1);
-//
-//        conn.execute_operation(&Operation {
-//            id: None,
-//            action: Action::Verify {
-//                proof: Box::new([U256::zero(); 8]),
-//            },
-//            block: Block {
-//                block_number: 1,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Deposit {
-//                    batch_number: 1,
-//                    transactions: vec![],
-//                },
-//            },
-//            accounts_updated: Some(fnv::FnvHashMap::default()),
-//            tx_meta: None,
-//        })
-//        .unwrap();
-//
-//        let pending = conn.load_unverified_commitments().unwrap();
-//        assert_eq!(pending.len(), 0);
+        //        let pool = ConnectionPool::new();
+        //        let conn = pool.access_storage().unwrap();
+        //        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
+        //        conn.prepare_nonce_scheduling("0x0", 0).unwrap();
+        //
+        //        conn.execute_operation(&Operation {
+        //            id: None,
+        //            action: Action::Commit,
+        //            block: Block {
+        //                block_number: 1,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Deposit {
+        //                    batch_number: 1,
+        //                    transactions: vec![],
+        //                },
+        //            },
+        //            accounts_updated: Some(fnv::FnvHashMap::default()),
+        //            tx_meta: None,
+        //        })
+        //        .unwrap();
+        //
+        //        let pending = conn.load_unverified_commitments().unwrap();
+        //        assert_eq!(pending.len(), 1);
+        //
+        //        conn.execute_operation(&Operation {
+        //            id: None,
+        //            action: Action::Verify {
+        //                proof: Box::new([U256::zero(); 8]),
+        //            },
+        //            block: Block {
+        //                block_number: 1,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Deposit {
+        //                    batch_number: 1,
+        //                    transactions: vec![],
+        //                },
+        //            },
+        //            accounts_updated: Some(fnv::FnvHashMap::default()),
+        //            tx_meta: None,
+        //        })
+        //        .unwrap();
+        //
+        //        let pending = conn.load_unverified_commitments().unwrap();
+        //        assert_eq!(pending.len(), 0);
     }
 
     #[test]
     fn test_store_helpers() {
-//        let pool = ConnectionPool::new();
-//        let conn = pool.access_storage().unwrap();
-//        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
-//
-//        assert_eq!(-1, conn.load_last_committed_deposit_batch().unwrap());
-//        assert_eq!(-1, conn.load_last_committed_exit_batch().unwrap());
-//        assert_eq!(0, conn.get_last_committed_block().unwrap());
-//        assert_eq!(0, conn.get_last_verified_block().unwrap());
-//        assert_eq!(conn.last_committed_state_for_account(9999).unwrap(), None);
-//        assert_eq!(conn.last_verified_state_for_account(9999).unwrap(), None);
-//
-//        conn.execute_operation(&Operation {
-//            id: None,
-//            action: Action::Commit,
-//            block: Block {
-//                block_number: 1,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Deposit {
-//                    batch_number: 3,
-//                    transactions: vec![],
-//                },
-//            },
-//            accounts_updated: Some(fnv::FnvHashMap::default()),
-//            tx_meta: None,
-//        })
-//        .unwrap();
-//        assert_eq!(3, conn.load_last_committed_deposit_batch().unwrap());
-//
-//        conn.execute_operation(&Operation {
-//            id: None,
-//            action: Action::Commit,
-//            block: Block {
-//                block_number: 1,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Exit {
-//                    batch_number: 2,
-//                    transactions: vec![],
-//                },
-//            },
-//            accounts_updated: Some(fnv::FnvHashMap::default()),
-//            tx_meta: None,
-//        })
-//        .unwrap();
-//        assert_eq!(2, conn.load_last_committed_exit_batch().unwrap());
+        //        let pool = ConnectionPool::new();
+        //        let conn = pool.access_storage().unwrap();
+        //        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
+        //
+        //        assert_eq!(-1, conn.load_last_committed_deposit_batch().unwrap());
+        //        assert_eq!(-1, conn.load_last_committed_exit_batch().unwrap());
+        //        assert_eq!(0, conn.get_last_committed_block().unwrap());
+        //        assert_eq!(0, conn.get_last_verified_block().unwrap());
+        //        assert_eq!(conn.last_committed_state_for_account(9999).unwrap(), None);
+        //        assert_eq!(conn.last_verified_state_for_account(9999).unwrap(), None);
+        //
+        //        conn.execute_operation(&Operation {
+        //            id: None,
+        //            action: Action::Commit,
+        //            block: Block {
+        //                block_number: 1,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Deposit {
+        //                    batch_number: 3,
+        //                    transactions: vec![],
+        //                },
+        //            },
+        //            accounts_updated: Some(fnv::FnvHashMap::default()),
+        //            tx_meta: None,
+        //        })
+        //        .unwrap();
+        //        assert_eq!(3, conn.load_last_committed_deposit_batch().unwrap());
+        //
+        //        conn.execute_operation(&Operation {
+        //            id: None,
+        //            action: Action::Commit,
+        //            block: Block {
+        //                block_number: 1,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Exit {
+        //                    batch_number: 2,
+        //                    transactions: vec![],
+        //                },
+        //            },
+        //            accounts_updated: Some(fnv::FnvHashMap::default()),
+        //            tx_meta: None,
+        //        })
+        //        .unwrap();
+        //        assert_eq!(2, conn.load_last_committed_exit_batch().unwrap());
     }
 
     #[test]
     fn test_store_txs_2() {
-//        let pool = ConnectionPool::new();
-//        let conn = pool.access_storage().unwrap();
-//        conn.conn().begin_test_transaction().unwrap();
-//
-//        let deposit_tx: DepositTx = DepositTx {
-//            account: 1,
-//            amount: BigDecimal::from_str_radix(&format!("{}", 10000), 10).unwrap(),
-//            pub_x: Fr::zero(),
-//            pub_y: Fr::zero(),
-//        };
-//
-//        let transfer_tx: TransferTx = TransferTx {
-//            from: 1,
-//            to: 2,
-//            amount: BigDecimal::from_str_radix(&format!("{}", 5000), 10).unwrap(),
-//            fee: BigDecimal::from_str_radix(&format!("{}", 0), 10).unwrap(),
-//            nonce: 1,
-//            good_until_block: 100_000,
-//            signature: TxSignature::default(),
-//            cached_pub_key: None,
-//        };
-//
-//        let exit_tx: ExitTx = ExitTx {
-//            account: 1,
-//            amount: BigDecimal::from_str_radix(&format!("{}", 5000), 10).unwrap(),
-//        };
-//
-//        conn.execute_operation(&Operation {
-//            id: None,
-//            action: Action::Commit,
-//            block: Block {
-//                block_number: 1,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Deposit {
-//                    batch_number: 1,
-//                    transactions: vec![deposit_tx.clone(), deposit_tx.clone()],
-//                },
-//            },
-//            accounts_updated: Some(fnv::FnvHashMap::default()),
-//            tx_meta: None,
-//        })
-//        .unwrap();
-//
-//        conn.execute_operation(&Operation {
-//            id: None,
-//            action: Action::Commit,
-//            block: Block {
-//                block_number: 2,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Transfer {
-//                    total_fees: BigDecimal::from_str_radix(&format!("{}", 0), 10).unwrap(),
-//                    transactions: vec![transfer_tx.clone(), transfer_tx.clone()],
-//                },
-//            },
-//            accounts_updated: Some(fnv::FnvHashMap::default()),
-//            tx_meta: None,
-//        })
-//        .unwrap();
-//
-//        conn.execute_operation(&Operation {
-//            id: None,
-//            action: Action::Commit,
-//            block: Block {
-//                block_number: 3,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Exit {
-//                    batch_number: 2,
-//                    transactions: vec![exit_tx.clone(), exit_tx.clone()],
-//                },
-//            },
-//            accounts_updated: Some(fnv::FnvHashMap::default()),
-//            tx_meta: None,
-//        })
-//        .unwrap();
-//
-//        let txs = conn.load_last_saved_transactions(10);
-//        assert_eq!(txs.len(), 6);
+        //        let pool = ConnectionPool::new();
+        //        let conn = pool.access_storage().unwrap();
+        //        conn.conn().begin_test_transaction().unwrap();
+        //
+        //        let deposit_tx: DepositTx = DepositTx {
+        //            account: 1,
+        //            amount: BigDecimal::from_str_radix(&format!("{}", 10000), 10).unwrap(),
+        //            pub_x: Fr::zero(),
+        //            pub_y: Fr::zero(),
+        //        };
+        //
+        //        let transfer_tx: TransferTx = TransferTx {
+        //            from: 1,
+        //            to: 2,
+        //            amount: BigDecimal::from_str_radix(&format!("{}", 5000), 10).unwrap(),
+        //            fee: BigDecimal::from_str_radix(&format!("{}", 0), 10).unwrap(),
+        //            nonce: 1,
+        //            good_until_block: 100_000,
+        //            signature: TxSignature::default(),
+        //            cached_pub_key: None,
+        //        };
+        //
+        //        let exit_tx: ExitTx = ExitTx {
+        //            account: 1,
+        //            amount: BigDecimal::from_str_radix(&format!("{}", 5000), 10).unwrap(),
+        //        };
+        //
+        //        conn.execute_operation(&Operation {
+        //            id: None,
+        //            action: Action::Commit,
+        //            block: Block {
+        //                block_number: 1,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Deposit {
+        //                    batch_number: 1,
+        //                    transactions: vec![deposit_tx.clone(), deposit_tx.clone()],
+        //                },
+        //            },
+        //            accounts_updated: Some(fnv::FnvHashMap::default()),
+        //            tx_meta: None,
+        //        })
+        //        .unwrap();
+        //
+        //        conn.execute_operation(&Operation {
+        //            id: None,
+        //            action: Action::Commit,
+        //            block: Block {
+        //                block_number: 2,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Transfer {
+        //                    total_fees: BigDecimal::from_str_radix(&format!("{}", 0), 10).unwrap(),
+        //                    transactions: vec![transfer_tx.clone(), transfer_tx.clone()],
+        //                },
+        //            },
+        //            accounts_updated: Some(fnv::FnvHashMap::default()),
+        //            tx_meta: None,
+        //        })
+        //        .unwrap();
+        //
+        //        conn.execute_operation(&Operation {
+        //            id: None,
+        //            action: Action::Commit,
+        //            block: Block {
+        //                block_number: 3,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Exit {
+        //                    batch_number: 2,
+        //                    transactions: vec![exit_tx.clone(), exit_tx.clone()],
+        //                },
+        //            },
+        //            accounts_updated: Some(fnv::FnvHashMap::default()),
+        //            tx_meta: None,
+        //        })
+        //        .unwrap();
+        //
+        //        let txs = conn.load_last_saved_transactions(10);
+        //        assert_eq!(txs.len(), 6);
     }
 
     fn dummy_op(action: Action, block_number: BlockNumber) -> Operation {
         unimplemented!()
-//        Operation {
-//            id: None,
-//            action,
-//            block: Block {
-//                block_number,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Deposit {
-//                    batch_number: 1,
-//                    transactions: vec![],
-//                },
-//            },
-//            accounts_updated: Some(fnv::FnvHashMap::default()),
-//            tx_meta: None,
-//        }
+        //        Operation {
+        //            id: None,
+        //            action,
+        //            block: Block {
+        //                block_number,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Deposit {
+        //                    batch_number: 1,
+        //                    transactions: vec![],
+        //                },
+        //            },
+        //            accounts_updated: Some(fnv::FnvHashMap::default()),
+        //            tx_meta: None,
+        //        }
     }
 
     #[test]
