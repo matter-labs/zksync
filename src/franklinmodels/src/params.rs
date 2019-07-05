@@ -11,10 +11,10 @@ pub const ACCOUNT_SUBTREE_DEPTH: &'static usize = &9;
 pub const BALANCE_TREE_DEPTH: &'static usize = &8;
 
 /// Account subtree hash width
-pub const SUBTREE_HASH_WIDTH: &'static usize = &256; //seems to be equal to Bn256::NUM_BITS could be replaced
+pub const SUBTREE_HASH_WIDTH: &'static usize = &254; //seems to be equal to Bn256::NUM_BITS could be replaced
 
 /// balance bit width
-pub const BALANCE_BIT_WIDTH: &'static usize = &128;
+pub const BALANCE_BIT_WIDTH: usize = 128;
 
 pub const NEW_PUBKEY_HASH_WIDTH: &'static usize = &224;
 /// Nonce bit width
@@ -36,9 +36,9 @@ pub const FEE_EXPONENT_BIT_WIDTH: &'static usize = &5;
 pub const FEE_MANTISSA_BIT_WIDTH: &'static usize = &3;
 
 // Signature data
-pub const SIGNATURE_S_BIT_WIDTH: &'static usize = &256;
-pub const SIGNATURE_R_X_BIT_WIDTH: &'static usize = &256;
-pub const SIGNATURE_R_Y_BIT_WIDTH: &'static usize = &256;
+pub const SIGNATURE_S_BIT_WIDTH: &'static usize = &254;
+pub const SIGNATURE_R_X_BIT_WIDTH: &'static usize = &254;
+pub const SIGNATURE_R_Y_BIT_WIDTH: &'static usize = &254;
 
 // Fr element encoding
-pub const FR_BIT_WIDTH: &'static usize = &256;
+pub const FR_BIT_WIDTH: usize = 254;

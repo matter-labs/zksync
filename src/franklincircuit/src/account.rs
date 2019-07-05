@@ -28,7 +28,7 @@ impl<E: JubjubEngine> AccountContent<E> {
         let nonce = CircuitElement::from_fe_strict(
             cs.namespace(|| "nonce"),
             || Ok(witness.nonce.grab()?),
-            *franklin_constants::NONCE_BIT_WIDTH,
+            franklin_constants::NONCE_BIT_WIDTH,
         )?;
         let pub_key = CircuitPubkey::from_xy_fe(
             cs.namespace(|| "pub_key"),

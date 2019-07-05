@@ -35,12 +35,12 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
         let mut leaf_content = Vec::new();
         //TODO: verify_order
 
-        leaf_content.extend(self.nonce.get_bits_le_fixed(*params::NONCE_BIT_WIDTH));
+        leaf_content.extend(self.nonce.get_bits_le_fixed(params::NONCE_BIT_WIDTH));
         leaf_content.extend(self.pub_y.get_bits_le_fixed(params::FR_BIT_WIDTH - 1));
         leaf_content.extend(self.pub_x.get_bits_le_fixed(1));
         leaf_content.extend(
             self.subtree_root_hash
-                .get_bits_le_fixed(*params::FR_BIT_WIDTH),
+                .get_bits_le_fixed(params::FR_BIT_WIDTH),
         );
         println!("test acc len {}", leaf_content.len());
 
@@ -56,7 +56,7 @@ pub struct Balance<E: JubjubEngine> {
 impl<E: JubjubEngine> GetBits for Balance<E> {
     fn get_bits_le(&self) -> Vec<bool> {
         let mut leaf_content = Vec::new();
-        leaf_content.extend(self.value.get_bits_le_fixed(*params::BALANCE_BIT_WIDTH));
+        leaf_content.extend(self.value.get_bits_le_fixed(params::BALANCE_BIT_WIDTH));
 
         leaf_content
     }
