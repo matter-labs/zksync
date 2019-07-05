@@ -27,6 +27,7 @@ use std::sync::mpsc::{Receiver, Sender};
 
 use std::io::BufReader;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use itertools::Itertools;
 
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
@@ -221,6 +222,7 @@ impl PlasmaStateKeeper {
             })
             .expect("Failed to get txs from mempool");
         let filtered_txs = self.filter_invalid_txs(txs);
+        info!("Preparing transfer block with txs: {:#?}",filtered_txs);
         self.apply_padding(filtered_txs)
     }
 
@@ -228,13 +230,28 @@ impl PlasmaStateKeeper {
         &self,
         mut transfer_txs: Vec<(i32, TransferTx)>,
     ) -> Vec<(i32, TransferTx)> {
-        transfer_txs
+        transfer_txs.into_iter()
+            .group_by(|(_, tx)| tx.from)
             .into_iter()
-            .filter(|(_, tx)| {
-                let from_nonce = self.account(tx.from).nonce;
-                from_nonce == tx.nonce
+            .map(|(from, txs)| {
+                let mut txs = txs.collect::<Vec<_>>();
+                txs.sort_by_key(|tx| tx.1.nonce);
+
+                let mut valid_txs = Vec::new();
+                let mut current_nonce = self.account(from).nonce;
+                for tx in txs {
+                    if tx.1.nonce == current_nonce {
+                        valid_txs.push(tx);
+                        current_nonce += 1;
+                    } else {
+                        break
+                    }
+                }
+                valid_txs
+            }).fold(Vec::new(), |mut all_txs, mut next_tx_batch| {
+                all_txs.append(&mut next_tx_batch);
+                all_txs
             })
-            .collect()
     }
 
     fn apply_padding(&self, mut transfer_txs: Vec<(i32, TransferTx)>) -> Vec<(i32, TransferTx)> {

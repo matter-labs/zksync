@@ -33,7 +33,7 @@ pub const SPECIAL_ACCOUNT_EXIT: u32 = 0;
 pub const SPECIAL_ACCOUNT_DEPOSIT: u32 = 1;
 
 /// Number of supported tokens.
-pub const TOTAL_TOKENS: usize = 256;
+pub const TOTAL_TOKENS: usize = 1;
 
 pub type TokenId = u8;
 pub const ETH_TOKEN_ID: TokenId = 0;
