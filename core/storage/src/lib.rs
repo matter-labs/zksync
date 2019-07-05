@@ -266,7 +266,7 @@ impl StoredOperation {
         op.id = Some(self.id);
 
         if op.accounts_updated.is_none() {
-            let (_, updates) = conn.load_state_diff_for_block(op.block.block_number)?;
+            let updates = conn.load_state_diff_for_block(op.block.block_number)?;
             op.accounts_updated = Some(updates);
         };
 
@@ -790,10 +790,14 @@ impl StorageProcessor {
     pub fn load_committed_state(&self, block: Option<u32>) -> QueryResult<(u32, AccountMap)> {
         self.conn().transaction(|| {
             let (verif_block, mut accounts) = self.load_verified_state()?;
-            let (block, state_diff) = self.load_state_diff(verif_block + 1, block)?;
-            debug!("Loaded state diff: {:?}", state_diff);
-            apply_updates(&mut accounts, state_diff);
-            Ok((block, accounts))
+
+            if let Some((block, state_diff)) = self.load_state_diff(verif_block + 1, block)? {
+                debug!("Loaded state diff: {:?}", state_diff);
+                apply_updates(&mut accounts, state_diff.clone());
+                Ok((block, accounts))
+            } else {
+                Ok((verif_block, accounts))
+            }
         })
     }
 
@@ -828,7 +832,7 @@ impl StorageProcessor {
         &self,
         from_block: u32,
         to_block: Option<u32>,
-    ) -> QueryResult<(u32, Vec<AccountUpdate>)> {
+    ) -> QueryResult<Option<(u32, Vec<AccountUpdate>)>> {
         self.conn().transaction(|| {
             let (to_block, unbounded) = if let Some(to_block) = to_block {
                 (to_block, false)
@@ -894,7 +898,11 @@ impl StorageProcessor {
                 }
             }
 
-            Ok((last_block, account_updates))
+            if !account_updates.is_empty() {
+                Ok(Some((last_block, account_updates)))
+            } else {
+                Ok(None)
+            }
         })
     }
 
@@ -902,8 +910,11 @@ impl StorageProcessor {
     pub fn load_state_diff_for_block(
         &self,
         block_number: u32,
-    ) -> QueryResult<(u32, Vec<AccountUpdate>)> {
-        self.load_state_diff(block_number, Some(block_number + 1))
+    ) -> QueryResult<Vec<AccountUpdate>> {
+        self.load_state_diff(block_number, Some(block_number + 1)).map(|diff| {
+            diff.unwrap_or_default().1
+        }
+        )
     }
 
     /// Sets up `op_config` to new address and nonce for scheduling ETH transactions for operations

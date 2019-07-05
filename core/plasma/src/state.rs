@@ -97,17 +97,17 @@ impl PlasmaState {
 
             let from_account_update = {
                 let from_old_balance = from.get_balance(ETH_TOKEN_ID).clone();
-                let old_nonce = from.nonce;
                 from.sub_balance(ETH_TOKEN_ID, &transacted_amount);
                 let from_new_balance = from.get_balance(ETH_TOKEN_ID).clone();
                 from.nonce += 1;
+                let new_nonce = from.nonce;
 
                 self.balance_tree.insert(tx.from, from);
 
                 AccountUpdate::UpdateBalance {
                     id: tx.from,
                     balance_update: (ETH_TOKEN_ID, from_old_balance, from_new_balance),
-                    nonce: old_nonce,
+                    nonce: new_nonce,
                 }
             };
 
@@ -116,18 +116,21 @@ impl PlasmaState {
                 let mut to = self.balance_tree.items.remove(&tx.to).unwrap_or_else(|| {
                     let new_acc = Account::default();
 
-                    let create_acc_update = AccountUpdate::Create {
-                        id: tx.to,
-                        public_key_x: new_acc.public_key_x.clone(),
-                        public_key_y: new_acc.public_key_y.clone(),
-                        nonce: new_acc.nonce,
-                    };
-                    to_account_updates.push(create_acc_update);
+                    // TODO: Document somewhere. (Account 0 used for padding tx).
+                    if tx.to != 0 {
+                        let create_acc_update = AccountUpdate::Create {
+                            id: tx.to,
+                            public_key_x: new_acc.public_key_x.clone(),
+                            public_key_y: new_acc.public_key_y.clone(),
+                            nonce: new_acc.nonce,
+                        };
+                        to_account_updates.push(create_acc_update);
+                    }
 
                     new_acc
                 });
 
-                // TODO (Drogan) Why? Document somewhere.
+                // TODO: Document somewhere. (Account 0 used for padding tx).
                 if tx.to != 0 {
                     let to_old_balance = to.get_balance(ETH_TOKEN_ID).clone();
                     to.add_balance(ETH_TOKEN_ID, &tx.amount);
@@ -150,6 +153,7 @@ impl PlasmaState {
             let mut account_updates = vec![from_account_update];
             account_updates.extend(to_account_updates.into_iter());
 
+            debug!("Transfer updates {:#?}",account_updates);
             return Ok((collected_fee, account_updates));
         }
 
