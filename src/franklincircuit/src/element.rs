@@ -1,15 +1,15 @@
-use crate::utils::{append_packed_public_key, pack_bits_to_element};
-use bellman::{Circuit, ConstraintSystem, SynthesisError};
-use ff::{Field, PrimeField};
-use franklin_crypto::circuit::baby_eddsa::EddsaSignature;
-use franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
-use franklin_crypto::circuit::ecc;
-use franklin_crypto::circuit::float_point::parse_with_exponent_le;
-use franklin_crypto::circuit::num::{AllocatedNum, Num};
-use franklin_crypto::circuit::pedersen_hash;
-use franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
-use franklin_crypto::circuit::Assignment;
-use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
+use crate::utils::{pack_bits_to_element};
+use bellman::{ConstraintSystem, SynthesisError};
+use ff::{Field};
+
+use franklin_crypto::circuit::boolean::{Boolean};
+
+
+use franklin_crypto::circuit::num::{AllocatedNum};
+
+
+
+use franklin_crypto::jubjub::{JubjubEngine};
 use franklinmodels::params as franklin_constants;
 
 #[derive(Clone)]
@@ -162,22 +162,6 @@ impl<E: JubjubEngine> CircuitElement<E> {
             AllocatedNum::equals(cs.namespace(|| "equals"), &x.get_number(), &y.get_number())?;
         Ok(Boolean::from(is_equal))
     }
-
-    // pub fn select_conditionally<CS: ConstraintSystem<E>>(
-    //     mut cs: CS,
-    //     condition: &Boolean,
-    //     x: &Self,
-    //     y: &Self,
-    // ) -> Result<Self, SynthesisError> {
-    //     let mut num_bits = bits.clone();
-    //     num_bits.truncate(max_length);
-    //     let number = pack_bits_to_element(cs.namespace(|| "pack_truncated_bits"), &bits)?;
-    //     Ok(CircuitElement {
-    //         number: number,
-    //         bits_le: num_bits,
-    //         length: max_length,
-    //     })
-    // }
 
     pub fn get_number(&self) -> AllocatedNum<E> {
         self.number.clone()

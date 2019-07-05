@@ -1,22 +1,21 @@
 use crate::account::AccountContent;
 use crate::allocated_structures::*;
 use crate::element::{CircuitElement, CircuitPubkey};
-use crate::operation::{Operation, OperationBranch};
-use crate::utils::{append_packed_public_key, pack_bits_to_element};
+use crate::operation::{Operation};
+use crate::utils::{pack_bits_to_element};
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use ff::{Field, PrimeField};
 use franklin_crypto::circuit::baby_eddsa::EddsaSignature;
-use franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
+use franklin_crypto::circuit::boolean::{Boolean};
 use franklin_crypto::circuit::ecc;
-use franklin_crypto::circuit::float_point::parse_with_exponent_le;
-use franklin_crypto::circuit::num::{AllocatedNum, Num};
+
+use franklin_crypto::circuit::num::{AllocatedNum};
 use franklin_crypto::circuit::pedersen_hash;
 use franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
 use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
 use franklinmodels::params as franklin_constants;
 
-const OPERATION_NUMBER: usize = 4;
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 6;
 
 struct FranklinCircuit<'a, E: JubjubEngine> {
@@ -34,10 +33,6 @@ struct FranklinCircuit<'a, E: JubjubEngine> {
 struct PreviousData<E: JubjubEngine> {
     //lhs, rhs //TODO: #merkle
     new_root: AllocatedNum<E>,
-}
-
-macro_rules! csprintln {
-    ($x:expr,$($arg:tt)*) => (if $x {println!($($arg)*)});
 }
 
 // Implementation of our circuit:
@@ -527,7 +522,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         // verify if new pubkey is equal to previous one (if existed)
         // TODO: function for pubkeys equality
-        let mut is_pubkey_correct = Boolean::Constant(true);
         let is_pub_equal_to_previous = CircuitPubkey::equals(
             cs.namespace(|| "is_pub_equal_to_previous"),
             &op_data.new_pubkey,
@@ -537,7 +531,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         //keys are same or account is empty
         let is_pubkey_correct = Boolean::and(
             cs.namespace(|| "acc not empty and keys are not the same"),
-            &is_pubkey_correct.not(),
+            &is_pub_equal_to_previous.not(),
             &is_account_empty.not(),
         )?
         .not();
@@ -1521,9 +1515,9 @@ mod test {
         use crate::account::*;
         use crate::operation::*;
         use crate::utils::*;
-        use crypto::digest::Digest;
-        use crypto::sha2::Sha256;
-        use ff::{BitIterator, Field};
+        
+        
+        use ff::{Field};
         use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
         use franklin_crypto::circuit::float_point::convert_to_float;
         use franklin_crypto::circuit::test::*;
@@ -1544,7 +1538,7 @@ mod test {
 
         let mut to_balance_tree =
             CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
-        let to_balance_root = to_balance_tree.root_hash();
+        let _to_balance_root = to_balance_tree.root_hash();
         // println!("test balance root: {}", balance_root);
 
         let phasher = PedersenHasher::<Bn256>::default();
@@ -1725,7 +1719,7 @@ mod test {
             },
         );
 
-        let mut to_nonce_after_transfer = to_leaf_before.nonce.clone();
+        let to_nonce_after_transfer = to_leaf_before.nonce.clone();
 
         let to_leaf_after = CircuitAccount::<Bn256> {
             subtree_root_hash: to_balance_tree.root_hash(),
@@ -1836,7 +1830,7 @@ mod test {
 
         //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
-        let from_audit_path_after: Vec<Option<Fr>> = tree
+        let _from_audit_path_after: Vec<Option<Fr>> = tree
             .merkle_path(from_leaf_number)
             .into_iter()
             .map(|e| Some(e.0))
@@ -1854,7 +1848,7 @@ mod test {
             .map(|e| Some(e.0))
             .collect();
 
-        let to_audit_balance_path_after: Vec<Option<Fr>> = to_balance_tree
+        let _to_audit_balance_path_after: Vec<Option<Fr>> = to_balance_tree
             .merkle_path(token)
             .into_iter()
             .map(|e| Some(e.0))

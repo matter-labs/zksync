@@ -12,23 +12,6 @@ pub struct CircuitAccount<E: JubjubEngine> {
     pub pub_y: E::Fr,
 }
 
-// impl<'a, E: JubjubEngine> std::default::Default for CircuitAccount<'a, E> {
-//     //default should be changed: since subtree_root_hash is not zero for all zero balances and subaccounts
-//     fn default() -> Self {
-//         // let balance=SparseMerkleTree<Balance<E>, E::Fr, PedersenHasher<E>>::new();
-//         let balance_tree = CircuitBalanceTree::new(*params::BALANCE_TREE_DEPTH as u32);
-//         let subaccount_tree = CircuitSubaccountTree::new(*params::SUBACCOUNT_TREE_DEPTH as u32);
-//         let balance_root = balance_tree.root_hash();
-//         let subaccount_root = subaccount_tree.root_hash();
-//         let hasher = PedersenHasher::<E>::default();
-//         Self {
-//             subtree_root_hash: E::Fr::zero(),
-//             nonce: E::Fr::zero(),
-//             pub_x: E::Fr::zero(),
-//             pub_y: E::Fr::zero(),
-//         }
-//     }
-// }
 
 impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
     fn get_bits_le(&self) -> Vec<bool> {
@@ -48,7 +31,6 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
     }
 }
 
-//TODO: probably simpler declaration
 pub struct Balance<E: JubjubEngine> {
     pub value: E::Fr,
 }
