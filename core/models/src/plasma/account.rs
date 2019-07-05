@@ -1,9 +1,8 @@
 use crate::circuit;
-use crate::plasma::params::{self, TokenId, ETH_TOKEN_ID, TOTAL_TOKENS};
+use crate::plasma::params::{self, TokenId, TOTAL_TOKENS};
 use crate::primitives::GetBits;
 use crate::{Engine, Fr, PublicKey};
 use bigdecimal::BigDecimal;
-use fnv::FnvHashMap;
 use sapling_crypto::jubjub::{edwards, Unknown};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -55,8 +54,8 @@ impl AccountUpdate {
                 nonce,
             } => AccountUpdate::Delete {
                 id: *id,
-                public_key_x: public_key_x.clone(),
-                public_key_y: public_key_y.clone(),
+                public_key_x: *public_key_x,
+                public_key_y: *public_key_y,
                 nonce: *nonce,
             },
             AccountUpdate::Delete {
@@ -66,8 +65,8 @@ impl AccountUpdate {
                 nonce,
             } => AccountUpdate::Create {
                 id: *id,
-                public_key_x: public_key_x.clone(),
-                public_key_y: public_key_y.clone(),
+                public_key_x: *public_key_x,
+                public_key_y: *public_key_y,
                 nonce: *nonce,
             },
             AccountUpdate::UpdateBalance {

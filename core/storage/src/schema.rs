@@ -49,8 +49,9 @@ table! {
 }
 
 table! {
-    mempool (id) {
-        id -> Int4,
+    mempool (from_account, nonce) {
+        from_account -> Int4,
+        nonce -> Int8,
         tx -> Jsonb,
         created_at -> Timestamp,
     }

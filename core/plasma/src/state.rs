@@ -120,8 +120,8 @@ impl PlasmaState {
                     if tx.to != 0 {
                         let create_acc_update = AccountUpdate::Create {
                             id: tx.to,
-                            public_key_x: new_acc.public_key_x.clone(),
-                            public_key_y: new_acc.public_key_y.clone(),
+                            public_key_x: new_acc.public_key_x,
+                            public_key_y: new_acc.public_key_y,
                             nonce: new_acc.nonce,
                         };
                         to_account_updates.push(create_acc_update);
@@ -153,7 +153,7 @@ impl PlasmaState {
             let mut account_updates = vec![from_account_update];
             account_updates.extend(to_account_updates.into_iter());
 
-            debug!("Transfer updates {:#?}",account_updates);
+            debug!("Transfer updates {:#?}", account_updates);
             return Ok((collected_fee, account_updates));
         }
 
@@ -169,13 +169,13 @@ impl PlasmaState {
             .remove(&tx.account)
             .unwrap_or_else(|| {
                 let mut acc = Account::default();
-                acc.public_key_x = tx.pub_x.clone();
-                acc.public_key_y = tx.pub_y.clone();
+                acc.public_key_x = tx.pub_x;
+                acc.public_key_y = tx.pub_y;
 
                 updates.push(AccountUpdate::Create {
                     id: tx.account,
-                    public_key_x: acc.public_key_x.clone(),
-                    public_key_y: acc.public_key_y.clone(),
+                    public_key_x: acc.public_key_x,
+                    public_key_y: acc.public_key_y,
                     nonce: acc.nonce,
                 });
 

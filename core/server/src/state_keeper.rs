@@ -14,20 +14,15 @@ use web3::types::H256;
 
 use models::config;
 
-use models::{
-    CommitRequest, NetworkStatus, ProtoBlock, StateKeeperRequest, TransferTxConfirmation,
-    TransferTxResult,
-};
+use models::{CommitRequest, NetworkStatus, ProtoBlock, StateKeeperRequest};
 use storage::ConnectionPool;
-use storage::Mempool;
 
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive, Zero};
-use fnv::FnvHashMap;
 use std::sync::mpsc::{Receiver, Sender};
 
+use itertools::Itertools;
 use std::io::BufReader;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use itertools::Itertools;
 
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
@@ -51,8 +46,6 @@ type RootHash = H256;
 #[allow(dead_code)]
 type UpdatedAccounts = AccountMap;
 
-const PADDING_TX_ID: i32 = -1;
-
 impl PlasmaStateKeeper {
     pub fn new(pool: ConnectionPool) -> Self {
         info!("constructing state keeper instance");
@@ -72,12 +65,21 @@ impl PlasmaStateKeeper {
             last_committed, last_verified
         );
 
+        let num_of_valid_txs = pool
+            .access_mempool()
+            .expect("Failed to get mempool")
+            .get_txs(config::RUNTIME_CONFIG.transfer_batch_size)
+            .expect("No txs from mempool")
+            .len();
+
         // Keeper starts with the NEXT block
         let keeper = PlasmaStateKeeper {
             state,
             block_queue: VecDeque::default(),
-            next_block_at_max: None,
-            txs_since_last_block: 0,
+            next_block_at_max: Some(
+                SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL),
+            ),
+            txs_since_last_block: num_of_valid_txs,
             db_conn_pool: pool,
         };
 
@@ -125,19 +127,19 @@ impl PlasmaStateKeeper {
                         error!("StateKeeperRequest::AddTransferTx: channel closed, sending failed");
                     }
 
-                    if self.txs_since_last_block == config::RUNTIME_CONFIG.transfer_batch_size {
+                    if self.txs_since_last_block > config::RUNTIME_CONFIG.transfer_batch_size {
                         self.finalize_current_batch(&tx_for_commitments);
                     }
                 }
                 StateKeeperRequest::AddBlock(block) => {
                     self.block_queue.push_back(block);
                     //debug!("new protoblock, transfer_tx_queue.len() = {}", self.transfer_tx_queue.len());
-                    if self.txs_since_last_block == 0 {
-                        self.process_block_queue(&tx_for_commitments);
-                    }
+                    self.process_block_queue(&tx_for_commitments);
                 }
                 StateKeeperRequest::TimerTick => {
-                    if let Some(next_block_at) = self.next_block_at_max {
+                    if self.txs_since_last_block > config::RUNTIME_CONFIG.transfer_batch_size {
+                        self.finalize_current_batch(&tx_for_commitments);
+                    } else if let Some(next_block_at) = self.next_block_at_max {
                         if next_block_at <= SystemTime::now() {
                             self.finalize_current_batch(&tx_for_commitments);
                         }
@@ -151,7 +153,7 @@ impl PlasmaStateKeeper {
         let account = self
             .state
             .get_account(tx.from)
-            .ok_or("Account not found.".to_string())?;
+            .ok_or_else(|| "Account not found.".to_string())?;
 
         let pub_key = account
             .get_pub_key()
@@ -166,6 +168,8 @@ impl PlasmaStateKeeper {
             return Err("Invalid signature".to_string());
         }
 
+        let can_be_executed_now = { account.nonce == tx.nonce };
+
         let mempool = self
             .db_conn_pool
             .access_mempool()
@@ -175,11 +179,13 @@ impl PlasmaStateKeeper {
             .add_tx(tx)
             .map_err(|e| format!("Mempool query error:  {:?}", e))?;
 
-        self.txs_since_last_block += 1;
-        if self.next_block_at_max.is_none() {
-            self.next_block_at_max =
-                Some(SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL));
-        };
+        if can_be_executed_now {
+            self.txs_since_last_block += 1;
+            if self.next_block_at_max.is_none() {
+                self.next_block_at_max =
+                    Some(SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL));
+            };
+        }
 
         Ok(())
     }
@@ -212,7 +218,7 @@ impl PlasmaStateKeeper {
         self.next_block_at_max = None;
     }
 
-    fn prepare_transfer_tx_block(&self) -> Vec<(i32, TransferTx)> {
+    fn prepare_transfer_tx_block(&self) -> Vec<TransferTx> {
         let txs = self
             .db_conn_pool
             .access_mempool()
@@ -222,39 +228,38 @@ impl PlasmaStateKeeper {
             })
             .expect("Failed to get txs from mempool");
         let filtered_txs = self.filter_invalid_txs(txs);
-        info!("Preparing transfer block with txs: {:#?}",filtered_txs);
+        debug!("Preparing transfer block with txs: {:#?}", filtered_txs);
         self.apply_padding(filtered_txs)
     }
 
-    fn filter_invalid_txs(
-        &self,
-        mut transfer_txs: Vec<(i32, TransferTx)>,
-    ) -> Vec<(i32, TransferTx)> {
-        transfer_txs.into_iter()
-            .group_by(|(_, tx)| tx.from)
+    fn filter_invalid_txs(&self, transfer_txs: Vec<TransferTx>) -> Vec<TransferTx> {
+        transfer_txs
+            .into_iter()
+            .group_by(|tx| tx.from)
             .into_iter()
             .map(|(from, txs)| {
                 let mut txs = txs.collect::<Vec<_>>();
-                txs.sort_by_key(|tx| tx.1.nonce);
+                txs.sort_by_key(|tx| tx.nonce);
 
                 let mut valid_txs = Vec::new();
                 let mut current_nonce = self.account(from).nonce;
                 for tx in txs {
-                    if tx.1.nonce == current_nonce {
+                    if tx.nonce == current_nonce {
                         valid_txs.push(tx);
                         current_nonce += 1;
                     } else {
-                        break
+                        break;
                     }
                 }
                 valid_txs
-            }).fold(Vec::new(), |mut all_txs, mut next_tx_batch| {
+            })
+            .fold(Vec::new(), |mut all_txs, mut next_tx_batch| {
                 all_txs.append(&mut next_tx_batch);
                 all_txs
             })
     }
 
-    fn apply_padding(&self, mut transfer_txs: Vec<(i32, TransferTx)>) -> Vec<(i32, TransferTx)> {
+    fn apply_padding(&self, mut transfer_txs: Vec<TransferTx>) -> Vec<TransferTx> {
         let to_pad = config::RUNTIME_CONFIG.transfer_batch_size - transfer_txs.len();
         if to_pad > 0 {
             debug!("padding transactions");
@@ -288,7 +293,7 @@ impl PlasmaStateKeeper {
                     );
                     assert!(tx.verify_sig(&pub_key));
 
-                    (PADDING_TX_ID, tx)
+                    tx
                 })
                 .collect();
             transfer_txs.append(&mut prepared_transactions);
@@ -296,30 +301,27 @@ impl PlasmaStateKeeper {
         transfer_txs
     }
 
-    fn create_transfer_block(&mut self, transactions: Vec<(i32, TransferTx)>) -> CommitRequest {
+    fn create_transfer_block(&mut self, transactions: Vec<TransferTx>) -> CommitRequest {
         info!("Creating transfer block");
         // collect updated state
         let mut accounts_updated = Vec::new();
-        let mut txs_executed = Vec::new();
         let mut txs = Vec::new();
 
         let mut total_fees = 0u128;
 
-        for (id, tx) in transactions.into_iter() {
+        for tx in transactions.into_iter() {
             let (fee, mut tx_updates) = self
                 .state
                 .apply_transfer(&tx)
                 .expect("must apply transfer transaction");
 
             accounts_updated.append(&mut tx_updates);
-            if id != PADDING_TX_ID {
-                txs_executed.push(id);
-            }
             txs.push(tx);
 
             total_fees += fee.to_u128().expect("Should not overflow");
         }
 
+        let num_txs = txs.len();
         let block = Block {
             block_number: self.state.block_number,
             new_root_hash: self.state.root_hash(),
@@ -329,12 +331,11 @@ impl PlasmaStateKeeper {
             },
         };
 
-        self.txs_since_last_block = 0;
+        self.txs_since_last_block.saturating_sub(num_txs);
 
         CommitRequest {
             block,
             accounts_updated,
-            txs_executed,
         }
     }
 
@@ -366,7 +367,6 @@ impl PlasmaStateKeeper {
         CommitRequest {
             block,
             accounts_updated,
-            txs_executed: Vec::new(),
         }
     }
 
@@ -399,7 +399,6 @@ impl PlasmaStateKeeper {
         CommitRequest {
             block,
             accounts_updated,
-            txs_executed: Vec::new(),
         }
     }
 

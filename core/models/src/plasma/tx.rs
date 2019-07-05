@@ -164,11 +164,6 @@ impl TransferTx {
             &params::JUBJUB_PARAMS,
             as_bytes.len(),
         ));
-        let cached_pub_key = Some(PublicKey::from_private(
-            &private_key,
-            p_g,
-            &params::JUBJUB_PARAMS,
-        ));
 
         TransferTx {
             from,

@@ -5,7 +5,7 @@ use actix_web::{
     HttpMessage, HttpRequest, HttpResponse,
 };
 use models::config::RUNTIME_CONFIG;
-use models::plasma::{Account as PAccount, PublicKey, TransferTx};
+use models::plasma::{Account as PAccount, TransferTx};
 use models::{ActionType, NetworkStatus, StateKeeperRequest, TransferTxConfirmation};
 use std::sync::mpsc;
 use storage::{BlockDetails, ConnectionPool};
@@ -67,7 +67,6 @@ pub struct AppState {
 }
 
 const TIMEOUT: u64 = 500;
-const NONCE_ORDER_TIMEOUT: u64 = 800;
 
 fn handle_submit_tx(
     req: &HttpRequest<AppState>,
@@ -89,18 +88,19 @@ fn handle_submit_tx(
             tx.validate()?;
 
             Ok(tx)
-        }
-        ).and_then(move |tx| {
-
+        })
+        .and_then(move |tx| {
             // TODO (Drogan) use oneshot.
             let (add_tx, add_rx) = oneshot::channel();
             tx_for_state
                 .send(StateKeeperRequest::AddTransferTx(Box::new(tx), add_tx))
                 .expect("sending to sate keeper failed");
             // Return response
-            add_rx.into_future().map_err(|e| format!("Failed to receive from StateKeeper: {:?}",e))
+            add_rx
+                .into_future()
+                .map_err(|e| format!("Failed to receive from StateKeeper: {:?}", e))
         })
-        .and_then( |confirmation| {
+        .and_then(|confirmation| {
             confirmation.map_err(|e| format!("Tx rejected: {:?}", e))?;
             let resp = TransactionResponse {
                 accepted: true,

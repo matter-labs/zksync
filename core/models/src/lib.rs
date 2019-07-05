@@ -12,9 +12,9 @@ pub mod primitives;
 
 use crate::plasma::block::Block;
 use crate::plasma::*;
+use futures::sync::oneshot;
 use serde_bytes;
 use std::sync::mpsc::Sender;
-use futures::sync::oneshot;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxMeta {
@@ -98,7 +98,7 @@ pub struct Operation {
 
 pub enum ProtoBlock {
     /// (tx id in mempool, tx) this way we can remove tx from mempool after execution.
-    Transfer(Vec<(i32, TransferTx)>),
+    Transfer(Vec<TransferTx>),
     Deposit(BatchNumber, Vec<DepositTx>),
     Exit(BatchNumber, Vec<ExitTx>),
 }
@@ -115,7 +115,6 @@ pub enum StateKeeperRequest {
 pub struct CommitRequest {
     pub block: Block,
     pub accounts_updated: Vec<AccountUpdate>,
-    pub txs_executed: Vec<i32>,
 }
 
 pub const ACTION_COMMIT: &str = "Commit";
