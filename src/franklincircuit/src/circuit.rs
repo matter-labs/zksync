@@ -866,8 +866,13 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         );
 
         //update balance
-        cur.balance = CircuitElement::conditionally_select_with_number_strict(cs.namespace(|| "updated_balance rhs"), &updated_balance_value, &cur.balance, &is_rhs_valid)?;
-        
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated_balance rhs"),
+            &updated_balance_value,
+            &cur.balance,
+            &is_rhs_valid,
+        )?;
+
         Ok(Boolean::and(
             cs.namespace(|| "lhs_valid nand rhs_valid"),
             &lhs_valid.not(),
@@ -894,12 +899,19 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         // subtree_data
         //     .extend(balance_root.into_bits_le(cs.namespace(|| "balance_subtree_root_bits"))?);
         // println!("balance root: {}", balance_root.get_value().unwrap());
-        let subtree_root = CircuitElement::from_number(cs.namespace(||"subtree_root_ce"), balance_root,franklin_constants::FR_BIT_WIDTH)?;
+        let subtree_root = CircuitElement::from_number(
+            cs.namespace(|| "subtree_root_ce"),
+            balance_root,
+            franklin_constants::FR_BIT_WIDTH,
+        )?;
         // println!("subtree root: {}", subtree_root.get_value().unwrap());
         let mut account_data = vec![];
         account_data.extend(branch.account.nonce.get_bits_le().clone());
         account_data.extend(branch.account.pub_key.get_packed_key());
-        println!("get_packed_key {}",branch.account.pub_key.get_packed_key().len() );
+        println!(
+            "get_packed_key {}",
+            branch.account.pub_key.get_packed_key().len()
+        );
         let account_data_packed =
             pack_bits_to_element(cs.namespace(|| "account_data_packed"), &account_data)?;
 
@@ -1646,7 +1658,13 @@ mod test {
         };
         tree.insert(from_leaf_number, from_leaf_before.clone());
         tree.insert(to_leaf_number, to_leaf_before.clone());
-        println!("hash from leaf {}",tree.get_hash((franklin_constants::ACCOUNT_TREE_DEPTH as u32, from_leaf_number)));
+        println!(
+            "hash from leaf {}",
+            tree.get_hash((
+                franklin_constants::ACCOUNT_TREE_DEPTH as u32,
+                from_leaf_number
+            ))
+        );
 
         let from_audit_path_before: Vec<Option<Fr>> = tree
             .merkle_path(from_leaf_number)

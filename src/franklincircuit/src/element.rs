@@ -133,7 +133,7 @@ impl<E: JubjubEngine> CircuitElement<E> {
         )?)
     }
 
-        // doesn't enforce length by design, though applied to both strict values will give strict result
+    // doesn't enforce length by design, though applied to both strict values will give strict result
     pub fn conditionally_select_with_number_strict<CS: ConstraintSystem<E>>(
         mut cs: CS,
         x: &AllocatedNum<E>,
