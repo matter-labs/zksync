@@ -28,9 +28,6 @@ fn run_committer(
     let storage = pool
         .access_storage()
         .expect("db connection failed for committer");;
-    let mempool = pool
-        .access_mempool()
-        .expect("db connection failed for commiter");
 
     let eth_client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
     let current_nonce = eth_client.current_nonce().expect("can not get nonce");
@@ -42,7 +39,6 @@ fn run_committer(
         if let Ok(CommitRequest {
             block,
             accounts_updated,
-            mut txs_executed,
         }) = req
         {
             let op = Operation {
@@ -57,9 +53,6 @@ fn run_committer(
                 .execute_operation(&op)
                 .expect("committer must commit the op into db");
 
-            mempool
-                .remove_txs(&txs_executed)
-                .expect("commiter mempool fail");
             //tx_for_proof_requests.send(ProverRequest(op.block.block_number)).expect("must send a proof request");
             tx_for_eth
                 .send(op)

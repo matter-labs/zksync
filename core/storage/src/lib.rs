@@ -10,7 +10,7 @@ use chrono::prelude::*;
 use diesel::dsl::*;
 use models::plasma::block::Block;
 use models::plasma::block::BlockData;
-use models::plasma::params::{TokenId, ETH_TOKEN_ID};
+use models::plasma::params::TokenId;
 use models::plasma::tx::TransactionType::{Deposit, Exit, Transfer};
 use models::plasma::tx::{
     DepositTx, ExitTx, TransactionType, TransferTx, TxSignature, DEPOSIT_TX, EXIT_TX, TRANSFER_TX,
@@ -30,9 +30,8 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool, PoolError, PooledConnection};
 use diesel::result::Error;
 
-use serde_json::{to_value, value::Value};
+use serde_json::value::Value;
 use std::env;
-use std::iter::FromIterator;
 
 use ff::Field;
 
@@ -439,7 +438,7 @@ fn fr_to_bytes(fr: &Fr) -> Vec<u8> {
 }
 
 // TODO: (Drogan) move this tmp methods
-fn fr_from_bytes(mut bytes: Vec<u8>) -> Fr {
+fn fr_from_bytes(bytes: Vec<u8>) -> Fr {
     use ff::{PrimeField, PrimeFieldRepr};
     let mut fr_repr = <Fr as PrimeField>::Repr::default();
     fr_repr.read_be(&*bytes).unwrap();
@@ -663,7 +662,7 @@ impl StorageProcessor {
                                 block_number: block_number as i32,
                                 pk_x: fr_to_bytes(&public_key_x),
                                 pk_y: fr_to_bytes(&public_key_y),
-                                nonce: nonce as i64,
+                                nonce: i64::from(nonce),
                             })
                             .execute(self.conn())?;
                     }
@@ -680,7 +679,7 @@ impl StorageProcessor {
                                 block_number: block_number as i32,
                                 pk_x: fr_to_bytes(&public_key_x),
                                 pk_y: fr_to_bytes(&public_key_y),
-                                nonce: nonce as i64,
+                                nonce: i64::from(nonce),
                             })
                             .execute(self.conn())?;
                     }
@@ -693,10 +692,10 @@ impl StorageProcessor {
                             .values(&StorageAccountUpdateInsert {
                                 account_id: id as i32,
                                 block_number: block_number as i32,
-                                coin_id: token as i32,
+                                coin_id: i32::from(token),
                                 old_balance: old_balance.clone(),
                                 new_balance: new_balance.clone(),
-                                nonce: nonce as i64,
+                                nonce: i64::from(nonce),
                             })
                             .execute(self.conn())?;
                     }
@@ -722,7 +721,7 @@ impl StorageProcessor {
                 .filter(account_creates::block_number.eq(&(block_number as i32)))
                 .load::<StorageAccountCreation>(self.conn())?;
 
-            let mut account_updates: Vec<StorageAccountDiff> = {
+            let account_updates: Vec<StorageAccountDiff> = {
                 let mut account_diff = Vec::new();
                 account_diff.extend(
                     account_balance_diff
@@ -748,7 +747,7 @@ impl StorageProcessor {
                             account_id: upd.account_id,
                             balance: upd.new_balance.clone(),
                         };
-                        let rows = insert_into(balances::table)
+                        insert_into(balances::table)
                             .values(&storage_balance)
                             .on_conflict((balances::coin_id, balances::account_id))
                             .do_update()
@@ -907,14 +906,9 @@ impl StorageProcessor {
     }
 
     /// loads the state of accounts updated in a specific block
-    pub fn load_state_diff_for_block(
-        &self,
-        block_number: u32,
-    ) -> QueryResult<Vec<AccountUpdate>> {
-        self.load_state_diff(block_number, Some(block_number + 1)).map(|diff| {
-            diff.unwrap_or_default().1
-        }
-        )
+    pub fn load_state_diff_for_block(&self, block_number: u32) -> QueryResult<Vec<AccountUpdate>> {
+        self.load_state_diff(block_number, Some(block_number + 1))
+            .map(|diff| diff.unwrap_or_default().1)
     }
 
     /// Sets up `op_config` to new address and nonce for scheduling ETH transactions for operations
@@ -1142,7 +1136,7 @@ impl StorageProcessor {
 
                 let last_block = account.last_block;
                 let (_, account) = restore_account(account, balances);
-                Ok((0, Some(account)))
+                Ok((last_block, Some(account)))
             } else {
                 Ok((0, None))
             }
@@ -1191,7 +1185,7 @@ impl StorageProcessor {
 
             Ok(account_diff
                 .into_iter()
-                .fold(account, |account, upd| Account::apply_update(account, upd)))
+                .fold(account, Account::apply_update))
         })
     }
 
@@ -1423,12 +1417,9 @@ mod test {
 
     use super::*;
     use bigdecimal::BigDecimal;
-    use bigdecimal::Num;
     use diesel::Connection;
     use ff::Field;
     use models::plasma::params::ETH_TOKEN_ID;
-    use web3::types::U256;
-    //use diesel::RunQueryDsl;
 
     #[test]
     fn test_store_proof() {
@@ -1467,7 +1458,7 @@ mod test {
         );
 
         let create_account = |id| {
-            let mut a = models::plasma::account::Account::default();
+            let a = models::plasma::account::Account::default();
             vec![AccountUpdate::Create {
                 id,
                 nonce: a.nonce,
@@ -1477,7 +1468,7 @@ mod test {
             .into_iter()
         };
         let transfer = |id_1, nonce_1, id_2, nonce_2| {
-            let mut a = models::plasma::account::Account::default();
+            let mut _a = models::plasma::account::Account::default();
             vec![
                 AccountUpdate::UpdateBalance {
                     id: id_1,
@@ -1501,7 +1492,7 @@ mod test {
         updates.extend(transfer(2, 1, 4, 1));
         updates.extend(create_account(5));
 
-        conn.commit_state_update(1, &updates);
+        conn.commit_state_update(1, &updates).expect("Commit state");
         apply_updates(&mut account_map, updates);
 
         let (_, state) = conn.load_committed_state(None).unwrap();
@@ -1866,7 +1857,7 @@ mod test {
         //        assert_eq!(txs.len(), 6);
     }
 
-    fn dummy_op(action: Action, block_number: BlockNumber) -> Operation {
+    fn dummy_op(_action: Action, _block_number: BlockNumber) -> Operation {
         unimplemented!()
         //        Operation {
         //            id: None,
