@@ -159,6 +159,14 @@ pub fn append_le_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, widt
     content.extend(token_bits.clone());
 }
 
+pub fn append_be_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, width: usize) {
+    let mut token_bits: Vec<bool> = BitIterator::new(x.into_repr()).collect();
+    token_bits.reverse();
+    token_bits.truncate(width);
+    token_bits.reverse();
+    content.extend(token_bits.clone());
+}
+
 pub fn le_bit_vector_into_field_element<P: PrimeField>(bits: &Vec<bool>) -> P {
     // double and add
     let mut fe = P::zero();

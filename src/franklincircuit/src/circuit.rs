@@ -1,15 +1,16 @@
 use crate::account::AccountContent;
 use crate::allocated_structures::*;
 use crate::element::{CircuitElement, CircuitPubkey};
-use crate::operation::{Operation};
-use crate::utils::{pack_bits_to_element};
+use crate::operation::Operation;
+use crate::utils::pack_bits_to_element;
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use ff::{Field, PrimeField};
 use franklin_crypto::circuit::baby_eddsa::EddsaSignature;
-use franklin_crypto::circuit::boolean::{Boolean};
+use franklin_crypto::circuit::boolean::Boolean;
 use franklin_crypto::circuit::ecc;
+use franklin_crypto::circuit::sha256;
 
-use franklin_crypto::circuit::num::{AllocatedNum};
+use franklin_crypto::circuit::num::AllocatedNum;
 use franklin_crypto::circuit::pedersen_hash;
 use franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
 use franklin_crypto::circuit::Assignment;
@@ -25,6 +26,10 @@ struct FranklinCircuit<'a, E: JubjubEngine> {
 
     /// The new root of the tree
     pub new_root: Option<E::Fr>,
+    pub block_number: Option<E::Fr>,
+    pub validator_address: Option<E::Fr>,
+
+    pub pub_data_commitment: Option<E::Fr>,
 
     pub operations: Vec<Operation<E>>,
 }
@@ -39,12 +44,19 @@ struct PreviousData<E: JubjubEngine> {
 //
 impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
     fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
-        let initial_pubdata =
-            AllocatedNum::alloc(cs.namespace(|| "initial pubdata"), || Ok(E::Fr::zero()))?;
-        initial_pubdata.assert_zero(cs.namespace(|| "initial pubdata is zero"))?;
+        let public_data_commitment =
+            AllocatedNum::alloc(cs.namespace(|| "public_data_commitment"), || {
+                self.pub_data_commitment.grab()
+            })?;
+        public_data_commitment.inputize(cs.namespace(|| "inputize pub_data"))?;
+
+            let validator_address = CircuitElement::from_fe_padded(cs.namespace(||"validator_address"), ||self.validator_address.grab())?;
+        
 
         let mut rolling_root =
             AllocatedNum::alloc(cs.namespace(|| "rolling_root"), || self.old_root.grab())?;
+
+        let old_root = CircuitElement::from_number_padded(cs.namespace(|| "old_root"), rolling_root.clone())?;
 
         let mut next_chunk_number =
             AllocatedNum::alloc(cs.namespace(|| "next_chunk_number"), || Ok(E::Fr::zero()))?;
@@ -64,21 +76,12 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             allocated_chunk_data = chunk_data;
             next_chunk_number = next_chunk;
 
-            // allocated_rolling_pubdata = self.accumulate_pubdata(
-            //     cs.namespace(|| "accumulate_pubdata"),
-            //     &operation,
-            //     &allocated_rolling_pubdata,
-            //     &allocated_chunk_data,
-            // )?;
-            let operation_pub_data_chunk =
-                AllocatedNum::alloc(cs.namespace(|| "operation_pub_data"), || {
-                    operation.clone().pubdata_chunk.grab()
-                })?;
-            let mut operation_pub_data_chunk_bits = operation_pub_data_chunk
-                .into_bits_le(cs.namespace(|| "operation_pub_data_chunk_bits"))?;
-            operation_pub_data_chunk_bits.truncate(franklin_constants::CHUNK_BIT_WIDTH);
-
-            block_pub_data_bits.extend(operation_pub_data_chunk_bits);
+            let operation_pub_data_chunk = CircuitElement::from_fe_strict(
+                cs.namespace(|| "operation_pub_data_chunk"),
+                || operation.clone().pubdata_chunk.grab(),
+                franklin_constants::CHUNK_BIT_WIDTH,
+            )?;
+            block_pub_data_bits.extend(operation_pub_data_chunk.get_bits_le());
 
             let lhs =
                 AllocatedOperationBranch::from_witness(cs.namespace(|| "lhs"), &operation.lhs)?;
@@ -112,7 +115,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &operation,
                 &allocated_chunk_data,
                 &is_account_empty,
-                &operation_pub_data_chunk,
+                &operation_pub_data_chunk.get_number(),
             )?;
             let (new_state_root, _is_account_empty) = self.check_account_data(
                 cs.namespace(|| "calculate new account root"),
@@ -120,7 +123,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             )?;
             let operation_new_root =
                 AllocatedNum::alloc(cs.namespace(|| "op_new_root"), || operation.new_root.grab())?;
-            //TODO inputize
             println!("new state_root: {}", new_state_root.get_value().unwrap());
             println!(
                 "op new state_root: {}",
@@ -134,8 +136,62 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             );
             rolling_root = new_state_root;
         }
-        //TODO enforce correct block new root
 
+        //TODO: apply fees
+        let final_root = CircuitElement::from_number_padded(cs.namespace(|| "final_root"), rolling_root.clone())?;
+        {
+            // Now it's time to pack the initial SHA256 hash due to Ethereum BE encoding
+            // and start rolling the hash
+
+            let mut initial_hash_data: Vec<Boolean> = vec![];
+
+            // make initial hash as sha256(uint256(block_number)||uint256(validator_address))
+            let mut block_number = CircuitElement::from_fe_padded(cs.namespace(||"block_number"), ||self.block_number.grab())?;
+            
+            initial_hash_data.extend(block_number.get_bits_be());
+
+            //TODO: probably enforce validator_address
+            initial_hash_data.extend(validator_address.get_bits_be());
+
+            assert_eq!(initial_hash_data.len(), 512);
+
+            let mut hash_block = sha256::sha256(
+                cs.namespace(|| "initial rolling sha256"),
+                &initial_hash_data,
+            )?;
+
+             let mut pack_bits = vec![];
+            pack_bits.extend(hash_block);
+            pack_bits.extend(old_root.get_bits_be());
+
+            hash_block = sha256::sha256(cs.namespace(|| "hash old_root"), &pack_bits)?;
+
+            let mut pack_bits = vec![];
+            pack_bits.extend(hash_block);
+            pack_bits.extend(final_root.get_bits_be());
+
+            hash_block = sha256::sha256(cs.namespace(|| "hash with new_root"), &pack_bits)?;
+
+            let mut pack_bits = vec![];
+            pack_bits.extend(hash_block);
+            pack_bits.extend(block_pub_data_bits.into_iter());
+
+            hash_block = sha256::sha256(cs.namespace(|| "final hash public"), &pack_bits)?;
+
+            // // now pack and enforce equality to the input
+
+            hash_block.reverse();
+            hash_block.truncate(E::Fr::CAPACITY as usize);
+
+            let final_hash = pack_bits_to_element(cs.namespace(||"final_hash"), &hash_block)?;
+
+            cs.enforce(
+                || "enforce external data hash equality",
+                |lc| lc + public_data_commitment.get_variable(),
+                |lc| lc + CS::one(),
+                |lc| lc + final_hash.get_variable(),
+            );
+        }
         Ok(())
     }
 }
@@ -521,7 +577,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         is_valid_flags.push(is_deposit.clone());
 
         // verify if new pubkey is equal to previous one (if existed)
-        // TODO: function for pubkeys equality
         let is_pub_equal_to_previous = CircuitPubkey::equals(
             cs.namespace(|| "is_pub_equal_to_previous"),
             &op_data.new_pubkey,
@@ -612,6 +667,44 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         Ok(tx_valid)
     }
+
+    fn transfer_to_new<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        cur: &mut AllocatedOperationBranch<E>,
+        lhs: &AllocatedOperationBranch<E>,
+        rhs: &AllocatedOperationBranch<E>,
+        chunk_data: &AllocatedChunkData<E>,
+        is_a_geq_b: &Boolean,
+        is_account_empty: &Boolean,
+        op_data: &AllocatedOperationData<E>,
+        ext_pubdata_chunk: &AllocatedNum<E>,
+    ) -> Result<Boolean, SynthesisError> {
+        let mut lhs_valid_flags = vec![];
+        let transfer_to_new_tx_type = AllocatedNum::alloc(cs.namespace(|| "transfer_to_new_tx_type"), || {
+                Ok(E::Fr::from_str("2").unwrap())
+            })?;
+        transfer_to_new_tx_type.assert_number(
+            cs.namespace(|| "transfer_to_new_tx_type equals two"),
+            &E::Fr::from_str("2").unwrap(),
+        )?;
+        let is_transfer = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is_transfer"),
+            &chunk_data.tx_type.get_number(),
+            &transfer_to_new_tx_type,
+        )?);
+        lhs_valid_flags.push(is_transfer);
+        let zero = AllocatedNum::alloc(cs.namespace(|| "zero"), || Ok(E::Fr::zero()))?;
+        zero.assert_zero(cs.namespace(|| "zero is zero"))?;
+        let is_first_chunk = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is_first_chunk"),
+            &chunk_data.chunk_number,
+            &zero,
+        )?);
+        lhs_valid_flags.push(is_first_chunk);
+
+    }
+
     //TODO: verify token equality
     fn transfer<CS: ConstraintSystem<E>>(
         &self,
@@ -632,12 +725,13 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             *franklin_constants::TOKEN_EXT_BIT_WIDTH,
             Boolean::constant(false),
         );
-        pubdata_bits.extend(chunk_data.tx_type.get_bits_le());
-        pubdata_bits.extend(lhs.account_address.get_bits_le());
+        pub_token_bits.reverse();
+        pubdata_bits.extend(chunk_data.tx_type.get_bits_be());
+        pubdata_bits.extend(lhs.account_address.get_bits_be());
         pubdata_bits.extend(pub_token_bits.clone());
-        pubdata_bits.extend(rhs.account_address.get_bits_le());
-        pubdata_bits.extend(op_data.amount_packed.get_bits_le().clone());
-        pubdata_bits.extend(op_data.fee_packed.get_bits_le().clone());
+        pubdata_bits.extend(rhs.account_address.get_bits_be());
+        pubdata_bits.extend(op_data.amount_packed.get_bits_be());
+        pubdata_bits.extend(op_data.fee_packed.get_bits_be());
         assert_eq!(pubdata_bits.len(), 13 * 8);
 
         pubdata_bits.resize(
@@ -881,7 +975,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         branch: &AllocatedOperationBranch<E>,
     ) -> Result<(Vec<Boolean>, Boolean), SynthesisError> {
         //first we prove calculate root of the subtree to obtain account_leaf_data:
-        // let mut subtree_data = vec![];
+
         let balance_data = &branch.balance.get_bits_le();
         let balance_root = allocate_merkle_root(
             cs.namespace(|| "balance_subtree_root"),
@@ -890,15 +984,13 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &branch.balance_audit_path,
             self.params,
         )?;
-        // subtree_data
-        //     .extend(balance_root.into_bits_le(cs.namespace(|| "balance_subtree_root_bits"))?);
+
         // println!("balance root: {}", balance_root.get_value().unwrap());
         let subtree_root = CircuitElement::from_number(
             cs.namespace(|| "subtree_root_ce"),
             balance_root,
             franklin_constants::FR_BIT_WIDTH,
         )?;
-        // println!("subtree root: {}", subtree_root.get_value().unwrap());
         let mut account_data = vec![];
         account_data.extend(branch.account.nonce.get_bits_le().clone());
         account_data.extend(branch.account.pub_key.get_packed_key());
@@ -940,7 +1032,6 @@ fn allocate_merkle_root<E: JubjubEngine, CS: ConstraintSystem<E>>(
     // This is an injective encoding, as cur is a
     // point in the prime order subgroup.
     let mut cur_hash = account_leaf_hash.get_x().clone();
-    // println!("leaf_hash: {}", cur_hash.get_value().unwrap());
 
     // Ascend the merkle tree authentication path
     for (i, direction_bit) in index.clone().into_iter().enumerate() {
@@ -1315,52 +1406,52 @@ mod test {
 
         let deposit_tx_type = Fr::from_str("1").unwrap();
         let mut pubdata_bits = vec![];
-        append_le_fixed_width(
+        append_be_fixed_width(
             &mut pubdata_bits,
             &deposit_tx_type,
             *franklin_constants::TX_TYPE_BIT_WIDTH,
         );
 
-        append_le_fixed_width(
+        append_be_fixed_width(
             &mut pubdata_bits,
             &sender_leaf_number_fe,
             franklin_constants::ACCOUNT_TREE_DEPTH,
         );
-        append_le_fixed_width(
+        append_be_fixed_width(
             &mut pubdata_bits,
             &token_fe,
             *franklin_constants::TOKEN_EXT_BIT_WIDTH,
         );
-        append_le_fixed_width(
+        append_be_fixed_width(
             &mut pubdata_bits,
             &transfer_amount_encoded,
             franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
                 + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
         );
 
-        append_le_fixed_width(
+        append_be_fixed_width(
             &mut pubdata_bits,
             &fee_encoded,
             franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         );
 
         let mut new_pubkey_bits = vec![];
-        append_le_fixed_width(
+        append_be_fixed_width(
             &mut new_pubkey_bits,
             &sender_y,
             franklin_constants::FR_BIT_WIDTH - 1,
         );
-        append_le_fixed_width(&mut new_pubkey_bits, &sender_x, 1);
+        append_be_fixed_width(&mut new_pubkey_bits, &sender_x, 1);
         let new_pubkey_hash = phasher.hash_bits(new_pubkey_bits);
 
-        append_le_fixed_width(
+        append_be_fixed_width(
             &mut pubdata_bits,
             &new_pubkey_hash,
             *franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         );
         assert_eq!(pubdata_bits.len(), 38 * 8);
         pubdata_bits.resize(40 * 8, false);
-        // let pubdata_chunks = pubdata_bits.chunks(64).collect::<Vec<_>>();
+
         let pubdata_chunks: Vec<Fr> = pubdata_bits
             .chunks(64)
             .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
@@ -1496,6 +1587,9 @@ mod test {
                     operation_three,
                     operation_four,
                 ],
+                pub_data_commitment: None,
+                block_number: None,
+                validator_address: None, 
             };
 
             instance.synthesize(&mut cs).unwrap();
@@ -1515,9 +1609,11 @@ mod test {
         use crate::account::*;
         use crate::operation::*;
         use crate::utils::*;
-        
-        
-        use ff::{Field};
+
+        use crypto::digest::Digest;
+        use crypto::sha2::Sha256;
+        use ff::Field;
+        use ff::{BitIterator, PrimeFieldRepr};
         use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
         use franklin_crypto::circuit::float_point::convert_to_float;
         use franklin_crypto::circuit::test::*;
@@ -1538,9 +1634,8 @@ mod test {
 
         let mut to_balance_tree =
             CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
-        let _to_balance_root = to_balance_tree.root_hash();
-        // println!("test balance root: {}", balance_root);
 
+        let validator_address = Fr::from_str("7").unwrap();
         let phasher = PedersenHasher::<Bn256>::default();
         let default_subtree_hash = from_balance_root;
         // println!("test subtree root: {}", default_subtree_hash);
@@ -1782,41 +1877,42 @@ mod test {
 
         // construct pubdata
         let mut pubdata_bits = vec![];
-        append_le_fixed_width(
+        append_be_fixed_width(
             &mut pubdata_bits,
             &transfer_tx_type,
             *franklin_constants::TX_TYPE_BIT_WIDTH,
         );
 
-        append_le_fixed_width(
+        append_be_fixed_width(
             &mut pubdata_bits,
             &from_leaf_number_fe,
             franklin_constants::ACCOUNT_TREE_DEPTH,
         );
-        append_le_fixed_width(
+        append_be_fixed_width(
             &mut pubdata_bits,
             &token_fe,
             *franklin_constants::TOKEN_EXT_BIT_WIDTH,
         );
-        append_le_fixed_width(
+        append_be_fixed_width(
             &mut pubdata_bits,
             &to_leaf_number_fe,
             franklin_constants::ACCOUNT_TREE_DEPTH,
         );
-        append_le_fixed_width(
+        append_be_fixed_width(
             &mut pubdata_bits,
             &transfer_amount_encoded,
             franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
                 + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
         );
 
-        append_le_fixed_width(
+        append_be_fixed_width(
             &mut pubdata_bits,
             &fee_encoded,
             franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         );
         assert_eq!(pubdata_bits.len(), 13 * 8);
-        pubdata_bits.resize(16 * 8, false);
+        pubdata_bits.resize(16 * 8, false); //TODO verify if right padding is okay
+
         let pub_first_chunk_bits = pubdata_bits[0..franklin_constants::CHUNK_BIT_WIDTH].to_vec();
         let pub_first_chunk = le_bit_vector_into_field_element::<Fr>(&pub_first_chunk_bits);
         println!("pub_first_chunk {}", pub_first_chunk);
@@ -1826,6 +1922,100 @@ mod test {
         let pub_second_chunk = le_bit_vector_into_field_element::<Fr>(&pub_second_chunk_bits);
         println!("pub_second_chunk {}", pub_second_chunk);
         // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
+
+        let mut public_data_initial_bits = vec![];
+
+        // these two are BE encodings because an iterator is BE. This is also an Ethereum standard behavior
+
+        let block_number_bits: Vec<bool> = BitIterator::new(Fr::one().into_repr()).collect();
+        for _ in 0..256 - block_number_bits.len() {
+            public_data_initial_bits.push(false);
+        }
+        public_data_initial_bits.extend(block_number_bits.into_iter());
+
+        let validator_id_bits: Vec<bool> =
+            BitIterator::new(validator_address.into_repr()).collect();
+        for _ in 0..256 - validator_id_bits.len() {
+            public_data_initial_bits.push(false);
+        }
+        public_data_initial_bits.extend(validator_id_bits.into_iter());
+
+        assert_eq!(public_data_initial_bits.len(), 512);
+
+        let mut h = Sha256::new();
+
+        let bytes_to_hash = be_bit_vector_into_bytes(&public_data_initial_bits);
+
+        h.input(&bytes_to_hash);
+
+        let mut hash_result = [0u8; 32];
+        h.result(&mut hash_result[..]);
+
+        println!("Initial hash hex {}", hex::encode(hash_result));
+
+        let mut packed_old_root_bits = vec![];
+        let old_root_bits: Vec<bool> = BitIterator::new(initial_root.into_repr()).collect();
+        for _ in 0..256 - old_root_bits.len() {
+            packed_old_root_bits.push(false);
+        }
+        packed_old_root_bits.extend(old_root_bits);
+
+        let packed_old_root_bytes = be_bit_vector_into_bytes(&packed_old_root_bits);
+
+        let mut packed_with_old_root = vec![];
+        packed_with_old_root.extend(hash_result.iter());
+        packed_with_old_root.extend(packed_old_root_bytes);
+
+        h = Sha256::new();
+        h.input(&packed_with_old_root);
+        hash_result = [0u8; 32];
+        h.result(&mut hash_result[..]);
+
+        let mut packed_new_root_bits = vec![];
+        let new_root_bits: Vec<bool> = BitIterator::new(final_root.into_repr()).collect();
+        for _ in 0..256 - new_root_bits.len() {
+            packed_new_root_bits.push(false);
+        }
+        packed_new_root_bits.extend(new_root_bits);
+
+        let packed_new_root_bytes = be_bit_vector_into_bytes(&packed_new_root_bits);
+
+        let mut packed_with_new_root = vec![];
+        packed_with_new_root.extend(hash_result.iter());
+        packed_with_new_root.extend(packed_new_root_bytes);
+
+        h = Sha256::new();
+        h.input(&packed_with_new_root);
+        hash_result = [0u8; 32];
+        h.result(&mut hash_result[..]);
+
+        println!("hash with new root as hex {}", hex::encode(hash_result));
+
+        let mut final_bytes = vec![];
+        let pubdata_bytes = be_bit_vector_into_bytes(&pubdata_bits);
+        final_bytes.extend(hash_result.iter());
+        final_bytes.extend(pubdata_bytes);
+
+        h = Sha256::new();
+        h.input(&final_bytes);
+        hash_result = [0u8; 32];
+        h.result(&mut hash_result[..]);
+
+        println!("final hash as hex {}", hex::encode(hash_result));
+
+        hash_result[0] &= 0x1f; // temporary solution, this nullifies top bits to be encoded into field element correctly
+
+        let mut repr = Fr::zero().into_repr();
+        repr.read_be(&hash_result[..])
+            .expect("pack hash as field element");
+
+        let public_data_commitment = Fr::from_repr(repr).unwrap();
+
+        println!(
+            "Final data commitment as field element = {}",
+            public_data_commitment
+        );
+
         let signature = sign(&sig_bits, &from_sk, p_g, params, rng);
 
         //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
@@ -1954,41 +2144,6 @@ mod test {
             rhs: to_operation_branch_after.clone(),
         };
 
-        // let mut h = Sha256::new();
-
-        // let bytes_to_hash = be_bit_vector_into_bytes(&pubdata_bits);
-        // h.input(&bytes_to_hash);
-        // let mut hash_result = [0u8; 32];
-        // h.result(&mut hash_result[..]);
-        // println!("Initial hash hex {}", hex::encode(hash_result));
-        // let mut packed_transaction_data = vec![];
-        // let transaction_data = transaction.public_data_into_bits();
-        // packed_transaction_data.extend(transaction_data.clone().into_iter());
-        // let packed_transaction_data_bytes =
-        //     be_bit_vector_into_bytes(&packed_transaction_data);
-        // println!(
-        //     "Packed transaction data hex {}",
-        //     hex::encode(packed_transaction_data_bytes.clone())
-        // );
-        // let mut next_round_hash_bytes = vec![];
-        // next_round_hash_bytes.extend(hash_result.iter());
-        // next_round_hash_bytes.extend(packed_transaction_data_bytes);
-        // // assert_eq!(next_round_hash_bytes.len(), 64);
-        // h = Sha256::new();
-        // h.input(&next_round_hash_bytes);
-        // hash_result = [0u8; 32];
-        // h.result(&mut hash_result[..]);
-        // println!("Final hash as hex {}", hex::encode(hash_result));
-        // hash_result[0] &= 0x1f; // temporary solution
-        // let mut repr = Fr::zero().into_repr();
-        // repr.read_be(&hash_result[..])
-        //     .expect("pack hash as field element");
-        // let public_data_commitment = Fr::from_repr(repr).unwrap();
-        // println!(
-        //     "Final data commitment as field element = {}",
-        //     public_data_commitment
-        // );
-
         {
             let mut cs = TestConstraintSystem::<Bn256>::new();
 
@@ -1997,6 +2152,9 @@ mod test {
                 old_root: Some(initial_root),
                 new_root: Some(final_root),
                 operations: vec![operation_zero, operation_one],
+                pub_data_commitment: Some(public_data_commitment),
+                block_number: Some(Fr::one()),
+                validator_address: Some(validator_address),
             };
 
             instance.synthesize(&mut cs).unwrap();

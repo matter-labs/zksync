@@ -1,15 +1,12 @@
-use crate::utils::{pack_bits_to_element};
+use crate::utils::pack_bits_to_element;
 use bellman::{ConstraintSystem, SynthesisError};
-use ff::{Field};
+use ff::Field;
 
-use franklin_crypto::circuit::boolean::{Boolean};
+use franklin_crypto::circuit::boolean::Boolean;
 
+use franklin_crypto::circuit::num::AllocatedNum;
 
-use franklin_crypto::circuit::num::{AllocatedNum};
-
-
-
-use franklin_crypto::jubjub::{JubjubEngine};
+use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::params as franklin_constants;
 
 #[derive(Clone)]
@@ -28,6 +25,15 @@ impl<E: JubjubEngine> CircuitElement<E> {
         let number =
             AllocatedNum::alloc(cs.namespace(|| "number from field element"), field_element)?;
         CircuitElement::from_number_strict(cs.namespace(|| "circuit_element"), number, max_length)
+    }
+
+      pub fn from_fe_padded<CS: ConstraintSystem<E>, F: FnOnce() -> Result<E::Fr, SynthesisError>>(
+        mut cs: CS,
+        field_element: F,
+    ) -> Result<Self, SynthesisError> {
+        let number =
+            AllocatedNum::alloc(cs.namespace(|| "number from field element"), field_element)?;
+        CircuitElement::from_number_padded(cs.namespace(|| "circuit_element"), number)
     }
     pub fn from_number<CS: ConstraintSystem<E>>(
         mut cs: CS,
@@ -59,6 +65,23 @@ impl<E: JubjubEngine> CircuitElement<E> {
 
         Ok(ce)
     }
+
+    pub fn from_number_padded<CS: ConstraintSystem<E>>(
+        mut cs: CS,
+        number: AllocatedNum<E>,
+    ) -> Result<Self, SynthesisError> {
+        let mut bits = number.into_bits_le(cs.namespace(|| "into_bits_le"))?;
+        bits.resize(256, Boolean::constant(false));
+
+        let ce = CircuitElement {
+            number: number,
+            bits_le: bits,
+            length: 256,
+        };
+
+        Ok(ce)
+    }
+
     pub fn enforce_length<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,

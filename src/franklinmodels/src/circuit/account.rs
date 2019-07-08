@@ -12,7 +12,6 @@ pub struct CircuitAccount<E: JubjubEngine> {
     pub pub_y: E::Fr,
 }
 
-
 impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
     fn get_bits_le(&self) -> Vec<bool> {
         let mut leaf_content = Vec::new();

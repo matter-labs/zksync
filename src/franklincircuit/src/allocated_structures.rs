@@ -12,7 +12,7 @@ use franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
 use franklin_crypto::circuit::num::AllocatedNum;
 
 use franklin_crypto::circuit::Assignment;
-use franklin_crypto::jubjub::{JubjubEngine};
+use franklin_crypto::jubjub::JubjubEngine;
 
 pub struct AllocatedOperationBranch<E: JubjubEngine> {
     pub account: AccountContent<E>,
