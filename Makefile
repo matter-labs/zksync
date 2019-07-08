@@ -303,13 +303,15 @@ tesseracts-down:
 
 # Key generator 
 
-restore-tree: db-drop db-wait db-setup build-restore-tree run-restore-tree
+tree-restore-setup-and-run: tree-restore-db-prepare tree-restore-build tree-restore-run
 
-build-restore-tree:
+tree-restore-db-prepare: db-drop db-wait db-setup
+
+tree-restore-build:
 	@cargo build -p data_restore --release --bin data_restore
 
-run-restore-tree:
-	@RUST_LOG=INFO ./target/release/data_restore 4 15
+tree-restore-run:
+	@RUST_LOG=INFO ./target/release/data_restore 4 300180
 
-continue-restore-tree:
+tree-restore-continue:
 	@RUST_LOG=INFO ./target/release/data_restore storage 15

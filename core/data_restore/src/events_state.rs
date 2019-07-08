@@ -4,17 +4,17 @@ use web3::futures::Future;
 use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
 // use tokio_core::reactor::Core;
 
-use crate::blocks::{BlockType, LogBlockData};
+use crate::events::{EventType, EventData};
 use crate::helpers::*;
 
-type ComAndVerBlocksVecs = (Vec<LogBlockData>, Vec<LogBlockData>);
+type ComAndVerBlocksVecs = (Vec<EventData>, Vec<EventData>);
 type BlockNumber256 = U256;
 
 #[derive(Debug, Clone)]
-pub struct BlockEventsFranklin {
+pub struct EventsState {
     pub config: DataRestoreConfig,
-    pub committed_blocks: Vec<LogBlockData>,
-    pub verified_blocks: Vec<LogBlockData>,
+    pub committed_blocks: Vec<EventData>,
+    pub verified_blocks: Vec<EventData>,
     pub last_watched_block_number: BlockNumber256,
 }
 
@@ -24,7 +24,7 @@ pub struct BlockEventsFranklin {
 // Subscribe on new blocks
 // New blocks -> last watching block ++
 // Check if txs in last watching block
-impl BlockEventsFranklin {
+impl EventsState {
     pub fn new(config: DataRestoreConfig) -> Self {
         Self {
             // ws_endpoint_string: ws_infura_endpoint_string,
@@ -40,7 +40,7 @@ impl BlockEventsFranklin {
         genesis_block: U256,
         blocks_delta: U256,
     ) -> Result<Self, DataRestoreError> {
-        let mut this = BlockEventsFranklin::new(config);
+        let mut this = EventsState::new(config);
         let (blocks, to_block_number): (ComAndVerBlocksVecs, BlockNumber256) = this
             .get_sorted_past_logs_from_genesis(genesis_block, blocks_delta)
             .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
@@ -66,8 +66,8 @@ impl BlockEventsFranklin {
 
     pub fn get_only_verified_committed_blocks(
         &self,
-        verified_blocks: &[LogBlockData],
-    ) -> Vec<&LogBlockData> {
+        verified_blocks: &[EventData],
+    ) -> Vec<&EventData> {
         let iter_ver_blocks = verified_blocks.iter();
         // let committed_blocks_iter = &mut self.com_blocks.iter();
         let mut ver_com_blocks = vec![];
@@ -85,7 +85,7 @@ impl BlockEventsFranklin {
         ver_com_blocks
     }
 
-    // pub fn get_only_verified_committed_blocks(&self) -> Vec<&LogBlockData> {
+    // pub fn get_only_verified_committed_blocks(&self) -> Vec<&EventData> {
     //     let ver_blocks = &mut self.verified_blocks.iter();
     //     // let committed_blocks_iter = &mut self.com_blocks.iter();
     //     let mut ver_com_blocks = vec![];
@@ -102,17 +102,17 @@ impl BlockEventsFranklin {
 
     pub fn check_committed_block_with_same_number_as_verified(
         &self,
-        verified_block: &LogBlockData,
-    ) -> Option<&LogBlockData> {
+        verified_block: &EventData,
+    ) -> Option<&EventData> {
         let committed_blocks_iter = &mut self.committed_blocks.iter();
         committed_blocks_iter.find(|&&x| x.block_num == verified_block.block_num)
     }
 
-    pub fn get_committed_blocks(&self) -> &Vec<LogBlockData> {
+    pub fn get_committed_blocks(&self) -> &Vec<EventData> {
         &self.committed_blocks
     }
 
-    pub fn get_verified_blocks(&self) -> &Vec<LogBlockData> {
+    pub fn get_verified_blocks(&self) -> &Vec<EventData> {
         &self.verified_blocks
     }
 
@@ -133,17 +133,17 @@ impl BlockEventsFranklin {
         if logs.is_empty() {
             return Err(DataRestoreError::NoData("No logs in list".to_string()));
         }
-        let mut committed_blocks: Vec<LogBlockData> = vec![];
-        let mut verified_blocks: Vec<LogBlockData> = vec![];
+        let mut committed_blocks: Vec<EventData> = vec![];
+        let mut verified_blocks: Vec<EventData> = vec![];
         let block_verified_topic = "BlockVerified(uint32)";
         let block_committed_topic = "BlockCommitted(uint32)";
         let block_verified_topic_h256: H256 = get_topic_keccak_hash(block_verified_topic);
         let block_committed_topic_h256: H256 = get_topic_keccak_hash(block_committed_topic);
         for log in logs {
-            let mut block: LogBlockData = LogBlockData {
+            let mut block: EventData = EventData {
                 block_num: 0,
                 transaction_hash: H256::zero(),
-                block_type: BlockType::Unknown,
+                block_type: EventType::Unknown,
             };
             // Log data
             let tx_hash = log.transaction_hash;
@@ -156,7 +156,7 @@ impl BlockEventsFranklin {
                     block.transaction_hash = hash;
 
                     if topic == block_verified_topic_h256 {
-                        block.block_type = BlockType::Verified;
+                        block.block_type = EventType::Verified;
                         verified_blocks.push(block);
                     // let result = self.check_committed_block_with_same_number_as_verified(&block);
                     // debug!("Block exists: {:?}", result);
@@ -165,7 +165,7 @@ impl BlockEventsFranklin {
                     // let data = FranklinTransaction::get_transaction(InfuraEndpoint::Rinkeby, &tx);
                     // debug!("TX data committed: {:?}", data);
                     } else if topic == block_committed_topic_h256 {
-                        block.block_type = BlockType::Committed;
+                        block.block_type = EventType::Committed;
                         committed_blocks.push(block);
                     }
                 }

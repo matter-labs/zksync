@@ -83,7 +83,7 @@ table! {
 }
 
 table! {
-    block_events (id) {
+    events_state (id) {
         id -> Int4,
         block_type -> Text,
         transaction_hash -> Bytea,
@@ -137,7 +137,7 @@ allow_tables_to_appear_in_same_query!(
     server_config,
     tree_restore_network,
     tree_restore_last_watched_eth_block,
-    block_events,
+    events_state,
     franklin_transactions,
     transactions,
 );

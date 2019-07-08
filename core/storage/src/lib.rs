@@ -314,7 +314,7 @@ pub struct StoredLastWatchedEthBlockNumber {
 }
 
 // #[derive(Insertable)]
-// #[table_name = "block_events"]
+// #[table_name = "events_state"]
 // struct NewBlockLog {
 //     pub block_type: String, // 'commit', 'verify'
 //     pub transaction_hash: String,
@@ -322,7 +322,7 @@ pub struct StoredLastWatchedEthBlockNumber {
 // }
 
 #[derive(Insertable)]
-#[table_name = "block_events"]
+#[table_name = "events_state"]
 pub struct NewBlockLog {
     pub block_type: String, // 'Committed', 'Verified'
     pub transaction_hash: Vec<u8>,
@@ -330,7 +330,7 @@ pub struct NewBlockLog {
 }
 
 #[derive(Insertable, Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
-#[table_name = "block_events"]
+#[table_name = "events_state"]
 pub struct StoredBlockLog {
     pub id: i32,
     pub block_type: String, // 'Committed', 'Verified'
@@ -339,8 +339,8 @@ pub struct StoredBlockLog {
 }
 
 // impl StoredBlockLog {
-//     pub fn into_block_log(&self) -> QueryResult<LogBlockData> {
-//         let mut block_log = LogBlockData {
+//     pub fn into_block_log(&self) -> QueryResult<EventData> {
+//         let mut block_log = EventData {
 //             block_num: self.block_num as u32,
 //             transaction_hash: H256::from_str(transaction_hash.as_str()).unwrap(),
 //             block_type: BlockType::Unknown,
@@ -1168,9 +1168,9 @@ impl StorageProcessor {
         Ok(())
     }
 
-    pub fn save_block_events(&self, events: &[NewBlockLog]) -> QueryResult<()> {
+    pub fn save_events_state(&self, events: &[NewBlockLog]) -> QueryResult<()> {
         for event in events.iter() {
-            let inserted = diesel::insert_into(block_events::table)
+            let inserted = diesel::insert_into(events_state::table)
                 .values(event)
                 .execute(self.conn())?;
             if 0 == inserted {
@@ -1217,8 +1217,8 @@ impl StorageProcessor {
         Ok(())
     }
 
-    pub fn delete_block_events(&self) -> QueryResult<()> {
-        let deleted = diesel::delete(block_events::table).execute(self.conn())?;
+    pub fn delete_events_state(&self) -> QueryResult<()> {
+        let deleted = diesel::delete(events_state::table).execute(self.conn())?;
         if 0 == deleted {
             error!("Error: could not delete block events!");
             return Err(Error::RollbackTransaction);
@@ -1250,10 +1250,10 @@ impl StorageProcessor {
         tree_restore_network.first(self.conn())
     }
 
-    pub fn load_committed_block_events(&self) -> Vec<StoredBlockLog> {
+    pub fn load_committed_events_state(&self) -> Vec<StoredBlockLog> {
         let committed_query = format!(
             "
-            SELECT * FROM block_events
+            SELECT * FROM events_state
             WHERE block_type = 'Committed'
             ORDER BY block_num ASC
         "
@@ -1263,10 +1263,10 @@ impl StorageProcessor {
             .unwrap_or_else(|_| vec![])
     }
 
-    pub fn load_verified_block_events(&self) -> Vec<StoredBlockLog> {
+    pub fn load_verified_events_state(&self) -> Vec<StoredBlockLog> {
         let verified_query = format!(
             "
-            SELECT * FROM block_events
+            SELECT * FROM events_state
             WHERE block_type = 'Verified'
             ORDER BY block_num ASC
         "

@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Checks if db is up and accepting connections.
+
+. .setup_env
+
+for i in $(seq 1 5);
+    do pg_isready -d "$TREE_RESTORE_DATABASE_URL" && s=0 && break || s=$? && sleep 5;
+done;
+
+# Force read env
+FRANKLIN_ENV=
+. .setup_env
+cd core/storage
+
+echo TREE_RESTORE_DATABASE_URL=$TREE_RESTORE_DATABASE_URL
+diesel database setup || exit 1
+diesel migration run || exit 1
+
+
+

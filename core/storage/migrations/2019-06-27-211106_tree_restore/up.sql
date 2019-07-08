@@ -9,7 +9,7 @@ CREATE TABLE tree_restore_last_watched_eth_block (
     block_number TEXT NOT NULL
 );
 
-CREATE TABLE block_events (
+CREATE TABLE events_state (
     id SERIAL PRIMARY KEY,
     block_type TEXT NOT NULL,
     transaction_hash BYTEA NOT NULL,

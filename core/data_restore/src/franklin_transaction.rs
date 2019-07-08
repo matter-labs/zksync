@@ -1,7 +1,7 @@
 use web3::futures::Future;
 use web3::types::{Transaction, TransactionId, H256};
 
-use crate::blocks::LogBlockData;
+use crate::events::EventData;
 use crate::helpers::*;
 
 #[derive(Debug, Copy, Clone)]
@@ -23,7 +23,7 @@ pub struct FranklinTransaction {
 impl FranklinTransaction {
     pub fn get_transaction(
         config: &DataRestoreConfig,
-        franklin_block: &LogBlockData,
+        franklin_block: &EventData,
     ) -> Option<Self> {
         let transaction = FranklinTransaction::get_ethereum_transaction(
             config,

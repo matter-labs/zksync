@@ -1,5 +1,5 @@
-use crate::block_events::BlockEventsFranklin;
-use crate::blocks::{BlockType, LogBlockData};
+use crate::events_state::EventsState;
+use crate::events::{EventType, EventData};
 use crate::franklin_transaction::{FranklinTransaction, FranklinTransactionType};
 use crate::helpers;
 use std::convert::TryFrom;
@@ -16,7 +16,7 @@ pub fn remove_storage_data(
         .access_storage()
         .expect("db connection failed for tree restore remove data");
     let delete_tree_restore_network_res = storage.delete_tree_restore_network();
-    let delete_block_events_res = storage.delete_block_events();
+    let delete_events_state_res = storage.delete_events_state();
     let delete_last_watched_block_number_res = storage.delete_last_watched_block_number();
     let delete_franklin_transactions_res = storage.delete_franklin_transactions();
     if delete_tree_restore_network_res.is_err() {
@@ -24,7 +24,7 @@ pub fn remove_storage_data(
             "No network in storage".to_string(),
         ));
     }
-    if delete_block_events_res.is_err() {
+    if delete_events_state_res.is_err() {
         return Err(helpers::DataRestoreError::NoData(
             "No block events in storage".to_string(),
         ));
@@ -60,7 +60,7 @@ pub fn save_tree_restore_from_config(
         .expect("cant save tree restore network");
 }
 
-pub fn save_block_events(events: &Vec<LogBlockData>, connection_pool: ConnectionPool) {
+pub fn save_events_state(events: &Vec<EventData>, connection_pool: ConnectionPool) {
     let mut new_logs: Vec<NewBlockLog> = vec![];
     for log in events {
         new_logs
@@ -70,7 +70,7 @@ pub fn save_block_events(events: &Vec<LogBlockData>, connection_pool: Connection
         .access_storage()
         .expect("db connection failed for tree restore save events");
     storage
-        .save_block_events(new_logs.as_slice())
+        .save_events_state(new_logs.as_slice())
         .expect("cant save tree restore network");
 }
 
@@ -102,25 +102,25 @@ pub fn save_franklin_transactions(txs: &Vec<FranklinTransaction>, connection_poo
         .expect("cant save franklin transaction");
 }
 
-pub fn stored_block_log_into_block_log(block: &StoredBlockLog) -> Option<LogBlockData> {
-    Some(LogBlockData {
+pub fn stored_block_log_into_block_log(block: &StoredBlockLog) -> Option<EventData> {
+    Some(EventData {
         block_num: u32::try_from(block.block_num)
             .expect("cant make block_num in stored_block_log_into_block_log"),
         transaction_hash: H256::from_slice(block.transaction_hash.as_slice()),
         block_type: match &block.block_type {
-            c if c == "Committed" => BlockType::Committed,
-            v if v == "Verified" => BlockType::Verified,
+            c if c == "Committed" => EventType::Committed,
+            v if v == "Verified" => EventType::Verified,
             _ => return None,
         },
     })
 }
 
-pub fn block_log_into_stored_block_log(block: &LogBlockData) -> Option<NewBlockLog> {
+pub fn block_log_into_stored_block_log(block: &EventData) -> Option<NewBlockLog> {
     Some(NewBlockLog {
         block_type: match block.block_type {
-            BlockType::Committed => "Committed".to_string(),
-            BlockType::Verified => "Verified".to_string(),
-            BlockType::Unknown => return None,
+            EventType::Committed => "Committed".to_string(),
+            EventType::Verified => "Verified".to_string(),
+            EventType::Unknown => return None,
         },
         transaction_hash: block.transaction_hash.as_bytes().to_vec(),
         block_num: i64::from(block.block_num),
@@ -292,9 +292,9 @@ pub fn get_last_watched_block_number_from_storage(connection_pool: ConnectionPoo
         .expect("cant make u256 block_number in get_last_watched_block_number_from_storage")
 }
 
-pub fn get_block_events_from_storage(connection_pool: ConnectionPool) -> BlockEventsFranklin {
+pub fn get_events_state_from_storage(connection_pool: ConnectionPool) -> EventsState {
     let config = get_config_from_storage(connection_pool.clone())
-        .expect("cant get config from storage in get_block_events_from_storage");
+        .expect("cant get config from storage in get_events_state_from_storage");
     let last_watched_block_number =
         get_last_watched_block_number_from_storage(connection_pool.clone());
 
@@ -302,21 +302,21 @@ pub fn get_block_events_from_storage(connection_pool: ConnectionPool) -> BlockEv
         .access_storage()
         .expect("db connection failed for past events");
 
-    let committed_logs = storage.load_committed_block_events();
-    let mut committed_blocks: Vec<LogBlockData> = vec![];
+    let committed_logs = storage.load_committed_events_state();
+    let mut committed_blocks: Vec<EventData> = vec![];
     for log in committed_logs {
         let block_log = stored_block_log_into_block_log(&log).expect("block logs db is broken");
         committed_blocks.push(block_log);
     }
 
-    let verified_logs = storage.load_verified_block_events();
-    let mut verified_blocks: Vec<LogBlockData> = vec![];
+    let verified_logs = storage.load_verified_events_state();
+    let mut verified_blocks: Vec<EventData> = vec![];
     for log in verified_logs {
         let block_log = stored_block_log_into_block_log(&log).expect("block logs db is broken");
         verified_blocks.push(block_log);
     }
 
-    BlockEventsFranklin {
+    EventsState {
         config,
         committed_blocks,
         verified_blocks,
