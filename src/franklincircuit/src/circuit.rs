@@ -19,7 +19,7 @@ use franklinmodels::params as franklin_constants;
 
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 6;
 
-struct FranklinCircuit<'a, E: JubjubEngine> {
+pub struct FranklinCircuit<'a, E: JubjubEngine> {
     pub params: &'a E::Params,
     /// The old root of the tree
     pub old_root: Option<E::Fr>,
@@ -50,13 +50,16 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             })?;
         public_data_commitment.inputize(cs.namespace(|| "inputize pub_data"))?;
 
-            let validator_address = CircuitElement::from_fe_padded(cs.namespace(||"validator_address"), ||self.validator_address.grab())?;
-        
+        let validator_address =
+            CircuitElement::from_fe_padded(cs.namespace(|| "validator_address"), || {
+                self.validator_address.grab()
+            })?;
 
         let mut rolling_root =
             AllocatedNum::alloc(cs.namespace(|| "rolling_root"), || self.old_root.grab())?;
 
-        let old_root = CircuitElement::from_number_padded(cs.namespace(|| "old_root"), rolling_root.clone())?;
+        let old_root =
+            CircuitElement::from_number_padded(cs.namespace(|| "old_root"), rolling_root.clone())?;
 
         let mut next_chunk_number =
             AllocatedNum::alloc(cs.namespace(|| "next_chunk_number"), || Ok(E::Fr::zero()))?;
@@ -138,7 +141,10 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         }
 
         //TODO: apply fees
-        let final_root = CircuitElement::from_number_padded(cs.namespace(|| "final_root"), rolling_root.clone())?;
+        let final_root = CircuitElement::from_number_padded(
+            cs.namespace(|| "final_root"),
+            rolling_root.clone(),
+        )?;
         {
             // Now it's time to pack the initial SHA256 hash due to Ethereum BE encoding
             // and start rolling the hash
@@ -146,8 +152,11 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             let mut initial_hash_data: Vec<Boolean> = vec![];
 
             // make initial hash as sha256(uint256(block_number)||uint256(validator_address))
-            let mut block_number = CircuitElement::from_fe_padded(cs.namespace(||"block_number"), ||self.block_number.grab())?;
-            
+            let mut block_number =
+                CircuitElement::from_fe_padded(cs.namespace(|| "block_number"), || {
+                    self.block_number.grab()
+                })?;
+
             initial_hash_data.extend(block_number.get_bits_be());
 
             //TODO: probably enforce validator_address
@@ -160,7 +169,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &initial_hash_data,
             )?;
 
-             let mut pack_bits = vec![];
+            let mut pack_bits = vec![];
             pack_bits.extend(hash_block);
             pack_bits.extend(old_root.get_bits_be());
 
@@ -183,7 +192,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             hash_block.reverse();
             hash_block.truncate(E::Fr::CAPACITY as usize);
 
-            let final_hash = pack_bits_to_element(cs.namespace(||"final_hash"), &hash_block)?;
+            let final_hash = pack_bits_to_element(cs.namespace(|| "final_hash"), &hash_block)?;
 
             cs.enforce(
                 || "enforce external data hash equality",
@@ -511,6 +520,17 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &op_data,
             &ext_pubdata_chunk,
         )?);
+        op_flags.push(self.transfer_to_new(
+            cs.namespace(|| "transfer_to_new"),
+            &mut cur,
+            &lhs,
+            &rhs,
+            &chunk_data,
+            &is_a_geq_b,
+            &is_account_empty,
+            &op_data,
+            &ext_pubdata_chunk,
+        )?);
         let op_valid = multi_or(cs.namespace(|| "op_valid"), &op_flags)?;
         println!("op_valid {}", op_valid.get_value().unwrap());
         cs.enforce(
@@ -539,13 +559,13 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             *franklin_constants::TOKEN_EXT_BIT_WIDTH,
             Boolean::constant(false),
         );
-        pubdata_bits.extend(chunk_data.tx_type.get_bits_le().clone()); //TX_TYPE_BIT_WIDTH=8
-        pubdata_bits.extend(cur.account_address.get_bits_le().clone()); //ACCOUNT_TREE_DEPTH=24
+        pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
+        pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
         pubdata_bits.extend(pub_token_bits); //TOKEN_EXT_BIT_WIDTH=16
-        pubdata_bits.extend(op_data.amount_packed.get_bits_le().clone()); //AMOUNT_PACKED=24
-        pubdata_bits.extend(op_data.fee_packed.get_bits_le().clone()); //FEE_PACKED=8
-        pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_le().clone()); //NEW_PUBKEY_HASH_WIDTH=224
-        assert_eq!(pubdata_bits.len(), 304);
+        pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //AMOUNT_PACKED=24
+        pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //FEE_PACKED=8
+        pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //NEW_PUBKEY_HASH_WIDTH=216
+        assert_eq!(pubdata_bits.len(), 296);
         pubdata_bits.resize(
             5 * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
@@ -680,8 +700,38 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         op_data: &AllocatedOperationData<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
     ) -> Result<Boolean, SynthesisError> {
+        let mut pubdata_bits = vec![];
+        let mut pub_token_bits = lhs.token.get_bits_le().clone();
+        pub_token_bits.resize(
+            *franklin_constants::TOKEN_EXT_BIT_WIDTH,
+            Boolean::constant(false),
+        );
+        pub_token_bits.reverse();
+        pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //8
+        pubdata_bits.extend(lhs.account_address.get_bits_be()); //24
+        pubdata_bits.extend(pub_token_bits.clone()); //16
+        pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //24
+        pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //224
+        pubdata_bits.extend(rhs.account_address.get_bits_be()); //24
+        pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //8
+        assert_eq!(pubdata_bits.len(), 40 * 8);
+
+        let pubdata_chunk = select_pubdata_chunk(
+            cs.namespace(|| "select_pubdata_chunk"),
+            &pubdata_bits,
+            &chunk_data.chunk_number,
+            5,
+        )?;
+        let is_pubdata_chunk_correct = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is_pubdata_correct"),
+            &pubdata_chunk,
+            &ext_pubdata_chunk,
+        )?);
+
         let mut lhs_valid_flags = vec![];
-        let transfer_to_new_tx_type = AllocatedNum::alloc(cs.namespace(|| "transfer_to_new_tx_type"), || {
+        lhs_valid_flags.push(is_pubdata_chunk_correct.clone());
+        let transfer_to_new_tx_type =
+            AllocatedNum::alloc(cs.namespace(|| "transfer_to_new_tx_type"), || {
                 Ok(E::Fr::from_str("2").unwrap())
             })?;
         transfer_to_new_tx_type.assert_number(
@@ -693,7 +743,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &chunk_data.tx_type.get_number(),
             &transfer_to_new_tx_type,
         )?);
-        lhs_valid_flags.push(is_transfer);
+        lhs_valid_flags.push(is_transfer.clone());
         let zero = AllocatedNum::alloc(cs.namespace(|| "zero"), || Ok(E::Fr::zero()))?;
         zero.assert_zero(cs.namespace(|| "zero is zero"))?;
         let is_first_chunk = Boolean::from(AllocatedNum::equals(
@@ -703,6 +753,145 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?);
         lhs_valid_flags.push(is_first_chunk);
 
+        // check signer pubkey
+        let is_signer_key_correct = CircuitPubkey::equals(
+            cs.namespace(|| "is_signer_key_correct"),
+            &op_data.signer_pubkey,
+            &lhs.account.pub_key,
+        )?;
+        lhs_valid_flags.push(is_signer_key_correct);
+        // TODO: construct signature message
+
+        // check operation arguments
+        let is_a_correct =
+            CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
+
+        lhs_valid_flags.push(is_a_correct);
+
+        let sum_amount_fee = AllocatedNum::alloc(cs.namespace(|| "amount plus fee"), || {
+            let mut bal = op_data.amount.grab()?;
+            bal.add_assign(&op_data.fee.grab()?);
+            Ok(bal)
+        })?;
+        cs.enforce(
+            || "sum_amount_fee is correct",
+            |lc| {
+                lc + op_data.amount.get_number().get_variable()
+                    + op_data.fee.get_number().get_variable()
+            },
+            |lc| lc + CS::one(),
+            |lc| lc + sum_amount_fee.get_variable(),
+        );
+        let is_b_correct = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is_b_correct"),
+            &op_data.b.get_number(),
+            &sum_amount_fee,
+        )?);
+        lhs_valid_flags.push(is_b_correct);
+        lhs_valid_flags.push(is_a_geq_b.clone());
+
+        lhs_valid_flags.push(no_nonce_overflow(
+            cs.namespace(|| "no nonce overflow"),
+            &cur.account.nonce.get_number(),
+        )?);
+
+        println!("lhs valid transfer to new");
+        let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
+        println!(
+            "is lhs valid {} transfer to new",
+            lhs_valid.get_value().grab()?
+        );
+
+        let updated_balance_value =
+            AllocatedNum::alloc(cs.namespace(|| "lhs updated_balance_value"), || {
+                let mut bal = cur.balance.clone().grab()?;
+                bal.sub_assign(sum_amount_fee.get_value().get()?);
+                Ok(bal)
+            })?;
+        cs.enforce(
+            || "lhs updated_balance_value is correct",
+            |lc| lc + cur.balance.get_number().get_variable() - sum_amount_fee.get_variable(),
+            |lc| lc + CS::one(),
+            |lc| lc + updated_balance_value.get_variable(),
+        );
+
+        let updated_nonce = AllocatedNum::alloc(cs.namespace(|| "updated_nonce"), || {
+            let mut nonce = cur.account.nonce.clone().grab()?;
+            nonce.add_assign(&E::Fr::from_str("1").unwrap());
+            Ok(nonce)
+        })?;
+        cs.enforce(
+            || "updated_nonce is correct",
+            |lc| lc + updated_nonce.get_variable() - CS::one(),
+            |lc| lc + CS::one(),
+            |lc| lc + cur.account.nonce.get_number().get_variable(),
+        );
+        //update cur values if lhs is valid
+        //update nonce
+        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "update cur nonce"),
+            &updated_nonce,
+            &cur.account.nonce,
+            &lhs_valid,
+        )?;
+
+        //update balance
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "updated cur balance"),
+            &updated_balance_value,
+            &cur.balance,
+            &lhs_valid,
+        )?;
+
+        let mut rhs_valid_flags = vec![];
+        let one =
+            AllocatedNum::alloc(cs.namespace(|| "one"), || Ok(E::Fr::from_str("1").unwrap()))?;
+        one.assert_number(
+            cs.namespace(|| "one is one"),
+            &E::Fr::from_str("1").unwrap(),
+        )?;
+        let is_second_chunk = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is_second_chunk"),
+            &chunk_data.chunk_number,
+            &one,
+        )?);
+        rhs_valid_flags.push(is_pubdata_chunk_correct.clone());
+        rhs_valid_flags.push(is_second_chunk);
+        rhs_valid_flags.push(is_transfer);
+        rhs_valid_flags.push(is_account_empty.clone());
+        println!("rhs valid transfer to new");
+        let rhs_valid = multi_and(cs.namespace(|| "rhs_valid"), &rhs_valid_flags)?;
+        println!(
+            "is rhs valid {} transfer to new",
+            rhs_valid.get_value().grab()?
+        );
+
+        cur.balance = CircuitElement::conditionally_select(
+            cs.namespace(|| "mutated balance"),
+            &op_data.amount,
+            &cur.balance,
+            &rhs_valid,
+        )?;
+        cur.balance
+            .enforce_length(cs.namespace(|| "mutated balance is still correct length"))?;
+
+        println!(
+            "changed bal data: {}",
+            cur.balance.get_number().get_value().unwrap()
+        );
+        cur.account.pub_key = CircuitPubkey::conditionally_select(
+            cs.namespace(|| "mutated_pubkey"),
+            &op_data.new_pubkey,
+            &cur.account.pub_key,
+            &rhs_valid,
+        )?;
+
+        Ok(Boolean::and(
+            cs.namespace(|| "lhs_valid nand rhs_valid"),
+            &lhs_valid.not(),
+            &rhs_valid.not(),
+        )?
+        .not())
     }
 
     //TODO: verify token equality
@@ -1260,913 +1449,4 @@ fn no_nonce_overflow<E: JubjubEngine, CS: ConstraintSystem<E>>(
         &max_nonce,
     )?)
     .not())
-}
-#[cfg(test)]
-mod test {
-
-    use super::*;
-
-    use franklin_crypto::jubjub::FixedGenerators;
-
-    use franklin_crypto::eddsa::{PrivateKey, PublicKey};
-
-    #[test]
-    fn test_deposit_franklin_in_empty_leaf() {
-        use crate::account::*;
-        use crate::operation::*;
-        use crate::utils::*;
-        use ff::{BitIterator, Field};
-        use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-        use franklin_crypto::circuit::float_point::convert_to_float;
-        use franklin_crypto::circuit::test::*;
-        use franklinmodels::circuit::account::{Balance, CircuitAccount};
-        use franklinmodels::{CircuitAccountTree, CircuitBalanceTree};
-        use merkle_tree::hasher::Hasher;
-        use merkle_tree::PedersenHasher;
-        use pairing::bn256::*;
-        use rand::{Rng, SeedableRng, XorShiftRng};
-
-        let params = &AltJubjubBn256::new();
-        let p_g = FixedGenerators::SpendingKeyGenerator;
-
-        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
-        let mut balance_tree =
-            CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
-        let balance_root = balance_tree.root_hash();
-        // println!("test balance root: {}", balance_root);
-        // println!("test subaccount root: {}", subaccount_root);
-        let phasher = PedersenHasher::<Bn256>::default();
-        let default_subtree_hash = balance_root;
-        // println!("test subtree root: {}", default_subtree_hash);
-        let zero_account = CircuitAccount {
-            nonce: Fr::zero(),
-            pub_x: Fr::zero(),
-            pub_y: Fr::zero(),
-            subtree_root_hash: default_subtree_hash,
-        };
-        let mut tree = CircuitAccountTree::new_with_leaf(
-            franklin_constants::ACCOUNT_TREE_DEPTH as u32,
-            zero_account,
-        );
-        let initial_root = tree.root_hash();
-        println!("Initial root = {}", initial_root);
-
-        let capacity = tree.capacity();
-        assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
-
-        let sender_sk = PrivateKey::<Bn256>(rng.gen());
-        let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
-        let (sender_x, sender_y) = sender_pk.0.into_xy();
-        println!("x = {}, y = {}", sender_x, sender_y);
-
-        // give some funds to sender and make zero balance for recipient
-
-        // let sender_leaf_number = 1;
-
-        let mut sender_leaf_number: u32 = rng.gen();
-        sender_leaf_number %= capacity;
-        let sender_leaf_number_fe = Fr::from_str(&sender_leaf_number.to_string()).unwrap();
-        println!(
-            "old leaf hash is {}",
-            tree.get_hash((
-                franklin_constants::ACCOUNT_TREE_DEPTH as u32,
-                sender_leaf_number
-            ))
-        );
-        let transfer_amount: u128 = 500;
-
-        let transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
-
-        let transfer_amount_bits = convert_to_float(
-            transfer_amount,
-            *franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-            *franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
-            10,
-        )
-        .unwrap();
-
-        let transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
-
-        let fee: u128 = 0;
-
-        let fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
-
-        let fee_bits = convert_to_float(
-            fee,
-            *franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-            *franklin_constants::FEE_MANTISSA_BIT_WIDTH,
-            10,
-        )
-        .unwrap();
-
-        let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
-
-        let token: u32 = 2;
-        let token_fe = Fr::from_str(&token.to_string()).unwrap();
-
-        balance_tree.insert(
-            token,
-            Balance {
-                value: transfer_amount_as_field_element,
-            },
-        );
-        let after_deposit_balance_root = balance_tree.root_hash();
-
-        let after_deposit_subtree_hash = after_deposit_balance_root;
-
-        let sender_leaf = CircuitAccount::<Bn256> {
-            subtree_root_hash: after_deposit_subtree_hash.clone(),
-            nonce: Fr::zero(),
-            pub_x: sender_x.clone(),
-            pub_y: sender_y.clone(),
-        };
-
-        tree.insert(sender_leaf_number, sender_leaf.clone());
-        let new_root = tree.root_hash();
-
-        println!("New root = {}", new_root);
-
-        assert!(initial_root != new_root);
-        println!(
-            "updated leaf hash is {}",
-            tree.get_hash((
-                franklin_constants::ACCOUNT_TREE_DEPTH as u32,
-                sender_leaf_number
-            ))
-        );
-
-        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
-        let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
-        sig_bits.reverse();
-        sig_bits.truncate(80);
-
-        // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
-        let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
-        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-
-        let deposit_tx_type = Fr::from_str("1").unwrap();
-        let mut pubdata_bits = vec![];
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &deposit_tx_type,
-            *franklin_constants::TX_TYPE_BIT_WIDTH,
-        );
-
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &sender_leaf_number_fe,
-            franklin_constants::ACCOUNT_TREE_DEPTH,
-        );
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &token_fe,
-            *franklin_constants::TOKEN_EXT_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &transfer_amount_encoded,
-            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
-                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        );
-
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &fee_encoded,
-            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-        );
-
-        let mut new_pubkey_bits = vec![];
-        append_be_fixed_width(
-            &mut new_pubkey_bits,
-            &sender_y,
-            franklin_constants::FR_BIT_WIDTH - 1,
-        );
-        append_be_fixed_width(&mut new_pubkey_bits, &sender_x, 1);
-        let new_pubkey_hash = phasher.hash_bits(new_pubkey_bits);
-
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &new_pubkey_hash,
-            *franklin_constants::NEW_PUBKEY_HASH_WIDTH,
-        );
-        assert_eq!(pubdata_bits.len(), 38 * 8);
-        pubdata_bits.resize(40 * 8, false);
-
-        let pubdata_chunks: Vec<Fr> = pubdata_bits
-            .chunks(64)
-            .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
-            .collect::<Vec<_>>();
-
-        let audit_path: Vec<Option<Fr>> = tree
-            .merkle_path(sender_leaf_number)
-            .into_iter()
-            .map(|e| Some(e.0))
-            .collect();
-
-        let audit_balance_path: Vec<Option<Fr>> = balance_tree
-            .merkle_path(token)
-            .into_iter()
-            .map(|e| Some(e.0))
-            .collect();
-
-        let op_args = OperationArguments {
-            a: Some(transfer_amount_as_field_element.clone()),
-            b: Some(fee_as_field_element.clone()),
-            amount: Some(transfer_amount_encoded.clone()),
-            fee: Some(fee_encoded.clone()),
-            new_pub_x: Some(sender_x.clone()),
-            new_pub_y: Some(sender_y.clone()),
-        };
-        let operation_branch_before = OperationBranch {
-            address: Some(sender_leaf_number_fe),
-            token: Some(token_fe),
-            witness: OperationBranchWitness {
-                account_witness: AccountWitness {
-                    nonce: Some(Fr::zero()),
-                    pub_x: Some(Fr::zero()),
-                    pub_y: Some(Fr::zero()),
-                },
-                account_path: audit_path.clone(),
-                balance_value: Some(Fr::zero()),
-                balance_subtree_path: audit_balance_path.clone(),
-            },
-        };
-        let operation_branch_after = OperationBranch::<Bn256> {
-            address: Some(sender_leaf_number_fe),
-            token: Some(token_fe),
-            witness: OperationBranchWitness {
-                account_witness: AccountWitness {
-                    nonce: Some(Fr::zero()),
-                    pub_x: Some(sender_x.clone()),
-                    pub_y: Some(sender_y.clone()),
-                },
-                account_path: audit_path.clone(),
-                balance_value: Some(transfer_amount_as_field_element.clone()),
-                balance_subtree_path: audit_balance_path.clone(),
-            },
-        };
-        let operation_zero = Operation {
-            new_root: Some(new_root.clone()),
-            tx_type: Some(Fr::from_str("1").unwrap()),
-            chunk: Some(Fr::from_str("0").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[0]),
-            sig_msg: Some(sig_msg.clone()),
-            signature: signature.clone(),
-            signer_pub_key_x: Some(sender_x.clone()),
-            signer_pub_key_y: Some(sender_y.clone()),
-            args: op_args.clone(),
-            lhs: operation_branch_before.clone(),
-            rhs: operation_branch_before.clone(),
-        };
-
-        let operation_one = Operation {
-            new_root: Some(new_root.clone()),
-            tx_type: Some(Fr::from_str("1").unwrap()),
-            chunk: Some(Fr::from_str("1").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[1]),
-            sig_msg: Some(sig_msg.clone()),
-            signature: signature.clone(),
-            signer_pub_key_x: Some(sender_x.clone()),
-            signer_pub_key_y: Some(sender_y.clone()),
-            args: op_args.clone(),
-            lhs: operation_branch_after.clone(),
-            rhs: operation_branch_after.clone(),
-        };
-
-        let operation_two = Operation {
-            new_root: Some(new_root.clone()),
-            tx_type: Some(Fr::from_str("1").unwrap()),
-            chunk: Some(Fr::from_str("2").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[2]),
-            sig_msg: Some(sig_msg.clone()),
-            signature: signature.clone(),
-            signer_pub_key_x: Some(sender_x.clone()),
-            signer_pub_key_y: Some(sender_y.clone()),
-            args: op_args.clone(),
-            lhs: operation_branch_after.clone(),
-            rhs: operation_branch_after.clone(),
-        };
-
-        let operation_three = Operation {
-            new_root: Some(new_root.clone()),
-            tx_type: Some(Fr::from_str("1").unwrap()),
-            chunk: Some(Fr::from_str("3").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[3]),
-            sig_msg: Some(sig_msg.clone()),
-            signature: signature.clone(),
-            signer_pub_key_x: Some(sender_x.clone()),
-            signer_pub_key_y: Some(sender_y.clone()),
-            args: op_args.clone(),
-            lhs: operation_branch_after.clone(),
-            rhs: operation_branch_after.clone(),
-        };
-        let operation_four = Operation {
-            new_root: Some(new_root.clone()),
-            tx_type: Some(Fr::from_str("1").unwrap()),
-            chunk: Some(Fr::from_str("4").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[4]),
-            sig_msg: Some(sig_msg.clone()),
-            signature: signature.clone(),
-            signer_pub_key_x: Some(sender_x.clone()),
-            signer_pub_key_y: Some(sender_y.clone()),
-            args: op_args.clone(),
-            lhs: operation_branch_after.clone(),
-            rhs: operation_branch_after.clone(),
-        };
-        {
-            let mut cs = TestConstraintSystem::<Bn256>::new();
-
-            let instance = FranklinCircuit {
-                params,
-                old_root: Some(initial_root),
-                new_root: Some(new_root),
-                operations: vec![
-                    operation_zero,
-                    operation_one,
-                    operation_two,
-                    operation_three,
-                    operation_four,
-                ],
-                pub_data_commitment: None,
-                block_number: None,
-                validator_address: None, 
-            };
-
-            instance.synthesize(&mut cs).unwrap();
-
-            println!("{}", cs.find_unconstrained());
-
-            println!("{}", cs.num_constraints());
-
-            let err = cs.which_is_unsatisfied();
-            if err.is_some() {
-                panic!("ERROR satisfying in {}", err.unwrap());
-            }
-        }
-    }
-    #[test]
-    fn test_transfer() {
-        use crate::account::*;
-        use crate::operation::*;
-        use crate::utils::*;
-
-        use crypto::digest::Digest;
-        use crypto::sha2::Sha256;
-        use ff::Field;
-        use ff::{BitIterator, PrimeFieldRepr};
-        use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-        use franklin_crypto::circuit::float_point::convert_to_float;
-        use franklin_crypto::circuit::test::*;
-        use franklinmodels::circuit::account::{Balance, CircuitAccount};
-        use franklinmodels::{CircuitAccountTree, CircuitBalanceTree};
-        use merkle_tree::hasher::Hasher;
-        use merkle_tree::PedersenHasher;
-        use pairing::bn256::*;
-        use rand::{Rng, SeedableRng, XorShiftRng};
-
-        let params = &AltJubjubBn256::new();
-        let p_g = FixedGenerators::SpendingKeyGenerator;
-
-        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
-        let mut from_balance_tree =
-            CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
-        let from_balance_root = from_balance_tree.root_hash();
-
-        let mut to_balance_tree =
-            CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
-
-        let validator_address = Fr::from_str("7").unwrap();
-        let phasher = PedersenHasher::<Bn256>::default();
-        let default_subtree_hash = from_balance_root;
-        // println!("test subtree root: {}", default_subtree_hash);
-        let zero_account = CircuitAccount {
-            nonce: Fr::zero(),
-            pub_x: Fr::zero(),
-            pub_y: Fr::zero(),
-            subtree_root_hash: default_subtree_hash,
-        };
-        let mut tree = CircuitAccountTree::new_with_leaf(
-            franklin_constants::ACCOUNT_TREE_DEPTH as u32,
-            zero_account,
-        );
-
-        let capacity = tree.capacity();
-        assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
-
-        let from_sk = PrivateKey::<Bn256>(rng.gen());
-        let from_pk = PublicKey::from_private(&from_sk, p_g, params);
-        let (from_x, from_y) = from_pk.0.into_xy();
-        println!("x = {}, y = {}", from_x, from_y);
-
-        let to_sk = PrivateKey::<Bn256>(rng.gen());
-        let to_pk = PublicKey::from_private(&to_sk, p_g, params);
-        let (to_x, to_y) = to_pk.0.into_xy();
-        println!("x = {}, y = {}", to_x, to_y);
-
-        // give some funds to sender and make zero balance for recipient
-
-        // let sender_leaf_number = 1;
-
-        let mut from_leaf_number: u32 = rng.gen();
-        from_leaf_number %= capacity;
-        let from_leaf_number_fe = Fr::from_str(&from_leaf_number.to_string()).unwrap();
-
-        let mut to_leaf_number: u32 = rng.gen();
-        to_leaf_number %= capacity;
-        let to_leaf_number_fe = Fr::from_str(&to_leaf_number.to_string()).unwrap();
-
-        let from_balance_before: u128 = 2000;
-
-        let from_balance_before_as_field_element =
-            Fr::from_str(&from_balance_before.to_string()).unwrap();
-
-        let to_balance_before: u128 = 2100;
-
-        let to_balance_before_as_field_element =
-            Fr::from_str(&to_balance_before.to_string()).unwrap();
-
-        let transfer_amount: u128 = 500;
-
-        let transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
-
-        let transfer_amount_bits = convert_to_float(
-            transfer_amount,
-            *franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-            *franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
-            10,
-        )
-        .unwrap();
-
-        let transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
-
-        let fee: u128 = 0;
-
-        let fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
-
-        let fee_bits = convert_to_float(
-            fee,
-            *franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-            *franklin_constants::FEE_MANTISSA_BIT_WIDTH,
-            10,
-        )
-        .unwrap();
-
-        let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
-
-        let token: u32 = 2;
-        let token_fe = Fr::from_str(&token.to_string()).unwrap();
-
-        from_balance_tree.insert(
-            token,
-            Balance {
-                value: from_balance_before_as_field_element,
-            },
-        );
-
-        let from_base_balance_root = from_balance_tree.root_hash();
-
-        let from_leaf_before = CircuitAccount::<Bn256> {
-            subtree_root_hash: from_base_balance_root.clone(),
-            nonce: Fr::zero(),
-            pub_x: from_x.clone(),
-            pub_y: from_y.clone(),
-        };
-
-        to_balance_tree.insert(
-            token,
-            Balance {
-                value: to_balance_before_as_field_element,
-            },
-        );
-        let to_base_balance_root = to_balance_tree.root_hash();
-        let to_leaf_before = CircuitAccount::<Bn256> {
-            subtree_root_hash: to_base_balance_root.clone(),
-            nonce: Fr::zero(),
-            pub_x: to_x.clone(),
-            pub_y: to_y.clone(),
-        };
-        tree.insert(from_leaf_number, from_leaf_before.clone());
-        tree.insert(to_leaf_number, to_leaf_before.clone());
-        println!(
-            "hash from leaf {}",
-            tree.get_hash((
-                franklin_constants::ACCOUNT_TREE_DEPTH as u32,
-                from_leaf_number
-            ))
-        );
-
-        let from_audit_path_before: Vec<Option<Fr>> = tree
-            .merkle_path(from_leaf_number)
-            .into_iter()
-            .map(|e| Some(e.0))
-            .collect();
-
-        let to_audit_path_before: Vec<Option<Fr>> = tree
-            .merkle_path(to_leaf_number)
-            .into_iter()
-            .map(|e| Some(e.0))
-            .collect();
-
-        let from_audit_balance_path_before: Vec<Option<Fr>> = from_balance_tree
-            .merkle_path(token)
-            .into_iter()
-            .map(|e| Some(e.0))
-            .collect();
-
-        let to_audit_balance_path_before: Vec<Option<Fr>> = to_balance_tree
-            .merkle_path(token)
-            .into_iter()
-            .map(|e| Some(e.0))
-            .collect();
-
-        let initial_root = tree.root_hash();
-        println!("Initial root = {}", initial_root);
-
-        let mut from_balance_after = from_balance_before_as_field_element.clone();
-        from_balance_after.sub_assign(&transfer_amount_as_field_element);
-
-        from_balance_tree.insert(
-            token,
-            Balance {
-                value: from_balance_after,
-            },
-        );
-
-        let mut from_nonce_after_transfer = from_leaf_before.nonce.clone();
-        from_nonce_after_transfer.add_assign(&Fr::from_str("1").unwrap());
-
-        let from_leaf_after = CircuitAccount::<Bn256> {
-            subtree_root_hash: from_balance_tree.root_hash(),
-            nonce: from_nonce_after_transfer,
-            pub_x: from_x.clone(),
-            pub_y: from_y.clone(),
-        };
-        tree.insert(from_leaf_number, from_leaf_after.clone());
-        let intermediate_root = tree.root_hash();
-
-        let mut to_balance_after = to_balance_before_as_field_element.clone();
-        to_balance_after.add_assign(&transfer_amount_as_field_element);
-
-        to_balance_tree.insert(
-            token,
-            Balance {
-                value: to_balance_after,
-            },
-        );
-
-        let to_nonce_after_transfer = to_leaf_before.nonce.clone();
-
-        let to_leaf_after = CircuitAccount::<Bn256> {
-            subtree_root_hash: to_balance_tree.root_hash(),
-            nonce: to_nonce_after_transfer,
-            pub_x: to_x.clone(),
-            pub_y: to_y.clone(),
-        };
-        tree.insert(to_leaf_number, to_leaf_after.clone());
-        let final_root = tree.root_hash();
-
-        // construct signature
-        let mut sig_bits = vec![];
-
-        let transfer_tx_type = Fr::from_str("5").unwrap();
-        append_le_fixed_width(
-            &mut sig_bits,
-            &transfer_tx_type,
-            *franklin_constants::TX_TYPE_BIT_WIDTH,
-        );
-        append_le_fixed_width(
-            &mut sig_bits,
-            &from_leaf_number_fe,
-            franklin_constants::ACCOUNT_TREE_DEPTH,
-        );
-        append_le_fixed_width(
-            &mut sig_bits,
-            &token_fe,
-            *franklin_constants::BALANCE_TREE_DEPTH,
-        );
-        append_le_fixed_width(
-            &mut sig_bits,
-            &from_leaf_before.nonce,
-            franklin_constants::NONCE_BIT_WIDTH,
-        );
-        append_le_fixed_width(
-            &mut sig_bits,
-            &transfer_amount_encoded,
-            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
-                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        );
-        append_le_fixed_width(
-            &mut sig_bits,
-            &fee_encoded,
-            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-        );
-        let sig_msg = le_bit_vector_into_field_element::<Fr>(&sig_bits);
-        let sig_msg_hash = phasher.hash_bits(sig_bits.clone());
-        let mut sig_msg_hash_bits = vec![];
-        append_le_fixed_width(
-            &mut sig_msg_hash_bits,
-            &sig_msg_hash,
-            franklin_constants::FR_BIT_WIDTH - 8,
-        ); //TODO: not clear what capacity is
-
-        println!(
-            "test sig_msg_hash={} sig_msg_hash_bits.len={}",
-            sig_msg_hash,
-            sig_msg_hash_bits.len()
-        );
-
-        // construct pubdata
-        let mut pubdata_bits = vec![];
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &transfer_tx_type,
-            *franklin_constants::TX_TYPE_BIT_WIDTH,
-        );
-
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &from_leaf_number_fe,
-            franklin_constants::ACCOUNT_TREE_DEPTH,
-        );
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &token_fe,
-            *franklin_constants::TOKEN_EXT_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &to_leaf_number_fe,
-            franklin_constants::ACCOUNT_TREE_DEPTH,
-        );
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &transfer_amount_encoded,
-            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
-                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        );
-
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &fee_encoded,
-            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-        );
-        assert_eq!(pubdata_bits.len(), 13 * 8);
-        pubdata_bits.resize(16 * 8, false); //TODO verify if right padding is okay
-
-        let pub_first_chunk_bits = pubdata_bits[0..franklin_constants::CHUNK_BIT_WIDTH].to_vec();
-        let pub_first_chunk = le_bit_vector_into_field_element::<Fr>(&pub_first_chunk_bits);
-        println!("pub_first_chunk {}", pub_first_chunk);
-        let pub_second_chunk_bits = pubdata_bits
-            [franklin_constants::CHUNK_BIT_WIDTH..2 * franklin_constants::CHUNK_BIT_WIDTH]
-            .to_vec();
-        let pub_second_chunk = le_bit_vector_into_field_element::<Fr>(&pub_second_chunk_bits);
-        println!("pub_second_chunk {}", pub_second_chunk);
-        // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
-
-        let mut public_data_initial_bits = vec![];
-
-        // these two are BE encodings because an iterator is BE. This is also an Ethereum standard behavior
-
-        let block_number_bits: Vec<bool> = BitIterator::new(Fr::one().into_repr()).collect();
-        for _ in 0..256 - block_number_bits.len() {
-            public_data_initial_bits.push(false);
-        }
-        public_data_initial_bits.extend(block_number_bits.into_iter());
-
-        let validator_id_bits: Vec<bool> =
-            BitIterator::new(validator_address.into_repr()).collect();
-        for _ in 0..256 - validator_id_bits.len() {
-            public_data_initial_bits.push(false);
-        }
-        public_data_initial_bits.extend(validator_id_bits.into_iter());
-
-        assert_eq!(public_data_initial_bits.len(), 512);
-
-        let mut h = Sha256::new();
-
-        let bytes_to_hash = be_bit_vector_into_bytes(&public_data_initial_bits);
-
-        h.input(&bytes_to_hash);
-
-        let mut hash_result = [0u8; 32];
-        h.result(&mut hash_result[..]);
-
-        println!("Initial hash hex {}", hex::encode(hash_result));
-
-        let mut packed_old_root_bits = vec![];
-        let old_root_bits: Vec<bool> = BitIterator::new(initial_root.into_repr()).collect();
-        for _ in 0..256 - old_root_bits.len() {
-            packed_old_root_bits.push(false);
-        }
-        packed_old_root_bits.extend(old_root_bits);
-
-        let packed_old_root_bytes = be_bit_vector_into_bytes(&packed_old_root_bits);
-
-        let mut packed_with_old_root = vec![];
-        packed_with_old_root.extend(hash_result.iter());
-        packed_with_old_root.extend(packed_old_root_bytes);
-
-        h = Sha256::new();
-        h.input(&packed_with_old_root);
-        hash_result = [0u8; 32];
-        h.result(&mut hash_result[..]);
-
-        let mut packed_new_root_bits = vec![];
-        let new_root_bits: Vec<bool> = BitIterator::new(final_root.into_repr()).collect();
-        for _ in 0..256 - new_root_bits.len() {
-            packed_new_root_bits.push(false);
-        }
-        packed_new_root_bits.extend(new_root_bits);
-
-        let packed_new_root_bytes = be_bit_vector_into_bytes(&packed_new_root_bits);
-
-        let mut packed_with_new_root = vec![];
-        packed_with_new_root.extend(hash_result.iter());
-        packed_with_new_root.extend(packed_new_root_bytes);
-
-        h = Sha256::new();
-        h.input(&packed_with_new_root);
-        hash_result = [0u8; 32];
-        h.result(&mut hash_result[..]);
-
-        println!("hash with new root as hex {}", hex::encode(hash_result));
-
-        let mut final_bytes = vec![];
-        let pubdata_bytes = be_bit_vector_into_bytes(&pubdata_bits);
-        final_bytes.extend(hash_result.iter());
-        final_bytes.extend(pubdata_bytes);
-
-        h = Sha256::new();
-        h.input(&final_bytes);
-        hash_result = [0u8; 32];
-        h.result(&mut hash_result[..]);
-
-        println!("final hash as hex {}", hex::encode(hash_result));
-
-        hash_result[0] &= 0x1f; // temporary solution, this nullifies top bits to be encoded into field element correctly
-
-        let mut repr = Fr::zero().into_repr();
-        repr.read_be(&hash_result[..])
-            .expect("pack hash as field element");
-
-        let public_data_commitment = Fr::from_repr(repr).unwrap();
-
-        println!(
-            "Final data commitment as field element = {}",
-            public_data_commitment
-        );
-
-        let signature = sign(&sig_bits, &from_sk, p_g, params, rng);
-
-        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-
-        let _from_audit_path_after: Vec<Option<Fr>> = tree
-            .merkle_path(from_leaf_number)
-            .into_iter()
-            .map(|e| Some(e.0))
-            .collect();
-
-        let to_audit_path_after: Vec<Option<Fr>> = tree
-            .merkle_path(to_leaf_number)
-            .into_iter()
-            .map(|e| Some(e.0))
-            .collect();
-
-        let from_audit_balance_path_after: Vec<Option<Fr>> = from_balance_tree
-            .merkle_path(token)
-            .into_iter()
-            .map(|e| Some(e.0))
-            .collect();
-
-        let _to_audit_balance_path_after: Vec<Option<Fr>> = to_balance_tree
-            .merkle_path(token)
-            .into_iter()
-            .map(|e| Some(e.0))
-            .collect();
-
-        let mut sum_amount_fee = transfer_amount_as_field_element.clone();
-        sum_amount_fee.add_assign(&fee_as_field_element);
-
-        let op_args = OperationArguments::<Bn256> {
-            a: Some(from_balance_before_as_field_element),
-            b: Some(sum_amount_fee.clone()),
-            amount: Some(transfer_amount_encoded.clone()),
-            fee: Some(fee_encoded.clone()),
-            new_pub_x: Some(from_x.clone()),
-            new_pub_y: Some(from_y.clone()),
-        };
-
-        let from_operation_branch_before = OperationBranch::<Bn256> {
-            address: Some(from_leaf_number_fe),
-            token: Some(token_fe),
-            witness: OperationBranchWitness {
-                account_witness: AccountWitness {
-                    nonce: Some(from_leaf_before.nonce),
-                    pub_x: Some(from_leaf_before.pub_x),
-                    pub_y: Some(from_leaf_before.pub_y),
-                },
-                account_path: from_audit_path_before.clone(),
-                balance_value: Some(from_balance_before_as_field_element.clone()),
-                balance_subtree_path: from_audit_balance_path_before.clone(),
-            },
-        };
-
-        let from_operation_branch_after = OperationBranch::<Bn256> {
-            address: Some(from_leaf_number_fe),
-            token: Some(token_fe),
-            witness: OperationBranchWitness {
-                account_witness: AccountWitness {
-                    nonce: Some(from_leaf_after.nonce),
-                    pub_x: Some(from_leaf_after.pub_x),
-                    pub_y: Some(from_leaf_after.pub_y),
-                },
-                account_path: from_audit_path_before.clone(),
-                balance_value: Some(from_balance_after.clone()),
-                balance_subtree_path: from_audit_balance_path_after.clone(),
-            },
-        };
-
-        let to_operation_branch_before = OperationBranch::<Bn256> {
-            address: Some(to_leaf_number_fe),
-            token: Some(token_fe),
-            witness: OperationBranchWitness {
-                account_witness: AccountWitness {
-                    nonce: Some(to_leaf_before.nonce),
-                    pub_x: Some(to_leaf_before.pub_x),
-                    pub_y: Some(to_leaf_before.pub_y),
-                },
-                account_path: to_audit_path_before.clone(),
-                balance_value: Some(to_balance_before_as_field_element.clone()),
-                balance_subtree_path: to_audit_balance_path_before.clone(),
-            },
-        };
-
-        let to_operation_branch_after = OperationBranch::<Bn256> {
-            address: Some(to_leaf_number_fe),
-            token: Some(token_fe),
-            witness: OperationBranchWitness {
-                account_witness: AccountWitness {
-                    nonce: Some(to_leaf_before.nonce),
-                    pub_x: Some(to_leaf_before.pub_x),
-                    pub_y: Some(to_leaf_before.pub_y),
-                },
-                account_path: to_audit_path_after.clone(),
-                balance_value: Some(to_balance_before_as_field_element.clone()),
-                balance_subtree_path: to_audit_balance_path_before.clone(),
-            },
-        };
-
-        let operation_zero = Operation {
-            new_root: Some(intermediate_root.clone()),
-            tx_type: Some(Fr::from_str("5").unwrap()),
-            chunk: Some(Fr::from_str("0").unwrap()),
-            pubdata_chunk: Some(pub_first_chunk),
-            sig_msg: Some(sig_msg.clone()),
-            signature: signature.clone(),
-            signer_pub_key_x: Some(from_x.clone()),
-            signer_pub_key_y: Some(from_y.clone()),
-            args: op_args.clone(),
-            lhs: from_operation_branch_before.clone(),
-            rhs: to_operation_branch_before.clone(),
-        };
-
-        let operation_one = Operation {
-            new_root: Some(final_root.clone()),
-            tx_type: Some(Fr::from_str("5").unwrap()),
-            chunk: Some(Fr::from_str("1").unwrap()),
-            pubdata_chunk: Some(pub_second_chunk),
-            sig_msg: Some(sig_msg.clone()),
-            signature: signature.clone(),
-            signer_pub_key_x: Some(from_x.clone()),
-            signer_pub_key_y: Some(from_y.clone()),
-            args: op_args.clone(),
-            lhs: from_operation_branch_after.clone(),
-            rhs: to_operation_branch_after.clone(),
-        };
-
-        {
-            let mut cs = TestConstraintSystem::<Bn256>::new();
-
-            let instance = FranklinCircuit {
-                params,
-                old_root: Some(initial_root),
-                new_root: Some(final_root),
-                operations: vec![operation_zero, operation_one],
-                pub_data_commitment: Some(public_data_commitment),
-                block_number: Some(Fr::one()),
-                validator_address: Some(validator_address),
-            };
-
-            instance.synthesize(&mut cs).unwrap();
-
-            println!("{}", cs.find_unconstrained());
-
-            println!("{}", cs.num_constraints());
-
-            let err = cs.which_is_unsatisfied();
-            if err.is_some() {
-                panic!("ERROR satisfying in {}", err.unwrap());
-            }
-        }
-    }
 }

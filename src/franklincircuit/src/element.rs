@@ -27,7 +27,7 @@ impl<E: JubjubEngine> CircuitElement<E> {
         CircuitElement::from_number_strict(cs.namespace(|| "circuit_element"), number, max_length)
     }
 
-      pub fn from_fe_padded<CS: ConstraintSystem<E>, F: FnOnce() -> Result<E::Fr, SynthesisError>>(
+    pub fn from_fe_padded<CS: ConstraintSystem<E>, F: FnOnce() -> Result<E::Fr, SynthesisError>>(
         mut cs: CS,
         field_element: F,
     ) -> Result<Self, SynthesisError> {
