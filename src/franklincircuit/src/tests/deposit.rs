@@ -1,11 +1,10 @@
 #[test]
 fn test_deposit_franklin_in_empty_leaf() {
-    use super::*;
     use crate::account::*;
     use crate::circuit::FranklinCircuit;
     use crate::operation::*;
     use crate::utils::*;
-    use bellman::{Circuit, ConstraintSystem, SynthesisError};
+    use bellman::Circuit;
     use crypto::digest::Digest;
     use crypto::sha2::Sha256;
     use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
@@ -13,7 +12,7 @@ fn test_deposit_franklin_in_empty_leaf() {
     use franklin_crypto::circuit::float_point::convert_to_float;
     use franklin_crypto::circuit::test::*;
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
-    use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
+    use franklin_crypto::jubjub::FixedGenerators;
     use franklinmodels::circuit::account::{Balance, CircuitAccount};
     use franklinmodels::params as franklin_constants;
     use franklinmodels::{CircuitAccountTree, CircuitBalanceTree};
@@ -172,12 +171,12 @@ fn test_deposit_franklin_in_empty_leaf() {
     );
 
     let mut new_pubkey_bits = vec![];
-    append_be_fixed_width(
+    append_le_fixed_width(
         &mut new_pubkey_bits,
         &sender_y,
         franklin_constants::FR_BIT_WIDTH - 1,
     );
-    append_be_fixed_width(&mut new_pubkey_bits, &sender_x, 1);
+    append_le_fixed_width(&mut new_pubkey_bits, &sender_x, 1);
     let new_pubkey_hash = phasher.hash_bits(new_pubkey_bits);
 
     append_be_fixed_width(
@@ -241,6 +240,7 @@ fn test_deposit_franklin_in_empty_leaf() {
             balance_subtree_path: audit_balance_path.clone(),
         },
     };
+    println!("pubdata_chunk number {} is {}", 0, pubdata_chunks[0]);
     let operation_zero = Operation {
         new_root: Some(new_root.clone()),
         tx_type: Some(Fr::from_str("1").unwrap()),
@@ -255,6 +255,7 @@ fn test_deposit_franklin_in_empty_leaf() {
         rhs: operation_branch_before.clone(),
     };
 
+    println!("pubdata_chunk number {} is {}", 1, pubdata_chunks[1]);
     let operation_one = Operation {
         new_root: Some(new_root.clone()),
         tx_type: Some(Fr::from_str("1").unwrap()),
@@ -269,6 +270,7 @@ fn test_deposit_franklin_in_empty_leaf() {
         rhs: operation_branch_after.clone(),
     };
 
+    println!("pubdata_chunk number {} is {}", 2, pubdata_chunks[2]);
     let operation_two = Operation {
         new_root: Some(new_root.clone()),
         tx_type: Some(Fr::from_str("1").unwrap()),

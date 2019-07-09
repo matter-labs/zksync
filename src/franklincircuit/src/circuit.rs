@@ -559,13 +559,14 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             *franklin_constants::TOKEN_EXT_BIT_WIDTH,
             Boolean::constant(false),
         );
+        pub_token_bits.reverse();
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
         pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
         pubdata_bits.extend(pub_token_bits); //TOKEN_EXT_BIT_WIDTH=16
         pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //AMOUNT_PACKED=24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //FEE_PACKED=8
         pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //NEW_PUBKEY_HASH_WIDTH=216
-        assert_eq!(pubdata_bits.len(), 296);
+        assert_eq!(pubdata_bits.len(), 37 * 8);
         pubdata_bits.resize(
             5 * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
@@ -577,6 +578,16 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &chunk_data.chunk_number,
             5,
         )?;
+        println!(
+            "selected_pubdata_chunk is {} on iteration {}",
+            pubdata_chunk.get_value().unwrap(),
+            &chunk_data.chunk_number.get_value().unwrap()
+        );
+        println!(
+            "ext_pubdata {} on iteration {}",
+            ext_pubdata_chunk.get_value().unwrap(),
+            &chunk_data.chunk_number.get_value().unwrap()
+        );
         let is_pubdata_chunk_correct = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_pubdata_equal"),
             &pubdata_chunk,
@@ -622,6 +633,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         is_valid_flags.push(is_b_correct);
         is_valid_flags.push(is_a_geq_b.clone());
+        println!("deposit_valid");
         let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
 
         println!("tx_valid {}", tx_valid.get_value().unwrap());

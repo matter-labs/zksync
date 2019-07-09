@@ -1,7 +1,5 @@
-
 #[test]
 fn test_transfer() {
-    use super::*;
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklinmodels::params as franklin_constants;
 
@@ -9,7 +7,7 @@ fn test_transfer() {
     use crate::circuit::FranklinCircuit;
     use crate::operation::*;
     use crate::utils::*;
-    use bellman::{Circuit, ConstraintSystem, SynthesisError};
+    use bellman::Circuit;
     use crypto::digest::Digest;
     use crypto::sha2::Sha256;
     use ff::Field;
@@ -17,7 +15,7 @@ fn test_transfer() {
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
     use franklin_crypto::circuit::float_point::convert_to_float;
     use franklin_crypto::circuit::test::*;
-    use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
+    use franklin_crypto::jubjub::FixedGenerators;
     use franklinmodels::circuit::account::{Balance, CircuitAccount};
     use franklinmodels::{CircuitAccountTree, CircuitBalanceTree};
     use merkle_tree::hasher::Hasher;
