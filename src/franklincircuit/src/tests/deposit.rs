@@ -1,24 +1,21 @@
-use crate::circuit::FranklinCircuit;
-use crate::operation::Operation;
-use crate::utils::pack_bits_to_element;
-use bellman::{Circuit, ConstraintSystem, SynthesisError};
-use ff::{Field, PrimeField};
-use franklin_crypto::eddsa::{PrivateKey, PublicKey};
-use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
-use franklinmodels::params as franklin_constants;
-
 #[test]
 fn test_deposit_franklin_in_empty_leaf() {
+    use super::*;
     use crate::account::*;
+    use crate::circuit::FranklinCircuit;
     use crate::operation::*;
     use crate::utils::*;
+    use bellman::{Circuit, ConstraintSystem, SynthesisError};
     use crypto::digest::Digest;
     use crypto::sha2::Sha256;
-    use ff::{BitIterator, Field, PrimeFieldRepr};
+    use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
     use franklin_crypto::circuit::float_point::convert_to_float;
     use franklin_crypto::circuit::test::*;
+    use franklin_crypto::eddsa::{PrivateKey, PublicKey};
+    use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
     use franklinmodels::circuit::account::{Balance, CircuitAccount};
+    use franklinmodels::params as franklin_constants;
     use franklinmodels::{CircuitAccountTree, CircuitBalanceTree};
     use merkle_tree::hasher::Hasher;
     use merkle_tree::PedersenHasher;

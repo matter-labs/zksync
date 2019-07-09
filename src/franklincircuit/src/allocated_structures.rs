@@ -8,7 +8,7 @@ use franklin_crypto::circuit::float_point::parse_with_exponent_le;
 use franklin_crypto::circuit::pedersen_hash;
 use franklinmodels::params as franklin_constants;
 
-use franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
+use franklin_crypto::circuit::boolean::AllocatedBit;
 use franklin_crypto::circuit::num::AllocatedNum;
 
 use franklin_crypto::circuit::Assignment;

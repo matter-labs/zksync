@@ -152,7 +152,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             let mut initial_hash_data: Vec<Boolean> = vec![];
 
             // make initial hash as sha256(uint256(block_number)||uint256(validator_address))
-            let mut block_number =
+            let block_number =
                 CircuitElement::from_fe_padded(cs.namespace(|| "block_number"), || {
                     self.block_number.grab()
                 })?;
