@@ -25,8 +25,8 @@ fn create_new_data_restore_driver(
     DataRestoreDriver::new(config, from, delta, connection_pool)
 }
 
-fn load_past_state_for_data_restore_driver(driver: &mut DataRestoreDriver) {
-    driver.load_past_state().expect("Cant get past state");
+fn load_past_state_for_data_restore_driver(driver: &mut DataRestoreDriver, until_franklin_block: Option<u32>) {
+    driver.load_past_state(until_franklin_block).expect("Cant get past state");
 }
 
 fn load_new_states_for_data_restore_driver(driver: &mut DataRestoreDriver) {
@@ -66,9 +66,13 @@ fn load_states_from_beginning(args: Vec<String>) {
         _ => None,
     }
     .expect("It's acceptable only 1 for Mainnet and 4 for Rinkeby networks");
+
     let from = U256::from(0); // It's better not to allow external users to set "from block" parameter. In 99% cases 0(zero) is correct
+    
     let delta = U256::from_dec_str(&args[2]).expect("blocks delta should be convertible to u256");
     info!("blocks delta is {}", &delta);
+
+    let until_block = u32::from_str(&args[3]).ok();
 
     let connection_pool = ConnectionPool::new();
 
@@ -80,8 +84,11 @@ fn load_states_from_beginning(args: Vec<String>) {
     let mut data_restore_driver =
         create_new_data_restore_driver(config, from, delta, connection_pool.clone());
     info!("Driver created");
-    load_past_state_for_data_restore_driver(&mut data_restore_driver);
-    load_new_states_for_data_restore_driver(&mut data_restore_driver);
+    load_past_state_for_data_restore_driver(&mut data_restore_driver, until_block);
+
+    if until_block.is_none() {
+        load_new_states_for_data_restore_driver(&mut data_restore_driver);
+    }
 }
 
 fn load_states_from_storage(args: Vec<String>) {
@@ -93,11 +100,16 @@ fn load_states_from_storage(args: Vec<String>) {
     let delta = U256::from_dec_str(&args[2]).expect("blocks delta should be convertible to u256");
     info!("blocks delta is {}", &delta);
 
+    let until_block = u32::from_str(&args[3]).ok();
+
     let mut data_restore_driver =
         create_new_data_restore_driver(config, from, delta, connection_pool.clone());
     info!("Driver created");
     load_past_state_from_storage(&mut data_restore_driver, connection_pool.clone());
-    load_new_states_for_data_restore_driver(&mut data_restore_driver);
+    
+    if until_block.is_none() {
+        load_new_states_for_data_restore_driver(&mut data_restore_driver);
+    }
 }
 
 fn load_past_state_from_storage(driver: &mut DataRestoreDriver, connection_pool: ConnectionPool) {
