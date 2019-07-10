@@ -76,6 +76,13 @@ where
             hasher,
         }
     }
+}
+impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
+where
+    T: GetBits,
+    Hash: Clone + Eq + Debug,
+    H: Hasher<Hash>,
+{
     // How many items can the tree hold
     pub fn capacity(&self) -> u32 {
         1 << self.tree_depth
@@ -206,6 +213,12 @@ where
     Hash: Clone + Eq + Debug,
     H: Hasher<Hash> + Default,
 {
+    pub fn get(&self, index: ItemIndex) -> Option<&T>{
+        match self.items.get(&index){
+            Some(i) => Some(i),
+            None => None,
+        }
+    }
     pub fn new(tree_depth: Depth) -> Self {
         let hasher = H::default();
         let items = HashMap::new();

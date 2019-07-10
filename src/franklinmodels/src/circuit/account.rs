@@ -4,9 +4,14 @@ use ff::Field;
 use franklin_crypto::alt_babyjubjub::JubjubEngine;
 
 use models::primitives::{GetBits, GetBitsFixed};
-#[derive(Debug, Clone)]
+use merkle_tree::{PedersenHasher, SparseMerkleTree};
+use pairing::bn256::{Bn256, Fr};
+pub type CircuitAccountTree = SparseMerkleTree<CircuitAccount<Bn256>, Fr, PedersenHasher<Bn256>>;
+pub type CircuitBalanceTree = SparseMerkleTree<Balance<Bn256>, Fr, PedersenHasher<Bn256>>;
+
 pub struct CircuitAccount<E: JubjubEngine> {
-    pub subtree_root_hash: E::Fr,
+    pub subtree: SparseMerkleTree<Balance<E>, E::Fr, PedersenHasher<E>>,
+    // pub subtree_root_hash: E::Fr,
     pub nonce: E::Fr,
     pub pub_x: E::Fr,
     pub pub_y: E::Fr,
@@ -21,13 +26,26 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
         leaf_content.extend(self.pub_y.get_bits_le_fixed(params::FR_BIT_WIDTH - 1));
         leaf_content.extend(self.pub_x.get_bits_le_fixed(1));
         leaf_content.extend(
-            self.subtree_root_hash
+            self.subtree.root_hash()
                 .get_bits_le_fixed(params::FR_BIT_WIDTH),
         );
         println!("test acc len {}", leaf_content.len());
 
         leaf_content
     }
+}
+
+impl std::default::Default for CircuitAccount<Bn256> {
+    //default should be changed: since subtree_root_hash is not zero for all zero balances and subaccounts
+    fn default() -> Self {
+        Self {
+            nonce: Fr::zero(),
+            pub_x: Fr::zero(),
+            pub_y: Fr::zero(),
+            subtree: SparseMerkleTree::new(*params::BALANCE_TREE_DEPTH as u32),
+        }
+    }
+
 }
 
 pub struct Balance<E: JubjubEngine> {

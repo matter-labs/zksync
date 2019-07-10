@@ -16,8 +16,7 @@ fn test_transfer() {
     use franklin_crypto::circuit::float_point::convert_to_float;
     use franklin_crypto::circuit::test::*;
     use franklin_crypto::jubjub::FixedGenerators;
-    use franklinmodels::circuit::account::{Balance, CircuitAccount};
-    use franklinmodels::{CircuitAccountTree, CircuitBalanceTree};
+    use franklinmodels::circuit::account::{Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
     use merkle_tree::hasher::Hasher;
     use merkle_tree::PedersenHasher;
     use pairing::bn256::*;

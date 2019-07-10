@@ -1,3 +1,39 @@
+ use crate::account::*;
+    use crate::circuit::FranklinCircuit;
+    use crate::operation::*;
+    use crate::utils::*;
+    use bellman::Circuit;
+    use crypto::digest::Digest;
+    use crypto::sha2::Sha256;
+    use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
+    use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+    use franklin_crypto::circuit::float_point::convert_to_float;
+    use franklin_crypto::circuit::test::*;
+    use franklin_crypto::eddsa::{PrivateKey, PublicKey};
+    use franklin_crypto::jubjub::FixedGenerators;
+    use franklinmodels::circuit::account::{Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree, };
+    use franklinmodels::params as franklin_constants;
+    use merkle_tree::hasher::Hasher;
+    use merkle_tree::PedersenHasher;
+    use pairing::bn256::*;
+    use rand::{Rng, SeedableRng, XorShiftRng};
+
+pub struct DepositData{
+    pub amount: u128,
+    pub token: u32,
+    pub account_address: u32,
+    pub new_pub_x: Fr,
+    pub new_pub_y: Fr,
+}
+pub struct DepositWitness{
+
+}
+pub fn apply_deposit(deposit: &DepositData, state: CircuitAccountTree) -> DepositWitness{
+    
+}
+
+
+
 #[test]
 fn test_deposit_franklin_in_empty_leaf() {
     use crate::account::*;
@@ -13,9 +49,8 @@ fn test_deposit_franklin_in_empty_leaf() {
     use franklin_crypto::circuit::test::*;
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklin_crypto::jubjub::FixedGenerators;
-    use franklinmodels::circuit::account::{Balance, CircuitAccount};
+    use franklinmodels::circuit::account::{Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
     use franklinmodels::params as franklin_constants;
-    use franklinmodels::{CircuitAccountTree, CircuitBalanceTree};
     use merkle_tree::hasher::Hasher;
     use merkle_tree::PedersenHasher;
     use pairing::bn256::*;
@@ -27,21 +62,10 @@ fn test_deposit_franklin_in_empty_leaf() {
 
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let mut balance_tree = CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
-    let balance_root = balance_tree.root_hash();
-    // println!("test balance root: {}", balance_root);
-    // println!("test subaccount root: {}", subaccount_root);
     let phasher = PedersenHasher::<Bn256>::default();
-    let default_subtree_hash = balance_root;
-    // println!("test subtree root: {}", default_subtree_hash);
-    let zero_account = CircuitAccount {
-        nonce: Fr::zero(),
-        pub_x: Fr::zero(),
-        pub_y: Fr::zero(),
-        subtree_root_hash: default_subtree_hash,
-    };
-    let mut tree = CircuitAccountTree::new_with_leaf(
+
+    let mut tree : CircuitAccountTree = CircuitAccountTree::new(
         franklin_constants::ACCOUNT_TREE_DEPTH as u32,
-        zero_account,
     );
     let initial_root = tree.root_hash();
     println!("Initial root = {}", initial_root);
@@ -56,7 +80,6 @@ fn test_deposit_franklin_in_empty_leaf() {
 
     // give some funds to sender and make zero balance for recipient
 
-    // let sender_leaf_number = 1;
 
     let mut sender_leaf_number: u32 = rng.gen();
     sender_leaf_number %= capacity;
@@ -69,7 +92,7 @@ fn test_deposit_franklin_in_empty_leaf() {
         ))
     );
     let transfer_amount: u128 = 500;
-
+    let fee: u128 = 0;
     let transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
 
     let transfer_amount_bits = convert_to_float(
@@ -82,7 +105,7 @@ fn test_deposit_franklin_in_empty_leaf() {
 
     let transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
 
-    let fee: u128 = 0;
+    
 
     let fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
 
@@ -110,13 +133,13 @@ fn test_deposit_franklin_in_empty_leaf() {
     let after_deposit_subtree_hash = after_deposit_balance_root;
 
     let sender_leaf = CircuitAccount::<Bn256> {
-        subtree_root_hash: after_deposit_subtree_hash.clone(),
+        subtree: balance_tree,
         nonce: Fr::zero(),
         pub_x: sender_x.clone(),
         pub_y: sender_y.clone(),
     };
 
-    tree.insert(sender_leaf_number, sender_leaf.clone());
+    tree.insert(sender_leaf_number, sender_leaf);
     let new_root = tree.root_hash();
 
     println!("New root = {}", new_root);
@@ -198,7 +221,7 @@ fn test_deposit_franklin_in_empty_leaf() {
         .map(|e| Some(e.0))
         .collect();
 
-    let audit_balance_path: Vec<Option<Fr>> = balance_tree
+    let audit_balance_path: Vec<Option<Fr>> = tree.get(sender_leaf_number).unwrap().subtree
         .merkle_path(token)
         .into_iter()
         .map(|e| Some(e.0))
