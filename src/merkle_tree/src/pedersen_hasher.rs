@@ -8,7 +8,7 @@ use pairing::bn256::Bn256;
 
 use crate::hasher::Hasher;
 use models::primitives::BitIteratorLe;
-
+#[derive(Clone)]
 pub struct PedersenHasher<E: JubjubEngine> {
     params: E::Params,
 }

@@ -1027,8 +1027,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             "is_sig_msg_correct={} ",
             is_sig_msg_correct.get_value().grab()?
         );
-
-        lhs_valid_flags.push(is_sig_msg_correct);
+        //TODO: uncomment signature check
+        // lhs_valid_flags.push(is_sig_msg_correct);
 
         // check signer pubkey
         let is_signer_key_correct = CircuitPubkey::equals(

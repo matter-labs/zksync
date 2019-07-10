@@ -1,41 +1,198 @@
- use crate::account::*;
-    use crate::circuit::FranklinCircuit;
-    use crate::operation::*;
-    use crate::utils::*;
-    use bellman::Circuit;
-    use crypto::digest::Digest;
-    use crypto::sha2::Sha256;
-    use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
-    use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-    use franklin_crypto::circuit::float_point::convert_to_float;
-    use franklin_crypto::circuit::test::*;
-    use franklin_crypto::eddsa::{PrivateKey, PublicKey};
-    use franklin_crypto::jubjub::FixedGenerators;
-    use franklinmodels::circuit::account::{Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree, };
-    use franklinmodels::params as franklin_constants;
-    use merkle_tree::hasher::Hasher;
-    use merkle_tree::PedersenHasher;
-    use pairing::bn256::*;
-    use rand::{Rng, SeedableRng, XorShiftRng};
+use super::utils::*;
+use crate::account::*;
+use crate::circuit::FranklinCircuit;
+use crate::operation::*;
+use crate::utils::*;
+use bellman::Circuit;
+use crypto::digest::Digest;
+use crypto::sha2::Sha256;
+use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
+use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use franklin_crypto::circuit::float_point::convert_to_float;
+use franklin_crypto::circuit::test::*;
+use franklin_crypto::eddsa::{PrivateKey, PublicKey};
+use franklin_crypto::jubjub::FixedGenerators;
+use franklin_crypto::jubjub::JubjubEngine;
+use franklinmodels::circuit::account::{
+    Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
+};
+use franklinmodels::params as franklin_constants;
+use merkle_tree::hasher::Hasher;
+use merkle_tree::PedersenHasher;
+use pairing::bn256::*;
+use rand::{Rng, SeedableRng, XorShiftRng};
 
-pub struct DepositData{
+pub struct DepositData {
     pub amount: u128,
+    pub fee: u128,
     pub token: u32,
     pub account_address: u32,
     pub new_pub_x: Fr,
     pub new_pub_y: Fr,
 }
-pub struct DepositWitness{
-
+pub struct DepositWitness<E: JubjubEngine> {
+    pub before: OperationBranch<E>,
+    pub after: OperationBranch<E>,
+    pub args: OperationArguments<E>,
+    pub before_root: Option<E::Fr>,
+    pub after_root: Option<E::Fr>,
+    pub tx_type: Option<E::Fr>,
 }
-pub fn apply_deposit(deposit: &DepositData, state: CircuitAccountTree) -> DepositWitness{
-    
+impl<E: JubjubEngine> DepositWitness<E> {
+    pub fn get_pubdata(&self) -> Vec<bool> {
+        let mut pubdata_bits = vec![];
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.tx_type.unwrap(),
+            *franklin_constants::TX_TYPE_BIT_WIDTH,
+        );
+
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.before.address.unwrap(),
+            franklin_constants::ACCOUNT_TREE_DEPTH,
+        );
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.before.token.unwrap(),
+            *franklin_constants::TOKEN_EXT_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.args.amount.unwrap(),
+            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
+                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+        );
+
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.args.fee.unwrap(),
+            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+        );
+
+        let mut new_pubkey_bits = vec![];
+        append_le_fixed_width(
+            &mut new_pubkey_bits,
+            &self.args.new_pub_y.unwrap(),
+            franklin_constants::FR_BIT_WIDTH - 1,
+        );
+        append_le_fixed_width(&mut new_pubkey_bits, &self.args.new_pub_x.unwrap(), 1);
+
+        let phasher = PedersenHasher::<Bn256>::default();
+        let new_pubkey_hash = phasher.hash_bits(new_pubkey_bits);
+
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &new_pubkey_hash,
+            *franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+        );
+        assert_eq!(pubdata_bits.len(), 37 * 8);
+        pubdata_bits.resize(40 * 8, false);
+        pubdata_bits
+    }
 }
+pub fn apply_deposit(
+    tree: &mut CircuitAccountTree,
+    deposit: &DepositData,
+) -> DepositWitness<Bn256> {
+    //preparing data and base witness
+    let before_root = tree.root_hash();
+    println!("Initial root = {}", before_root);
+    let (audit_path_before, audit_balance_path_before) =
+        get_audits(tree, deposit.account_address, deposit.token);
 
+    let capacity = tree.capacity();
+    assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
+    let account_address_fe = Fr::from_str(&deposit.account_address.to_string()).unwrap();
+    let token_fe = Fr::from_str(&deposit.token.to_string()).unwrap();
+    let amount_as_field_element = Fr::from_str(&deposit.amount.to_string()).unwrap();
 
+    let amount_bits = convert_to_float(
+        deposit.amount,
+        *franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+        *franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
+        10,
+    )
+    .unwrap();
+
+    let amount_encoded: Fr = le_bit_vector_into_field_element(&amount_bits);
+
+    let fee_as_field_element = Fr::from_str(&deposit.fee.to_string()).unwrap();
+
+    let fee_bits = convert_to_float(
+        deposit.fee,
+        *franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+        *franklin_constants::FEE_MANTISSA_BIT_WIDTH,
+        10,
+    )
+    .unwrap();
+
+    let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
+
+    //calculate a and b
+    let a = amount_as_field_element.clone();
+    let b = fee_as_field_element.clone();
+
+    //applying deposit
+    let (account_witness_before, account_witness_after, balance_before, balance_after) =
+        apply_leaf_operation(
+            tree,
+            deposit.account_address,
+            deposit.token,
+            |acc| {
+                assert!(
+                    (acc.pub_x == deposit.new_pub_x && acc.pub_y == deposit.new_pub_y)
+                        || (acc.pub_y == Fr::zero() && acc.pub_x == Fr::zero())
+                );
+                acc.pub_x = deposit.new_pub_x;
+                acc.pub_y = deposit.new_pub_y;
+            },
+            |bal| bal.value.add_assign(&amount_as_field_element),
+        );
+
+    let after_root = tree.root_hash();
+    println!("After root = {}", after_root);
+    let (audit_path_after, audit_balance_path_after) =
+        get_audits(tree, deposit.account_address, deposit.token);
+
+    DepositWitness {
+        before: OperationBranch {
+            address: Some(account_address_fe),
+            token: Some(token_fe),
+            witness: OperationBranchWitness {
+                account_witness: account_witness_before,
+                account_path: audit_path_before,
+                balance_value: Some(balance_before),
+                balance_subtree_path: audit_balance_path_before,
+            },
+        },
+        after: OperationBranch {
+            address: Some(account_address_fe),
+            token: Some(token_fe),
+            witness: OperationBranchWitness {
+                account_witness: account_witness_after,
+                account_path: audit_path_after,
+                balance_value: Some(balance_after),
+                balance_subtree_path: audit_balance_path_after,
+            },
+        },
+        args: OperationArguments {
+            amount: Some(amount_encoded),
+            fee: Some(fee_encoded),
+            a: Some(a),
+            b: Some(b),
+            new_pub_x: Some(deposit.new_pub_x),
+            new_pub_y: Some(deposit.new_pub_y),
+        },
+        before_root: Some(before_root),
+        after_root: Some(after_root),
+        tx_type: Some(Fr::from_str("1").unwrap()),
+    }
+}
 
 #[test]
 fn test_deposit_franklin_in_empty_leaf() {
+    use super::utils::public_data_commitment;
     use crate::account::*;
     use crate::circuit::FranklinCircuit;
     use crate::operation::*;
@@ -49,7 +206,9 @@ fn test_deposit_franklin_in_empty_leaf() {
     use franklin_crypto::circuit::test::*;
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklin_crypto::jubjub::FixedGenerators;
-    use franklinmodels::circuit::account::{Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
+    use franklinmodels::circuit::account::{
+        Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
+    };
     use franklinmodels::params as franklin_constants;
     use merkle_tree::hasher::Hasher;
     use merkle_tree::PedersenHasher;
@@ -59,19 +218,12 @@ fn test_deposit_franklin_in_empty_leaf() {
     let params = &AltJubjubBn256::new();
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let validator_address = Fr::from_str("7").unwrap();
-
+    let block_number = Fr::from_str("1").unwrap();
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
-    let mut balance_tree = CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
-    let phasher = PedersenHasher::<Bn256>::default();
+    // let phasher = PedersenHasher::<Bn256>::default();
 
-    let mut tree : CircuitAccountTree = CircuitAccountTree::new(
-        franklin_constants::ACCOUNT_TREE_DEPTH as u32,
-    );
-    let initial_root = tree.root_hash();
-    println!("Initial root = {}", initial_root);
-
-    let capacity = tree.capacity();
-    assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
+    let mut tree: CircuitAccountTree =
+        CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
 
     let sender_sk = PrivateKey::<Bn256>(rng.gen());
     let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
@@ -80,78 +232,27 @@ fn test_deposit_franklin_in_empty_leaf() {
 
     // give some funds to sender and make zero balance for recipient
 
-
-    let mut sender_leaf_number: u32 = rng.gen();
-    sender_leaf_number %= capacity;
-    let sender_leaf_number_fe = Fr::from_str(&sender_leaf_number.to_string()).unwrap();
-    println!(
-        "old leaf hash is {}",
-        tree.get_hash((
-            franklin_constants::ACCOUNT_TREE_DEPTH as u32,
-            sender_leaf_number
-        ))
-    );
-    let transfer_amount: u128 = 500;
+    let mut account_address: u32 = rng.gen();
+    account_address %= tree.capacity();
+    let amount: u128 = 500;
     let fee: u128 = 0;
-    let transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
-
-    let transfer_amount_bits = convert_to_float(
-        transfer_amount,
-        *franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        *franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap();
-
-    let transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
-
-    
-
-    let fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
-
-    let fee_bits = convert_to_float(
-        fee,
-        *franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-        *franklin_constants::FEE_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap();
-
-    let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
-
     let token: u32 = 2;
-    let token_fe = Fr::from_str(&token.to_string()).unwrap();
-
-    balance_tree.insert(
-        token,
-        Balance {
-            value: transfer_amount_as_field_element,
+    let deposit_witness = apply_deposit(
+        &mut tree,
+        &DepositData {
+            amount: amount,
+            fee: fee,
+            token: token,
+            account_address: account_address,
+            new_pub_x: sender_x,
+            new_pub_y: sender_y,
         },
     );
-    let after_deposit_balance_root = balance_tree.root_hash();
-
-    let after_deposit_subtree_hash = after_deposit_balance_root;
-
-    let sender_leaf = CircuitAccount::<Bn256> {
-        subtree: balance_tree,
-        nonce: Fr::zero(),
-        pub_x: sender_x.clone(),
-        pub_y: sender_y.clone(),
-    };
-
-    tree.insert(sender_leaf_number, sender_leaf);
-    let new_root = tree.root_hash();
-
-    println!("New root = {}", new_root);
-
-    assert!(initial_root != new_root);
-    println!(
-        "updated leaf hash is {}",
-        tree.get_hash((
-            franklin_constants::ACCOUNT_TREE_DEPTH as u32,
-            sender_leaf_number
-        ))
-    );
+    let pubdata_chunks: Vec<_> = deposit_witness
+        .get_pubdata()
+        .chunks(64)
+        .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
+        .collect();
 
     let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
     let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
@@ -162,276 +263,91 @@ fn test_deposit_franklin_in_empty_leaf() {
     let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
     //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
-    let deposit_tx_type = Fr::from_str("1").unwrap();
-    let mut pubdata_bits = vec![];
-    append_be_fixed_width(
-        &mut pubdata_bits,
-        &deposit_tx_type,
-        *franklin_constants::TX_TYPE_BIT_WIDTH,
-    );
-
-    append_be_fixed_width(
-        &mut pubdata_bits,
-        &sender_leaf_number_fe,
-        franklin_constants::ACCOUNT_TREE_DEPTH,
-    );
-    append_be_fixed_width(
-        &mut pubdata_bits,
-        &token_fe,
-        *franklin_constants::TOKEN_EXT_BIT_WIDTH,
-    );
-    append_be_fixed_width(
-        &mut pubdata_bits,
-        &transfer_amount_encoded,
-        franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
-            + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-    );
-
-    append_be_fixed_width(
-        &mut pubdata_bits,
-        &fee_encoded,
-        franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-    );
-
-    let mut new_pubkey_bits = vec![];
-    append_le_fixed_width(
-        &mut new_pubkey_bits,
-        &sender_y,
-        franklin_constants::FR_BIT_WIDTH - 1,
-    );
-    append_le_fixed_width(&mut new_pubkey_bits, &sender_x, 1);
-    let new_pubkey_hash = phasher.hash_bits(new_pubkey_bits);
-
-    append_be_fixed_width(
-        &mut pubdata_bits,
-        &new_pubkey_hash,
-        *franklin_constants::NEW_PUBKEY_HASH_WIDTH,
-    );
-    assert_eq!(pubdata_bits.len(), 37 * 8);
-    pubdata_bits.resize(40 * 8, false);
-
-    let pubdata_chunks: Vec<Fr> = pubdata_bits
-        .chunks(64)
-        .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
-        .collect::<Vec<_>>();
-
-    let audit_path: Vec<Option<Fr>> = tree
-        .merkle_path(sender_leaf_number)
-        .into_iter()
-        .map(|e| Some(e.0))
-        .collect();
-
-    let audit_balance_path: Vec<Option<Fr>> = tree.get(sender_leaf_number).unwrap().subtree
-        .merkle_path(token)
-        .into_iter()
-        .map(|e| Some(e.0))
-        .collect();
-
-    let op_args = OperationArguments {
-        a: Some(transfer_amount_as_field_element.clone()),
-        b: Some(fee_as_field_element.clone()),
-        amount: Some(transfer_amount_encoded.clone()),
-        fee: Some(fee_encoded.clone()),
-        new_pub_x: Some(sender_x.clone()),
-        new_pub_y: Some(sender_y.clone()),
-    };
-    let operation_branch_before = OperationBranch {
-        address: Some(sender_leaf_number_fe),
-        token: Some(token_fe),
-        witness: OperationBranchWitness {
-            account_witness: AccountWitness {
-                nonce: Some(Fr::zero()),
-                pub_x: Some(Fr::zero()),
-                pub_y: Some(Fr::zero()),
-            },
-            account_path: audit_path.clone(),
-            balance_value: Some(Fr::zero()),
-            balance_subtree_path: audit_balance_path.clone(),
-        },
-    };
-    let operation_branch_after = OperationBranch::<Bn256> {
-        address: Some(sender_leaf_number_fe),
-        token: Some(token_fe),
-        witness: OperationBranchWitness {
-            account_witness: AccountWitness {
-                nonce: Some(Fr::zero()),
-                pub_x: Some(sender_x.clone()),
-                pub_y: Some(sender_y.clone()),
-            },
-            account_path: audit_path.clone(),
-            balance_value: Some(transfer_amount_as_field_element.clone()),
-            balance_subtree_path: audit_balance_path.clone(),
-        },
-    };
-    println!("pubdata_chunk number {} is {}", 0, pubdata_chunks[0]);
     let operation_zero = Operation {
-        new_root: Some(new_root.clone()),
-        tx_type: Some(Fr::from_str("1").unwrap()),
+        new_root: deposit_witness.after_root.clone(),
+        tx_type: deposit_witness.tx_type,
         chunk: Some(Fr::from_str("0").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[0]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: Some(sender_x.clone()),
-        signer_pub_key_y: Some(sender_y.clone()),
-        args: op_args.clone(),
-        lhs: operation_branch_before.clone(),
-        rhs: operation_branch_before.clone(),
+        signer_pub_key_x: deposit_witness.args.new_pub_x,
+        signer_pub_key_y: deposit_witness.args.new_pub_y,
+        args: deposit_witness.args.clone(),
+        lhs: deposit_witness.before.clone(),
+        rhs: deposit_witness.before.clone(),
     };
 
     println!("pubdata_chunk number {} is {}", 1, pubdata_chunks[1]);
     let operation_one = Operation {
-        new_root: Some(new_root.clone()),
-        tx_type: Some(Fr::from_str("1").unwrap()),
+        new_root: deposit_witness.after_root.clone(),
+        tx_type: deposit_witness.tx_type,
         chunk: Some(Fr::from_str("1").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[1]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: Some(sender_x.clone()),
-        signer_pub_key_y: Some(sender_y.clone()),
-        args: op_args.clone(),
-        lhs: operation_branch_after.clone(),
-        rhs: operation_branch_after.clone(),
+        signer_pub_key_x: deposit_witness.args.new_pub_x,
+        signer_pub_key_y: deposit_witness.args.new_pub_y,
+        args: deposit_witness.args.clone(),
+        lhs: deposit_witness.after.clone(),
+        rhs: deposit_witness.after.clone(),
     };
 
     println!("pubdata_chunk number {} is {}", 2, pubdata_chunks[2]);
     let operation_two = Operation {
-        new_root: Some(new_root.clone()),
-        tx_type: Some(Fr::from_str("1").unwrap()),
+        new_root: deposit_witness.after_root.clone(),
+        tx_type: deposit_witness.tx_type,
         chunk: Some(Fr::from_str("2").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[2]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: Some(sender_x.clone()),
-        signer_pub_key_y: Some(sender_y.clone()),
-        args: op_args.clone(),
-        lhs: operation_branch_after.clone(),
-        rhs: operation_branch_after.clone(),
+        signer_pub_key_x: deposit_witness.args.new_pub_x,
+        signer_pub_key_y: deposit_witness.args.new_pub_y,
+        args: deposit_witness.args.clone(),
+        lhs: deposit_witness.after.clone(),
+        rhs: deposit_witness.after.clone(),
     };
 
     let operation_three = Operation {
-        new_root: Some(new_root.clone()),
-        tx_type: Some(Fr::from_str("1").unwrap()),
+        new_root: deposit_witness.after_root.clone(),
+        tx_type: deposit_witness.tx_type,
         chunk: Some(Fr::from_str("3").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[3]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: Some(sender_x.clone()),
-        signer_pub_key_y: Some(sender_y.clone()),
-        args: op_args.clone(),
-        lhs: operation_branch_after.clone(),
-        rhs: operation_branch_after.clone(),
+        signer_pub_key_x: deposit_witness.args.new_pub_x,
+        signer_pub_key_y: deposit_witness.args.new_pub_y,
+        args: deposit_witness.args.clone(),
+        lhs: deposit_witness.after.clone(),
+        rhs: deposit_witness.after.clone(),
     };
     let operation_four = Operation {
-        new_root: Some(new_root.clone()),
-        tx_type: Some(Fr::from_str("1").unwrap()),
+        new_root: deposit_witness.after_root.clone(),
+        tx_type: deposit_witness.tx_type,
         chunk: Some(Fr::from_str("4").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[4]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: Some(sender_x.clone()),
-        signer_pub_key_y: Some(sender_y.clone()),
-        args: op_args.clone(),
-        lhs: operation_branch_after.clone(),
-        rhs: operation_branch_after.clone(),
+        signer_pub_key_x: deposit_witness.args.new_pub_x,
+        signer_pub_key_y: deposit_witness.args.new_pub_y,
+        args: deposit_witness.args.clone(),
+        lhs: deposit_witness.after.clone(),
+        rhs: deposit_witness.after.clone(),
     };
-    let mut public_data_initial_bits = vec![];
 
-    // these two are BE encodings because an iterator is BE. This is also an Ethereum standard behavior
-
-    let block_number_bits: Vec<bool> = BitIterator::new(Fr::one().into_repr()).collect();
-    for _ in 0..256 - block_number_bits.len() {
-        public_data_initial_bits.push(false);
-    }
-    public_data_initial_bits.extend(block_number_bits.into_iter());
-
-    let validator_id_bits: Vec<bool> = BitIterator::new(validator_address.into_repr()).collect();
-    for _ in 0..256 - validator_id_bits.len() {
-        public_data_initial_bits.push(false);
-    }
-    public_data_initial_bits.extend(validator_id_bits.into_iter());
-
-    assert_eq!(public_data_initial_bits.len(), 512);
-
-    let mut h = Sha256::new();
-
-    let bytes_to_hash = be_bit_vector_into_bytes(&public_data_initial_bits);
-
-    h.input(&bytes_to_hash);
-
-    let mut hash_result = [0u8; 32];
-    h.result(&mut hash_result[..]);
-
-    println!("Initial hash hex {}", hex::encode(hash_result));
-
-    let mut packed_old_root_bits = vec![];
-    let old_root_bits: Vec<bool> = BitIterator::new(initial_root.into_repr()).collect();
-    for _ in 0..256 - old_root_bits.len() {
-        packed_old_root_bits.push(false);
-    }
-    packed_old_root_bits.extend(old_root_bits);
-
-    let packed_old_root_bytes = be_bit_vector_into_bytes(&packed_old_root_bits);
-
-    let mut packed_with_old_root = vec![];
-    packed_with_old_root.extend(hash_result.iter());
-    packed_with_old_root.extend(packed_old_root_bytes);
-
-    h = Sha256::new();
-    h.input(&packed_with_old_root);
-    hash_result = [0u8; 32];
-    h.result(&mut hash_result[..]);
-
-    let mut packed_new_root_bits = vec![];
-    let new_root_bits: Vec<bool> = BitIterator::new(new_root.into_repr()).collect();
-    for _ in 0..256 - new_root_bits.len() {
-        packed_new_root_bits.push(false);
-    }
-    packed_new_root_bits.extend(new_root_bits);
-
-    let packed_new_root_bytes = be_bit_vector_into_bytes(&packed_new_root_bits);
-
-    let mut packed_with_new_root = vec![];
-    packed_with_new_root.extend(hash_result.iter());
-    packed_with_new_root.extend(packed_new_root_bytes);
-
-    h = Sha256::new();
-    h.input(&packed_with_new_root);
-    hash_result = [0u8; 32];
-    h.result(&mut hash_result[..]);
-
-    println!("hash with new root as hex {}", hex::encode(hash_result));
-
-    let mut final_bytes = vec![];
-    let pubdata_bytes = be_bit_vector_into_bytes(&pubdata_bits);
-    final_bytes.extend(hash_result.iter());
-    final_bytes.extend(pubdata_bytes);
-
-    h = Sha256::new();
-    h.input(&final_bytes);
-    hash_result = [0u8; 32];
-    h.result(&mut hash_result[..]);
-
-    println!("final hash as hex {}", hex::encode(hash_result));
-
-    hash_result[0] &= 0x1f; // temporary solution, this nullifies top bits to be encoded into field element correctly
-
-    let mut repr = Fr::zero().into_repr();
-    repr.read_be(&hash_result[..])
-        .expect("pack hash as field element");
-
-    let public_data_commitment = Fr::from_repr(repr).unwrap();
-
-    println!(
-        "Final data commitment as field element = {}",
-        public_data_commitment
+    let public_data_commitment = public_data_commitment::<Bn256>(
+        &deposit_witness.get_pubdata(),
+        deposit_witness.before_root,
+        deposit_witness.after_root,
+        Some(validator_address),
+        Some(block_number),
     );
     {
         let mut cs = TestConstraintSystem::<Bn256>::new();
 
         let instance = FranklinCircuit {
             params,
-            old_root: Some(initial_root),
-            new_root: Some(new_root),
+            old_root: deposit_witness.before_root,
+            new_root: deposit_witness.after_root,
             operations: vec![
                 operation_zero,
                 operation_one,

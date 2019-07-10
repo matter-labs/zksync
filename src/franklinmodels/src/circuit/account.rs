@@ -3,8 +3,8 @@ use crate::params;
 use ff::Field;
 use franklin_crypto::alt_babyjubjub::JubjubEngine;
 
-use models::primitives::{GetBits, GetBitsFixed};
 use merkle_tree::{PedersenHasher, SparseMerkleTree};
+use models::primitives::{GetBits, GetBitsFixed};
 use pairing::bn256::{Bn256, Fr};
 pub type CircuitAccountTree = SparseMerkleTree<CircuitAccount<Bn256>, Fr, PedersenHasher<Bn256>>;
 pub type CircuitBalanceTree = SparseMerkleTree<Balance<Bn256>, Fr, PedersenHasher<Bn256>>;
@@ -26,7 +26,8 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
         leaf_content.extend(self.pub_y.get_bits_le_fixed(params::FR_BIT_WIDTH - 1));
         leaf_content.extend(self.pub_x.get_bits_le_fixed(1));
         leaf_content.extend(
-            self.subtree.root_hash()
+            self.subtree
+                .root_hash()
                 .get_bits_le_fixed(params::FR_BIT_WIDTH),
         );
         println!("test acc len {}", leaf_content.len());
@@ -45,9 +46,8 @@ impl std::default::Default for CircuitAccount<Bn256> {
             subtree: SparseMerkleTree::new(*params::BALANCE_TREE_DEPTH as u32),
         }
     }
-
 }
-
+#[derive(Clone)]
 pub struct Balance<E: JubjubEngine> {
     pub value: E::Fr,
 }

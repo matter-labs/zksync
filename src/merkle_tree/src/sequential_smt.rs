@@ -213,8 +213,8 @@ where
     Hash: Clone + Eq + Debug,
     H: Hasher<Hash> + Default,
 {
-    pub fn get(&self, index: ItemIndex) -> Option<&T>{
-        match self.items.get(&index){
+    pub fn get(&self, index: ItemIndex) -> Option<&T> {
+        match self.items.get(&index) {
             Some(i) => Some(i),
             None => None,
         }
@@ -244,6 +244,31 @@ where
             hashes,
             hasher,
         }
+    }
+
+    pub fn remove(&mut self, index: ItemIndex) -> Option<T> {
+        assert!(index < self.capacity());
+        let hash_index = (self.tree_depth, index);
+
+        let item = T::default();
+
+        let item_bits = item.get_bits_le();
+
+        let hash = self.hasher.hash_bits(item_bits);
+
+        self.hashes.insert(hash_index.pack(), hash);
+        let old = self.items.remove(&index);
+        self.items.insert(index, item);
+
+        let mut next_level = (hash_index.0, hash_index.1);
+
+        for _ in 0..next_level.0 {
+            next_level = (next_level.0 - 1, next_level.1 >> 1);
+            self.update_hash(next_level);
+        }
+
+        assert_eq!(next_level.0, 0);
+        old
     }
 
     pub fn delete(&mut self, index: ItemIndex) {
