@@ -2,6 +2,14 @@
   "name": "franklin-contracts",
   "version": "0.1.0",
   "devDependencies": {
-    "ethereum-waffle": "^2.0.12"
+    "chai": "^4.2.0",
+    "ethereum-waffle": "^2.0.12",
+    "ethjs": "^0.4.0",
+    "mocha": "^6.1.4",
+    "openzeppelin-solidity": "^2.3.0"
+  },
+  "scripts": {
+    "test": "npx mocha",
+    "deploy": "node scripts/deploy.js"
   }
 }
