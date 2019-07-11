@@ -162,7 +162,7 @@ pub fn apply_transfer(
         balance_to_after,
     ) = apply_leaf_operation(
         tree,
-        transfer.from_account_address,
+        transfer.to_account_address,
         transfer.token,
         |_| {},
         |bal| bal.value.add_assign(&amount_as_field_element),
@@ -225,9 +225,9 @@ pub fn apply_transfer(
             token: Some(token_fe),
             witness: OperationBranchWitness {
                 account_witness: account_witness_to_intermediate,
-                account_path: audit_path_to_intermediate,
+                account_path: audit_path_to_intermediate.clone(),
                 balance_value: Some(balance_to_intermediate),
-                balance_subtree_path: audit_balance_path_to_intermediate,
+                balance_subtree_path: audit_balance_path_to_intermediate.clone(),
             },
         },
         to_after: OperationBranch {
