@@ -1,26 +1,26 @@
 use super::utils::*;
-use crate::account::*;
-use crate::circuit::FranklinCircuit;
+
+
 use crate::operation::*;
 use crate::utils::*;
-use bellman::Circuit;
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
+
+
+
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
-use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+
 use franklin_crypto::circuit::float_point::convert_to_float;
-use franklin_crypto::circuit::test::*;
-use franklin_crypto::eddsa::{PrivateKey, PublicKey};
-use franklin_crypto::jubjub::FixedGenerators;
+
+
+
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::{
     Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
 };
 use franklinmodels::params as franklin_constants;
-use merkle_tree::hasher::Hasher;
-use merkle_tree::PedersenHasher;
+
+
 use pairing::bn256::*;
-use rand::{Rng, SeedableRng, XorShiftRng};
+
 
 pub struct TransferData {
     pub amount: u128,
@@ -259,13 +259,13 @@ fn test_transfer() {
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklinmodels::params as franklin_constants;
 
-    use crate::account::*;
+    
     use crate::circuit::FranklinCircuit;
     use crate::operation::*;
     use crate::utils::*;
     use bellman::Circuit;
-    use crypto::digest::Digest;
-    use crypto::sha2::Sha256;
+    
+    
     use ff::Field;
     use ff::{BitIterator, PrimeField, PrimeFieldRepr};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
@@ -313,7 +313,7 @@ fn test_transfer() {
 
     let mut to_leaf_number: u32 = rng.gen();
     to_leaf_number %= capacity;
-    let to_leaf_number_fe = Fr::from_str(&to_leaf_number.to_string()).unwrap();
+    let _to_leaf_number_fe = Fr::from_str(&to_leaf_number.to_string()).unwrap();
 
     let from_balance_before: u128 = 2000;
 
@@ -326,7 +326,7 @@ fn test_transfer() {
 
     let transfer_amount: u128 = 500;
 
-    let transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
+    let _transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
 
     let transfer_amount_bits = convert_to_float(
         transfer_amount,
@@ -340,7 +340,7 @@ fn test_transfer() {
 
     let fee: u128 = 0;
 
-    let fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
+    let _fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
 
     let fee_bits = convert_to_float(
         fee,

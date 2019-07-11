@@ -1,27 +1,27 @@
-use franklin_crypto::eddsa::{PrivateKey, PublicKey};
-use franklinmodels::params as franklin_constants;
+
+
 
 use crate::account::*;
-use crate::circuit::FranklinCircuit;
-use crate::operation::*;
+
+
 use crate::utils::*;
-use bellman::Circuit;
+
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use ff::Field;
 use ff::{BitIterator, PrimeField, PrimeFieldRepr};
-use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-use franklin_crypto::circuit::float_point::convert_to_float;
-use franklin_crypto::circuit::test::*;
-use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
+
+
+
+use franklin_crypto::jubjub::{JubjubEngine};
 use franklinmodels::circuit::account::{
-    Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
+    Balance, CircuitAccount, CircuitAccountTree,
 };
-use merkle_tree::hasher::Hasher;
-use merkle_tree::{PedersenHasher, SparseMerkleTree};
+
+
 
 use pairing::bn256::*;
-use rand::{Rng, SeedableRng, XorShiftRng};
+
 
 pub fn public_data_commitment<E: JubjubEngine>(
     pubdata_bits: &[bool],
