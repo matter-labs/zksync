@@ -10,15 +10,16 @@ use franklinmodels::circuit::account::{
 use franklinmodels::params as franklin_constants;
 use pairing::bn256::*;
 
-
-pub struct TransferData {
+pub struct TransferToNewData {
     pub amount: u128,
     pub fee: u128,
     pub token: u32,
     pub from_account_address: u32,
     pub to_account_address: u32,
+    pub new_pub_x: Fr,
+    pub new_pub_y: Fr,
 }
-pub struct TransferWitness<E: JubjubEngine> {
+pub struct TransferToNewWitness<E: JubjubEngine> {
     pub from_before: OperationBranch<E>,
     pub from_intermediate: OperationBranch<E>,
     pub from_after: OperationBranch<E>,
@@ -31,9 +32,24 @@ pub struct TransferWitness<E: JubjubEngine> {
     pub after_root: Option<E::Fr>,
     pub tx_type: Option<E::Fr>,
 }
-impl<E: JubjubEngine> TransferWitness<E> {
+impl<E: JubjubEngine> TransferToNewWitness<E> {
     pub fn get_pubdata(&self) -> Vec<bool> {
-        // construct pubdata
+        // let mut pubdata_bits = vec![];
+        // let mut pub_token_bits = lhs.token.get_bits_le().clone();
+        // pub_token_bits.resize(
+        //     *franklin_constants::TOKEN_EXT_BIT_WIDTH,
+        //     Boolean::constant(false),
+        // );
+        // pub_token_bits.reverse();
+        // pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //8
+        // pubdata_bits.extend(lhs.account_address.get_bits_be()); //24
+        // pubdata_bits.extend(pub_token_bits.clone()); //16
+        // pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //24
+        // pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //224
+        // pubdata_bits.extend(rhs.account_address.get_bits_be()); //24
+        // pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //8
+        // assert_eq!(pubdata_bits.len(), 40 * 8);
+
         let mut pubdata_bits = vec![];
         append_be_fixed_width(
             &mut pubdata_bits,
@@ -74,40 +90,40 @@ impl<E: JubjubEngine> TransferWitness<E> {
     }
 }
 
-pub fn apply_transfer(
+pub fn apply_transfer_to_new(
     tree: &mut CircuitAccountTree,
-    transfer: &TransferData,
-) -> TransferWitness<Bn256> {
+    transfer_to_new: &TransferToNewData,
+) -> TransferToNewWitness<Bn256> {
     //preparing data and base witness
     let before_root = tree.root_hash();
     println!("Initial root = {}", before_root);
     let (audit_path_from_before, audit_balance_path_from_before) =
-        get_audits(tree, transfer.from_account_address, transfer.token);
+        get_audits(tree, transfer_to_new.from_account_address, transfer_to_new.token);
 
     let (audit_path_to_before, audit_balance_path_to_before) =
-        get_audits(tree, transfer.to_account_address, transfer.token);
+        get_audits(tree, transfer_to_new.to_account_address, transfer_to_new.token);
 
     let capacity = tree.capacity();
     assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
-    let account_address_from_fe = Fr::from_str(&transfer.from_account_address.to_string()).unwrap();
-    let account_address_to_fe = Fr::from_str(&transfer.to_account_address.to_string()).unwrap();
-    let token_fe = Fr::from_str(&transfer.token.to_string()).unwrap();
-    let amount_as_field_element = Fr::from_str(&transfer.amount.to_string()).unwrap();
+    let account_address_from_fe = Fr::from_str(&transfer_to_new.from_account_address.to_string()).unwrap();
+    let account_address_to_fe = Fr::from_str(&transfer_to_new.to_account_address.to_string()).unwrap();
+    let token_fe = Fr::from_str(&transfer_to_new.token.to_string()).unwrap();
+    let amount_as_field_element = Fr::from_str(&transfer_to_new.amount.to_string()).unwrap();
 
     let amount_bits = convert_to_float(
-        transfer.amount,
+        transfer_to_new.amount,
         *franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
         *franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
         10,
     )
     .unwrap();
-
+    
     let amount_encoded: Fr = le_bit_vector_into_field_element(&amount_bits);
 
-    let fee_as_field_element = Fr::from_str(&transfer.fee.to_string()).unwrap();
+    let fee_as_field_element = Fr::from_str(&transfer_to_new.fee.to_string()).unwrap();
 
     let fee_bits = convert_to_float(
-        transfer.fee,
+        transfer_to_new.fee,
         *franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         *franklin_constants::FEE_MANTISSA_BIT_WIDTH,
         10,
@@ -124,8 +140,8 @@ pub fn apply_transfer(
         balance_from_intermediate,
     ) = apply_leaf_operation(
         tree,
-        transfer.from_account_address,
-        transfer.token,
+        transfer_to_new.from_account_address,
+        transfer_to_new.token,
         |acc| {
             acc.nonce.add_assign(&Fr::from_str("1").unwrap());
         },
@@ -139,10 +155,10 @@ pub fn apply_transfer(
     println!("Intermediate root = {}", intermediate_root);
 
     let (audit_path_from_intermediate, audit_balance_path_from_intermediate) =
-        get_audits(tree, transfer.from_account_address, transfer.token);
+        get_audits(tree, transfer_to_new.from_account_address, transfer_to_new.token);
 
     let (audit_path_to_intermediate, audit_balance_path_to_intermediate) =
-        get_audits(tree, transfer.to_account_address, transfer.token);
+        get_audits(tree, transfer_to_new.to_account_address, transfer_to_new.token);
 
     let (
         account_witness_to_intermediate,
@@ -151,24 +167,29 @@ pub fn apply_transfer(
         balance_to_after,
     ) = apply_leaf_operation(
         tree,
-        transfer.to_account_address,
-        transfer.token,
-        |_| {},
+        transfer_to_new.to_account_address,
+        transfer_to_new.token,
+        |acc| {assert!(
+                    (acc.pub_x == transfer_to_new.new_pub_x && acc.pub_y == transfer_to_new.new_pub_y)
+                        || (acc.pub_y == Fr::zero() && acc.pub_x == Fr::zero())
+                );
+                acc.pub_x = transfer_to_new.new_pub_x;
+                acc.pub_y = transfer_to_new.new_pub_y;},
         |bal| bal.value.add_assign(&amount_as_field_element),
     );
     let after_root = tree.root_hash();
     let (audit_path_from_after, audit_balance_path_from_after) =
-        get_audits(tree, transfer.from_account_address, transfer.token);
+        get_audits(tree, transfer_to_new.from_account_address, transfer_to_new.token);
 
     let (audit_path_to_after, audit_balance_path_to_after) =
-        get_audits(tree, transfer.to_account_address, transfer.token);
+        get_audits(tree, transfer_to_new.to_account_address, transfer_to_new.token);
 
     //calculate a and b
     let a = balance_from_before.clone();
     let mut b = amount_as_field_element.clone();
     b.add_assign(&fee_as_field_element);
 
-    TransferWitness {
+    TransferToNewWitness {
         from_before: OperationBranch {
             address: Some(account_address_from_fe),
             token: Some(token_fe),
@@ -234,17 +255,17 @@ pub fn apply_transfer(
             fee: Some(fee_encoded),
             a: Some(a),
             b: Some(b),
-            new_pub_x: Some(Fr::zero()),
-            new_pub_y: Some(Fr::zero()), //shouldn't matter for transfer operation
+            new_pub_x: Some(transfer_to_new.new_pub_x),
+            new_pub_y: Some(transfer_to_new.new_pub_y), 
         },
         before_root: Some(before_root),
         intermediate_root: Some(intermediate_root),
         after_root: Some(after_root),
-        tx_type: Some(Fr::from_str("5").unwrap()),
+        tx_type: Some(Fr::from_str("2").unwrap()),
     }
 }
 #[test]
-fn test_transfer() {
+fn test_transfer_to_new() {
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklinmodels::params as franklin_constants;
 
@@ -378,9 +399,9 @@ fn test_transfer() {
     tree.insert(from_leaf_number, from_leaf_initial);
     tree.insert(to_leaf_number, to_leaf_initial);
 
-    let transfer_witness = apply_transfer(
+    let transfer_witness = apply_transfer_to_new(
         &mut tree,
-        &TransferData {
+        &TransferToNewData {
             amount: transfer_amount,
             fee: fee,
             token: token,

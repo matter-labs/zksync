@@ -869,7 +869,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?);
         rhs_valid_flags.push(is_pubdata_chunk_correct.clone());
         rhs_valid_flags.push(is_second_chunk);
-        rhs_valid_flags.push(is_transfer);
+        rhs_valid_flags.push(is_transfer.clone());
         rhs_valid_flags.push(is_account_empty.clone());
         println!("rhs valid transfer to new");
         let rhs_valid = multi_and(cs.namespace(|| "rhs_valid"), &rhs_valid_flags)?;
@@ -898,12 +898,13 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &rhs_valid,
         )?;
 
-        Ok(Boolean::and(
-            cs.namespace(|| "lhs_valid nand rhs_valid"),
-            &lhs_valid.not(),
-            &rhs_valid.not(),
-        )?
-        .not())
+        let mut ohs_valid_flags = vec![];
+        ohs_valid_flags.push(is_pubdata_chunk_correct.clone());
+        ohs_valid_flags.push(is_transfer);
+        ohs_valid_flags.push(is_account_empty.clone());
+        let is_ohs_valid = multi_and(cs.namespace(||"is_ohs_valid"), &ohs_valid_flags)?;
+        let is_op_valid = multi_or(cs.namespace(||"is_op_valid"), &[is_ohs_valid, lhs_valid, rhs_valid])?;
+        Ok(is_op_valid)
     }
 
     //TODO: verify token equality
@@ -1043,7 +1044,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
 
         lhs_valid_flags.push(is_a_correct);
-
+        
         let sum_amount_fee = AllocatedNum::alloc(cs.namespace(|| "amount plus fee"), || {
             let mut bal = op_data.amount.grab()?;
             bal.add_assign(&op_data.fee.grab()?);
@@ -1118,7 +1119,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         // rhs
         let mut rhs_valid_flags = vec![];
-        rhs_valid_flags.push(is_transfer);
+        rhs_valid_flags.push(is_transfer.clone());
 
         let one =
             AllocatedNum::alloc(cs.namespace(|| "one"), || Ok(E::Fr::from_str("1").unwrap()))?;
