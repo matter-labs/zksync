@@ -1,16 +1,11 @@
 use super::utils::*;
 
-
 use crate::operation::*;
 use crate::utils::*;
-
-
 
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
 
 use franklin_crypto::circuit::float_point::convert_to_float;
-
-
 
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::{
@@ -20,7 +15,6 @@ use franklinmodels::params as franklin_constants;
 use merkle_tree::hasher::Hasher;
 use merkle_tree::PedersenHasher;
 use pairing::bn256::*;
-
 
 pub struct DepositData {
     pub amount: u128,
@@ -193,16 +187,15 @@ pub fn apply_deposit(
 #[test]
 fn test_deposit_franklin_in_empty_leaf() {
     use super::utils::public_data_commitment;
-    
+
     use crate::circuit::FranklinCircuit;
     use crate::operation::*;
     use crate::utils::*;
     use bellman::Circuit;
-    
-    
+
     use ff::{BitIterator, Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-    
+
     use franklin_crypto::circuit::test::*;
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklin_crypto::jubjub::FixedGenerators;
@@ -210,8 +203,7 @@ fn test_deposit_franklin_in_empty_leaf() {
         Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
     use franklinmodels::params as franklin_constants;
-    
-    
+
     use pairing::bn256::*;
     use rand::{Rng, SeedableRng, XorShiftRng};
 

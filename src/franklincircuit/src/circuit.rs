@@ -1,8 +1,9 @@
 use crate::account::AccountContent;
+use crate::account::AccountWitness;
 use crate::allocated_structures::*;
 use crate::element::{CircuitElement, CircuitPubkey};
 use crate::operation::Operation;
-use crate::utils::pack_bits_to_element;
+use crate::utils::{allocate_audit_path, allocate_sum, pack_bits_to_element};
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use ff::{Field, PrimeField};
 use franklin_crypto::circuit::baby_eddsa::EddsaSignature;
@@ -30,10 +31,16 @@ pub struct FranklinCircuit<'a, E: JubjubEngine> {
     pub validator_address: Option<E::Fr>,
 
     pub pub_data_commitment: Option<E::Fr>,
-
     pub operations: Vec<Operation<E>>,
+
+    pub validator_balances: Vec<Option<E::Fr>>,
+    pub validator_audit_path: Vec<Option<E::Fr>>,
+    pub validator_account: AccountWitness<E>,
 }
 
+struct Precomputed<E: JubjubEngine> {
+    pub asserted_numbers: Vec<AllocatedNum<E>>,
+}
 #[derive(Clone)]
 struct PreviousData<E: JubjubEngine> {
     //lhs, rhs //TODO: #merkle
@@ -44,26 +51,60 @@ struct PreviousData<E: JubjubEngine> {
 //
 impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
     fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+        //
+
+        let mut asserted_numbers = vec![];
+        for i in 0..(1 << franklin_constants::BALANCE_TREE_DEPTH) {
+            let number = AllocatedNum::alloc(cs.namespace(|| format!("number {}", i)), || {
+                Ok(E::Fr::from_str(&i.to_string()).unwrap())
+            })?;
+            number.assert_number(
+                cs.namespace(|| format!("number {} is correct", i)),
+                &E::Fr::from_str(&i.to_string()).unwrap(),
+            )?;
+            asserted_numbers.push(number);
+        }
+        let precomputed = Precomputed {
+            asserted_numbers: asserted_numbers,
+        };
+
         let public_data_commitment =
             AllocatedNum::alloc(cs.namespace(|| "public_data_commitment"), || {
                 self.pub_data_commitment.grab()
             })?;
         public_data_commitment.inputize(cs.namespace(|| "inputize pub_data"))?;
 
-        let validator_address =
+        let validator_address_padded =
             CircuitElement::from_fe_padded(cs.namespace(|| "validator_address"), || {
                 self.validator_address.grab()
             })?;
-
+        let mut validator_address = validator_address_padded.get_bits_le();
+        validator_address.truncate(franklin_constants::ACCOUNT_TREE_DEPTH);
+        let mut validator_balances = allocate_audit_path(
+            cs.namespace(|| "validator_balances"),
+            &self.validator_balances,
+        )?;
+        let validator_audit_path = allocate_audit_path(
+            cs.namespace(|| "validator_audit_path"),
+            &self.validator_audit_path,
+        )?;
+        let validator_account = AccountContent::from_witness(
+            cs.namespace(|| "validator account"),
+            &self.validator_account,
+        )?;
         let mut rolling_root =
             AllocatedNum::alloc(cs.namespace(|| "rolling_root"), || self.old_root.grab())?;
 
         let old_root =
             CircuitElement::from_number_padded(cs.namespace(|| "old_root"), rolling_root.clone())?;
 
-        let mut next_chunk_number =
-            AllocatedNum::alloc(cs.namespace(|| "next_chunk_number"), || Ok(E::Fr::zero()))?;
-        next_chunk_number.assert_zero(cs.namespace(|| "initial next_chunk_number"))?;
+        let mut next_chunk_number = precomputed.asserted_numbers[0].clone();
+
+        let mut fees = vec![];
+        let fees_len = 1 << *franklin_constants::BALANCE_TREE_DEPTH;
+        for _ in 0..fees_len {
+            fees.push(precomputed.asserted_numbers[0].clone());
+        }
 
         let mut allocated_chunk_data: AllocatedChunkData<E>;
         let mut block_pub_data_bits = vec![];
@@ -119,6 +160,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &allocated_chunk_data,
                 &is_account_empty,
                 &operation_pub_data_chunk.get_number(),
+                &mut fees,
+                &precomputed.asserted_numbers,
             )?;
             let (new_state_root, _is_account_empty) = self.check_account_data(
                 cs.namespace(|| "calculate new account root"),
@@ -140,10 +183,67 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             rolling_root = new_state_root;
         }
 
-        //TODO: apply fees
+        let old_operator_balance_root = calculate_root_from_full_representation_fees(
+            cs.namespace(|| "calculate_root_from_full_representation_fees before"),
+            &validator_balances,
+            self.params,
+        )?;
+
+        let mut operator_account_data = vec![];
+        operator_account_data.extend(validator_account.nonce.get_bits_le().clone());
+        operator_account_data.extend(validator_account.pub_key.get_packed_key());
+        operator_account_data.extend(
+            old_operator_balance_root
+                .into_bits_le(cs.namespace(|| "old_operator_balance_root_bits"))?,
+        );
+
+        let root_from_operator = allocate_merkle_root(
+            cs.namespace(|| "root from operator_account"),
+            &operator_account_data,
+            &validator_address,
+            &validator_audit_path,
+            self.params,
+        )?;
+        cs.enforce(
+            || "root before applying fees is correct",
+            |lc| lc + root_from_operator.get_variable(),
+            |lc| lc + CS::one(),
+            |lc| lc + rolling_root.get_variable(),
+        );
+
+        //apply fees
+        for i in 0..fees_len {
+            validator_balances[i] = allocate_sum(
+                cs.namespace(|| format!("validator balance number i {}", i)),
+                &validator_balances[i],
+                &fees[i],
+            )?;
+        }
+
+        let new_operator_balance_root = calculate_root_from_full_representation_fees(
+            cs.namespace(|| "calculate_root_from_full_representation_fees after"),
+            &validator_balances,
+            self.params,
+        )?;
+
+        let mut operator_account_data = vec![];
+        operator_account_data.extend(validator_account.nonce.get_bits_le().clone());
+        operator_account_data.extend(validator_account.pub_key.get_packed_key());
+        operator_account_data.extend(
+            new_operator_balance_root
+                .into_bits_le(cs.namespace(|| "new_operator_balance_root_bits"))?,
+        );
+        let root_from_operator_after_fees = allocate_merkle_root(
+            cs.namespace(|| "root from operator_account"),
+            &operator_account_data,
+            &validator_address,
+            &validator_audit_path,
+            self.params,
+        )?;
+
         let final_root = CircuitElement::from_number_padded(
             cs.namespace(|| "final_root"),
-            rolling_root.clone(),
+            root_from_operator_after_fees.clone(),
         )?;
         {
             // Now it's time to pack the initial SHA256 hash due to Ethereum BE encoding
@@ -160,7 +260,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             initial_hash_data.extend(block_number.get_bits_be());
 
             //TODO: probably enforce validator_address
-            initial_hash_data.extend(validator_address.get_bits_be());
+            initial_hash_data.extend(validator_address_padded.get_bits_be());
 
             assert_eq!(initial_hash_data.len(), 512);
 
@@ -419,6 +519,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         chunk_data: &AllocatedChunkData<E>,
         is_account_empty: &Boolean,
         ext_pubdata_chunk: &AllocatedNum<E>,
+        fees: &mut [AllocatedNum<E>],
+        precomputed: &[AllocatedNum<E>],
     ) -> Result<(), SynthesisError> {
         let public_generator = self
             .params
@@ -539,6 +641,22 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             |lc| lc + CS::one(),
             |lc| lc + CS::one(),
         );
+
+        // let fees_len = 1<< franklin_constants.BALANCE_TREE_DEPTH;
+        for i in 0..(1 << *franklin_constants::BALANCE_TREE_DEPTH as u32) {
+            let sum = allocate_sum(
+                cs.namespace(|| format!("fee number {}", i)),
+                &fees[i],
+                &op_data.fee.get_number(),
+            )?;
+            fees[i] = AllocatedNum::select_ifeq(
+                cs.namespace(|| format!("update fee number {}", i)),
+                &lhs.token.get_number(),
+                &precomputed[i],
+                &sum,
+                &fees[i],
+            )?;
+        }
         Ok(())
     }
     fn deposit<CS: ConstraintSystem<E>>(
@@ -901,10 +1019,13 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let mut ohs_valid_flags = vec![];
         ohs_valid_flags.push(is_pubdata_chunk_correct.clone());
         ohs_valid_flags.push(is_transfer);
-        
-        let is_ohs_valid = multi_and(cs.namespace(||"is_ohs_valid"), &ohs_valid_flags)?;
 
-        let is_op_valid = multi_or(cs.namespace(||"is_op_valid"), &[is_ohs_valid, lhs_valid, rhs_valid])?;
+        let is_ohs_valid = multi_and(cs.namespace(|| "is_ohs_valid"), &ohs_valid_flags)?;
+
+        let is_op_valid = multi_or(
+            cs.namespace(|| "is_op_valid"),
+            &[is_ohs_valid, lhs_valid, rhs_valid],
+        )?;
         Ok(is_op_valid)
     }
 
@@ -1045,7 +1166,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
 
         lhs_valid_flags.push(is_a_correct);
-        
+
         let sum_amount_fee = AllocatedNum::alloc(cs.namespace(|| "amount plus fee"), || {
             let mut bal = op_data.amount.grab()?;
             bal.add_assign(&op_data.fee.grab()?);
@@ -1372,6 +1493,48 @@ fn multi_or<E: JubjubEngine, CS: ConstraintSystem<E>>(
 
     Ok(result)
 }
+
+fn calculate_root_from_full_representation_fees<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    fees: &[AllocatedNum<E>],
+    params: &E::Params,
+) -> Result<AllocatedNum<E>, SynthesisError> {
+    let mut fee_hashes = vec![];
+    for (index, fee) in fees.into_iter().enumerate() {
+        let cs = &mut cs.namespace(|| format!("fee hashing index number {}", index));
+        let mut fee_bits = fee.into_bits_le(cs.namespace(|| "fee_bits"))?;
+        fee_bits.truncate(64); //TODO move to constant
+        let temp = pedersen_hash::pedersen_hash(
+            cs.namespace(|| "account leaf content hash"),
+            pedersen_hash::Personalization::NoteCommitment,
+            &fee_bits,
+            params,
+        )?;
+        fee_hashes.push(temp.get_x().clone());
+    }
+    let mut hash_vec = fee_hashes;
+
+    for i in 0..*franklin_constants::BALANCE_TREE_DEPTH {
+        let cs = &mut cs.namespace(|| format!("merkle tree level index number {}", i));
+        let chunks = hash_vec.chunks(2);
+        let mut new_hashes = vec![];
+        for x in chunks {
+            let mut preimage = vec![];
+            preimage.extend(x[0].into_bits_le(cs.namespace(|| "x[0] into bits"))?);
+            preimage.extend(x[1].into_bits_le(cs.namespace(|| "x[1] into bits"))?);
+            let hash = pedersen_hash::pedersen_hash(
+                cs.namespace(|| "account leaf content hash"),
+                pedersen_hash::Personalization::MerkleTree(i),
+                &preimage,
+                params,
+            )?;
+            new_hashes.push(hash.get_x().clone());
+        }
+        hash_vec = new_hashes;
+    }
+    Ok(hash_vec[0].clone())
+}
+
 // TODO: actually it is redundant due to circuit design
 fn enforce_lies_between<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,

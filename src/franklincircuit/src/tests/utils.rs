@@ -1,8 +1,4 @@
-
-
-
 use crate::account::*;
-
 
 use crate::utils::*;
 
@@ -11,17 +7,10 @@ use crypto::sha2::Sha256;
 use ff::Field;
 use ff::{BitIterator, PrimeField, PrimeFieldRepr};
 
-
-
-use franklin_crypto::jubjub::{JubjubEngine};
-use franklinmodels::circuit::account::{
-    Balance, CircuitAccount, CircuitAccountTree,
-};
-
-
+use franklin_crypto::jubjub::JubjubEngine;
+use franklinmodels::circuit::account::{Balance, CircuitAccount, CircuitAccountTree};
 
 use pairing::bn256::*;
-
 
 pub fn public_data_commitment<E: JubjubEngine>(
     pubdata_bits: &[bool],

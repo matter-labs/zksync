@@ -4,12 +4,9 @@ use crate::utils::*;
 use ff::{Field, PrimeField};
 use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::jubjub::JubjubEngine;
-use franklinmodels::circuit::account::{
-  CircuitAccountTree,
-};
+use franklinmodels::circuit::account::CircuitAccountTree;
 use franklinmodels::params as franklin_constants;
 use pairing::bn256::*;
-
 
 pub struct TransferData {
     pub amount: u128,
@@ -248,15 +245,13 @@ fn test_transfer() {
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklinmodels::params as franklin_constants;
 
-    
     use crate::circuit::FranklinCircuit;
     use crate::operation::*;
     use crate::utils::*;
     use bellman::Circuit;
-    
-    
+
     use ff::Field;
-    use ff::{PrimeField};
+    use ff::PrimeField;
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
     use franklin_crypto::circuit::float_point::convert_to_float;
     use franklin_crypto::circuit::test::*;

@@ -67,6 +67,25 @@ where
         s: sigs_converted,
     })
 }
+pub fn allocate_sum<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    a: &AllocatedNum<E>,
+    b: &AllocatedNum<E>,
+) -> Result<AllocatedNum<E>, SynthesisError> {
+    let sum = AllocatedNum::alloc(cs.namespace(|| "sum"), || {
+        let mut sum = a.get_value().grab()?;
+        sum.add_assign(&b.get_value().grab()?);
+        Ok(sum)
+    })?;
+    cs.enforce(
+        || "pack account data",
+        |lc| lc + a.get_variable() + b.get_variable(),
+        |lc| lc + CS::one(),
+        |lc| lc + sum.get_variable(),
+    );
+
+    Ok(sum)
+}
 
 pub fn pack_bits_to_element<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
