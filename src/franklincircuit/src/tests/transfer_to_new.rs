@@ -7,6 +7,8 @@ use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::{
   CircuitAccountTree,
 };
+use merkle_tree::hasher::Hasher;
+use merkle_tree::PedersenHasher;
 use franklinmodels::params as franklin_constants;
 use pairing::bn256::*;
 
@@ -34,21 +36,7 @@ pub struct TransferToNewWitness<E: JubjubEngine> {
 }
 impl<E: JubjubEngine> TransferToNewWitness<E> {
     pub fn get_pubdata(&self) -> Vec<bool> {
-        // let mut pubdata_bits = vec![];
-        // let mut pub_token_bits = lhs.token.get_bits_le().clone();
-        // pub_token_bits.resize(
-        //     *franklin_constants::TOKEN_EXT_BIT_WIDTH,
-        //     Boolean::constant(false),
-        // );
-        // pub_token_bits.reverse();
-        // pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //8
-        // pubdata_bits.extend(lhs.account_address.get_bits_be()); //24
-        // pubdata_bits.extend(pub_token_bits.clone()); //16
-        // pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //24
-        // pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //224
-        // pubdata_bits.extend(rhs.account_address.get_bits_be()); //24
-        // pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //8
-        // assert_eq!(pubdata_bits.len(), 40 * 8);
+
 
         let mut pubdata_bits = vec![];
         append_be_fixed_width(
@@ -67,11 +55,7 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
             &self.from_before.token.unwrap(),
             *franklin_constants::TOKEN_EXT_BIT_WIDTH,
         );
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &self.to_before.address.unwrap(),
-            franklin_constants::ACCOUNT_TREE_DEPTH,
-        );
+      
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.amount.unwrap(),
@@ -79,13 +63,34 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
                 + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
         );
 
+        let mut new_pubkey_bits = vec![];
+        append_le_fixed_width(
+            &mut new_pubkey_bits,
+            &self.args.new_pub_y.unwrap(),
+            franklin_constants::FR_BIT_WIDTH - 1,
+        );
+        append_le_fixed_width(&mut new_pubkey_bits, &self.args.new_pub_x.unwrap(), 1);
+
+        let phasher = PedersenHasher::<Bn256>::default();
+        let new_pubkey_hash = phasher.hash_bits(new_pubkey_bits);
+
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &new_pubkey_hash,
+            *franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+        );
+
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.to_before.address.unwrap(),
+            franklin_constants::ACCOUNT_TREE_DEPTH,
+        );
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.fee.unwrap(),
             franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         );
-        assert_eq!(pubdata_bits.len(), 13 * 8);
-        pubdata_bits.resize(16 * 8, false); //TODO verify if right padding is okay
+        assert_eq!(pubdata_bits.len(), 40 * 8);
         pubdata_bits
     }
 }
@@ -308,8 +313,8 @@ fn test_transfer_to_new() {
     let (from_x, from_y) = from_pk.0.into_xy();
     println!("x = {}, y = {}", from_x, from_y);
 
-    let to_sk = PrivateKey::<Bn256>(rng.gen());
-    let to_pk = PublicKey::from_private(&to_sk, p_g, params);
+    let new_sk = PrivateKey::<Bn256>(rng.gen());
+    let to_pk = PublicKey::from_private(&new_sk, p_g, params);
     let (to_x, to_y) = to_pk.0.into_xy();
     println!("x = {}, y = {}", to_x, to_y);
 
@@ -330,9 +335,6 @@ fn test_transfer_to_new() {
     let from_balance_before_as_field_element =
         Fr::from_str(&from_balance_before.to_string()).unwrap();
 
-    let to_balance_before: u128 = 2100;
-
-    let to_balance_before_as_field_element = Fr::from_str(&to_balance_before.to_string()).unwrap();
 
     let transfer_amount: u128 = 500;
 
@@ -384,20 +386,8 @@ fn test_transfer_to_new() {
         pub_y: from_y.clone(),
     };
 
-    to_balance_tree.insert(
-        token,
-        Balance {
-            value: to_balance_before_as_field_element,
-        },
-    );
-    let to_leaf_initial = CircuitAccount::<Bn256> {
-        subtree: to_balance_tree,
-        nonce: Fr::zero(),
-        pub_x: to_x.clone(),
-        pub_y: to_y.clone(),
-    };
+
     tree.insert(from_leaf_number, from_leaf_initial);
-    tree.insert(to_leaf_number, to_leaf_initial);
 
     let transfer_witness = apply_transfer_to_new(
         &mut tree,
@@ -407,6 +397,8 @@ fn test_transfer_to_new() {
             token: token,
             from_account_address: from_leaf_number,
             to_account_address: to_leaf_number,
+            new_pub_x: to_x,
+            new_pub_y: to_y,
         },
     );
     // construct signature
@@ -501,9 +493,52 @@ fn test_transfer_to_new() {
         signature: signature.clone(),
         signer_pub_key_x: Some(from_x.clone()),
         signer_pub_key_y: Some(from_y.clone()),
+        args: transfer_witness.args.clone(),
+        lhs: transfer_witness.from_intermediate.clone(),
+        rhs: transfer_witness.to_intermediate.clone(),
+    };
+
+    let operation_two = Operation {
+        new_root: transfer_witness.after_root,
+        tx_type: transfer_witness.tx_type,
+        chunk: Some(Fr::from_str("2").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[2]),
+        sig_msg: Some(sig_msg.clone()),
+        signature: signature.clone(),
+        signer_pub_key_x: Some(from_x.clone()),
+        signer_pub_key_y: Some(from_y.clone()),
+        args: transfer_witness.args.clone(),
+        lhs: transfer_witness.from_after.clone(),
+        rhs: transfer_witness.to_after.clone(),
+    };
+
+
+    let operation_three = Operation {
+        new_root: transfer_witness.after_root,
+        tx_type: transfer_witness.tx_type,
+        chunk: Some(Fr::from_str("3").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[3]),
+        sig_msg: Some(sig_msg.clone()),
+        signature: signature.clone(),
+        signer_pub_key_x: Some(from_x.clone()),
+        signer_pub_key_y: Some(from_y.clone()),
+        args: transfer_witness.args.clone(),
+        lhs: transfer_witness.from_after.clone(),
+        rhs: transfer_witness.to_after.clone(),
+    };
+
+    let operation_four = Operation {
+        new_root: transfer_witness.after_root,
+        tx_type: transfer_witness.tx_type,
+        chunk: Some(Fr::from_str("4").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[4]),
+        sig_msg: Some(sig_msg.clone()),
+        signature: signature.clone(),
+        signer_pub_key_x: Some(from_x.clone()),
+        signer_pub_key_y: Some(from_y.clone()),
         args: transfer_witness.args,
-        lhs: transfer_witness.from_intermediate,
-        rhs: transfer_witness.to_intermediate,
+        lhs: transfer_witness.from_after,
+        rhs: transfer_witness.to_after,
     };
 
     {
@@ -513,7 +548,7 @@ fn test_transfer_to_new() {
             params,
             old_root: transfer_witness.before_root,
             new_root: transfer_witness.after_root,
-            operations: vec![operation_zero, operation_one],
+            operations: vec![operation_zero, operation_one, operation_two, operation_three, operation_four],
             pub_data_commitment: Some(public_data_commitment),
             block_number: Some(block_number),
             validator_address: Some(validator_address),

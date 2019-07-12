@@ -901,8 +901,9 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let mut ohs_valid_flags = vec![];
         ohs_valid_flags.push(is_pubdata_chunk_correct.clone());
         ohs_valid_flags.push(is_transfer);
-        ohs_valid_flags.push(is_account_empty.clone());
+        
         let is_ohs_valid = multi_and(cs.namespace(||"is_ohs_valid"), &ohs_valid_flags)?;
+
         let is_op_valid = multi_or(cs.namespace(||"is_op_valid"), &[is_ohs_valid, lhs_valid, rhs_valid])?;
         Ok(is_op_valid)
     }
