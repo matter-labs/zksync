@@ -16,9 +16,7 @@ async function main() {
     const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
     let wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
 
-    let contract = await deployContract(wallet, FrankliContract, [ethers.constants.HashZero, wallet.address, wallet.address], {
-        gasLimit: 8000000
-    });
+    let contract = new ethers.Contract(process.env.CONTRACT2_ADDR, FrankliContract.abi, provider).connect(wallet);
     console.log("Franklin address:",contract.address);
 
     let erc20 = await deployContract(wallet, ERC20MintableContract, []);
