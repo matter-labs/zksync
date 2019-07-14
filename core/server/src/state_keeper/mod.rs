@@ -10,6 +10,7 @@ use plasma::state::PlasmaState;
 use rayon::prelude::*;
 use sapling_crypto::eddsa::PrivateKey;
 use std::collections::VecDeque;
+use std::sync::{Arc, RwLock};
 use web3::types::H256;
 
 use models::config;
@@ -21,6 +22,7 @@ use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive, Zero};
 use std::sync::mpsc::{Receiver, Sender};
 
 use itertools::Itertools;
+use crate::new_eth_watch::ETHState;
 use std::io::BufReader;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -28,6 +30,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 pub struct PlasmaStateKeeper {
     /// Current plasma state
     state: PlasmaState,
+
+    eth_state: Arc<RwLock<ETHState>>,
 
     /// Queue for blocks to be processed next
     block_queue: VecDeque<ProtoBlock>,
@@ -47,7 +51,7 @@ type RootHash = H256;
 type UpdatedAccounts = AccountMap;
 
 impl PlasmaStateKeeper {
-    pub fn new(pool: ConnectionPool) -> Self {
+    pub fn new(pool: ConnectionPool, eth_state: Arc<RwLock<ETHState>>) -> Self {
         info!("constructing state keeper instance");
 
         // here we should insert default accounts into the tree
@@ -75,6 +79,7 @@ impl PlasmaStateKeeper {
         // Keeper starts with the NEXT block
         let keeper = PlasmaStateKeeper {
             state,
+            eth_state,
             block_queue: VecDeque::default(),
             next_block_at_max: Some(
                 SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL),
