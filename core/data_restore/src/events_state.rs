@@ -4,7 +4,7 @@ use web3::futures::Future;
 use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
 // use tokio_core::reactor::Core;
 
-use crate::events::{EventType, EventData};
+use crate::events::{EventData, EventType};
 use crate::helpers::*;
 
 type ComAndVerBlocksVecs = (Vec<EventData>, Vec<EventData>);

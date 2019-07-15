@@ -2,9 +2,9 @@
 extern crate log;
 
 pub mod accounts_state;
-pub mod events_state;
-pub mod events;
 pub mod data_restore_driver;
+pub mod events;
+pub mod events_state;
 pub mod franklin_transaction;
 pub mod helpers;
 pub mod storage_interactor;
@@ -25,8 +25,13 @@ fn create_new_data_restore_driver(
     DataRestoreDriver::new(config, from, delta, connection_pool)
 }
 
-fn load_past_state_for_data_restore_driver(driver: &mut DataRestoreDriver, until_franklin_block: Option<u32>) {
-    driver.load_past_state(until_franklin_block).expect("Cant get past state");
+fn load_past_state_for_data_restore_driver(
+    driver: &mut DataRestoreDriver,
+    until_franklin_block: Option<u32>,
+) {
+    driver
+        .load_past_state(until_franklin_block)
+        .expect("Cant get past state");
 }
 
 fn load_new_states_for_data_restore_driver(driver: &mut DataRestoreDriver) {
@@ -68,7 +73,7 @@ fn load_states_from_beginning(args: Vec<String>) {
     .expect("It's acceptable only 1 for Mainnet and 4 for Rinkeby networks");
 
     let from = U256::from(0); // It's better not to allow external users to set "from block" parameter. In 99% cases 0(zero) is correct
-    
+
     let delta = U256::from_dec_str(&args[2]).expect("blocks delta should be convertible to u256");
     info!("blocks delta is {}", &delta);
 
@@ -109,14 +114,22 @@ fn load_states_from_storage(args: Vec<String>) {
     if args.len() > 3 {
         let until_block = u32::from_str(&args[3]).ok();
         info!("until block is {:?}", &until_block);
-        load_past_state_from_storage(&mut data_restore_driver, connection_pool.clone(), until_block);
+        load_past_state_from_storage(
+            &mut data_restore_driver,
+            connection_pool.clone(),
+            until_block,
+        );
     } else {
         load_past_state_from_storage(&mut data_restore_driver, connection_pool.clone(), None);
         load_new_states_for_data_restore_driver(&mut data_restore_driver);
     }
 }
 
-fn load_past_state_from_storage(driver: &mut DataRestoreDriver, connection_pool: ConnectionPool, until_franklin_block: Option<u32>) {
+fn load_past_state_from_storage(
+    driver: &mut DataRestoreDriver,
+    connection_pool: ConnectionPool,
+    until_franklin_block: Option<u32>,
+) {
     info!("Loading stored state");
     driver.events_state = get_events_state_from_storage(connection_pool.clone());
     let mut transactions = get_transactions_from_storage(connection_pool.clone());

@@ -21,10 +21,7 @@ pub struct FranklinTransaction {
 }
 
 impl FranklinTransaction {
-    pub fn get_transaction(
-        config: &DataRestoreConfig,
-        franklin_block: &EventData,
-    ) -> Option<Self> {
+    pub fn get_transaction(config: &DataRestoreConfig, franklin_block: &EventData) -> Option<Self> {
         let transaction = FranklinTransaction::get_ethereum_transaction(
             config,
             &franklin_block.transaction_hash,

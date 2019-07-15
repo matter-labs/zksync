@@ -1,6 +1,6 @@
 use crate::accounts_state::FranklinAccountsStates;
-use crate::events_state::EventsState;
 use crate::events::EventData;
+use crate::events_state::EventsState;
 use crate::franklin_transaction::FranklinTransaction;
 use crate::helpers::*;
 use crate::storage_interactor;
@@ -37,7 +37,7 @@ impl DataRestoreDriver {
             run_updates: false,
             events_state: EventsState::new(config.clone()),
             account_states: FranklinAccountsStates::new(config.clone()),
-            transactions: vec![]
+            transactions: vec![],
         }
     }
 
@@ -58,9 +58,9 @@ impl DataRestoreDriver {
     }
 
     // pub fn get_past_state_until_block(&mut self, block_num: u32) -> Result<(), DataRestoreError> {
-        
+
     //     // TODO: pop transactions with block number > block_num
-        
+
     //     info!("Loading past state until block: {}", block_num);
     //     let mut verified_blocks = self.events_state.verified_blocks.clone();
     //     if verified_blocks.len() > block_num {
@@ -137,7 +137,7 @@ impl DataRestoreDriver {
 
     fn update_past_franklin_blocks_events_and_accounts_tree_state(
         &mut self,
-        until_block: Option<u32>
+        until_block: Option<u32>,
     ) -> Result<(), DataRestoreError> {
         let mut got_events = false;
         while !got_events {
@@ -179,7 +179,10 @@ impl DataRestoreDriver {
             &mut self.events_state.last_watched_block_number,
             self.connection_pool.clone(),
         );
-        storage_interactor::save_franklin_transactions(&self.transactions, self.connection_pool.clone());
+        storage_interactor::save_franklin_transactions(
+            &self.transactions,
+            self.connection_pool.clone(),
+        );
         info!("Storage state saved");
     }
 

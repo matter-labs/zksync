@@ -1,5 +1,5 @@
+use crate::events::{EventData, EventType};
 use crate::events_state::EventsState;
-use crate::events::{EventType, EventData};
 use crate::franklin_transaction::{FranklinTransaction, FranklinTransactionType};
 use crate::helpers;
 use std::convert::TryFrom;
