@@ -281,7 +281,7 @@ impl DataRestoreDriver {
             f.write(
                 format!(
                     "Root hash on Franklin block {}: {}\n\nAccounts list: {:?}\n\nTransactions: {:?}",
-                    self.events_state.verified_blocks.len(),
+                    transactions[transactions.len()-1].block_number,
                     root.to_hex(),
                     self.account_states.plasma_state.get_accounts(),
                     transactions
@@ -348,7 +348,7 @@ impl DataRestoreDriver {
         let verified_blocks = &new_events.1;
         let txs =
             self.get_verified_committed_blocks_transactions_from_blocks_state(&verified_blocks);
-        let mut sorted_txs = DataRestoreDriver::sort_transactions_by_block_number(txs);
+        let sorted_txs = DataRestoreDriver::sort_transactions_by_block_number(txs);
         self.transactions.append(&mut sorted_txs.clone());
 
         self.update_accounts_state_from_transactions(&sorted_txs)

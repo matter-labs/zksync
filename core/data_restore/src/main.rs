@@ -102,22 +102,27 @@ fn load_states_from_storage(args: Vec<String>) {
     let delta = U256::from_dec_str(&args[2]).expect("blocks delta should be convertible to u256");
     info!("blocks delta is {}", &delta);
 
-    let until_block = u32::from_str(&args[3]).ok();
-
     let mut data_restore_driver =
         create_new_data_restore_driver(config, from, delta, connection_pool.clone());
     info!("Driver created");
-    load_past_state_from_storage(&mut data_restore_driver, connection_pool.clone());
-    
-    if until_block.is_none() {
+
+    if args.len() > 3 {
+        let until_block = u32::from_str(&args[3]).ok();
+        info!("until block is {:?}", &until_block);
+        load_past_state_from_storage(&mut data_restore_driver, connection_pool.clone(), until_block);
+    } else {
+        load_past_state_from_storage(&mut data_restore_driver, connection_pool.clone(), None);
         load_new_states_for_data_restore_driver(&mut data_restore_driver);
     }
 }
 
-fn load_past_state_from_storage(driver: &mut DataRestoreDriver, connection_pool: ConnectionPool) {
+fn load_past_state_from_storage(driver: &mut DataRestoreDriver, connection_pool: ConnectionPool, until_franklin_block: Option<u32>) {
     info!("Loading stored state");
     driver.events_state = get_events_state_from_storage(connection_pool.clone());
-    let transactions = get_transactions_from_storage(connection_pool.clone());
+    let mut transactions = get_transactions_from_storage(connection_pool.clone());
+    if let Some(block) = until_franklin_block {
+        transactions.retain(|x| x.block_number <= block);
+    }
     driver
         .update_accounts_state_from_transactions(transactions.as_slice())
         .expect("Cant update accounts state from transactions in load_past_state_from_storage");

@@ -311,7 +311,7 @@ tree-restore-build:
 	@cargo build -p data_restore --release --bin data_restore
 
 tree-restore-run:
-	@RUST_LOG=INFO ./target/release/data_restore 4 338480
+	@RUST_LOG=INFO ./target/release/data_restore 4 15
 
 tree-restore-continue:
-	@RUST_LOG=INFO ./target/release/data_restore storage 15
+	@RUST_LOG=INFO ./target/release/data_restore storage 15 2
