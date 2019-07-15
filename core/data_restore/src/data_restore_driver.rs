@@ -152,8 +152,7 @@ impl DataRestoreDriver {
             self.get_verified_committed_blocks_transactions_from_blocks_state(&verified_blocks);
         let mut sorted_txs = DataRestoreDriver::sort_transactions_by_block_number(txs);
 
-        self.transactions.append(&mut sorted_txs);
-        // debug!("Transactions: {:?}", sorted_txs);
+        self.transactions.append(&mut sorted_txs.clone());
 
         self.account_states = FranklinAccountsStates::new(self.config.clone());
 
@@ -350,7 +349,7 @@ impl DataRestoreDriver {
         let txs =
             self.get_verified_committed_blocks_transactions_from_blocks_state(&verified_blocks);
         let mut sorted_txs = DataRestoreDriver::sort_transactions_by_block_number(txs);
-        self.transactions.append(&mut sorted_txs);
+        self.transactions.append(&mut sorted_txs.clone());
 
         self.update_accounts_state_from_transactions(&sorted_txs)
             .map_err(|e| DataRestoreError::StateUpdate(e.to_string()))?;

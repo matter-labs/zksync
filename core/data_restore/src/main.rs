@@ -72,8 +72,6 @@ fn load_states_from_beginning(args: Vec<String>) {
     let delta = U256::from_dec_str(&args[2]).expect("blocks delta should be convertible to u256");
     info!("blocks delta is {}", &delta);
 
-    let until_block = u32::from_str(&args[3]).ok();
-
     let connection_pool = ConnectionPool::new();
 
     let remove_storage_data_res = remove_storage_data(connection_pool.clone());
@@ -84,9 +82,13 @@ fn load_states_from_beginning(args: Vec<String>) {
     let mut data_restore_driver =
         create_new_data_restore_driver(config, from, delta, connection_pool.clone());
     info!("Driver created");
-    load_past_state_for_data_restore_driver(&mut data_restore_driver, until_block);
 
-    if until_block.is_none() {
+    if args.len() > 3 {
+        let until_block = u32::from_str(&args[3]).ok();
+        info!("until block is {:?}", &until_block);
+        load_past_state_for_data_restore_driver(&mut data_restore_driver, until_block);
+    } else {
+        load_past_state_for_data_restore_driver(&mut data_restore_driver, None);
         load_new_states_for_data_restore_driver(&mut data_restore_driver);
     }
 }
