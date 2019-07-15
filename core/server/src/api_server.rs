@@ -90,7 +90,6 @@ fn handle_submit_tx(
             Ok(tx)
         })
         .and_then(move |tx| {
-            // TODO (Drogan) use oneshot.
             let (add_tx, add_rx) = oneshot::channel();
             tx_for_state
                 .send(StateKeeperRequest::AddTransferTx(Box::new(tx), add_tx))

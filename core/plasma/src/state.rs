@@ -4,7 +4,7 @@ use models::plasma::account::Account;
 use models::plasma::tx::{DepositTx, ExitTx, TransferTx};
 use models::plasma::{
     params::{self, ETH_TOKEN_ID},
-    AccountUpdate,
+    AccountUpdate, AccountUpdates,
 };
 use models::plasma::{AccountId, AccountMap, Fr, TransferApplicationError};
 
@@ -57,7 +57,7 @@ impl PlasmaState {
     pub fn apply_transfer(
         &mut self,
         tx: &TransferTx,
-    ) -> Result<(BigDecimal, Vec<AccountUpdate>), TransferApplicationError> {
+    ) -> Result<(BigDecimal, AccountUpdates), TransferApplicationError> {
         if let Some(mut from) = self.balance_tree.items.get(&tx.from).cloned() {
             // TODO: take from `from` instead and uncomment below
             let pub_key = self
@@ -104,11 +104,13 @@ impl PlasmaState {
 
                 self.balance_tree.insert(tx.from, from);
 
-                AccountUpdate::UpdateBalance {
-                    id: tx.from,
-                    balance_update: (ETH_TOKEN_ID, from_old_balance, from_new_balance),
-                    nonce: new_nonce,
-                }
+                (
+                    tx.from,
+                    AccountUpdate::UpdateBalance {
+                        balance_update: (ETH_TOKEN_ID, from_old_balance, from_new_balance),
+                        nonce: new_nonce,
+                    },
+                )
             };
 
             let to_account_updates = {
@@ -118,12 +120,14 @@ impl PlasmaState {
 
                     // TODO: Document somewhere. (Account 0 used for padding tx).
                     if tx.to != 0 {
-                        let create_acc_update = AccountUpdate::Create {
-                            id: tx.to,
-                            public_key_x: new_acc.public_key_x,
-                            public_key_y: new_acc.public_key_y,
-                            nonce: new_acc.nonce,
-                        };
+                        let create_acc_update = (
+                            tx.to,
+                            AccountUpdate::Create {
+                                public_key_x: new_acc.public_key_x,
+                                public_key_y: new_acc.public_key_y,
+                                nonce: new_acc.nonce,
+                            },
+                        );
                         to_account_updates.push(create_acc_update);
                     }
 
@@ -136,11 +140,13 @@ impl PlasmaState {
                     to.add_balance(ETH_TOKEN_ID, &tx.amount);
                     let to_new_balance = to.get_balance(ETH_TOKEN_ID).clone();
 
-                    let balance_update = AccountUpdate::UpdateBalance {
-                        id: tx.to,
-                        balance_update: (ETH_TOKEN_ID, to_old_balance, to_new_balance),
-                        nonce: to.nonce,
-                    };
+                    let balance_update = (
+                        tx.to,
+                        AccountUpdate::UpdateBalance {
+                            balance_update: (ETH_TOKEN_ID, to_old_balance, to_new_balance),
+                            nonce: to.nonce,
+                        },
+                    );
                     to_account_updates.push(balance_update);
                 }
 
@@ -160,7 +166,7 @@ impl PlasmaState {
         Err(TransferApplicationError::InvalidSigner)
     }
 
-    pub fn apply_deposit(&mut self, tx: &DepositTx) -> Result<Vec<AccountUpdate>, ()> {
+    pub fn apply_deposit(&mut self, tx: &DepositTx) -> Result<AccountUpdates, ()> {
         let mut updates = Vec::new();
 
         let mut acc = self
@@ -172,12 +178,14 @@ impl PlasmaState {
                 acc.public_key_x = tx.pub_x;
                 acc.public_key_y = tx.pub_y;
 
-                updates.push(AccountUpdate::Create {
-                    id: tx.account,
-                    public_key_x: acc.public_key_x,
-                    public_key_y: acc.public_key_y,
-                    nonce: acc.nonce,
-                });
+                updates.push((
+                    tx.account,
+                    AccountUpdate::Create {
+                        public_key_x: acc.public_key_x,
+                        public_key_y: acc.public_key_y,
+                        nonce: acc.nonce,
+                    },
+                ));
 
                 acc
             });
@@ -189,16 +197,18 @@ impl PlasmaState {
 
         self.balance_tree.insert(tx.account, acc);
 
-        updates.push(AccountUpdate::UpdateBalance {
-            id: tx.account,
-            balance_update: (ETH_TOKEN_ID, old_amount, new_amount),
-            nonce: old_nonce,
-        });
+        updates.push((
+            tx.account,
+            AccountUpdate::UpdateBalance {
+                balance_update: (ETH_TOKEN_ID, old_amount, new_amount),
+                nonce: old_nonce,
+            },
+        ));
 
         Ok(updates)
     }
 
-    pub fn apply_exit(&mut self, tx: &mut ExitTx) -> Result<Vec<AccountUpdate>, ()> {
+    pub fn apply_exit(&mut self, tx: &mut ExitTx) -> Result<AccountUpdates, ()> {
         let acc = self.balance_tree.items.remove(&tx.account).ok_or(())?;
 
         debug!(
@@ -210,17 +220,21 @@ impl PlasmaState {
         tx.amount = old_amount.clone();
 
         let mut updates = Vec::new();
-        updates.push(AccountUpdate::UpdateBalance {
-            id: tx.account,
-            balance_update: (ETH_TOKEN_ID, old_amount, BigDecimal::zero()),
-            nonce: acc.nonce,
-        });
-        updates.push(AccountUpdate::Delete {
-            id: tx.account,
-            public_key_x: acc.public_key_x,
-            public_key_y: acc.public_key_y,
-            nonce: acc.nonce,
-        });
+        updates.push((
+            tx.account,
+            AccountUpdate::UpdateBalance {
+                balance_update: (ETH_TOKEN_ID, old_amount, BigDecimal::zero()),
+                nonce: acc.nonce,
+            },
+        ));
+        updates.push((
+            tx.account,
+            AccountUpdate::Delete {
+                public_key_x: acc.public_key_x,
+                public_key_y: acc.public_key_y,
+                nonce: acc.nonce,
+            },
+        ));
         Ok(updates)
     }
 }

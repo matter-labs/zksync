@@ -44,7 +44,7 @@ fn run_committer(
             let op = Operation {
                 action: Action::Commit,
                 block,
-                accounts_updated: Some(accounts_updated),
+                accounts_updated: accounts_updated,
                 tx_meta: None,
                 id: None,
             };
@@ -72,7 +72,7 @@ fn run_committer(
                             proof: Box::new(proof),
                         },
                         block,
-                        accounts_updated: None,
+                        accounts_updated: Vec::new(),
                         tx_meta: None,
                         id: None,
                     };
