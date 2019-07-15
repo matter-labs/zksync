@@ -23,14 +23,14 @@ if [ ! -z "$NEW_CONTRACT" ]
 then
     echo New contract at $NEW_CONTRACT
 
-    OLD_CONTRACT=`grep CONTRACT_ADDR ./$ENV_FILE | grep -oE '=(.+)' | sed -n "s/=//p"`
+    OLD_CONTRACT=`grep "^CONTRACT_ADDR" ./$ENV_FILE | grep -oE '=(.+)' | sed -n "s/=//p"`
     echo Old contract at $OLD_CONTRACT
 
     mkdir -p logs/$LABEL/
     cp deploy.log logs/$LABEL/deploy.log
     cp ./$ENV_FILE logs/$LABEL/$FRANKLIN_ENV.bak
 
-    sed -i".bak" "s/CONTRACT_ADDR=$OLD_CONTRACT/CONTRACT_ADDR=$NEW_CONTRACT/g" ./$ENV_FILE
+    sed -i".bak" "s/^CONTRACT_ADDR=$OLD_CONTRACT/CONTRACT_ADDR=$NEW_CONTRACT/g" ./$ENV_FILE
 
     echo successfully deployed contracts
 
