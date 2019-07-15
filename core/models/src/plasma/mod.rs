@@ -28,6 +28,13 @@ pub fn apply_updates(accounts: &mut AccountMap, updates: AccountUpdates) {
     }
 }
 
+pub fn reverse_updates(updates: &mut AccountUpdates) {
+    updates.reverse();
+    for (_, acc_upd) in updates.iter_mut() {
+        *acc_upd = acc_upd.reversed_update();
+    }
+}
+
 pub type PublicKey = eddsa::PublicKey<Engine>;
 pub type PrivateKey = eddsa::PrivateKey<Engine>;
 

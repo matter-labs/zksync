@@ -33,7 +33,8 @@ create TABLE account_balance_updates
     coin_id           integer not null references tokens (id) on update cascade,
     old_balance       numeric not null,
     new_balance       numeric not null,
-    nonce             bigint  not null,
+    old_nonce         bigint  not null,
+    new_nonce         bigint  not null,
     PRIMARY KEY (balance_update_id)
 );
 

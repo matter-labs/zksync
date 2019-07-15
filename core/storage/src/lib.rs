@@ -14,8 +14,8 @@ use models::plasma::tx::{
     DepositTx, ExitTx, TransactionType, TransferTx, TxSignature, DEPOSIT_TX, EXIT_TX, TRANSFER_TX,
 };
 use models::plasma::{
-    apply_updates, Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr,
-    Nonce,
+    apply_updates, reverse_updates, Account, AccountId, AccountMap, AccountUpdate, AccountUpdates,
+    BlockNumber, Fr, Nonce,
 };
 use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
@@ -114,7 +114,8 @@ struct StorageAccountUpdateInsert {
     pub coin_id: i32,
     pub old_balance: BigDecimal,
     pub new_balance: BigDecimal,
-    pub nonce: i64,
+    pub old_nonce: i64,
+    pub new_nonce: i64,
 }
 
 #[derive(Debug, Queryable, QueryableByName)]
@@ -126,7 +127,8 @@ struct StorageAccountUpdate {
     pub coin_id: i32,
     pub old_balance: BigDecimal,
     pub new_balance: BigDecimal,
-    pub nonce: i64,
+    pub old_nonce: i64,
+    pub new_nonce: i64,
 }
 
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
@@ -169,7 +171,8 @@ impl Into<(u32, AccountUpdate)> for StorageAccountDiff {
             StorageAccountDiff::BalanceUpdate(upd) => (
                 upd.account_id as u32,
                 AccountUpdate::UpdateBalance {
-                    nonce: upd.nonce as u32,
+                    old_nonce: upd.old_nonce as u32,
+                    new_nonce: upd.new_nonce as u32,
                     balance_update: (upd.coin_id as TokenId, upd.old_balance, upd.new_balance),
                 },
             ),
@@ -196,7 +199,7 @@ impl Into<(u32, AccountUpdate)> for StorageAccountDiff {
 impl StorageAccountDiff {
     fn nonce(&self) -> i64 {
         *match self {
-            StorageAccountDiff::BalanceUpdate(StorageAccountUpdate { nonce, .. }) => nonce,
+            StorageAccountDiff::BalanceUpdate(StorageAccountUpdate { old_nonce, .. }) => old_nonce,
             StorageAccountDiff::Create(StorageAccountCreation { nonce, .. }) => nonce,
             StorageAccountDiff::Delete(StorageAccountCreation { nonce, .. }) => nonce,
         }
@@ -669,7 +672,8 @@ impl StorageProcessor {
                     }
                     AccountUpdate::UpdateBalance {
                         balance_update: (token, ref old_balance, ref new_balance),
-                        nonce,
+                        old_nonce,
+                        new_nonce,
                     } => {
                         diesel::insert_into(account_balance_updates::table)
                             .values(&StorageAccountUpdateInsert {
@@ -678,7 +682,8 @@ impl StorageProcessor {
                                 coin_id: i32::from(token),
                                 old_balance: old_balance.clone(),
                                 new_balance: new_balance.clone(),
-                                nonce: i64::from(nonce),
+                                old_nonce: i64::from(old_nonce),
+                                new_nonce: i64::from(new_nonce),
                             })
                             .execute(self.conn())?;
                     }
@@ -734,7 +739,7 @@ impl StorageProcessor {
                         update(accounts::table.filter(accounts::id.eq(upd.account_id)))
                             .set((
                                 accounts::last_block.eq(upd.block_number),
-                                accounts::nonce.eq(upd.nonce),
+                                accounts::nonce.eq(upd.old_nonce),
                             ))
                             .execute(self.conn())?;
                     }
@@ -868,10 +873,7 @@ impl StorageProcessor {
             };
 
             if !time_forward {
-                account_updates.reverse();
-                for (_, acc_upd) in account_updates.iter_mut() {
-                    acc_upd.reverse_update();
-                }
+                reverse_updates(&mut account_updates);
             }
 
             if !account_updates.is_empty() {
@@ -1453,14 +1455,16 @@ mod test {
                 (
                     id_1,
                     AccountUpdate::UpdateBalance {
-                        nonce: nonce_1,
+                        old_nonce: nonce_1,
+                        new_nonce: nonce_1,
                         balance_update: (0, 1.into(), 2.into()),
                     },
                 ),
                 (
                     id_2,
                     AccountUpdate::UpdateBalance {
-                        nonce: nonce_2,
+                        old_nonce: nonce_2,
+                        new_nonce: nonce_2,
                         balance_update: (0, 2.into(), 3.into()),
                     },
                 ),
@@ -1523,7 +1527,8 @@ mod test {
                 (
                     id,
                     AccountUpdate::UpdateBalance {
-                        nonce: a.nonce,
+                        old_nonce: a.nonce,
+                        new_nonce: a.nonce,
                         balance_update: (ETH_TOKEN_ID, old_balance, new_balance),
                     },
                 ),

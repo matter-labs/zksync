@@ -6,7 +6,8 @@ table! {
         coin_id -> Int4,
         old_balance -> Numeric,
         new_balance -> Numeric,
-        nonce -> Int8,
+        old_nonce -> Int8,
+        new_nonce -> Int8,
     }
 }
 

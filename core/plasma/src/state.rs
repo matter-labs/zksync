@@ -97,9 +97,10 @@ impl PlasmaState {
 
             let from_account_update = {
                 let from_old_balance = from.get_balance(ETH_TOKEN_ID).clone();
+                let old_nonce = from.nonce;
                 from.sub_balance(ETH_TOKEN_ID, &transacted_amount);
-                let from_new_balance = from.get_balance(ETH_TOKEN_ID).clone();
                 from.nonce += 1;
+                let from_new_balance = from.get_balance(ETH_TOKEN_ID).clone();
                 let new_nonce = from.nonce;
 
                 self.balance_tree.insert(tx.from, from);
@@ -108,7 +109,8 @@ impl PlasmaState {
                     tx.from,
                     AccountUpdate::UpdateBalance {
                         balance_update: (ETH_TOKEN_ID, from_old_balance, from_new_balance),
-                        nonce: new_nonce,
+                        old_nonce,
+                        new_nonce,
                     },
                 )
             };
@@ -144,7 +146,8 @@ impl PlasmaState {
                         tx.to,
                         AccountUpdate::UpdateBalance {
                             balance_update: (ETH_TOKEN_ID, to_old_balance, to_new_balance),
-                            nonce: to.nonce,
+                            old_nonce: to.nonce,
+                            new_nonce: to.nonce,
                         },
                     );
                     to_account_updates.push(balance_update);
@@ -191,7 +194,7 @@ impl PlasmaState {
             });
 
         let old_amount = acc.get_balance(ETH_TOKEN_ID).clone();
-        let old_nonce = acc.nonce;
+        let nonce = acc.nonce;
         acc.add_balance(ETH_TOKEN_ID, &tx.amount);
         let new_amount = acc.get_balance(ETH_TOKEN_ID).clone();
 
@@ -201,7 +204,8 @@ impl PlasmaState {
             tx.account,
             AccountUpdate::UpdateBalance {
                 balance_update: (ETH_TOKEN_ID, old_amount, new_amount),
-                nonce: old_nonce,
+                old_nonce: nonce,
+                new_nonce: nonce,
             },
         ));
 
@@ -224,7 +228,8 @@ impl PlasmaState {
             tx.account,
             AccountUpdate::UpdateBalance {
                 balance_update: (ETH_TOKEN_ID, old_amount, BigDecimal::zero()),
-                nonce: acc.nonce,
+                old_nonce: acc.nonce,
+                new_nonce: acc.nonce,
             },
         ));
         updates.push((
