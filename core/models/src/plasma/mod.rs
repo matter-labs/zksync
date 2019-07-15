@@ -17,11 +17,10 @@ pub type Engine = bn256::Bn256;
 pub type Fr = bn256::Fr;
 
 pub type AccountMap = fnv::FnvHashMap<u32, Account>;
-pub type AccountUpdateMap = Vec<AccountUpdate>;
+pub type AccountUpdates = Vec<(u32, AccountUpdate)>;
 
-pub fn apply_updates(accounts: &mut AccountMap, updates: AccountUpdateMap) {
-    for update in updates.into_iter() {
-        let id = update.get_account_id();
+pub fn apply_updates(accounts: &mut AccountMap, updates: AccountUpdates) {
+    for (id, update) in updates.into_iter() {
         let updated_account = Account::apply_update(accounts.remove(&id), update);
         if let Some(account) = updated_account {
             accounts.insert(id, account);

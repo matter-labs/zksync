@@ -13,6 +13,7 @@ pub mod primitives;
 use crate::plasma::block::Block;
 use crate::plasma::*;
 use futures::sync::oneshot;
+use plasma::AccountUpdates;
 use serde_bytes;
 use std::sync::mpsc::Sender;
 
@@ -90,7 +91,7 @@ pub struct Operation {
     pub id: Option<i32>,
     pub action: Action,
     pub block: Block,
-    pub accounts_updated: Option<Vec<AccountUpdate>>,
+    pub accounts_updated: AccountUpdates,
 
     #[serde(skip)]
     pub tx_meta: Option<TxMeta>,
@@ -114,7 +115,7 @@ pub enum StateKeeperRequest {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CommitRequest {
     pub block: Block,
-    pub accounts_updated: Vec<AccountUpdate>,
+    pub accounts_updated: AccountUpdates,
 }
 
 pub const ACTION_COMMIT: &str = "Commit";

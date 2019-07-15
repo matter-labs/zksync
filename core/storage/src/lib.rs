@@ -1,5 +1,3 @@
-#![allow(clippy::wrong_self_convention)] // All methods with name into_* must consume self.
-
 #[macro_use]
 extern crate diesel;
 #[macro_use]
@@ -16,13 +14,19 @@ use models::plasma::tx::{
     DepositTx, ExitTx, TransactionType, TransferTx, TxSignature, DEPOSIT_TX, EXIT_TX, TRANSFER_TX,
 };
 use models::plasma::{
-    apply_updates, Account, AccountId, AccountMap, AccountUpdate, BlockNumber, Fr, Nonce,
+    apply_updates, Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr,
+    Nonce,
 };
 use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
 
+mod helpers;
+mod mempool;
 mod schema;
+
+use self::helpers::{fr_from_bytes, fr_to_bytes};
+
 use crate::schema::*;
 
 use diesel::pg::PgConnection;
@@ -37,8 +41,6 @@ use ff::Field;
 
 use diesel::sql_types::{Integer, Nullable, Text, Timestamp};
 sql_function!(coalesce, Coalesce, (x: Nullable<Integer>, y: Integer) -> Integer);
-
-mod mempool;
 
 pub use mempool::Mempool;
 
@@ -161,26 +163,32 @@ impl From<StorageAccountCreation> for StorageAccountDiff {
     }
 }
 
-impl Into<AccountUpdate> for StorageAccountDiff {
-    fn into(self) -> AccountUpdate {
+impl Into<(u32, AccountUpdate)> for StorageAccountDiff {
+    fn into(self) -> (u32, AccountUpdate) {
         match self {
-            StorageAccountDiff::BalanceUpdate(upd) => AccountUpdate::UpdateBalance {
-                id: upd.account_id as u32,
-                nonce: upd.nonce as u32,
-                balance_update: (upd.coin_id as TokenId, upd.old_balance, upd.new_balance),
-            },
-            StorageAccountDiff::Create(upd) => AccountUpdate::Create {
-                id: upd.account_id as u32,
-                nonce: upd.nonce as u32,
-                public_key_x: fr_from_bytes(upd.pk_x),
-                public_key_y: fr_from_bytes(upd.pk_y),
-            },
-            StorageAccountDiff::Delete(upd) => AccountUpdate::Delete {
-                id: upd.account_id as u32,
-                nonce: upd.nonce as u32,
-                public_key_x: fr_from_bytes(upd.pk_x),
-                public_key_y: fr_from_bytes(upd.pk_y),
-            },
+            StorageAccountDiff::BalanceUpdate(upd) => (
+                upd.account_id as u32,
+                AccountUpdate::UpdateBalance {
+                    nonce: upd.nonce as u32,
+                    balance_update: (upd.coin_id as TokenId, upd.old_balance, upd.new_balance),
+                },
+            ),
+            StorageAccountDiff::Create(upd) => (
+                upd.account_id as u32,
+                AccountUpdate::Create {
+                    nonce: upd.nonce as u32,
+                    public_key_x: fr_from_bytes(upd.pk_x),
+                    public_key_y: fr_from_bytes(upd.pk_y),
+                },
+            ),
+            StorageAccountDiff::Delete(upd) => (
+                upd.account_id as u32,
+                AccountUpdate::Delete {
+                    nonce: upd.nonce as u32,
+                    public_key_x: fr_from_bytes(upd.pk_x),
+                    public_key_y: fr_from_bytes(upd.pk_y),
+                },
+            ),
         }
     }
 }
@@ -264,9 +272,9 @@ impl StoredOperation {
         op.tx_meta = Some(meta);
         op.id = Some(self.id);
 
-        if op.accounts_updated.is_none() {
+        if op.accounts_updated.is_empty() {
             let updates = conn.load_state_diff_for_block(op.block.block_number)?;
-            op.accounts_updated = Some(updates);
+            op.accounts_updated = updates;
         };
 
         Ok(op)
@@ -291,7 +299,6 @@ struct NewTx {
 #[table_name = "transactions"]
 pub struct StoredTx {
     pub id: i32,
-    //pub data:           serde_json::Value,
     pub tx_type: String, // 'transfer', 'deposit', 'exit'
     pub from_account: i32,
     pub to_account: Option<i32>, // only used for transfers
@@ -306,7 +313,7 @@ pub struct StoredTx {
 }
 
 impl StoredTx {
-    pub fn into_tx(&self) -> QueryResult<TransactionType> {
+    pub fn into_tx(self) -> QueryResult<TransactionType> {
         let res = match &self.tx_type {
             t if t == TRANSFER_TX => Transfer {
                 tx: Box::new(self.into_transfer_transaction()),
@@ -322,7 +329,7 @@ impl StoredTx {
         Ok(res)
     }
 
-    pub fn into_transfer_transaction(&self) -> TransferTx {
+    pub fn into_transfer_transaction(self) -> TransferTx {
         TransferTx {
             from: self.from_account as u32,
             to: self.to_account.unwrap() as u32,
@@ -334,7 +341,7 @@ impl StoredTx {
         }
     }
 
-    pub fn into_deposit_transaction(&self) -> DepositTx {
+    pub fn into_deposit_transaction(self) -> DepositTx {
         DepositTx {
             account: self.from_account as u32,
             amount: BigDecimal::from(self.amount),
@@ -343,7 +350,7 @@ impl StoredTx {
         }
     }
 
-    pub fn into_exit_transaction(&self) -> ExitTx {
+    pub fn into_exit_transaction(self) -> ExitTx {
         ExitTx {
             account: self.from_account as u32,
             amount: BigDecimal::from(self.amount),
@@ -429,22 +436,6 @@ pub struct StorageProcessor {
     conn: ConnectionHolder,
 }
 
-// TODO: (Drogan) move this tmp methods
-fn fr_to_bytes(fr: &Fr) -> Vec<u8> {
-    use ff::{PrimeField, PrimeFieldRepr};
-    let mut buff: Vec<u8> = Vec::new();
-    fr.into_repr().write_be(&mut buff).unwrap();
-    buff
-}
-
-// TODO: (Drogan) move this tmp methods
-fn fr_from_bytes(bytes: Vec<u8>) -> Fr {
-    use ff::{PrimeField, PrimeFieldRepr};
-    let mut fr_repr = <Fr as PrimeField>::Repr::default();
-    fr_repr.read_be(&*bytes).unwrap();
-    Fr::from_repr(fr_repr).unwrap()
-}
-
 fn restore_account(
     stored_account: StorageAccount,
     stored_balances: Vec<StorageBalance>,
@@ -494,11 +485,7 @@ impl StorageProcessor {
         self.conn().transaction(|| {
             match &op.action {
                 Action::Commit => {
-                    self.commit_state_update(
-                        op.block.block_number,
-                        // TODO: (Drogan) make shure that this unwrap is ok(i.e. we always update accounts when commiting)
-                        op.accounts_updated.as_ref().unwrap(),
-                    )?;
+                    self.commit_state_update(op.block.block_number, &op.accounts_updated)?;
                     self.save_transactions(op)?;
                 }
                 Action::Verify { .. } => self.apply_state_update(op.block.block_number)?,
@@ -639,25 +626,23 @@ impl StorageProcessor {
     fn commit_state_update(
         &self,
         block_number: u32,
-        accounts_updated: &[AccountUpdate],
+        accounts_updated: &AccountUpdates,
     ) -> QueryResult<()> {
         self.conn().transaction(|| {
-            for upd in accounts_updated.iter() {
+            for (id, upd) in accounts_updated.iter() {
                 debug!(
                     "Committing state update for account {} in block {}",
-                    upd.get_account_id(),
-                    block_number
+                    id, block_number
                 );
                 match *upd {
                     AccountUpdate::Create {
-                        id,
                         public_key_x,
                         public_key_y,
                         nonce,
                     } => {
                         diesel::insert_into(account_creates::table)
                             .values(&StorageAccountCreation {
-                                account_id: id as i32,
+                                account_id: *id as i32,
                                 is_create: true,
                                 block_number: block_number as i32,
                                 pk_x: fr_to_bytes(&public_key_x),
@@ -667,14 +652,13 @@ impl StorageProcessor {
                             .execute(self.conn())?;
                     }
                     AccountUpdate::Delete {
-                        id,
                         public_key_x,
                         public_key_y,
                         nonce,
                     } => {
                         diesel::insert_into(account_creates::table)
                             .values(&StorageAccountCreation {
-                                account_id: id as i32,
+                                account_id: *id as i32,
                                 is_create: false,
                                 block_number: block_number as i32,
                                 pk_x: fr_to_bytes(&public_key_x),
@@ -684,13 +668,12 @@ impl StorageProcessor {
                             .execute(self.conn())?;
                     }
                     AccountUpdate::UpdateBalance {
-                        id,
                         balance_update: (token, ref old_balance, ref new_balance),
                         nonce,
                     } => {
                         diesel::insert_into(account_balance_updates::table)
                             .values(&StorageAccountUpdateInsert {
-                                account_id: id as i32,
+                                account_id: *id as i32,
                                 block_number: block_number as i32,
                                 coin_id: i32::from(token),
                                 old_balance: old_balance.clone(),
@@ -700,12 +683,6 @@ impl StorageProcessor {
                             .execute(self.conn())?;
                     }
                 }
-                // TODO: (Drogan) was this check necessary?
-                //             let inserted = ;
-                //             if 0 == inserted {
-                //                 error!("Error: could not commit all state updates!");
-                //                 return Err(Error::RollbackTransaction);
-                //             }
             }
             Ok(())
         })
@@ -831,7 +808,7 @@ impl StorageProcessor {
         &self,
         from_block: u32,
         to_block: Option<u32>,
-    ) -> QueryResult<Option<(u32, Vec<AccountUpdate>)>> {
+    ) -> QueryResult<Option<(u32, AccountUpdates)>> {
         self.conn().transaction(|| {
             let (to_block, unbounded) = if let Some(to_block) = to_block {
                 (to_block, false)
@@ -885,14 +862,14 @@ impl StorageProcessor {
                     account_diff
                         .into_iter()
                         .map(|d| d.into())
-                        .collect::<Vec<AccountUpdate>>(),
+                        .collect::<AccountUpdates>(),
                     last_block as u32,
                 )
             };
 
             if !time_forward {
                 account_updates.reverse();
-                for acc_upd in account_updates.iter_mut() {
+                for (_, acc_upd) in account_updates.iter_mut() {
                     acc_upd.reverse_update();
                 }
             }
@@ -906,7 +883,7 @@ impl StorageProcessor {
     }
 
     /// loads the state of accounts updated in a specific block
-    pub fn load_state_diff_for_block(&self, block_number: u32) -> QueryResult<Vec<AccountUpdate>> {
+    pub fn load_state_diff_for_block(&self, block_number: u32) -> QueryResult<AccountUpdates> {
         self.load_state_diff(block_number, Some(block_number + 1))
             .map(|diff| diff.unwrap_or_default().1)
     }
@@ -1180,11 +1157,12 @@ impl StorageProcessor {
                 account_diff
                     .into_iter()
                     .map(|upd| upd.into())
-                    .collect::<Vec<AccountUpdate>>()
+                    .collect::<AccountUpdates>()
             };
 
             Ok(account_diff
                 .into_iter()
+                .map(|(_, upd)| upd)
                 .fold(account, Account::apply_update))
         })
     }
@@ -1459,27 +1437,33 @@ mod test {
 
         let create_account = |id| {
             let a = models::plasma::account::Account::default();
-            vec![AccountUpdate::Create {
+            vec![(
                 id,
-                nonce: a.nonce,
-                public_key_x: a.public_key_x,
-                public_key_y: a.public_key_y,
-            }]
+                AccountUpdate::Create {
+                    nonce: a.nonce,
+                    public_key_x: a.public_key_x,
+                    public_key_y: a.public_key_y,
+                },
+            )]
             .into_iter()
         };
         let transfer = |id_1, nonce_1, id_2, nonce_2| {
             let mut _a = models::plasma::account::Account::default();
             vec![
-                AccountUpdate::UpdateBalance {
-                    id: id_1,
-                    nonce: nonce_1,
-                    balance_update: (0, 1.into(), 2.into()),
-                },
-                AccountUpdate::UpdateBalance {
-                    id: id_2,
-                    nonce: nonce_2,
-                    balance_update: (0, 2.into(), 3.into()),
-                },
+                (
+                    id_1,
+                    AccountUpdate::UpdateBalance {
+                        nonce: nonce_1,
+                        balance_update: (0, 1.into(), 2.into()),
+                    },
+                ),
+                (
+                    id_2,
+                    AccountUpdate::UpdateBalance {
+                        nonce: nonce_2,
+                        balance_update: (0, 2.into(), 3.into()),
+                    },
+                ),
             ]
             .into_iter()
         };
@@ -1528,17 +1512,21 @@ mod test {
             a.set_balance(ETH_TOKEN_ID, &BigDecimal::from(balance));
             let new_balance = a.get_balance(ETH_TOKEN_ID).clone();
             vec![
-                AccountUpdate::Create {
+                (
                     id,
-                    nonce: a.nonce,
-                    public_key_x: a.public_key_x,
-                    public_key_y: a.public_key_y,
-                },
-                AccountUpdate::UpdateBalance {
+                    AccountUpdate::Create {
+                        nonce: a.nonce,
+                        public_key_x: a.public_key_x,
+                        public_key_y: a.public_key_y,
+                    },
+                ),
+                (
                     id,
-                    nonce: a.nonce,
-                    balance_update: (ETH_TOKEN_ID, old_balance, new_balance),
-                },
+                    AccountUpdate::UpdateBalance {
+                        nonce: a.nonce,
+                        balance_update: (ETH_TOKEN_ID, old_balance, new_balance),
+                    },
+                ),
             ]
             .into_iter()
         };

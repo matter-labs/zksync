@@ -14,22 +14,18 @@ pub struct Account {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-// TODO (Drogan) remove id from here up.
 pub enum AccountUpdate {
     Create {
-        id: u32,
         public_key_x: Fr,
         public_key_y: Fr,
         nonce: u32,
     },
     Delete {
-        id: u32,
         public_key_x: Fr,
         public_key_y: Fr,
         nonce: u32,
     },
     UpdateBalance {
-        id: u32,
         nonce: u32,
         // (token, old, new)
         balance_update: (TokenId, BigDecimal, BigDecimal),
@@ -37,44 +33,30 @@ pub enum AccountUpdate {
 }
 
 impl AccountUpdate {
-    pub fn get_account_id(&self) -> u32 {
-        match *self {
-            AccountUpdate::Create { id, .. } => id,
-            AccountUpdate::Delete { id, .. } => id,
-            AccountUpdate::UpdateBalance { id, .. } => id,
-        }
-    }
-
     pub fn reverse_update(&self) -> Self {
         match self {
             AccountUpdate::Create {
-                id,
                 public_key_x,
                 public_key_y,
                 nonce,
             } => AccountUpdate::Delete {
-                id: *id,
                 public_key_x: *public_key_x,
                 public_key_y: *public_key_y,
                 nonce: *nonce,
             },
             AccountUpdate::Delete {
-                id,
                 public_key_x,
                 public_key_y,
                 nonce,
             } => AccountUpdate::Create {
-                id: *id,
                 public_key_x: *public_key_x,
                 public_key_y: *public_key_y,
                 nonce: *nonce,
             },
             AccountUpdate::UpdateBalance {
-                id,
                 nonce,
                 balance_update,
             } => AccountUpdate::UpdateBalance {
-                id: *id,
                 nonce: *nonce,
                 balance_update: (
                     balance_update.0,
