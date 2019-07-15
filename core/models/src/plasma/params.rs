@@ -35,7 +35,7 @@ pub const SPECIAL_ACCOUNT_DEPOSIT: u32 = 1;
 /// Number of supported tokens.
 pub const TOTAL_TOKENS: usize = 1;
 
-pub type TokenId = u8;
+pub type TokenId = u32;
 pub const ETH_TOKEN_ID: TokenId = 0;
 
 use sapling_crypto::alt_babyjubjub::AltJubjubBn256;

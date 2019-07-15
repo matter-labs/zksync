@@ -116,12 +116,13 @@ table! {
         tx_type -> Text,
         from_account -> Int4,
         to_account -> Nullable<Int4>,
-        nonce -> Nullable<Int4>,
         amount -> Int4,
         fee -> Int4,
         block_number -> Nullable<Int4>,
         state_root -> Nullable<Text>,
         created_at -> Timestamp,
+        nonce -> Int4,
+        token -> Int4,
     }
 }
 

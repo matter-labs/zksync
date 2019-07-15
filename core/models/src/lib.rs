@@ -11,6 +11,7 @@ pub mod plasma;
 pub mod primitives;
 
 use crate::plasma::block::Block;
+use crate::plasma::tx::FranklinTx;
 use crate::plasma::*;
 use futures::sync::oneshot;
 use plasma::AccountUpdates;
@@ -105,8 +106,7 @@ pub enum ProtoBlock {
 }
 
 pub enum StateKeeperRequest {
-    AddTransferTx(Box<TransferTx>, oneshot::Sender<Result<(), String>>),
-    AddBlock(ProtoBlock),
+    AddTx(Box<FranklinTx>, oneshot::Sender<Result<(), String>>),
     GetAccount(u32, Sender<Option<Account>>),
     GetNetworkStatus(Sender<NetworkStatus>),
     TimerTick,

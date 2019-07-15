@@ -297,19 +297,18 @@ type Err = BabyProverErr;
 
 impl BabyProver {
     pub fn apply_and_prove(&mut self, block: &Block) -> Result<FullBabyProof, Err> {
-        // let block_number = block.block_number;
-        // let new_root_hash = block.new_root_hash;
-        match block.block_data {
-            BlockData::Deposit {
-                ref transactions, ..
-            } => self.apply_and_prove_deposit(&block, transactions),
-            BlockData::Exit {
-                ref transactions, ..
-            } => self.apply_and_prove_exit(&block, transactions),
-            BlockData::Transfer {
-                ref transactions, ..
-            } => self.apply_and_prove_transfer(&block, &transactions),
-        }
+        //        match block.block_data {
+        //            BlockData::Deposit {
+        //                ref transactions, ..
+        //            } => self.apply_and_prove_deposit(&block, transactions),
+        //            BlockData::Exit {
+        //                ref transactions, ..
+        //            } => self.apply_and_prove_exit(&block, transactions),
+        //            BlockData::Transfer {
+        //                ref transactions, ..
+        //            } => self.apply_and_prove_transfer(&block, &transactions),
+        //        }
+        unimplemented!()
     }
 
     // Apply transactions to the state while also making a witness for proof, then calculate proof

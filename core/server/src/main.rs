@@ -35,8 +35,8 @@ fn main() {
     //let rt = Runtime::new().unwrap();
 
     let connection_pool = ConnectionPool::new();
-    let eth_watch = unimplemented!(); //EthWatch::new(0, 0, connection_pool.clone());
-    let state_keeper = unimplemented!(); //PlasmaStateKeeper::new(connection_pool.clone());
+    let eth_watch = EthWatch::new();
+    let state_keeper = PlasmaStateKeeper::new(connection_pool.clone());
 
     let storage = connection_pool
         .access_storage()

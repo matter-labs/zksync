@@ -1,3 +1,4 @@
+use crate::plasma::tx::FranklinTx;
 pub use crate::plasma::tx::{DepositTx, ExitTx, TransferTx, TxSignature};
 use crate::plasma::{BatchNumber, BlockNumber, Fr};
 use bigdecimal::BigDecimal;
@@ -39,5 +40,12 @@ pub enum BlockData {
 pub struct Block {
     pub block_number: BlockNumber,
     pub new_root_hash: Fr,
-    pub block_data: BlockData,
+    pub block_data: Vec<FranklinTx>,
+}
+
+impl Block {
+    pub fn get_eth_public_data(&self) -> Vec<u8> {
+        // TODO: (Drogan) implement using new public data spec.
+        Vec::new()
+    }
 }

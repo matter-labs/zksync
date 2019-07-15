@@ -11,7 +11,9 @@ use pairing::bn256;
 use sapling_crypto::eddsa;
 
 pub use crate::plasma::account::{Account, AccountUpdate};
-pub use crate::plasma::tx::{DepositTx, ExitTx, TransferTx, TxSignature};
+pub use crate::plasma::tx::{
+    DepositTx, ExitTx, FranklinTx, NewDepositTx, NewExitTx, TransferTx, TxSignature,
+};
 
 pub type Engine = bn256::Bn256;
 pub type Fr = bn256::Fr;

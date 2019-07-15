@@ -43,6 +43,7 @@ impl std::string::ToString for TransactionType {
 pub struct TransferTx {
     pub from: u32,
     pub to: u32,
+    pub token: u32,
     pub amount: BigDecimal,
     pub fee: BigDecimal,
     pub nonce: u32,
@@ -144,6 +145,7 @@ impl TransferTx {
         let tx = TransferTx {
             from,
             to,
+            token: 0,
             amount: amount.clone(),
             fee: fee.clone(),
             nonce,
@@ -168,6 +170,7 @@ impl TransferTx {
         TransferTx {
             from,
             to,
+            token: 0,
             amount,
             fee,
             nonce,
@@ -231,7 +234,56 @@ pub struct ExitTx {
     pub amount: BigDecimal,
 }
 
-#[derive(Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct NewDepositTx {
+    pub to: u32,
+    pub token: u32,
+    pub amount: BigDecimal,
+    pub fee: BigDecimal,
+    pub nonce: u32,
+    pub good_until_block: u32,
+    pub pub_x: Fr,
+    pub pub_y: Fr,
+    // TODO: add and check eth signature
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct NewExitTx {
+    pub account_id: u32,
+    pub token: u32,
+    pub amount: BigDecimal,
+    pub fee: BigDecimal,
+    pub nonce: u32,
+    pub good_until_block: u32,
+    pub signature: TxSignature,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum FranklinTx {
+    Deposit(NewDepositTx),
+    Transfer(TransferTx),
+    Exit(NewExitTx),
+}
+
+impl FranklinTx {
+    pub fn nonce(&self) -> u32 {
+        match self {
+            FranklinTx::Deposit(tx) => tx.nonce,
+            FranklinTx::Transfer(tx) => tx.nonce,
+            FranklinTx::Exit(tx) => tx.nonce,
+        }
+    }
+
+    pub fn account_id(&self) -> u32 {
+        match self {
+            FranklinTx::Deposit(tx) => tx.to,
+            FranklinTx::Transfer(tx) => tx.from,
+            FranklinTx::Exit(tx) => tx.account_id,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TxSignature {
     pub r_x: Fr,
     pub r_y: Fr,

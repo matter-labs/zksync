@@ -4,7 +4,7 @@ use pairing::bn256::Bn256;
 
 use models::plasma::account::Account;
 use models::plasma::block::{Block, BlockData};
-use models::plasma::tx::{DepositTx, ExitTx, TransferTx};
+use models::plasma::tx::{FranklinTx, TransferTx};
 use models::plasma::{AccountId, AccountMap, BatchNumber};
 use plasma::state::PlasmaState;
 use rayon::prelude::*;
@@ -21,8 +21,8 @@ use storage::ConnectionPool;
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive, Zero};
 use std::sync::mpsc::{Receiver, Sender};
 
-use itertools::Itertools;
 use crate::new_eth_watch::ETHState;
+use itertools::Itertools;
 use std::io::BufReader;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -30,11 +30,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 pub struct PlasmaStateKeeper {
     /// Current plasma state
     state: PlasmaState,
-
-    eth_state: Arc<RwLock<ETHState>>,
-
-    /// Queue for blocks to be processed next
-    block_queue: VecDeque<ProtoBlock>,
 
     /// Promised latest UNIX timestamp of the next block
     next_block_at_max: Option<SystemTime>,
@@ -51,7 +46,7 @@ type RootHash = H256;
 type UpdatedAccounts = AccountMap;
 
 impl PlasmaStateKeeper {
-    pub fn new(pool: ConnectionPool, eth_state: Arc<RwLock<ETHState>>) -> Self {
+    pub fn new(pool: ConnectionPool) -> Self {
         info!("constructing state keeper instance");
 
         // here we should insert default accounts into the tree
@@ -79,8 +74,6 @@ impl PlasmaStateKeeper {
         // Keeper starts with the NEXT block
         let keeper = PlasmaStateKeeper {
             state,
-            eth_state,
-            block_queue: VecDeque::default(),
             next_block_at_max: Some(
                 SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL),
             ),
@@ -124,8 +117,8 @@ impl PlasmaStateKeeper {
                         error!("StateKeeperRequest::GetAccount: channel closed, sending failed");
                     }
                 }
-                StateKeeperRequest::AddTransferTx(tx, sender) => {
-                    let result = self.handle_new_transfer_tx(&*tx);
+                StateKeeperRequest::AddTx(tx, sender) => {
+                    let result = self.handle_new_tx(&*tx);
 
                     let r = sender.send(result);
                     if r.is_err() {
@@ -133,20 +126,15 @@ impl PlasmaStateKeeper {
                     }
 
                     if self.txs_since_last_block > config::RUNTIME_CONFIG.transfer_batch_size {
-                        self.finalize_current_batch(&tx_for_commitments);
+                        self.create_new_block(&tx_for_commitments);
                     }
-                }
-                StateKeeperRequest::AddBlock(block) => {
-                    self.block_queue.push_back(block);
-                    //debug!("new protoblock, transfer_tx_queue.len() = {}", self.transfer_tx_queue.len());
-                    self.process_block_queue(&tx_for_commitments);
                 }
                 StateKeeperRequest::TimerTick => {
                     if self.txs_since_last_block > config::RUNTIME_CONFIG.transfer_batch_size {
-                        self.finalize_current_batch(&tx_for_commitments);
+                        self.create_new_block(&tx_for_commitments);
                     } else if let Some(next_block_at) = self.next_block_at_max {
                         if next_block_at <= SystemTime::now() {
-                            self.finalize_current_batch(&tx_for_commitments);
+                            self.create_new_block(&tx_for_commitments);
                         }
                     }
                 }
@@ -154,26 +142,28 @@ impl PlasmaStateKeeper {
         }
     }
 
-    fn handle_new_transfer_tx(&mut self, tx: &TransferTx) -> Result<(), String> {
-        let account = self
-            .state
-            .get_account(tx.from)
-            .ok_or_else(|| "Account not found.".to_string())?;
+    fn handle_new_tx(&mut self, tx: &FranklinTx) -> Result<(), String> {
+        //        let account = self
+        //            .state
+        //            .get_account(tx.from)
+        //            .ok_or_else(|| "Account not found.".to_string())?;
 
-        let pub_key = account
-            .get_pub_key()
-            .ok_or_else(|| "Pubkey expired".to_string())?;
-        let verified = tx.verify_sig(&pub_key);
-        if !verified {
-            let (x, y) = pub_key.0.into_xy();
-            warn!(
-                "Signature is invalid: (x,y,s) = ({:?},{:?},{:?}) for pubkey = {:?}, {:?}",
-                &tx.signature.r_x, &tx.signature.r_y, &tx.signature.s, x, y
-            );
-            return Err("Invalid signature".to_string());
-        }
+        // TODO: (Drogan) proper sign verification. ETH sign for deposit?
+        //        let pub_key = account
+        //            .get_pub_key()
+        //            .ok_or_else(|| "Pubkey expired".to_string())?;
+        //        let verified = tx.verify_sig(&pub_key);
+        //        if !verified {
+        //            let (x, y) = pub_key.0.into_xy();
+        //            warn!(
+        //                "Signature is invalid: (x,y,s) = ({:?},{:?},{:?}) for pubkey = {:?}, {:?}",
+        //                &tx.signature.r_x, &tx.signature.r_y, &tx.signature.s, x, y
+        //            );
+        //            return Err("Invalid signature".to_string());
+        //        }
 
-        let can_be_executed_now = { account.nonce == tx.nonce };
+        // TODO: Drogan handle nonce for deposit and exit.
+        let can_be_executed_now = true;
 
         let mempool = self
             .db_conn_pool
@@ -195,35 +185,17 @@ impl PlasmaStateKeeper {
         Ok(())
     }
 
-    fn process_block_queue(&mut self, tx_for_commitments: &Sender<CommitRequest>) {
-        let blocks = std::mem::replace(&mut self.block_queue, VecDeque::default());
-        info!("Processing block queue, len: {}", blocks.len());
-        for block in blocks.into_iter() {
-            let req = match block {
-                ProtoBlock::Transfer(transactions) => self.create_transfer_block(transactions),
-                ProtoBlock::Deposit(batch_number, transactions) => {
-                    self.create_deposit_block(batch_number, transactions)
-                }
-                ProtoBlock::Exit(batch_number, transactions) => {
-                    self.create_exit_block(batch_number, transactions)
-                }
-            };
-            //debug!("sending request to committer {:?}", req);
-            tx_for_commitments
-                .send(req)
-                .expect("must send new operation for commitment");
-            self.state.block_number += 1; // bump current block number as we've made one
-        }
-    }
-
-    fn finalize_current_batch(&mut self, tx_for_commitments: &Sender<CommitRequest>) {
-        let transfer_block = ProtoBlock::Transfer(self.prepare_transfer_tx_block());
-        self.block_queue.push_front(transfer_block);
-        self.process_block_queue(&tx_for_commitments);
+    fn create_new_block(&mut self, tx_for_commitments: &Sender<CommitRequest>) {
+        let txs = self.prepare_tx_for_block();
+        let commit_request = self.apply_txs(txs);
+        tx_for_commitments
+            .send(commit_request)
+            .expect("Commit request send");
         self.next_block_at_max = None;
+        self.state.block_number += 1; // bump current block number as we've made one
     }
 
-    fn prepare_transfer_tx_block(&self) -> Vec<TransferTx> {
+    fn prepare_tx_for_block(&self) -> Vec<FranklinTx> {
         let txs = self
             .db_conn_pool
             .access_mempool()
@@ -233,23 +205,23 @@ impl PlasmaStateKeeper {
             })
             .expect("Failed to get txs from mempool");
         let filtered_txs = self.filter_invalid_txs(txs);
-        debug!("Preparing transfer block with txs: {:#?}", filtered_txs);
-        self.apply_padding(filtered_txs)
+        debug!("Preparing block with txs: {:#?}", filtered_txs);
+        filtered_txs
     }
 
-    fn filter_invalid_txs(&self, transfer_txs: Vec<TransferTx>) -> Vec<TransferTx> {
+    fn filter_invalid_txs(&self, transfer_txs: Vec<FranklinTx>) -> Vec<FranklinTx> {
         transfer_txs
             .into_iter()
-            .group_by(|tx| tx.from)
+            .group_by(|tx| tx.account_id())
             .into_iter()
             .map(|(from, txs)| {
                 let mut txs = txs.collect::<Vec<_>>();
-                txs.sort_by_key(|tx| tx.nonce);
+                txs.sort_by_key(|tx| tx.nonce());
 
                 let mut valid_txs = Vec::new();
                 let mut current_nonce = self.account(from).nonce;
                 for tx in txs {
-                    if tx.nonce == current_nonce {
+                    if tx.nonce() == current_nonce {
                         valid_txs.push(tx);
                         current_nonce += 1;
                     } else {
@@ -264,76 +236,27 @@ impl PlasmaStateKeeper {
             })
     }
 
-    fn apply_padding(&self, mut transfer_txs: Vec<TransferTx>) -> Vec<TransferTx> {
-        let to_pad = config::RUNTIME_CONFIG.transfer_batch_size - transfer_txs.len();
-        if to_pad > 0 {
-            debug!("padding transactions");
-            // TODO: move to env vars
-            let pk_bytes =
-                hex::decode("8ea0225bbf7f3689eb8ba6f8d7bef3d8ae2541573d71711a28d5149807b40805")
-                    .unwrap();
-            let private_key: PrivateKey<Bn256> =
-                PrivateKey::read(BufReader::new(pk_bytes.as_slice())).unwrap();
-            let padding_account_id = 2; // TODO: 1
-
-            let base_nonce = self.account(padding_account_id).nonce;
-            let pub_key = self
-                .state
-                .get_account(padding_account_id)
-                .and_then(|a| a.get_pub_key())
-                .expect("public key must exist for padding account");
-
-            let mut prepared_transactions: Vec<_> = (0..(to_pad as u32))
-                .into_par_iter()
-                .map(|i| {
-                    let nonce = base_nonce + i;
-                    let tx = TransferTx::create_signed_tx(
-                        padding_account_id, // from
-                        0,                  // to
-                        BigDecimal::zero(), // amount
-                        BigDecimal::zero(), // fee
-                        nonce,              // nonce
-                        2_147_483_647,      // good until max_block
-                        &private_key,
-                    );
-                    assert!(tx.verify_sig(&pub_key));
-
-                    tx
-                })
-                .collect();
-            transfer_txs.append(&mut prepared_transactions);
-        }
-        transfer_txs
-    }
-
-    fn create_transfer_block(&mut self, transactions: Vec<TransferTx>) -> CommitRequest {
+    fn apply_txs(&mut self, transactions: Vec<FranklinTx>) -> CommitRequest {
         info!("Creating transfer block");
         // collect updated state
         let mut accounts_updated = Vec::new();
         let mut txs = Vec::new();
 
-        let mut total_fees = 0u128;
-
-        for tx in transactions.into_iter() {
-            let (fee, mut tx_updates) = self
+        for tx in transactions.iter() {
+            let mut tx_updates = self
                 .state
-                .apply_transfer(&tx)
-                .expect("must apply transfer transaction");
+                .apply_tx(&tx)
+                .expect("must apply franklin transaction");
 
             accounts_updated.append(&mut tx_updates);
             txs.push(tx);
-
-            total_fees += fee.to_u128().expect("Should not overflow");
         }
 
         let num_txs = txs.len();
         let block = Block {
             block_number: self.state.block_number,
             new_root_hash: self.state.root_hash(),
-            block_data: BlockData::Transfer {
-                total_fees: BigDecimal::from_u128(total_fees).unwrap(),
-                transactions: txs,
-            },
+            block_data: transactions,
         };
 
         self.txs_since_last_block.saturating_sub(num_txs);
@@ -342,81 +265,6 @@ impl PlasmaStateKeeper {
             block,
             accounts_updated,
         }
-    }
-
-    fn create_deposit_block(
-        &mut self,
-        batch_number: BatchNumber,
-        transactions: Vec<DepositTx>,
-    ) -> CommitRequest {
-        let transactions = Self::sort_deposit_block(transactions);
-        let mut accounts_updated = Vec::new();
-        for tx in transactions.iter() {
-            let mut tx_updates = self
-                .state
-                .apply_deposit(&tx)
-                .expect("must apply deposit transaction");
-
-            accounts_updated.append(&mut tx_updates);
-        }
-
-        let block = Block {
-            block_number: self.state.block_number,
-            new_root_hash: self.state.root_hash(),
-            block_data: BlockData::Deposit {
-                batch_number,
-                transactions,
-            },
-        };
-
-        CommitRequest {
-            block,
-            accounts_updated,
-        }
-    }
-
-    // prover MUST read old balances and mutate the block data
-    fn create_exit_block(
-        &mut self,
-        batch_number: BatchNumber,
-        transactions: Vec<ExitTx>,
-    ) -> CommitRequest {
-        let mut transactions = Self::sort_exit_block(transactions);
-        let mut accounts_updated = Vec::new();
-        for tx in transactions.iter_mut() {
-            let mut tx_updates = self
-                .state
-                .apply_exit(tx)
-                .expect("must augment exit transaction information");
-            // collect updated state
-            accounts_updated.append(&mut tx_updates);
-        }
-
-        let block = Block {
-            block_number: self.state.block_number,
-            new_root_hash: self.state.root_hash(),
-            block_data: BlockData::Exit {
-                batch_number,
-                transactions,
-            },
-        };
-
-        CommitRequest {
-            block,
-            accounts_updated,
-        }
-    }
-
-    // sorting is required to ensure that all accounts affected are unique, see the smart contract
-    fn sort_deposit_block(mut txes: Vec<DepositTx>) -> Vec<DepositTx> {
-        txes.sort_by_key(|l| l.account);
-        txes
-    }
-
-    // sorting is required to ensure that all accounts affected are unique, see the smart contract
-    fn sort_exit_block(mut txes: Vec<ExitTx>) -> Vec<ExitTx> {
-        txes.sort_by_key(|l| l.account);
-        txes
     }
 
     fn account(&self, account_id: AccountId) -> Account {

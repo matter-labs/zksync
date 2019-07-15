@@ -25,6 +25,8 @@ contract Franklin is DummyVerifier, VerificationKey {
 
     event TokenAdded(address token, uint32 tokenId);
 
+    event AccountRegistered(address indexed owner, uint32 id);
+
     // ==== STORAGE ====
 
     // Governance
@@ -62,6 +64,9 @@ contract Franklin is DummyVerifier, VerificationKey {
 
     // List of root-chain balances (per owner and tokenId)
     mapping (address => mapping (uint32 => Balance)) public balances;
+
+    uint32 public totalAccounts;
+    mapping (address => uint32) public accountIdByAddress;
 
 
     // Blocks
@@ -253,6 +258,13 @@ contract Franklin is DummyVerifier, VerificationKey {
         requireActive();
         requireValidToken(_tokenId);
         require(uint256(_amount) + balances[msg.sender][_tokenId].balance < MAX_VALUE, "overflow");
+
+        // register account if not registered
+        if (accountIdByAddress[msg.sender] == 0) {
+            accountIdByAddress[msg.sender] = totalAccounts + 1;
+            totalAccounts++;
+        }
+
         balances[msg.sender][_tokenId].balance += _amount;
         uint32 lockedUntilBlock = uint32(block.number + LOCK_DEPOSITS_FOR);
         balances[msg.sender][_tokenId].lockedUntilBlock = lockedUntilBlock;
@@ -355,7 +367,7 @@ contract Franklin is DummyVerifier, VerificationKey {
         // deposit
         if (opType == 0x01) {
             // pubdata: to_account: 3, token: 2, amount: 2, fee: 1, new_pubkey_hash: 21
-            address account = address(uint(uint8(_publicData[currentPointer + 1])) + uint(uint8(_publicData[currentPointer + 2])) << 8 + uint(uint8(_publicData[currentPointer + 3])) << 16);
+            address account = addressById(uint(uint8(_publicData[currentPointer + 1])) + uint(uint8(_publicData[currentPointer + 2])) << 8 + uint(uint8(_publicData[currentPointer + 3])) << 16);
             uint16 tokenId = uint16(uint(uint8(_publicData[currentPointer + 4])) + uint(uint8(_publicData[currentPointer + 5])) << 8);
             uint24 amountPacked = uint24(uint8(_publicData[currentPointer + 6])) + uint24(uint8(_publicData[currentPointer + 7])) << 8;
             uint112 amount = unpack(amountPacked, tokenId);
@@ -378,7 +390,7 @@ contract Franklin is DummyVerifier, VerificationKey {
         // partial_exit
         if (opType == 0x04) {
             // pubdata: account: 3, token: 2, amount: 2, fee: 1
-            address account = address(uint(uint8(_publicData[currentPointer + 1])) + uint(uint8(_publicData[currentPointer + 2])) << 8 + uint(uint8(_publicData[currentPointer + 3])) << 16);
+            address account = addressById(uint(uint8(_publicData[currentPointer + 1])) + uint(uint8(_publicData[currentPointer + 2])) << 8 + uint(uint8(_publicData[currentPointer + 3])) << 16);
             uint16 tokenId = uint16(uint(uint8(_publicData[currentPointer + 4])) + uint(uint8(_publicData[currentPointer + 5])) << 8);
             uint24 amountPacked = uint24(uint8(_publicData[currentPointer + 6])) + uint24(uint8(_publicData[currentPointer + 7])) << 8;
             uint112 amount = unpack(amountPacked, tokenId);
