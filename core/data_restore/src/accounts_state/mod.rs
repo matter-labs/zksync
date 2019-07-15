@@ -215,6 +215,7 @@ impl FranklinAccountsStates {
             let transfer_tx = TransferTx {
                 from,
                 to,
+                token: ETH_TOKEN_ID,
                 amount: amount.clone(), //BigDecimal::from_str_radix("0", 10).unwrap(),
                 fee,                    //BigDecimal::from_str_radix("0", 10).unwrap(),
                 nonce: i.try_into().unwrap(),

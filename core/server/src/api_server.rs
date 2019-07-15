@@ -5,7 +5,7 @@ use actix_web::{
     HttpMessage, HttpRequest, HttpResponse,
 };
 use models::config::RUNTIME_CONFIG;
-use models::plasma::{Account as PAccount, TransferTx};
+use models::plasma::{Account as PAccount, FranklinTx};
 use models::{ActionType, NetworkStatus, StateKeeperRequest, TransferTxConfirmation};
 use std::sync::mpsc;
 use storage::{BlockDetails, ConnectionPool};
@@ -76,7 +76,7 @@ fn handle_submit_tx(
 
     req.json()
         .map_err(|e| format!("{}", e)) // convert all errors to String
-        .and_then(move |tx: TransferTx| {
+        .and_then(move |tx: FranklinTx| {
             // Rate limit check
 
             // TODO: check lazy init
@@ -85,15 +85,14 @@ fn handle_submit_tx(
             }
 
             // Validate tx input (only basic consistency check).
-            tx.validate()?;
+            //            tx.validate()?;
 
             Ok(tx)
         })
         .and_then(move |tx| {
-            // TODO (Drogan) use oneshot.
             let (add_tx, add_rx) = oneshot::channel();
             tx_for_state
-                .send(StateKeeperRequest::AddTransferTx(Box::new(tx), add_tx))
+                .send(StateKeeperRequest::AddTx(Box::new(tx), add_tx))
                 .expect("sending to sate keeper failed");
             // Return response
             add_rx

@@ -123,14 +123,12 @@ impl Account {
     }
 
     fn get_token(&self, token: TokenId) -> &BigDecimal {
-        self.balances
-            .get(usize::from(token))
-            .expect("Token not found")
+        self.balances.get(token as usize).expect("Token not found")
     }
 
     fn get_token_mut(&mut self, token: TokenId) -> &mut BigDecimal {
         self.balances
-            .get_mut(usize::from(token))
+            .get_mut(token as usize)
             .expect("Token not found")
     }
 

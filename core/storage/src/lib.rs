@@ -1,5 +1,3 @@
-#![allow(clippy::wrong_self_convention)] // All methods with name into_* must consume self.
-
 #[macro_use]
 extern crate diesel;
 #[macro_use]
@@ -11,9 +9,8 @@ use diesel::dsl::*;
 use models::plasma::block::Block;
 use models::plasma::block::BlockData;
 use models::plasma::params::TokenId;
-use models::plasma::tx::TransactionType::{Deposit, Exit, Transfer};
 use models::plasma::tx::{
-    DepositTx, ExitTx, TransactionType, TransferTx, TxSignature, DEPOSIT_TX, EXIT_TX, TRANSFER_TX,
+    FranklinTx, NewDepositTx, NewExitTx, TransferTx, TxSignature, DEPOSIT_TX, EXIT_TX, TRANSFER_TX,
 };
 use models::plasma::{
     apply_updates, Account, AccountId, AccountMap, AccountUpdate, BlockNumber, Fr, Nonce,
@@ -279,7 +276,8 @@ struct NewTx {
     pub tx_type: String, // 'transfer', 'deposit', 'exit'
     pub from_account: i32,
     pub to_account: Option<i32>, // only used for transfers
-    pub nonce: Option<i32>,      // only used for transfers
+    pub nonce: i32,              // only used for transfers
+    pub token: i32,
     pub amount: i32,
     pub fee: i32,
 
@@ -295,7 +293,8 @@ pub struct StoredTx {
     pub tx_type: String, // 'transfer', 'deposit', 'exit'
     pub from_account: i32,
     pub to_account: Option<i32>, // only used for transfers
-    pub nonce: Option<i32>,      // only used for transfers
+    pub nonce: i32,
+    pub token: i32,
     pub amount: i32,
     pub fee: i32,
 
@@ -306,47 +305,51 @@ pub struct StoredTx {
 }
 
 impl StoredTx {
-    pub fn into_tx(&self) -> QueryResult<TransactionType> {
+    pub fn into_tx(self) -> QueryResult<FranklinTx> {
         let res = match &self.tx_type {
-            t if t == TRANSFER_TX => Transfer {
-                tx: Box::new(self.into_transfer_transaction()),
-            },
-            d if d == DEPOSIT_TX => Deposit {
-                tx: self.into_deposit_transaction(),
-            },
-            e if e == EXIT_TX => Exit {
-                tx: self.into_exit_transaction(),
-            },
+            t if t == TRANSFER_TX => FranklinTx::Transfer(self.into_transfer_transaction()),
+            d if d == DEPOSIT_TX => FranklinTx::Deposit(self.into_deposit_transaction()),
+            e if e == EXIT_TX => FranklinTx::Exit(self.into_exit_transaction()),
             _ => return Err(Error::NotFound),
         };
         Ok(res)
     }
 
-    pub fn into_transfer_transaction(&self) -> TransferTx {
+    pub fn into_transfer_transaction(self) -> TransferTx {
         TransferTx {
             from: self.from_account as u32,
             to: self.to_account.unwrap() as u32,
+            token: self.token as u32,
             amount: BigDecimal::from(self.amount),
             fee: BigDecimal::from(self.fee),
-            nonce: 0,
+            nonce: self.nonce as u32,
             good_until_block: 0,
             signature: TxSignature::default(),
         }
     }
 
-    pub fn into_deposit_transaction(&self) -> DepositTx {
-        DepositTx {
-            account: self.from_account as u32,
+    pub fn into_deposit_transaction(self) -> NewDepositTx {
+        NewDepositTx {
+            to: self.to_account.unwrap() as u32,
+            token: self.token as u32,
             amount: BigDecimal::from(self.amount),
+            fee: BigDecimal::from(self.fee),
+            nonce: self.nonce as u32,
+            good_until_block: 0,
             pub_x: Fr::zero(),
             pub_y: Fr::zero(),
         }
     }
 
-    pub fn into_exit_transaction(&self) -> ExitTx {
-        ExitTx {
-            account: self.from_account as u32,
+    pub fn into_exit_transaction(self) -> NewExitTx {
+        NewExitTx {
+            account_id: self.to_account.unwrap() as u32,
+            token: self.token as u32,
             amount: BigDecimal::from(self.amount),
+            fee: BigDecimal::from(self.fee),
+            nonce: self.nonce as u32,
+            good_until_block: 0,
+            signature: TxSignature::default(),
         }
     }
 }
@@ -528,110 +531,109 @@ impl StorageProcessor {
 
     fn save_transactions(&self, op: &Operation) -> QueryResult<()> {
         let block_data = &op.block.block_data;
-        match block_data {
-            BlockData::Transfer { transactions, .. } => {
-                self.save_transfer_transactions(op, &transactions)?
+        self.save_franklin_transactions(op, &block_data)
+    }
+
+    fn save_franklin_transactions(&self, op: &Operation, txs: &[FranklinTx]) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            for tx in txs.iter() {
+                match tx {
+                    FranklinTx::Deposit(tx) => self.save_deposit_transaction(op, tx)?,
+                    FranklinTx::Transfer(tx) => self.save_transfer_transaction(op, tx)?,
+                    FranklinTx::Exit(tx) => self.save_exit_transaction(op, tx)?,
+                }
             }
-            BlockData::Deposit { transactions, .. } => {
-                self.save_deposit_transactions(op, &transactions)?
-            }
-            BlockData::Exit { transactions, .. } => {
-                self.save_exit_transactions(op, &transactions)?
-            }
+            Ok(())
+        })
+    }
+
+    fn save_transfer_transaction(&self, op: &Operation, tx: &TransferTx) -> QueryResult<()> {
+        let inserted = diesel::insert_into(transactions::table)
+            .values(&NewTx {
+                tx_type: String::from("transfer"),
+                from_account: tx.from as i32,
+                to_account: Some(tx.to as i32),
+                nonce: tx.nonce as i32,
+                token: tx.token as i32,
+                amount: tx
+                    .amount
+                    .as_bigint_and_exponent()
+                    .0
+                    .to_str_radix(10)
+                    .as_str()
+                    .parse()
+                    .unwrap(),
+                fee: tx
+                    .fee
+                    .as_bigint_and_exponent()
+                    .0
+                    .to_str_radix(10)
+                    .as_str()
+                    .parse()
+                    .unwrap(),
+                block_number: Some(op.block.block_number as i32),
+                state_root: Some(op.block.new_root_hash.to_hex()),
+            })
+            .execute(self.conn())?;
+        if 0 == inserted {
+            error!("Error: could not commit all new transactions!");
+            return Err(Error::RollbackTransaction);
         }
         Ok(())
     }
 
-    fn save_transfer_transactions(&self, op: &Operation, txs: &[TransferTx]) -> QueryResult<()> {
-        for tx in txs.iter() {
-            let inserted = diesel::insert_into(transactions::table)
-                .values(&NewTx {
-                    tx_type: String::from("transfer"),
-                    from_account: tx.from as i32,
-                    to_account: Some(tx.to as i32),
-                    nonce: Some(tx.nonce as i32),
-                    amount: tx
-                        .amount
-                        .as_bigint_and_exponent()
-                        .0
-                        .to_str_radix(10)
-                        .as_str()
-                        .parse()
-                        .unwrap(),
-                    fee: tx
-                        .fee
-                        .as_bigint_and_exponent()
-                        .0
-                        .to_str_radix(10)
-                        .as_str()
-                        .parse()
-                        .unwrap(),
-                    block_number: Some(op.block.block_number as i32),
-                    state_root: Some(op.block.new_root_hash.to_hex()),
-                })
-                .execute(self.conn())?;
-            if 0 == inserted {
-                error!("Error: could not commit all new transactions!");
-                return Err(Error::RollbackTransaction);
-            }
+    fn save_deposit_transaction(&self, op: &Operation, tx: &NewDepositTx) -> QueryResult<()> {
+        let inserted = diesel::insert_into(transactions::table)
+            .values(&NewTx {
+                tx_type: String::from("deposit"),
+                from_account: tx.to as i32,
+                to_account: None,
+                nonce: tx.nonce as i32,
+                token: tx.token as i32,
+                amount: tx
+                    .amount
+                    .as_bigint_and_exponent()
+                    .0
+                    .to_str_radix(10)
+                    .as_str()
+                    .parse()
+                    .unwrap(),
+                fee: 0,
+                block_number: Some(op.block.block_number as i32),
+                state_root: Some(op.block.new_root_hash.to_hex()),
+            })
+            .execute(self.conn())?;
+        if 0 == inserted {
+            error!("Error: could not commit all new transactions!");
+            return Err(Error::RollbackTransaction);
         }
         Ok(())
     }
 
-    fn save_deposit_transactions(&self, op: &Operation, txs: &[DepositTx]) -> QueryResult<()> {
-        for tx in txs.iter() {
-            let inserted = diesel::insert_into(transactions::table)
-                .values(&NewTx {
-                    tx_type: String::from("deposit"),
-                    from_account: tx.account as i32,
-                    to_account: None,
-                    nonce: None,
-                    amount: tx
-                        .amount
-                        .as_bigint_and_exponent()
-                        .0
-                        .to_str_radix(10)
-                        .as_str()
-                        .parse()
-                        .unwrap(),
-                    fee: 0,
-                    block_number: Some(op.block.block_number as i32),
-                    state_root: Some(op.block.new_root_hash.to_hex()),
-                })
-                .execute(self.conn())?;
-            if 0 == inserted {
-                error!("Error: could not commit all new transactions!");
-                return Err(Error::RollbackTransaction);
-            }
-        }
-        Ok(())
-    }
-
-    fn save_exit_transactions(&self, op: &Operation, txs: &[ExitTx]) -> QueryResult<()> {
-        for tx in txs.iter() {
-            let inserted = diesel::insert_into(transactions::table)
-                .values(&NewTx {
-                    tx_type: String::from("exit"),
-                    from_account: tx.account as i32,
-                    to_account: None,
-                    nonce: None,
-                    amount: tx
-                        .amount
-                        .as_bigint_and_exponent()
-                        .0
-                        .to_str_radix(10)
-                        .as_str()
-                        .parse()
-                        .unwrap(),
-                    fee: 0,
-                    block_number: Some(op.block.block_number as i32),
-                    state_root: Some(op.block.new_root_hash.to_hex()),
-                })
-                .execute(self.conn())?;
-            if 0 == inserted {
-                error!("Error: could not commit all new transactions!");
-                return Err(Error::RollbackTransaction);
-            }
+    fn save_exit_transaction(&self, op: &Operation, tx: &NewExitTx) -> QueryResult<()> {
+        let inserted = diesel::insert_into(transactions::table)
+            .values(&NewTx {
+                tx_type: String::from("exit"),
+                from_account: tx.account_id as i32,
+                to_account: None,
+                nonce: tx.nonce as i32,
+                token: tx.token as i32,
+                amount: tx
+                    .amount
+                    .as_bigint_and_exponent()
+                    .0
+                    .to_str_radix(10)
+                    .as_str()
+                    .parse()
+                    .unwrap(),
+                fee: 0,
+                block_number: Some(op.block.block_number as i32),
+                state_root: Some(op.block.new_root_hash.to_hex()),
+            })
+            .execute(self.conn())?;
+        if 0 == inserted {
+            error!("Error: could not commit all new transactions!");
+            return Err(Error::RollbackTransaction);
         }
         Ok(())
     }
@@ -692,7 +694,7 @@ impl StorageProcessor {
                             .values(&StorageAccountUpdateInsert {
                                 account_id: id as i32,
                                 block_number: block_number as i32,
-                                coin_id: i32::from(token),
+                                coin_id: token as i32,
                                 old_balance: old_balance.clone(),
                                 new_balance: new_balance.clone(),
                                 nonce: i64::from(nonce),

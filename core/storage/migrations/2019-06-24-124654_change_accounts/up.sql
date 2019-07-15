@@ -43,3 +43,9 @@ CREATE TABLE account_creates (
     nonce bigint not null,
     PRIMARY KEY (account_id, block_number)
 );
+
+
+ALTER TABLE transactions
+    drop column nonce cascade,
+    add column nonce integer not null,
+    add column token integer not null;

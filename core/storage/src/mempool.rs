@@ -1,4 +1,4 @@
-use models::plasma::tx::TransferTx;
+use models::plasma::tx::FranklinTx;
 
 use super::ConnectionHolder;
 
@@ -57,11 +57,11 @@ impl Mempool {
             .execute(self.conn())
     }
 
-    pub fn add_tx(&self, tx: &TransferTx) -> QueryResult<()> {
+    pub fn add_tx(&self, tx: &FranklinTx) -> QueryResult<()> {
         insert_into(mempool::table)
             .values(&InsertTx {
-                from_account: tx.from as i32,
-                nonce: i64::from(tx.nonce),
+                from_account: tx.account_id() as i32,
+                nonce: i64::from(tx.nonce()),
                 tx: serde_json::to_value(tx).unwrap(),
             })
             .on_conflict((mempool::from_account, mempool::nonce))
@@ -74,7 +74,7 @@ impl Mempool {
             .map(drop)
     }
 
-    pub fn get_txs(&self, max_size: usize) -> QueryResult<Vec<TransferTx>> {
+    pub fn get_txs(&self, max_size: usize) -> QueryResult<Vec<FranklinTx>> {
         //TODO (Drogan) use "gaps and islands" sql solution for this.
         let stored_txs: Vec<_> = mempool::table
             .inner_join(accounts::table.on(mempool::from_account.eq(accounts::id)))
