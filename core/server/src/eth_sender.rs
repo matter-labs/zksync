@@ -4,14 +4,14 @@ use eth_client::ETHClient;
 use ff::{PrimeField, PrimeFieldRepr};
 use models::abi::TEST_PLASMA_ALWAYS_VERIFY;
 use models::plasma::block::BlockData;
-use models::plasma::{params, AccountMap, AccountUpdate, AccountUpdates};
+use models::plasma::{params, AccountMap, AccountUpdate};
 use models::*;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use storage::ConnectionPool;
 use web3::types::{H256, U128, U256};
 
 fn sorted_and_padded_for_deposits(
-    accounts_updated: &AccountUpdates,
+    accounts_updated: &[(u32, AccountUpdate)],
 ) -> [u64; config::DEPOSIT_BATCH_SIZE] {
     let balance_updates: Vec<_> = accounts_updated
         .iter()
@@ -38,7 +38,7 @@ fn sorted_and_padded_for_deposits(
 }
 
 fn sorted_and_padded_for_exits(
-    accounts_updated: &AccountUpdates,
+    accounts_updated: &[(u32, AccountUpdate)],
 ) -> [u64; config::EXIT_BATCH_SIZE] {
     let account_exits: Vec<_> = accounts_updated
         .iter()

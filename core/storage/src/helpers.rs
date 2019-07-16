@@ -15,3 +15,14 @@ pub fn fr_from_bytes(bytes: Vec<u8>) -> Fr {
     fr_repr.read_be(&*bytes).unwrap();
     Fr::from_repr(fr_repr).unwrap()
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_fr_binary_serialization() {
+        use ff::Field;
+        assert_eq!(fr_from_bytes(fr_to_bytes(&Fr::one())), Fr::one());
+    }
+}

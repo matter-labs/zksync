@@ -44,7 +44,7 @@ fn run_committer(
             let op = Operation {
                 action: Action::Commit,
                 block,
-                accounts_updated: accounts_updated,
+                accounts_updated,
                 tx_meta: None,
                 id: None,
             };
