@@ -69,6 +69,49 @@ table! {
 }
 
 table! {
+    data_restore_network (id) {
+        id -> Int4,
+        network_id -> Int2,
+    }
+}
+
+table! {
+    data_restore_last_watched_eth_block (id) {
+        id -> Int4,
+        block_number -> Text,
+    }
+}
+
+table! {
+    events_state (id) {
+        id -> Int4,
+        block_type -> Text,
+        transaction_hash -> Bytea,
+        block_num -> Int8,
+    }
+}
+
+table! {
+    franklin_op_blocks (id) {
+        id -> Int4,
+        franklin_op_block_type -> Text,
+        block_number -> Int8,
+        eth_tx_hash -> Bytea,
+        eth_tx_nonce -> Text,
+        eth_tx_block_hash -> Nullable<Bytea>,
+        eth_tx_block_number -> Nullable<Text>,
+        eth_tx_transaction_index -> Nullable<Text>,
+        eth_tx_from -> Bytea,
+        eth_tx_to -> Nullable<Bytea>,
+        eth_tx_value -> Text,
+        eth_tx_gas_price -> Text,
+        eth_tx_gas -> Text,
+        eth_tx_input -> Bytea,
+        commitment_data -> Bytea,
+    }
+}
+
+table! {
     transactions (id) {
         id -> Int4,
         tx_type -> Text,

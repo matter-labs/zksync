@@ -1,0 +1,24 @@
+[package]
+name = "data_restore"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+bigdecimal = { version = "0.1.0", features = ["serde"]}
+futures = "0.1.26"
+web3 = { git = "https://github.com/tomusdrw/rust-web3" }
+tiny-keccak = "1.4.2"
+ethabi = "8.0.0"
+hex = "0.3.2"
+sapling-crypto = { package = "sapling-crypto_ce", version = "0.0.5" }
+ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
+pairing = { package = "pairing_ce", version = "0.17.0" }
+tokio = "0.1"
+bitvec = "0.11"
+log = "0.4"
+env_logger = "0.6"
+signal-hook = { version = "0.1.8", features = ["tokio-support"] }
+
+plasma = { path = "../plasma" }
+models = { path = "../models" }
+storage = { path = "../storage" }

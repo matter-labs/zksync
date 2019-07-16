@@ -285,6 +285,114 @@ pub struct BlockDetails {
     pub verified_at: Option<NaiveDateTime>,
 }
 
+/// MARK: - Data restore part
+
+#[derive(Insertable)]
+#[table_name = "data_restore_network"]
+pub struct NewDataRestoreNetwork {
+    pub network_id: i16, // 1 - Mainnet, 4 - Rinkeby
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
+#[table_name = "data_restore_network"]
+pub struct StoredDataRestoreNetwork {
+    pub id: i32,
+    pub network_id: i16, // 1 - Mainnet, 4 - Rinkeby
+}
+
+#[derive(Insertable)]
+#[table_name = "data_restore_last_watched_eth_block"]
+pub struct NewLastWatchedEthBlockNumber {
+    pub block_number: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
+#[table_name = "data_restore_last_watched_eth_block"]
+pub struct StoredLastWatchedEthBlockNumber {
+    pub id: i32,
+    pub block_number: String,
+}
+
+// #[derive(Insertable)]
+// #[table_name = "events_state"]
+// struct NewBlockLog {
+//     pub block_type: String, // 'commit', 'verify'
+//     pub transaction_hash: String,
+//     pub block_num: i32,
+// }
+
+#[derive(Insertable)]
+#[table_name = "events_state"]
+pub struct NewBlockLog {
+    pub block_type: String, // 'Committed', 'Verified'
+    pub transaction_hash: Vec<u8>,
+    pub block_num: i64,
+}
+
+#[derive(Insertable, Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
+#[table_name = "events_state"]
+pub struct StoredBlockLog {
+    pub id: i32,
+    pub block_type: String, // 'Committed', 'Verified'
+    pub transaction_hash: Vec<u8>,
+    pub block_num: i64,
+}
+
+// impl StoredBlockLog {
+//     pub fn into_block_log(&self) -> QueryResult<EventData> {
+//         let mut block_log = EventData {
+//             block_num: self.block_num as u32,
+//             transaction_hash: H256::from_str(transaction_hash.as_str()).unwrap(),
+//             block_type: BlockType::Unknown,
+//         };
+//         match &self.tx_type {
+//             c if c == "Committed" => block_log.block_type: BlockType::Committed,
+//             v if v == "Verified" => block_log.block_type: BlockType::Verified,
+//             _ => return Err(Error::NotFound),
+//         };
+//         Ok(block_log)
+//     }
+// }
+
+#[derive(Insertable)]
+#[table_name = "franklin_op_blocks"]
+pub struct NewFranklinOpBlock {
+    pub franklin_op_block_type: String, // Deposit, Transfer, FullExit
+    pub block_number: i64,
+    pub eth_tx_hash: Vec<u8>,
+    pub eth_tx_nonce: String,
+    pub eth_tx_block_hash: Option<Vec<u8>>,
+    pub eth_tx_block_number: Option<String>,
+    pub eth_tx_transaction_index: Option<String>,
+    pub eth_tx_from: Vec<u8>,
+    pub eth_tx_to: Option<Vec<u8>>,
+    pub eth_tx_value: String,
+    pub eth_tx_gas_price: String,
+    pub eth_tx_gas: String,
+    pub eth_tx_input: Vec<u8>,
+    pub commitment_data: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
+#[table_name = "franklin_op_blocks"]
+pub struct StoredFranklinOpBlock {
+    pub id: i32,
+    pub franklin_op_block_type: String, // Deposit, Transfer, FullExit
+    pub block_number: i64,
+    pub eth_tx_hash: Vec<u8>,
+    pub eth_tx_nonce: String,
+    pub eth_tx_block_hash: Option<Vec<u8>>,
+    pub eth_tx_block_number: Option<String>,
+    pub eth_tx_transaction_index: Option<String>,
+    pub eth_tx_from: Vec<u8>,
+    pub eth_tx_to: Option<Vec<u8>>,
+    pub eth_tx_value: String,
+    pub eth_tx_gas_price: String,
+    pub eth_tx_gas: String,
+    pub eth_tx_input: Vec<u8>,
+    pub commitment_data: Vec<u8>,
+}
+
 enum ConnectionHolder {
     Pooled(PooledConnection<ConnectionManager<PgConnection>>),
     Direct(PgConnection),
@@ -1045,6 +1153,144 @@ impl StorageProcessor {
             .filter(dsl::block_number.eq(block_number as i32))
             .get_result(self.conn())?;
         Ok(serde_json::from_value(stored.proof).unwrap())
+    }
+
+    /// MARK: - Data restore part
+
+    pub fn save_data_restore_network(&self, network: &NewDataRestoreNetwork) -> QueryResult<()> {
+        let inserted = diesel::insert_into(data_restore_network::table)
+            .values(network)
+            .execute(self.conn())?;
+        if 0 == inserted {
+            error!("Error: could not save network!");
+            return Err(Error::RollbackTransaction);
+        }
+        Ok(())
+    }
+
+    pub fn save_events_state(&self, events: &[NewBlockLog]) -> QueryResult<()> {
+        for event in events.iter() {
+            let inserted = diesel::insert_into(events_state::table)
+                .values(event)
+                .execute(self.conn())?;
+            if 0 == inserted {
+                error!("Error: could not commit all new events!");
+                return Err(Error::RollbackTransaction);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn save_last_watched_block_number(
+        &self,
+        number: &NewLastWatchedEthBlockNumber,
+    ) -> QueryResult<()> {
+        let inserted = diesel::insert_into(data_restore_last_watched_eth_block::table)
+            .values(number)
+            .execute(self.conn())?;
+        if 0 == inserted {
+            error!("Error: could not save last watched eth block number!");
+            return Err(Error::RollbackTransaction);
+        }
+        Ok(())
+    }
+
+    pub fn save_franklin_op_blocks(&self, blocks: &[NewFranklinOpBlock]) -> QueryResult<()> {
+        for block in blocks.iter() {
+            let inserted = diesel::insert_into(franklin_op_blocks::table)
+                .values(block)
+                .execute(self.conn())?;
+            if 0 == inserted {
+                error!("Error: could not commit all new op blocks!");
+                return Err(Error::RollbackTransaction);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn delete_data_restore_network(&self) -> QueryResult<()> {
+        let deleted = diesel::delete(data_restore_network::table).execute(self.conn())?;
+        if 0 == deleted {
+            error!("Error: could not delete network!");
+            return Err(Error::RollbackTransaction);
+        }
+        Ok(())
+    }
+
+    pub fn delete_events_state(&self) -> QueryResult<()> {
+        let deleted = diesel::delete(events_state::table).execute(self.conn())?;
+        if 0 == deleted {
+            error!("Error: could not delete block events!");
+            return Err(Error::RollbackTransaction);
+        }
+        Ok(())
+    }
+
+    pub fn delete_last_watched_block_number(&self) -> QueryResult<()> {
+        let deleted =
+            diesel::delete(data_restore_last_watched_eth_block::table).execute(self.conn())?;
+        if 0 == deleted {
+            error!("Error: could not delete last watched eth block number!");
+            return Err(Error::RollbackTransaction);
+        }
+        Ok(())
+    }
+
+    pub fn delete_franklin_op_blocks(&self) -> QueryResult<()> {
+        let deleted = diesel::delete(franklin_op_blocks::table).execute(self.conn())?;
+        if 0 == deleted {
+            error!("Error: could not delete franklin op blocks!");
+            return Err(Error::RollbackTransaction);
+        }
+        Ok(())
+    }
+
+    pub fn load_data_restore_network(&self) -> QueryResult<StoredDataRestoreNetwork> {
+        use crate::schema::data_restore_network::dsl::*;
+        data_restore_network.first(self.conn())
+    }
+
+    pub fn load_committed_events_state(&self) -> Vec<StoredBlockLog> {
+        let committed_query = format!(
+            "
+            SELECT * FROM events_state
+            WHERE block_type = 'Committed'
+            ORDER BY block_num ASC
+        "
+        );
+        diesel::sql_query(committed_query)
+            .load(self.conn())
+            .unwrap_or_else(|_| vec![])
+    }
+
+    pub fn load_verified_events_state(&self) -> Vec<StoredBlockLog> {
+        let verified_query = format!(
+            "
+            SELECT * FROM events_state
+            WHERE block_type = 'Verified'
+            ORDER BY block_num ASC
+        "
+        );
+        diesel::sql_query(verified_query)
+            .load(self.conn())
+            .unwrap_or_else(|_| vec![])
+    }
+
+    pub fn load_last_watched_block_number(&self) -> QueryResult<StoredLastWatchedEthBlockNumber> {
+        use crate::schema::data_restore_last_watched_eth_block::dsl::*;
+        data_restore_last_watched_eth_block.first(self.conn())
+    }
+
+    pub fn load_franklin_op_blocks(&self) -> Vec<StoredFranklinOpBlock> {
+        let verified_query = format!(
+            "
+            SELECT * FROM franklin_op_blocks
+            ORDER BY block_number ASC
+        "
+        );
+        diesel::sql_query(verified_query)
+            .load(self.conn())
+            .unwrap_or_else(|_| vec![])
     }
 }
 

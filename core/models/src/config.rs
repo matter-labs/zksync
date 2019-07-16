@@ -44,14 +44,14 @@ impl RuntimeConfig {
                 .ok()
                 .and_then(|v| v.parse::<u32>().ok())
                 .expect("MAX_OUTSTANDING_TXS env var not set"),
-            mainnet_http_endpoint_string: env::var("TREE_RESTORE_MAINNET_ENDPOINT")
-                .expect("TREE_RESTORE_MAINNET_ENDPOINT env missing"),
-            rinkeby_http_endpoint_string: env::var("TREE_RESTORE_RINKEBY_ENDPOINT")
-                .expect("TREE_RESTORE_RINKEBY_ENDPOINT env missing"),
-            mainnet_franklin_contract_address: env::var("TREE_RESTORE_MAINNET_CONTRACT_ADDR")
-                .expect("TREE_RESTORE_MAINNET_CONTRACT_ADDR env missing"),
-            rinkeby_franklin_contract_address: env::var("TREE_RESTORE_RINKEBY_CONTRACT_ADDR")
-                .expect("TREE_RESTORE_RINKEBY_CONTRACT_ADDR env missing"),
+            mainnet_http_endpoint_string: env::var("DATA_RESTORE_MAINNET_ENDPOINT")
+                .expect("DATA_RESTORE_MAINNET_ENDPOINT env missing"),
+            rinkeby_http_endpoint_string: env::var("DATA_RESTORE_RINKEBY_ENDPOINT")
+                .expect("DATA_RESTORE_RINKEBY_ENDPOINT env missing"),
+            mainnet_franklin_contract_address: env::var("DATA_RESTORE_MAINNET_CONTRACT_ADDR")
+                .expect("DATA_RESTORE_MAINNET_CONTRACT_ADDR env missing"),
+            rinkeby_franklin_contract_address: env::var("DATA_RESTORE_RINKEBY_CONTRACT_ADDR")
+                .expect("DATA_RESTORE_RINKEBY_CONTRACT_ADDR env missing"),
         }
     }
 }
