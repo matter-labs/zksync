@@ -219,6 +219,8 @@ where
             None => None,
         }
     }
+
+
     pub fn new(tree_depth: Depth) -> Self {
         let hasher = H::default();
         let items = HashMap::new();

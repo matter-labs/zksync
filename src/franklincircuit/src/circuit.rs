@@ -188,7 +188,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             &validator_balances,
             self.params,
         )?;
-
+        println!("\n old_operator_balance_root: {}\n", old_operator_balance_root.get_value().unwrap());
+   
         let mut operator_account_data = vec![];
         operator_account_data.extend(validator_account.nonce.get_bits_le().clone());
         operator_account_data.extend(validator_account.pub_key.get_packed_key());
@@ -204,6 +205,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             &validator_audit_path,
             self.params,
         )?;
+        println!("\n root_from_operator_account before applying_fees: {}\n", root_from_operator.get_value().unwrap());
         cs.enforce(
             || "root before applying fees is correct",
             |lc| lc + root_from_operator.get_variable(),
@@ -234,7 +236,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 .into_bits_le(cs.namespace(|| "new_operator_balance_root_bits"))?,
         );
         let root_from_operator_after_fees = allocate_merkle_root(
-            cs.namespace(|| "root from operator_account"),
+            cs.namespace(|| "root from operator_account after fees"),
             &operator_account_data,
             &validator_address,
             &validator_audit_path,
@@ -1499,11 +1501,12 @@ fn calculate_root_from_full_representation_fees<E: JubjubEngine, CS: ConstraintS
     fees: &[AllocatedNum<E>],
     params: &E::Params,
 ) -> Result<AllocatedNum<E>, SynthesisError> {
+    assert_eq!(fees.len(), 1<<*franklin_constants::BALANCE_TREE_DEPTH);
     let mut fee_hashes = vec![];
     for (index, fee) in fees.into_iter().enumerate() {
         let cs = &mut cs.namespace(|| format!("fee hashing index number {}", index));
         let mut fee_bits = fee.into_bits_le(cs.namespace(|| "fee_bits"))?;
-        fee_bits.truncate(64); //TODO move to constant
+        fee_bits.truncate(franklin_constants::BALANCE_BIT_WIDTH);
         let temp = pedersen_hash::pedersen_hash(
             cs.namespace(|| "account leaf content hash"),
             pedersen_hash::Personalization::NoteCommitment,
@@ -1518,7 +1521,8 @@ fn calculate_root_from_full_representation_fees<E: JubjubEngine, CS: ConstraintS
         let cs = &mut cs.namespace(|| format!("merkle tree level index number {}", i));
         let chunks = hash_vec.chunks(2);
         let mut new_hashes = vec![];
-        for x in chunks {
+        for (chunk_number, x) in chunks.enumerate() {
+            let cs = &mut cs.namespace(|| format!("chunk number {}", chunk_number));
             let mut preimage = vec![];
             preimage.extend(x[0].into_bits_le(cs.namespace(|| "x[0] into bits"))?);
             preimage.extend(x[1].into_bits_le(cs.namespace(|| "x[1] into bits"))?);
@@ -1532,6 +1536,7 @@ fn calculate_root_from_full_representation_fees<E: JubjubEngine, CS: ConstraintS
         }
         hash_vec = new_hashes;
     }
+    assert_eq!(hash_vec.len(), 1);
     Ok(hash_vec[0].clone())
 }
 
