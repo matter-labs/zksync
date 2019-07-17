@@ -1,4 +1,5 @@
 use super::utils::*;
+use crate::account::AccountWitness;
 use crate::operation::*;
 use crate::utils::*;
 use ff::{Field, PrimeField};
@@ -269,7 +270,9 @@ fn test_transfer() {
 
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
 
-    let validator_address = Fr::from_str("7").unwrap();
+    let validator_address_number = 7;
+    let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
+
     let phasher = PedersenHasher::<Bn256>::default();
 
     let mut tree = CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
@@ -288,8 +291,22 @@ fn test_transfer() {
     println!("x = {}, y = {}", to_x, to_y);
 
     // give some funds to sender and make zero balance for recipient
+    let validator_sk = PrivateKey::<Bn256>(rng.gen());
+    let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
+    let (validator_x, validator_y) = validator_pk.0.into_xy();
+    println!("x = {}, y = {}", validator_x, validator_y);
+    let validator_leaf = CircuitAccount::<Bn256> {
+        subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
+        nonce: Fr::zero(),
+        pub_x: validator_x.clone(),
+        pub_y: validator_y.clone(),
+    };
 
-    // let sender_leaf_number = 1;
+    let mut validator_balances = vec![];
+    for _ in 0..1 << *franklin_constants::BALANCE_TREE_DEPTH {
+        validator_balances.push(Some(Fr::zero()));
+    }
+    tree.insert(validator_address_number, validator_leaf);
 
     let mut from_leaf_number: u32 = rng.gen();
     from_leaf_number %= capacity;
@@ -480,6 +497,28 @@ fn test_transfer() {
         rhs: transfer_witness.to_intermediate,
     };
 
+    // fee collecting logic
+    let mut validator_leaf = tree.remove(validator_address_number).unwrap();
+    let validator_account_witness = AccountWitness {
+        nonce: Some(validator_leaf.nonce.clone()),
+        pub_x: Some(validator_leaf.pub_x.clone()),
+        pub_y: Some(validator_leaf.pub_y.clone()),
+    };
+    let validator_balance_root = validator_leaf.subtree.root_hash();
+    println!("validator_balance_root: {}", validator_balance_root);
+    println!("tree before_applying fees: {}", tree.root_hash());
+
+    validator_leaf.subtree.insert(
+        token,
+        Balance {
+            value: Fr::from_str(&fee.to_string()).unwrap(),
+        },
+    );
+
+    tree.insert(validator_address_number, validator_leaf);
+    let root_after_fee = tree.root_hash();
+    let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
+
     {
         let mut cs = TestConstraintSystem::<Bn256>::new();
 
@@ -490,7 +529,10 @@ fn test_transfer() {
             operations: vec![operation_zero, operation_one],
             pub_data_commitment: Some(public_data_commitment),
             block_number: Some(block_number),
+            validator_account: validator_account_witness,
             validator_address: Some(validator_address),
+            validator_balances: validator_balances,
+            validator_audit_path: validator_audit_path,
         };
 
         instance.synthesize(&mut cs).unwrap();

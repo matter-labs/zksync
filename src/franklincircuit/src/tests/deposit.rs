@@ -5,8 +5,8 @@ use crate::utils::*;
 
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
 
-use franklin_crypto::circuit::float_point::convert_to_float;
 use crate::account::AccountWitness;
+use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::{
     Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
@@ -224,7 +224,7 @@ fn test_deposit_franklin_in_empty_leaf() {
     println!("x = {}, y = {}", sender_x, sender_y);
 
     // give some funds to sender and make zero balance for recipient
-     let validator_sk = PrivateKey::<Bn256>(rng.gen());
+    let validator_sk = PrivateKey::<Bn256>(rng.gen());
     let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
     let (validator_x, validator_y) = validator_pk.0.into_xy();
     println!("x = {}, y = {}", validator_x, validator_y);
@@ -236,7 +236,7 @@ fn test_deposit_franklin_in_empty_leaf() {
     };
 
     let mut validator_balances = vec![];
-    for _ in 0..1<<*franklin_constants::BALANCE_TREE_DEPTH {
+    for _ in 0..1 << *franklin_constants::BALANCE_TREE_DEPTH {
         validator_balances.push(Some(Fr::zero()));
     }
     tree.insert(validator_address_number, validator_leaf);
@@ -352,7 +352,7 @@ fn test_deposit_franklin_in_empty_leaf() {
     );
 
     let mut validator_leaf = tree.remove(validator_address_number).unwrap();
-    let validator_account_witness = AccountWitness{
+    let validator_account_witness = AccountWitness {
         nonce: Some(validator_leaf.nonce.clone()),
         pub_x: Some(validator_leaf.pub_x.clone()),
         pub_y: Some(validator_leaf.pub_y.clone()),
@@ -361,14 +361,16 @@ fn test_deposit_franklin_in_empty_leaf() {
     println!("validator_balance_root: {}", validator_balance_root);
     println!("tree before_applying fees: {}", tree.root_hash());
 
-    validator_leaf.subtree.insert(token, Balance{
-        value: Fr::from_str(&fee.to_string()).unwrap()
-    });
-    
+    validator_leaf.subtree.insert(
+        token,
+        Balance {
+            value: Fr::from_str(&fee.to_string()).unwrap(),
+        },
+    );
+
     tree.insert(validator_address_number, validator_leaf);
     let root_after_fee = tree.root_hash();
-    let (validator_audit_path, _) =
-        get_audits(&mut tree, validator_address_number, 0);
+    let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
 
     {
         let mut cs = TestConstraintSystem::<Bn256>::new();
@@ -385,11 +387,11 @@ fn test_deposit_franklin_in_empty_leaf() {
                 operation_four,
             ],
             pub_data_commitment: Some(public_data_commitment),
-            block_number: Some(Fr::one()),
+            block_number: Some(block_number),
             validator_account: validator_account_witness,
             validator_address: Some(validator_address),
             validator_balances: validator_balances,
-            validator_audit_path: validator_audit_path
+            validator_audit_path: validator_audit_path,
         };
 
         instance.synthesize(&mut cs).unwrap();

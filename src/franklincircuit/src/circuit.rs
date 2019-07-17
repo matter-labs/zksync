@@ -188,8 +188,11 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             &validator_balances,
             self.params,
         )?;
-        println!("\n old_operator_balance_root: {}\n", old_operator_balance_root.get_value().unwrap());
-   
+        println!(
+            "\n old_operator_balance_root: {}\n",
+            old_operator_balance_root.get_value().unwrap()
+        );
+
         let mut operator_account_data = vec![];
         operator_account_data.extend(validator_account.nonce.get_bits_le().clone());
         operator_account_data.extend(validator_account.pub_key.get_packed_key());
@@ -205,7 +208,10 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             &validator_audit_path,
             self.params,
         )?;
-        println!("\n root_from_operator_account before applying_fees: {}\n", root_from_operator.get_value().unwrap());
+        println!(
+            "\n root_from_operator_account before applying_fees: {}\n",
+            root_from_operator.get_value().unwrap()
+        );
         cs.enforce(
             || "root before applying fees is correct",
             |lc| lc + root_from_operator.get_variable(),
@@ -1501,7 +1507,7 @@ fn calculate_root_from_full_representation_fees<E: JubjubEngine, CS: ConstraintS
     fees: &[AllocatedNum<E>],
     params: &E::Params,
 ) -> Result<AllocatedNum<E>, SynthesisError> {
-    assert_eq!(fees.len(), 1<<*franklin_constants::BALANCE_TREE_DEPTH);
+    assert_eq!(fees.len(), 1 << *franklin_constants::BALANCE_TREE_DEPTH);
     let mut fee_hashes = vec![];
     for (index, fee) in fees.into_iter().enumerate() {
         let cs = &mut cs.namespace(|| format!("fee hashing index number {}", index));
