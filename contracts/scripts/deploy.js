@@ -25,9 +25,17 @@ async function deployFranklin(wallet, franklin) {
 async function main() {
     try {
         let franklinDeployedContract = await deployFranklin(wallet, franklinContract);
+
         let erc20DeployedToken = await erc20token.deployAndAddToFranklin(wallet, franklinDeployedContract);
+        
         await ether.deposit("0.1", wallet, franklinDeployedContract);
         await ether.withdraw("0.05", franklinDeployedContract);
+
+        // TODO: - need to add tokens to wallet and send them
+        // adding tokens to wallet 
+        // await erc20token.deposit(erc20DeployedToken, "0.1", wallet, franklinDeployedContract);
+        // await erc20token.withdraw(erc20DeployedToken.address, "0.05", franklinDeployedContract);
+        
     } catch (err) {
         console.log("Error:" + err);
     }

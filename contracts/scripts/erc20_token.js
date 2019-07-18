@@ -1,3 +1,4 @@
+const ethers = require('ethers');
 const {
     deployContract
 } = require('ethereum-waffle');
@@ -49,10 +50,10 @@ async function deposit(token, amount, wallet, franklin) {
 async function withdraw(tokenAddress, amount, franklin) {
     try {
         let withdrawAmount = ethers.utils.parseEther(amount);
-        let overrides = {
-            gasLimit: 10000000
-        };
-        let tx = await franklin.withdrawERC20(tokenAddress, withdrawAmount, overrides);
+        // let overrides = {
+        //     gasLimit: 10000000
+        // };
+        let tx = await franklin.withdrawERC20(tokenAddress, withdrawAmount);
 
         console.log("Withdrew token in Transaction: " + tx.hash);
     } catch (error) {

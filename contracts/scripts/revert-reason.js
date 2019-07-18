@@ -1,37 +1,40 @@
-const franklinContract = require('../build/Franklin');
-const {
-    deployContract
-} = require('ethereum-waffle');
-const ethers = require('ethers');
-const erc20token = require('./erc20_token.js');
-const ether = require('./ether.js');
+const ethers = require('ethers')
+//const provider = ethers.getDefaultProvider('rinkeby')
+//const provider = new ethers.providers.JsonRpcProvider('https://rinkeby.infura.io/v3/48beda66075e41bda8b124c6a48fdfa0')
+const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL)
 
-const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider); ////"fine music test violin matrix prize squirrel panther purchase material script deal"
+function hex_to_ascii(str1) {
+	var hex  = str1.toString();
+	var str = '';
+	for (var n = 0; n < hex.length; n += 2) {
+		str += String.fromCharCode(parseInt(hex.substr(n, 2), 16));
+	}
+	return str;
+ }
 
-async function deployFranklin(wallet, franklin) {
-    try {
-        let contract = await deployContract(wallet, franklin, [ethers.constants.HashZero, wallet.address, wallet.address], {
-            gasLimit: 8000000
-        });
-        console.log("Franklin address:" + contract.address);
+async function reason() {
+    var args = process.argv.slice(2)
+    let hash = args[0]
+    console.log('tx hash:', hash)
+    console.log('provider:', process.env.WEB3_URL)
 
-        return contract
-    } catch (err) {
-        console.log("Error:" + err);
+    let tx = await provider.getTransaction(hash)
+    if (!tx) {
+        console.log('tx not found')
+    } else {
+        //console.log('tx:', tx)
+
+        let receipt = await provider.getTransactionReceipt(hash)
+        //console.log('receipt:', receipt)
+
+        if (receipt.status) {
+            console.log('tx success')
+        } else {
+            let code = await provider.call(tx, tx.blockNumber)
+            let reason = hex_to_ascii(code.substr(138))
+            console.log('revert reason:', reason)
+        }
     }
 }
 
-async function main() {
-    try {
-        let franklinDeployedContract = await deployFranklin(wallet, franklinContract);
-        let erc20DeployedToken = await erc20token.deployAndAddToFranklin(wallet, franklinDeployedContract);
-        await ether.deposit("0.1", wallet, franklinDeployedContract);
-        await ether.withdraw("0.05", franklinDeployedContract);
-    } catch (err) {
-        console.log("Error:" + err);
-    }
-}
-
-
-main();
+reason()
