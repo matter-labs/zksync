@@ -1,6 +1,6 @@
 // import Contract2 from './build/Franklin'
 
-const FranklinContract = require('../build/Franklin');
+const franklinContract = require('../build/Franklin');
 const {
     deployContract
 } = require('ethereum-waffle');
@@ -10,21 +10,29 @@ const ERC20MintableContract = function () {
     contract.evm = {bytecode: contract.bytecode};
     return contract
 }();
+const erc20token = require('./erc20_token.js');
 
+const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
+const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider); ////"fine music test violin matrix prize squirrel panther purchase material script deal"
 
-async function main() {
+async function deployFranklin(wallet, franklinContract) {
     try {
-        const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-        let wallet = ethers.Wallet.fromMnemonic("fine music test violin matrix prize squirrel panther purchase material script deal").connect(provider); //"fine music test violin matrix prize squirrel panther purchase material script deal"
-
-        let contract = await deployContract(wallet, FranklinContract, [ethers.constants.HashZero, wallet.address, wallet.address], {
+        let contract = await deployContract(wallet, franklinContract, [ethers.constants.HashZero, wallet.address, wallet.address], {
             gasLimit: 8000000
         });
         console.log("Franklin address:",contract.address);
 
-        let erc20 = await deployContract(wallet, ERC20MintableContract, []);
-        console.log("Test ERC20 address:", erc20.address);
-        await contract.addToken(erc20.address)
+        return contract
+    } catch (err) {
+        console.log("Error:", err);
+    }
+}
+
+
+async function main() {
+    try {
+        let franklinDeployedContract = await deployFranklin(wallet, franklinContract);
+        let erc20Token = await erc20token.deployAndAddToFranklin(ERC20MintableContract, wallet, franklinDeployedContract);
     } catch (err) {
         console.log("Error:", err);
     }

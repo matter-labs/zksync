@@ -20,11 +20,15 @@ contract Franklin is Verifier, VerificationKeys {
 
     event OnchainDeposit(address indexed owner, uint32 tokenId, uint112 amount, uint32 lockedUntilBlock);
     event OnchainWithdrawal(address indexed owner, uint32 tokenId, uint112 amount);
-    event OnchainBalanceChanged(address indexed owner, uint32 tokenId, uint112 amount, uint32 lockedUntilBlock);
 
-    event TokenAdded(address token, uint32 tokenId);
+    // TODO: - fix
+    // event OnchainBalanceChanged(address indexed owner, uint32 tokenId, uint112 amount, uint32 lockedUntilBlock);
 
-    event AccountRegistered(address indexed owner, uint32 id);
+    // event TokenAdded(address token, uint32 tokenId);
+
+    // event AccountRegistered(address indexed owner, uint32 id);
+    /////////
+
 
     // ==== STORAGE ====
 
@@ -64,9 +68,10 @@ contract Franklin is Verifier, VerificationKeys {
     // List of root-chain balances (per owner and tokenId)
     mapping (address => mapping (uint32 => Balance)) public balances;
 
-    uint32 public totalAccounts;
-    mapping (address => uint32) public accountIdByAddress;
-
+    // TODO: - fix
+    // uint32 public totalAccounts;
+    // mapping (address => uint32) public accountIdByAddress;
+    ///////////////
 
     // Blocks
 
@@ -195,7 +200,8 @@ contract Franklin is Verifier, VerificationKeys {
         tokenAddresses[totalTokens + 1] = _token; // Adding one because tokenId = 0 is reserved for ETH
         tokenIds[_token] = totalTokens + 1;
         totalTokens++;
-        emit TokenAdded(_token, totalTokens);
+        //TODO: -fix
+        // emit TokenAdded(_token, totalTokens);
     }
 
     function setValidator(address _validator, bool _active) external {
@@ -258,16 +264,18 @@ contract Franklin is Verifier, VerificationKeys {
         requireValidToken(_tokenId);
         require(uint256(_amount) + balances[msg.sender][_tokenId].balance < MAX_VALUE, "overflow");
 
-        // register account if not registered
-        if (accountIdByAddress[msg.sender] == 0) {
-            accountIdByAddress[msg.sender] = totalAccounts + 1;
-            totalAccounts++;
-        }
+        // TODO: - fix
+        // // register account if not registered
+        // if (accountIdByAddress[msg.sender] == 0) {
+        //     accountIdByAddress[msg.sender] = totalAccounts + 1;
+        //     totalAccounts++;
+        // }
 
         balances[msg.sender][_tokenId].balance += _amount;
         uint32 lockedUntilBlock = uint32(block.number + LOCK_DEPOSITS_FOR);
         balances[msg.sender][_tokenId].lockedUntilBlock = lockedUntilBlock;
-        emit OnchainBalanceChanged(msg.sender, _tokenId, balances[msg.sender][_tokenId].balance, lockedUntilBlock);
+        // TODO: - fix
+        // emit OnchainBalanceChanged(msg.sender, _tokenId, balances[msg.sender][_tokenId].balance, lockedUntilBlock);
         emit OnchainDeposit(msg.sender, _tokenId, _amount, lockedUntilBlock);
     }
 
@@ -277,7 +285,8 @@ contract Franklin is Verifier, VerificationKeys {
         require(block.number >= balances[msg.sender][_tokenId].lockedUntilBlock, "balance locked");
         require(balances[msg.sender][_tokenId].balance >= _amount, "insufficient balance");
         balances[msg.sender][_tokenId].balance -= _amount;
-        emit OnchainBalanceChanged(msg.sender, _tokenId, balances[msg.sender][_tokenId].balance, balances[msg.sender][_tokenId].lockedUntilBlock);
+        // TODO: - fix
+        // emit OnchainBalanceChanged(msg.sender, _tokenId, balances[msg.sender][_tokenId].balance, balances[msg.sender][_tokenId].lockedUntilBlock);
         emit OnchainWithdrawal(msg.sender, _tokenId, _amount);
     }
 
@@ -379,7 +388,8 @@ contract Franklin is Verifier, VerificationKeys {
             require(balances[account][tokenId].balance >= amount, "balance insuffcient");
 
             balances[account][tokenId].balance -= amount;
-            emit OnchainBalanceChanged(account, tokenId, balances[account][tokenId].balance, balances[account][tokenId].lockedUntilBlock);
+            // TODO: - fix
+            // emit OnchainBalanceChanged(account, tokenId, balances[account][tokenId].balance, balances[account][tokenId].lockedUntilBlock);
             onchainOps[currentOnchainOp] = OnchainOp(
                 OnchainOpType.Deposit,
                 tokenId,
@@ -449,7 +459,8 @@ contract Franklin is Verifier, VerificationKeys {
             if (op.opType == OnchainOpType.Withdrawal) {
                 // withdrawal was successful, accrue balance
                 balances[op.owner][op.tokenId].balance += op.amount;
-                emit OnchainBalanceChanged(op.owner, op.tokenId, balances[op.owner][op.tokenId].balance, balances[op.owner][op.tokenId].lockedUntilBlock);
+                // TODO: - fix
+                // emit OnchainBalanceChanged(op.owner, op.tokenId, balances[op.owner][op.tokenId].balance, balances[op.owner][op.tokenId].lockedUntilBlock);
             }
             delete onchainOps[current];
         }
@@ -480,7 +491,8 @@ contract Franklin is Verifier, VerificationKeys {
             if (op.opType == OnchainOpType.Deposit) {
                 // deposit failed, return funds
                 balances[op.owner][op.tokenId].balance += op.amount;
-                emit OnchainBalanceChanged(op.owner, op.tokenId, balances[op.owner][op.tokenId].balance, balances[op.owner][op.tokenId].lockedUntilBlock);
+                // TODO: - fix
+                // emit OnchainBalanceChanged(op.owner, op.tokenId, balances[op.owner][op.tokenId].balance, balances[op.owner][op.tokenId].lockedUntilBlock);
             }
             delete onchainOps[current];
         }
@@ -507,7 +519,8 @@ contract Franklin is Verifier, VerificationKeys {
 
         for(uint256 i = 0; i < _owners.length; i++) {
             balances [_owners[i]][_tokenId].balance += _amounts[i];
-            emit OnchainBalanceChanged(_owners[i], _tokenId, balances[_owners[i]][_tokenId].balance, balances[_owners[i]][_tokenId].lockedUntilBlock);
+            // TODO: - fix
+            // emit OnchainBalanceChanged(_owners[i], _tokenId, balances[_owners[i]][_tokenId].balance, balances[_owners[i]][_tokenId].lockedUntilBlock);
             exited   [_owners[i]][_tokenId] = true;
         }
     }

@@ -2,12 +2,13 @@
   "name": "franklin-contracts",
   "version": "0.1.0",
   "devDependencies": {
-    "solc": "^0.5.10",
-    "ethjs": "^0.4.0",
-    "ethereum-waffle": "^2.0.12",
     "chai": "^4.2.0",
+    "ethereum-waffle": "^2.0.12",
+    "ethers": "^4.0.33",
+    "ethjs": "^0.4.0",
     "mocha": "^6.1.4",
-    "openzeppelin-solidity": "^2.3.0"
+    "openzeppelin-solidity": "^2.3.0",
+    "solc": "^0.5.10"
   },
   "scripts": {
     "test": "npx waffle && npx mocha",
