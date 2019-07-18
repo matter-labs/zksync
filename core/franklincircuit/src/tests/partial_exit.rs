@@ -16,15 +16,14 @@ use merkle_tree::hasher::Hasher;
 use merkle_tree::PedersenHasher;
 use pairing::bn256::*;
 
-pub struct DepositData {
+pub struct PartialExitData {
     pub amount: u128,
     pub fee: u128,
     pub token: u32,
     pub account_address: u32,
-    pub new_pub_x: Fr,
-    pub new_pub_y: Fr,
+    pub ethereum_key: Fr,
 }
-pub struct DepositWitness<E: JubjubEngine> {
+pub struct PartialExitWitness<E: JubjubEngine> {
     pub before: OperationBranch<E>,
     pub after: OperationBranch<E>,
     pub args: OperationArguments<E>,
@@ -32,7 +31,7 @@ pub struct DepositWitness<E: JubjubEngine> {
     pub after_root: Option<E::Fr>,
     pub tx_type: Option<E::Fr>,
 }
-impl<E: JubjubEngine> DepositWitness<E> {
+impl<E: JubjubEngine> PartialExitWitness<E> {
     pub fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
         append_be_fixed_width(
@@ -64,45 +63,34 @@ impl<E: JubjubEngine> DepositWitness<E> {
             franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         );
 
-        let mut new_pubkey_bits = vec![];
-        append_le_fixed_width(
-            &mut new_pubkey_bits,
-            &self.args.new_pub_y.unwrap(),
-            franklin_constants::FR_BIT_WIDTH - 1,
-        );
-        append_le_fixed_width(&mut new_pubkey_bits, &self.args.new_pub_x.unwrap(), 1);
-
-        let phasher = PedersenHasher::<Bn256>::default();
-        let new_pubkey_hash = phasher.hash_bits(new_pubkey_bits);
-
         append_be_fixed_width(
             &mut pubdata_bits,
-            &new_pubkey_hash,
-            *franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+            &self.args.ethereum_key.unwrap(),
+            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
         );
-        assert_eq!(pubdata_bits.len(), 37 * 8);
-        pubdata_bits.resize(40 * 8, false);
+        assert_eq!(pubdata_bits.len(), 30 * 8);
+        pubdata_bits.resize(32 * 8, false);
         pubdata_bits
     }
 }
-pub fn apply_deposit(
+pub fn apply_partial_exit(
     tree: &mut CircuitAccountTree,
-    deposit: &DepositData,
-) -> DepositWitness<Bn256> {
+    partial_exit: &PartialExitData,
+) -> PartialExitWitness<Bn256> {
     //preparing data and base witness
     let before_root = tree.root_hash();
     println!("Initial root = {}", before_root);
     let (audit_path_before, audit_balance_path_before) =
-        get_audits(tree, deposit.account_address, deposit.token);
+        get_audits(tree, partial_exit.account_address, partial_exit.token);
 
     let capacity = tree.capacity();
     assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
-    let account_address_fe = Fr::from_str(&deposit.account_address.to_string()).unwrap();
-    let token_fe = Fr::from_str(&deposit.token.to_string()).unwrap();
-    let amount_as_field_element = Fr::from_str(&deposit.amount.to_string()).unwrap();
+    let account_address_fe = Fr::from_str(&partial_exit.account_address.to_string()).unwrap();
+    let token_fe = Fr::from_str(&partial_exit.token.to_string()).unwrap();
+    let amount_as_field_element = Fr::from_str(&partial_exit.amount.to_string()).unwrap();
 
     let amount_bits = convert_to_float(
-        deposit.amount,
+        partial_exit.amount,
         *franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
         *franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
         10,
@@ -111,10 +99,10 @@ pub fn apply_deposit(
 
     let amount_encoded: Fr = le_bit_vector_into_field_element(&amount_bits);
 
-    let fee_as_field_element = Fr::from_str(&deposit.fee.to_string()).unwrap();
+    let fee_as_field_element = Fr::from_str(&partial_exit.fee.to_string()).unwrap();
 
     let fee_bits = convert_to_float(
-        deposit.fee,
+        partial_exit.fee,
         *franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         *franklin_constants::FEE_MANTISSA_BIT_WIDTH,
         10,
@@ -124,32 +112,34 @@ pub fn apply_deposit(
     let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
 
     //calculate a and b
-    let a = amount_as_field_element.clone();
-    let b = fee_as_field_element.clone();
+    
 
-    //applying deposit
+    //applying partial_exit
     let (account_witness_before, account_witness_after, balance_before, balance_after) =
         apply_leaf_operation(
             tree,
-            deposit.account_address,
-            deposit.token,
+            partial_exit.account_address,
+            partial_exit.token,
             |acc| {
-                assert!(
-                    (acc.pub_x == deposit.new_pub_x && acc.pub_y == deposit.new_pub_y)
-                        || (acc.pub_y == Fr::zero() && acc.pub_x == Fr::zero())
-                );
-                acc.pub_x = deposit.new_pub_x;
-                acc.pub_y = deposit.new_pub_y;
+                acc.nonce.add_assign(&Fr::from_str("1").unwrap());
             },
-            |bal| bal.value.add_assign(&amount_as_field_element),
+            |bal| {
+                bal.value.sub_assign(&amount_as_field_element);
+                bal.value.sub_assign(&fee_as_field_element)
+            },
         );
+    
 
     let after_root = tree.root_hash();
     println!("After root = {}", after_root);
     let (audit_path_after, audit_balance_path_after) =
-        get_audits(tree, deposit.account_address, deposit.token);
+        get_audits(tree, partial_exit.account_address, partial_exit.token);
 
-    DepositWitness {
+    let a = balance_before.clone();
+    let mut b = amount_as_field_element.clone();
+    b.add_assign(&fee_as_field_element);
+    
+    PartialExitWitness {
         before: OperationBranch {
             address: Some(account_address_fe),
             token: Some(token_fe),
@@ -171,22 +161,22 @@ pub fn apply_deposit(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(Fr::zero()),
+            ethereum_key: Some(partial_exit.ethereum_key),
             amount: Some(amount_encoded),
             fee: Some(fee_encoded),
             a: Some(a),
             b: Some(b),
-            new_pub_x: Some(deposit.new_pub_x),
-            new_pub_y: Some(deposit.new_pub_y),
+            new_pub_x: Some(Fr::zero()),
+            new_pub_y: Some(Fr::zero()),
         },
         before_root: Some(before_root),
         after_root: Some(after_root),
-        tx_type: Some(Fr::from_str("1").unwrap()),
+        tx_type: Some(Fr::from_str("3").unwrap()),
     }
 }
 
 #[test]
-fn test_deposit_franklin_in_empty_leaf() {
+fn test_partial_exit_franklin_in_empty_leaf() {
     use super::utils::public_data_commitment;
 
     use crate::circuit::FranklinCircuit;
@@ -245,26 +235,26 @@ fn test_deposit_franklin_in_empty_leaf() {
     let mut account_address: u32 = rng.gen();
     account_address %= tree.capacity();
     let amount: u128 = 500;
-    let fee: u128 = 0;
+    let fee: u128 = 10;
     let token: u32 = 2;
-    let deposit_witness = apply_deposit(
+    let ethereum_key = Fr::from_str("124").unwrap();
+    let partial_exit_witness = apply_partial_exit(
         &mut tree,
-        &DepositData {
+        &PartialExitData {
             amount: amount,
             fee: fee,
             token: token,
             account_address: account_address,
-            new_pub_x: sender_x,
-            new_pub_y: sender_y,
+            ethereum_key: ethereum_key,
         },
     );
-    let pubdata_chunks: Vec<_> = deposit_witness
+    let pubdata_chunks: Vec<_> = partial_exit_witness
         .get_pubdata()
         .chunks(64)
         .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
         .collect();
 
-    let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
+    let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on partial_exit proof
     let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
     sig_bits.reverse();
     sig_bits.truncate(80);
@@ -274,80 +264,67 @@ fn test_deposit_franklin_in_empty_leaf() {
     //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
     let operation_zero = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
+        new_root: partial_exit_witness.after_root.clone(),
+        tx_type: partial_exit_witness.tx_type,
         chunk: Some(Fr::from_str("0").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[0]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: deposit_witness.args.new_pub_x,
-        signer_pub_key_y: deposit_witness.args.new_pub_y,
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.before.clone(),
-        rhs: deposit_witness.before.clone(),
+        signer_pub_key_x: Some(sender_x),
+        signer_pub_key_y: Some(sender_y),
+        args: partial_exit_witness.args.clone(),
+        lhs: partial_exit_witness.before.clone(),
+        rhs: partial_exit_witness.before.clone(),
     };
 
     println!("pubdata_chunk number {} is {}", 1, pubdata_chunks[1]);
     let operation_one = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
+        new_root: partial_exit_witness.after_root.clone(),
+        tx_type: partial_exit_witness.tx_type,
         chunk: Some(Fr::from_str("1").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[1]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: deposit_witness.args.new_pub_x,
-        signer_pub_key_y: deposit_witness.args.new_pub_y,
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.after.clone(),
-        rhs: deposit_witness.after.clone(),
+        signer_pub_key_x: Some(sender_x),
+        signer_pub_key_y: Some(sender_y),
+        args: partial_exit_witness.args.clone(),
+        lhs: partial_exit_witness.after.clone(),
+        rhs: partial_exit_witness.after.clone(),
     };
 
     println!("pubdata_chunk number {} is {}", 2, pubdata_chunks[2]);
     let operation_two = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
+        new_root: partial_exit_witness.after_root.clone(),
+        tx_type: partial_exit_witness.tx_type,
         chunk: Some(Fr::from_str("2").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[2]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: deposit_witness.args.new_pub_x,
-        signer_pub_key_y: deposit_witness.args.new_pub_y,
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.after.clone(),
-        rhs: deposit_witness.after.clone(),
+        signer_pub_key_x: Some(sender_x),
+        signer_pub_key_y: Some(sender_y),
+        args: partial_exit_witness.args.clone(),
+        lhs: partial_exit_witness.after.clone(),
+        rhs: partial_exit_witness.after.clone(),
     };
 
     let operation_three = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
+        new_root: partial_exit_witness.after_root.clone(),
+        tx_type: partial_exit_witness.tx_type,
         chunk: Some(Fr::from_str("3").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[3]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: deposit_witness.args.new_pub_x,
-        signer_pub_key_y: deposit_witness.args.new_pub_y,
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.after.clone(),
-        rhs: deposit_witness.after.clone(),
-    };
-    let operation_four = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
-        chunk: Some(Fr::from_str("4").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[4]),
-        sig_msg: Some(sig_msg.clone()),
-        signature: signature.clone(),
-        signer_pub_key_x: deposit_witness.args.new_pub_x,
-        signer_pub_key_y: deposit_witness.args.new_pub_y,
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.after.clone(),
-        rhs: deposit_witness.after.clone(),
+        signer_pub_key_x: Some(sender_x),
+        signer_pub_key_y: Some(sender_y),
+        args: partial_exit_witness.args.clone(),
+        lhs: partial_exit_witness.after.clone(),
+        rhs: partial_exit_witness.after.clone(),
     };
 
     let public_data_commitment = public_data_commitment::<Bn256>(
-        &deposit_witness.get_pubdata(),
-        deposit_witness.before_root,
-        deposit_witness.after_root,
+        &partial_exit_witness.get_pubdata(),
+        partial_exit_witness.before_root,
+        partial_exit_witness.after_root,
         Some(validator_address),
         Some(block_number),
     );
@@ -378,14 +355,13 @@ fn test_deposit_franklin_in_empty_leaf() {
 
         let instance = FranklinCircuit {
             params,
-            old_root: deposit_witness.before_root,
+            old_root: partial_exit_witness.before_root,
             new_root: Some(root_after_fee),
             operations: vec![
                 operation_zero,
                 operation_one,
                 operation_two,
                 operation_three,
-                operation_four,
             ],
             pub_data_commitment: Some(public_data_commitment),
             block_number: Some(block_number),

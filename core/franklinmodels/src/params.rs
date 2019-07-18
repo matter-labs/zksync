@@ -24,6 +24,7 @@ pub const TOKEN_EXT_BIT_WIDTH: &'static usize = &16;
 //
 pub const CHUNK_BIT_WIDTH: usize = 64;
 
+pub const ETHEREUM_KEY_BIT_WIDTH: usize = 160;
 /// Block number bit width
 pub const BLOCK_NUMBER_BIT_WIDTH: &'static usize = &32;
 

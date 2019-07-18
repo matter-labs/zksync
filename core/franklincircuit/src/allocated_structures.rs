@@ -89,6 +89,7 @@ pub struct AllocatedOperationData<E: JubjubEngine> {
     pub fee: CircuitElement<E>,
     pub sig_msg: CircuitElement<E>,
     pub new_pubkey_hash: CircuitElement<E>,
+    pub ethereum_key: CircuitElement<E>,
     pub a: CircuitElement<E>,
     pub b: CircuitElement<E>,
 }
@@ -99,6 +100,11 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
         op: &Operation<E>,
         params: &E::Params, //TODO: probably move out
     ) -> Result<AllocatedOperationData<E>, SynthesisError> {
+        let ethereum_key = CircuitElement::from_fe_strict(
+            cs.namespace(|| "ethereum_key"),
+            || op.args.ethereum_key.grab(),
+            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
+        )?;
         let amount_packed = CircuitElement::from_fe_strict(
             cs.namespace(|| "amount_packed"),
             || op.args.amount.grab(),
@@ -183,6 +189,7 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
         )?;
 
         Ok(AllocatedOperationData {
+            ethereum_key: ethereum_key,
             new_pubkey: new_pubkey,
             signer_pubkey: sig_pubkey,
             amount_packed: amount_packed,

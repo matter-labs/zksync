@@ -275,6 +275,7 @@ pub fn apply_transfer_to_new(
             },
         },
         args: OperationArguments {
+            ethereum_key: Some(Fr::zero()),
             amount: Some(amount_encoded),
             fee: Some(fee_encoded),
             a: Some(a),

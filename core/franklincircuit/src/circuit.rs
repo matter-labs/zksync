@@ -547,7 +547,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
 
         let sender_pk = ecc::EdwardsPoint::interpret(
-            cs.namespace(|| "sender public key"),
+            cs.namespace(|| "signer public key"),
             &op_data.signer_pubkey.get_x().get_number(),
             &op_data.signer_pubkey.get_y().get_number(),
             self.params,
@@ -641,6 +641,16 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &op_data,
             &ext_pubdata_chunk,
         )?);
+        op_flags.push(self.partial_exit(
+            cs.namespace(|| "partial_exit"),
+            &mut cur,
+            &chunk_data,
+            &is_a_geq_b,
+            &is_account_empty,
+            &op_data,
+            &ext_pubdata_chunk,
+            precomputed,
+        )?);
         let op_valid = multi_or(cs.namespace(|| "op_valid"), &op_flags)?;
         println!("op_valid {}", op_valid.get_value().unwrap());
         cs.enforce(
@@ -667,6 +677,170 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         }
         Ok(())
     }
+
+    fn partial_exit<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        cur: &mut AllocatedOperationBranch<E>,
+        chunk_data: &AllocatedChunkData<E>,
+        is_a_geq_b: &Boolean,
+        is_account_empty: &Boolean,
+        op_data: &AllocatedOperationData<E>,
+        ext_pubdata_chunk: &AllocatedNum<E>,
+        precomputed_numbers: &[AllocatedNum<E>],
+    ) -> Result<Boolean, SynthesisError> {
+        let mut is_valid_flags = vec![];
+        //construct pubdata
+        let mut pubdata_bits = vec![];
+        let mut pub_token_bits = cur.token.get_bits_le().clone();
+        pub_token_bits.resize(
+            *franklin_constants::TOKEN_EXT_BIT_WIDTH,
+            Boolean::constant(false),
+        );
+        pub_token_bits.reverse();
+        pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
+        pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
+        pubdata_bits.extend(pub_token_bits); //TOKEN_EXT_BIT_WIDTH=16
+        pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //AMOUNT_PACKED=24
+        pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //FEE_PACKED=8
+        pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //ETHEREUM_KEY=160
+        assert_eq!(pubdata_bits.len(), 30 * 8);
+        pubdata_bits.resize(
+            4 * franklin_constants::CHUNK_BIT_WIDTH,
+            Boolean::constant(false),
+        );
+
+        let pubdata_chunk = select_pubdata_chunk(
+            cs.namespace(|| "select_pubdata_chunk"),
+            &pubdata_bits,
+            &chunk_data.chunk_number,
+            4,
+        )?;
+        println!(
+            "selected_pubdata_chunk is {} on iteration {}",
+            pubdata_chunk.get_value().unwrap(),
+            &chunk_data.chunk_number.get_value().unwrap()
+        );
+        println!(
+            "ext_pubdata {} on iteration {}",
+            ext_pubdata_chunk.get_value().unwrap(),
+            &chunk_data.chunk_number.get_value().unwrap()
+        );
+        let is_pubdata_chunk_correct = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is_pubdata_equal"),
+            &pubdata_chunk,
+            ext_pubdata_chunk,
+        )?);
+        is_valid_flags.push(is_pubdata_chunk_correct);
+
+        // verify correct tx_code
+        let is_partial_exit = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is_deposit"),
+            &chunk_data.tx_type.get_number(),
+            &precomputed_numbers[3], //partial_exit tx code
+        )?);
+        is_valid_flags.push(is_partial_exit.clone());
+
+        // check operation arguments
+        let is_a_correct =
+            CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
+
+        is_valid_flags.push(is_a_correct);
+
+        let sum_amount_fee = allocate_sum(
+            cs.namespace(|| "amount plus fee"),
+            &op_data.amount.get_number(),
+            &op_data.fee.get_number(),
+        )?;
+        let is_b_correct = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is_b_correct"),
+            &op_data.b.get_number(),
+            &sum_amount_fee,
+        )?);
+        is_valid_flags.push(is_b_correct);
+        is_valid_flags.push(is_a_geq_b.clone());
+
+        is_valid_flags.push(no_nonce_overflow(
+            cs.namespace(|| "no nonce overflow"),
+            &cur.account.nonce.get_number(),
+        )?);
+
+        let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
+
+        println!("tx_valid {}", tx_valid.get_value().unwrap());
+
+        let is_first_chunk = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is_first_chunk"),
+            &chunk_data.chunk_number,
+            &precomputed_numbers[0],
+        )?);
+        println!("is_first  chunk {}", is_first_chunk.get_value().unwrap());
+        let is_valid_first = Boolean::and(
+            cs.namespace(|| "is valid and first"),
+            &tx_valid,
+            &is_first_chunk,
+        )?;
+
+        //update cur data if we are processing first operation of valid partial_exit transaction
+        let updated_balance_value =
+            AllocatedNum::alloc(cs.namespace(|| "updated_balance_value"), || {
+                let mut new_balance = cur.balance.clone().grab()?;
+                new_balance.sub_assign(&op_data.amount.grab()?);
+                new_balance.sub_assign(&op_data.fee.grab()?);
+                Ok(new_balance)
+            })?;
+        cs.enforce(
+            || "correct_updated_balance",
+            |lc| lc + updated_balance_value.get_variable(),
+            |lc| lc + CS::one(),
+            |lc| {
+                lc + cur.balance.get_number().get_variable() - op_data.amount.get_number().get_variable()//TODO: get_number().get_variable() is kinda ugly
+                    - op_data.fee.get_number().get_variable()
+            },
+        );
+        //
+        let updated_balance_ce = CircuitElement::from_number(
+            cs.namespace(|| "updated_balance_ce"),
+            updated_balance_value,
+            franklin_constants::BALANCE_BIT_WIDTH,
+        )?;
+        //mutate current branch if it is first chunk of valid partial_exit transaction
+        cur.balance = CircuitElement::conditionally_select(
+            cs.namespace(|| "mutated balance"),
+            &updated_balance_ce,
+            &cur.balance,
+            &is_valid_first,
+        )?;
+        cur.balance
+            .enforce_length(cs.namespace(|| "mutated balance is still correct length"))?;
+
+        println!(
+            "changed bal data: {}",
+            cur.balance.get_number().get_value().unwrap()
+        );
+        cur.account.pub_key = CircuitPubkey::conditionally_select(
+            cs.namespace(|| "mutated_pubkey"),
+            &op_data.new_pubkey,
+            &cur.account.pub_key,
+            &is_valid_first,
+        )?;
+
+        let updated_nonce = allocate_sum(
+            cs.namespace(|| "updated_nonce"),
+            &cur.account.nonce.get_number(),
+            &precomputed_numbers[1],
+        )?;
+        //update nonce
+        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "update cur nonce"),
+            &updated_nonce,
+            &cur.account.nonce,
+            &is_valid_first,
+        )?;
+
+        Ok(tx_valid)
+    }
+
     fn deposit<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -1601,12 +1775,19 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
         points.push((x, y));
     }
 
-    for i in &[3, 5] {
+    for i in &[5] {
         //transfer, create_subaccount, close_subaccount, fill_orders
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let y = E::Fr::from_str("1").unwrap();
         points.push((x, y));
     }
+    for i in &[3] {
+        //partial exit
+        let x = E::Fr::from_str(&i.to_string()).unwrap();
+        let y = E::Fr::from_str("3").unwrap();
+        points.push((x, y));
+    }
+
     for i in &[1, 2] {
         //deposit, transfer_to_new
         let x = E::Fr::from_str(&i.to_string()).unwrap();

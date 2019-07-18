@@ -228,6 +228,7 @@ pub fn apply_transfer(
             },
         },
         args: OperationArguments {
+            ethereum_key: Some(Fr::zero()),
             amount: Some(amount_encoded),
             fee: Some(fee_encoded),
             a: Some(a),
