@@ -18,7 +18,7 @@ async function main() {
         let wallet = ethers.Wallet.fromMnemonic("fine music test violin matrix prize squirrel panther purchase material script deal").connect(provider); //"fine music test violin matrix prize squirrel panther purchase material script deal"
 
         let contract = await deployContract(wallet, FranklinContract, [ethers.constants.HashZero, wallet.address, wallet.address], {
-            gasLimit: 16000000
+            gasLimit: 8000000
         });
         console.log("Franklin address:",contract.address);
 

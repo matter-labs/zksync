@@ -7,7 +7,7 @@ import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 import "./common/DummyVerifier.sol";
 import "./common/VerificationKeys.sol";
 
-contract Franklin is DummyVerifier, VerificationKey {
+contract Franklin is DummyVerifier, VerificationKeys {
 
     uint constant BLOCK_SIZE = 2000;                // chunks per block; each chunk has 8 bytes of public data
     uint constant MAX_VALUE = 2**112-1;             // must fit into uint112
