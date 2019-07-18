@@ -22,9 +22,9 @@ async function main() {
         });
         console.log("Franklin address:",contract.address);
 
-        // let erc20 = await deployContract(wallet, ERC20MintableContract, []);
-        // console.log("Test ERC20 address:", erc20.address);
-        // await contract.addToken(erc20.address)
+        let erc20 = await deployContract(wallet, ERC20MintableContract, []);
+        console.log("Test ERC20 address:", erc20.address);
+        await contract.addToken(erc20.address)
     } catch (err) {
         console.log("Error:", err);
     }
