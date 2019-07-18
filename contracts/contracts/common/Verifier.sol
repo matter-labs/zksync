@@ -1,6 +1,5 @@
 // from https://github.com/HarryR/ethsnarks/blob/master/contracts/Verifier.sol
-pragma solidity ^0.4.24;
-
+pragma solidity ^0.5.1;
 
 contract Verifier {
 
@@ -11,12 +10,12 @@ contract Verifier {
         return q - (Y % q);
     }
 
-    function Verify ( uint256[14] in_vk, uint256[] vk_gammaABC, uint256[8] in_proof, uint256[] proof_inputs )
-        internal 
-        view 
+    function Verify (uint256[14] memory in_vk, uint256[] memory vk_gammaABC, uint256[8] memory in_proof, uint256[] memory proof_inputs)
+        internal
+        view
         returns (bool)
     {
-        require( ((vk_gammaABC.length / 2) - 1) == proof_inputs.length, "Invalid number of public inputs" );
+        require(((vk_gammaABC.length / 2) - 1) == proof_inputs.length, "Invalid number of public inputs");
 
         // Compute the linear combination vk_x
         uint256[3] memory mul_input;
@@ -34,17 +33,18 @@ contract Verifier {
             mul_input[1] = vk_gammaABC[m++];
             mul_input[2] = proof_inputs[i];
 
-            assembly {
+            // solhint-disable-next-line no-inline-assembly
+            assembly{
                 // ECMUL, output to last 2 elements of `add_input`
                 success := staticcall(sub(gas, 2000), 7, mul_input, 0x60, add(add_input, 0x40), 0x40)
             }
-            require( success, "Failed to call ECMUL precompile" );
+            require(success, "Failed to call ECMUL precompile");
 
-            assembly {
+            assembly{
                 // ECADD
                 success := staticcall(sub(gas, 2000), 6, add_input, 0x80, add_input, 0x40)
             }
-            require( success, "Failed to call ECADD precompile" );
+            require(success, "Failed to call ECADD precompile");
         }
 
         uint[24] memory input = [

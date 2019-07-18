@@ -1,12 +1,6 @@
-
-// This contract is generated programmatically
-
-pragma solidity ^0.4.24;
-import "../keys/DepositVerificationKey.sol";
-import "../keys/TransferVerificationKey.sol";
-import "../keys/ExitVerificationKey.sol";
-
+pragma solidity ^0.5.1;
+import "../keys/VerificationKey.sol";
 
 // Hardcoded constants to avoid accessing store
-contract VerificationKeys is TransferVerificationKey, DepositVerificationKey, ExitVerificationKey {
+contract VerificationKeys is VerificationKey {
 }

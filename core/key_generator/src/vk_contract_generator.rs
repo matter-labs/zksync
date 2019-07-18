@@ -77,7 +77,7 @@ pub fn generate_vk_contract<E: Engine>(
         r#"
 // This contract is generated programmatically
 
-pragma solidity ^0.4.24;
+pragma solidity ^0.5.1;
 
 
 // Hardcoded constants to avoid accessing store

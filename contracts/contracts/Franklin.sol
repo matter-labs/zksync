@@ -1,11 +1,11 @@
-pragma solidity ^0.5.8;
+pragma solidity ^0.5.1;
 
 import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
 // Warning! Verifier does not work.
 //import "./Verifier.sol";
-import "./DummyVerifier.sol";
-import "./VerificationKey.sol";
+import "./common/DummyVerifier.sol";
+import "./common/VerificationKeys.sol";
 
 contract Franklin is DummyVerifier, VerificationKey {
 
@@ -367,7 +367,10 @@ contract Franklin is DummyVerifier, VerificationKey {
         // deposit
         if (opType == 0x01) {
             // pubdata: to_account: 3, token: 2, amount: 2, fee: 1, new_pubkey_hash: 21
-            address account = addressById(uint(uint8(_publicData[currentPointer + 1])) + uint(uint8(_publicData[currentPointer + 2])) << 8 + uint(uint8(_publicData[currentPointer + 3])) << 16);
+
+            // TODO: - this should work: get address by id
+            address account = address(uint(uint8(_publicData[currentPointer + 1])) + uint(uint8(_publicData[currentPointer + 2])) << 8 + uint(uint8(_publicData[currentPointer + 3])) << 16);
+            
             uint16 tokenId = uint16(uint(uint8(_publicData[currentPointer + 4])) + uint(uint8(_publicData[currentPointer + 5])) << 8);
             uint24 amountPacked = uint24(uint8(_publicData[currentPointer + 6])) + uint24(uint8(_publicData[currentPointer + 7])) << 8;
             uint112 amount = unpack(amountPacked, tokenId);
@@ -390,7 +393,10 @@ contract Franklin is DummyVerifier, VerificationKey {
         // partial_exit
         if (opType == 0x04) {
             // pubdata: account: 3, token: 2, amount: 2, fee: 1
-            address account = addressById(uint(uint8(_publicData[currentPointer + 1])) + uint(uint8(_publicData[currentPointer + 2])) << 8 + uint(uint8(_publicData[currentPointer + 3])) << 16);
+
+            // TODO: - this should work: get address by id
+            address account = address(uint(uint8(_publicData[currentPointer + 1])) + uint(uint8(_publicData[currentPointer + 2])) << 8 + uint(uint8(_publicData[currentPointer + 3])) << 16);
+            
             uint16 tokenId = uint16(uint(uint8(_publicData[currentPointer + 4])) + uint(uint8(_publicData[currentPointer + 5])) << 8);
             uint24 amountPacked = uint24(uint8(_publicData[currentPointer + 6])) + uint24(uint8(_publicData[currentPointer + 7])) << 8;
             uint112 amount = unpack(amountPacked, tokenId);
