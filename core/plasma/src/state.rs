@@ -2,10 +2,7 @@ use bigdecimal::{BigDecimal, Zero};
 use merkle_tree::AccountTree;
 use models::plasma::account::Account;
 use models::plasma::tx::{FranklinTx, NewDepositTx, NewExitTx, TransferTx};
-use models::plasma::{
-    params::{self, ETH_TOKEN_ID},
-    AccountUpdate, AccountUpdates,
-};
+use models::plasma::{params::{self, ETH_TOKEN_ID}, AccountUpdate, AccountUpdates, BlockNumber};
 use models::plasma::{AccountId, AccountMap, Fr, TransferApplicationError};
 
 pub struct PlasmaState {
@@ -13,7 +10,7 @@ pub struct PlasmaState {
     pub balance_tree: AccountTree,
 
     /// Current block number
-    pub block_number: u32,
+    pub block_number: BlockNumber,
 }
 
 impl PlasmaState {
@@ -57,8 +54,9 @@ impl PlasmaState {
     pub fn apply_tx(&mut self, tx: &FranklinTx) -> Result<AccountUpdates, ()> {
         match tx {
             FranklinTx::Deposit(tx) => self.apply_deposit(tx),
-            FranklinTx::Transfer(tx) => self.apply_transfer(tx).map_err(drop),
-            FranklinTx::Exit(tx) => self.apply_exit(tx),
+            FranklinTx::TransferToNew(tx) => self.apply_transfer_to_new(tx),
+            FranklinTx::PartialExit(tx) => self.apply_partial_exit(tx),
+            FranklinTx::Transfer(tx) => self.apply_transfer(tx),
         }
     }
 
@@ -174,7 +172,7 @@ impl PlasmaState {
     fn apply_deposit(&mut self, tx: &NewDepositTx) -> Result<AccountUpdates, ()> {
         let mut updates = Vec::new();
 
-        let mut acc = self.balance_tree.items.remove(&tx.to).unwrap_or_else(|| {
+        let mut acc = self.balance_tree.items.get(&tx.to).cloned().unwrap_or_else(|| {
             let mut acc = Account::default();
             acc.public_key_x = tx.pub_x;
             acc.public_key_y = tx.pub_y;

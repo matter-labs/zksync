@@ -24,14 +24,6 @@ pub struct TxMeta {
     pub nonce: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TransferTxConfirmation {
-    pub block_number: BlockNumber,
-    pub signature: String,
-}
-
-pub type TransferTxResult = Result<TransferTxConfirmation, TransferApplicationError>;
-
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkStatus {
     pub next_block_at_max: Option<u64>,
@@ -45,22 +37,9 @@ pub type EncodedProof = [U256; 8];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub enum EthBlockData {
-    Transfer {
-        total_fees: U128,
-
-        #[serde(with = "serde_bytes")]
-        public_data: Vec<u8>,
-    },
-    Deposit {
-        batch_number: BatchNumber,
-    },
-    Exit {
-        batch_number: BatchNumber,
-
-        #[serde(with = "serde_bytes")]
-        public_data: Vec<u8>,
-    },
+pub struct EthBlockData {
+    #[serde(with = "serde_bytes")]
+    public_data: Vec<u8>,
 }
 
 pub struct ProverRequest(pub BlockNumber);
@@ -96,13 +75,6 @@ pub struct Operation {
 
     #[serde(skip)]
     pub tx_meta: Option<TxMeta>,
-}
-
-pub enum ProtoBlock {
-    /// (tx id in mempool, tx) this way we can remove tx from mempool after execution.
-    Transfer(Vec<TransferTx>),
-    Deposit(BatchNumber, Vec<DepositTx>),
-    Exit(BatchNumber, Vec<ExitTx>),
 }
 
 pub enum StateKeeperRequest {
