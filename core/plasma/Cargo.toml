@@ -13,4 +13,6 @@ models = { path = "../models" }
 merkle_tree = { path = "../merkle_tree" }
 bigdecimal = { version = "0.0.14", features = ["serde"]}
 log = "0.4"
+failure = "0.1"
+ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
 

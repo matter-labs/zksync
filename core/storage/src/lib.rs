@@ -1679,288 +1679,288 @@ mod test {
     #[test]
     fn test_store_txs() {
         unimplemented!()
-//        let pool = ConnectionPool::new();
-//        let conn = pool.access_storage().unwrap();
-//        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
-//        conn.prepare_nonce_scheduling("0x0", 0).unwrap();
-//
-//        let mut accounts = AccountMap::default();
-//        // commit initial state update
-//        let updates = {
-//            let mut updates = Vec::new();
-//            updates.extend(acc_create_updates(3, 1, 11));
-//            updates.extend(acc_create_updates(5, 2, 12));
-//            updates.extend(acc_create_updates(7, 3, 13));
-//            updates.extend(acc_create_updates(8, 4, 14));
-//            updates
-//        };
-//        apply_updates(&mut accounts, updates.clone());
-//
-//        conn.execute_operation(&Operation {
-//            id: None,
-//            action: Action::Commit,
-//            block: Block {
-//                block_number: 1,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Deposit {
-//                    batch_number: 0,
-//                    transactions: vec![],
-//                },
-//            },
-//            accounts_updated: updates,
-//            tx_meta: None,
-//        })
-//        .unwrap();
-//        assert_eq!(conn.last_verified_state_for_account(5).unwrap(), None);
-//        assert_eq!(
-//            conn.last_committed_state_for_account(5)
-//                .unwrap()
-//                .unwrap()
-//                .get_balance(ETH_TOKEN_ID),
-//            &BigDecimal::from(2)
-//        );
-//
-//        conn.execute_operation(&Operation {
-//            id: None,
-//            action: Action::Verify {
-//                proof: Box::new(EncodedProof::default()),
-//            },
-//            block: Block {
-//                block_number: 1,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Deposit {
-//                    batch_number: 0,
-//                    transactions: vec![],
-//                },
-//            },
-//            accounts_updated: AccountUpdates::default(),
-//            tx_meta: None,
-//        })
-//        .unwrap();
-//
-//        assert_eq!(
-//            conn.last_verified_state_for_account(7)
-//                .unwrap()
-//                .unwrap()
-//                .get_balance(ETH_TOKEN_ID),
-//            &BigDecimal::from(3)
-//        );
-//        assert_eq!(
-//            conn.last_committed_state_for_account(7)
-//                .unwrap()
-//                .unwrap()
-//                .get_balance(ETH_TOKEN_ID),
-//            &BigDecimal::from(3)
-//        );
-//
-//        let pending = conn.load_unsent_ops(0).unwrap();
-//        assert_eq!(pending.len(), 2);
-//        assert_eq!(pending[0].tx_meta.as_ref().unwrap().nonce, 0);
-//        assert_eq!(pending[1].tx_meta.as_ref().unwrap().nonce, 1);
-//
-//        let pending = conn.load_unsent_ops(1).unwrap();
-//        assert_eq!(pending.len(), 1);
-//        assert_eq!(pending[0].tx_meta.as_ref().unwrap().nonce, 1);
-//
-//        let pending = conn.load_unsent_ops(2).unwrap();
-//        assert_eq!(pending.len(), 0);
+        //        let pool = ConnectionPool::new();
+        //        let conn = pool.access_storage().unwrap();
+        //        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
+        //        conn.prepare_nonce_scheduling("0x0", 0).unwrap();
+        //
+        //        let mut accounts = AccountMap::default();
+        //        // commit initial state update
+        //        let updates = {
+        //            let mut updates = Vec::new();
+        //            updates.extend(acc_create_updates(3, 1, 11));
+        //            updates.extend(acc_create_updates(5, 2, 12));
+        //            updates.extend(acc_create_updates(7, 3, 13));
+        //            updates.extend(acc_create_updates(8, 4, 14));
+        //            updates
+        //        };
+        //        apply_updates(&mut accounts, updates.clone());
+        //
+        //        conn.execute_operation(&Operation {
+        //            id: None,
+        //            action: Action::Commit,
+        //            block: Block {
+        //                block_number: 1,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Deposit {
+        //                    batch_number: 0,
+        //                    transactions: vec![],
+        //                },
+        //            },
+        //            accounts_updated: updates,
+        //            tx_meta: None,
+        //        })
+        //        .unwrap();
+        //        assert_eq!(conn.last_verified_state_for_account(5).unwrap(), None);
+        //        assert_eq!(
+        //            conn.last_committed_state_for_account(5)
+        //                .unwrap()
+        //                .unwrap()
+        //                .get_balance(ETH_TOKEN_ID),
+        //            &BigDecimal::from(2)
+        //        );
+        //
+        //        conn.execute_operation(&Operation {
+        //            id: None,
+        //            action: Action::Verify {
+        //                proof: Box::new(EncodedProof::default()),
+        //            },
+        //            block: Block {
+        //                block_number: 1,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Deposit {
+        //                    batch_number: 0,
+        //                    transactions: vec![],
+        //                },
+        //            },
+        //            accounts_updated: AccountUpdates::default(),
+        //            tx_meta: None,
+        //        })
+        //        .unwrap();
+        //
+        //        assert_eq!(
+        //            conn.last_verified_state_for_account(7)
+        //                .unwrap()
+        //                .unwrap()
+        //                .get_balance(ETH_TOKEN_ID),
+        //            &BigDecimal::from(3)
+        //        );
+        //        assert_eq!(
+        //            conn.last_committed_state_for_account(7)
+        //                .unwrap()
+        //                .unwrap()
+        //                .get_balance(ETH_TOKEN_ID),
+        //            &BigDecimal::from(3)
+        //        );
+        //
+        //        let pending = conn.load_unsent_ops(0).unwrap();
+        //        assert_eq!(pending.len(), 2);
+        //        assert_eq!(pending[0].tx_meta.as_ref().unwrap().nonce, 0);
+        //        assert_eq!(pending[1].tx_meta.as_ref().unwrap().nonce, 1);
+        //
+        //        let pending = conn.load_unsent_ops(1).unwrap();
+        //        assert_eq!(pending.len(), 1);
+        //        assert_eq!(pending[0].tx_meta.as_ref().unwrap().nonce, 1);
+        //
+        //        let pending = conn.load_unsent_ops(2).unwrap();
+        //        assert_eq!(pending.len(), 0);
     }
 
     #[test]
     fn test_store_proof_reqs() {
         unimplemented!()
-//        let pool = ConnectionPool::new();
-//        let conn = pool.access_storage().unwrap();
-//        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
-//        conn.prepare_nonce_scheduling("0x0", 0).unwrap();
-//
-//        conn.execute_operation(&Operation {
-//            id: None,
-//            action: Action::Commit,
-//            block: Block {
-//                block_number: 1,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Deposit {
-//                    batch_number: 1,
-//                    transactions: Vec::new(),
-//                },
-//            },
-//            accounts_updated: AccountUpdates::default(),
-//            tx_meta: None,
-//        })
-//        .unwrap();
-//
-//        let pending = conn.load_unverified_commitments().unwrap();
-//        assert_eq!(pending.len(), 1);
-//
-//        conn.execute_operation(&Operation {
-//            id: None,
-//            action: Action::Verify {
-//                proof: Box::new(EncodedProof::default()),
-//            },
-//            block: Block {
-//                block_number: 1,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Deposit {
-//                    batch_number: 1,
-//                    transactions: Vec::new(),
-//                },
-//            },
-//            accounts_updated: AccountUpdates::default(),
-//            tx_meta: None,
-//        })
-//        .unwrap();
-//
-//        let pending = conn.load_unverified_commitments().unwrap();
-//        assert_eq!(pending.len(), 0);
+        //        let pool = ConnectionPool::new();
+        //        let conn = pool.access_storage().unwrap();
+        //        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
+        //        conn.prepare_nonce_scheduling("0x0", 0).unwrap();
+        //
+        //        conn.execute_operation(&Operation {
+        //            id: None,
+        //            action: Action::Commit,
+        //            block: Block {
+        //                block_number: 1,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Deposit {
+        //                    batch_number: 1,
+        //                    transactions: Vec::new(),
+        //                },
+        //            },
+        //            accounts_updated: AccountUpdates::default(),
+        //            tx_meta: None,
+        //        })
+        //        .unwrap();
+        //
+        //        let pending = conn.load_unverified_commitments().unwrap();
+        //        assert_eq!(pending.len(), 1);
+        //
+        //        conn.execute_operation(&Operation {
+        //            id: None,
+        //            action: Action::Verify {
+        //                proof: Box::new(EncodedProof::default()),
+        //            },
+        //            block: Block {
+        //                block_number: 1,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Deposit {
+        //                    batch_number: 1,
+        //                    transactions: Vec::new(),
+        //                },
+        //            },
+        //            accounts_updated: AccountUpdates::default(),
+        //            tx_meta: None,
+        //        })
+        //        .unwrap();
+        //
+        //        let pending = conn.load_unverified_commitments().unwrap();
+        //        assert_eq!(pending.len(), 0);
     }
 
     #[test]
     fn test_store_helpers() {
         unimplemented!()
-//        let pool = ConnectionPool::new();
-//        let conn = pool.access_storage().unwrap();
-//        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
-//
-//        assert_eq!(-1, conn.load_last_committed_deposit_batch().unwrap());
-//        assert_eq!(-1, conn.load_last_committed_exit_batch().unwrap());
-//        assert_eq!(0, conn.get_last_committed_block().unwrap());
-//        assert_eq!(0, conn.get_last_verified_block().unwrap());
-//        assert_eq!(conn.last_committed_state_for_account(9999).unwrap(), None);
-//        assert_eq!(conn.last_verified_state_for_account(9999).unwrap(), None);
-//
-//        conn.execute_operation(&Operation {
-//            id: None,
-//            action: Action::Commit,
-//            block: Block {
-//                block_number: 1,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Deposit {
-//                    batch_number: 3,
-//                    transactions: Vec::new(),
-//                },
-//            },
-//            accounts_updated: AccountUpdates::default(),
-//            tx_meta: None,
-//        })
-//        .unwrap();
-//        assert_eq!(3, conn.load_last_committed_deposit_batch().unwrap());
-//
-//        conn.execute_operation(&Operation {
-//            id: None,
-//            action: Action::Commit,
-//            block: Block {
-//                block_number: 1,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Exit {
-//                    batch_number: 2,
-//                    transactions: Vec::new(),
-//                },
-//            },
-//            accounts_updated: AccountUpdates::default(),
-//            tx_meta: None,
-//        })
-//        .unwrap();
-//        assert_eq!(2, conn.load_last_committed_exit_batch().unwrap());
+        //        let pool = ConnectionPool::new();
+        //        let conn = pool.access_storage().unwrap();
+        //        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
+        //
+        //        assert_eq!(-1, conn.load_last_committed_deposit_batch().unwrap());
+        //        assert_eq!(-1, conn.load_last_committed_exit_batch().unwrap());
+        //        assert_eq!(0, conn.get_last_committed_block().unwrap());
+        //        assert_eq!(0, conn.get_last_verified_block().unwrap());
+        //        assert_eq!(conn.last_committed_state_for_account(9999).unwrap(), None);
+        //        assert_eq!(conn.last_verified_state_for_account(9999).unwrap(), None);
+        //
+        //        conn.execute_operation(&Operation {
+        //            id: None,
+        //            action: Action::Commit,
+        //            block: Block {
+        //                block_number: 1,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Deposit {
+        //                    batch_number: 3,
+        //                    transactions: Vec::new(),
+        //                },
+        //            },
+        //            accounts_updated: AccountUpdates::default(),
+        //            tx_meta: None,
+        //        })
+        //        .unwrap();
+        //        assert_eq!(3, conn.load_last_committed_deposit_batch().unwrap());
+        //
+        //        conn.execute_operation(&Operation {
+        //            id: None,
+        //            action: Action::Commit,
+        //            block: Block {
+        //                block_number: 1,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Exit {
+        //                    batch_number: 2,
+        //                    transactions: Vec::new(),
+        //                },
+        //            },
+        //            accounts_updated: AccountUpdates::default(),
+        //            tx_meta: None,
+        //        })
+        //        .unwrap();
+        //        assert_eq!(2, conn.load_last_committed_exit_batch().unwrap());
     }
 
     #[test]
     fn test_store_txs_2() {
         unimplemented!()
-//        let pool = ConnectionPool::new();
-//        let conn = pool.access_storage().unwrap();
-//        conn.conn().begin_test_transaction().unwrap();
-//
-//        let deposit_tx: NewDepositTx = NewDepositTx {
-//            account: 1,
-//            amount: BigDecimal::from(10000),
-//            pub_x: Fr::zero(),
-//            pub_y: Fr::zero(),
-//        };
-//
-//        let transfer_tx: TransferTx = TransferTx {
-//            from: 1,
-//            to: 2,
-//            amount: BigDecimal::from(5000),
-//            fee: BigDecimal::from(0),
-//            nonce: 1,
-//            good_until_block: 100_000,
-//            signature: TxSignature::default(),
-//        };
-//
-//        let exit_tx: ExitTx = ExitTx {
-//            account: 1,
-//            amount: BigDecimal::from(5000),
-//        };
-//
-//        conn.execute_operation(&Operation {
-//            id: None,
-//            action: Action::Commit,
-//            block: Block {
-//                block_number: 1,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Deposit {
-//                    batch_number: 1,
-//                    transactions: vec![deposit_tx.clone(), deposit_tx.clone()],
-//                },
-//            },
-//            accounts_updated: AccountUpdates::default(),
-//            tx_meta: None,
-//        })
-//        .unwrap();
-//
-//        conn.execute_operation(&Operation {
-//            id: None,
-//            action: Action::Commit,
-//            block: Block {
-//                block_number: 2,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Transfer {
-//                    total_fees: BigDecimal::from(0),
-//                    transactions: vec![transfer_tx.clone(), transfer_tx.clone()],
-//                },
-//            },
-//            accounts_updated: AccountUpdates::default(),
-//            tx_meta: None,
-//        })
-//        .unwrap();
-//
-//        conn.execute_operation(&Operation {
-//            id: None,
-//            action: Action::Commit,
-//            block: Block {
-//                block_number: 3,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Exit {
-//                    batch_number: 2,
-//                    transactions: vec![exit_tx.clone(), exit_tx.clone()],
-//                },
-//            },
-//            accounts_updated: AccountUpdates::default(),
-//            tx_meta: None,
-//        })
-//        .unwrap();
-//
-//        let txs = conn.load_last_saved_transactions(10);
-//        assert_eq!(txs.len(), 6);
+        //        let pool = ConnectionPool::new();
+        //        let conn = pool.access_storage().unwrap();
+        //        conn.conn().begin_test_transaction().unwrap();
+        //
+        //        let deposit_tx: NewDepositTx = NewDepositTx {
+        //            account: 1,
+        //            amount: BigDecimal::from(10000),
+        //            pub_x: Fr::zero(),
+        //            pub_y: Fr::zero(),
+        //        };
+        //
+        //        let transfer_tx: TransferTx = TransferTx {
+        //            from: 1,
+        //            to: 2,
+        //            amount: BigDecimal::from(5000),
+        //            fee: BigDecimal::from(0),
+        //            nonce: 1,
+        //            good_until_block: 100_000,
+        //            signature: TxSignature::default(),
+        //        };
+        //
+        //        let exit_tx: ExitTx = ExitTx {
+        //            account: 1,
+        //            amount: BigDecimal::from(5000),
+        //        };
+        //
+        //        conn.execute_operation(&Operation {
+        //            id: None,
+        //            action: Action::Commit,
+        //            block: Block {
+        //                block_number: 1,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Deposit {
+        //                    batch_number: 1,
+        //                    transactions: vec![deposit_tx.clone(), deposit_tx.clone()],
+        //                },
+        //            },
+        //            accounts_updated: AccountUpdates::default(),
+        //            tx_meta: None,
+        //        })
+        //        .unwrap();
+        //
+        //        conn.execute_operation(&Operation {
+        //            id: None,
+        //            action: Action::Commit,
+        //            block: Block {
+        //                block_number: 2,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Transfer {
+        //                    total_fees: BigDecimal::from(0),
+        //                    transactions: vec![transfer_tx.clone(), transfer_tx.clone()],
+        //                },
+        //            },
+        //            accounts_updated: AccountUpdates::default(),
+        //            tx_meta: None,
+        //        })
+        //        .unwrap();
+        //
+        //        conn.execute_operation(&Operation {
+        //            id: None,
+        //            action: Action::Commit,
+        //            block: Block {
+        //                block_number: 3,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Exit {
+        //                    batch_number: 2,
+        //                    transactions: vec![exit_tx.clone(), exit_tx.clone()],
+        //                },
+        //            },
+        //            accounts_updated: AccountUpdates::default(),
+        //            tx_meta: None,
+        //        })
+        //        .unwrap();
+        //
+        //        let txs = conn.load_last_saved_transactions(10);
+        //        assert_eq!(txs.len(), 6);
     }
 
     fn dummy_op(action: Action, block_number: BlockNumber) -> Operation {
         unimplemented!()
-//        Operation {
-//            id: None,
-//            action,
-//            block: Block {
-//                block_number,
-//                new_root_hash: Fr::default(),
-//                block_data: BlockData::Deposit {
-//                    batch_number: 1,
-//                    transactions: Vec::new(),
-//                },
-//            },
-//            accounts_updated: AccountUpdates::default(),
-//            tx_meta: None,
-//        }
+        //        Operation {
+        //            id: None,
+        //            action,
+        //            block: Block {
+        //                block_number,
+        //                new_root_hash: Fr::default(),
+        //                block_data: BlockData::Deposit {
+        //                    batch_number: 1,
+        //                    transactions: Vec::new(),
+        //                },
+        //            },
+        //            accounts_updated: AccountUpdates::default(),
+        //            tx_meta: None,
+        //        }
     }
 
     #[test]

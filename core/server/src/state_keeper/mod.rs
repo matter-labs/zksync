@@ -242,14 +242,18 @@ impl PlasmaStateKeeper {
         let mut accounts_updated = Vec::new();
         let mut txs = Vec::new();
 
-        for tx in transactions.iter() {
-            let mut tx_updates = self
-                .state
-                .apply_tx(&tx)
-                .expect("must apply franklin transaction");
+        for tx in transactions.into_iter() {
+            let mut tx_updates = self.state.apply_tx(&tx);
 
-            accounts_updated.append(&mut tx_updates);
-            txs.push(tx);
+            match tx_updates {
+                Ok(updates) => {
+                    accounts_updated.append(&mut tx_updates);
+                    txs.push(tx);
+                }
+                Err(_) => {
+                    error!("Failed to execute transaction: {:?}", tx);
+                }
+            };
         }
 
         let num_txs = txs.len();
