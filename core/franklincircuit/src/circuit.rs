@@ -233,21 +233,31 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             &validator_balances,
             self.params,
         )?;
+        println!(
+            "new_operator_balance_root: {}",
+            new_operator_balance_root.get_value().unwrap()
+        );
 
-        let mut operator_account_data = vec![];
-        operator_account_data.extend(validator_account.nonce.get_bits_le().clone());
-        operator_account_data.extend(validator_account.pub_key.get_packed_key());
-        operator_account_data.extend(
+        let mut validator_account_data = vec![];
+        validator_account_data.extend(validator_account.nonce.get_bits_le().clone());
+        validator_account_data.extend(validator_account.pub_key.get_packed_key());
+        validator_account_data.extend(
             new_operator_balance_root
                 .into_bits_le(cs.namespace(|| "new_operator_balance_root_bits"))?,
         );
         let root_from_operator_after_fees = allocate_merkle_root(
             cs.namespace(|| "root from operator_account after fees"),
-            &operator_account_data,
+            &validator_account_data,
             &validator_address,
             &validator_audit_path,
             self.params,
         )?;
+
+        // cs.enforce(||"root after applying fees is correct", |lc| lc + root_from_operator_after_fees.get_variable(), |lc|lc +CS::one(), |lc|lc + )
+        println!(
+            "root from operator after fees: {}",
+            root_from_operator_after_fees.get_value().unwrap()
+        );
 
         let final_root = CircuitElement::from_number_padded(
             cs.namespace(|| "final_root"),
@@ -610,37 +620,37 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?);
 
         let mut op_flags = vec![];
-        op_flags.push(self.deposit(
-            cs.namespace(|| "deposit"),
-            &mut cur,
-            &chunk_data,
-            &is_a_geq_b,
-            &is_account_empty,
-            &op_data,
-            &ext_pubdata_chunk,
-        )?);
-        op_flags.push(self.transfer(
-            cs.namespace(|| "transfer"),
-            &mut cur,
-            &lhs,
-            &rhs,
-            &chunk_data,
-            &is_a_geq_b,
-            &is_account_empty,
-            &op_data,
-            &ext_pubdata_chunk,
-        )?);
-        op_flags.push(self.transfer_to_new(
-            cs.namespace(|| "transfer_to_new"),
-            &mut cur,
-            &lhs,
-            &rhs,
-            &chunk_data,
-            &is_a_geq_b,
-            &is_account_empty,
-            &op_data,
-            &ext_pubdata_chunk,
-        )?);
+        // op_flags.push(self.deposit(
+        //     cs.namespace(|| "deposit"),
+        //     &mut cur,
+        //     &chunk_data,
+        //     &is_a_geq_b,
+        //     &is_account_empty,
+        //     &op_data,
+        //     &ext_pubdata_chunk,
+        // )?);
+        // op_flags.push(self.transfer(
+        //     cs.namespace(|| "transfer"),
+        //     &mut cur,
+        //     &lhs,
+        //     &rhs,
+        //     &chunk_data,
+        //     &is_a_geq_b,
+        //     &is_account_empty,
+        //     &op_data,
+        //     &ext_pubdata_chunk,
+        // )?);
+        // op_flags.push(self.transfer_to_new(
+        //     cs.namespace(|| "transfer_to_new"),
+        //     &mut cur,
+        //     &lhs,
+        //     &rhs,
+        //     &chunk_data,
+        //     &is_a_geq_b,
+        //     &is_account_empty,
+        //     &op_data,
+        //     &ext_pubdata_chunk,
+        // )?);
         op_flags.push(self.partial_exit(
             cs.namespace(|| "partial_exit"),
             &mut cur,
@@ -659,7 +669,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             |lc| lc + CS::one(),
             |lc| lc + CS::one(),
         );
-
         // let fees_len = 1<< franklin_constants.BALANCE_TREE_DEPTH;
         for i in 0..(1 << *franklin_constants::BALANCE_TREE_DEPTH as u32) {
             let sum = allocate_sum(
@@ -667,14 +676,24 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 &fees[i],
                 &op_data.fee.get_number(),
             )?;
-            fees[i] = AllocatedNum::select_ifeq(
-                cs.namespace(|| format!("update fee number {}", i)),
+            let is_token_correct = Boolean::from(AllocatedNum::equals(
+                cs.namespace(|| format!("is token equal to number {}", i)),
                 &lhs.token.get_number(),
                 &precomputed[i],
+            )?);
+            let should_update = Boolean::and(
+                cs.namespace(|| format!("should update fee number {}", i)),
+                &is_token_correct,
+                &Boolean::from(chunk_data.is_chunk_last.clone()),
+            )?;
+            fees[i] = AllocatedNum::conditionally_select(
+                cs.namespace(|| format!("update fee number {}", i)),
                 &sum,
                 &fees[i],
+                &should_update,
             )?;
         }
+
         Ok(())
     }
 
@@ -689,7 +708,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         ext_pubdata_chunk: &AllocatedNum<E>,
         precomputed_numbers: &[AllocatedNum<E>],
     ) -> Result<Boolean, SynthesisError> {
-        let mut is_valid_flags = vec![];
+        let mut base_valid_flags = vec![];
         //construct pubdata
         let mut pubdata_bits = vec![];
         let mut pub_token_bits = cur.token.get_bits_le().clone();
@@ -731,21 +750,29 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &pubdata_chunk,
             ext_pubdata_chunk,
         )?);
-        is_valid_flags.push(is_pubdata_chunk_correct);
+        base_valid_flags.push(is_pubdata_chunk_correct);
 
         // verify correct tx_code
         let is_partial_exit = Boolean::from(AllocatedNum::equals(
-            cs.namespace(|| "is_deposit"),
+            cs.namespace(|| "is_partial_exit"),
             &chunk_data.tx_type.get_number(),
             &precomputed_numbers[3], //partial_exit tx code
         )?);
-        is_valid_flags.push(is_partial_exit.clone());
+        base_valid_flags.push(is_partial_exit.clone());
 
+        let is_base_valid = multi_and(
+            cs.namespace(|| "valid base partial_exit"),
+            &base_valid_flags,
+        )?;
+
+        let mut lhs_valid_flags = vec![];
+        lhs_valid_flags.push(is_base_valid.clone());
         // check operation arguments
+        //TODO: should be checked only for first chunk
         let is_a_correct =
             CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
 
-        is_valid_flags.push(is_a_correct);
+        lhs_valid_flags.push(is_a_correct);
 
         let sum_amount_fee = allocate_sum(
             cs.namespace(|| "amount plus fee"),
@@ -757,29 +784,21 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &op_data.b.get_number(),
             &sum_amount_fee,
         )?);
-        is_valid_flags.push(is_b_correct);
-        is_valid_flags.push(is_a_geq_b.clone());
+        lhs_valid_flags.push(is_b_correct);
+        lhs_valid_flags.push(is_a_geq_b.clone());
 
-        is_valid_flags.push(no_nonce_overflow(
+        lhs_valid_flags.push(no_nonce_overflow(
             cs.namespace(|| "no nonce overflow"),
             &cur.account.nonce.get_number(),
         )?);
-
-        let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
-
-        println!("tx_valid {}", tx_valid.get_value().unwrap());
 
         let is_first_chunk = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_first_chunk"),
             &chunk_data.chunk_number,
             &precomputed_numbers[0],
         )?);
-        println!("is_first  chunk {}", is_first_chunk.get_value().unwrap());
-        let is_valid_first = Boolean::and(
-            cs.namespace(|| "is valid and first"),
-            &tx_valid,
-            &is_first_chunk,
-        )?;
+        lhs_valid_flags.push(is_first_chunk.clone());
+        let lhs_valid = multi_and(cs.namespace(|| "is_lhs_valid"), &lhs_valid_flags)?;
 
         //update cur data if we are processing first operation of valid partial_exit transaction
         let updated_balance_value =
@@ -809,7 +828,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "mutated balance"),
             &updated_balance_ce,
             &cur.balance,
-            &is_valid_first,
+            &lhs_valid,
         )?;
         cur.balance
             .enforce_length(cs.namespace(|| "mutated balance is still correct length"))?;
@@ -818,12 +837,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             "changed bal data: {}",
             cur.balance.get_number().get_value().unwrap()
         );
-        cur.account.pub_key = CircuitPubkey::conditionally_select(
-            cs.namespace(|| "mutated_pubkey"),
-            &op_data.new_pubkey,
-            &cur.account.pub_key,
-            &is_valid_first,
-        )?;
 
         let updated_nonce = allocate_sum(
             cs.namespace(|| "updated_nonce"),
@@ -835,9 +848,15 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "update cur nonce"),
             &updated_nonce,
             &cur.account.nonce,
-            &is_valid_first,
+            &lhs_valid,
         )?;
 
+        let mut ohs_valid_flags = vec![];
+        ohs_valid_flags.push(is_base_valid);
+        ohs_valid_flags.push(is_first_chunk.not());
+        let is_ohs_valid = multi_and(cs.namespace(|| "is_ohs_valid"), &ohs_valid_flags)?;
+
+        let tx_valid = multi_or(cs.namespace(|| "tx_valid"), &[lhs_valid, is_ohs_valid])?;
         Ok(tx_valid)
     }
 
@@ -958,7 +977,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             AllocatedNum::alloc(cs.namespace(|| "updated_balance_value"), || {
                 let mut new_balance = cur.balance.clone().grab()?;
                 new_balance.add_assign(&op_data.amount.grab()?);
-                new_balance.sub_assign(&op_data.fee.grab()?);
                 Ok(new_balance)
             })?;
         cs.enforce(
@@ -966,8 +984,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             |lc| lc + updated_balance_value.get_variable(),
             |lc| lc + CS::one(),
             |lc| {
-                lc + cur.balance.get_number().get_variable() + op_data.amount.get_number().get_variable()//TODO: get_number().get_variable() is kinda ugly
-                    - op_data.fee.get_number().get_variable()
+                lc + cur.balance.get_number().get_variable()
+                    + op_data.amount.get_number().get_variable() //TODO: get_number().get_variable() is kinda ugly
             },
         );
         //

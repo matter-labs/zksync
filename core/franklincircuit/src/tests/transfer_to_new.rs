@@ -487,13 +487,7 @@ fn test_transfer_to_new() {
         sig_msg_hash,
         sig_msg_hash_bits.len()
     );
-    let public_data_commitment = public_data_commitment::<Bn256>(
-        &transfer_witness.get_pubdata(),
-        transfer_witness.before_root,
-        transfer_witness.after_root,
-        Some(validator_address),
-        Some(block_number),
-    );
+
     let pubdata_chunks: Vec<_> = transfer_witness
         .get_pubdata()
         .chunks(64)
@@ -511,8 +505,8 @@ fn test_transfer_to_new() {
         signer_pub_key_x: Some(from_x.clone()),
         signer_pub_key_y: Some(from_y.clone()),
         args: transfer_witness.args.clone(),
-        lhs: transfer_witness.from_before,
-        rhs: transfer_witness.to_before,
+        lhs: transfer_witness.from_before.clone(),
+        rhs: transfer_witness.to_before.clone(),
     };
 
     let operation_one = Operation {
@@ -566,9 +560,9 @@ fn test_transfer_to_new() {
         signature: signature.clone(),
         signer_pub_key_x: Some(from_x.clone()),
         signer_pub_key_y: Some(from_y.clone()),
-        args: transfer_witness.args,
-        lhs: transfer_witness.from_after,
-        rhs: transfer_witness.to_after,
+        args: transfer_witness.args.clone(),
+        lhs: transfer_witness.from_after.clone(),
+        rhs: transfer_witness.to_after.clone(),
     };
 
     // fee collecting logic
@@ -593,6 +587,13 @@ fn test_transfer_to_new() {
     let root_after_fee = tree.root_hash();
     let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
 
+    let public_data_commitment = public_data_commitment::<Bn256>(
+        &transfer_witness.get_pubdata(),
+        transfer_witness.before_root,
+        Some(root_after_fee),
+        Some(validator_address),
+        Some(block_number),
+    );
     {
         let mut cs = TestConstraintSystem::<Bn256>::new();
 

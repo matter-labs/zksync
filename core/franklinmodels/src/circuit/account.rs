@@ -30,7 +30,6 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
                 .root_hash()
                 .get_bits_le_fixed(params::FR_BIT_WIDTH),
         );
-        println!("test acc len {}", leaf_content.len());
 
         leaf_content
     }

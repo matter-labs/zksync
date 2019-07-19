@@ -112,7 +112,6 @@ pub fn apply_partial_exit(
     let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
 
     //calculate a and b
-    
 
     //applying partial_exit
     let (account_witness_before, account_witness_after, balance_before, balance_after) =
@@ -128,7 +127,6 @@ pub fn apply_partial_exit(
                 bal.value.sub_assign(&fee_as_field_element)
             },
         );
-    
 
     let after_root = tree.root_hash();
     println!("After root = {}", after_root);
@@ -138,7 +136,7 @@ pub fn apply_partial_exit(
     let a = balance_before.clone();
     let mut b = amount_as_field_element.clone();
     b.add_assign(&fee_as_field_element);
-    
+
     PartialExitWitness {
         before: OperationBranch {
             address: Some(account_address_fe),
@@ -235,9 +233,33 @@ fn test_partial_exit_franklin_in_empty_leaf() {
     let mut account_address: u32 = rng.gen();
     account_address %= tree.capacity();
     let amount: u128 = 500;
-    let fee: u128 = 10;
+    let fee: u128 = 0;
     let token: u32 = 2;
     let ethereum_key = Fr::from_str("124").unwrap();
+
+    let sender_balance_before: u128 = 2000;
+
+    let sender_balance_before_as_field_element =
+        Fr::from_str(&sender_balance_before.to_string()).unwrap();
+
+    let mut sender_balance_tree =
+        CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
+    sender_balance_tree.insert(
+        token,
+        Balance {
+            value: sender_balance_before_as_field_element,
+        },
+    );
+
+    let sender_leaf_initial = CircuitAccount::<Bn256> {
+        subtree: sender_balance_tree,
+        nonce: Fr::zero(),
+        pub_x: sender_x.clone(),
+        pub_y: sender_x.clone(),
+    };
+
+    tree.insert(account_address, sender_leaf_initial);
+
     let partial_exit_witness = apply_partial_exit(
         &mut tree,
         &PartialExitData {
@@ -321,14 +343,6 @@ fn test_partial_exit_franklin_in_empty_leaf() {
         rhs: partial_exit_witness.after.clone(),
     };
 
-    let public_data_commitment = public_data_commitment::<Bn256>(
-        &partial_exit_witness.get_pubdata(),
-        partial_exit_witness.before_root,
-        partial_exit_witness.after_root,
-        Some(validator_address),
-        Some(block_number),
-    );
-
     let mut validator_leaf = tree.remove(validator_address_number).unwrap();
     let validator_account_witness = AccountWitness {
         nonce: Some(validator_leaf.nonce.clone()),
@@ -350,6 +364,13 @@ fn test_partial_exit_franklin_in_empty_leaf() {
     let root_after_fee = tree.root_hash();
     let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
 
+    let public_data_commitment = public_data_commitment::<Bn256>(
+        &partial_exit_witness.get_pubdata(),
+        partial_exit_witness.before_root,
+        Some(root_after_fee),
+        Some(validator_address),
+        Some(block_number),
+    );
     {
         let mut cs = TestConstraintSystem::<Bn256>::new();
 

@@ -245,7 +245,7 @@ fn test_deposit_franklin_in_empty_leaf() {
     let mut account_address: u32 = rng.gen();
     account_address %= tree.capacity();
     let amount: u128 = 500;
-    let fee: u128 = 0;
+    let fee: u128 = 10;
     let token: u32 = 2;
     let deposit_witness = apply_deposit(
         &mut tree,
@@ -344,13 +344,7 @@ fn test_deposit_franklin_in_empty_leaf() {
         rhs: deposit_witness.after.clone(),
     };
 
-    let public_data_commitment = public_data_commitment::<Bn256>(
-        &deposit_witness.get_pubdata(),
-        deposit_witness.before_root,
-        deposit_witness.after_root,
-        Some(validator_address),
-        Some(block_number),
-    );
+    println!("tree before_applying fees: {}", tree.root_hash());
 
     let mut validator_leaf = tree.remove(validator_address_number).unwrap();
     let validator_account_witness = AccountWitness {
@@ -360,7 +354,6 @@ fn test_deposit_franklin_in_empty_leaf() {
     };
     let validator_balance_root = validator_leaf.subtree.root_hash();
     println!("validator_balance_root: {}", validator_balance_root);
-    println!("tree before_applying fees: {}", tree.root_hash());
 
     validator_leaf.subtree.insert(
         token,
@@ -368,10 +361,22 @@ fn test_deposit_franklin_in_empty_leaf() {
             value: Fr::from_str(&fee.to_string()).unwrap(),
         },
     );
-
+    println!(
+        "validator_balance_root after applying fee: {}",
+        validator_leaf.subtree.root_hash()
+    );
     tree.insert(validator_address_number, validator_leaf);
     let root_after_fee = tree.root_hash();
+    println!("test root after fees {}", root_after_fee);
     let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
+
+    let public_data_commitment = public_data_commitment::<Bn256>(
+        &deposit_witness.get_pubdata(),
+        deposit_witness.before_root,
+        Some(root_after_fee),
+        Some(validator_address),
+        Some(block_number),
+    );
 
     {
         let mut cs = TestConstraintSystem::<Bn256>::new();
