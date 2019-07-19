@@ -6,7 +6,7 @@
     "ethereum-waffle": "^2.0.12",
     "ethers": "^4.0.33",
     "ethjs": "^0.4.0",
-    "mocha": "^6.1.4",
+    "mocha": "^6.2.0",
     "openzeppelin-solidity": "^2.3.0",
     "solc": "^0.5.10"
   },

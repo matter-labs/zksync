@@ -41,5 +41,9 @@ async function main() {
     }
 }
 
-
 main();
+
+module.exports = {
+    deployFranklin,
+    wallet
+}
