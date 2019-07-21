@@ -8,7 +8,7 @@ use franklin_crypto::circuit::float_point::parse_with_exponent_le;
 use franklin_crypto::circuit::pedersen_hash;
 use franklinmodels::params as franklin_constants;
 
-use franklin_crypto::circuit::boolean::AllocatedBit;
+use franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
 use franklin_crypto::circuit::num::AllocatedNum;
 
 use franklin_crypto::circuit::Assignment;
@@ -75,11 +75,12 @@ impl<E: JubjubEngine> AllocatedOperationBranch<E> {
 }
 
 pub struct AllocatedChunkData<E: JubjubEngine> {
-    pub is_chunk_last: AllocatedBit,
+    pub is_chunk_last: Boolean,
     pub chunk_number: AllocatedNum<E>, //TODO: don't need bit representation here, though make sense to unify probably
     pub tx_type: CircuitElement<E>,
 }
 
+#[derive(Clone)]
 pub struct AllocatedOperationData<E: JubjubEngine> {
     pub new_pubkey: CircuitPubkey<E>,
     pub signer_pubkey: CircuitPubkey<E>,
