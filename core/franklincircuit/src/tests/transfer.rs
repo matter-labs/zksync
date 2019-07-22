@@ -242,6 +242,67 @@ pub fn apply_transfer(
         tx_type: Some(Fr::from_str("5").unwrap()),
     }
 }
+
+pub fn calculate_transfer_operations_from_witness(
+    transfer_witness: &TransferWitness<Bn256>,
+    sig_msg: &Fr,
+    signature: Option<TransactionSignature<Bn256>>,
+) -> Vec<Operation<Bn256>> {
+    let pubdata_chunks: Vec<_> = transfer_witness
+        .get_pubdata()
+        .chunks(64)
+        .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
+        .collect();
+
+    let operation_zero = Operation {
+        new_root: transfer_witness.intermediate_root,
+        tx_type: transfer_witness.tx_type,
+        chunk: Some(Fr::from_str("0").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[0]),
+        sig_msg: Some(sig_msg.clone()),
+        signature: signature.clone(),
+        signer_pub_key_x: transfer_witness
+            .from_before
+            .witness
+            .account_witness
+            .pub_x
+            .clone(),
+        signer_pub_key_y: transfer_witness
+            .from_before
+            .witness
+            .account_witness
+            .pub_y
+            .clone(),
+        args: transfer_witness.args.clone(),
+        lhs: transfer_witness.from_before.clone(),
+        rhs: transfer_witness.to_before.clone(),
+    };
+
+    let operation_one = Operation {
+        new_root: transfer_witness.after_root,
+        tx_type: transfer_witness.tx_type,
+        chunk: Some(Fr::from_str("1").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[1]),
+        sig_msg: Some(sig_msg.clone()),
+        signature: signature.clone(),
+        signer_pub_key_x: transfer_witness
+            .from_before
+            .witness
+            .account_witness
+            .pub_x
+            .clone(),
+        signer_pub_key_y: transfer_witness
+            .from_before
+            .witness
+            .account_witness
+            .pub_y
+            .clone(),
+        args: transfer_witness.args.clone(),
+        lhs: transfer_witness.from_intermediate.clone(),
+        rhs: transfer_witness.to_intermediate.clone(),
+    };
+    vec![operation_zero, operation_one]
+}
 #[test]
 fn test_transfer() {
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
@@ -340,7 +401,7 @@ fn test_transfer() {
 
     let transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
 
-    let fee: u128 = 0;
+    let fee: u128 = 7;
 
     let _fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
 
@@ -456,69 +517,23 @@ fn test_transfer() {
         sig_msg_hash,
         sig_msg_hash_bits.len()
     );
+
+    let signature = sign(&sig_bits, &from_sk, p_g, params, rng);
+
+    let operations =
+        calculate_transfer_operations_from_witness(&transfer_witness, &sig_msg, signature);
+
+    let (root_after_fee, validator_account_witness) =
+        apply_fee(&mut tree, validator_address_number, token, fee);
+
+    let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
     let public_data_commitment = public_data_commitment::<Bn256>(
         &transfer_witness.get_pubdata(),
         transfer_witness.before_root,
-        transfer_witness.after_root,
+        Some(root_after_fee),
         Some(validator_address),
         Some(block_number),
     );
-    let pubdata_chunks: Vec<_> = transfer_witness
-        .get_pubdata()
-        .chunks(64)
-        .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
-        .collect();
-    let signature = sign(&sig_bits, &from_sk, p_g, params, rng);
-
-    let operation_zero = Operation {
-        new_root: transfer_witness.intermediate_root,
-        tx_type: transfer_witness.tx_type,
-        chunk: Some(Fr::from_str("0").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[0]),
-        sig_msg: Some(sig_msg.clone()),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(from_x.clone()),
-        signer_pub_key_y: Some(from_y.clone()),
-        args: transfer_witness.args.clone(),
-        lhs: transfer_witness.from_before,
-        rhs: transfer_witness.to_before,
-    };
-
-    let operation_one = Operation {
-        new_root: transfer_witness.after_root,
-        tx_type: transfer_witness.tx_type,
-        chunk: Some(Fr::from_str("1").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[1]),
-        sig_msg: Some(sig_msg.clone()),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(from_x.clone()),
-        signer_pub_key_y: Some(from_y.clone()),
-        args: transfer_witness.args,
-        lhs: transfer_witness.from_intermediate,
-        rhs: transfer_witness.to_intermediate,
-    };
-
-    // fee collecting logic
-    let mut validator_leaf = tree.remove(validator_address_number).unwrap();
-    let validator_account_witness = AccountWitness {
-        nonce: Some(validator_leaf.nonce.clone()),
-        pub_x: Some(validator_leaf.pub_x.clone()),
-        pub_y: Some(validator_leaf.pub_y.clone()),
-    };
-    let validator_balance_root = validator_leaf.subtree.root_hash();
-    println!("validator_balance_root: {}", validator_balance_root);
-    println!("tree before_applying fees: {}", tree.root_hash());
-
-    validator_leaf.subtree.insert(
-        token,
-        Balance {
-            value: Fr::from_str(&fee.to_string()).unwrap(),
-        },
-    );
-
-    tree.insert(validator_address_number, validator_leaf);
-    let root_after_fee = tree.root_hash();
-    let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
 
     {
         let mut cs = TestConstraintSystem::<Bn256>::new();
@@ -526,8 +541,8 @@ fn test_transfer() {
         let instance = FranklinCircuit {
             params,
             old_root: transfer_witness.before_root,
-            new_root: transfer_witness.after_root,
-            operations: vec![operation_zero, operation_one],
+            new_root: Some(root_after_fee),
+            operations: operations,
             pub_data_commitment: Some(public_data_commitment),
             block_number: Some(block_number),
             validator_account: validator_account_witness,

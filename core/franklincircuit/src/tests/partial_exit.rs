@@ -172,7 +172,121 @@ pub fn apply_partial_exit(
         tx_type: Some(Fr::from_str("3").unwrap()),
     }
 }
+pub fn calculate_partial_exit_operations_from_witness(
+    partial_exit_witness: &PartialExitWitness<Bn256>,
+    sig_msg: &Fr,
+    signature: Option<TransactionSignature<Bn256>>,
+) -> Vec<Operation<Bn256>> {
+    let pubdata_chunks: Vec<_> = partial_exit_witness
+        .get_pubdata()
+        .chunks(64)
+        .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
+        .collect();
 
+    let operation_zero = Operation {
+        new_root: partial_exit_witness.after_root.clone(),
+        tx_type: partial_exit_witness.tx_type,
+        chunk: Some(Fr::from_str("0").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[0]),
+        sig_msg: Some(sig_msg.clone()),
+        signature: signature.clone(),
+        signer_pub_key_x: partial_exit_witness
+            .before
+            .witness
+            .account_witness
+            .pub_x
+            .clone(),
+        signer_pub_key_y: partial_exit_witness
+            .before
+            .witness
+            .account_witness
+            .pub_y
+            .clone(),
+        args: partial_exit_witness.args.clone(),
+        lhs: partial_exit_witness.before.clone(),
+        rhs: partial_exit_witness.before.clone(),
+    };
+
+    println!("pubdata_chunk number {} is {}", 1, pubdata_chunks[1]);
+    let operation_one = Operation {
+        new_root: partial_exit_witness.after_root.clone(),
+        tx_type: partial_exit_witness.tx_type,
+        chunk: Some(Fr::from_str("1").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[1]),
+        sig_msg: Some(sig_msg.clone()),
+        signature: signature.clone(),
+        signer_pub_key_x: partial_exit_witness
+            .before
+            .witness
+            .account_witness
+            .pub_x
+            .clone(),
+        signer_pub_key_y: partial_exit_witness
+            .before
+            .witness
+            .account_witness
+            .pub_y
+            .clone(),
+        args: partial_exit_witness.args.clone(),
+        lhs: partial_exit_witness.after.clone(),
+        rhs: partial_exit_witness.after.clone(),
+    };
+
+    println!("pubdata_chunk number {} is {}", 2, pubdata_chunks[2]);
+    let operation_two = Operation {
+        new_root: partial_exit_witness.after_root.clone(),
+        tx_type: partial_exit_witness.tx_type,
+        chunk: Some(Fr::from_str("2").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[2]),
+        sig_msg: Some(sig_msg.clone()),
+        signature: signature.clone(),
+        signer_pub_key_x: partial_exit_witness
+            .before
+            .witness
+            .account_witness
+            .pub_x
+            .clone(),
+        signer_pub_key_y: partial_exit_witness
+            .before
+            .witness
+            .account_witness
+            .pub_y
+            .clone(),
+        args: partial_exit_witness.args.clone(),
+        lhs: partial_exit_witness.after.clone(),
+        rhs: partial_exit_witness.after.clone(),
+    };
+
+    let operation_three = Operation {
+        new_root: partial_exit_witness.after_root.clone(),
+        tx_type: partial_exit_witness.tx_type,
+        chunk: Some(Fr::from_str("3").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[3]),
+        sig_msg: Some(sig_msg.clone()),
+        signature: signature.clone(),
+        signer_pub_key_x: partial_exit_witness
+            .before
+            .witness
+            .account_witness
+            .pub_x
+            .clone(),
+        signer_pub_key_y: partial_exit_witness
+            .before
+            .witness
+            .account_witness
+            .pub_y
+            .clone(),
+        args: partial_exit_witness.args.clone(),
+        lhs: partial_exit_witness.after.clone(),
+        rhs: partial_exit_witness.after.clone(),
+    };
+    vec![
+        operation_zero,
+        operation_one,
+        operation_two,
+        operation_three,
+    ]
+}
 #[test]
 fn test_partial_exit_franklin_in_empty_leaf() {
     use super::utils::public_data_commitment;
@@ -255,7 +369,7 @@ fn test_partial_exit_franklin_in_empty_leaf() {
         subtree: sender_balance_tree,
         nonce: Fr::zero(),
         pub_x: sender_x.clone(),
-        pub_y: sender_x.clone(),
+        pub_y: sender_y.clone(),
     };
 
     tree.insert(account_address, sender_leaf_initial);
@@ -270,11 +384,6 @@ fn test_partial_exit_franklin_in_empty_leaf() {
             ethereum_key: ethereum_key,
         },
     );
-    let pubdata_chunks: Vec<_> = partial_exit_witness
-        .get_pubdata()
-        .chunks(64)
-        .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
-        .collect();
 
     let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on partial_exit proof
     let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
@@ -285,83 +394,12 @@ fn test_partial_exit_franklin_in_empty_leaf() {
     let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
     //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
-    let operation_zero = Operation {
-        new_root: partial_exit_witness.after_root.clone(),
-        tx_type: partial_exit_witness.tx_type,
-        chunk: Some(Fr::from_str("0").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[0]),
-        sig_msg: Some(sig_msg.clone()),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(sender_x),
-        signer_pub_key_y: Some(sender_y),
-        args: partial_exit_witness.args.clone(),
-        lhs: partial_exit_witness.before.clone(),
-        rhs: partial_exit_witness.before.clone(),
-    };
+    let operations =
+        calculate_partial_exit_operations_from_witness(&partial_exit_witness, &sig_msg, signature);
 
-    println!("pubdata_chunk number {} is {}", 1, pubdata_chunks[1]);
-    let operation_one = Operation {
-        new_root: partial_exit_witness.after_root.clone(),
-        tx_type: partial_exit_witness.tx_type,
-        chunk: Some(Fr::from_str("1").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[1]),
-        sig_msg: Some(sig_msg.clone()),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(sender_x),
-        signer_pub_key_y: Some(sender_y),
-        args: partial_exit_witness.args.clone(),
-        lhs: partial_exit_witness.after.clone(),
-        rhs: partial_exit_witness.after.clone(),
-    };
+    let (root_after_fee, validator_account_witness) =
+        apply_fee(&mut tree, validator_address_number, token, fee);
 
-    println!("pubdata_chunk number {} is {}", 2, pubdata_chunks[2]);
-    let operation_two = Operation {
-        new_root: partial_exit_witness.after_root.clone(),
-        tx_type: partial_exit_witness.tx_type,
-        chunk: Some(Fr::from_str("2").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[2]),
-        sig_msg: Some(sig_msg.clone()),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(sender_x),
-        signer_pub_key_y: Some(sender_y),
-        args: partial_exit_witness.args.clone(),
-        lhs: partial_exit_witness.after.clone(),
-        rhs: partial_exit_witness.after.clone(),
-    };
-
-    let operation_three = Operation {
-        new_root: partial_exit_witness.after_root.clone(),
-        tx_type: partial_exit_witness.tx_type,
-        chunk: Some(Fr::from_str("3").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[3]),
-        sig_msg: Some(sig_msg.clone()),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(sender_x),
-        signer_pub_key_y: Some(sender_y),
-        args: partial_exit_witness.args.clone(),
-        lhs: partial_exit_witness.after.clone(),
-        rhs: partial_exit_witness.after.clone(),
-    };
-
-    let mut validator_leaf = tree.remove(validator_address_number).unwrap();
-    let validator_account_witness = AccountWitness {
-        nonce: Some(validator_leaf.nonce.clone()),
-        pub_x: Some(validator_leaf.pub_x.clone()),
-        pub_y: Some(validator_leaf.pub_y.clone()),
-    };
-    let validator_balance_root = validator_leaf.subtree.root_hash();
-    println!("validator_balance_root: {}", validator_balance_root);
-    println!("tree before_applying fees: {}", tree.root_hash());
-
-    validator_leaf.subtree.insert(
-        token,
-        Balance {
-            value: Fr::from_str(&fee.to_string()).unwrap(),
-        },
-    );
-
-    tree.insert(validator_address_number, validator_leaf);
-    let root_after_fee = tree.root_hash();
     let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
 
     let public_data_commitment = public_data_commitment::<Bn256>(
@@ -378,12 +416,7 @@ fn test_partial_exit_franklin_in_empty_leaf() {
             params,
             old_root: partial_exit_witness.before_root,
             new_root: Some(root_after_fee),
-            operations: vec![
-                operation_zero,
-                operation_one,
-                operation_two,
-                operation_three,
-            ],
+            operations: operations,
             pub_data_commitment: Some(public_data_commitment),
             block_number: Some(block_number),
             validator_account: validator_account_witness,

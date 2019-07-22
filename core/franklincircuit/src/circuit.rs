@@ -141,12 +141,10 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         // vector of pub_data_bits that will be aggregated during block processing
         let mut block_pub_data_bits = vec![];
 
-        let mut allocated_chunk_data: AllocatedChunkData<E> = AllocatedChunkData{
-            is_chunk_last: Boolean::constant(
-                false
-            ),
+        let mut allocated_chunk_data: AllocatedChunkData<E> = AllocatedChunkData {
+            is_chunk_last: Boolean::constant(false),
             chunk_number: precomputed.asserted_numbers[0].clone(),
-            tx_type:zero_circuit_element,
+            tx_type: zero_circuit_element,
         };
         for (i, operation) in self.operations.iter().enumerate() {
             println!("\n operation number {} started \n", i);
@@ -231,10 +229,14 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         }
 
         cs.enforce(
-                || "ensure op_data correct",
-                |_| allocated_chunk_data.is_chunk_last.lc(CS::one(), E::Fr::one()),
-                |lc| lc + CS::one(),
-                |lc| lc + CS::one(),
+            || "ensure op_data correct",
+            |_| {
+                allocated_chunk_data
+                    .is_chunk_last
+                    .lc(CS::one(), E::Fr::one())
+            },
+            |lc| lc + CS::one(),
+            |lc| lc + CS::one(),
         );
 
         // calculate operator's balance_tree root hash from whole tree representation
@@ -597,7 +599,12 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         precomputed: &[AllocatedNum<E>],
         prev: &mut PreviousData<E>,
     ) -> Result<(), SynthesisError> {
-        cs.enforce(||"left and right tokens are equal",|lc| lc + lhs.token.get_number().get_variable(), |lc|lc +CS::one(), |lc| lc + rhs.token.get_number().get_variable());
+        cs.enforce(
+            || "left and right tokens are equal",
+            |lc| lc + lhs.token.get_number().get_variable(),
+            |lc| lc + CS::one(),
+            |lc| lc + rhs.token.get_number().get_variable(),
+        );
         let public_generator = self
             .params
             .generator(FixedGenerators::SpendingKeyGenerator)
@@ -655,17 +662,14 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 cs.namespace(|| "is_op_data_equal_to_previous"),
                 &is_op_data_correct_flags,
             )?;
-            let is_chunk_first =  Boolean::from(AllocatedNum::equals(
-                        cs.namespace(|| "is_chunk_first"),
-                        &chunk_data.chunk_number,
-                        &precomputed[0],
-                    )?);
+            let is_chunk_first = Boolean::from(AllocatedNum::equals(
+                cs.namespace(|| "is_chunk_first"),
+                &chunk_data.chunk_number,
+                &precomputed[0],
+            )?);
             let is_op_data_correct = multi_or(
                 cs.namespace(|| "is_op_data_correct"),
-                &[
-                    is_op_data_equal_to_previous,
-                    is_chunk_first,
-                ],
+                &[is_op_data_equal_to_previous, is_chunk_first],
             )?;
             cs.enforce(
                 || "ensure op_data correct",

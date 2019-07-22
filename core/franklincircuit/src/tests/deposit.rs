@@ -185,6 +185,94 @@ pub fn apply_deposit(
     }
 }
 
+pub fn calculate_deposit_operations_from_witness(
+    deposit_witness: &DepositWitness<Bn256>,
+    sig_msg: &Fr,
+    signature: Option<TransactionSignature<Bn256>>,
+) -> Vec<Operation<Bn256>> {
+    let pubdata_chunks: Vec<_> = deposit_witness
+        .get_pubdata()
+        .chunks(64)
+        .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
+        .collect();
+    let operation_zero = Operation {
+        new_root: deposit_witness.after_root.clone(),
+        tx_type: deposit_witness.tx_type,
+        chunk: Some(Fr::from_str("0").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[0]),
+        sig_msg: Some(sig_msg.clone()),
+        signature: signature.clone(),
+        signer_pub_key_x: deposit_witness.args.new_pub_x,
+        signer_pub_key_y: deposit_witness.args.new_pub_y,
+        args: deposit_witness.args.clone(),
+        lhs: deposit_witness.before.clone(),
+        rhs: deposit_witness.before.clone(),
+    };
+
+    let operation_one = Operation {
+        new_root: deposit_witness.after_root.clone(),
+        tx_type: deposit_witness.tx_type,
+        chunk: Some(Fr::from_str("1").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[1]),
+        sig_msg: Some(sig_msg.clone()),
+        signature: signature.clone(),
+        signer_pub_key_x: deposit_witness.args.new_pub_x,
+        signer_pub_key_y: deposit_witness.args.new_pub_y,
+        args: deposit_witness.args.clone(),
+        lhs: deposit_witness.after.clone(),
+        rhs: deposit_witness.after.clone(),
+    };
+
+    let operation_two = Operation {
+        new_root: deposit_witness.after_root.clone(),
+        tx_type: deposit_witness.tx_type,
+        chunk: Some(Fr::from_str("2").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[2]),
+        sig_msg: Some(sig_msg.clone()),
+        signature: signature.clone(),
+        signer_pub_key_x: deposit_witness.args.new_pub_x,
+        signer_pub_key_y: deposit_witness.args.new_pub_y,
+        args: deposit_witness.args.clone(),
+        lhs: deposit_witness.after.clone(),
+        rhs: deposit_witness.after.clone(),
+    };
+
+    let operation_three = Operation {
+        new_root: deposit_witness.after_root.clone(),
+        tx_type: deposit_witness.tx_type,
+        chunk: Some(Fr::from_str("3").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[3]),
+        sig_msg: Some(sig_msg.clone()),
+        signature: signature.clone(),
+        signer_pub_key_x: deposit_witness.args.new_pub_x,
+        signer_pub_key_y: deposit_witness.args.new_pub_y,
+        args: deposit_witness.args.clone(),
+        lhs: deposit_witness.after.clone(),
+        rhs: deposit_witness.after.clone(),
+    };
+    let operation_four = Operation {
+        new_root: deposit_witness.after_root.clone(),
+        tx_type: deposit_witness.tx_type,
+        chunk: Some(Fr::from_str("4").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[4]),
+        sig_msg: Some(sig_msg.clone()),
+        signature: signature.clone(),
+        signer_pub_key_x: deposit_witness.args.new_pub_x,
+        signer_pub_key_y: deposit_witness.args.new_pub_y,
+        args: deposit_witness.args.clone(),
+        lhs: deposit_witness.after.clone(),
+        rhs: deposit_witness.after.clone(),
+    };
+
+    let operations: Vec<Operation<_>> = vec![
+        operation_zero,
+        operation_one,
+        operation_two,
+        operation_three,
+        operation_four,
+    ];
+    operations
+}
 #[test]
 fn test_deposit_franklin_in_empty_leaf() {
     use super::utils::public_data_commitment;
@@ -247,6 +335,8 @@ fn test_deposit_franklin_in_empty_leaf() {
     let amount: u128 = 500;
     let fee: u128 = 10;
     let token: u32 = 2;
+
+    //-------------- Start applying changes to state
     let deposit_witness = apply_deposit(
         &mut tree,
         &DepositData {
@@ -258,11 +348,6 @@ fn test_deposit_franklin_in_empty_leaf() {
             new_pub_y: sender_y,
         },
     );
-    let pubdata_chunks: Vec<_> = deposit_witness
-        .get_pubdata()
-        .chunks(64)
-        .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
-        .collect();
 
     let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
     let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
@@ -273,100 +358,13 @@ fn test_deposit_franklin_in_empty_leaf() {
     let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
     //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
-    let operation_zero = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
-        chunk: Some(Fr::from_str("0").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[0]),
-        sig_msg: Some(sig_msg.clone()),
-        signature: signature.clone(),
-        signer_pub_key_x: deposit_witness.args.new_pub_x,
-        signer_pub_key_y: deposit_witness.args.new_pub_y,
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.before.clone(),
-        rhs: deposit_witness.before.clone(),
-    };
-
-    println!("pubdata_chunk number {} is {}", 1, pubdata_chunks[1]);
-    let operation_one = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
-        chunk: Some(Fr::from_str("1").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[1]),
-        sig_msg: Some(sig_msg.clone()),
-        signature: signature.clone(),
-        signer_pub_key_x: deposit_witness.args.new_pub_x,
-        signer_pub_key_y: deposit_witness.args.new_pub_y,
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.after.clone(),
-        rhs: deposit_witness.after.clone(),
-    };
-
-    println!("pubdata_chunk number {} is {}", 2, pubdata_chunks[2]);
-    let operation_two = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
-        chunk: Some(Fr::from_str("2").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[2]),
-        sig_msg: Some(sig_msg.clone()),
-        signature: signature.clone(),
-        signer_pub_key_x: deposit_witness.args.new_pub_x,
-        signer_pub_key_y: deposit_witness.args.new_pub_y,
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.after.clone(),
-        rhs: deposit_witness.after.clone(),
-    };
-
-    let operation_three = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
-        chunk: Some(Fr::from_str("3").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[3]),
-        sig_msg: Some(sig_msg.clone()),
-        signature: signature.clone(),
-        signer_pub_key_x: deposit_witness.args.new_pub_x,
-        signer_pub_key_y: deposit_witness.args.new_pub_y,
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.after.clone(),
-        rhs: deposit_witness.after.clone(),
-    };
-    let operation_four = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
-        chunk: Some(Fr::from_str("4").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[4]),
-        sig_msg: Some(sig_msg.clone()),
-        signature: signature.clone(),
-        signer_pub_key_x: deposit_witness.args.new_pub_x,
-        signer_pub_key_y: deposit_witness.args.new_pub_y,
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.after.clone(),
-        rhs: deposit_witness.after.clone(),
-    };
+    let operations =
+        calculate_deposit_operations_from_witness(&deposit_witness, &sig_msg, signature);
 
     println!("tree before_applying fees: {}", tree.root_hash());
 
-    let mut validator_leaf = tree.remove(validator_address_number).unwrap();
-    let validator_account_witness = AccountWitness {
-        nonce: Some(validator_leaf.nonce.clone()),
-        pub_x: Some(validator_leaf.pub_x.clone()),
-        pub_y: Some(validator_leaf.pub_y.clone()),
-    };
-    let validator_balance_root = validator_leaf.subtree.root_hash();
-    println!("validator_balance_root: {}", validator_balance_root);
-
-    validator_leaf.subtree.insert(
-        token,
-        Balance {
-            value: Fr::from_str(&fee.to_string()).unwrap(),
-        },
-    );
-    println!(
-        "validator_balance_root after applying fee: {}",
-        validator_leaf.subtree.root_hash()
-    );
-    tree.insert(validator_address_number, validator_leaf);
-    let root_after_fee = tree.root_hash();
+    let (root_after_fee, validator_account_witness) =
+        apply_fee(&mut tree, validator_address_number, token, fee);
     println!("test root after fees {}", root_after_fee);
     let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
 
@@ -385,13 +383,7 @@ fn test_deposit_franklin_in_empty_leaf() {
             params,
             old_root: deposit_witness.before_root,
             new_root: Some(root_after_fee),
-            operations: vec![
-                operation_zero,
-                operation_one,
-                operation_two,
-                operation_three,
-                operation_four,
-            ],
+            operations: operations,
             pub_data_commitment: Some(public_data_commitment),
             block_number: Some(block_number),
             validator_account: validator_account_witness,
