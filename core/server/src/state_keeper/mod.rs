@@ -3,9 +3,9 @@ use pairing::bn256::Bn256;
 // use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 
 use models::plasma::account::Account;
-use models::plasma::block::{Block, BlockData};
+use models::plasma::block::Block;
 use models::plasma::tx::{FranklinTx, TransferTx};
-use models::plasma::{AccountId, AccountMap, BatchNumber};
+use models::plasma::{AccountId, AccountMap, Fr};
 use plasma::state::PlasmaState;
 use rayon::prelude::*;
 use sapling_crypto::eddsa::PrivateKey;
@@ -15,14 +15,15 @@ use web3::types::H256;
 
 use models::config;
 
-use models::{CommitRequest, NetworkStatus, ProtoBlock, StateKeeperRequest};
+use models::{CommitRequest, NetworkStatus, StateKeeperRequest};
 use storage::ConnectionPool;
 
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive, Zero};
 use std::sync::mpsc::{Receiver, Sender};
 
-use crate::new_eth_watch::ETHState;
+use crate::eth_watch::ETHState;
 use itertools::Itertools;
+use models::plasma::params::BLOCK_SIZE_CHUNKS;
 use std::io::BufReader;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -38,6 +39,11 @@ pub struct PlasmaStateKeeper {
     txs_since_last_block: usize,
 
     db_conn_pool: ConnectionPool,
+
+    /// (pk_x, pk_y)
+    fee_account_pk: (Fr, Fr),
+
+    eth_state: Arc<RwLock<ETHState>>,
 }
 
 #[allow(dead_code)]
@@ -46,7 +52,7 @@ type RootHash = H256;
 type UpdatedAccounts = AccountMap;
 
 impl PlasmaStateKeeper {
-    pub fn new(pool: ConnectionPool) -> Self {
+    pub fn new(pool: ConnectionPool, eth_state: Arc<RwLock<ETHState>>) -> Self {
         info!("constructing state keeper instance");
 
         // here we should insert default accounts into the tree
@@ -79,6 +85,9 @@ impl PlasmaStateKeeper {
             ),
             txs_since_last_block: num_of_valid_txs,
             db_conn_pool: pool,
+            // TODO: load pk from config.
+            fee_account_pk: (Fr::default(), Fr::default()),
+            eth_state,
         };
 
         let root = keeper.state.root_hash();
@@ -196,6 +205,7 @@ impl PlasmaStateKeeper {
     }
 
     fn prepare_tx_for_block(&self) -> Vec<FranklinTx> {
+        // TODO: get proper number of txs from db.
         let txs = self
             .db_conn_pool
             .access_mempool()
@@ -210,9 +220,20 @@ impl PlasmaStateKeeper {
     }
 
     fn filter_invalid_txs(&self, transfer_txs: Vec<FranklinTx>) -> Vec<FranklinTx> {
-        transfer_txs
+        let mut filtered_txs = Vec::new();
+
+        // Separate txs with no account.
+        filtered_txs.extend(
+            transfer_txs
+                .iter()
+                .filter(|tx| tx.account_id().is_none())
+                .cloned(),
+        );
+
+        let txs_with_correct_nonce = transfer_txs
             .into_iter()
-            .group_by(|tx| tx.account_id())
+            .filter(|tx| tx.account_id().is_some())
+            .group_by(|tx| tx.account_id().unwrap())
             .into_iter()
             .map(|(from, txs)| {
                 let mut txs = txs.collect::<Vec<_>>();
@@ -233,21 +254,45 @@ impl PlasmaStateKeeper {
             .fold(Vec::new(), |mut all_txs, mut next_tx_batch| {
                 all_txs.append(&mut next_tx_batch);
                 all_txs
+            });
+
+        filtered_txs.extend(txs_with_correct_nonce.into_iter());
+
+        let mut total_chunks = 0;
+        filtered_txs
+            .into_iter()
+            .take_while(|tx| {
+                total_chunks += tx.chunks();
+                total_chunks <= BLOCK_SIZE_CHUNKS
             })
+            .collect()
+    }
+
+    fn precheck_tx(&self, tx: &FranklinTx) -> Result<(), failure::Error> {
+        warn!("ETH state is not checked when applying tx");
+        Ok(())
+        //        unimplemented!("Check ETH state before applying transaction");
     }
 
     fn apply_txs(&mut self, transactions: Vec<FranklinTx>) -> CommitRequest {
         info!("Creating transfer block");
         // collect updated state
         let mut accounts_updated = Vec::new();
+        let mut fees = Vec::new();
         let mut txs = Vec::new();
 
         for tx in transactions.into_iter() {
+            if let Err(e) = self.precheck_tx(&tx) {
+                error!("Tx {:?} not ready: {:?}", tx, e);
+                continue;
+            }
+
             let mut tx_updates = self.state.apply_tx(&tx);
 
             match tx_updates {
-                Ok(updates) => {
-                    accounts_updated.append(&mut tx_updates);
+                Ok((fee, mut updates)) => {
+                    accounts_updated.append(&mut updates);
+                    fees.push(fee);
                     txs.push(tx);
                 }
                 Err(_) => {
@@ -256,11 +301,15 @@ impl PlasmaStateKeeper {
             };
         }
 
+        let (fee_account_id, fee_updates) = self.state.collect_fee(&fees, &self.fee_account_pk);
+        accounts_updated.extend(fee_updates.into_iter());
+
         let num_txs = txs.len();
         let block = Block {
             block_number: self.state.block_number,
             new_root_hash: self.state.root_hash(),
-            block_data: transactions,
+            fee_account: fee_account_id,
+            block_transactions: txs,
         };
 
         self.txs_since_last_block.saturating_sub(num_txs);
@@ -289,23 +338,23 @@ pub fn start_state_keeper(
 
 #[test]
 fn test_read_private_key() {
-    let pk_bytes =
-        hex::decode("8ea0225bbf7f3689eb8ba6f8d7bef3d8ae2541573d71711a28d5149807b40805").unwrap();
-    let private_key: PrivateKey<Bn256> =
-        PrivateKey::read(BufReader::new(pk_bytes.as_slice())).unwrap();
-
-    let padding_account_id = 2;
-
-    let nonce = 0;
-    let _tx = TransferTx::create_signed_tx(
-        padding_account_id, // from
-        0,                  // to
-        BigDecimal::zero(), // amount
-        BigDecimal::zero(), // fee
-        nonce,              // nonce
-        2_147_483_647,      // good until max_block
-        &private_key,
-    );
+    //    let pk_bytes =
+    //        hex::decode("8ea0225bbf7f3689eb8ba6f8d7bef3d8ae2541573d71711a28d5149807b40805").unwrap();
+    //    let private_key: PrivateKey<Bn256> =
+    //        PrivateKey::read(BufReader::new(pk_bytes.as_slice())).unwrap();
+    //
+    //    let padding_account_id = 2;
+    //
+    //    let nonce = 0;
+    //    let _tx = TransferTx::create_signed_tx(
+    //        padding_account_id, // from
+    //        0,                  // to
+    //        BigDecimal::zero(), // amount
+    //        BigDecimal::zero(), // fee
+    //        nonce,              // nonce
+    //        2_147_483_647,      // good until max_block
+    //        &private_key,
+    //    );
 
     //let pub_key = PublicKey::from_private(private_key, FixedGenerators::SpendingKeyGenerator, &params::JUBJUB_PARAMS as &sapling_crypto::alt_babyjubjub::AltJubjubBn256);
     //assert!( tx.verify_sig(&pub_key) );

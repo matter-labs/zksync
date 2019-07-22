@@ -4,7 +4,6 @@ version = "0.0.1"
 edition = "2018"
 
 [dependencies]
-circuit = { path = "../circuit" }
 eth_client = { path = "../eth_client" }
 plasma = { path = "../plasma" }
 models = { path = "../models" }
@@ -47,3 +46,4 @@ bigdecimal = { version = "0.0.14", features = ["serde"]}
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 diesel = { version = "1.4.2", features = ["postgres", "serde_json", "r2d2", "chrono"] }
 signal-hook = { version = "0.1.8", features = ["tokio-support"] }
+failure = "0.1"

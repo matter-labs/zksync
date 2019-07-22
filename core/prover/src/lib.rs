@@ -30,7 +30,6 @@ use bellman::groth16::{
     create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
 };
 
-use circuit::CircuitAccountTree;
 use models::plasma::block::Block;
 use models::plasma::block::BlockData;
 use models::plasma::circuit::account::CircuitAccount;
@@ -44,15 +43,8 @@ use models::config::{
     DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE, PROVER_CYCLE_WAIT, PROVER_TIMEOUT, PROVER_TIMER_TICK,
     RUNTIME_CONFIG,
 };
-use models::EncodedProof;
 use storage::StorageProcessor;
 
-use circuit::deposit::circuit::{Deposit, DepositWitness};
-use circuit::deposit::deposit_request::DepositRequest;
-use circuit::exit::circuit::{Exit, ExitWitness};
-use circuit::exit::exit_request::ExitRequest;
-use circuit::leaf::LeafWitness;
-use circuit::transfer::transaction::Transaction;
 use models::plasma::circuit::utils::be_bit_vector_into_bytes;
 
 use circuit::transfer::circuit::{TransactionWitness, Transfer};
@@ -61,20 +53,20 @@ use models::primitives::{
     field_element_to_u32, serialize_g1_for_ethereum, serialize_g2_for_ethereum,
 };
 
-pub struct Prover<E: JubjubEngine> {
-    pub transfer_batch_size: usize,
-    pub deposit_batch_size: usize,
-    pub exit_batch_size: usize,
-    pub current_block_number: BlockNumber,
-    pub accounts_tree: CircuitAccountTree,
-    pub transfer_parameters: BabyParameters,
-    pub deposit_parameters: BabyParameters,
-    pub exit_parameters: BabyParameters,
-    pub jubjub_params: E::Params,
-    pub worker: String,
-    pub prover_id: i32,
-    pub current_job: Arc<AtomicUsize>,
-}
+//pub struct Prover<E: JubjubEngine> {
+//    pub transfer_batch_size: usize,
+//    pub deposit_batch_size: usize,
+//    pub exit_batch_size: usize,
+//    pub current_block_number: BlockNumber,
+//    pub accounts_tree: CircuitAccountTree,
+//    pub transfer_parameters: BabyParameters,
+//    pub deposit_parameters: BabyParameters,
+//    pub exit_parameters: BabyParameters,
+//    pub jubjub_params: E::Params,
+//    pub worker: String,
+//    pub prover_id: i32,
+//    pub current_job: Arc<AtomicUsize>,
+//}
 
 pub type BabyProof = Proof<Engine>;
 pub type BabyParameters = Parameters<Engine>;
@@ -1216,15 +1208,16 @@ impl BabyProver {
     }
 
     pub fn run(&mut self, shutdown_tx: Sender<()>, stop_signal: Arc<AtomicBool>) {
-        info!("prover is running");
-        while !stop_signal.load(Ordering::SeqCst) {
-            if let Err(err) = self.make_proving_attempt() {
-                error!("Error: {}", err);
-            }
-            self.current_job.store(0, Ordering::Relaxed);
-        }
-        info!("prover stopped");
-        shutdown_tx.send(()).unwrap();
+        //        info!("prover is running");
+        //        while !stop_signal.load(Ordering::SeqCst) {
+        //            if let Err(err) = self.make_proving_attempt() {
+        //                error!("Error: {}", err);
+        //            }
+        //            self.current_job.store(0, Ordering::Relaxed);
+        //        }
+        //        info!("prover stopped");
+        //        shutdown_tx.send(()).unwrap();
+        unimplemented!()
     }
 }
 

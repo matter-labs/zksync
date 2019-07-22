@@ -7,14 +7,9 @@ use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
 use models::plasma::block::Block;
-use models::plasma::block::BlockData;
-use models::plasma::params::TokenId;
-use models::plasma::tx::{
-    FranklinTx, NewDepositTx, NewExitTx, TransferTx, TxSignature, DEPOSIT_TX, EXIT_TX, TRANSFER_TX,
-};
 use models::plasma::{
     apply_updates, reverse_updates, Account, AccountId, AccountMap, AccountUpdate, AccountUpdates,
-    BlockNumber, Fr, Nonce,
+    BlockNumber, Fr, Nonce, TokenId,
 };
 use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
@@ -95,7 +90,7 @@ struct StorageAccount {
 struct StorageBalance {
     pub account_id: i32,
     pub coin_id: i32,
-    pub balance: BigDecimal,
+    pub balance: i32,
 }
 
 #[derive(Insertable, QueryableByName, Queryable)]
@@ -111,8 +106,8 @@ struct StorageAccountUpdateInsert {
     pub account_id: i32,
     pub block_number: i32,
     pub coin_id: i32,
-    pub old_balance: BigDecimal,
-    pub new_balance: BigDecimal,
+    pub old_balance: i32,
+    pub new_balance: i32,
     pub old_nonce: i64,
     pub new_nonce: i64,
 }
@@ -124,8 +119,8 @@ struct StorageAccountUpdate {
     pub account_id: i32,
     pub block_number: i32,
     pub coin_id: i32,
-    pub old_balance: BigDecimal,
-    pub new_balance: BigDecimal,
+    pub old_balance: i32,
+    pub new_balance: i32,
     pub old_nonce: i64,
     pub new_nonce: i64,
 }
@@ -172,7 +167,11 @@ impl Into<(u32, AccountUpdate)> for StorageAccountDiff {
                 AccountUpdate::UpdateBalance {
                     old_nonce: upd.old_nonce as u32,
                     new_nonce: upd.new_nonce as u32,
-                    balance_update: (upd.coin_id as TokenId, upd.old_balance, upd.new_balance),
+                    balance_update: (
+                        upd.coin_id as TokenId,
+                        upd.old_balance as u32,
+                        upd.new_balance as u32,
+                    ),
                 },
             ),
             StorageAccountDiff::Create(upd) => (
@@ -283,89 +282,6 @@ impl StoredOperation {
     }
 }
 
-#[derive(Insertable)]
-#[table_name = "transactions"]
-struct NewTx {
-    pub tx_type: String, // 'transfer', 'deposit', 'exit'
-    pub from_account: i32,
-    pub to_account: Option<i32>, // only used for transfers
-    pub nonce: i32,              // only used for transfers
-    pub token: i32,
-    pub amount: i32,
-    pub fee: i32,
-
-    pub block_number: Option<i32>,
-    pub state_root: Option<String>, // unique block id (for possible reorgs)
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
-#[table_name = "transactions"]
-pub struct StoredTx {
-    pub id: i32,
-    pub tx_type: String, // 'transfer', 'deposit', 'exit'
-    pub from_account: i32,
-    pub to_account: Option<i32>, // only used for transfers
-    pub nonce: i32,
-    pub token: i32,
-    pub amount: i32,
-    pub fee: i32,
-
-    pub block_number: Option<i32>,
-    pub state_root: Option<String>, // unique block id (for possible reorgs)
-
-    pub created_at: NaiveDateTime,
-}
-
-impl StoredTx {
-    pub fn into_tx(self) -> QueryResult<FranklinTx> {
-        let res = match &self.tx_type {
-            t if t == TRANSFER_TX => FranklinTx::Transfer(self.into_transfer_transaction()),
-            d if d == DEPOSIT_TX => FranklinTx::Deposit(self.into_deposit_transaction()),
-            e if e == EXIT_TX => FranklinTx::Exit(self.into_exit_transaction()),
-            _ => return Err(Error::NotFound),
-        };
-        Ok(res)
-    }
-
-    pub fn into_transfer_transaction(self) -> TransferTx {
-        TransferTx {
-            from: self.from_account as u32,
-            to: self.to_account.unwrap() as u32,
-            token: self.token as u32,
-            amount: BigDecimal::from(self.amount),
-            fee: BigDecimal::from(self.fee),
-            nonce: self.nonce as u32,
-            good_until_block: 0,
-            signature: TxSignature::default(),
-        }
-    }
-
-    pub fn into_deposit_transaction(self) -> NewDepositTx {
-        NewDepositTx {
-            to: self.to_account.unwrap() as u32,
-            token: self.token as u32,
-            amount: BigDecimal::from(self.amount),
-            fee: BigDecimal::from(self.fee),
-            nonce: self.nonce as u32,
-            good_until_block: 0,
-            pub_x: Fr::zero(),
-            pub_y: Fr::zero(),
-        }
-    }
-
-    pub fn into_exit_transaction(self) -> NewExitTx {
-        NewExitTx {
-            account_id: self.to_account.unwrap() as u32,
-            token: self.token as u32,
-            amount: BigDecimal::from(self.amount),
-            fee: BigDecimal::from(self.fee),
-            nonce: self.nonce as u32,
-            good_until_block: 0,
-            signature: TxSignature::default(),
-        }
-    }
-}
-
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
 #[table_name = "proofs"]
 pub struct NewProof {
@@ -451,7 +367,7 @@ fn restore_account(
     let mut account = Account::default();
     for b in stored_balances.into_iter() {
         assert_eq!(b.account_id, stored_account.id);
-        account.set_balance(b.coin_id as TokenId, &b.balance);
+        account.set_balance(b.coin_id as TokenId, b.balance as u32);
     }
     account.nonce = stored_account.nonce as u32;
     account.public_key_x = fr_from_bytes(stored_account.pk_x);
@@ -494,7 +410,8 @@ impl StorageProcessor {
             match &op.action {
                 Action::Commit => {
                     self.commit_state_update(op.block.block_number, &op.accounts_updated)?;
-                    self.save_transactions(op)?;
+                    //                    self.save_transactions(op)?;
+                    warn!("Tx in block are not stored");
                 }
                 Action::Verify { .. } => self.apply_state_update(op.block.block_number)?,
             };
@@ -519,115 +436,6 @@ impl StorageProcessor {
             .set(tx_hash.eq(hash))
             .execute(self.conn())
             .map(|_| ())
-    }
-
-    fn save_transactions(&self, op: &Operation) -> QueryResult<()> {
-        let block_data = &op.block.block_data;
-        self.save_franklin_transactions(op, &block_data)
-    }
-
-    fn save_franklin_transactions(&self, op: &Operation, txs: &[FranklinTx]) -> QueryResult<()> {
-        self.conn().transaction(|| {
-            for tx in txs.iter() {
-                match tx {
-                    FranklinTx::Deposit(tx) => self.save_deposit_transaction(op, tx)?,
-                    FranklinTx::Transfer(tx) => self.save_transfer_transaction(op, tx)?,
-                    FranklinTx::Exit(tx) => self.save_exit_transaction(op, tx)?,
-                }
-            }
-            Ok(())
-        })
-    }
-
-    fn save_transfer_transaction(&self, op: &Operation, tx: &TransferTx) -> QueryResult<()> {
-        let inserted = diesel::insert_into(transactions::table)
-            .values(&NewTx {
-                tx_type: String::from("transfer"),
-                from_account: tx.from as i32,
-                to_account: Some(tx.to as i32),
-                nonce: tx.nonce as i32,
-                token: tx.token as i32,
-                amount: tx
-                    .amount
-                    .as_bigint_and_exponent()
-                    .0
-                    .to_str_radix(10)
-                    .as_str()
-                    .parse()
-                    .unwrap(),
-                fee: tx
-                    .fee
-                    .as_bigint_and_exponent()
-                    .0
-                    .to_str_radix(10)
-                    .as_str()
-                    .parse()
-                    .unwrap(),
-                block_number: Some(op.block.block_number as i32),
-                state_root: Some(op.block.new_root_hash.to_hex()),
-            })
-            .execute(self.conn())?;
-        if 0 == inserted {
-            error!("Error: could not commit all new transactions!");
-            return Err(Error::RollbackTransaction);
-        }
-        Ok(())
-    }
-
-    fn save_deposit_transaction(&self, op: &Operation, tx: &NewDepositTx) -> QueryResult<()> {
-        let inserted = diesel::insert_into(transactions::table)
-            .values(&NewTx {
-                tx_type: String::from("deposit"),
-                from_account: tx.to as i32,
-                to_account: None,
-                nonce: tx.nonce as i32,
-                token: tx.token as i32,
-                amount: tx
-                    .amount
-                    .as_bigint_and_exponent()
-                    .0
-                    .to_str_radix(10)
-                    .as_str()
-                    .parse()
-                    .unwrap(),
-                fee: 0,
-                block_number: Some(op.block.block_number as i32),
-                state_root: Some(op.block.new_root_hash.to_hex()),
-            })
-            .execute(self.conn())?;
-        if 0 == inserted {
-            error!("Error: could not commit all new transactions!");
-            return Err(Error::RollbackTransaction);
-        }
-        Ok(())
-    }
-
-    fn save_exit_transaction(&self, op: &Operation, tx: &NewExitTx) -> QueryResult<()> {
-        let inserted = diesel::insert_into(transactions::table)
-            .values(&NewTx {
-                tx_type: String::from("exit"),
-                from_account: tx.account_id as i32,
-                to_account: None,
-                nonce: tx.nonce as i32,
-                token: tx.token as i32,
-                amount: tx
-                    .amount
-                    .as_bigint_and_exponent()
-                    .0
-                    .to_str_radix(10)
-                    .as_str()
-                    .parse()
-                    .unwrap(),
-                fee: 0,
-                block_number: Some(op.block.block_number as i32),
-                state_root: Some(op.block.new_root_hash.to_hex()),
-            })
-            .execute(self.conn())?;
-        if 0 == inserted {
-            error!("Error: could not commit all new transactions!");
-            return Err(Error::RollbackTransaction);
-        }
-        Ok(())
     }
 
     fn commit_state_update(
@@ -675,7 +483,7 @@ impl StorageProcessor {
                             .execute(self.conn())?;
                     }
                     AccountUpdate::UpdateBalance {
-                        balance_update: (token, ref old_balance, ref new_balance),
+                        balance_update: (token, old_balance, new_balance),
                         old_nonce,
                         new_nonce,
                     } => {
@@ -684,8 +492,8 @@ impl StorageProcessor {
                                 account_id: *id as i32,
                                 block_number: block_number as i32,
                                 coin_id: token as i32,
-                                old_balance: old_balance.clone(),
-                                new_balance: new_balance.clone(),
+                                old_balance: old_balance as i32,
+                                new_balance: new_balance as i32,
                                 old_nonce: i64::from(old_nonce),
                                 new_nonce: i64::from(new_nonce),
                             })
@@ -1245,82 +1053,6 @@ impl StorageProcessor {
         //self.load_number("SELECT COALESCE(max(last_block), 0) AS integer_value FROM accounts")
     }
 
-    pub fn load_last_saved_transactions(&self, count: i32) -> Vec<StoredTx> {
-        let query = format!(
-            "
-            SELECT * FROM transactions
-            ORDER BY block_number DESC
-            LIMIT {}
-        ",
-            count
-        );
-        diesel::sql_query(query)
-            .load(self.conn())
-            .unwrap_or_default()
-    }
-
-    pub fn load_tx_transactions_for_account(
-        &self,
-        account_id: AccountId,
-        count: i32,
-    ) -> Vec<StoredTx> {
-        let query = format!(
-            "
-            SELECT * FROM transactions
-            WHERE from_account = {}
-            ORDER BY block_number DESC
-            LIMIT {}
-        ",
-            account_id, count
-        );
-        diesel::sql_query(query)
-            .load(self.conn())
-            .unwrap_or_default()
-    }
-
-    pub fn load_rx_transactions_for_account(
-        &self,
-        account_id: AccountId,
-        count: i32,
-    ) -> Vec<StoredTx> {
-        let query = format!(
-            "
-            SELECT * FROM transactions
-            WHERE to_account = {}
-            ORDER BY block_number DESC
-            LIMIT {}
-        ",
-            account_id, count
-        );
-        diesel::sql_query(query)
-            .load(self.conn())
-            .unwrap_or_else(|_| vec![])
-    }
-
-    pub fn load_transaction_with_id(&self, tx_id: u32) -> Option<StoredTx> {
-        let query = format!(
-            "
-            SELECT * FROM transactions
-            WHERE id = {}
-            DESC LIMIT 1
-        ",
-            tx_id as i32
-        );
-        diesel::sql_query(query).get_result(self.conn()).ok()
-    }
-
-    pub fn load_transactions_in_block(&self, block_number: u32) -> QueryResult<Vec<StoredTx>> {
-        let query = format!(
-            "
-            SELECT * FROM transactions
-            WHERE block_number = {}
-            ORDER BY block_number
-        ",
-            block_number as i32
-        );
-        diesel::sql_query(query).load(self.conn())
-    }
-
     pub fn fetch_prover_job(
         &self,
         worker_: &str,
@@ -1415,7 +1147,6 @@ impl StorageProcessor {
 mod test {
 
     use super::*;
-    use bigdecimal::BigDecimal;
     use diesel::Connection;
     use models::plasma::params::ETH_TOKEN_ID;
 
@@ -1475,7 +1206,7 @@ mod test {
                     AccountUpdate::UpdateBalance {
                         old_nonce: nonce_1,
                         new_nonce: nonce_1,
-                        balance_update: (0, 1.into(), 2.into()),
+                        balance_update: (0, 1, 2),
                     },
                 ),
                 (
@@ -1483,7 +1214,7 @@ mod test {
                     AccountUpdate::UpdateBalance {
                         old_nonce: nonce_2,
                         new_nonce: nonce_2,
-                        balance_update: (0, 2.into(), 3.into()),
+                        balance_update: (0, 2, 3),
                     },
                 ),
             ]
@@ -1515,13 +1246,13 @@ mod test {
 
     fn acc_create_updates(
         id: u32,
-        balance: u64,
+        balance: u32,
         nonce: u32,
     ) -> impl Iterator<Item = (u32, AccountUpdate)> {
         let mut a = models::plasma::account::Account::default();
         a.nonce = nonce;
         let old_balance = a.get_balance(ETH_TOKEN_ID).clone();
-        a.set_balance(ETH_TOKEN_ID, &BigDecimal::from(balance));
+        a.set_balance(ETH_TOKEN_ID, balance);
         let new_balance = a.get_balance(ETH_TOKEN_ID).clone();
         vec![
             (

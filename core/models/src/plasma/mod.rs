@@ -40,6 +40,12 @@ pub fn reverse_updates(updates: &mut AccountUpdates) {
 pub type PublicKey = eddsa::PublicKey<Engine>;
 pub type PrivateKey = eddsa::PrivateKey<Engine>;
 
-pub type BlockNumber = u32;
+pub type TokenId = u16;
+
+/// 3 bytes used.
 pub type AccountId = u32;
+pub type BlockNumber = u32;
 pub type Nonce = u32;
+/// 3 bytes used.
+pub type TokenAmount = u32;
+pub type FeeAmount = u8;

@@ -4,8 +4,8 @@ table! {
         account_id -> Int4,
         block_number -> Int4,
         coin_id -> Int4,
-        old_balance -> Numeric,
-        new_balance -> Numeric,
+        old_balance -> Int4,
+        new_balance -> Int4,
         old_nonce -> Int8,
         new_nonce -> Int8,
     }
@@ -45,13 +45,14 @@ table! {
     balances (account_id, coin_id) {
         account_id -> Int4,
         coin_id -> Int4,
-        balance -> Numeric,
+        balance -> Int4,
     }
 }
 
 table! {
-    mempool (from_account, nonce) {
-        from_account -> Int4,
+    mempool (hash) {
+        hash -> Bytea,
+        primary_account -> Nullable<Int4>,
         nonce -> Int8,
         tx -> Jsonb,
         created_at -> Timestamp,

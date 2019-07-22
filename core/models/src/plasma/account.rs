@@ -1,14 +1,14 @@
 use crate::circuit;
-use crate::plasma::params::{self, TokenId, TOTAL_TOKENS};
+use crate::plasma::params::{self, TOTAL_TOKENS};
+use crate::plasma::{Nonce, TokenAmount, TokenId};
 use crate::primitives::GetBits;
 use crate::{Engine, Fr, PublicKey};
-use bigdecimal::BigDecimal;
 use sapling_crypto::jubjub::{edwards, Unknown};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Account {
-    balances: Vec<BigDecimal>,
-    pub nonce: u32,
+    balances: Vec<TokenAmount>,
+    pub nonce: Nonce,
     pub public_key_x: Fr,
     pub public_key_y: Fr,
 }
@@ -18,18 +18,18 @@ pub enum AccountUpdate {
     Create {
         public_key_x: Fr,
         public_key_y: Fr,
-        nonce: u32,
+        nonce: Nonce,
     },
     Delete {
         public_key_x: Fr,
         public_key_y: Fr,
-        nonce: u32,
+        nonce: Nonce,
     },
     UpdateBalance {
-        old_nonce: u32,
-        new_nonce: u32,
+        old_nonce: Nonce,
+        new_nonce: Nonce,
         // (token, old, new)
-        balance_update: (TokenId, BigDecimal, BigDecimal),
+        balance_update: (TokenId, TokenAmount, TokenAmount),
     },
 }
 
@@ -61,11 +61,7 @@ impl AccountUpdate {
             } => AccountUpdate::UpdateBalance {
                 old_nonce: *new_nonce,
                 new_nonce: *old_nonce,
-                balance_update: (
-                    balance_update.0,
-                    balance_update.2.clone(),
-                    balance_update.1.clone(),
-                ),
+                balance_update: (balance_update.0, balance_update.2, balance_update.1),
             },
         }
     }
@@ -74,7 +70,7 @@ impl AccountUpdate {
 impl Default for Account {
     fn default() -> Self {
         Self {
-            balances: vec![BigDecimal::default(); TOTAL_TOKENS],
+            balances: vec![0; TOTAL_TOKENS],
             nonce: 0,
             public_key_x: Fr::default(),
             public_key_y: Fr::default(),
@@ -84,9 +80,21 @@ impl Default for Account {
 
 impl GetBits for Account {
     fn get_bits_le(&self) -> Vec<bool> {
-        circuit::account::CircuitAccount::<Engine>::from(self.clone()).get_bits_le()
+        use bitvec::prelude::*;
+        use ff::{PrimeField, PrimeFieldRepr};
 
-        // TODO: make more efficient:
+        // TODO: (Drogan) use circuit here.
+        let mut bytes = Vec::new();
+        for token in 0..TOTAL_TOKENS {
+            bytes.extend_from_slice(&self.get_balance(token as TokenId).to_le_bytes());
+        }
+        bytes.extend_from_slice(&self.nonce.to_le_bytes());
+        self.public_key_x.into_repr().write_le(&mut bytes).unwrap();
+        self.public_key_y.into_repr().write_le(&mut bytes).unwrap();
+
+        BitVec::<LittleEndian, u8>::from_slice(&bytes)
+            .into_iter()
+            .collect()
 
         // let mut leaf_content = Vec::new();
         // leaf_content.extend(self.balance.get_bits_le_fixed(params::BALANCE_BIT_WIDTH));
@@ -107,34 +115,20 @@ impl Account {
         point.map(sapling_crypto::eddsa::PublicKey::<Engine>)
     }
 
-    fn get_token(&self, token: TokenId) -> &BigDecimal {
-        self.balances.get(token as usize).expect("Token not found")
+    pub fn get_balance(&self, token: TokenId) -> TokenAmount {
+        self.balances[token as usize]
     }
 
-    fn get_token_mut(&mut self, token: TokenId) -> &mut BigDecimal {
-        self.balances
-            .get_mut(token as usize)
-            .expect("Token not found")
+    pub fn set_balance(&mut self, token: TokenId, amount: TokenAmount) {
+        self.balances[token as usize] = amount;
     }
 
-    pub fn get_balance(&self, token: TokenId) -> &BigDecimal {
-        self.get_token(token)
+    pub fn add_balance(&mut self, token: TokenId, amount: TokenAmount) {
+        self.balances[token as usize] += amount;
     }
 
-    pub fn balances(&self) -> Vec<BigDecimal> {
-        self.balances.clone()
-    }
-
-    pub fn set_balance(&mut self, token: TokenId, amount: &BigDecimal) {
-        std::mem::replace(self.get_token_mut(token), amount.clone());
-    }
-
-    pub fn add_balance(&mut self, token: TokenId, amount: &BigDecimal) {
-        *self.get_token_mut(token) += amount;
-    }
-
-    pub fn sub_balance(&mut self, token: TokenId, amount: &BigDecimal) {
-        *self.get_token_mut(token) -= amount;
+    pub fn sub_balance(&mut self, token: TokenId, amount: TokenAmount) {
+        self.balances[token as usize] -= amount;
     }
 
     pub fn apply_update(account: Option<Self>, update: AccountUpdate) -> Option<Self> {
@@ -146,7 +140,7 @@ impl Account {
                     new_nonce,
                     ..
                 } => {
-                    account.set_balance(token, &amount);
+                    account.set_balance(token, amount);
                     account.nonce = new_nonce;
                     Some(account)
                 }

@@ -5,7 +5,7 @@ use super::{AccountId, BlockNumber, Fr};
 pub struct Block {
     pub block_number: BlockNumber,
     pub new_root_hash: Fr,
-    pub operator_account_id: AccountId,
+    pub fee_account: AccountId,
     pub block_transactions: Vec<FranklinTx>,
 }
 

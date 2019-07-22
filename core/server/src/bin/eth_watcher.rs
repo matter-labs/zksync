@@ -1,4 +1,4 @@
-use server::new_eth_watch::EthWatch;
+use server::eth_watch::EthWatch;
 
 fn main() {
     env_logger::init();

@@ -22,14 +22,16 @@ pub struct Mempool {
 #[derive(Debug, Insertable)]
 #[table_name = "mempool"]
 struct InsertTx {
-    from_account: i32,
+    hash: Vec<u8>,
+    primary_account: Option<i32>,
     nonce: i64,
     tx: Value,
 }
 
 #[derive(Debug, Queryable)]
 struct ReadTx {
-    from_account: i32,
+    hash: Vec<u8>,
+    primary_account: Option<i32>,
     nonce: i64,
     tx: Value,
     created_at: NaiveDateTime,
@@ -53,39 +55,49 @@ impl Mempool {
 
     pub fn get_size(&self) -> QueryResult<usize> {
         mempool::table
-            .select(count(mempool::from_account))
+            .select(count(mempool::primary_account))
             .execute(self.conn())
     }
 
     pub fn add_tx(&self, tx: &FranklinTx) -> QueryResult<()> {
         insert_into(mempool::table)
             .values(&InsertTx {
-                from_account: tx.account_id() as i32,
+                hash: tx.hash(),
+                primary_account: tx.account_id().map(|id| id as i32),
                 nonce: i64::from(tx.nonce()),
                 tx: serde_json::to_value(tx).unwrap(),
             })
-            .on_conflict((mempool::from_account, mempool::nonce))
-            .do_update()
-            .set((
-                mempool::tx.eq(serde_json::to_value(tx).unwrap()),
-                mempool::created_at.eq(diesel::dsl::now),
-            ))
             .execute(self.conn())
             .map(drop)
     }
 
     pub fn get_txs(&self, max_size: usize) -> QueryResult<Vec<FranklinTx>> {
-        //TODO (Drogan) use "gaps and islands" sql solution for this.
+        //TODO use "gaps and islands" sql solution for this.
         let stored_txs: Vec<_> = mempool::table
-            .inner_join(accounts::table.on(mempool::from_account.eq(accounts::id)))
+            .inner_join(accounts::table.on(mempool::primary_account.eq(accounts::id.nullable())))
             .filter(accounts::nonce.eq(mempool::nonce))
             .order(mempool::created_at.asc())
             .limit(max_size as i64)
             .load::<(ReadTx, StorageAccount)>(self.conn())?;
 
-        Ok(stored_txs
-            .into_iter()
-            .map(|(stored_tx, _)| serde_json::from_value(stored_tx.tx).unwrap())
-            .collect())
+        let new_account_txs: Vec<_> = mempool::table
+            .filter(mempool::primary_account.is_null())
+            .order(mempool::created_at.asc())
+            .limit(max_size as i64)
+            .load::<ReadTx>(self.conn())?;
+
+        let mut txs = Vec::new();
+        txs.extend(
+            stored_txs
+                .into_iter()
+                .map(|(stored_tx, _)| serde_json::from_value(stored_tx.tx).unwrap()),
+        );
+        txs.extend(
+            new_account_txs
+                .into_iter()
+                .map(|stored_tx| serde_json::from_value(stored_tx.tx).unwrap()),
+        );
+        txs.truncate(max_size);
+        Ok(txs)
     }
 }

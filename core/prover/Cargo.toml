@@ -4,7 +4,6 @@ version = "0.0.1"
 edition = "2018"
 
 [dependencies]
-circuit = { path = "../circuit" }
 plasma = { path = "../plasma" }
 models = { path = "../models" }
 storage = { path = "../storage" }

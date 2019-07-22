@@ -18,7 +18,7 @@ CREATE TABLE balances
 (
     account_id integer REFERENCES accounts (id) ON UPDATE CASCADE ON DELETE CASCADE,
     coin_id    integer REFERENCES tokens (id) ON UPDATE CASCADE,
-    balance    numeric not null default 0,
+    balance    integer not null default 0,
     PRIMARY KEY (account_id, coin_id)
 );
 
@@ -31,8 +31,8 @@ create TABLE account_balance_updates
     account_id        integer not null,
     block_number      integer not null,
     coin_id           integer not null references tokens (id) on update cascade,
-    old_balance       numeric not null,
-    new_balance       numeric not null,
+    old_balance       integer not null,
+    new_balance       integer not null,
     old_nonce         bigint  not null,
     new_nonce         bigint  not null,
     PRIMARY KEY (balance_update_id)

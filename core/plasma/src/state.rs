@@ -3,9 +3,11 @@ use failure::{bail, ensure, format_err, Error};
 use ff::PrimeField;
 use merkle_tree::AccountTree;
 use models::plasma::account::Account;
-use models::plasma::params::TokenId;
-use models::plasma::tx::{DepositTx, FranklinTx, PartialExitTx, TransferTx};
-use models::plasma::{params, AccountUpdate, AccountUpdates, BlockNumber, TransferToNewTx};
+use models::plasma::tx::{CloseTx, DepositTx, FranklinTx, PartialExitTx, TransferTx};
+use models::plasma::{
+    params, AccountUpdate, AccountUpdates, BlockNumber, FeeAmount, TokenAmount, TokenId,
+    TransferToNewTx,
+};
 use models::plasma::{AccountId, AccountMap, Fr};
 use std::collections::HashMap;
 
@@ -35,7 +37,7 @@ pub struct PlasmaState {
 
 pub struct CollectedFee {
     pub token: TokenId,
-    pub amount: BigDecimal,
+    pub amount: FeeAmount,
 }
 
 impl PlasmaState {
@@ -80,7 +82,68 @@ impl PlasmaState {
             FranklinTx::TransferToNew(tx) => self.apply_transfer_to_new(tx),
             FranklinTx::PartialExit(tx) => self.apply_partial_exit(tx),
             FranklinTx::Transfer(tx) => self.apply_transfer(tx),
+            FranklinTx::Close(tx) => self.apply_close(tx),
         }
+    }
+
+    pub fn collect_fee(
+        &mut self,
+        fees: &[CollectedFee],
+        fee_account: &(Fr, Fr),
+    ) -> (AccountId, AccountUpdates) {
+        let mut updates = Vec::new();
+        let (id, mut account, create_upd) =
+            self.get_or_create_account_by_pubkey(fee_account.0, fee_account.1);
+        updates.extend(create_upd.into_iter());
+
+        for fee in fees {
+            let old_amount = account.get_balance(fee.token).clone();
+            let nonce = account.nonce;
+            account.add_balance(fee.token, u32::from(fee.amount));
+            let new_amount = account.get_balance(fee.token).clone();
+
+            updates.push((
+                id,
+                AccountUpdate::UpdateBalance {
+                    balance_update: (fee.token, old_amount, new_amount),
+                    old_nonce: nonce,
+                    new_nonce: nonce,
+                },
+            ));
+        }
+
+        self.insert_account(id, account);
+
+        (id, updates)
+    }
+
+    fn get_or_create_account_by_pubkey(
+        &self,
+        pub_key_x: Fr,
+        pub_key_y: Fr,
+    ) -> (AccountId, Account, AccountUpdates) {
+        let mut updates = Vec::new();
+        let (id, account) = self
+            .get_account_by_pubkey(pub_key_x, pub_key_y)
+            .unwrap_or_else(|| {
+                let mut acc = Account::default();
+                acc.public_key_x = pub_key_x;
+                acc.public_key_y = pub_key_y;
+                acc.nonce = 0;
+
+                let acc_id = self.total_accounts();
+
+                updates.push((
+                    acc_id,
+                    AccountUpdate::Create {
+                        public_key_x: acc.public_key_x,
+                        public_key_y: acc.public_key_y,
+                        nonce: acc.nonce,
+                    },
+                ));
+                (acc_id, acc)
+            });
+        (id, account, updates)
     }
 
     fn get_account_by_pubkey(&self, pub_key_x: Fr, pub_key_y: Fr) -> Option<(AccountId, Account)> {
@@ -100,6 +163,14 @@ impl PlasmaState {
         self.balance_tree.insert(id, account);
     }
 
+    fn remove_account(&mut self, id: AccountId) {
+        if let Some(account) = self.get_account(id) {
+            self.account_id_by_pubkey
+                .remove(&(account.public_key_x, account.public_key_y).into());
+            self.balance_tree.delete(id);
+        }
+    }
+
     fn total_accounts(&self) -> u32 {
         self.account_id_by_pubkey.len() as u32
     }
@@ -113,26 +184,9 @@ impl PlasmaState {
         );
 
         let mut updates = Vec::new();
-        let (acc_id, mut acc) = self
-            .get_account_by_pubkey(tx.pub_x, tx.pub_y)
-            .unwrap_or_else(|| {
-                let mut acc = Account::default();
-                acc.public_key_x = tx.pub_x;
-                acc.public_key_y = tx.pub_y;
-                acc.nonce = 0;
-
-                let acc_id = self.total_accounts();
-
-                updates.push((
-                    acc_id,
-                    AccountUpdate::Create {
-                        public_key_x: acc.public_key_x,
-                        public_key_y: acc.public_key_y,
-                        nonce: acc.nonce,
-                    },
-                ));
-                (acc_id, acc)
-            });
+        let (acc_id, mut acc, create_upd) =
+            self.get_or_create_account_by_pubkey(tx.pub_x, tx.pub_y);
+        updates.extend(create_upd.into_iter());
 
         let old_amount = acc.get_balance(tx.token).clone();
         let old_nonce = acc.nonce;
@@ -142,8 +196,8 @@ impl PlasmaState {
             tx.nonce,
             old_nonce
         );
-        // TODO: Drogan check eth state balance.
-        acc.add_balance(tx.token, &tx.amount);
+        // TODO: (Drogan) check eth state balance.
+        acc.add_balance(tx.token, tx.amount);
         acc.nonce += 1;
         let new_amount = acc.get_balance(tx.token).clone();
         let new_nonce = acc.nonce;
@@ -161,7 +215,7 @@ impl PlasmaState {
 
         let fee = CollectedFee {
             token: tx.token,
-            amount: tx.fee.clone(),
+            amount: tx.fee,
         };
 
         Ok((fee, updates))
@@ -210,17 +264,17 @@ impl PlasmaState {
         let from_old_nonce = from_account.nonce;
         ensure!(tx.nonce == from_old_nonce, "Nonce mismatch");
         ensure!(
-            from_old_balance >= &tx.amount + &tx.fee,
+            from_old_balance >= tx.amount + u32::from(tx.fee),
             "Not enough balance"
         );
-        from_account.add_balance(tx.token, &tx.amount);
+        from_account.sub_balance(tx.token, tx.amount + u32::from(tx.fee));
         from_account.nonce += 1;
         let from_new_balance = from_account.get_balance(tx.token).clone();
         let from_new_nonce = from_account.nonce;
 
         let to_old_balance = to_account.get_balance(tx.token).clone();
         let to_account_nonce = to_account.nonce;
-        to_account.add_balance(tx.token, &tx.amount);
+        to_account.add_balance(tx.token, tx.amount);
         let to_new_balance = to_account.get_balance(tx.token).clone();
 
         self.insert_account(tx.from, from_account);
@@ -245,7 +299,7 @@ impl PlasmaState {
 
         let fee = CollectedFee {
             token: tx.token,
-            amount: tx.amount.clone(),
+            amount: tx.fee,
         };
 
         Ok((fee, updates))
@@ -271,11 +325,11 @@ impl PlasmaState {
 
         ensure!(tx.nonce == from_old_nonce, "Nonce mismatch");
         ensure!(
-            from_old_balance >= &tx.amount + &tx.fee,
+            from_old_balance >= tx.amount + u32::from(tx.fee),
             "Not enough balance"
         );
 
-        from_account.sub_balance(tx.token, &tx.amount);
+        from_account.sub_balance(tx.token, tx.amount + u32::from(tx.fee));
         from_account.nonce += 1;
 
         let from_new_balance = from_account.get_balance(tx.token).clone();
@@ -294,7 +348,47 @@ impl PlasmaState {
 
         let fee = CollectedFee {
             token: tx.token,
-            amount: tx.amount.clone(),
+            amount: tx.fee,
+        };
+
+        Ok((fee, updates))
+    }
+
+    fn apply_close(&mut self, tx: &CloseTx) -> Result<(CollectedFee, AccountUpdates), Error> {
+        ensure!(
+            self.block_number <= tx.good_until_block,
+            "Transaction expired, block: {}, tx_good_until {}",
+            self.block_number,
+            tx.good_until_block
+        );
+
+        let mut updates = Vec::new();
+        let account = self
+            .get_account(tx.account_id)
+            .ok_or_else(|| format_err!("Account does not exist id: {}", tx.account_id))?;
+
+        for token in 0..params::TOTAL_TOKENS {
+            if account.get_balance(token as TokenId) != 0 {
+                bail!("Account is not empty, token id: {}", token);
+            }
+        }
+
+        ensure!(tx.nonce == account.nonce, "Nonce mismatch");
+
+        self.remove_account(tx.account_id);
+
+        updates.push((
+            tx.account_id,
+            AccountUpdate::Delete {
+                public_key_x: account.public_key_x,
+                public_key_y: account.public_key_y,
+                nonce: account.nonce,
+            },
+        ));
+
+        let fee = CollectedFee {
+            token: params::ETH_TOKEN_ID,
+            amount: 0,
         };
 
         Ok((fee, updates))
@@ -321,11 +415,11 @@ impl PlasmaState {
 
         ensure!(tx.nonce == from_old_nonce, "Nonce mismatch");
         ensure!(
-            from_old_balance >= &tx.amount + &tx.fee,
+            from_old_balance >= tx.amount + u32::from(tx.fee),
             "Not enough balance"
         );
 
-        from_account.sub_balance(tx.token, &tx.amount);
+        from_account.sub_balance(tx.token, tx.amount + u32::from(tx.fee));
         from_account.nonce += 1;
 
         let from_new_balance = from_account.get_balance(tx.token).clone();
@@ -334,7 +428,7 @@ impl PlasmaState {
         let to_old_balance = to_account.get_balance(tx.token).clone();
         let to_account_nonce = to_account.nonce;
 
-        to_account.add_balance(tx.token, &tx.amount);
+        to_account.add_balance(tx.token, tx.amount);
 
         let to_new_balance = to_account.get_balance(tx.token).clone();
 
@@ -361,7 +455,7 @@ impl PlasmaState {
 
         let fee = CollectedFee {
             token: tx.token,
-            amount: tx.amount.clone(),
+            amount: tx.fee,
         };
 
         Ok((fee, updates))

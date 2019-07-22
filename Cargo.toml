@@ -9,5 +9,4 @@ members = [
     "core/prover",
     "core/server",
     "core/storage",
-    "core/circuit",
 ]

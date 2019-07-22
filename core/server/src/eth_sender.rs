@@ -1,10 +1,8 @@
-use circuit::encoder;
 use config;
 use eth_client::ETHClient;
 use ff::{PrimeField, PrimeFieldRepr};
 use models::abi::TEST_PLASMA_ALWAYS_VERIFY;
-use models::plasma::block::BlockData;
-use models::plasma::tx::{FranklinTx, NewDepositTx, NewExitTx, TransferTx};
+use models::plasma::tx::FranklinTx;
 use models::plasma::{params, AccountMap, AccountUpdate};
 use models::*;
 use std::sync::mpsc::{channel, Receiver, Sender};
