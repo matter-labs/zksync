@@ -1,6 +1,7 @@
 pub mod account;
 pub mod block;
 pub mod circuit;
+pub mod operations;
 pub mod params;
 pub mod tx;
 
@@ -11,9 +12,8 @@ use pairing::bn256;
 use sapling_crypto::eddsa;
 
 pub use self::account::{Account, AccountUpdate};
-pub use self::tx::{
-    DepositTx, FranklinTx, PartialExitTx, TransferToNewTx, TransferTx, TxSignature,
-};
+pub use self::operations::{DepositOp, FranklinOp, PartialExitOp, TransferOp, TransferToNewOp};
+pub use self::tx::TxSignature;
 
 pub type Engine = bn256::Bn256;
 pub type Fr = bn256::Fr;

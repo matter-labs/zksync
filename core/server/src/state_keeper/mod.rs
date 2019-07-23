@@ -4,7 +4,7 @@ use pairing::bn256::Bn256;
 
 use models::plasma::account::Account;
 use models::plasma::block::Block;
-use models::plasma::tx::{FranklinTx, TransferTx};
+use models::plasma::operations::{FranklinOp, TransferOp};
 use models::plasma::{AccountId, AccountMap, Fr};
 use plasma::state::PlasmaState;
 use rayon::prelude::*;
@@ -151,7 +151,7 @@ impl PlasmaStateKeeper {
         }
     }
 
-    fn handle_new_tx(&mut self, tx: &FranklinTx) -> Result<(), String> {
+    fn handle_new_tx(&mut self, tx: &FranklinOp) -> Result<(), String> {
         //        let account = self
         //            .state
         //            .get_account(tx.from)
@@ -179,9 +179,9 @@ impl PlasmaStateKeeper {
             .access_mempool()
             .map_err(|e| format!("Failed to connect to mempool. {:?}", e))?;
 
-        mempool
-            .add_tx(tx)
-            .map_err(|e| format!("Mempool query error:  {:?}", e))?;
+        //        mempool
+        //            .add_tx(tx)
+        //            .map_err(|e| format!("Mempool query error:  {:?}", e))?;
 
         if can_be_executed_now {
             self.txs_since_last_block += 1;
@@ -204,22 +204,23 @@ impl PlasmaStateKeeper {
         self.state.block_number += 1; // bump current block number as we've made one
     }
 
-    fn prepare_tx_for_block(&self) -> Vec<FranklinTx> {
+    fn prepare_tx_for_block(&self) -> Vec<FranklinOp> {
         // TODO: get proper number of txs from db.
-        let txs = self
-            .db_conn_pool
-            .access_mempool()
-            .map(|m| {
-                m.get_txs(config::RUNTIME_CONFIG.transfer_batch_size)
-                    .expect("Failed to get tx from db")
-            })
-            .expect("Failed to get txs from mempool");
-        let filtered_txs = self.filter_invalid_txs(txs);
-        debug!("Preparing block with txs: {:#?}", filtered_txs);
-        filtered_txs
+        unimplemented!()
+        //        let txs = self
+        //            .db_conn_pool
+        //            .access_mempool()
+        //            .map(|m| {
+        //                m.get_txs(config::RUNTIME_CONFIG.transfer_batch_size)
+        //                    .expect("Failed to get tx from db")
+        //            })
+        //            .expect("Failed to get txs from mempool");
+        //        let filtered_txs = self.filter_invalid_txs(txs);
+        //        debug!("Preparing block with txs: {:#?}", filtered_txs);
+        //        filtered_txs
     }
 
-    fn filter_invalid_txs(&self, transfer_txs: Vec<FranklinTx>) -> Vec<FranklinTx> {
+    fn filter_invalid_txs(&self, transfer_txs: Vec<FranklinOp>) -> Vec<FranklinOp> {
         let mut filtered_txs = Vec::new();
 
         // Separate txs with no account.
@@ -268,13 +269,13 @@ impl PlasmaStateKeeper {
             .collect()
     }
 
-    fn precheck_tx(&self, tx: &FranklinTx) -> Result<(), failure::Error> {
+    fn precheck_tx(&self, tx: &FranklinOp) -> Result<(), failure::Error> {
         warn!("ETH state is not checked when applying tx");
         Ok(())
         //        unimplemented!("Check ETH state before applying transaction");
     }
 
-    fn apply_txs(&mut self, transactions: Vec<FranklinTx>) -> CommitRequest {
+    fn apply_txs(&mut self, transactions: Vec<FranklinOp>) -> CommitRequest {
         info!("Creating transfer block");
         // collect updated state
         let mut accounts_updated = Vec::new();

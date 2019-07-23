@@ -5,7 +5,7 @@ use actix_web::{
     HttpMessage, HttpRequest, HttpResponse,
 };
 use models::config::RUNTIME_CONFIG;
-use models::plasma::{Account as PAccount, FranklinTx};
+use models::plasma::{Account as PAccount, FranklinOp};
 use models::{ActionType, NetworkStatus, StateKeeperRequest};
 use std::sync::mpsc;
 use storage::{BlockDetails, ConnectionPool};
@@ -75,7 +75,7 @@ fn handle_submit_tx(
 
     req.json()
         .map_err(|e| format!("{}", e)) // convert all errors to String
-        .and_then(move |tx: FranklinTx| {
+        .and_then(move |tx: FranklinOp| {
             // Rate limit check
 
             // TODO: check lazy init

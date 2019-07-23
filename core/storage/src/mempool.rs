@@ -60,15 +60,16 @@ impl Mempool {
     }
 
     pub fn add_tx(&self, tx: &FranklinTx) -> QueryResult<()> {
-        insert_into(mempool::table)
-            .values(&InsertTx {
-                hash: tx.hash(),
-                primary_account: tx.account_id().map(|id| id as i32),
-                nonce: i64::from(tx.nonce()),
-                tx: serde_json::to_value(tx).unwrap(),
-            })
-            .execute(self.conn())
-            .map(drop)
+        unimplemented!()
+        //        insert_into(mempool::table)
+        //            .values(&InsertTx {
+        //                hash: tx.hash(),
+        //                primary_account: tx.account_id().map(|id| id as i32),
+        //                nonce: i64::from(tx.nonce()),
+        //                tx: serde_json::to_value(tx).unwrap(),
+        //            })
+        //            .execute(self.conn())
+        //            .map(drop)
     }
 
     pub fn get_txs(&self, max_size: usize) -> QueryResult<Vec<FranklinTx>> {

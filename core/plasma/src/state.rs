@@ -3,10 +3,11 @@ use failure::{bail, ensure, format_err, Error};
 use ff::PrimeField;
 use merkle_tree::AccountTree;
 use models::plasma::account::Account;
-use models::plasma::tx::{CloseTx, DepositTx, FranklinTx, PartialExitTx, TransferTx};
+use models::plasma::operations::{CloseOp, DepositOp, FranklinOp, PartialExitOp, TransferOp};
+use models::plasma::tx::{Close, Deposit, FranklinTx, Transfer, Withdraw};
 use models::plasma::{
     params, AccountUpdate, AccountUpdates, BlockNumber, FeeAmount, TokenAmount, TokenId,
-    TransferToNewTx,
+    TransferToNewOp,
 };
 use models::plasma::{AccountId, AccountMap, Fr};
 use std::collections::HashMap;
@@ -14,6 +15,13 @@ use std::collections::HashMap;
 #[derive(Hash, PartialEq, Eq)]
 struct PubkeyBytes {
     bytes: Vec<u64>,
+}
+
+#[derive(Debug)]
+pub struct TxSuccess {
+    pub fee: CollectedFee,
+    pub updates: AccountUpdates,
+    pub executed_op: FranklinOp,
 }
 
 impl From<(Fr, Fr)> for PubkeyBytes {
@@ -35,6 +43,7 @@ pub struct PlasmaState {
     pub block_number: BlockNumber,
 }
 
+#[derive(Debug)]
 pub struct CollectedFee {
     pub token: TokenId,
     pub amount: FeeAmount,
@@ -76,14 +85,90 @@ impl PlasmaState {
         self.balance_tree.items.get(&account_id).cloned()
     }
 
-    pub fn apply_tx(&mut self, tx: &FranklinTx) -> Result<(CollectedFee, AccountUpdates), Error> {
+    pub fn apply_tx(&mut self, tx: FranklinTx) -> Result<TxSuccess, Error> {
         match tx {
-            FranklinTx::Deposit(tx) => self.apply_deposit(tx),
-            FranklinTx::TransferToNew(tx) => self.apply_transfer_to_new(tx),
-            FranklinTx::PartialExit(tx) => self.apply_partial_exit(tx),
             FranklinTx::Transfer(tx) => self.apply_transfer(tx),
+            FranklinTx::Deposit(tx) => self.apply_deposit(tx),
+            FranklinTx::Withdraw(tx) => self.apply_withdraw(tx),
             FranklinTx::Close(tx) => self.apply_close(tx),
         }
+    }
+
+    fn get_free_account_id(&self) -> AccountId {
+        // TODO check for collisions.
+        self.balance_tree.items.len() as u32
+    }
+
+    fn apply_deposit(&mut self, tx: Deposit) -> Result<TxSuccess, Error> {
+        let account_id =
+            if let Some((account_id, _)) = self.get_account_by_pubkey(tx.to.pk_x, tx.to.pk_y) {
+                account_id
+            } else {
+                self.get_free_account_id()
+            };
+        let deposit_op = DepositOp { tx, account_id };
+
+        let (fee, updates) = self.apply_deposit_op(&deposit_op)?;
+        Ok(TxSuccess {
+            fee,
+            updates,
+            executed_op: FranklinOp::Deposit(deposit_op),
+        })
+    }
+
+    fn apply_transfer(&mut self, tx: Transfer) -> Result<TxSuccess, Error> {
+        let (from, _) = self
+            .get_account_by_pubkey(tx.from.pk_x, tx.from.pk_y)
+            .ok_or_else(|| format_err!("From account does not exist"))?;
+
+        if let Some((to, _)) = self.get_account_by_pubkey(tx.to.pk_x, tx.to.pk_y) {
+            let transfer_op = TransferOp { tx, from, to };
+
+            let (fee, updates) = self.apply_transfer_op(&transfer_op)?;
+            Ok(TxSuccess {
+                fee,
+                updates,
+                executed_op: FranklinOp::Transfer(transfer_op),
+            })
+        } else {
+            let to = self.get_free_account_id();
+            let transfer_to_new_op = TransferToNewOp { tx, from, to };
+
+            let (fee, updates) = self.apply_transfer_to_new_op(&transfer_to_new_op)?;
+            Ok(TxSuccess {
+                fee,
+                updates,
+                executed_op: FranklinOp::TransferToNew(transfer_to_new_op),
+            })
+        }
+    }
+
+    fn apply_withdraw(&mut self, tx: Withdraw) -> Result<TxSuccess, Error> {
+        let (account_id, _) = self
+            .get_account_by_pubkey(tx.account.pk_x, tx.account.pk_y)
+            .ok_or_else(|| format_err!("Account does not exist"))?;
+        let partial_exit_op = PartialExitOp { tx, account_id };
+
+        let (fee, updates) = self.apply_partial_exit_op(&partial_exit_op)?;
+        Ok(TxSuccess {
+            fee,
+            updates,
+            executed_op: FranklinOp::PartialExit(partial_exit_op),
+        })
+    }
+
+    fn apply_close(&mut self, tx: Close) -> Result<TxSuccess, Error> {
+        let (account_id, _) = self
+            .get_account_by_pubkey(tx.account.pk_x, tx.account.pk_y)
+            .ok_or_else(|| format_err!("Account does not exist"))?;
+        let close_op = CloseOp { tx, account_id };
+
+        let (fee, updates) = self.apply_close_op(&close_op)?;
+        Ok(TxSuccess {
+            fee,
+            updates,
+            executed_op: FranklinOp::Close(close_op),
+        })
     }
 
     pub fn collect_fee(
@@ -115,6 +200,32 @@ impl PlasmaState {
         self.insert_account(id, account);
 
         (id, updates)
+    }
+
+    fn get_or_create_account_by_id(
+        &self,
+        id: AccountId,
+        pub_key_x: Fr,
+        pub_key_y: Fr,
+    ) -> (Account, AccountUpdates) {
+        let mut updates = Vec::new();
+        let account = self.get_account(id).unwrap_or_else(|| {
+            let mut acc = Account::default();
+            acc.public_key_x = pub_key_x;
+            acc.public_key_y = pub_key_y;
+            acc.nonce = 0;
+
+            updates.push((
+                id,
+                AccountUpdate::Create {
+                    public_key_x: acc.public_key_x,
+                    public_key_y: acc.public_key_y,
+                    nonce: acc.nonce,
+                },
+            ));
+            acc
+        });
+        (account, updates)
     }
 
     fn get_or_create_account_by_pubkey(
@@ -175,17 +286,14 @@ impl PlasmaState {
         self.account_id_by_pubkey.len() as u32
     }
 
-    fn apply_deposit(&mut self, tx: &DepositTx) -> Result<(CollectedFee, AccountUpdates), Error> {
-        ensure!(
-            self.block_number <= tx.good_until_block,
-            "Transaction expired, block: {}, tx_good_until {}",
-            self.block_number,
-            tx.good_until_block
-        );
-
+    fn apply_deposit_op(
+        &mut self,
+        op: &DepositOp,
+    ) -> Result<(CollectedFee, AccountUpdates), Error> {
+        let tx = &op.tx;
         let mut updates = Vec::new();
-        let (acc_id, mut acc, create_upd) =
-            self.get_or_create_account_by_pubkey(tx.pub_x, tx.pub_y);
+        let (mut acc, create_upd) =
+            self.get_or_create_account_by_id(op.account_id, tx.to.pk_x, tx.to.pk_y);
         updates.extend(create_upd.into_iter());
 
         let old_amount = acc.get_balance(tx.token).clone();
@@ -202,10 +310,10 @@ impl PlasmaState {
         let new_amount = acc.get_balance(tx.token).clone();
         let new_nonce = acc.nonce;
 
-        self.insert_account(acc_id, acc);
+        self.insert_account(op.account_id, acc);
 
         updates.push((
-            acc_id,
+            op.account_id,
             AccountUpdate::UpdateBalance {
                 balance_update: (tx.token, old_amount, new_amount),
                 old_nonce,
@@ -221,45 +329,22 @@ impl PlasmaState {
         Ok((fee, updates))
     }
 
-    fn apply_transfer_to_new(
+    fn apply_transfer_to_new_op(
         &mut self,
-        tx: &TransferToNewTx,
+        op: &TransferToNewOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
-        ensure!(
-            self.block_number <= tx.good_until_block,
-            "Transaction expired, block: {}, tx_good_until {}",
-            self.block_number,
-            tx.good_until_block
-        );
-
-        if self.get_account_by_pubkey(tx.pub_x, tx.pub_y).is_some() {
+        let tx = &op.tx;
+        if self.get_account_by_pubkey(tx.to.pk_x, tx.to.pk_y).is_some() {
             bail!("Transfer to new account exists");
         }
 
         let mut updates = Vec::new();
 
-        let (to_account_id, mut to_account) = {
-            let mut acc = Account::default();
-            acc.public_key_x = tx.pub_x;
-            acc.public_key_y = tx.pub_y;
-            acc.nonce = 0;
+        let (mut to_account, create_upd) =
+            self.get_or_create_account_by_id(op.to, tx.to.pk_x, tx.to.pk_y);
+        updates.extend(create_upd.into_iter());
 
-            let acc_id = self.total_accounts();
-
-            updates.push((
-                acc_id,
-                AccountUpdate::Create {
-                    public_key_x: acc.public_key_x,
-                    public_key_y: acc.public_key_y,
-                    nonce: acc.nonce,
-                },
-            ));
-            (acc_id, acc)
-        };
-
-        let mut from_account = self
-            .get_account(tx.from)
-            .ok_or_else(|| format_err!("From account does not exist id: {}", tx.from))?;
+        let mut from_account = self.get_account(op.from).unwrap();
         let from_old_balance = from_account.get_balance(tx.token).clone();
         let from_old_nonce = from_account.nonce;
         ensure!(tx.nonce == from_old_nonce, "Nonce mismatch");
@@ -277,11 +362,11 @@ impl PlasmaState {
         to_account.add_balance(tx.token, tx.amount);
         let to_new_balance = to_account.get_balance(tx.token).clone();
 
-        self.insert_account(tx.from, from_account);
-        self.insert_account(to_account_id, to_account);
+        self.insert_account(op.from, from_account);
+        self.insert_account(op.to, to_account);
 
         updates.push((
-            tx.from,
+            op.from,
             AccountUpdate::UpdateBalance {
                 balance_update: (tx.token, from_old_balance, from_new_balance),
                 old_nonce: from_old_nonce,
@@ -289,7 +374,7 @@ impl PlasmaState {
             },
         ));
         updates.push((
-            to_account_id,
+            op.to,
             AccountUpdate::UpdateBalance {
                 balance_update: (tx.token, to_old_balance, to_new_balance),
                 old_nonce: to_account_nonce,
@@ -305,21 +390,16 @@ impl PlasmaState {
         Ok((fee, updates))
     }
 
-    fn apply_partial_exit(
+    fn apply_partial_exit_op(
         &mut self,
-        tx: &PartialExitTx,
+        op: &PartialExitOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
-        ensure!(
-            self.block_number <= tx.good_until_block,
-            "Transaction expired, block: {}, tx_good_until {}",
-            self.block_number,
-            tx.good_until_block
-        );
+        let tx = &op.tx;
 
         let mut updates = Vec::new();
         let mut from_account = self
-            .get_account(tx.account_id)
-            .ok_or_else(|| format_err!("From account does not exist id: {}", tx.account_id))?;
+            .get_account(op.account_id)
+            .ok_or_else(|| format_err!("From account does not exist id: {}", op.account_id))?;
         let from_old_balance = from_account.get_balance(tx.token).clone();
         let from_old_nonce = from_account.nonce;
 
@@ -335,10 +415,10 @@ impl PlasmaState {
         let from_new_balance = from_account.get_balance(tx.token).clone();
         let from_new_nonce = from_account.nonce;
 
-        self.insert_account(tx.account_id, from_account);
+        self.insert_account(op.account_id, from_account);
 
         updates.push((
-            tx.account_id,
+            op.account_id,
             AccountUpdate::UpdateBalance {
                 balance_update: (tx.token, from_old_balance, from_new_balance),
                 old_nonce: from_old_nonce,
@@ -354,18 +434,11 @@ impl PlasmaState {
         Ok((fee, updates))
     }
 
-    fn apply_close(&mut self, tx: &CloseTx) -> Result<(CollectedFee, AccountUpdates), Error> {
-        ensure!(
-            self.block_number <= tx.good_until_block,
-            "Transaction expired, block: {}, tx_good_until {}",
-            self.block_number,
-            tx.good_until_block
-        );
-
+    fn apply_close_op(&mut self, op: &CloseOp) -> Result<(CollectedFee, AccountUpdates), Error> {
         let mut updates = Vec::new();
         let account = self
-            .get_account(tx.account_id)
-            .ok_or_else(|| format_err!("Account does not exist id: {}", tx.account_id))?;
+            .get_account(op.account_id)
+            .ok_or_else(|| format_err!("Account does not exist id: {}", op.account_id))?;
 
         for token in 0..params::TOTAL_TOKENS {
             if account.get_balance(token as TokenId) != 0 {
@@ -373,12 +446,12 @@ impl PlasmaState {
             }
         }
 
-        ensure!(tx.nonce == account.nonce, "Nonce mismatch");
+        ensure!(op.tx.nonce == account.nonce, "Nonce mismatch");
 
-        self.remove_account(tx.account_id);
+        self.remove_account(op.account_id);
 
         updates.push((
-            tx.account_id,
+            op.account_id,
             AccountUpdate::Delete {
                 public_key_x: account.public_key_x,
                 public_key_y: account.public_key_y,
@@ -394,21 +467,14 @@ impl PlasmaState {
         Ok((fee, updates))
     }
 
-    fn apply_transfer(&mut self, tx: &TransferTx) -> Result<(CollectedFee, AccountUpdates), Error> {
-        ensure!(
-            self.block_number <= tx.good_until_block,
-            "Transaction expired, block: {}, tx_good_until {}",
-            self.block_number,
-            tx.good_until_block
-        );
-
+    fn apply_transfer_op(
+        &mut self,
+        op: &TransferOp,
+    ) -> Result<(CollectedFee, AccountUpdates), Error> {
         let mut updates = Vec::new();
-        let mut from_account = self
-            .get_account(tx.from)
-            .ok_or_else(|| format_err!("From account does not exist, id: {}", tx.from))?;
-        let mut to_account = self
-            .get_account(tx.to)
-            .ok_or_else(|| format_err!("To account does not exist, id: {}", tx.to))?;
+        let tx = &op.tx;
+        let mut from_account = self.get_account(op.from).unwrap();
+        let mut to_account = self.get_account(op.to).unwrap();
 
         let from_old_balance = from_account.get_balance(tx.token).clone();
         let from_old_nonce = from_account.nonce;
@@ -432,11 +498,11 @@ impl PlasmaState {
 
         let to_new_balance = to_account.get_balance(tx.token).clone();
 
-        self.insert_account(tx.from, from_account);
-        self.insert_account(tx.to, to_account);
+        self.insert_account(op.from, from_account);
+        self.insert_account(op.to, to_account);
 
         updates.push((
-            tx.from,
+            op.from,
             AccountUpdate::UpdateBalance {
                 balance_update: (tx.token, from_old_balance, from_new_balance),
                 old_nonce: from_old_nonce,
@@ -445,7 +511,7 @@ impl PlasmaState {
         ));
 
         updates.push((
-            tx.to,
+            op.to,
             AccountUpdate::UpdateBalance {
                 balance_update: (tx.token, to_old_balance, to_new_balance),
                 old_nonce: to_account_nonce,

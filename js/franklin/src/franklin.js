@@ -8,28 +8,29 @@ const bn = ethers.utils.bigNumberify
 const MULTIPLIER = ethers.utils.bigNumberify('1000000000000')
 
 class FranklinWallet {
-    constructor(franklin, ethAddress, privateKeySeed, signer) {
+    constructor(franklin, privateKeySeed, depositorSigner) {
         this.fra = franklin
         this.eth = franklin.eth
-        this.ethWallet = signer.connect(franklin.eth.provider)
+        this.ethWallet = depositorSigner.connect(franklin.eth.provider)
         this.nextNonce = 0
 
-        this.ethAddress = ethAddress
+        this.ethAddress = depositorSigner.address
 
         if (!privateKeySeed) throw 'Cannot create FranklinWallet: privateKeySeed must be valid'
         this.key = transaction.newKey(privateKeySeed)
 
-        console.log(`Private key for ${signer.address}: ${JSON.stringify(this.key)}`)
+        // console.log(`Private key for ${signer.address}: ${JSON.stringify(this.key)}`)
 
         this.sidechainAccountId = null
         this.sidechainState = null
 
-        console.log(`new FranklinWallet(${this.ethAddress})`)
+        console.log(`new FranklinWallet(${this.key.publicKey})`)
     }
 
-    async pullState(checkAddress) {
-        checkAddress = checkAddress || !this.sidechainAccountId
-        this.sidechainAccountId = await this.eth.contract.ethereumAddressToAccountID(this.ethAddress)
+    async pullState() {
+        // account id, balances
+        // get chain state -- fetch available tokens
+        // this.sidechainAccountId = await this.eth.contract.ethereumAddressToAccountID(this.ethAddress)
         this.sidechainState = this.sidechainAccountId > 0 ?
             await this.fra.pullSidechainState(this.sidechainAccountId) : null
         //console.log(this.sidechainState.current.nonce, this.nextNonce)
@@ -46,7 +47,9 @@ class FranklinWallet {
         return this.sidechainOpen ? this.sidechainState.current.balance : undefined
     }
 
-    async deposit(amount) {
+    async deposit(token, amount) {
+        throw "Not implemented"
+
         if (!this.ethWallet) {
             throw 'Can not initiate deposit into Franklin: no wallet connected'
         }
@@ -71,49 +74,61 @@ class FranklinWallet {
         return contract.deposit([pubX, pubY], maxFee, {value})
     }
 
-    async exit() {
-        if (!this.ethWallet) {
-            throw 'Can not initiate exit from Franklin: no wallet connected'
-        }
-        let contract = this.eth.contract.connect(this.ethWallet)
-        return contract.exit()
+    async withdraw(ethAddress, token, amount) {
+        throw "Not implemented"
     }
 
-    async transfer(to, amount) {
-        if ( !this.sidechainOpen ) {
-            throw ''
-        }
-
-        if (!this.fra.truncate(amount).eq(amount)) {
-            throw 'Amount must be rounded with franklin.truncate(): ' + amount
-        }
-
-        // TODO: if `to` is address, convert it to sidechainAccountId
-
-        const from = this.sidechainAccountId
-        amount = amount.div(MULTIPLIER).toNumber()
-        const privateKey = this.key.privateKey
-        //console.log(this.sidechainState)
-        const nonce = this.nextNonce++
-        const good_until_block = 50000 // TODO: add to current block?
-        const fee = 0;
-
-        const apiForm = transaction.createTransaction(from, to, amount, fee, nonce, good_until_block, privateKey);
-        const result = await axios({
-            method:     'post',
-            url:        this.fra.baseUrl + '/submit_tx',
-            data:       apiForm
-        });
-        //await new Promise(resolve => setTimeout(resolve, 500))
-        // let error = result.data && result.data.error
-        // if (error) {
-        //     await this.pullState(false)
-        //     if (this.sidechainState.current.nonce < nonce) {
-        //         this.nextNonce = this.sidechainState.current.nonce
-        //     }
-        // }
-        return result.data
+    async transfer(to, token, amount) {
+        throw "Not implemented"
     }
+
+    async close() {
+        throw "Not implemented"
+    }
+
+    // async exit() {
+    //     if (!this.ethWallet) {
+    //         throw 'Can not initiate exit from Franklin: no wallet connected'
+    //     }
+    //     let contract = this.eth.contract.connect(this.ethWallet)
+    //     return contract.exit()
+    // }
+    //
+    // async transfer(to, amount) {
+    //     if ( !this.sidechainOpen ) {
+    //         throw ''
+    //     }
+    //
+    //     if (!this.fra.truncate(amount).eq(amount)) {
+    //         throw 'Amount must be rounded with franklin.truncate(): ' + amount
+    //     }
+    //
+    //     // TODO: if `to` is address, convert it to sidechainAccountId
+    //
+    //     const from = this.sidechainAccountId
+    //     amount = amount.div(MULTIPLIER).toNumber()
+    //     const privateKey = this.key.privateKey
+    //     //console.log(this.sidechainState)
+    //     const nonce = this.nextNonce++
+    //     const good_until_block = 50000 // TODO: add to current block?
+    //     const fee = 0;
+    //
+    //     const apiForm = transaction.createTransaction(from, to, amount, fee, nonce, good_until_block, privateKey);
+    //     const result = await axios({
+    //         method:     'post',
+    //         url:        this.fra.baseUrl + '/submit_tx',
+    //         data:       apiForm
+    //     });
+    //     //await new Promise(resolve => setTimeout(resolve, 500))
+    //     // let error = result.data && result.data.error
+    //     // if (error) {
+    //     //     await this.pullState(false)
+    //     //     if (this.sidechainState.current.nonce < nonce) {
+    //     //         this.nextNonce = this.sidechainState.current.nonce
+    //     //     }
+    //     // }
+    //     return result.data
+    // }
     
 }
 
