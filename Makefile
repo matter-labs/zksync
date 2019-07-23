@@ -303,16 +303,16 @@ tesseracts-down:
 
  # Data Restore
 
- data-restore-setup-and-run: data-restore-db-prepare data-restore-build data-restore-run
+data-restore-setup-and-run: data-restore-db-prepare data-restore-build data-restore-run
 
- data-restore-db-prepare: db-drop db-wait db-setup
+data-restore-db-prepare: db-drop db-wait db-setup
 
- data-restore-build:
+data-restore-build:
 	@cargo build -p data_restore --release --bin data_restore
 
- data-restore-run:
-	@RUST_LOG=INFO ./target/release/data_restore 4 15
+data-restore-run:
+	@RUST_LOG=INFO ./target/release/data_restore 15
 
- data-restore-continue:
+data-restore-continue:
 	@RUST_LOG=INFO ./target/release/data_restore storage 15
 	

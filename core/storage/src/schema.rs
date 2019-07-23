@@ -69,13 +69,6 @@ table! {
 }
 
 table! {
-    data_restore_network (id) {
-        id -> Int4,
-        network_id -> Int2,
-    }
-}
-
-table! {
     data_restore_last_watched_eth_block (id) {
         id -> Int4,
         block_number -> Text,

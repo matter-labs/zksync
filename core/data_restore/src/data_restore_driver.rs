@@ -203,7 +203,6 @@ impl DataRestoreDriver {
         let mut logs = self.events_state.committed_blocks.clone();
         logs.append(&mut self.events_state.verified_blocks.clone());
 
-        storage_interactor::save_network(&self.config, self.connection_pool.clone());
         storage_interactor::save_events_state(&logs, self.connection_pool.clone());
         storage_interactor::save_last_watched_block_number(
             &mut self.events_state.last_watched_block_number,

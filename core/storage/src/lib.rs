@@ -288,19 +288,6 @@ pub struct BlockDetails {
 /// MARK: - Data restore part
 
 #[derive(Insertable)]
-#[table_name = "data_restore_network"]
-pub struct NewDataRestoreNetwork {
-    pub network_id: i16, // 1 - Mainnet, 4 - Rinkeby
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
-#[table_name = "data_restore_network"]
-pub struct StoredDataRestoreNetwork {
-    pub id: i32,
-    pub network_id: i16, // 1 - Mainnet, 4 - Rinkeby
-}
-
-#[derive(Insertable)]
 #[table_name = "data_restore_last_watched_eth_block"]
 pub struct NewLastWatchedEthBlockNumber {
     pub block_number: String,
@@ -1157,17 +1144,6 @@ impl StorageProcessor {
 
     /// MARK: - Data restore part
 
-    pub fn save_data_restore_network(&self, network: &NewDataRestoreNetwork) -> QueryResult<()> {
-        let inserted = diesel::insert_into(data_restore_network::table)
-            .values(network)
-            .execute(self.conn())?;
-        if 0 == inserted {
-            error!("Error: could not save network!");
-            return Err(Error::RollbackTransaction);
-        }
-        Ok(())
-    }
-
     pub fn save_events_state(&self, events: &[NewBlockLog]) -> QueryResult<()> {
         for event in events.iter() {
             let inserted = diesel::insert_into(events_state::table)
@@ -1208,15 +1184,6 @@ impl StorageProcessor {
         Ok(())
     }
 
-    pub fn delete_data_restore_network(&self) -> QueryResult<()> {
-        let deleted = diesel::delete(data_restore_network::table).execute(self.conn())?;
-        if 0 == deleted {
-            error!("Error: could not delete network!");
-            return Err(Error::RollbackTransaction);
-        }
-        Ok(())
-    }
-
     pub fn delete_events_state(&self) -> QueryResult<()> {
         let deleted = diesel::delete(events_state::table).execute(self.conn())?;
         if 0 == deleted {
@@ -1243,11 +1210,6 @@ impl StorageProcessor {
             return Err(Error::RollbackTransaction);
         }
         Ok(())
-    }
-
-    pub fn load_data_restore_network(&self) -> QueryResult<StoredDataRestoreNetwork> {
-        use crate::schema::data_restore_network::dsl;
-        dsl::data_restore_network.first(self.conn())
     }
 
     pub fn load_committed_events_state(&self) -> Vec<StoredBlockLog> {

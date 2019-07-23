@@ -4,7 +4,7 @@ use crate::franklin_op_block::{FranklinOpBlock, FranklinOpBlockType};
 use crate::helpers;
 use std::convert::TryFrom;
 use storage::{
-    ConnectionPool, NewBlockLog, NewDataRestoreNetwork, NewFranklinOpBlock,
+    ConnectionPool, NewBlockLog, NewFranklinOpBlock,
     NewLastWatchedEthBlockNumber, StoredBlockLog, StoredFranklinOpBlock,
 };
 use web3::types::{Bytes, Transaction, H160, H256, U128, U256};
@@ -21,15 +21,9 @@ pub fn remove_storage_data(
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for data restore remove data");
-    let delete_data_restore_network_res = storage.delete_data_restore_network();
     let delete_events_state_res = storage.delete_events_state();
     let delete_last_watched_block_number_res = storage.delete_last_watched_block_number();
     let delete_franklin_op_blocks_res = storage.delete_franklin_op_blocks();
-    if delete_data_restore_network_res.is_err() {
-        return Err(helpers::DataRestoreError::NoData(
-            "No network in storage".to_string(),
-        ));
-    }
     if delete_events_state_res.is_err() {
         return Err(helpers::DataRestoreError::NoData(
             "No block events in storage".to_string(),
@@ -46,28 +40,6 @@ pub fn remove_storage_data(
         ));
     }
     Ok(())
-}
-
-/// Saves network in storage
-///
-/// # Arguments
-///
-/// * `config` - Configuration of DataRestore driver
-/// * `connection_pool` - Database Connection Pool
-///
-pub fn save_network(config: &helpers::DataRestoreConfig, connection_pool: ConnectionPool) {
-    let network = NewDataRestoreNetwork {
-        network_id: config.network_id,
-    };
-    let storage = connection_pool
-        .access_storage()
-        .expect("db connection failed for data restore save network");
-    if let Err(_) = storage.delete_data_restore_network() {
-        info!("First time saving data restore network");
-    }
-    storage
-        .save_data_restore_network(&network)
-        .expect("cant save data restore network");
 }
 
 /// Saves Franklin Contract events in storage
@@ -88,7 +60,7 @@ pub fn save_events_state(events: &Vec<EventData>, connection_pool: ConnectionPoo
         .expect("db connection failed for data restore save events");
     storage
         .save_events_state(new_logs.as_slice())
-        .expect("cant save data restore network");
+        .expect("cant save events state");
 }
 
 /// Saves last watched Ethereum block number in storage
@@ -168,33 +140,6 @@ pub fn block_log_into_stored_block_log(block: &EventData) -> Option<NewBlockLog>
         transaction_hash: block.transaction_hash.as_bytes().to_vec(),
         block_num: i64::from(block.block_num),
     })
-}
-
-/// Get Optional configuration of DataRestore driver from storage
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database Connection Pool
-///
-pub fn get_config_from_storage(
-    connection_pool: ConnectionPool,
-) -> Option<helpers::DataRestoreConfig> {
-    let storage = connection_pool
-        .access_storage()
-        .expect("db connection failed for data restore config");
-    let network_id = storage
-        .load_data_restore_network()
-        .expect("can not load network")
-        .network_id;
-    match network_id {
-        1 => Some(helpers::DataRestoreConfig::new(
-            helpers::InfuraEndpoint::Mainnet,
-        )),
-        4 => Some(helpers::DataRestoreConfig::new(
-            helpers::InfuraEndpoint::Rinkeby,
-        )),
-        _ => None,
-    }
 }
 
 /// Get new stored represantation of the Franklin operations block from itself
@@ -371,9 +316,7 @@ pub fn get_last_watched_block_number_from_storage(connection_pool: ConnectionPoo
 ///
 /// * `connection_pool` - Database Connection Pool
 ///
-pub fn get_events_state_from_storage(connection_pool: ConnectionPool) -> EventsState {
-    let config = get_config_from_storage(connection_pool.clone())
-        .expect("cant get config from storage in get_events_state_from_storage");
+pub fn get_events_state_from_storage(connection_pool: ConnectionPool, config: helpers::DataRestoreConfig) -> EventsState {
     let last_watched_block_number =
         get_last_watched_block_number_from_storage(connection_pool.clone());
 

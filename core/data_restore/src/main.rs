@@ -86,23 +86,11 @@ fn load_new_states_for_data_restore_driver(driver: &mut DataRestoreDriver) {
 /// * `args` - Func Arguments
 ///
 fn load_states_from_beginning(args: Vec<String>) {
-    let infura_endpoint_id =
-        u8::from_str(&args[1]).expect("Network endpoint should be convertible to u8");
-    info!("Network number is {}", &infura_endpoint_id);
-    let config = match infura_endpoint_id {
-        1 => Some(helpers::DataRestoreConfig::new(
-            helpers::InfuraEndpoint::Mainnet,
-        )),
-        4 => Some(helpers::DataRestoreConfig::new(
-            helpers::InfuraEndpoint::Rinkeby,
-        )),
-        _ => None,
-    }
-    .expect("It's acceptable only 1 for Mainnet and 4 for Rinkeby networks");
+    let config = helpers::DataRestoreConfig::new();
 
     let from = U256::from(0); // It's better not to allow external users to set "from block" parameter. In 99% cases 0(zero) is correct
 
-    let delta = U256::from_dec_str(&args[2]).expect("blocks delta should be convertible to u256");
+    let delta = U256::from_dec_str(&args[1]).expect("blocks delta should be convertible to u256");
     info!("blocks delta is {}", &delta);
 
     let connection_pool = ConnectionPool::new();
@@ -116,8 +104,8 @@ fn load_states_from_beginning(args: Vec<String>) {
         create_new_data_restore_driver(config, from, delta, connection_pool.clone());
     info!("Driver created");
 
-    if args.len() > 3 {
-        let until_block = u32::from_str(&args[3]).ok();
+    if args.len() > 2 {
+        let until_block = u32::from_str(&args[2]).ok();
         info!("until block is {:?}", &until_block);
         load_past_state_for_data_restore_driver(&mut data_restore_driver, until_block);
     } else {
@@ -135,8 +123,7 @@ fn load_states_from_beginning(args: Vec<String>) {
 fn load_states_from_storage(args: Vec<String>) {
     let connection_pool = ConnectionPool::new();
 
-    let config =
-        get_config_from_storage(connection_pool.clone()).expect("Network id is broken in storage");
+    let config = helpers::DataRestoreConfig::new();
     let from = U256::from(0); // It's better not to allow external users to set "from block" parameter. In 99% cases 0(zero) is correct
     let delta = U256::from_dec_str(&args[2]).expect("blocks delta should be convertible to u256");
     info!("blocks delta is {}", &delta);
@@ -173,7 +160,7 @@ fn load_past_state_from_storage(
     until_franklin_block: Option<u32>,
 ) {
     info!("Loading stored state");
-    driver.events_state = get_events_state_from_storage(connection_pool.clone());
+    driver.events_state = get_events_state_from_storage(connection_pool.clone(), driver.config.clone());
     let mut blocks = get_op_blocks_from_storage(connection_pool.clone());
     if let Some(block) = until_franklin_block {
         blocks.retain(|x| x.block_number <= block);
