@@ -130,8 +130,12 @@ pub fn apply_transfer_to_new(
 
     let amount_encoded: Fr = le_bit_vector_into_field_element(&amount_bits);
 
+    println!("test_transfer_to_new.fee {}", transfer_to_new.fee);
     let fee_as_field_element = Fr::from_str(&transfer_to_new.fee.to_string()).unwrap();
-
+    println!(
+        "test transfer_to_new fee_as_field_element = {}",
+        fee_as_field_element
+    );
     let fee_bits = convert_to_float(
         transfer_to_new.fee,
         *franklin_constants::FEE_EXPONENT_BIT_WIDTH,
@@ -141,7 +145,7 @@ pub fn apply_transfer_to_new(
     .unwrap();
 
     let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
-
+    println!("fee_encoded in test_transfer_to_new {}", fee_encoded);
     //applying first transfer part
     let (
         account_witness_from_before,
@@ -212,7 +216,7 @@ pub fn apply_transfer_to_new(
     let a = balance_from_before.clone();
     let mut b = amount_as_field_element.clone();
     b.add_assign(&fee_as_field_element);
-
+    println!("b in trasfer_to_new_test equals {}", b.to_string());
     TransferToNewWitness {
         from_before: OperationBranch {
             address: Some(account_address_from_fe),
@@ -521,9 +525,7 @@ fn test_transfer_to_new() {
 
     let transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
 
-    let fee: u128 = 8;
-
-    let _fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
+    let fee: u128 = 20;
 
     let fee_bits = convert_to_float(
         fee,
@@ -632,27 +634,6 @@ fn test_transfer_to_new() {
         calculate_transfer_to_new_operations_from_witness(&transfer_witness, &sig_msg, signature);
     let (root_after_fee, validator_account_witness) =
         apply_fee(&mut tree, validator_address_number, token, fee);
-
-    // fee collecting logic
-    let mut validator_leaf = tree.remove(validator_address_number).unwrap();
-    let validator_account_witness = AccountWitness {
-        nonce: Some(validator_leaf.nonce.clone()),
-        pub_x: Some(validator_leaf.pub_x.clone()),
-        pub_y: Some(validator_leaf.pub_y.clone()),
-    };
-    let validator_balance_root = validator_leaf.subtree.root_hash();
-    println!("validator_balance_root: {}", validator_balance_root);
-    println!("tree before_applying fees: {}", tree.root_hash());
-
-    validator_leaf.subtree.insert(
-        token,
-        Balance {
-            value: Fr::from_str(&fee.to_string()).unwrap(),
-        },
-    );
-
-    tree.insert(validator_address_number, validator_leaf);
-    let root_after_fee = tree.root_hash();
     let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
 
     let public_data_commitment = public_data_commitment::<Bn256>(

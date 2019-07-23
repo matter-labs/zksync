@@ -297,17 +297,17 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             new_operator_balance_root.get_value().unwrap()
         );
 
-        let mut validator_account_data = vec![];
-        validator_account_data.extend(validator_account.nonce.get_bits_le().clone());
-        validator_account_data.extend(validator_account.pub_key.get_packed_key());
-        validator_account_data.extend(
+        let mut operator_account_data = vec![];
+        operator_account_data.extend(validator_account.nonce.get_bits_le().clone());
+        operator_account_data.extend(validator_account.pub_key.get_packed_key());
+        operator_account_data.extend(
             new_operator_balance_root
                 .into_bits_le(cs.namespace(|| "new_operator_balance_root_bits"))?,
         );
 
         let root_from_operator_after_fees = allocate_merkle_root(
             cs.namespace(|| "root from operator_account after fees"),
-            &validator_account_data,
+            &operator_account_data,
             &validator_address,
             &validator_audit_path,
             self.params,
@@ -751,6 +751,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &is_account_empty,
             &op_data,
             &ext_pubdata_chunk,
+            precomputed,
         )?);
         op_flags.push(self.transfer(
             cs.namespace(|| "transfer"),
@@ -762,6 +763,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &is_account_empty,
             &op_data,
             &ext_pubdata_chunk,
+            precomputed,
         )?);
         op_flags.push(self.transfer_to_new(
             cs.namespace(|| "transfer_to_new"),
@@ -773,6 +775,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &is_account_empty,
             &op_data,
             &ext_pubdata_chunk,
+            precomputed,
         )?);
         op_flags.push(self.partial_exit(
             cs.namespace(|| "partial_exit"),
@@ -992,6 +995,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         is_account_empty: &Boolean,
         op_data: &AllocatedOperationData<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
+        precomputed_numbers: &[AllocatedNum<E>],
     ) -> Result<Boolean, SynthesisError> {
         let mut is_valid_flags = vec![];
         //construct pubdata
@@ -1080,13 +1084,10 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         println!("tx_valid {}", tx_valid.get_value().unwrap());
 
-        //TODO precompute
-        let zero = AllocatedNum::alloc(cs.namespace(|| "zero"), || Ok(E::Fr::zero()))?;
-        zero.assert_zero(cs.namespace(|| "zero is zero"))?;
         let is_first_chunk = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_first_chunk"),
             &chunk_data.chunk_number,
-            &zero,
+            &precomputed_numbers[0],
         )?);
         println!("is_first  chunk {}", is_first_chunk.get_value().unwrap());
         let is_valid_first = Boolean::and(
@@ -1095,7 +1096,9 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &is_first_chunk,
         )?;
 
-        //calculate updated value on deposit
+        // below we conditionally (if first chunk) update leaf
+
+        // update balance
         let updated_balance_value =
             AllocatedNum::alloc(cs.namespace(|| "updated_balance_value"), || {
                 let mut new_balance = cur.balance.clone().grab()?;
@@ -1111,13 +1114,11 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                     + op_data.amount.get_number().get_variable() //TODO: get_number().get_variable() is kinda ugly
             },
         );
-        //
         let updated_balance_ce = CircuitElement::from_number(
             cs.namespace(|| "updated_balance_ce"),
             updated_balance_value,
             franklin_constants::BALANCE_BIT_WIDTH,
         )?;
-        //mutate current branch if it is first chunk of valid deposit transaction
         cur.balance = CircuitElement::conditionally_select(
             cs.namespace(|| "mutated balance"),
             &updated_balance_ce,
@@ -1131,10 +1132,32 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             "changed bal data: {}",
             cur.balance.get_number().get_value().unwrap()
         );
+
+        // update pub_key
         cur.account.pub_key = CircuitPubkey::conditionally_select(
             cs.namespace(|| "mutated_pubkey"),
             &op_data.new_pubkey,
             &cur.account.pub_key,
+            &is_valid_first,
+        )?;
+
+        // update nonce
+        let updated_nonce = AllocatedNum::alloc(cs.namespace(|| "updated_nonce"), || {
+            let mut nonce = cur.account.nonce.clone().grab()?;
+            nonce.add_assign(&E::Fr::from_str("1").unwrap());
+            Ok(nonce)
+        })?;
+        cs.enforce(
+            || "updated_nonce is correct",
+            |lc| lc + updated_nonce.get_variable() - CS::one(),
+            |lc| lc + CS::one(),
+            |lc| lc + cur.account.nonce.get_number().get_variable(),
+        );
+
+        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "update cur nonce"),
+            &updated_nonce,
+            &cur.account.nonce,
             &is_valid_first,
         )?;
 
@@ -1152,6 +1175,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         is_account_empty: &Boolean,
         op_data: &AllocatedOperationData<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
+        precomputed_numbers: &[AllocatedNum<E>],
     ) -> Result<Boolean, SynthesisError> {
         let mut pubdata_bits = vec![];
         let mut pub_token_bits = lhs.token.get_bits_le().clone();
@@ -1183,28 +1207,19 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let mut lhs_valid_flags = vec![];
         lhs_valid_flags.push(is_pubdata_chunk_correct.clone());
-        let transfer_to_new_tx_type =
-            AllocatedNum::alloc(cs.namespace(|| "transfer_to_new_tx_type"), || {
-                Ok(E::Fr::from_str("2").unwrap())
-            })?;
-        transfer_to_new_tx_type.assert_number(
-            cs.namespace(|| "transfer_to_new_tx_type equals two"),
-            &E::Fr::from_str("2").unwrap(),
-        )?;
+        let transfer_to_new_tx_type = precomputed_numbers[2].clone();
         let is_transfer = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_transfer"),
             &chunk_data.tx_type.get_number(),
             &transfer_to_new_tx_type,
         )?);
         lhs_valid_flags.push(is_transfer.clone());
-        let zero = AllocatedNum::alloc(cs.namespace(|| "zero"), || Ok(E::Fr::zero()))?;
-        zero.assert_zero(cs.namespace(|| "zero is zero"))?;
         let is_first_chunk = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_first_chunk"),
             &chunk_data.chunk_number,
-            &zero,
+            &precomputed_numbers[0],
         )?);
-        lhs_valid_flags.push(is_first_chunk);
+        lhs_valid_flags.push(is_first_chunk.clone());
 
         // check signer pubkey
         let is_signer_key_correct = CircuitPubkey::equals(
@@ -1221,19 +1236,18 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         lhs_valid_flags.push(is_a_correct);
 
-        let sum_amount_fee = AllocatedNum::alloc(cs.namespace(|| "amount plus fee"), || {
-            let mut bal = op_data.amount.grab()?;
-            bal.add_assign(&op_data.fee.grab()?);
-            Ok(bal)
-        })?;
-        cs.enforce(
-            || "sum_amount_fee is correct",
-            |lc| {
-                lc + op_data.amount.get_number().get_variable()
-                    + op_data.fee.get_number().get_variable()
-            },
-            |lc| lc + CS::one(),
-            |lc| lc + sum_amount_fee.get_variable(),
+        let sum_amount_fee = allocate_sum(
+            cs.namespace(|| "amount plus fee"),
+            &op_data.amount.get_number(),
+            &op_data.fee.get_number(),
+        )?;
+        println!(
+            "op_data.b in trasfer_to_new equals {}",
+            op_data.b.get_number().get_value().grab()?
+        );
+        println!(
+            "sum_amount_fee in trasfer_to_new equals {}",
+            sum_amount_fee.get_value().grab()?
         );
         let is_b_correct = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_b_correct"),
@@ -1297,19 +1311,15 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
 
         let mut rhs_valid_flags = vec![];
-        let one =
-            AllocatedNum::alloc(cs.namespace(|| "one"), || Ok(E::Fr::from_str("1").unwrap()))?;
-        one.assert_number(
-            cs.namespace(|| "one is one"),
-            &E::Fr::from_str("1").unwrap(),
-        )?;
+        let one = precomputed_numbers[1].clone();
+
         let is_second_chunk = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_second_chunk"),
             &chunk_data.chunk_number,
             &one,
         )?);
         rhs_valid_flags.push(is_pubdata_chunk_correct.clone());
-        rhs_valid_flags.push(is_second_chunk);
+        rhs_valid_flags.push(is_second_chunk.clone());
         rhs_valid_flags.push(is_transfer.clone());
         rhs_valid_flags.push(is_account_empty.clone());
         println!("rhs valid transfer to new");
@@ -1341,6 +1351,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let mut ohs_valid_flags = vec![];
         ohs_valid_flags.push(is_pubdata_chunk_correct.clone());
+        ohs_valid_flags.push(is_first_chunk.not().clone());
+        ohs_valid_flags.push(is_second_chunk.not().clone());
         ohs_valid_flags.push(is_transfer);
 
         let is_ohs_valid = multi_and(cs.namespace(|| "is_ohs_valid"), &ohs_valid_flags)?;
@@ -1364,6 +1376,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         is_account_empty: &Boolean,
         op_data: &AllocatedOperationData<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
+        precomputed_numbers: &[AllocatedNum<E>],
     ) -> Result<Boolean, SynthesisError> {
         // construct pubdata
         let mut pubdata_bits = vec![];
@@ -1403,14 +1416,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         );
         println!("pubdata_chunk {}", pubdata_chunk.get_value().grab()?);
         // verify correct tx_code
-        let allocated_transfer_tx_type =
-            AllocatedNum::alloc(cs.namespace(|| "transfer_tx_type"), || {
-                Ok(E::Fr::from_str("5").unwrap())
-            })?;
-        allocated_transfer_tx_type.assert_number(
-            cs.namespace(|| "transfer_tx_type equals five"),
-            &E::Fr::from_str("5").unwrap(),
-        )?;
+        let allocated_transfer_tx_type = precomputed_numbers[5].clone();
+
         let is_transfer = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_transfer"),
             &chunk_data.tx_type.get_number(),

@@ -347,7 +347,7 @@ fn test_partial_exit_franklin_in_empty_leaf() {
     let mut account_address: u32 = rng.gen();
     account_address %= tree.capacity();
     let amount: u128 = 500;
-    let fee: u128 = 0;
+    let fee: u128 = 100;
     let token: u32 = 2;
     let ethereum_key = Fr::from_str("124").unwrap();
 

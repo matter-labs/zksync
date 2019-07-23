@@ -6,7 +6,7 @@ use crate::utils::*;
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
 
 use crate::account::AccountWitness;
-use franklin_crypto::circuit::float_point::convert_to_float;
+use franklin_crypto::circuit::float_point::{convert_to_float, parse_float_to_u128};
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::{
     Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
@@ -108,6 +108,14 @@ pub fn apply_deposit(
         10,
     )
     .unwrap();
+    let reparsed_amount = parse_float_to_u128(
+        amount_bits.clone(),
+        *franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+        *franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
+        10,
+    )
+    .unwrap();
+    assert_eq!(reparsed_amount, deposit.amount);
 
     let amount_encoded: Fr = le_bit_vector_into_field_element(&amount_bits);
 
@@ -120,7 +128,14 @@ pub fn apply_deposit(
         10,
     )
     .unwrap();
-
+    let reparsed_fee = parse_float_to_u128(
+        fee_bits.clone(),
+        *franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+        *franklin_constants::FEE_MANTISSA_BIT_WIDTH,
+        10,
+    )
+    .unwrap();
+    assert_eq!(reparsed_fee, deposit.fee);
     let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
 
     //calculate a and b
@@ -140,6 +155,7 @@ pub fn apply_deposit(
                 );
                 acc.pub_x = deposit.new_pub_x;
                 acc.pub_y = deposit.new_pub_y;
+                acc.nonce.add_assign(&Fr::from_str("1").unwrap());
             },
             |bal| bal.value.add_assign(&amount_as_field_element),
         );
@@ -333,7 +349,7 @@ fn test_deposit_franklin_in_empty_leaf() {
     let mut account_address: u32 = rng.gen();
     account_address %= tree.capacity();
     let amount: u128 = 500;
-    let fee: u128 = 10;
+    let fee: u128 = 80;
     let token: u32 = 2;
 
     //-------------- Start applying changes to state

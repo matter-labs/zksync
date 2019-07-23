@@ -33,8 +33,8 @@ pub const AMOUNT_EXPONENT_BIT_WIDTH: &'static usize = &5;
 pub const AMOUNT_MANTISSA_BIT_WIDTH: &'static usize = &19;
 
 /// Fee bit widths
-pub const FEE_EXPONENT_BIT_WIDTH: &'static usize = &5;
-pub const FEE_MANTISSA_BIT_WIDTH: &'static usize = &3;
+pub const FEE_EXPONENT_BIT_WIDTH: &'static usize = &4;
+pub const FEE_MANTISSA_BIT_WIDTH: &'static usize = &4;
 
 // Signature data
 pub const SIGNATURE_S_BIT_WIDTH: &'static usize = &254;
