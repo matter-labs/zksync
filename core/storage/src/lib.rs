@@ -1246,49 +1246,37 @@ impl StorageProcessor {
     }
 
     pub fn load_data_restore_network(&self) -> QueryResult<StoredDataRestoreNetwork> {
-        use crate::schema::data_restore_network::dsl::*;
-        data_restore_network.first(self.conn())
+        use crate::schema::data_restore_network::dsl;
+        dsl::data_restore_network.first(self.conn())
     }
 
     pub fn load_committed_events_state(&self) -> Vec<StoredBlockLog> {
-        let committed_query = format!(
-            "
-            SELECT * FROM events_state
-            WHERE block_type = 'Committed'
-            ORDER BY block_num ASC
-        "
-        );
-        diesel::sql_query(committed_query)
+        use crate::schema::events_state::dsl;
+        dsl::events_state
+            .filter(dsl::block_type.eq("Committed".to_string()))
+            .order(dsl::block_num.asc())
             .load(self.conn())
             .unwrap_or_else(|_| vec![])
     }
 
     pub fn load_verified_events_state(&self) -> Vec<StoredBlockLog> {
-        let verified_query = format!(
-            "
-            SELECT * FROM events_state
-            WHERE block_type = 'Verified'
-            ORDER BY block_num ASC
-        "
-        );
-        diesel::sql_query(verified_query)
+        use crate::schema::events_state::dsl;
+        dsl::events_state
+            .filter(dsl::block_type.eq("Verified".to_string()))
+            .order(dsl::block_num.asc())
             .load(self.conn())
             .unwrap_or_else(|_| vec![])
     }
 
     pub fn load_last_watched_block_number(&self) -> QueryResult<StoredLastWatchedEthBlockNumber> {
-        use crate::schema::data_restore_last_watched_eth_block::dsl::*;
-        data_restore_last_watched_eth_block.first(self.conn())
+        use crate::schema::data_restore_last_watched_eth_block::dsl;
+        dsl::data_restore_last_watched_eth_block.first(self.conn())
     }
 
     pub fn load_franklin_op_blocks(&self) -> Vec<StoredFranklinOpBlock> {
-        let verified_query = format!(
-            "
-            SELECT * FROM franklin_op_blocks
-            ORDER BY block_number ASC
-        "
-        );
-        diesel::sql_query(verified_query)
+        use crate::schema::franklin_op_blocks::dsl;
+        dsl::franklin_op_blocks
+            .order(dsl::block_number.asc())
             .load(self.conn())
             .unwrap_or_else(|_| vec![])
     }

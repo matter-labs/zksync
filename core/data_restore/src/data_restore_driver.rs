@@ -4,13 +4,13 @@ use crate::events_state::EventsState;
 use crate::franklin_op_block::FranklinOpBlock;
 use crate::helpers::*;
 use crate::storage_interactor;
-use std::fs::File;
-use std::io::{BufWriter, Write};
+// use std::fs::File;
+// use std::io::{BufWriter, Write};
 use storage::ConnectionPool;
 use web3::types::U256;
 
 /// FILENAME is the constant name for txt file with restored data
-const FILENAME: &str = "restored_data.txt";
+// const FILENAME: &str = "restored_data.txt";
 
 /// Description of data restore driver
 pub struct DataRestoreDriver {
@@ -327,26 +327,26 @@ impl DataRestoreDriver {
 
         let root = self.account_states.root_hash();
         info!("Root: {:?}", &root);
-        info!(
-            "Saving root, accounts list and op_blocks into file {}",
-            FILENAME
-        );
-        {
-            let f = File::create(FILENAME).expect("Unable to create file");
-            let mut f = BufWriter::new(f);
-            f.write(
-                format!(
-                    "Root hash on Franklin block {}: {}\n\nAccounts list: {:?}\n\nOp blocks: {:?}",
-                    op_blocks[op_blocks.len() - 1].block_number,
-                    root.to_hex(),
-                    self.account_states.plasma_state.get_accounts(),
-                    op_blocks
-                )
-                .as_bytes(),
-            )
-            .expect("Unable to write new root");
-        }
-        info!("Root saved in file");
+        // info!(
+        //     "Saving root, accounts list and op_blocks into file {}",
+        //     FILENAME
+        // );
+        // {
+        //     let f = File::create(FILENAME).expect("Unable to create file");
+        //     let mut f = BufWriter::new(f);
+        //     f.write(
+        //         format!(
+        //             "Root hash on Franklin block {}: {}\n\nAccounts list: {:?}\n\nOp blocks: {:?}",
+        //             op_blocks[op_blocks.len() - 1].block_number,
+        //             root.to_hex(),
+        //             self.account_states.plasma_state.get_accounts(),
+        //             op_blocks
+        //         )
+        //         .as_bytes(),
+        //     )
+        //     .expect("Unable to write new root");
+        // }
+        // info!("Root saved in file");
         Ok(())
     }
 
