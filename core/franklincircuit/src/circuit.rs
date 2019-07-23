@@ -834,6 +834,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         ext_pubdata_chunk: &AllocatedNum<E>,
         precomputed_numbers: &[AllocatedNum<E>],
     ) -> Result<Boolean, SynthesisError> {
+        println!("partial_exit");
         let mut base_valid_flags = vec![];
         //construct pubdata
         let mut pubdata_bits = vec![];
@@ -871,6 +872,14 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             ext_pubdata_chunk.get_value().unwrap(),
             &chunk_data.chunk_number.get_value().unwrap()
         );
+
+        //TODO: this flag is used too often, we better compute it above
+        let is_first_chunk = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is_first_chunk"),
+            &chunk_data.chunk_number,
+            &precomputed_numbers[0],
+        )?);
+
         let is_pubdata_chunk_correct = Boolean::from(AllocatedNum::equals(
             cs.namespace(|| "is_pubdata_equal"),
             &pubdata_chunk,
@@ -886,103 +895,189 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?);
         base_valid_flags.push(is_partial_exit.clone());
 
+        //here we verify whether exit should be full
+        let is_full_exit = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "amount is zero"),
+            &op_data.amount.get_number(),
+            &precomputed_numbers[0],
+        )?);
         let is_base_valid = multi_and(
             cs.namespace(|| "valid base partial_exit"),
             &base_valid_flags,
         )?;
+        let lhs_partial_valid: Boolean;
+        {
+            let mut lhs_partial_valid_flags = vec![];
 
-        let mut lhs_valid_flags = vec![];
-        lhs_valid_flags.push(is_base_valid.clone());
-        // check operation arguments
-        //TODO: should be checked only for first chunk
-        let is_a_correct =
-            CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
+            let cs = &mut cs.namespace(|| "partial_exit");
+            lhs_partial_valid_flags.push(is_full_exit.not().clone());
+            lhs_partial_valid_flags.push(is_base_valid.clone());
 
-        lhs_valid_flags.push(is_a_correct);
+            // check operation arguments
+            let is_a_correct =
+                CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
 
-        let sum_amount_fee = allocate_sum(
-            cs.namespace(|| "amount plus fee"),
-            &op_data.amount.get_number(),
-            &op_data.fee.get_number(),
-        )?;
-        let is_b_correct = Boolean::from(AllocatedNum::equals(
-            cs.namespace(|| "is_b_correct"),
-            &op_data.b.get_number(),
-            &sum_amount_fee,
-        )?);
-        lhs_valid_flags.push(is_b_correct);
-        lhs_valid_flags.push(is_a_geq_b.clone());
+            lhs_partial_valid_flags.push(is_a_correct);
 
-        lhs_valid_flags.push(no_nonce_overflow(
-            cs.namespace(|| "no nonce overflow"),
-            &cur.account.nonce.get_number(),
-        )?);
+            let sum_amount_fee = allocate_sum(
+                cs.namespace(|| "amount plus fee"),
+                &op_data.amount.get_number(),
+                &op_data.fee.get_number(),
+            )?;
+            let is_b_correct = Boolean::from(AllocatedNum::equals(
+                cs.namespace(|| "is_b_correct"),
+                &op_data.b.get_number(),
+                &sum_amount_fee,
+            )?);
+            lhs_partial_valid_flags.push(is_b_correct);
+            lhs_partial_valid_flags.push(is_a_geq_b.clone());
 
-        let is_first_chunk = Boolean::from(AllocatedNum::equals(
-            cs.namespace(|| "is_first_chunk"),
-            &chunk_data.chunk_number,
-            &precomputed_numbers[0],
-        )?);
-        lhs_valid_flags.push(is_first_chunk.clone());
-        let lhs_valid = multi_and(cs.namespace(|| "is_lhs_valid"), &lhs_valid_flags)?;
+            lhs_partial_valid_flags.push(no_nonce_overflow(
+                cs.namespace(|| "no nonce overflow"),
+                &cur.account.nonce.get_number(),
+            )?);
 
-        //update cur data if we are processing first operation of valid partial_exit transaction
-        let updated_balance_value =
-            AllocatedNum::alloc(cs.namespace(|| "updated_balance_value"), || {
-                let mut new_balance = cur.balance.clone().grab()?;
-                new_balance.sub_assign(&op_data.amount.grab()?);
-                new_balance.sub_assign(&op_data.fee.grab()?);
-                Ok(new_balance)
-            })?;
-        cs.enforce(
-            || "correct_updated_balance",
-            |lc| lc + updated_balance_value.get_variable(),
-            |lc| lc + CS::one(),
-            |lc| {
-                lc + cur.balance.get_number().get_variable() - op_data.amount.get_number().get_variable()//TODO: get_number().get_variable() is kinda ugly
+            lhs_partial_valid_flags.push(is_first_chunk.clone());
+            lhs_partial_valid =
+                multi_and(cs.namespace(|| "is_lhs_valid"), &lhs_partial_valid_flags)?;
+
+            //update cur data if we are processing first operation of valid partial_exit transaction
+            let updated_balance_value =
+                AllocatedNum::alloc(cs.namespace(|| "updated_balance_value"), || {
+                    let mut new_balance = cur.balance.clone().grab()?;
+                    new_balance.sub_assign(&op_data.amount.grab()?);
+                    new_balance.sub_assign(&op_data.fee.grab()?);
+                    Ok(new_balance)
+                })?;
+            cs.enforce(
+                || "correct_updated_balance",
+                |lc| lc + updated_balance_value.get_variable(),
+                |lc| lc + CS::one(),
+                |lc| {
+                    lc + cur.balance.get_number().get_variable() - op_data.amount.get_number().get_variable()//TODO: get_number().get_variable() is kinda ugly
                     - op_data.fee.get_number().get_variable()
-            },
-        );
-        //
-        let updated_balance_ce = CircuitElement::from_number(
-            cs.namespace(|| "updated_balance_ce"),
-            updated_balance_value,
-            franklin_constants::BALANCE_BIT_WIDTH,
-        )?;
-        //mutate current branch if it is first chunk of valid partial_exit transaction
-        cur.balance = CircuitElement::conditionally_select(
-            cs.namespace(|| "mutated balance"),
-            &updated_balance_ce,
-            &cur.balance,
-            &lhs_valid,
-        )?;
-        cur.balance
-            .enforce_length(cs.namespace(|| "mutated balance is still correct length"))?;
+                },
+            );
+            //
+            let updated_balance_ce = CircuitElement::from_number(
+                cs.namespace(|| "updated_balance_ce"),
+                updated_balance_value,
+                franklin_constants::BALANCE_BIT_WIDTH,
+            )?;
+            //mutate current branch if it is first chunk of valid partial_exit transaction
+            cur.balance = CircuitElement::conditionally_select(
+                cs.namespace(|| "mutated balance"),
+                &updated_balance_ce,
+                &cur.balance,
+                &lhs_partial_valid,
+            )?;
+            cur.balance
+                .enforce_length(cs.namespace(|| "mutated balance is still correct length"))?;
 
-        println!(
-            "changed bal data: {}",
-            cur.balance.get_number().get_value().unwrap()
-        );
+            println!(
+                "changed bal data: {}",
+                cur.balance.get_number().get_value().unwrap()
+            );
 
-        let updated_nonce = allocate_sum(
-            cs.namespace(|| "updated_nonce"),
-            &cur.account.nonce.get_number(),
-            &precomputed_numbers[1],
-        )?;
-        //update nonce
-        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
-            cs.namespace(|| "update cur nonce"),
-            &updated_nonce,
-            &cur.account.nonce,
-            &lhs_valid,
-        )?;
+            let updated_nonce = allocate_sum(
+                cs.namespace(|| "updated_nonce"),
+                &cur.account.nonce.get_number(),
+                &precomputed_numbers[1],
+            )?;
+            //update nonce
+            cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
+                cs.namespace(|| "update cur nonce"),
+                &updated_nonce,
+                &cur.account.nonce,
+                &lhs_partial_valid,
+            )?;
+        }
+
+        let lhs_full_valid: Boolean;
+        {
+            let mut lhs_full_valid_flags = vec![];
+
+            let cs = &mut cs.namespace(|| "full_exit");
+            println!("lhs_full_valid_flags");
+            lhs_full_valid_flags.push(is_full_exit.clone());
+            lhs_full_valid_flags.push(is_base_valid.clone());
+            lhs_full_valid_flags.push(is_first_chunk.clone());
+            let diff_balance_fee = AllocatedNum::alloc(cs.namespace(|| "balance-fee"), || {
+                let mut balance_val = cur.balance.grab()?;
+                balance_val.sub_assign(&op_data.fee.grab()?);
+                Ok(balance_val)
+            })?;
+            cs.enforce(
+                || "balance-fee is correct",
+                |lc| {
+                    lc + cur.balance.get_number().get_variable()
+                        - op_data.fee.get_number().get_variable()
+                },
+                |lc| lc + CS::one(),
+                |lc| lc + diff_balance_fee.get_variable(),
+            );
+            let mut diff_balance_fee_bits =
+                diff_balance_fee.into_bits_le(cs.namespace(|| "balance - fee bits"))?;
+            diff_balance_fee_bits.truncate(franklin_constants::BALANCE_BIT_WIDTH);
+            let diff_balance_fee_bits_repacked = pack_bits_to_element(
+                cs.namespace(|| "pack balance - fee bits"),
+                &diff_balance_fee_bits,
+            )?;
+            let is_balance_geq_fee = Boolean::from(AllocatedNum::equals(
+                cs.namespace(|| "diff equal to repacked"),
+                &diff_balance_fee,
+                &diff_balance_fee_bits_repacked,
+            )?);
+            lhs_full_valid_flags.push(is_balance_geq_fee);
+
+            lhs_full_valid_flags.push(no_nonce_overflow(
+                cs.namespace(|| "no nonce overflow"),
+                &cur.account.nonce.get_number(),
+            )?);
+
+            lhs_full_valid = multi_and(cs.namespace(|| "lhs_full_valid"), &lhs_full_valid_flags)?;
+
+            //update cur data if we are processing first operation of valid partial_exit transaction
+            let updated_balance_value = precomputed_numbers[0].clone();
+
+            //mutate current branch if it is first chunk of valid partial_exit transaction
+            cur.balance = CircuitElement::conditionally_select_with_number_strict(
+                cs.namespace(|| "mutated balance"),
+                &updated_balance_value,
+                &cur.balance,
+                &lhs_full_valid,
+            )?;
+            cur.balance
+                .enforce_length(cs.namespace(|| "mutated balance is still correct length"))?;
+
+            println!(
+                "changed bal data: {}",
+                cur.balance.get_number().get_value().unwrap()
+            );
+
+            let updated_nonce = allocate_sum(
+                cs.namespace(|| "updated_nonce"),
+                &cur.account.nonce.get_number(),
+                &precomputed_numbers[1],
+            )?;
+            //update nonce
+            cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
+                cs.namespace(|| "update cur nonce"),
+                &updated_nonce,
+                &cur.account.nonce,
+                &lhs_full_valid,
+            )?;
+        }
 
         let mut ohs_valid_flags = vec![];
         ohs_valid_flags.push(is_base_valid);
         ohs_valid_flags.push(is_first_chunk.not());
         let is_ohs_valid = multi_and(cs.namespace(|| "is_ohs_valid"), &ohs_valid_flags)?;
 
-        let tx_valid = multi_or(cs.namespace(|| "tx_valid"), &[lhs_valid, is_ohs_valid])?;
+        let tx_valid = multi_or(
+            cs.namespace(|| "tx_valid"),
+            &[lhs_partial_valid, lhs_full_valid, is_ohs_valid],
+        )?;
         Ok(tx_valid)
     }
 
