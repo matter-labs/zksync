@@ -8,36 +8,46 @@ use crate::plasma::circuit::utils::{
 };
 use crate::primitives::{get_bits_le_fixed_u128, pack_bits_into_bytes};
 use bigdecimal::{BigDecimal, ToPrimitive};
+use crypto::{digest::Digest, sha2::Sha256};
 use ff::{PrimeField, PrimeFieldRepr};
 use sapling_crypto::circuit::float_point::convert_to_float;
 use sapling_crypto::eddsa::Signature;
 use sapling_crypto::jubjub::{edwards, FixedGenerators, JubjubEngine, Unknown};
 
+use crate::plasma::account::AccountAddress;
 use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
 use web3::types::Address;
 
-// Signed by user.
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Pubkey {
-    pub pk_x: Fr,
-    pub pk_y: Fr,
-}
+/// Signed by user.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transfer {
-    pub from: Pubkey,
-    pub to: Pubkey,
+    // TODO restore from address from signature
+    pub from: AccountAddress,
+    pub to: AccountAddress,
     pub token: TokenId,
     pub amount: TokenAmount,
     pub fee: FeeAmount,
     pub nonce: Nonce,
     // TODO: Signature unimplemented
+}
+
+impl Transfer {
+    fn get_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&self.from.data);
+        out.extend_from_slice(&self.to.data);
+        out.extend_from_slice(&self.token.to_be_bytes());
+        out.extend_from_slice(&self.amount.to_be_bytes()[1..]);
+        out.extend_from_slice(&self.fee.to_be_bytes());
+        out.extend_from_slice(&self.nonce.to_be_bytes());
+        out
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Deposit {
-    pub to: Pubkey,
+    pub to: AccountAddress,
     pub token: TokenId,
     pub amount: TokenAmount,
     pub fee: FeeAmount,
@@ -45,9 +55,21 @@ pub struct Deposit {
     // TODO: Signature unimplemented
 }
 
+impl Deposit {
+    fn get_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&self.to.data);
+        out.extend_from_slice(&self.token.to_be_bytes());
+        out.extend_from_slice(&self.amount.to_be_bytes()[1..]);
+        out.extend_from_slice(&self.fee.to_be_bytes());
+        out.extend_from_slice(&self.nonce.to_be_bytes());
+        out
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Withdraw {
-    pub account: Pubkey,
+    pub account: AccountAddress,
     pub eth_address: Address,
     pub token: TokenId,
     /// None -> withdraw all
@@ -57,11 +79,33 @@ pub struct Withdraw {
     // TODO: Signature unimplemented
 }
 
+impl Withdraw {
+    fn get_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&self.account.data);
+        out.extend_from_slice(&self.eth_address);
+        out.extend_from_slice(&self.token.to_be_bytes());
+        out.extend_from_slice(&self.amount.to_be_bytes()[1..]);
+        out.extend_from_slice(&self.fee.to_be_bytes());
+        out.extend_from_slice(&self.nonce.to_be_bytes());
+        out
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Close {
-    pub account: Pubkey,
+    pub account: AccountAddress,
     pub nonce: Nonce,
     // TODO: Signature unimplemented
+}
+
+impl Close {
+    fn get_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&self.account.data);
+        out.extend_from_slice(&self.nonce.to_be_bytes());
+        out
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,80 +119,43 @@ pub enum FranklinTx {
 
 impl FranklinTx {
     pub fn hash(&self) -> Vec<u8> {
-        unimplemented!("hash")
+        let bytes = match self {
+            FranklinTx::Transfer(tx) => tx.get_bytes(),
+            FranklinTx::Deposit(tx) => tx.get_bytes(),
+            FranklinTx::Withdraw(tx) => tx.get_bytes(),
+            FranklinTx::Close(tx) => tx.get_bytes(),
+        };
+
+        let mut hasher = Sha256::new();
+        hasher.input(&bytes);
+        let mut out = vec![0u8; 32];
+        hasher.result(&mut out);
+        out
+    }
+
+    pub fn account(&self) -> AccountAddress {
+        match self {
+            FranklinTx::Transfer(tx) => tx.from.clone(),
+            FranklinTx::Deposit(tx) => tx.to.clone(),
+            FranklinTx::Withdraw(tx) => tx.account.clone(),
+            FranklinTx::Close(tx) => tx.account.clone(),
+        }
+    }
+
+    pub fn nonce(&self) -> Nonce {
+        match self {
+            FranklinTx::Transfer(tx) => tx.nonce,
+            FranklinTx::Deposit(tx) => tx.nonce,
+            FranklinTx::Withdraw(tx) => tx.nonce,
+            FranklinTx::Close(tx) => tx.nonce,
+        }
+    }
+
+    pub fn min_number_of_chunks(&self) -> usize {
+        // TODO use spec
+        1
     }
 }
-
-//
-//impl DepositTx {
-//    fn get_bytes(&self) -> Vec<u8> {
-//        let mut out = Vec::new();
-//        out.extend_from_slice(&self.token.to_be_bytes());
-//        out.extend_from_slice(&self.amount.to_be_bytes()[1..]);
-//        out.extend_from_slice(&self.fee.to_be_bytes());
-//        self.pub_x.into_repr().write_be(&mut out).unwrap();
-//        self.pub_y.into_repr().write_be(&mut out).unwrap();
-//        out.extend_from_slice(&self.nonce.to_be_bytes());
-//        out.extend_from_slice(&self.good_until_block.to_be_bytes());
-//        out
-//    }
-//}
-//
-//
-//impl TransferToNewTx {
-//    fn get_bytes(&self) -> Vec<u8> {
-//        let mut out = Vec::new();
-//        out.extend_from_slice(&self.from.to_be_bytes()[1..]);
-//        out.extend_from_slice(&self.token.to_be_bytes());
-//        out.extend_from_slice(&self.amount.to_be_bytes()[1..]);
-//        out.extend_from_slice(&self.fee.to_be_bytes());
-//        self.pub_x.into_repr().write_be(&mut out).unwrap();
-//        self.pub_y.into_repr().write_be(&mut out).unwrap();
-//        out.extend_from_slice(&self.nonce.to_be_bytes());
-//        out.extend_from_slice(&self.good_until_block.to_be_bytes());
-//        out
-//    }
-//}
-//
-//
-//impl PartialExitTx {
-//    fn get_bytes(&self) -> Vec<u8> {
-//        let mut out = Vec::new();
-//        out.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
-//        out.extend_from_slice(&self.token.to_be_bytes());
-//        out.extend_from_slice(&self.amount.to_be_bytes()[1..]);
-//        out.extend_from_slice(&self.fee.to_be_bytes());
-//        out.extend_from_slice(&self.eth_address);
-//        out.extend_from_slice(&self.nonce.to_be_bytes());
-//        out.extend_from_slice(&self.good_until_block.to_be_bytes());
-//        out
-//    }
-//}
-//
-//
-//impl TransferTx {
-//    fn get_bytes(&self) -> Vec<u8> {
-//        let mut out = Vec::new();
-//        out.extend_from_slice(&self.from.to_be_bytes()[1..]);
-//        out.extend_from_slice(&self.to.to_be_bytes()[1..]);
-//        out.extend_from_slice(&self.token.to_be_bytes());
-//        out.extend_from_slice(&self.amount.to_be_bytes()[1..]);
-//        out.extend_from_slice(&self.fee.to_be_bytes());
-//        out.extend_from_slice(&self.nonce.to_be_bytes());
-//        out.extend_from_slice(&self.good_until_block.to_be_bytes());
-//        out
-//    }
-//}
-//
-//impl CloseTx {
-//    fn get_bytes(&self) -> Vec<u8> {
-//        let mut out = Vec::new();
-//        out.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
-//        out.extend_from_slice(&self.nonce.to_be_bytes());
-//        out.extend_from_slice(&self.good_until_block.to_be_bytes());
-//        out
-//    }
-//}
 
 //impl TransferTx {
 //    pub fn create_signed_tx(

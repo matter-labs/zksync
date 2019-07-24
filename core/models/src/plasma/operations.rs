@@ -1,7 +1,6 @@
 use super::tx::{Close, Deposit, Transfer, Withdraw};
 use super::Fr;
 use super::{params, AccountId, BlockNumber, FeeAmount, Nonce, TokenAmount, TokenId};
-use crypto::{digest::Digest, sha2::Sha256};
 use web3::types::Address;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

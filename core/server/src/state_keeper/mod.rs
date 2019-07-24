@@ -2,11 +2,11 @@ use pairing::bn256::Bn256;
 // use sapling_crypto::jubjub::{FixedGenerators};
 // use sapling_crypto::alt_babyjubjub::{AltJubjubBn256};
 
-use models::plasma::account::Account;
+use models::plasma::account::{Account, AccountAddress};
 use models::plasma::block::Block;
-use models::plasma::operations::{FranklinOp, TransferOp};
+use models::plasma::tx::FranklinTx;
 use models::plasma::{AccountId, AccountMap, Fr};
-use plasma::state::PlasmaState;
+use plasma::state::{PlasmaState, TxSuccess};
 use rayon::prelude::*;
 use sapling_crypto::eddsa::PrivateKey;
 use std::collections::VecDeque;
@@ -40,8 +40,7 @@ pub struct PlasmaStateKeeper {
 
     db_conn_pool: ConnectionPool,
 
-    /// (pk_x, pk_y)
-    fee_account_pk: (Fr, Fr),
+    fee_account_address: AccountAddress,
 
     eth_state: Arc<RwLock<ETHState>>,
 }
@@ -86,7 +85,7 @@ impl PlasmaStateKeeper {
             txs_since_last_block: num_of_valid_txs,
             db_conn_pool: pool,
             // TODO: load pk from config.
-            fee_account_pk: (Fr::default(), Fr::default()),
+            fee_account_address: AccountAddress::default(),
             eth_state,
         };
 
@@ -119,15 +118,18 @@ impl PlasmaStateKeeper {
                         );
                     }
                 }
-                StateKeeperRequest::GetAccount(account_id, sender) => {
-                    let account = self.state.get_account(account_id);
+                StateKeeperRequest::GetAccount(address, sender) => {
+                    let account = self
+                        .state
+                        .get_account_by_address(&address)
+                        .map(|(_, acc)| acc);
                     let r = sender.send(account);
                     if r.is_err() {
                         error!("StateKeeperRequest::GetAccount: channel closed, sending failed");
                     }
                 }
                 StateKeeperRequest::AddTx(tx, sender) => {
-                    let result = self.handle_new_tx(&*tx);
+                    let result = self.handle_new_tx(*tx);
 
                     let r = sender.send(result);
                     if r.is_err() {
@@ -151,7 +153,7 @@ impl PlasmaStateKeeper {
         }
     }
 
-    fn handle_new_tx(&mut self, tx: &FranklinOp) -> Result<(), String> {
+    fn handle_new_tx(&mut self, tx: FranklinTx) -> Result<(), String> {
         //        let account = self
         //            .state
         //            .get_account(tx.from)
@@ -179,9 +181,9 @@ impl PlasmaStateKeeper {
             .access_mempool()
             .map_err(|e| format!("Failed to connect to mempool. {:?}", e))?;
 
-        //        mempool
-        //            .add_tx(tx)
-        //            .map_err(|e| format!("Mempool query error:  {:?}", e))?;
+        mempool
+            .add_tx(tx)
+            .map_err(|e| format!("Mempool query error:  {:?}", e))?;
 
         if can_be_executed_now {
             self.txs_since_last_block += 1;
@@ -204,44 +206,34 @@ impl PlasmaStateKeeper {
         self.state.block_number += 1; // bump current block number as we've made one
     }
 
-    fn prepare_tx_for_block(&self) -> Vec<FranklinOp> {
+    fn prepare_tx_for_block(&self) -> Vec<FranklinTx> {
         // TODO: get proper number of txs from db.
-        unimplemented!()
-        //        let txs = self
-        //            .db_conn_pool
-        //            .access_mempool()
-        //            .map(|m| {
-        //                m.get_txs(config::RUNTIME_CONFIG.transfer_batch_size)
-        //                    .expect("Failed to get tx from db")
-        //            })
-        //            .expect("Failed to get txs from mempool");
-        //        let filtered_txs = self.filter_invalid_txs(txs);
-        //        debug!("Preparing block with txs: {:#?}", filtered_txs);
-        //        filtered_txs
+        let txs = self
+            .db_conn_pool
+            .access_mempool()
+            .map(|m| {
+                m.get_txs(config::RUNTIME_CONFIG.transfer_batch_size)
+                    .expect("Failed to get tx from db")
+            })
+            .expect("Failed to get txs from mempool");
+        let filtered_txs = self.filter_invalid_txs(txs);
+        debug!("Preparing block with txs: {:#?}", filtered_txs);
+        filtered_txs
     }
 
-    fn filter_invalid_txs(&self, transfer_txs: Vec<FranklinOp>) -> Vec<FranklinOp> {
+    fn filter_invalid_txs(&self, transfer_txs: Vec<FranklinTx>) -> Vec<FranklinTx> {
         let mut filtered_txs = Vec::new();
-
-        // Separate txs with no account.
-        filtered_txs.extend(
-            transfer_txs
-                .iter()
-                .filter(|tx| tx.account_id().is_none())
-                .cloned(),
-        );
 
         let txs_with_correct_nonce = transfer_txs
             .into_iter()
-            .filter(|tx| tx.account_id().is_some())
-            .group_by(|tx| tx.account_id().unwrap())
+            .group_by(|tx| tx.account())
             .into_iter()
             .map(|(from, txs)| {
                 let mut txs = txs.collect::<Vec<_>>();
                 txs.sort_by_key(|tx| tx.nonce());
 
                 let mut valid_txs = Vec::new();
-                let mut current_nonce = self.account(from).nonce;
+                let mut current_nonce = self.account(&from).nonce;
                 for tx in txs {
                     if tx.nonce() == current_nonce {
                         valid_txs.push(tx);
@@ -259,58 +251,70 @@ impl PlasmaStateKeeper {
 
         filtered_txs.extend(txs_with_correct_nonce.into_iter());
 
+        // Conservative chunk number estimation
         let mut total_chunks = 0;
         filtered_txs
             .into_iter()
             .take_while(|tx| {
-                total_chunks += tx.chunks();
+                total_chunks += tx.min_number_of_chunks();
                 total_chunks <= BLOCK_SIZE_CHUNKS
             })
             .collect()
     }
 
-    fn precheck_tx(&self, tx: &FranklinOp) -> Result<(), failure::Error> {
+    fn precheck_tx(&self, tx: &FranklinTx) -> Result<(), failure::Error> {
         warn!("ETH state is not checked when applying tx");
         Ok(())
         //        unimplemented!("Check ETH state before applying transaction");
     }
 
-    fn apply_txs(&mut self, transactions: Vec<FranklinOp>) -> CommitRequest {
+    fn apply_txs(&mut self, transactions: Vec<FranklinTx>) -> CommitRequest {
         info!("Creating transfer block");
         // collect updated state
         let mut accounts_updated = Vec::new();
         let mut fees = Vec::new();
-        let mut txs = Vec::new();
+        let mut ops = Vec::new();
+        let mut chunks_used = 0;
 
         for tx in transactions.into_iter() {
+            if chunks_used >= BLOCK_SIZE_CHUNKS {
+                break;
+            }
+
             if let Err(e) = self.precheck_tx(&tx) {
                 error!("Tx {:?} not ready: {:?}", tx, e);
                 continue;
             }
 
-            let mut tx_updates = self.state.apply_tx(&tx);
+            let mut tx_updates = self.state.apply_tx(tx.clone());
 
             match tx_updates {
-                Ok((fee, mut updates)) => {
+                Ok(TxSuccess {
+                    fee,
+                    mut updates,
+                    executed_op,
+                }) => {
+                    chunks_used += executed_op.chunks();
                     accounts_updated.append(&mut updates);
                     fees.push(fee);
-                    txs.push(tx);
+                    ops.push(executed_op);
                 }
-                Err(_) => {
-                    error!("Failed to execute transaction: {:?}", tx);
+                Err(e) => {
+                    error!("Failed to execute transaction: {:?}, {:?}", tx, e);
                 }
             };
         }
 
-        let (fee_account_id, fee_updates) = self.state.collect_fee(&fees, &self.fee_account_pk);
+        let (fee_account_id, fee_updates) =
+            self.state.collect_fee(&fees, &self.fee_account_address);
         accounts_updated.extend(fee_updates.into_iter());
 
-        let num_txs = txs.len();
+        let num_txs = ops.len();
         let block = Block {
             block_number: self.state.block_number,
             new_root_hash: self.state.root_hash(),
             fee_account: fee_account_id,
-            block_transactions: txs,
+            block_transactions: ops,
         };
 
         self.txs_since_last_block.saturating_sub(num_txs);
@@ -321,8 +325,11 @@ impl PlasmaStateKeeper {
         }
     }
 
-    fn account(&self, account_id: AccountId) -> Account {
-        self.state.get_account(account_id).unwrap_or_default()
+    fn account(&self, address: &AccountAddress) -> Account {
+        self.state
+            .get_account_by_address(address)
+            .unwrap_or_default()
+            .1
     }
 }
 

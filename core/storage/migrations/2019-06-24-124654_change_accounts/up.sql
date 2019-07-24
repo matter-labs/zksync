@@ -1,8 +1,7 @@
 ALTER TABLE accounts
     DROP COLUMN data CASCADE,
     ADD COLUMN nonce BIGINT not null,
-    ADD COLUMN pk_x bytea not null,
-    ADD COLUMN pk_y bytea not null;
+    ADD COLUMN address bytea not null;
 
 CREATE TABLE tokens
 (
@@ -18,7 +17,7 @@ CREATE TABLE balances
 (
     account_id integer REFERENCES accounts (id) ON UPDATE CASCADE ON DELETE CASCADE,
     coin_id    integer REFERENCES tokens (id) ON UPDATE CASCADE,
-    balance    integer not null default 0,
+    balance    numeric not null default 0,
     PRIMARY KEY (account_id, coin_id)
 );
 
@@ -31,8 +30,8 @@ create TABLE account_balance_updates
     account_id        integer not null,
     block_number      integer not null,
     coin_id           integer not null references tokens (id) on update cascade,
-    old_balance       integer not null,
-    new_balance       integer not null,
+    old_balance       numeric not null,
+    new_balance       numeric not null,
     old_nonce         bigint  not null,
     new_nonce         bigint  not null,
     PRIMARY KEY (balance_update_id)
@@ -43,8 +42,7 @@ CREATE TABLE account_creates
     account_id   integer not null,
     is_create    bool    not null,
     block_number integer not null,
-    pk_x         bytea   not null,
-    pk_y         bytea   not null,
+    address      bytea   not null,
     nonce        bigint  not null,
     PRIMARY KEY (account_id, block_number)
 );

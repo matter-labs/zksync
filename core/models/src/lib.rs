@@ -10,8 +10,9 @@ pub mod config;
 pub mod plasma;
 pub mod primitives;
 
+use crate::plasma::account::AccountAddress;
 use crate::plasma::block::Block;
-use crate::plasma::operations::FranklinOp;
+use crate::plasma::tx::FranklinTx;
 use crate::plasma::*;
 use futures::sync::oneshot;
 use plasma::AccountUpdates;
@@ -78,8 +79,8 @@ pub struct Operation {
 }
 
 pub enum StateKeeperRequest {
-    AddTx(Box<FranklinOp>, oneshot::Sender<Result<(), String>>),
-    GetAccount(u32, Sender<Option<Account>>),
+    AddTx(Box<FranklinTx>, oneshot::Sender<Result<(), String>>),
+    GetAccount(AccountAddress, Sender<Option<Account>>),
     GetNetworkStatus(Sender<NetworkStatus>),
     TimerTick,
 }

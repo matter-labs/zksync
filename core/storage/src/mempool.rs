@@ -23,7 +23,7 @@ pub struct Mempool {
 #[table_name = "mempool"]
 struct InsertTx {
     hash: Vec<u8>,
-    primary_account: Option<i32>,
+    primary_account_address: Vec<u8>,
     nonce: i64,
     tx: Value,
 }
@@ -31,7 +31,7 @@ struct InsertTx {
 #[derive(Debug, Queryable)]
 struct ReadTx {
     hash: Vec<u8>,
-    primary_account: Option<i32>,
+    primary_account_address: Vec<u8>,
     nonce: i64,
     tx: Value,
     created_at: NaiveDateTime,
@@ -55,37 +55,30 @@ impl Mempool {
 
     pub fn get_size(&self) -> QueryResult<usize> {
         mempool::table
-            .select(count(mempool::primary_account))
+            .select(count(mempool::primary_account_address))
             .execute(self.conn())
     }
 
-    pub fn add_tx(&self, tx: &FranklinTx) -> QueryResult<()> {
-        unimplemented!()
-        //        insert_into(mempool::table)
-        //            .values(&InsertTx {
-        //                hash: tx.hash(),
-        //                primary_account: tx.account_id().map(|id| id as i32),
-        //                nonce: i64::from(tx.nonce()),
-        //                tx: serde_json::to_value(tx).unwrap(),
-        //            })
-        //            .execute(self.conn())
-        //            .map(drop)
+    pub fn add_tx(&self, tx: FranklinTx) -> QueryResult<()> {
+        insert_into(mempool::table)
+            .values(&InsertTx {
+                hash: tx.hash(),
+                primary_account_address: tx.account().data.to_vec(),
+                nonce: i64::from(tx.nonce()),
+                tx: serde_json::to_value(tx).unwrap(),
+            })
+            .execute(self.conn())
+            .map(drop)
     }
 
     pub fn get_txs(&self, max_size: usize) -> QueryResult<Vec<FranklinTx>> {
         //TODO use "gaps and islands" sql solution for this.
         let stored_txs: Vec<_> = mempool::table
-            .inner_join(accounts::table.on(mempool::primary_account.eq(accounts::id.nullable())))
-            .filter(accounts::nonce.eq(mempool::nonce))
+            .left_join(accounts::table.on(mempool::primary_account_address.eq(accounts::address)))
+            .filter(accounts::nonce.ge(mempool::nonce))
             .order(mempool::created_at.asc())
             .limit(max_size as i64)
-            .load::<(ReadTx, StorageAccount)>(self.conn())?;
-
-        let new_account_txs: Vec<_> = mempool::table
-            .filter(mempool::primary_account.is_null())
-            .order(mempool::created_at.asc())
-            .limit(max_size as i64)
-            .load::<ReadTx>(self.conn())?;
+            .load::<(ReadTx, Option<StorageAccount>)>(self.conn())?;
 
         let mut txs = Vec::new();
         txs.extend(
@@ -93,12 +86,6 @@ impl Mempool {
                 .into_iter()
                 .map(|(stored_tx, _)| serde_json::from_value(stored_tx.tx).unwrap()),
         );
-        txs.extend(
-            new_account_txs
-                .into_iter()
-                .map(|stored_tx| serde_json::from_value(stored_tx.tx).unwrap()),
-        );
-        txs.truncate(max_size);
         Ok(txs)
     }
 }

@@ -14,6 +14,7 @@ use sapling_crypto::eddsa;
 pub use self::account::{Account, AccountUpdate};
 pub use self::operations::{DepositOp, FranklinOp, PartialExitOp, TransferOp, TransferToNewOp};
 pub use self::tx::TxSignature;
+use bigdecimal::BigDecimal;
 
 pub type Engine = bn256::Bn256;
 pub type Fr = bn256::Fr;
@@ -35,6 +36,14 @@ pub fn reverse_updates(updates: &mut AccountUpdates) {
     for (_, acc_upd) in updates.iter_mut() {
         *acc_upd = acc_upd.reversed_update();
     }
+}
+
+pub fn unpack_fee(fee: FeeAmount) -> BigDecimal {
+    unimplemented!()
+}
+
+pub fn unpack_amount(amount: TokenAmount) -> BigDecimal {
+    unimplemented!()
 }
 
 pub type PublicKey = eddsa::PublicKey<Engine>;
