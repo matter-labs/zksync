@@ -16,7 +16,7 @@ pub const SUBTREE_HASH_WIDTH: &'static usize = &254; //seems to be equal to Bn25
 /// balance bit width
 pub const BALANCE_BIT_WIDTH: usize = 128;
 
-pub const NEW_PUBKEY_HASH_WIDTH: &'static usize = &216;
+pub const NEW_PUBKEY_HASH_WIDTH: usize = 216;
 /// Nonce bit width
 pub const NONCE_BIT_WIDTH: usize = 32;
 //
@@ -43,3 +43,4 @@ pub const SIGNATURE_R_Y_BIT_WIDTH: &'static usize = &254;
 
 // Fr element encoding
 pub const FR_BIT_WIDTH: usize = 254;
+pub const FR_BIT_WIDTH_PADDED: usize = 256;

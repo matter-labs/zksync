@@ -20,6 +20,7 @@ impl<E: JubjubEngine> AccountContent<E> {
     pub fn from_witness<CS: ConstraintSystem<E>>(
         mut cs: CS,
         witness: &AccountWitness<E>,
+        params: &E::Params,
     ) -> Result<Self, SynthesisError> {
         let nonce = CircuitElement::from_fe_strict(
             cs.namespace(|| "nonce"),
@@ -30,6 +31,7 @@ impl<E: JubjubEngine> AccountContent<E> {
             cs.namespace(|| "pub_key"),
             || Ok(witness.pub_x.grab()?),
             || Ok(witness.pub_y.grab()?),
+            &params,
         )?;
         Ok(Self {
             nonce: nonce,

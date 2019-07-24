@@ -80,11 +80,13 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                     cs.namespace(|| "dummy new_pubkey"),
                     precomputed.asserted_numbers[0].clone(),
                     precomputed.asserted_numbers[0].clone(),
+                    &self.params,
                 )?,
                 signer_pubkey: CircuitPubkey::from_xy(
                     cs.namespace(|| "dummy signer_pubkey"),
                     precomputed.asserted_numbers[0].clone(),
                     precomputed.asserted_numbers[0].clone(),
+                    &self.params,
                 )?,
                 amount_packed: zero_circuit_element.clone(),
                 fee_packed: zero_circuit_element.clone(),
@@ -122,6 +124,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         let validator_account = AccountContent::from_witness(
             cs.namespace(|| "validator account"),
             &self.validator_account,
+            &self.params,
         )?;
         let mut rolling_root =
             AllocatedNum::alloc(cs.namespace(|| "rolling_root"), || self.old_root.grab())?;
@@ -166,9 +169,9 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             block_pub_data_bits.extend(operation_pub_data_chunk.get_bits_le());
 
             let lhs =
-                AllocatedOperationBranch::from_witness(cs.namespace(|| "lhs"), &operation.lhs)?;
+                AllocatedOperationBranch::from_witness(cs.namespace(|| "lhs"), &operation.lhs, &self.params,)?;
             let rhs =
-                AllocatedOperationBranch::from_witness(cs.namespace(|| "rhs"), &operation.rhs)?;
+                AllocatedOperationBranch::from_witness(cs.namespace(|| "rhs"), &operation.rhs, &self.params,)?;
             let mut current_branch = self.select_branch(
                 cs.namespace(|| "select appropriate branch"),
                 &lhs,
@@ -252,7 +255,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
         let mut operator_account_data = vec![];
         operator_account_data.extend(validator_account.nonce.get_bits_le().clone());
-        operator_account_data.extend(validator_account.pub_key.get_packed_key());
+        operator_account_data.extend(validator_account.pub_key.get_hash().get_bits_le());
         operator_account_data.extend(
             old_operator_balance_root
                 .into_bits_le(cs.namespace(|| "old_operator_balance_root_bits"))?,
@@ -299,7 +302,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
         let mut operator_account_data = vec![];
         operator_account_data.extend(validator_account.nonce.get_bits_le().clone());
-        operator_account_data.extend(validator_account.pub_key.get_packed_key());
+        operator_account_data.extend(validator_account.pub_key.get_hash().get_bits_le());
         operator_account_data.extend(
             new_operator_balance_root
                 .into_bits_le(cs.namespace(|| "new_operator_balance_root_bits"))?,
@@ -1742,14 +1745,13 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         let mut account_data = vec![];
         account_data.extend(branch.account.nonce.get_bits_le().clone());
-        account_data.extend(branch.account.pub_key.get_packed_key());
-        println!(
-            "get_packed_key {}",
-            branch.account.pub_key.get_packed_key().len()
-        );
+        account_data.extend(branch.account.pub_key.get_hash().get_bits_le());
+        
         let account_data_packed =
             pack_bits_to_element(cs.namespace(|| "account_data_packed"), &account_data)?;
 
+
+        //TODO: preallocate
         let zero = AllocatedNum::alloc(cs.namespace(|| "zero"), || Ok(E::Fr::zero()))?;
         zero.assert_zero(cs.namespace(|| "zero is zero"))?;
 

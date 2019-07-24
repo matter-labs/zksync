@@ -5,7 +5,7 @@ use ff::Field;
 use franklin_crypto::circuit::boolean::Boolean;
 
 use franklin_crypto::circuit::num::AllocatedNum;
-
+use franklin_crypto::circuit::{pedersen_hash};
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::params as franklin_constants;
 
@@ -211,6 +211,7 @@ impl<E: JubjubEngine> CircuitElement<E> {
 pub struct CircuitPubkey<E: JubjubEngine> {
     x: CircuitElement<E>,
     y: CircuitElement<E>,
+    hash: CircuitElement<E>,
 }
 
 impl<E: JubjubEngine> CircuitPubkey<E> {
@@ -222,29 +223,39 @@ impl<E: JubjubEngine> CircuitPubkey<E> {
         mut cs: CS,
         x: Fx,
         y: Fy,
+        params: &E::Params, 
     ) -> Result<Self, SynthesisError> {
         let x_num = AllocatedNum::alloc(cs.namespace(|| "x_num"), x)?;
         let y_num = AllocatedNum::alloc(cs.namespace(|| "y_num"), y)?;
-        let x_ce = CircuitElement::from_number(cs.namespace(|| "x"), x_num, 1)?;
-        let y_ce = CircuitElement::from_number(
+        let x_ce = CircuitElement::from_number_padded(cs.namespace(|| "x"), x_num)?;
+        let y_ce = CircuitElement::from_number_padded(
             cs.namespace(|| "y"),
             y_num,
-            franklin_constants::FR_BIT_WIDTH - 1,
         )?;
-        Ok(CircuitPubkey { x: x_ce, y: y_ce })
+        let mut to_hash = vec![];
+        to_hash.extend(x_ce.get_bits_le());
+        to_hash.extend(y_ce.get_bits_le());
+        let hash = pedersen_hash::pedersen_hash(cs.namespace(||"hash"), pedersen_hash::Personalization::NoteCommitment, &to_hash, params)?;
+        let hash_ce = CircuitElement::from_number(cs.namespace(||"hash ce"), hash.get_x().clone(), franklin_constants::NEW_PUBKEY_HASH_WIDTH)?;
+        Ok(CircuitPubkey { x: x_ce, y: y_ce, hash: hash_ce })
     }
     pub fn from_xy<CS: ConstraintSystem<E>>(
         mut cs: CS,
         x: AllocatedNum<E>,
         y: AllocatedNum<E>,
+        params: &E::Params,
     ) -> Result<Self, SynthesisError> {
-        let x_ce = CircuitElement::from_number(cs.namespace(|| "x"), x, 1)?;
-        let y_ce = CircuitElement::from_number(
+        let x_ce = CircuitElement::from_number_padded(cs.namespace(|| "x"), x)?;
+        let y_ce = CircuitElement::from_number_padded(
             cs.namespace(|| "y"),
             y,
-            franklin_constants::FR_BIT_WIDTH - 1,
         )?;
-        Ok(CircuitPubkey { x: x_ce, y: y_ce })
+        let mut to_hash = vec![];
+        to_hash.extend(x_ce.get_bits_le());
+        to_hash.extend(y_ce.get_bits_le());
+        let hash = pedersen_hash::pedersen_hash(cs.namespace(||"hash"), pedersen_hash::Personalization::NoteCommitment, &to_hash, params)?;
+        let hash_ce = CircuitElement::from_number(cs.namespace(||"hash ce"), hash.get_x().clone(), franklin_constants::NEW_PUBKEY_HASH_WIDTH)?;
+        Ok(CircuitPubkey { x: x_ce, y: y_ce, hash: hash_ce })
     }
     pub fn get_x(&self) -> CircuitElement<E> {
         self.x.clone()
@@ -252,12 +263,10 @@ impl<E: JubjubEngine> CircuitPubkey<E> {
     pub fn get_y(&self) -> CircuitElement<E> {
         self.y.clone()
     }
-    pub fn get_packed_key(&self) -> Vec<Boolean> {
-        let mut result = vec![];
-        result.extend(self.get_y().get_bits_le());
-        result.extend(self.get_x().get_bits_le());
-        result
+    pub fn get_hash(&self) -> CircuitElement<E> {
+        self.hash.clone()
     }
+
     pub fn conditionally_select<CS: ConstraintSystem<E>>(
         mut cs: CS,
         a: &Self,
@@ -276,9 +285,16 @@ impl<E: JubjubEngine> CircuitPubkey<E> {
             &b.get_y(),
             &condition,
         )?;
+        let selected_hash = CircuitElement::conditionally_select(
+            cs.namespace(|| "conditionally_select_hash"),
+            &a.get_hash(),
+            &b.get_hash(),
+            &condition,
+        )?;
         Ok(CircuitPubkey {
             x: selected_x,
             y: selected_y,
+            hash: selected_hash,
         })
     }
     pub fn equals<CS: ConstraintSystem<E>>(

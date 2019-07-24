@@ -27,6 +27,7 @@ impl<E: JubjubEngine> AllocatedOperationBranch<E> {
     pub fn from_witness<CS: ConstraintSystem<E>>(
         mut cs: CS,
         operation_branch: &OperationBranch<E>,
+        params: &E::Params,
     ) -> Result<AllocatedOperationBranch<E>, SynthesisError> {
         let account_address = CircuitElement::from_fe_strict(
             cs.namespace(|| "account_address"),
@@ -46,6 +47,7 @@ impl<E: JubjubEngine> AllocatedOperationBranch<E> {
         let account = account::AccountContent::from_witness(
             cs.namespace(|| "allocate account_content"),
             &operation_branch.witness.account_witness,
+            &params,
         )?;
 
         let balance = CircuitElement::from_fe_strict(
@@ -160,32 +162,16 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             cs.namespace(|| "signer_pubkey"),
             || op.signer_pub_key_x.grab(),
             || op.signer_pub_key_y.grab(),
+            &params
         )?;
 
         let new_pubkey = CircuitPubkey::from_xy_fe(
             cs.namespace(|| "new_pubkey"),
             || op.args.new_pub_x.grab(),
             || op.args.new_pub_y.grab(),
+            &params
         )?;
-
-        let new_pubkey_bits = new_pubkey.get_packed_key();
-
-        let new_pubkey_hash = pedersen_hash::pedersen_hash(
-            cs.namespace(|| "new_pubkey_hash"),
-            pedersen_hash::Personalization::NoteCommitment,
-            &new_pubkey_bits,
-            params,
-        )?
-        .get_x()
-        .clone();
-
-        //length not enforced, cause we intentionally truncate data here
-        let new_pubkey_hash_ce = CircuitElement::from_number(
-            cs.namespace(|| "new_pubkehy_hash_ce"),
-            new_pubkey_hash,
-            *franklin_constants::NEW_PUBKEY_HASH_WIDTH,
-        )?;
-
+        let new_pubkey_hash = new_pubkey.get_hash().clone();
         let a = CircuitElement::from_fe_strict(
             cs.namespace(|| "a"),
             || op.args.a.grab(),
@@ -206,7 +192,7 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             fee: fee,
             amount: amount,
             sig_msg: sig_msg,
-            new_pubkey_hash: new_pubkey_hash_ce,
+            new_pubkey_hash: new_pubkey_hash,
             a: a,
             b: b,
         })

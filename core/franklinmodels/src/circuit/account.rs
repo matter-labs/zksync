@@ -3,6 +3,7 @@ use crate::params;
 use ff::Field;
 use franklin_crypto::alt_babyjubjub::JubjubEngine;
 
+use merkle_tree::hasher::Hasher;
 use merkle_tree::{PedersenHasher, SparseMerkleTree};
 use models::primitives::{GetBits, GetBitsFixed};
 use pairing::bn256::{Bn256, Fr};
@@ -23,13 +24,30 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
         //TODO: verify_order
 
         leaf_content.extend(self.nonce.get_bits_le_fixed(params::NONCE_BIT_WIDTH));
-        leaf_content.extend(self.pub_y.get_bits_le_fixed(params::FR_BIT_WIDTH - 1));
-        leaf_content.extend(self.pub_x.get_bits_le_fixed(1));
-        leaf_content.extend(
-            self.subtree
-                .root_hash()
-                .get_bits_le_fixed(params::FR_BIT_WIDTH),
-        );
+
+        let mut to_hash = vec![];
+        let mut pub_x_resized = self.pub_x.get_bits_le_fixed(params::FR_BIT_WIDTH);
+        pub_x_resized.resize(params::FR_BIT_WIDTH_PADDED, false);
+        to_hash.extend(pub_x_resized);
+
+        let mut pub_y_resized = self.pub_x.get_bits_le_fixed(params::FR_BIT_WIDTH);
+        pub_y_resized.resize(256, false);
+        to_hash.extend(pub_y_resized);
+        let mut phash = self
+            .subtree
+            .hasher
+            .hash_bits(to_hash)
+            .get_bits_le_fixed(params::NEW_PUBKEY_HASH_WIDTH);
+        // phash.resize(256, false);
+        leaf_content.extend(phash);
+
+        let mut root_hash_bits = self
+            .subtree
+            .root_hash()
+            .get_bits_le_fixed(params::FR_BIT_WIDTH);
+        root_hash_bits.resize(params::FR_BIT_WIDTH_PADDED, false);
+
+        leaf_content.extend(root_hash_bits);
 
         leaf_content
     }

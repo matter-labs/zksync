@@ -67,10 +67,12 @@ impl<E: JubjubEngine> DepositWitness<E> {
         let mut new_pubkey_bits = vec![];
         append_le_fixed_width(
             &mut new_pubkey_bits,
-            &self.args.new_pub_y.unwrap(),
-            franklin_constants::FR_BIT_WIDTH - 1,
+            &self.args.new_pub_x.unwrap(),
+            franklin_constants::FR_BIT_WIDTH,
         );
-        append_le_fixed_width(&mut new_pubkey_bits, &self.args.new_pub_x.unwrap(), 1);
+        new_pubkey_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+        append_le_fixed_width(&mut new_pubkey_bits, &self.args.new_pub_y.unwrap(),franklin_constants::FR_BIT_WIDTH);
+        new_pubkey_bits.resize(2*franklin_constants::FR_BIT_WIDTH_PADDED, false);
 
         let phasher = PedersenHasher::<Bn256>::default();
         let new_pubkey_hash = phasher.hash_bits(new_pubkey_bits);
@@ -78,7 +80,7 @@ impl<E: JubjubEngine> DepositWitness<E> {
         append_be_fixed_width(
             &mut pubdata_bits,
             &new_pubkey_hash,
-            *franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         );
         assert_eq!(pubdata_bits.len(), 37 * 8);
         pubdata_bits.resize(40 * 8, false);
