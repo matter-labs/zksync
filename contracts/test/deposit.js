@@ -26,7 +26,7 @@ describe('INTEGRATION: Deposit', () => {
     });
   
     it('Ether deposit', async () => {
-        await ether.deposit("0.1", wallet, franklinDeployedContract);
+        await etherLib.deposit("0.1", wallet, franklinDeployedContract);
     });
   
-  });
+});
