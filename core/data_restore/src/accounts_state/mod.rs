@@ -18,6 +18,7 @@ use web3::types::Log;
 
 use crate::franklin_transaction::{FranklinTransaction, FranklinTransactionType};
 use crate::helpers::*;
+use models::plasma::params::ETH_TOKEN_ID;
 
 pub struct FranklinAccountsStates {
     pub config: DataRestoreConfig,
@@ -78,7 +79,7 @@ impl FranklinAccountsStates {
                 transacted_amount += &tx.amount;
                 transacted_amount += &tx.fee;
 
-                if from.balance < transacted_amount {
+                if *from.get_balance(ETH_TOKEN_ID) < transacted_amount {
                     return Err(DataRestoreError::WrongAmount);
                 }
 
@@ -87,11 +88,11 @@ impl FranklinAccountsStates {
                     to = existing_to.clone();
                 }
 
-                from.balance -= transacted_amount;
+                from.sub_balance(ETH_TOKEN_ID, &transacted_amount);
 
                 from.nonce += 1;
                 if tx.to != 0 {
-                    to.balance += &tx.amount;
+                    to.add_balance(ETH_TOKEN_ID, &tx.amount);
                 }
 
                 self.plasma_state.balance_tree.insert(tx.from, from);
@@ -122,10 +123,9 @@ impl FranklinAccountsStates {
                     let mut new_account = Account::default();
                     new_account.public_key_x = tx.pub_x;
                     new_account.public_key_y = tx.pub_y;
-                    new_account.balance = BigDecimal::zero();
                     new_account
                 });
-            account.balance += tx.amount;
+            account.add_balance(ETH_TOKEN_ID, &tx.amount);
             self.plasma_state.balance_tree.insert(tx.account, account);
         }
         Ok(())
@@ -215,12 +215,12 @@ impl FranklinAccountsStates {
             let transfer_tx = TransferTx {
                 from,
                 to,
+                token: ETH_TOKEN_ID,
                 amount: amount.clone(), //BigDecimal::from_str_radix("0", 10).unwrap(),
                 fee,                    //BigDecimal::from_str_radix("0", 10).unwrap(),
                 nonce: i.try_into().unwrap(),
                 good_until_block: 0,
                 signature: TxSignature::default(),
-                cached_pub_key: None,
             };
             info!(
                 "Transaction from account {:?} to account {:?}, amount = {:?}",

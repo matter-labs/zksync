@@ -4,7 +4,6 @@ version = "0.0.1"
 edition = "2018"
 
 [dependencies]
-circuit = { path = "../circuit" }
 eth_client = { path = "../eth_client" }
 plasma = { path = "../plasma" }
 models = { path = "../models" }
@@ -23,7 +22,7 @@ fnv = "1.0.3"
 ethabi = "6.1.0"
 web3 = "0.6.0"
 rustc-hex = "2.0.1"
-futures = "0.1.25"
+futures = "0.1.28"
 hyper = "0.12.16"
 serde = "1.0.90"
 serde_derive = "1.0.90"
@@ -31,6 +30,7 @@ serde_bytes = "0.11.1"
 serde_json = "1.0.39"
 log = "0.4"
 env_logger = "0.6"
+itertools = "0.8"
 
 im = "12.2.0"
 priority-queue = "0.5.2"
@@ -42,7 +42,8 @@ tokio = "0.1.18"
 actix = "0.7.9"
 actix-web = "0.7.19"
 
-bigdecimal = { version = "0.1.0", features = ["serde"]}
+bigdecimal = { version = "0.0.14", features = ["serde"]}
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 diesel = { version = "1.4.2", features = ["postgres", "serde_json", "r2d2", "chrono"] }
 signal-hook = { version = "0.1.8", features = ["tokio-support"] }
+failure = "0.1"

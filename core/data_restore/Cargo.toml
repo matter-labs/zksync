@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-bigdecimal = { version = "0.1.0", features = ["serde"]}
-futures = "0.1.26"
+bigdecimal = { version = "0.0.14", features = ["serde"]}
+futures = "0.1.28"
 web3 = { git = "https://github.com/tomusdrw/rust-web3" }
 tiny-keccak = "1.4.2"
 ethabi = "7.0.0"

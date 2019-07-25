@@ -10,8 +10,12 @@ pub mod config;
 pub mod plasma;
 pub mod primitives;
 
+use crate::plasma::account::AccountAddress;
 use crate::plasma::block::Block;
+use crate::plasma::tx::FranklinTx;
 use crate::plasma::*;
+use futures::sync::oneshot;
+use plasma::AccountUpdates;
 use serde_bytes;
 use std::sync::mpsc::Sender;
 
@@ -20,14 +24,6 @@ pub struct TxMeta {
     pub addr: String,
     pub nonce: u32,
 }
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TransferTxConfirmation {
-    pub block_number: BlockNumber,
-    pub signature: String,
-}
-
-pub type TransferTxResult = Result<TransferTxConfirmation, TransferApplicationError>;
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkStatus {
@@ -42,22 +38,9 @@ pub type EncodedProof = [U256; 8];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub enum EthBlockData {
-    Transfer {
-        total_fees: U128,
-
-        #[serde(with = "serde_bytes")]
-        public_data: Vec<u8>,
-    },
-    Deposit {
-        batch_number: BatchNumber,
-    },
-    Exit {
-        batch_number: BatchNumber,
-
-        #[serde(with = "serde_bytes")]
-        public_data: Vec<u8>,
-    },
+pub struct EthBlockData {
+    #[serde(with = "serde_bytes")]
+    public_data: Vec<u8>,
 }
 
 pub struct ProverRequest(pub BlockNumber);
@@ -84,27 +67,20 @@ impl std::fmt::Debug for Action {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Operation {
     pub id: Option<i32>,
     pub action: Action,
     pub block: Block,
-    pub accounts_updated: Option<AccountMap>,
+    pub accounts_updated: AccountUpdates,
 
     #[serde(skip)]
     pub tx_meta: Option<TxMeta>,
 }
 
-pub enum ProtoBlock {
-    Transfer,
-    Deposit(BatchNumber, Vec<DepositTx>),
-    Exit(BatchNumber, Vec<ExitTx>),
-}
-
 pub enum StateKeeperRequest {
-    AddTransferTx(Box<TransferTx>, Sender<TransferTxResult>),
-    AddBlock(ProtoBlock),
-    GetAccount(u32, Sender<Option<Account>>),
+    AddTx(Box<FranklinTx>, oneshot::Sender<Result<(), String>>),
+    GetAccount(AccountAddress, Sender<Option<Account>>),
     GetNetworkStatus(Sender<NetworkStatus>),
     TimerTick,
 }
@@ -112,7 +88,7 @@ pub enum StateKeeperRequest {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CommitRequest {
     pub block: Block,
-    pub accounts_updated: AccountMap,
+    pub accounts_updated: AccountUpdates,
 }
 
 pub const ACTION_COMMIT: &str = "Commit";

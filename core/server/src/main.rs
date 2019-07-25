@@ -35,8 +35,9 @@ fn main() {
     //let rt = Runtime::new().unwrap();
 
     let connection_pool = ConnectionPool::new();
-    let state_keeper = PlasmaStateKeeper::new(connection_pool.clone());
-    let eth_watch = EthWatch::new(0, 0, connection_pool.clone());
+    let eth_watch = EthWatch::new();
+    let state_keeper =
+        PlasmaStateKeeper::new(connection_pool.clone(), eth_watch.get_shared_eth_state());
 
     let storage = connection_pool
         .access_storage()
@@ -62,7 +63,7 @@ fn main() {
 
     let (tx_for_state, rx_for_state) = channel();
     start_api_server(tx_for_state.clone(), connection_pool.clone());
-    start_eth_watch(eth_watch, tx_for_state.clone());
+    start_eth_watch(eth_watch);
     let (tx_for_ops, rx_for_ops) = channel();
     start_state_keeper(state_keeper, rx_for_state, tx_for_ops.clone());
     let tx_for_eth = eth_sender::start_eth_sender(connection_pool.clone());

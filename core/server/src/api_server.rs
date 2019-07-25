@@ -1,17 +1,16 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
-use crate::nonce_futures::NonceFutures;
 use actix_web::{
     http::Method, middleware, middleware::cors::Cors, server, App, AsyncResponder, Error,
     HttpMessage, HttpRequest, HttpResponse,
 };
 use models::config::RUNTIME_CONFIG;
-use models::plasma::{Account, PublicKey, TransferTx};
-use models::{ActionType, NetworkStatus, StateKeeperRequest, TransferTxConfirmation};
+use models::plasma::{tx::FranklinTx, Account as PAccount};
+use models::{ActionType, NetworkStatus, StateKeeperRequest};
 use std::sync::mpsc;
 use storage::{BlockDetails, ConnectionPool};
 
-use futures::Future;
+use futures::{sync::oneshot, Future};
 use std::env;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
@@ -34,7 +33,6 @@ struct TransactionRequest {
 struct TransactionResponse {
     accepted: bool,
     error: Option<String>,
-    confirmation: Option<TransferTxConfirmation>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -42,12 +40,12 @@ struct TestnetConfigResponse {
     address: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct AccountDetailsResponse {
-    pending: Option<Account>,
-    verified: Option<Account>,
-    committed: Option<Account>,
-}
+//#[derive(Debug, Serialize, Deserialize)]
+//struct AccountDetailsResponse {
+//    pending: Option<Account>,
+//    verified: Option<Account>,
+//    committed: Option<Account>,
+//}
 
 #[derive(Default, Clone)]
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
@@ -64,23 +62,20 @@ pub struct AppState {
     tx_for_state: mpsc::Sender<StateKeeperRequest>,
     contract_address: String,
     connection_pool: ConnectionPool,
-    nonce_futures: NonceFutures,
     network_status: SharedNetworkStatus,
 }
 
 const TIMEOUT: u64 = 500;
-const NONCE_ORDER_TIMEOUT: u64 = 800;
 
 fn handle_submit_tx(
     req: &HttpRequest<AppState>,
 ) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let tx_for_state = req.state().tx_for_state.clone();
     let network_status = req.state().network_status.read();
-    let nonce_futures = req.state().nonce_futures.clone();
 
     req.json()
         .map_err(|e| format!("{}", e)) // convert all errors to String
-        .and_then(move |tx: TransferTx| {
+        .and_then(move |tx: FranklinTx| {
             // Rate limit check
 
             // TODO: check lazy init
@@ -88,87 +83,26 @@ fn handle_submit_tx(
                 return Err("Rate limit exceeded".to_string());
             }
 
-            // Validate tx input
+            // Validate tx input (only basic consistency check).
+            //            tx.validate()?;
 
-            tx.validate()?;
-
-            // Fetch account
-
-            // TODO: the code below will block the current thread; switch to futures instead
-            let (key_tx, key_rx) = mpsc::channel();
-            let request = StateKeeperRequest::GetAccount(tx.from, key_tx);
-            tx_for_state
-                .send(request)
-                .expect("must send a new transaction to queue");
-            let account = key_rx
-                .recv_timeout(std::time::Duration::from_millis(TIMEOUT))
-                .map_err(|_| "Internal error: timeout on GetAccount".to_string())?;
-            let account = account.ok_or_else(|| "Account not found".to_string())?;
-
-            Ok((tx, account, tx_for_state))
+            Ok(tx)
         })
-        .and_then(move |(tx, account, tx_for_state)| {
-            //debug!("account {}: nonce {} received", tx.from, tx.nonce);
-
-            // Wait for nonce
-
-            let future = if account.nonce == tx.nonce {
-                nonce_futures.ready(tx.from, tx.nonce)
-            } else {
-                //debug!("account {}: waiting for nonce {}", tx.from, tx.nonce);
-                nonce_futures.nonce_await(tx.from, tx.nonce)
-            };
-            future
-                .timeout(Duration::from_millis(NONCE_ORDER_TIMEOUT))
-                .map(|_| (tx, account, nonce_futures, tx_for_state))
-                .or_else(|e| future::err(format!("Nonce error: {:?}", e)))
-        })
-        .and_then(move |(mut tx, account, mut nonce_futures, tx_for_state)| {
-            //debug!("account {}: nonce {} ready", tx.from, tx.nonce);
-
-            // Verify signature
-
-            let pub_key: PublicKey = account
-                .get_pub_key()
-                .ok_or_else(|| "Pubkey expired".to_string())?;
-            let verified = tx.verify_sig(&pub_key);
-            if !verified {
-                let (x, y) = pub_key.0.into_xy();
-                warn!("Got public key: {:?}, {:?}", x, y);
-                warn!(
-                    "Signature is invalid: (x,y,s) = ({:?},{:?},{:?})",
-                    &tx.signature.r_x, &tx.signature.r_y, &tx.signature.s
-                );
-                return Err("Invalid signature".to_string());
-            }
-
-            // Cache public key we just verified against (to skip verifying again in state keeper)
-
-            tx.cached_pub_key = Some(pub_key);
-
-            // Apply tx
-
-            let (add_tx, add_rx) = mpsc::channel();
-            let (account, nonce) = (tx.from, tx.nonce);
+        .and_then(move |tx| {
+            let (add_tx, add_rx) = oneshot::channel();
             tx_for_state
-                .send(StateKeeperRequest::AddTransferTx(Box::new(tx), add_tx))
+                .send(StateKeeperRequest::AddTx(Box::new(tx), add_tx))
                 .expect("sending to sate keeper failed");
-            // TODO: reconsider timeouts
-            let confirmation = add_rx
-                .recv_timeout(std::time::Duration::from_millis(500))
-                .map_err(|_| "Internal error: timeout on AddTransferTx".to_string())?
-                .map_err(|e| format!("Tx rejected: {:?}", e))?;
-
-            // Notify futures waiting for nonce
-
-            nonce_futures.set_next_nonce(account, nonce + 1);
-
             // Return response
-
+            add_rx
+                .into_future()
+                .map_err(|e| format!("Failed to receive from StateKeeper: {:?}", e))
+        })
+        .and_then(|confirmation| {
+            confirmation.map_err(|e| format!("Tx rejected: {:?}", e))?;
             let resp = TransactionResponse {
                 accepted: true,
                 error: None,
-                confirmation: Some(confirmation),
             };
             Ok(HttpResponse::Ok().json(resp))
         })
@@ -176,7 +110,6 @@ fn handle_submit_tx(
             let resp = TransactionResponse {
                 accepted: false,
                 error: Some(err),
-                confirmation: None,
             };
             Ok(HttpResponse::Ok().json(resp))
         })
@@ -184,87 +117,108 @@ fn handle_submit_tx(
 }
 
 use actix_web::Result as ActixResult;
+use bigdecimal::BigDecimal;
+use models::plasma::Fr;
 
-fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-    let tx_for_state = req.state().tx_for_state.clone();
-    let pool = req.state().connection_pool.clone();
+//#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+//pub struct Account {
+//    pub balance: BigDecimal,
+//    pub nonce: u32,
+//    pub public_key_x: Fr,
+//    pub public_key_y: Fr,
+//}
+//
+//impl From<PAccount> for Account {
+//    fn from(a: PAccount) -> Account {
+//        Self {
+//            balance: a.get_balance(0).clone(),
+//            nonce: a.nonce,
+//            public_key_x: a.public_key_x,
+//            public_key_y: a.public_key_y,
+//        }
+//    }
+//}
+//
+//fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+//    let tx_for_state = req.state().tx_for_state.clone();
+//    let pool = req.state().connection_pool.clone();
+//
+//    let storage = pool.access_storage();
+//    if storage.is_err() {
+//        return Ok(HttpResponse::Ok().json(ApiError {
+//            error: "rate limit".to_string(),
+//        }));
+//    }
+//    let storage = storage.unwrap();
+//
+//    // check that something like this exists in state keeper's memory at all
+//    let account_id_string = req.match_info().get("id");
+//    if account_id_string.is_none() {
+//        return Ok(HttpResponse::Ok().json(ApiError {
+//            error: "invalid parameters".to_string(),
+//        }));
+//    }
+//    let account_id = account_id_string.unwrap().parse::<u32>();
+//    if account_id.is_err() {
+//        return Ok(HttpResponse::Ok().json(ApiError {
+//            error: "invalid account_id".to_string(),
+//        }));
+//    }
+//
+//    let (acc_tx, acc_rx) = mpsc::channel();
+//    let account_id_u32 = account_id.unwrap();
+//    let request = StateKeeperRequest::GetAccount(account_id_u32, acc_tx);
+//    tx_for_state
+//        .send(request)
+//        .expect("must send a request for an account state");
+//
+//    let pending: Result<Option<PAccount>, _> =
+//        acc_rx.recv_timeout(std::time::Duration::from_millis(TIMEOUT));
+//
+//    if pending.is_err() {
+//        warn!("API request timeout!");
+//        return Ok(HttpResponse::Ok().json(ApiError {
+//            error: "account request timeout".to_string(),
+//        }));
+//    }
+//
+//    let pending = pending.unwrap();
+//    if pending.is_none() {
+//        return Ok(HttpResponse::Ok().json(ApiError {
+//            error: "non-existing account".to_string(),
+//        }));
+//    }
+//
+//    let committed = storage.last_committed_state_for_account(account_id_u32);
+//    if let Err(ref err) = &committed {
+//        return Ok(HttpResponse::Ok().json(ApiError {
+//            error: format!("db error: {}", err),
+//        }));
+//    }
+//
+//    let verified = storage.last_verified_state_for_account(account_id_u32);
+//    if let Err(ref err) = &verified {
+//        return Ok(HttpResponse::Ok().json(ApiError {
+//            error: format!("db error: {}", err),
+//        }));
+//    }
+//
+//    // QUESTION: why do we need committed here?
+//    let response = AccountDetailsResponse {
+//        pending: pending.map(|i| i.into()),
+//        verified: verified.unwrap().map(|i| i.into()),
+//        committed: committed.unwrap().map(|i| i.into()),
+//    };
+//
+//    Ok(HttpResponse::Ok().json(response))
+//}
 
-    let storage = pool.access_storage();
-    if storage.is_err() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "rate limit".to_string(),
-        }));
-    }
-    let storage = storage.unwrap();
-
-    // check that something like this exists in state keeper's memory at all
-    let account_id_string = req.match_info().get("id");
-    if account_id_string.is_none() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "invalid parameters".to_string(),
-        }));
-    }
-    let account_id = account_id_string.unwrap().parse::<u32>();
-    if account_id.is_err() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "invalid account_id".to_string(),
-        }));
-    }
-
-    let (acc_tx, acc_rx) = mpsc::channel();
-    let account_id_u32 = account_id.unwrap();
-    let request = StateKeeperRequest::GetAccount(account_id_u32, acc_tx);
-    tx_for_state
-        .send(request)
-        .expect("must send a request for an account state");
-
-    let pending: Result<Option<Account>, _> =
-        acc_rx.recv_timeout(std::time::Duration::from_millis(TIMEOUT));
-
-    if pending.is_err() {
-        warn!("API request timeout!");
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "account request timeout".to_string(),
-        }));
-    }
-
-    let pending = pending.unwrap();
-    if pending.is_none() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "non-existing account".to_string(),
-        }));
-    }
-
-    let committed = storage.last_committed_state_for_account(account_id_u32);
-    if let Err(ref err) = &committed {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: format!("db error: {}", err),
-        }));
-    }
-
-    let verified = storage.last_verified_state_for_account(account_id_u32);
-    if let Err(ref err) = &verified {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: format!("db error: {}", err),
-        }));
-    }
-
-    // QUESTION: why do we need committed here?
-    let response = AccountDetailsResponse {
-        pending,
-        verified: verified.unwrap(),
-        committed: committed.unwrap(),
-    };
-
-    Ok(HttpResponse::Ok().json(response))
-}
-
-fn handle_get_testnet_config(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-    let address = req.state().contract_address.clone();
-    Ok(HttpResponse::Ok().json(TestnetConfigResponse {
-        address: format!("0x{}", address),
-    }))
-}
+//fn handle_get_testnet_config(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+//    let address = req.state().contract_address.clone();
+//    Ok(HttpResponse::Ok().json(TestnetConfigResponse {
+//        address: format!("0x{}", address),
+//    }))
+//}
 
 // fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
 //     let tx_for_state = req.state().tx_for_state.clone();
@@ -300,230 +254,230 @@ fn handle_get_testnet_config(req: &HttpRequest<AppState>) -> ActixResult<HttpRes
 //     Ok(HttpResponse::Ok().json(status))
 // }
 
-fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-    let network_status = req.state().network_status.read();
-    Ok(HttpResponse::Ok().json(network_status))
-}
+//fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+//    let network_status = req.state().network_status.read();
+//    Ok(HttpResponse::Ok().json(network_status))
+//}
 
-fn handle_get_account_transactions(_req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-    Ok(HttpResponse::Ok().json("{}"))
-}
+//fn handle_get_account_transactions(_req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+//    Ok(HttpResponse::Ok().json("{}"))
+//}
 
-fn handle_get_transaction_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-    let pool = req.state().connection_pool.clone();
+//fn handle_get_transaction_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+//    let pool = req.state().connection_pool.clone();
+//
+//    let storage = pool.access_storage();
+//    if storage.is_err() {
+//        return Ok(HttpResponse::Ok().json(ApiError {
+//            error: "rate limit".to_string(),
+//        }));
+//    }
+//    let storage = storage.unwrap();
+//
+//    let transaction_id_string = req.match_info().get("tx_id");
+//    if transaction_id_string.is_none() {
+//        return Ok(HttpResponse::Ok().json(ApiError {
+//            error: "invalid parameters".to_string(),
+//        }));
+//    }
+//    let transaction_id = transaction_id_string.unwrap().parse::<u32>();
+//    if transaction_id.is_err() {
+//        return Ok(HttpResponse::Ok().json(ApiError {
+//            error: "invalid transaction_id".to_string(),
+//        }));
+//    }
+//
+//    let transaction_id_u32 = transaction_id.unwrap();
+//
+//    let tx = storage.load_transaction_with_id(transaction_id_u32);
+//
+//    Ok(HttpResponse::Ok().json(tx))
+//}
 
-    let storage = pool.access_storage();
-    if storage.is_err() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "rate limit".to_string(),
-        }));
-    }
-    let storage = storage.unwrap();
+//fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+//    let pool = req.state().connection_pool.clone();
+//
+//    let storage = pool.access_storage();
+//    if storage.is_err() {
+//        return Ok(HttpResponse::Ok().json(ApiError {
+//            error: "rate limit".to_string(),
+//        }));
+//    }
+//    let storage = storage.unwrap();
+//
+//    let block_id_string = req.match_info().get("block_id");
+//    if block_id_string.is_none() {
+//        return Ok(HttpResponse::Ok().json(ApiError {
+//            error: "invalid parameters".to_string(),
+//        }));
+//    }
+//    let block_id = block_id_string.unwrap().parse::<u32>();
+//    if block_id.is_err() {
+//        return Ok(HttpResponse::Ok().json(ApiError {
+//            error: "invalid block_id".to_string(),
+//        }));
+//    }
+//
+//    let block_id_u32 = block_id.unwrap();
+//
+//    let result = storage.load_transactions_in_block(block_id_u32);
+//    match result {
+//        Ok(txs) => Ok(HttpResponse::Ok().json(txs)),
+//        Err(err) => Ok(HttpResponse::Ok().json(ApiError {
+//            error: format!("error: {}", err),
+//        })),
+//    }
+//}
 
-    let transaction_id_string = req.match_info().get("tx_id");
-    if transaction_id_string.is_none() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "invalid parameters".to_string(),
-        }));
-    }
-    let transaction_id = transaction_id_string.unwrap().parse::<u32>();
-    if transaction_id.is_err() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "invalid transaction_id".to_string(),
-        }));
-    }
+//fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+//    let pool = req.state().connection_pool.clone();
+//
+//    let storage = pool.access_storage();
+//    if storage.is_err() {
+//        return Ok(HttpResponse::Ok().json(ApiError {
+//            error: "rate limit".to_string(),
+//        }));
+//    }
+//    let storage = storage.unwrap();
+//
+//    let block_id_string = req.match_info().get("block_id");
+//    if block_id_string.is_none() {
+//        return Ok(HttpResponse::Ok().json(ApiError {
+//            error: "invalid parameters".to_string(),
+//        }));
+//    }
+//    let block_id = block_id_string.unwrap().parse::<u32>();
+//    if block_id.is_err() {
+//        return Ok(HttpResponse::Ok().json(ApiError {
+//            error: "invalid block_id".to_string(),
+//        }));
+//    }
+//
+//    let block_id_u32 = block_id.unwrap();
+//
+//    // FIXME: no expects in API server db requests, because they might fail temporarily and bring down the server!
+//    let stored_commit_operation =
+//        storage.load_stored_op_with_block_number(block_id_u32, ActionType::COMMIT);
+//    if stored_commit_operation.is_none() {
+//        return Ok(HttpResponse::Ok().json(ApiError {
+//            error: "not found".to_string(),
+//        }));
+//    }
+//
+//    let commit = stored_commit_operation.unwrap();
+//    let operation = commit.clone().into_op(&storage);
+//    if let Err(ref err) = &operation {
+//        return Ok(HttpResponse::Ok().json(ApiError {
+//            error: format!("db error: {}", err),
+//        }));
+//    }
+//    let operation = operation.unwrap();
+//
+//    let verify = storage.load_stored_op_with_block_number(block_id_u32, ActionType::VERIFY);
+//
+//    let response = BlockDetails {
+//        block_number: commit.block_number as i32,
+//        new_state_root: format!("0x{}", operation.block.new_root_hash.to_hex()),
+//        commit_tx_hash: commit.tx_hash,
+//        verify_tx_hash: verify.as_ref().and_then(|op| op.tx_hash.clone()),
+//        committed_at: commit.created_at,
+//        verified_at: verify.as_ref().map(|op| op.created_at),
+//    };
+//
+//    Ok(HttpResponse::Ok().json(response))
+//}
 
-    let transaction_id_u32 = transaction_id.unwrap();
-
-    let tx = storage.load_transaction_with_id(transaction_id_u32);
-
-    Ok(HttpResponse::Ok().json(tx))
-}
-
-fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-    let pool = req.state().connection_pool.clone();
-
-    let storage = pool.access_storage();
-    if storage.is_err() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "rate limit".to_string(),
-        }));
-    }
-    let storage = storage.unwrap();
-
-    let block_id_string = req.match_info().get("block_id");
-    if block_id_string.is_none() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "invalid parameters".to_string(),
-        }));
-    }
-    let block_id = block_id_string.unwrap().parse::<u32>();
-    if block_id.is_err() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "invalid block_id".to_string(),
-        }));
-    }
-
-    let block_id_u32 = block_id.unwrap();
-
-    let result = storage.load_transactions_in_block(block_id_u32);
-    match result {
-        Ok(txs) => Ok(HttpResponse::Ok().json(txs)),
-        Err(err) => Ok(HttpResponse::Ok().json(ApiError {
-            error: format!("error: {}", err),
-        })),
-    }
-}
-
-fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-    let pool = req.state().connection_pool.clone();
-
-    let storage = pool.access_storage();
-    if storage.is_err() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "rate limit".to_string(),
-        }));
-    }
-    let storage = storage.unwrap();
-
-    let block_id_string = req.match_info().get("block_id");
-    if block_id_string.is_none() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "invalid parameters".to_string(),
-        }));
-    }
-    let block_id = block_id_string.unwrap().parse::<u32>();
-    if block_id.is_err() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "invalid block_id".to_string(),
-        }));
-    }
-
-    let block_id_u32 = block_id.unwrap();
-
-    // FIXME: no expects in API server db requests, because they might fail temporarily and bring down the server!
-    let stored_commit_operation =
-        storage.load_stored_op_with_block_number(block_id_u32, ActionType::COMMIT);
-    if stored_commit_operation.is_none() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "not found".to_string(),
-        }));
-    }
-
-    let commit = stored_commit_operation.unwrap();
-    let operation = commit.clone().into_op(&storage);
-    if let Err(ref err) = &operation {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: format!("db error: {}", err),
-        }));
-    }
-    let operation = operation.unwrap();
-
-    let verify = storage.load_stored_op_with_block_number(block_id_u32, ActionType::VERIFY);
-
-    let response = BlockDetails {
-        block_number: commit.block_number as i32,
-        new_state_root: format!("0x{}", operation.block.new_root_hash.to_hex()),
-        commit_tx_hash: commit.tx_hash,
-        verify_tx_hash: verify.as_ref().and_then(|op| op.tx_hash.clone()),
-        committed_at: commit.created_at,
-        verified_at: verify.as_ref().map(|op| op.created_at),
-    };
-
-    Ok(HttpResponse::Ok().json(response))
-}
-
-#[allow(dead_code)]
-struct GetBlocksQuery {
-    pub from_block: Option<u32>,
-}
-
-// ***
-fn handle_get_blocks(
-    req: &HttpRequest<AppState>,
-) -> Box<Future<Item = HttpResponse, Error = Error>> {
-    let pool = req.state().connection_pool.clone();
-
-    let max_block = req
-        .query()
-        .get("max_block")
-        .cloned()
-        .unwrap_or_else(|| "99999999".to_string());
-    let limit = req
-        .query()
-        .get("limit")
-        .cloned()
-        .unwrap_or_else(|| "20".to_string());
-
-    req.body()
-        .map_err(|err| format!("{}", err))
-        .and_then(move |_| {
-            let storage = pool
-                .access_storage()
-                .map_err(|err| format!("db err: {}", err))?;
-
-            let max_block: u32 = max_block
-                .parse()
-                .map_err(|_| "invalid max_block".to_string())?;
-            let limit: u32 = limit.parse().map_err(|_| "invalid limit".to_string())?;
-            if limit > 100 {
-                return Err("limit can not exceed 100".to_string());
-            }
-
-            let response: Vec<BlockDetails> = storage
-                .load_block_range(max_block, limit)
-                .map_err(|e| format!("db err: {}", e))?;
-
-            // let commited_stored_operations = storage.load_stored_ops_in_blocks_range(max_block, limit, ActionType::COMMIT);
-            // let verified_operations = storage.load_stored_ops_in_blocks_range(max_block, limit, ActionType::VERIFY);
-
-            // let commited_operations: Vec<Operation> = commited_stored_operations.clone().iter()
-            // .map(|x| x.clone().into_op(&storage).expect("into_op must work")).collect();
-
-            // // FIXME: oy vey!
-            // let response: Vec<BlockDetailsResponse> = commited_stored_operations.into_iter().map(|x|
-            //     BlockDetailsResponse {
-            //         block_number:        x.clone().block_number as u32,
-            //         new_state_root:      commited_operations.iter().find(|&y| y.id.unwrap() == x.id).unwrap().block.new_root_hash.to_hex(),
-            //         commit_tx_hash:      x.clone().tx_hash,
-            //         verify_tx_hash:      verified_operations.iter().find(|&y| y.id == x.id).map_or(None, |x| x.clone().tx_hash),
-            //         committed_at:        None,
-            //         verified_at:         None,
-            //     }
-            // ).collect();
-            Ok(HttpResponse::Ok().json(response))
-
-            //Ok(HttpResponse::Ok().json(format!("offset = {:?}", offset)))
-        })
-        .or_else(|err: String| {
-            let resp = TransactionResponse {
-                accepted: false,
-                error: Some(err),
-                confirmation: None,
-            };
-            Ok(HttpResponse::Ok().json(resp))
-        })
-        .responder()
-}
-
-fn handle_search(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
-    let pool = req.state().connection_pool.clone();
-    let query = req.query().get("query").cloned().unwrap_or_default();
-    req.body()
-        .map_err(|err| format!("{}", err))
-        .and_then(move |_| {
-            let storage = pool
-                .access_storage()
-                .map_err(|err| format!("db err: {}", err))?;
-            let response: BlockDetails = storage.handle_search(query).ok_or("db err")?;
-            Ok(HttpResponse::Ok().json(response))
-        })
-        .or_else(|err: String| {
-            let resp = ApiError { error: err };
-            Ok(HttpResponse::Ok().json(resp))
-        })
-        .responder()
-}
+//#[allow(dead_code)]
+//struct GetBlocksQuery {
+//    pub from_block: Option<u32>,
+//}
+//
+//// ***
+//fn handle_get_blocks(
+//    req: &HttpRequest<AppState>,
+//) -> Box<Future<Item = HttpResponse, Error = Error>> {
+//    let pool = req.state().connection_pool.clone();
+//
+//    let max_block = req
+//        .query()
+//        .get("max_block")
+//        .cloned()
+//        .unwrap_or_else(|| "99999999".to_string());
+//    let limit = req
+//        .query()
+//        .get("limit")
+//        .cloned()
+//        .unwrap_or_else(|| "20".to_string());
+//
+//    req.body()
+//        .map_err(|err| format!("{}", err))
+//        .and_then(move |_| {
+//            let storage = pool
+//                .access_storage()
+//                .map_err(|err| format!("db err: {}", err))?;
+//
+//            let max_block: u32 = max_block
+//                .parse()
+//                .map_err(|_| "invalid max_block".to_string())?;
+//            let limit: u32 = limit.parse().map_err(|_| "invalid limit".to_string())?;
+//            if limit > 100 {
+//                return Err("limit can not exceed 100".to_string());
+//            }
+//
+//            let response: Vec<BlockDetails> = storage
+//                .load_block_range(max_block, limit)
+//                .map_err(|e| format!("db err: {}", e))?;
+//
+//            // let commited_stored_operations = storage.load_stored_ops_in_blocks_range(max_block, limit, ActionType::COMMIT);
+//            // let verified_operations = storage.load_stored_ops_in_blocks_range(max_block, limit, ActionType::VERIFY);
+//
+//            // let commited_operations: Vec<Operation> = commited_stored_operations.clone().iter()
+//            // .map(|x| x.clone().into_op(&storage).expect("into_op must work")).collect();
+//
+//            // // FIXME: oy vey!
+//            // let response: Vec<BlockDetailsResponse> = commited_stored_operations.into_iter().map(|x|
+//            //     BlockDetailsResponse {
+//            //         block_number:        x.clone().block_number as u32,
+//            //         new_state_root:      commited_operations.iter().find(|&y| y.id.unwrap() == x.id).unwrap().block.new_root_hash.to_hex(),
+//            //         commit_tx_hash:      x.clone().tx_hash,
+//            //         verify_tx_hash:      verified_operations.iter().find(|&y| y.id == x.id).map_or(None, |x| x.clone().tx_hash),
+//            //         committed_at:        None,
+//            //         verified_at:         None,
+//            //     }
+//            // ).collect();
+//            Ok(HttpResponse::Ok().json(response))
+//
+//            //Ok(HttpResponse::Ok().json(format!("offset = {:?}", offset)))
+//        })
+//        .or_else(|err: String| {
+//            let resp = TransactionResponse {
+//                accepted: false,
+//                error: Some(err),
+//                confirmation: None,
+//            };
+//            Ok(HttpResponse::Ok().json(resp))
+//        })
+//        .responder()
+//}
+//
+//fn handle_search(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+//    let pool = req.state().connection_pool.clone();
+//    let query = req.query().get("query").cloned().unwrap_or_default();
+//    req.body()
+//        .map_err(|err| format!("{}", err))
+//        .and_then(move |_| {
+//            let storage = pool
+//                .access_storage()
+//                .map_err(|err| format!("db err: {}", err))?;
+//            let response: BlockDetails = storage.handle_search(query).ok_or("db err")?;
+//            Ok(HttpResponse::Ok().json(response))
+//        })
+//        .or_else(|err: String| {
+//            let resp = ApiError { error: err };
+//            Ok(HttpResponse::Ok().json(resp))
+//        })
+//        .responder()
+//}
 
 fn start_server(state: AppState, bind_to: String) {
     server::new(move || {
@@ -532,36 +486,36 @@ fn start_server(state: AppState, bind_to: String) {
             .middleware(Cors::build().send_wildcard().max_age(3600).finish())
             .scope("/api/v0.1", |api_scope| {
                 api_scope
-                    .resource("/testnet_config", |r| {
-                        r.method(Method::GET).f(handle_get_testnet_config);
-                    })
-                    .resource("/status", |r| {
-                        r.method(Method::GET).f(handle_get_network_status);
-                    })
+                    //                    .resource("/testnet_config", |r| {
+                    //                        r.method(Method::GET).f(handle_get_testnet_config);
+                    //                    })
+                    //                    .resource("/status", |r| {
+                    //                        r.method(Method::GET).f(handle_get_network_status);
+                    //                    })
                     .resource("/submit_tx", |r| {
                         r.method(Method::POST).f(handle_submit_tx);
                     })
-                    .resource("/account/{id}", |r| {
-                        r.method(Method::GET).f(handle_get_account_state);
-                    })
-                    .resource("/account/{id}/transactions", |r| {
-                        r.method(Method::GET).f(handle_get_account_transactions);
-                    })
-                    .resource("/blocks/transactions/{tx_id}", |r| {
-                        r.method(Method::GET).f(handle_get_transaction_by_id);
-                    })
-                    .resource("/blocks/{block_id}/transactions", |r| {
-                        r.method(Method::GET).f(handle_get_block_transactions);
-                    })
-                    .resource("/blocks/{block_id}", |r| {
-                        r.method(Method::GET).f(handle_get_block_by_id);
-                    })
-                    .resource("/blocks", |r| {
-                        r.method(Method::GET).f(handle_get_blocks);
-                    })
-                    .resource("/search", |r| {
-                        r.method(Method::GET).f(handle_search);
-                    })
+                //                    .resource("/account/{id}", |r| {
+                //                        r.method(Method::GET).f(handle_get_account_state);
+                //                    })
+                //                    .resource("/account/{id}/transactions", |r| {
+                //                        r.method(Method::GET).f(handle_get_account_transactions);
+                //                    })
+                //                    .resource("/blocks/transactions/{tx_id}", |r| {
+                //                        r.method(Method::GET).f(handle_get_transaction_by_id);
+                //                    })
+                //                    .resource("/blocks/{block_id}/transactions", |r| {
+                //                        r.method(Method::GET).f(handle_get_block_transactions);
+                //                    })
+                //                    .resource("/blocks/{block_id}", |r| {
+                //                        r.method(Method::GET).f(handle_get_block_by_id);
+                //                    })
+                //                    .resource("/blocks", |r| {
+                //                        r.method(Method::GET).f(handle_get_blocks);
+                //                    })
+                //                    .resource("/search", |r| {
+                //                        r.method(Method::GET).f(handle_search);
+                //                    })
             })
     })
     .bind(&bind_to)
@@ -620,7 +574,6 @@ pub fn start_api_server(
                 tx_for_state: tx_for_state.clone(),
                 contract_address: env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR env missing"),
                 connection_pool: connection_pool.clone(),
-                nonce_futures: NonceFutures::default(),
                 network_status: SharedNetworkStatus::default(),
             };
 
