@@ -109,7 +109,7 @@ impl EthWatch {
 
         Self {
             contract_addr: H160::from_str(
-                &env::var("CONTRACT2_ADDR").expect("CONTRACT2_ADDR env var not found"),
+                &env::var("CONTRACT_ADDR").expect("CONTRACT2_ADDR env var not found"),
             )
             .unwrap(),
             web3_url: env::var("WEB3_URL").expect("WEB3_URL env var not found"),

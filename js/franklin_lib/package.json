@@ -1,5 +1,25 @@
 {
   "name": "franklin_lib",
   "version": "1.0.0",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@types/bn.js": "^4.11.5",
+    "@types/node": "^12.6.8",
+    "axios": "^0.19.0",
+    "bn.js": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.1.7",
+    "@types/mocha": "^5.2.7",
+    "chai": "^4.2.0",
+    "mocha": "^6.2.0",
+    "prettier": "1.18.2",
+    "ts-node": "^8.3.0",
+    "typescript": "^3.5.3"
+  },
+  "scripts": {
+    "test": "mocha -r ts-node/register tests/**/*.test.ts",
+    "run": "ts-node src/wallet.ts",
+    "fmt": "prettier --parser typescript --write \"**/*.ts\""
+  }
 }

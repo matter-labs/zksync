@@ -22,7 +22,7 @@ use web3::types::Address;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transfer {
-    // TODO restore from address from signature
+    // TODO: derrive account address from signature
     pub from: AccountAddress,
     pub to: AccountAddress,
     pub token: TokenId,
@@ -47,6 +47,7 @@ impl Transfer {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Deposit {
+    // TODO: derrive account address from signature
     pub to: AccountAddress,
     pub token: TokenId,
     pub amount: TokenAmount,
@@ -69,6 +70,7 @@ impl Deposit {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Withdraw {
+    // TODO: derrive account address from signature
     pub account: AccountAddress,
     pub eth_address: Address,
     pub token: TokenId,
@@ -94,6 +96,7 @@ impl Withdraw {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Close {
+    // TODO: derrive account address from signature
     pub account: AccountAddress,
     pub nonce: Nonce,
     // TODO: Signature unimplemented

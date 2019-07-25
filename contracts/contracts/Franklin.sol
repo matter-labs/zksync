@@ -22,9 +22,9 @@ contract Franklin is Verifier, VerificationKeys {
     event OnchainWithdrawal(address indexed owner, uint32 tokenId, uint112 amount);
 
     // TODO: - fix
-    // event OnchainBalanceChanged(address indexed owner, uint32 tokenId, uint112 amount, uint32 lockedUntilBlock);
+     event OnchainBalanceChanged(address indexed owner, uint32 tokenId, uint112 amount, uint32 lockedUntilBlock);
 
-    // event TokenAdded(address token, uint32 tokenId);
+     event TokenAdded(address token, uint32 tokenId);
 
     // event AccountRegistered(address indexed owner, uint32 id);
     /////////

@@ -79,20 +79,19 @@ impl GetBits for Account {
         use bitvec::prelude::*;
         use ff::{PrimeField, PrimeFieldRepr};
 
-        unimplemented!()
 
         //        // TODO: (Drogan) use circuit here.
-        //        let mut bytes = Vec::new();
-        //        for token in 0..TOTAL_TOKENS {
-        //            bytes.extend_from_slice(&self.get_balance(token as TokenId).to_le_bytes());
-        //        }
-        //        bytes.extend_from_slice(&self.nonce.to_le_bytes());
-        //        self.public_key_x.into_repr().write_le(&mut bytes).unwrap();
-        //        self.public_key_y.into_repr().write_le(&mut bytes).unwrap();
-        //
-        //        BitVec::<LittleEndian, u8>::from_slice(&bytes)
-        //            .into_iter()
-        //            .collect()
+                let mut bytes = Vec::new();
+                for token in 0..TOTAL_TOKENS {
+                    let balance_str = format!("{}",&self.get_balance(token as TokenId));
+                    bytes.extend_from_slice(balance_str.as_bytes());
+                }
+                bytes.extend_from_slice(&self.nonce.to_le_bytes());
+                bytes.extend_from_slice(&self.address.data);
+
+                BitVec::<LittleEndian, u8>::from_slice(&bytes)
+                    .into_iter()
+                    .collect()
 
         // let mut leaf_content = Vec::new();
         // leaf_content.extend(self.balance.get_bits_le_fixed(params::BALANCE_BIT_WIDTH));

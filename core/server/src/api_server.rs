@@ -78,6 +78,8 @@ fn handle_submit_tx(
         .and_then(move |tx: FranklinTx| {
             // Rate limit check
 
+            info!("Received tx: {:#?}", tx);
+
             // TODO: check lazy init
             if network_status.outstanding_txs > RUNTIME_CONFIG.max_outstanding_txs {
                 return Err("Rate limit exceeded".to_string());

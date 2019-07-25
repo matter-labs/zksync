@@ -11,6 +11,7 @@ pub struct Block {
 
 impl Block {
     pub fn get_eth_public_data(&self) -> Vec<u8> {
-        unimplemented!()
+        // TODO unimplemented
+        Vec::new()
     }
 }

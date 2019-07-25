@@ -66,7 +66,7 @@ fn main() {
     start_eth_watch(eth_watch);
     let (tx_for_ops, rx_for_ops) = channel();
     start_state_keeper(state_keeper, rx_for_state, tx_for_ops.clone());
-    let tx_for_eth = eth_sender::start_eth_sender(connection_pool.clone());
+    let tx_for_eth = std::sync::mpsc::channel().0;//eth_sender::start_eth_sender(connection_pool.clone());
     start_committer(rx_for_ops, tx_for_eth, connection_pool.clone());
 
     // start_prover(connection_pool.clone(), "worker 1");
