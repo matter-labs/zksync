@@ -128,10 +128,10 @@ push-image-rust: image-rust
 # Contracts
 
 deploy-contracts: confirm_action
-	@cd contracts && npx waffle && node scripts/deploy.js
+	@cd contracts && yarn deploy
 
 test-contracts: confirm_action
-	@cd contracts && npx waffle && npx mocha
+	@cd contracts && yarn test
 
 # deploy-contracts: confirm_action
 # 	@bin/deploy-contracts
