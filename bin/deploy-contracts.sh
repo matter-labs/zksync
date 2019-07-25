@@ -2,24 +2,24 @@
 
 . .setup_env
 
-KEY_FILES=$CONTRACT_KEY_FILES
-.load_keys
-
-mkdir -p contracts/contracts/keys/
-cp -f $KEY_DIR/*.sol contracts/contracts/keys/
+# // TODO key generation
+# KEY_FILES=$CONTRACT_KEY_FILES
+# .load_keys
+#
+# mkdir -p contracts/contracts/keys/
+# cp -f $KEY_DIR/*.sol contracts/contracts/keys/
 
 echo redeploying for the db $DATABASE_URL
-
 cd contracts
 yarn deploy  | tee ../deploy.log
 cd ..
 
 export LABEL=$FRANKLIN_ENV-`date +%Y-%m-%d-%H%M%S`
 
-export NEW_CONTRACT=`grep -A999 "Starting migrations" deploy.log | grep -A4 "'FranklinProxy'" | grep "contract address" | grep -oE '0x(.+)' \
-| sed -n "s/0x//p"`
+export NEW_CONTRACT=`cat deploy.log | grep "Franklin address" | grep -oE '0x(.+)' | sed -n "s/0x//p"`
 
-if [ ! -z "$NEW_CONTRACT" ]
+
+if [[ ! -z "$NEW_CONTRACT" ]]
 then
     echo New contract at $NEW_CONTRACT
 

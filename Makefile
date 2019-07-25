@@ -43,7 +43,7 @@ db-setup:
 	@bin/db-setup
 
 db-insert-contract:
-	@bin/db-insert-contract
+	@bin/db-insert-contract.sh
 
 db-reset: confirm_action db-drop db-setup db-insert-contract
 	@echo database is ready
@@ -128,7 +128,7 @@ push-image-rust: image-rust
 # Contracts
 
 deploy-contracts: confirm_action
-	@cd contracts && yarn deploy
+	@bin/deploy-contracts.sh
 
 test-contracts: confirm_action
 	@cd contracts && yarn test
