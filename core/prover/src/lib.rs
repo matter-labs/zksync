@@ -297,18 +297,19 @@ type Err = BabyProverErr;
 
 impl BabyProver {
     pub fn apply_and_prove(&mut self, block: &Block) -> Result<FullBabyProof, Err> {
-        //        match block.block_data {
-        //            BlockData::Deposit {
-        //                ref transactions, ..
-        //            } => self.apply_and_prove_deposit(&block, transactions),
-        //            BlockData::Exit {
-        //                ref transactions, ..
-        //            } => self.apply_and_prove_exit(&block, transactions),
-        //            BlockData::Transfer {
-        //                ref transactions, ..
-        //            } => self.apply_and_prove_transfer(&block, &transactions),
-        //        }
-        unimplemented!()
+        // let block_number = block.block_number;
+        // let new_root_hash = block.new_root_hash;
+        match block.block_data {
+            BlockData::Deposit {
+                ref transactions, ..
+            } => self.apply_and_prove_deposit(&block, transactions),
+            BlockData::Exit {
+                ref transactions, ..
+            } => self.apply_and_prove_exit(&block, transactions),
+            BlockData::Transfer {
+                ref transactions, ..
+            } => self.apply_and_prove_transfer(&block, &transactions),
+        }
     }
 
     // Apply transactions to the state while also making a witness for proof, then calculate proof
@@ -1133,14 +1134,10 @@ impl BabyProver {
             "rewinding the state from block #{} to #{}",
             self.current_block_number, expected_current_block
         );
-        let (_, new_accounts) = storage
-            .load_committed_state(Some(expected_current_block))
+        let (_, updated_accounts) = storage
+            .load_state_diff(self.current_block_number, expected_current_block)
             .map_err(|e| format!("load_state_diff failed: {}", e))?;
-
-        let mut tree = CircuitAccountTree::new(params::BALANCE_TREE_DEPTH as u32);
-        extend_accounts(&mut tree, new_accounts.into_iter());
-
-        self.accounts_tree = tree;
+        extend_accounts(&mut self.accounts_tree, updated_accounts.into_iter());
         self.current_block_number = expected_current_block;
         Ok(())
     }

@@ -10,26 +10,27 @@ use bellman::groth16::generate_random_parameters;
 
 use crate::vk_contract_generator::generate_vk_contract;
 
-use circuit::exit::circuit::{Exit, ExitWitness};
-use circuit::exit::exit_request::ExitRequest;
+use circuit::deposit::circuit::{Deposit, DepositWitness};
+use circuit::deposit::deposit_request::DepositRequest;
 use circuit::leaf::LeafWitness;
 use models::plasma::params as plasma_constants;
 
-const EXIT_BATCH_SIZE: usize = 1;
-const FILENAME: &str = "exit_pk.key";
-const CONTRACT_FILENAME: &str = "ExitVerificationKey.sol";
-const CONTRACT_NAME: &str = "ExitVerificationKey";
-const CONTRACT_FUNCTION_NAME: &str = "getVkExitCircuit";
+const DEPOSIT_BATCH_SIZE: usize = 1;
+const FILENAME: &str = "deposit_pk.key";
+const CONTRACT_FILENAME: &str = "DepositVerificationKey.sol";
+const CONTRACT_NAME: &str = "DepositVerificationKey";
+const CONTRACT_FUNCTION_NAME: &str = "getVkDepositCircuit";
 
-pub fn make_exitor_key() {
+pub fn make_depositor_key() {
     // let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &AltJubjubBn256::new();
     // let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
     let rng = &mut OsRng::new().unwrap();
 
-    let empty_request = ExitRequest {
-        from: None,
+    let empty_request = DepositRequest {
+        into: None,
         amount: None,
+        public_key: None,
     };
 
     let empty_leaf_witness = LeafWitness {
@@ -39,20 +40,22 @@ pub fn make_exitor_key() {
         pub_y: None,
     };
 
-    let empty_witness = ExitWitness {
+    let empty_witness = DepositWitness {
         leaf: empty_leaf_witness.clone(),
         auth_path: vec![None; plasma_constants::BALANCE_TREE_DEPTH],
+        leaf_is_empty: None,
+        new_pub_x: None,
+        new_pub_y: None,
     };
 
-    let instance_for_generation: Exit<'_, Bn256> = Exit {
+    let instance_for_generation: Deposit<'_, Bn256> = Deposit {
         params,
-        number_of_exits: EXIT_BATCH_SIZE,
+        number_of_deposits: DEPOSIT_BATCH_SIZE,
         old_root: None,
         new_root: None,
         public_data_commitment: None,
-        empty_leaf_witness: empty_leaf_witness.clone(),
         block_number: None,
-        requests: vec![(empty_request, empty_witness); EXIT_BATCH_SIZE],
+        requests: vec![(empty_request, empty_witness); DEPOSIT_BATCH_SIZE],
     };
 
     info!("generating setup...");

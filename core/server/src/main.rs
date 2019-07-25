@@ -11,7 +11,7 @@ use std::time::Duration;
 use server::api_server::start_api_server;
 use server::committer::start_committer;
 use server::eth_sender;
-use server::new_eth_watch::{start_eth_watch, EthWatch};
+use server::eth_watch::{start_eth_watch, EthWatch};
 use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
 
 use models::{config, StateKeeperRequest};
@@ -35,8 +35,8 @@ fn main() {
     //let rt = Runtime::new().unwrap();
 
     let connection_pool = ConnectionPool::new();
-    let eth_watch = EthWatch::new();
     let state_keeper = PlasmaStateKeeper::new(connection_pool.clone());
+    let eth_watch = EthWatch::new(0, 0, connection_pool.clone());
 
     let storage = connection_pool
         .access_storage()
@@ -62,7 +62,7 @@ fn main() {
 
     let (tx_for_state, rx_for_state) = channel();
     start_api_server(tx_for_state.clone(), connection_pool.clone());
-    start_eth_watch(eth_watch);
+    start_eth_watch(eth_watch, tx_for_state.clone());
     let (tx_for_ops, rx_for_ops) = channel();
     start_state_keeper(state_keeper, rx_for_state, tx_for_ops.clone());
     let tx_for_eth = eth_sender::start_eth_sender(connection_pool.clone());

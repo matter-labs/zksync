@@ -10,11 +10,8 @@ serde = "1.0.90"
 serde_derive = "1.0.90"
 serde_json = "1.0.39"
 web3 = "0.6.0"
-diesel = { version = "1.4.2", features = ["postgres", "serde_json", "r2d2", "chrono", "numeric"] }
-bigdecimal = { version = "0.0.14", features = ["serde"]}
+diesel = { version = "1.4.2", features = ["postgres", "serde_json", "r2d2", "chrono"] }
+bigdecimal = { version = "0.1.0", features = ["serde"]}
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 log = "0.4"
-
-[dev-dependencies]
-env_logger = "0.6"

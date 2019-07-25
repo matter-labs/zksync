@@ -5,7 +5,7 @@ edition = "2018"
 
 [dependencies]
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
-bigdecimal = { version = "0.0.14", features = ["serde"]}
+bigdecimal = { version = "0.1.0", features = ["serde"]}
 pairing = { package = "pairing_ce", version = "0.17.0" }
 sapling_crypto = { package = "sapling-crypto_ce", version = "0.0.5" }
 bellman = { package = "bellman_ce", version = "0.3.0" }
@@ -17,4 +17,3 @@ lazy_static = "1.2.0"
 rand = "0.4"
 fnv = "1.0.3"
 log = "0.4"
-futures = "0.1.28"

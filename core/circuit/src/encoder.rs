@@ -29,19 +29,18 @@ fn convert_exit(transactions: &[models::plasma::tx::ExitTx]) -> Result<Vec<Vec<b
 }
 
 pub fn encode_transactions(block: &Block) -> Result<Vec<u8>, String> {
-    unimplemented!()
-    //    let mut encoding: Vec<u8> = vec![];
-    //
-    //    let transactions_bits: Vec<Vec<bool>> = match &block.block_data {
-    //        BlockData::Transfer { transactions, .. } => convert_transfer(transactions)?,
-    //        BlockData::Deposit { transactions, .. } => convert_deposit(transactions)?,
-    //        BlockData::Exit { transactions, .. } => convert_exit(transactions)?,
-    //    };
-    //
-    //    for tx_bits in transactions_bits {
-    //        let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
-    //        encoding.extend(tx_encoding.into_iter());
-    //    }
-    //
-    //    Ok(encoding)
+    let mut encoding: Vec<u8> = vec![];
+
+    let transactions_bits: Vec<Vec<bool>> = match &block.block_data {
+        BlockData::Transfer { transactions, .. } => convert_transfer(transactions)?,
+        BlockData::Deposit { transactions, .. } => convert_deposit(transactions)?,
+        BlockData::Exit { transactions, .. } => convert_exit(transactions)?,
+    };
+
+    for tx_bits in transactions_bits {
+        let tx_encoding = be_bit_vector_into_bytes(&tx_bits);
+        encoding.extend(tx_encoding.into_iter());
+    }
+
+    Ok(encoding)
 }

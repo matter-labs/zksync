@@ -1,4 +1,4 @@
-use crate::plasma::params::{self, ETH_TOKEN_ID};
+use crate::plasma::params;
 use crate::primitives::{GetBits, GetBitsFixed};
 use ff::{Field, PrimeField};
 use sapling_crypto::alt_babyjubjub::JubjubEngine;
@@ -41,7 +41,7 @@ impl std::convert::From<crate::plasma::Account> for CircuitAccount<pairing::bn25
         use pairing::bn256::Fr;
 
         Self {
-            balance: Fr::from_str(&a.get_balance(ETH_TOKEN_ID).to_string()).unwrap(),
+            balance: Fr::from_str(&a.balance.to_string()).unwrap(),
             nonce: Fr::from_str(&a.nonce.to_string()).unwrap(),
             pub_x: a.public_key_x,
             pub_y: a.public_key_y,

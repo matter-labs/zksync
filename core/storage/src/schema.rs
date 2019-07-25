@@ -1,34 +1,16 @@
 table! {
-    account_balance_updates (balance_update_id) {
-        balance_update_id -> Int4,
-        account_id -> Int4,
-        block_number -> Int4,
-        coin_id -> Int4,
-        old_balance -> Numeric,
-        new_balance -> Numeric,
-        old_nonce -> Int8,
-        new_nonce -> Int8,
-    }
-}
-
-table! {
-    account_creates (account_id, block_number) {
-        account_id -> Int4,
-        is_create -> Bool,
-        block_number -> Int4,
-        pk_x -> Bytea,
-        pk_y -> Bytea,
-        nonce -> Int8,
-    }
-}
-
-table! {
     accounts (id) {
         id -> Int4,
         last_block -> Int4,
-        nonce -> Int8,
-        pk_x -> Bytea,
-        pk_y -> Bytea,
+        data -> Json,
+    }
+}
+
+table! {
+    account_updates (account_id, block_number) {
+        account_id -> Int4,
+        block_number -> Int4,
+        data -> Json,
     }
 }
 
@@ -38,23 +20,6 @@ table! {
         worker -> Text,
         created_at -> Timestamp,
         stopped_at -> Nullable<Timestamp>,
-    }
-}
-
-table! {
-    balances (account_id, coin_id) {
-        account_id -> Int4,
-        coin_id -> Int4,
-        balance -> Numeric,
-    }
-}
-
-table! {
-    mempool (from_account, nonce) {
-        from_account -> Int4,
-        nonce -> Int8,
-        tx -> Jsonb,
-        created_at -> Timestamp,
     }
 }
 
@@ -104,44 +69,28 @@ table! {
 }
 
 table! {
-    tokens (id) {
-        id -> Int4,
-        address -> Text,
-    }
-}
-
-table! {
     transactions (id) {
         id -> Int4,
         tx_type -> Text,
         from_account -> Int4,
         to_account -> Nullable<Int4>,
+        nonce -> Nullable<Int4>,
         amount -> Int4,
         fee -> Int4,
         block_number -> Nullable<Int4>,
         state_root -> Nullable<Text>,
         created_at -> Timestamp,
-        nonce -> Int4,
-        token -> Int4,
     }
 }
 
-joinable!(account_balance_updates -> tokens (coin_id));
-joinable!(balances -> accounts (account_id));
-joinable!(balances -> tokens (coin_id));
-
 allow_tables_to_appear_in_same_query!(
-    account_balance_updates,
-    account_creates,
     accounts,
+    account_updates,
     active_provers,
-    balances,
-    mempool,
     op_config,
     operations,
     proofs,
     prover_runs,
     server_config,
-    tokens,
     transactions,
 );
