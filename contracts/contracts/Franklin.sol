@@ -1,13 +1,12 @@
-pragma solidity ^0.5.8;
+pragma solidity ^0.5.1;
 
 import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
 // Warning! Verifier does not work.
-//import "./Verifier.sol";
-import "./DummyVerifier.sol";
-import "./VerificationKey.sol";
+import "./common/Verifier.sol";
+import "./common/VerificationKeys.sol";
 
-contract Franklin is DummyVerifier, VerificationKey {
+contract Franklin is Verifier, VerificationKeys {
 
     uint constant BLOCK_SIZE = 2000;                // chunks per block; each chunk has 8 bytes of public data
     uint constant MAX_VALUE = 2**112-1;             // must fit into uint112
@@ -21,11 +20,15 @@ contract Franklin is DummyVerifier, VerificationKey {
 
     event OnchainDeposit(address indexed owner, uint32 tokenId, uint112 amount, uint32 lockedUntilBlock);
     event OnchainWithdrawal(address indexed owner, uint32 tokenId, uint112 amount);
-    event OnchainBalanceChanged(address indexed owner, uint32 tokenId, uint112 amount, uint32 lockedUntilBlock);
 
-    event TokenAdded(address token, uint32 tokenId);
+    // TODO: - fix
+    // event OnchainBalanceChanged(address indexed owner, uint32 tokenId, uint112 amount, uint32 lockedUntilBlock);
 
-    event AccountRegistered(address indexed owner, uint32 id);
+    // event TokenAdded(address token, uint32 tokenId);
+
+    // event AccountRegistered(address indexed owner, uint32 id);
+    /////////
+
 
     // ==== STORAGE ====
 
@@ -65,9 +68,10 @@ contract Franklin is DummyVerifier, VerificationKey {
     // List of root-chain balances (per owner and tokenId)
     mapping (address => mapping (uint32 => Balance)) public balances;
 
-    uint32 public totalAccounts;
-    mapping (address => uint32) public accountIdByAddress;
-
+    // TODO: - fix
+    // uint32 public totalAccounts;
+    // mapping (address => uint32) public accountIdByAddress;
+    ///////////////
 
     // Blocks
 
@@ -196,7 +200,8 @@ contract Franklin is DummyVerifier, VerificationKey {
         tokenAddresses[totalTokens + 1] = _token; // Adding one because tokenId = 0 is reserved for ETH
         tokenIds[_token] = totalTokens + 1;
         totalTokens++;
-        emit TokenAdded(_token, totalTokens);
+        //TODO: -fix
+        // emit TokenAdded(_token, totalTokens);
     }
 
     function setValidator(address _validator, bool _active) external {
@@ -259,16 +264,18 @@ contract Franklin is DummyVerifier, VerificationKey {
         requireValidToken(_tokenId);
         require(uint256(_amount) + balances[msg.sender][_tokenId].balance < MAX_VALUE, "overflow");
 
-        // register account if not registered
-        if (accountIdByAddress[msg.sender] == 0) {
-            accountIdByAddress[msg.sender] = totalAccounts + 1;
-            totalAccounts++;
-        }
+        // TODO: - fix
+        // // register account if not registered
+        // if (accountIdByAddress[msg.sender] == 0) {
+        //     accountIdByAddress[msg.sender] = totalAccounts + 1;
+        //     totalAccounts++;
+        // }
 
         balances[msg.sender][_tokenId].balance += _amount;
         uint32 lockedUntilBlock = uint32(block.number + LOCK_DEPOSITS_FOR);
         balances[msg.sender][_tokenId].lockedUntilBlock = lockedUntilBlock;
-        emit OnchainBalanceChanged(msg.sender, _tokenId, balances[msg.sender][_tokenId].balance, lockedUntilBlock);
+        // TODO: - fix
+        // emit OnchainBalanceChanged(msg.sender, _tokenId, balances[msg.sender][_tokenId].balance, lockedUntilBlock);
         emit OnchainDeposit(msg.sender, _tokenId, _amount, lockedUntilBlock);
     }
 
@@ -278,7 +285,8 @@ contract Franklin is DummyVerifier, VerificationKey {
         require(block.number >= balances[msg.sender][_tokenId].lockedUntilBlock, "balance locked");
         require(balances[msg.sender][_tokenId].balance >= _amount, "insufficient balance");
         balances[msg.sender][_tokenId].balance -= _amount;
-        emit OnchainBalanceChanged(msg.sender, _tokenId, balances[msg.sender][_tokenId].balance, balances[msg.sender][_tokenId].lockedUntilBlock);
+        // TODO: - fix
+        // emit OnchainBalanceChanged(msg.sender, _tokenId, balances[msg.sender][_tokenId].balance, balances[msg.sender][_tokenId].lockedUntilBlock);
         emit OnchainWithdrawal(msg.sender, _tokenId, _amount);
     }
 
@@ -367,7 +375,10 @@ contract Franklin is DummyVerifier, VerificationKey {
         // deposit
         if (opType == 0x01) {
             // pubdata: to_account: 3, token: 2, amount: 2, fee: 1, new_pubkey_hash: 21
-            address account = addressById(uint(uint8(_publicData[currentPointer + 1])) + uint(uint8(_publicData[currentPointer + 2])) << 8 + uint(uint8(_publicData[currentPointer + 3])) << 16);
+
+            // TODO: - this should work: get address by id
+            address account = address(uint(uint8(_publicData[currentPointer + 1])) + uint(uint8(_publicData[currentPointer + 2])) << 8 + uint(uint8(_publicData[currentPointer + 3])) << 16);
+            
             uint16 tokenId = uint16(uint(uint8(_publicData[currentPointer + 4])) + uint(uint8(_publicData[currentPointer + 5])) << 8);
             uint24 amountPacked = uint24(uint8(_publicData[currentPointer + 6])) + uint24(uint8(_publicData[currentPointer + 7])) << 8;
             uint112 amount = unpack(amountPacked, tokenId);
@@ -377,7 +388,8 @@ contract Franklin is DummyVerifier, VerificationKey {
             require(balances[account][tokenId].balance >= amount, "balance insuffcient");
 
             balances[account][tokenId].balance -= amount;
-            emit OnchainBalanceChanged(account, tokenId, balances[account][tokenId].balance, balances[account][tokenId].lockedUntilBlock);
+            // TODO: - fix
+            // emit OnchainBalanceChanged(account, tokenId, balances[account][tokenId].balance, balances[account][tokenId].lockedUntilBlock);
             onchainOps[currentOnchainOp] = OnchainOp(
                 OnchainOpType.Deposit,
                 tokenId,
@@ -390,7 +402,10 @@ contract Franklin is DummyVerifier, VerificationKey {
         // partial_exit
         if (opType == 0x04) {
             // pubdata: account: 3, token: 2, amount: 2, fee: 1
-            address account = addressById(uint(uint8(_publicData[currentPointer + 1])) + uint(uint8(_publicData[currentPointer + 2])) << 8 + uint(uint8(_publicData[currentPointer + 3])) << 16);
+
+            // TODO: - this should work: get address by id
+            address account = address(uint(uint8(_publicData[currentPointer + 1])) + uint(uint8(_publicData[currentPointer + 2])) << 8 + uint(uint8(_publicData[currentPointer + 3])) << 16);
+            
             uint16 tokenId = uint16(uint(uint8(_publicData[currentPointer + 4])) + uint(uint8(_publicData[currentPointer + 5])) << 8);
             uint24 amountPacked = uint24(uint8(_publicData[currentPointer + 6])) + uint24(uint8(_publicData[currentPointer + 7])) << 8;
             uint112 amount = unpack(amountPacked, tokenId);
@@ -444,7 +459,8 @@ contract Franklin is DummyVerifier, VerificationKey {
             if (op.opType == OnchainOpType.Withdrawal) {
                 // withdrawal was successful, accrue balance
                 balances[op.owner][op.tokenId].balance += op.amount;
-                emit OnchainBalanceChanged(op.owner, op.tokenId, balances[op.owner][op.tokenId].balance, balances[op.owner][op.tokenId].lockedUntilBlock);
+                // TODO: - fix
+                // emit OnchainBalanceChanged(op.owner, op.tokenId, balances[op.owner][op.tokenId].balance, balances[op.owner][op.tokenId].lockedUntilBlock);
             }
             delete onchainOps[current];
         }
@@ -475,7 +491,8 @@ contract Franklin is DummyVerifier, VerificationKey {
             if (op.opType == OnchainOpType.Deposit) {
                 // deposit failed, return funds
                 balances[op.owner][op.tokenId].balance += op.amount;
-                emit OnchainBalanceChanged(op.owner, op.tokenId, balances[op.owner][op.tokenId].balance, balances[op.owner][op.tokenId].lockedUntilBlock);
+                // TODO: - fix
+                // emit OnchainBalanceChanged(op.owner, op.tokenId, balances[op.owner][op.tokenId].balance, balances[op.owner][op.tokenId].lockedUntilBlock);
             }
             delete onchainOps[current];
         }
@@ -502,7 +519,8 @@ contract Franklin is DummyVerifier, VerificationKey {
 
         for(uint256 i = 0; i < _owners.length; i++) {
             balances [_owners[i]][_tokenId].balance += _amounts[i];
-            emit OnchainBalanceChanged(_owners[i], _tokenId, balances[_owners[i]][_tokenId].balance, balances[_owners[i]][_tokenId].lockedUntilBlock);
+            // TODO: - fix
+            // emit OnchainBalanceChanged(_owners[i], _tokenId, balances[_owners[i]][_tokenId].balance, balances[_owners[i]][_tokenId].lockedUntilBlock);
             exited   [_owners[i]][_tokenId] = true;
         }
     }

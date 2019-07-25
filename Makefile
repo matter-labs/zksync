@@ -128,21 +128,27 @@ push-image-rust: image-rust
 # Contracts
 
 deploy-contracts: confirm_action
-	@bin/deploy-contracts
+	@cd contracts && yarn deploy
 
-flattener = @docker run --rm -v $(shell pwd)/contracts:/home/contracts -it "${FLATTENER_DOCKER_IMAGE}"
-define flatten_file
-	@echo flattening $(1)
-	$(flattener) -c 'solidity_flattener --output /home/contracts/flat/$(1) /home/contracts/contracts/$(1)'
-endef
+test-contracts: confirm_action
+	@cd contracts && yarn test
 
-# Flatten contract source
-flatten:
-	@mkdir -p contracts/flat
-	$(call flatten_file,FranklinProxy.sol)
-	$(call flatten_file,Depositor.sol)
-	$(call flatten_file,Exitor.sol)
-	$(call flatten_file,Transactor.sol)
+# deploy-contracts: confirm_action
+# 	@bin/deploy-contracts
+
+# flattener = @docker run --rm -v $(shell pwd)/contracts:/home/contracts -it "${FLATTENER_DOCKER_IMAGE}"
+# define flatten_file
+# 	@echo flattening $(1)
+# 	$(flattener) -c 'solidity_flattener --output /home/contracts/flat/$(1) /home/contracts/contracts/$(1)'
+# endef
+
+# # Flatten contract source
+# flatten:
+# 	@mkdir -p contracts/flat
+# 	$(call flatten_file,FranklinProxy.sol)
+# 	$(call flatten_file,Depositor.sol)
+# 	$(call flatten_file,Exitor.sol)
+# 	$(call flatten_file,Transactor.sol)
 
 # Publish source to etherscan.io
 source: #flatten
