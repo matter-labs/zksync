@@ -26,8 +26,8 @@ pub struct Transfer {
     pub from: AccountAddress,
     pub to: AccountAddress,
     pub token: TokenId,
-    pub amount: TokenAmount,
-    pub fee: FeeAmount,
+    pub amount: BigDecimal,
+    pub fee: BigDecimal,
     pub nonce: Nonce,
     // TODO: Signature unimplemented
 }
@@ -38,8 +38,8 @@ impl Transfer {
         out.extend_from_slice(&self.from.data);
         out.extend_from_slice(&self.to.data);
         out.extend_from_slice(&self.token.to_be_bytes());
-        out.extend_from_slice(&self.amount.to_be_bytes()[1..]);
-        out.extend_from_slice(&self.fee.to_be_bytes());
+        //        out.extend_from_slice(&self.amount.to_be_bytes()[1..]);
+        //        out.extend_from_slice(&self.fee.to_be_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }
@@ -50,8 +50,8 @@ pub struct Deposit {
     // TODO: derrive account address from signature
     pub to: AccountAddress,
     pub token: TokenId,
-    pub amount: TokenAmount,
-    pub fee: FeeAmount,
+    pub amount: BigDecimal,
+    pub fee: BigDecimal,
     pub nonce: Nonce,
     // TODO: Signature unimplemented
 }
@@ -61,8 +61,8 @@ impl Deposit {
         let mut out = Vec::new();
         out.extend_from_slice(&self.to.data);
         out.extend_from_slice(&self.token.to_be_bytes());
-        out.extend_from_slice(&self.amount.to_be_bytes()[1..]);
-        out.extend_from_slice(&self.fee.to_be_bytes());
+        //        out.extend_from_slice(&self.amount.to_be_bytes()[1..]);
+        //        out.extend_from_slice(&self.fee.to_be_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }
@@ -75,8 +75,8 @@ pub struct Withdraw {
     pub eth_address: Address,
     pub token: TokenId,
     /// None -> withdraw all
-    pub amount: TokenAmount,
-    pub fee: FeeAmount,
+    pub amount: BigDecimal,
+    pub fee: BigDecimal,
     pub nonce: Nonce,
     // TODO: Signature unimplemented
 }
@@ -87,8 +87,8 @@ impl Withdraw {
         out.extend_from_slice(&self.account.data);
         out.extend_from_slice(&self.eth_address);
         out.extend_from_slice(&self.token.to_be_bytes());
-        out.extend_from_slice(&self.amount.to_be_bytes()[1..]);
-        out.extend_from_slice(&self.fee.to_be_bytes());
+        //        out.extend_from_slice(&self.amount.to_be_bytes()[1..]);
+        //        out.extend_from_slice(&self.fee.to_be_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }

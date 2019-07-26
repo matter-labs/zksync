@@ -73,18 +73,19 @@ impl Mempool {
 
     pub fn get_txs(&self, max_size: usize) -> QueryResult<Vec<FranklinTx>> {
         //TODO use "gaps and islands" sql solution for this.
-        let stored_txs: Vec<_> = mempool::table
-            .left_join(accounts::table.on(mempool::primary_account_address.eq(accounts::address)))
-            .filter(accounts::nonce.ge(mempool::nonce))
-            .order(mempool::created_at.asc())
-            .limit(max_size as i64)
-            .load::<(ReadTx, Option<StorageAccount>)>(self.conn())?;
+        //        let stored_txs: Vec<_> = mempool::table
+        //            .left_join(accounts::table.on(mempool::primary_account_address.eq(accounts::address)))
+        //            .filter(accounts::nonce.ge(mempool::nonce))
+        //            .order(mempool::created_at.asc())
+        //            .limit(max_size as i64)
+        //            .load::<(ReadTx, Option<StorageAccount>)>(self.conn())?;
+        let stored_txs: Vec<_> = mempool::table.load::<ReadTx>(self.conn())?;
 
         let mut txs = Vec::new();
         txs.extend(
             stored_txs
                 .into_iter()
-                .map(|(stored_tx, _)| serde_json::from_value(stored_tx.tx).unwrap()),
+                .map(|stored_tx| serde_json::from_value(stored_tx.tx).unwrap()),
         );
         Ok(txs)
     }

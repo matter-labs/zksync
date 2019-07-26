@@ -2,40 +2,57 @@ import BN = require('bn.js');
 import { integerToFloat } from './utils';
 import Axios from 'axios';
 
-type Token = number;
+export type Address = Buffer;
+export type Token = number;
 
-class Wallet {
-    nonce: number;
+export class Wallet {
+    // TODO: use public/private key instead of address.
+    constructor(public address: Address, public franklin_provider: string = 'http://127.0.0.1:3000') {}
 
-    constructor(public address, public tx_endpoint: string = 'http://127.0.0.1:3000') {
-        this.nonce = 0;
-    }
-
-    deposit(token: Token, amount: BN, fee: BN) {
+    async deposit(token: Token, amount: BN, fee: BN) {
+        let nonce = await this.getNonce();
         // use packed numbers for signture
-        let packed_amount = Buffer.concat([Buffer.from([0]), integerToFloat(amount, 9, 15, 10)]).readUInt32BE(0);
-        let packed_fee = integerToFloat(fee, 4, 4, 10).readUInt8(0);
         let tx = {
             type: 'Deposit',
-            to: this.address,
+            to: this.address.toString('hex'),
             token: token,
-            amount: packed_amount,
-            fee: packed_fee,
-            nonce: this.nonce,
+            amount: amount.toString(10),
+            fee: fee.toString(10),
+            nonce: nonce,
         };
-        this.nonce += 1;
 
-        return Axios.post(this.tx_endpoint + '/api/v0.1/submit_tx', tx);
+        let result = await Axios.post(this.franklin_provider + '/api/v0.1/submit_tx', tx);
+        return result.data;
+    }
+
+    async transfer(address: Address, token: Token, amount: BN, fee: BN) {
+        let nonce = await this.getNonce();
+        // use packed numbers for signture
+        let tx = {
+            type: 'Transfer',
+            from: this.address.toString('hex'),
+            to: address.toString('hex'),
+            token: token,
+            amount: amount.toString(10),
+            fee: fee.toString(10),
+            nonce: nonce,
+        };
+
+        let result = await Axios.post(this.franklin_provider + '/api/v0.1/submit_tx', tx);
+        return result.data;
+    }
+
+    async getState() {
+        return await Axios.get(this.franklin_provider + '/api/v0.1/account/' + this.address.toString('hex')).then(
+            reps => reps.data,
+        );
+    }
+
+    async getNonce() {
+        let state = await this.getState();
+        if (state.error) {
+            return 0;
+        }
+        return (await this.getState()).nonce;
     }
 }
-
-async function main() {
-    let wallet = new Wallet({
-        data: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    });
-
-    let result = await wallet.deposit(0, new BN(1200), new BN(8));
-    console.log(result);
-}
-
-main();

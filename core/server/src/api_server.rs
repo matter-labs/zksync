@@ -120,6 +120,7 @@ fn handle_submit_tx(
 
 use actix_web::Result as ActixResult;
 use bigdecimal::BigDecimal;
+use models::plasma::account::AccountAddress;
 use models::plasma::Fr;
 
 //#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -141,79 +142,74 @@ use models::plasma::Fr;
 //    }
 //}
 //
-//fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-//    let tx_for_state = req.state().tx_for_state.clone();
-//    let pool = req.state().connection_pool.clone();
-//
-//    let storage = pool.access_storage();
-//    if storage.is_err() {
-//        return Ok(HttpResponse::Ok().json(ApiError {
-//            error: "rate limit".to_string(),
-//        }));
-//    }
-//    let storage = storage.unwrap();
-//
-//    // check that something like this exists in state keeper's memory at all
-//    let account_id_string = req.match_info().get("id");
-//    if account_id_string.is_none() {
-//        return Ok(HttpResponse::Ok().json(ApiError {
-//            error: "invalid parameters".to_string(),
-//        }));
-//    }
-//    let account_id = account_id_string.unwrap().parse::<u32>();
-//    if account_id.is_err() {
-//        return Ok(HttpResponse::Ok().json(ApiError {
-//            error: "invalid account_id".to_string(),
-//        }));
-//    }
-//
-//    let (acc_tx, acc_rx) = mpsc::channel();
-//    let account_id_u32 = account_id.unwrap();
-//    let request = StateKeeperRequest::GetAccount(account_id_u32, acc_tx);
-//    tx_for_state
-//        .send(request)
-//        .expect("must send a request for an account state");
-//
-//    let pending: Result<Option<PAccount>, _> =
-//        acc_rx.recv_timeout(std::time::Duration::from_millis(TIMEOUT));
-//
-//    if pending.is_err() {
-//        warn!("API request timeout!");
-//        return Ok(HttpResponse::Ok().json(ApiError {
-//            error: "account request timeout".to_string(),
-//        }));
-//    }
-//
-//    let pending = pending.unwrap();
-//    if pending.is_none() {
-//        return Ok(HttpResponse::Ok().json(ApiError {
-//            error: "non-existing account".to_string(),
-//        }));
-//    }
-//
-//    let committed = storage.last_committed_state_for_account(account_id_u32);
-//    if let Err(ref err) = &committed {
-//        return Ok(HttpResponse::Ok().json(ApiError {
-//            error: format!("db error: {}", err),
-//        }));
-//    }
-//
-//    let verified = storage.last_verified_state_for_account(account_id_u32);
-//    if let Err(ref err) = &verified {
-//        return Ok(HttpResponse::Ok().json(ApiError {
-//            error: format!("db error: {}", err),
-//        }));
-//    }
-//
-//    // QUESTION: why do we need committed here?
-//    let response = AccountDetailsResponse {
-//        pending: pending.map(|i| i.into()),
-//        verified: verified.unwrap().map(|i| i.into()),
-//        committed: committed.unwrap().map(|i| i.into()),
-//    };
-//
-//    Ok(HttpResponse::Ok().json(response))
-//}
+fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    let tx_for_state = req.state().tx_for_state.clone();
+    let pool = req.state().connection_pool.clone();
+
+    let storage = pool.access_storage();
+    if storage.is_err() {
+        return Ok(HttpResponse::Ok().json(ApiError {
+            error: "rate limit".to_string(),
+        }));
+    }
+    let storage = storage.unwrap();
+
+    // check that something like this exists in state keeper's memory at all
+    let account_address = req.match_info().get("address");
+    if account_address.is_none() {
+        return Ok(HttpResponse::Ok().json(ApiError {
+            error: "invalid parameters".to_string(),
+        }));
+    }
+    let address = AccountAddress::from_hex(account_address.unwrap());
+    if address.is_err() {
+        return Ok(HttpResponse::Ok().json(ApiError {
+            error: "invalid account_address".to_string(),
+        }));
+    }
+
+    let (acc_tx, acc_rx) = mpsc::channel();
+    let request = StateKeeperRequest::GetAccount(address.unwrap(), acc_tx);
+    tx_for_state
+        .send(request)
+        .expect("must send a request for an account state");
+
+    let pending: Result<Option<PAccount>, _> =
+        acc_rx.recv_timeout(std::time::Duration::from_millis(TIMEOUT));
+
+    if pending.is_err() {
+        warn!("API request timeout!");
+        return Ok(HttpResponse::Ok().json(ApiError {
+            error: "account request timeout".to_string(),
+        }));
+    }
+
+    let pending = pending.unwrap();
+    if pending.is_none() {
+        return Ok(HttpResponse::Ok().json(ApiError {
+            error: "non-existing account".to_string(),
+        }));
+    }
+
+    //    let committed = storage.last_committed_state_for_account(account_id_u32);
+    //    if let Err(ref err) = &committed {
+    //        return Ok(HttpResponse::Ok().json(ApiError {
+    //            error: format!("db error: {}", err),
+    //        }));
+    //    }
+    //
+    //    let verified = storage.last_verified_state_for_account(account_id_u32);
+    //    if let Err(ref err) = &verified {
+    //        return Ok(HttpResponse::Ok().json(ApiError {
+    //            error: format!("db error: {}", err),
+    //        }));
+    //    }
+
+    // QUESTION: why do we need committed here?
+    let response = pending.unwrap();
+
+    Ok(HttpResponse::Ok().json(response))
+}
 
 //fn handle_get_testnet_config(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
 //    let address = req.state().contract_address.clone();
@@ -497,9 +493,9 @@ fn start_server(state: AppState, bind_to: String) {
                     .resource("/submit_tx", |r| {
                         r.method(Method::POST).f(handle_submit_tx);
                     })
-                //                    .resource("/account/{id}", |r| {
-                //                        r.method(Method::GET).f(handle_get_account_state);
-                //                    })
+                    .resource("/account/{address}", |r| {
+                        r.method(Method::GET).f(handle_get_account_state);
+                    })
                 //                    .resource("/account/{id}/transactions", |r| {
                 //                        r.method(Method::GET).f(handle_get_account_transactions);
                 //                    })

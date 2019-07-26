@@ -1,7 +1,7 @@
 pub const TRANSFER_BATCH_SIZE: usize = 8;
 pub const DEPOSIT_BATCH_SIZE: usize = 1;
 pub const EXIT_BATCH_SIZE: usize = 1;
-pub const PADDING_INTERVAL: u64 = 60; // sec
+pub const PADDING_INTERVAL: u64 = 5; // sec
 pub const PROVER_TIMEOUT: usize = 60; // sec
 pub const PROVER_TIMER_TICK: u64 = 5; // sec
 pub const PROVER_CYCLE_WAIT: u64 = 5; // sec

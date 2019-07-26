@@ -6,8 +6,8 @@ use models::plasma::account::{Account, AccountAddress};
 use models::plasma::operations::{CloseOp, DepositOp, FranklinOp, PartialExitOp, TransferOp};
 use models::plasma::tx::{Close, Deposit, FranklinTx, Transfer, Withdraw};
 use models::plasma::{
-    params, unpack_amount, unpack_fee, AccountUpdate, AccountUpdates, BlockNumber, FeeAmount,
-    TokenAmount, TokenId, TransferToNewOp,
+    params, AccountUpdate, AccountUpdates, BlockNumber, FeeAmount, TokenAmount, TokenId,
+    TransferToNewOp,
 };
 use models::plasma::{AccountId, AccountMap, Fr};
 use std::collections::HashMap;
@@ -32,7 +32,7 @@ pub struct PlasmaState {
 #[derive(Debug)]
 pub struct CollectedFee {
     pub token: TokenId,
-    pub amount: FeeAmount,
+    pub amount: BigDecimal,
 }
 
 impl PlasmaState {
@@ -174,15 +174,13 @@ impl PlasmaState {
             };
 
         for fee in fees {
-            let amount = unpack_fee(fee.amount);
-
-            if amount == BigDecimal::from(0) {
+            if fee.amount == BigDecimal::from(0) {
                 continue;
             }
 
             let old_amount = account.get_balance(fee.token).clone();
             let nonce = account.nonce;
-            account.add_balance(fee.token, &amount);
+            account.add_balance(fee.token, &fee.amount);
             let new_amount = account.get_balance(fee.token).clone();
 
             updates.push((
@@ -243,7 +241,7 @@ impl PlasmaState {
             old_nonce
         );
         // TODO: (Drogan) check eth state balance.
-        account.add_balance(op.tx.token, &unpack_amount(op.tx.amount));
+        account.add_balance(op.tx.token, &op.tx.amount);
         account.nonce += 1;
         let new_amount = account.get_balance(op.tx.token).clone();
         let new_nonce = account.nonce;
@@ -261,7 +259,7 @@ impl PlasmaState {
 
         let fee = CollectedFee {
             token: op.tx.token,
-            amount: op.tx.fee,
+            amount: op.tx.fee.clone(),
         };
 
         Ok((fee, updates))
@@ -288,20 +286,17 @@ impl PlasmaState {
         let from_old_nonce = from_account.nonce;
         ensure!(op.tx.nonce == from_old_nonce, "Nonce mismatch");
         ensure!(
-            from_old_balance >= unpack_amount(op.tx.amount) + unpack_fee(op.tx.fee),
+            from_old_balance >= &op.tx.amount + &op.tx.fee,
             "Not enough balance"
         );
-        from_account.sub_balance(
-            op.tx.token,
-            &(unpack_amount(op.tx.amount) + unpack_fee(op.tx.fee)),
-        );
+        from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
         from_account.nonce += 1;
         let from_new_balance = from_account.get_balance(op.tx.token).clone();
         let from_new_nonce = from_account.nonce;
 
         let to_old_balance = to_account.get_balance(op.tx.token).clone();
         let to_account_nonce = to_account.nonce;
-        to_account.add_balance(op.tx.token, &unpack_amount(op.tx.amount));
+        to_account.add_balance(op.tx.token, &op.tx.amount);
         let to_new_balance = to_account.get_balance(op.tx.token).clone();
 
         self.insert_account(op.from, from_account);
@@ -326,7 +321,7 @@ impl PlasmaState {
 
         let fee = CollectedFee {
             token: op.tx.token,
-            amount: op.tx.fee,
+            amount: op.tx.fee.clone(),
         };
 
         Ok((fee, updates))
@@ -344,14 +339,11 @@ impl PlasmaState {
 
         ensure!(op.tx.nonce == from_old_nonce, "Nonce mismatch");
         ensure!(
-            from_old_balance >= unpack_amount(op.tx.amount) + unpack_fee(op.tx.fee),
+            from_old_balance >= &op.tx.amount + &op.tx.fee,
             "Not enough balance"
         );
 
-        from_account.sub_balance(
-            op.tx.token,
-            &(unpack_amount(op.tx.amount) + unpack_fee(op.tx.fee)),
-        );
+        from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
         from_account.nonce += 1;
 
         let from_new_balance = from_account.get_balance(op.tx.token).clone();
@@ -370,7 +362,7 @@ impl PlasmaState {
 
         let fee = CollectedFee {
             token: op.tx.token,
-            amount: op.tx.fee,
+            amount: op.tx.fee.clone(),
         };
 
         Ok((fee, updates))
@@ -400,7 +392,7 @@ impl PlasmaState {
 
         let fee = CollectedFee {
             token: params::ETH_TOKEN_ID,
-            amount: 0,
+            amount: BigDecimal::from(0),
         };
 
         Ok((fee, updates))
@@ -420,14 +412,11 @@ impl PlasmaState {
 
         ensure!(op.tx.nonce == from_old_nonce, "Nonce mismatch");
         ensure!(
-            from_old_balance >= unpack_amount(op.tx.amount) + unpack_fee(op.tx.fee),
+            from_old_balance >= &op.tx.amount + &op.tx.fee,
             "Not enough balance"
         );
 
-        from_account.sub_balance(
-            op.tx.token,
-            &(unpack_amount(op.tx.amount) + unpack_fee(op.tx.fee)),
-        );
+        from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
         from_account.nonce += 1;
 
         let from_new_balance = from_account.get_balance(op.tx.token).clone();
@@ -436,7 +425,7 @@ impl PlasmaState {
         let to_old_balance = to_account.get_balance(op.tx.token).clone();
         let to_account_nonce = to_account.nonce;
 
-        to_account.add_balance(op.tx.token, &unpack_amount(op.tx.amount));
+        to_account.add_balance(op.tx.token, &op.tx.amount);
 
         let to_new_balance = to_account.get_balance(op.tx.token).clone();
 
@@ -463,7 +452,7 @@ impl PlasmaState {
 
         let fee = CollectedFee {
             token: op.tx.token,
-            amount: op.tx.fee,
+            amount: op.tx.fee.clone(),
         };
 
         Ok((fee, updates))

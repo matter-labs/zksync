@@ -33,10 +33,7 @@ pub struct PlasmaStateKeeper {
     state: PlasmaState,
 
     /// Promised latest UNIX timestamp of the next block
-    next_block_at_max: Option<SystemTime>,
-
-    /// Transactions added since last block.
-    txs_since_last_block: usize,
+    next_block_at_max: SystemTime,
 
     db_conn_pool: ConnectionPool,
 
@@ -69,20 +66,10 @@ impl PlasmaStateKeeper {
             last_committed, last_verified
         );
 
-        let num_of_valid_txs = pool
-            .access_mempool()
-            .expect("Failed to get mempool")
-            .get_txs(config::RUNTIME_CONFIG.transfer_batch_size)
-            .expect("No txs from mempool")
-            .len();
-
         // Keeper starts with the NEXT block
         let keeper = PlasmaStateKeeper {
             state,
-            next_block_at_max: Some(
-                SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL),
-            ),
-            txs_since_last_block: num_of_valid_txs,
+            next_block_at_max: SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL),
             db_conn_pool: pool,
             // TODO: load pk from config.
             fee_account_address: AccountAddress::default(),
@@ -104,9 +91,12 @@ impl PlasmaStateKeeper {
             match req {
                 StateKeeperRequest::GetNetworkStatus(sender) => {
                     let r = sender.send(NetworkStatus {
-                        next_block_at_max: self
-                            .next_block_at_max
-                            .map(|t| t.duration_since(UNIX_EPOCH).unwrap().as_secs()),
+                        next_block_at_max: Some(
+                            self.next_block_at_max
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs(),
+                        ),
                         last_committed: 0,
                         last_verified: 0,
                         outstanding_txs: 0,
@@ -135,18 +125,10 @@ impl PlasmaStateKeeper {
                     if r.is_err() {
                         error!("StateKeeperRequest::AddTransferTx: channel closed, sending failed");
                     }
-
-                    if self.txs_since_last_block > config::RUNTIME_CONFIG.transfer_batch_size {
-                        self.create_new_block(&tx_for_commitments);
-                    }
                 }
                 StateKeeperRequest::TimerTick => {
-                    if self.txs_since_last_block > config::RUNTIME_CONFIG.transfer_batch_size {
+                    if self.next_block_at_max <= SystemTime::now() {
                         self.create_new_block(&tx_for_commitments);
-                    } else if let Some(next_block_at) = self.next_block_at_max {
-                        if next_block_at <= SystemTime::now() {
-                            self.create_new_block(&tx_for_commitments);
-                        }
                     }
                 }
             }
@@ -173,9 +155,6 @@ impl PlasmaStateKeeper {
         //            return Err("Invalid signature".to_string());
         //        }
 
-        // TODO: Drogan handle nonce for deposit and exit.
-        let can_be_executed_now = true;
-
         let mempool = self
             .db_conn_pool
             .access_mempool()
@@ -184,14 +163,6 @@ impl PlasmaStateKeeper {
         mempool
             .add_tx(tx)
             .map_err(|e| format!("Mempool query error:  {:?}", e))?;
-
-        if can_be_executed_now {
-            self.txs_since_last_block += 1;
-            if self.next_block_at_max.is_none() {
-                self.next_block_at_max =
-                    Some(SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL));
-            };
-        }
 
         Ok(())
     }
@@ -202,7 +173,7 @@ impl PlasmaStateKeeper {
         tx_for_commitments
             .send(commit_request)
             .expect("Commit request send");
-        self.next_block_at_max = None;
+        self.next_block_at_max = SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL);
         self.state.block_number += 1; // bump current block number as we've made one
     }
 
@@ -269,7 +240,7 @@ impl PlasmaStateKeeper {
     }
 
     fn apply_txs(&mut self, transactions: Vec<FranklinTx>) -> CommitRequest {
-        info!("Creating transfer block");
+        info!("Creating block, size: {}", transactions.len());
         // collect updated state
         let mut accounts_updated = Vec::new();
         let mut fees = Vec::new();
@@ -316,8 +287,6 @@ impl PlasmaStateKeeper {
             fee_account: fee_account_id,
             block_transactions: ops,
         };
-
-        self.txs_since_last_block.saturating_sub(num_txs);
 
         CommitRequest {
             block,

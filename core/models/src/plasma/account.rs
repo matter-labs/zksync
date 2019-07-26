@@ -4,11 +4,49 @@ use crate::plasma::{AccountId, AccountUpdates, Nonce, TokenAmount, TokenId};
 use crate::primitives::GetBits;
 use crate::{Engine, Fr, PublicKey};
 use bigdecimal::BigDecimal;
+use failure::ensure;
 use sapling_crypto::jubjub::{edwards, Unknown};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::convert::TryInto;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Default, Eq, Hash)]
 pub struct AccountAddress {
     pub data: [u8; 27],
+}
+
+impl AccountAddress {
+    pub fn to_hex(&self) -> String {
+        hex::encode(&self.data)
+    }
+
+    pub fn from_hex(s: &str) -> Result<Self, failure::Error> {
+        let bytes = hex::decode(s)?;
+        ensure!(bytes.len() == 27, "Size mismatch");
+        Ok(AccountAddress {
+            data: bytes.as_slice().try_into().unwrap(),
+        })
+    }
+}
+
+impl Serialize for AccountAddress {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_hex())
+    }
+}
+
+impl<'de> Deserialize<'de> for AccountAddress {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+        String::deserialize(deserializer).and_then(|string| {
+            AccountAddress::from_hex(&string).map_err(|err| Error::custom(err.to_string()))
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -79,19 +117,18 @@ impl GetBits for Account {
         use bitvec::prelude::*;
         use ff::{PrimeField, PrimeFieldRepr};
 
-
         //        // TODO: (Drogan) use circuit here.
-                let mut bytes = Vec::new();
-                for token in 0..TOTAL_TOKENS {
-                    let balance_str = format!("{}",&self.get_balance(token as TokenId));
-                    bytes.extend_from_slice(balance_str.as_bytes());
-                }
-                bytes.extend_from_slice(&self.nonce.to_le_bytes());
-                bytes.extend_from_slice(&self.address.data);
+        let mut bytes = Vec::new();
+        for token in 0..TOTAL_TOKENS {
+            let balance_str = format!("{}", &self.get_balance(token as TokenId));
+            bytes.extend_from_slice(balance_str.as_bytes());
+        }
+        bytes.extend_from_slice(&self.nonce.to_le_bytes());
+        bytes.extend_from_slice(&self.address.data);
 
-                BitVec::<LittleEndian, u8>::from_slice(&bytes)
-                    .into_iter()
-                    .collect()
+        BitVec::<LittleEndian, u8>::from_slice(&bytes)
+            .into_iter()
+            .collect()
 
         // let mut leaf_content = Vec::new();
         // leaf_content.extend(self.balance.get_bits_le_fixed(params::BALANCE_BIT_WIDTH));
