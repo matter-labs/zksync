@@ -16,7 +16,9 @@ const franklinContract = require('../build/Franklin');
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
 
-describe('INTEGRATION: Deposit', () => {
+describe('INTEGRATION: Deposit', function () {
+    this.timeout(10000);
+
     let franklinDeployedContract;
     let erc20DeployedToken;
   

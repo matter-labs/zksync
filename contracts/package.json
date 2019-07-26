@@ -11,7 +11,7 @@
     "solc": "^0.5.10"
   },
   "scripts": {
-    "test": "npx waffle && npx mocha",
-    "deploy": "npx waffle && node scripts/deploy.js"
+    "test": "waffle && mocha",
+    "deploy": "waffle && node scripts/deploy.js"
   }
 }
