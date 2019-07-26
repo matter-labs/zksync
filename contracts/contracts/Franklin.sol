@@ -545,6 +545,7 @@ contract Franklin is Verifier, VerificationKeys {
             block.number > blocks[totalBlocksVerified + 1].committedAtBlock + EXPECT_VERIFICATION_IN;
     }
 
+    // TODO rename to unpack amount, add unpack fee
     function unpack(uint24 _amount, uint16 /*_tokenId*/) internal pure returns (uint112) {
         // TODO: implement depending on the format chosen
         return uint112(_amount >> 8) * uint112(10) ** (15 + (_amount ^ 0xff));
