@@ -8,10 +8,12 @@
     "ethjs": "^0.4.0",
     "mocha": "^6.2.0",
     "openzeppelin-solidity": "^2.3.0",
+    "prettier-plugin-solidity": "^1.0.0-alpha.27",
     "solc": "^0.5.10"
   },
   "scripts": {
     "test": "waffle && mocha",
-    "deploy": "waffle && node scripts/deploy.js"
+    "deploy": "waffle && node scripts/deploy.js",
+    "fmt": "prettier --write **/*.sol"
   }
 }
