@@ -1,4 +1,6 @@
 import BN = require('bn.js');
+import { curve } from 'elliptic';
+import EdwardsPoint = curve.edwards.EdwardsPoint;
 
 const elliptic = require('elliptic');
 
@@ -27,27 +29,27 @@ const babyJubjubParams = {
 const fsModulus = babyJubjubParams.n;
 const fsOne = new BN(1); //(new BN(2)).pow(new BN(256)).mod(fsModulus);
 const fsZero = new BN(0);
-const curve = new elliptic.curve.edwards(babyJubjubParams);
-const curveZero = curve.point('0', '1');
+const altjubjubCurve = new elliptic.curve.edwards(babyJubjubParams);
+const curveZero = altjubjubCurve.point('0', '1');
 const chunksPerGenerator = 62;
 
-let gen1 = curve.point(
+let gen1 = altjubjubCurve.point(
     '184570ed4909a81b2793320a26e8f956be129e4eed381acf901718dff8802135',
     '1c3a9a830f61587101ef8cbbebf55063c1c6480e7e5a7441eac7f626d8f69a45',
 );
-let gen2 = curve.point(
+let gen2 = altjubjubCurve.point(
     '0afc00ffa0065f5479f53575e86f6dcd0d88d7331eefd39df037eea2d6f031e4',
     '237a6734dd50e044b4f44027ee9e70fcd2e5724ded1d1c12b820a11afdc15c7a',
 );
-let gen3 = curve.point(
+let gen3 = altjubjubCurve.point(
     '00fb62ad05ee0e615f935c5a83a870f389a5ea2baccf22ad731a4929e7a75b37',
     '00bc8b1c9d376ceeea2cf66a91b7e2ad20ab8cce38575ac13dbefe2be548f702',
 );
-let gen4 = curve.point(
+let gen4 = altjubjubCurve.point(
     '0675544aa0a708b0c584833fdedda8d89be14c516e0a7ef3042f378cb01f6e48',
     '169025a530508ee4f1d34b73b4d32e008b97da2147f15af3c53f405cf44f89d4',
 );
-let gen5 = curve.point(
+let gen5 = altjubjubCurve.point(
     '07350a0660a05014168047155c0a0647ea2720ecb182a6cb137b29f8a5cfd37f',
     '3004ad73b7abe27f17ec04b04b450955a4189dd012b4cf4b174af15bd412696a',
 );
@@ -117,7 +119,7 @@ function buffer2bits(buff) {
     return res;
 }
 
-export function pedersenHash(input) {
+export function pedersenHash(input: Buffer): EdwardsPoint {
     let personaizationBits = new Array(6).fill(true);
 
     let bits = personaizationBits.concat(buffer2bits(input));
