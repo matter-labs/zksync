@@ -29,7 +29,7 @@ const babyJubjubParams = {
 const fsModulus = babyJubjubParams.n;
 const fsOne = new BN(1); //(new BN(2)).pow(new BN(256)).mod(fsModulus);
 const fsZero = new BN(0);
-const altjubjubCurve = new elliptic.curve.edwards(babyJubjubParams);
+export const altjubjubCurve = new elliptic.curve.edwards(babyJubjubParams);
 const curveZero = altjubjubCurve.point('0', '1');
 const chunksPerGenerator = 62;
 
