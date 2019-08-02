@@ -3,10 +3,10 @@ pragma solidity ^0.5.1;
 import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
 // Warning! Verifier does not work.
-import "./common/Verifier.sol";
+import "./common/DummyVerifier.sol";
 import "./common/VerificationKeys.sol";
 
-contract Franklin is Verifier, VerificationKeys {
+contract Franklin is DummyVerifier, VerificationKeys {
     // chunks per block; each chunk has 8 bytes of public data
     uint256 constant BLOCK_SIZE = 2000;
     // must fit into uint112
@@ -38,13 +38,7 @@ contract Franklin is Verifier, VerificationKeys {
         uint112 amount
     );
 
-    // TODO: - fix
-    // event OnchainBalanceChanged(address indexed owner, uint32 tokenId, uint112 amount, uint32 lockedUntilBlock);
-
-    // event TokenAdded(address token, uint32 tokenId);
-
-    // event AccountRegistered(address indexed owner, uint32 id);
-    /////////
+    event TokenAdded(address token, uint32 tokenId);
 
     // ==== STORAGE ====
 
@@ -81,7 +75,8 @@ contract Franklin is Verifier, VerificationKeys {
 
     // List of root-chain balances (per owner and tokenId)
     mapping(address => mapping(uint32 => Balance)) public balances;
-    mapping(bytes => address) public depositToAddress;
+    mapping (address => bool) public depositWasDone;
+    mapping(bytes => address) public depositFranklinToETH;
 
     // TODO: - fix
     // uint32 public totalAccounts;
@@ -204,8 +199,7 @@ contract Franklin is Verifier, VerificationKeys {
         tokenAddresses[totalTokens + 1] = _token; // Adding one because tokenId = 0 is reserved for ETH
         tokenIds[_token] = totalTokens + 1;
         totalTokens++;
-        //TODO: -fix
-        // emit TokenAdded(_token, totalTokens);
+         emit TokenAdded(_token, totalTokens);
     }
 
     function setValidator(address _validator, bool _active) external {
@@ -242,9 +236,9 @@ contract Franklin is Verifier, VerificationKeys {
     // Root-chain balances
 
     // Deposit ETH (simply by sending it to the contract)
-    function depositETH(bytes franklin_addr) external payable {
+    function depositETH(bytes calldata _franklin_addr) external payable {
         require(msg.value <= MAX_VALUE, "sorry Joe");
-        registerDeposit(0, uint112(msg.value), franklin_addr);
+        registerDeposit(0, uint112(msg.value), _franklin_addr);
     }
 
     function withdrawETH(uint112 _amount) external {
@@ -252,12 +246,12 @@ contract Franklin is Verifier, VerificationKeys {
         msg.sender.transfer(_amount);
     }
 
-    function depositERC20(address _token, uint112 _amount) external {
+    function depositERC20(address _token, uint112 _amount, bytes calldata _franklin_addr) external {
         require(
             IERC20(_token).transferFrom(msg.sender, address(this), _amount),
             "transfer failed"
         );
-        registerDeposit(tokenIds[_token], _amount);
+        registerDeposit(tokenIds[_token], _amount, _franklin_addr);
     }
 
     function withdrawERC20(address _token, uint112 _amount) external {
@@ -271,7 +265,7 @@ contract Franklin is Verifier, VerificationKeys {
     function registerDeposit(
         uint32 _tokenId,
         uint112 _amount,
-        bytes _franklin_addr
+        bytes memory _franklin_addr
     ) internal {
         requireActive();
         requireValidToken(_tokenId);
@@ -285,7 +279,12 @@ contract Franklin is Verifier, VerificationKeys {
         uint32 lockedUntilBlock = uint32(block.number + LOCK_DEPOSITS_FOR);
         balances[msg.sender][_tokenId].lockedUntilBlock = lockedUntilBlock;
 
-        depositToAddress[_franklin_addr] = msg.sender;
+        if (depositWasDone[msg.sender]) {
+            require(depositFranklinToETH[_franklin_addr] == msg.sender, "ETH depositor mismatch");
+        } else {
+            depositFranklinToETH[_franklin_addr] = msg.sender;
+            depositWasDone[msg.sender] = true;
+        }
 
         emit OnchainDeposit(
             msg.sender,
@@ -315,6 +314,7 @@ contract Franklin is Verifier, VerificationKeys {
 
     function commitBlock(
         uint32 _blockNumber,
+        uint24 _feeAccount,
         bytes32 _newRoot,
         bytes calldata _publicData
     ) external {
@@ -334,17 +334,16 @@ contract Franklin is Verifier, VerificationKeys {
 
         // TODO: make efficient padding here
 
-        (uint64 startId, uint64 totalProcessed, uint112 feeCollected) = commitOnchainOps(
+        (uint64 startId, uint64 totalProcessed) = commitOnchainOps(
             _publicData
         );
 
         bytes32 commitment = createBlockCommitment(
             _blockNumber,
-            msg.sender,
+            _feeAccount,
             blocks[_blockNumber - 1].stateRoot,
             _newRoot,
-            _publicData,
-            feeCollected
+            _publicData
         );
 
         blocks[_blockNumber] = Block(
@@ -362,17 +361,16 @@ contract Franklin is Verifier, VerificationKeys {
         emit BlockCommitted(_blockNumber);
     }
 
-    // TODO use collected fee.
+    // TODO: make the same as in the spec.
     function createBlockCommitment(
         uint32 _blockNumber,
-        address _validator,
+        uint24 _feeAccount,
         bytes32 _oldRoot,
         bytes32 _newRoot,
-        bytes memory _publicData,
-        uint112 _feeCollected
+        bytes memory _publicData
     ) internal pure returns (bytes32) {
         bytes32 hash = sha256(
-            abi.encodePacked(uint256(_blockNumber), uint256(_validator))
+            abi.encodePacked(uint256(_blockNumber), uint256(_feeAccount))
         );
         hash = sha256(abi.encodePacked(hash, _oldRoot));
         hash = sha256(abi.encodePacked(hash, _newRoot));
@@ -391,8 +389,7 @@ contract Franklin is Verifier, VerificationKeys {
         internal
         returns (
             uint64 onchainOpsStartId,
-            uint64 processedOnchainOps,
-            uint112 feeCollected
+            uint64 processedOnchainOps
         )
     {
         require(_publicData.length % 8 == 0, "pubdata.len % 8 != 0");
@@ -438,27 +435,28 @@ contract Franklin is Verifier, VerificationKeys {
         if (opType == 0x01) {
             //pubdata from_account: 3, token: 2, to_account: 3, amount: 3, fee: 1, new_pubkey_hash: 27
 
-            franklin_address_ = new bytes[](27);
-            for (uint256 i = 0; i < 27; i++) {
-                franklin_address_[i] = _publicData[10 + i];
-            }
-
-            address account = depositToAddress[franklin_address_];
-
             uint16 tokenId = uint16(
-                uint256(uint8(_publicData[currentPointer + 4])) +
-                    uint256(uint8(_publicData[currentPointer + 5])) <<
-                    8
+                uint256(uint8(_publicData[currentPointer + 3])) +
+                uint256(uint8(_publicData[currentPointer + 4])) <<
+                8
             );
-            uint24 amountPacked = uint24(
-                    uint8(_publicData[currentPointer + 6])
-                ) +
-                uint24(uint8(_publicData[currentPointer + 7])) <<
-                8 +
-                uint24(uint8(_publicData[currentPointer + 8])) <<
-                16;
 
-            uint112 amount = unpack(amountPacked, tokenId);
+
+            uint8[3] memory amountPacked;
+            amountPacked[0] = uint8(_publicData[currentPointer + 8]);
+            amountPacked[1] = uint8(_publicData[currentPointer + 9]);
+            amountPacked[2] = uint8(_publicData[currentPointer + 10]);
+            uint112 amount = unpackAmount(amountPacked);
+
+            uint8 feePacked = uint8(_publicData[currentPointer + 11]);
+            uint112 fee = unpackFee(feePacked);
+
+            bytes memory franklin_address_ = new bytes(27);
+            for (uint256 i = 0; i < 27; i++) {
+                franklin_address_[i] = _publicData[12 + i];
+            }
+            address account = depositFranklinToETH[franklin_address_];
+
 
             requireValidToken(tokenId);
             require(
@@ -466,48 +464,47 @@ contract Franklin is Verifier, VerificationKeys {
                 "balance must be locked"
             );
             require(
-                balances[account][tokenId].balance >= amount,
-                "balance insuffcient"
+                balances[account][tokenId].balance >= amount + fee,
+                "balance insufficient"
             );
 
-            balances[account][tokenId].balance -= amount;
+            balances[account][tokenId].balance -= (amount + fee);
             onchainOps[currentOnchainOp] = OnchainOp(
                 OnchainOpType.Deposit,
                 tokenId,
                 account,
-                amount
+                (amount + fee)
             );
             return (5 * 8, 1);
         }
 
         // partial_exit
         if (opType == 0x04) {
-            // pubdata account: 3, token: 2, amount: 3, fee: 1, ethereum_key: 20
+            // pubdata account: 3, token: 2, amount: 3, fee: 1, eth_key: 20
 
             uint16 tokenId = uint16(
-                uint256(uint8(_publicData[currentPointer + 4])) +
-                    uint256(uint8(_publicData[currentPointer + 5])) <<
+                uint256(uint8(_publicData[currentPointer + 3])) +
+                    uint256(uint8(_publicData[currentPointer + 4])) <<
                     8
             );
-            uint24 amountPacked = uint24(
-                    uint8(_publicData[currentPointer + 6])
-                ) +
-                uint24(uint8(_publicData[currentPointer + 7])) <<
-                8 +
-                uint24(uint8(_publicData[currentPointer + 8])) <<
-                16;
-            bytes20 ethAddress;
+
+            uint8[3] memory amountPacked;
+            amountPacked[0] = uint8(_publicData[currentPointer + 5]);
+            amountPacked[1] = uint8(_publicData[currentPointer + 6]);
+            amountPacked[2] = uint8(_publicData[currentPointer + 7]);
+            uint112 amount = unpackAmount(amountPacked);
+
+            bytes memory ethAddress = new bytes(20);
             for (uint256 i = 0; i < 20; ++i) {
-                ethAddress[i] = _publicData[currentPointer + 10 + i];
+                ethAddress[i] = _publicData[currentPointer + 9 + i];
             }
-            uint112 amount = unpack(amountPacked, tokenId);
 
             requireValidToken(tokenId);
 
             onchainOps[currentOnchainOp] = OnchainOp(
                 OnchainOpType.Withdrawal,
                 tokenId,
-                address(ethAddress),
+                bytesToAddress(ethAddress),
                 amount
             );
             return (4 * 8, 1);
@@ -568,7 +565,7 @@ contract Franklin is Verifier, VerificationKeys {
     // Reverting committed blocks
 
     function revertExpiredBlocks() external {
-        require(blockCommitmentExpired(), "not expirated");
+        require(blockCommitmentExpired(), "not expired");
         emit BlocksReverted(totalBlocksVerified, totalBlocksCommitted);
         uint32 total = totalBlocksCommitted - totalBlocksVerified;
         for (uint32 i = 0; i < total; i++) {
@@ -646,13 +643,24 @@ contract Franklin is Verifier, VerificationKeys {
                     EXPECT_VERIFICATION_IN;
     }
 
-    // TODO rename to unpack amount, add unpack fee
-    function unpack(
-        uint24 _amount,
-        uint16 /*_tokenId*/
+    // TODO: implement depending on the format chosen (?)
+    function unpackAmount(
+        uint8[3] memory _amount
     ) internal pure returns (uint112) {
-        // TODO: implement depending on the format chosen
-        return uint112(_amount >> 8) * uint112(10) ** (15 + (_amount ^ 0xff));
+        // TODO: unimplemented
+        return 0;
     }
 
+    function unpackFee(
+        uint8 _fee
+    ) internal pure returns (uint112) {
+        // TODO: unimplemented
+        return 0;
+    }
+
+    function bytesToAddress(bytes memory bys) private pure returns (address addr) {
+        assembly {
+            addr := mload(add(bys,20))
+        }
+    }
 }

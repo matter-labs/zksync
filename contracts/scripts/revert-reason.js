@@ -27,6 +27,10 @@ async function reason() {
         let receipt = await provider.getTransactionReceipt(hash)
         //console.log('receipt:', receipt)
 
+        if (receipt.gasUsed) {
+            console.log("Gas used: ",receipt.gasUsed.toString());
+        }
+
         if (receipt.status) {
             console.log('tx success')
         } else {
