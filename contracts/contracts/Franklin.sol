@@ -676,7 +676,7 @@ contract Franklin is DummyVerifier, VerificationKeys {
         return (n >> 4) * 10 ** (n & 15);
     }
 
-    function bytesToAddress(bytes memory bys) private pure returns (address addr) {
+    function bytesToAddress(bytes memory bys) internal pure returns (address addr) {
         assembly {
             addr := mload(add(bys,20))
         }
