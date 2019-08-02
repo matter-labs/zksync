@@ -7,11 +7,16 @@ import "./common/Verifier.sol";
 import "./common/VerificationKeys.sol";
 
 contract Franklin is Verifier, VerificationKeys {
-    uint256 constant BLOCK_SIZE = 2000; // chunks per block; each chunk has 8 bytes of public data
-    uint256 constant MAX_VALUE = 2 ** 112 - 1; // must fit into uint112
-    uint256 constant LOCK_DEPOSITS_FOR = 8 * 60; // ETH blocks
-    uint256 constant EXPECT_VERIFICATION_IN = 8 * 60; // ETH blocks
-    uint256 constant MAX_UNVERIFIED_BLOCKS = 4 * 60; // To make sure that all reverted blocks can be copied under block gas limit!
+    // chunks per block; each chunk has 8 bytes of public data
+    uint256 constant BLOCK_SIZE = 2000;
+    // must fit into uint112
+    uint256 constant MAX_VALUE = 2 ** 112 - 1;
+    // ETH blocks
+    uint256 constant LOCK_DEPOSITS_FOR = 8 * 60;
+    // ETH blocks
+    uint256 constant EXPECT_VERIFICATION_IN = 8 * 60;
+    // To make sure that all reverted blocks can be copied under block gas limit!
+    uint256 constant MAX_UNVERIFIED_BLOCKS = 4 * 60;
 
     event BlockCommitted(uint32 indexed blockNumber);
     event BlockVerified(uint32 indexed blockNumber);
@@ -555,8 +560,6 @@ contract Franklin is Verifier, VerificationKeys {
             if (op.opType == OnchainOpType.Withdrawal) {
                 // withdrawal was successful, accrue balance
                 balances[op.owner][op.tokenId].balance += op.amount;
-                // TODO: - fix
-                // emit OnchainBalanceChanged(op.owner, op.tokenId, balances[op.owner][op.tokenId].balance, balances[op.owner][op.tokenId].lockedUntilBlock);
             }
             delete onchainOps[current];
         }
@@ -587,8 +590,6 @@ contract Franklin is Verifier, VerificationKeys {
             if (op.opType == OnchainOpType.Deposit) {
                 // deposit failed, return funds
                 balances[op.owner][op.tokenId].balance += op.amount;
-                // TODO: - fix
-                // emit OnchainBalanceChanged(op.owner, op.tokenId, balances[op.owner][op.tokenId].balance, balances[op.owner][op.tokenId].lockedUntilBlock);
             }
             delete onchainOps[current];
         }
@@ -619,8 +620,6 @@ contract Franklin is Verifier, VerificationKeys {
 
         for (uint256 i = 0; i < _owners.length; i++) {
             balances[_owners[i]][_tokenId].balance += _amounts[i];
-            // TODO: - fix
-            // emit OnchainBalanceChanged(_owners[i], _tokenId, balances[_owners[i]][_tokenId].balance, balances[_owners[i]][_tokenId].lockedUntilBlock);
             exited[_owners[i]][_tokenId] = true;
         }
     }

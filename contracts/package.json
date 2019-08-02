@@ -8,12 +8,15 @@
     "ethjs": "^0.4.0",
     "mocha": "^6.2.0",
     "openzeppelin-solidity": "^2.3.0",
+    "prettier": "^1.18.2",
     "prettier-plugin-solidity": "^1.0.0-alpha.27",
-    "solc": "^0.5.10"
+    "solhint": "^2.1.2",
+    "solhint-plugin-prettier": "^0.0.3"
   },
   "scripts": {
     "test": "waffle && mocha",
     "deploy": "waffle && node scripts/deploy.js",
-    "fmt": "prettier --write **/*.sol"
+    "lint:solidity": "solhint contracts/**/*.sol",
+    "prettier:solidity": "prettier --write contracts/**/*.sol"
   }
 }
