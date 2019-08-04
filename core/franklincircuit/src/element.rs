@@ -4,6 +4,7 @@ use ff::Field;
 use ff::PrimeField;
 use franklin_crypto::circuit::boolean::Boolean;
 
+use franklin_crypto::circuit::expression::Expression;
 use franklin_crypto::circuit::num::AllocatedNum;
 use franklin_crypto::circuit::pedersen_hash;
 use franklin_crypto::jubjub::JubjubEngine;
@@ -15,7 +16,6 @@ pub struct CircuitElement<E: JubjubEngine> {
     bits_le: Vec<Boolean>,
     length: usize,
 }
-//TODO: !!! into_bits_le usage here is redundant, we can minimize constraints by using predefined length
 impl<E: JubjubEngine> CircuitElement<E> {
     pub fn from_fe_strict<CS: ConstraintSystem<E>, F: FnOnce() -> Result<E::Fr, SynthesisError>>(
         mut cs: CS,
@@ -41,8 +41,7 @@ impl<E: JubjubEngine> CircuitElement<E> {
         max_length: usize,
     ) -> Result<Self, SynthesisError> {
         // let mut bits = number.into_bits_le(cs.namespace(|| "into_bits_le"))?;
-        let mut bits =
-            number.into_bits_le(cs.namespace(|| "into_bits_le_fixed"))?;
+        let mut bits = number.into_bits_le(cs.namespace(|| "into_bits_le_fixed"))?;
         bits.truncate(max_length);
         Ok(CircuitElement {
             number: number,
@@ -64,7 +63,7 @@ impl<E: JubjubEngine> CircuitElement<E> {
             bits_le: bits,
             length: max_length,
         };
-        ce.enforce_length(cs.namespace(|| "enforce_length"))?;
+        // ce.enforce_length(cs.namespace(|| "enforce_length"))?;
 
         Ok(ce)
     }
@@ -160,15 +159,18 @@ impl<E: JubjubEngine> CircuitElement<E> {
     }
 
     // doesn't enforce length by design, though applied to both strict values will give strict result
-    pub fn conditionally_select_with_number_strict<CS: ConstraintSystem<E>>(
+    pub fn conditionally_select_with_number_strict<
+        CS: ConstraintSystem<E>,
+        EX: Into<Expression<E>>,
+    >(
         mut cs: CS,
-        x: &AllocatedNum<E>,
+        x: EX,
         y: &Self,
         condition: &Boolean,
     ) -> Result<Self, SynthesisError> {
-        let selected_number = AllocatedNum::conditionally_select(
+        let selected_number = Expression::conditionally_select(
             cs.namespace(|| "conditionally_select"),
-            &x,
+            x,
             &y.get_number(),
             &condition,
         )?;
@@ -241,11 +243,17 @@ impl<E: JubjubEngine> CircuitPubkey<E> {
             &to_hash,
             params,
         )?;
-         let mut hash_bits = hash.get_x().into_bits_le(cs.namespace(||"hash into_bits"))?;
+        let mut hash_bits = hash
+            .get_x()
+            .into_bits_le(cs.namespace(|| "hash into_bits"))?;
         hash_bits.truncate(franklin_constants::NEW_PUBKEY_HASH_WIDTH);
-        let hash_repacked = pack_bits_to_element(cs.namespace(||"repack_hash"), &hash_bits)?;
-        let hash_repacked_ce = CircuitElement::from_number(cs.namespace(||"hash_repacked_ce"), hash_repacked, franklin_constants::NEW_PUBKEY_HASH_WIDTH)?;
-       
+        let hash_repacked = pack_bits_to_element(cs.namespace(|| "repack_hash"), &hash_bits)?;
+        let hash_repacked_ce = CircuitElement::from_number(
+            cs.namespace(|| "hash_repacked_ce"),
+            hash_repacked,
+            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+        )?;
+
         Ok(CircuitPubkey {
             x: x_ce,
             y: y_ce,
@@ -269,11 +277,17 @@ impl<E: JubjubEngine> CircuitPubkey<E> {
             &to_hash,
             params,
         )?;
-        let mut hash_bits = hash.get_x().into_bits_le(cs.namespace(||"hash into_bits"))?;
+        let mut hash_bits = hash
+            .get_x()
+            .into_bits_le(cs.namespace(|| "hash into_bits"))?;
         hash_bits.truncate(franklin_constants::NEW_PUBKEY_HASH_WIDTH);
-        let hash_repacked = pack_bits_to_element(cs.namespace(||"repack_hash"), &hash_bits)?;
-        let hash_repacked_ce = CircuitElement::from_number(cs.namespace(||"hash_repacked_ce"), hash_repacked, franklin_constants::NEW_PUBKEY_HASH_WIDTH)?;
-       
+        let hash_repacked = pack_bits_to_element(cs.namespace(|| "repack_hash"), &hash_bits)?;
+        let hash_repacked_ce = CircuitElement::from_number(
+            cs.namespace(|| "hash_repacked_ce"),
+            hash_repacked,
+            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+        )?;
+
         Ok(CircuitPubkey {
             x: x_ce,
             y: y_ce,

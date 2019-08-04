@@ -335,13 +335,14 @@ fn test_deposit_franklin_in_empty_leaf() {
         // pub_x: validator_x.clone(),
         // pub_y: validator_y.clone(),
     };
+    println!("zero root_hash equals: {}",sender_leaf.subtree.root_hash());
 
     // give some funds to sender and make zero balance for recipient
     let validator_sk = PrivateKey::<Bn256>(rng.gen());
     let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
     let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
     let (validator_x, validator_y) = validator_pk.0.into_xy();
-    
+
     let validator_leaf = CircuitAccount::<Bn256> {
         subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
         nonce: Fr::zero(),
@@ -371,8 +372,6 @@ fn test_deposit_franklin_in_empty_leaf() {
             token: token,
             account_address: account_address,
             new_pub_key_hash: sender_pub_key_hash,
-            // new_pub_x: sender_x,
-            // new_pub_y: sender_y,
         },
     );
 
@@ -433,6 +432,6 @@ fn test_deposit_franklin_in_empty_leaf() {
         if err.is_some() {
             panic!("ERROR satisfying in {}", err.unwrap());
         }
-        assert_eq!(cs.num_constraints(), 1)
+        // assert_eq!(cs.num_constraints(), 1)
     }
 }

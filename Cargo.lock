@@ -904,7 +904,7 @@ dependencies = [
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
-source = "git+ssh://git@github.com/matter-labs/franklin-crypto.git?branch=new_gadgets#993478dbcb8d374a55e791d5ad7c6c63d9f3537d"
+source = "git+ssh://git@github.com/matter-labs/franklin-crypto.git?branch=new_gadgets#db06fdf8e5853ec7b405351820bd04f81db8f4c8"
 dependencies = [
  "bellman_ce 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "blake2-rfc_bellman_edition 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)",

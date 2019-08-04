@@ -12,7 +12,10 @@ use franklinmodels::params as franklin_constants;
 use merkle_tree::hasher::Hasher;
 use pairing::bn256::*;
 
-pub fn pub_key_hash<E: JubjubEngine, H: Hasher<E::Fr>>(pub_key: &PublicKey<E>, hasher: &H) -> E::Fr {
+pub fn pub_key_hash<E: JubjubEngine, H: Hasher<E::Fr>>(
+    pub_key: &PublicKey<E>,
+    hasher: &H,
+) -> E::Fr {
     let (pub_x, pub_y) = pub_key.0.into_xy();
     println!("x = {}, y = {}", pub_x, pub_y);
     let mut pub_key_bits = vec![];

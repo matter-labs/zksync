@@ -11,8 +11,8 @@ use franklin_crypto::circuit::boolean::Boolean;
 use franklin_crypto::circuit::ecc;
 use franklin_crypto::circuit::sha256;
 
-use franklin_crypto::circuit::num::AllocatedNum;
 use franklin_crypto::circuit::expression::Expression;
+use franklin_crypto::circuit::num::{AllocatedNum, Num};
 use franklin_crypto::circuit::pedersen_hash;
 use franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
 use franklin_crypto::circuit::Assignment;
@@ -46,10 +46,10 @@ struct PreviousData<E: JubjubEngine> {
 // Implementation of our circuit:
 impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
     fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
-        
         //this is needed for technical purposes and convenience only
-        let zero = AllocatedNum::alloc(cs.namespace(||"zero"), ||Ok(E::Fr::zero()))?;
-        zero.assert_zero(cs.namespace(||"zero==0"));
+        let zero = AllocatedNum::alloc(cs.namespace(|| "zero"), || Ok(E::Fr::zero()))?;
+        zero.assert_zero(cs.namespace(|| "zero==0"))?;
+
         // we only need this for consistency of first operation
         let zero_circuit_element = CircuitElement::from_number(
             cs.namespace(|| "zero_circuit_element"),
@@ -163,7 +163,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             )?;
 
             // calculate root for given account data
-            let (state_root, is_account_empty) = self
+            let (state_root, is_account_empty, subtree_root) = self
                 .check_account_data(cs.namespace(|| "calculate account root"), &current_branch)?;
             println!("old_state_root: {}", state_root.get_value().unwrap());
             println!(
@@ -187,11 +187,12 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &allocated_chunk_data,
                 &is_account_empty,
                 &operation_pub_data_chunk.get_number(),
+                &subtree_root,
                 &mut fees,
                 &mut prev,
             )?;
 
-            let (new_state_root, _) = self.check_account_data(
+            let (new_state_root, _, _) = self.check_account_data(
                 cs.namespace(|| "calculate new account root"),
                 &current_branch,
             )?;
@@ -465,24 +466,20 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         _op: &Operation<E>,
         chunk_data: &AllocatedChunkData<E>,
     ) -> Result<AllocatedOperationBranch<E>, SynthesisError> {
-        let deposit_allocated =
-            AllocatedNum::alloc(cs.namespace(|| "deposit_tx_type"), || Ok(E::Fr::one()))?;
-        deposit_allocated.assert_number(cs.namespace(|| "deposit_type is one"), &E::Fr::one())?;
+        let deposit_tx_type = Expression::u64::<CS>(1);
+        let left_side = Expression::constant::<CS>(E::Fr::one());
 
-        let left_side = AllocatedNum::alloc(cs.namespace(|| "left_side"), || Ok(E::Fr::zero()))?;
-        left_side.assert_zero(cs.namespace(|| "left_side is zero"))?;
-
-        let cur_side = AllocatedNum::select_ifeq(
+        let cur_side = Expression::select_ifeq(
             cs.namespace(|| "select corresponding branch"),
             &chunk_data.tx_type.get_number(),
-            &deposit_allocated,
-            &left_side,
+            deposit_tx_type,
+            left_side.clone(),
             &chunk_data.chunk_number,
         )?;
 
         let is_left = Boolean::from(Expression::equals(
             cs.namespace(|| "is_left"),
-            &left_side,
+            left_side.clone(),
             &cur_side,
         )?);
         Ok(AllocatedOperationBranch {
@@ -502,7 +499,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             },
             account_audit_path: select_vec_ifeq(
                 cs.namespace(|| "account_audit_path"),
-                &left_side,
+                left_side.clone(),
                 &cur_side,
                 &first.account_audit_path,
                 &second.account_audit_path,
@@ -521,7 +518,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             )?,
             balance_audit_path: select_vec_ifeq(
                 cs.namespace(|| "balance_audit_path"),
-                &left_side,
+                left_side,
                 &cur_side,
                 &first.balance_audit_path,
                 &second.balance_audit_path,
@@ -539,12 +536,13 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         &self,
         mut cs: CS,
         cur: &AllocatedOperationBranch<E>,
-    ) -> Result<(AllocatedNum<E>, Boolean), SynthesisError> {
+    ) -> Result<(AllocatedNum<E>, Boolean, CircuitElement<E>), SynthesisError> {
         //first we prove calculate root of the subtree to obtain account_leaf_data:
-        let (cur_account_leaf_bits, is_account_empty) = self.allocate_account_leaf_bits(
-            cs.namespace(|| "allocate current_account_leaf_hash"),
-            cur,
-        )?;
+        let (cur_account_leaf_bits, is_account_empty, subtree_root) = self
+            .allocate_account_leaf_bits(
+                cs.namespace(|| "allocate current_account_leaf_hash"),
+                cur,
+            )?;
         println!("cur_account_leaf_bits.len {}", cur_account_leaf_bits.len());
         let temp = pedersen_hash::pedersen_hash(
             cs.namespace(|| "account leaf content hash"),
@@ -565,6 +563,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 self.params,
             )?,
             is_account_empty,
+            subtree_root,
         ))
     }
 
@@ -578,6 +577,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         chunk_data: &AllocatedChunkData<E>,
         is_account_empty: &Boolean,
         ext_pubdata_chunk: &AllocatedNum<E>,
+        subtree_root: &CircuitElement<E>,
         fees: &mut [AllocatedNum<E>],
         prev: &mut PreviousData<E>,
     ) -> Result<(), SynthesisError> {
@@ -647,7 +647,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             let is_chunk_first = Boolean::from(Expression::equals(
                 cs.namespace(|| "is_chunk_first"),
                 &chunk_data.chunk_number,
-                Expression::constant(E::Fr::zero()),
+                Expression::constant::<CS>(E::Fr::zero()),
             )?);
             let is_op_data_correct = multi_or(
                 cs.namespace(|| "is_op_data_correct"),
@@ -765,34 +765,40 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &op_data,
             &ext_pubdata_chunk,
         )?);
+        op_flags.push(self.close_account(
+            cs.namespace(|| "close_account"),
+            &mut cur,
+            &chunk_data,
+            &is_a_geq_b,
+            &is_account_empty,
+            &op_data,
+            &ext_pubdata_chunk,
+            &subtree_root,
+        )?);
         let op_valid = multi_or(cs.namespace(|| "op_valid"), &op_flags)?;
         println!("op_valid {}", op_valid.get_value().unwrap());
-        cs.enforce(
-            || "op is valid",
-            |_| op_valid.lc(CS::one(), E::Fr::one()),
-            |lc| lc + CS::one(),
-            |lc| lc + CS::one(),
-        );
-        // let fees_len = 1<< franklin_constants.BALANCE_TREE_DEPTH;
+        Boolean::enforce_equal(
+            cs.namespace(|| "op_valid is true"),
+            &op_valid,
+            &Boolean::constant(true),
+        )?;
+
         for i in 0..(1 << *franklin_constants::BALANCE_TREE_DEPTH as u32) {
-            let sum = allocate_sum(
-                cs.namespace(|| format!("fee number {}", i)),
-                &fees[i],
-                &op_data.fee.get_number(),
-            )?;
+            let sum = Expression::from(&fees[i]) + Expression::from(&op_data.fee.get_number());
+
             let is_token_correct = Boolean::from(Expression::equals(
                 cs.namespace(|| format!("is token equal to number {}", i)),
                 &lhs.token.get_number(),
-                Expression::constant(E::Fr::from_str(&i.to_string()).unwrap()),
+                Expression::constant::<CS>(E::Fr::from_str(&i.to_string()).unwrap()),
             )?);
             let should_update = Boolean::and(
                 cs.namespace(|| format!("should update fee number {}", i)),
                 &is_token_correct,
                 &Boolean::from(chunk_data.is_chunk_last.clone()),
             )?;
-            fees[i] = AllocatedNum::conditionally_select(
+            fees[i] = Expression::conditionally_select(
                 cs.namespace(|| format!("update fee number {}", i)),
-                &sum,
+                sum,
                 &fees[i],
                 &should_update,
             )?;
@@ -854,7 +860,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
             &chunk_data.chunk_number,
-            Expression::constant(E::Fr::zero()),
+            Expression::constant::<CS>(E::Fr::zero()),
         )?);
 
         let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
@@ -868,7 +874,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let is_partial_exit = Boolean::from(Expression::equals(
             cs.namespace(|| "is_partial_exit"),
             &chunk_data.tx_type.get_number(),
-            Expression::constant(E::Fr::from_str("3").unwrap()), //partial_exit tx code
+            Expression::constant::<CS>(E::Fr::from_str("3").unwrap()), //partial_exit tx code
         )?);
         base_valid_flags.push(is_partial_exit.clone());
 
@@ -876,7 +882,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let is_full_exit = Boolean::from(Expression::equals(
             cs.namespace(|| "amount is zero"),
             &op_data.amount.get_number(),
-            Expression::constant(E::Fr::zero()),
+            Expression::constant::<CS>(E::Fr::zero()),
         )?);
         let is_base_valid = multi_and(
             cs.namespace(|| "valid base partial_exit"),
@@ -896,15 +902,12 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
             lhs_partial_valid_flags.push(is_a_correct);
 
-            let sum_amount_fee = allocate_sum(
-                cs.namespace(|| "amount plus fee"),
-                &op_data.amount.get_number(),
-                &op_data.fee.get_number(),
-            )?;
+            let sum_amount_fee = Expression::from(&op_data.amount.get_number())+Expression::from(&op_data.fee.get_number());
+           
             let is_b_correct = Boolean::from(Expression::equals(
                 cs.namespace(|| "is_b_correct"),
                 &op_data.b.get_number(),
-                &sum_amount_fee,
+                sum_amount_fee.clone(),
             )?);
             lhs_partial_valid_flags.push(is_b_correct);
             lhs_partial_valid_flags.push(is_a_geq_b.clone());
@@ -918,33 +921,34 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             lhs_partial_valid =
                 multi_and(cs.namespace(|| "is_lhs_valid"), &lhs_partial_valid_flags)?;
 
+            let updated_balance = Expression::from(&cur.balance.get_number()) - sum_amount_fee;
             //update cur data if we are processing first operation of valid partial_exit transaction
-            let updated_balance_value =
-                AllocatedNum::alloc(cs.namespace(|| "updated_balance_value"), || {
-                    let mut new_balance = cur.balance.clone().grab()?;
-                    new_balance.sub_assign(&op_data.amount.grab()?);
-                    new_balance.sub_assign(&op_data.fee.grab()?);
-                    Ok(new_balance)
-                })?;
-            cs.enforce(
-                || "correct_updated_balance",
-                |lc| lc + updated_balance_value.get_variable(),
-                |lc| lc + CS::one(),
-                |lc| {
-                    lc + cur.balance.get_number().get_variable() - op_data.amount.get_number().get_variable()//TODO: get_number().get_variable() is kinda ugly
-                    - op_data.fee.get_number().get_variable()
-                },
-            );
-            //
-            let updated_balance_ce = CircuitElement::from_number(
-                cs.namespace(|| "updated_balance_ce"),
-                updated_balance_value,
-                franklin_constants::BALANCE_BIT_WIDTH,
-            )?;
+            // let updated_balance_value =
+            //     AllocatedNum::alloc(cs.namespace(|| "updated_balance_value"), || {
+            //         let mut new_balance = cur.balance.clone().grab()?;
+            //         new_balance.sub_assign(&op_data.amount.grab()?);
+            //         new_balance.sub_assign(&op_data.fee.grab()?);
+            //         Ok(new_balance)
+            //     })?;
+            // cs.enforce(
+            //     || "correct_updated_balance",
+            //     |lc| lc + updated_balance_value.get_variable(),
+            //     |lc| lc + CS::one(),
+            //     |lc| {
+            //         lc + cur.balance.get_number().get_variable() - op_data.amount.get_number().get_variable()//TODO: get_number().get_variable() is kinda ugly
+            //         - op_data.fee.get_number().get_variable()
+            //     },
+            // );
+            // //
+            // let updated_balance_ce = CircuitElement::from_number(
+            //     cs.namespace(|| "updated_balance_ce"),
+            //     updated_balance_value,
+            //     franklin_constants::BALANCE_BIT_WIDTH,
+            // )?;
             //mutate current branch if it is first chunk of valid partial_exit transaction
-            cur.balance = CircuitElement::conditionally_select(
+            cur.balance = CircuitElement::conditionally_select_with_number_strict(
                 cs.namespace(|| "mutated balance"),
-                &updated_balance_ce,
+                updated_balance,
                 &cur.balance,
                 &lhs_partial_valid,
             )?;
@@ -955,16 +959,14 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 "changed bal data: {}",
                 cur.balance.get_number().get_value().unwrap()
             );
+            // let mut updated_nonce = Num::from(cur.account.nonce.get_number()).add_number_with_coeff(variable: &AllocatedNum<E>, coeff: E::Fr)
+            let updated_nonce =
+                Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1);
 
-            let updated_nonce = allocate_sum(
-                cs.namespace(|| "updated_nonce"),
-                &cur.account.nonce.get_number(),
-                &precomputed_numbers[1],
-            )?;
             //update nonce
             cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
                 cs.namespace(|| "update cur nonce"),
-                &updated_nonce,
+                updated_nonce,
                 &cur.account.nonce,
                 &lhs_partial_valid,
             )?;
@@ -1015,12 +1017,12 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             lhs_full_valid = multi_and(cs.namespace(|| "lhs_full_valid"), &lhs_full_valid_flags)?;
 
             //update cur data if we are processing first operation of valid partial_exit transaction
-            let updated_balance_value = precomputed_numbers[0].clone();
+            let updated_balance_value = Expression::constant::<CS>(E::Fr::zero());
 
             //mutate current branch if it is first chunk of valid partial_exit transaction
             cur.balance = CircuitElement::conditionally_select_with_number_strict(
                 cs.namespace(|| "mutated balance"),
-                &updated_balance_value,
+                updated_balance_value,
                 &cur.balance,
                 &lhs_full_valid,
             )?;
@@ -1032,15 +1034,12 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 cur.balance.get_number().get_value().unwrap()
             );
 
-            let updated_nonce = allocate_sum(
-                cs.namespace(|| "updated_nonce"),
-                &cur.account.nonce.get_number(),
-                &precomputed_numbers[1],
-            )?;
+            let mut updated_nonce =
+                Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1);
             //update nonce
             cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
                 cs.namespace(|| "update cur nonce"),
-                &updated_nonce,
+                updated_nonce,
                 &cur.account.nonce,
                 &lhs_full_valid,
             )?;
@@ -1158,7 +1157,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
             &chunk_data.chunk_number,
-            Expression::constant(E::Fr::zero()),
+            Expression::constant::<CS>(E::Fr::zero()),
         )?);
         println!("is_first  chunk {}", is_first_chunk.get_value().unwrap());
         let is_valid_first = Boolean::and(
@@ -1235,6 +1234,89 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         Ok(tx_valid)
     }
 
+    fn close_account<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        cur: &mut AllocatedOperationBranch<E>,
+        chunk_data: &AllocatedChunkData<E>,
+        is_a_geq_b: &Boolean,
+        is_account_empty: &Boolean,
+        op_data: &AllocatedOperationData<E>,
+        ext_pubdata_chunk: &AllocatedNum<E>,
+        subtree_root: &CircuitElement<E>,
+    ) -> Result<Boolean, SynthesisError> {
+        let mut is_valid_flags = vec![];
+        //construct pubdata
+        let mut pubdata_bits = vec![];
+        pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
+        pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
+        assert_eq!(pubdata_bits.len(), 4 * 8);
+        pubdata_bits.resize(
+            1 * franklin_constants::CHUNK_BIT_WIDTH,
+            Boolean::constant(false),
+        );
+
+        let pubdata_chunk = select_pubdata_chunk(
+            cs.namespace(|| "select_pubdata_chunk"),
+            &pubdata_bits,
+            &chunk_data.chunk_number,
+            1,
+        )?;
+        println!(
+            "selected_pubdata_chunk is {} on iteration {}",
+            pubdata_chunk.get_value().unwrap(),
+            &chunk_data.chunk_number.get_value().unwrap()
+        );
+        println!(
+            "ext_pubdata {} on iteration {}",
+            ext_pubdata_chunk.get_value().unwrap(),
+            &chunk_data.chunk_number.get_value().unwrap()
+        );
+        let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_pubdata_equal"),
+            &pubdata_chunk,
+            ext_pubdata_chunk,
+        )?);
+        is_valid_flags.push(is_pubdata_chunk_correct);
+
+        let is_close_account = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_deposit"),
+            &chunk_data.tx_type.get_number(),
+            Expression::u64::<CS>(4), //close_account tx_type
+        )?);
+        is_valid_flags.push(is_close_account.clone());
+
+        let are_balances_empty = Boolean::from(Expression::equals(
+            cs.namespace(|| "are_balances_empty"),
+            &subtree_root.get_number(),
+            Expression::constant::<CS>(E::Fr::from_str("0x1bffa58529a93ab3ad62cfbf1a7ad903d40b70d8bf10c200ea0c69c1148728f2").unwrap()),//TODO: fix, it doesn't work
+        )?);
+        is_valid_flags.push(are_balances_empty);
+        println!("close_account valid");
+        let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
+
+        println!("tx_valid {}", tx_valid.get_value().unwrap());
+
+        // below we conditionally (if first chunk) update leaf
+
+        // update pub_key
+        cur.account.pub_key_hash = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "mutated_pubkey"),
+            Expression::constant::<CS>(E::Fr::zero()),
+            &cur.account.pub_key_hash,
+            &tx_valid,
+        )?;
+
+        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "update cur nonce"),
+            Expression::constant::<CS>(E::Fr::zero()),
+            &cur.account.nonce,
+            &tx_valid,
+        )?;
+
+        Ok(tx_valid)
+    }
+
     fn transfer_to_new<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -1280,13 +1362,13 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let is_transfer = Boolean::from(Expression::equals(
             cs.namespace(|| "is_transfer"),
             &chunk_data.tx_type.get_number(),
-            Expression::constant(E::Fr::from_str("2").unwrap()),
+            Expression::constant::<CS>(E::Fr::from_str("2").unwrap()),
         )?);
         lhs_valid_flags.push(is_transfer.clone());
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
             &chunk_data.chunk_number,
-            Expression::constant(E::Fr::zero()),
+            Expression::constant::<CS>(E::Fr::zero()),
         )?);
         lhs_valid_flags.push(is_first_chunk.clone());
 
@@ -1384,7 +1466,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let is_second_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_second_chunk"),
             &chunk_data.chunk_number,
-            Expression::constant(E::Fr::from_str("1").unwrap()),
+            Expression::constant::<CS>(E::Fr::from_str("1").unwrap()),
         )?);
         rhs_valid_flags.push(is_pubdata_chunk_correct.clone());
         rhs_valid_flags.push(is_second_chunk.clone());
@@ -1487,7 +1569,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let is_transfer = Boolean::from(Expression::equals(
             cs.namespace(|| "is_transfer"),
             &chunk_data.tx_type.get_number(),
-            Expression::constant(E::Fr::from_str("5").unwrap()),
+            Expression::constant::<CS>(E::Fr::from_str("5").unwrap()),
         )?);
 
         let mut lhs_valid_flags = vec![];
@@ -1505,10 +1587,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         // construct signature message
         let mut sig_bits = vec![];
-        let mut transfer_tx_type_bits =
-            allocated_transfer_tx_type.into_bits_le(cs.namespace(|| "transfer_tx_type_bits"))?;
-        transfer_tx_type_bits.truncate(*franklin_constants::TX_TYPE_BIT_WIDTH);
-        sig_bits.extend(transfer_tx_type_bits);
+
+        sig_bits.extend(chunk_data.tx_type.get_bits_le());
         sig_bits.extend(lhs.account_address.get_bits_le());
         sig_bits.extend(lhs.token.get_bits_le());
         sig_bits.extend(lhs.account.nonce.get_bits_le());
@@ -1693,7 +1773,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         &self,
         mut cs: CS,
         branch: &AllocatedOperationBranch<E>,
-    ) -> Result<(Vec<Boolean>, Boolean), SynthesisError> {
+    ) -> Result<(Vec<Boolean>, Boolean, CircuitElement<E>), SynthesisError> {
         //first we prove calculate root of the subtree to obtain account_leaf_data:
 
         let balance_data = &branch.balance.get_bits_le();
@@ -1706,11 +1786,9 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
 
         // println!("balance root: {}", balance_root.get_value().unwrap());
-        let subtree_root = CircuitElement::from_number(
-            cs.namespace(|| "subtree_root_ce"),
-            balance_root,
-            franklin_constants::FR_BIT_WIDTH,
-        )?;
+        let subtree_root =
+            CircuitElement::from_number_padded(cs.namespace(|| "subtree_root_ce"), balance_root)?;
+
         let mut account_data = vec![];
         account_data.extend(branch.account.nonce.get_bits_le());
         account_data.extend(branch.account.pub_key_hash.get_bits_le());
@@ -1718,17 +1796,13 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let account_data_packed =
             pack_bits_to_element(cs.namespace(|| "account_data_packed"), &account_data)?;
 
-        //TODO: preallocate
-        let zero = AllocatedNum::alloc(cs.namespace(|| "zero"), || Ok(E::Fr::zero()))?;
-        zero.assert_zero(cs.namespace(|| "zero is zero"))?;
-
         let is_account_empty = Expression::equals(
             cs.namespace(|| "is_account_empty"),
             &account_data_packed,
-            &zero,
+            Expression::constant::<CS>(E::Fr::zero()),
         )?;
         account_data.extend(subtree_root.get_bits_le());
-        Ok((account_data, Boolean::from(is_account_empty)))
+        Ok((account_data, Boolean::from(is_account_empty), subtree_root))
     }
 }
 
@@ -1792,18 +1866,30 @@ fn allocate_merkle_root<E: JubjubEngine, CS: ConstraintSystem<E>>(
     Ok(cur_hash.clone())
 }
 
-fn select_vec_ifeq<E: JubjubEngine, CS: ConstraintSystem<E>>(
+fn select_vec_ifeq<
+    E: JubjubEngine,
+    CS: ConstraintSystem<E>,
+    EX1: Into<Expression<E>>,
+    EX2: Into<Expression<E>>,
+>(
     mut cs: CS,
-    a: &AllocatedNum<E>,
-    b: &AllocatedNum<E>,
+    a: EX1,
+    b: EX2,
     x: &[AllocatedNum<E>],
     y: &[AllocatedNum<E>],
 ) -> Result<Vec<AllocatedNum<E>>, SynthesisError> {
     assert_eq!(x.len(), y.len());
+    let a: Expression<E> = a.into();
+    let b: Expression<E> = b.into();
     let mut resulting_vector = vec![];
     for (i, (t_x, t_y)) in x.iter().zip(y.iter()).enumerate() {
-        let temp =
-            AllocatedNum::select_ifeq(cs.namespace(|| format!("iteration {}", i)), a, b, t_x, t_y)?;
+        let temp = Expression::select_ifeq(
+            cs.namespace(|| format!("iteration {}", i)),
+            a.clone(),
+            b.clone(),
+            t_x,
+            t_y,
+        )?;
         resulting_vector.push(temp);
     }
     Ok(resulting_vector)
@@ -1850,18 +1936,11 @@ fn select_pubdata_chunk<E: JubjubEngine, CS: ConstraintSystem<E>>(
             .to_vec();
         let current_chunk =
             pack_bits_to_element(cs.namespace(|| "chunk as field element"), &pub_chunk_bits)?;
-        let current_chunk_number_allocated =
-            AllocatedNum::alloc(cs.namespace(|| "chunk number"), || {
-                Ok(E::Fr::from_str(&i.to_string()).unwrap())
-            })?;
-        current_chunk_number_allocated.assert_number(
-            cs.namespace(|| "number is correct"),
-            &E::Fr::from_str(&i.to_string()).unwrap(),
-        )?;
-        result = AllocatedNum::select_ifeq(
+
+        result = Expression::select_ifeq(
             cs.namespace(|| "select if correct chunk number"),
-            &current_chunk_number_allocated,
-            &chunk_number,
+            Expression::u64::<CS>(i as u64),
+            chunk_number,
             &current_chunk,
             &result,
         )?;
@@ -1888,6 +1967,7 @@ fn multi_or<E: JubjubEngine, CS: ConstraintSystem<E>>(
     Ok(result)
 }
 
+//TODO: we can use fees: &[Expression<E>] if needed, though no real need
 fn calculate_root_from_full_representation_fees<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     fees: &[AllocatedNum<E>],
@@ -2017,17 +2097,10 @@ fn no_nonce_overflow<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     nonce: &AllocatedNum<E>,
 ) -> Result<Boolean, SynthesisError> {
-    let max_nonce = AllocatedNum::alloc(cs.namespace(|| "max_nonce"), || {
-        Ok(E::Fr::from_str(&(256 * 256 - 1).to_string()).unwrap())
-    })?;
-    max_nonce.assert_number(
-        cs.namespace(|| "max_nonce is correct"),
-        &E::Fr::from_str(&(256 * 256 - 1).to_string()).unwrap(),
-    )?;
     Ok(Boolean::from(Expression::equals(
         cs.namespace(|| "is nonce at max"),
         nonce,
-        &max_nonce,
+        Expression::constant::<CS>(E::Fr::from_str(&(256 * 256 - 1).to_string()).unwrap()),
     )?)
     .not())
 }
