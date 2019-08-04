@@ -233,8 +233,7 @@ pub fn apply_transfer(
             fee: Some(fee_encoded),
             a: Some(a),
             b: Some(b),
-            new_pub_x: Some(Fr::zero()),
-            new_pub_y: Some(Fr::zero()), //shouldn't matter for transfer operation
+            new_pub_key_hash: Some(Fr::zero()),
         },
         before_root: Some(before_root),
         intermediate_root: Some(intermediate_root),
@@ -247,6 +246,8 @@ pub fn calculate_transfer_operations_from_witness(
     transfer_witness: &TransferWitness<Bn256>,
     sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
+    signer_pub_key_x: &Fr,
+    signer_pub_key_y: &Fr,
 ) -> Vec<Operation<Bn256>> {
     let pubdata_chunks: Vec<_> = transfer_witness
         .get_pubdata()
@@ -261,18 +262,8 @@ pub fn calculate_transfer_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[0]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: transfer_witness
-            .from_before
-            .witness
-            .account_witness
-            .pub_x
-            .clone(),
-        signer_pub_key_y: transfer_witness
-            .from_before
-            .witness
-            .account_witness
-            .pub_y
-            .clone(),
+        signer_pub_key_x: Some(signer_pub_key_x.clone()),
+        signer_pub_key_y: Some(signer_pub_key_y.clone()),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_before.clone(),
         rhs: transfer_witness.to_before.clone(),
@@ -285,18 +276,8 @@ pub fn calculate_transfer_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[1]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: transfer_witness
-            .from_before
-            .witness
-            .account_witness
-            .pub_x
-            .clone(),
-        signer_pub_key_y: transfer_witness
-            .from_before
-            .witness
-            .account_witness
-            .pub_y
-            .clone(),
+        signer_pub_key_x: Some(signer_pub_key_x.clone()),
+        signer_pub_key_y: Some(signer_pub_key_y.clone()),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_intermediate.clone(),
         rhs: transfer_witness.to_intermediate.clone(),
@@ -346,22 +327,55 @@ fn test_transfer() {
     let from_pk = PublicKey::from_private(&from_sk, p_g, params);
     let (from_x, from_y) = from_pk.0.into_xy();
     println!("x = {}, y = {}", from_x, from_y);
+    let mut from_key_bits = vec![];
+    append_le_fixed_width(&mut from_key_bits, &from_x, Fr::NUM_BITS as usize);
+    append_le_fixed_width(&mut from_key_bits, &from_y, Fr::NUM_BITS as usize);
+    let from_pub_key_hash = phasher.hash_bits(from_key_bits);
+    let mut from_pub_key_hash_bits = vec![];
+    append_le_fixed_width(
+        &mut from_pub_key_hash_bits,
+        &from_pub_key_hash,
+        franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+    );
+    let from_pub_key_hash = le_bit_vector_into_field_element(&from_pub_key_hash_bits);
 
     let to_sk = PrivateKey::<Bn256>(rng.gen());
     let to_pk = PublicKey::from_private(&to_sk, p_g, params);
     let (to_x, to_y) = to_pk.0.into_xy();
     println!("x = {}, y = {}", to_x, to_y);
+    let mut to_key_bits = vec![];
+    append_le_fixed_width(&mut to_key_bits, &from_x, Fr::NUM_BITS as usize);
+    append_le_fixed_width(&mut to_key_bits, &from_y, Fr::NUM_BITS as usize);
+    let to_pub_key_hash = phasher.hash_bits(to_key_bits);
+    let mut to_pub_key_hash_bits = vec![];
+    append_le_fixed_width(
+        &mut to_pub_key_hash_bits,
+        &to_pub_key_hash,
+        franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+    );
+    let to_pub_key_hash = le_bit_vector_into_field_element(&to_pub_key_hash_bits);
 
     // give some funds to sender and make zero balance for recipient
     let validator_sk = PrivateKey::<Bn256>(rng.gen());
     let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
     let (validator_x, validator_y) = validator_pk.0.into_xy();
     println!("x = {}, y = {}", validator_x, validator_y);
+    let mut validator_key_bits = vec![];
+    append_le_fixed_width(&mut validator_key_bits, &validator_x, Fr::NUM_BITS as usize);
+    append_le_fixed_width(&mut validator_key_bits, &validator_y, Fr::NUM_BITS as usize);
+    let validator_pub_key_hash = phasher.hash_bits(validator_key_bits);
+    let mut validator_pub_key_hash_bits = vec![];
+    append_le_fixed_width(
+        &mut validator_pub_key_hash_bits,
+        &validator_pub_key_hash,
+        franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+    );
+    let validator_pub_key_hash = le_bit_vector_into_field_element(&validator_pub_key_hash_bits);
+
     let validator_leaf = CircuitAccount::<Bn256> {
         subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
         nonce: Fr::zero(),
-        pub_x: validator_x.clone(),
-        pub_y: validator_y.clone(),
+        pub_key_hash: validator_pub_key_hash,
     };
 
     let mut validator_balances = vec![];
@@ -433,8 +447,7 @@ fn test_transfer() {
     let from_leaf_initial = CircuitAccount::<Bn256> {
         subtree: from_balance_tree,
         nonce: Fr::zero(),
-        pub_x: from_x.clone(),
-        pub_y: from_y.clone(),
+        pub_key_hash: from_pub_key_hash,
     };
 
     to_balance_tree.insert(
@@ -446,8 +459,7 @@ fn test_transfer() {
     let to_leaf_initial = CircuitAccount::<Bn256> {
         subtree: to_balance_tree,
         nonce: Fr::zero(),
-        pub_x: to_x.clone(),
-        pub_y: to_y.clone(),
+        pub_key_hash: to_pub_key_hash,
     };
     tree.insert(from_leaf_number, from_leaf_initial);
     tree.insert(to_leaf_number, to_leaf_initial);
@@ -520,8 +532,13 @@ fn test_transfer() {
 
     let signature = sign(&sig_bits, &from_sk, p_g, params, rng);
 
-    let operations =
-        calculate_transfer_operations_from_witness(&transfer_witness, &sig_msg, signature);
+    let operations = calculate_transfer_operations_from_witness(
+        &transfer_witness,
+        &sig_msg,
+        signature,
+        &from_x,
+        &from_y,
+    );
 
     let (root_after_fee, validator_account_witness) =
         apply_fee(&mut tree, validator_address_number, token, fee);

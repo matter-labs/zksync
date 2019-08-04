@@ -14,8 +14,9 @@ pub struct CircuitAccount<E: JubjubEngine> {
     pub subtree: SparseMerkleTree<Balance<E>, E::Fr, PedersenHasher<E>>,
     // pub subtree_root_hash: E::Fr,
     pub nonce: E::Fr,
-    pub pub_x: E::Fr,
-    pub pub_y: E::Fr,
+    pub pub_key_hash: E::Fr,
+    // pub pub_x: E::Fr,
+    // pub pub_y: E::Fr,
 }
 
 impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
@@ -24,22 +25,17 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
         //TODO: verify_order
 
         leaf_content.extend(self.nonce.get_bits_le_fixed(params::NONCE_BIT_WIDTH));
+        leaf_content.extend(
+            self.pub_key_hash
+                .get_bits_le_fixed(params::NEW_PUBKEY_HASH_WIDTH),
+        );
 
-        let mut to_hash = vec![];
-        let mut pub_x_resized = self.pub_x.get_bits_le_fixed(params::FR_BIT_WIDTH);
-        pub_x_resized.resize(params::FR_BIT_WIDTH_PADDED, false);
-        to_hash.extend(pub_x_resized);
-
-        let mut pub_y_resized = self.pub_x.get_bits_le_fixed(params::FR_BIT_WIDTH);
-        pub_y_resized.resize(256, false);
-        to_hash.extend(pub_y_resized);
-        let mut phash = self
-            .subtree
-            .hasher
-            .hash_bits(to_hash)
-            .get_bits_le_fixed(params::NEW_PUBKEY_HASH_WIDTH);
-        // phash.resize(256, false);
-        leaf_content.extend(phash);
+        // let mut phash = self
+        //     .subtree
+        //     .hasher
+        //     .hash_bits(to_hash)
+        //     .get_bits_le_fixed(params::NEW_PUBKEY_HASH_WIDTH);
+        // leaf_content.extend(phash);
 
         let mut root_hash_bits = self
             .subtree
@@ -58,8 +54,9 @@ impl std::default::Default for CircuitAccount<Bn256> {
     fn default() -> Self {
         Self {
             nonce: Fr::zero(),
-            pub_x: Fr::zero(),
-            pub_y: Fr::zero(),
+            pub_key_hash: Fr::zero(),
+            // pub_x: Fr::zero(),
+            // pub_y: Fr::zero(),
             subtree: SparseMerkleTree::new(*params::BALANCE_TREE_DEPTH as u32),
         }
     }

@@ -10,6 +10,105 @@ use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
 use crate::operation::TransactionSignature;
 use franklinmodels::params as franklin_constants;
 
+// pub fn equals_lc<CS, E>(
+//         mut cs: CS,
+//         a: &AllocatedNum<E>,
+//         b: &E::Fr
+//     ) -> Result<boolean::AllocatedBit, SynthesisError>
+//         where E: JubjubEngine,
+//             CS: ConstraintSystem<E>
+//     {
+//         // Allocate and constrain `r`: result boolean bit.
+//         // It equals `true` if `a` equals `b`, `false` otherwise
+
+//         let r_value = match (a.value, b.value) {
+//             (Some(a), Some(b))  => Some(a == b),
+//             _                   => None,
+//         };
+
+//         let r = boolean::AllocatedBit::alloc(cs.namespace(|| "r"), r_value)?;
+
+//         // Let `delta = a - b`
+
+//         let delta_value = match (a.value, b.value) {
+//             (Some(a), Some(b))  => {
+//                 // return (a - b)
+//                 let mut a = a;
+//                 a.sub_assign(&b);
+//                 Some(a)
+//             },
+//             _ => None,
+//         };
+
+//         let delta_inv_value = delta_value.as_ref().map(|delta_value| {
+//             let tmp = delta_value.clone();
+//             if tmp.is_zero() {
+//                 E::Fr::one() // we can return any number here, it doesn't matter
+//             } else {
+//                 tmp.inverse().unwrap()
+//             }
+//         });
+
+//         let delta_inv = Self::alloc(cs.namespace(|| "delta_inv"), || delta_inv_value.grab() )?;
+
+//         // Allocate `t = delta * delta_inv`
+//         // If `delta` is non-zero (a != b), `t` will equal 1
+//         // If `delta` is zero (a == b), `t` cannot equal 1
+
+//         let t_value = match (delta_value, delta_inv_value) {
+//             (Some(a), Some(b))  => {
+//                 let mut t = a.clone();
+//                 t.mul_assign(&b);
+//                 Some(t)
+//             },
+//             _ => None,
+//         };
+
+//         let t = Self::alloc(cs.namespace(|| "t"), || t_value.grab() )?;
+
+//         // Constrain allocation:
+//         // t = (a - b) * delta_inv
+//         cs.enforce(
+//             || "t = (a - b) * delta_inv",
+//             |lc| lc + a.variable - b.variable,
+//             |lc| lc + delta_inv.variable,
+//             |lc| lc + t.variable,
+//         );
+
+//         // Constrain:
+//         // (a - b) * (t - 1) == 0
+//         // This enforces that correct `delta_inv` was provided,
+//         // and thus `t` is 1 if `(a - b)` is non zero (a != b )
+//         cs.enforce(
+//             || "(a - b) * (t - 1) == 0",
+//             |lc| lc + a.variable - b.variable,
+//             |lc| lc + t.variable - CS::one(),
+//             |lc| lc
+//         );
+
+//         // Constrain:
+//         // (a - b) * r == 0
+//         // This enforces that `r` is zero if `(a - b)` is non-zero (a != b)
+//         cs.enforce(
+//             || "(a - b) * r == 0",
+//             |lc| lc + a.variable - b.variable,
+//             |lc| lc + r.get_variable(),
+//             |lc| lc
+//         );
+
+//         // Constrain:
+//         // (t - 1) * (r - 1) == 0
+//         // This enforces that `r` is one if `t` is not one (a == b)
+//         cs.enforce(
+//             || "(t - 1) * (r - 1) == 0",
+//             |lc| lc + t.get_variable() - CS::one(),
+//             |lc| lc + r.get_variable() - CS::one(),
+//             |lc| lc
+//         );
+
+//         Ok(r)
+//     }
+
 pub fn sign<R, E>(
     msg_data: &[bool],
     private_key: &PrivateKey<E>,
@@ -78,7 +177,7 @@ pub fn allocate_sum<E: JubjubEngine, CS: ConstraintSystem<E>>(
         Ok(sum)
     })?;
     cs.enforce(
-        || "pack account data",
+        || "enforce sum",
         |lc| lc + a.get_variable() + b.get_variable(),
         |lc| lc + CS::one(),
         |lc| lc + sum.get_variable(),
@@ -174,14 +273,15 @@ pub fn append_packed_public_key(
 pub fn append_le_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, width: usize) {
     let mut token_bits: Vec<bool> = BitIterator::new(x.into_repr()).collect();
     token_bits.reverse();
-    token_bits.truncate(width);
+    // token_bits.truncate(width);
+    token_bits.resize(width, false);
     content.extend(token_bits.clone());
 }
 
 pub fn append_be_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, width: usize) {
     let mut token_bits: Vec<bool> = BitIterator::new(x.into_repr()).collect();
     token_bits.reverse();
-    token_bits.truncate(width);
+    token_bits.resize(width, false);
     token_bits.reverse();
     content.extend(token_bits.clone());
 }

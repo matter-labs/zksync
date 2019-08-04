@@ -1,11 +1,11 @@
 use crate::utils::pack_bits_to_element;
 use bellman::{ConstraintSystem, SynthesisError};
 use ff::Field;
-
+use ff::PrimeField;
 use franklin_crypto::circuit::boolean::Boolean;
 
 use franklin_crypto::circuit::num::AllocatedNum;
-use franklin_crypto::circuit::{pedersen_hash};
+use franklin_crypto::circuit::pedersen_hash;
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::params as franklin_constants;
 
@@ -15,7 +15,7 @@ pub struct CircuitElement<E: JubjubEngine> {
     bits_le: Vec<Boolean>,
     length: usize,
 }
-
+//TODO: !!! into_bits_le usage here is redundant, we can minimize constraints by using predefined length
 impl<E: JubjubEngine> CircuitElement<E> {
     pub fn from_fe_strict<CS: ConstraintSystem<E>, F: FnOnce() -> Result<E::Fr, SynthesisError>>(
         mut cs: CS,
@@ -40,7 +40,9 @@ impl<E: JubjubEngine> CircuitElement<E> {
         number: AllocatedNum<E>,
         max_length: usize,
     ) -> Result<Self, SynthesisError> {
-        let mut bits = number.into_bits_le(cs.namespace(|| "into_bits_le"))?;
+        // let mut bits = number.into_bits_le(cs.namespace(|| "into_bits_le"))?;
+        let mut bits =
+            number.into_bits_le(cs.namespace(|| "into_bits_le_fixed"))?;
         bits.truncate(max_length);
         Ok(CircuitElement {
             number: number,
@@ -53,8 +55,9 @@ impl<E: JubjubEngine> CircuitElement<E> {
         number: AllocatedNum<E>,
         max_length: usize,
     ) -> Result<Self, SynthesisError> {
-        let mut bits = number.into_bits_le(cs.namespace(|| "into_bits_le"))?;
-        bits.truncate(max_length);
+        // let mut bits = number.into_bits_le(cs.namespace(|| "into_bits_le"))?;
+        let mut bits =
+            number.into_bits_le_fixed(cs.namespace(|| "into_bits_le_fixed"), max_length)?;
 
         let ce = CircuitElement {
             number: number,
@@ -223,21 +226,31 @@ impl<E: JubjubEngine> CircuitPubkey<E> {
         mut cs: CS,
         x: Fx,
         y: Fy,
-        params: &E::Params, 
+        params: &E::Params,
     ) -> Result<Self, SynthesisError> {
         let x_num = AllocatedNum::alloc(cs.namespace(|| "x_num"), x)?;
         let y_num = AllocatedNum::alloc(cs.namespace(|| "y_num"), y)?;
         let x_ce = CircuitElement::from_number_padded(cs.namespace(|| "x"), x_num)?;
-        let y_ce = CircuitElement::from_number_padded(
-            cs.namespace(|| "y"),
-            y_num,
-        )?;
+        let y_ce = CircuitElement::from_number_padded(cs.namespace(|| "y"), y_num)?;
         let mut to_hash = vec![];
         to_hash.extend(x_ce.get_bits_le());
         to_hash.extend(y_ce.get_bits_le());
-        let hash = pedersen_hash::pedersen_hash(cs.namespace(||"hash"), pedersen_hash::Personalization::NoteCommitment, &to_hash, params)?;
-        let hash_ce = CircuitElement::from_number(cs.namespace(||"hash ce"), hash.get_x().clone(), franklin_constants::NEW_PUBKEY_HASH_WIDTH)?;
-        Ok(CircuitPubkey { x: x_ce, y: y_ce, hash: hash_ce })
+        let hash = pedersen_hash::pedersen_hash(
+            cs.namespace(|| "hash"),
+            pedersen_hash::Personalization::NoteCommitment,
+            &to_hash,
+            params,
+        )?;
+         let mut hash_bits = hash.get_x().into_bits_le(cs.namespace(||"hash into_bits"))?;
+        hash_bits.truncate(franklin_constants::NEW_PUBKEY_HASH_WIDTH);
+        let hash_repacked = pack_bits_to_element(cs.namespace(||"repack_hash"), &hash_bits)?;
+        let hash_repacked_ce = CircuitElement::from_number(cs.namespace(||"hash_repacked_ce"), hash_repacked, franklin_constants::NEW_PUBKEY_HASH_WIDTH)?;
+       
+        Ok(CircuitPubkey {
+            x: x_ce,
+            y: y_ce,
+            hash: hash_repacked_ce,
+        })
     }
     pub fn from_xy<CS: ConstraintSystem<E>>(
         mut cs: CS,
@@ -246,16 +259,26 @@ impl<E: JubjubEngine> CircuitPubkey<E> {
         params: &E::Params,
     ) -> Result<Self, SynthesisError> {
         let x_ce = CircuitElement::from_number_padded(cs.namespace(|| "x"), x)?;
-        let y_ce = CircuitElement::from_number_padded(
-            cs.namespace(|| "y"),
-            y,
-        )?;
+        let y_ce = CircuitElement::from_number_padded(cs.namespace(|| "y"), y)?;
         let mut to_hash = vec![];
         to_hash.extend(x_ce.get_bits_le());
         to_hash.extend(y_ce.get_bits_le());
-        let hash = pedersen_hash::pedersen_hash(cs.namespace(||"hash"), pedersen_hash::Personalization::NoteCommitment, &to_hash, params)?;
-        let hash_ce = CircuitElement::from_number(cs.namespace(||"hash ce"), hash.get_x().clone(), franklin_constants::NEW_PUBKEY_HASH_WIDTH)?;
-        Ok(CircuitPubkey { x: x_ce, y: y_ce, hash: hash_ce })
+        let hash = pedersen_hash::pedersen_hash(
+            cs.namespace(|| "hash"),
+            pedersen_hash::Personalization::NoteCommitment,
+            &to_hash,
+            params,
+        )?;
+        let mut hash_bits = hash.get_x().into_bits_le(cs.namespace(||"hash into_bits"))?;
+        hash_bits.truncate(franklin_constants::NEW_PUBKEY_HASH_WIDTH);
+        let hash_repacked = pack_bits_to_element(cs.namespace(||"repack_hash"), &hash_bits)?;
+        let hash_repacked_ce = CircuitElement::from_number(cs.namespace(||"hash_repacked_ce"), hash_repacked, franklin_constants::NEW_PUBKEY_HASH_WIDTH)?;
+       
+        Ok(CircuitPubkey {
+            x: x_ce,
+            y: y_ce,
+            hash: hash_repacked_ce,
+        })
     }
     pub fn get_x(&self) -> CircuitElement<E> {
         self.x.clone()

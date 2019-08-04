@@ -21,8 +21,7 @@ pub struct DepositData {
     pub fee: u128,
     pub token: u32,
     pub account_address: u32,
-    pub new_pub_x: Fr,
-    pub new_pub_y: Fr,
+    pub new_pub_key_hash: Fr,
 }
 pub struct DepositWitness<E: JubjubEngine> {
     pub before: OperationBranch<E>,
@@ -64,22 +63,22 @@ impl<E: JubjubEngine> DepositWitness<E> {
             franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         );
 
-        let mut new_pubkey_bits = vec![];
-        append_le_fixed_width(
-            &mut new_pubkey_bits,
-            &self.args.new_pub_x.unwrap(),
-            franklin_constants::FR_BIT_WIDTH,
-        );
-        new_pubkey_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
-        append_le_fixed_width(&mut new_pubkey_bits, &self.args.new_pub_y.unwrap(),franklin_constants::FR_BIT_WIDTH);
-        new_pubkey_bits.resize(2*franklin_constants::FR_BIT_WIDTH_PADDED, false);
+        // let mut new_pubkey_bits = vec![];
+        // append_le_fixed_width(
+        //     &mut new_pubkey_bits,
+        //     &self.args.new_pub_x.unwrap(),
+        //     franklin_constants::FR_BIT_WIDTH,
+        // );
+        // new_pubkey_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+        // append_le_fixed_width(&mut new_pubkey_bits, &self.args.new_pub_y.unwrap(),franklin_constants::FR_BIT_WIDTH);
+        // new_pubkey_bits.resize(2*franklin_constants::FR_BIT_WIDTH_PADDED, false);
 
-        let phasher = PedersenHasher::<Bn256>::default();
-        let new_pubkey_hash = phasher.hash_bits(new_pubkey_bits);
+        // let phasher = PedersenHasher::<Bn256>::default();
+        // let new_pubkey_hash = phasher.hash_bits(new_pubkey_bits);
 
         append_be_fixed_width(
             &mut pubdata_bits,
-            &new_pubkey_hash,
+            &self.args.new_pub_key_hash.unwrap(),
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         );
         assert_eq!(pubdata_bits.len(), 37 * 8);
@@ -152,11 +151,10 @@ pub fn apply_deposit(
             deposit.token,
             |acc| {
                 assert!(
-                    (acc.pub_x == deposit.new_pub_x && acc.pub_y == deposit.new_pub_y)
-                        || (acc.pub_y == Fr::zero() && acc.pub_x == Fr::zero())
+                    (acc.pub_key_hash == deposit.new_pub_key_hash)
+                        || (acc.pub_key_hash == Fr::zero())
                 );
-                acc.pub_x = deposit.new_pub_x;
-                acc.pub_y = deposit.new_pub_y;
+                acc.pub_key_hash = deposit.new_pub_key_hash;
                 acc.nonce.add_assign(&Fr::from_str("1").unwrap());
             },
             |bal| bal.value.add_assign(&amount_as_field_element),
@@ -194,8 +192,7 @@ pub fn apply_deposit(
             fee: Some(fee_encoded),
             a: Some(a),
             b: Some(b),
-            new_pub_x: Some(deposit.new_pub_x),
-            new_pub_y: Some(deposit.new_pub_y),
+            new_pub_key_hash: Some(deposit.new_pub_key_hash),
         },
         before_root: Some(before_root),
         after_root: Some(after_root),
@@ -207,6 +204,8 @@ pub fn calculate_deposit_operations_from_witness(
     deposit_witness: &DepositWitness<Bn256>,
     sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
+    signer_pub_key_x: &Fr,
+    signer_pub_key_y: &Fr,
 ) -> Vec<Operation<Bn256>> {
     let pubdata_chunks: Vec<_> = deposit_witness
         .get_pubdata()
@@ -220,8 +219,8 @@ pub fn calculate_deposit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[0]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: deposit_witness.args.new_pub_x,
-        signer_pub_key_y: deposit_witness.args.new_pub_y,
+        signer_pub_key_x: Some(signer_pub_key_x.clone()),
+        signer_pub_key_y: Some(signer_pub_key_y.clone()),
         args: deposit_witness.args.clone(),
         lhs: deposit_witness.before.clone(),
         rhs: deposit_witness.before.clone(),
@@ -234,8 +233,8 @@ pub fn calculate_deposit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[1]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: deposit_witness.args.new_pub_x,
-        signer_pub_key_y: deposit_witness.args.new_pub_y,
+        signer_pub_key_x: Some(signer_pub_key_x.clone()),
+        signer_pub_key_y: Some(signer_pub_key_y.clone()),
         args: deposit_witness.args.clone(),
         lhs: deposit_witness.after.clone(),
         rhs: deposit_witness.after.clone(),
@@ -248,8 +247,8 @@ pub fn calculate_deposit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[2]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: deposit_witness.args.new_pub_x,
-        signer_pub_key_y: deposit_witness.args.new_pub_y,
+        signer_pub_key_x: Some(signer_pub_key_x.clone()),
+        signer_pub_key_y: Some(signer_pub_key_y.clone()),
         args: deposit_witness.args.clone(),
         lhs: deposit_witness.after.clone(),
         rhs: deposit_witness.after.clone(),
@@ -262,8 +261,8 @@ pub fn calculate_deposit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[3]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: deposit_witness.args.new_pub_x,
-        signer_pub_key_y: deposit_witness.args.new_pub_y,
+        signer_pub_key_x: Some(signer_pub_key_x.clone()),
+        signer_pub_key_y: Some(signer_pub_key_y.clone()),
         args: deposit_witness.args.clone(),
         lhs: deposit_witness.after.clone(),
         rhs: deposit_witness.after.clone(),
@@ -275,8 +274,8 @@ pub fn calculate_deposit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[4]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: deposit_witness.args.new_pub_x,
-        signer_pub_key_y: deposit_witness.args.new_pub_y,
+        signer_pub_key_x: Some(signer_pub_key_x.clone()),
+        signer_pub_key_y: Some(signer_pub_key_y.clone()),
         args: deposit_witness.args.clone(),
         lhs: deposit_witness.after.clone(),
         rhs: deposit_witness.after.clone(),
@@ -320,26 +319,35 @@ fn test_deposit_franklin_in_empty_leaf() {
     let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
     let block_number = Fr::from_str("1").unwrap();
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
-    // let phasher = PedersenHasher::<Bn256>::default();
+    let phasher = PedersenHasher::<Bn256>::default();
 
     let mut tree: CircuitAccountTree =
         CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
 
     let sender_sk = PrivateKey::<Bn256>(rng.gen());
     let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
+    let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
     let (sender_x, sender_y) = sender_pk.0.into_xy();
-    println!("x = {}, y = {}", sender_x, sender_y);
+    let sender_leaf = CircuitAccount::<Bn256> {
+        subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
+        nonce: Fr::zero(),
+        pub_key_hash: sender_pub_key_hash
+        // pub_x: validator_x.clone(),
+        // pub_y: validator_y.clone(),
+    };
 
     // give some funds to sender and make zero balance for recipient
     let validator_sk = PrivateKey::<Bn256>(rng.gen());
     let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
+    let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
     let (validator_x, validator_y) = validator_pk.0.into_xy();
-    println!("x = {}, y = {}", validator_x, validator_y);
+    
     let validator_leaf = CircuitAccount::<Bn256> {
         subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
         nonce: Fr::zero(),
-        pub_x: validator_x.clone(),
-        pub_y: validator_y.clone(),
+        pub_key_hash: validator_pub_key_hash
+        // pub_x: validator_x.clone(),
+        // pub_y: validator_y.clone(),
     };
 
     let mut validator_balances = vec![];
@@ -362,8 +370,9 @@ fn test_deposit_franklin_in_empty_leaf() {
             fee: fee,
             token: token,
             account_address: account_address,
-            new_pub_x: sender_x,
-            new_pub_y: sender_y,
+            new_pub_key_hash: sender_pub_key_hash,
+            // new_pub_x: sender_x,
+            // new_pub_y: sender_y,
         },
     );
 
@@ -376,8 +385,13 @@ fn test_deposit_franklin_in_empty_leaf() {
     let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
     //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
-    let operations =
-        calculate_deposit_operations_from_witness(&deposit_witness, &sig_msg, signature);
+    let operations = calculate_deposit_operations_from_witness(
+        &deposit_witness,
+        &sig_msg,
+        signature,
+        &sender_x,
+        &sender_y,
+    );
 
     println!("tree before_applying fees: {}", tree.root_hash());
 
@@ -414,11 +428,11 @@ fn test_deposit_franklin_in_empty_leaf() {
 
         println!("{}", cs.find_unconstrained());
 
-        println!("{}", cs.num_constraints());
-
+        println!("number of constraints {}", cs.num_constraints());
         let err = cs.which_is_unsatisfied();
         if err.is_some() {
             panic!("ERROR satisfying in {}", err.unwrap());
         }
+        assert_eq!(cs.num_constraints(), 1)
     }
 }

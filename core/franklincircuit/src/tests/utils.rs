@@ -1,17 +1,33 @@
 use crate::account::*;
 
 use crate::utils::*;
-
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use ff::Field;
 use ff::{BitIterator, PrimeField, PrimeFieldRepr};
-
+use franklin_crypto::eddsa::PublicKey;
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::{Balance, CircuitAccount, CircuitAccountTree};
-
+use franklinmodels::params as franklin_constants;
+use merkle_tree::hasher::Hasher;
 use pairing::bn256::*;
 
+pub fn pub_key_hash<E: JubjubEngine, H: Hasher<E::Fr>>(pub_key: &PublicKey<E>, hasher: &H) -> E::Fr {
+    let (pub_x, pub_y) = pub_key.0.into_xy();
+    println!("x = {}, y = {}", pub_x, pub_y);
+    let mut pub_key_bits = vec![];
+    append_le_fixed_width(&mut pub_key_bits, &pub_x, Fr::NUM_BITS as usize);
+    append_le_fixed_width(&mut pub_key_bits, &pub_y, Fr::NUM_BITS as usize);
+    let pub_key_hash = hasher.hash_bits(pub_key_bits);
+    let mut pub_key_hash_bits = vec![];
+    append_le_fixed_width(
+        &mut pub_key_hash_bits,
+        &pub_key_hash,
+        franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+    );
+    let pub_key_hash = le_bit_vector_into_field_element(&pub_key_hash_bits);
+    pub_key_hash
+}
 pub fn public_data_commitment<E: JubjubEngine>(
     pubdata_bits: &[bool],
     initial_root: Option<E::Fr>,
@@ -149,8 +165,7 @@ pub fn apply_leaf_operation<
     let mut account = tree.remove(account_address).unwrap_or(default_account);
     let account_witness_before = AccountWitness {
         nonce: Some(account.nonce),
-        pub_x: Some(account.pub_x),
-        pub_y: Some(account.pub_y),
+        pub_key_hash: Some(account.pub_key_hash),
     };
     let mut balance = account
         .subtree
@@ -165,8 +180,7 @@ pub fn apply_leaf_operation<
 
     let account_witness_after = AccountWitness {
         nonce: Some(account.nonce),
-        pub_x: Some(account.pub_x),
-        pub_y: Some(account.pub_y),
+        pub_key_hash: Some(account.pub_key_hash),
     };
     tree.insert(account_address, account);
     (
@@ -187,8 +201,7 @@ pub fn apply_fee(
     let mut validator_leaf = tree.remove(validator_address).unwrap();
     let validator_account_witness = AccountWitness {
         nonce: Some(validator_leaf.nonce.clone()),
-        pub_x: Some(validator_leaf.pub_x.clone()),
-        pub_y: Some(validator_leaf.pub_y.clone()),
+        pub_key_hash: Some(validator_leaf.pub_key_hash.clone()),
     };
     let validator_balance_root = validator_leaf.subtree.root_hash();
     println!("validator_balance_root: {}", validator_balance_root);

@@ -42,8 +42,7 @@ pub struct OperationArguments<E: JubjubEngine> {
     pub b: Option<E::Fr>,
     pub amount: Option<E::Fr>,
     pub fee: Option<E::Fr>,
-    pub new_pub_x: Option<E::Fr>,
-    pub new_pub_y: Option<E::Fr>,
+    pub new_pub_key_hash: Option<E::Fr>,
     pub ethereum_key: Option<E::Fr>,
 }
 

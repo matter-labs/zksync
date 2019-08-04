@@ -84,7 +84,7 @@ pub struct AllocatedChunkData<E: JubjubEngine> {
 
 #[derive(Clone)]
 pub struct AllocatedOperationData<E: JubjubEngine> {
-    pub new_pubkey: CircuitPubkey<E>,
+    // pub new_pubkey: CircuitPubkey<E>,
     pub signer_pubkey: CircuitPubkey<E>,
     pub amount_packed: CircuitElement<E>,
     pub fee_packed: CircuitElement<E>,
@@ -162,16 +162,23 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             cs.namespace(|| "signer_pubkey"),
             || op.signer_pub_key_x.grab(),
             || op.signer_pub_key_y.grab(),
-            &params
+            &params,
         )?;
 
-        let new_pubkey = CircuitPubkey::from_xy_fe(
-            cs.namespace(|| "new_pubkey"),
-            || op.args.new_pub_x.grab(),
-            || op.args.new_pub_y.grab(),
-            &params
+        // let new_pubkey = CircuitPubkey::from_xy_fe(
+        //     cs.namespace(|| "new_pubkey"),
+        //     || op.args.new_pub_x.grab(),
+        //     || op.args.new_pub_y.grab(),
+        //     &params
+        // )?;
+
+        let new_pubkey_hash = CircuitElement::from_fe_strict(
+            cs.namespace(|| "new_pubkey_hash"),
+            || op.args.new_pub_key_hash.grab(),
+            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         )?;
-        let new_pubkey_hash = new_pubkey.get_hash().clone();
+        // let new_pubkey_hash = new_pubkey.get_hash().clone();
+
         let a = CircuitElement::from_fe_strict(
             cs.namespace(|| "a"),
             || op.args.a.grab(),
@@ -185,7 +192,6 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
 
         Ok(AllocatedOperationData {
             ethereum_key: ethereum_key,
-            new_pubkey: new_pubkey,
             signer_pubkey: sig_pubkey,
             amount_packed: amount_packed,
             fee_packed: fee_packed,
