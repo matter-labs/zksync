@@ -76,3 +76,11 @@ export function integerToFloat(integer: BN, exp_bits: number, mantissa_bits: num
     }
     return integerToFloatInner(integer, exp_bits, mantissa_bits, exp_base, false);
 }
+
+export function packAmount(amount: BN): Buffer {
+    return integerToFloat(amount, 5, 19, 10);
+}
+
+export function packFee(amount: BN): Buffer {
+    return integerToFloat(amount, 4, 4, 10);
+}

@@ -128,7 +128,7 @@ contract Franklin is DummyVerifier, VerificationKeys {
         uint112 amount;
     }
 
-    // Total number of registered OnchainOps
+// Total number of registered OnchainOps
     uint64 totalOnchainOps;
 
     // List of OnchainOps by index
@@ -350,13 +350,15 @@ contract Franklin is DummyVerifier, VerificationKeys {
         blocks[_blockNumber] = Block(
             commitment,
             _newRoot,
-            _blockNumber, // committed at
+            uint32(block.number), // committed at
             0, // verified at
             msg.sender, // validator
             // onchain-ops
             startId,
             totalProcessed
         );
+
+        totalOnchainOps = startId + totalProcessed;
 
         totalBlocksCommitted += 1;
         emit BlockCommitted(_blockNumber);
@@ -418,7 +420,7 @@ contract Franklin is DummyVerifier, VerificationKeys {
             currentPointer == _publicData.length,
             "last chunk exceeds pubdata"
         );
-        return (0, 0);
+        return (onchainOpsStartId, processedOnchainOps);
     }
 
     function processOp(
@@ -427,37 +429,38 @@ contract Franklin is DummyVerifier, VerificationKeys {
         bytes memory _publicData,
         uint64 currentOnchainOp
     ) internal returns (uint256 processedLen, uint64 processedOnchainOps) {
+        uint256 opDataPointer = currentPointer + 1;
+
         if (opType == 0x00) return (1 * 8, 0); // noop
-        if (opType == 0x01) return (5 * 8, 0); // transfer_to_new
-        if (opType == 0x07) return (2 * 8, 0); // transfer
-        if (opType == 0x05) return (1 * 8, 0); // close_account
+        if (opType == 0x02) return (5 * 8, 0); // transfer_to_new
+        if (opType == 0x05) return (2 * 8, 0); // transfer
+        if (opType == 0x04) return (1 * 8, 0); // close_account
 
         // deposit
         if (opType == 0x01) {
-            //pubdata from_account: 3, token: 2, to_account: 3, amount: 3, fee: 1, new_pubkey_hash: 27
+            // to_account: 3, token: 2, amount: 3, fee: 1, new_pubkey_hash: 27
 
             uint16 tokenId = uint16(
-                uint256(uint8(_publicData[currentPointer + 3])) +
-                uint256(uint8(_publicData[currentPointer + 4])) <<
-                8
+            (uint256(uint8(_publicData[opDataPointer + 3])) << 8)
+                + uint256(uint8(_publicData[opDataPointer + 4]))
             );
 
 
             uint8[3] memory amountPacked;
-            amountPacked[0] = uint8(_publicData[currentPointer + 8]);
-            amountPacked[1] = uint8(_publicData[currentPointer + 9]);
-            amountPacked[2] = uint8(_publicData[currentPointer + 10]);
+            amountPacked[0] = uint8(_publicData[opDataPointer + 5]);
+            amountPacked[1] = uint8(_publicData[opDataPointer + 6]);
+            amountPacked[2] = uint8(_publicData[opDataPointer + 7]);
             uint112 amount = unpackAmount(amountPacked);
 
-            uint8 feePacked = uint8(_publicData[currentPointer + 11]);
+
+            uint8 feePacked = uint8(_publicData[opDataPointer + 8]);
             uint112 fee = unpackFee(feePacked);
 
             bytes memory franklin_address_ = new bytes(27);
             for (uint256 i = 0; i < 27; i++) {
-                franklin_address_[i] = _publicData[12 + i];
+                franklin_address_[i] = _publicData[opDataPointer + 9 + i];
             }
             address account = depositFranklinToETH[franklin_address_];
-
 
             requireValidToken(tokenId);
             require(
@@ -465,7 +468,7 @@ contract Franklin is DummyVerifier, VerificationKeys {
                 "balance must be locked"
             );
             require(
-                balances[account][tokenId].balance >= amount + fee,
+                balances[account][tokenId].balance >= (amount + fee),
                 "balance insufficient"
             );
 
@@ -480,24 +483,23 @@ contract Franklin is DummyVerifier, VerificationKeys {
         }
 
         // partial_exit
-        if (opType == 0x04) {
+        if (opType == 0x03) {
             // pubdata account: 3, token: 2, amount: 3, fee: 1, eth_key: 20
 
             uint16 tokenId = uint16(
-                uint256(uint8(_publicData[currentPointer + 3])) +
-                    uint256(uint8(_publicData[currentPointer + 4])) <<
-                    8
+                (uint256(uint8(_publicData[opDataPointer + 3])) << 8)
+                + uint256(uint8(_publicData[opDataPointer + 4]))
             );
 
             uint8[3] memory amountPacked;
-            amountPacked[0] = uint8(_publicData[currentPointer + 5]);
-            amountPacked[1] = uint8(_publicData[currentPointer + 6]);
-            amountPacked[2] = uint8(_publicData[currentPointer + 7]);
+            amountPacked[0] = uint8(_publicData[opDataPointer + 5]);
+            amountPacked[1] = uint8(_publicData[opDataPointer + 6]);
+            amountPacked[2] = uint8(_publicData[opDataPointer + 7]);
             uint112 amount = unpackAmount(amountPacked);
 
             bytes memory ethAddress = new bytes(20);
             for (uint256 i = 0; i < 20; ++i) {
-                ethAddress[i] = _publicData[currentPointer + 9 + i];
+                ethAddress[i] = _publicData[opDataPointer + 9 + i];
             }
 
             requireValidToken(tokenId);
@@ -551,9 +553,9 @@ contract Franklin is DummyVerifier, VerificationKeys {
     }
 
     function consummateOnchainOps(uint32 _blockNumber) internal {
-        uint64 current = blocks[_blockNumber].operationStartId;
-        uint64 end = current + blocks[_blockNumber].totalOperations;
-        while (current < end) {
+        uint64 start = blocks[_blockNumber].operationStartId;
+        uint64 end = start + blocks[_blockNumber].totalOperations;
+        for (uint64 current = start; current < end; ++current) {
             OnchainOp memory op = onchainOps[current];
             if (op.opType == OnchainOpType.Withdrawal) {
                 // withdrawal was successful, accrue balance
@@ -649,7 +651,7 @@ contract Franklin is DummyVerifier, VerificationKeys {
         uint8[3] memory _amount
     ) internal pure returns (uint112) {
         uint112 n = uint112(bitwise_reverse(_amount));
-        return (n >> 9) * 10 ** (n & 511);
+        return (n >> 5) * (uint112(10) ** (n & 0x1f));
     }
 
     function reverse_byte(uint8 b) internal pure returns (uint8) {
@@ -674,7 +676,7 @@ contract Franklin is DummyVerifier, VerificationKeys {
 
     function unpackFee(uint8 encoded_fee) internal pure returns (uint112) {
         uint112 n = reverse_byte(encoded_fee);
-        return (n >> 4) * 10 ** (n & 15);
+        return (n >> 4) * uint112(10) ** (n & 0x0f);
     }
 
     function bytesToAddress(bytes memory bys) internal pure returns (address addr) {
