@@ -17,8 +17,7 @@ pub struct TransferToNewData {
     pub token: u32,
     pub from_account_address: u32,
     pub to_account_address: u32,
-    pub new_pub_x: Fr,
-    pub new_pub_y: Fr,
+    pub new_pub_key_hash: Fr,
 }
 pub struct TransferToNewWitness<E: JubjubEngine> {
     pub from_before: OperationBranch<E>,
@@ -60,21 +59,9 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
                 + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
         );
 
-        let mut new_pubkey_bits = vec![];
-        append_le_fixed_width(
-            &mut new_pubkey_bits,
-            &self.args.new_pub_x.unwrap(),
-            franklin_constants::FR_BIT_WIDTH,
-        );
-        new_pubkey_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
-        append_le_fixed_width(&mut new_pubkey_bits, &self.args.new_pub_y.unwrap(),franklin_constants::FR_BIT_WIDTH);
-        new_pubkey_bits.resize(2*franklin_constants::FR_BIT_WIDTH_PADDED, false);
-        let phasher = PedersenHasher::<Bn256>::default();
-        let new_pubkey_hash = phasher.hash_bits(new_pubkey_bits);
-
         append_be_fixed_width(
             &mut pubdata_bits,
-            &new_pubkey_hash,
+            &self.args.new_pub_key_hash.unwrap(),
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         );
 
@@ -191,12 +178,8 @@ pub fn apply_transfer_to_new(
         transfer_to_new.to_account_address,
         transfer_to_new.token,
         |acc| {
-            assert!(
-                (acc.pub_x == transfer_to_new.new_pub_x && acc.pub_y == transfer_to_new.new_pub_y)
-                    || (acc.pub_y == Fr::zero() && acc.pub_x == Fr::zero())
-            );
-            acc.pub_x = transfer_to_new.new_pub_x;
-            acc.pub_y = transfer_to_new.new_pub_y;
+            assert!((acc.pub_key_hash == Fr::zero()));
+            acc.pub_key_hash = transfer_to_new.new_pub_key_hash;
         },
         |bal| bal.value.add_assign(&amount_as_field_element),
     );
@@ -285,8 +268,7 @@ pub fn apply_transfer_to_new(
             fee: Some(fee_encoded),
             a: Some(a),
             b: Some(b),
-            new_pub_x: Some(transfer_to_new.new_pub_x),
-            new_pub_y: Some(transfer_to_new.new_pub_y),
+            new_pub_key_hash: Some(transfer_to_new.new_pub_key_hash),
         },
         before_root: Some(before_root),
         intermediate_root: Some(intermediate_root),
@@ -299,6 +281,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
     transfer_witness: &TransferToNewWitness<Bn256>,
     sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
+    signer_pub_key_x: &Fr,
+    signer_pub_key_y: &Fr,
 ) -> Vec<Operation<Bn256>> {
     let pubdata_chunks: Vec<_> = transfer_witness
         .get_pubdata()
@@ -313,18 +297,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[0]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: transfer_witness
-            .from_before
-            .witness
-            .account_witness
-            .pub_x
-            .clone(),
-        signer_pub_key_y: transfer_witness
-            .from_before
-            .witness
-            .account_witness
-            .pub_y
-            .clone(),
+        signer_pub_key_x: Some(signer_pub_key_x.clone()),
+        signer_pub_key_y: Some(signer_pub_key_y.clone()),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_before.clone(),
         rhs: transfer_witness.to_before.clone(),
@@ -337,18 +311,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[1]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: transfer_witness
-            .from_before
-            .witness
-            .account_witness
-            .pub_x
-            .clone(),
-        signer_pub_key_y: transfer_witness
-            .from_before
-            .witness
-            .account_witness
-            .pub_y
-            .clone(),
+        signer_pub_key_x: Some(signer_pub_key_x.clone()),
+        signer_pub_key_y: Some(signer_pub_key_y.clone()),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_intermediate.clone(),
         rhs: transfer_witness.to_intermediate.clone(),
@@ -361,18 +325,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[2]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: transfer_witness
-            .from_before
-            .witness
-            .account_witness
-            .pub_x
-            .clone(),
-        signer_pub_key_y: transfer_witness
-            .from_before
-            .witness
-            .account_witness
-            .pub_y
-            .clone(),
+        signer_pub_key_x: Some(signer_pub_key_x.clone()),
+        signer_pub_key_y: Some(signer_pub_key_y.clone()),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_after.clone(),
         rhs: transfer_witness.to_after.clone(),
@@ -385,18 +339,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[3]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: transfer_witness
-            .from_before
-            .witness
-            .account_witness
-            .pub_x
-            .clone(),
-        signer_pub_key_y: transfer_witness
-            .from_before
-            .witness
-            .account_witness
-            .pub_y
-            .clone(),
+        signer_pub_key_x: Some(signer_pub_key_x.clone()),
+        signer_pub_key_y: Some(signer_pub_key_y.clone()),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_after.clone(),
         rhs: transfer_witness.to_after.clone(),
@@ -409,18 +353,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[4]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: transfer_witness
-            .from_before
-            .witness
-            .account_witness
-            .pub_x
-            .clone(),
-        signer_pub_key_y: transfer_witness
-            .from_before
-            .witness
-            .account_witness
-            .pub_y
-            .clone(),
+        signer_pub_key_x: Some(signer_pub_key_x.clone()),
+        signer_pub_key_y: Some(signer_pub_key_y.clone()),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_after.clone(),
         rhs: transfer_witness.to_after.clone(),
@@ -473,24 +407,26 @@ fn test_transfer_to_new() {
 
     let from_sk = PrivateKey::<Bn256>(rng.gen());
     let from_pk = PublicKey::from_private(&from_sk, p_g, params);
+    let from_pub_key_hash = pub_key_hash(&from_pk, &phasher);
     let (from_x, from_y) = from_pk.0.into_xy();
     println!("x = {}, y = {}", from_x, from_y);
 
     let new_sk = PrivateKey::<Bn256>(rng.gen());
     let to_pk = PublicKey::from_private(&new_sk, p_g, params);
+    let to_pub_key_hash = pub_key_hash(&to_pk, &phasher);
     let (to_x, to_y) = to_pk.0.into_xy();
     println!("x = {}, y = {}", to_x, to_y);
 
     // give some funds to sender and make zero balance for recipient
     let validator_sk = PrivateKey::<Bn256>(rng.gen());
     let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
+    let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
     let (validator_x, validator_y) = validator_pk.0.into_xy();
     println!("x = {}, y = {}", validator_x, validator_y);
     let validator_leaf = CircuitAccount::<Bn256> {
         subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
         nonce: Fr::zero(),
-        pub_x: validator_x.clone(),
-        pub_y: validator_y.clone(),
+        pub_key_hash: validator_pub_key_hash,
     };
 
     let mut validator_balances = vec![];
@@ -556,8 +492,7 @@ fn test_transfer_to_new() {
     let from_leaf_initial = CircuitAccount::<Bn256> {
         subtree: from_balance_tree,
         nonce: Fr::zero(),
-        pub_x: from_x.clone(),
-        pub_y: from_y.clone(),
+        pub_key_hash: from_pub_key_hash,
     };
 
     tree.insert(from_leaf_number, from_leaf_initial);
@@ -570,8 +505,7 @@ fn test_transfer_to_new() {
             token: token,
             from_account_address: from_leaf_number,
             to_account_address: to_leaf_number,
-            new_pub_x: to_x,
-            new_pub_y: to_y,
+            new_pub_key_hash: to_pub_key_hash,
         },
     );
     // construct signature
@@ -631,8 +565,13 @@ fn test_transfer_to_new() {
     );
 
     let signature = sign(&sig_bits, &from_sk, p_g, params, rng);
-    let operations =
-        calculate_transfer_to_new_operations_from_witness(&transfer_witness, &sig_msg, signature);
+    let operations = calculate_transfer_to_new_operations_from_witness(
+        &transfer_witness,
+        &sig_msg,
+        signature,
+        &from_x,
+        &from_y,
+    );
     let (root_after_fee, validator_account_witness) =
         apply_fee(&mut tree, validator_address_number, token, fee);
     let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);

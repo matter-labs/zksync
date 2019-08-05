@@ -16,14 +16,10 @@ use merkle_tree::hasher::Hasher;
 use merkle_tree::PedersenHasher;
 use pairing::bn256::*;
 
-pub struct DepositData {
-    pub amount: u128,
-    pub fee: u128,
-    pub token: u32,
+pub struct CloseAccountData {
     pub account_address: u32,
-    pub new_pub_key_hash: Fr,
 }
-pub struct DepositWitness<E: JubjubEngine> {
+pub struct CloseAccountWitness<E: JubjubEngine> {
     pub before: OperationBranch<E>,
     pub after: OperationBranch<E>,
     pub args: OperationArguments<E>,
@@ -31,7 +27,7 @@ pub struct DepositWitness<E: JubjubEngine> {
     pub after_root: Option<E::Fr>,
     pub tx_type: Option<E::Fr>,
 }
-impl<E: JubjubEngine> DepositWitness<E> {
+impl<E: JubjubEngine> CloseAccountWitness<E> {
     pub fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
         append_be_fixed_width(
@@ -45,65 +41,30 @@ impl<E: JubjubEngine> DepositWitness<E> {
             &self.before.address.unwrap(),
             franklin_constants::ACCOUNT_TREE_DEPTH,
         );
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &self.before.token.unwrap(),
-            *franklin_constants::TOKEN_EXT_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &self.args.amount.unwrap(),
-            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
-                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        );
-
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &self.args.fee.unwrap(),
-            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-        );
-
-        // let mut new_pubkey_bits = vec![];
-        // append_le_fixed_width(
-        //     &mut new_pubkey_bits,
-        //     &self.args.new_pub_x.unwrap(),
-        //     franklin_constants::FR_BIT_WIDTH,
-        // );
-        // new_pubkey_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
-        // append_le_fixed_width(&mut new_pubkey_bits, &self.args.new_pub_y.unwrap(),franklin_constants::FR_BIT_WIDTH);
-        // new_pubkey_bits.resize(2*franklin_constants::FR_BIT_WIDTH_PADDED, false);
-
-        // let phasher = PedersenHasher::<Bn256>::default();
-        // let new_pubkey_hash = phasher.hash_bits(new_pubkey_bits);
-
-        append_be_fixed_width(
-            &mut pubdata_bits,
-            &self.args.new_pub_key_hash.unwrap(),
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
-        );
-        assert_eq!(pubdata_bits.len(), 37 * 8);
-        pubdata_bits.resize(40 * 8, false);
+      
+        assert_eq!(pubdata_bits.len(), 4 * 8);
+        pubdata_bits.resize(8 * 8, false);
         pubdata_bits
     }
 }
-pub fn apply_deposit(
+pub fn apply_close_account(
     tree: &mut CircuitAccountTree,
-    deposit: &DepositData,
-) -> DepositWitness<Bn256> {
+    close_account: &CloseAccountData,
+) -> CloseAccountWitness<Bn256> {
     //preparing data and base witness
     let before_root = tree.root_hash();
     println!("Initial root = {}", before_root);
     let (audit_path_before, audit_balance_path_before) =
-        get_audits(tree, deposit.account_address, deposit.token);
+        get_audits(tree, close_account.account_address, close_account.token);
 
     let capacity = tree.capacity();
     assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
-    let account_address_fe = Fr::from_str(&deposit.account_address.to_string()).unwrap();
-    let token_fe = Fr::from_str(&deposit.token.to_string()).unwrap();
-    let amount_as_field_element = Fr::from_str(&deposit.amount.to_string()).unwrap();
+    let account_address_fe = Fr::from_str(&close_account.account_address.to_string()).unwrap();
+    let token_fe = Fr::from_str(&close_account.token.to_string()).unwrap();
+    let amount_as_field_element = Fr::from_str(&close_account.amount.to_string()).unwrap();
 
     let amount_bits = convert_to_float(
-        deposit.amount,
+        close_account.amount,
         *franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
         *franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
         10,
@@ -116,14 +77,14 @@ pub fn apply_deposit(
         10,
     )
     .unwrap();
-    assert_eq!(reparsed_amount, deposit.amount);
+    assert_eq!(reparsed_amount, close_account.amount);
 
     let amount_encoded: Fr = le_bit_vector_into_field_element(&amount_bits);
 
-    let fee_as_field_element = Fr::from_str(&deposit.fee.to_string()).unwrap();
+    let fee_as_field_element = Fr::from_str(&close_account.fee.to_string()).unwrap();
 
     let fee_bits = convert_to_float(
-        deposit.fee,
+        close_account.fee,
         *franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         *franklin_constants::FEE_MANTISSA_BIT_WIDTH,
         10,
@@ -136,25 +97,25 @@ pub fn apply_deposit(
         10,
     )
     .unwrap();
-    assert_eq!(reparsed_fee, deposit.fee);
+    assert_eq!(reparsed_fee, close_account.fee);
     let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
 
     //calculate a and b
     let a = amount_as_field_element.clone();
     let b = fee_as_field_element.clone();
 
-    //applying deposit
+    //applying close_account
     let (account_witness_before, account_witness_after, balance_before, balance_after) =
         apply_leaf_operation(
             tree,
-            deposit.account_address,
-            deposit.token,
+            close_account.account_address,
+            close_account.token,
             |acc| {
                 assert!(
-                    (acc.pub_key_hash == deposit.new_pub_key_hash)
+                    (acc.pub_key_hash == close_account.new_pub_key_hash)
                         || (acc.pub_key_hash == Fr::zero())
                 );
-                acc.pub_key_hash = deposit.new_pub_key_hash;
+                acc.pub_key_hash = close_account.new_pub_key_hash;
                 acc.nonce.add_assign(&Fr::from_str("1").unwrap());
             },
             |bal| bal.value.add_assign(&amount_as_field_element),
@@ -163,9 +124,9 @@ pub fn apply_deposit(
     let after_root = tree.root_hash();
     println!("After root = {}", after_root);
     let (audit_path_after, audit_balance_path_after) =
-        get_audits(tree, deposit.account_address, deposit.token);
+        get_audits(tree, close_account.account_address, close_account.token);
 
-    DepositWitness {
+    CloseAccountWitness {
         before: OperationBranch {
             address: Some(account_address_fe),
             token: Some(token_fe),
@@ -192,7 +153,7 @@ pub fn apply_deposit(
             fee: Some(fee_encoded),
             a: Some(a),
             b: Some(b),
-            new_pub_key_hash: Some(deposit.new_pub_key_hash),
+            new_pub_key_hash: Some(close_account.new_pub_key_hash),
         },
         before_root: Some(before_root),
         after_root: Some(after_root),
@@ -200,85 +161,85 @@ pub fn apply_deposit(
     }
 }
 
-pub fn calculate_deposit_operations_from_witness(
-    deposit_witness: &DepositWitness<Bn256>,
+pub fn calculate_close_account_operations_from_witness(
+    close_account_witness: &CloseAccountWitness<Bn256>,
     sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
 ) -> Vec<Operation<Bn256>> {
-    let pubdata_chunks: Vec<_> = deposit_witness
+    let pubdata_chunks: Vec<_> = close_account_witness
         .get_pubdata()
         .chunks(64)
         .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
         .collect();
     let operation_zero = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
+        new_root: close_account_witness.after_root.clone(),
+        tx_type: close_account_witness.tx_type,
         chunk: Some(Fr::from_str("0").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[0]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.before.clone(),
-        rhs: deposit_witness.before.clone(),
+        args: close_account_witness.args.clone(),
+        lhs: close_account_witness.before.clone(),
+        rhs: close_account_witness.before.clone(),
     };
 
     let operation_one = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
+        new_root: close_account_witness.after_root.clone(),
+        tx_type: close_account_witness.tx_type,
         chunk: Some(Fr::from_str("1").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[1]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.after.clone(),
-        rhs: deposit_witness.after.clone(),
+        args: close_account_witness.args.clone(),
+        lhs: close_account_witness.after.clone(),
+        rhs: close_account_witness.after.clone(),
     };
 
     let operation_two = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
+        new_root: close_account_witness.after_root.clone(),
+        tx_type: close_account_witness.tx_type,
         chunk: Some(Fr::from_str("2").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[2]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.after.clone(),
-        rhs: deposit_witness.after.clone(),
+        args: close_account_witness.args.clone(),
+        lhs: close_account_witness.after.clone(),
+        rhs: close_account_witness.after.clone(),
     };
 
     let operation_three = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
+        new_root: close_account_witness.after_root.clone(),
+        tx_type: close_account_witness.tx_type,
         chunk: Some(Fr::from_str("3").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[3]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.after.clone(),
-        rhs: deposit_witness.after.clone(),
+        args: close_account_witness.args.clone(),
+        lhs: close_account_witness.after.clone(),
+        rhs: close_account_witness.after.clone(),
     };
     let operation_four = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
+        new_root: close_account_witness.after_root.clone(),
+        tx_type: close_account_witness.tx_type,
         chunk: Some(Fr::from_str("4").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[4]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.after.clone(),
-        rhs: deposit_witness.after.clone(),
+        args: close_account_witness.args.clone(),
+        lhs: close_account_witness.after.clone(),
+        rhs: close_account_witness.after.clone(),
     };
 
     let operations: Vec<Operation<_>> = vec![
@@ -291,7 +252,7 @@ pub fn calculate_deposit_operations_from_witness(
     operations
 }
 #[test]
-fn test_deposit_franklin_in_empty_leaf() {
+fn test_close_account_franklin_in_empty_leaf() {
     use super::utils::public_data_commitment;
 
     use crate::circuit::FranklinCircuit;
@@ -362,9 +323,9 @@ fn test_deposit_franklin_in_empty_leaf() {
     let token: u32 = 2;
 
     //-------------- Start applying changes to state
-    let deposit_witness = apply_deposit(
+    let close_account_witness = apply_close_account(
         &mut tree,
-        &DepositData {
+        &CloseAccountData {
             amount: amount,
             fee: fee,
             token: token,
@@ -373,7 +334,7 @@ fn test_deposit_franklin_in_empty_leaf() {
         },
     );
 
-    let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
+    let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on close_account proof
     let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
     sig_bits.reverse();
     sig_bits.truncate(80);
@@ -382,8 +343,8 @@ fn test_deposit_franklin_in_empty_leaf() {
     let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
     //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
-    let operations = calculate_deposit_operations_from_witness(
-        &deposit_witness,
+    let operations = calculate_close_account_operations_from_witness(
+        &close_account_witness,
         &sig_msg,
         signature,
         &sender_x,
@@ -398,8 +359,8 @@ fn test_deposit_franklin_in_empty_leaf() {
     let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
 
     let public_data_commitment = public_data_commitment::<Bn256>(
-        &deposit_witness.get_pubdata(),
-        deposit_witness.before_root,
+        &close_account_witness.get_pubdata(),
+        close_account_witness.before_root,
         Some(root_after_fee),
         Some(validator_address),
         Some(block_number),
@@ -410,7 +371,7 @@ fn test_deposit_franklin_in_empty_leaf() {
 
         let instance = FranklinCircuit {
             params,
-            old_root: deposit_witness.before_root,
+            old_root: close_account_witness.before_root,
             new_root: Some(root_after_fee),
             operations: operations,
             pub_data_commitment: Some(public_data_commitment),

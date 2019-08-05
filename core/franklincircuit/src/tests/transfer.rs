@@ -474,6 +474,10 @@ fn test_transfer() {
             to_account_address: to_leaf_number,
         },
     );
+    println!(
+        "transfer_witness calculated a is: {}",
+        transfer_witness.args.a.unwrap()
+    );
     // construct signature
     let mut sig_bits = vec![];
 

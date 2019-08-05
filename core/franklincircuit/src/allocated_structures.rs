@@ -165,13 +165,6 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             &params,
         )?;
 
-        // let new_pubkey = CircuitPubkey::from_xy_fe(
-        //     cs.namespace(|| "new_pubkey"),
-        //     || op.args.new_pub_x.grab(),
-        //     || op.args.new_pub_y.grab(),
-        //     &params
-        // )?;
-
         let new_pubkey_hash = CircuitElement::from_fe_strict(
             cs.namespace(|| "new_pubkey_hash"),
             || op.args.new_pub_key_hash.grab(),

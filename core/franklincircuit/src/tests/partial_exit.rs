@@ -169,8 +169,7 @@ pub fn apply_partial_exit(
             fee: Some(fee_encoded),
             a: Some(a),
             b: Some(b),
-            new_pub_x: Some(Fr::zero()),
-            new_pub_y: Some(Fr::zero()),
+            new_pub_key_hash: Some(Fr::zero()),
         },
         before_root: Some(before_root),
         after_root: Some(after_root),
@@ -181,6 +180,8 @@ pub fn calculate_partial_exit_operations_from_witness(
     partial_exit_witness: &PartialExitWitness<Bn256>,
     sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
+    signer_pub_key_x: &Fr,
+    signer_pub_key_y: &Fr,
 ) -> Vec<Operation<Bn256>> {
     let pubdata_chunks: Vec<_> = partial_exit_witness
         .get_pubdata()
@@ -195,18 +196,8 @@ pub fn calculate_partial_exit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[0]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: partial_exit_witness
-            .before
-            .witness
-            .account_witness
-            .pub_x
-            .clone(),
-        signer_pub_key_y: partial_exit_witness
-            .before
-            .witness
-            .account_witness
-            .pub_y
-            .clone(),
+        signer_pub_key_x: Some(signer_pub_key_x.clone()),
+        signer_pub_key_y: Some(signer_pub_key_y.clone()),
         args: partial_exit_witness.args.clone(),
         lhs: partial_exit_witness.before.clone(),
         rhs: partial_exit_witness.before.clone(),
@@ -220,18 +211,8 @@ pub fn calculate_partial_exit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[1]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: partial_exit_witness
-            .before
-            .witness
-            .account_witness
-            .pub_x
-            .clone(),
-        signer_pub_key_y: partial_exit_witness
-            .before
-            .witness
-            .account_witness
-            .pub_y
-            .clone(),
+        signer_pub_key_x: Some(signer_pub_key_x.clone()),
+        signer_pub_key_y: Some(signer_pub_key_y.clone()),
         args: partial_exit_witness.args.clone(),
         lhs: partial_exit_witness.after.clone(),
         rhs: partial_exit_witness.after.clone(),
@@ -245,18 +226,8 @@ pub fn calculate_partial_exit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[2]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: partial_exit_witness
-            .before
-            .witness
-            .account_witness
-            .pub_x
-            .clone(),
-        signer_pub_key_y: partial_exit_witness
-            .before
-            .witness
-            .account_witness
-            .pub_y
-            .clone(),
+        signer_pub_key_x: Some(signer_pub_key_x.clone()),
+        signer_pub_key_y: Some(signer_pub_key_y.clone()),
         args: partial_exit_witness.args.clone(),
         lhs: partial_exit_witness.after.clone(),
         rhs: partial_exit_witness.after.clone(),
@@ -269,18 +240,8 @@ pub fn calculate_partial_exit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[3]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
-        signer_pub_key_x: partial_exit_witness
-            .before
-            .witness
-            .account_witness
-            .pub_x
-            .clone(),
-        signer_pub_key_y: partial_exit_witness
-            .before
-            .witness
-            .account_witness
-            .pub_y
-            .clone(),
+        signer_pub_key_x: Some(signer_pub_key_x.clone()),
+        signer_pub_key_y: Some(signer_pub_key_y.clone()),
         args: partial_exit_witness.args.clone(),
         lhs: partial_exit_witness.after.clone(),
         rhs: partial_exit_witness.after.clone(),
@@ -321,26 +282,27 @@ fn test_partial_exit_franklin() {
     let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
     let block_number = Fr::from_str("1").unwrap();
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
-    // let phasher = PedersenHasher::<Bn256>::default();
+    let phasher = PedersenHasher::<Bn256>::default();
 
     let mut tree: CircuitAccountTree =
         CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
 
     let sender_sk = PrivateKey::<Bn256>(rng.gen());
     let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
+    let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
     let (sender_x, sender_y) = sender_pk.0.into_xy();
     println!("x = {}, y = {}", sender_x, sender_y);
 
     // give some funds to sender and make zero balance for recipient
     let validator_sk = PrivateKey::<Bn256>(rng.gen());
     let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
+    let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
     let (validator_x, validator_y) = validator_pk.0.into_xy();
     println!("x = {}, y = {}", validator_x, validator_y);
     let validator_leaf = CircuitAccount::<Bn256> {
         subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
         nonce: Fr::zero(),
-        pub_x: validator_x.clone(),
-        pub_y: validator_y.clone(),
+        pub_key_hash: validator_pub_key_hash.clone(),
     };
 
     let mut validator_balances = vec![];
@@ -373,8 +335,7 @@ fn test_partial_exit_franklin() {
     let sender_leaf_initial = CircuitAccount::<Bn256> {
         subtree: sender_balance_tree,
         nonce: Fr::zero(),
-        pub_x: sender_x.clone(),
-        pub_y: sender_y.clone(),
+        pub_key_hash: sender_pub_key_hash.clone(),
     };
 
     tree.insert(account_address, sender_leaf_initial);
@@ -399,8 +360,13 @@ fn test_partial_exit_franklin() {
     let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
     //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
-    let operations =
-        calculate_partial_exit_operations_from_witness(&partial_exit_witness, &sig_msg, signature);
+    let operations = calculate_partial_exit_operations_from_witness(
+        &partial_exit_witness,
+        &sig_msg,
+        signature,
+        &sender_x,
+        &sender_y,
+    );
 
     let (root_after_fee, validator_account_witness) =
         apply_fee(&mut tree, validator_address_number, token, fee);
@@ -472,26 +438,27 @@ fn test_full_exit_franklin() {
     let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
     let block_number = Fr::from_str("1").unwrap();
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
-    // let phasher = PedersenHasher::<Bn256>::default();
+    let phasher = PedersenHasher::<Bn256>::default();
 
     let mut tree: CircuitAccountTree =
         CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
 
     let sender_sk = PrivateKey::<Bn256>(rng.gen());
     let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
+    let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
     let (sender_x, sender_y) = sender_pk.0.into_xy();
     println!("x = {}, y = {}", sender_x, sender_y);
 
     // give some funds to sender and make zero balance for recipient
     let validator_sk = PrivateKey::<Bn256>(rng.gen());
     let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
+    let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
     let (validator_x, validator_y) = validator_pk.0.into_xy();
     println!("x = {}, y = {}", validator_x, validator_y);
     let validator_leaf = CircuitAccount::<Bn256> {
         subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
         nonce: Fr::zero(),
-        pub_x: validator_x.clone(),
-        pub_y: validator_y.clone(),
+        pub_key_hash: validator_pub_key_hash,
     };
 
     let mut validator_balances = vec![];
@@ -524,8 +491,7 @@ fn test_full_exit_franklin() {
     let sender_leaf_initial = CircuitAccount::<Bn256> {
         subtree: sender_balance_tree,
         nonce: Fr::zero(),
-        pub_x: sender_x.clone(),
-        pub_y: sender_y.clone(),
+        pub_key_hash: sender_pub_key_hash.clone(),
     };
 
     tree.insert(account_address, sender_leaf_initial);
@@ -550,8 +516,13 @@ fn test_full_exit_franklin() {
     let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
     //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
-    let operations =
-        calculate_partial_exit_operations_from_witness(&partial_exit_witness, &sig_msg, signature);
+    let operations = calculate_partial_exit_operations_from_witness(
+        &partial_exit_witness,
+        &sig_msg,
+        signature,
+        &sender_x,
+        &sender_y,
+    );
 
     let (root_after_fee, validator_account_witness) =
         apply_fee(&mut tree, validator_address_number, token, fee);
