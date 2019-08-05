@@ -90,5 +90,5 @@ async function run() {
     let wallet = await Wallet.fromEthWallet(ethWallet);
     console.log(wallet);
 }
-
-run();
+//
+// run();
