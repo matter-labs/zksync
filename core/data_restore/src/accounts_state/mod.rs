@@ -18,6 +18,7 @@ use web3::types::Log;
 
 use crate::franklin_transaction::{FranklinTransaction, FranklinTransactionType};
 use crate::helpers::*;
+use models::plasma::params::ETH_TOKEN_ID;
 
 pub struct FranklinAccountsStates {
     pub config: DataRestoreConfig,
@@ -67,18 +68,18 @@ impl FranklinAccountsStates {
         &mut self,
         transaction: &FranklinTransaction,
     ) -> Result<(), DataRestoreError> {
-        // println!("tx: {:?}", transaction.ethereum_transaction.hash);
+        // debug!("tx: {:?}", transaction.ethereum_transaction.hash);
         let transfer_txs_block = self
             .get_all_transactions_from_transfer_block(transaction)
             .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         for tx in transfer_txs_block {
             if let Some(mut from) = self.plasma_state.balance_tree.items.get(&tx.from).cloned() {
                 let mut transacted_amount = BigDecimal::zero();
-                // println!("amount tx: {:?}", &tx.amount);
+                // debug!("amount tx: {:?}", &tx.amount);
                 transacted_amount += &tx.amount;
                 transacted_amount += &tx.fee;
 
-                if from.balance < transacted_amount {
+                if *from.get_balance(ETH_TOKEN_ID) < transacted_amount {
                     return Err(DataRestoreError::WrongAmount);
                 }
 
@@ -87,11 +88,11 @@ impl FranklinAccountsStates {
                     to = existing_to.clone();
                 }
 
-                from.balance -= transacted_amount;
+                from.sub_balance(ETH_TOKEN_ID, &transacted_amount);
 
                 from.nonce += 1;
                 if tx.to != 0 {
-                    to.balance += &tx.amount;
+                    to.add_balance(ETH_TOKEN_ID, &tx.amount);
                 }
 
                 self.plasma_state.balance_tree.insert(tx.from, from);
@@ -122,10 +123,9 @@ impl FranklinAccountsStates {
                     let mut new_account = Account::default();
                     new_account.public_key_x = tx.pub_x;
                     new_account.public_key_y = tx.pub_y;
-                    new_account.balance = BigDecimal::zero();
                     new_account
                 });
-            account.balance += tx.amount;
+            account.add_balance(ETH_TOKEN_ID, &tx.amount);
             self.plasma_state.balance_tree.insert(tx.account, account);
         }
         Ok(())
@@ -176,17 +176,17 @@ impl FranklinAccountsStates {
         transaction: &FranklinTransaction,
     ) -> Result<Vec<TransferTx>, DataRestoreError> {
         let mut tx_data_vec = transaction.commitment_data.clone();
-        // println!("tx_data_vec: {:?}", tx_data_vec);
+        // debug!("tx_data_vec: {:?}", tx_data_vec);
         // let block_number = &transaction.commitment_data.clone()[0..32];
-        // println!("block_number: {:?}", block_number);
+        // debug!("block_number: {:?}", block_number);
         let tx_data_len = tx_data_vec.len();
-        // println!("tx_data_len: {:?}", tx_data_len);
+        // debug!("tx_data_len: {:?}", tx_data_len);
         tx_data_vec.reverse();
         tx_data_vec.truncate(tx_data_len - 160);
         tx_data_vec.reverse();
-        // println!("tx_data_vec final: {:?}", tx_data_vec);
+        // debug!("tx_data_vec final: {:?}", tx_data_vec);
         // tx_data_len = tx_data_vec.len();
-        // println!("tx_data_len final: {:?}", tx_data_len);
+        // debug!("tx_data_len final: {:?}", tx_data_len);
         let txs = tx_data_vec.chunks(9);
 
         let mut transfers: Vec<TransferTx> = vec![];
@@ -215,14 +215,14 @@ impl FranklinAccountsStates {
             let transfer_tx = TransferTx {
                 from,
                 to,
+                token: ETH_TOKEN_ID,
                 amount: amount.clone(), //BigDecimal::from_str_radix("0", 10).unwrap(),
                 fee,                    //BigDecimal::from_str_radix("0", 10).unwrap(),
                 nonce: i.try_into().unwrap(),
                 good_until_block: 0,
                 signature: TxSignature::default(),
-                cached_pub_key: None,
             };
-            println!(
+            info!(
                 "Transaction from account {:?} to account {:?}, amount = {:?}",
                 from, to, amount
             );
@@ -364,7 +364,7 @@ impl FranklinAccountsStates {
 
         let mut all_deposits = vec![];
         for (k, v) in this_batch.iter() {
-            println!(
+            info!(
                 "Into account {:?} with public key {:x}, deposit amount = {:?}",
                 k, v.1, v.0
             );
@@ -478,7 +478,7 @@ impl FranklinAccountsStates {
 
         let mut all_exits = vec![];
         for k in this_batch.iter() {
-            println!("Exit from account {:?}", k);
+            info!("Exit from account {:?}", k);
 
             let tx: ExitTx = ExitTx {
                 account: k.as_u32(),

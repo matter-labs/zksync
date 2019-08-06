@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate log;
 
 use ethereum_types::{H160, H256, U256};
 use hex;
@@ -92,7 +94,7 @@ impl ETHClient {
         if gas_price < min_gas_price {
             gas_price = min_gas_price;
         }
-        println!(
+        info!(
             "Sending tx: gas price = {}, min = {}, factored = {}, nonce = {}",
             orig_gas_price, min_gas_price, gas_price, meta.nonce
         );
@@ -226,18 +228,18 @@ fn test_eth() {
 
     // let proof: [U256; 8] = [U256::zero(); 8];
 
-    // println!("committing block...");
+    // debug!("committing block...");
     // let r = client.commit_block(block_num, total_fees, tx_data_packed, new_root);
     // match r {
-    //     Err(e) => println!("{:#?}", e),
-    //     Ok(hash) => println!("https://rinkeby.etherscan.io/tx/{:?}", hash),
+    //     Err(e) => debug!("{:#?}", e),
+    //     Ok(hash) => debug!("https://rinkeby.etherscan.io/tx/{:?}", hash),
     // };
 
-    // println!("verifying block...");
+    // debug!("verifying block...");
     // let r = client.verify_block(block_num, proof);
     // match r {
-    //     Err(e) => println!("{:#?}", e),
-    //     Ok(hash) => println!("https://rinkeby.etherscan.io/tx/{:?}", hash),
+    //     Err(e) => debug!("{:#?}", e),
+    //     Ok(hash) => debug!("https://rinkeby.etherscan.io/tx/{:?}", hash),
     // };
 }
 
@@ -251,7 +253,7 @@ fn test_encoding() {
         .expect("failed to get function");
     let inputs = &f.inputs;
     for i in inputs {
-        println!("{} = {}", i.name, i.kind);
+        debug!("{} = {}", i.name, i.kind);
     }
     let params = (U256::from(0), [0u64; 1], 1u64, H256::zero());
     let _data = f

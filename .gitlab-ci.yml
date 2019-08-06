@@ -1,0 +1,43 @@
+stages:
+  - build
+  - tests
+
+.rust-template: &rust-template
+  before_script:
+    - rustup --version
+    - rustc --version
+    - cargo --version
+  tags:
+    - franklin
+
+compile:
+  image: 'registry.mattr.network/devops/images/rust_night'
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - target/
+  <<: *rust-template
+  stage: build
+  script:
+    - cargo fmt --all -- --check
+    - cargo build --verbose
+  only:
+    - master
+    - merge_requests
+
+tests:
+  image: 'registry.mattr.network/devops/images/rust_night'
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - target/
+    policy: pull
+  <<: *rust-template
+  stage: tests
+  when: manual
+  script:
+    - cargo clippy --tests --benches -- -D warnings
+    - cargo test --verbose
+  only:
+    - master
+    - merge_requests

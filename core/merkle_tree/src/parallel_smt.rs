@@ -322,8 +322,8 @@ where
 
     pub fn print_stats() {
         // unsafe {
-        //            println!("leaf hashes: {}", HN);
-        //            println!("tree hashes: {}", HC);
+        //            debug!("leaf hashes: {}", HN);
+        //            debug!("tree hashes: {}", HC);
         // }
     }
 
@@ -333,28 +333,28 @@ where
         //
         //        let r = thread::scope(|scope| {
         //            scope.spawn(move |_| {
-        //                println!("Hello! {:?}", self.root_hash());
+        //                debug!("Hello! {:?}", self.root_hash());
         //                std::thread::sleep(Duration::from_millis(1400));
-        //                println!("done");
+        //                debug!("done");
         //                3 + 5
         //            });
         //        }).unwrap();
-        //        println!("r {:?}", r);
+        //        debug!("r {:?}", r);
 
-        //        println!("testing cpu");
+        //        debug!("testing cpu");
         //        crossbeam_utils::thread::scope(|scope| {
         //            scope.spawn(move || {
-        //                println!("begin");
+        //                debug!("begin");
         //            })
         //        });
 
         //        Box::new(self.pool.spawn(future::lazy(move || {
-        //            println!("begin");
+        //            debug!("begin");
         //            let r = self.root_hash();
-        //            println!("end: {:?}", r);
+        //            debug!("end: {:?}", r);
         //            future::ok::<(), ()>(())
         //        })))/*.then(|result| {
-        //            println!("result {:?}", result);
+        //            debug!("result {:?}", result);
         //            future::ok::<(), ()>(())
         //        }));*/
         //f.wait();
@@ -369,6 +369,8 @@ static mut HC: usize = 0;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use log::debug;
 
     #[derive(Debug)]
     struct TestHasher {}
@@ -415,7 +417,7 @@ mod tests {
 
         fn compress(&self, lhs: &u64, rhs: &u64, i: usize) -> u64 {
             (11 * lhs + 17 * rhs + 1 + i as u64) % 1_234_567_891
-            //println!("compress {} {}, {} => {}", lhs, rhs, i, r);
+            //debug!("compress {} {}, {} => {}", lhs, rhs, i, r);
         }
     }
 
@@ -439,7 +441,7 @@ mod tests {
         //            tree.root_hash();
         //        }
         //        tree.insert(usize::rand(rng) % capacity, TestLeaf(2));
-        //        //println!("{:?}\n", tree);
+        //        //debug!("{:?}\n", tree);
 
         let mut n = 1000;
         for _i in 0..3 {
@@ -455,7 +457,7 @@ mod tests {
             }
             tree.root_hash();
             unsafe {
-                println!("{}: HN = {}, HC = {}\n", n, HN, HC);
+                debug!("{}: HN = {}, HC = {}\n", n, HN, HC);
             }
             n *= 10;
         }
@@ -479,12 +481,12 @@ mod tests {
         tree.make_a_future();
 
         //        tree.insert(0,  TestLeaf(1));
-        //        println!("{}", tree.root_hash());
-        //        println!("{:?}", tree.prehashed);
-        //        println!("{:?}", tree.nodes);
+        //        debug!("{}", tree.root_hash());
+        //        debug!("{:?}", tree.prehashed);
+        //        debug!("{:?}", tree.nodes);
         //
         //        tree.insert(0, TestLeaf(2));
-        //        println!("{}", tree.root_hash());
-        //        println!("{:?}", tree.nodes);
+        //        debug!("{}", tree.root_hash());
+        //        debug!("{:?}", tree.nodes);
     }
 }

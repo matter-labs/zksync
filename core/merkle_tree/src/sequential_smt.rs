@@ -131,7 +131,7 @@ where
         let rhs_hash = self.get_hash(rhs_index);
 
         //let idx = (1 << index.0) + index.1;
-        //println!("({:?}, {:?}, {})", &lhs_hash, &rhs_hash, (self.tree_depth - 1 - index.0));
+        //debug!("({:?}, {:?}, {})", &lhs_hash, &rhs_hash, (self.tree_depth - 1 - index.0));
 
         let hash = self.hasher.compress(
             &lhs_hash,
@@ -139,7 +139,7 @@ where
             (self.tree_depth - 1 - index.0) as usize,
         );
 
-        //println!("hash [{}] = {:?}", (1 << index.0) + index.1, hash);
+        //debug!("hash [{}] = {:?}", (1 << index.0) + index.1, hash);
 
         self.hashes.insert(index.pack(), hash.clone());
         hash
@@ -301,6 +301,8 @@ where
 mod tests {
     use super::*;
 
+    use log::debug;
+
     #[derive(Debug)]
     struct TestHasher {}
 
@@ -325,7 +327,7 @@ mod tests {
 
         fn compress(&self, lhs: &u64, rhs: &u64, i: usize) -> u64 {
             11 * lhs + 17 * rhs + 1 + i as u64
-            //println!("compress {} {}, {} => {}", lhs, rhs, i, r);
+            //debug!("compress {} {}, {} => {}", lhs, rhs, i, r);
         }
     }
 
@@ -347,15 +349,15 @@ mod tests {
         assert_eq!(tree.capacity(), 8);
 
         tree.insert(0, 1);
-        println!("{:?}", tree);
+        debug!("{:?}", tree);
         assert_eq!(tree.root_hash(), 697_516_875);
 
         tree.insert(0, 2);
-        println!("{:?}", tree);
+        debug!("{:?}", tree);
         assert_eq!(tree.root_hash(), 741_131_083);
 
         tree.insert(3, 2);
-        //println!("{:?}", tree);
+        //debug!("{:?}", tree);
         assert_eq!(tree.root_hash(), 793_215_819);
     }
 
@@ -364,7 +366,7 @@ mod tests {
         let mut tree = TestSMT::new(3);
         tree.insert(2, 1);
         let path = tree.merkle_path(2);
-        //println!("{:?}", tree);
+        //debug!("{:?}", tree);
         assert_eq!(path, [(32768, false), (917_505, true), (25_690_142, false)]);
     }
 }

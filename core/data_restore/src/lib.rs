@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate log;
+
 pub mod accounts_state;
 pub mod block_events;
 pub mod blocks;

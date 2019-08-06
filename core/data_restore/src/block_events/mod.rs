@@ -156,17 +156,17 @@ impl BlockEventsFranklin {
                         block.block_type = BlockType::Verified;
                         verified_blocks.push(block);
                     // let result = self.check_committed_block_with_same_number_as_verified(&block);
-                    // println!("Block exists: {:?}", result);
+                    // debug!("Block exists: {:?}", result);
                     // let tx = result.unwrap().clone().transaction_hash;
-                    // println!("--- Starting getting tx");
+                    // debug!("--- Starting getting tx");
                     // let data = FranklinTransaction::get_transaction(InfuraEndpoint::Rinkeby, &tx);
-                    // println!("TX data committed: {:?}", data);
+                    // debug!("TX data committed: {:?}", data);
                     } else if topic == block_committed_topic_h256 {
                         block.block_type = BlockType::Committed;
                         committed_blocks.push(block);
                     }
                 }
-                None => println!("No tx hash"),
+                None => warn!("No tx hash"),
             };
         }
         committed_blocks.sort_by_key(|x| x.block_num);
@@ -295,42 +295,42 @@ impl BlockEventsFranklin {
     //     ));
 
     //     // Subscription
-    //     println!("subscribing to new blocks");
+    //     debug!("subscribing to new blocks");
 
     //     let future = web3_endpoint.eth_subscribe()
     //         .subscribe_new_heads()
     //         .and_then(|sub| {
     //             sub.for_each(|log| {
-    //                 println!("---");
-    //                 println!("Got block number {:?}", log.number);
+    //                 debug!("---");
+    //                 debug!("Got block number {:?}", log.number);
     //                 let number_to_watch = self.last_watched_block_number + 1;
     //                 self.last_watched_block_number = number_to_watch;
-    //                 println!("Block to watch {:?}", &number_to_watch);
+    //                 debug!("Block to watch {:?}", &number_to_watch);
     //                 match self.get_sorted_logs_in_block(number_to_watch) {
     //                     Ok(mut result) => {
-    //                         println!("Old committed blocks array len: {:?}", &self.committed_blocks.len());
-    //                         println!("Old verified blocks array len: {:?}", &self.verified_blocks.len());
-    //                         println!("Got sorted logs");
-    //                         println!("Committed: {:?}", &result.0);
-    //                         println!("Verified: {:?}", &result.1);
+    //                         debug!("Old committed blocks array len: {:?}", &self.committed_blocks.len());
+    //                         debug!("Old verified blocks array len: {:?}", &self.verified_blocks.len());
+    //                         debug!("Got sorted logs");
+    //                         debug!("Committed: {:?}", &result.0);
+    //                         debug!("Verified: {:?}", &result.1);
     //                         self.committed_blocks.append(&mut result.0);
     //                         self.verified_blocks.append(&mut result.1);
-    //                         println!("New committed blocks array len: {:?}", &self.committed_blocks.len());
-    //                         println!("New verified blocks array len: {:?}", &self.verified_blocks.len());
+    //                         debug!("New committed blocks array len: {:?}", &self.committed_blocks.len());
+    //                         debug!("New verified blocks array len: {:?}", &self.verified_blocks.len());
 
     //                     },
     //                     Err(_) => {
-    //                         println!("No new blocks");
+    //                         debug!("No new blocks");
     //                     }
     //                 };
     //                 Ok(())
     //             })
     //         })
-    //         .map_err(|e| eprintln!("franklin log err: {}", e));
+    //         .map_err(|e| error!("franklin log err: {}", e));
 
     //     // Run eloop
     //     if let Err(_err) = eloop.run(future) {
-    //         eprintln!("Cant run eloop");
+    //         error!("Cant run eloop");
     //     }
     // }
 
@@ -353,7 +353,7 @@ impl BlockEventsFranklin {
     //     ));
 
     //     // Subscription
-    //     println!("subscribing to franklin logs {:?} {:?}...", block_verified_topic, block_committed_topic);
+    //     debug!("subscribing to franklin logs {:?} {:?}...", block_verified_topic, block_committed_topic);
 
     //     let filter = FilterBuilder::default()
     //         .address(vec![self.franklin_contract_address.clone()])
@@ -369,29 +369,29 @@ impl BlockEventsFranklin {
     //         .subscribe_logs(filter)
     //         .and_then(|sub| {
     //             sub.for_each(|log| {
-    //                 println!("---");
-    //                 println!("got log from subscription: {:?}", log);
+    //                 debug!("---");
+    //                 debug!("got log from subscription: {:?}", log);
 
     //                 let mut sorted_blocks = self.sort_logs(&vec![log]).unwrap();
     //                 self.committed_blocks.append(&mut sorted_blocks.0);
     //                 self.verified_blocks.append(&mut sorted_blocks.1);
     //                 // let result = self.check_committed_block_with_same_number_as_verified(&block);
-    //                 // println!("Block exists: {:?}", result);
+    //                 // debug!("Block exists: {:?}", result);
     //                 // let tx = result.unwrap().clone().transaction_hash;
-    //                 // println!("--- Starting getting tx");
+    //                 // debug!("--- Starting getting tx");
     //                 // let data = FranklinTransaction::get_transaction(InfuraEndpoint::Rinkeby, &tx);
-    //                 // println!("TX data committed: {:?}", data);
+    //                 // debug!("TX data committed: {:?}", data);
 
-    //                 println!("Verified blocks in storage: {:?}", self.verified_blocks);
-    //                 println!("Committed blocks in storage: {:?}", self.committed_blocks);
+    //                 debug!("Verified blocks in storage: {:?}", self.verified_blocks);
+    //                 debug!("Committed blocks in storage: {:?}", self.committed_blocks);
     //                 Ok(())
     //             })
     //         })
-    //         .map_err(|e| eprintln!("franklin log err: {}", e));
+    //         .map_err(|e| error!("franklin log err: {}", e));
 
     //     // Run eloop
     //     if let Err(_err) = eloop.run(future) {
-    //         eprintln!("ERROR");
+    //         error!("ERROR");
     //     }
     // }
 }

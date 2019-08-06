@@ -43,13 +43,13 @@ db-setup:
 	@bin/db-setup
 
 db-insert-contract:
-	@bin/db-insert-contract
+	@bin/db-insert-contract.sh
 
 db-reset: confirm_action db-drop db-setup db-insert-contract
 	@echo database is ready
 
 db-migrate: confirm_action
-	@cd src/storage && diesel migration run
+	@cd core/storage && diesel migration run
 
 db-drop: confirm_action
 	@# this is used to clear the produciton db; cannot do `diesel database reset` because we don't own the db
@@ -128,21 +128,27 @@ push-image-rust: image-rust
 # Contracts
 
 deploy-contracts: confirm_action
-	@bin/deploy-contracts
+	@bin/deploy-contracts.sh
 
-flattener = @docker run --rm -v $(shell pwd)/contracts:/home/contracts -it "${FLATTENER_DOCKER_IMAGE}"
-define flatten_file
-	@echo flattening $(1)
-	$(flattener) -c 'solidity_flattener --output /home/contracts/flat/$(1) /home/contracts/contracts/$(1)'
-endef
+test-contracts: confirm_action
+	@cd contracts && yarn test
 
-# Flatten contract source
-flatten:
-	@mkdir -p contracts/flat
-	$(call flatten_file,FranklinProxy.sol)
-	$(call flatten_file,Depositor.sol)
-	$(call flatten_file,Exitor.sol)
-	$(call flatten_file,Transactor.sol)
+# deploy-contracts: confirm_action
+# 	@bin/deploy-contracts
+
+# flattener = @docker run --rm -v $(shell pwd)/contracts:/home/contracts -it "${FLATTENER_DOCKER_IMAGE}"
+# define flatten_file
+# 	@echo flattening $(1)
+# 	$(flattener) -c 'solidity_flattener --output /home/contracts/flat/$(1) /home/contracts/contracts/$(1)'
+# endef
+
+# # Flatten contract source
+# flatten:
+# 	@mkdir -p contracts/flat
+# 	$(call flatten_file,FranklinProxy.sol)
+# 	$(call flatten_file,Depositor.sol)
+# 	$(call flatten_file,Exitor.sol)
+# 	$(call flatten_file,Transactor.sol)
 
 # Publish source to etherscan.io
 source: #flatten

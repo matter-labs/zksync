@@ -42,7 +42,7 @@ impl DataRestoreDriver {
     }
 
     pub fn load_past_state(&mut self) -> Result<(), DataRestoreError> {
-        println!("Loading past state");
+        info!("Loading past state");
         let states = DataRestoreDriver::get_past_franklin_blocks_events_and_accounts_tree_state(
             self.config.clone(),
             self.genesis_block,
@@ -53,10 +53,10 @@ impl DataRestoreDriver {
         self.account_states = states.1;
 
         // let accs = &self.account_states.get_accounts();
-        // println!("Accs: {:?}", accs);
+        // debug!("Accs: {:?}", accs);
         let root = self.account_states.root_hash();
-        println!("Root: {:?}", &root);
-        println!("______________");
+        debug!("Root: {:?}", &root);
+        debug!("______________");
 
         if let Some(ref _channel) = self.channel {
             let state = ProtoAccountsState {
@@ -70,7 +70,7 @@ impl DataRestoreDriver {
                 ));
             }
         }
-        println!("Finished loading past state");
+        debug!("Finished loading past state");
         Ok(())
     }
 
@@ -79,13 +79,13 @@ impl DataRestoreDriver {
     }
 
     pub fn run_state_updates(&mut self) -> Option<DataRestoreError> {
-        println!("Start state updates");
+        info!("Start state updates");
         self.run_updates = true;
         let mut err: Option<DataRestoreError> = None;
         while self.run_updates {
             // match DataRestoreDriver::update_franklin_blocks_events_and_accounts_tree_state(self) {
             //     Err(error) => {
-            //         println!("Something goes wrong: {:?}", error);
+            //         error!("Something goes wrong: {:?}", error);
             //         self.run_updates = false;
             //         err = Some(DataRestoreError::StateUpdate(format!(
             //             "Error occured: {:?}",
@@ -93,21 +93,21 @@ impl DataRestoreDriver {
             //         )));
             //     }
             //     Ok(()) => {
-            //         // println!("Updated, last watched ethereum block: {:?}", &self.block_events.last_watched_block_number);
-            //         // println!("Committed franklin blocks count: {:?}", &self.block_events.committed_blocks.len());
-            //         // println!("Last committed franklin block: {:?}", &self.block_events.committed_blocks.last());
-            //         // println!("Verified franklin blocks count: {:?}", &self.block_events.verified_blocks.len());
-            //         // println!("Last verified franklin block: {:?}", &self.block_events.verified_blocks.last());
+            //         // debug!("Updated, last watched ethereum block: {:?}", &self.block_events.last_watched_block_number);
+            //         // debug!("Committed franklin blocks count: {:?}", &self.block_events.committed_blocks.len());
+            //         // debug!("Last committed franklin block: {:?}", &self.block_events.committed_blocks.last());
+            //         // debug!("Verified franklin blocks count: {:?}", &self.block_events.verified_blocks.len());
+            //         // debug!("Last verified franklin block: {:?}", &self.block_events.verified_blocks.last());
             //         // let accs = self.account_states.get_accounts();
             //         // let root = self.account_states.root_hash();
-            //         // println!("Accs: {:?}", accs);
-            //         // println!("Root: {:?}", &root);
+            //         // debug!("Accs: {:?}", accs);
+            //         // debug!("Root: {:?}", &root);
             //     }
             // };
             if let Err(error) =
                 DataRestoreDriver::update_franklin_blocks_events_and_accounts_tree_state(self)
             {
-                println!("Something goes wrong: {:?}", error);
+                error!("Something goes wrong: {:?}", error);
                 self.run_updates = false;
                 err = Some(DataRestoreError::StateUpdate(format!(
                     "Error occured: {:?}",
@@ -115,8 +115,8 @@ impl DataRestoreDriver {
                 )));
             }
             let root = self.account_states.root_hash();
-            println!("New root: {:?}", root);
-            println!("______________");
+            debug!("New root: {:?}", root);
+            debug!("______________");
             if let Some(ref _channel) = self.channel {
                 let state = ProtoAccountsState {
                     errored: !self.run_updates,
@@ -131,7 +131,7 @@ impl DataRestoreDriver {
                 }
             }
         }
-        println!("Stopped state updates");
+        debug!("Stopped state updates");
         err
     }
 
@@ -143,14 +143,14 @@ impl DataRestoreDriver {
         let events_state =
             DataRestoreDriver::get_past_blocks_state(config.clone(), genesis_block, blocks_delta)
                 .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-        // println!("Last watched block: {:?}", events_state.last_watched_block_number);
+        // debug!("Last watched block: {:?}", events_state.last_watched_block_number);
         let verified_blocks = events_state.verified_blocks.clone();
         let txs = DataRestoreDriver::get_verified_committed_blocks_transactions_from_blocks_state(
             &events_state,
             &verified_blocks,
         );
         let sorted_txs = DataRestoreDriver::sort_transactions_by_block_number(txs);
-        // println!("Transactions: {:?}", sorted_txs);
+        // debug!("Transactions: {:?}", sorted_txs);
 
         let mut accounts_state = FranklinAccountsStates::new(config.clone());
         DataRestoreDriver::update_accounts_state_from_transactions(
@@ -158,7 +158,7 @@ impl DataRestoreDriver {
             &sorted_txs,
         )
         .map_err(|e| DataRestoreError::StateUpdate(e.to_string()))?;
-        println!("Accounts and events state finished update");
+        info!("Accounts and events state finished update");
         Ok((events_state, accounts_state))
     }
 
@@ -173,23 +173,23 @@ impl DataRestoreDriver {
             blocks_delta,
         )
         .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-        println!(
+        debug!(
             "Got past events state till ethereum block: {:?}",
             &events.last_watched_block_number
         );
-        println!(
+        debug!(
             "Committed franklin blocks count: {:?}",
             &events.committed_blocks.len()
         );
-        println!(
+        debug!(
             "Last committed franklin block: {:?}",
             &events.committed_blocks.last()
         );
-        println!(
+        debug!(
             "Verified franklin blocks count: {:?}",
             &events.verified_blocks.len()
         );
-        println!(
+        debug!(
             "Last verified franklin block: {:?}",
             &events.verified_blocks.last()
         );
@@ -202,7 +202,7 @@ impl DataRestoreDriver {
     ) -> Vec<FranklinTransaction> {
         let committed_blocks =
             block_events_state.get_only_verified_committed_blocks(verified_blocks);
-        // println!("Committed verified blocks: {:?}", committed_blocks);
+        // debug!("Committed verified blocks: {:?}", committed_blocks);
         let mut transactions = vec![];
         for block in committed_blocks {
             let tx = FranklinTransaction::get_transaction(&block_events_state.config, &block);
@@ -211,7 +211,7 @@ impl DataRestoreDriver {
             }
             transactions.push(tx.unwrap());
         }
-        println!("Transactions sorted: only verified commited");
+        debug!("Transactions sorted: only verified commited");
         transactions
     }
 
@@ -220,7 +220,7 @@ impl DataRestoreDriver {
     ) -> Vec<FranklinTransaction> {
         let mut sorted_transactions = transactions;
         sorted_transactions.sort_by_key(|x| x.block_number);
-        println!("Transactions sorted: by number");
+        debug!("Transactions sorted: by number");
         sorted_transactions
     }
 
@@ -229,13 +229,13 @@ impl DataRestoreDriver {
         transactions: &[FranklinTransaction],
     ) -> Result<(), DataRestoreError> {
         // let mut state = accounts_state::FranklinAccountsStates::new(config);
-        println!("Start accounts state updating");
+        debug!("Start accounts state updating");
         for transaction in transactions {
             state
                 .update_accounts_states_from_transaction(&transaction)
                 .map_err(|e| DataRestoreError::StateUpdate(e.to_string()))?;
         }
-        println!("Finished accounts state updating");
+        debug!("Finished accounts state updating");
         Ok(())
     }
 
@@ -252,32 +252,32 @@ impl DataRestoreDriver {
             match ne {
                 Ok(result) => new_events = result,
                 Err(error) => {
-                    println!("Got no events: {:?}", error);
+                    debug!("Got no events: {:?}", error);
                     continue;
                 }
             }
             if new_events.1.is_empty() {
-                println!("No new verified blocks");
+                debug!("No new verified blocks");
                 continue;
             // return Err(DataRestoreError::NoData("No verified blocks".to_string()))
             } else {
-                println!(
+                debug!(
                     "Got new events state till ethereum block: {:?}",
                     &data_restore_driver.block_events.last_watched_block_number
                 );
-                println!(
+                debug!(
                     "Committed franklin blocks count: {:?}",
                     &data_restore_driver.block_events.committed_blocks.len()
                 );
-                println!(
+                debug!(
                     "Last committed franklin block: {:?}",
                     &data_restore_driver.block_events.committed_blocks.last()
                 );
-                println!(
+                debug!(
                     "Verified franklin blocks count: {:?}",
                     &data_restore_driver.block_events.verified_blocks.len()
                 );
-                println!(
+                debug!(
                     "Last verified franklin block: {:?}",
                     &data_restore_driver.block_events.verified_blocks.last()
                 );

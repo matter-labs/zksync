@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate log;
+
 use rand::OsRng;
 use std::fmt;
 use std::iter::Iterator;
@@ -27,7 +30,6 @@ use bellman::groth16::{
     create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
 };
 
-use circuit::CircuitAccountTree;
 use models::plasma::block::Block;
 use models::plasma::block::BlockData;
 use models::plasma::circuit::account::CircuitAccount;
@@ -41,15 +43,8 @@ use models::config::{
     DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE, PROVER_CYCLE_WAIT, PROVER_TIMEOUT, PROVER_TIMER_TICK,
     RUNTIME_CONFIG,
 };
-use models::EncodedProof;
 use storage::StorageProcessor;
 
-use circuit::deposit::circuit::{Deposit, DepositWitness};
-use circuit::deposit::deposit_request::DepositRequest;
-use circuit::exit::circuit::{Exit, ExitWitness};
-use circuit::exit::exit_request::ExitRequest;
-use circuit::leaf::LeafWitness;
-use circuit::transfer::transaction::Transaction;
 use models::plasma::circuit::utils::be_bit_vector_into_bytes;
 
 use circuit::transfer::circuit::{TransactionWitness, Transfer};
@@ -58,20 +53,20 @@ use models::primitives::{
     field_element_to_u32, serialize_g1_for_ethereum, serialize_g2_for_ethereum,
 };
 
-pub struct Prover<E: JubjubEngine> {
-    pub transfer_batch_size: usize,
-    pub deposit_batch_size: usize,
-    pub exit_batch_size: usize,
-    pub current_block_number: BlockNumber,
-    pub accounts_tree: CircuitAccountTree,
-    pub transfer_parameters: BabyParameters,
-    pub deposit_parameters: BabyParameters,
-    pub exit_parameters: BabyParameters,
-    pub jubjub_params: E::Params,
-    pub worker: String,
-    pub prover_id: i32,
-    pub current_job: Arc<AtomicUsize>,
-}
+//pub struct Prover<E: JubjubEngine> {
+//    pub transfer_batch_size: usize,
+//    pub deposit_batch_size: usize,
+//    pub exit_batch_size: usize,
+//    pub current_block_number: BlockNumber,
+//    pub accounts_tree: CircuitAccountTree,
+//    pub transfer_parameters: BabyParameters,
+//    pub deposit_parameters: BabyParameters,
+//    pub exit_parameters: BabyParameters,
+//    pub jubjub_params: E::Params,
+//    pub worker: String,
+//    pub prover_id: i32,
+//    pub current_job: Arc<AtomicUsize>,
+//}
 
 pub type BabyProof = Proof<Engine>;
 pub type BabyParameters = Parameters<Engine>;
@@ -206,38 +201,38 @@ impl BabyProver {
             .expect("db must be functional");
         let initial_state = PlasmaState::new(accounts, last_block + 1);
 
-        println!("Reading proving key, may take a while");
+        info!("Reading proving key, may take a while");
 
         let keys_path = &RUNTIME_CONFIG.keys_path;
 
         let path = format!("{}/transfer_pk.key", keys_path);
-        println!("Reading key from {}", path);
+        debug!("Reading key from {}", path);
         let transfer_circuit_params = read_parameters(&path);
         if transfer_circuit_params.is_err() {
             return Err(transfer_circuit_params.err().unwrap());
         }
 
-        println!("Done reading transfer key");
+        debug!("Done reading transfer key");
 
         let path = format!("{}/deposit_pk.key", keys_path);
-        println!("Reading key from {}", path);
+        debug!("Reading key from {}", path);
         let deposit_circuit_params = read_parameters(&path);
         if deposit_circuit_params.is_err() {
             return Err(deposit_circuit_params.err().unwrap());
         }
 
-        println!("Done reading deposit key");
+        debug!("Done reading deposit key");
 
         let path = format!("{}/exit_pk.key", keys_path);
-        println!("Reading key from {}", path);
+        debug!("Reading key from {}", path);
         let exit_circuit_params = read_parameters(&path);
         if exit_circuit_params.is_err() {
             return Err(exit_circuit_params.err().unwrap());
         }
 
-        println!("Done reading exit key");
+        debug!("Done reading exit key");
 
-        println!("Copying states to balance tree");
+        info!("Copying states to balance tree");
 
         // TODO: replace with .clone() by moving PedersenHasher to static context
         let mut tree = CircuitAccountTree::new(params::BALANCE_TREE_DEPTH as u32);
@@ -256,7 +251,7 @@ impl BabyProver {
 
         let state_block_number = initial_state.block_number;
 
-        println!(
+        info!(
             "Initial root hash is {} for block {}",
             root, state_block_number
         );
@@ -294,19 +289,18 @@ type Err = BabyProverErr;
 
 impl BabyProver {
     pub fn apply_and_prove(&mut self, block: &Block) -> Result<FullBabyProof, Err> {
-        // let block_number = block.block_number;
-        // let new_root_hash = block.new_root_hash;
-        match block.block_data {
-            BlockData::Deposit {
-                ref transactions, ..
-            } => self.apply_and_prove_deposit(&block, transactions),
-            BlockData::Exit {
-                ref transactions, ..
-            } => self.apply_and_prove_exit(&block, transactions),
-            BlockData::Transfer {
-                ref transactions, ..
-            } => self.apply_and_prove_transfer(&block, &transactions),
-        }
+        //        match block.block_data {
+        //            BlockData::Deposit {
+        //                ref transactions, ..
+        //            } => self.apply_and_prove_deposit(&block, transactions),
+        //            BlockData::Exit {
+        //                ref transactions, ..
+        //            } => self.apply_and_prove_exit(&block, transactions),
+        //            BlockData::Transfer {
+        //                ref transactions, ..
+        //            } => self.apply_and_prove_transfer(&block, &transactions),
+        //        }
+        unimplemented!()
     }
 
     // Apply transactions to the state while also making a witness for proof, then calculate proof
@@ -317,7 +311,7 @@ impl BabyProver {
     ) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.current_block_number {
-            println!(
+            debug!(
                 "Transfer proof request is for block {}, while prover state is block {}",
                 block_number, self.current_block_number
             );
@@ -481,7 +475,7 @@ impl BabyProver {
             ));
         }
 
-        println!(
+        info!(
             "Prover final root = {}, final root from state keeper = {}",
             final_root, block_final_root
         );
@@ -517,7 +511,7 @@ impl BabyProver {
         let bytes_to_hash = be_bit_vector_into_bytes(&public_data_initial_bits);
 
         // let hex_block_and_fee: String = bytes_to_hash.clone().to_hex();
-        // println!("Packed initial hash information = {}", hex_block_and_fee);
+        // debug!("Packed initial hash information = {}", hex_block_and_fee);
 
         h.input(&bytes_to_hash);
 
@@ -528,9 +522,9 @@ impl BabyProver {
             let packed_transaction_data_bytes = public_data.clone();
 
             // let hex: String = packed_transaction_data_bytes.clone().to_hex();
-            // println!("Packed transfers information data = {}", hex);
+            // debug!("Packed transfers information data = {}", hex);
 
-            let mut next_round_hash_bytes = vec![];
+            let mut next_round_hash_bytes = Vec::new();
             next_round_hash_bytes.extend(hash_result.iter());
             next_round_hash_bytes.extend(packed_transaction_data_bytes);
 
@@ -589,11 +583,11 @@ impl BabyProver {
         //     if err.is_some() {
         //         panic!("ERROR satisfying in {}\n", err.unwrap());
         //     }
-        //     println!("CS is satisfied!");
+        //     debug!("CS is satisfied!");
         // }
 
         let mut rng = OsRng::new().unwrap();
-        println!("Prover has started to work transfer");
+        info!("Prover has started to work transfer");
         let proof = create_random_proof(instance, &self.transfer_parameters, &mut rng);
         if proof.is_err() {
             return Err(BabyProverErr::Other("proof.is_err()".to_owned()));
@@ -603,7 +597,7 @@ impl BabyProver {
 
         let pvk = prepare_verifying_key(&self.transfer_parameters.vk);
 
-        println!(
+        info!(
             "Made a proof for initial root = {}, final root = {}, public data = {}",
             initial_root,
             final_root,
@@ -615,7 +609,7 @@ impl BabyProver {
             &[initial_root, final_root, public_data_commitment],
         );
         if success.is_err() {
-            println!(
+            error!(
                 "Proof is verification failed with error {}",
                 success.err().unwrap()
             );
@@ -624,11 +618,11 @@ impl BabyProver {
             ));
         }
         if !success.unwrap() {
-            println!("Proof is invalid");
+            error!("Proof is invalid");
             return Err(BabyProverErr::Other("Proof is invalid".to_owned()));
         }
 
-        println!("Proof generation is complete");
+        info!("Proof generation is complete");
 
         let full_proof = FullBabyProof {
             proof: p,
@@ -647,12 +641,12 @@ impl BabyProver {
         block: &Block,
         transactions: &[DepositTx],
     ) -> Result<FullBabyProof, Err> {
-        // println!("block: {:?}", &block.block_data);
-        // println!("transactions: {:?}", &transactions);
+        // debug!("block: {:?}", &block.block_data);
+        // debug!("transactions: {:?}", &transactions);
 
         let block_number = block.block_number;
         if block_number != self.current_block_number {
-            println!(
+            error!(
                 "Deposit proof request is for block {}, while prover state is block {}",
                 block_number, self.current_block_number
             );
@@ -752,7 +746,7 @@ impl BabyProver {
 
         let final_root = self.accounts_tree.root_hash();
 
-        println!(
+        info!(
             "Prover final root = {}, final root from state keeper = {}",
             final_root, block_final_root
         );
@@ -789,7 +783,7 @@ impl BabyProver {
         let bytes_to_hash = be_bit_vector_into_bytes(&public_data_initial_bits);
 
         let hex_block_and_fee: String = bytes_to_hash.clone().to_hex();
-        println!(
+        debug!(
             "Packed initial hash information in deposit = {}",
             hex_block_and_fee
         );
@@ -800,13 +794,13 @@ impl BabyProver {
         h.result(&mut hash_result[..]);
 
         let initial_hash: String = hash_result.to_hex();
-        println!("Block number hash in deposit = {}", initial_hash);
+        debug!("Block number hash in deposit = {}", initial_hash);
 
         {
             let packed_transaction_data_bytes = public_data.clone();
 
             let hex: String = packed_transaction_data_bytes.clone().to_hex();
-            println!("Packed deposit information data in deposit = {}", hex);
+            debug!("Packed deposit information data in deposit = {}", hex);
 
             let mut next_round_hash_bytes = vec![];
             next_round_hash_bytes.extend(hash_result.iter());
@@ -840,7 +834,7 @@ impl BabyProver {
         };
 
         let mut rng = OsRng::new().unwrap();
-        println!("Prover has started to work deposits");
+        debug!("Prover has started to work deposits");
         let proof = create_random_proof(instance, &self.deposit_parameters, &mut rng);
         if proof.is_err() {
             return Err(BabyProverErr::Other("proof.is_err()".to_owned()));
@@ -850,7 +844,7 @@ impl BabyProver {
 
         let pvk = prepare_verifying_key(&self.deposit_parameters.vk);
 
-        println!(
+        debug!(
             "Made an deposit proof for initial root = {}, final root = {}, public data = {}",
             initial_root,
             final_root,
@@ -863,17 +857,17 @@ impl BabyProver {
         );
 
         if success.is_err() {
-            println!(
+            error!(
                 "Proof verification failed with error {}",
                 success.err().unwrap()
             );
             return Err(BabyProverErr::Other("Proof verification failed".to_owned()));
         }
         if !success.unwrap() {
-            println!("Proof is invalid");
+            error!("Proof is invalid");
             return Err(BabyProverErr::Other("Proof is invalid".to_owned()));
         }
-        println!("Proof generation is complete");
+        info!("Proof generation is complete");
 
         let full_proof = FullBabyProof {
             proof: p,
@@ -894,7 +888,7 @@ impl BabyProver {
     ) -> Result<FullBabyProof, Err> {
         let block_number = block.block_number;
         if block_number != self.current_block_number {
-            println!(
+            info!(
                 "Exit proof request is for block {}, while prover state is block {}",
                 block_number, self.current_block_number
             );
@@ -913,12 +907,12 @@ impl BabyProver {
             ));
         }
 
-        let mut witnesses: Vec<(ExitRequest<Engine>, ExitWitness<Engine>)> = vec![];
+        let mut witnesses: Vec<(ExitRequest<Engine>, ExitWitness<Engine>)> = Vec::new();
 
         let initial_root = self.accounts_tree.root_hash();
 
         // we also need to create public data cause we need info from state
-        let mut public_data: Vec<u8> = vec![];
+        let mut public_data: Vec<u8> = Vec::new();
 
         for tx in transactions {
             let tx = circuit::CircuitExitRequest::try_from(tx)
@@ -984,7 +978,7 @@ impl BabyProver {
             ));
         }
 
-        println!(
+        debug!(
             "Prover final root = {}, final root from state keeper = {}",
             final_root, block_final_root
         );
@@ -1014,7 +1008,7 @@ impl BabyProver {
         let bytes_to_hash = be_bit_vector_into_bytes(&public_data_initial_bits);
 
         // let hex_block_and_fee: String = bytes_to_hash.clone().to_hex();
-        // println!("Packed initial hash information in exit = {}", hex_block_and_fee);
+        // debug!("Packed initial hash information in exit = {}", hex_block_and_fee);
 
         h.input(&bytes_to_hash);
 
@@ -1022,20 +1016,20 @@ impl BabyProver {
         h.result(&mut hash_result[..]);
 
         // let initial_hash: String = hash_result.clone().to_hex();
-        // println!("Block number hash in exit = {}", initial_hash);
+        // debug!("Block number hash in exit = {}", initial_hash);
 
         {
             let packed_transaction_data_bytes = public_data.clone();
 
             // let hex: String = packed_transaction_data_bytes.clone().to_hex();
-            // println!("Packed transfers information data in exit= {}", hex);
+            // debug!("Packed transfers information data in exit= {}", hex);
 
-            let mut next_round_hash_bytes = vec![];
+            let mut next_round_hash_bytes = Vec::new();
             next_round_hash_bytes.extend(hash_result.iter());
             next_round_hash_bytes.extend(packed_transaction_data_bytes);
 
             // let hex_full: String = next_round_hash_bytes.clone().to_hex();
-            // println!("Final hashable information data in exit= {}", hex_full);
+            // debug!("Final hashable information data in exit= {}", hex_full);
 
             let mut h = Sha256::new();
 
@@ -1047,7 +1041,7 @@ impl BabyProver {
         // clip to fit into field element
 
         // let final_hash_hex: String = hash_result.clone().to_hex();
-        // println!("Full public data commitment = {}", final_hash_hex);
+        // debug!("Full public data commitment = {}", final_hash_hex);
 
         hash_result[0] &= 0x1f; // temporary solution
 
@@ -1076,7 +1070,7 @@ impl BabyProver {
         };
 
         let mut rng = OsRng::new().unwrap();
-        println!("Prover has started to work on exits");
+        debug!("Prover has started to work on exits");
         let proof = create_random_proof(instance, &self.exit_parameters, &mut rng);
         if proof.is_err() {
             return Err(BabyProverErr::Other("proof.is_err()".to_owned()));
@@ -1086,7 +1080,7 @@ impl BabyProver {
 
         let pvk = prepare_verifying_key(&self.exit_parameters.vk);
 
-        println!(
+        info!(
             "Made an exit proof for initial root = {}, final root = {}, public data = {}",
             initial_root,
             final_root,
@@ -1099,17 +1093,17 @@ impl BabyProver {
         );
 
         if success.is_err() {
-            println!(
+            error!(
                 "Proof verification failed with error {}",
                 success.err().unwrap()
             );
             return Err(BabyProverErr::Other("Proof verification failed".to_owned()));
         }
         if !success.unwrap() {
-            println!("Proof is invalid");
+            error!("Proof is invalid");
             return Err(BabyProverErr::Other("Proof is invalid".to_owned()));
         }
-        println!("Proof generation is complete");
+        info!("Proof generation is complete");
 
         let full_proof = FullBabyProof {
             proof: p,
@@ -1127,14 +1121,18 @@ impl BabyProver {
         storage: &StorageProcessor,
         expected_current_block: BlockNumber,
     ) -> Result<(), String> {
-        println!(
+        info!(
             "rewinding the state from block #{} to #{}",
             self.current_block_number, expected_current_block
         );
-        let (_, updated_accounts) = storage
-            .load_state_diff(self.current_block_number, expected_current_block)
+        let (_, new_accounts) = storage
+            .load_committed_state(Some(expected_current_block))
             .map_err(|e| format!("load_state_diff failed: {}", e))?;
-        extend_accounts(&mut self.accounts_tree, updated_accounts.into_iter());
+
+        let mut tree = CircuitAccountTree::new(params::BALANCE_TREE_DEPTH as u32);
+        extend_accounts(&mut tree, new_accounts.into_iter());
+
+        self.accounts_tree = tree;
         self.current_block_number = expected_current_block;
         Ok(())
     }
@@ -1148,7 +1146,7 @@ impl BabyProver {
 
         if let Some(job) = job {
             let block_number = job.block_number as BlockNumber;
-            println!(
+            info!(
                 "prover {} got a new job for block {}",
                 &self.worker, block_number
             );
@@ -1196,7 +1194,7 @@ impl BabyProver {
                 .fold(job_ref, |job_ref, _| {
                     let job = job_ref.load(Ordering::Relaxed);
                     if job > 0 {
-                        //println!("prover is working on block {}", job);
+                        //debug!("prover is working on block {}", job);
                         if let Ok(storage) = StorageProcessor::establish_connection() {
                             let _ = storage.update_prover_job(job as i32);
                         }
@@ -1210,15 +1208,16 @@ impl BabyProver {
     }
 
     pub fn run(&mut self, shutdown_tx: Sender<()>, stop_signal: Arc<AtomicBool>) {
-        println!("prover is running");
-        while !stop_signal.load(Ordering::SeqCst) {
-            if let Err(err) = self.make_proving_attempt() {
-                eprint!("Error: {}", err);
-            }
-            self.current_job.store(0, Ordering::Relaxed);
-        }
-        println!("prover stopped");
-        shutdown_tx.send(()).unwrap();
+        //        info!("prover is running");
+        //        while !stop_signal.load(Ordering::SeqCst) {
+        //            if let Err(err) = self.make_proving_attempt() {
+        //                error!("Error: {}", err);
+        //            }
+        //            self.current_job.store(0, Ordering::Relaxed);
+        //        }
+        //        info!("prover stopped");
+        //        shutdown_tx.send(()).unwrap();
+        unimplemented!()
     }
 }
 

@@ -1,5 +1,4 @@
 use eth_client::ETHClient;
-use models::abi::TEST_PLASMA_ALWAYS_VERIFY;
 use models::{Action, CommitRequest, Operation};
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
@@ -24,14 +23,14 @@ fn run_committer(
     tx_for_eth: Sender<Operation>,
     pool: ConnectionPool,
 ) {
-    println!("committer started");
+    info!("committer started");
     let storage = pool
         .access_storage()
         .expect("db connection failed for committer");;
 
-    let eth_client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
-    let current_nonce = eth_client.current_nonce().expect("can not get nonce");
-    let _ = storage.prepare_nonce_scheduling(&eth_client.current_sender(), current_nonce);
+    //    let eth_client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
+    //    let current_nonce = eth_client.current_nonce().expect("can not get nonce");
+    //    let _ = storage.prepare_nonce_scheduling(&eth_client.current_sender(), current_nonce);
 
     let mut last_verified_block = storage.get_last_verified_block().expect("db failed");
     loop {
@@ -44,18 +43,19 @@ fn run_committer(
             let op = Operation {
                 action: Action::Commit,
                 block,
-                accounts_updated: Some(accounts_updated),
+                accounts_updated,
                 tx_meta: None,
                 id: None,
             };
-            println!("commit block #{}", op.block.block_number);
+            info!("commit block #{}", op.block.block_number);
             let op = storage
                 .execute_operation(&op)
                 .expect("committer must commit the op into db");
+
             //tx_for_proof_requests.send(ProverRequest(op.block.block_number)).expect("must send a proof request");
-            tx_for_eth
-                .send(op)
-                .expect("must send an operation for commitment to ethereum");
+            //            tx_for_eth
+            //                .send(op)
+            //                .expect("must send an operation for commitment to ethereum");
             continue;
         } else {
             // there was a timeout, so check for the new ready proofs
@@ -71,16 +71,16 @@ fn run_committer(
                             proof: Box::new(proof),
                         },
                         block,
-                        accounts_updated: None,
+                        accounts_updated: Vec::new(),
                         tx_meta: None,
                         id: None,
                     };
                     let op = storage
                         .execute_operation(&op)
                         .expect("committer must commit the op into db");
-                    tx_for_eth
-                        .send(op)
-                        .expect("must send an operation for commitment to ethereum");
+                    //                    tx_for_eth
+                    //                        .send(op)
+                    //                        .expect("must send an operation for commitment to ethereum");
                     last_verified_block += 1;
                 } else {
                     break;
