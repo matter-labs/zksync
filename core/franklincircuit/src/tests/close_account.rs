@@ -55,81 +55,38 @@ pub fn apply_close_account(
     let before_root = tree.root_hash();
     println!("Initial root = {}", before_root);
     let (audit_path_before, audit_balance_path_before) =
-        get_audits(tree, close_account.account_address, close_account.token);
+        get_audits(tree, close_account.account_address, 0);
 
     let capacity = tree.capacity();
     assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
     let account_address_fe = Fr::from_str(&close_account.account_address.to_string()).unwrap();
-    let token_fe = Fr::from_str(&close_account.token.to_string()).unwrap();
-    let amount_as_field_element = Fr::from_str(&close_account.amount.to_string()).unwrap();
-
-    let amount_bits = convert_to_float(
-        close_account.amount,
-        *franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        *franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap();
-    let reparsed_amount = parse_float_to_u128(
-        amount_bits.clone(),
-        *franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        *franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap();
-    assert_eq!(reparsed_amount, close_account.amount);
-
-    let amount_encoded: Fr = le_bit_vector_into_field_element(&amount_bits);
-
-    let fee_as_field_element = Fr::from_str(&close_account.fee.to_string()).unwrap();
-
-    let fee_bits = convert_to_float(
-        close_account.fee,
-        *franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-        *franklin_constants::FEE_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap();
-    let reparsed_fee = parse_float_to_u128(
-        fee_bits.clone(),
-        *franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-        *franklin_constants::FEE_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap();
-    assert_eq!(reparsed_fee, close_account.fee);
-    let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
-
+   
     //calculate a and b
-    let a = amount_as_field_element.clone();
-    let b = fee_as_field_element.clone();
+    let a = Fr::zero();
+    let b = Fr::zero();
 
     //applying close_account
     let (account_witness_before, account_witness_after, balance_before, balance_after) =
         apply_leaf_operation(
             tree,
             close_account.account_address,
-            close_account.token,
+            0,
             |acc| {
-                assert!(
-                    (acc.pub_key_hash == close_account.new_pub_key_hash)
-                        || (acc.pub_key_hash == Fr::zero())
-                );
-                acc.pub_key_hash = close_account.new_pub_key_hash;
-                acc.nonce.add_assign(&Fr::from_str("1").unwrap());
+                acc.pub_key_hash = Fr::zero();
+                acc.nonce = Fr::zero();
             },
-            |bal| bal.value.add_assign(&amount_as_field_element),
+            |_| {},
         );
 
     let after_root = tree.root_hash();
     println!("After root = {}", after_root);
     let (audit_path_after, audit_balance_path_after) =
-        get_audits(tree, close_account.account_address, close_account.token);
+        get_audits(tree, close_account.account_address, 0);
 
     CloseAccountWitness {
         before: OperationBranch {
             address: Some(account_address_fe),
-            token: Some(token_fe),
+            token: Some(Fr::zero()),
             witness: OperationBranchWitness {
                 account_witness: account_witness_before,
                 account_path: audit_path_before,
@@ -139,7 +96,7 @@ pub fn apply_close_account(
         },
         after: OperationBranch {
             address: Some(account_address_fe),
-            token: Some(token_fe),
+            token: Some(Fr::zero()),
             witness: OperationBranchWitness {
                 account_witness: account_witness_after,
                 account_path: audit_path_after,
@@ -149,15 +106,15 @@ pub fn apply_close_account(
         },
         args: OperationArguments {
             ethereum_key: Some(Fr::zero()),
-            amount: Some(amount_encoded),
-            fee: Some(fee_encoded),
+            amount: Some(Fr::zero()),
+            fee: Some(Fr::zero()),
             a: Some(a),
             b: Some(b),
-            new_pub_key_hash: Some(close_account.new_pub_key_hash),
+            new_pub_key_hash: Some(Fr::zero()),
         },
         before_root: Some(before_root),
         after_root: Some(after_root),
-        tx_type: Some(Fr::from_str("1").unwrap()),
+        tx_type: Some(Fr::from_str("4").unwrap()),
     }
 }
 
@@ -187,72 +144,13 @@ pub fn calculate_close_account_operations_from_witness(
         rhs: close_account_witness.before.clone(),
     };
 
-    let operation_one = Operation {
-        new_root: close_account_witness.after_root.clone(),
-        tx_type: close_account_witness.tx_type,
-        chunk: Some(Fr::from_str("1").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[1]),
-        sig_msg: Some(sig_msg.clone()),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(signer_pub_key_x.clone()),
-        signer_pub_key_y: Some(signer_pub_key_y.clone()),
-        args: close_account_witness.args.clone(),
-        lhs: close_account_witness.after.clone(),
-        rhs: close_account_witness.after.clone(),
-    };
-
-    let operation_two = Operation {
-        new_root: close_account_witness.after_root.clone(),
-        tx_type: close_account_witness.tx_type,
-        chunk: Some(Fr::from_str("2").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[2]),
-        sig_msg: Some(sig_msg.clone()),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(signer_pub_key_x.clone()),
-        signer_pub_key_y: Some(signer_pub_key_y.clone()),
-        args: close_account_witness.args.clone(),
-        lhs: close_account_witness.after.clone(),
-        rhs: close_account_witness.after.clone(),
-    };
-
-    let operation_three = Operation {
-        new_root: close_account_witness.after_root.clone(),
-        tx_type: close_account_witness.tx_type,
-        chunk: Some(Fr::from_str("3").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[3]),
-        sig_msg: Some(sig_msg.clone()),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(signer_pub_key_x.clone()),
-        signer_pub_key_y: Some(signer_pub_key_y.clone()),
-        args: close_account_witness.args.clone(),
-        lhs: close_account_witness.after.clone(),
-        rhs: close_account_witness.after.clone(),
-    };
-    let operation_four = Operation {
-        new_root: close_account_witness.after_root.clone(),
-        tx_type: close_account_witness.tx_type,
-        chunk: Some(Fr::from_str("4").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[4]),
-        sig_msg: Some(sig_msg.clone()),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(signer_pub_key_x.clone()),
-        signer_pub_key_y: Some(signer_pub_key_y.clone()),
-        args: close_account_witness.args.clone(),
-        lhs: close_account_witness.after.clone(),
-        rhs: close_account_witness.after.clone(),
-    };
-
     let operations: Vec<Operation<_>> = vec![
         operation_zero,
-        operation_one,
-        operation_two,
-        operation_three,
-        operation_four,
     ];
     operations
 }
 #[test]
-fn test_close_account_franklin_in_empty_leaf() {
+fn test_close_account_franklin_empty_leaf() {
     use super::utils::public_data_commitment;
 
     use crate::circuit::FranklinCircuit;
@@ -318,19 +216,12 @@ fn test_close_account_franklin_in_empty_leaf() {
 
     let mut account_address: u32 = rng.gen();
     account_address %= tree.capacity();
-    let amount: u128 = 500;
-    let fee: u128 = 80;
-    let token: u32 = 2;
 
     //-------------- Start applying changes to state
     let close_account_witness = apply_close_account(
         &mut tree,
         &CloseAccountData {
-            amount: amount,
-            fee: fee,
-            token: token,
             account_address: account_address,
-            new_pub_key_hash: sender_pub_key_hash,
         },
     );
 
@@ -354,7 +245,7 @@ fn test_close_account_franklin_in_empty_leaf() {
     println!("tree before_applying fees: {}", tree.root_hash());
 
     let (root_after_fee, validator_account_witness) =
-        apply_fee(&mut tree, validator_address_number, token, fee);
+        apply_fee(&mut tree, validator_address_number, 0, 0);
     println!("test root after fees {}", root_after_fee);
     let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
 
