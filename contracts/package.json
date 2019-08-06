@@ -20,7 +20,7 @@
   },
   "scripts": {
     "test": "waffle && mocha -r ts-node/register test/**/*.ts",
-    "deploy": "waffle && node scripts/testnet-deploy.ts",
+    "deploy": "waffle && ts-node scripts/testnet-deploy.ts",
     "lint:solidity": "solhint contracts/**/*.sol",
     "lint:ts": "tslint -c tslint.json {scripts,test}/**/*.ts",
     "lint:ts-fix": "tslint -c tslint.json --fix {scripts,test}/**/*.ts",
