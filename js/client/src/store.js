@@ -10,6 +10,11 @@ const store = {
             balance:    null,
             completeWithdrawArgs: null,
         },
+        coin_balances: {
+            'ETH': '10000.01',
+            'BTC': '10321',
+            'ZEC': '123'
+        },
         plasma: {
             id:         null,
             closing:    false,

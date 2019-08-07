@@ -32,7 +32,7 @@
         </p>
         
         <b-row>
-            <b-col sm="6" order="2" class="col-xl-8 col-lg-7 col-md-6 col-sm-12">
+            <b-col sm="6" order="2" class="col-xl-6 col-lg-7 col-md-6 col-sm-12">
                 <b-card title="Transfer in Matter Network" class="mb-4 d-flex">
                     <label for="transferToInput">To (recepient ETH address): </label>
                     <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0" autocomplete="off"></b-form-input>
@@ -42,7 +42,7 @@
                     </p>
 
                     <label for="transferAmountInput" class="mt-4">Amount</label>
-                            (max ETH <a href="#" @click="transferAmount=store.account.plasma.committed.balance">{{store.account.plasma.committed.balance || 0}}</a>):
+                            (max ETH&nbsp;<a href="#" @click="transferAmount=store.account.plasma.committed.balance">{{store.account.plasma.committed.balance || 0}}</a>):
                     <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
 
                     <label for="transferNonceInput" class="mt-4">Nonce (autoincrementing):</label>
@@ -65,7 +65,7 @@
                 </b-card>
 
             </b-col>
-            <b-col sm="6" class="col-xl-4 col-lg-5 col-md-6 col-sm-12 mb-5" order="1">
+            <b-col class="col-xl-6 col-lg-5 col-md-6 col-sm-12 mb-5" order="1">
                 <b-card title="Account info">
                     <b-card class="mb-3">
                         <p class="mb-2"><strong>Mainchain</strong></p>
@@ -74,7 +74,10 @@
                                 target="blanc">block explorer</a>):
                         <b-form-input id="addr" v-model="store.account.address" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                         <b-row class="mt-2">
-                            <b-col cols="6">Balance:</b-col> <b-col>ETH {{store.account.balance}}</b-col>
+                            <!-- Print balance here -->
+                            <b-col>Balances:
+                                <b-row v-for="item in Object.keys(store.account.coin_balances)" class="amount_show">{{item}}&nbsp;{{store.account.coin_balances[item]}}</b-row>
+                            </b-col>
                         </b-row>
                         <b-row class="mt-2" style="color: grey" v-if="pendingWithdraw">
                            <b-col cols="6">Pending:</b-col> <b-col>ETH {{store.account.onchain.balance}}</b-col>
@@ -110,6 +113,7 @@
                         <img src="./assets/loading.gif" width="100em" v-if="store.account.plasma.id === null">
                         <div v-if="store.account.plasma.id === 0">
                             <p>No account yet.</p>
+                            <b-button>Generate franklin address</b-button>
                         </div>
                         <div v-if="store.account.plasma.id > 0 && store.account.plasma.closing">
                             <p>Closing account #{{store.account.plasma.id}}: please complete pending withdrawal.</p>
@@ -144,8 +148,11 @@
     </b-container>
 
     <b-modal ref="depositModal" id="depositModal" title="Deposit" hide-footer>
+        <b-form-select v-model="coin" :option="store.coins" class="mb-3">
+            <option v-for="item in Object.keys(store.account.coin_balances)" @click="coin=item">{{ item }}</option>
+        </b-form-select>
         <label for="depositAmountInput">Amount</label> 
-            (max ETH <a href="#" @click="depositAmount=store.account.balance">{{store.account.balance}}</a>):
+            (max <span>{{ coin }}</span> <a href="#" @click="depositAmount=store.account.coin_balances[coin]">{{store.account.coin_balances[coin]}}</a>):
         <b-form-input id="depositAmountInput" type="number" placeholder="7.50" v-model="depositAmount"></b-form-input>
         <div id="doDepositBtn" class="mt-4 float-right">
             <b-btn variant="primary" @click="deposit" :disabled="!!doDepositProblem">Deposit</b-btn>
@@ -193,7 +200,7 @@ import {ethers} from 'ethers'
 import axios from 'axios'
 import ethUtil from 'ethjs-util'
 import transactionLib from './transaction'
-
+// import Wallet from '../franklin_lib/src/wallet'=
 window.transactionLib = transactionLib
 
 import ABI from './contract'
@@ -206,6 +213,7 @@ export default {
         network:            null,
 
         nonce:              0,
+        coin:               'ETH',
         transferTo:         '',
         transferAmount:     '0.001',
         transferPending:    false,
@@ -221,10 +229,21 @@ export default {
         this.network = web3.version.network
 
         console.log('start')
-        let result = await axios({
-            method: 'get',
-            url:    this.baseUrl + '/testnet_config',
-        })
+        let result = {
+            data: {
+                address: "0x5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9"
+            }
+        };
+        try {
+            result = await axios({
+                method: 'get',
+                url:    this.baseUrl + '/testnet_config',
+            });
+        } catch (e) {
+            // TODO: remove try/catch when server works again
+            console.log("testnet_config still doesn't serve");
+        }
+        
         if(!result.data) throw "Can not load contract address"
         store.contractAddress = result.data.address
         window.contractAddress = result.data.address
@@ -508,6 +527,28 @@ export default {
             let pendingBalance = Eth.fromWei(finalBalance.mul(multiplier), 'ether')
             return {blocks: entries, pendingBalance}
         },
+        async generateFranklinAddressss() {
+            // let accounts = await eth.accounts()
+            // console.log('Accounts: ', accounts);
+            // let account = accounts[0]
+            // this.acc = account
+            // if (!account) {
+            //     await ethereum.enable()
+            //     account = ethereum.selectedAddress
+            // }
+            // console.log('Logging in with', account)
+            // let sig = await eth.personal_sign(ethUtil.fromUtf8(new Buffer('Login Franklin v0.1')), account)
+            // store.account.address = account
+
+            // let hash = keccak256(sig)
+            // console.log('sig', sig)
+            // console.log('hash', hash)
+
+            // store.account.plasma.key = newKey(sig)
+            // console.log(store.account.plasma.key)
+
+            // this.$parent.$router.push('/wallet')
+        },
         async updateAccountInfo() {
 
             //this.network = web3.version.network
@@ -588,4 +629,19 @@ export default {
 .pending {
     color: green!important;
 }
+.amount_show {
+    overflow: auto;
+    margin-left: 0;
+    position: relative;
+}
+/* 
+.amount_show::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 3em;
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.7), white, white);
+} */
 </style>

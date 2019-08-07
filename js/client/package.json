@@ -22,6 +22,7 @@
     "html-webpack-plugin": "^3.2.0",
     "js-sha3": "^0.8.0",
     "popper.js": "^1.12.9",
+    "typescript": "^3.5.3",
     "vue": "^2.5.3",
     "vue-router": "^3.0.2",
     "vue-timers": "^2.0.2"
@@ -38,6 +39,23 @@
     "vue-loader": "^13.5.0",
     "vue-template-compiler": "^2.5.3",
     "webpack": "^3.8.1",
-    "webpack-dev-server": "^2.9.4"
+    "webpack-dev-server": "^2.9.4",
+    "@types/bn.js": "^4.11.5",
+    "@types/chai": "^4.1.7",
+    "@types/crypto-js": "^3.1.43",
+    "@types/elliptic": "^6.4.9",
+    "@types/mocha": "^5.2.7",
+    "@types/node": "^12.6.8",
+    "axios": "^0.19.0",
+    "bn.js": "^5.0.0",
+    "chai": "^4.2.0",
+    "crypto-js": "^3.1.9-1",
+    "elliptic": "^6.5.0",
+    "ethers": "^4.0.33",
+    "mocha": "^6.2.0",
+    "prettier": "1.18.2",
+    "ts-node": "^8.3.0",
+    "typescript": "^3.5.3",
+    "ts-loader": "^3"
   }
 }

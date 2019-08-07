@@ -22,6 +22,8 @@ import ethUtil from 'ethjs-util'
 import transactionLib from './transaction'
 const newKey = transactionLib.newKey
 import {keccak256} from 'js-sha3'
+const ethers = require('ethers')
+import * as Wallet from '../../franklin_lib/tsDist/src/wallet'
 
 export default {
     name: 'login',
@@ -39,8 +41,13 @@ export default {
                     account = ethereum.selectedAddress
                 }
                 console.log('Logging in with', account)
-                let sig = await eth.personal_sign(ethUtil.fromUtf8(new Buffer('Login Franklin v0.1')), account)
-                store.account.address = account
+                var provider = new ethers.providers.Web3Provider(web3.currentProvider);
+                window.signer = provider.getSigner();
+                console.log("Wallet: ", Wallet);
+                window.wallet = await Wallet.Wallet.fromEthWallet(signer);
+                console.log("Your new Franklin address: ", window.wallet.address);
+                console.log("Congratulations!");
+                let sig = await signer.signMessage('Login Franklin v0.1');
 
                 let hash = keccak256(sig)
                 console.log('sig', sig)

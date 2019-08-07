@@ -130,8 +130,10 @@ export class Wallet {
 
     static async fromEthWallet(wallet: ethers.Signer) {
         let defaultFranklinProvider = new FranklinProvider();
-        let seed = (await wallet.signMessage('Matter login')).substr(2);
-        let frankinWallet = new Wallet(Buffer.from(seed, 'hex'), defaultFranklinProvider, wallet);
+        let seed = await wallet.signMessage('Matter login');
+        console.log('seed', seed);
+        let gex = Buffer.from(seed.substr(2), 'hex');
+        let frankinWallet = new Wallet(gex, defaultFranklinProvider, wallet);
         return frankinWallet;
     }
 
