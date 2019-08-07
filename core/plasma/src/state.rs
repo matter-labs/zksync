@@ -1,15 +1,16 @@
 use bigdecimal::BigDecimal;
 use failure::{bail, ensure, format_err, Error};
 use ff::PrimeField;
-use merkle_tree::AccountTree;
-use models::plasma::account::{Account, AccountAddress};
-use models::plasma::operations::{CloseOp, DepositOp, FranklinOp, PartialExitOp, TransferOp};
-use models::plasma::tx::{Close, Deposit, FranklinTx, Transfer, Withdraw};
-use models::plasma::{
-    params, AccountUpdate, AccountUpdates, BlockNumber, FeeAmount, TokenAmount, TokenId,
-    TransferToNewOp,
+use models::node::operations::{
+    CloseOp, DepositOp, FranklinOp, PartialExitOp, TransferOp, TransferToNewOp,
 };
-use models::plasma::{AccountId, AccountMap, Fr};
+use models::node::tx::{Close, Deposit, FranklinTx, Transfer, Withdraw};
+use models::node::{Account, AccountAddress, AccountTree};
+use models::node::{
+    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, FeeAmount, Fr, TokenAmount,
+    TokenId,
+};
+use models::params;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -37,7 +38,7 @@ pub struct CollectedFee {
 
 impl PlasmaState {
     pub fn empty() -> Self {
-        let tree_depth = params::BALANCE_TREE_DEPTH as u32;
+        let tree_depth = *params::BALANCE_TREE_DEPTH as u32;
         let balance_tree = AccountTree::new(tree_depth);
         Self {
             balance_tree,

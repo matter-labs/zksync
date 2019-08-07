@@ -8,8 +8,8 @@ use ff::{BitIterator, PrimeField, PrimeFieldRepr};
 use franklin_crypto::eddsa::PublicKey;
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::{Balance, CircuitAccount, CircuitAccountTree};
+use franklinmodels::merkle_tree::hasher::Hasher;
 use franklinmodels::params as franklin_constants;
-use merkle_tree::hasher::Hasher;
 use pairing::bn256::*;
 
 pub fn pub_key_hash<E: JubjubEngine, H: Hasher<E::Fr>>(

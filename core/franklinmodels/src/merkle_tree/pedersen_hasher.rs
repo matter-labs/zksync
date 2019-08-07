@@ -6,8 +6,8 @@ use franklin_crypto::pedersen_hash::{baby_pedersen_hash, Personalization};
 use franklin_crypto::alt_babyjubjub::{AltJubjubBn256, JubjubEngine};
 use pairing::bn256::Bn256;
 
-use crate::hasher::Hasher;
-use models::primitives::BitIteratorLe;
+use super::hasher::Hasher;
+use crate::primitives::BitIteratorLe;
 #[derive(Clone)]
 pub struct PedersenHasher<E: JubjubEngine> {
     params: E::Params,

@@ -4,8 +4,8 @@ use actix_web::{
     http::Method, middleware, middleware::cors::Cors, server, App, AsyncResponder, Error,
     HttpMessage, HttpRequest, HttpResponse,
 };
-use models::config::RUNTIME_CONFIG;
-use models::plasma::{tx::FranklinTx, Account as PAccount};
+use models::node::config::RUNTIME_CONFIG;
+use models::node::{tx::FranklinTx, Account as PAccount};
 use models::{ActionType, NetworkStatus, StateKeeperRequest};
 use std::sync::mpsc;
 use storage::{BlockDetails, ConnectionPool};
@@ -120,8 +120,8 @@ fn handle_submit_tx(
 
 use actix_web::Result as ActixResult;
 use bigdecimal::BigDecimal;
-use models::plasma::account::AccountAddress;
-use models::plasma::Fr;
+use models::node::AccountAddress;
+use models::node::Fr;
 
 //#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 //pub struct Account {
