@@ -5,13 +5,14 @@ use std::convert::TryInto;
 
 use bigdecimal::BigDecimal;
 use failure::ensure;
+use ff::PrimeField;
 use franklin_crypto::alt_babyjubjub::JubjubEngine;
 use franklin_crypto::jubjub::{edwards, Unknown};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{AccountId, AccountUpdates, Nonce, TokenAmount, TokenId};
 use super::{Engine, Fr};
-use crate::circuit::account::CircuitAccount;
+use crate::circuit::account::{Balance, CircuitAccount};
 
 #[derive(Debug, Clone, PartialEq, Default, Eq, Hash)]
 pub struct AccountAddress {
@@ -78,9 +79,27 @@ pub enum AccountUpdate {
     },
 }
 
-impl<E: JubjubEngine> From<Account> for CircuitAccount<E> {
+// TODO: Check if coding to Fr is the same as in the circuit.
+impl From<Account> for CircuitAccount<super::Engine> {
     fn from(acc: Account) -> Self {
-        unimplemented!()
+        let mut circuit_account = CircuitAccount::default();
+
+        let balances: Vec<_> = acc
+            .balances
+            .iter()
+            .map(|b| Balance {
+                value: Fr::from_str(&b.to_string()).unwrap(),
+            })
+            .collect();
+
+        for (i, b) in balances.into_iter().enumerate() {
+            circuit_account.subtree.insert(i as u32, b);
+        }
+
+        circuit_account.nonce = Fr::from_str(&acc.nonce.to_string()).unwrap();
+        circuit_account.pub_key_hash = Fr::from_hex(&acc.address.to_hex()).unwrap();
+
+        circuit_account
     }
 }
 
