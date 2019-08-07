@@ -1,6 +1,6 @@
 use ff::Field;
-use franklin_crypto::alt_babyjubjub::JubjubEngine;
-use franklin_crypto::jubjub::{edwards, Unknown};
+use sapling_crypto::alt_babyjubjub::JubjubEngine;
+use sapling_crypto::jubjub::{edwards, Unknown};
 
 // use crate::models::params;
 

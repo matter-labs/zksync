@@ -1,6 +1,6 @@
 use crate::plasma::params;
 use ff::{BitIterator, PrimeField};
-use franklin_crypto::jubjub::JubjubEngine;
+use sapling_crypto::jubjub::JubjubEngine;
 
 #[derive(Clone)]
 pub struct DepositRequest<E: JubjubEngine> {

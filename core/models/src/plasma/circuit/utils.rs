@@ -1,8 +1,8 @@
 use bellman::{ConstraintSystem, SynthesisError};
 use ff::{BitIterator, Field, PrimeField};
-use franklin_crypto::circuit::num::{AllocatedNum, Num};
-use franklin_crypto::circuit::{boolean, Assignment};
-use franklin_crypto::jubjub::JubjubEngine;
+use sapling_crypto::circuit::num::{AllocatedNum, Num};
+use sapling_crypto::circuit::{boolean, Assignment};
+use sapling_crypto::jubjub::JubjubEngine;
 
 use crate::plasma::params as plasma_constants;
 
