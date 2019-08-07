@@ -21,11 +21,12 @@ pub struct AccountAddress {
 
 impl AccountAddress {
     pub fn to_hex(&self) -> String {
-        hex::encode(&self.data)
+        format!("0x{}", hex::encode(&self.data))
     }
 
     pub fn from_hex(s: &str) -> Result<Self, failure::Error> {
-        let bytes = hex::decode(s)?;
+        ensure!(s.starts_with("0x"), "Address should start with 0x");
+        let bytes = hex::decode(&s[2..])?;
         ensure!(bytes.len() == 27, "Size mismatch");
         Ok(AccountAddress {
             data: bytes.as_slice().try_into().unwrap(),
