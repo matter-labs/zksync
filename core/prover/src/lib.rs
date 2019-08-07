@@ -20,9 +20,9 @@ use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
-use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
-use sapling_crypto::circuit::float_point::parse_float_to_u128;
-use sapling_crypto::jubjub::{edwards, JubjubEngine};
+use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use franklin_crypto::circuit::float_point::parse_float_to_u128;
+use franklin_crypto::jubjub::{edwards, JubjubEngine};
 
 use rustc_hex::ToHex;
 
@@ -568,7 +568,7 @@ impl BabyProver {
         //         transactions: witnesses.clone(),
         //     };
 
-        //     use sapling_crypto::circuit::test::*;
+        //     use franklin_crypto::circuit::test::*;
         //     use bellman::Circuit;
         //     let mut cs = TestConstraintSystem::<Engine>::new();
         //     inst.synthesize(&mut cs).unwrap();

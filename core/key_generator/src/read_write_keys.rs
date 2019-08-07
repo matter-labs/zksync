@@ -11,8 +11,8 @@
 //use pairing::bn256::*;
 //use pairing::Engine;
 //use rand::{Rng, SeedableRng, XorShiftRng};
-//use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
-//use sapling_crypto::circuit::test::*;
+//use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+//use franklin_crypto::circuit::test::*;
 //use std::collections::HashMap;
 //
 //use crate::vk_contract_generator::hardcode_vk;
@@ -22,9 +22,9 @@
 //};
 //use bellman::Circuit;
 //
-//use sapling_crypto::circuit::float_point::convert_to_float;
-//use sapling_crypto::eddsa::{PrivateKey, PublicKey};
-//use sapling_crypto::jubjub::FixedGenerators;
+//use franklin_crypto::circuit::float_point::convert_to_float;
+//use franklin_crypto::eddsa::{PrivateKey, PublicKey};
+//use franklin_crypto::jubjub::FixedGenerators;
 //
 //use models::plasma::circuit::account::CircuitAccount;
 //use models::plasma::circuit::utils::{be_bit_vector_into_bytes, le_bit_vector_into_field_element};
