@@ -1,6 +1,6 @@
 import BN = require('bn.js');
 import { Wallet } from '../src/wallet';
-import {ethers} from "ethers";
+import { ethers } from 'ethers';
 
 function sleep(ms) {
     return new Promise(resolve => {
