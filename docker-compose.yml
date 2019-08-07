@@ -75,4 +75,11 @@ services:
     - type: bind
       source: ./volumes/tesseracts
       target: /var/lib/tesseracts/data
-
+  metabase:
+    image: "metabase/metabase"
+    ports:
+      - "2112:3000"
+    volumes:
+      - type: bind
+        source: ./volumes/metabase
+        target: /metabase-data

@@ -302,7 +302,7 @@ dev-push-flattener:
 make-keys:
 	@cargo run -p key_generator --release --bin key_generator
 
-# Tesseracts
+# Tesseracts (local blockchain explorer)
 
 tesseracts-up:
 	@docker-compose up -d tesseracts
