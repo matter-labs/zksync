@@ -9,7 +9,7 @@ pub use web3::types::{H256, U128, U256};
 
 // use merkle_tree::{PedersenHasher, SparseMerkleTree};
 use pairing::bn256;
-use sapling_crypto::eddsa;
+use franklin_crypto::eddsa;
 
 pub use self::account::{Account, AccountUpdate};
 pub use self::operations::{DepositOp, FranklinOp, PartialExitOp, TransferOp, TransferToNewOp};

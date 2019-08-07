@@ -5,7 +5,7 @@ use crate::primitives::GetBits;
 use crate::{Engine, Fr, PublicKey};
 use bigdecimal::BigDecimal;
 use failure::ensure;
-use sapling_crypto::jubjub::{edwards, Unknown};
+use franklin_crypto::jubjub::{edwards, Unknown};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
 

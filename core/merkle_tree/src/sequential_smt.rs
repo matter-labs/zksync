@@ -37,27 +37,26 @@ impl PackToIndex for HashIndex {
 }
 
 #[derive(Debug, Clone)]
-pub struct SparseMerkleTree<T: GetBits + Default, Hash: Clone + Eq + Debug, H: Hasher<Hash>> {
+pub struct SparseMerkleTree<T: GetBits, Hash: Clone + Eq + Debug, H: Hasher<Hash>> {
     tree_depth: Depth,
     pub prehashed: Vec<Hash>,
     pub items: HashMap<ItemIndex, T>,
     pub hashes: HashMap<ItemIndexPacked, Hash>,
     pub hasher: H,
 }
-
 impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
 where
-    T: GetBits + Default,
+    T: GetBits,
     Hash: Clone + Eq + Debug,
     H: Hasher<Hash> + Default,
 {
-    pub fn new(tree_depth: Depth) -> Self {
+    pub fn new_with_leaf(tree_depth: Depth, default_leaf: T) -> Self {
         let hasher = H::default();
         let items = HashMap::new();
         let hashes = HashMap::new();
         // we need to make sparse hashes for tree depth levels
         let mut prehashed = Vec::with_capacity((tree_depth + 1) as usize);
-        let mut cur = hasher.hash_bits(T::default().get_bits_le());
+        let mut cur = hasher.hash_bits(default_leaf.get_bits_le());
         prehashed.push(cur.clone());
 
         for i in 0..tree_depth {
@@ -77,7 +76,13 @@ where
             hasher,
         }
     }
-
+}
+impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
+where
+    T: GetBits,
+    Hash: Clone + Eq + Debug,
+    H: Hasher<Hash>,
+{
     // How many items can the tree hold
     pub fn capacity(&self) -> u32 {
         1 << self.tree_depth
@@ -86,30 +91,6 @@ where
     pub fn insert(&mut self, index: ItemIndex, item: T) {
         assert!(index < self.capacity());
         let hash_index = (self.tree_depth, index);
-
-        let item_bits = item.get_bits_le();
-
-        let hash = self.hasher.hash_bits(item_bits);
-
-        self.hashes.insert(hash_index.pack(), hash);
-
-        self.items.insert(index, item);
-
-        let mut next_level = (hash_index.0, hash_index.1);
-
-        for _ in 0..next_level.0 {
-            next_level = (next_level.0 - 1, next_level.1 >> 1);
-            self.update_hash(next_level);
-        }
-
-        assert_eq!(next_level.0, 0);
-    }
-
-    pub fn delete(&mut self, index: ItemIndex) {
-        assert!(index < self.capacity());
-        let hash_index = (self.tree_depth, index);
-
-        let item = T::default();
 
         let item_bits = item.get_bits_le();
 
@@ -224,6 +205,95 @@ where
 
     pub fn root_hash(&self) -> Hash {
         self.get_hash((0, 0))
+    }
+}
+impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
+where
+    T: GetBits + Default,
+    Hash: Clone + Eq + Debug,
+    H: Hasher<Hash> + Default,
+{
+    pub fn get(&self, index: ItemIndex) -> Option<&T> {
+        match self.items.get(&index) {
+            Some(i) => Some(i),
+            None => None,
+        }
+    }
+
+    pub fn new(tree_depth: Depth) -> Self {
+        let hasher = H::default();
+        let items = HashMap::new();
+        let hashes = HashMap::new();
+        // we need to make sparse hashes for tree depth levels
+        let mut prehashed = Vec::with_capacity((tree_depth + 1) as usize);
+        let mut cur = hasher.hash_bits(T::default().get_bits_le());
+        prehashed.push(cur.clone());
+
+        for i in 0..tree_depth {
+            cur = hasher.compress(&cur, &cur, i as usize);
+            prehashed.push(cur.clone());
+        }
+        prehashed.reverse();
+
+        // print!("Made default hashes in quantity {}\n", prehashed.len());
+
+        assert_eq!(prehashed.len() - 1, tree_depth as usize);
+        Self {
+            tree_depth,
+            prehashed,
+            items,
+            hashes,
+            hasher,
+        }
+    }
+
+    pub fn remove(&mut self, index: ItemIndex) -> Option<T> {
+        assert!(index < self.capacity());
+        let hash_index = (self.tree_depth, index);
+
+        let item = T::default();
+
+        let item_bits = item.get_bits_le();
+
+        let hash = self.hasher.hash_bits(item_bits);
+
+        self.hashes.insert(hash_index.pack(), hash);
+        let old = self.items.remove(&index);
+        self.items.insert(index, item);
+
+        let mut next_level = (hash_index.0, hash_index.1);
+
+        for _ in 0..next_level.0 {
+            next_level = (next_level.0 - 1, next_level.1 >> 1);
+            self.update_hash(next_level);
+        }
+
+        assert_eq!(next_level.0, 0);
+        old
+    }
+
+    pub fn delete(&mut self, index: ItemIndex) {
+        assert!(index < self.capacity());
+        let hash_index = (self.tree_depth, index);
+
+        let item = T::default();
+
+        let item_bits = item.get_bits_le();
+
+        let hash = self.hasher.hash_bits(item_bits);
+
+        self.hashes.insert(hash_index.pack(), hash);
+
+        self.items.insert(index, item);
+
+        let mut next_level = (hash_index.0, hash_index.1);
+
+        for _ in 0..next_level.0 {
+            next_level = (next_level.0 - 1, next_level.1 >> 1);
+            self.update_hash(next_level);
+        }
+
+        assert_eq!(next_level.0, 0);
     }
 }
 

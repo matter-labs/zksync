@@ -41,7 +41,7 @@ pub const BLOCK_SIZE_CHUNKS: usize = 2000;
 
 pub const ETH_TOKEN_ID: TokenId = 0;
 
-use sapling_crypto::alt_babyjubjub::AltJubjubBn256;
+use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();

@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 
 use ff::{Field, PrimeField, PrimeFieldRepr};
-use sapling_crypto::jubjub::{edwards, Unknown};
+use franklin_crypto::jubjub::{edwards, Unknown};
 use web3::futures::Future;
 use web3::types::{BlockNumber, Filter, FilterBuilder, H256, U256};
 

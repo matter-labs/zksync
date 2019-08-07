@@ -1,14 +1,14 @@
 // Pedersen hash implementation of the Hasher trait
 
 use ff::PrimeField;
-use sapling_crypto::pedersen_hash::{baby_pedersen_hash, Personalization};
+use franklin_crypto::pedersen_hash::{baby_pedersen_hash, Personalization};
 
+use franklin_crypto::alt_babyjubjub::{AltJubjubBn256, JubjubEngine};
 use pairing::bn256::Bn256;
-use sapling_crypto::alt_babyjubjub::{AltJubjubBn256, JubjubEngine};
 
 use crate::hasher::Hasher;
 use models::primitives::BitIteratorLe;
-
+#[derive(Clone)]
 pub struct PedersenHasher<E: JubjubEngine> {
     params: E::Params,
 }

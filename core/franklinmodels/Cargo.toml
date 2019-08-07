@@ -1,13 +1,15 @@
 [package]
-name = "models"
+name = "franklinmodels"
 version = "0.0.1"
 edition = "2018"
 
 [dependencies]
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
-bigdecimal = { version = "0.0.14", features = ["serde"]}
+bigdecimal = { version = "0.1.0", features = ["serde"]}
 pairing = { package = "pairing_ce", version = "0.17.0" }
-franklin_crypto = { package = "franklin-crypto", git = "ssh://git@github.com/matter-labs/franklin-crypto.git"}
+franklin_crypto = { package = "franklin-crypto", git = "ssh://git@github.com/matter-labs/franklin-crypto.git" }
+merkle_tree = { path = "../merkle_tree" }
+models = { path = "../models" }
 bellman = { package = "bellman_ce", version = "0.3.0" }
 web3 = "0.6.0"
 serde = "1.0.90"
@@ -16,9 +18,3 @@ serde_bytes = "0.11.1"
 lazy_static = "1.2.0"
 rand = "0.4"
 fnv = "1.0.3"
-log = "0.4"
-futures = "0.1.28"
-rust-crypto = "0.2"
-bitvec = "0.14"
-hex = "0.3"
-failure = "0.1"

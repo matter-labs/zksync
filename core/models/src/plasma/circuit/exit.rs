@@ -1,6 +1,6 @@
 use ff::{BitIterator, PrimeField};
 
-use sapling_crypto::jubjub::JubjubEngine;
+use franklin_crypto::jubjub::JubjubEngine;
 
 use crate::plasma::params;
 

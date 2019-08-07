@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "core/data_restore",
     "core/key_generator",
     "core/merkle_tree",
     "core/eth_client",
@@ -9,4 +8,6 @@ members = [
     "core/prover",
     "core/server",
     "core/storage",
+    "core/franklincircuit",
+    "core/franklinmodels",
 ]

@@ -10,9 +10,9 @@ use crate::primitives::{get_bits_le_fixed_u128, pack_bits_into_bytes};
 use bigdecimal::{BigDecimal, ToPrimitive};
 use crypto::{digest::Digest, sha2::Sha256};
 use ff::{PrimeField, PrimeFieldRepr};
-use sapling_crypto::circuit::float_point::convert_to_float;
-use sapling_crypto::eddsa::Signature;
-use sapling_crypto::jubjub::{edwards, FixedGenerators, JubjubEngine, Unknown};
+use franklin_crypto::circuit::float_point::convert_to_float;
+use franklin_crypto::eddsa::Signature;
+use franklin_crypto::jubjub::{edwards, FixedGenerators, JubjubEngine, Unknown};
 
 use crate::plasma::account::AccountAddress;
 use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
