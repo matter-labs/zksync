@@ -1,11 +1,10 @@
-use super::{params, AccountId, BlockNumber, FeeAmount, Nonce, TokenAmount, TokenId};
+use super::{AccountId, BlockNumber, FeeAmount, Nonce, TokenAmount, TokenId};
 use super::{Engine, Fr};
-use super::{PrivateKey, PublicKey};
-use crate::plasma::circuit::sig::TransactionSignature;
-use crate::plasma::circuit::transfer::Tx;
-use crate::plasma::circuit::utils::{
-    encode_fr_into_fs, encode_fs_into_fr, le_bit_vector_into_field_element,
-};
+//use crate::plasma::circuit::sig::TransactionSignature;
+//use crate::plasma::circuit::transfer::Tx;
+//use crate::plasma::circuit::utils::{
+//    encode_fr_into_fs, encode_fs_into_fr, le_bit_vector_into_field_element,
+//};
 use crate::primitives::{get_bits_le_fixed_u128, pack_bits_into_bytes};
 use bigdecimal::{BigDecimal, ToPrimitive};
 use crypto::{digest::Digest, sha2::Sha256};
@@ -14,7 +13,7 @@ use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::eddsa::Signature;
 use franklin_crypto::jubjub::{edwards, FixedGenerators, JubjubEngine, Unknown};
 
-use crate::plasma::account::AccountAddress;
+use super::account::AccountAddress;
 use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
 use web3::types::Address;
 
@@ -247,38 +246,38 @@ impl FranklinTx {
 //        Ok(())
 //    }
 //}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct TxSignature {
-    pub r_x: Fr,
-    pub r_y: Fr,
-    pub s: Fr,
-}
-
-impl TxSignature {
-    pub fn try_from(signature: TransactionSignature<Engine>) -> Result<Self, String> {
-        let (x, y) = signature.r.into_xy();
-
-        Ok(Self {
-            r_x: x,
-            r_y: y,
-            s: signature.s,
-        })
-    }
-
-    pub fn from(signature: Signature<Engine>) -> Self {
-        let (r_x, r_y) = signature.r.into_xy();
-        let s = encode_fs_into_fr::<Engine>(signature.s);
-
-        Self { r_x, r_y, s }
-    }
-
-    pub fn to_jubjub_eddsa(&self) -> Result<Signature<Engine>, String> {
-        let r =
-            edwards::Point::<Engine, Unknown>::from_xy(self.r_x, self.r_y, &params::JUBJUB_PARAMS)
-                .expect("make point from X and Y");
-        let s: <Engine as JubjubEngine>::Fs = encode_fr_into_fs::<Engine>(self.s);
-
-        Ok(Signature::<Engine> { r, s })
-    }
-}
+//
+//#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+//pub struct TxSignature {
+//    pub r_x: Fr,
+//    pub r_y: Fr,
+//    pub s: Fr,
+//}
+//
+//impl TxSignature {
+//    pub fn try_from(signature: TransactionSignature<Engine>) -> Result<Self, String> {
+//        let (x, y) = signature.r.into_xy();
+//
+//        Ok(Self {
+//            r_x: x,
+//            r_y: y,
+//            s: signature.s,
+//        })
+//    }
+//
+//    pub fn from(signature: Signature<Engine>) -> Self {
+//        let (r_x, r_y) = signature.r.into_xy();
+//        let s = encode_fs_into_fr::<Engine>(signature.s);
+//
+//        Self { r_x, r_y, s }
+//    }
+//
+//    pub fn to_jubjub_eddsa(&self) -> Result<Signature<Engine>, String> {
+//        let r =
+//            edwards::Point::<Engine, Unknown>::from_xy(self.r_x, self.r_y, &params::JUBJUB_PARAMS)
+//                .expect("make point from X and Y");
+//        let s: <Engine as JubjubEngine>::Fs = encode_fr_into_fs::<Engine>(self.s);
+//
+//        Ok(Signature::<Engine> { r, s })
+//    }
+//}

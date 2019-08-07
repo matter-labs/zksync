@@ -11,9 +11,9 @@ use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::{
     Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
 };
+use franklinmodels::merkle_tree::hasher::Hasher;
+use franklinmodels::merkle_tree::PedersenHasher;
 use franklinmodels::params as franklin_constants;
-use merkle_tree::hasher::Hasher;
-use merkle_tree::PedersenHasher;
 use pairing::bn256::*;
 
 pub struct CloseAccountData {
@@ -41,7 +41,7 @@ impl<E: JubjubEngine> CloseAccountWitness<E> {
             &self.before.address.unwrap(),
             franklin_constants::ACCOUNT_TREE_DEPTH,
         );
-      
+
         assert_eq!(pubdata_bits.len(), 4 * 8);
         pubdata_bits.resize(8 * 8, false);
         pubdata_bits
@@ -60,7 +60,7 @@ pub fn apply_close_account(
     let capacity = tree.capacity();
     assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
     let account_address_fe = Fr::from_str(&close_account.account_address.to_string()).unwrap();
-   
+
     //calculate a and b
     let a = Fr::zero();
     let b = Fr::zero();
@@ -144,9 +144,7 @@ pub fn calculate_close_account_operations_from_witness(
         rhs: close_account_witness.before.clone(),
     };
 
-    let operations: Vec<Operation<_>> = vec![
-        operation_zero,
-    ];
+    let operations: Vec<Operation<_>> = vec![operation_zero];
     operations
 }
 #[test]

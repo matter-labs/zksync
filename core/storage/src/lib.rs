@@ -6,8 +6,8 @@ extern crate log;
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
-use models::plasma::block::Block;
-use models::plasma::{
+use models::node::block::Block;
+use models::node::{
     apply_updates, reverse_updates, Account, AccountId, AccountMap, AccountUpdate, AccountUpdates,
     BlockNumber, Fr, Nonce, TokenId,
 };
@@ -38,7 +38,7 @@ use diesel::sql_types::{Integer, Nullable, Text, Timestamp};
 sql_function!(coalesce, Coalesce, (x: Nullable<Integer>, y: Integer) -> Integer);
 
 pub use mempool::Mempool;
-use models::plasma::account::AccountAddress;
+use models::node::AccountAddress;
 
 #[derive(Clone)]
 pub struct ConnectionPool {
@@ -940,7 +940,7 @@ impl StorageProcessor {
     pub fn last_committed_state_for_account(
         &self,
         account_id: AccountId,
-    ) -> QueryResult<Option<models::plasma::account::Account>> {
+    ) -> QueryResult<Option<models::node::Account>> {
         self.conn().transaction(|| {
             let (last_block, account) = self.get_account_and_last_block(account_id)?;
 
@@ -987,7 +987,7 @@ impl StorageProcessor {
     pub fn last_verified_state_for_account(
         &self,
         account_id: AccountId,
-    ) -> QueryResult<Option<models::plasma::account::Account>> {
+    ) -> QueryResult<Option<models::node::Account>> {
         let (_, account) = self.get_account_and_last_block(account_id)?;
         Ok(account)
     }

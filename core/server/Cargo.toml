@@ -6,7 +6,7 @@ edition = "2018"
 [dependencies]
 eth_client = { path = "../eth_client" }
 plasma = { path = "../plasma" }
-models = { path = "../models" }
+models = { package = "franklinmodels", path = "../franklinmodels" }
 storage = { path = "../storage" }
 
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }

@@ -14,7 +14,7 @@ use server::eth_sender;
 use server::eth_watch::{start_eth_watch, EthWatch};
 use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
 
-use models::{config, StateKeeperRequest};
+use models::{node::config, StateKeeperRequest};
 use storage::ConnectionPool;
 
 fn main() {

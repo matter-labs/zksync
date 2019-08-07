@@ -1,13 +1,17 @@
-use crate::circuit;
-use crate::plasma::params::{self, TOTAL_TOKENS};
-use crate::plasma::{AccountId, AccountUpdates, Nonce, TokenAmount, TokenId};
+use crate::params::{self, TOTAL_TOKENS};
 use crate::primitives::GetBits;
-use crate::{Engine, Fr, PublicKey};
+
+use std::convert::TryInto;
+
 use bigdecimal::BigDecimal;
 use failure::ensure;
+use franklin_crypto::alt_babyjubjub::JubjubEngine;
 use franklin_crypto::jubjub::{edwards, Unknown};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::convert::TryInto;
+
+use super::{AccountId, AccountUpdates, Nonce, TokenAmount, TokenId};
+use super::{Engine, Fr};
+use crate::circuit::account::CircuitAccount;
 
 #[derive(Debug, Clone, PartialEq, Default, Eq, Hash)]
 pub struct AccountAddress {
@@ -74,6 +78,12 @@ pub enum AccountUpdate {
     },
 }
 
+impl<E: JubjubEngine> From<Account> for CircuitAccount<E> {
+    fn from(acc: Account) -> Self {
+        unimplemented!()
+    }
+}
+
 impl AccountUpdate {
     pub fn reversed_update(&self) -> Self {
         match self {
@@ -114,28 +124,7 @@ impl Default for Account {
 
 impl GetBits for Account {
     fn get_bits_le(&self) -> Vec<bool> {
-        use bitvec::prelude::*;
-        use ff::{PrimeField, PrimeFieldRepr};
-
-        //        // TODO: (Drogan) use circuit here.
-        let mut bytes = Vec::new();
-        for token in 0..TOTAL_TOKENS {
-            let balance_str = format!("{}", &self.get_balance(token as TokenId));
-            bytes.extend_from_slice(balance_str.as_bytes());
-        }
-        bytes.extend_from_slice(&self.nonce.to_le_bytes());
-        bytes.extend_from_slice(&self.address.data);
-
-        BitVec::<LittleEndian, u8>::from_slice(&bytes)
-            .into_iter()
-            .collect()
-
-        // let mut leaf_content = Vec::new();
-        // leaf_content.extend(self.balance.get_bits_le_fixed(params::BALANCE_BIT_WIDTH));
-        // leaf_content.extend(self.nonce.get_bits_le_fixed(params::NONCE_BIT_WIDTH));
-        // leaf_content.extend(self.pub_x.get_bits_le_fixed(params::FR_BIT_WIDTH));
-        // leaf_content.extend(self.pub_y.get_bits_le_fixed(params::FR_BIT_WIDTH));
-        // leaf_content
+        CircuitAccount::<super::Engine>::from(self.clone()).get_bits_le()
     }
 }
 

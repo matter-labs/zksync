@@ -1,4 +1,4 @@
-use models::plasma::tx::FranklinTx;
+use models::node::tx::FranklinTx;
 
 use super::ConnectionHolder;
 
