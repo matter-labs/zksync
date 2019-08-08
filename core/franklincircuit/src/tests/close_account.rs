@@ -261,6 +261,7 @@ fn test_close_account_franklin_empty_leaf() {
         let mut cs = TestConstraintSystem::<Bn256>::new();
 
         let instance = FranklinCircuit {
+            operation_batch_size: 10,
             params,
             old_root: close_account_witness.before_root,
             new_root: Some(root_after_fee),

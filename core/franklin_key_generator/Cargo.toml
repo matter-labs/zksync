@@ -1,0 +1,24 @@
+[package]
+name = "franklin_key_generator"
+version = "0.1.1"
+edition = "2018"
+
+authors = [
+    "Alex Gluchowski <alex@gluchowski.net>",
+    "Alex Vlasov <alex.m.vlasov@gmail.com>"
+]
+
+[dependencies]
+rand = "0.4"
+time = "0.1"
+pairing = { package = "pairing_ce", version = "0.17.0" }
+franklin_crypto = { package = "franklin-crypto", git = "ssh://git@github.com/matter-labs/franklin-crypto.git"}
+bellman = { package = "bellman_ce", version = "0.3.0" }
+models = { path = "../models" }
+franklinmodels = { path = "../franklinmodels" }
+franklincircuit= { path = "../franklincircuit" }
+hex = "0.3.2"
+rust-crypto = "0.2"
+ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
+log = "0.4"
+env_logger = "0.6"

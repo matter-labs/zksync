@@ -119,10 +119,10 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             || op.args.fee.grab(),
             franklin_constants::FEE_EXPONENT_BIT_WIDTH + franklin_constants::FEE_MANTISSA_BIT_WIDTH,
         )?;
-        println!(
-            "fee_packed in allocated_operation_data equals {}",
-            fee_packed.get_number().get_value().grab()?
-        );
+//        println!(
+//            "fee_packed in allocated_operation_data equals {}",
+//            fee_packed.get_number().get_value().grab()?
+//        );
 
         let amount_parsed = parse_with_exponent_le(
             cs.namespace(|| "parse amount"),
@@ -149,10 +149,10 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             fee_parsed,
             franklin_constants::BALANCE_BIT_WIDTH,
         )?;
-        println!(
-            "fee_parsed in allocated_operation_data equals {}",
-            fee.get_number().get_value().grab()?
-        );
+//        println!(
+//            "fee_parsed in allocated_operation_data equals {}",
+//            fee.get_number().get_value().grab()?
+//        );
         let sig_msg = CircuitElement::from_fe_strict(
             cs.namespace(|| "signature_message_x"),
             || op.sig_msg.grab(),

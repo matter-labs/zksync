@@ -134,7 +134,7 @@ where
         }
         message_bytes.push(byte);
     }
-    println!("message_len {}", message_bytes.len());
+    println !("message_len {}", message_bytes.len());
     let max_message_len = 31 as usize; //todo
     let signature = private_key.sign_raw_message(&message_bytes, rng, p_g, params, max_message_len);
 

@@ -290,6 +290,7 @@ pub fn calculate_deposit_operations_from_witness(
     ];
     operations
 }
+
 #[test]
 fn test_deposit_franklin_in_empty_leaf() {
     use super::utils::public_data_commitment;
@@ -409,6 +410,7 @@ fn test_deposit_franklin_in_empty_leaf() {
         let mut cs = TestConstraintSystem::<Bn256>::new();
 
         let instance = FranklinCircuit {
+            operation_batch_size: 10,
             params,
             old_root: deposit_witness.before_root,
             new_root: Some(root_after_fee),

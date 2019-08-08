@@ -384,6 +384,7 @@ fn test_partial_exit_franklin() {
         let mut cs = TestConstraintSystem::<Bn256>::new();
 
         let instance = FranklinCircuit {
+            operation_batch_size: 10,
             params,
             old_root: partial_exit_witness.before_root,
             new_root: Some(root_after_fee),
@@ -540,6 +541,7 @@ fn test_full_exit_franklin() {
         let mut cs = TestConstraintSystem::<Bn256>::new();
 
         let instance = FranklinCircuit {
+            operation_batch_size: 10,
             params,
             old_root: partial_exit_witness.before_root,
             new_root: Some(root_after_fee),

@@ -560,6 +560,7 @@ fn test_transfer() {
         let mut cs = TestConstraintSystem::<Bn256>::new();
 
         let instance = FranklinCircuit {
+            operation_batch_size: 10,
             params,
             old_root: transfer_witness.before_root,
             new_root: Some(root_after_fee),

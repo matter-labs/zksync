@@ -10,4 +10,5 @@ members = [
     "core/storage",
     "core/franklincircuit",
     "core/franklinmodels",
+    "core/franklin_key_generator",
 ]
