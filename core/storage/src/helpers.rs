@@ -1,4 +1,4 @@
-use models::plasma::Fr;
+use models::node::Fr;
 
 /// Serialize `Fr`.
 pub fn fr_to_bytes(fr: &Fr) -> Vec<u8> {

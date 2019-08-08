@@ -2,18 +2,17 @@ use pairing::bn256::Bn256;
 // use franklin_crypto::jubjub::{FixedGenerators};
 // use franklin_crypto::alt_babyjubjub::{AltJubjubBn256};
 
-use models::plasma::account::{Account, AccountAddress};
-use models::plasma::block::Block;
-use models::plasma::tx::FranklinTx;
-use models::plasma::{AccountId, AccountMap, Fr};
+use franklin_crypto::eddsa::PrivateKey;
+use models::node::block::{Block, ExecutedTx};
+use models::node::tx::FranklinTx;
+use models::node::{Account, AccountAddress, AccountId, AccountMap, Fr};
 use plasma::state::{PlasmaState, TxSuccess};
 use rayon::prelude::*;
-use franklin_crypto::eddsa::PrivateKey;
 use std::collections::VecDeque;
 use std::sync::{Arc, RwLock};
 use web3::types::H256;
 
-use models::config;
+use models::node::config;
 
 use models::{CommitRequest, NetworkStatus, StateKeeperRequest};
 use storage::ConnectionPool;
@@ -23,7 +22,7 @@ use std::sync::mpsc::{Receiver, Sender};
 
 use crate::eth_watch::ETHState;
 use itertools::Itertools;
-use models::plasma::params::BLOCK_SIZE_CHUNKS;
+use models::params::BLOCK_SIZE_CHUNKS;
 use std::io::BufReader;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -268,10 +267,23 @@ impl PlasmaStateKeeper {
                     chunks_used += executed_op.chunks();
                     accounts_updated.append(&mut updates);
                     fees.push(fee);
-                    ops.push(executed_op);
+                    let exec_result = ExecutedTx {
+                        tx,
+                        success: true,
+                        op: Some(executed_op),
+                        fail_reason: None,
+                    };
+                    ops.push(exec_result);
                 }
                 Err(e) => {
                     error!("Failed to execute transaction: {:?}, {:?}", tx, e);
+                    let exec_result = ExecutedTx {
+                        tx,
+                        success: false,
+                        op: None,
+                        fail_reason: Some(e.to_string()),
+                    };
+                    ops.push(exec_result);
                 }
             };
         }
@@ -280,7 +292,6 @@ impl PlasmaStateKeeper {
             self.state.collect_fee(&fees, &self.fee_account_address);
         accounts_updated.extend(fee_updates.into_iter());
 
-        let num_txs = ops.len();
         let block = Block {
             block_number: self.state.block_number,
             new_root_hash: self.state.root_hash(),

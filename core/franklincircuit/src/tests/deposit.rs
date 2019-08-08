@@ -11,9 +11,9 @@ use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::{
     Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
 };
+use franklinmodels::merkle_tree::hasher::Hasher;
+use franklinmodels::merkle_tree::PedersenHasher;
 use franklinmodels::params as franklin_constants;
-use merkle_tree::hasher::Hasher;
-use merkle_tree::PedersenHasher;
 use pairing::bn256::*;
 
 pub struct DepositData {

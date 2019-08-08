@@ -48,9 +48,20 @@ table! {
 }
 
 table! {
+    executed_transactions (id) {
+        id -> Int4,
+        block_number -> Int8,
+        tx_hash -> Bytea,
+        operation -> Nullable<Jsonb>,
+        success -> Bool,
+        fail_reason -> Nullable<Text>,
+    }
+}
+
+table! {
     mempool (hash) {
         hash -> Bytea,
-        primary_account_address -> Bytea,
+        primary_account_address -> Text,
         nonce -> Int8,
         tx -> Jsonb,
         created_at -> Timestamp,
@@ -135,6 +146,7 @@ allow_tables_to_appear_in_same_query!(
     accounts,
     active_provers,
     balances,
+    executed_transactions,
     mempool,
     op_config,
     operations,

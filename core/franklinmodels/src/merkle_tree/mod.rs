@@ -3,13 +3,10 @@ pub mod parallel_smt;
 pub mod pedersen_hasher;
 pub mod sequential_smt;
 
-use models::plasma::account::Account;
-use models::plasma::{Engine, Fr};
+use crate::node::{Engine, Fr};
 
 pub type SparseMerkleTree<T, H, HH> = sequential_smt::SparseMerkleTree<T, H, HH>;
 pub type PedersenHasher<T> = pedersen_hasher::PedersenHasher<T>;
-
-pub type AccountTree = SparseMerkleTree<Account, Fr, PedersenHasher<Engine>>;
 
 // TODO: return the code below and uncomment asserts
 

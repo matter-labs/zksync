@@ -1,9 +1,7 @@
 [workspace]
 members = [
     "core/key_generator",
-    "core/merkle_tree",
     "core/eth_client",
-    "core/models",
     "core/plasma",
     "core/prover",
     "core/server",

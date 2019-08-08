@@ -6,9 +6,9 @@ use ff::{Field, PrimeField};
 use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::CircuitAccountTree;
+use franklinmodels::merkle_tree::hasher::Hasher;
+use franklinmodels::merkle_tree::PedersenHasher;
 use franklinmodels::params as franklin_constants;
-use merkle_tree::hasher::Hasher;
-use merkle_tree::PedersenHasher;
 use pairing::bn256::*;
 
 pub struct TransferToNewData {

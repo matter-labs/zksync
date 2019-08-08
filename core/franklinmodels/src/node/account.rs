@@ -1,13 +1,18 @@
-use crate::circuit;
-use crate::plasma::params::{self, TOTAL_TOKENS};
-use crate::plasma::{AccountId, AccountUpdates, Nonce, TokenAmount, TokenId};
+use crate::params::{self, TOTAL_TOKENS};
 use crate::primitives::GetBits;
-use crate::{Engine, Fr, PublicKey};
+
+use std::convert::TryInto;
+
 use bigdecimal::BigDecimal;
 use failure::ensure;
+use ff::PrimeField;
+use franklin_crypto::alt_babyjubjub::JubjubEngine;
 use franklin_crypto::jubjub::{edwards, Unknown};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::convert::TryInto;
+
+use super::{AccountId, AccountUpdates, Nonce, TokenAmount, TokenId};
+use super::{Engine, Fr};
+use crate::circuit::account::{Balance, CircuitAccount};
 
 #[derive(Debug, Clone, PartialEq, Default, Eq, Hash)]
 pub struct AccountAddress {
@@ -16,11 +21,12 @@ pub struct AccountAddress {
 
 impl AccountAddress {
     pub fn to_hex(&self) -> String {
-        hex::encode(&self.data)
+        format!("0x{}", hex::encode(&self.data))
     }
 
     pub fn from_hex(s: &str) -> Result<Self, failure::Error> {
-        let bytes = hex::decode(s)?;
+        ensure!(s.starts_with("0x"), "Address should start with 0x");
+        let bytes = hex::decode(&s[2..])?;
         ensure!(bytes.len() == 27, "Size mismatch");
         Ok(AccountAddress {
             data: bytes.as_slice().try_into().unwrap(),
@@ -74,6 +80,30 @@ pub enum AccountUpdate {
     },
 }
 
+// TODO: Check if coding to Fr is the same as in the circuit.
+impl From<Account> for CircuitAccount<super::Engine> {
+    fn from(acc: Account) -> Self {
+        let mut circuit_account = CircuitAccount::default();
+
+        let balances: Vec<_> = acc
+            .balances
+            .iter()
+            .map(|b| Balance {
+                value: Fr::from_str(&b.to_string()).unwrap(),
+            })
+            .collect();
+
+        for (i, b) in balances.into_iter().enumerate() {
+            circuit_account.subtree.insert(i as u32, b);
+        }
+
+        circuit_account.nonce = Fr::from_str(&acc.nonce.to_string()).unwrap();
+        circuit_account.pub_key_hash = Fr::from_hex(&acc.address.to_hex()).unwrap();
+
+        circuit_account
+    }
+}
+
 impl AccountUpdate {
     pub fn reversed_update(&self) -> Self {
         match self {
@@ -114,28 +144,7 @@ impl Default for Account {
 
 impl GetBits for Account {
     fn get_bits_le(&self) -> Vec<bool> {
-        use bitvec::prelude::*;
-        use ff::{PrimeField, PrimeFieldRepr};
-
-        //        // TODO: (Drogan) use circuit here.
-        let mut bytes = Vec::new();
-        for token in 0..TOTAL_TOKENS {
-            let balance_str = format!("{}", &self.get_balance(token as TokenId));
-            bytes.extend_from_slice(balance_str.as_bytes());
-        }
-        bytes.extend_from_slice(&self.nonce.to_le_bytes());
-        bytes.extend_from_slice(&self.address.data);
-
-        BitVec::<LittleEndian, u8>::from_slice(&bytes)
-            .into_iter()
-            .collect()
-
-        // let mut leaf_content = Vec::new();
-        // leaf_content.extend(self.balance.get_bits_le_fixed(params::BALANCE_BIT_WIDTH));
-        // leaf_content.extend(self.nonce.get_bits_le_fixed(params::NONCE_BIT_WIDTH));
-        // leaf_content.extend(self.pub_x.get_bits_le_fixed(params::FR_BIT_WIDTH));
-        // leaf_content.extend(self.pub_y.get_bits_le_fixed(params::FR_BIT_WIDTH));
-        // leaf_content
+        CircuitAccount::<super::Engine>::from(self.clone()).get_bits_le()
     }
 }
 

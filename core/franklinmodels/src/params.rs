@@ -1,3 +1,5 @@
+use crate::node::TokenId;
+
 /// Account tree depth
 pub const TX_TYPE_BIT_WIDTH: &'static usize = &8;
 
@@ -44,3 +46,9 @@ pub const SIGNATURE_R_Y_BIT_WIDTH: &'static usize = &254;
 // Fr element encoding
 pub const FR_BIT_WIDTH: usize = 254;
 pub const FR_BIT_WIDTH_PADDED: usize = 256;
+
+/// Number of supported tokens.
+pub const TOTAL_TOKENS: usize = 1;
+pub const ETH_TOKEN_ID: TokenId = 0;
+
+pub const BLOCK_SIZE_CHUNKS: usize = 2000;

@@ -6,10 +6,10 @@ extern crate log;
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
-use models::plasma::block::Block;
-use models::plasma::{
+use models::node::block::{Block, ExecutedTx};
+use models::node::{
     apply_updates, reverse_updates, Account, AccountId, AccountMap, AccountUpdate, AccountUpdates,
-    BlockNumber, Fr, Nonce, TokenId,
+    BlockNumber, Fr, FranklinOp, Nonce, TokenId,
 };
 use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
@@ -38,7 +38,7 @@ use diesel::sql_types::{Integer, Nullable, Text, Timestamp};
 sql_function!(coalesce, Coalesce, (x: Nullable<Integer>, y: Integer) -> Integer);
 
 pub use mempool::Mempool;
-use models::plasma::account::AccountAddress;
+use models::node::AccountAddress;
 
 #[derive(Clone)]
 pub struct ConnectionPool {
@@ -134,6 +134,39 @@ struct StorageAccountCreation {
     block_number: i32,
     address: Vec<u8>,
     nonce: i64,
+}
+
+#[derive(Debug, Insertable)]
+#[table_name = "executed_transactions"]
+struct NewExecutedTransaction {
+    block_number: i64,
+    tx_hash: Vec<u8>,
+    operation: Option<Value>,
+    success: bool,
+    fail_reason: Option<String>,
+}
+
+#[derive(Debug, Queryable, QueryableByName)]
+#[table_name = "executed_transactions"]
+struct StoredExecutedTransaction {
+    id: i32,
+    block_number: i64,
+    tx_hash: Vec<u8>,
+    operation: Option<Value>,
+    success: bool,
+    fail_reason: Option<String>,
+}
+
+impl NewExecutedTransaction {
+    fn prepare_stored_tx(exec_tx: &ExecutedTx, block: BlockNumber) -> Self {
+        Self {
+            block_number: block as i64,
+            tx_hash: exec_tx.tx.hash(),
+            operation: exec_tx.op.clone().map(|o| serde_json::to_value(o).unwrap()),
+            success: exec_tx.success,
+            fail_reason: exec_tx.fail_reason.clone(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -409,8 +442,7 @@ impl StorageProcessor {
             match &op.action {
                 Action::Commit => {
                     self.commit_state_update(op.block.block_number, &op.accounts_updated)?;
-                    //                    self.save_transactions(op)?;
-                    warn!("Tx in block are not stored");
+                    self.save_block_transactions(op)?;
                 }
                 Action::Verify { .. } => self.apply_state_update(op.block.block_number)?,
             };
@@ -435,6 +467,31 @@ impl StorageProcessor {
             .set(tx_hash.eq(hash))
             .execute(self.conn())
             .map(|_| ())
+    }
+
+    fn save_block_transactions(&self, op: &Operation) -> QueryResult<()> {
+        for block_tx in op.block.block_transactions.iter() {
+            let stored_tx =
+                NewExecutedTransaction::prepare_stored_tx(block_tx, op.block.block_number);
+            diesel::insert_into(executed_transactions::table)
+                .values(&stored_tx)
+                .execute(self.conn())?;
+        }
+        Ok(())
+    }
+
+    fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {
+        let executed_txs: Vec<_> = executed_transactions::table
+            .filter(executed_transactions::block_number.eq(block as i64))
+            .load::<StoredExecutedTransaction>(self.conn())?;
+        Ok(executed_txs
+            .into_iter()
+            .filter_map(|exec_tx| {
+                exec_tx
+                    .operation
+                    .map(|op| serde_json::from_value(op).expect("stored op"))
+            })
+            .collect())
     }
 
     fn commit_state_update(
@@ -940,7 +997,7 @@ impl StorageProcessor {
     pub fn last_committed_state_for_account(
         &self,
         account_id: AccountId,
-    ) -> QueryResult<Option<models::plasma::account::Account>> {
+    ) -> QueryResult<Option<models::node::Account>> {
         self.conn().transaction(|| {
             let (last_block, account) = self.get_account_and_last_block(account_id)?;
 
@@ -987,7 +1044,7 @@ impl StorageProcessor {
     pub fn last_verified_state_for_account(
         &self,
         account_id: AccountId,
-    ) -> QueryResult<Option<models::plasma::account::Account>> {
+    ) -> QueryResult<Option<models::node::Account>> {
         let (_, account) = self.get_account_and_last_block(account_id)?;
         Ok(account)
     }
@@ -1136,7 +1193,6 @@ mod test {
 
     use super::*;
     use diesel::Connection;
-    use models::plasma::params::ETH_TOKEN_ID;
     //
     //    #[test]
     //    fn test_store_proof() {

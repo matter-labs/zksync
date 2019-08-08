@@ -1,5 +1,6 @@
 import BN = require('bn.js');
 import { Wallet } from '../src/wallet';
+import { ethers } from 'ethers';
 
 function sleep(ms) {
     return new Promise(resolve => {
@@ -8,14 +9,16 @@ function sleep(ms) {
 }
 
 async function main() {
-    let Account1Address = Buffer.from('dead00000000000000000000000000000000000000000000000000', 'hex');
-    let Account2Address = Buffer.from('beef00000000000000000000000000000000000000000000000000', 'hex');
-    let Account3Address = Buffer.from('babe00000000000000000000000000000000000000000000000000', 'hex');
-    let feeCollectorAddress = Buffer.from('000000000000000000000000000000000000000000000000000000', 'hex');
-    let acc1 = new Wallet(Account1Address);
-    let acc2 = new Wallet(Account2Address);
-    let acc3 = new Wallet(Account3Address);
-    let feeAccount = new Wallet(feeCollectorAddress);
+    let Account1ETH = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2");
+    let Account2ETH = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/3");
+    let Account3ETH = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/4");
+    let feeCollector = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1");
+    let acc1 = await Wallet.fromEthWallet(Account1ETH);
+    let acc2 = await Wallet.fromEthWallet(Account2ETH);
+    let acc3 = await Wallet.fromEthWallet(Account3ETH);
+    let feeAccount = await Wallet.fromEthWallet(feeCollector);
+    console.log(feeAccount.address);
+    console.log(acc1.address);
 
     console.log('Before deposit');
     console.log('Account 1', await acc1.getState());
