@@ -23,7 +23,7 @@ pub struct Mempool {
 #[table_name = "mempool"]
 struct InsertTx {
     hash: Vec<u8>,
-    primary_account_address: Vec<u8>,
+    primary_account_address: String,
     nonce: i64,
     tx: Value,
 }
@@ -31,7 +31,7 @@ struct InsertTx {
 #[derive(Debug, Queryable)]
 struct ReadTx {
     hash: Vec<u8>,
-    primary_account_address: Vec<u8>,
+    primary_account_address: String,
     nonce: i64,
     tx: Value,
     created_at: NaiveDateTime,
@@ -63,7 +63,7 @@ impl Mempool {
         insert_into(mempool::table)
             .values(&InsertTx {
                 hash: tx.hash(),
-                primary_account_address: tx.account().data.to_vec(),
+                primary_account_address: tx.account().to_hex(),
                 nonce: i64::from(tx.nonce()),
                 tx: serde_json::to_value(tx).unwrap(),
             })

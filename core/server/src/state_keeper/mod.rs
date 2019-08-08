@@ -3,7 +3,7 @@ use pairing::bn256::Bn256;
 // use franklin_crypto::alt_babyjubjub::{AltJubjubBn256};
 
 use franklin_crypto::eddsa::PrivateKey;
-use models::node::block::Block;
+use models::node::block::{Block, ExecutedTx};
 use models::node::tx::FranklinTx;
 use models::node::{Account, AccountAddress, AccountId, AccountMap, Fr};
 use plasma::state::{PlasmaState, TxSuccess};
@@ -267,10 +267,23 @@ impl PlasmaStateKeeper {
                     chunks_used += executed_op.chunks();
                     accounts_updated.append(&mut updates);
                     fees.push(fee);
-                    ops.push(executed_op);
+                    let exec_result = ExecutedTx {
+                        tx,
+                        success: true,
+                        op: Some(executed_op),
+                        fail_reason: None,
+                    };
+                    ops.push(exec_result);
                 }
                 Err(e) => {
                     error!("Failed to execute transaction: {:?}, {:?}", tx, e);
+                    let exec_result = ExecutedTx {
+                        tx,
+                        success: false,
+                        op: None,
+                        fail_reason: Some(e.to_string()),
+                    };
+                    ops.push(exec_result);
                 }
             };
         }
@@ -279,7 +292,6 @@ impl PlasmaStateKeeper {
             self.state.collect_fee(&fees, &self.fee_account_address);
         accounts_updated.extend(fee_updates.into_iter());
 
-        let num_txs = ops.len();
         let block = Block {
             block_number: self.state.block_number,
             new_root_hash: self.state.root_hash(),

@@ -184,20 +184,18 @@ impl EthWatch {
     }
 
     fn get_deposit_event_filter(&self, from: BlockNumber, to: BlockNumber) -> Filter {
-        let onchain_balance_change_event_topic = self
-            .contract
-            .event("OnchainBalanceChanged")
-            .unwrap()
-            .signature();
+        //        let onchain_balance_change_event_topic = self
+        //            .contract
+        //            .event("OnchainBalanceChanged")
+        //            .unwrap()
+        //            .signature();
         FilterBuilder::default()
             .address(vec![self.contract_addr])
             .from_block(from)
             .to_block(to)
             .topics(
-                Some(vec![onchain_balance_change_event_topic]),
-                None,
-                None,
-                None,
+                //                Some(vec![onchain_balance_change_event_topic]),
+                None, None, None, None,
             )
             .build()
     }

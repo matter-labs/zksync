@@ -10,6 +10,7 @@ use models::{ActionType, NetworkStatus, StateKeeperRequest};
 use std::sync::mpsc;
 use storage::{BlockDetails, ConnectionPool};
 
+use failure::format_err;
 use futures::{sync::oneshot, Future};
 use std::env;
 use std::sync::{Arc, RwLock};
@@ -156,20 +157,14 @@ fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResp
 
     // check that something like this exists in state keeper's memory at all
     let account_address = req.match_info().get("address");
-    if account_address.is_none() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "invalid parameters".to_string(),
-        }));
-    }
-    let address = AccountAddress::from_hex(account_address.unwrap());
-    if address.is_err() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "invalid account_address".to_string(),
-        }));
-    }
+    let address = if let Some(account_address) = account_address {
+        AccountAddress::from_hex(account_address)?
+    } else {
+        return Err(format_err!("Invalid parameters").into());
+    };
 
     let (acc_tx, acc_rx) = mpsc::channel();
-    let request = StateKeeperRequest::GetAccount(address.unwrap(), acc_tx);
+    let request = StateKeeperRequest::GetAccount(address, acc_tx);
     tx_for_state
         .send(request)
         .expect("must send a request for an account state");

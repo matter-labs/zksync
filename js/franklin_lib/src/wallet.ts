@@ -15,7 +15,7 @@ class FranklinProvider {
     constructor(public providerAddress: string = 'http://127.0.0.1:3000') {}
 
     async submitTx(tx) {
-        let result = await Axios.post(this.providerAddress + '/api/v0.1/submit_tx', tx).then(reps => reps.data);
+        return await Axios.post(this.providerAddress + '/api/v0.1/submit_tx', tx).then(reps => reps.data);
     }
 
     async getState(address: Address) {
@@ -78,10 +78,13 @@ export class Wallet {
 
     static async fromEthWallet(wallet: ethers.Wallet) {
         let defaultFranklinProvider = new FranklinProvider();
-        let seed = await wallet.signMessage('Matter login');
-        console.log('seed', seed);
+        let seed = (await wallet.signMessage('Matter login')).substr(2);
         let frankinWallet = new Wallet(Buffer.from(seed, 'hex'), defaultFranklinProvider, wallet);
         return frankinWallet;
+    }
+
+    async getState() {
+        return await this.provider.getState(this.address);
     }
 }
 
