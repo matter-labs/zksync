@@ -6,11 +6,9 @@ pub const TX_TYPE_BIT_WIDTH: &'static usize = &8;
 /// Account tree depth
 pub const ACCOUNT_TREE_DEPTH: usize = 24;
 
-/// Account subtree depth
-pub const ACCOUNT_SUBTREE_DEPTH: &'static usize = &9;
 
 /// Balance tree depth
-pub const BALANCE_TREE_DEPTH: &'static usize = &8;
+pub const BALANCE_TREE_DEPTH: &'static usize = &10;
 
 /// Account subtree hash width
 pub const SUBTREE_HASH_WIDTH: &'static usize = &254; //seems to be equal to Bn256::NUM_BITS could be replaced
@@ -51,4 +49,4 @@ pub const FR_BIT_WIDTH_PADDED: usize = 256;
 pub const TOTAL_TOKENS: usize = 1;
 pub const ETH_TOKEN_ID: TokenId = 0;
 
-pub const BLOCK_SIZE_CHUNKS: usize = 2000;
+pub const BLOCK_SIZE_CHUNKS: usize = 10;

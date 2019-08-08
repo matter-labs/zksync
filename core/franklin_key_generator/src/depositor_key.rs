@@ -72,7 +72,7 @@ pub fn make_franklin_key() {
 
     let instance_for_generation: FranklinCircuit<'_, Bn256> = FranklinCircuit {
         params,
-        operation_batch_size: OPERATION_BATCH_SIZE,
+        operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
         old_root: None,
         new_root: None,
         validator_address: None,

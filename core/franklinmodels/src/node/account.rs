@@ -16,7 +16,7 @@ use crate::circuit::account::{Balance, CircuitAccount};
 
 #[derive(Debug, Clone, PartialEq, Default, Eq, Hash)]
 pub struct AccountAddress {
-    pub data: [u8; 27],
+    pub data: [u8; params::NEW_PUBKEY_HASH_WIDTH/8],
 }
 
 impl AccountAddress {
@@ -27,7 +27,7 @@ impl AccountAddress {
     pub fn from_hex(s: &str) -> Result<Self, failure::Error> {
         ensure!(s.starts_with("0x"), "Address should start with 0x");
         let bytes = hex::decode(&s[2..])?;
-        ensure!(bytes.len() == 27, "Size mismatch");
+        ensure!(bytes.len() ==  params::NEW_PUBKEY_HASH_WIDTH/8, "Size mismatch");
         Ok(AccountAddress {
             data: bytes.as_slice().try_into().unwrap(),
         })

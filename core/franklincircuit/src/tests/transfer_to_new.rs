@@ -386,8 +386,8 @@ fn test_transfer_to_new() {
     use franklinmodels::circuit::account::{
         Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
-    use merkle_tree::hasher::Hasher;
-    use merkle_tree::PedersenHasher;
+    use franklinmodels::merkle_tree::hasher::Hasher;
+    use franklinmodels::merkle_tree::PedersenHasher;
     use pairing::bn256::*;
     use rand::{Rng, SeedableRng, XorShiftRng};
 
