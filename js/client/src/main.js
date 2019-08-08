@@ -32,6 +32,7 @@ const router = new Router({
 
 Vue.mixin({
     computed: {
+        wallet: () => window.wallet,
         store: () => store,
         isDev: () => process.env.NODE_ENV === 'development',
         apiServer() { return this.store.config.API_SERVER },

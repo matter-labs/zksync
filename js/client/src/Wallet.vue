@@ -1,5 +1,14 @@
 <template>
 <div>
+<!-- 
+ ##     ## ########    ###    ########  ######## ########  
+ ##     ## ##         ## ##   ##     ## ##       ##     ## 
+ ##     ## ##        ##   ##  ##     ## ##       ##     ## 
+ ######### ######   ##     ## ##     ## ######   ########  
+ ##     ## ##       ######### ##     ## ##       ##   ##   
+ ##     ## ##       ##     ## ##     ## ##       ##    ##  
+ ##     ## ######## ##     ## ########  ######## ##     ## 
+-->
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
         <b-navbar-toggle target="nav_collapse"></b-navbar-toggle>
@@ -22,7 +31,7 @@
         <h3 style="color: red">Please switch to <b>{{currentNetwork}}</b> network in Metamask to try this demo.</h3>
     </b-container>
     <b-container v-if="network && correctNetwork">
-        <b-alert show dismissible :variant="alertType" fade :show="countdown" @dismissed="countdown=0" class="mt-2">
+        <b-alert dismissible :variant="alertType" fade :show="countdown" @dismissed="countdown=0" class="mt-2">
             {{result}}
         </b-alert>
 
@@ -32,55 +41,30 @@
         </p>
         
         <b-row>
-            <b-col sm="6" order="2" class="col-xl-6 col-lg-7 col-md-6 col-sm-12">
-                <b-card title="Transfer in Matter Network" class="mb-4 d-flex">
-                    <label for="transferToInput">To (recepient ETH address): </label>
-                    <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0" autocomplete="off"></b-form-input>
-                    <p class="mt-2" style="color: grey">
-                        Note: your recipient must register in Matter Network first. For testing, try 
-                        <a href="#" @click="transferTo='0x'+store.config.SENDER_ACCOUNT">0x{{store.config.SENDER_ACCOUNT}}</a>
-                    </p>
-
-                    <label for="transferAmountInput" class="mt-4">Amount</label>
-                            (max ETH&nbsp;<a href="#" @click="transferAmount=store.account.plasma.committed.balance">{{store.account.plasma.committed.balance || 0}}</a>):
-                    <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
-
-                    <label for="transferNonceInput" class="mt-4">Nonce (autoincrementing):</label>
-                    <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
-
-                    <div id="transferBtn" class="right">
-                        <img v-if="transferPending" style="margin-right: 1.5em" src="./assets/loading.gif" width="100em">
-                        <b-btn v-else class="mt-4" variant="outline-primary" @click="transfer" :disabled="!!transferProblem">Submit transaction</b-btn>
-                    </div>
-
-                    <p class="mt-2" style="color: grey">
-                        To commit a new block, either submit {{store.config.TRANSFER_BATCH_SIZE}} transactions, or wait 1 minute until timer triggers block generation.
-                    </p>
-                    <p class="mt-2" style="color: grey">
-                         Once a block is committed, it takes about 5 minutes to verify it.
-                    </p>
-                    <b-tooltip target="transferBtn" :disabled="transferPending || !transferProblem" triggers="hover">
-                        Transfer not possible: {{ transferProblem }}
-                    </b-tooltip>
-                </b-card>
-
-            </b-col>
-            <b-col class="col-xl-6 col-lg-5 col-md-6 col-sm-12 mb-5" order="1">
+<!-- 
+   ###     ######   ######   #######  ##     ## ##    ## ########    #### ##    ## ########  #######  
+  ## ##   ##    ## ##    ## ##     ## ##     ## ###   ##    ##        ##  ###   ## ##       ##     ## 
+ ##   ##  ##       ##       ##     ## ##     ## ####  ##    ##        ##  ####  ## ##       ##     ## 
+##     ## ##       ##       ##     ## ##     ## ## ## ##    ##        ##  ## ## ## ######   ##     ## 
+######### ##       ##       ##     ## ##     ## ##  ####    ##        ##  ##  #### ##       ##     ## 
+##     ## ##    ## ##    ## ##     ## ##     ## ##   ###    ##        ##  ##   ### ##       ##     ## 
+##     ##  ######   ######   #######   #######  ##    ##    ##       #### ##    ## ##        #######  
+ -->
+            <b-col class="col-xl-6 mb-5" order="1">
                 <b-card title="Account info">
                     <b-card class="mb-3">
                         <p class="mb-2"><strong>Mainchain</strong></p>
                         <label for="addr">Address</label> 
-                            (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+store.account.address"
+                            (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+ethereumAddress"
                                 target="blanc">block explorer</a>):
-                        <b-form-input id="addr" v-model="store.account.address" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
+                        <b-form-input id="addr" v-model="ethereumAddress" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                         <b-row class="mt-2">
-                            <!-- Print balance here -->
                             <b-col>Balances:
-                                <b-row v-for="item in Object.keys(store.account.coin_balances)" class="amount_show">{{item}}&nbsp;{{store.account.coin_balances[item]}}</b-row>
+                                <b-row v-for="token in ethTokens" class="amount_show">
+                                    <span>{{token}}&nbsp;{{ethereumBalanceForToken(token)}}</span>
+                                    <span v-if="pendingWithdrawForToken(token)">, pending: {{pendingAmountForToken(token)}}</span>
+                                </b-row>
                             </b-col>
-                        </b-row>
-                        <b-row class="mt-2" style="color: grey" v-if="pendingWithdraw">
-                           <b-col cols="6">Pending:</b-col> <b-col>ETH {{store.account.onchain.balance}}</b-col>
                         </b-row>
                         <b-row class="mt-2 mx-auto" v-if="pendingWithdraw">
                             <b-btn variant="primary" class="mt-2 mx-auto" @click="completeWithdraw">Complete withdrawal</b-btn>                            
@@ -106,7 +90,69 @@
                             </b-tooltip>
                         </b-col>
                     </b-row>
+<!-- 
+######## ########     ###    ##    ## ##    ## ##       #### ##    ## 
+##       ##     ##   ## ##   ###   ## ##   ##  ##        ##  ###   ## 
+##       ##     ##  ##   ##  ####  ## ##  ##   ##        ##  ####  ## 
+######   ########  ##     ## ## ## ## #####    ##        ##  ## ## ## 
+##       ##   ##   ######### ##  #### ##  ##   ##        ##  ##  #### 
+##       ##    ##  ##     ## ##   ### ##   ##  ##        ##  ##   ### 
+##       ##     ## ##     ## ##    ## ##    ## ######## #### ##    ## 
+ -->
                     <b-card class="mt-2">
+                        <p class="mb-2"><strong>Franklin</strong></p>
+                        <label for="addr">Address</label> 
+                            <!-- TODO: is this address Ethereum or our? -->
+                            (<a v-bind:href="'/explorer/'+franklinAddress"
+                                target="blanc">block explorer</a>):
+                        <b-form-input id="franklin_addr" v-model="franklinAddress" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
+                        <b-row class="mt-2">
+                            <!-- Print balance here -->
+                            <b-col>Balances:
+                                <div v-for="token in franklinCoins">
+                                    <b-row class="amount_show">
+                                        Verified {{token}}&nbsp;{{franklinBalanceForToken(token)}}
+                                    </b-row>
+                                    <b-row class="amount_show" style="color: grey" v-if="nonverifiedFranklinTransaction(token)">
+                                        Committed {{token}}&nbsp;{{franklinCommittedBalanceForToken(token)}}
+                                    </b-row>
+                                    <b-row class="amount_show" style="color: grey" v-if="pendingFranklinTransaction(token)">
+                                        Pending {{token}}&nbsp;{{franklinPendingBalanceForToken(token)}}
+                                    </b-row>
+                                </div>
+                            </b-col>
+                        </b-row>
+                        <b-row class="mt-2" style="color: grey" v-if="pendingWithdraw">
+                           <b-col cols="6">Pending:</b-col> <b-col>ETH {{store.account.onchain.balance}}</b-col>
+                        </b-row>
+                        <b-row class="mt-2 mx-auto" v-if="pendingWithdraw">
+                            <b-btn variant="primary" class="mt-2 mx-auto" @click="completeWithdraw">Complete withdrawal</b-btn>                            
+                        </b-row>
+                        <!-- <div v-if="franklinAccountActive">
+                            <label for="acc_id">Account ID:</label>
+                            <b-form-input id="acc_id" v-model="store.account.plasma.id" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
+                            <b-row class="mt-2">
+                                <b-col cols="8">Verified balance:</b-col> 
+                                <b-col>ETH {{store.account.plasma.verified.balance || 0}}</b-col>
+                            </b-row>
+                            <b-row class="mt-2" style="color: grey" v-if="store.account.plasma.verified.balance != store.account.plasma.committed.balance">
+                                <b-col cols="8">Committed balance:</b-col> 
+                                <b-col>ETH {{store.account.plasma.committed.balance || 0}}</b-col>
+                            </b-row>
+                            <b-row class="mt-2" style="color: grey" v-if="store.account.plasma.pending.balance != store.account.plasma.committed.balance">
+                                <b-col cols="8">Pending balance:</b-col> 
+                                <b-col>ETH {{store.account.plasma.pending.balance || 0}}</b-col>
+                            </b-row>
+                            <b-row class="mt-2">                    
+                                <b-col cols="8">Latest nonce:</b-col> 
+                                <b-col>{{store.account.plasma.committed.nonce || 0}}</b-col>
+                            </b-row>
+                            <b-row class="mt-2" style="color: grey" v-if="store.account.plasma.pending.nonce !== store.account.plasma.committed.nonce">
+                                <b-col cols="8">Next nonce:</b-col> <b-col>{{store.account.plasma.pending.nonce || store.account.plasma.committed.nonce || 0}}</b-col>
+                            </b-row>
+                        </div> -->
+                    </b-card>
+                    <!-- <b-card class="mt-2">
                         <p class="mb-2"><strong>Matter Network</strong>
                             (<a href="/explorer/" target="_blank">block explorer</a>)</p>
 
@@ -141,18 +187,71 @@
                                 <b-col cols="8">Next nonce:</b-col> <b-col>{{store.account.plasma.pending.nonce || store.account.plasma.committed.nonce || 0}}</b-col>
                             </b-row>
                         </div>
-                    </b-card>
+                    </b-card> -->
                 </b-card>
+            </b-col>
+<!-- 
+######## ########     ###    ##    ##  ######  ######## ######## ########     ##     ##    ###    ######## ######## ######## ########  
+   ##    ##     ##   ## ##   ###   ## ##    ## ##       ##       ##     ##    ###   ###   ## ##      ##       ##    ##       ##     ## 
+   ##    ##     ##  ##   ##  ####  ## ##       ##       ##       ##     ##    #### ####  ##   ##     ##       ##    ##       ##     ## 
+   ##    ########  ##     ## ## ## ##  ######  ######   ######   ########     ## ### ## ##     ##    ##       ##    ######   ########  
+   ##    ##   ##   ######### ##  ####       ## ##       ##       ##   ##      ##     ## #########    ##       ##    ##       ##   ##   
+   ##    ##    ##  ##     ## ##   ### ##    ## ##       ##       ##    ##     ##     ## ##     ##    ##       ##    ##       ##    ##  
+   ##    ##     ## ##     ## ##    ##  ######  ##       ######## ##     ##    ##     ## ##     ##    ##       ##    ######## ##     ## 
+ -->
+            <b-col sm="6" order="2" class="col-xl-6">
+                <b-card title="Transfer in Matter Network" class="mb-4 d-flex">
+                    <label for="transferToInput">To (recepient Franklin address): </label>
+                    <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0" autocomplete="off"></b-form-input>
+                    <p class="mt-2" style="color: grey">
+                        <!-- Note: your recipient must register in Matter Network first. For testing, try 
+                        <a href="#" @click="transferTo='0x'+store.config.SENDER_ACCOUNT">0x{{store.config.SENDER_ACCOUNT}}</a> -->
+                    </p>
+                    <label for="transferToken" class="mt-4">Token</label>
+                    <b-form-select v-model="coin" :option="store.coins" class="mb-3">
+                        <option v-for="token in ethTokens" @click="coin=token">{{ token }}</option>
+                    </b-form-select>
+                    <label for="transferAmountInput" class="mt-4">Amount</label>
+                            (max {{coin}}&nbsp;<a href="#" @click="transferAmount=franklinCommittedBalanceForToken(coin)">{{franklinCommittedBalanceForToken(coin)}}</a>):
+                    <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
+
+                    <label for="transferNonceInput" class="mt-4">Nonce (autoincrementing):</label>
+                    <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
+
+                    <div id="transferBtn" class="right">
+                        <img v-if="transferPending" style="margin-right: 1.5em" src="./assets/loading.gif" width="100em">
+                        <b-btn v-else class="mt-4" variant="outline-primary" @click="transfer" :disabled="!!transferProblem">Submit transaction</b-btn>
+                    </div>
+
+                    <p class="mt-2" style="color: grey">
+                        To commit a new block, either submit {{store.config.TRANSFER_BATCH_SIZE}} transactions, or wait 1 minute until timer triggers block generation.
+                    </p>
+                    <p class="mt-2" style="color: grey">
+                         Once a block is committed, it takes about 5 minutes to verify it.
+                    </p>
+                    <b-tooltip target="transferBtn" :disabled="transferPending || !transferProblem" triggers="hover">
+                        Transfer not possible: {{ transferProblem }}
+                    </b-tooltip>
+                </b-card>
+
             </b-col>
         </b-row>
     </b-container>
-
+<!-- 
+########  ######## ########   #######   ######  #### ######## 
+##     ## ##       ##     ## ##     ## ##    ##  ##     ##    
+##     ## ##       ##     ## ##     ## ##        ##     ##    
+##     ## ######   ########  ##     ##  ######   ##     ##    
+##     ## ##       ##        ##     ##       ##  ##     ##    
+##     ## ##       ##        ##     ## ##    ##  ##     ##    
+########  ######## ##         #######   ######  ####    ##    
+ -->
     <b-modal ref="depositModal" id="depositModal" title="Deposit" hide-footer>
         <b-form-select v-model="coin" :option="store.coins" class="mb-3">
-            <option v-for="item in Object.keys(store.account.coin_balances)" @click="coin=item">{{ item }}</option>
+            <option v-for="token in ethTokens" @click="coin=token">{{ token }}</option>
         </b-form-select>
         <label for="depositAmountInput">Amount</label> 
-            (max <span>{{ coin }}</span> <a href="#" @click="depositAmount=store.account.coin_balances[coin]">{{store.account.coin_balances[coin]}}</a>):
+            (max <span>{{ coin }}</span> <a href="#" @click="depositAmount=ethereumBalanceForToken(coin)">{{ethereumBalanceForToken(coin)}}</a>):
         <b-form-input id="depositAmountInput" type="number" placeholder="7.50" v-model="depositAmount"></b-form-input>
         <div id="doDepositBtn" class="mt-4 float-right">
             <b-btn variant="primary" @click="deposit" :disabled="!!doDepositProblem">Deposit</b-btn>
@@ -161,7 +260,15 @@
             Deposit not possible: {{ doDepositProblem }}
         </b-tooltip>
     </b-modal>
-
+<!-- 
+##      ## #### ######## ##     ## ########  ########     ###    ##      ## 
+##  ##  ##  ##     ##    ##     ## ##     ## ##     ##   ## ##   ##  ##  ## 
+##  ##  ##  ##     ##    ##     ## ##     ## ##     ##  ##   ##  ##  ##  ## 
+##  ##  ##  ##     ##    ######### ##     ## ########  ##     ## ##  ##  ## 
+##  ##  ##  ##     ##    ##     ## ##     ## ##   ##   ######### ##  ##  ## 
+##  ##  ##  ##     ##    ##     ## ##     ## ##    ##  ##     ## ##  ##  ## 
+ ###  ###  ####    ##    ##     ## ########  ##     ## ##     ##  ###  ###  
+ -->
     <b-modal ref="withdrawModal" id="withdrawModal" title="Withdrawal" hide-footer>
         <b-tabs pills card>
             <!--<b-tab title="Partial withdrawal" active>
@@ -190,6 +297,15 @@
     </b-modal>
 </div>
 </template>
+<!--
+ ######   ######  ########  #### ########  ######## 
+##    ## ##    ## ##     ##  ##  ##     ##    ##    
+##       ##       ##     ##  ##  ##     ##    ##    
+ ######  ##       ########   ##  ########     ##    
+      ## ##       ##   ##    ##  ##           ##    
+##    ## ##    ## ##    ##   ##  ##           ##    
+ ######   ######  ##     ## #### ##           ##    
+-->
 
 <script>
 
@@ -204,6 +320,7 @@ import transactionLib from './transaction'
 window.transactionLib = transactionLib
 
 import ABI from './contract'
+import { setTimeout } from 'timers';
 
 const maxExitEntries = 32;
 
@@ -261,7 +378,33 @@ export default {
     },
     destroyed() {
     },
+/*
+ *  ######   #######  ##     ## ########  ##     ## ######## ######## ########  
+ * ##    ## ##     ## ###   ### ##     ## ##     ##    ##    ##       ##     ## 
+ * ##       ##     ## #### #### ##     ## ##     ##    ##    ##       ##     ## 
+ * ##       ##     ## ## ### ## ########  ##     ##    ##    ######   ##     ## 
+ * ##       ##     ## ##     ## ##        ##     ##    ##    ##       ##     ## 
+ * ##    ## ##     ## ##     ## ##        ##     ##    ##    ##       ##     ## 
+ *  ######   #######  ##     ## ##         #######     ##    ######## ########  
+ */
+
     computed: {
+        franklinAccountActive() {
+            return Math.random() < 0.3;
+            // return store.account.plasma.id > 0 && !store.account.plasma.closing;
+        },
+        ethTokens() {
+            return ['ETH', 'BTC', 'ZEC']
+        },
+        franklinCoins() {
+            return ['ETH', 'BTC', 'ZEC'].reverse()
+        },
+        franklinAddress() {
+            return wallet.address;
+        },
+        ethereumAddress() {
+            return wallet.ethWallet.address;
+        },
         isTestnet() {
             return this.network === '9'
         },
@@ -283,7 +426,8 @@ export default {
         contractAddress: () => window.contractAddress,
         depositProblem() {
             if(store.account.plasma.closing) return "pending closing account, please complete exit first"
-            if(!(Number(store.account.balance) > 0)) return "empty balance in the mainchain account"
+            // if ( ! this.franklinCoins.some(ethereumBalanceForToken)) return "empty balance in the mainchain account"
+            // if(!(Number(store.account.balance) > 0)) return "empty balance in the mainchain account"
         },
         doDepositProblem() {
             if(this.depositProblem) return this.depositProblem
@@ -313,7 +457,48 @@ export default {
         },
         pendingWithdraw: () => Number(store.account.onchain.balance) > 0,
     },
+/*
+ * ##     ## ######## ######## ##     ##  #######  ########   ######  
+ * ###   ### ##          ##    ##     ## ##     ## ##     ## ##    ## 
+ * #### #### ##          ##    ##     ## ##     ## ##     ## ##       
+ * ## ### ## ######      ##    ######### ##     ## ##     ##  ######  
+ * ##     ## ##          ##    ##     ## ##     ## ##     ##       ## 
+ * ##     ## ##          ##    ##     ## ##     ## ##     ## ##    ## 
+ * ##     ## ########    ##    ##     ##  #######  ########   ######  
+ */
     methods: {
+        nonverifiedFranklinTransaction(token) {
+            return Math.random() < 0.2;
+        },
+        franklinCommittedBalanceForToken(token) {
+            return Math.random() * 10000;
+        },
+        pendingFranklinTransaction(token) {
+            return Math.random() < 0.2;
+        },
+        franklinPendingBalanceForToken(token) {
+            return Math.random() * 10000;
+        },
+        pendingAmountForToken(token) {
+            return (Math.random() * 1000).toPrecision(2);
+        },
+        pendingWithdrawForToken(token) {
+            return Math.random() < 0.5;
+        },
+        ethereumBalanceForToken(token) {
+            return ({
+                'ETH': 123,
+                'BTC': 456,
+                'ZEC': 789
+            })[token];
+        },
+        franklinBalanceForToken(token) {
+            return 19937 + ({
+                'ETH': 123,
+                'BTC': 456,
+                'ZEC': 789
+            })[token];
+        },
         async deposit() {
             this.$refs.depositModal.hide()
             let pub = store.account.plasma.key.publicKey
@@ -359,7 +544,7 @@ export default {
             this.transferPending = true
                 if(!ethUtil.isHexString(this.transferTo)) {
                     this.alert('to is not a hex string')
-                    return  
+                    return 
                 }
                 const to = (await contract.ethereumAddressToAccountID(this.transferTo))[0].toNumber()
                 if(0 === to) {
@@ -424,6 +609,7 @@ export default {
             return data
         },
         async getPlasmaInfo(accountId) {
+            console.log('getplasmainfo called')
             //console.log(`getAccountInfo ${accountId}`)
             let result = (await axios({
                 method: 'get',
@@ -557,68 +743,68 @@ export default {
             let timer = this.updateTimer
             let plasmaData = {}
             let onchain = {}
-            try {
-                newData.address = window.ethereum ? ethereum.selectedAddress : (await eth.accounts())[0]
-                //console.log('1', newData.address)
-                let balance = (await eth.getBalance(newData.address)).toString(10)
+            // try {
+            //     newData.address = window.ethereum ? ethereum.selectedAddress : (await eth.accounts())[0]
+            //     //console.log('1', newData.address)
+            //     let balance = (await eth.getBalance(newData.address)).toString(10)
 
-                newData.balance = Eth.fromWei(new BN(balance), 'ether')
-                let id = (await contract.ethereumAddressToAccountID(newData.address))[0].toNumber();
+            //     newData.balance = Eth.fromWei(new BN(balance), 'ether')
+            //     let id = (await contract.ethereumAddressToAccountID(newData.address))[0].toNumber();
 
-                if( store.account.plasma.id && id !== store.account.plasma.id ) {
-                    // FIXME:
-                    //store.account.plasma.id = null // display loading.gif
-                    store.account.plasma.id = null
-                    this.$router.push('/login')
-                    return
-                }
+            //     if( store.account.plasma.id && id !== store.account.plasma.id ) {
+            //         // FIXME:
+            //         //store.account.plasma.id = null // display loading.gif
+            //         store.account.plasma.id = null
+            //         this.$router.push('/login')
+            //         return
+            //     }
 
-                let accountState = await contract.accounts(id);
+            //     let accountState = await contract.accounts(id);
 
-                // let accountState = await ethersContract.accounts(id);
-                plasmaData.closing = accountState.state.toNumber() > 1;
+            //     // let accountState = await ethersContract.accounts(id);
+            //     plasmaData.closing = accountState.state.toNumber() > 1;
 
-                let {blocks, pendingBalance} = await this.loadEvents(newData.address, plasmaData.closing)
-                onchain.completeWithdrawArgs = blocks
-                onchain.balance = pendingBalance
+            //     let {blocks, pendingBalance} = await this.loadEvents(newData.address, plasmaData.closing)
+            //     onchain.completeWithdrawArgs = blocks
+            //     onchain.balance = pendingBalance
 
-                newData.plasmaId = id
-                if(id > 0) {
-                    plasmaData = await this.getPlasmaInfo(id)
-                }
-            } catch (err) {
-                this.alert('Status update failed: ' + err)
-                console.log(err)
-            }
-            if(timer === this.updateTimer) { // if this handler is still valid
-                store.account.address = newData.address
-                store.account.balance = newData.balance
+            //     newData.plasmaId = id
+            //     if(id > 0) {
+            //         plasmaData = await this.getPlasmaInfo(id)
+            //     }
+            // } catch (err) {
+            //     this.alert('Status update failed: ' + err)
+            //     console.log(err)
+            // }
+            // if(timer === this.updateTimer) { // if this handler is still valid
+            //     store.account.address = newData.address
+            //     store.account.balance = newData.balance
 
-                store.account.onchain = onchain
+            //     store.account.onchain = onchain
 
-                store.account.plasma.id = newData.plasmaId
-                store.account.plasma.closing = plasmaData.closing
+            //     store.account.plasma.id = newData.plasmaId
+            //     store.account.plasma.closing = plasmaData.closing
 
-                if(store.account.plasma.id) {
+            //     if(store.account.plasma.id) {
 
-                    //console.log('plasmaData', plasmaData)
-                    store.account.plasma.verified = plasmaData.verified || {}
-                    store.account.plasma.committed = plasmaData.committed || {}
-                    store.account.plasma.pending = plasmaData.pending || {}
+            //         //console.log('plasmaData', plasmaData)
+            //         store.account.plasma.verified = plasmaData.verified || {}
+            //         store.account.plasma.committed = plasmaData.committed || {}
+            //         store.account.plasma.pending = plasmaData.pending || {}
 
-                    if(store.account.plasma.pending.nonce !== null) {
+            //         if(store.account.plasma.pending.nonce !== null) {
                         
-                        this.nonce = store.account.plasma.pending.nonce
+            //             this.nonce = store.account.plasma.pending.nonce
                         
-                        // if (store.account.plasma.pending.nonce > Number(this.nonce)) {
-                        //     this.nonce = store.account.plasma.pending.nonce
-                        // }
-                        // if (store.account.plasma.pending_nonce > Number(this.nonce)) {
-                        //     this.nonce = store.account.plasma.pending_nonce
-                        // }
-                    }
-                }
-                this.updateTimer = setTimeout(() => this.updateAccountInfo(), 1000)
+            //             // if (store.account.plasma.pending.nonce > Number(this.nonce)) {
+            //             //     this.nonce = store.account.plasma.pending.nonce
+            //             // }
+            //             // if (store.account.plasma.pending_nonce > Number(this.nonce)) {
+            //             //     this.nonce = store.account.plasma.pending_nonce
+            //             // }
+            //         }
+            //     }
+            //     this.updateTimer = setTimeout(() => this.updateAccountInfo(), 1000)
             }
         },
     },

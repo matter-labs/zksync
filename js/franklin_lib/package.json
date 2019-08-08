@@ -27,6 +27,7 @@
     "test": "mocha -r ts-node/register tests/**/*.test.ts",
     "loadtest": "ts-node scripts/loadtest.ts",
     "fmt": "prettier --parser typescript --write \"**/*.ts\"",
-    "wallet": "ts-node src/wallet.ts"
+    "wallet": "ts-node src/wallet.ts",
+    "build": "tsc"
   }
 }

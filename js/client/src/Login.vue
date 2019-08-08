@@ -23,7 +23,7 @@ import transactionLib from './transaction'
 const newKey = transactionLib.newKey
 import {keccak256} from 'js-sha3'
 const ethers = require('ethers')
-import * as Wallet from '../../franklin_lib/tsDist/src/wallet'
+import * as Wallet from '../../franklin_lib/dist/src/wallet'
 
 export default {
     name: 'login',
@@ -41,8 +41,10 @@ export default {
                     account = ethereum.selectedAddress
                 }
                 console.log('Logging in with', account)
-                var provider = new ethers.providers.Web3Provider(web3.currentProvider);
-                window.signer = provider.getSigner();
+                // let provider = new ethers.providers.Web3Provider(web3.currentProvider);
+                // window.signer = provider.getSigner();
+                let provider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
+                window.signer = ethers.Wallet.fromMnemonic("fine music test violin matrix prize squirrel panther purchase material script deal").connect(provider);
                 console.log("Wallet: ", Wallet);
                 window.wallet = await Wallet.Wallet.fromEthWallet(signer);
                 console.log("Your new Franklin address: ", window.wallet.address);

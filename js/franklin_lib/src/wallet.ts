@@ -60,6 +60,7 @@ export class Wallet {
     address: Address;
     privateKey: BN;
     publicKey: EdwardsPoint;
+    ethWallet: ethers.Wallet
 
     supportedTokens: Token[];
     franklinState: FranklinAccountState;
@@ -71,6 +72,7 @@ export class Wallet {
         let privateKey = new BN(HmacSHA512(seed.toString('hex'), 'Matter seed').toString(), 'hex');
         this.privateKey = privateKey.mod(altjubjubCurve.n);
         this.publicKey = altjubjubCurve.g.mul(this.privateKey).normalize();
+        this.ethWallet = ethersWallet;
         let [x, y] = [this.publicKey.getX(), this.publicKey.getY()];
         let buff = Buffer.from(x.toString('hex') + y.toString('hex'), 'hex');
         let hash = pedersenHash(buff);
