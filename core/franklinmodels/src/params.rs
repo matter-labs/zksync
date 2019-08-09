@@ -52,3 +52,7 @@ pub const TOTAL_TOKENS: usize = 1;
 pub const ETH_TOKEN_ID: TokenId = 0;
 
 pub const BLOCK_SIZE_CHUNKS: usize = 2000;
+
+/// Lock onchain deposits for this number of eth blocks.
+pub const LOCK_DEPOSITS_FOR: u64 = 8 * 60;
+pub const FR_ADDRESS_LEN: usize = 27;

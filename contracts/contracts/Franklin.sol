@@ -290,7 +290,7 @@ contract Franklin is DummyVerifier, VerificationKeys {
         emit OnchainDeposit(
             msg.sender,
             _tokenId,
-            _amount,
+            balances[msg.sender][_tokenId].balance,
             lockedUntilBlock,
             _franklin_addr
         );

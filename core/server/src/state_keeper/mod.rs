@@ -2,6 +2,7 @@ use pairing::bn256::Bn256;
 // use franklin_crypto::jubjub::{FixedGenerators};
 // use franklin_crypto::alt_babyjubjub::{AltJubjubBn256};
 
+use failure::{bail, ensure};
 use franklin_crypto::eddsa::PrivateKey;
 use models::node::block::{Block, ExecutedTx};
 use models::node::tx::FranklinTx;
@@ -167,12 +168,15 @@ impl PlasmaStateKeeper {
     }
 
     fn create_new_block(&mut self, tx_for_commitments: &Sender<CommitRequest>) {
+        self.next_block_at_max = SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL);
         let txs = self.prepare_tx_for_block();
+        if txs.is_empty() {
+            return;
+        }
         let commit_request = self.apply_txs(txs);
         tx_for_commitments
             .send(commit_request)
             .expect("Commit request send");
-        self.next_block_at_max = SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL);
         self.state.block_number += 1; // bump current block number as we've made one
     }
 
@@ -233,9 +237,25 @@ impl PlasmaStateKeeper {
     }
 
     fn precheck_tx(&self, tx: &FranklinTx) -> Result<(), failure::Error> {
-        warn!("ETH state is not checked when applying tx");
+        if let FranklinTx::Deposit(deposit) = tx {
+            let eth_state = self.eth_state.read().expect("eth state rlock");
+            if let Some(locked_balance) = eth_state
+                .locked_balances
+                .get(&(deposit.to.clone(), deposit.token))
+            {
+                ensure!(
+                    locked_balance.amount > deposit.amount,
+                    "Locked amount insufficient"
+                );
+                ensure!(
+                    locked_balance.blocks_left_until_unlock > 10,
+                    "Locked balance will unlock soon"
+                );
+            } else {
+                bail!("Onchain balance is not locked");
+            }
+        }
         Ok(())
-        //        unimplemented!("Check ETH state before applying transaction");
     }
 
     fn apply_txs(&mut self, transactions: Vec<FranklinTx>) -> CommitRequest {
@@ -252,7 +272,7 @@ impl PlasmaStateKeeper {
             }
 
             if let Err(e) = self.precheck_tx(&tx) {
-                error!("Tx {:?} not ready: {:?}", tx, e);
+                error!("Tx {} is not ready: {}", hex::encode(tx.hash()), e);
                 continue;
             }
 

@@ -32,6 +32,13 @@ impl AccountAddress {
             data: bytes.as_slice().try_into().unwrap(),
         })
     }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, failure::Error> {
+        ensure!(bytes.len() == 27, "Size mismatch");
+        Ok(AccountAddress {
+            data: bytes.try_into().unwrap(),
+        })
+    }
 }
 
 impl Serialize for AccountAddress {
