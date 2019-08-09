@@ -850,6 +850,7 @@ dependencies = [
  "franklin-crypto 0.0.5 (git+ssh://git@github.com/matter-labs/franklin-crypto.git)",
  "franklinmodels 0.0.1",
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num-traits 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "pairing_ce 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",

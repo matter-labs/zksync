@@ -9,7 +9,7 @@ use diesel::dsl::*;
 use models::node::block::{Block, ExecutedTx};
 use models::node::{
     apply_updates, reverse_updates, Account, AccountId, AccountMap, AccountUpdate, AccountUpdates,
-    BlockNumber, Fr, FranklinOp, Nonce, TokenId,
+    BlockNumber, FranklinOp, Nonce, TokenId,
 };
 use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};

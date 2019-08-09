@@ -11,7 +11,31 @@ use franklinmodels::circuit::account::{Balance, CircuitAccount, CircuitAccountTr
 use franklinmodels::merkle_tree::hasher::Hasher;
 use franklinmodels::params as franklin_constants;
 use pairing::bn256::*;
+use crate::operation::TransactionSignature;
+use franklin_crypto::eddsa::{PrivateKey};
+use franklin_crypto::jubjub::FixedGenerators;
+use rand::{Rng, SeedableRng, XorShiftRng};
+use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 
+pub fn generate_dummy_sig_data()->(Option<TransactionSignature<Bn256>>, Fr, Fr, Fr){
+    let params = &AltJubjubBn256::new();
+    let p_g = FixedGenerators::SpendingKeyGenerator;
+    let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+    let sender_sk = PrivateKey::<Bn256>(rng.gen());
+    let sender_pk = PublicKey::from_private(&sender_sk, p_g, &params);
+    let (sender_x, sender_y) = sender_pk.0.into_xy();
+    let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
+    let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
+    sig_bits.reverse();
+    sig_bits.truncate(80);
+
+    // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
+    let signature = sign(&sig_bits, &sender_sk, p_g, &params, rng);
+    (signature, sig_msg, sender_x, sender_y)
+
+    //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+
+}
 pub fn pub_key_hash<E: JubjubEngine, H: Hasher<E::Fr>>(
     pub_key: &PublicKey<E>,
     hasher: &H,

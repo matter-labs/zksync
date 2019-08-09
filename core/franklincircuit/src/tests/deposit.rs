@@ -1,8 +1,8 @@
 use super::utils::*;
-
-use crate::operation::*;
 use crate::utils::*;
 
+use crate::operation::*;
+use num_traits::cast::ToPrimitive;
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
 
 use crate::account::AccountWitness;
@@ -14,6 +14,7 @@ use franklinmodels::circuit::account::{
 use franklinmodels::merkle_tree::hasher::Hasher;
 use franklinmodels::merkle_tree::PedersenHasher;
 use franklinmodels::params as franklin_constants;
+use franklinmodels::node::{DepositOp};
 use pairing::bn256::*;
 
 pub struct DepositData {
@@ -85,6 +86,25 @@ impl<E: JubjubEngine> DepositWitness<E> {
         pubdata_bits.resize(40 * 8, false);
         pubdata_bits
     }
+}
+
+pub fn apply_deposit_tx(
+    tree: &mut CircuitAccountTree,
+    deposit: &DepositOp
+) -> DepositWitness<Bn256>{
+    let mut fr_repr = <Fr as PrimeField>::Repr::default();
+    fr_repr.read_be(&*deposit.tx.to.data.to_vec()).unwrap();
+    let new_pubkey_hash = Fr::from_repr(fr_repr).unwrap();
+
+    let deposit_data = DepositData{
+        amount: deposit.tx.amount.to_u128().unwrap(),
+        fee: deposit.tx.fee.to_u128().unwrap(),
+        token: deposit.tx.token as u32,
+        account_address: deposit.account_id as u32, 
+        new_pub_key_hash: new_pubkey_hash,
+    };
+    // le_bit_vector_into_field_element()
+    apply_deposit(tree, &deposit_data)
 }
 pub fn apply_deposit(
     tree: &mut CircuitAccountTree,
