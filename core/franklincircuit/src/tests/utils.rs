@@ -248,3 +248,9 @@ pub fn apply_fee(
     let root_after_fee = tree.root_hash();
     (root_after_fee, validator_account_witness)
 }
+
+pub fn fr_from_bytes(bytes: Vec<u8>) -> Fr {
+    let mut fr_repr = <Fr as PrimeField>::Repr::default();
+    fr_repr.read_be(&*bytes).unwrap();
+    Fr::from_repr(fr_repr).unwrap()
+}

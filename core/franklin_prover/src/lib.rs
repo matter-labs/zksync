@@ -18,6 +18,7 @@ use tokio::timer;
 
 use circuit::tests::deposit::*;
 use circuit::tests::utils::*;
+use circuit::account::AccountWitness;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
@@ -42,6 +43,7 @@ use models::node::block::{Block, ExecutedTx};
 use models::primitives::*;
 use plasma::state::PlasmaState;
 
+use num_traits::cast::ToPrimitive;
 // use models::circuit::encoder;
 // use models::config::{
 //    DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE, PROVER_CYCLE_WAIT, PROVER_TIMEOUT, PROVER_TIMER_TICK,
@@ -197,7 +199,9 @@ impl BabyProver {
        let (last_block, accounts) = storage
            .load_verified_state()
            .expect("db must be functional");
-       let initial_state = PlasmaState::new(accounts, last_block + 1);
+       info!("Last block is: {}", last_block);
+        debug!("Accounts: {:?}", accounts);
+       let initial_state = PlasmaState::new(accounts, last_block);
 
        info!("Reading proving key, may take a while");
 
@@ -205,7 +209,7 @@ impl BabyProver {
 
     //    let path = format!("{}/transfer_pk.key", keys_path);
 
-       let path = format!("../franklin_key_generator/franklin_pk.key");
+       let path = format!("core/franklin_key_generator/franklin_pk.key");
        debug!("Reading key from {}", path);
        let franklin_circuit_params = read_parameters(&path);
        if franklin_circuit_params.is_err() {
@@ -217,7 +221,7 @@ impl BabyProver {
        info!("Copying states to balance tree");
 
        // TODO: replace with .clone() by moving PedersenHasher to static context
-       let mut tree = CircuitAccountTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
+       let mut tree = CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
        extend_accounts(&mut tree, initial_state.get_accounts().into_iter());
 
        let root = tree.root_hash();
@@ -230,7 +234,7 @@ impl BabyProver {
        );
 
        let supplied_root = initial_state.root_hash();
-
+       info!("supplied_root is: {}", supplied_root);
        if root != supplied_root {
            return Err(BabyProverErr::Other("root did not change".to_owned()));
        }
@@ -1098,7 +1102,7 @@ impl BabyProver {
            .load_committed_state(Some(expected_current_block))
            .map_err(|e| format!("load_state_diff failed: {}", e))?;
 
-       let mut tree = CircuitAccountTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
+       let mut tree = CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
        extend_accounts(&mut tree, new_accounts.into_iter());
 
        self.accounts_tree = tree;
@@ -1114,6 +1118,7 @@ impl BabyProver {
            .map_err(|e| format!("fetch_prover_job failed: {}", e))?;
 
        if let Some(job) = job {
+           let initial_root = self.accounts_tree.root_hash();
            let block_number = job.block_number as BlockNumber;
            info!(
                "prover {} got a new job for block {}",
@@ -1139,6 +1144,8 @@ impl BabyProver {
             for op in ops{
                  match op{
                      FranklinOp::Deposit(deposit) => {
+
+                         println!("{:?}", deposit.tx.to.data);
                         let deposit_witness = apply_deposit_tx(&mut self.accounts_tree, &deposit);
                         
                         //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
@@ -1158,7 +1165,31 @@ impl BabyProver {
                          unreachable!("only deposists allowed");
                      }
                  } 
-            }   
+            }
+           let mut root_after_fee: Fr = Fr::zero();
+           let mut validator_account_witness: AccountWitness<Engine> = AccountWitness{
+               nonce: None,
+               pub_key_hash: None,
+           };
+           for (fee, token) in fees{
+               let (root, acc_witness) = apply_fee(&mut self.accounts_tree, block.fee_account as u32, token as u32, fee.to_u128().unwrap());
+               root_after_fee = root;
+               validator_account_witness = acc_witness;
+           }
+           info!("root after fees {}", root_after_fee);
+           info!("block new hash {}", block.new_root_hash);
+
+           let (validator_audit_path, _) = get_audits(&mut self.accounts_tree, block.fee_account as u32, 0);
+
+           let public_data_commitment = public_data_commitment::<Engine>(
+               &pub_data,
+               Some(initial_root),
+               Some(root_after_fee),
+               Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
+               Some(Fr::from_str(&block_number.to_string()).unwrap()),
+           );
+
+
             let proof = self
                 .apply_and_prove(&block)
                 .map_err(|e| format!("apply_and_prove failed: {}", e))?;

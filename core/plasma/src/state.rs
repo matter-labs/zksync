@@ -38,7 +38,7 @@ pub struct CollectedFee {
 
 impl PlasmaState {
     pub fn empty() -> Self {
-        let tree_depth = *params::BALANCE_TREE_DEPTH as u32;
+        let tree_depth = params::ACCOUNT_TREE_DEPTH as u32;
         let balance_tree = AccountTree::new(tree_depth);
         Self {
             balance_tree,

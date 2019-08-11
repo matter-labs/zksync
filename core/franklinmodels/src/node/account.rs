@@ -6,6 +6,7 @@ use std::convert::TryInto;
 use bigdecimal::BigDecimal;
 use failure::ensure;
 use ff::PrimeField;
+use ff::PrimeFieldRepr;
 use franklin_crypto::alt_babyjubjub::JubjubEngine;
 use franklin_crypto::jubjub::{edwards, Unknown};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -99,7 +100,13 @@ impl From<Account> for CircuitAccount<super::Engine> {
 
         circuit_account.nonce = Fr::from_str(&acc.nonce.to_string()).unwrap();
         circuit_account.pub_key_hash = Fr::from_hex(&acc.address.to_hex()).unwrap();
-
+//        let mut fr_repr = <Fr as PrimeField>::Repr::default();
+//        let mut addr_vec = acc.address.data.to_vec();
+//        addr_vec.reverse();
+//        addr_vec.resize(32, 0u8);
+//        addr_vec.reverse();
+//        fr_repr.read_be(&*addr_vec).unwrap();
+//        circuit_account.pub_key_hash = Fr::from_repr(fr_repr).unwrap();
         circuit_account
     }
 }

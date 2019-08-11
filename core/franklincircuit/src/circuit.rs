@@ -749,6 +749,16 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &ext_pubdata_chunk,
             &subtree_root,
         )?);
+        op_flags.push(self.noop(
+            cs.namespace(|| "noop"),
+            &mut cur,
+            &chunk_data,
+            &is_a_geq_b,
+            &is_account_empty,
+            &op_data,
+            &ext_pubdata_chunk,
+            &subtree_root,
+        )?);
         println!("op_valid  after all operations 1");
 
         let op_valid = multi_or(cs.namespace(|| "op_valid"), &op_flags)?;
@@ -1252,6 +1262,52 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &tx_valid,
         )?;
 
+        Ok(tx_valid)
+    }
+
+     fn noop<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        cur: &mut AllocatedOperationBranch<E>,
+        chunk_data: &AllocatedChunkData<E>,
+        is_a_geq_b: &Boolean,
+        is_account_empty: &Boolean,
+        op_data: &AllocatedOperationData<E>,
+        ext_pubdata_chunk: &AllocatedNum<E>,
+        subtree_root: &CircuitElement<E>,
+    ) -> Result<Boolean, SynthesisError> {
+        let mut is_valid_flags = vec![];
+        //construct pubdata (it's all 0 for noop)
+        let mut pubdata_bits = vec![];
+        pubdata_bits.resize(
+            1 * franklin_constants::CHUNK_BIT_WIDTH,
+            Boolean::constant(false),
+        );
+
+        let pubdata_chunk = select_pubdata_chunk(
+            cs.namespace(|| "select_pubdata_chunk"),
+            &pubdata_bits,
+            &chunk_data.chunk_number,
+            1,
+        )?;
+
+        let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_pubdata_equal"),
+            &pubdata_chunk,
+            ext_pubdata_chunk,
+        )?);
+        is_valid_flags.push(is_pubdata_chunk_correct);
+
+        let is_noop = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_deposit"),
+            &chunk_data.tx_type.get_number(),
+            Expression::u64::<CS>(0), //noop tx_type
+        )?);
+        is_valid_flags.push(is_noop.clone());
+
+        let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
+
+//       
         Ok(tx_valid)
     }
 

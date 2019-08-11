@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate log;
 
-use crate::BabyProver;
+use franklin_prover::BabyProver;
 use signal_hook::iterator::Signals;
 use std::env;
 use std::sync::{atomic::AtomicBool, Arc};

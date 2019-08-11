@@ -15,6 +15,7 @@ use franklinmodels::merkle_tree::hasher::Hasher;
 use franklinmodels::merkle_tree::PedersenHasher;
 use franklinmodels::params as franklin_constants;
 use franklinmodels::node::{DepositOp};
+use franklinmodels::node::tx::Deposit;
 use pairing::bn256::*;
 
 pub struct DepositData {
@@ -92,10 +93,15 @@ pub fn apply_deposit_tx(
     tree: &mut CircuitAccountTree,
     deposit: &DepositOp
 ) -> DepositWitness<Bn256>{
+    let alt_new_pubkey_hash = Fr::from_hex(&deposit.tx.to.to_hex()).unwrap();
     let mut fr_repr = <Fr as PrimeField>::Repr::default();
-    fr_repr.read_be(&*deposit.tx.to.data.to_vec()).unwrap();
+    let mut addr_vec = deposit.tx.to.data.to_vec();
+    addr_vec.reverse();
+    addr_vec.resize(32, 0u8);
+    addr_vec.reverse();
+    fr_repr.read_be(&*addr_vec).unwrap();
     let new_pubkey_hash = Fr::from_repr(fr_repr).unwrap();
-
+    println!("alt_new_pubkey_hash {} \n new_pubkey_hash {}", alt_new_pubkey_hash, new_pubkey_hash);
     let deposit_data = DepositData{
         amount: deposit.tx.amount.to_u128().unwrap(),
         fee: deposit.tx.fee.to_u128().unwrap(),
@@ -310,7 +316,19 @@ pub fn calculate_deposit_operations_from_witness(
     ];
     operations
 }
-
+//#[test]
+//fn test_deposit_apply_tx(){
+//    let data = [0 as u8; 20]
+//    let alt_new_pubkey_hash = Fr::from_hex(&data.to_hex()).unwrap();
+//    let mut fr_repr = <Fr as PrimeField>::Repr::default();
+//    let mut addr_vec = deposit.tx.to.data.to_vec();
+//    addr_vec.reverse();
+//    addr_vec.resize(32, 0u8);
+//    addr_vec.reverse();
+//    fr_repr.read_be(&*addr_vec).unwrap();
+//    let new_pubkey_hash = Fr::from_repr(fr_repr).unwrap();
+//    println!("alt_new_pubkey_hash {} \n new_pubkey_hash {}", alt_new_pubkey_hash, new_pubkey_hash);
+//}
 #[test]
 fn test_deposit_franklin_in_empty_leaf() {
     use super::utils::public_data_commitment;
@@ -344,7 +362,7 @@ fn test_deposit_franklin_in_empty_leaf() {
 
     let mut tree: CircuitAccountTree =
         CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
-
+    println!("empty tree root_hash is: {}", tree.root_hash());
     let sender_sk = PrivateKey::<Bn256>(rng.gen());
     let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
     let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);

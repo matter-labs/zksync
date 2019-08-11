@@ -828,6 +828,7 @@ dependencies = [
  "franklinmodels 0.0.1",
  "futures 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num-traits 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "pairing_ce 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "plasma 0.1.1",
  "rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
