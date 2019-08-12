@@ -57,6 +57,8 @@ interface ETHAccountState {
 }
 
 export class Wallet {
+    static tokensNames = ['ETH'];
+
     address: Address;
     privateKey: BN;
     publicKey: EdwardsPoint;
@@ -140,8 +142,192 @@ export class Wallet {
     }
 
     async getState() {
-        this.supportedTokens = await this.provider.getTokens();
-        return await this.provider.getState(this.address);
+        let res = await this.provider.getState(this.address);
+        let balances = {};
+
+        ['pending', 'committed', 'verified'].forEach(state => {
+            let tmp = {};
+            tmp['nonce'] = res.nonce;
+            tmp['balances'] = [];
+            for (let t = 0; t < res.balances.length; ++t) {
+                tmp['balances'].push({
+                    token: Wallet.tokensNames[t],
+                    balance: res.balances[t]
+                });
+            }
+            res[state] = tmp;
+        })
+
+        delete res.balances;
+
+        return res;
+    }
+
+    /**
+     * gets balance for token in the mainchain
+     * @param token — tokenId
+     */
+    async getOnchainBalanceForToken(token: Token) {
+        if (token === 0) {
+            return await this.ethWallet.getBalance();
+        }
+
+        return new BN(Math.random() * 1000);
+    }
+
+    /**
+     * returns a list of tokenIds that user has in his mainchain account
+     */
+    async getOnchainTokensList() {
+        return [0];
+    }
+
+    /**
+     * get a list of balances in the mainchain
+     */
+    async getVerifiedOnchainState() {
+        let tokens = await this.getOnchainTokensList();
+        let balanceGetter = this.getOnchainBalanceForToken.bind(this);
+        let balances = await Promise.all(tokens.map(balanceGetter));
+        let res = [];
+        for (let t = 0; t < tokens.length; ++t) {
+            res.push({
+                token: Wallet.tokensNames[t],
+                balance: balances[t].toString()
+            });
+        }
+        return {
+            balances: res
+        };
+    }
+
+    /**
+     * list of tokens user has locked/unlocked in our contract
+     */
+    async getCommittedContractTokensList() {
+        return [0];
+    }
+
+    async getLockedContractBalanceForToken(token: Token) {
+        return new BN(Math.random() * 1000);
+    }
+    
+    async getUnlockedContractBalanceForToken(token: Token) {
+        return new BN(Math.random() * 1000);
+    }
+
+    /**
+     * locked/unlocked balances in our contract
+     */
+    async getCommittedContractBalances() {
+        let tokens = await this.getCommittedContractTokensList();
+        let lockedBalanceGetter = this.getLockedContractBalanceForToken.bind(this);
+        let unlockedBalanceGetter = this.getUnlockedContractBalanceForToken.bind(this);
+        let [lockedBalances, unlockedBalances] = await Promise.all([
+            Promise.all(tokens.map(lockedBalanceGetter)),
+            Promise.all(tokens.map(unlockedBalanceGetter))
+        ]);
+        let res = [];
+        for (let t = 0; t < tokens.length; ++t) {
+            res.push({
+                token: Wallet.tokensNames[t],
+                locked: lockedBalances[t].toString(),
+                unlocked: unlockedBalances[t].toString()
+            });
+        }
+        return {
+            contractBalances: res
+        };
+    }
+
+    /**
+     * locked/unlocked balances, but pending.
+     * ought to be calculated from the transactions sent from the wallet 
+     * during this very session.
+     */
+    async getPendingContractBalances() {
+        return await this.getCommittedContractBalances();
+    }
+
+    /**
+     * balances in Franklin
+     */
+    async getVerifiedFranklinState() {
+        let res = await this.getVerifiedOnchainState();
+        res['nonce'] = 32;
+        return res;
+    }
+
+    /**
+     * 
+     */
+    async getCommittedFranklinState() {
+        return await this.getVerifiedFranklinState();
+    }
+    
+    /**
+     * take verified state and here, on the client, apply transactions 
+     * sent during this session, to get the pending state.
+     */
+    async getPendingFranklinState() {
+        return await this.getVerifiedFranklinState();
+    }
+
+    /**
+     * transfer from mainchain to contract
+     */
+    async depositOnchain(token, amount) {
+
+    }
+
+    /**
+     * transfer from contract balance to franklin
+     * @param token 
+     * @param amount 
+     */
+    async depositFranklin(token, amount) {
+        
+    }
+
+    /**
+     * transfer from Franklin balance to the contract balance
+     * @param token 
+     * @param amount 
+     */
+    async exitFranklin(token, amount) {
+
+    }
+
+    /**
+     * transfer from our contract balance to the mainchain balance
+     * @param token 
+     * @param amount 
+     */
+    async exitOnchain(token, amount) {
+
+    }
+
+    /**
+     * load all the transactions for user
+     */
+    async getFullTransactionHistory() {
+        return this.getLocalTransactionHistory()
+    }
+
+    /**
+     * just the transactions sent during this session
+     */
+    getLocalTransactionHistory() {
+        return [
+            {
+                txId:   0xDEADBEEF,
+                to:     0x00000000,
+                token:  0,
+                amount: "20",
+                fee:    "3", 
+                status: "pending" // 'pending' | 'failed' | 'committed' | 'verified'
+            }
+        ]
     }
 }
 

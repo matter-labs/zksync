@@ -316,7 +316,7 @@ import {ethers} from 'ethers'
 import axios from 'axios'
 import ethUtil from 'ethjs-util'
 import transactionLib from './transaction'
-// import Wallet from '../franklin_lib/src/wallet'=
+import * as Wallet from '../../franklin_lib/dist/src/wallet'
 window.transactionLib = transactionLib
 
 import ABI from './contract'
@@ -743,68 +743,92 @@ export default {
             let timer = this.updateTimer
             let plasmaData = {}
             let onchain = {}
-            // try {
-            //     newData.address = window.ethereum ? ethereum.selectedAddress : (await eth.accounts())[0]
-            //     //console.log('1', newData.address)
-            //     let balance = (await eth.getBalance(newData.address)).toString(10)
+            let ethData = {}
+            try {
+                ethData.address = wallet.ethWallet.address
+                
+                ethData.balances = {}
+                ethData.balances['ETH'] = (await wallet.ethWallet.getBalance()).toString(10)
 
-            //     newData.balance = Eth.fromWei(new BN(balance), 'ether')
-            //     let id = (await contract.ethereumAddressToAccountID(newData.address))[0].toNumber();
+                plasmaData.address = wallet.address
+                plasmaData.balances = {}
+                let accountState = await wallet.getState()
+                console.log('accountState:', accountState);
+                let {pending, committed, verified} = accountState
+                plasmaData.balances = {pending, committed, verified}
 
-            //     if( store.account.plasma.id && id !== store.account.plasma.id ) {
-            //         // FIXME:
-            //         //store.account.plasma.id = null // display loading.gif
-            //         store.account.plasma.id = null
-            //         this.$router.push('/login')
-            //         return
-            //     }
+                console.log('ethData:', ethData)
+                console.log('plasmaData:', plasmaData)
 
-            //     let accountState = await contract.accounts(id);
+                store.ethData = ethData
+                store.plasmaData = plasmaData
+                store.nonce = Math.max.apply(null, [
+                    pending.nonce,
+                    committed.nonce,
+                    verified.nonce
+                ]);
 
-            //     // let accountState = await ethersContract.accounts(id);
-            //     plasmaData.closing = accountState.state.toNumber() > 1;
+                // newData.address = window.ethereum ? ethereum.selectedAddress : (await eth.accounts())[0]
+                // //console.log('1', newData.address)
+                // let balance = (await eth.getBalance(newData.address)).toString(10)
 
-            //     let {blocks, pendingBalance} = await this.loadEvents(newData.address, plasmaData.closing)
-            //     onchain.completeWithdrawArgs = blocks
-            //     onchain.balance = pendingBalance
+                // newData.balance = Eth.fromWei(new BN(balance), 'ether')
+                // let id = (await contract.ethereumAddressToAccountID(newData.address))[0].toNumber();
 
-            //     newData.plasmaId = id
-            //     if(id > 0) {
-            //         plasmaData = await this.getPlasmaInfo(id)
-            //     }
-            // } catch (err) {
-            //     this.alert('Status update failed: ' + err)
-            //     console.log(err)
-            // }
-            // if(timer === this.updateTimer) { // if this handler is still valid
-            //     store.account.address = newData.address
-            //     store.account.balance = newData.balance
+                // if( store.account.plasma.id && id !== store.account.plasma.id ) {
+                //     // FIXME:
+                //     //store.account.plasma.id = null // display loading.gif
+                //     store.account.plasma.id = null
+                //     this.$router.push('/login')
+                //     return
+                // }
 
-            //     store.account.onchain = onchain
+                // let accountState = await contract.accounts(id);
 
-            //     store.account.plasma.id = newData.plasmaId
-            //     store.account.plasma.closing = plasmaData.closing
+                // // let accountState = await ethersContract.accounts(id);
+                // plasmaData.closing = accountState.state.toNumber() > 1;
 
-            //     if(store.account.plasma.id) {
+                // let {blocks, pendingBalance} = await this.loadEvents(newData.address, plasmaData.closing)
+                // onchain.completeWithdrawArgs = blocks
+                // onchain.balance = pendingBalance
 
-            //         //console.log('plasmaData', plasmaData)
-            //         store.account.plasma.verified = plasmaData.verified || {}
-            //         store.account.plasma.committed = plasmaData.committed || {}
-            //         store.account.plasma.pending = plasmaData.pending || {}
+                // newData.plasmaId = id
+                // if(id > 0) {
+                //     plasmaData = await this.getPlasmaInfo(id)
+                // }
+            } catch (err) {
+                this.alert('Status update failed: ' + err)
+                console.log(err)
+            }
+            if(timer === this.updateTimer) { // if this handler is still valid
+                // store.account.address = newData.address
+                // store.account.balance = newData.balance
 
-            //         if(store.account.plasma.pending.nonce !== null) {
+                // store.account.onchain = onchain
+
+                // store.account.plasma.id = newData.plasmaId
+                // store.account.plasma.closing = plasmaData.closing
+
+                if(store.account.plasma.id) {
+
+                    // //console.log('plasmaData', plasmaData)
+                    // store.account.plasma.verified = plasmaData.verified || {}
+                    // store.account.plasma.committed = plasmaData.committed || {}
+                    // store.account.plasma.pending = plasmaData.pending || {}
+
+                    // if(store.account.plasma.pending.nonce !== null) {
                         
-            //             this.nonce = store.account.plasma.pending.nonce
+                    //     this.nonce = store.account.plasma.pending.nonce
                         
-            //             // if (store.account.plasma.pending.nonce > Number(this.nonce)) {
-            //             //     this.nonce = store.account.plasma.pending.nonce
-            //             // }
-            //             // if (store.account.plasma.pending_nonce > Number(this.nonce)) {
-            //             //     this.nonce = store.account.plasma.pending_nonce
-            //             // }
-            //         }
-            //     }
-            //     this.updateTimer = setTimeout(() => this.updateAccountInfo(), 1000)
+                    //     // if (store.account.plasma.pending.nonce > Number(this.nonce)) {
+                    //     //     this.nonce = store.account.plasma.pending.nonce
+                    //     // }
+                    //     // if (store.account.plasma.pending_nonce > Number(this.nonce)) {
+                    //     //     this.nonce = store.account.plasma.pending_nonce
+                    //     // }
+                    // }
+                }
+                this.updateTimer = setTimeout(() => this.updateAccountInfo(), 1000)
             }
         },
     },
