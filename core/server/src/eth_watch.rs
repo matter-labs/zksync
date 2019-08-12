@@ -13,16 +13,18 @@ use web3::types::{Address, BlockNumber, Filter, FilterBuilder, Log, H160, H256, 
 use web3::Web3;
 
 use bigdecimal::BigDecimal;
+use hyper::client::connect::Connect;
 use models::node::{AccountAddress, TokenId};
 use models::params::LOCK_DEPOSITS_FOR;
+use storage::{ConnectionPool, StorageProcessor};
 
-#[derive(Debug)]
 pub struct EthWatch {
     contract_addr: H160,
     web3_url: String,
     contract: ethabi::Contract,
     processed_block: u64,
     eth_state: Arc<RwLock<ETHState>>,
+    db_pool: ConnectionPool,
 }
 
 #[derive(Debug)]
@@ -52,7 +54,6 @@ pub struct ETHState {
 }
 
 impl ETHState {
-    // TODO: store new token in db, query new token symbol if it is ERC20Detailed.
     fn add_new_token(&mut self, id: TokenId, address: Address) {
         self.tokens.insert(id, address);
     }
@@ -161,6 +162,7 @@ impl EthWatch {
                 tokens: HashMap::new(),
                 locked_balances: HashMap::new(),
             })),
+            db_pool: ConnectionPool::new(),
         }
     }
 
@@ -174,7 +176,7 @@ impl EthWatch {
         let deposit_events = self.get_onchain_deposit_events(
             web3,
             contract,
-            BlockNumber::Number(block - LOCK_DEPOSITS_FOR),
+            BlockNumber::Number(block.saturating_sub(LOCK_DEPOSITS_FOR)),
             BlockNumber::Number(block),
         );
         for deposit in deposit_events {
@@ -266,6 +268,8 @@ impl EthWatch {
         contract: &Contract<T>,
         last_block: u64,
     ) {
+        debug_assert!(self.processed_block < last_block);
+
         let mut eth_state = self.eth_state.write().expect("ETH state lock");
 
         let new_tokens = self.get_new_token_events(
@@ -331,6 +335,20 @@ impl EthWatch {
             })
             .collect();
         self.processed_block = last_block;
+    }
+
+    pub fn commit_state(&self) {
+        let eth_state = self.eth_state.read().expect("eth state read lock");
+        self.db_pool
+            .access_storage()
+            .map(|storage| {
+                for (id, address) in &eth_state.tokens {
+                    if let Err(e) = storage.store_token(*id, &address.hex(), None) {
+                        warn!("Failed to add token to db: {:?}", e);
+                    }
+                }
+            })
+            .unwrap_or_default();
     }
 
     pub fn get_shared_eth_state(&self) -> Arc<RwLock<ETHState>> {

@@ -14,6 +14,7 @@ use models::node::{
 use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
+use std::collections::HashMap;
 use std::convert::TryInto;
 
 mod helpers;
@@ -96,9 +97,10 @@ struct StorageBalance {
 
 #[derive(Insertable, QueryableByName, Queryable)]
 #[table_name = "tokens"]
-struct Token {
+pub struct Token {
     pub id: i32,
     pub address: String,
+    pub symbol: Option<String>,
 }
 
 #[derive(Debug, Insertable)]
@@ -1132,11 +1134,11 @@ impl StorageProcessor {
                 // };
                 use crate::schema::prover_runs::dsl::*;
                 let inserted: ProverRun = insert_into(prover_runs)
-                .values(&vec![(
-                    block_number.eq(block_number_ as i32),
-                    worker.eq(worker_.to_string())
-                )])
-                .get_result(self.conn())?;
+                    .values(&vec![(
+                        block_number.eq(block_number_ as i32),
+                        worker.eq(worker_.to_string())
+                    )])
+                    .get_result(self.conn())?;
                 Ok(Some(inserted))
             } else {
                 Ok(None)
@@ -1193,11 +1195,31 @@ impl StorageProcessor {
             .get_result(self.conn())?;
         Ok(serde_json::from_value(stored.proof).unwrap())
     }
+
+    pub fn store_token(&self, id: TokenId, address: &str, symbol: Option<&str>) -> QueryResult<()> {
+        let new_token = Token {
+            id: id as i32,
+            address: address.to_string(),
+            symbol: symbol.map(String::from),
+        };
+        diesel::insert_into(tokens::table)
+            .values(&new_token)
+            .on_conflict_do_nothing()
+            .execute(self.conn())
+            .map(drop)
+    }
+
+    pub fn load_tokens(&self) -> QueryResult<HashMap<TokenId, Token>> {
+        let tokens = tokens::table.load::<Token>(self.conn())?;
+        Ok(tokens
+            .into_iter()
+            .map(|token| (token.id as TokenId, token))
+            .collect())
+    }
 }
 
 #[cfg(test)]
 mod test {
-
     use super::*;
     use diesel::Connection;
 

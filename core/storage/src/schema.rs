@@ -117,6 +117,7 @@ table! {
     tokens (id) {
         id -> Int4,
         address -> Text,
+        symbol -> Nullable<Text>,
     }
 }
 
