@@ -225,13 +225,12 @@ pub fn apply_fee(
     fee: u128,
 ) -> (Fr, AccountWitness<Bn256>) {
     let fee_fe = Fr::from_str(&fee.to_string()).unwrap();
-    let mut validator_leaf = tree.remove(validator_address).unwrap();
+    let mut validator_leaf = tree.remove(validator_address).expect("validator_leaf not empty");
     let validator_account_witness = AccountWitness {
         nonce: Some(validator_leaf.nonce.clone()),
         pub_key_hash: Some(validator_leaf.pub_key_hash.clone()),
     };
     let validator_balance_root = validator_leaf.subtree.root_hash();
-    println!("validator_balance_root: {}", validator_balance_root);
 
     let mut balance = validator_leaf
         .subtree
@@ -239,10 +238,7 @@ pub fn apply_fee(
         .unwrap_or(Balance::default());
     balance.value.add_assign(&fee_fe);
     validator_leaf.subtree.insert(token, balance);
-    println!(
-        "validator_balance_root after applying fee: {}",
-        validator_leaf.subtree.root_hash()
-    );
+
     tree.insert(validator_address, validator_leaf);
 
     let root_after_fee = tree.root_hash();

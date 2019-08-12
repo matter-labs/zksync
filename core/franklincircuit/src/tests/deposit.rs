@@ -94,20 +94,22 @@ pub fn apply_deposit_tx(
     deposit: &DepositOp
 ) -> DepositWitness<Bn256>{
     let alt_new_pubkey_hash = Fr::from_hex(&deposit.tx.to.to_hex()).unwrap();
-    let mut fr_repr = <Fr as PrimeField>::Repr::default();
-    let mut addr_vec = deposit.tx.to.data.to_vec();
-    addr_vec.reverse();
-    addr_vec.resize(32, 0u8);
-    addr_vec.reverse();
-    fr_repr.read_be(&*addr_vec).unwrap();
-    let new_pubkey_hash = Fr::from_repr(fr_repr).unwrap();
-    println!("alt_new_pubkey_hash {} \n new_pubkey_hash {}", alt_new_pubkey_hash, new_pubkey_hash);
+//    let mut fr_repr = <Fr as PrimeField>::Repr::default();
+//    let mut addr_vec = deposit.tx.to.data.to_vec();
+//    addr_vec.reverse();
+//    addr_vec.resize(32, 0u8);
+//    addr_vec.reverse();
+//    fr_repr.read_be(&*addr_vec).unwrap();
+//    let new_pubkey_hash = Fr::from_repr(fr_repr).unwrap();
+//    println!("alt_new_pubkey_hash {} \n new_pubkey_hash {}", alt_new_pubkey_hash, new_pubkey_hash);
+    println!("before converting amount: {:?}, after converting amount: {:?}", deposit.tx.amount, deposit.tx.amount.to_u128().unwrap());
+    println!("before converting fee: {:?}, after converting fee: {:?}", deposit.tx.fee, deposit.tx.fee.to_u128().unwrap());
     let deposit_data = DepositData{
         amount: deposit.tx.amount.to_u128().unwrap(),
         fee: deposit.tx.fee.to_u128().unwrap(),
         token: deposit.tx.token as u32,
         account_address: deposit.account_id as u32, 
-        new_pub_key_hash: new_pubkey_hash,
+        new_pub_key_hash: alt_new_pubkey_hash,
     };
     // le_bit_vector_into_field_element()
     apply_deposit(tree, &deposit_data)
@@ -118,7 +120,7 @@ pub fn apply_deposit(
 ) -> DepositWitness<Bn256> {
     //preparing data and base witness
     let before_root = tree.root_hash();
-    println!("Initial root = {}", before_root);
+    println!("deposit Initial root = {}", before_root);
     let (audit_path_before, audit_balance_path_before) =
         get_audits(tree, deposit.account_address, deposit.token);
 
@@ -187,7 +189,7 @@ pub fn apply_deposit(
         );
 
     let after_root = tree.root_hash();
-    println!("After root = {}", after_root);
+    println!("deposit After root = {}", after_root);
     let (audit_path_after, audit_balance_path_after) =
         get_audits(tree, deposit.account_address, deposit.token);
 

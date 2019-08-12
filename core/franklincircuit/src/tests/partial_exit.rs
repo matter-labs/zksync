@@ -11,6 +11,9 @@ use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::{
     Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
 };
+use num_traits::cast::ToPrimitive;
+
+use franklinmodels::node::{TransferOp, PartialExitOp};
 use franklinmodels::merkle_tree::hasher::Hasher;
 use franklinmodels::merkle_tree::PedersenHasher;
 use franklinmodels::params as franklin_constants;
@@ -72,6 +75,21 @@ impl<E: JubjubEngine> PartialExitWitness<E> {
         pubdata_bits.resize(32 * 8, false);
         pubdata_bits
     }
+}
+pub fn apply_partial_exit_tx(
+    tree: &mut CircuitAccountTree,
+    partial_exit: &PartialExitOp
+) -> PartialExitWitness<Bn256>{
+
+    let transfer_data = PartialExitData{
+        amount: partial_exit.tx.amount.to_u128().unwrap(),
+        fee: partial_exit.tx.fee.to_u128().unwrap(),
+        token: partial_exit.tx.token as u32,
+        account_address: partial_exit.account_id as u32,
+        ethereum_key: Fr::from_hex(&partial_exit.tx.eth_address.hex()).unwrap(),
+    };
+    // le_bit_vector_into_field_element()
+    apply_partial_exit(tree, &transfer_data)
 }
 pub fn apply_partial_exit(
     tree: &mut CircuitAccountTree,

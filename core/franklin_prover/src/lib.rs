@@ -15,7 +15,7 @@ use tokio::prelude::*;
 use tokio::runtime::current_thread::Handle;
 use tokio::sync::oneshot::Sender;
 use tokio::timer;
-
+use storage::ProverRun;
 use circuit::tests::deposit::*;
 use circuit::tests::utils::*;
 use circuit::account::AccountWitness;
@@ -1113,82 +1113,158 @@ impl BabyProver {
    fn make_proving_attempt(&mut self) -> Result<(), String> {
        let storage = StorageProcessor::establish_connection()
            .map_err(|e| format!("establish_connection failed: {}", e))?;
-       let job = storage
+       let mut job = storage
            .fetch_prover_job(&self.worker, PROVER_TIMEOUT)
            .map_err(|e| format!("fetch_prover_job failed: {}", e))?;
 
-       if let Some(job) = job {
-           let initial_root = self.accounts_tree.root_hash();
-           let block_number = job.block_number as BlockNumber;
-           info!(
-               "prover {} got a new job for block {}",
-               &self.worker, block_number
-           );
-           self.current_job.store(job.id as usize, Ordering::Relaxed);
 
-           // load state delta self.current_block_number => block_number (can go both forwards and backwards)
-            let expected_current_block = block_number;
-            if self.current_block_number != expected_current_block {
-               self.rewind_state(&storage, expected_current_block)?;
-            }
+       let initial_root = self.accounts_tree.root_hash();
+       let block_number = 0 as BlockNumber;
+       info!(
+           "prover {} got a new job for block {}",
+           &self.worker, block_number
+       );
+       self.current_job.store(0 as usize, Ordering::Relaxed);
 
-            let block = storage
-               .load_committed_block(block_number)
-               .ok_or("load_committed_block failed")?;
-            let ops = storage.get_block_operations(block.block_number).unwrap();
-            
-            drop(storage);   
-            let mut operations = vec![];
-            let mut pub_data = vec![];
-            let mut fees = vec![];
-            for op in ops{
-                 match op{
-                     FranklinOp::Deposit(deposit) => {
+       // load state delta self.current_block_number => block_number (can go both forwards and backwards)
+       let expected_current_block = block_number;
+       if self.current_block_number != expected_current_block {
+           self.rewind_state(&storage, expected_current_block)?;
+       }
 
-                         println!("{:?}", deposit.tx.to.data);
-                        let deposit_witness = apply_deposit_tx(&mut self.accounts_tree, &deposit);
-                        
-                        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-                        let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
-                        let deposit_operations = calculate_deposit_operations_from_witness(
-                            &deposit_witness,
-                            &sig_msg,
-                            signature,
-                            &sender_x,
-                            &sender_y,
-                        );
-                        operations.extend(deposit_operations);
-                        fees.push((deposit.tx.fee, deposit.tx.token));
-                        pub_data.extend(deposit_witness.get_pubdata());
-                     },
-                     _ => {
-                         unreachable!("only deposists allowed");
-                     }
-                 } 
-            }
-           let mut root_after_fee: Fr = self.accounts_tree.root_hash();
-           let mut validator_account_witness: AccountWitness<Engine> = AccountWitness{
-               nonce: None,
-               pub_key_hash: None,
-           };
-           for (fee, token) in fees{
-               info!("fee, token: {}, {}", fee, token);
-               let (root, acc_witness) = apply_fee(&mut self.accounts_tree, block.fee_account as u32, token as u32, fee.to_u128().unwrap());
-               root_after_fee = root;
-               validator_account_witness = acc_witness;
+       let block = storage
+           .load_committed_block(block_number+1)
+           .ok_or("load_committed_block failed")?;
+       let ops = storage.get_block_operations(block.block_number).unwrap();
+       debug!("{:?}", ops);
+       drop(storage);
+       let mut operations = vec![];
+       let mut pub_data = vec![];
+       let mut fees = vec![];
+       for op in ops{
+           match op{
+               FranklinOp::Deposit(deposit) => {
+
+                   let deposit_witness = apply_deposit_tx(&mut self.accounts_tree, &deposit);
+
+                   //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+                   let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
+                   let deposit_operations = calculate_deposit_operations_from_witness(
+                       &deposit_witness,
+                       &sig_msg,
+                       signature,
+                       &sender_x,
+                       &sender_y,
+                   );
+                   operations.extend(deposit_operations);
+                   fees.push((deposit.tx.fee, deposit.tx.token));
+                   pub_data.extend(deposit_witness.get_pubdata());
+               },
+               _ => {
+                   unreachable!("only deposists allowed");
+               }
            }
-           info!("root after fees {}", root_after_fee);
-           info!("block new hash {}", block.new_root_hash);
+       }
+       let mut root_after_fee: Fr = self.accounts_tree.root_hash();
+       let mut validator_account_witness: AccountWitness<Engine> = AccountWitness{
+           nonce: None,
+           pub_key_hash: None,
+       };
+       for (fee, token) in fees{
+           info!("fee, token: {}, {}", fee, token);
+           let (root, acc_witness) = apply_fee(&mut self.accounts_tree, block.fee_account as u32, token as u32, fee.to_u128().unwrap());
+           root_after_fee = root;
+           validator_account_witness = acc_witness;
+       }
+       for leaf in &self.accounts_tree.items{
+           debug!("balance: {} tree acc {} with id: {} ",leaf.1.subtree.get(0).unwrap().value,  leaf.1.pub_key_hash, leaf.0, );
+       }
+       info!("root after fees {}", root_after_fee);
+       info!("block new hash {}", block.new_root_hash);
 
-           let (validator_audit_path, _) = get_audits(&mut self.accounts_tree, block.fee_account as u32, 0);
+       let (validator_audit_path, _) = get_audits(&mut self.accounts_tree, block.fee_account as u32, 0);
 
-           let public_data_commitment = public_data_commitment::<Engine>(
-               &pub_data,
-               Some(initial_root),
-               Some(root_after_fee),
-               Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
-               Some(Fr::from_str(&block_number.to_string()).unwrap()),
-           );
+       let public_data_commitment = public_data_commitment::<Engine>(
+           &pub_data,
+           Some(initial_root),
+           Some(root_after_fee),
+           Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
+           Some(Fr::from_str(&block_number.to_string()).unwrap()),
+       );
+//
+//
+//       if let Some(job) = job {
+//           let initial_root = self.accounts_tree.root_hash();
+//           let block_number = job.block_number as BlockNumber;
+//           info!(
+//               "prover {} got a new job for block {}",
+//               &self.worker, block_number
+//           );
+//           self.current_job.store(job.id as usize, Ordering::Relaxed);
+//
+//           // load state delta self.current_block_number => block_number (can go both forwards and backwards)
+//            let expected_current_block = block_number;
+//            if self.current_block_number != expected_current_block {
+//               self.rewind_state(&storage, expected_current_block)?;
+//            }
+//
+//            let block = storage
+//               .load_committed_block(block_number)
+//               .ok_or("load_committed_block failed")?;
+//            let ops = storage.get_block_operations(block.block_number).unwrap();
+//
+//            drop(storage);
+//            let mut operations = vec![];
+//            let mut pub_data = vec![];
+//            let mut fees = vec![];
+//            for op in ops{
+//                 match op{
+//                     FranklinOp::Deposit(deposit) => {
+//
+//                        let deposit_witness = apply_deposit_tx(&mut self.accounts_tree, &deposit);
+//
+//                        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+//                        let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
+//                        let deposit_operations = calculate_deposit_operations_from_witness(
+//                            &deposit_witness,
+//                            &sig_msg,
+//                            signature,
+//                            &sender_x,
+//                            &sender_y,
+//                        );
+//                        operations.extend(deposit_operations);
+//                        fees.push((deposit.tx.fee, deposit.tx.token));
+//                        pub_data.extend(deposit_witness.get_pubdata());
+//                     },
+//                     _ => {
+//                         unreachable!("only deposists allowed");
+//                     }
+//                 }
+//            }
+//           let mut root_after_fee: Fr = self.accounts_tree.root_hash();
+//           let mut validator_account_witness: AccountWitness<Engine> = AccountWitness{
+//               nonce: None,
+//               pub_key_hash: None,
+//           };
+//           for (fee, token) in fees{
+//               info!("fee, token: {}, {}", fee, token);
+//               let (root, acc_witness) = apply_fee(&mut self.accounts_tree, block.fee_account as u32, token as u32, fee.to_u128().unwrap());
+//               root_after_fee = root;
+//               validator_account_witness = acc_witness;
+//           }
+//
+//           info!("root after fees {}", root_after_fee);
+//           info!("block new hash {}", block.new_root_hash);
+//
+//           let (validator_audit_path, _) = get_audits(&mut self.accounts_tree, block.fee_account as u32, 0);
+//
+//           let public_data_commitment = public_data_commitment::<Engine>(
+//               &pub_data,
+//               Some(initial_root),
+//               Some(root_after_fee),
+//               Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
+//               Some(Fr::from_str(&block_number.to_string()).unwrap()),
+//           );
 
 //
 //            let proof = self
@@ -1200,17 +1276,17 @@ impl BabyProver {
 //            storage
 //                .store_proof(block_number, &encoded)
 //                .map_err(|e| format!("store_proof failed: {}", e))?;
-       } else {
-           // no new job, so let's try to fast forward to the latest verified state for efficiency, and then sleep
-           let last_verified_block = storage
-               .get_last_verified_block()
-               .map_err(|e| format!("get_last_verified_block failed: {}", e))?;
-           if self.current_block_number < last_verified_block + 1 {
-               self.rewind_state(&storage, last_verified_block + 1)
-                   .map_err(|e| format!("rewind_state failed: {}", e))?;
-           }
-           thread::sleep(Duration::from_secs(PROVER_CYCLE_WAIT));
-       }
+//       } else {
+//           // no new job, so let's try to fast forward to the latest verified state for efficiency, and then sleep
+//           let last_verified_block = storage
+//               .get_last_verified_block()
+//               .map_err(|e| format!("get_last_verified_block failed: {}", e))?;
+//           if self.current_block_number < last_verified_block + 1 {
+//               self.rewind_state(&storage, last_verified_block + 1)
+//                   .map_err(|e| format!("rewind_state failed: {}", e))?;
+//           }
+//           thread::sleep(Duration::from_secs(PROVER_CYCLE_WAIT));
+//       }
        Ok(())
    }
 

@@ -55,7 +55,7 @@ impl PlasmaStateKeeper {
             .access_storage()
             .expect("db connection failed for statekeeper");
 
-        let fee_account_address = AccountAddress::default();
+        let fee_account_address = AccountAddress::from_hex("0x123456789123456789123456789123456789123456789123456789").unwrap();
 
         let (last_committed, mut accounts) = storage.load_committed_state(None).expect("db failed");
         // TODO: move genesis block creation to separate routine.
