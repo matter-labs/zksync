@@ -1166,12 +1166,13 @@ impl BabyProver {
                      }
                  } 
             }
-           let mut root_after_fee: Fr = Fr::zero();
+           let mut root_after_fee: Fr = self.accounts_tree.root_hash();
            let mut validator_account_witness: AccountWitness<Engine> = AccountWitness{
                nonce: None,
                pub_key_hash: None,
            };
            for (fee, token) in fees{
+               info!("fee, token: {}, {}", fee, token);
                let (root, acc_witness) = apply_fee(&mut self.accounts_tree, block.fee_account as u32, token as u32, fee.to_u128().unwrap());
                root_after_fee = root;
                validator_account_witness = acc_witness;
@@ -1189,16 +1190,16 @@ impl BabyProver {
                Some(Fr::from_str(&block_number.to_string()).unwrap()),
            );
 
-
-            let proof = self
-                .apply_and_prove(&block)
-                .map_err(|e| format!("apply_and_prove failed: {}", e))?;
-            let encoded = Self::encode_proof(&proof).expect("proof encoding failed");   
-            let storage = StorageProcessor::establish_connection()
-                .map_err(|e| format!("establish_connection failed: {}", e))?;
-            storage
-                .store_proof(block_number, &encoded)
-                .map_err(|e| format!("store_proof failed: {}", e))?;
+//
+//            let proof = self
+//                .apply_and_prove(&block)
+//                .map_err(|e| format!("apply_and_prove failed: {}", e))?;
+//            let encoded = Self::encode_proof(&proof).expect("proof encoding failed");
+//            let storage = StorageProcessor::establish_connection()
+//                .map_err(|e| format!("establish_connection failed: {}", e))?;
+//            storage
+//                .store_proof(block_number, &encoded)
+//                .map_err(|e| format!("store_proof failed: {}", e))?;
        } else {
            // no new job, so let's try to fast forward to the latest verified state for efficiency, and then sleep
            let last_verified_block = storage

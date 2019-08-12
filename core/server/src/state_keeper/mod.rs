@@ -167,12 +167,16 @@ impl PlasmaStateKeeper {
     }
 
     fn create_new_block(&mut self, tx_for_commitments: &Sender<CommitRequest>) {
+
+        self.next_block_at_max = SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL);
         let txs = self.prepare_tx_for_block();
+        if txs.is_empty() {
+            return;
+        }
         let commit_request = self.apply_txs(txs);
         tx_for_commitments
             .send(commit_request)
             .expect("Commit request send");
-        self.next_block_at_max = SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL);
         self.state.block_number += 1; // bump current block number as we've made one
     }
 
