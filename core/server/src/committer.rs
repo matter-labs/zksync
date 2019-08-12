@@ -63,6 +63,7 @@ fn run_committer(
                 let block_number = last_verified_block + 1;
                 let proof = storage.load_proof(block_number);
                 if let Ok(proof) = proof {
+                    info!("New proof for block: {}", block_number);
                     let block = storage
                         .load_committed_block(block_number)
                         .unwrap_or_else(|| panic!("failed to load block #{}", block_number));

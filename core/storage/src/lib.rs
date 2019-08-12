@@ -494,7 +494,7 @@ impl StorageProcessor {
             .collect())
     }
 
-    fn commit_state_update(
+    pub fn commit_state_update(
         &self,
         block_number: u32,
         accounts_updated: &[(u32, AccountUpdate)],
@@ -551,7 +551,8 @@ impl StorageProcessor {
         })
     }
 
-    fn apply_state_update(&self, block_number: u32) -> QueryResult<()> {
+    pub fn apply_state_update(&self, block_number: u32) -> QueryResult<()> {
+        info!("Applying state update for block: {}", block_number);
         self.conn().transaction(|| {
             let account_balance_diff = account_balance_updates::table
                 .filter(account_balance_updates::block_number.eq(&(block_number as i32)))
@@ -683,9 +684,15 @@ impl StorageProcessor {
                 (0, true)
             };
 
-            let time_forward = from_block <= to_block;
-            let start_block = cmp::min(from_block, to_block);
-            let end_block = cmp::max(from_block, to_block);
+            let (time_forward, start_block, end_block) = if unbounded {
+                (true, from_block, 0)
+            } else {
+                (
+                    from_block <= to_block,
+                    cmp::min(from_block, to_block),
+                    cmp::max(from_block, to_block),
+                )
+            };
 
             let account_balance_diff = account_balance_updates::table
                 .filter(
@@ -1193,209 +1200,212 @@ mod test {
 
     use super::*;
     use diesel::Connection;
+
+    #[test]
+    fn test_store_proof() {
+        let pool = ConnectionPool::new();
+        let conn = pool.access_storage().unwrap();
+        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
+
+        assert!(conn.load_proof(1).is_err());
+
+        let proof = EncodedProof::default();
+        assert!(conn.store_proof(1, &proof).is_ok());
+
+        let loaded = conn.load_proof(1).expect("must load proof");
+        assert_eq!(loaded, proof);
+    }
+
+    //        #[test]
+    //        fn test_store_commited_updates() {
+    //            let _ = env_logger::try_init();
     //
-    //    #[test]
-    //    fn test_store_proof() {
-    //        let pool = ConnectionPool::new();
-    //        let conn = pool.access_storage().unwrap();
-    //        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
+    //            let pool = ConnectionPool::new();
+    //            let conn = pool.access_storage().unwrap();
+    //            conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
     //
-    //        assert!(conn.load_proof(1).is_err());
+    //            let mut account_map = AccountMap::default();
     //
-    //        let proof = EncodedProof::default();
-    //        assert!(conn.store_proof(1, &proof).is_ok());
+    //            let (_, state) = conn.load_committed_state(None).unwrap();
+    //            assert_eq!(
+    //                state
+    //                    .into_iter()
+    //                    .collect::<Vec<(u32, models::plasma::account::Account)>>(),
+    //                account_map
+    //                    .clone()
+    //                    .into_iter()
+    //                    .collect::<Vec<(u32, models::plasma::account::Account)>>()
+    //            );
     //
-    //        let loaded = conn.load_proof(1).expect("must load proof");
-    //        assert_eq!(loaded, proof);
-    //    }
-    //
-    //    #[test]
-    //    fn test_store_commited_updates() {
-    //        let _ = env_logger::try_init();
-    //
-    //        let pool = ConnectionPool::new();
-    //        let conn = pool.access_storage().unwrap();
-    //        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
-    //
-    //        let mut account_map = AccountMap::default();
-    //
-    //        let (_, state) = conn.load_committed_state(None).unwrap();
-    //        assert_eq!(
-    //            state
-    //                .into_iter()
-    //                .collect::<Vec<(u32, models::plasma::account::Account)>>(),
-    //            account_map
-    //                .clone()
-    //                .into_iter()
-    //                .collect::<Vec<(u32, models::plasma::account::Account)>>()
-    //        );
-    //
-    //        let create_account = |id| {
-    //            let a = models::plasma::account::Account::default();
-    //            vec![(
-    //                id,
-    //                AccountUpdate::Create {
-    //                    nonce: a.nonce,
-    //                    public_key_x: a.public_key_x,
-    //                    public_key_y: a.public_key_y,
-    //                },
-    //            )]
-    //            .into_iter()
-    //        };
-    //        let transfer = |id_1, nonce_1, id_2, nonce_2| {
-    //            let mut _a = models::plasma::account::Account::default();
-    //            vec![
-    //                (
-    //                    id_1,
-    //                    AccountUpdate::UpdateBalance {
-    //                        old_nonce: nonce_1,
-    //                        new_nonce: nonce_1,
-    //                        balance_update: (0, 1, 2),
+    //            let create_account = |id| {
+    //                let a = models::plasma::account::Account::default();
+    //                vec![(
+    //                    id,
+    //                    AccountUpdate::Create {
+    //                        nonce: a.nonce,
+    //                        public_key_x: a.public_key_x,
+    //                        public_key_y: a.public_key_y,
     //                    },
-    //                ),
-    //                (
-    //                    id_2,
-    //                    AccountUpdate::UpdateBalance {
-    //                        old_nonce: nonce_2,
-    //                        new_nonce: nonce_2,
-    //                        balance_update: (0, 2, 3),
-    //                    },
-    //                ),
-    //            ]
-    //            .into_iter()
-    //        };
-    //
-    //        let mut updates = Vec::new();
-    //        updates.extend(create_account(2));
-    //        updates.extend(create_account(4));
-    //        updates.extend(transfer(2, 1, 4, 0));
-    //        updates.extend(transfer(4, 0, 2, 1));
-    //        updates.extend(transfer(2, 1, 4, 1));
-    //        updates.extend(create_account(5));
-    //
-    //        conn.commit_state_update(1, &updates).expect("Commit state");
-    //        apply_updates(&mut account_map, updates);
-    //
-    //        let (_, state) = conn.load_committed_state(None).unwrap();
-    //        assert_eq!(
-    //            state
+    //                )]
     //                .into_iter()
-    //                .collect::<Vec<(u32, models::plasma::account::Account)>>(),
-    //            account_map
-    //                .clone()
+    //            };
+    //            let transfer = |id_1, nonce_1, id_2, nonce_2| {
+    //                let mut _a = models::plasma::account::Account::default();
+    //                vec![
+    //                    (
+    //                        id_1,
+    //                        AccountUpdate::UpdateBalance {
+    //                            old_nonce: nonce_1,
+    //                            new_nonce: nonce_1,
+    //                            balance_update: (0, 1, 2),
+    //                        },
+    //                    ),
+    //                    (
+    //                        id_2,
+    //                        AccountUpdate::UpdateBalance {
+    //                            old_nonce: nonce_2,
+    //                            new_nonce: nonce_2,
+    //                            balance_update: (0, 2, 3),
+    //                        },
+    //                    ),
+    //                ]
     //                .into_iter()
-    //                .collect::<Vec<(u32, models::plasma::account::Account)>>()
-    //        )
-    //    }
-    //
-    //    fn acc_create_updates(
-    //        id: u32,
-    //        balance: u32,
-    //        nonce: u32,
-    //    ) -> impl Iterator<Item = (u32, AccountUpdate)> {
-    //        let mut a = models::plasma::account::Account::default();
-    //        a.nonce = nonce;
-    //        let old_balance = a.get_balance(ETH_TOKEN_ID).clone();
-    //        a.set_balance(ETH_TOKEN_ID, balance);
-    //        let new_balance = a.get_balance(ETH_TOKEN_ID).clone();
-    //        vec![
-    //            (
-    //                id,
-    //                AccountUpdate::Create {
-    //                    nonce: a.nonce,
-    //                    public_key_x: a.public_key_x,
-    //                    public_key_y: a.public_key_y,
-    //                },
-    //            ),
-    //            (
-    //                id,
-    //                AccountUpdate::UpdateBalance {
-    //                    old_nonce: a.nonce,
-    //                    new_nonce: a.nonce,
-    //                    balance_update: (ETH_TOKEN_ID, old_balance, new_balance),
-    //                },
-    //            ),
-    //        ]
-    //        .into_iter()
-    //    }
-    //
-    //    #[test]
-    //    fn test_commit_rewind() {
-    //        let _ = env_logger::try_init();
-    //
-    //        let pool = ConnectionPool::new();
-    //        let conn = pool.access_storage().unwrap();
-    //        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
-    //
-    //        let (accounts_block_1, updates_block_1) = {
-    //            let mut accounts = AccountMap::default();
-    //            let updates = {
-    //                let mut updates = Vec::new();
-    //                updates.extend(acc_create_updates(1, 1, 2));
-    //                updates.extend(acc_create_updates(2, 2, 4));
-    //                updates.extend(acc_create_updates(3, 3, 8));
-    //                updates
     //            };
-    //            apply_updates(&mut accounts, updates.clone());
-    //            (accounts, updates)
-    //        };
     //
-    //        let (accounts_block_2, updates_block_2) = {
-    //            let mut accounts = accounts_block_1.clone();
-    //            let updates = {
-    //                let mut updates = Vec::new();
-    //                updates.extend(acc_create_updates(4, 1, 2));
-    //                updates.extend(acc_create_updates(5, 2, 4));
-    //                updates.extend(acc_create_updates(6, 3, 8));
-    //                updates
-    //            };
-    //            apply_updates(&mut accounts, updates.clone());
-    //            (accounts, updates)
-    //        };
-    //        let (accounts_block_3, updates_block_3) = {
-    //            let mut accounts = accounts_block_2.clone();
-    //            let updates = {
-    //                let mut updates = Vec::new();
-    //                updates.extend(acc_create_updates(7, 1, 2));
-    //                updates.extend(acc_create_updates(8, 2, 4));
-    //                updates.extend(acc_create_updates(9, 3, 8));
-    //                updates
-    //            };
-    //            apply_updates(&mut accounts, updates.clone());
-    //            (accounts, updates)
-    //        };
+    //            let mut updates = Vec::new();
+    //            updates.extend(create_account(2));
+    //            updates.extend(create_account(4));
+    //            updates.extend(transfer(2, 1, 4, 0));
+    //            updates.extend(transfer(4, 0, 2, 1));
+    //            updates.extend(transfer(2, 1, 4, 1));
+    //            updates.extend(create_account(5));
     //
-    //        conn.commit_state_update(1, &updates_block_1).unwrap();
-    //        conn.commit_state_update(2, &updates_block_2).unwrap();
-    //        conn.commit_state_update(3, &updates_block_3).unwrap();
+    //            conn.commit_state_update(1, &updates).expect("Commit state");
+    //            apply_updates(&mut account_map, updates);
     //
-    //        let (block, state) = conn.load_committed_state(Some(1)).unwrap();
-    //        assert_eq!(block, 1);
-    //        assert_eq!(state, accounts_block_1);
-    //
-    //        let (block, state) = conn.load_committed_state(Some(2)).unwrap();
-    //        assert_eq!(block, 2);
-    //        assert_eq!(state, accounts_block_2);
-    //
-    //        let (block, state) = conn.load_committed_state(Some(3)).unwrap();
-    //        assert_eq!(block, 3);
-    //        assert_eq!(state, accounts_block_3);
-    //
-    //        conn.apply_state_update(1).unwrap();
-    //        conn.apply_state_update(2).unwrap();
-    //
-    //        let (block, state) = conn.load_committed_state(Some(1)).unwrap();
-    //        assert_eq!(block, 1);
-    //        assert_eq!(state, accounts_block_1);
-    //
-    //        let (block, state) = conn.load_committed_state(Some(2)).unwrap();
-    //        assert_eq!(block, 2);
-    //        assert_eq!(state, accounts_block_2);
-    //
-    //        let (block, state) = conn.load_committed_state(Some(3)).unwrap();
-    //        assert_eq!(block, 3);
-    //        assert_eq!(state, accounts_block_3);
-    //    }
+    //            let (_, state) = conn.load_committed_state(None).unwrap();
+    //            assert_eq!(
+    //                state
+    //                    .into_iter()
+    //                    .collect::<Vec<(u32, models::plasma::account::Account)>>(),
+    //                account_map
+    //                    .clone()
+    //                    .into_iter()
+    //                    .collect::<Vec<(u32, models::plasma::account::Account)>>()
+    //            )
+    //        }
+
+    fn acc_create_updates(
+        id: u32,
+        balance: u32,
+        nonce: u32,
+    ) -> impl Iterator<Item = (u32, AccountUpdate)> {
+        let mut a = models::node::account::Account::default();
+        a.nonce = nonce;
+        let old_balance = a.get_balance(0).clone();
+        a.set_balance(0, BigDecimal::from(balance));
+        let new_balance = a.get_balance(0).clone();
+        vec![
+            (
+                id,
+                AccountUpdate::Create {
+                    nonce: a.nonce,
+                    address: a.address,
+                },
+            ),
+            (
+                id,
+                AccountUpdate::UpdateBalance {
+                    old_nonce: a.nonce,
+                    new_nonce: a.nonce,
+                    balance_update: (0, old_balance, new_balance),
+                },
+            ),
+        ]
+        .into_iter()
+    }
+
+    #[test]
+    fn test_commit_rewind() {
+        let _ = env_logger::try_init();
+
+        let pool = ConnectionPool::new();
+        let conn = pool.access_storage().unwrap();
+        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
+
+        let (accounts_block_1, updates_block_1) = {
+            let mut accounts = AccountMap::default();
+            let updates = {
+                let mut updates = Vec::new();
+                updates.extend(acc_create_updates(1, 1, 2));
+                updates.extend(acc_create_updates(2, 2, 4));
+                updates.extend(acc_create_updates(3, 3, 8));
+                updates
+            };
+            apply_updates(&mut accounts, updates.clone());
+            (accounts, updates)
+        };
+
+        let (accounts_block_2, updates_block_2) = {
+            let mut accounts = accounts_block_1.clone();
+            let updates = {
+                let mut updates = Vec::new();
+                updates.extend(acc_create_updates(4, 1, 2));
+                updates.extend(acc_create_updates(5, 2, 4));
+                updates.extend(acc_create_updates(6, 3, 8));
+                updates
+            };
+            apply_updates(&mut accounts, updates.clone());
+            (accounts, updates)
+        };
+        let (accounts_block_3, updates_block_3) = {
+            let mut accounts = accounts_block_2.clone();
+            let updates = {
+                let mut updates = Vec::new();
+                updates.extend(acc_create_updates(7, 1, 2));
+                updates.extend(acc_create_updates(8, 2, 4));
+                updates.extend(acc_create_updates(9, 3, 8));
+                updates
+            };
+            apply_updates(&mut accounts, updates.clone());
+            (accounts, updates)
+        };
+
+        conn.commit_state_update(1, &updates_block_1).unwrap();
+        conn.commit_state_update(2, &updates_block_2).unwrap();
+        conn.commit_state_update(3, &updates_block_3).unwrap();
+
+        let (block, state) = conn.load_committed_state(Some(1)).unwrap();
+        assert_eq!(block, 1);
+        assert_eq!(state, accounts_block_1);
+
+        let (block, state) = conn.load_committed_state(Some(2)).unwrap();
+        assert_eq!(block, 2);
+        assert_eq!(state, accounts_block_2);
+
+        let (block, state) = conn.load_committed_state(Some(3)).unwrap();
+        assert_eq!(block, 3);
+        assert_eq!(state, accounts_block_3);
+
+        conn.apply_state_update(1).unwrap();
+        conn.apply_state_update(2).unwrap();
+
+        let (block, state) = conn.load_committed_state(Some(1)).unwrap();
+        assert_eq!(block, 1);
+        assert_eq!(state, accounts_block_1);
+
+        let (block, state) = conn.load_committed_state(Some(2)).unwrap();
+        assert_eq!(block, 2);
+        assert_eq!(state, accounts_block_2);
+
+        let (block, state) = conn.load_committed_state(Some(3)).unwrap();
+        assert_eq!(block, 3);
+        assert_eq!(state, accounts_block_3);
+
+        let (block, state) = conn.load_committed_state(None).unwrap();
+        assert_eq!(block, 3);
+        assert_eq!(state, accounts_block_3);
+    }
     //
     //    #[test]
     //    fn test_store_state() {

@@ -6,7 +6,7 @@ use failure::{bail, ensure};
 use franklin_crypto::eddsa::PrivateKey;
 use models::node::block::{Block, ExecutedTx};
 use models::node::tx::FranklinTx;
-use models::node::{Account, AccountAddress, AccountId, AccountMap, Fr};
+use models::node::{Account, AccountAddress, AccountId, AccountMap, AccountUpdate, Fr};
 use plasma::state::{PlasmaState, TxSuccess};
 use rayon::prelude::*;
 use std::collections::VecDeque;
@@ -56,7 +56,25 @@ impl PlasmaStateKeeper {
             .access_storage()
             .expect("db connection failed for statekeeper");
 
-        let (last_committed, accounts) = storage.load_committed_state(None).expect("db failed");
+        let fee_account_address =
+            AccountAddress::from_hex("0x123456789123456789123456789123456789123456789123456789")
+                .unwrap();
+
+        let (last_committed, mut accounts) = storage.load_committed_state(None).expect("db failed");
+        debug!("accounts: {:?}", accounts);
+        // TODO: move genesis block creation to separate routine.
+        if last_committed == 0 && accounts.is_empty() {
+            let mut fee_account = Account::default();
+            fee_account.address = fee_account_address.clone();
+            let db_account_update = AccountUpdate::Create {
+                address: fee_account_address.clone(),
+                nonce: fee_account.nonce,
+            };
+            accounts.insert(0, fee_account);
+            storage.commit_state_update(0, &[(0, db_account_update)]);
+            storage.apply_state_update(0);
+            info!("Genesis block created, state: {:#?}", accounts);
+        }
         let last_verified = storage.get_last_verified_block().expect("db failed");
         let state = PlasmaState::new(accounts, last_committed + 1);
         //let outstanding_txs = storage.count_outstanding_proofs(last_verified).expect("db failed");
@@ -72,7 +90,7 @@ impl PlasmaStateKeeper {
             next_block_at_max: SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL),
             db_conn_pool: pool,
             // TODO: load pk from config.
-            fee_account_address: AccountAddress::default(),
+            fee_account_address,
             eth_state,
         };
 
@@ -174,6 +192,7 @@ impl PlasmaStateKeeper {
             return;
         }
         let commit_request = self.apply_txs(txs);
+
         tx_for_commitments
             .send(commit_request)
             .expect("Commit request send");
@@ -237,6 +256,8 @@ impl PlasmaStateKeeper {
     }
 
     fn precheck_tx(&self, tx: &FranklinTx) -> Result<(), failure::Error> {
+        return Ok(());
+        unimplemented!();
         if let FranklinTx::Deposit(deposit) = tx {
             let eth_state = self.eth_state.read().expect("eth state rlock");
             if let Some(locked_balance) = eth_state

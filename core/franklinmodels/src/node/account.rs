@@ -14,9 +14,15 @@ use super::{AccountId, AccountUpdates, Nonce, TokenAmount, TokenId};
 use super::{Engine, Fr};
 use crate::circuit::account::{Balance, CircuitAccount};
 
-#[derive(Debug, Clone, PartialEq, Default, Eq, Hash)]
+#[derive(Clone, PartialEq, Default, Eq, Hash)]
 pub struct AccountAddress {
     pub data: [u8; 27],
+}
+
+impl std::fmt::Debug for AccountAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
 }
 
 impl AccountAddress {
