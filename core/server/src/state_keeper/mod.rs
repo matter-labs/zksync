@@ -55,7 +55,17 @@ impl PlasmaStateKeeper {
             .access_storage()
             .expect("db connection failed for statekeeper");
 
-        let (last_committed, accounts) = storage.load_committed_state(None).expect("db failed");
+        let fee_account_address = AccountAddress::default();
+
+        let (last_committed, mut accounts) = storage.load_committed_state(None).expect("db failed");
+        // TODO: move genesis block creation to separate routine.
+        if last_committed == 0 {
+            debug_assert_eq!(accounts.len(), 0);
+            let mut fee_account = Account::default();
+            fee_account.address = fee_account_address.clone();
+            accounts.insert(0, fee_account);
+            info!("Genesis block created, state: {:#?}", accounts);
+        }
         let last_verified = storage.get_last_verified_block().expect("db failed");
         let state = PlasmaState::new(accounts, last_committed + 1);
         //let outstanding_txs = storage.count_outstanding_proofs(last_verified).expect("db failed");
@@ -71,7 +81,7 @@ impl PlasmaStateKeeper {
             next_block_at_max: SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL),
             db_conn_pool: pool,
             // TODO: load pk from config.
-            fee_account_address: AccountAddress::default(),
+            fee_account_address,
             eth_state,
         };
 
@@ -167,12 +177,20 @@ impl PlasmaStateKeeper {
     }
 
     fn create_new_block(&mut self, tx_for_commitments: &Sender<CommitRequest>) {
+        self.next_block_at_max = SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL);
+
         let txs = self.prepare_tx_for_block();
+
+        if txs.is_empty() {
+            return;
+        }
+
         let commit_request = self.apply_txs(txs);
+
         tx_for_commitments
             .send(commit_request)
             .expect("Commit request send");
-        self.next_block_at_max = SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL);
+
         self.state.block_number += 1; // bump current block number as we've made one
     }
 
