@@ -128,30 +128,30 @@ impl EthWatch {
         contract: &Contract<T>,
         block: u64,
     ) {
-        let mut eth_state = self.eth_state.write().expect("ETH state lock");
-        let new_tokens = self.get_all_new_token_events(
-            web3,
-            contract,
-            BlockNumber::Earliest,
-            BlockNumber::Number(block),
-        );
-        for token in new_tokens.into_iter() {
-            eth_state.tokens.insert(token.id, token);
-        }
-
-        let locked_deposits = self.get_all_locked_deposits(
-            web3,
-            contract,
-            BlockNumber::Number(block - LOCK_DEPOSITS_FOR),
-            BlockNumber::Number(block),
-        );
-        for deposit in locked_deposits.into_iter() {
-            eth_state
-                .balances
-                .insert((deposit.address, deposit.token_id), deposit);
-        }
-
-        debug!("ETH state: {:#?}", *eth_state);
+        //        let mut eth_state = self.eth_state.write().expect("ETH state lock");
+        //        let new_tokens = self.get_all_new_token_events(
+        //            web3,
+        //            contract,
+        //            BlockNumber::Earliest,
+        //            BlockNumber::Number(block),
+        //        );
+        //        for token in new_tokens.into_iter() {
+        //            eth_state.tokens.insert(token.id, token);
+        //        }
+        //
+        //        let locked_deposits = self.get_all_locked_deposits(
+        //            web3,
+        //            contract,
+        //            BlockNumber::Number(block.saturating_sub(LOCK_DEPOSITS_FOR)),
+        //            BlockNumber::Number(block),
+        //        );
+        //        for deposit in locked_deposits.into_iter() {
+        //            eth_state
+        //                .balances
+        //                .insert((deposit.address, deposit.token_id), deposit);
+        //        }
+        //
+        //        debug!("ETH state: {:#?}", *eth_state);
     }
 
     fn get_new_token_event_filter(&self, from: BlockNumber, to: BlockNumber) -> Filter {
@@ -224,44 +224,44 @@ impl EthWatch {
         contract: &Contract<T>,
         last_block: u64,
     ) {
-        let mut eth_state = self.eth_state.write().expect("ETH state lock");
-
-        let new_tokens = self.get_all_new_token_events(
-            web3,
-            contract,
-            BlockNumber::Number(self.processed_block + 1),
-            BlockNumber::Number(last_block),
-        );
-        for token in new_tokens.into_iter() {
-            debug!("New token added: {:?}", token);
-            eth_state.tokens.insert(token.id, token);
-        }
-
-        let locked_deposits = self.get_all_locked_deposits(
-            web3,
-            contract,
-            BlockNumber::Number(self.processed_block + 1),
-            BlockNumber::Number(last_block),
-        );
-        for deposit in locked_deposits.into_iter() {
-            debug!("New locked deposit: {:?}", deposit);
-            eth_state
-                .balances
-                .insert((deposit.address, deposit.token_id), deposit);
-        }
-
-        eth_state.balances = eth_state
-            .balances
-            .drain()
-            .filter(|(_, v)| {
-                let is_valid = v.locked_until_block > last_block;
-                if !is_valid {
-                    debug!("Deposit expired: {:?}", v);
-                }
-                is_valid
-            })
-            .collect();
-        self.processed_block = last_block;
+        //        let mut eth_state = self.eth_state.write().expect("ETH state lock");
+        //
+        //        let new_tokens = self.get_all_new_token_events(
+        //            web3,
+        //            contract,
+        //            BlockNumber::Number(self.processed_block + 1),
+        //            BlockNumber::Number(last_block),
+        //        );
+        //        for token in new_tokens.into_iter() {
+        //            debug!("New token added: {:?}", token);
+        //            eth_state.tokens.insert(token.id, token);
+        //        }
+        //
+        //        let locked_deposits = self.get_all_locked_deposits(
+        //            web3,
+        //            contract,
+        //            BlockNumber::Number(self.processed_block + 1),
+        //            BlockNumber::Number(last_block),
+        //        );
+        //        for deposit in locked_deposits.into_iter() {
+        //            debug!("New locked deposit: {:?}", deposit);
+        //            eth_state
+        //                .balances
+        //                .insert((deposit.address, deposit.token_id), deposit);
+        //        }
+        //
+        //        eth_state.balances = eth_state
+        //            .balances
+        //            .drain()
+        //            .filter(|(_, v)| {
+        //                let is_valid = v.locked_until_block > last_block;
+        //                if !is_valid {
+        //                    debug!("Deposit expired: {:?}", v);
+        //                }
+        //                is_valid
+        //            })
+        //            .collect();
+        //        self.processed_block = last_block;
     }
 
     pub fn get_shared_eth_state(&self) -> Arc<RwLock<ETHState>> {
