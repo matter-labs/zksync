@@ -5,7 +5,7 @@ use pairing::bn256::Bn256;
 use franklin_crypto::eddsa::PrivateKey;
 use models::node::block::{Block, ExecutedTx};
 use models::node::tx::FranklinTx;
-use models::node::{Account, AccountAddress, AccountId, AccountMap, Fr};
+use models::node::{Account, AccountAddress, AccountId, AccountMap, AccountUpdate, Fr};
 use plasma::state::{PlasmaState, TxSuccess};
 use rayon::prelude::*;
 use std::collections::VecDeque;
@@ -59,12 +59,17 @@ impl PlasmaStateKeeper {
 
         let (last_committed, mut accounts) = storage.load_committed_state(None).expect("db failed");
         // TODO: move genesis block creation to separate routine.
-        if last_committed == 0 {
-            debug_assert_eq!(accounts.len(), 0);
+        if last_committed == 0 && accounts.is_empty() {
             let mut fee_account = Account::default();
             fee_account.address = fee_account_address.clone();
-            accounts.insert(0, fee_account);
             info!("Genesis block created, state: {:#?}", accounts);
+            let db_account_update = AccountUpdate::Create {
+                address: fee_account_address.clone(),
+                nonce: fee_account.nonce,
+            };
+            accounts.insert(0, fee_account);
+            storage.commit_state_update(0, &[(0, db_account_update)]);
+            storage.apply_state_update(0);
         }
         let last_verified = storage.get_last_verified_block().expect("db failed");
         let state = PlasmaState::new(accounts, last_committed + 1);

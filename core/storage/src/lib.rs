@@ -494,7 +494,7 @@ impl StorageProcessor {
             .collect())
     }
 
-    fn commit_state_update(
+    pub fn commit_state_update(
         &self,
         block_number: u32,
         accounts_updated: &[(u32, AccountUpdate)],
@@ -551,7 +551,7 @@ impl StorageProcessor {
         })
     }
 
-    fn apply_state_update(&self, block_number: u32) -> QueryResult<()> {
+    pub fn apply_state_update(&self, block_number: u32) -> QueryResult<()> {
         self.conn().transaction(|| {
             let account_balance_diff = account_balance_updates::table
                 .filter(account_balance_updates::block_number.eq(&(block_number as i32)))
