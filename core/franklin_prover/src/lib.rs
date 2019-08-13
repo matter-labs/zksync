@@ -10,7 +10,7 @@ use std::sync::{
 };
 use std::thread;
 use std::time::Duration;
-use bellman::groth16::generate_random_parameters;
+
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use circuit::account::AccountWitness;
 use circuit::circuit::FranklinCircuit;
@@ -36,7 +36,7 @@ use tokio::prelude::*;
 use tokio::runtime::current_thread::Handle;
 use tokio::sync::oneshot::Sender;
 use tokio::timer;
-
+use bellman::groth16::generate_random_parameters;
 use bellman::groth16::{
     create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
 };
@@ -416,7 +416,9 @@ impl BabyProver {
                     validator_audit_path: validator_audit_path.clone(),
                     validator_account: validator_account_witness.clone(),
                 };
-            let inst = FranklinCircuit {
+      
+            {
+                let inst = FranklinCircuit {
                     params: &self.jubjub_params,
                     operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
                     old_root: Some(initial_root),
@@ -429,41 +431,26 @@ impl BabyProver {
                     validator_audit_path: validator_audit_path,
                     validator_account: validator_account_witness,
                 };
-            // {
-            //     let inst = FranklinCircuit {
-            //         params: &self.jubjub_params,
-            //         operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
-            //         old_root: Some(initial_root),
-            //         new_root: Some(block.new_root_hash),
-            //         block_number: Fr::from_str(&(block_number + 1).to_string()),
-            //         validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
-            //         pub_data_commitment: Some(public_data_commitment.clone()),
-            //         operations: operations,
-            //         validator_balances: validator_balances,
-            //         validator_audit_path: validator_audit_path,
-            //         validator_account: validator_account_witness,
-            //     };
-            //     let mut cs = TestConstraintSystem::<Engine>::new();
-            //     inst.synthesize(&mut cs).unwrap();
+                let mut cs = TestConstraintSystem::<Engine>::new();
+                inst.synthesize(&mut cs).unwrap();
 
-            //     warn!("unconstrained {}\n", cs.find_unconstrained());
-            //     warn!("inputs {}\n", cs.num_inputs());
-            //     warn!("num_constraints: {}\n", cs.num_constraints());
-            //     warn!("is satisfied: {}\n", cs.is_satisfied());
-            //     warn!("which is unsatisfied: {:?}\n", cs.which_is_unsatisfied());
-            // }
+                warn!("unconstrained {}\n", cs.find_unconstrained());
+                warn!("inputs {}\n", cs.num_inputs());
+                warn!("num_constraints: {}\n", cs.num_constraints());
+                warn!("is satisfied: {}\n", cs.is_satisfied());
+                warn!("which is unsatisfied: {:?}\n", cs.which_is_unsatisfied());
+            }
 
             let mut rng = OsRng::new().unwrap();
             info!("Prover has started to work");
             // let tmp_cirtuit_params = generate_random_parameters(instance, &mut rng).unwrap();
-
+            self.parameters.vk.alpha_g1.len()
             let proof = create_random_proof(instance, &self.parameters, &mut rng);
             if proof.is_err() {
                 error!("proof can not be created: {}", proof.err().unwrap());
                 return Err("proof can not be created".to_owned());
                 //             return Err(BabyProverErr::Other("proof.is_err()".to_owned()));
             }
-
             let p = proof.unwrap();
 
             let pvk = prepare_verifying_key(&self.parameters.vk);

@@ -150,6 +150,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &mut next_chunk_number,
                 cs.namespace(|| "verify_correct_chunking"),
             )?;
+            cs.enforce(||"test constraint", |lc| lc + next_chunk.get_variable(), |lc| lc, |lc| lc);
             println!("\n verify_correct_chunking success");
 
             allocated_chunk_data = chunk_data;
@@ -833,7 +834,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //AMOUNT_PACKED=24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //FEE_PACKED=8
         pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //ETHEREUM_KEY=160
-        assert_eq!(pubdata_bits.len(), 30 * 8);
+//        assert_eq!(pubdata_bits.len(), 30 * 8);
         pubdata_bits.resize(
             4 * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
@@ -1070,7 +1071,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //AMOUNT_PACKED=24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //FEE_PACKED=8
         pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //NEW_PUBKEY_HASH_WIDTH=216
-        assert_eq!(pubdata_bits.len(), 37 * 8);
+        // assert_eq!(pubdata_bits.len(), 37 * 8);
         pubdata_bits.resize(
             5 * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
@@ -1206,7 +1207,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
         pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
-        assert_eq!(pubdata_bits.len(), 4 * 8);
+//        assert_eq!(pubdata_bits.len(), 4 * 8);
         pubdata_bits.resize(
             1 * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
@@ -1350,8 +1351,10 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //224
         pubdata_bits.extend(rhs.account_address.get_bits_be()); //24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //8
-        assert_eq!(pubdata_bits.len(), 40 * 8);
-
+//        assert_eq!(pubdata_bits.len(), 40 * 8);
+        pubdata_bits.resize(5 * franklin_constants::CHUNK_BIT_WIDTH,
+            Boolean::constant(false),
+        );
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
@@ -1519,7 +1522,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(rhs.account_address.get_bits_be());
         pubdata_bits.extend(op_data.amount_packed.get_bits_be());
         pubdata_bits.extend(op_data.fee_packed.get_bits_be());
-        assert_eq!(pubdata_bits.len(), 13 * 8);
+//        assert_eq!(pubdata_bits.len(), 13 * 8);
 
         pubdata_bits.resize(
             2 * franklin_constants::CHUNK_BIT_WIDTH,
