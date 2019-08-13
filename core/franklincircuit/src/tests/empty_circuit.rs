@@ -3,7 +3,7 @@ use bellman;
 use pairing::bn256::*;
 use rand::OsRng;
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-
+use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
 use bellman::groth16::generate_random_parameters;
 use franklin_crypto::circuit::test::*;
 use crate::circuit::FranklinCircuit;
@@ -13,11 +13,13 @@ use franklinmodels::params as franklin_constants;
 use pairing::bn256::*;
 use rand::{Rng, SeedableRng, XorShiftRng};
 use bellman::Circuit;
+
+#[test]
 pub fn test_franklin_key() {
     // let p_g = FixedGenerators::SpendingKeyGenerator;
-    let OPERATION_BATCH_SIZE = 10;
     let params = &AltJubjubBn256::new();
-    let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+    // let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+    let rng = &mut OsRng::new().unwrap();
 
     let empty_operation = Operation {
         new_root: None,
@@ -57,11 +59,11 @@ pub fn test_franklin_key() {
             }
         }
     };
-    let mut cs = TestConstraintSystem::<Bn256>::new();
+
 
     let instance_for_generation: FranklinCircuit<'_, Bn256> = FranklinCircuit {
         params,
-        operation_batch_size: OPERATION_BATCH_SIZE,
+        operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
         old_root: None,
         new_root: None,
         validator_address: None,
@@ -69,12 +71,14 @@ pub fn test_franklin_key() {
         pub_data_commitment: None,
         validator_balances: vec![None; 1 << (*franklin_constants::BALANCE_TREE_DEPTH as i32)],
         validator_audit_path: vec![None; franklin_constants::ACCOUNT_TREE_DEPTH],
-        operations: vec![empty_operation; OPERATION_BATCH_SIZE],
+        operations: vec![empty_operation; franklin_constants::BLOCK_SIZE_CHUNKS],
         validator_account: AccountWitness { nonce: None, pub_key_hash: None },
     };
 
-    instance_for_generation.synthesize(&mut cs).unwrap();
+    let mut cs = TestConstraintSystem::<Bn256>::new();
 
+    instance_for_generation.synthesize(&mut cs).unwrap();
+    assert_eq!(cs.num_constraints(), 1);
     println!("{}", cs.find_unconstrained());
 
     println!("number of constraints {}", cs.num_constraints());

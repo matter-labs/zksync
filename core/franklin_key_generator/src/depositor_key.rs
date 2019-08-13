@@ -18,7 +18,6 @@ use franklincircuit::account::AccountWitness;
 //use circuit::leaf::LeafWitness;
 use franklinmodels::params as franklin_constants;
 
-const OPERATION_BATCH_SIZE: usize = 10;
 const FILENAME: &str = "franklin_pk.key";
 const CONTRACT_FILENAME: &str = "FranklinVerificationKey.sol";
 const CONTRACT_NAME: &str = "FranklinVerificationKey";
@@ -80,10 +79,9 @@ pub fn make_franklin_key() {
         pub_data_commitment: None,
         validator_balances: vec![None; 1 << (*franklin_constants::BALANCE_TREE_DEPTH as i32)],
         validator_audit_path: vec![None; franklin_constants::ACCOUNT_TREE_DEPTH],
-        operations: vec![empty_operation; OPERATION_BATCH_SIZE],
+        operations: vec![empty_operation; franklin_constants::BLOCK_SIZE_CHUNKS],
         validator_account: AccountWitness { nonce: None, pub_key_hash: None },
     };
-
 
     info!("generating setup...");
     let start = PreciseTime::now();

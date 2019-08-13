@@ -20,7 +20,7 @@ use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
 use franklinmodels::params as franklin_constants;
 
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 6;
-
+#[derive(Clone)]
 pub struct FranklinCircuit<'a, E: JubjubEngine> {
     pub params: &'a E::Params,
     pub operation_batch_size: usize,
@@ -48,6 +48,7 @@ struct PreviousData<E: JubjubEngine> {
 impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
     fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         //this is needed for technical purposes and convenience only
+        println!("beginninsg the circuit");
         let zero = AllocatedNum::alloc(cs.namespace(|| "zero"), || Ok(E::Fr::zero()))?;
         zero.assert_zero(cs.namespace(|| "zero==0"))?;
 
@@ -76,21 +77,22 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 b: zero_circuit_element.clone(),
             },
         };
-
+        println!("beginninsg the circui t 1");
         // this is only public input to our circuit
         let public_data_commitment =
             AllocatedNum::alloc(cs.namespace(|| "public_data_commitment"), || {
                 self.pub_data_commitment.grab()
             })?;
+        println!("beginninsg the circui t 1.5");
         public_data_commitment.inputize(cs.namespace(|| "inputize pub_data"))?;
-
+        println!("beginninsg the circui t 2");
         let validator_address_padded =
             CircuitElement::from_fe_padded(cs.namespace(|| "validator_address"), || {
                 self.validator_address.grab()
             })?;
         let mut validator_address = validator_address_padded.get_bits_le();
         validator_address.truncate(franklin_constants::ACCOUNT_TREE_DEPTH);
-
+        println!("beginninsg the circui t 3");
         let mut validator_balances = allocate_audit_path(
             cs.namespace(|| "validator_balances"),
             &self.validator_balances,
@@ -109,7 +111,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
         let old_root =
             CircuitElement::from_number_padded(cs.namespace(|| "old_root"), rolling_root.clone())?;
-
+        println!("beginninsg the circui t 4");
         // first chunk of block should always have number 0
         let mut next_chunk_number = zero.clone();
 
@@ -127,6 +129,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             chunk_number: zero.clone(),
             tx_type: zero_circuit_element,
         };
+        println!("before cycle the circuit");
         for (i, operation) in self.operations.iter().enumerate() {
             println!("\n operation number {} started \n", i);
             let cs = &mut cs.namespace(|| format!("chunk number {}", i));
@@ -1299,7 +1302,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         is_valid_flags.push(is_pubdata_chunk_correct);
 
         let is_noop = Boolean::from(Expression::equals(
-            cs.namespace(|| "is_deposit"),
+            cs.namespace(|| "is_noop"),
             &chunk_data.tx_type.get_number(),
             Expression::u64::<CS>(0), //noop tx_type
         )?);

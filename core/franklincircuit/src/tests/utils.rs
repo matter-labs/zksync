@@ -154,7 +154,7 @@ pub fn public_data_commitment<E: JubjubEngine>(
 }
 
 pub fn get_audits(
-    tree: &mut CircuitAccountTree,
+    tree: &CircuitAccountTree,
     account_address: u32,
     token: u32,
 ) -> (Vec<Option<Fr>>, Vec<Option<Fr>>) {

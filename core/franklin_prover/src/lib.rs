@@ -18,12 +18,17 @@ use tokio::timer;
 use storage::ProverRun;
 use circuit::tests::deposit::*;
 use circuit::tests::utils::*;
+use circuit::operation::Operation;
+use circuit::tests::noop::noop_operation;
+use circuit::circuit::FranklinCircuit;
 use circuit::account::AccountWitness;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use franklin_crypto::circuit::float_point::parse_float_to_u128;
+use bellman::{Circuit, ConstraintSystem, SynthesisError};
+use franklin_crypto::circuit::test::TestConstraintSystem;
 use franklin_crypto::jubjub::{edwards, JubjubEngine};
 use models::EncodedProof;
 use models::node::Account;
@@ -273,6 +278,8 @@ impl BabyProver {
        //                ref transactions, ..
        //            } => self.apply_and_prove_transfer(&block, &transactions),
        //        }
+
+       
        unimplemented!()
    }
 
@@ -1118,175 +1125,276 @@ impl BabyProver {
            .map_err(|e| format!("fetch_prover_job failed: {}", e))?;
 
 
-       let initial_root = self.accounts_tree.root_hash();
-       let block_number = 0 as BlockNumber;
-       info!(
-           "prover {} got a new job for block {}",
-           &self.worker, block_number
-       );
-       self.current_job.store(0 as usize, Ordering::Relaxed);
-
-       // load state delta self.current_block_number => block_number (can go both forwards and backwards)
-       let expected_current_block = block_number;
-       if self.current_block_number != expected_current_block {
-           self.rewind_state(&storage, expected_current_block)?;
-       }
-
-       let block = storage
-           .load_committed_block(block_number+1)
-           .ok_or("load_committed_block failed")?;
-       let ops = storage.get_block_operations(block.block_number).unwrap();
-       debug!("{:?}", ops);
-       drop(storage);
-       let mut operations = vec![];
-       let mut pub_data = vec![];
-       let mut fees = vec![];
-       for op in ops{
-           match op{
-               FranklinOp::Deposit(deposit) => {
-
-                   let deposit_witness = apply_deposit_tx(&mut self.accounts_tree, &deposit);
-
-                   //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-                   let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
-                   let deposit_operations = calculate_deposit_operations_from_witness(
-                       &deposit_witness,
-                       &sig_msg,
-                       signature,
-                       &sender_x,
-                       &sender_y,
-                   );
-                   operations.extend(deposit_operations);
-                   fees.push((deposit.tx.fee, deposit.tx.token));
-                   pub_data.extend(deposit_witness.get_pubdata());
-               },
-               _ => {
-                   unreachable!("only deposists allowed");
-               }
-           }
-       }
-       let mut root_after_fee: Fr = self.accounts_tree.root_hash();
-       let mut validator_account_witness: AccountWitness<Engine> = AccountWitness{
-           nonce: None,
-           pub_key_hash: None,
-       };
-       for (fee, token) in fees{
-           info!("fee, token: {}, {}", fee, token);
-           let (root, acc_witness) = apply_fee(&mut self.accounts_tree, block.fee_account as u32, token as u32, fee.to_u128().unwrap());
-           root_after_fee = root;
-           validator_account_witness = acc_witness;
-       }
-       for leaf in &self.accounts_tree.items{
-           debug!("balance: {} tree acc {} with id: {} ",leaf.1.subtree.get(0).unwrap().value,  leaf.1.pub_key_hash, leaf.0, );
-       }
-       info!("root after fees {}", root_after_fee);
-       info!("block new hash {}", block.new_root_hash);
-
-       let (validator_audit_path, _) = get_audits(&mut self.accounts_tree, block.fee_account as u32, 0);
-
-       let public_data_commitment = public_data_commitment::<Engine>(
-           &pub_data,
-           Some(initial_root),
-           Some(root_after_fee),
-           Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
-           Some(Fr::from_str(&block_number.to_string()).unwrap()),
-       );
+//       let initial_root = self.accounts_tree.root_hash();
+//       let block_number = 0 as BlockNumber;
+//       info!(
+//           "prover {} got a new job for block {}",
+//           &self.worker, block_number
+//       );
+//       self.current_job.store(0 as usize, Ordering::Relaxed);
 //
-//
-//       if let Some(job) = job {
-//           let initial_root = self.accounts_tree.root_hash();
-//           let block_number = job.block_number as BlockNumber;
-//           info!(
-//               "prover {} got a new job for block {}",
-//               &self.worker, block_number
-//           );
-//           self.current_job.store(job.id as usize, Ordering::Relaxed);
-//
-//           // load state delta self.current_block_number => block_number (can go both forwards and backwards)
-//            let expected_current_block = block_number;
-//            if self.current_block_number != expected_current_block {
-//               self.rewind_state(&storage, expected_current_block)?;
-//            }
-//
-//            let block = storage
-//               .load_committed_block(block_number)
-//               .ok_or("load_committed_block failed")?;
-//            let ops = storage.get_block_operations(block.block_number).unwrap();
-//
-//            drop(storage);
-//            let mut operations = vec![];
-//            let mut pub_data = vec![];
-//            let mut fees = vec![];
-//            for op in ops{
-//                 match op{
-//                     FranklinOp::Deposit(deposit) => {
-//
-//                        let deposit_witness = apply_deposit_tx(&mut self.accounts_tree, &deposit);
-//
-//                        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-//                        let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
-//                        let deposit_operations = calculate_deposit_operations_from_witness(
-//                            &deposit_witness,
-//                            &sig_msg,
-//                            signature,
-//                            &sender_x,
-//                            &sender_y,
-//                        );
-//                        operations.extend(deposit_operations);
-//                        fees.push((deposit.tx.fee, deposit.tx.token));
-//                        pub_data.extend(deposit_witness.get_pubdata());
-//                     },
-//                     _ => {
-//                         unreachable!("only deposists allowed");
-//                     }
-//                 }
-//            }
-//           let mut root_after_fee: Fr = self.accounts_tree.root_hash();
-//           let mut validator_account_witness: AccountWitness<Engine> = AccountWitness{
-//               nonce: None,
-//               pub_key_hash: None,
-//           };
-//           for (fee, token) in fees{
-//               info!("fee, token: {}, {}", fee, token);
-//               let (root, acc_witness) = apply_fee(&mut self.accounts_tree, block.fee_account as u32, token as u32, fee.to_u128().unwrap());
-//               root_after_fee = root;
-//               validator_account_witness = acc_witness;
-//           }
-//
-//           info!("root after fees {}", root_after_fee);
-//           info!("block new hash {}", block.new_root_hash);
-//
-//           let (validator_audit_path, _) = get_audits(&mut self.accounts_tree, block.fee_account as u32, 0);
-//
-//           let public_data_commitment = public_data_commitment::<Engine>(
-//               &pub_data,
-//               Some(initial_root),
-//               Some(root_after_fee),
-//               Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
-//               Some(Fr::from_str(&block_number.to_string()).unwrap()),
-//           );
-
-//
-//            let proof = self
-//                .apply_and_prove(&block)
-//                .map_err(|e| format!("apply_and_prove failed: {}", e))?;
-//            let encoded = Self::encode_proof(&proof).expect("proof encoding failed");
-//            let storage = StorageProcessor::establish_connection()
-//                .map_err(|e| format!("establish_connection failed: {}", e))?;
-//            storage
-//                .store_proof(block_number, &encoded)
-//                .map_err(|e| format!("store_proof failed: {}", e))?;
-//       } else {
-//           // no new job, so let's try to fast forward to the latest verified state for efficiency, and then sleep
-//           let last_verified_block = storage
-//               .get_last_verified_block()
-//               .map_err(|e| format!("get_last_verified_block failed: {}", e))?;
-//           if self.current_block_number < last_verified_block + 1 {
-//               self.rewind_state(&storage, last_verified_block + 1)
-//                   .map_err(|e| format!("rewind_state failed: {}", e))?;
-//           }
-//           thread::sleep(Duration::from_secs(PROVER_CYCLE_WAIT));
+//       // load state delta self.current_block_number => block_number (can go both forwards and backwards)
+//       let expected_current_block = block_number;
+//       if self.current_block_number != expected_current_block {
+//           self.rewind_state(&storage, expected_current_block)?;
 //       }
+//
+//       let block = storage
+//           .load_committed_block(block_number+1)
+//           .ok_or("load_committed_block failed")?;
+//       let ops = storage.get_block_operations(block.block_number).unwrap();
+//       debug!("{:?}", ops);
+//       drop(storage);
+//       let mut operations = vec![];
+//       let mut pub_data = vec![];
+//       let mut fees = vec![];
+//       for op in ops{
+//           match op{
+//               FranklinOp::Deposit(deposit) => {
+//
+//                   let deposit_witness = apply_deposit_tx(&mut self.accounts_tree, &deposit);
+//
+//                   //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+//                   let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
+//                   let deposit_operations = calculate_deposit_operations_from_witness(
+//                       &deposit_witness,
+//                       &sig_msg,
+//                       signature,
+//                       &sender_x,
+//                       &sender_y,
+//                   );
+//                   operations.extend(deposit_operations);
+//                   fees.push((deposit.tx.fee, deposit.tx.token));
+//                   pub_data.extend(deposit_witness.get_pubdata());
+//               },
+//               _ => {
+//                   unreachable!("only deposists allowed");
+//               }
+//           }
+//       }
+//       let mut root_after_fee: Fr = self.accounts_tree.root_hash();
+//       let mut validator_account_witness: AccountWitness<Engine> = AccountWitness{
+//           nonce: None,
+//           pub_key_hash: None,
+//       };
+//       for (fee, token) in fees{
+//           info!("fee, token: {}, {}", fee, token);
+//           let (root, acc_witness) = apply_fee(&mut self.accounts_tree, block.fee_account as u32, token as u32, fee.to_u128().unwrap());
+//           root_after_fee = root;
+//           validator_account_witness = acc_witness;
+//       }
+//       for leaf in &self.accounts_tree.items{
+//           debug!("balance: {} tree acc {} with id: {} ",leaf.1.subtree.get(0).unwrap().value,  leaf.1.pub_key_hash, leaf.0, );
+//       }
+//       info!("root after fees {}", root_after_fee);
+//       info!("block new hash {}", block.new_root_hash);
+//
+//       let (validator_audit_path, _) = get_audits(&mut self.accounts_tree, block.fee_account as u32, 0);
+//
+//       let public_data_commitment = public_data_commitment::<Engine>(
+//           &pub_data,
+//           Some(initial_root),
+//           Some(root_after_fee),
+//           Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
+//           Some(Fr::from_str(&block_number.to_string()).unwrap()),
+//       );
+//
+//
+       if let Some(job) = job {
+           let initial_root = self.accounts_tree.root_hash();
+           let block_number = job.block_number as BlockNumber;
+           info!(
+               "prover {} got a new job for block {}",
+               &self.worker, block_number
+           );
+           self.current_job.store(job.id as usize, Ordering::Relaxed);
+
+           // load state delta self.current_block_number => block_number (can go both forwards and backwards)
+            let expected_current_block = block_number-1;
+            if self.current_block_number != expected_current_block {
+               self.rewind_state(&storage, expected_current_block)?;
+            }
+
+            let block = storage
+               .load_committed_block(block_number)
+               .ok_or("load_committed_block failed")?;
+            let ops = storage.get_block_operations(block.block_number).unwrap();
+
+            drop(storage);
+            let mut operations = vec![];
+            let mut pub_data = vec![];
+            let mut fees = vec![];
+            for op in ops{
+                 match op{
+                     FranklinOp::Deposit(deposit) => {
+
+                        let deposit_witness = apply_deposit_tx(&mut self.accounts_tree, &deposit);
+
+                        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+                        let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
+                        let deposit_operations = calculate_deposit_operations_from_witness(
+                            &deposit_witness,
+                            &sig_msg,
+                            signature,
+                            &sender_x,
+                            &sender_y,
+                        );
+                        operations.extend(deposit_operations);
+                        fees.push((deposit.tx.fee, deposit.tx.token));
+                        pub_data.extend(deposit_witness.get_pubdata());
+                     },
+                     _ => {
+                         unreachable!("only deposists allowed");
+                     }
+                 }
+            }
+            if operations.len() < franklin_constants::BLOCK_SIZE_CHUNKS{
+                for _ in 0..franklin_constants::BLOCK_SIZE_CHUNKS-operations.len(){
+                    let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
+                    operations.push(noop_operation(&self.accounts_tree, block.fee_account, &sig_msg, signature, &sender_x, &sender_x));
+                }
+            }
+           
+           let validator_acc = self.accounts_tree.get(block.fee_account as u32).expect("fee_account is not empty");
+           let mut validator_balances = vec![];
+           for i in 0..1<<*franklin_constants::BALANCE_TREE_DEPTH{
+            //    validator_balances.push(Some(validator_acc.subtree.get(i as u32).map(|s| s.clone()).unwrap_or(Balance::default())));
+                let balance_value = match validator_acc.subtree.get(i as u32){
+                    None => Fr::zero(),
+                    Some(bal) => bal.value.clone()
+                };
+               validator_balances.push(Some(balance_value));
+           }
+           let mut root_after_fee: Fr = self.accounts_tree.root_hash();
+           let mut validator_account_witness: AccountWitness<Engine> = AccountWitness{
+               nonce: None,
+               pub_key_hash: None,
+           };
+           for (fee, token) in fees{
+               info!("fee, token: {}, {}", fee, token);
+               let (root, acc_witness) = apply_fee(&mut self.accounts_tree, block.fee_account as u32, token as u32, fee.to_u128().unwrap());
+               root_after_fee = root;
+               validator_account_witness = acc_witness;
+           }
+
+           info!("root after fees {}", root_after_fee);
+           info!("block new hash {}", block.new_root_hash);
+           assert_eq!(root_after_fee, block.new_root_hash);
+           
+           let (validator_audit_path, _) = get_audits(&mut self.accounts_tree, block.fee_account as u32, 0);
+           
+           let public_data_commitment = public_data_commitment::<Engine>(
+               &pub_data,
+               Some(initial_root.clone()),
+               Some(root_after_fee.clone()),
+               Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
+               Some(Fr::from_str(&block_number.to_string()).unwrap()),
+           );
+            let instance = FranklinCircuit{
+                params: &self.jubjub_params,
+                operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
+                old_root: Some(initial_root),
+                new_root: Some(block.new_root_hash),
+                block_number: Fr::from_str(&(block_number+1).to_string()),
+                validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
+                pub_data_commitment: Some(public_data_commitment.clone()),
+                operations: operations.clone(),
+                validator_balances: validator_balances.clone(),
+                validator_audit_path: validator_audit_path.clone(),
+                validator_account: validator_account_witness.clone(),
+            };
+
+            {
+                let inst = FranklinCircuit{
+                params: &self.jubjub_params,
+                operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
+                old_root: Some(initial_root),
+                new_root: Some(block.new_root_hash),
+                block_number: Fr::from_str(&(block_number+1).to_string()),
+                validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
+                pub_data_commitment: Some(public_data_commitment.clone()),
+                operations: operations,
+                validator_balances: validator_balances,
+                validator_audit_path: validator_audit_path,
+                validator_account: validator_account_witness,
+            };
+            let mut cs = TestConstraintSystem::<Engine>::new();
+             inst.synthesize(&mut cs).unwrap();
+
+             warn!("unconstrained {}\n", cs.find_unconstrained());
+
+             warn!("num_constraints: {}\n", cs.num_constraints());
+            }
+           
+
+           let mut rng = OsRng::new().unwrap();
+         info!("Prover has started to work transfer");
+         let proof = create_random_proof(instance, &self.parameters, &mut rng);
+         if proof.is_err() {
+             error!("proof can not be created: {}", proof.err().unwrap());
+             return Err("proof can not be created".to_owned())
+//             return Err(BabyProverErr::Other("proof.is_err()".to_owned()));
+         }
+
+         let p = proof.unwrap();
+
+         let pvk = prepare_verifying_key(&self.parameters.vk);
+
+         info!(
+             "Made a proof for initial root = {}, final root = {}, public data = {}",
+             initial_root,
+             root_after_fee,
+             public_data_commitment.to_hex()
+         );
+         let success = verify_proof(
+             &pvk,
+             &p.clone(),
+             &[public_data_commitment],
+         );
+         if success.is_err() {
+             error!(
+                 "Proof is verification failed with error {}",
+                 success.err().unwrap()
+             );
+             return Err("Proof verification has failed".to_owned())
+//             return Err(BabyProverErr::Other(
+//                 "Proof is verification failed".to_owned(),
+//             ));
+         }
+         if !success.unwrap() {
+             error!("Proof is invalid");
+             return Err("Proof is invalid".to_owned());
+//             return Err(BabyProverErr::Other("Proof is invalid".to_owned()));
+         }
+
+            info!("Proof generation is complete");
+
+            let full_proof = FullBabyProof {
+                proof: p,
+                inputs: [public_data_commitment],
+                // public_data: pub_data,
+                public_data: vec![0 as u8; 10],
+            };
+
+//        Ok(full_proof)
+
+            let encoded = Self::encode_proof(&full_proof).expect("proof encoding failed");
+            let storage = StorageProcessor::establish_connection()
+                .map_err(|e| format!("establish_connection failed: {}", e))?;
+            storage
+                .store_proof(block_number, &encoded)
+                .map_err(|e| format!("store_proof failed: {}", e))?;
+       } else {
+           // no new job, so let's try to fast forward to the latest verified state for efficiency, and then sleep
+           let last_verified_block = storage
+               .get_last_verified_block()
+               .map_err(|e| format!("get_last_verified_block failed: {}", e))?;
+           if self.current_block_number < last_verified_block + 1 {
+               self.rewind_state(&storage, last_verified_block + 1)
+                   .map_err(|e| format!("rewind_state failed: {}", e))?;
+           }
+           thread::sleep(Duration::from_secs(PROVER_CYCLE_WAIT));
+       }
        Ok(())
    }
 
