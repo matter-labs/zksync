@@ -28,7 +28,7 @@ export class Wallet {
     privateKey: BN;
     publicKey: EdwardsPoint;
 
-    constructor(seed: Buffer, public provider: FranklinProvider, public ethWallet: ethers.Wallet) {
+    constructor(seed: Buffer, public provider: FranklinProvider, public ethWallet: ethers.Signer) {
         let privateKey = new BN(HmacSHA512(seed.toString('hex'), 'Matter seed').toString(), 'hex');
         this.privateKey = privateKey.mod(altjubjubCurve.n);
         this.publicKey = altjubjubCurve.g.mul(this.privateKey).normalize();
@@ -76,7 +76,7 @@ export class Wallet {
         return (await this.provider.getState(this.address)).nonce;
     }
 
-    static async fromEthWallet(wallet: ethers.Wallet) {
+    static async fromEthWallet(wallet: ethers.Signer) {
         let defaultFranklinProvider = new FranklinProvider();
         let seed = (await wallet.signMessage('Matter login')).substr(2);
         let frankinWallet = new Wallet(Buffer.from(seed, 'hex'), defaultFranklinProvider, wallet);

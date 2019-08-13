@@ -9,9 +9,9 @@ export const ERC20MintableContract = function () {
 }();
 export const franklinContractCode = require('../build/Franklin');
 
-export async function deployFranklin(wallet, franklinCode = franklinContractCode) {
+export async function deployFranklin(wallet, genesisRoot = ethers.constants.HashZero, franklinCode = franklinContractCode) {
     try {
-        let contract = await deployContract(wallet, franklinCode, [ethers.constants.HashZero, wallet.address, wallet.address], {
+        let contract = await deployContract(wallet, franklinCode, [genesisRoot, wallet.address, wallet.address], {
             gasLimit: 8000000,
         });
         console.log("Franklin address:" + contract.address);

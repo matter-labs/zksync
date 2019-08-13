@@ -51,33 +51,19 @@ impl PlasmaStateKeeper {
     pub fn new(pool: ConnectionPool, eth_state: Arc<RwLock<ETHState>>) -> Self {
         info!("constructing state keeper instance");
 
-        // here we should insert default accounts into the tree
         let storage = pool
             .access_storage()
             .expect("db connection failed for statekeeper");
 
-        let fee_account_address =
-            AccountAddress::from_hex("0x123456789123456789123456789123456789123456789123456789")
-                .unwrap();
-
         let (last_committed, mut accounts) = storage.load_committed_state(None).expect("db failed");
-        debug!("accounts: {:?}", accounts);
-        // TODO: move genesis block creation to separate routine.
-        if last_committed == 0 && accounts.is_empty() {
-            let mut fee_account = Account::default();
-            fee_account.address = fee_account_address.clone();
-            let db_account_update = AccountUpdate::Create {
-                address: fee_account_address.clone(),
-                nonce: fee_account.nonce,
-            };
-            accounts.insert(0, fee_account);
-            storage.commit_state_update(0, &[(0, db_account_update)]);
-            storage.apply_state_update(0);
-            info!("Genesis block created, state: {:#?}", accounts);
-        }
         let last_verified = storage.get_last_verified_block().expect("db failed");
         let state = PlasmaState::new(accounts, last_committed + 1);
-        //let outstanding_txs = storage.count_outstanding_proofs(last_verified).expect("db failed");
+
+        let fee_account_address = std::env::var("OPERATOR_FRANKLIN_ADDRESS")
+            .map(|addr| {
+                AccountAddress::from_hex(&addr).expect("Incorrect franklin account address")
+            })
+            .expect("OPERATOR_FRANKLIN_ADDRESS must be set");
 
         info!(
             "last_committed = {}, last_verified = {}",
@@ -98,6 +84,37 @@ impl PlasmaStateKeeper {
         info!("created state keeper, root hash = {}", root);
 
         keeper
+    }
+
+    pub fn create_genesis_block(pool: ConnectionPool) {
+        let storage = pool
+            .access_storage()
+            .expect("db connection failed for statekeeper");
+        let fee_account_address = std::env::var("OPERATOR_FRANKLIN_ADDRESS")
+            .map(|addr| {
+                AccountAddress::from_hex(&addr).expect("Incorrect franklin account address")
+            })
+            .expect("OPERATOR_FRANKLIN_ADDRESS must be set");
+
+        let (last_committed, mut accounts) = storage.load_committed_state(None).expect("db failed");
+        // TODO: move genesis block creation to separate routine.
+        assert!(
+            last_committed == 0 && accounts.is_empty(),
+            "db should be empty"
+        );
+        let mut fee_account = Account::default();
+        fee_account.address = fee_account_address.clone();
+        let db_account_update = AccountUpdate::Create {
+            address: fee_account_address.clone(),
+            nonce: fee_account.nonce,
+        };
+        accounts.insert(0, fee_account);
+        storage
+            .commit_state_update(0, &[(0, db_account_update)])
+            .expect("db fail");
+        storage.apply_state_update(0).expect("db fail");
+        let state = PlasmaState::new(accounts, last_committed + 1);
+        info!("Genesis block created, state: {}", state.root_hash());
     }
 
     fn run(

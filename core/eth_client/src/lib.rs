@@ -37,17 +37,15 @@ impl ETHClient {
     pub fn new(contract_abi: String) -> Self {
         Self {
             web3_url: env::var("WEB3_URL").unwrap_or_else(|_| "http://localhost:8545".to_string()),
-            private_key: H256::from_str(&env::var("PRIVATE_KEY").unwrap_or_else(|_| {
-                "aa8564af9bef22f581e99125d1829b76c45d08e4f6f0b74d586911f4318b6776".to_string()
-            }))
-            .expect("private key must be correct"),
-            contract_addr: H160::from_str(
-                &env::var("CONTRACT_ADDR")
-                    .unwrap_or_else(|_| "616e08c733fe20e99bf70c5088635694d5e25c54".to_string()),
+            private_key: H256::from_str(
+                &env::var("OPERATOR_PRIVATE_KEY").expect("OPERATOR_PRIVATE_KEY"),
             )
-            .expect("contract address must be correct"),
-            sender_account: env::var("SENDER_ACCOUNT")
-                .unwrap_or_else(|_| "e5d0efb4756bd5cdd4b5140d3d2e08ca7e6cf644".to_string()),
+            .expect("private key must be correct"),
+            contract_addr: H160::from_str(&env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR"))
+                .expect("contract address must be correct"),
+            sender_account: env::var("OPERATOR_ETH_ADDRESS")
+                .map(|s| s[2..].to_string())
+                .expect("OPERATOR_ETH_ADDRESS"),
             chain_id: u8::from_str(&env::var("CHAIN_ID").unwrap_or_else(|_| "4".to_string()))
                 .expect("chain id must be correct"),
             contract: ethabi::Contract::load(contract_abi.as_bytes())
