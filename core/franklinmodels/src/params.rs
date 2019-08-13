@@ -6,7 +6,6 @@ pub const TX_TYPE_BIT_WIDTH: &'static usize = &8;
 /// Account tree depth
 pub const ACCOUNT_TREE_DEPTH: usize = 24;
 
-
 /// Balance tree depth
 pub const BALANCE_TREE_DEPTH: &'static usize = &10;
 

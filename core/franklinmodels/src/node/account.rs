@@ -17,7 +17,7 @@ use crate::circuit::account::{Balance, CircuitAccount};
 
 #[derive(Debug, Clone, PartialEq, Default, Eq, Hash)]
 pub struct AccountAddress {
-    pub data: [u8; params::NEW_PUBKEY_HASH_WIDTH/8],
+    pub data: [u8; params::NEW_PUBKEY_HASH_WIDTH / 8],
 }
 
 impl AccountAddress {
@@ -28,7 +28,10 @@ impl AccountAddress {
     pub fn from_hex(s: &str) -> Result<Self, failure::Error> {
         ensure!(s.starts_with("0x"), "Address should start with 0x");
         let bytes = hex::decode(&s[2..])?;
-        ensure!(bytes.len() ==  params::NEW_PUBKEY_HASH_WIDTH/8, "Size mismatch");
+        ensure!(
+            bytes.len() == params::NEW_PUBKEY_HASH_WIDTH / 8,
+            "Size mismatch"
+        );
         Ok(AccountAddress {
             data: bytes.as_slice().try_into().unwrap(),
         })
@@ -100,13 +103,13 @@ impl From<Account> for CircuitAccount<super::Engine> {
 
         circuit_account.nonce = Fr::from_str(&acc.nonce.to_string()).unwrap();
         circuit_account.pub_key_hash = Fr::from_hex(&acc.address.to_hex()).unwrap();
-//        let mut fr_repr = <Fr as PrimeField>::Repr::default();
-//        let mut addr_vec = acc.address.data.to_vec();
-//        addr_vec.reverse();
-//        addr_vec.resize(32, 0u8);
-//        addr_vec.reverse();
-//        fr_repr.read_be(&*addr_vec).unwrap();
-//        circuit_account.pub_key_hash = Fr::from_repr(fr_repr).unwrap();
+        //        let mut fr_repr = <Fr as PrimeField>::Repr::default();
+        //        let mut addr_vec = acc.address.data.to_vec();
+        //        addr_vec.reverse();
+        //        addr_vec.resize(32, 0u8);
+        //        addr_vec.reverse();
+        //        fr_repr.read_be(&*addr_vec).unwrap();
+        //        circuit_account.pub_key_hash = Fr::from_repr(fr_repr).unwrap();
         circuit_account
     }
 }

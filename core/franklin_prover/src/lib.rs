@@ -5,46 +5,46 @@ use rand::OsRng;
 use std::fmt;
 use std::iter::Iterator;
 use std::sync::{
-   atomic::{AtomicBool, AtomicUsize, Ordering},
-   Arc,
+    atomic::{AtomicBool, AtomicUsize, Ordering},
+    Arc,
 };
 use std::thread;
 use std::time::Duration;
-
-use tokio::prelude::*;
-use tokio::runtime::current_thread::Handle;
-use tokio::sync::oneshot::Sender;
-use tokio::timer;
-use storage::ProverRun;
-use circuit::tests::deposit::*;
-use circuit::tests::utils::*;
-use circuit::operation::Operation;
-use circuit::tests::noop::noop_operation;
-use circuit::circuit::FranklinCircuit;
+use bellman::groth16::generate_random_parameters;
+use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use circuit::account::AccountWitness;
+use circuit::circuit::FranklinCircuit;
+use circuit::operation::Operation;
+use circuit::tests::deposit::*;
+use circuit::tests::noop::noop_operation;
+use circuit::tests::utils::*;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use franklin_crypto::circuit::float_point::parse_float_to_u128;
-use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use franklin_crypto::circuit::test::TestConstraintSystem;
 use franklin_crypto::jubjub::{edwards, JubjubEngine};
-use models::EncodedProof;
-use models::node::Account;
 use models::node::config::*;
 use models::node::operations::*;
+use models::node::Account;
 use models::params as franklin_constants;
+use models::EncodedProof;
 use rustc_hex::ToHex;
+use storage::ProverRun;
+use tokio::prelude::*;
+use tokio::runtime::current_thread::Handle;
+use tokio::sync::oneshot::Sender;
+use tokio::timer;
 
 use bellman::groth16::{
-   create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
+    create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
 };
-use models::circuit::CircuitAccountTree;
 use models::circuit::account::{Balance, CircuitAccount};
+use models::circuit::CircuitAccountTree;
 use models::merkle_tree::*;
-use models::node::*;
 use models::node::block::{Block, ExecutedTx};
+use models::node::*;
 use models::primitives::*;
 use plasma::state::PlasmaState;
 
@@ -62,18 +62,18 @@ use circuit::utils::be_bit_vector_into_bytes;
 use circuit::operation::*;
 
 use models::primitives::{
-   field_element_to_u32, serialize_g1_for_ethereum, serialize_g2_for_ethereum,
+    field_element_to_u32, serialize_g1_for_ethereum, serialize_g2_for_ethereum,
 };
 
 pub struct Prover<E: JubjubEngine> {
-   pub operation_batch_size: usize,
-   pub current_block_number: BlockNumber,
-   pub accounts_tree: CircuitAccountTree,
-   pub parameters: BabyParameters,
-   pub jubjub_params: E::Params,
-   pub worker: String,
-   pub prover_id: i32,
-   pub current_job: Arc<AtomicUsize>,
+    pub operation_batch_size: usize,
+    pub current_block_number: BlockNumber,
+    pub accounts_tree: CircuitAccountTree,
+    pub parameters: BabyParameters,
+    pub jubjub_params: E::Params,
+    pub worker: String,
+    pub prover_id: i32,
+    pub current_job: Arc<AtomicUsize>,
 }
 
 pub type BabyProof = Proof<Engine>;
@@ -82,206 +82,478 @@ pub type BabyProver = Prover<Engine>;
 
 #[derive(Debug)]
 pub enum BabyProverErr {
-   InvalidAmountEncoding,
-   InvalidFeeEncoding,
-   InvalidSender,
-   InvalidRecipient,
-   InvalidTransaction(String),
-   IoError(std::io::Error),
-   Other(String),
+    InvalidAmountEncoding,
+    InvalidFeeEncoding,
+    InvalidSender,
+    InvalidRecipient,
+    InvalidTransaction(String),
+    IoError(std::io::Error),
+    Other(String),
 }
 
 impl BabyProverErr {
-   fn description(&self) -> String {
-       match *self {
-           BabyProverErr::InvalidAmountEncoding => {
-               "transfer amount is malformed or too large".to_owned()
-           }
-           BabyProverErr::InvalidFeeEncoding => {
-               "transfer fee is malformed or too large".to_owned()
-           }
-           BabyProverErr::InvalidSender => "sender account is unknown".to_owned(),
-           BabyProverErr::InvalidRecipient => "recipient account is unknown".to_owned(),
-           BabyProverErr::InvalidTransaction(ref reason) => format!("invalid tx data: {}", reason),
-           BabyProverErr::IoError(_) => "encountered an I/O error".to_owned(),
-           BabyProverErr::Other(ref reason) => format!("Prover error: {}", reason),
-       }
-   }
+    fn description(&self) -> String {
+        match *self {
+            BabyProverErr::InvalidAmountEncoding => {
+                "transfer amount is malformed or too large".to_owned()
+            }
+            BabyProverErr::InvalidFeeEncoding => {
+                "transfer fee is malformed or too large".to_owned()
+            }
+            BabyProverErr::InvalidSender => "sender account is unknown".to_owned(),
+            BabyProverErr::InvalidRecipient => "recipient account is unknown".to_owned(),
+            BabyProverErr::InvalidTransaction(ref reason) => format!("invalid tx data: {}", reason),
+            BabyProverErr::IoError(_) => "encountered an I/O error".to_owned(),
+            BabyProverErr::Other(ref reason) => format!("Prover error: {}", reason),
+        }
+    }
 }
 
 impl fmt::Display for BabyProverErr {
-   fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-       if let BabyProverErr::IoError(ref e) = *self {
-           write!(f, "I/O error: ")?;
-           e.fmt(f)
-       } else {
-           write!(f, "{}", self.description())
-       }
-   }
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        if let BabyProverErr::IoError(ref e) = *self {
+            write!(f, "I/O error: ")?;
+            e.fmt(f)
+        } else {
+            write!(f, "{}", self.description())
+        }
+    }
 }
 
 #[derive(Debug)]
 pub struct FullBabyProof {
-   proof: BabyProof,
-   inputs: [Fr; 1],
-   public_data: Vec<u8>,
+    proof: BabyProof,
+    inputs: [Fr; 1],
+    public_data: Vec<u8>,
 }
 
 fn read_parameters(file_name: &str) -> Result<BabyParameters, BabyProverErr> {
-   use std::fs::File;
-   use std::io::BufReader;
+    use std::fs::File;
+    use std::io::BufReader;
 
-   let f_r = File::open(file_name);
-   if f_r.is_err() {
-       return Err(BabyProverErr::IoError(f_r.err().unwrap()));
-   }
-   let mut r = BufReader::new(f_r.unwrap());
-   let circuit_params = BabyParameters::read(&mut r, true);
+    let f_r = File::open(file_name);
+    if f_r.is_err() {
+        return Err(BabyProverErr::IoError(f_r.err().unwrap()));
+    }
+    let mut r = BufReader::new(f_r.unwrap());
+    let circuit_params = BabyParameters::read(&mut r, true);
 
-   if circuit_params.is_err() {
-       return Err(BabyProverErr::IoError(circuit_params.err().unwrap()));
-   }
+    if circuit_params.is_err() {
+        return Err(BabyProverErr::IoError(circuit_params.err().unwrap()));
+    }
 
-   Ok(circuit_params.unwrap())
+    Ok(circuit_params.unwrap())
 }
 
 fn extend_accounts<I: Sized + Iterator<Item = (AccountId, Account)>>(
-   tree: &mut CircuitAccountTree,
-   accounts: I,
+    tree: &mut CircuitAccountTree,
+    accounts: I,
 ) {
-   for e in accounts {
-       let acc_number = e.0;
-       let leaf_copy = CircuitAccount::from(e.1.clone());
-       tree.insert(acc_number, leaf_copy);
-   }
+    for e in accounts {
+        let acc_number = e.0;
+        let leaf_copy = CircuitAccount::from(e.1.clone());
+        tree.insert(acc_number, leaf_copy);
+    }
 }
 
 // IMPORTANT: prover does NOT care about some ordering of the transactions, so blocks supplied here MUST be ordered
 // for the application layer
 
 impl BabyProver {
-   // Outputs
-   // - 8 uint256 for encoding of the field elements
-   // - one uint256 for new root hash
-   // - uint256 block number
-   // - uint256 total fees
-   // - Bytes public data
-   //
-   // Old root is available to take from the storage of the smart-contract
-   pub fn encode_proof(proof: &FullBabyProof) -> Result<EncodedProof, Err> {
-       // proof
-       // pub a: E::G1Affine,
-       // pub b: E::G2Affine,
-       // pub c: E::G1Affine
+    // Outputs
+    // - 8 uint256 for encoding of the field elements
+    // - one uint256 for new root hash
+    // - uint256 block number
+    // - uint256 total fees
+    // - Bytes public data
+    //
+    // Old root is available to take from the storage of the smart-contract
+    pub fn encode_proof(proof: &FullBabyProof) -> Result<EncodedProof, Err> {
+        // proof
+        // pub a: E::G1Affine,
+        // pub b: E::G2Affine,
+        // pub c: E::G1Affine
 
-       let (a_x, a_y) = serialize_g1_for_ethereum(proof.proof.a);
+        let (a_x, a_y) = serialize_g1_for_ethereum(proof.proof.a);
 
-       let ((b_x_0, b_x_1), (b_y_0, b_y_1)) = serialize_g2_for_ethereum(proof.proof.b);
+        let ((b_x_0, b_x_1), (b_y_0, b_y_1)) = serialize_g2_for_ethereum(proof.proof.b);
 
-       let (c_x, c_y) = serialize_g1_for_ethereum(proof.proof.c);
+        let (c_x, c_y) = serialize_g1_for_ethereum(proof.proof.c);
 
-       // let new_root = serialize_fe_for_ethereum(proof.inputs[1]);
+        // let new_root = serialize_fe_for_ethereum(proof.inputs[1]);
 
-       // let total_fees = serialize_fe_for_ethereum(proof.total_fees);
+        // let total_fees = serialize_fe_for_ethereum(proof.total_fees);
 
-       // let block_number = serialize_fe_for_ethereum(proof.block_number);
+        // let block_number = serialize_fe_for_ethereum(proof.block_number);
 
-       // let public_data = proof.public_data.clone();
+        // let public_data = proof.public_data.clone();
 
-       let p = [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y];
+        let p = [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y];
 
-       // EncodedProof{
-       //     groth_proof: [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y],
-       //     //block_number: block_number,
-       // };
+        // EncodedProof{
+        //     groth_proof: [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y],
+        //     //block_number: block_number,
+        // };
 
-       Ok(p)
-   }
+        Ok(p)
+    }
 
-   pub fn create(worker: String) -> Result<BabyProver, BabyProverErr> {
-       let storage =
-           StorageProcessor::establish_connection().expect("db connection failed for prover");
-       let (last_block, accounts) = storage
-           .load_verified_state()
-           .expect("db must be functional");
-       info!("Last block is: {}", last_block);
+    pub fn create(worker: String) -> Result<BabyProver, BabyProverErr> {
+        let storage =
+            StorageProcessor::establish_connection().expect("db connection failed for prover");
+        let (last_block, accounts) = storage
+            .load_verified_state()
+            .expect("db must be functional");
+        info!("Last block is: {}", last_block);
         debug!("Accounts: {:?}", accounts);
-       let initial_state = PlasmaState::new(accounts, last_block);
+        let initial_state = PlasmaState::new(accounts, last_block);
 
-       info!("Reading proving key, may take a while");
+        info!("Reading proving key, may take a while");
 
-    //    let keys_path = &RUNTIME_CONFIG.keys_path;
+        //    let keys_path = &RUNTIME_CONFIG.keys_path;
 
-    //    let path = format!("{}/transfer_pk.key", keys_path);
+        //    let path = format!("{}/transfer_pk.key", keys_path);
 
-       let path = format!("core/franklin_key_generator/franklin_pk.key");
-       debug!("Reading key from {}", path);
-       let franklin_circuit_params = read_parameters(&path);
-       if franklin_circuit_params.is_err() {
-           return Err(franklin_circuit_params.err().unwrap());
-       }
+        let path = format!("core/franklin_key_generator/franklin_pk.key");
+        debug!("Reading key from {}", path);
+        let franklin_circuit_params = read_parameters(&path);
+        if franklin_circuit_params.is_err() {
+            return Err(franklin_circuit_params.err().unwrap());
+        }
 
-       debug!("Done reading franklin key");
+        debug!("Done reading franklin key");
 
-       info!("Copying states to balance tree");
+        info!("Copying states to balance tree");
 
-       // TODO: replace with .clone() by moving PedersenHasher to static context
-       let mut tree = CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
-       extend_accounts(&mut tree, initial_state.get_accounts().into_iter());
+        // TODO: replace with .clone() by moving PedersenHasher to static context
+        let mut tree = CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
+        extend_accounts(&mut tree, initial_state.get_accounts().into_iter());
 
-       let root = tree.root_hash();
+        let root = tree.root_hash();
 
-       let state_block_number = initial_state.block_number;
+        let state_block_number = initial_state.block_number;
 
-       info!(
-           "Initial root hash is {} for block {}",
-           root, state_block_number
-       );
+        info!(
+            "Initial root hash is {} for block {}",
+            root, state_block_number
+        );
 
-       let supplied_root = initial_state.root_hash();
-       info!("supplied_root is: {}", supplied_root);
-       if root != supplied_root {
-           return Err(BabyProverErr::Other("root did not change".to_owned()));
-       }
+        let supplied_root = initial_state.root_hash();
+        info!("supplied_root is: {}", supplied_root);
+        if root != supplied_root {
+            return Err(BabyProverErr::Other("root did not change".to_owned()));
+        }
 
-       let jubjub_params = AltJubjubBn256::new();
+        let jubjub_params = AltJubjubBn256::new();
 
-       let prover_id = storage
-           .register_prover(&worker)
-           .expect("getting prover id failed");
+        let prover_id = storage
+            .register_prover(&worker)
+            .expect("getting prover id failed");
 
-       Ok(Self {
-           operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
-           current_block_number: state_block_number,
-           accounts_tree: tree,
-           parameters: franklin_circuit_params.unwrap(),
-           jubjub_params,
-           current_job: Arc::new(AtomicUsize::new(0)),
-           worker,
-           prover_id,
-       })
-   }
+        Ok(Self {
+            operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
+            current_block_number: state_block_number,
+            accounts_tree: tree,
+            parameters: franklin_circuit_params.unwrap(),
+            jubjub_params,
+            current_job: Arc::new(AtomicUsize::new(0)),
+            worker,
+            prover_id,
+        })
+    }
 }
 
 type Err = BabyProverErr;
 
 impl BabyProver {
-   pub fn apply_and_prove(&mut self, block: &Block) -> Result<FullBabyProof, Err> {
-       //        match block.block_data {
-       //            BlockData::Deposit {
-       //                ref transactions, ..
-       //            } => self.apply_and_prove_deposit(&block, transactions),
-       //            BlockData::Exit {
-       //                ref transactions, ..
-       //            } => self.apply_and_prove_exit(&block, transactions),
-       //            BlockData::Transfer {
-       //                ref transactions, ..
-       //            } => self.apply_and_prove_transfer(&block, &transactions),
-       //        }
+    fn rewind_state(
+        &mut self,
+        storage: &StorageProcessor,
+        expected_current_block: BlockNumber,
+    ) -> Result<(), String> {
+        info!(
+            "rewinding the state from block #{} to #{}",
+            self.current_block_number, expected_current_block
+        );
+        let (_, new_accounts) = storage
+            .load_committed_state(Some(expected_current_block))
+            .map_err(|e| format!("load_state_diff failed: {}", e))?;
 
+        let mut tree = CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
+        extend_accounts(&mut tree, new_accounts.into_iter());
+
+        self.accounts_tree = tree;
+        self.current_block_number = expected_current_block;
+        Ok(())
+    }
+
+    fn make_proving_attempt(&mut self) -> Result<(), String> {
+        let storage = StorageProcessor::establish_connection()
+            .map_err(|e| format!("establish_connection failed: {}", e))?;
+        let mut job = storage
+            .fetch_prover_job(&self.worker, PROVER_TIMEOUT)
+            .map_err(|e| format!("fetch_prover_job failed: {}", e))?;
+
+        if let Some(job) = job {
+            let initial_root = self.accounts_tree.root_hash();
+            let block_number = job.block_number as BlockNumber;
+            info!(
+                "prover {} got a new job for block {}",
+                &self.worker, block_number
+            );
+            self.current_job.store(job.id as usize, Ordering::Relaxed);
+
+            // load state delta self.current_block_number => block_number (can go both forwards and backwards)
+            let expected_current_block = block_number - 1;
+            if self.current_block_number != expected_current_block {
+                self.rewind_state(&storage, expected_current_block)?;
+            }
+
+            let block = storage
+                .load_committed_block(block_number)
+                .ok_or("load_committed_block failed")?;
+            let ops = storage.get_block_operations(block.block_number).unwrap();
+
+            drop(storage);
+            let mut operations = vec![];
+            let mut pub_data = vec![];
+            let mut fees = vec![];
+            for op in ops {
+                match op {
+                    FranklinOp::Deposit(deposit) => {
+                        let deposit_witness = apply_deposit_tx(&mut self.accounts_tree, &deposit);
+
+                        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+                        let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
+                        let deposit_operations = calculate_deposit_operations_from_witness(
+                            &deposit_witness,
+                            &sig_msg,
+                            signature,
+                            &sender_x,
+                            &sender_y,
+                        );
+                        operations.extend(deposit_operations);
+                        fees.push((deposit.tx.fee, deposit.tx.token));
+                        pub_data.extend(deposit_witness.get_pubdata());
+                    }
+                    _ => {
+                        unreachable!("only deposists allowed");
+                    }
+                }
+            }
+            if operations.len() < franklin_constants::BLOCK_SIZE_CHUNKS {
+                for _ in 0..franklin_constants::BLOCK_SIZE_CHUNKS - operations.len() {
+                    let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
+                    operations.push(noop_operation(
+                        &self.accounts_tree,
+                        block.fee_account,
+                        &sig_msg,
+                        signature,
+                        &sender_x,
+                        &sender_y,
+                    ));
+                    pub_data.extend(vec![false; 64]);
+                }
+            }
+            assert_eq!(pub_data.len(), 64 * 10);
+            assert_eq!(operations.len(), 10);
+
+            let validator_acc = self
+                .accounts_tree
+                .get(block.fee_account as u32)
+                .expect("fee_account is not empty");
+            let mut validator_balances = vec![];
+            for i in 0..1 << *franklin_constants::BALANCE_TREE_DEPTH {
+                //    validator_balances.push(Some(validator_acc.subtree.get(i as u32).map(|s| s.clone()).unwrap_or(Balance::default())));
+                let balance_value = match validator_acc.subtree.get(i as u32) {
+                    None => Fr::zero(),
+                    Some(bal) => bal.value.clone(),
+                };
+                validator_balances.push(Some(balance_value));
+            }
+            let mut root_after_fee: Fr = self.accounts_tree.root_hash();
+            let mut validator_account_witness: AccountWitness<Engine> = AccountWitness {
+                nonce: None,
+                pub_key_hash: None,
+            };
+            for (fee, token) in fees {
+                info!("fee, token: {}, {}", fee, token);
+                let (root, acc_witness) = apply_fee(
+                    &mut self.accounts_tree,
+                    block.fee_account as u32,
+                    token as u32,
+                    fee.to_u128().unwrap(),
+                );
+                root_after_fee = root;
+                validator_account_witness = acc_witness;
+            }
+
+            info!("root after fees {}", root_after_fee);
+            info!("block new hash {}", block.new_root_hash);
+            assert_eq!(root_after_fee, block.new_root_hash);
+
+            let (validator_audit_path, _) =
+                get_audits(&mut self.accounts_tree, block.fee_account as u32, 0);
+
+            let public_data_commitment = public_data_commitment::<Engine>(
+                &pub_data,
+                Some(initial_root.clone()),
+                Some(root_after_fee.clone()),
+                Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
+                Some(Fr::from_str(&(block_number + 1).to_string()).unwrap()),
+            );
        
-       unimplemented!()
-   }
+            let instance = FranklinCircuit {
+                    params: &self.jubjub_params,
+                    operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
+                    old_root: Some(initial_root),
+                    new_root: Some(block.new_root_hash),
+                    block_number: Fr::from_str(&(block_number + 1).to_string()),
+                    validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
+                    pub_data_commitment: Some(public_data_commitment.clone()),
+                    operations: operations.clone(),
+                    validator_balances: validator_balances.clone(),
+                    validator_audit_path: validator_audit_path.clone(),
+                    validator_account: validator_account_witness.clone(),
+                };
+            let inst = FranklinCircuit {
+                    params: &self.jubjub_params,
+                    operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
+                    old_root: Some(initial_root),
+                    new_root: Some(block.new_root_hash),
+                    block_number: Fr::from_str(&(block_number + 1).to_string()),
+                    validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
+                    pub_data_commitment: Some(public_data_commitment.clone()),
+                    operations: operations,
+                    validator_balances: validator_balances,
+                    validator_audit_path: validator_audit_path,
+                    validator_account: validator_account_witness,
+                };
+            // {
+            //     let inst = FranklinCircuit {
+            //         params: &self.jubjub_params,
+            //         operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
+            //         old_root: Some(initial_root),
+            //         new_root: Some(block.new_root_hash),
+            //         block_number: Fr::from_str(&(block_number + 1).to_string()),
+            //         validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
+            //         pub_data_commitment: Some(public_data_commitment.clone()),
+            //         operations: operations,
+            //         validator_balances: validator_balances,
+            //         validator_audit_path: validator_audit_path,
+            //         validator_account: validator_account_witness,
+            //     };
+            //     let mut cs = TestConstraintSystem::<Engine>::new();
+            //     inst.synthesize(&mut cs).unwrap();
+
+            //     warn!("unconstrained {}\n", cs.find_unconstrained());
+            //     warn!("inputs {}\n", cs.num_inputs());
+            //     warn!("num_constraints: {}\n", cs.num_constraints());
+            //     warn!("is satisfied: {}\n", cs.is_satisfied());
+            //     warn!("which is unsatisfied: {:?}\n", cs.which_is_unsatisfied());
+            // }
+
+            let mut rng = OsRng::new().unwrap();
+            info!("Prover has started to work");
+            // let tmp_cirtuit_params = generate_random_parameters(instance, &mut rng).unwrap();
+
+            let proof = create_random_proof(instance, &self.parameters, &mut rng);
+            if proof.is_err() {
+                error!("proof can not be created: {}", proof.err().unwrap());
+                return Err("proof can not be created".to_owned());
+                //             return Err(BabyProverErr::Other("proof.is_err()".to_owned()));
+            }
+
+            let p = proof.unwrap();
+
+            let pvk = prepare_verifying_key(&self.parameters.vk);
+
+            info!(
+                "Made a proof for initial root = {}, final root = {}, public data = {}",
+                initial_root,
+                root_after_fee,
+                public_data_commitment.to_hex()
+            );
+            let success = verify_proof(&pvk, &p.clone(), &[public_data_commitment]);
+            if success.is_err() {
+                error!(
+                    "Proof is verification failed with error {}",
+                    success.err().unwrap()
+                );
+                return Err("Proof verification has failed".to_owned());
+                //             return Err(BabyProverErr::Other(
+                //                 "Proof is verification failed".to_owned(),
+                //             ));
+            }
+            if !success.unwrap() {
+                error!("Proof is invalid");
+                return Err("Proof is invalid".to_owned());
+                //             return Err(BabyProverErr::Other("Proof is invalid".to_owned()));
+            }
+
+            info!("Proof generation is complete");
+
+            let full_proof = FullBabyProof {
+                proof: p,
+                inputs: [public_data_commitment],
+                // public_data: pub_data,
+                public_data: vec![0 as u8; 10],
+            };
+
+            //        Ok(full_proof)
+
+            let encoded = Self::encode_proof(&full_proof).expect("proof encoding failed");
+            let storage = StorageProcessor::establish_connection()
+                .map_err(|e| format!("establish_connection failed: {}", e))?;
+            storage
+                .store_proof(block_number, &encoded)
+                .map_err(|e| format!("store_proof failed: {}", e))?;
+        } else {
+            // no new job, so let's try to fast forward to the latest verified state for efficiency, and then sleep
+            let last_verified_block = storage
+                .get_last_verified_block()
+                .map_err(|e| format!("get_last_verified_block failed: {}", e))?;
+            if self.current_block_number < last_verified_block + 1 {
+                self.rewind_state(&storage, last_verified_block + 1)
+                    .map_err(|e| format!("rewind_state failed: {}", e))?;
+            }
+            thread::sleep(Duration::from_secs(PROVER_CYCLE_WAIT));
+        }
+        Ok(())
+    }
+
+    pub fn start_timer_interval(&self, rt: &Handle) {
+        let job_ref = self.current_job.clone();
+        rt.spawn(
+            timer::Interval::new_interval(Duration::from_secs(PROVER_TIMER_TICK))
+                .fold(job_ref, |job_ref, _| {
+                    let job = job_ref.load(Ordering::Relaxed);
+                    if job > 0 {
+                        //debug!("prover is working on block {}", job);
+                        if let Ok(storage) = StorageProcessor::establish_connection() {
+                            let _ = storage.update_prover_job(job as i32);
+                        }
+                    }
+                    Ok(job_ref)
+                })
+                .map(|_| ())
+                .map_err(|_| ()),
+        )
+        .unwrap();
+    }
+
+    pub fn run(&mut self, shutdown_tx: Sender<()>, stop_signal: Arc<AtomicBool>) {
+        info!("prover is running");
+        while !stop_signal.load(Ordering::SeqCst) {
+            if let Err(err) = self.make_proving_attempt() {
+                error!("Error: {}", err);
+            }
+            self.current_job.store(0, Ordering::Relaxed);
+        }
+        info!("prover stopped");
+        shutdown_tx.send(()).unwrap();
+    }
+}
 
 //    // Apply transactions to the state while also making a witness for proof, then calculate proof
 //    pub fn apply_and_prove_transfer(
@@ -1095,341 +1367,6 @@ impl BabyProver {
 
 //        Ok(full_proof)
 //    }
-
-   fn rewind_state(
-       &mut self,
-       storage: &StorageProcessor,
-       expected_current_block: BlockNumber,
-   ) -> Result<(), String> {
-       info!(
-           "rewinding the state from block #{} to #{}",
-           self.current_block_number, expected_current_block
-       );
-       let (_, new_accounts) = storage
-           .load_committed_state(Some(expected_current_block))
-           .map_err(|e| format!("load_state_diff failed: {}", e))?;
-
-       let mut tree = CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
-       extend_accounts(&mut tree, new_accounts.into_iter());
-
-       self.accounts_tree = tree;
-       self.current_block_number = expected_current_block;
-       Ok(())
-   }
-
-   fn make_proving_attempt(&mut self) -> Result<(), String> {
-       let storage = StorageProcessor::establish_connection()
-           .map_err(|e| format!("establish_connection failed: {}", e))?;
-       let mut job = storage
-           .fetch_prover_job(&self.worker, PROVER_TIMEOUT)
-           .map_err(|e| format!("fetch_prover_job failed: {}", e))?;
-
-
-//       let initial_root = self.accounts_tree.root_hash();
-//       let block_number = 0 as BlockNumber;
-//       info!(
-//           "prover {} got a new job for block {}",
-//           &self.worker, block_number
-//       );
-//       self.current_job.store(0 as usize, Ordering::Relaxed);
-//
-//       // load state delta self.current_block_number => block_number (can go both forwards and backwards)
-//       let expected_current_block = block_number;
-//       if self.current_block_number != expected_current_block {
-//           self.rewind_state(&storage, expected_current_block)?;
-//       }
-//
-//       let block = storage
-//           .load_committed_block(block_number+1)
-//           .ok_or("load_committed_block failed")?;
-//       let ops = storage.get_block_operations(block.block_number).unwrap();
-//       debug!("{:?}", ops);
-//       drop(storage);
-//       let mut operations = vec![];
-//       let mut pub_data = vec![];
-//       let mut fees = vec![];
-//       for op in ops{
-//           match op{
-//               FranklinOp::Deposit(deposit) => {
-//
-//                   let deposit_witness = apply_deposit_tx(&mut self.accounts_tree, &deposit);
-//
-//                   //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-//                   let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
-//                   let deposit_operations = calculate_deposit_operations_from_witness(
-//                       &deposit_witness,
-//                       &sig_msg,
-//                       signature,
-//                       &sender_x,
-//                       &sender_y,
-//                   );
-//                   operations.extend(deposit_operations);
-//                   fees.push((deposit.tx.fee, deposit.tx.token));
-//                   pub_data.extend(deposit_witness.get_pubdata());
-//               },
-//               _ => {
-//                   unreachable!("only deposists allowed");
-//               }
-//           }
-//       }
-//       let mut root_after_fee: Fr = self.accounts_tree.root_hash();
-//       let mut validator_account_witness: AccountWitness<Engine> = AccountWitness{
-//           nonce: None,
-//           pub_key_hash: None,
-//       };
-//       for (fee, token) in fees{
-//           info!("fee, token: {}, {}", fee, token);
-//           let (root, acc_witness) = apply_fee(&mut self.accounts_tree, block.fee_account as u32, token as u32, fee.to_u128().unwrap());
-//           root_after_fee = root;
-//           validator_account_witness = acc_witness;
-//       }
-//       for leaf in &self.accounts_tree.items{
-//           debug!("balance: {} tree acc {} with id: {} ",leaf.1.subtree.get(0).unwrap().value,  leaf.1.pub_key_hash, leaf.0, );
-//       }
-//       info!("root after fees {}", root_after_fee);
-//       info!("block new hash {}", block.new_root_hash);
-//
-//       let (validator_audit_path, _) = get_audits(&mut self.accounts_tree, block.fee_account as u32, 0);
-//
-//       let public_data_commitment = public_data_commitment::<Engine>(
-//           &pub_data,
-//           Some(initial_root),
-//           Some(root_after_fee),
-//           Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
-//           Some(Fr::from_str(&block_number.to_string()).unwrap()),
-//       );
-//
-//
-       if let Some(job) = job {
-           let initial_root = self.accounts_tree.root_hash();
-           let block_number = job.block_number as BlockNumber;
-           info!(
-               "prover {} got a new job for block {}",
-               &self.worker, block_number
-           );
-           self.current_job.store(job.id as usize, Ordering::Relaxed);
-
-           // load state delta self.current_block_number => block_number (can go both forwards and backwards)
-            let expected_current_block = block_number-1;
-            if self.current_block_number != expected_current_block {
-               self.rewind_state(&storage, expected_current_block)?;
-            }
-
-            let block = storage
-               .load_committed_block(block_number)
-               .ok_or("load_committed_block failed")?;
-            let ops = storage.get_block_operations(block.block_number).unwrap();
-
-            drop(storage);
-            let mut operations = vec![];
-            let mut pub_data = vec![];
-            let mut fees = vec![];
-            for op in ops{
-                 match op{
-                     FranklinOp::Deposit(deposit) => {
-
-                        let deposit_witness = apply_deposit_tx(&mut self.accounts_tree, &deposit);
-
-                        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-                        let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
-                        let deposit_operations = calculate_deposit_operations_from_witness(
-                            &deposit_witness,
-                            &sig_msg,
-                            signature,
-                            &sender_x,
-                            &sender_y,
-                        );
-                        operations.extend(deposit_operations);
-                        fees.push((deposit.tx.fee, deposit.tx.token));
-                        pub_data.extend(deposit_witness.get_pubdata());
-                     },
-                     _ => {
-                         unreachable!("only deposists allowed");
-                     }
-                 }
-            }
-            if operations.len() < franklin_constants::BLOCK_SIZE_CHUNKS{
-                for _ in 0..franklin_constants::BLOCK_SIZE_CHUNKS-operations.len(){
-                    let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
-                    operations.push(noop_operation(&self.accounts_tree, block.fee_account, &sig_msg, signature, &sender_x, &sender_x));
-                }
-            }
-           
-           let validator_acc = self.accounts_tree.get(block.fee_account as u32).expect("fee_account is not empty");
-           let mut validator_balances = vec![];
-           for i in 0..1<<*franklin_constants::BALANCE_TREE_DEPTH{
-            //    validator_balances.push(Some(validator_acc.subtree.get(i as u32).map(|s| s.clone()).unwrap_or(Balance::default())));
-                let balance_value = match validator_acc.subtree.get(i as u32){
-                    None => Fr::zero(),
-                    Some(bal) => bal.value.clone()
-                };
-               validator_balances.push(Some(balance_value));
-           }
-           let mut root_after_fee: Fr = self.accounts_tree.root_hash();
-           let mut validator_account_witness: AccountWitness<Engine> = AccountWitness{
-               nonce: None,
-               pub_key_hash: None,
-           };
-           for (fee, token) in fees{
-               info!("fee, token: {}, {}", fee, token);
-               let (root, acc_witness) = apply_fee(&mut self.accounts_tree, block.fee_account as u32, token as u32, fee.to_u128().unwrap());
-               root_after_fee = root;
-               validator_account_witness = acc_witness;
-           }
-
-           info!("root after fees {}", root_after_fee);
-           info!("block new hash {}", block.new_root_hash);
-           assert_eq!(root_after_fee, block.new_root_hash);
-           
-           let (validator_audit_path, _) = get_audits(&mut self.accounts_tree, block.fee_account as u32, 0);
-           
-           let public_data_commitment = public_data_commitment::<Engine>(
-               &pub_data,
-               Some(initial_root.clone()),
-               Some(root_after_fee.clone()),
-               Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
-               Some(Fr::from_str(&block_number.to_string()).unwrap()),
-           );
-            let instance = FranklinCircuit{
-                params: &self.jubjub_params,
-                operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
-                old_root: Some(initial_root),
-                new_root: Some(block.new_root_hash),
-                block_number: Fr::from_str(&(block_number+1).to_string()),
-                validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
-                pub_data_commitment: Some(public_data_commitment.clone()),
-                operations: operations.clone(),
-                validator_balances: validator_balances.clone(),
-                validator_audit_path: validator_audit_path.clone(),
-                validator_account: validator_account_witness.clone(),
-            };
-
-            {
-                let inst = FranklinCircuit{
-                params: &self.jubjub_params,
-                operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
-                old_root: Some(initial_root),
-                new_root: Some(block.new_root_hash),
-                block_number: Fr::from_str(&(block_number+1).to_string()),
-                validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
-                pub_data_commitment: Some(public_data_commitment.clone()),
-                operations: operations,
-                validator_balances: validator_balances,
-                validator_audit_path: validator_audit_path,
-                validator_account: validator_account_witness,
-            };
-            let mut cs = TestConstraintSystem::<Engine>::new();
-             inst.synthesize(&mut cs).unwrap();
-
-             warn!("unconstrained {}\n", cs.find_unconstrained());
-
-             warn!("num_constraints: {}\n", cs.num_constraints());
-            }
-           
-
-           let mut rng = OsRng::new().unwrap();
-         info!("Prover has started to work transfer");
-         let proof = create_random_proof(instance, &self.parameters, &mut rng);
-         if proof.is_err() {
-             error!("proof can not be created: {}", proof.err().unwrap());
-             return Err("proof can not be created".to_owned())
-//             return Err(BabyProverErr::Other("proof.is_err()".to_owned()));
-         }
-
-         let p = proof.unwrap();
-
-         let pvk = prepare_verifying_key(&self.parameters.vk);
-
-         info!(
-             "Made a proof for initial root = {}, final root = {}, public data = {}",
-             initial_root,
-             root_after_fee,
-             public_data_commitment.to_hex()
-         );
-         let success = verify_proof(
-             &pvk,
-             &p.clone(),
-             &[public_data_commitment],
-         );
-         if success.is_err() {
-             error!(
-                 "Proof is verification failed with error {}",
-                 success.err().unwrap()
-             );
-             return Err("Proof verification has failed".to_owned())
-//             return Err(BabyProverErr::Other(
-//                 "Proof is verification failed".to_owned(),
-//             ));
-         }
-         if !success.unwrap() {
-             error!("Proof is invalid");
-             return Err("Proof is invalid".to_owned());
-//             return Err(BabyProverErr::Other("Proof is invalid".to_owned()));
-         }
-
-            info!("Proof generation is complete");
-
-            let full_proof = FullBabyProof {
-                proof: p,
-                inputs: [public_data_commitment],
-                // public_data: pub_data,
-                public_data: vec![0 as u8; 10],
-            };
-
-//        Ok(full_proof)
-
-            let encoded = Self::encode_proof(&full_proof).expect("proof encoding failed");
-            let storage = StorageProcessor::establish_connection()
-                .map_err(|e| format!("establish_connection failed: {}", e))?;
-            storage
-                .store_proof(block_number, &encoded)
-                .map_err(|e| format!("store_proof failed: {}", e))?;
-       } else {
-           // no new job, so let's try to fast forward to the latest verified state for efficiency, and then sleep
-           let last_verified_block = storage
-               .get_last_verified_block()
-               .map_err(|e| format!("get_last_verified_block failed: {}", e))?;
-           if self.current_block_number < last_verified_block + 1 {
-               self.rewind_state(&storage, last_verified_block + 1)
-                   .map_err(|e| format!("rewind_state failed: {}", e))?;
-           }
-           thread::sleep(Duration::from_secs(PROVER_CYCLE_WAIT));
-       }
-       Ok(())
-   }
-
-   pub fn start_timer_interval(&self, rt: &Handle) {
-       let job_ref = self.current_job.clone();
-       rt.spawn(
-           timer::Interval::new_interval(Duration::from_secs(PROVER_TIMER_TICK))
-               .fold(job_ref, |job_ref, _| {
-                   let job = job_ref.load(Ordering::Relaxed);
-                   if job > 0 {
-                       //debug!("prover is working on block {}", job);
-                       if let Ok(storage) = StorageProcessor::establish_connection() {
-                           let _ = storage.update_prover_job(job as i32);
-                       }
-                   }
-                   Ok(job_ref)
-               })
-               .map(|_| ())
-               .map_err(|_| ()),
-       )
-       .unwrap();
-   }
-
-   pub fn run(&mut self, shutdown_tx: Sender<()>, stop_signal: Arc<AtomicBool>) {
-              info!("prover is running");
-              while !stop_signal.load(Ordering::SeqCst) {
-                  if let Err(err) = self.make_proving_attempt() {
-                      error!("Error: {}", err);
-                  }
-                  self.current_job.store(0, Ordering::Relaxed);
-              }
-              info!("prover stopped");
-              shutdown_tx.send(()).unwrap();
-   }
-}
 
 // #[test]
 

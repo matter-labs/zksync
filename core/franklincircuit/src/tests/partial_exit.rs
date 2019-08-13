@@ -13,9 +13,9 @@ use franklinmodels::circuit::account::{
 };
 use num_traits::cast::ToPrimitive;
 
-use franklinmodels::node::{TransferOp, PartialExitOp};
 use franklinmodels::merkle_tree::hasher::Hasher;
 use franklinmodels::merkle_tree::PedersenHasher;
+use franklinmodels::node::{PartialExitOp, TransferOp};
 use franklinmodels::params as franklin_constants;
 use pairing::bn256::*;
 
@@ -78,10 +78,9 @@ impl<E: JubjubEngine> PartialExitWitness<E> {
 }
 pub fn apply_partial_exit_tx(
     tree: &mut CircuitAccountTree,
-    partial_exit: &PartialExitOp
-) -> PartialExitWitness<Bn256>{
-
-    let transfer_data = PartialExitData{
+    partial_exit: &PartialExitOp,
+) -> PartialExitWitness<Bn256> {
+    let transfer_data = PartialExitData {
         amount: partial_exit.tx.amount.to_u128().unwrap(),
         fee: partial_exit.tx.fee.to_u128().unwrap(),
         token: partial_exit.tx.token as u32,

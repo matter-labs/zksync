@@ -10,7 +10,6 @@ use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
 use crate::operation::TransactionSignature;
 use franklinmodels::params as franklin_constants;
 
-
 pub fn sign<R, E>(
     msg_data: &[bool],
     private_key: &PrivateKey<E>,
@@ -36,7 +35,7 @@ where
         }
         message_bytes.push(byte);
     }
-    println !("message_len {}", message_bytes.len());
+    println!("message_len {}", message_bytes.len());
     let max_message_len = 31 as usize; //todo
     let signature = private_key.sign_raw_message(&message_bytes, rng, p_g, params, max_message_len);
 
@@ -286,9 +285,9 @@ pub fn encode_fr_into_fs<E: JubjubEngine>(input: E::Fr) -> E::Fs {
 fn test_be_bytes_to_bit_conversion() {
     let a = 7 as u8;
     let mut acum = 1 as u8;
-    for i in 0..8{
+    for i in 0..8 {
         let bit = a & acum;
         println!("bit: {}", bit);
-        acum*=2;
+        acum *= 2;
     }
 }

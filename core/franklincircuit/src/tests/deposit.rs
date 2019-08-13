@@ -2,8 +2,8 @@ use super::utils::*;
 use crate::utils::*;
 
 use crate::operation::*;
-use num_traits::cast::ToPrimitive;
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
+use num_traits::cast::ToPrimitive;
 
 use crate::account::AccountWitness;
 use franklin_crypto::circuit::float_point::{convert_to_float, parse_float_to_u128};
@@ -13,9 +13,9 @@ use franklinmodels::circuit::account::{
 };
 use franklinmodels::merkle_tree::hasher::Hasher;
 use franklinmodels::merkle_tree::PedersenHasher;
-use franklinmodels::params as franklin_constants;
-use franklinmodels::node::{DepositOp};
 use franklinmodels::node::tx::Deposit;
+use franklinmodels::node::DepositOp;
+use franklinmodels::params as franklin_constants;
 use pairing::bn256::*;
 
 pub struct DepositData {
@@ -91,24 +91,32 @@ impl<E: JubjubEngine> DepositWitness<E> {
 
 pub fn apply_deposit_tx(
     tree: &mut CircuitAccountTree,
-    deposit: &DepositOp
-) -> DepositWitness<Bn256>{
+    deposit: &DepositOp,
+) -> DepositWitness<Bn256> {
     let alt_new_pubkey_hash = Fr::from_hex(&deposit.tx.to.to_hex()).unwrap();
-//    let mut fr_repr = <Fr as PrimeField>::Repr::default();
-//    let mut addr_vec = deposit.tx.to.data.to_vec();
-//    addr_vec.reverse();
-//    addr_vec.resize(32, 0u8);
-//    addr_vec.reverse();
-//    fr_repr.read_be(&*addr_vec).unwrap();
-//    let new_pubkey_hash = Fr::from_repr(fr_repr).unwrap();
-//    println!("alt_new_pubkey_hash {} \n new_pubkey_hash {}", alt_new_pubkey_hash, new_pubkey_hash);
-    println!("before converting amount: {:?}, after converting amount: {:?}", deposit.tx.amount, deposit.tx.amount.to_u128().unwrap());
-    println!("before converting fee: {:?}, after converting fee: {:?}", deposit.tx.fee, deposit.tx.fee.to_u128().unwrap());
-    let deposit_data = DepositData{
+    //    let mut fr_repr = <Fr as PrimeField>::Repr::default();
+    //    let mut addr_vec = deposit.tx.to.data.to_vec();
+    //    addr_vec.reverse();
+    //    addr_vec.resize(32, 0u8);
+    //    addr_vec.reverse();
+    //    fr_repr.read_be(&*addr_vec).unwrap();
+    //    let new_pubkey_hash = Fr::from_repr(fr_repr).unwrap();
+    //    println!("alt_new_pubkey_hash {} \n new_pubkey_hash {}", alt_new_pubkey_hash, new_pubkey_hash);
+    println!(
+        "before converting amount: {:?}, after converting amount: {:?}",
+        deposit.tx.amount,
+        deposit.tx.amount.to_u128().unwrap()
+    );
+    println!(
+        "before converting fee: {:?}, after converting fee: {:?}",
+        deposit.tx.fee,
+        deposit.tx.fee.to_u128().unwrap()
+    );
+    let deposit_data = DepositData {
         amount: deposit.tx.amount.to_u128().unwrap(),
         fee: deposit.tx.fee.to_u128().unwrap(),
         token: deposit.tx.token as u32,
-        account_address: deposit.account_id as u32, 
+        account_address: deposit.account_id as u32,
         new_pub_key_hash: alt_new_pubkey_hash,
     };
     // le_bit_vector_into_field_element()
@@ -240,6 +248,12 @@ pub fn calculate_deposit_operations_from_witness(
         .chunks(64)
         .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
         .collect();
+
+    println!(
+        "acc_path{} \n bal_path {} ",
+        deposit_witness.before.witness.account_path.len(),
+        deposit_witness.before.witness.balance_subtree_path.len()
+    );
     let operation_zero = Operation {
         new_root: deposit_witness.after_root.clone(),
         tx_type: deposit_witness.tx_type,
@@ -445,6 +459,7 @@ fn test_deposit_franklin_in_empty_leaf() {
         Some(validator_address),
         Some(block_number),
     );
+    println!("validator balances: {}", validator_balances.len());
 
     {
         let mut cs = TestConstraintSystem::<Bn256>::new();
@@ -462,11 +477,9 @@ fn test_deposit_franklin_in_empty_leaf() {
             validator_balances: validator_balances,
             validator_audit_path: validator_audit_path,
         };
-
         instance.synthesize(&mut cs).unwrap();
 
-        println!("{}", cs.find_unconstrained());
-
+        println!("unconstrained: {}", cs.find_unconstrained());
         println!("number of constraints {}", cs.num_constraints());
         let err = cs.which_is_unsatisfied();
         if err.is_some() {

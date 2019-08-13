@@ -8,11 +8,10 @@ use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::CircuitAccountTree;
 use franklinmodels::merkle_tree::hasher::Hasher;
 use franklinmodels::merkle_tree::PedersenHasher;
+use franklinmodels::node::TransferToNewOp;
 use franklinmodels::params as franklin_constants;
-use pairing::bn256::*;
-use franklinmodels::node::{TransferToNewOp};
 use num_traits::cast::ToPrimitive;
-
+use pairing::bn256::*;
 
 pub struct TransferToNewData {
     pub amount: u128,
@@ -84,17 +83,17 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
 }
 pub fn apply_transfer_to_new_tx(
     tree: &mut CircuitAccountTree,
-    transfer_to_new: &TransferToNewOp
-) -> TransferToNewWitness<Bn256>{
+    transfer_to_new: &TransferToNewOp,
+) -> TransferToNewWitness<Bn256> {
     let new_pubkey_hash = Fr::from_hex(&transfer_to_new.tx.to.to_hex()).unwrap();
 
-    let transfer_data = TransferToNewData{
+    let transfer_data = TransferToNewData {
         amount: transfer_to_new.tx.amount.to_u128().unwrap(),
         fee: transfer_to_new.tx.fee.to_u128().unwrap(),
         token: transfer_to_new.tx.token as u32,
         from_account_address: transfer_to_new.from as u32,
         to_account_address: transfer_to_new.to as u32,
-        new_pub_key_hash: new_pubkey_hash
+        new_pub_key_hash: new_pubkey_hash,
     };
     // le_bit_vector_into_field_element()
     apply_transfer_to_new(tree, &transfer_data)

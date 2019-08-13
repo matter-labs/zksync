@@ -1,23 +1,23 @@
 use crate::account::*;
 
+use crate::operation::TransactionSignature;
 use crate::utils::*;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use ff::Field;
 use ff::{BitIterator, PrimeField, PrimeFieldRepr};
+use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use franklin_crypto::eddsa::PrivateKey;
 use franklin_crypto::eddsa::PublicKey;
+use franklin_crypto::jubjub::FixedGenerators;
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::{Balance, CircuitAccount, CircuitAccountTree};
 use franklinmodels::merkle_tree::hasher::Hasher;
 use franklinmodels::params as franklin_constants;
 use pairing::bn256::*;
-use crate::operation::TransactionSignature;
-use franklin_crypto::eddsa::{PrivateKey};
-use franklin_crypto::jubjub::FixedGenerators;
 use rand::{Rng, SeedableRng, XorShiftRng};
-use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 
-pub fn generate_dummy_sig_data()->(Option<TransactionSignature<Bn256>>, Fr, Fr, Fr){
+pub fn generate_dummy_sig_data() -> (Option<TransactionSignature<Bn256>>, Fr, Fr, Fr) {
     let params = &AltJubjubBn256::new();
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
@@ -34,7 +34,6 @@ pub fn generate_dummy_sig_data()->(Option<TransactionSignature<Bn256>>, Fr, Fr, 
     (signature, sig_msg, sender_x, sender_y)
 
     //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-
 }
 pub fn pub_key_hash<E: JubjubEngine, H: Hasher<E::Fr>>(
     pub_key: &PublicKey<E>,
@@ -225,7 +224,9 @@ pub fn apply_fee(
     fee: u128,
 ) -> (Fr, AccountWitness<Bn256>) {
     let fee_fe = Fr::from_str(&fee.to_string()).unwrap();
-    let mut validator_leaf = tree.remove(validator_address).expect("validator_leaf not empty");
+    let mut validator_leaf = tree
+        .remove(validator_address)
+        .expect("validator_leaf not empty");
     let validator_account_witness = AccountWitness {
         nonce: Some(validator_leaf.nonce.clone()),
         pub_key_hash: Some(validator_leaf.pub_key_hash.clone()),

@@ -2,16 +2,16 @@ use bellman;
 
 use time::PreciseTime;
 
+use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use pairing::bn256::*;
 use rand::OsRng;
-use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 
 use bellman::groth16::generate_random_parameters;
 
 use crate::vk_contract_generator::generate_vk_contract;
+use franklincircuit::account::AccountWitness;
 use franklincircuit::circuit::FranklinCircuit;
 use franklincircuit::operation::*;
-use franklincircuit::account::AccountWitness;
 //use franklincircuit::tests:
 //use circuit::deposit::circuit::{Deposit, DepositWitness};
 //use circuit::deposit::deposit_request::DepositRequest;
@@ -44,30 +44,35 @@ pub fn make_franklin_key() {
             amount: None,
             fee: None,
             new_pub_key_hash: None,
-            ethereum_key: None
+            ethereum_key: None,
         },
         lhs: OperationBranch {
             address: None,
             token: None,
             witness: OperationBranchWitness {
-                account_witness: AccountWitness { nonce: None, pub_key_hash: None },
+                account_witness: AccountWitness {
+                    nonce: None,
+                    pub_key_hash: None,
+                },
                 account_path: vec![None; franklin_constants::ACCOUNT_TREE_DEPTH],
                 balance_value: None,
                 balance_subtree_path: vec![None; *franklin_constants::BALANCE_TREE_DEPTH],
-            }
+            },
         },
         rhs: OperationBranch {
             address: None,
             token: None,
             witness: OperationBranchWitness {
-                account_witness: AccountWitness { nonce: None, pub_key_hash: None },
+                account_witness: AccountWitness {
+                    nonce: None,
+                    pub_key_hash: None,
+                },
                 account_path: vec![None; franklin_constants::ACCOUNT_TREE_DEPTH],
                 balance_value: None,
                 balance_subtree_path: vec![None; *franklin_constants::BALANCE_TREE_DEPTH],
-            }
-        }
+            },
+        },
     };
-
 
     let instance_for_generation: FranklinCircuit<'_, Bn256> = FranklinCircuit {
         params,
@@ -77,10 +82,13 @@ pub fn make_franklin_key() {
         validator_address: None,
         block_number: None,
         pub_data_commitment: None,
-        validator_balances: vec![None; 1 << (*franklin_constants::BALANCE_TREE_DEPTH as i32)],
+        validator_balances: vec![None; (1 << *franklin_constants::BALANCE_TREE_DEPTH) as usize ],
         validator_audit_path: vec![None; franklin_constants::ACCOUNT_TREE_DEPTH],
         operations: vec![empty_operation; franklin_constants::BLOCK_SIZE_CHUNKS],
-        validator_account: AccountWitness { nonce: None, pub_key_hash: None },
+        validator_account: AccountWitness {
+            nonce: None,
+            pub_key_hash: None,
+        },
     };
 
     info!("generating setup...");

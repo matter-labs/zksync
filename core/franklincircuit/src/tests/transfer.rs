@@ -7,11 +7,11 @@ use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::CircuitAccountTree;
 use franklinmodels::params as franklin_constants;
-use pairing::bn256::*;
 use num_traits::cast::ToPrimitive;
+use pairing::bn256::*;
 
-use franklinmodels::node::{TransferOp};
 use franklinmodels::node::tx::Transfer;
+use franklinmodels::node::TransferOp;
 
 pub struct TransferData {
     pub amount: u128,
@@ -77,15 +77,14 @@ impl<E: JubjubEngine> TransferWitness<E> {
 }
 pub fn apply_transfer_tx(
     tree: &mut CircuitAccountTree,
-    transfer: &TransferOp
-) -> TransferWitness<Bn256>{
-
-    let transfer_data = TransferData{
-       amount: transfer.tx.amount.to_u128().unwrap(),
-       fee: transfer.tx.fee.to_u128().unwrap(),
-       token: transfer.tx.token as u32,
-       from_account_address: transfer.from as u32,
-       to_account_address: transfer.to as u32,
+    transfer: &TransferOp,
+) -> TransferWitness<Bn256> {
+    let transfer_data = TransferData {
+        amount: transfer.tx.amount.to_u128().unwrap(),
+        fee: transfer.tx.fee.to_u128().unwrap(),
+        token: transfer.tx.token as u32,
+        from_account_address: transfer.from as u32,
+        to_account_address: transfer.to as u32,
     };
     // le_bit_vector_into_field_element()
     apply_transfer(tree, &transfer_data)

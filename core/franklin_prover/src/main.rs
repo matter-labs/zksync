@@ -55,4 +55,3 @@ fn main() {
 
     rt.block_on(shutdown_rx).unwrap();
 }
-
