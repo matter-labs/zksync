@@ -185,7 +185,7 @@ export class Wallet {
     /**
      * get a list of balances in the mainchain
      */
-    async getVerifiedOnchainState() {
+    async getCommittedOnchainState() {
         let tokens = await this.getOnchainTokensList();
         let balanceGetter = this.getOnchainBalanceForToken.bind(this);
         let balances = await Promise.all(tokens.map(balanceGetter));
@@ -199,6 +199,10 @@ export class Wallet {
         return {
             balances: res
         };
+    }
+
+    async getPendingOnchainState() {
+        return await this.getCommittedOnchainState();
     }
 
     /**
@@ -253,7 +257,7 @@ export class Wallet {
      * balances in Franklin
      */
     async getVerifiedFranklinState() {
-        let res = await this.getVerifiedOnchainState();
+        let res = await this.getCommittedOnchainState();
         res['nonce'] = 32;
         return res;
     }

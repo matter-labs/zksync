@@ -1,6 +1,44 @@
 const store = {
     config:          null,
     contractAddress: null,
+
+    onchain:    {
+        address: null,
+        nonce:   null,
+        committed: {
+            balances: {}
+        },
+        pending: {
+            balances: {}
+        },
+    },
+    contract: {
+        committed: {
+            lockedUnlockedBalances: {
+                
+            }
+        }, 
+        pending: {
+            lockedUnlockedBalances: {
+                
+            }
+        }
+    },
+    plasma: {
+        address:    null,
+        pending: {
+            balances: {},
+            nonce:   0
+        },
+        committed: {
+            balance: {},
+            nonce:   0
+        },
+        verified: {
+            balance: {},
+            nonce:   0
+        }
+    },
     account: {
         // ethereum part
         address:    null,

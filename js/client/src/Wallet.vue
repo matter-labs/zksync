@@ -21,7 +21,7 @@
             </b-navbar-nav>
             <!-- Right aligned nav items -->
             <b-navbar-nav class="ml-auto">
-                <span style="color: white">{{ store.account.address }}</span>
+                <span style="color: white">{{store.onchain.address}}</span>
             </b-navbar-nav>
         </b-collapse>
     </b-container>
@@ -55,14 +55,16 @@
                     <b-card class="mb-3">
                         <p class="mb-2"><strong>Mainchain</strong></p>
                         <label for="addr">Address</label> 
-                            (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+ethereumAddress"
+                            (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+store.onchain.address"
                                 target="blanc">block explorer</a>):
                         <b-form-input id="addr" v-model="ethereumAddress" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                         <b-row class="mt-2">
                             <b-col>Balances:
-                                <b-row v-for="token in ethTokens" class="amount_show">
-                                    <span>{{token}}&nbsp;{{ethereumBalanceForToken(token)}}</span>
-                                    <span v-if="pendingWithdrawForToken(token)">, pending: {{pendingAmountForToken(token)}}</span>
+                                <b-row v-for="token in store.onchain.allTokensInfo" class="amount_show" v-bind:key="token.elemId" v-bind:id="token.elemId">
+                                    <span v-bind:style="{color: token.color}">
+                                        <span>{{token.shortBalanceInfo}}</span>
+                                        <b-tooltip v-bind:target="token.elemId">{{token.longBalanceInfo}}</b-tooltip>
+                                    </span>
                                 </b-row>
                             </b-col>
                         </b-row>
@@ -102,24 +104,16 @@
                     <b-card class="mt-2">
                         <p class="mb-2"><strong>Franklin</strong></p>
                         <label for="addr">Address</label> 
-                            <!-- TODO: is this address Ethereum or our? -->
-                            (<a v-bind:href="'/explorer/'+franklinAddress"
-                                target="blanc">block explorer</a>):
-                        <b-form-input id="franklin_addr" v-model="franklinAddress" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
+                            (<a v-bind:href="'/explorer/'+store.plasma.address" target="blanc">block explorer</a>):
+                        <b-form-input id="franklin_addr" v-model="store.plasma.address" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                         <b-row class="mt-2">
-                            <!-- Print balance here -->
                             <b-col>Balances:
-                                <div v-for="token in franklinCoins">
-                                    <b-row class="amount_show">
-                                        Verified {{token}}&nbsp;{{franklinBalanceForToken(token)}}
-                                    </b-row>
-                                    <b-row class="amount_show" style="color: grey" v-if="nonverifiedFranklinTransaction(token)">
-                                        Committed {{token}}&nbsp;{{franklinCommittedBalanceForToken(token)}}
-                                    </b-row>
-                                    <b-row class="amount_show" style="color: grey" v-if="pendingFranklinTransaction(token)">
-                                        Pending {{token}}&nbsp;{{franklinPendingBalanceForToken(token)}}
-                                    </b-row>
-                                </div>
+                                <b-row v-for="token in store.plasma.allTokensInfo" class="amount_show" v-bind:key="token.elemId" v-bind:id="token.elemId">
+                                    <span v-bind:style="{color: token.color}">
+                                        <span>{{token.shortBalanceInfo}}</span>
+                                        <b-tooltip v-bind:target="token.elemId">{{token.longBalanceInfo}}</b-tooltip>
+                                    </span>
+                                </b-row>
                             </b-col>
                         </b-row>
                         <b-row class="mt-2" style="color: grey" v-if="pendingWithdraw">
@@ -736,102 +730,263 @@ export default {
             // this.$parent.$router.push('/wallet')
         },
         async updateAccountInfo() {
+            // *************** helper *****************
+            const MaturityLevel = Object.freeze({
+                low: 'pending',
+                mid: 'committed',
+                high: 'verified',
 
-            //this.network = web3.version.network
-
-            let newData = {}
-            let timer = this.updateTimer
-            let plasmaData = {}
-            let onchain = {}
-            let ethData = {}
+                toNumber: x => {
+                    switch (x) {
+                        case MaturityLevel.low: return 1;
+                        case MaturityLevel.mid: return 2;
+                        case MaturityLevel.high: return 3;
+                        default: throw new Error('switch reached default');
+                    }
+                },
+                cmp: (a, b) => {
+                    MaturityLevel.toNumber(a) - MaturityLevel.toNumber(b)
+                },
+                lowestMaturityLevel: (pending, committed, verified) => {
+                    if (pending !== committed) return MaturityLevel.low;
+                    if (committed !== verified) return MaturityLevel.mid;
+                    return MaturityLevel.high;
+                },
+                lowestFromList: xs => {
+                    return xs.slice().sort(MaturityLevel.cmp)[0];
+                }
+            });
+            
+            let timer = this.updateTimer;
             try {
-                ethData.address = wallet.ethWallet.address
+                // ******************* get the info from wallet *******************
+                store.onchain.address = wallet.ethWallet.address;
+                store.onchain.nonce = await wallet.getNonce();
                 
-                ethData.balances = {}
-                ethData.balances['ETH'] = (await wallet.ethWallet.getBalance()).toString(10)
+                store.onchain.committed = await wallet.getCommittedOnchainState();
+                store.onchain.pending   = await wallet.getPendingOnchainState();
+            
+                store.plasma.address = wallet.address;
+                store.plasma.pending   = await wallet.getPendingFranklinState();
+                store.plasma.committed = await wallet.getCommittedFranklinState();
+                store.plasma.verified  = await wallet.getVerifiedFranklinState();
 
-                plasmaData.address = wallet.address
-                plasmaData.balances = {}
-                let accountState = await wallet.getState()
-                console.log('accountState:', accountState);
-                let {pending, committed, verified} = accountState
-                plasmaData.balances = {pending, committed, verified}
+                store.contract.committed.lockedUnlockedBalances = 
+                    (await wallet.getCommittedContractBalances()).contractBalances;
+                store.contract.pending.lockedUnlockedBalances =
+                    (await wallet.getPendingContractBalances()).contractBalances;
+                
+                // ************************ transform to dicts ************************
 
-                console.log('ethData:', ethData)
-                console.log('plasmaData:', plasmaData)
+                store.onchain.committed.balanceDict = balanceArrayToDict(store.onchain.committed.balances)
+                store.onchain.pending.balanceDict   = balanceArrayToDict(store.onchain.pending.balances)
+                
+                store.contract.committed.lockedDict = 
+                    objectArrayToDict(store.contract.committed.lockedUnlockedBalances, "token", "locked");
+                store.contract.committed.unlockedDict = 
+                    objectArrayToDict(store.contract.committed.lockedUnlockedBalances, "token", "unlocked");
+                store.contract.pending.lockedDict = 
+                    objectArrayToDict(store.contract.pending.lockedUnlockedBalances, "token", "locked");
+                store.contract.pending.unlockedDict = 
+                    objectArrayToDict(store.contract.pending.lockedUnlockedBalances, "token", "unlocked");
+                
+                store.plasma.pending.balanceDict   = balanceArrayToDict(store.plasma.pending.balances);
+                store.plasma.committed.balanceDict = balanceArrayToDict(store.plasma.committed.balances);
+                store.plasma.verified.balanceDict  = balanceArrayToDict(store.plasma.verified.balances);
 
-                store.ethData = ethData
-                store.plasmaData = plasmaData
-                store.nonce = Math.max.apply(null, [
-                    pending.nonce,
-                    committed.nonce,
-                    verified.nonce
+                // ************************ get unique tokens ************************
+
+                store.onchain.allTokensList = uniqueElements([
+                    Object.keys(store.onchain.committed.balanceDict),
+                    Object.keys(store.onchain.pending.balanceDict),
+                    Object.keys(store.contract.committed.lockedDict),
+                    Object.keys(store.contract.committed.unlockedDict),
+                    Object.keys(store.contract.pending.lockedDict),
+                    Object.keys(store.contract.pending.unlockedDict)
                 ]);
 
-                // newData.address = window.ethereum ? ethereum.selectedAddress : (await eth.accounts())[0]
-                // //console.log('1', newData.address)
-                // let balance = (await eth.getBalance(newData.address)).toString(10)
+                store.plasma.allTokensList = uniqueElements([
+                    Object.keys(store.plasma.pending.balanceDict),
+                    Object.keys(store.plasma.committed.balanceDict),
+                    Object.keys(store.plasma.verified.balanceDict)
+                ]);
 
-                // newData.balance = Eth.fromWei(new BN(balance), 'ether')
-                // let id = (await contract.ethereumAddressToAccountID(newData.address))[0].toNumber();
+                // ************************* all the information for frontend *************************
 
-                // if( store.account.plasma.id && id !== store.account.plasma.id ) {
-                //     // FIXME:
-                //     //store.account.plasma.id = null // display loading.gif
-                //     store.account.plasma.id = null
-                //     this.$router.push('/login')
-                //     return
-                // }
+                store.onchain.allTokensInfo = store.onchain.allTokensList.map(tokenName => {
+                    let res = {};
+                    res.tokenName = tokenName;
+                    res.elemId = `ethBalance__${tokenName}`;
 
-                // let accountState = await contract.accounts(id);
+                    res.longBalanceInfo = "";
 
-                // // let accountState = await ethersContract.accounts(id);
-                // plasmaData.closing = accountState.state.toNumber() > 1;
+                    // ***** make string with all info about onchain balance to be shown on hover ***** 
 
-                // let {blocks, pendingBalance} = await this.loadEvents(newData.address, plasmaData.closing)
-                // onchain.completeWithdrawArgs = blocks
-                // onchain.balance = pendingBalance
+                    res.longBalanceInfo += appendableBalancesString(
+                        store.onchain.committed.balanceDict[tokenName],
+                        store.onchain.pending.balanceDict[tokenName],
+                        'committed', 
+                        ', pending'
+                    );
 
-                // newData.plasmaId = id
-                // if(id > 0) {
-                //     plasmaData = await this.getPlasmaInfo(id)
-                // }
+                    res.longBalanceInfo += appendableBalancesString(
+                        store.contract.committed.lockedDict[tokenName],
+                        store.contract.pending.lockedDict[tokenName],
+                        ', locked', 
+                        ', locked pending'
+                    );
+
+                    res.longBalanceInfo += appendableBalancesString(
+                        store.contract.committed.unlockedDict[tokenName],
+                        store.contract.pending.unlockedDict[tokenName],
+                        ', unlocked', 
+                        ', unlocked pending'
+                    );
+
+                    // *************** make short description to be shown on the page ***************
+
+                    res.shortBalanceInfo = `${tokenName} ${store.onchain.pending.balanceDict[tokenName]}`;
+                    if (store.contract.pending.lockedDict[tokenName]) {
+                        res.shortBalanceInfo += `, locked ${store.contract.pending.lockedDict[tokenName]}`;
+                    }
+                    if (store.contract.pending.unlockedDict[tokenName]) {
+                        res.shortBalanceInfo += `, unlocked ${store.contract.pending.unlockedDict[tokenName]}`;
+                    }
+
+                    // ***************************** decide on colors *****************************
+
+                    res.lowestMaturityOnchainLevel = 
+                        store.onchain.committed.balanceDict[tokenName] === store.onchain.pending.balanceDict[tokenName]
+                        && store.contract.committed.lockedDict[tokenName] === store.contract.pending.lockedDict[tokenName] 
+                        && store.contract.committed.unlockedDict[tokenName] === store.contract.pending.unlockedDict[tokenName] 
+                        ? MaturityLevel.high
+                        : MaturityLevel.low;
+
+                    res.color = null;
+                    switch (res.lowestMaturityOnchainLevel) {
+                        case MaturityLevel.low:  res.color = '#999'; break;
+                        case MaturityLevel.high: res.color = '#000'; break;
+                        default: throw new Error(`switch reached default, ${res.lowestMaturityOnchainLevel}`);
+                    }
+
+                    return res;
+                });
+
+                store.plasma.allTokensInfo = store.plasma.allTokensList.map(tokenName => {
+                    let res = {};
+                    res.tokenName = tokenName;
+                    res.elemId = `franklinBalance__${tokenName}`;
+
+                    res.longBalanceInfo = "";
+
+                    // ***** make string with all info about onchain balance to be shown on hover ***** 
+
+                    res.longBalanceInfo += appendableBalancesStringThreeLevels(
+                        store.plasma.pending.balanceDict[tokenName],
+                        store.plasma.committed.balanceDict[tokenName],
+                        store.plasma.verified.balanceDict[tokenName],
+                        ', pending', ', committed', ', verified'
+                    );
+
+                    res.longBalanceInfo = res.longBalanceInfo.substr(2);
+
+                    // *************** make short description to be shown on the page ***************
+
+                    res.lowestMaturityPlasmaLevel = MaturityLevel.lowestMaturityLevel(
+                        store.plasma.pending.balanceDict[tokenName],
+                        store.plasma.committed.balanceDict[tokenName],
+                        store.plasma.verified.balanceDict[tokenName]
+                    );
+
+                    // ***************************** decide on colors *****************************
+
+                    res.color = null;
+                    res.shortBalanceInfo = null;
+                    switch (res.lowestMaturityPlasmaLevel) {
+                        case MaturityLevel.low:  
+                            res.color = '#999'; 
+                            res.shortBalanceInfo = `${tokenName} ${store.plasma.pending.balanceDict[tokenName]}`;
+                            break;
+                        case MaturityLevel.mid:  
+                            res.color = '#555'; 
+                            res.shortBalanceInfo = `${tokenName} ${store.plasma.committed.balanceDict[tokenName]}`;
+                            break;
+                        case MaturityLevel.high: 
+                            res.color = '#000'; 
+                            res.shortBalanceInfo = `${tokenName} ${store.plasma.verified.balanceDict[tokenName]}`;
+                            break;
+                        default: throw new Error(`switch reached default, ${res.lowestMaturityPlasmaLevel}`);
+                    }
+
+                    return res;
+                });
+
+                function appendableBalancesStringThreeLevels(pending, committed, verified, 
+                                                             pendingMessage, committedMessage, verifiedMessage) {
+                    let res = '';
+                    if (verified) {
+                        res += `${verifiedMessage} ${verified}`;
+                    }
+                    if (committed && committed !== verified) {
+                        res += `${committedMessage} ${committed}`;
+                    }
+                    if (pending && pending !== committed) {
+                        res += `${pendingMessage} ${pending}`;
+                    }
+                    return res;
+                }
+
+                function appendableBalancesString(committed, pending, committedMessage, pendingMessage) {
+                    let res = '';
+                    if (committed) {
+                        res += `${committedMessage} ${committed}`;
+                    }
+                    if (pending && committed !== pending) {
+                        res += `${pendingMessage} ${pending}`;
+                    }
+                    return res;
+                }
             } catch (err) {
                 this.alert('Status update failed: ' + err)
                 console.log(err)
             }
             if(timer === this.updateTimer) { // if this handler is still valid
-                // store.account.address = newData.address
-                // store.account.balance = newData.balance
-
-                // store.account.onchain = onchain
-
-                // store.account.plasma.id = newData.plasmaId
-                // store.account.plasma.closing = plasmaData.closing
-
-                if(store.account.plasma.id) {
-
-                    // //console.log('plasmaData', plasmaData)
-                    // store.account.plasma.verified = plasmaData.verified || {}
-                    // store.account.plasma.committed = plasmaData.committed || {}
-                    // store.account.plasma.pending = plasmaData.pending || {}
-
-                    // if(store.account.plasma.pending.nonce !== null) {
-                        
-                    //     this.nonce = store.account.plasma.pending.nonce
-                        
-                    //     // if (store.account.plasma.pending.nonce > Number(this.nonce)) {
-                    //     //     this.nonce = store.account.plasma.pending.nonce
-                    //     // }
-                    //     // if (store.account.plasma.pending_nonce > Number(this.nonce)) {
-                    //     //     this.nonce = store.account.plasma.pending_nonce
-                    //     // }
-                    // }
-                }
-                this.updateTimer = setTimeout(() => this.updateAccountInfo(), 1000)
+                this.updateTimer = setTimeout(() => this.updateAccountInfo(), 1001)
             }
         },
     },
+}
+
+/*
+ * ##     ## ######## ##       ########  ######## ########   ######  
+ * ##     ## ##       ##       ##     ## ##       ##     ## ##    ## 
+ * ##     ## ##       ##       ##     ## ##       ##     ## ##       
+ * ######### ######   ##       ########  ######   ########   ######  
+ * ##     ## ##       ##       ##        ##       ##   ##         ## 
+ * ##     ## ##       ##       ##        ##       ##    ##  ##    ## 
+ * ##     ## ######## ######## ##        ######## ##     ##  ######  
+ */
+
+function objectArrayToDict(arr, k, v) {
+    let res = {};
+    arr.forEach(b => {
+        res[b[k]] = b[v]
+    });
+    return res;
+}
+
+function balanceArrayToDict(arr) {
+    return objectArrayToDict(arr, "token", "balance");
+}
+
+function uniqueElements(arrays) {
+    let res = {};
+    arrays.forEach(arr => {
+        arr.forEach(el => {
+            res[el] = null;
+        });
+    });
+    return Object.keys(res);
 }
 </script>
 
