@@ -10,7 +10,7 @@ use franklin_crypto::alt_babyjubjub::JubjubEngine;
 use franklin_crypto::jubjub::{edwards, Unknown};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{AccountId, AccountUpdates, Nonce, TokenAmount, TokenId};
+use super::{AccountId, AccountUpdates, Nonce, TokenId};
 use super::{Engine, Fr};
 use crate::circuit::account::{Balance, CircuitAccount};
 

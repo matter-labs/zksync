@@ -7,8 +7,7 @@ use models::node::operations::{
 use models::node::tx::{Close, Deposit, FranklinTx, Transfer, Withdraw};
 use models::node::{Account, AccountAddress, AccountTree};
 use models::node::{
-    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, FeeAmount, Fr, TokenAmount,
-    TokenId,
+    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr, TokenId,
 };
 use models::params;
 use std::collections::HashMap;

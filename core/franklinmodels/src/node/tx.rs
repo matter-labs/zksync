@@ -1,4 +1,4 @@
-use super::{AccountId, BlockNumber, FeeAmount, Nonce, TokenAmount, TokenId};
+use super::{AccountId, BlockNumber, Nonce, TokenId};
 use super::{Engine, Fr};
 //use crate::plasma::circuit::sig::TransactionSignature;
 //use crate::plasma::circuit::transfer::Tx;

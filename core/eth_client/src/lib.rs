@@ -34,7 +34,7 @@ pub struct ETHClient {
 /// ETH client for Plasma contract
 /// All methods are blocking for now
 impl ETHClient {
-    pub fn new(contract_abi: ABI) -> Self {
+    pub fn new(contract_abi: String) -> Self {
         Self {
             web3_url: env::var("WEB3_URL").unwrap_or_else(|_| "http://localhost:8545".to_string()),
             private_key: H256::from_str(&env::var("PRIVATE_KEY").unwrap_or_else(|_| {
@@ -50,7 +50,7 @@ impl ETHClient {
                 .unwrap_or_else(|_| "e5d0efb4756bd5cdd4b5140d3d2e08ca7e6cf644".to_string()),
             chain_id: u8::from_str(&env::var("CHAIN_ID").unwrap_or_else(|_| "4".to_string()))
                 .expect("chain id must be correct"),
-            contract: ethabi::Contract::load(contract_abi.0)
+            contract: ethabi::Contract::load(contract_abi.as_bytes())
                 .expect("contract must be loaded correctly"),
             reqwest_client: reqwest::Client::new(),
             gas_price_factor: usize::from_str(

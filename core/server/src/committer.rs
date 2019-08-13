@@ -52,10 +52,9 @@ fn run_committer(
                 .execute_operation(&op)
                 .expect("committer must commit the op into db");
 
-            //tx_for_proof_requests.send(ProverRequest(op.block.block_number)).expect("must send a proof request");
-            //            tx_for_eth
-            //                .send(op)
-            //                .expect("must send an operation for commitment to ethereum");
+            tx_for_eth
+                .send(op)
+                .expect("must send an operation for commitment to ethereum");
             continue;
         } else {
             // there was a timeout, so check for the new ready proofs
@@ -79,9 +78,9 @@ fn run_committer(
                     let op = storage
                         .execute_operation(&op)
                         .expect("committer must commit the op into db");
-                    //                    tx_for_eth
-                    //                        .send(op)
-                    //                        .expect("must send an operation for commitment to ethereum");
+                    tx_for_eth
+                        .send(op)
+                        .expect("must send an operation for commitment to ethereum");
                     last_verified_block += 1;
                 } else {
                     break;
