@@ -95,7 +95,7 @@ struct StorageBalance {
     pub balance: BigDecimal,
 }
 
-#[derive(Insertable, QueryableByName, Queryable)]
+#[derive(Insertable, QueryableByName, Queryable, Serialize, Deserialize)]
 #[table_name = "tokens"]
 pub struct Token {
     pub id: i32,
@@ -1001,6 +1001,29 @@ impl StorageProcessor {
                 Ok((0, None))
             }
         })
+    }
+
+    // Verified, commited states.
+    pub fn account_state_by_address(
+        &self,
+        address: &AccountAddress,
+    ) -> QueryResult<(Option<AccountId>, Option<Account>, Option<Account>)> {
+        let account_create_record = account_creates::table
+            .filter(account_creates::address.eq(address.data.to_vec()))
+            .filter(account_creates::is_create.eq(true))
+            .order(account_creates::block_number.desc())
+            .first::<StorageAccountCreation>(self.conn())
+            .optional()?;
+
+        let account_id = if let Some(account_create_record) = account_create_record {
+            account_create_record.account_id as AccountId
+        } else {
+            return Ok((None, None, None));
+        };
+
+        let commited_state = self.last_committed_state_for_account(account_id)?;
+        let verified_state = self.last_verified_state_for_account(account_id)?;
+        Ok((Some(account_id), verified_state, commited_state))
     }
 
     pub fn last_committed_state_for_account(

@@ -339,7 +339,7 @@ impl EthWatch {
         self.processed_block = last_block;
     }
 
-    pub fn commit_state(&self) {
+    fn commit_state(&self) {
         let eth_state = self.eth_state.read().expect("eth state read lock");
         self.db_pool
             .access_storage()
@@ -381,6 +381,7 @@ impl EthWatch {
 
             if block > self.processed_block {
                 self.process_new_blocks(&web3, &contract, block);
+                self.commit_state();
             }
         }
     }

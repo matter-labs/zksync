@@ -1,4 +1,5 @@
 use models::node::tx::FranklinTx;
+use models::node::AccountAddress;
 
 use super::ConnectionHolder;
 
@@ -11,7 +12,7 @@ use serde_json::Value;
 use chrono::NaiveDateTime;
 
 use super::schema::*;
-use super::StorageAccount;
+use super::{StorageAccount, StoredExecutedTransaction};
 use diesel::expression::dsl::count;
 use diesel::insert_into;
 
@@ -23,7 +24,7 @@ pub struct Mempool {
 #[table_name = "mempool"]
 struct InsertTx {
     hash: Vec<u8>,
-    primary_account_address: String,
+    primary_account_address: Vec<u8>,
     nonce: i64,
     tx: Value,
 }
@@ -31,7 +32,7 @@ struct InsertTx {
 #[derive(Debug, Queryable)]
 struct ReadTx {
     hash: Vec<u8>,
-    primary_account_address: String,
+    primary_account_address: Vec<u8>,
     nonce: i64,
     tx: Value,
     created_at: NaiveDateTime,
@@ -60,10 +61,11 @@ impl Mempool {
     }
 
     pub fn add_tx(&self, tx: FranklinTx) -> QueryResult<()> {
+        // TODO Check tx and add only txs with valid nonce.
         insert_into(mempool::table)
             .values(&InsertTx {
                 hash: tx.hash(),
-                primary_account_address: tx.account().to_hex(),
+                primary_account_address: tx.account().data.to_vec(),
                 nonce: i64::from(tx.nonce()),
                 tx: serde_json::to_value(tx).unwrap(),
             })
@@ -71,22 +73,55 @@ impl Mempool {
             .map(drop)
     }
 
+    pub fn get_pending_txs(&self, address: &AccountAddress) -> QueryResult<Vec<FranklinTx>> {
+        let pending_txs: Vec<_> = mempool::table
+            .left_join(accounts::table.on(accounts::address.eq(address.data.to_vec())))
+            .filter(
+                accounts::nonce
+                    .is_null()
+                    .or(accounts::nonce.lt(mempool::nonce)),
+            )
+            .left_join(
+                executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),
+            )
+            .filter(executed_transactions::tx_hash.is_null())
+            .order(mempool::nonce.asc())
+            .load::<(
+                ReadTx,
+                Option<StorageAccount>,
+                Option<StoredExecutedTransaction>,
+            )>(self.conn())?;
+
+        Ok(pending_txs
+            .into_iter()
+            .map(|(stored_tx, _, _)| serde_json::from_value(stored_tx.tx).unwrap())
+            .collect())
+    }
+
     pub fn get_txs(&self, max_size: usize) -> QueryResult<Vec<FranklinTx>> {
         //TODO use "gaps and islands" sql solution for this.
-        //        let stored_txs: Vec<_> = mempool::table
-        //            .left_join(accounts::table.on(mempool::primary_account_address.eq(accounts::address)))
-        //            .filter(accounts::nonce.ge(mempool::nonce))
-        //            .order(mempool::created_at.asc())
-        //            .limit(max_size as i64)
-        //            .load::<(ReadTx, Option<StorageAccount>)>(self.conn())?;
-        let stored_txs: Vec<_> = mempool::table.load::<ReadTx>(self.conn())?;
+        let stored_txs: Vec<_> = mempool::table
+            .left_join(
+                executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),
+            )
+            .filter(executed_transactions::tx_hash.is_null())
+            .left_join(accounts::table.on(accounts::address.eq(mempool::primary_account_address)))
+            .filter(
+                accounts::nonce
+                    .is_null()
+                    .or(accounts::nonce.ge(mempool::nonce)),
+            )
+            .order(mempool::created_at.asc())
+            .limit(max_size as i64)
+            .load::<(
+                ReadTx,
+                Option<StoredExecutedTransaction>,
+                Option<StorageAccount>,
+            )>(self.conn())?;
 
-        let mut txs = Vec::new();
-        txs.extend(
-            stored_txs
-                .into_iter()
-                .map(|stored_tx| serde_json::from_value(stored_tx.tx).unwrap()),
-        );
-        Ok(txs)
+        Ok(stored_txs
+            .into_iter()
+            .map(|stored_tx| serde_json::from_value(stored_tx.0.tx).unwrap())
+            .collect())
     }
 }

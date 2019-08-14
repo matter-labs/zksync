@@ -275,8 +275,6 @@ impl PlasmaStateKeeper {
     }
 
     fn precheck_tx(&self, tx: &FranklinTx) -> Result<(), failure::Error> {
-        return Ok(());
-        unimplemented!();
         if let FranklinTx::Deposit(deposit) = tx {
             let eth_state = self.eth_state.read().expect("eth state rlock");
             if let Some(locked_balance) = eth_state

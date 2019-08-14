@@ -61,7 +61,7 @@ table! {
 table! {
     mempool (hash) {
         hash -> Bytea,
-        primary_account_address -> Text,
+        primary_account_address -> Bytea,
         nonce -> Int8,
         tx -> Jsonb,
         created_at -> Timestamp,
@@ -140,6 +140,7 @@ table! {
 joinable!(account_balance_updates -> tokens (coin_id));
 joinable!(balances -> accounts (account_id));
 joinable!(balances -> tokens (coin_id));
+joinable!(executed_transactions -> mempool (tx_hash));
 
 allow_tables_to_appear_in_same_query!(
     account_balance_updates,
