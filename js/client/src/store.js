@@ -6,38 +6,43 @@ const store = {
         address: null,
         nonce:   null,
         committed: {
-            balances: {}
+            balances: {},
+            balanceDict: {}
         },
         pending: {
-            balances: {}
+            balances: {},
+            balanceDict: {}
         },
+        allTokensList: [],
+        allTokensInfo: []
     },
     contract: {
         committed: {
-            lockedUnlockedBalances: {
-                
-            }
+            lockedUnlockedBalances: {}
         }, 
         pending: {
-            lockedUnlockedBalances: {
-                
-            }
+            lockedUnlockedBalances: {}
         }
     },
     plasma: {
         address:    null,
         pending: {
             balances: {},
+            balanceDict: {},
             nonce:   0
         },
         committed: {
             balance: {},
+            balanceDict: {},
             nonce:   0
         },
         verified: {
             balance: {},
+            balanceDict: {},
             nonce:   0
-        }
+        },
+        allTokensList: [],
+        allTokensInfo: []
     },
     account: {
         // ethereum part

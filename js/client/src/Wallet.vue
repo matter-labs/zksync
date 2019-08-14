@@ -198,15 +198,13 @@
                     <label for="transferToInput">To (recepient Franklin address): </label>
                     <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0" autocomplete="off"></b-form-input>
                     <p class="mt-2" style="color: grey">
-                        <!-- Note: your recipient must register in Matter Network first. For testing, try 
-                        <a href="#" @click="transferTo='0x'+store.config.SENDER_ACCOUNT">0x{{store.config.SENDER_ACCOUNT}}</a> -->
                     </p>
                     <label for="transferToken" class="mt-4">Token</label>
-                    <b-form-select v-model="coin" :option="store.coins" class="mb-3">
-                        <option v-for="token in ethTokens" @click="coin=token">{{ token }}</option>
+                    <b-form-select v-model="tokenToTransferFranklin" :option="store.plasma.allTokensList" class="mb-3">
+                        <option v-for="token in store.allTokensInfo" v-bind:key="token.elemId" @click="tokenToTransferFranklin=token.tokenName">{{ token }}</option>
                     </b-form-select>
                     <label for="transferAmountInput" class="mt-4">Amount</label>
-                            (max {{coin}}&nbsp;<a href="#" @click="transferAmount=franklinCommittedBalanceForToken(coin)">{{franklinCommittedBalanceForToken(coin)}}</a>):
+                            (max {{tokenToTransferFranklin}}&nbsp;<a href="#" @click="transferAmount=franklinCommittedBalanceForToken(tokenToTransferFranklin)">{{franklinCommittedBalanceForToken(tokenToTransferFranklin)}}</a>):
                     <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
 
                     <label for="transferNonceInput" class="mt-4">Nonce (autoincrementing):</label>
@@ -241,11 +239,11 @@
 ########  ######## ##         #######   ######  ####    ##    
  -->
     <b-modal ref="depositModal" id="depositModal" title="Deposit" hide-footer>
-        <b-form-select v-model="coin" :option="store.coins" class="mb-3">
-            <option v-for="token in ethTokens" @click="coin=token">{{ token }}</option>
+        <b-form-select v-model="tokenForDeposit" :option="store.coins" class="mb-3">
+            <option v-for="token in store.onchain.allTokensInfo" v-bind:key="token.elemId" @click="tokenForDeposit=token.tokenName">{{ token.tokenName }}</option>
         </b-form-select>
         <label for="depositAmountInput">Amount</label> 
-            (max <span>{{ coin }}</span> <a href="#" @click="depositAmount=ethereumBalanceForToken(coin)">{{ethereumBalanceForToken(coin)}}</a>):
+            (max <span>{{ tokenForDeposit }}</span> <a href="#" @click="depositAmount=store.onchain.committed.balanceDict[tokenForDeposit]">{{store.onchain.committed.balanceDict[tokenForDeposit]}}</a>):
         <b-form-input id="depositAmountInput" type="number" placeholder="7.50" v-model="depositAmount"></b-form-input>
         <div id="doDepositBtn" class="mt-4 float-right">
             <b-btn variant="primary" @click="deposit" :disabled="!!doDepositProblem">Deposit</b-btn>
@@ -265,9 +263,9 @@
  -->
     <b-modal ref="withdrawModal" id="withdrawModal" title="Withdrawal" hide-footer>
         <b-tabs pills card>
-            <!--<b-tab title="Partial withdrawal" active>
+            <b-tab title="Partial withdrawal" active>
                 <label for="withdrawAmountInput" class="mt-4">Amount</label>
-                    (max ETH <a href="#" @click="withdrawAmount=store.account.plasma.verified.balance">{{store.account.plasma.verified.balance}}</a>):
+                    <!-- (max ETH <a href="#" @click="withdrawAmount=store.plasma.verified.balances">{{store.plasma.verified.balances}}</a>): -->
                 <b-form-input id="withdrawAmountInput" type="number" placeholder="7.50" v-model="withdrawAmount"></b-form-input>
                 <label for="transferNonceInput" class="mt-4">Nonce:</label>
                 <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
@@ -277,7 +275,7 @@
                 <b-tooltip target="doWithdrawBtn" :disabled="!doWithdrawProblem" triggers="hover">
                     Withdraw not possible: {{ doWithdrawProblem }}
                 </b-tooltip>
-            </b-tab>-->
+            </b-tab>
             <!--<b-tab title="Full exit" class="mb-4">-->
                 <p>This will close your account and withdraw all money from it.</p>
                 <div id="doExitBtn" class="mt-4 float-right">
@@ -324,7 +322,8 @@ export default {
         network:            null,
 
         nonce:              0,
-        coin:               'ETH',
+        tokenToTransferFranklin: 'ETH',
+        tokenForDeposit:    'ETH',
         transferTo:         '',
         transferAmount:     '0.001',
         transferPending:    false,
@@ -430,8 +429,9 @@ export default {
                 + this.depositAmount + " > " + store.account.balance
         }, 
         withdrawProblem() {
-            if(!(Number(store.account.plasma.committed.balance) > 0)) return "empty balance in the Matter Network account"
-            if(!(Number(store.account.plasma.verified.balance) > 0)) return "empty balance in the Matter Network account"
+            console.log('store.plasma.committed', store.plasma.committed);
+            if(Object.keys(store.plasma.committed.balances).length === 0) return "empty balance in the Matter Network account"
+            // if(Object.keys(store.plasma.verified.balances).length === 0) return "empty balance in the Matter Network account"
         },
         doWithdrawProblem() {
             if(this.depositProblem) return this.depositProblem
@@ -479,12 +479,8 @@ export default {
         pendingWithdrawForToken(token) {
             return Math.random() < 0.5;
         },
-        ethereumBalanceForToken(token) {
-            return ({
-                'ETH': 123,
-                'BTC': 456,
-                'ZEC': 789
-            })[token];
+        onchainCommittedBalanceForToken(token) {
+            // return res;
         },
         franklinBalanceForToken(token) {
             return 19937 + ({
@@ -758,62 +754,104 @@ export default {
             });
             
             let timer = this.updateTimer;
+            let onchain = {
+                address: null,
+                nonce:   null,
+                committed: {
+                    balances: {},
+                    balanceDict: {}
+                },
+                pending: {
+                    balances: {},
+                    balanceDict: {}
+                },
+                allTokensList: [],
+                allTokensInfo: []
+            };
+            let contract = {
+                committed: {
+                    lockedUnlockedBalances: {}
+                }, 
+                pending: {
+                    lockedUnlockedBalances: {}
+                }
+            };
+            let plasma = {
+                address:    null,
+                pending: {
+                    balances: {},
+                    balanceDict: {},
+                    nonce:   0
+                },
+                committed: {
+                    balance: {},
+                    balanceDict: {},
+                    nonce:   0
+                },
+                verified: {
+                    balance: {},
+                    balanceDict: {},
+                    nonce:   0
+                },
+                allTokensList: [],
+                allTokensInfo: []
+            };
             try {
                 // ******************* get the info from wallet *******************
-                store.onchain.address = wallet.ethWallet.address;
-                store.onchain.nonce = await wallet.getNonce();
+                onchain.address = wallet.ethWallet.address;
+                onchain.nonce = await wallet.getNonce();
                 
-                store.onchain.committed = await wallet.getCommittedOnchainState();
-                store.onchain.pending   = await wallet.getPendingOnchainState();
+                onchain.committed = await wallet.getCommittedOnchainState();
+                onchain.pending   = await wallet.getPendingOnchainState();
             
-                store.plasma.address = wallet.address;
-                store.plasma.pending   = await wallet.getPendingFranklinState();
-                store.plasma.committed = await wallet.getCommittedFranklinState();
-                store.plasma.verified  = await wallet.getVerifiedFranklinState();
+                plasma.address = wallet.address;
+                plasma.pending   = await wallet.getPendingFranklinState();
+                plasma.committed = await wallet.getCommittedFranklinState();
+                plasma.verified  = await wallet.getVerifiedFranklinState();
 
-                store.contract.committed.lockedUnlockedBalances = 
+                contract.committed.lockedUnlockedBalances = 
                     (await wallet.getCommittedContractBalances()).contractBalances;
-                store.contract.pending.lockedUnlockedBalances =
+                contract.pending.lockedUnlockedBalances =
                     (await wallet.getPendingContractBalances()).contractBalances;
                 
                 // ************************ transform to dicts ************************
 
-                store.onchain.committed.balanceDict = balanceArrayToDict(store.onchain.committed.balances)
-                store.onchain.pending.balanceDict   = balanceArrayToDict(store.onchain.pending.balances)
+                onchain.committed.balanceDict = balanceArrayToDict(onchain.committed.balances)
+                onchain.pending.balanceDict   = balanceArrayToDict(onchain.pending.balances)
                 
-                store.contract.committed.lockedDict = 
-                    objectArrayToDict(store.contract.committed.lockedUnlockedBalances, "token", "locked");
-                store.contract.committed.unlockedDict = 
-                    objectArrayToDict(store.contract.committed.lockedUnlockedBalances, "token", "unlocked");
-                store.contract.pending.lockedDict = 
-                    objectArrayToDict(store.contract.pending.lockedUnlockedBalances, "token", "locked");
-                store.contract.pending.unlockedDict = 
-                    objectArrayToDict(store.contract.pending.lockedUnlockedBalances, "token", "unlocked");
+                contract.committed.lockedDict = 
+                    objectArrayToDict(contract.committed.lockedUnlockedBalances, "token", "locked");
+                contract.committed.unlockedDict = 
+                    objectArrayToDict(contract.committed.lockedUnlockedBalances, "token", "unlocked");
+                contract.pending.lockedDict = 
+                    objectArrayToDict(contract.pending.lockedUnlockedBalances, "token", "locked");
+                contract.pending.unlockedDict = 
+                    objectArrayToDict(contract.pending.lockedUnlockedBalances, "token", "unlocked");
                 
-                store.plasma.pending.balanceDict   = balanceArrayToDict(store.plasma.pending.balances);
-                store.plasma.committed.balanceDict = balanceArrayToDict(store.plasma.committed.balances);
-                store.plasma.verified.balanceDict  = balanceArrayToDict(store.plasma.verified.balances);
+                plasma.pending.balanceDict   = balanceArrayToDict(plasma.pending.balances);
+                plasma.committed.balanceDict = balanceArrayToDict(plasma.committed.balances);
+                plasma.verified.balanceDict  = balanceArrayToDict(plasma.verified.balances);
 
                 // ************************ get unique tokens ************************
 
-                store.onchain.allTokensList = uniqueElements([
-                    Object.keys(store.onchain.committed.balanceDict),
-                    Object.keys(store.onchain.pending.balanceDict),
-                    Object.keys(store.contract.committed.lockedDict),
-                    Object.keys(store.contract.committed.unlockedDict),
-                    Object.keys(store.contract.pending.lockedDict),
-                    Object.keys(store.contract.pending.unlockedDict)
+                onchain.allTokensList = uniqueElements([
+                    Object.keys(onchain.committed.balanceDict),
+                    Object.keys(onchain.pending.balanceDict),
+                    Object.keys(contract.committed.lockedDict),
+                    Object.keys(contract.committed.unlockedDict),
+                    Object.keys(contract.pending.lockedDict),
+                    Object.keys(contract.pending.unlockedDict)
                 ]);
 
-                store.plasma.allTokensList = uniqueElements([
-                    Object.keys(store.plasma.pending.balanceDict),
-                    Object.keys(store.plasma.committed.balanceDict),
-                    Object.keys(store.plasma.verified.balanceDict)
+                plasma.allTokensList = uniqueElements([
+                    Object.keys(plasma.pending.balanceDict),
+                    Object.keys(plasma.committed.balanceDict),
+                    Object.keys(plasma.verified.balanceDict)
                 ]);
 
                 // ************************* all the information for frontend *************************
 
-                store.onchain.allTokensInfo = store.onchain.allTokensList.map(tokenName => {
+                onchain.allTokensInfo = onchain.allTokensList.map(tokenName => {
                     let res = {};
                     res.tokenName = tokenName;
                     res.elemId = `ethBalance__${tokenName}`;
@@ -823,42 +861,42 @@ export default {
                     // ***** make string with all info about onchain balance to be shown on hover ***** 
 
                     res.longBalanceInfo += appendableBalancesString(
-                        store.onchain.committed.balanceDict[tokenName],
-                        store.onchain.pending.balanceDict[tokenName],
+                        onchain.committed.balanceDict[tokenName],
+                        onchain.pending.balanceDict[tokenName],
                         'committed', 
                         ', pending'
                     );
 
                     res.longBalanceInfo += appendableBalancesString(
-                        store.contract.committed.lockedDict[tokenName],
-                        store.contract.pending.lockedDict[tokenName],
+                        contract.committed.lockedDict[tokenName],
+                        contract.pending.lockedDict[tokenName],
                         ', locked', 
                         ', locked pending'
                     );
 
                     res.longBalanceInfo += appendableBalancesString(
-                        store.contract.committed.unlockedDict[tokenName],
-                        store.contract.pending.unlockedDict[tokenName],
+                        contract.committed.unlockedDict[tokenName],
+                        contract.pending.unlockedDict[tokenName],
                         ', unlocked', 
                         ', unlocked pending'
                     );
 
                     // *************** make short description to be shown on the page ***************
 
-                    res.shortBalanceInfo = `${tokenName} ${store.onchain.pending.balanceDict[tokenName]}`;
-                    if (store.contract.pending.lockedDict[tokenName]) {
-                        res.shortBalanceInfo += `, locked ${store.contract.pending.lockedDict[tokenName]}`;
+                    res.shortBalanceInfo = `${tokenName} ${onchain.pending.balanceDict[tokenName]}`;
+                    if (contract.pending.lockedDict[tokenName]) {
+                        res.shortBalanceInfo += `, locked ${contract.pending.lockedDict[tokenName]}`;
                     }
-                    if (store.contract.pending.unlockedDict[tokenName]) {
-                        res.shortBalanceInfo += `, unlocked ${store.contract.pending.unlockedDict[tokenName]}`;
+                    if (contract.pending.unlockedDict[tokenName]) {
+                        res.shortBalanceInfo += `, unlocked ${contract.pending.unlockedDict[tokenName]}`;
                     }
 
                     // ***************************** decide on colors *****************************
 
                     res.lowestMaturityOnchainLevel = 
-                        store.onchain.committed.balanceDict[tokenName] === store.onchain.pending.balanceDict[tokenName]
-                        && store.contract.committed.lockedDict[tokenName] === store.contract.pending.lockedDict[tokenName] 
-                        && store.contract.committed.unlockedDict[tokenName] === store.contract.pending.unlockedDict[tokenName] 
+                        onchain.committed.balanceDict[tokenName] === onchain.pending.balanceDict[tokenName]
+                        && contract.committed.lockedDict[tokenName] === contract.pending.lockedDict[tokenName] 
+                        && contract.committed.unlockedDict[tokenName] === contract.pending.unlockedDict[tokenName] 
                         ? MaturityLevel.high
                         : MaturityLevel.low;
 
@@ -872,7 +910,7 @@ export default {
                     return res;
                 });
 
-                store.plasma.allTokensInfo = store.plasma.allTokensList.map(tokenName => {
+                plasma.allTokensInfo = plasma.allTokensList.map(tokenName => {
                     let res = {};
                     res.tokenName = tokenName;
                     res.elemId = `franklinBalance__${tokenName}`;
@@ -882,9 +920,9 @@ export default {
                     // ***** make string with all info about onchain balance to be shown on hover ***** 
 
                     res.longBalanceInfo += appendableBalancesStringThreeLevels(
-                        store.plasma.pending.balanceDict[tokenName],
-                        store.plasma.committed.balanceDict[tokenName],
-                        store.plasma.verified.balanceDict[tokenName],
+                        plasma.pending.balanceDict[tokenName],
+                        plasma.committed.balanceDict[tokenName],
+                        plasma.verified.balanceDict[tokenName],
                         ', pending', ', committed', ', verified'
                     );
 
@@ -893,9 +931,9 @@ export default {
                     // *************** make short description to be shown on the page ***************
 
                     res.lowestMaturityPlasmaLevel = MaturityLevel.lowestMaturityLevel(
-                        store.plasma.pending.balanceDict[tokenName],
-                        store.plasma.committed.balanceDict[tokenName],
-                        store.plasma.verified.balanceDict[tokenName]
+                        plasma.pending.balanceDict[tokenName],
+                        plasma.committed.balanceDict[tokenName],
+                        plasma.verified.balanceDict[tokenName]
                     );
 
                     // ***************************** decide on colors *****************************
@@ -905,15 +943,15 @@ export default {
                     switch (res.lowestMaturityPlasmaLevel) {
                         case MaturityLevel.low:  
                             res.color = '#999'; 
-                            res.shortBalanceInfo = `${tokenName} ${store.plasma.pending.balanceDict[tokenName]}`;
+                            res.shortBalanceInfo = `${tokenName} ${plasma.pending.balanceDict[tokenName]}`;
                             break;
                         case MaturityLevel.mid:  
                             res.color = '#555'; 
-                            res.shortBalanceInfo = `${tokenName} ${store.plasma.committed.balanceDict[tokenName]}`;
+                            res.shortBalanceInfo = `${tokenName} ${plasma.committed.balanceDict[tokenName]}`;
                             break;
                         case MaturityLevel.high: 
                             res.color = '#000'; 
-                            res.shortBalanceInfo = `${tokenName} ${store.plasma.verified.balanceDict[tokenName]}`;
+                            res.shortBalanceInfo = `${tokenName} ${plasma.verified.balanceDict[tokenName]}`;
                             break;
                         default: throw new Error(`switch reached default, ${res.lowestMaturityPlasmaLevel}`);
                     }
@@ -951,6 +989,28 @@ export default {
                 console.log(err)
             }
             if(timer === this.updateTimer) { // if this handler is still valid
+                store.onchain.address = onchain.address || {};
+                store.onchain.nonce = onchain.nonce || {};
+                store.onchain.committed.balances = onchain.committed.balances || {};
+                store.onchain.committed.balanceDict = onchain.committed.balanceDict || {};
+                store.onchain.pending.balances = onchain.pending.balances || {};
+                store.onchain.pending.balanceDict = onchain.pending.balanceDict || {};
+                store.onchain.allTokensList = onchain.allTokensList || {};
+                store.onchain.allTokensInfo = onchain.allTokensInfo || {};
+                store.plasma.address = plasma.address || {};
+                store.plasma.pending.balances = plasma.pending.balances || {};
+                store.plasma.pending.balanceDict = plasma.pending.balanceDict || {};
+                store.plasma.pending.nonce = plasma.pending.nonce || {};
+                store.plasma.committed.balances = plasma.committed.balances || {};
+                store.plasma.committed.balanceDict = plasma.committed.balanceDict || {};
+                store.plasma.committed.nonce = plasma.committed.nonce || {};
+                store.plasma.verified.balance = plasma.verified.balance || {};
+                store.plasma.verified.balanceDict = plasma.verified.balanceDict || {};
+                store.plasma.verified.nonce = plasma.verified.nonce || {};
+                store.plasma.allTokensList = plasma.allTokensList || {};
+                store.plasma.allTokensInfo = plasma.allTokensInfo || {};
+                store.contract.committed.lockedUnlockedBalances = contract.committed.lockedUnlockedBalances || {};
+                store.contract.pending.lockedUnlockedBalances = contract.pending.lockedUnlockedBalances || {};
                 this.updateTimer = setTimeout(() => this.updateAccountInfo(), 1001)
             }
         },
