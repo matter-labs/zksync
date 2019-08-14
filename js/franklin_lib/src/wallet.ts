@@ -33,7 +33,7 @@ class FranklinProvider {
         return await Axios.get(this.providerAddress + '/api/v0.1/tokens').then(reps => reps.data);
     }
 
-    async getState(address: Address): Promise<FranklinState> {
+    async getState(address: Address): Promise<FranklinAccountState> {
         return await Axios.get(this.providerAddress + '/api/v0.1/account/' + address).then(reps => reps.data);
     }
 }
@@ -44,18 +44,27 @@ interface FranklinAccountState {
     balances: BigNumberish[],
 }
 
-interface FranklinState {
+interface FranklinAccountState {
     id?: number,
     commited: FranklinAccountState,
     verified: FranklinAccountState,
-    pending_txs: any[],
+    pendingTxs: any[],
+}
+interface ETHAccountState {
+    onchainBalances: BigNumberish[],
+    contractBalances: BigNumberish[],
+    lockedBlocksLeft: BigNumberish[],
 }
 
 export class Wallet {
     address: Address;
     privateKey: BN;
     publicKey: EdwardsPoint;
-    supportedTokens;
+
+    supportedTokens: Token[];
+    franklinState: FranklinAccountState;
+    ethState: ETHAccountState;
+
 
 
     constructor(seed: Buffer, public provider: FranklinProvider, public ethWallet: ethers.Signer) {
@@ -73,13 +82,15 @@ export class Wallet {
         const franklinAddressBinary = Buffer.from(this.address.substr(2), "hex");
         if (token.id == 0) {
             const tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: amount});
-            return await tx.hash;
+            await tx.wait(2);
+            return tx.hash;
         } else {
             const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
             await erc20DeployedToken.approve(franklinDeployedContract.address, amount);
             const tx = await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, franklinAddressBinary,
                 {gasLimit: bigNumberify("150000")});
-            return await tx.hash;
+            await tx.wait(2);
+            return tx.hash;
         }
     }
 
@@ -135,9 +146,10 @@ async function run() {
     let ethWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
     let wallet = await Wallet.fromEthWallet(ethWallet);
     console.log((await wallet.getState()));
-    return;
+
     console.log(await wallet.depositOnchain(wallet.supportedTokens['1'], bigNumberify(1)));
-    await wallet.depositOffchain(wallet.supportedTokens['1'], new BN(1), new BN(0));
+    console.log(await wallet.depositOffchain(wallet.supportedTokens['1'], new BN(1), new BN(0)));
+
     console.log((await wallet.getState()));
 }
 

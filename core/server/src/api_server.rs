@@ -8,10 +8,15 @@ use models::node::config::RUNTIME_CONFIG;
 use models::node::{tx::FranklinTx, Account, AccountId};
 use models::{ActionType, NetworkStatus, StateKeeperRequest};
 use std::sync::mpsc;
-use storage::{BlockDetails, ConnectionPool};
+use storage::{BlockDetails, ConnectionPool, TxAddError};
 
+use actix_web::Result as ActixResult;
+use bigdecimal::BigDecimal;
+use ethabi::Address;
 use failure::format_err;
 use futures::{sync::oneshot, Future};
+use models::node::AccountAddress;
+use models::node::Fr;
 use std::env;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
@@ -41,13 +46,6 @@ struct TestnetConfigResponse {
     address: String,
 }
 
-//#[derive(Debug, Serialize, Deserialize)]
-//struct AccountDetailsResponse {
-//    pending: Option<Account>,
-//    verified: Option<Account>,
-//    committed: Option<Account>,
-//}
-
 #[derive(Default, Clone)]
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
 
@@ -66,84 +64,63 @@ pub struct AppState {
     network_status: SharedNetworkStatus,
 }
 
-const TIMEOUT: u64 = 500;
+//let storage = pool
+//.access_mempool()
+//.map_err(|_| HttpResponse::InternalServerError().body(Body::Empty));
+//let storage_query_result = storage.and_then(|storage| {
+//storage.add_tx(tx)
+//.map(|tx_add_result| {
+//match tx_add_result {
+//Ok(_) => HttpResponse::Ok().body(Body::Empty),
+//Err(e) => HttpResponse::BadRequest().json(e),
+//}
+//})
+//.map_err(|_| HttpResponse::InternalServerError().body(Body::Empty))
+//});
+
+#[derive(Debug, Serialize, Deserialize)]
+struct NewTxResponse {
+    hash: String,
+    err: Option<TxAddError>,
+}
 
 fn handle_submit_tx(
     req: &HttpRequest<AppState>,
 ) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let tx_for_state = req.state().tx_for_state.clone();
     let network_status = req.state().network_status.read();
+    let pool = req.state().connection_pool.clone();
 
     req.json()
         .map_err(|e| format!("{}", e)) // convert all errors to String
         .and_then(move |tx: FranklinTx| {
             // Rate limit check
 
-            info!("Received tx: {:#?}", tx);
-
-            // TODO: check lazy init
-            if network_status.outstanding_txs > RUNTIME_CONFIG.max_outstanding_txs {
-                return Err("Rate limit exceeded".to_string());
-            }
-
-            // Validate tx input (only basic consistency check).
-            //            tx.validate()?;
-
-            Ok(tx)
+            let storage = pool
+                .access_storage()
+                .map_err(|e| format!("db error: {}", e))?;
+            let response = storage
+                .mempool_add_tx(&tx)
+                .map(|tx_add_result| {
+                    let resp = match tx_add_result {
+                        Ok(_) => NewTxResponse {
+                            hash: hex::encode(&tx.hash()),
+                            err: None,
+                        },
+                        Err(e) => NewTxResponse {
+                            hash: hex::encode(&tx.hash()),
+                            err: Some(e),
+                        },
+                    };
+                    HttpResponse::Ok().json(resp)
+                })
+                .map_err(|e| format!("mempool error: {}", e))?;
+            Ok(response)
         })
-        .and_then(move |tx| {
-            let (add_tx, add_rx) = oneshot::channel();
-            tx_for_state
-                .send(StateKeeperRequest::AddTx(Box::new(tx), add_tx))
-                .expect("sending to sate keeper failed");
-            // Return response
-            add_rx
-                .into_future()
-                .map_err(|e| format!("Failed to receive from StateKeeper: {:?}", e))
-        })
-        .and_then(|confirmation| {
-            confirmation.map_err(|e| format!("Tx rejected: {:?}", e))?;
-            let resp = TransactionResponse {
-                accepted: true,
-                error: None,
-            };
-            Ok(HttpResponse::Ok().json(resp))
-        })
-        .or_else(|err: String| {
-            let resp = TransactionResponse {
-                accepted: false,
-                error: Some(err),
-            };
-            Ok(HttpResponse::Ok().json(resp))
-        })
+        .or_else(|err: String| Ok(HttpResponse::InternalServerError().json(err)))
         .responder()
 }
 
-use actix_web::Result as ActixResult;
-use bigdecimal::BigDecimal;
-use ethabi::Address;
-use models::node::AccountAddress;
-use models::node::Fr;
-
-//#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-//pub struct Account {
-//    pub balance: BigDecimal,
-//    pub nonce: u32,
-//    pub public_key_x: Fr,
-//    pub public_key_y: Fr,
-//}
-//
-//impl From<PAccount> for Account {
-//    fn from(a: PAccount) -> Account {
-//        Self {
-//            balance: a.get_balance(0).clone(),
-//            nonce: a.nonce,
-//            public_key_x: a.public_key_x,
-//            public_key_y: a.public_key_y,
-//        }
-//    }
-//}
-//
 #[derive(Debug, Serialize)]
 struct AccountStateResponce {
     // None if account is not created yet.
@@ -185,7 +162,7 @@ fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResp
 
     let pending_txs = {
         let storage = pool
-            .access_mempool()
+            .access_storage()
             .map_err(|_| HttpResponse::InternalServerError().body(Body::Empty));
         let storage_query_result = storage.and_then(|storage| {
             storage

@@ -8,8 +8,8 @@ use chrono::prelude::*;
 use diesel::dsl::*;
 use models::node::block::{Block, ExecutedTx};
 use models::node::{
-    apply_updates, reverse_updates, Account, AccountId, AccountMap, AccountUpdate, AccountUpdates,
-    BlockNumber, Fr, FranklinOp, Nonce, TokenId,
+    apply_updates, reverse_updates, tx::FranklinTx, Account, AccountId, AccountMap, AccountUpdate,
+    AccountUpdates, BlockNumber, Fr, FranklinOp, Nonce, TokenId,
 };
 use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
@@ -18,7 +18,6 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 
 mod helpers;
-mod mempool;
 mod schema;
 
 use self::helpers::{fr_from_bytes, fr_to_bytes};
@@ -38,7 +37,6 @@ use ff::Field;
 use diesel::sql_types::{Integer, Nullable, Text, Timestamp};
 sql_function!(coalesce, Coalesce, (x: Nullable<Integer>, y: Integer) -> Integer);
 
-pub use mempool::Mempool;
 use models::node::AccountAddress;
 
 #[derive(Clone)]
@@ -63,10 +61,6 @@ impl ConnectionPool {
     pub fn access_storage(&self) -> Result<StorageProcessor, PoolError> {
         let connection = self.pool.get()?;
         Ok(StorageProcessor::from_pool(connection))
-    }
-
-    pub fn access_mempool(&self) -> Result<Mempool, PoolError> {
-        Ok(Mempool::from_db_connect_pool(self.pool.get()?))
     }
 }
 
@@ -384,6 +378,31 @@ pub struct BlockDetails {
     pub verified_at: Option<NaiveDateTime>,
 }
 
+#[derive(Debug, Insertable)]
+#[table_name = "mempool"]
+struct InsertTx {
+    hash: Vec<u8>,
+    primary_account_address: Vec<u8>,
+    nonce: i64,
+    tx: Value,
+}
+
+#[derive(Debug, Queryable)]
+struct ReadTx {
+    hash: Vec<u8>,
+    primary_account_address: Vec<u8>,
+    nonce: i64,
+    tx: Value,
+    created_at: NaiveDateTime,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum TxAddError {
+    TxExist,
+    NonceTooLow,
+    InvalidSignature,
+}
+
 enum ConnectionHolder {
     Pooled(PooledConnection<ConnectionManager<PgConnection>>),
     Direct(PgConnection),
@@ -444,7 +463,7 @@ impl StorageProcessor {
             match &op.action {
                 Action::Commit => {
                     self.commit_state_update(op.block.block_number, &op.accounts_updated)?;
-                    self.save_block_transactions(op)?;
+                    self.save_block_transactions(&op.block)?;
                 }
                 Action::Verify { .. } => self.apply_state_update(op.block.block_number)?,
             };
@@ -471,10 +490,9 @@ impl StorageProcessor {
             .map(|_| ())
     }
 
-    fn save_block_transactions(&self, op: &Operation) -> QueryResult<()> {
-        for block_tx in op.block.block_transactions.iter() {
-            let stored_tx =
-                NewExecutedTransaction::prepare_stored_tx(block_tx, op.block.block_number);
+    pub fn save_block_transactions(&self, block: &Block) -> QueryResult<()> {
+        for block_tx in block.block_transactions.iter() {
+            let stored_tx = NewExecutedTransaction::prepare_stored_tx(block_tx, block.block_number);
             diesel::insert_into(executed_transactions::table)
                 .values(&stored_tx)
                 .execute(self.conn())?;
@@ -1232,11 +1250,91 @@ impl StorageProcessor {
             .map(drop)
     }
 
-    pub fn load_tokens(&self) -> QueryResult<HashMap<TokenId, Token>> {
-        let tokens = tokens::table.load::<Token>(self.conn())?;
-        Ok(tokens
+    pub fn load_tokens(&self) -> QueryResult<Vec<Token>> {
+        let tokens = tokens::table
+            .order(tokens::id.asc())
+            .load::<Token>(self.conn())?;
+        Ok(tokens.into_iter().collect())
+    }
+
+    pub fn mempool_get_size(&self) -> QueryResult<usize> {
+        mempool::table
+            .select(count(mempool::primary_account_address))
+            .execute(self.conn())
+    }
+
+    pub fn mempool_add_tx(&self, tx: &FranklinTx) -> QueryResult<Result<(), TxAddError>> {
+        if !tx.check_signature() {
+            return Ok(Err(TxAddError::InvalidSignature));
+        }
+
+        let this_tx = mempool::table
+            .filter(mempool::hash.eq(tx.hash()))
+            .first::<ReadTx>(self.conn())
+            .optional()?;
+        if this_tx.is_some() {
+            return Ok(Err(TxAddError::TxExist));
+        }
+
+        let (_, _, commited_state) = self.account_state_by_address(&tx.account())?;
+        let lowest_possible_nonce = commited_state.map(|a| a.nonce as u32).unwrap_or_default();
+        if tx.nonce() < lowest_possible_nonce {
+            return Ok(Err(TxAddError::NonceTooLow));
+        }
+
+        // TODO Check tx and add only txs with valid nonce.
+        insert_into(mempool::table)
+            .values(&InsertTx {
+                hash: tx.hash(),
+                primary_account_address: tx.account().data.to_vec(),
+                nonce: i64::from(tx.nonce()),
+                tx: serde_json::to_value(tx).unwrap(),
+            })
+            .execute(self.conn())
+            .map(drop)?;
+
+        Ok(Ok(()))
+    }
+
+    pub fn get_pending_txs(&self, address: &AccountAddress) -> QueryResult<Vec<FranklinTx>> {
+        let (_, _, commited_state) = self.account_state_by_address(address)?;
+        let commited_nonce = commited_state.map(|a| a.nonce as i64).unwrap_or_default();
+
+        let pending_txs: Vec<_> = mempool::table
+            .filter(mempool::primary_account_address.eq(address.data.to_vec()))
+            .filter(mempool::nonce.ge(commited_nonce))
+            .load::<(ReadTx)>(self.conn())?;
+
+        Ok(pending_txs
             .into_iter()
-            .map(|token| (token.id as TokenId, token))
+            .map(|stored_tx| serde_json::from_value(stored_tx.tx).unwrap())
+            .collect())
+    }
+
+    pub fn mempool_get_txs(&self, max_size: usize) -> QueryResult<Vec<FranklinTx>> {
+        //TODO use "gaps and islands" sql solution for this.
+        let stored_txs: Vec<_> = mempool::table
+            .left_join(
+                executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),
+            )
+            .filter(executed_transactions::tx_hash.is_null())
+            .left_join(accounts::table.on(accounts::address.eq(mempool::primary_account_address)))
+            .filter(
+                accounts::nonce
+                    .is_null()
+                    .or(accounts::nonce.ge(mempool::nonce)),
+            )
+            .order(mempool::created_at.asc())
+            .limit(max_size as i64)
+            .load::<(
+                ReadTx,
+                Option<StoredExecutedTransaction>,
+                Option<StorageAccount>,
+            )>(self.conn())?;
+
+        Ok(stored_txs
+            .into_iter()
+            .map(|stored_tx| serde_json::from_value(stored_tx.0.tx).unwrap())
             .collect())
     }
 }

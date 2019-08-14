@@ -155,14 +155,6 @@ impl PlasmaStateKeeper {
                         error!("StateKeeperRequest::GetAccount: channel closed, sending failed");
                     }
                 }
-                StateKeeperRequest::AddTx(tx, sender) => {
-                    let result = self.handle_new_tx(*tx);
-
-                    let r = sender.send(result);
-                    if r.is_err() {
-                        error!("StateKeeperRequest::AddTransferTx: channel closed, sending failed");
-                    }
-                }
                 StateKeeperRequest::TimerTick => {
                     if self.next_block_at_max <= SystemTime::now() {
                         self.create_new_block(&tx_for_commitments);
@@ -170,38 +162,6 @@ impl PlasmaStateKeeper {
                 }
             }
         }
-    }
-
-    fn handle_new_tx(&mut self, tx: FranklinTx) -> Result<(), String> {
-        //        let account = self
-        //            .state
-        //            .get_account(tx.from)
-        //            .ok_or_else(|| "Account not found.".to_string())?;
-
-        // TODO: (Drogan) proper sign verification. ETH sign for deposit?
-        //        let pub_key = account
-        //            .get_pub_key()
-        //            .ok_or_else(|| "Pubkey expired".to_string())?;
-        //        let verified = tx.verify_sig(&pub_key);
-        //        if !verified {
-        //            let (x, y) = pub_key.0.into_xy();
-        //            warn!(
-        //                "Signature is invalid: (x,y,s) = ({:?},{:?},{:?}) for pubkey = {:?}, {:?}",
-        //                &tx.signature.r_x, &tx.signature.r_y, &tx.signature.s, x, y
-        //            );
-        //            return Err("Invalid signature".to_string());
-        //        }
-
-        let mempool = self
-            .db_conn_pool
-            .access_mempool()
-            .map_err(|e| format!("Failed to connect to mempool. {:?}", e))?;
-
-        mempool
-            .add_tx(tx)
-            .map_err(|e| format!("Mempool query error:  {:?}", e))?;
-
-        Ok(())
     }
 
     fn create_new_block(&mut self, tx_for_commitments: &Sender<CommitRequest>) {
@@ -212,22 +172,26 @@ impl PlasmaStateKeeper {
         }
         let commit_request = self.apply_txs(txs);
 
+        if !commit_request.accounts_updated.is_empty() {
+            self.state.block_number += 1; // bump current block number as we've made one
+        }
+
         tx_for_commitments
             .send(commit_request)
             .expect("Commit request send");
-        self.state.block_number += 1; // bump current block number as we've made one
     }
 
     fn prepare_tx_for_block(&self) -> Vec<FranklinTx> {
         // TODO: get proper number of txs from db.
         let txs = self
             .db_conn_pool
-            .access_mempool()
+            .access_storage()
             .map(|m| {
-                m.get_txs(config::RUNTIME_CONFIG.transfer_batch_size)
+                m.mempool_get_txs(config::RUNTIME_CONFIG.transfer_batch_size)
                     .expect("Failed to get tx from db")
             })
             .expect("Failed to get txs from mempool");
+        debug!("Unfiltered txs: {:#?}", txs);
         let filtered_txs = self.filter_invalid_txs(txs);
         debug!("Preparing block with txs: {:#?}", filtered_txs);
         filtered_txs
@@ -247,7 +211,9 @@ impl PlasmaStateKeeper {
                 let mut valid_txs = Vec::new();
                 let mut current_nonce = self.account(&from).nonce;
                 for tx in txs {
-                    if tx.nonce() == current_nonce {
+                    if tx.nonce() < current_nonce {
+                        continue;
+                    } else if tx.nonce() == current_nonce {
                         valid_txs.push(tx);
                         current_nonce += 1;
                     } else {
@@ -311,6 +277,13 @@ impl PlasmaStateKeeper {
 
             if let Err(e) = self.precheck_tx(&tx) {
                 error!("Tx {} is not ready: {}", hex::encode(tx.hash()), e);
+                let exec_result = ExecutedTx {
+                    tx,
+                    success: false,
+                    op: None,
+                    fail_reason: Some(e.to_string()),
+                };
+                ops.push(exec_result);
                 continue;
             }
 

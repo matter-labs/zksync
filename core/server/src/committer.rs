@@ -40,6 +40,17 @@ fn run_committer(
             accounts_updated,
         }) = req
         {
+            if accounts_updated.is_empty() {
+                info!(
+                    "Failed transactions commited block: #{}",
+                    block.block_number
+                );
+                storage
+                    .save_block_transactions(&block)
+                    .expect("commiter failed tx save");
+                continue;
+            }
+
             let op = Operation {
                 action: Action::Commit,
                 block,
