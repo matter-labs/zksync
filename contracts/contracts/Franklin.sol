@@ -76,6 +76,17 @@ contract Franklin is DummyVerifier, VerificationKeys {
 
     // List of root-chain balances (per owner and tokenId)
     mapping(address => mapping(uint32 => Balance)) public balances;
+
+    function getMyBalanceForTokenAndAddress(address owner, uint16 tokenId) public view returns (uint112, uint32) {
+        Balance memory bal = balances[owner][tokenId];
+        return (bal.balance, bal.lockedUntilBlock);
+    }
+
+    function getMyBalanceForToken(uint16 tokenId) public view returns (uint112, uint32) {
+        Balance memory bal = balances[msg.sender][tokenId];
+        return (bal.balance, bal.lockedUntilBlock);
+    }
+
     mapping (address => bool) public depositWasDone;
     mapping(bytes => address) public depositFranklinToETH;
 

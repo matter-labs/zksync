@@ -33,6 +33,10 @@ async function main() {
 
     console.log(await richFranklinWallet.getCommittedOnchainState());
 
+    console.log(await richFranklinWallet.contract.getMyBalanceForToken(1));
+    console.log(await richFranklinWallet.contract.getMyBalanceForTokenAndAddress(richFranklinWallet.ethWallet.address, 1));
+    console.log(richFranklinWallet.ethWallet.address);
+
     // console.log('Before deposit:');
     // console.log('Account 1', await acc1.getState());
     // console.log('Account 2', await acc2.getState());

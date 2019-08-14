@@ -25,6 +25,7 @@ export async function deployFranklin(wallet, genesisRoot = ethers.constants.Hash
 export async function addTestERC20Token(wallet, franklin) {
     try {
         let erc20 = await deployContract(wallet, ERC20MintableContract, []);
+        console.log(`minting for ${wallet.address}`);
         await erc20.mint(wallet.address, bigNumberify("1000000000"));
         console.log("Test ERC20 address:" + erc20.address);
         await (await franklin.addToken(erc20.address)).wait();

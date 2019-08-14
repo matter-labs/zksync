@@ -58,7 +58,7 @@ interface ETHAccountState {
 
 export class Wallet {
     static tokensNames = ['ETH', 'ERC20'];
-    static tokensAddresses = ['eth_address', '0x572b9410D9a14Fa729F3af92cB83A07aaA472dE0'];
+    static tokensAddresses = ['eth_address', '0x06Fc308DB909c1Fe016243b623CFa42c50487e07'];
     address: Address;
     privateKey: BN;
     publicKey: EdwardsPoint;
@@ -81,9 +81,10 @@ export class Wallet {
         let hash = pedersenHash(buff);
         this.address = '0x' + (hash.getX().toString('hex') + hash.getY().toString('hex')).slice(0, 27 * 2);
         this.contract = new ethers.Contract(
-            "5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9", 
+            "0xDE1F1506b9b881DE029D4BD79745DDD4E16caa97", 
             require('../../../contracts/build/Franklin').abi, 
-            ethersWallet.provider);
+            ethersWallet);
+        this.contract.connect(this.ethWallet);
     }
 
     async depositOnchain(token: Token, amount: BigNumber) {
@@ -214,15 +215,27 @@ export class Wallet {
      * list of tokens user has locked/unlocked in our contract
      */
     async getCommittedContractTokensList() {
-        return [0];
+        // TODO:
+        // this can be retrieved from our contract or our server
+        return [0, 1];
     }
 
     async getLockedContractBalanceForToken(token: Token) {
-        return new BN(Math.random() * 1000);
+        let [balance, block] = await this.contract.getMyBalanceForToken(token);
+        let currBlock = await this.ethWallet.provider.getBlockNumber();
+        if (currBlock < block) {
+            return balance;
+        }
+        return new BN(0);
     }
     
     async getUnlockedContractBalanceForToken(token: Token) {
-        return new BN(Math.random() * 1000);
+        let [balance, block] = await this.contract.getMyBalanceForToken(token);
+        let currBlock = await this.ethWallet.provider.getBlockNumber();
+        if (currBlock >= block) {
+            return balance;
+        }
+        return new BN(0);
     }
 
     /**
