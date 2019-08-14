@@ -15,7 +15,7 @@ init:
 	@bin/init
 
 yarn:
-	@cd js/franklin && yarn
+	@cd js/franklin_lib && yarn
 	@cd js/client && yarn
 	@cd js/loadtest && yarn
 	@cd js/explorer && yarn
@@ -59,6 +59,9 @@ db-drop: confirm_action
 
 db-wait:
 	@bin/db-wait
+
+genesis: confirm_action db-reset
+	@bin/genesis.sh
 
 # Frontend clients
 
@@ -176,7 +179,7 @@ deposit: confirm_action
 # Devops: main
 
 # (Re)deploy contracts and database
-redeploy: confirm_action stop deploy-contracts db-reset
+redeploy: confirm_action stop deploy-contracts db-insert-contract
 
 dev-ready = docker ps | grep -q "$(GETH_DOCKER_IMAGE)"
 

@@ -114,7 +114,9 @@ impl PlasmaStateKeeper {
             .expect("db fail");
         storage.apply_state_update(0).expect("db fail");
         let state = PlasmaState::new(accounts, last_committed + 1);
+        let root_hash = state.root_hash();
         info!("Genesis block created, state: {}", state.root_hash());
+        println!("GENESIS_ROOT=0x{}", root_hash.to_hex());
     }
 
     fn run(

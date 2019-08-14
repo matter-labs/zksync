@@ -41,8 +41,12 @@ impl ETHClient {
                 &env::var("OPERATOR_PRIVATE_KEY").expect("OPERATOR_PRIVATE_KEY"),
             )
             .expect("private key must be correct"),
-            contract_addr: H160::from_str(&env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR"))
-                .expect("contract address must be correct"),
+            contract_addr: H160::from_str(
+                &env::var("CONTRACT_ADDR")
+                    .map(|s| s[2..].to_string())
+                    .expect("CONTRACT_ADDR"),
+            )
+            .expect("contract address must be correct"),
             sender_account: env::var("OPERATOR_ETH_ADDRESS")
                 .map(|s| s[2..].to_string())
                 .expect("OPERATOR_ETH_ADDRESS"),
