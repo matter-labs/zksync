@@ -27,7 +27,11 @@ async function main() {
 
     console.log('getstate:', await richFranklinWallet.getState());
 
-    console.log('getverifiedstate:', await richFranklinWallet.getVerifiedOnchainState());
+    console.log('getverifiedstate:', await richFranklinWallet.getVerifiedFranklinState());
+
+    console.log(richFranklinWallet.contract);
+
+    console.log(await richFranklinWallet.getCommittedOnchainState());
 
     // console.log('Before deposit:');
     // console.log('Account 1', await acc1.getState());

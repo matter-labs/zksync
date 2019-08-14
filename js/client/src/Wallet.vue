@@ -418,7 +418,7 @@ export default {
         store: () => store,
         contractAddress: () => window.contractAddress,
         depositProblem() {
-            if(store.account.plasma.closing) return "pending closing account, please complete exit first"
+            // if(store.account.plasma.closing) return "pending closing account, please complete exit first"
             // if ( ! this.franklinCoins.some(ethereumBalanceForToken)) return "empty balance in the mainchain account"
             // if(!(Number(store.account.balance) > 0)) return "empty balance in the mainchain account"
         },

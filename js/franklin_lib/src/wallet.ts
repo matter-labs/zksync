@@ -57,12 +57,13 @@ interface ETHAccountState {
 }
 
 export class Wallet {
-    static tokensNames = ['ETH'];
-
+    static tokensNames = ['ETH', 'ERC20'];
+    static tokensAddresses = ['eth_address', '0x572b9410D9a14Fa729F3af92cB83A07aaA472dE0'];
     address: Address;
     privateKey: BN;
     publicKey: EdwardsPoint;
-    ethWallet: ethers.Wallet
+    ethWallet: ethers.Wallet;
+    contract: ethers.Contract;
 
     supportedTokens: Token[];
     franklinState: FranklinAccountState;
@@ -79,6 +80,10 @@ export class Wallet {
         let buff = Buffer.from(x.toString('hex') + y.toString('hex'), 'hex');
         let hash = pedersenHash(buff);
         this.address = '0x' + (hash.getX().toString('hex') + hash.getY().toString('hex')).slice(0, 27 * 2);
+        this.contract = new ethers.Contract(
+            "5E6D086F5eC079ADFF4FB3774CDf3e8D6a34F7E9", 
+            require('../../../contracts/build/Franklin').abi, 
+            ethersWallet.provider);
     }
 
     async depositOnchain(token: Token, amount: BigNumber) {
@@ -142,25 +147,19 @@ export class Wallet {
     }
 
     async getState() {
-        let res = await this.provider.getState(this.address);
-        let balances = {};
+        return await this.provider.getState(this.address);
+    }
 
-        ['pending', 'committed', 'verified'].forEach(state => {
-            let tmp = {};
-            tmp['nonce'] = res.nonce;
-            tmp['balances'] = [];
-            for (let t = 0; t < res.balances.length; ++t) {
-                tmp['balances'].push({
-                    token: Wallet.tokensNames[t],
-                    balance: res.balances[t]
-                });
-            }
-            res[state] = tmp;
-        })
-
-        delete res.balances;
-
-        return res;
+    private state_ = null;
+    private state_timestamp_ = null;
+    private async state() {
+        const update_interval = 1000;
+        let curr_time = Date.now();
+        if (this.state_timestamp_ === null || curr_time - this.state_timestamp_ > update_interval) {
+            this.state_ = await this.getState();
+            this.state_timestamp_ = curr_time;
+        }
+        return this.state_;
     }
 
     /**
@@ -172,14 +171,20 @@ export class Wallet {
             return await this.ethWallet.getBalance();
         }
 
-        return new BN(Math.random() * 1000);
+        let address = Wallet.tokensAddresses[token];
+        let erc20abi = require('./erc20.abi');
+        let contract = new ethers.Contract(address, erc20abi, this.ethWallet);
+        return await contract.balanceOf(this.ethWallet.address);
     }
 
     /**
      * returns a list of tokenIds that user has in his mainchain account
      */
     async getOnchainTokensList() {
-        return [0];
+        // user should add tokens by hand to view their balance
+        // just like in metamask. We have to store it somewhere, idk.
+        // for now, hardcode.
+        return [0, 1];
     }
 
     /**
