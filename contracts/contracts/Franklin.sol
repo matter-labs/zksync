@@ -2,11 +2,10 @@ pragma solidity ^0.5.1;
 
 import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
-// Warning! Verifier does not work.
-import "./common/Verifier.sol";
-import "./common/VerificationKeys.sol";
+import "./Verifier.sol";
+import "./VerificationKey.sol";
 
-contract Franklin is Verifier, VerificationKeys {
+contract Franklin is Verifier, VerificationKey {
     // chunks per block; each chunk has 8 bytes of public data
     uint256 constant BLOCK_SIZE = 10;
     // must fit into uint112
