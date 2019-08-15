@@ -6,12 +6,13 @@ ALTER TABLE accounts
 CREATE TABLE tokens
 (
     id      integer not null primary key,
-    address text    not null
+    address text    not null,
+    symbol  text
 );
 
 -- Add ETH token
 INSERT INTO tokens
-values (0, '');
+values (0, '', 'ETH');
 
 CREATE TABLE balances
 (

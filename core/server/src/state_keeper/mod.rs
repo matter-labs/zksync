@@ -2,6 +2,7 @@ use pairing::bn256::Bn256;
 // use franklin_crypto::jubjub::{FixedGenerators};
 // use franklin_crypto::alt_babyjubjub::{AltJubjubBn256};
 
+use failure::{bail, ensure};
 use franklin_crypto::eddsa::PrivateKey;
 use models::node::block::{Block, ExecutedTx};
 use models::node::tx::FranklinTx;
@@ -50,32 +51,19 @@ impl PlasmaStateKeeper {
     pub fn new(pool: ConnectionPool, eth_state: Arc<RwLock<ETHState>>) -> Self {
         info!("constructing state keeper instance");
 
-        // here we should insert default accounts into the tree
         let storage = pool
             .access_storage()
             .expect("db connection failed for statekeeper");
 
-        let fee_account_address =
-            AccountAddress::from_hex("0x123456789123456789123456789123456789123456789123456789")
-                .unwrap();
-
         let (last_committed, mut accounts) = storage.load_committed_state(None).expect("db failed");
-        // TODO: move genesis block creation to separate routine.
-        if last_committed == 0 && accounts.is_empty() {
-            let mut fee_account = Account::default();
-            fee_account.address = fee_account_address.clone();
-            info!("Genesis block created, state: {:#?}", accounts);
-            let db_account_update = AccountUpdate::Create {
-                address: fee_account_address.clone(),
-                nonce: fee_account.nonce,
-            };
-            accounts.insert(0, fee_account);
-            storage.commit_state_update(0, &[(0, db_account_update)]);
-            storage.apply_state_update(0);
-        }
         let last_verified = storage.get_last_verified_block().expect("db failed");
         let state = PlasmaState::new(accounts, last_committed + 1);
-        //let outstanding_txs = storage.count_outstanding_proofs(last_verified).expect("db failed");
+
+        let fee_account_address = std::env::var("OPERATOR_FRANKLIN_ADDRESS")
+            .map(|addr| {
+                AccountAddress::from_hex(&addr).expect("Incorrect franklin account address")
+            })
+            .expect("OPERATOR_FRANKLIN_ADDRESS must be set");
 
         info!(
             "last_committed = {}, last_verified = {}",
@@ -96,6 +84,39 @@ impl PlasmaStateKeeper {
         info!("created state keeper, root hash = {}", root);
 
         keeper
+    }
+
+    pub fn create_genesis_block(pool: ConnectionPool) {
+        let storage = pool
+            .access_storage()
+            .expect("db connection failed for statekeeper");
+        let fee_account_address = std::env::var("OPERATOR_FRANKLIN_ADDRESS")
+            .map(|addr| {
+                AccountAddress::from_hex(&addr).expect("Incorrect franklin account address")
+            })
+            .expect("OPERATOR_FRANKLIN_ADDRESS must be set");
+
+        let (last_committed, mut accounts) = storage.load_committed_state(None).expect("db failed");
+        // TODO: move genesis block creation to separate routine.
+        assert!(
+            last_committed == 0 && accounts.is_empty(),
+            "db should be empty"
+        );
+        let mut fee_account = Account::default();
+        fee_account.address = fee_account_address.clone();
+        let db_account_update = AccountUpdate::Create {
+            address: fee_account_address.clone(),
+            nonce: fee_account.nonce,
+        };
+        accounts.insert(0, fee_account);
+        storage
+            .commit_state_update(0, &[(0, db_account_update)])
+            .expect("db fail");
+        storage.apply_state_update(0).expect("db fail");
+        let state = PlasmaState::new(accounts, last_committed + 1);
+        let root_hash = state.root_hash();
+        info!("Genesis block created, state: {}", state.root_hash());
+        println!("GENESIS_ROOT=0x{}", root_hash.to_hex());
     }
 
     fn run(
@@ -134,14 +155,6 @@ impl PlasmaStateKeeper {
                         error!("StateKeeperRequest::GetAccount: channel closed, sending failed");
                     }
                 }
-                StateKeeperRequest::AddTx(tx, sender) => {
-                    let result = self.handle_new_tx(*tx);
-
-                    let r = sender.send(result);
-                    if r.is_err() {
-                        error!("StateKeeperRequest::AddTransferTx: channel closed, sending failed");
-                    }
-                }
                 StateKeeperRequest::TimerTick => {
                     if self.next_block_at_max <= SystemTime::now() {
                         self.create_new_block(&tx_for_commitments);
@@ -151,66 +164,34 @@ impl PlasmaStateKeeper {
         }
     }
 
-    fn handle_new_tx(&mut self, tx: FranklinTx) -> Result<(), String> {
-        //        let account = self
-        //            .state
-        //            .get_account(tx.from)
-        //            .ok_or_else(|| "Account not found.".to_string())?;
-
-        // TODO: (Drogan) proper sign verification. ETH sign for deposit?
-        //        let pub_key = account
-        //            .get_pub_key()
-        //            .ok_or_else(|| "Pubkey expired".to_string())?;
-        //        let verified = tx.verify_sig(&pub_key);
-        //        if !verified {
-        //            let (x, y) = pub_key.0.into_xy();
-        //            warn!(
-        //                "Signature is invalid: (x,y,s) = ({:?},{:?},{:?}) for pubkey = {:?}, {:?}",
-        //                &tx.signature.r_x, &tx.signature.r_y, &tx.signature.s, x, y
-        //            );
-        //            return Err("Invalid signature".to_string());
-        //        }
-
-        let mempool = self
-            .db_conn_pool
-            .access_mempool()
-            .map_err(|e| format!("Failed to connect to mempool. {:?}", e))?;
-
-        mempool
-            .add_tx(tx)
-            .map_err(|e| format!("Mempool query error:  {:?}", e))?;
-
-        Ok(())
-    }
-
     fn create_new_block(&mut self, tx_for_commitments: &Sender<CommitRequest>) {
         self.next_block_at_max = SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL);
-
         let txs = self.prepare_tx_for_block();
-
         if txs.is_empty() {
             return;
         }
-
         let commit_request = self.apply_txs(txs);
+
+        if !commit_request.accounts_updated.is_empty() {
+            self.state.block_number += 1; // bump current block number as we've made one
+        }
 
         tx_for_commitments
             .send(commit_request)
             .expect("Commit request send");
-
-        self.state.block_number += 1; // bump current block number as we've made one
     }
 
     fn prepare_tx_for_block(&self) -> Vec<FranklinTx> {
         // TODO: get proper number of txs from db.
         let txs = self
             .db_conn_pool
-            .access_mempool()
+            .access_storage()
             .map(|m| {
-                m.get_txs(config::RUNTIME_CONFIG.transfer_batch_size)
+                m.mempool_get_txs(config::RUNTIME_CONFIG.transfer_batch_size)
                     .expect("Failed to get tx from db")
             })
             .expect("Failed to get txs from mempool");
+        debug!("Unfiltered txs: {:#?}", txs);
         let filtered_txs = self.filter_invalid_txs(txs);
         debug!("Preparing block with txs: {:#?}", filtered_txs);
         filtered_txs
@@ -230,7 +211,9 @@ impl PlasmaStateKeeper {
                 let mut valid_txs = Vec::new();
                 let mut current_nonce = self.account(&from).nonce;
                 for tx in txs {
-                    if tx.nonce() == current_nonce {
+                    if tx.nonce() < current_nonce {
+                        continue;
+                    } else if tx.nonce() == current_nonce {
                         valid_txs.push(tx);
                         current_nonce += 1;
                     } else {
@@ -258,9 +241,25 @@ impl PlasmaStateKeeper {
     }
 
     fn precheck_tx(&self, tx: &FranklinTx) -> Result<(), failure::Error> {
-        warn!("ETH state is not checked when applying tx");
+        if let FranklinTx::Deposit(deposit) = tx {
+            let eth_state = self.eth_state.read().expect("eth state rlock");
+            if let Some(locked_balance) = eth_state
+                .locked_balances
+                .get(&(deposit.to.clone(), deposit.token))
+            {
+                ensure!(
+                    locked_balance.amount > deposit.amount,
+                    "Locked amount insufficient"
+                );
+                ensure!(
+                    locked_balance.blocks_left_until_unlock > 10,
+                    "Locked balance will unlock soon"
+                );
+            } else {
+                bail!("Onchain balance is not locked");
+            }
+        }
         Ok(())
-        //        unimplemented!("Check ETH state before applying transaction");
     }
 
     fn apply_txs(&mut self, transactions: Vec<FranklinTx>) -> CommitRequest {
@@ -277,7 +276,14 @@ impl PlasmaStateKeeper {
             }
 
             if let Err(e) = self.precheck_tx(&tx) {
-                error!("Tx {:?} not ready: {:?}", tx, e);
+                error!("Tx {} is not ready: {}", hex::encode(tx.hash()), e);
+                let exec_result = ExecutedTx {
+                    tx,
+                    success: false,
+                    op: None,
+                    fail_reason: Some(e.to_string()),
+                };
+                ops.push(exec_result);
                 continue;
             }
 

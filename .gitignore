@@ -25,6 +25,7 @@ Cargo.lock
 !/etc/env/dev.env.example
 /contracts/yarn-error.log
 /deploy.log
+/genesis.log
 /keys
 /tmp
 /volumes

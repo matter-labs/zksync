@@ -1,6 +1,7 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
 use ff::ScalarEngine;
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
+use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::jubjub::{edwards, JubjubEngine, Unknown};
 use pairing::bn256::Bn256;
 use pairing::{CurveAffine, Engine};
@@ -233,6 +234,13 @@ pub fn pack_bits_into_bytes(bits: Vec<bool>) -> Vec<u8> {
     }
 
     message_bytes
+}
+
+pub fn pack_as_float(number: &BigDecimal, exponent_len: usize, mantissa_len: usize) -> Vec<u8> {
+    let uint = number.to_u128().expect("should be in u128");
+
+    let vec = convert_to_float(uint, exponent_len, mantissa_len, 10).expect("packing error");
+    pack_bits_into_bytes(vec)
 }
 
 #[test]

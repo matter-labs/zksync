@@ -17,8 +17,27 @@ use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
 use models::{node::config, StateKeeperRequest};
 use storage::ConnectionPool;
 
+use clap::{App, Arg, SubCommand};
+
 fn main() {
     env_logger::init();
+
+    let cmd_line = App::new("Franklin operator node")
+        .author("Matter labs")
+        .arg(
+            Arg::with_name("genesis")
+                .long("genesis")
+                .help("Generate genesis block for the first contract deployment"),
+        )
+        .get_matches();
+
+    let connection_pool = ConnectionPool::new();
+
+    if cmd_line.is_present("genesis") {
+        info!("Generating genesis block.");
+        PlasmaStateKeeper::create_genesis_block(connection_pool.clone());
+        return;
+    }
 
     debug!("starting server");
 
@@ -34,7 +53,6 @@ fn main() {
     // create main tokio runtime
     //let rt = Runtime::new().unwrap();
 
-    let connection_pool = ConnectionPool::new();
     let eth_watch = EthWatch::new();
     let state_keeper =
         PlasmaStateKeeper::new(connection_pool.clone(), eth_watch.get_shared_eth_state());
@@ -66,7 +84,7 @@ fn main() {
     start_eth_watch(eth_watch);
     let (tx_for_ops, rx_for_ops) = channel();
     start_state_keeper(state_keeper, rx_for_state, tx_for_ops.clone());
-    let tx_for_eth = std::sync::mpsc::channel().0; //eth_sender::start_eth_sender(connection_pool.clone());
+    let tx_for_eth = eth_sender::start_eth_sender(connection_pool.clone());
     start_committer(rx_for_ops, tx_for_eth, connection_pool.clone());
 
     // start_prover(connection_pool.clone(), "worker 1");

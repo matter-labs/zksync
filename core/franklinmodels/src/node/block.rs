@@ -1,6 +1,7 @@
 use super::operations::FranklinOp;
 use super::tx::FranklinTx;
 use super::{AccountId, BlockNumber, Fr};
+use crate::params::BLOCK_SIZE_CHUNKS;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecutedTx {
@@ -20,7 +21,18 @@ pub struct Block {
 
 impl Block {
     pub fn get_eth_public_data(&self) -> Vec<u8> {
-        // TODO unimplemented
-        Vec::new()
+        let mut executed_tx_pub_data = self
+            .block_transactions
+            .iter()
+            .filter_map(|tx| tx.op.clone().map(|op| op.public_data()))
+            .fold(Vec::new(), |mut acc, pub_data| {
+                acc.extend(pub_data.into_iter());
+                acc
+            });
+
+        // Pad block with noops.
+        executed_tx_pub_data.resize(BLOCK_SIZE_CHUNKS * 8, 0x00);
+
+        executed_tx_pub_data
     }
 }

@@ -82,7 +82,6 @@ pub struct Operation {
 }
 
 pub enum StateKeeperRequest {
-    AddTx(Box<FranklinTx>, oneshot::Sender<Result<(), String>>),
     GetAccount(AccountAddress, Sender<Option<Account>>),
     GetNetworkStatus(Sender<NetworkStatus>),
     TimerTick,

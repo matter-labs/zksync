@@ -1,10 +1,11 @@
-use super::{AccountId, BlockNumber, FeeAmount, Nonce, TokenAmount, TokenId};
+use super::{AccountId, BlockNumber, Nonce, TokenId};
 use super::{Engine, Fr};
 //use crate::plasma::circuit::sig::TransactionSignature;
 //use crate::plasma::circuit::transfer::Tx;
 //use crate::plasma::circuit::utils::{
 //    encode_fr_into_fs, encode_fs_into_fr, le_bit_vector_into_field_element,
 //};
+use crate::node::{pack_fee_amount, pack_token_amount};
 use crate::primitives::{get_bits_le_fixed_u128, pack_bits_into_bytes};
 use bigdecimal::{BigDecimal, ToPrimitive};
 use crypto::{digest::Digest, sha2::Sha256};
@@ -37,8 +38,8 @@ impl Transfer {
         out.extend_from_slice(&self.from.data);
         out.extend_from_slice(&self.to.data);
         out.extend_from_slice(&self.token.to_be_bytes());
-        //        out.extend_from_slice(&self.amount.to_be_bytes()[1..]);
-        //        out.extend_from_slice(&self.fee.to_be_bytes());
+        out.extend_from_slice(&pack_token_amount(&self.amount));
+        out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }
@@ -60,8 +61,8 @@ impl Deposit {
         let mut out = Vec::new();
         out.extend_from_slice(&self.to.data);
         out.extend_from_slice(&self.token.to_be_bytes());
-        //        out.extend_from_slice(&self.amount.to_be_bytes()[1..]);
-        //        out.extend_from_slice(&self.fee.to_be_bytes());
+        out.extend_from_slice(&pack_token_amount(&self.amount));
+        out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }
@@ -86,8 +87,8 @@ impl Withdraw {
         out.extend_from_slice(&self.account.data);
         out.extend_from_slice(&self.eth_address);
         out.extend_from_slice(&self.token.to_be_bytes());
-        //        out.extend_from_slice(&self.amount.to_be_bytes()[1..]);
-        //        out.extend_from_slice(&self.fee.to_be_bytes());
+        out.extend_from_slice(&pack_token_amount(&self.amount));
+        out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }
@@ -156,6 +157,10 @@ impl FranklinTx {
     pub fn min_number_of_chunks(&self) -> usize {
         // TODO use spec
         1
+    }
+
+    pub fn check_signature(&self) -> bool {
+        true
     }
 }
 
