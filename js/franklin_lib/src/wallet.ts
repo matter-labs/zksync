@@ -48,7 +48,7 @@ interface FranklinAccountState {
     id?: number,
     commited: FranklinAccountState,
     verified: FranklinAccountState,
-    pendingTxs: any[],
+    pending_txs: any[],
 }
 interface ETHAccountState {
     onchainBalances: BigNumberish[],
@@ -108,6 +108,36 @@ export class Wallet {
         return await this.provider.submitTx(tx);
     }
 
+
+    async widthdrawOnchain(token: Token, amount: BigNumber) {
+        const franklinDeployedContract = new Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, this.ethWallet);
+        const franklinAddressBinary = Buffer.from(this.address.substr(2), "hex");
+        if (token.id == 0) {
+            const tx = await franklinDeployedContract.withdrawETH(amount);
+            await tx.wait(2);
+            return tx.hash;
+        } else {
+            const tx = await franklinDeployedContract.withdrawERC20(token.address, amount, {gasLimit: bigNumberify("150000")});
+            await tx.wait(2);
+            return tx.hash;
+        }
+    }
+
+    async widthdrawOffchain(token: Token, amount: BN, fee: BN) {
+        let nonce = await this.getNonce();
+        let tx = {
+            type: 'Withdraw',
+            account: this.address,
+            eth_address: await this.ethWallet.getAddress(),
+            token: token.id,
+            amount: amount.toString(10),
+            fee: fee.toString(10),
+            nonce: nonce,
+        };
+
+        return await this.provider.submitTx(tx);
+    }
+
     async transfer(address: Address, token: Token, amount: BN, fee: BN) {
         let nonce = await this.getNonce();
         // use packed numbers for signture
@@ -115,7 +145,7 @@ export class Wallet {
             type: 'Transfer',
             from: this.address,
             to: address,
-            token: token,
+            token: token.id,
             amount: amount.toString(10),
             fee: fee.toString(10),
             nonce: nonce,
@@ -125,7 +155,8 @@ export class Wallet {
     }
 
     async getNonce(): Promise<number> {
-        return (await this.provider.getState(this.address)).commited.nonce
+        await this.getState();
+        return this.franklinState.commited.nonce
     }
 
     static async fromEthWallet(wallet: ethers.Signer) {
@@ -137,20 +168,35 @@ export class Wallet {
 
     async getState() {
         this.supportedTokens = await this.provider.getTokens();
-        return await this.provider.getState(this.address);
+        this.franklinState = await this.provider.getState(this.address);
     }
 }
 
 async function run() {
-    const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-    let ethWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
-    let wallet = await Wallet.fromEthWallet(ethWallet);
-    console.log((await wallet.getState()));
-
-    console.log(await wallet.depositOnchain(wallet.supportedTokens['1'], bigNumberify(1)));
-    console.log(await wallet.depositOffchain(wallet.supportedTokens['1'], new BN(1), new BN(0)));
-
-    console.log((await wallet.getState()));
+    // const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
+    // let ethWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+    // let wallet = await Wallet.fromEthWallet(ethWallet);
+    //
+    // await wallet.getState();
+    // console.log(await wallet.depositOnchain(wallet.supportedTokens['1'], bigNumberify(2)));
+    // console.log(await wallet.depositOffchain(wallet.supportedTokens['1'], new BN(2), new BN(0)));
+    //
+    // await wallet.getState();
+    // while (wallet.franklinState.pending_txs.length != 0) {
+    //     await wallet.getState();
+    // }
+    //
+    // let ethWallet2 = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
+    // let wallet2 = await Wallet.fromEthWallet(ethWallet2);
+    // await wallet2.getState();
+    //
+    //
+    // console.log(await wallet.transfer(wallet2.address, wallet.supportedTokens['1'], new BN(2), new BN(0)));
+    // console.log(await wallet2.widthdrawOffchain(wallet2.supportedTokens['1'], new BN(2), new BN(1)));
+    //
+    // await wallet.getState();
+    // await wallet2.getState();
+    // console.log(wallet2.franklinState);
 }
 
 run();
