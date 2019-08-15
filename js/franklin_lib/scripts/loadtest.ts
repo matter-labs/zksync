@@ -15,9 +15,9 @@ async function main() {
     let wallet = await Wallet.fromEthWallet(ethWallet);
 
     await wallet.getState();
-    console.log(await wallet.depositOnchain(wallet.supportedTokens['0'], bigNumberify(10)));
-    sleep(5000);
-    console.log(await wallet.depositOffchain(wallet.supportedTokens['0'], new BN(9), new BN(0)));
+    console.log(await wallet.depositOnchain(wallet.supportedTokens['0'], bigNumberify(20)));
+    await sleep(20000);
+    console.log(await wallet.depositOffchain(wallet.supportedTokens['0'], new BN(18), new BN(2)));
     //
     // sleep(10000);
     //

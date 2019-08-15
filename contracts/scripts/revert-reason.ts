@@ -1,5 +1,8 @@
-import {ethers} from "ethers";
+import {Contract, ethers} from "ethers";
+// import {franklinContractCode} from "../src.ts/deploy";
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
+// const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+// const franklinDeployedContract = new Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, wallet);
 
 function hex_to_ascii(str1) {
 	const hex  = str1.toString();
@@ -20,10 +23,14 @@ async function reason() {
     if (!tx) {
         console.log("tx not found");
     } else {
-        // console.log('tx:', tx)
+        console.log('tx:', tx);
+
 
         const receipt = await provider.getTransactionReceipt(hash);
         console.log("receipt:", receipt);
+
+        // console.log(franklinDeployedContract.interface.parseLog(receipt.logs[0]));
+        // console.log(franklinDeployedContract.interface.parseLog(receipt.logs[1]));
 
         if (receipt.gasUsed) {
             console.log("Gas used: ", receipt.gasUsed.toString());
