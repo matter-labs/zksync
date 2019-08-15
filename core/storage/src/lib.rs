@@ -398,7 +398,6 @@ struct ReadTx {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum TxAddError {
-    TxExist,
     NonceTooLow,
     InvalidSignature,
 }
@@ -1268,18 +1267,23 @@ impl StorageProcessor {
             return Ok(Err(TxAddError::InvalidSignature));
         }
 
-        let this_tx = mempool::table
-            .filter(mempool::hash.eq(tx.hash()))
-            .first::<ReadTx>(self.conn())
-            .optional()?;
-        if this_tx.is_some() {
-            return Ok(Err(TxAddError::TxExist));
-        }
-
         let (_, _, commited_state) = self.account_state_by_address(&tx.account())?;
         let lowest_possible_nonce = commited_state.map(|a| a.nonce as u32).unwrap_or_default();
         if tx.nonce() < lowest_possible_nonce {
             return Ok(Err(TxAddError::NonceTooLow));
+        }
+
+        let tx_failed = executed_transactions::table
+            .filter(executed_transactions::tx_hash.eq(tx.hash()))
+            .filter(executed_transactions::success.eq(false))
+            .first::<StoredExecutedTransaction>(self.conn())
+            .optional()?;
+        // Remove from db
+        if let Some(tx_failed) = tx_failed {
+            diesel::delete(
+                executed_transactions::table.filter(executed_transactions::id.eq(tx_failed.id)),
+            )
+            .execute(self.conn())?;
         }
 
         // TODO Check tx and add only txs with valid nonce.
