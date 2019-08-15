@@ -18,7 +18,7 @@ pub const SUBTREE_HASH_WIDTH: &'static usize = &254; //seems to be equal to Bn25
 /// balance bit width
 pub const BALANCE_BIT_WIDTH: usize = 128;
 
-pub const NEW_PUBKEY_HASH_WIDTH: usize = 216;
+pub const NEW_PUBKEY_HASH_WIDTH: usize = FR_ADDRESS_LEN * 8;
 /// Nonce bit width
 pub const NONCE_BIT_WIDTH: usize = 32;
 //
@@ -48,11 +48,11 @@ pub const FR_BIT_WIDTH: usize = 254;
 pub const FR_BIT_WIDTH_PADDED: usize = 256;
 
 /// Number of supported tokens.
-pub const TOTAL_TOKENS: usize = 2;
+pub const TOTAL_TOKENS: usize = 1 << *BALANCE_TREE_DEPTH;
 pub const ETH_TOKEN_ID: TokenId = 0;
 
-pub const BLOCK_SIZE_CHUNKS: usize = 2000;
+pub const BLOCK_SIZE_CHUNKS: usize = 10;
 
 /// Lock onchain deposits for this number of eth blocks.
-pub const LOCK_DEPOSITS_FOR: u64 = 8 * 60;
+pub const LOCK_DEPOSITS_FOR: u64 = 8 * 60 * 100;
 pub const FR_ADDRESS_LEN: usize = 27;
