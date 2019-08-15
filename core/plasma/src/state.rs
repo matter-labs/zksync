@@ -7,8 +7,7 @@ use models::node::operations::{
 use models::node::tx::{Close, Deposit, FranklinTx, Transfer, Withdraw};
 use models::node::{Account, AccountAddress, AccountTree};
 use models::node::{
-    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, FeeAmount, Fr, TokenAmount,
-    TokenId,
+    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr, TokenId,
 };
 use models::params;
 use std::collections::HashMap;
@@ -168,10 +167,10 @@ impl PlasmaState {
             if let Some((id, account)) = self.get_account_by_address(fee_account) {
                 (id, account)
             } else {
-                let id = self.get_free_account_id();
-                let (account, upd) = Account::create_account(id, fee_account.clone());
-                updates.extend(upd.into_iter());
-                (id, account)
+                panic!(
+                    "Fee account should be present in the account tree: {}",
+                    fee_account.to_hex()
+                );
             };
 
         for fee in fees {

@@ -1,4 +1,5 @@
 use super::merkle_tree::{PedersenHasher, SparseMerkleTree};
+use super::primitives::pack_as_float;
 use bigdecimal::BigDecimal;
 use franklin_crypto::eddsa;
 use pairing::bn256;
@@ -43,6 +44,11 @@ pub type TokenId = u16;
 pub type AccountId = u32;
 pub type BlockNumber = u32;
 pub type Nonce = u32;
-/// 3 bytes used.
-pub type TokenAmount = u32;
-pub type FeeAmount = u8;
+
+pub fn pack_token_amount(amount: &BigDecimal) -> Vec<u8> {
+    pack_as_float(amount, 5, 19)
+}
+
+pub fn pack_fee_amount(amount: &BigDecimal) -> Vec<u8> {
+    pack_as_float(amount, 4, 4)
+}

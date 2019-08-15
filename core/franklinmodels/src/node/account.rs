@@ -10,13 +10,19 @@ use franklin_crypto::alt_babyjubjub::JubjubEngine;
 use franklin_crypto::jubjub::{edwards, Unknown};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{AccountId, AccountUpdates, Nonce, TokenAmount, TokenId};
+use super::{AccountId, AccountUpdates, Nonce, TokenId};
 use super::{Engine, Fr};
 use crate::circuit::account::{Balance, CircuitAccount};
 
-#[derive(Debug, Clone, PartialEq, Default, Eq, Hash)]
+#[derive(Clone, PartialEq, Default, Eq, Hash)]
 pub struct AccountAddress {
     pub data: [u8; 27],
+}
+
+impl std::fmt::Debug for AccountAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
 }
 
 impl AccountAddress {
@@ -30,6 +36,13 @@ impl AccountAddress {
         ensure!(bytes.len() == 27, "Size mismatch");
         Ok(AccountAddress {
             data: bytes.as_slice().try_into().unwrap(),
+        })
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, failure::Error> {
+        ensure!(bytes.len() == 27, "Size mismatch");
+        Ok(AccountAddress {
+            data: bytes.try_into().unwrap(),
         })
     }
 }

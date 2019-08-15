@@ -14,26 +14,15 @@ cd contracts
 yarn deploy  | tee ../deploy.log
 cd ..
 
-export LABEL=$FRANKLIN_ENV-`date +%Y-%m-%d-%H%M%S`
-
-export NEW_CONTRACT=`cat deploy.log | grep "Franklin address" | grep -oE '0x(.+)' | sed -n "s/0x//p"`
-
-
-if [[ ! -z "$NEW_CONTRACT" ]]
+CONTRACT_ADDR_NEW_VALUE=`grep "CONTRACT_ADDR" deploy.log`
+if [[ ! -z "$CONTRACT_ADDR_NEW_VALUE" ]]
 then
-    echo New contract at $NEW_CONTRACT
-
-    OLD_CONTRACT=`grep "^CONTRACT_ADDR" ./$ENV_FILE | grep -oE '=(.+)' | sed -n "s/=//p"`
-    echo Old contract at $OLD_CONTRACT
-
+    export LABEL=$FRANKLIN_ENV-Contract_deploy-`date +%Y-%m-%d-%H%M%S`
     mkdir -p logs/$LABEL/
-    cp deploy.log logs/$LABEL/deploy.log
     cp ./$ENV_FILE logs/$LABEL/$FRANKLIN_ENV.bak
-
-    sed -i".bak" "s/^CONTRACT_ADDR=$OLD_CONTRACT/CONTRACT_ADDR=$NEW_CONTRACT/g" ./$ENV_FILE
-
-    echo successfully deployed contracts
-
+    cp deploy.log logs/$LABEL/
+    echo $CONTRACT_ADDR_NEW_VALUE
+    python3 bin/replace-env-variable.py ./$ENV_FILE $CONTRACT_ADDR_NEW_VALUE
 else
     echo "Contract deployment failed"
     exit 1

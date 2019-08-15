@@ -40,6 +40,17 @@ fn run_committer(
             accounts_updated,
         }) = req
         {
+            if accounts_updated.is_empty() {
+                info!(
+                    "Failed transactions commited block: #{}",
+                    block.block_number
+                );
+                storage
+                    .save_block_transactions(&block)
+                    .expect("commiter failed tx save");
+                continue;
+            }
+
             let op = Operation {
                 action: Action::Commit,
                 block,
@@ -52,10 +63,9 @@ fn run_committer(
                 .execute_operation(&op)
                 .expect("committer must commit the op into db");
 
-            //tx_for_proof_requests.send(ProverRequest(op.block.block_number)).expect("must send a proof request");
-            //            tx_for_eth
-            //                .send(op)
-            //                .expect("must send an operation for commitment to ethereum");
+            tx_for_eth
+                .send(op)
+                .expect("must send an operation for commitment to ethereum");
             continue;
         } else {
             // there was a timeout, so check for the new ready proofs
@@ -63,6 +73,7 @@ fn run_committer(
                 let block_number = last_verified_block + 1;
                 let proof = storage.load_proof(block_number);
                 if let Ok(proof) = proof {
+                    info!("New proof for block: {}", block_number);
                     let block = storage
                         .load_committed_block(block_number)
                         .unwrap_or_else(|| panic!("failed to load block #{}", block_number));
@@ -78,9 +89,9 @@ fn run_committer(
                     let op = storage
                         .execute_operation(&op)
                         .expect("committer must commit the op into db");
-                    //                    tx_for_eth
-                    //                        .send(op)
-                    //                        .expect("must send an operation for commitment to ethereum");
+                    tx_for_eth
+                        .send(op)
+                        .expect("must send an operation for commitment to ethereum");
                     last_verified_block += 1;
                 } else {
                     break;
