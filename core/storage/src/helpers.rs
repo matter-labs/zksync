@@ -9,7 +9,6 @@ pub fn fr_to_bytes(fr: &Fr) -> Vec<u8> {
 }
 
 /// Deserialize `Fr` from trusted source.
-/// TODO: move to models
 pub fn fr_from_bytes(bytes: Vec<u8>) -> Fr {
     use ff::{PrimeField, PrimeFieldRepr};
     let mut fr_repr = <Fr as PrimeField>::Repr::default();
