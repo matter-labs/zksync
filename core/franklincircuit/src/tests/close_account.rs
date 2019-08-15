@@ -4,7 +4,8 @@ use crate::operation::*;
 use crate::utils::*;
 
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
-
+use franklinmodels::node::tx::Close;
+use franklinmodels::node::operations::CloseOp;
 use crate::account::AccountWitness;
 use franklin_crypto::circuit::float_point::{convert_to_float, parse_float_to_u128};
 use franklin_crypto::jubjub::JubjubEngine;
@@ -46,6 +47,13 @@ impl<E: JubjubEngine> CloseAccountWitness<E> {
         pubdata_bits.resize(8 * 8, false);
         pubdata_bits
     }
+}
+pub fn apply_close_account_tx( tree: &mut CircuitAccountTree, close_account: &CloseOp) ->CloseAccountWitness<Bn256>{
+                        
+    let close_acoount_data = CloseAccountData {
+         account_address: close_account.account_id as u32
+    };
+    apply_close_account(tree, &close_acoount_data)
 }
 pub fn apply_close_account(
     tree: &mut CircuitAccountTree,

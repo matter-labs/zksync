@@ -641,7 +641,7 @@ fn test_deposit_franklin_in_empty_leaf_proof() {
         let pvk = prepare_verifying_key(&tmp_cirtuit_params.vk);
 
 
-        let success = verify_proof(&pvk, &p.clone(), &[Fr::from_str("9").unwrap()]);
+        let success = verify_proof(&pvk, &p.clone(), &[public_data_commitment]);
         if success.is_err() {
             panic!(
                 "Proof is verification failed with error {}",

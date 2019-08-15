@@ -12,7 +12,7 @@ authors = [
 franklinmodels = { path = "../franklinmodels" }
 pairing = { package = "pairing_ce", version = "0.17.0" }
 bellman = { package = "bellman_ce", version = "0.3.0" }
-franklin_crypto = { package = "franklin-crypto", git = "ssh://git@github.com/matter-labs/franklin-crypto.git"}
+franklin_crypto = { package = "franklin-crypto", git = "ssh://git@github.com/matter-labs/franklin-crypto.git", branch="master"}
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
 rand = "0.4"
 rust-crypto = "0.2"

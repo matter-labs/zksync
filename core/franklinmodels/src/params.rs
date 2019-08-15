@@ -4,12 +4,12 @@ use crate::node::TokenId;
 pub const TX_TYPE_BIT_WIDTH: &'static usize = &8;
 
 /// Account tree depth
-//pub const ACCOUNT_TREE_DEPTH: usize = 24;
-pub const ACCOUNT_TREE_DEPTH: usize = 3;
+pub const ACCOUNT_TREE_DEPTH: usize = 24;
+// pub const ACCOUNT_TREE_DEPTH: usize = 3;
 
 /// Balance tree depth
-//pub const BALANCE_TREE_DEPTH: &'static usize = &10;
-pub const BALANCE_TREE_DEPTH: &'static usize = &3;
+pub const BALANCE_TREE_DEPTH: &'static usize = &10;
+// pub const BALANCE_TREE_DEPTH: &'static usize = &3;
 
 /// Account subtree hash width
 pub const SUBTREE_HASH_WIDTH: &'static usize = &254; //seems to be equal to Bn256::NUM_BITS could be replaced

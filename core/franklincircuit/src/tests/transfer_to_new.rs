@@ -218,7 +218,6 @@ pub fn apply_transfer_to_new(
     let a = balance_from_before.clone();
     let mut b = amount_as_field_element.clone();
     b.add_assign(&fee_as_field_element);
-    println!("b in trasfer_to_new_test equals {}", b.to_string());
     TransferToNewWitness {
         from_before: OperationBranch {
             address: Some(account_address_from_fe),

@@ -16,6 +16,10 @@ use circuit::account::AccountWitness;
 use circuit::circuit::FranklinCircuit;
 use circuit::operation::Operation;
 use circuit::tests::deposit::*;
+use circuit::tests::close_account::*;
+use circuit::tests::transfer::*;
+use circuit::tests::transfer_to_new::*;
+use circuit::tests::partial_exit::*;
 use circuit::tests::noop::noop_operation;
 use circuit::tests::utils::*;
 use crypto::digest::Digest;
@@ -290,12 +294,11 @@ impl BabyProver {
     fn make_proving_attempt(&mut self) -> Result<(), String> {
         let storage = StorageProcessor::establish_connection()
             .map_err(|e| format!("establish_connection failed: {}", e))?;
-        let mut job = storage
+        let job = storage
             .fetch_prover_job(&self.worker, PROVER_TIMEOUT)
             .map_err(|e| format!("fetch_prover_job failed: {}", e))?;
 
         if let Some(job) = job {
-            let initial_root = self.accounts_tree.root_hash();
             let block_number = job.block_number as BlockNumber;
             info!(
                 "prover {} got a new job for block {}",
@@ -308,7 +311,12 @@ impl BabyProver {
             if self.current_block_number != expected_current_block {
                 self.rewind_state(&storage, expected_current_block)?;
             }
+            let initial_root = self.accounts_tree.root_hash();
 
+
+            for (index, item) in &self.accounts_tree.items{
+                info!("index: {}, item: {}",index, item.pub_key_hash );
+            }
             let block = storage
                 .load_committed_block(block_number)
                 .ok_or("load_committed_block failed")?;
@@ -336,8 +344,60 @@ impl BabyProver {
                         fees.push((deposit.tx.fee, deposit.tx.token));
                         pub_data.extend(deposit_witness.get_pubdata());
                     }
-                    _ => {
-                        unreachable!("only deposists allowed");
+                    FranklinOp::Transfer(transfer) => {
+                        let transfer_witness = apply_transfer_tx(&mut self.accounts_tree, &transfer);
+                        let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
+                        let transfer_operations = calculate_transfer_operations_from_witness(
+                            &transfer_witness,
+                            &sig_msg,
+                            signature,
+                            &sender_x,
+                            &sender_y,
+                        );
+                        operations.extend(transfer_operations);
+                        fees.push((transfer.tx.fee, transfer.tx.token));
+                        pub_data.extend(transfer_witness.get_pubdata());                    
+                    }
+                    FranklinOp::TransferToNew(transfer_to_new) => {
+                        let transfer_to_new_witness = apply_transfer_to_new_tx(&mut self.accounts_tree, &transfer_to_new);
+                        let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
+                        let transfer_to_new_operations = calculate_transfer_to_new_operations_from_witness(
+                            &transfer_to_new_witness,
+                            &sig_msg,
+                            signature,
+                            &sender_x,
+                            &sender_y,
+                        );
+                        operations.extend(transfer_to_new_operations);
+                        fees.push((transfer_to_new.tx.fee, transfer_to_new.tx.token));
+                        pub_data.extend(transfer_to_new_witness.get_pubdata());     
+                    }
+                    FranklinOp::PartialExit(partial_exit) => {
+                        let partial_exit_witness = apply_partial_exit_tx(&mut self.accounts_tree, &partial_exit);
+                        let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
+                        let partial_exit_operations = calculate_partial_exit_operations_from_witness(
+                            &partial_exit_witness,
+                            &sig_msg,
+                            signature,
+                            &sender_x,
+                            &sender_y,
+                        );
+                        operations.extend(partial_exit_operations);
+                        fees.push((partial_exit.tx.fee, partial_exit.tx.token));
+                        pub_data.extend(partial_exit_witness.get_pubdata());    
+                    }
+                    FranklinOp::Close(close) => {
+                        let close_account_witness = apply_close_account_tx(&mut self.accounts_tree, &close);
+                        let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
+                        let close_account_operations = calculate_close_account_operations_from_witness(
+                            &close_account_witness,
+                            &sig_msg,
+                            signature,
+                            &sender_x,
+                            &sender_y,
+                        );
+                        operations.extend(close_account_operations);
+                        pub_data.extend(close_account_witness.get_pubdata());  
                     }
                 }
             }
@@ -417,34 +477,33 @@ impl BabyProver {
                     validator_account: validator_account_witness.clone(),
                 };
       
-            {
-                let inst = FranklinCircuit {
-                    params: &self.jubjub_params,
-                    operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
-                    old_root: Some(initial_root),
-                    new_root: Some(block.new_root_hash),
-                    block_number: Fr::from_str(&(block_number + 1).to_string()),
-                    validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
-                    pub_data_commitment: Some(public_data_commitment.clone()),
-                    operations: operations,
-                    validator_balances: validator_balances,
-                    validator_audit_path: validator_audit_path,
-                    validator_account: validator_account_witness,
-                };
-                let mut cs = TestConstraintSystem::<Engine>::new();
-                inst.synthesize(&mut cs).unwrap();
+            // {
+            //     let inst = FranklinCircuit {
+            //         params: &self.jubjub_params,
+            //         operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
+            //         old_root: Some(initial_root),
+            //         new_root: Some(block.new_root_hash),
+            //         block_number: Fr::from_str(&(block_number + 1).to_string()),
+            //         validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
+            //         pub_data_commitment: Some(public_data_commitment.clone()),
+            //         operations: operations,
+            //         validator_balances: validator_balances,
+            //         validator_audit_path: validator_audit_path,
+            //         validator_account: validator_account_witness,
+            //     };
+            //     let mut cs = TestConstraintSystem::<Engine>::new();
+            //     inst.synthesize(&mut cs).unwrap();
 
-                warn!("unconstrained {}\n", cs.find_unconstrained());
-                warn!("inputs {}\n", cs.num_inputs());
-                warn!("num_constraints: {}\n", cs.num_constraints());
-                warn!("is satisfied: {}\n", cs.is_satisfied());
-                warn!("which is unsatisfied: {:?}\n", cs.which_is_unsatisfied());
-            }
+            //     warn!("unconstrained {}\n", cs.find_unconstrained());
+            //     warn!("inputs {}\n", cs.num_inputs());
+            //     warn!("num_constraints: {}\n", cs.num_constraints());
+            //     warn!("is satisfied: {}\n", cs.is_satisfied());
+            //     warn!("which is unsatisfied: {:?}\n", cs.which_is_unsatisfied());
+            // }
 
             let mut rng = OsRng::new().unwrap();
             info!("Prover has started to work");
             // let tmp_cirtuit_params = generate_random_parameters(instance, &mut rng).unwrap();
-            self.parameters.vk.alpha_g1.len()
             let proof = create_random_proof(instance, &self.parameters, &mut rng);
             if proof.is_err() {
                 error!("proof can not be created: {}", proof.err().unwrap());
