@@ -509,6 +509,7 @@ fn test_transfer() {
         &from_leaf_number_fe,
         franklin_constants::ACCOUNT_TREE_DEPTH,
     );
+    append_le_fixed_width(&mut sig_bits, , franklin_constants::NEW_PUBKEY_HASH_WIDTH);
     append_le_fixed_width(
         &mut sig_bits,
         &token_fe,
