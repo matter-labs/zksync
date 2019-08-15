@@ -9,6 +9,7 @@ import 'ethers';
 import {Contract, ethers} from 'ethers';
 import {franklinContractCode} from "../../../contracts/src.ts/deploy";
 import {BigNumber, bigNumberify, BigNumberish, parseEther} from "ethers/utils";
+import {expect} from "chai";
 
 const IERC20Conract = require("openzeppelin-solidity/build/contracts/IERC20");
 
@@ -67,7 +68,7 @@ export class Wallet {
 
 
 
-    constructor(seed: Buffer, public provider: FranklinProvider, public ethWallet: ethers.Signer) {
+    constructor(seed: Buffer, public provider: FranklinProvider, public ethWallet: ethers.Wallet) {
         let privateKey = new BN(HmacSHA512(seed.toString('hex'), 'Matter seed').toString(), 'hex');
         this.privateKey = privateKey.mod(altjubjubCurve.n);
         this.publicKey = altjubjubCurve.g.mul(this.privateKey).normalize();
@@ -81,6 +82,7 @@ export class Wallet {
         const franklinDeployedContract = new Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, this.ethWallet);
         const franklinAddressBinary = Buffer.from(this.address.substr(2), "hex");
         if (token.id == 0) {
+            // console.log(await franklinDeployedContract.balances(this.ethWallet.address, 0));
             const tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: amount});
             await tx.wait(2);
             return tx.hash;
@@ -159,7 +161,7 @@ export class Wallet {
         return this.franklinState.commited.nonce
     }
 
-    static async fromEthWallet(wallet: ethers.Signer) {
+    static async fromEthWallet(wallet: ethers.Wallet) {
         let defaultFranklinProvider = new FranklinProvider();
         let seed = (await wallet.signMessage('Matter login')).substr(2);
         let frankinWallet = new Wallet(Buffer.from(seed, 'hex'), defaultFranklinProvider, wallet);
