@@ -1,6 +1,6 @@
 import BN = require('bn.js');
 import { integerToFloat } from './utils';
-import Axios from 'axios';
+import Axios, { CancelTokenSource } from 'axios';
 import { altjubjubCurve, pedersenHash } from './sign';
 import { curve } from 'elliptic';
 import EdwardsPoint = curve.edwards.EdwardsPoint;
@@ -48,7 +48,7 @@ interface FranklinAccountState {
     id?: number,
     commited: FranklinAccountState,
     verified: FranklinAccountState,
-    pendingTxs: any[],
+    pending_txs: any[],
 }
 interface ETHAccountState {
     onchainBalances: BigNumberish[],
@@ -62,20 +62,16 @@ export class Wallet {
     address: Address;
     privateKey: BN;
     publicKey: EdwardsPoint;
-    ethWallet: ethers.Wallet;
     contract: ethers.Contract;
 
     supportedTokens: Token[];
     franklinState: FranklinAccountState;
     ethState: ETHAccountState;
 
-
-
-    constructor(seed: Buffer, public provider: FranklinProvider, public ethWallet: ethers.Signer) {
+    constructor(seed: Buffer, public provider: FranklinProvider, public ethWallet: ethers.Wallet) {
         let privateKey = new BN(HmacSHA512(seed.toString('hex'), 'Matter seed').toString(), 'hex');
         this.privateKey = privateKey.mod(altjubjubCurve.n);
         this.publicKey = altjubjubCurve.g.mul(this.privateKey).normalize();
-        this.ethWallet = ethersWallet;
         let [x, y] = [this.publicKey.getX(), this.publicKey.getY()];
         let buff = Buffer.from(x.toString('hex') + y.toString('hex'), 'hex');
         let hash = pedersenHash(buff);
@@ -83,7 +79,7 @@ export class Wallet {
         this.contract = new ethers.Contract(
             "0xDE1F1506b9b881DE029D4BD79745DDD4E16caa97", 
             require('../../../contracts/build/Franklin').abi, 
-            ethersWallet);
+            ethWallet);
         this.contract.connect(this.ethWallet);
     }
 
@@ -104,8 +100,19 @@ export class Wallet {
         }
     }
 
+    /**
+     * transfer from contract balance to franklin balance
+     * @param token 
+     * @param amount 
+     * @param fee 
+     */
     async depositOffchain(token: Token, amount: BN, fee: BN) {
         let nonce = await this.getNonce();
+        if (this.franklinState.pending_txs.length > 0) {
+            console.log("please wait for all pending transactions to complete before sending a new one.");
+            return;
+        }
+
         let tx = {
             type: 'Deposit',
             to: this.address,
@@ -118,14 +125,63 @@ export class Wallet {
         return await this.provider.submitTx(tx);
     }
 
+    /**
+     * transfer from contract to onchain
+     * @param token 
+     * @param amount 
+     */
+    async widthdrawOnchain(token: Token, amount: BigNumber) {
+        const franklinDeployedContract = new Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, this.ethWallet);
+        const franklinAddressBinary = Buffer.from(this.address.substr(2), "hex");
+        if (token.id == 0) {
+            const tx = await franklinDeployedContract.withdrawETH(amount);
+            await tx.wait(2);
+            return tx.hash;
+        } else {
+            const tx = await franklinDeployedContract.withdrawERC20(token.address, amount, {gasLimit: bigNumberify("150000")});
+            await tx.wait(2);
+            return tx.hash;
+        }
+    }
+
+    /**
+     * from b
+     * @param token 
+     * @param amount 
+     * @param fee 
+     */
+    async widthdrawOffchain(token: Token, amount: BN, fee: BN) {
+        let nonce = await this.getNonce();
+        if (this.franklinState.pending_txs.length > 0) {
+            console.log("please wait for all pending transactions to complete before sending a new one.");
+            return;
+        }
+
+        let tx = {
+            type: 'Withdraw',
+            account: this.address,
+            eth_address: await this.ethWallet.getAddress(),
+            token: token.id,
+            amount: amount.toString(10),
+            fee: fee.toString(10),
+            nonce: nonce,
+        };
+
+        return await this.provider.submitTx(tx);
+    }
+
     async transfer(address: Address, token: Token, amount: BN, fee: BN) {
         let nonce = await this.getNonce();
+        if (this.franklinState.pending_txs.length > 0) {
+            console.log("please wait for all pending transactions to complete before sending a new one.");
+            return;
+        }
         // use packed numbers for signture
         let tx = {
             type: 'Transfer',
             from: this.address,
             to: address,
-            token: token,
+            token: token.id,
             amount: amount.toString(10),
             fee: fee.toString(10),
             nonce: nonce,
@@ -135,10 +191,11 @@ export class Wallet {
     }
 
     async getNonce(): Promise<number> {
-        return (await this.provider.getState(this.address)).commited.nonce
+        await this.getState();
+        return this.franklinState.commited.nonce
     }
 
-    static async fromEthWallet(wallet: ethers.Signer) {
+    static async fromEthWallet(wallet: ethers.Wallet) {
         let defaultFranklinProvider = new FranklinProvider();
         let seed = await wallet.signMessage('Matter login');
         console.log('seed', seed);
@@ -148,7 +205,8 @@ export class Wallet {
     }
 
     async getState() {
-        return await this.provider.getState(this.address);
+        this.supportedTokens = await this.provider.getTokens();
+        this.franklinState = await this.provider.getState(this.address);
     }
 
     private state_ = null;
@@ -168,13 +226,12 @@ export class Wallet {
      * @param token — tokenId
      */
     async getOnchainBalanceForToken(token: Token) {
-        if (token === 0) {
+        if (token.id === 0) {
             return await this.ethWallet.getBalance();
         }
 
-        let address = Wallet.tokensAddresses[token];
         let erc20abi = require('./erc20.abi');
-        let contract = new ethers.Contract(address, erc20abi, this.ethWallet);
+        let contract = new ethers.Contract(token.address, erc20abi, this.ethWallet);
         return await contract.balanceOf(this.ethWallet.address);
     }
 
@@ -185,7 +242,9 @@ export class Wallet {
         // user should add tokens by hand to view their balance
         // just like in metamask. We have to store it somewhere, idk.
         // for now, hardcode.
-        return [0, 1];
+        await this.getState();
+        return this.supportedTokens;
+        // return [0, 1];
     }
 
     /**
@@ -193,13 +252,15 @@ export class Wallet {
      */
     async getCommittedOnchainState() {
         let tokens = await this.getOnchainTokensList();
-        let balanceGetter = this.getOnchainBalanceForToken.bind(this);
-        let balances = await Promise.all(tokens.map(balanceGetter));
+        // let balanceGetter = this.getOnchainBalanceForToken.bind(this);
+        // let balances = await Promise.all(tokens.map(balanceGetter));
         let res = [];
         for (let t = 0; t < tokens.length; ++t) {
+            let currToken = this.supportedTokens[t];
+            let balance = (await this.getOnchainBalanceForToken(currToken)).toString(10);
             res.push({
-                token: Wallet.tokensNames[t],
-                balance: balances[t].toString()
+                token: currToken.address,
+                balance: balance,
             });
         }
         return {
@@ -217,7 +278,7 @@ export class Wallet {
     async getCommittedContractTokensList() {
         // TODO:
         // this can be retrieved from our contract or our server
-        return [0, 1];
+        return await this.getOnchainTokensList();
     }
 
     async getLockedContractBalanceForToken(token: Token) {
@@ -228,9 +289,10 @@ export class Wallet {
         }
         return new BN(0);
     }
-    
+
     async getUnlockedContractBalanceForToken(token: Token) {
-        let [balance, block] = await this.contract.getMyBalanceForToken(token);
+        let address = this.ethWallet.address;
+        let [balance, block] = await this.contract.balances(address, token.id);
         let currBlock = await this.ethWallet.provider.getBlockNumber();
         if (currBlock >= block) {
             return balance;
@@ -242,24 +304,37 @@ export class Wallet {
      * locked/unlocked balances in our contract
      */
     async getCommittedContractBalances() {
-        let tokens = await this.getCommittedContractTokensList();
+        let tokens: Token[] = await this.getCommittedContractTokensList();
         let lockedBalanceGetter = this.getLockedContractBalanceForToken.bind(this);
         let unlockedBalanceGetter = this.getUnlockedContractBalanceForToken.bind(this);
-        let [lockedBalances, unlockedBalances] = await Promise.all([
-            Promise.all(tokens.map(lockedBalanceGetter)),
-            Promise.all(tokens.map(unlockedBalanceGetter))
-        ]);
+
         let res = [];
-        for (let t = 0; t < tokens.length; ++t) {
+        for (let i = 0; i < tokens.length; i++) {
+            let token: Token = tokens[i];
+            let lockedBalance = await this.getLockedContractBalanceForToken(token);
+            let unlockedBalance = await this.getUnlockedContractBalanceForToken(token);
             res.push({
-                token: Wallet.tokensNames[t],
-                locked: lockedBalances[t].toString(),
-                unlocked: unlockedBalances[t].toString()
+                token: token.symbol,
+                locked: lockedBalance,
+                unlocked: unlockedBalance
             });
         }
-        return {
-            contractBalances: res
-        };
+
+        // let [lockedBalances, unlockedBalances] = await Promise.all([
+        //     Promise.all(tokens.map(lockedBalanceGetter)),
+        //     Promise.all(tokens.map(unlockedBalanceGetter))
+        // ]);
+        // let res = [];
+        // for (let t = 0; t < tokens.length; ++t) {
+        //     res.push({
+        //         token: Wallet.tokensNames[t],
+        //         locked: lockedBalances[t].toString(),
+        //         unlocked: unlockedBalances[t].toString()
+        //     });
+        // }
+        // return {
+        //     contractBalances: res
+        // };
     }
 
     /**
@@ -293,13 +368,6 @@ export class Wallet {
      */
     async getPendingFranklinState() {
         return await this.getVerifiedFranklinState();
-    }
-
-    /**
-     * transfer from mainchain to contract
-     */
-    async depositOnchain(token, amount) {
-
     }
 
     /**
@@ -352,17 +420,3 @@ export class Wallet {
         ]
     }
 }
-
-async function run() {
-    const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-    let ethWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
-    let wallet = await Wallet.fromEthWallet(ethWallet);
-    console.log((await wallet.getState()));
-
-    console.log(await wallet.depositOnchain(wallet.supportedTokens['1'], bigNumberify(1)));
-    console.log(await wallet.depositOffchain(wallet.supportedTokens['1'], new BN(1), new BN(0)));
-
-    console.log((await wallet.getState()));
-}
-
-run();
