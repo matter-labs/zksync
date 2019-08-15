@@ -3,20 +3,20 @@ pragma solidity ^0.5.1;
 import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
 // Warning! Verifier does not work.
-import "./common/DummyVerifier.sol";
+import "./common/Verifier.sol";
 import "./common/VerificationKeys.sol";
 
-contract Franklin is DummyVerifier, VerificationKeys {
+contract Franklin is Verifier, VerificationKeys {
     // chunks per block; each chunk has 8 bytes of public data
-    uint256 constant BLOCK_SIZE = 2000;
+    uint256 constant BLOCK_SIZE = 10;
     // must fit into uint112
     uint256 constant MAX_VALUE = 2 ** 112 - 1;
     // ETH blocks
-    uint256 constant LOCK_DEPOSITS_FOR = 8 * 60;
+    uint256 constant LOCK_DEPOSITS_FOR = 8 * 60 * 100;
     // ETH blocks
-    uint256 constant EXPECT_VERIFICATION_IN = 8 * 60;
+    uint256 constant EXPECT_VERIFICATION_IN = 8 * 60 * 100;
     // To make sure that all reverted blocks can be copied under block gas limit!
-    uint256 constant MAX_UNVERIFIED_BLOCKS = 4 * 60;
+    uint256 constant MAX_UNVERIFIED_BLOCKS = 4 * 60 * 100;
 
     event BlockCommitted(uint32 indexed blockNumber);
     event BlockVerified(uint32 indexed blockNumber);
@@ -290,7 +290,7 @@ contract Franklin is DummyVerifier, VerificationKeys {
         emit OnchainDeposit(
             msg.sender,
             _tokenId,
-            _amount,
+            balances[msg.sender][_tokenId].balance,
             lockedUntilBlock,
             _franklin_addr
         );
