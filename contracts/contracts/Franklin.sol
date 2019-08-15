@@ -5,17 +5,17 @@ import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 import "./Verifier.sol";
 import "./VerificationKey.sol";
 
-contract IVerifier {
+interface IVerifier {
     function Verify(
-        uint256[14] memory in_vk,
-        uint256[] memory vk_gammaABC,
-        uint256[8] memory in_proof,
-        uint256[] memory proof_inputs
-    ) public view returns (bool);
+        uint256[14] calldata in_vk,
+        uint256[] calldata vk_gammaABC,
+        uint256[8] calldata in_proof,
+        uint256[] calldata proof_inputs
+    ) external view returns (bool);
 }
 
-contract IVerificationKey {
-    function getVk() public pure returns (uint256[14] memory vk, uint256[] memory gammaABC);
+interface IVerificationKey {
+    function getVk() external pure returns (uint256[14] memory vk, uint256[] memory gammaABC);
 }
 
 contract Franklin {
