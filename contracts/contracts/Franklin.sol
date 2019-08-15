@@ -5,7 +5,24 @@ import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 import "./Verifier.sol";
 import "./VerificationKey.sol";
 
-contract Franklin is Verifier, VerificationKey {
+contract IVerifier {
+    function Verify(
+        uint256[14] memory in_vk,
+        uint256[] memory vk_gammaABC,
+        uint256[8] memory in_proof,
+        uint256[] memory proof_inputs
+    ) public view returns (bool);
+}
+
+contract IVerificationKey {
+    function getVk() public pure returns (uint256[14] memory vk, uint256[] memory gammaABC);
+}
+
+contract Franklin {
+
+    IVerificationKey verificationKey;
+    IVerifier verifier;
+    
     // chunks per block; each chunk has 8 bytes of public data
     uint256 constant BLOCK_SIZE = 10;
     // must fit into uint112
@@ -174,10 +191,15 @@ contract Franklin is Verifier, VerificationKey {
     // Constructor
 
     constructor(
+        address _verifierAddress,
+        address _vkAddress,
         bytes32 _genesisRoot,
         address _exitQueue,
         address _networkGovernor
     ) public {
+        verifier = IVerifier(_verifierAddress);
+        verificationKey = IVerificationKey(_vkAddress);
+
         blocks[0].stateRoot = _genesisRoot;
         exitQueue = _exitQueue;
         networkGovernor = _networkGovernor;
@@ -545,10 +567,10 @@ contract Franklin is Verifier, VerificationKey {
         uint256 mask = (~uint256(0)) >> 3;
         uint256[14] memory vk;
         uint256[] memory gammaABC;
-        (vk, gammaABC) = getVk();
+        (vk, gammaABC) = verificationKey.getVk();
         uint256[] memory inputs = new uint256[](1);
         inputs[0] = uint256(commitment) & mask;
-        return Verify(vk, gammaABC, proof, inputs);
+        return verifier.Verify(vk, gammaABC, proof, inputs);
     }
 
     function consummateOnchainOps(uint32 _blockNumber) internal {

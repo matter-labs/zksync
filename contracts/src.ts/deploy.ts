@@ -8,10 +8,24 @@ export const ERC20MintableContract = function () {
     return contract
 }();
 export const franklinContractCode = require('../build/Franklin');
+export const vkContractCode = require('../build/VerificationKey');
+export const verifierContractCode = require('../build/Verifier');
 
-export async function deployFranklin(wallet, genesisRoot = ethers.constants.HashZero, franklinCode = franklinContractCode) {
+export async function deployFranklin(
+    wallet,
+    genesisRoot = ethers.constants.HashZero,
+    franklinCode = franklinContractCode,
+    verifierCode = verifierContractCode,
+    vkCode = vkContractCode
+    ) {
     try {
-        let contract = await deployContract(wallet, franklinCode, [genesisRoot, ethers.constants.AddressZero, wallet.address], {
+        let verifier = await deployContract(wallet, verifierCode, [], {
+            gasLimit: 1000000,
+        });
+        let vk = await deployContract(wallet, vkCode, [], {
+            gasLimit: 1000000,
+        });
+        let contract = await deployContract(wallet, franklinCode, [verifier.address, vk.address, genesisRoot, ethers.constants.AddressZero, wallet.address], {
             gasLimit: 8000000,
         });
         console.log(`CONTRACT_ADDR=${contract.address}`);
