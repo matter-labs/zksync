@@ -3,10 +3,8 @@ use super::utils::*;
 use crate::operation::*;
 use crate::utils::*;
 
-use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
-use franklinmodels::node::tx::Close;
-use franklinmodels::node::operations::CloseOp;
 use crate::account::AccountWitness;
+use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
 use franklin_crypto::circuit::float_point::{convert_to_float, parse_float_to_u128};
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::{
@@ -14,6 +12,8 @@ use franklinmodels::circuit::account::{
 };
 use franklinmodels::merkle_tree::hasher::Hasher;
 use franklinmodels::merkle_tree::PedersenHasher;
+use franklinmodels::node::operations::CloseOp;
+use franklinmodels::node::tx::Close;
 use franklinmodels::params as franklin_constants;
 use pairing::bn256::*;
 
@@ -48,10 +48,12 @@ impl<E: JubjubEngine> CloseAccountWitness<E> {
         pubdata_bits
     }
 }
-pub fn apply_close_account_tx( tree: &mut CircuitAccountTree, close_account: &CloseOp) ->CloseAccountWitness<Bn256>{
-                        
+pub fn apply_close_account_tx(
+    tree: &mut CircuitAccountTree,
+    close_account: &CloseOp,
+) -> CloseAccountWitness<Bn256> {
     let close_acoount_data = CloseAccountData {
-         account_address: close_account.account_id as u32
+        account_address: close_account.account_id as u32,
     };
     apply_close_account(tree, &close_acoount_data)
 }

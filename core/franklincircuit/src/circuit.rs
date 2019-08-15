@@ -172,7 +172,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             // calculate root for given account data
             let (state_root, is_account_empty, subtree_root) = self
                 .check_account_data(cs.namespace(|| "calculate account root"), &current_branch)?;
-    
 
             // ensure root hash of state before applying operation is correct
             cs.enforce(
@@ -200,7 +199,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             )?;
             let operation_new_root =
                 AllocatedNum::alloc(cs.namespace(|| "op_new_root"), || operation.new_root.grab())?;
-        
+
             // ensure that root hash of the state is correct after applying operation
             cs.enforce(
                 || "new root is correct",
@@ -228,7 +227,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             &validator_balances,
             self.params,
         )?;
- 
 
         let mut operator_account_data = vec![];
         operator_account_data.extend(validator_account.nonce.get_bits_le());
@@ -245,7 +243,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             &validator_audit_path,
             self.params,
         )?;
-  
+
         // ensure that this operator leaf is correct for our tree state
         cs.enforce(
             || "root before applying fees is correct",
@@ -786,7 +784,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //AMOUNT_PACKED=24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //FEE_PACKED=8
         pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //ETHEREUM_KEY=160
-//        assert_eq!(pubdata_bits.len(), 30 * 8);
+                                                                 //        assert_eq!(pubdata_bits.len(), 30 * 8);
         pubdata_bits.resize(
             4 * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
@@ -1002,7 +1000,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //AMOUNT_PACKED=24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //FEE_PACKED=8
         pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //NEW_PUBKEY_HASH_WIDTH=216
-        // assert_eq!(pubdata_bits.len(), 37 * 8);
+                                                                    // assert_eq!(pubdata_bits.len(), 37 * 8);
         pubdata_bits.resize(
             5 * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
@@ -1057,7 +1055,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         is_valid_flags.push(is_b_correct);
         is_valid_flags.push(is_a_geq_b.clone());
         let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
-
 
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
@@ -1120,7 +1117,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
         pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
-//        assert_eq!(pubdata_bits.len(), 4 * 8);
+                                                                //        assert_eq!(pubdata_bits.len(), 4 * 8);
         pubdata_bits.resize(
             1 * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
@@ -1159,7 +1156,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?);
         is_valid_flags.push(are_balances_empty);
         let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
-
 
         // below we conditionally if it is valid operation
 
@@ -1252,8 +1248,9 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //224
         pubdata_bits.extend(rhs.account_address.get_bits_be()); //24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //8
-//        assert_eq!(pubdata_bits.len(), 40 * 8);
-        pubdata_bits.resize(5 * franklin_constants::CHUNK_BIT_WIDTH,
+                                                               //        assert_eq!(pubdata_bits.len(), 40 * 8);
+        pubdata_bits.resize(
+            5 * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
         let pubdata_chunk = select_pubdata_chunk(
@@ -1350,7 +1347,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         rhs_valid_flags.push(is_transfer.clone());
         rhs_valid_flags.push(is_account_empty.clone());
         let rhs_valid = multi_and(cs.namespace(|| "rhs_valid"), &rhs_valid_flags)?;
- 
 
         cur.balance = CircuitElement::conditionally_select(
             cs.namespace(|| "mutated balance"),
@@ -1360,7 +1356,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         cur.balance
             .enforce_length(cs.namespace(|| "mutated balance is still correct length"))?; // TODO: this is actually redundant, cause they are both enforced to be of appropriate length
-
 
         cur.account.pub_key_hash = CircuitElement::conditionally_select(
             cs.namespace(|| "mutated_pubkey"),
@@ -1410,7 +1405,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(rhs.account_address.get_bits_be());
         pubdata_bits.extend(op_data.amount_packed.get_bits_be());
         pubdata_bits.extend(op_data.fee_packed.get_bits_be());
-//        assert_eq!(pubdata_bits.len(), 13 * 8);
+        //        assert_eq!(pubdata_bits.len(), 13 * 8);
 
         pubdata_bits.resize(
             2 * franklin_constants::CHUNK_BIT_WIDTH,
@@ -1473,7 +1468,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         .get_x()
         .clone();
         //TODO: rhs_pubkey
-
 
         let is_sig_msg_correct = CircuitElement::equals(
             cs.namespace(|| "is_sig_msg_correct"),

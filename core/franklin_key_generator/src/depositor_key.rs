@@ -82,7 +82,7 @@ pub fn make_franklin_key() {
         validator_address: None,
         block_number: None,
         pub_data_commitment: None,
-        validator_balances: vec![None; (1 << *franklin_constants::BALANCE_TREE_DEPTH) as usize ],
+        validator_balances: vec![None; (1 << *franklin_constants::BALANCE_TREE_DEPTH) as usize],
         validator_audit_path: vec![None; franklin_constants::ACCOUNT_TREE_DEPTH],
         operations: vec![empty_operation; franklin_constants::BLOCK_SIZE_CHUNKS],
         validator_account: AccountWitness {

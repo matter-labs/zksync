@@ -11,16 +11,20 @@ use std::sync::{
 use std::thread;
 use std::time::Duration;
 
+use bellman::groth16::generate_random_parameters;
+use bellman::groth16::{
+    create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
+};
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use circuit::account::AccountWitness;
 use circuit::circuit::FranklinCircuit;
 use circuit::operation::Operation;
-use circuit::tests::deposit::*;
 use circuit::tests::close_account::*;
+use circuit::tests::deposit::*;
+use circuit::tests::noop::noop_operation;
+use circuit::tests::partial_exit::*;
 use circuit::tests::transfer::*;
 use circuit::tests::transfer_to_new::*;
-use circuit::tests::partial_exit::*;
-use circuit::tests::noop::noop_operation;
 use circuit::tests::utils::*;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -29,28 +33,24 @@ use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use franklin_crypto::circuit::float_point::parse_float_to_u128;
 use franklin_crypto::circuit::test::TestConstraintSystem;
 use franklin_crypto::jubjub::{edwards, JubjubEngine};
+use models::circuit::account::{Balance, CircuitAccount};
+use models::circuit::CircuitAccountTree;
+use models::merkle_tree::*;
+use models::node::block::{Block, ExecutedTx};
 use models::node::config::*;
 use models::node::operations::*;
 use models::node::Account;
+use models::node::*;
 use models::params as franklin_constants;
+use models::primitives::*;
 use models::EncodedProof;
+use plasma::state::PlasmaState;
 use rustc_hex::ToHex;
 use storage::ProverRun;
 use tokio::prelude::*;
 use tokio::runtime::current_thread::Handle;
 use tokio::sync::oneshot::Sender;
 use tokio::timer;
-use bellman::groth16::generate_random_parameters;
-use bellman::groth16::{
-    create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
-};
-use models::circuit::account::{Balance, CircuitAccount};
-use models::circuit::CircuitAccountTree;
-use models::merkle_tree::*;
-use models::node::block::{Block, ExecutedTx};
-use models::node::*;
-use models::primitives::*;
-use plasma::state::PlasmaState;
 
 use num_traits::cast::ToPrimitive;
 // use models::circuit::encoder;
@@ -313,9 +313,8 @@ impl BabyProver {
             }
             let initial_root = self.accounts_tree.root_hash();
 
-
-            for (index, item) in &self.accounts_tree.items{
-                info!("index: {}, item: {}",index, item.pub_key_hash );
+            for (index, item) in &self.accounts_tree.items {
+                info!("index: {}, item: {}", index, item.pub_key_hash);
             }
             let block = storage
                 .load_committed_block(block_number)
@@ -345,7 +344,8 @@ impl BabyProver {
                         pub_data.extend(deposit_witness.get_pubdata());
                     }
                     FranklinOp::Transfer(transfer) => {
-                        let transfer_witness = apply_transfer_tx(&mut self.accounts_tree, &transfer);
+                        let transfer_witness =
+                            apply_transfer_tx(&mut self.accounts_tree, &transfer);
                         let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
                         let transfer_operations = calculate_transfer_operations_from_witness(
                             &transfer_witness,
@@ -356,48 +356,54 @@ impl BabyProver {
                         );
                         operations.extend(transfer_operations);
                         fees.push((transfer.tx.fee, transfer.tx.token));
-                        pub_data.extend(transfer_witness.get_pubdata());                    
+                        pub_data.extend(transfer_witness.get_pubdata());
                     }
                     FranklinOp::TransferToNew(transfer_to_new) => {
-                        let transfer_to_new_witness = apply_transfer_to_new_tx(&mut self.accounts_tree, &transfer_to_new);
+                        let transfer_to_new_witness =
+                            apply_transfer_to_new_tx(&mut self.accounts_tree, &transfer_to_new);
                         let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
-                        let transfer_to_new_operations = calculate_transfer_to_new_operations_from_witness(
-                            &transfer_to_new_witness,
-                            &sig_msg,
-                            signature,
-                            &sender_x,
-                            &sender_y,
-                        );
+                        let transfer_to_new_operations =
+                            calculate_transfer_to_new_operations_from_witness(
+                                &transfer_to_new_witness,
+                                &sig_msg,
+                                signature,
+                                &sender_x,
+                                &sender_y,
+                            );
                         operations.extend(transfer_to_new_operations);
                         fees.push((transfer_to_new.tx.fee, transfer_to_new.tx.token));
-                        pub_data.extend(transfer_to_new_witness.get_pubdata());     
+                        pub_data.extend(transfer_to_new_witness.get_pubdata());
                     }
                     FranklinOp::PartialExit(partial_exit) => {
-                        let partial_exit_witness = apply_partial_exit_tx(&mut self.accounts_tree, &partial_exit);
+                        let partial_exit_witness =
+                            apply_partial_exit_tx(&mut self.accounts_tree, &partial_exit);
                         let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
-                        let partial_exit_operations = calculate_partial_exit_operations_from_witness(
-                            &partial_exit_witness,
-                            &sig_msg,
-                            signature,
-                            &sender_x,
-                            &sender_y,
-                        );
+                        let partial_exit_operations =
+                            calculate_partial_exit_operations_from_witness(
+                                &partial_exit_witness,
+                                &sig_msg,
+                                signature,
+                                &sender_x,
+                                &sender_y,
+                            );
                         operations.extend(partial_exit_operations);
                         fees.push((partial_exit.tx.fee, partial_exit.tx.token));
-                        pub_data.extend(partial_exit_witness.get_pubdata());    
+                        pub_data.extend(partial_exit_witness.get_pubdata());
                     }
                     FranklinOp::Close(close) => {
-                        let close_account_witness = apply_close_account_tx(&mut self.accounts_tree, &close);
+                        let close_account_witness =
+                            apply_close_account_tx(&mut self.accounts_tree, &close);
                         let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
-                        let close_account_operations = calculate_close_account_operations_from_witness(
-                            &close_account_witness,
-                            &sig_msg,
-                            signature,
-                            &sender_x,
-                            &sender_y,
-                        );
+                        let close_account_operations =
+                            calculate_close_account_operations_from_witness(
+                                &close_account_witness,
+                                &sig_msg,
+                                signature,
+                                &sender_x,
+                                &sender_y,
+                            );
                         operations.extend(close_account_operations);
-                        pub_data.extend(close_account_witness.get_pubdata());  
+                        pub_data.extend(close_account_witness.get_pubdata());
                     }
                 }
             }
@@ -462,21 +468,21 @@ impl BabyProver {
                 Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
                 Some(Fr::from_str(&(block_number + 1).to_string()).unwrap()),
             );
-       
+
             let instance = FranklinCircuit {
-                    params: &self.jubjub_params,
-                    operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
-                    old_root: Some(initial_root),
-                    new_root: Some(block.new_root_hash),
-                    block_number: Fr::from_str(&(block_number + 1).to_string()),
-                    validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
-                    pub_data_commitment: Some(public_data_commitment.clone()),
-                    operations: operations.clone(),
-                    validator_balances: validator_balances.clone(),
-                    validator_audit_path: validator_audit_path.clone(),
-                    validator_account: validator_account_witness.clone(),
-                };
-      
+                params: &self.jubjub_params,
+                operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
+                old_root: Some(initial_root),
+                new_root: Some(block.new_root_hash),
+                block_number: Fr::from_str(&(block_number + 1).to_string()),
+                validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
+                pub_data_commitment: Some(public_data_commitment.clone()),
+                operations: operations.clone(),
+                validator_balances: validator_balances.clone(),
+                validator_audit_path: validator_audit_path.clone(),
+                validator_account: validator_account_witness.clone(),
+            };
+
             // {
             //     let inst = FranklinCircuit {
             //         params: &self.jubjub_params,

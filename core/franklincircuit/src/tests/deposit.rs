@@ -6,6 +6,10 @@ use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
 use num_traits::cast::ToPrimitive;
 
 use crate::account::AccountWitness;
+use bellman::groth16::generate_random_parameters;
+use bellman::groth16::{
+    create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
+};
 use franklin_crypto::circuit::float_point::{convert_to_float, parse_float_to_u128};
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::{
@@ -17,10 +21,6 @@ use franklinmodels::node::tx::Deposit;
 use franklinmodels::node::DepositOp;
 use franklinmodels::params as franklin_constants;
 use pairing::bn256::*;
-use bellman::groth16::generate_random_parameters;
-use bellman::groth16::{
-    create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
-};
 
 pub struct DepositData {
     pub amount: u128,
@@ -87,7 +87,7 @@ impl<E: JubjubEngine> DepositWitness<E> {
             &self.args.new_pub_key_hash.unwrap(),
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         );
-//        assert_eq!(pubdata_bits.len(), 37 * 8);
+        //        assert_eq!(pubdata_bits.len(), 37 * 8);
         pubdata_bits.resize(40 * 8, false);
         pubdata_bits
     }
@@ -477,7 +477,6 @@ fn test_deposit_franklin_in_empty_leaf() {
         if err.is_some() {
             panic!("ERROR satisfying in {}", err.unwrap());
         }
-
     }
 }
 
@@ -598,7 +597,6 @@ fn test_deposit_franklin_in_empty_leaf_proof() {
     println!("validator balances: {}", validator_balances.len());
 
     {
-
         let instance = FranklinCircuit {
             operation_batch_size: 10,
             params,
@@ -613,9 +611,8 @@ fn test_deposit_franklin_in_empty_leaf_proof() {
             validator_audit_path: validator_audit_path.clone(),
         };
 
-
         let tmp_cirtuit_params = generate_random_parameters(instance, &mut rng).unwrap();
-        println!("len a is {}" , tmp_cirtuit_params.a.len());
+        println!("len a is {}", tmp_cirtuit_params.a.len());
         let instance = FranklinCircuit {
             operation_batch_size: 10,
             params,
@@ -640,14 +637,12 @@ fn test_deposit_franklin_in_empty_leaf_proof() {
 
         let pvk = prepare_verifying_key(&tmp_cirtuit_params.vk);
 
-
         let success = verify_proof(&pvk, &p.clone(), &[public_data_commitment]);
         if success.is_err() {
             panic!(
                 "Proof is verification failed with error {}",
                 success.err().unwrap()
             );
-
         }
         if !success.unwrap() {
             panic!("Proof is invalid");
