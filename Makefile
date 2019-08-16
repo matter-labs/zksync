@@ -107,7 +107,7 @@ franklin-prover:
 	@cargo run --release --bin franklin_prover
 
 server:
-	@cargo run --bin server
+	@cargo run --bin server --release
 
 sandbox:
 	@cargo run --bin sandbox

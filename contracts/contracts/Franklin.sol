@@ -657,36 +657,15 @@ contract Franklin {
         pure
         returns (uint112)
     {
-        uint112 n = uint112(bitwise_reverse(_amount));
-        return (n >> 5) * (uint112(10) ** (n & 0x1f));
+        uint24 n = uint24(_amount[0]) << 2*8
+        + uint24(_amount[1]) << 8
+        + uint24(_amount[2]);
+        return uint112(n >> 5) * (uint112(10) ** (n & 0x1f));
     }
 
-    function reverse_byte(uint8 b) internal pure returns (uint8) {
-        uint8 res = 0;
-        for (uint256 i = 0; i < 8; ++i) {
-            res <<= 1;
-            res |= (b >> i) & 1;
-        }
-        return res;
-    }
-
-    function bitwise_reverse(uint8[3] memory arr)
-        internal
-        pure
-        returns (uint256)
-    {
-        uint112 res = 0;
-        for (uint256 i = arr.length; i-- > 0; ) {
-            uint8 reversed = reverse_byte(arr[i]);
-            res <<= 8;
-            res |= reversed;
-        }
-        return res;
-    }
 
     function unpackFee(uint8 encoded_fee) internal pure returns (uint112) {
-        uint112 n = reverse_byte(encoded_fee);
-        return (n >> 4) * uint112(10) ** (n & 0x0f);
+        return uint112(encoded_fee >> 4) * uint112(10) ** (encoded_fee & 0x0f);
     }
 
     function bytesToAddress(bytes memory bys)

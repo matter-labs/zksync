@@ -565,13 +565,13 @@ impl BabyProver {
                 .map_err(|e| format!("store_proof failed: {}", e))?;
         } else {
             // no new job, so let's try to fast forward to the latest verified state for efficiency, and then sleep
-            let last_verified_block = storage
-                .get_last_verified_block()
-                .map_err(|e| format!("get_last_verified_block failed: {}", e))?;
-            if self.current_block_number < last_verified_block + 1 {
-                self.rewind_state(&storage, last_verified_block + 1)
-                    .map_err(|e| format!("rewind_state failed: {}", e))?;
-            }
+//            let last_verified_block = storage
+//                .get_last_verified_block()
+//                .map_err(|e| format!("get_last_verified_block failed: {}", e))?;
+//            if self.current_block_number < last_verified_block + 1 {
+//                self.rewind_state(&storage, last_verified_block + 1)
+//                    .map_err(|e| format!("rewind_state failed: {}", e))?;
+//            }
             thread::sleep(Duration::from_secs(PROVER_CYCLE_WAIT));
         }
         Ok(())

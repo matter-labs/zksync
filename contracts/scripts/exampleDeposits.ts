@@ -13,7 +13,10 @@ async function main() {
     // const depositFee = parseEther("0.01");
     // const tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: depositValue});
     // const receipt = await tx.wait();
-    console.log(await franklinDeployedContract.blocks(1));
+    let ethWallet2 = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
+
+    console.log(await franklinDeployedContract.blocks(4));
+    console.log(await franklinDeployedContract.balances(ethWallet2.address, 0));
     // console.log(receipt);
 }
 
