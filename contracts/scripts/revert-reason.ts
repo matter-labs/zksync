@@ -42,6 +42,7 @@ async function reason() {
             const code = await provider.call(tx, tx.blockNumber);
             const reason = hex_to_ascii(code.substr(138));
             console.log("revert reason:", reason);
+            console.log("revert code", code);
         }
     }
 }

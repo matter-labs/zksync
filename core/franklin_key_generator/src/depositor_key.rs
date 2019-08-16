@@ -19,9 +19,9 @@ use franklincircuit::operation::*;
 use franklinmodels::params as franklin_constants;
 
 const FILENAME: &str = "franklin_pk.key";
-const CONTRACT_FILENAME: &str = "FranklinVerificationKey.sol";
-const CONTRACT_NAME: &str = "FranklinVerificationKey";
-const CONTRACT_FUNCTION_NAME: &str = "getVkFranklinCircuit";
+const CONTRACT_FILENAME: &str = "VerificationKey.sol";
+const CONTRACT_NAME: &str = "VerificationKey";
+const CONTRACT_FUNCTION_NAME: &str = "getVk";
 
 pub fn make_franklin_key() {
     // let p_g = FixedGenerators::SpendingKeyGenerator;

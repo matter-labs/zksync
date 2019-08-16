@@ -312,3 +312,5 @@ tesseracts-up:
 
 tesseracts-down:
 	@docker-compose stop tesseracts
+submit-proof:
+	@cd contracts && yarn submit-proof
