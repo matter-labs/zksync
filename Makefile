@@ -265,11 +265,11 @@ nodes:
 
 # Dev environment
 
-dev-up:
+dev-up: tesseracts-up
 	@{ docker ps | grep -q "$(GETH_DOCKER_IMAGE)" && echo "Dev env already running" && exit 1; } || echo -n
 	@docker-compose up -d postgres geth
 
-dev-down:
+dev-down: tesseracts-down
 	@docker-compose stop postgres geth
 
 geth-up: geth
