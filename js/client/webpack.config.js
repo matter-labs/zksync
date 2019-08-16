@@ -4,6 +4,11 @@ const ExtractTextPlugin = require("extract-text-webpack-plugin")
 const HtmlWebpackPlugin = require('html-webpack-plugin')
 
 module.exports = {
+  target: 'web',
+  node: {
+    fs: 'empty',
+    child_process: 'empty'
+  },  
   entry: './src/main.js',
   output: {
     path: path.resolve(__dirname, './dist'),

@@ -7,9 +7,9 @@ import EdwardsPoint = curve.edwards.EdwardsPoint;
 import { HmacSHA512 } from 'crypto-js';
 import 'ethers';
 import {Contract, ethers} from 'ethers';
-import {franklinContractCode} from "../../../contracts/src.ts/deploy";
 import {BigNumber, bigNumberify, BigNumberish, parseEther} from "ethers/utils";
 
+const franklinContractCode = require("/Users/oleg/Desktop/franklin/contracts/build/Franklin")
 const IERC20Conract = require("openzeppelin-solidity/build/contracts/IERC20");
 
 export type Address = string;
@@ -78,7 +78,7 @@ export class Wallet {
         this.address = '0x' + (hash.getX().toString('hex') + hash.getY().toString('hex')).slice(0, 27 * 2);
         this.contract = new ethers.Contract(
             "0xDE1F1506b9b881DE029D4BD79745DDD4E16caa97", 
-            require('../../../contracts/build/Franklin').abi, 
+            require('/Users/oleg/Desktop/franklin/contracts/build/Franklin').abi, 
             ethWallet);
         this.contract.connect(this.ethWallet);
     }
