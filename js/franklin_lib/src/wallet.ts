@@ -8,6 +8,7 @@ import { HmacSHA512 } from 'crypto-js';
 import 'ethers';
 import {Contract, ethers} from 'ethers';
 import {BigNumber, bigNumberify, BigNumberish, parseEther} from "ethers/utils";
+import {expect} from "chai";
 
 const franklinContractCode = require("/Users/oleg/Desktop/franklin/contracts/build/Franklin")
 const IERC20Conract = require("openzeppelin-solidity/build/contracts/IERC20");
@@ -87,6 +88,7 @@ export class Wallet {
         const franklinDeployedContract = new Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, this.ethWallet);
         const franklinAddressBinary = Buffer.from(this.address.substr(2), "hex");
         if (token.id == 0) {
+            // console.log(await franklinDeployedContract.balances(this.ethWallet.address, 0));
             const tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: amount});
             await tx.wait(2);
             return tx.hash;

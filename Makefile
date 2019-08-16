@@ -165,7 +165,7 @@ price:
 # Loadtest
 
 run-loadtest: confirm_action
-	@node js/loadtest/loadtest.js
+	@cd js/franklin_lib && yarn loadtest
 
 prepare-loadtest: confirm_action
 	@node js/loadtest/loadtest.js prepare
