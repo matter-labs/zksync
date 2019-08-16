@@ -359,7 +359,11 @@ contract Franklin {
         (uint64 startId, uint64 totalProcessed) = commitOnchainOps(
             _publicData
         );
-
+        emit BlockCommitmentInfo( _blockNumber,
+            _feeAccount,
+            blocks[_blockNumber - 1].stateRoot,
+            _newRoot,
+            _publicData);
         bytes32 commitment = createBlockCommitment(
             _blockNumber,
             _feeAccount,
@@ -367,7 +371,7 @@ contract Franklin {
             _newRoot,
             _publicData
         );
-
+        emit BlockCommitment(commitment);
         blocks[_blockNumber] = Block(
             commitment,
             _newRoot,
@@ -386,6 +390,13 @@ contract Franklin {
     }
 
     // TODO: make the same as in the spec.
+    event BlockCommitment(bytes32 _pubData);
+    event BlockCommitmentInfo(
+        uint32 _blockNumber,
+        uint24 _feeAccount,
+        bytes32 _oldRoot,
+        bytes32 _newRoot,
+        bytes _publicData);
     function createBlockCommitment(
         uint32 _blockNumber,
         uint24 _feeAccount,
@@ -396,16 +407,16 @@ contract Franklin {
         bytes32 hash = sha256(
             abi.encodePacked(uint256(_blockNumber), uint256(_feeAccount))
         );
-        hash = sha256(abi.encodePacked(hash, _oldRoot));
-        hash = sha256(abi.encodePacked(hash, _newRoot));
+        hash = sha256(abi.encodePacked(hash, uint256(_oldRoot)));
+        hash = sha256(abi.encodePacked(hash, uint256(_newRoot)));
         // public data is committed with padding (TODO: check assembly and optimize to avoid copying data)
         hash = sha256(
             abi.encodePacked(
                 hash,
-                _publicData,
-                new bytes(BLOCK_SIZE * 8 - _publicData.length)
+                _publicData
             )
         );
+
         return hash;
     }
 
@@ -538,7 +549,6 @@ contract Franklin {
     }
 
     // Block verification
-
     function verifyBlock(uint32 _blockNumber, uint256[8] calldata proof)
         external
     {
@@ -565,11 +575,14 @@ contract Franklin {
         returns (bool valid)
     {
         uint256 mask = (~uint256(0)) >> 3;
+//        emit BlockCommitment(bytes32(mask));
         uint256[14] memory vk;
         uint256[] memory gammaABC;
         (vk, gammaABC) = verificationKey.getVk();
         uint256[] memory inputs = new uint256[](1);
         inputs[0] = uint256(commitment) & mask;
+//        emit BlockCommitment(bytes32(inputs[0]));
+//        return true;
         return verifier.Verify(vk, gammaABC, proof, inputs);
     }
 

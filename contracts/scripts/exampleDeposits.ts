@@ -9,11 +9,12 @@ const franklinAddressBinary = Buffer.from(franklinAddress, "hex");
 
 async function main() {
     const franklinDeployedContract = new Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, wallet);
-    const depositValue = parseEther("0.3");
-    const depositFee = parseEther("0.01");
-    const tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: depositValue});
-    const receipt = await tx.wait();
-    console.log(receipt);
+    // const depositValue = parseEther("0.3");
+    // const depositFee = parseEther("0.01");
+    // const tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: depositValue});
+    // const receipt = await tx.wait();
+    console.log(await franklinDeployedContract.blocks(1));
+    // console.log(receipt);
 }
 
 main();

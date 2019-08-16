@@ -29,7 +29,7 @@ fn run_eth_sender(
                     .write_be(&mut be_bytes)
                     .expect("Write commit bytes");
                 let root = H256::from(U256::from_big_endian(&be_bytes));
-
+                info!("public_data for block_number {}: {:x?}", op.block.block_number, op.block.get_eth_public_data());
                 // function commitBlock(uint32 _blockNumber, uint24 _feeAccount, bytes32 _newRoot, bytes calldata _publicData)
                 eth_client.call(
                     "commitBlock",

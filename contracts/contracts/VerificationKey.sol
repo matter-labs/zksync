@@ -7,7 +7,7 @@ pragma solidity ^0.5.1;
 // Hardcoded constants to avoid accessing store
 contract VerificationKey {
 
-    function getVk() internal pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {
+    function getVk() external pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {
 
         vk[0] = 0x168be547f38bbf62a5fd3737d05c459fdfc9cbb5df9810f75d11e78c4f67bbd3;
         vk[1] = 0x1090e1e0c31f3a4c72fd391894e67cdd546f52dd3d55f8937fd9a35349eaab2f;

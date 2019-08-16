@@ -314,3 +314,9 @@ tesseracts-down:
 	@docker-compose stop tesseracts
 submit-proof:
 	@cd contracts && yarn submit-proof
+
+submit-test-proof:
+	@cd contracts && yarn submit-test-proof
+
+block-commitment:
+	@cd contracts && yarn exampleDeposits

@@ -41,6 +41,7 @@ use models::node::config::*;
 use models::node::operations::*;
 use models::node::Account;
 use models::node::*;
+use models::primitives::pack_bits_into_bytes_in_order;
 use models::params as franklin_constants;
 use models::primitives::*;
 use models::EncodedProof;
@@ -457,16 +458,18 @@ impl BabyProver {
             info!("root after fees {}", root_after_fee);
             info!("block new hash {}", block.new_root_hash);
             assert_eq!(root_after_fee, block.new_root_hash);
-
             let (validator_audit_path, _) =
                 get_audits(&mut self.accounts_tree, block.fee_account as u32, 0);
-
+            
+            info!("Data for public commitment. pub_data: {:x?}, initial_root: {}, final_root: {}, validator_address: {}, block_number: {}",
+                  pack_bits_into_bytes_in_order(pub_data.clone()), initial_root.clone(), root_after_fee.clone(), Fr::from_str(&block.fee_account.to_string()).unwrap(), Fr::from_str(&(block_number + 1).to_string()).unwrap()
+                );
             let public_data_commitment = public_data_commitment::<Engine>(
                 &pub_data,
                 Some(initial_root.clone()),
                 Some(root_after_fee.clone()),
                 Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
-                Some(Fr::from_str(&(block_number + 1).to_string()).unwrap()),
+                Some(Fr::from_str(&(block_number).to_string()).unwrap()),
             );
 
             let instance = FranklinCircuit {
@@ -474,7 +477,7 @@ impl BabyProver {
                 operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
                 old_root: Some(initial_root),
                 new_root: Some(block.new_root_hash),
-                block_number: Fr::from_str(&(block_number + 1).to_string()),
+                block_number: Fr::from_str(&(block_number).to_string()),
                 validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
                 pub_data_commitment: Some(public_data_commitment.clone()),
                 operations: operations.clone(),
@@ -521,7 +524,7 @@ impl BabyProver {
             let pvk = prepare_verifying_key(&self.parameters.vk);
 
             info!(
-                "Made a proof for initial root = {}, final root = {}, public data = {}",
+                "Made a proof for initial root = {}, final root = {}, public_data_commitment = {}",
                 initial_root,
                 root_after_fee,
                 public_data_commitment.to_hex()

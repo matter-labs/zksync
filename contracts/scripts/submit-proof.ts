@@ -7,7 +7,7 @@ const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/
 const franklinDeployedContract = new Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, wallet);
 
 async function main() {
-    const blockProof = ["0x9d2a07078f7827da52e8b59196a59143c23d1ce46eeb732c5a64f9c8f70022a", "0x15af07e1dbe5da4ba159278d37f5b3b550c95a98a5ecf4a1830170dbdc57aa01", "0xb1a4527cf195934249d1de157f2621e5e6098c27c23b22aa55b5ebbf55274a1", "0x11f12c2f7149c50761b33c0ce1632f03c06679a02fb180f6bbf3cd5b9825ff91", "0x5cb55c231b3ad6982f4846f88ac92fb43feb7e34d3261a4207621221d2e31e7", "0x104955fe794e0630b65efd94dccd91925ce5573a692d597402889e069e7e1150", "0x2051bb039d373074465e68da4770a4d4c9d4ea80e7104cea7daf8063db3d6417", "0x2ad34d0969f70b9672cb5da95a0a58a0990bfeb07700d84abfef99c595e990c9"];
+    const blockProof = ["0x248e713ef673d819793fddf7af2eaee18cb0fef2698cfdafb5a1133d76a3d6ce", "0x3fb5d99e4f02be3ed3ce4fd10a71fb929669001f442774e713723faadfd4c37", "0x28a6a4230573eeefd3afe006872c2f6bbafadd7bf4dada5bac8f8dc81ab173f1", "0x3367fbbc14dc25a837cc43337f58ceae358f75f68630853167a86d77c0a6021", "0x1776d25389caf42351ba498d8004d3f7131a74f093c2172b54b6b5eb4bf157fc", "0x1cbb8012cb48807e0ac6ed29602ebed033142949fdda8bfc8f28062e4971eb84", "0x24f65e2ed6467dc7d83fdfa8b4bcf5bb93af111fc119860f56b07c10df42702", "0x2d0fd274a53293cab12986bc2997d7fd8eccb80f1d480fc5539bca2bcaa8e44a"];
     let tx = await franklinDeployedContract.verifyBlock(1, blockProof, {gasLimit: bigNumberify("1000000")});
     console.log("tx: ",tx);
     let receipt = await tx.wait();
