@@ -77,8 +77,9 @@ export class Wallet {
         let buff = Buffer.from(x.toString('hex') + y.toString('hex'), 'hex');
         let hash = pedersenHash(buff);
         this.address = '0x' + (hash.getX().toString('hex') + hash.getY().toString('hex')).slice(0, 27 * 2);
+        console.log('process.env.CONTRACT_ADDR', process.env.CONTRACT_ADDR);
         this.contract = new ethers.Contract(
-            "0xDE1F1506b9b881DE029D4BD79745DDD4E16caa97", 
+            process.env.CONTRACT_ADDR,
             require('/Users/oleg/Desktop/franklin/contracts/build/Franklin').abi, 
             ethWallet);
         this.contract.connect(this.ethWallet);
@@ -111,8 +112,9 @@ export class Wallet {
     async depositOffchain(token: Token, amount: BN, fee: BN) {
         let nonce = await this.getNonce();
         if (this.franklinState.pending_txs.length > 0) {
-            console.log("please wait for all pending transactions to complete before sending a new one.");
-            return;
+            return {
+                err: "please wait for all pending transactions to complete before sending a new one."
+            };
         }
 
         let tx = {
@@ -172,11 +174,19 @@ export class Wallet {
         return await this.provider.submitTx(tx);
     }
 
+    /**
+     * transfer between franklin
+     * @param address 
+     * @param token 
+     * @param amount 
+     * @param fee 
+     */
     async transfer(address: Address, token: Token, amount: BN, fee: BN) {
         let nonce = await this.getNonce();
         if (this.franklinState.pending_txs.length > 0) {
-            console.log("please wait for all pending transactions to complete before sending a new one.");
-            return;
+            return {
+                err: "please wait for all pending transactions to complete before sending a new one."
+            };
         }
         // use packed numbers for signture
         let tx = {
@@ -194,7 +204,7 @@ export class Wallet {
 
     async getNonce(): Promise<number> {
         await this.getState();
-        return this.franklinState.commited.nonce
+        return this.franklinState.commited.nonce + 9
     }
 
     static async fromEthWallet(wallet: ethers.Wallet) {
@@ -254,14 +264,12 @@ export class Wallet {
      */
     async getCommittedOnchainState() {
         let tokens = await this.getOnchainTokensList();
-        // let balanceGetter = this.getOnchainBalanceForToken.bind(this);
-        // let balances = await Promise.all(tokens.map(balanceGetter));
         let res = [];
         for (let t = 0; t < tokens.length; ++t) {
             let currToken = this.supportedTokens[t];
             let balance = (await this.getOnchainBalanceForToken(currToken)).toString(10);
             res.push({
-                token: currToken.address,
+                token: currToken.symbol,
                 balance: balance,
             });
         }
@@ -277,14 +285,15 @@ export class Wallet {
     /**
      * list of tokens user has locked/unlocked in our contract
      */
-    async getCommittedContractTokensList() {
+    private async getCommittedContractTokensList() {
         // TODO:
         // this can be retrieved from our contract or our server
         return await this.getOnchainTokensList();
     }
 
-    async getLockedContractBalanceForToken(token: Token) {
-        let [balance, block] = await this.contract.getMyBalanceForToken(token);
+    private async getLockedContractBalanceForToken(token: Token) {
+        let address = this.ethWallet.address;
+        let [balance, block] = await this.contract.balances(address, token.id);
         let currBlock = await this.ethWallet.provider.getBlockNumber();
         if (currBlock < block) {
             return balance;
@@ -292,7 +301,7 @@ export class Wallet {
         return new BN(0);
     }
 
-    async getUnlockedContractBalanceForToken(token: Token) {
+    private async getUnlockedContractBalanceForToken(token: Token) {
         let address = this.ethWallet.address;
         let [balance, block] = await this.contract.balances(address, token.id);
         let currBlock = await this.ethWallet.provider.getBlockNumber();
@@ -307,9 +316,6 @@ export class Wallet {
      */
     async getCommittedContractBalances() {
         let tokens: Token[] = await this.getCommittedContractTokensList();
-        let lockedBalanceGetter = this.getLockedContractBalanceForToken.bind(this);
-        let unlockedBalanceGetter = this.getUnlockedContractBalanceForToken.bind(this);
-
         let res = [];
         for (let i = 0; i < tokens.length; i++) {
             let token: Token = tokens[i];
@@ -321,22 +327,19 @@ export class Wallet {
                 unlocked: unlockedBalance
             });
         }
+        return {
+            contractBalances: res
+        };
+    }
 
-        // let [lockedBalances, unlockedBalances] = await Promise.all([
-        //     Promise.all(tokens.map(lockedBalanceGetter)),
-        //     Promise.all(tokens.map(unlockedBalanceGetter))
-        // ]);
-        // let res = [];
-        // for (let t = 0; t < tokens.length; ++t) {
-        //     res.push({
-        //         token: Wallet.tokensNames[t],
-        //         locked: lockedBalances[t].toString(),
-        //         unlocked: unlockedBalances[t].toString()
-        //     });
-        // }
-        // return {
-        //     contractBalances: res
-        // };
+    async getCommittedContractBalancesString() {
+        return {
+            contractBalances: (await this.getCommittedContractBalances()).contractBalances.map(balance => ({
+                token: balance.token,
+                locked: balance.locked.toString(10),
+                unlocked: balance.unlocked.toString(10)
+            }))
+        };
     }
 
     /**
@@ -352,16 +355,40 @@ export class Wallet {
      * balances in Franklin
      */
     async getVerifiedFranklinState() {
-        let res = await this.getCommittedOnchainState();
-        res['nonce'] = 32;
-        return res;
+        let balances = this.franklinState.verified.balances;
+        let tokens = this.supportedTokens;
+        let res = [];
+        for (let t = 0; t < tokens.length; t++) {
+            let token = tokens[t];
+            let balance = balances[t];
+            res.push({
+                token: token.symbol,
+                balance: balance,
+            });
+        }
+        return {
+            balances: res
+        };
     }
 
     /**
      * 
      */
     async getCommittedFranklinState() {
-        return await this.getVerifiedFranklinState();
+        let balances = this.franklinState.commited.balances;
+        let tokens = this.supportedTokens;
+        let res = [];
+        for (let t = 0; t < tokens.length; t++) {
+            let token = tokens[t];
+            let balance = balances[t];
+            res.push({
+                token: token.symbol,
+                balance: balance,
+            });
+        }
+        return {
+            balances: res
+        };
     }
     
     /**
@@ -369,16 +396,30 @@ export class Wallet {
      * sent during this session, to get the pending state.
      */
     async getPendingFranklinState() {
-        return await this.getVerifiedFranklinState();
-    }
-
-    /**
-     * transfer from contract balance to franklin
-     * @param token 
-     * @param amount 
-     */
-    async depositFranklin(token, amount) {
+        let committed = (await this.getCommittedFranklinState()).balances;
         
+        let pendingTransactions = this.franklinState.pending_txs;
+        for (let i = 0; i < pendingTransactions.length; i++) {
+            let tx = pendingTransactions[i];
+            for (let j = 0; j < committed.length; j++) {
+                let balance = committed[j];
+                let symbol = this.supportedTokens[tx.token].symbol
+                
+                if (symbol == balance.token) continue;
+
+                if (tx.to === this.address) {
+                    balance.balance += tx.amount;
+                } else if (tx.from === this.address) {
+                    balance.balance -= tx.amount;
+                } else {
+                    throw new Error ('pending transactions must be related to this account.');
+                }
+            }
+        }
+
+        return {
+            balances: committed
+        };
     }
 
     /**

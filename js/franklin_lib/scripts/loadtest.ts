@@ -42,9 +42,26 @@ async function main() {
     let wallet = await Wallet.fromEthWallet(ethWallet);
 
     await wallet.getState();
-    console.log(await wallet.depositOnchain(wallet.supportedTokens['0'], bigNumberify(20)));
-    await sleep(20000);
-    console.log(await wallet.depositOffchain(wallet.supportedTokens['0'], new BN(18), new BN(2)));
+    await wallet.transfer(
+        "0x000000000000000000000000000000000000000000000000000000", 
+        wallet.supportedTokens[0], 
+        new BN("10"), 
+        new BN("1"));
+
+    await new Promise(r => setTimeout(r, 5999));
+
+    await wallet.getState();
+    console.log(await wallet.getCommittedOnchainState());
+    console.log(await wallet.getCommittedContractBalancesString());
+    console.log("verified:");
+    console.log(JSON.stringify(await wallet.getVerifiedFranklinState()));
+    console.log("committed:");
+    console.log(JSON.stringify(await wallet.getCommittedFranklinState()));
+    console.log("pending:");
+    console.log(JSON.stringify(await wallet.getPendingFranklinState()));
+    // console.log(await wallet.depositOnchain(wallet.supportedTokens['0'], bigNumberify(20)));
+    // await sleep(20000);
+    // console.log(await wallet.depositOffchain(wallet.supportedTokens['0'], new BN(18), new BN(2)));
     //
     // sleep(10000);
     //

@@ -201,10 +201,10 @@
                     </p>
                     <label for="transferToken" class="mt-4">Token</label>
                     <b-form-select v-model="tokenToTransferFranklin" :option="store.plasma.allTokensList" class="mb-3">
-                        <option v-for="token in store.allTokensInfo" v-bind:key="token.elemId" @click="tokenToTransferFranklin=token.tokenName">{{ token }}</option>
+                        <option v-for="token in store.plasma.allTokensInfo" v-bind:key="token.elemId" @click="tokenToTransferFranklin=token.tokenName">{{ token.tokenName   }}</option>
                     </b-form-select>
                     <label for="transferAmountInput" class="mt-4">Amount</label>
-                            (max {{tokenToTransferFranklin}}&nbsp;<a href="#" @click="transferAmount=franklinCommittedBalanceForToken(tokenToTransferFranklin)">{{franklinCommittedBalanceForToken(tokenToTransferFranklin)}}</a>):
+                            (max {{tokenToTransferFranklin}}&nbsp;<a href="#" @click="transferAmount=store.plasma.committed.balanceDict[tokenToTransferFranklin]">{{store.plasma.committed.balanceDict[tokenToTransferFranklin]}}</a>):
                     <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
 
                     <label for="transferNonceInput" class="mt-4">Nonce (autoincrementing):</label>
@@ -313,6 +313,7 @@ window.transactionLib = transactionLib
 
 import ABI from './contract'
 import { setTimeout } from 'timers';
+import { write } from 'fs';
 
 const maxExitEntries = 32;
 
@@ -419,14 +420,18 @@ export default {
         contractAddress: () => window.contractAddress,
         depositProblem() {
             // if(store.account.plasma.closing) return "pending closing account, please complete exit first"
-            // if ( ! this.franklinCoins.some(ethereumBalanceForToken)) return "empty balance in the mainchain account"
-            // if(!(Number(store.account.balance) > 0)) return "empty balance in the mainchain account"
+            if ( ! store.onchain.committed.balances.some(b => b.balance > 0)) {
+                return "empty balance in the mainchain account"
+            }
         },
         doDepositProblem() {
             if(this.depositProblem) return this.depositProblem
             if(!(this.depositAmount > 0)) return "invalid deposit amount: " + this.depositAmount
-            if(Number(this.depositAmount) > Number(store.account.balance)) return "deposit amount exceeds mainchain account balance: " 
-                + this.depositAmount + " > " + store.account.balance
+            console.log('tokenForDEposit: ', this.tokenForDeposit);
+            let token = this.tokenForDeposit;
+            let onchainBalance = store.onchain.committed.balanceDict[token];
+            if(Number(this.depositAmount) > Number(onchainBalance)) return "deposit amount exceeds mainchain account balance: " 
+                + this.depositAmount + " > " + onchainBalance;
         }, 
         withdrawProblem() {
             console.log('store.plasma.committed', store.plasma.committed);
@@ -440,14 +445,31 @@ export default {
                 + this.nonce + ", expected >= " + store.account.plasma.committed.nonce
         },
         transferProblem() {
-            if(!store.account.plasma.id) return "no Matter Network account exists yet"
-            if(!(Number(store.account.plasma.committed.balance) > 0)) return "Matter Network account has empty balance"
-            if(!(Number(store.account.plasma.verified.balance) > 0)) return "empty balance in the Matter Network account"
-            if(!ethUtil.isHexString(this.transferTo)) return "`To` is not a valid ethereum address: " + this.transferTo
+            if ( false === store.plasma.committed.balances.some(b => b.balance > 0) ) {
+                return "Matter Network account has empty balances"
+            }
+
+            // TODO: when prover works, uncomment
+            // console.log('store.plasma.verified', store.plasma.verified);
+            // if ( false === store.plasma.verified.balances.some(b => b.balance > 0) ) {
+            //     return "empty balance in the Matter Network account"
+            // }
+            
+            // if(!ethUtil.isHexString(this.transferTo)) return "`To` is not a valid ethereum address: " + this.transferTo
             if(!(this.transferAmount > 0)) return "positive amount required, e.g. 100.55"
-            if(Number(this.transferAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Matter Network balance"
-            if(Number(this.nonce) < Number(store.account.plasma.committed.nonce)) return "nonce must be greater then confirmed in Matter Network: got " 
-                + this.nonce + ", expected >= " + store.account.plasma.committed.nonce
+            // if(Number(this.transferAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Matter Network balance"
+
+            let token = this.tokenToTransferFranklin;
+            let plasmaBalance = store.plasma.committed.balanceDict[token];
+            console.log('token trnasfer', token);
+            console.log('plasmaBalance for this token', plasmaBalance)
+
+            if ( this.transferAmount > plasmaBalance ) {
+                return " insufficient funds for the operation ";
+            }
+            
+            if(Number(this.nonce) < Number(store.plasma.committed.nonce)) return "nonce must be greater then confirmed in Matter Network: got " 
+                + this.nonce + ", expected >= " + store.plasma.committed.nonce
         },
         pendingWithdraw: () => Number(store.account.onchain.balance) > 0,
     },
@@ -490,13 +512,45 @@ export default {
             })[token];
         },
         async deposit() {
-            this.$refs.depositModal.hide()
-            let pub = store.account.plasma.key.publicKey
-            let maxFee = new BN(0)
-            let value = Eth.toWei(this.depositAmount, 'ether')
-            let from = store.account.address
-            let hash = await contract.deposit([pub.x, pub.y], maxFee, { value, from })
-            this.alert('Deposit initiated, tx: ' + hash, 'success')
+            this.$refs.depositModal.hide();
+            try {
+                this.alert('starting deposit onchain');
+            
+                let token = ((tokenSymbol) => {
+                    let allTokens = wallet.supportedTokens;
+                        for (let i = 0; i < allTokens.length; i++) {
+                        if (String(allTokens[i].symbol) == tokenSymbol) {
+                            return allTokens[i];
+                        }
+                    }
+                    throw new Error("hey " + tokenSymbol);
+                })(this.tokenForDeposit);
+                console.log('token for deposit: ', token);
+
+                let amount = ethers.utils.bigNumberify(this.depositAmount);
+                console.log('amount for deposit', amount);
+
+                this.alert('starting deposit onchain');
+                await wallet.depositOnchain(token, amount);
+        
+                await new Promise(r => setTimeout(r, 5000));
+
+                this.alert('starting deposit offchain');
+                let res = await wallet.depositOffchain(token, amount, new BN("0x1"));
+
+                this.alert("status of this transaction: " + JSON.stringify(res));
+
+                let contract_balances = await wallet.getCommittedContractBalances();
+            } catch (e) {
+                this.alert('deposit failed: ' + e);
+            }
+
+            // let pub = store.account.plasma.key.publicKey
+            // let maxFee = new BN(0)
+            // let value = Eth.toWei(this.depositAmount, 'ether')
+            // let from = store.account.address
+            // let hash = await contract.deposit([pub.x, pub.y], maxFee, { value, from })
+            // this.alert('Deposit initiated, tx: ' + hash, 'success')
         },
         async withdrawSome() {
             try {
@@ -532,15 +586,15 @@ export default {
         async transfer() {
             try {
             this.transferPending = true
-                if(!ethUtil.isHexString(this.transferTo)) {
-                    this.alert('to is not a hex string')
-                    return 
-                }
-                const to = (await contract.ethereumAddressToAccountID(this.transferTo))[0].toNumber()
-                if(0 === to) {
-                    this.alert('recepient not found')
-                    return
-                }
+                // if(!ethUtil.isHexString(this.transferTo)) {
+                //     this.alert('to is not a hex string')
+                //     return 
+                // }
+                // const to = (await contract.ethereumAddressToAccountID(this.transferTo))[0].toNumber()
+                // if(0 === to) {
+                //     this.alert('recepient not found')
+                //     return
+                // }
                 await this.plasmaTransfer(to, this.transferAmount)
             } finally {
                 this.transferPending = false
@@ -798,9 +852,10 @@ export default {
             };
             try {
                 // ******************* get the info from wallet *******************
+                await wallet.getState();
+
                 onchain.address = wallet.ethWallet.address;
-                onchain.nonce = await wallet.getNonce();
-                
+        
                 onchain.committed = await wallet.getCommittedOnchainState();
                 onchain.pending   = await wallet.getPendingOnchainState();
             
@@ -808,6 +863,8 @@ export default {
                 plasma.pending   = await wallet.getPendingFranklinState();
                 plasma.committed = await wallet.getCommittedFranklinState();
                 plasma.verified  = await wallet.getVerifiedFranklinState();
+                this.nonce = plasma.nonce = wallet.franklinState.commited.nonce;
+
 
                 contract.committed.lockedUnlockedBalances = 
                     (await wallet.getCommittedContractBalances()).contractBalances;
@@ -989,28 +1046,9 @@ export default {
                 console.log(err)
             }
             if(timer === this.updateTimer) { // if this handler is still valid
-                store.onchain.address = onchain.address || {};
-                store.onchain.nonce = onchain.nonce || {};
-                store.onchain.committed.balances = onchain.committed.balances || {};
-                store.onchain.committed.balanceDict = onchain.committed.balanceDict || {};
-                store.onchain.pending.balances = onchain.pending.balances || {};
-                store.onchain.pending.balanceDict = onchain.pending.balanceDict || {};
-                store.onchain.allTokensList = onchain.allTokensList || {};
-                store.onchain.allTokensInfo = onchain.allTokensInfo || {};
-                store.plasma.address = plasma.address || {};
-                store.plasma.pending.balances = plasma.pending.balances || {};
-                store.plasma.pending.balanceDict = plasma.pending.balanceDict || {};
-                store.plasma.pending.nonce = plasma.pending.nonce || {};
-                store.plasma.committed.balances = plasma.committed.balances || {};
-                store.plasma.committed.balanceDict = plasma.committed.balanceDict || {};
-                store.plasma.committed.nonce = plasma.committed.nonce || {};
-                store.plasma.verified.balance = plasma.verified.balance || {};
-                store.plasma.verified.balanceDict = plasma.verified.balanceDict || {};
-                store.plasma.verified.nonce = plasma.verified.nonce || {};
-                store.plasma.allTokensList = plasma.allTokensList || {};
-                store.plasma.allTokensInfo = plasma.allTokensInfo || {};
-                store.contract.committed.lockedUnlockedBalances = contract.committed.lockedUnlockedBalances || {};
-                store.contract.pending.lockedUnlockedBalances = contract.pending.lockedUnlockedBalances || {};
+                store.onchain = onchain;
+                store.plasma = plasma;
+                store.contract = contract;
                 this.updateTimer = setTimeout(() => this.updateAccountInfo(), 1001)
             }
         },
