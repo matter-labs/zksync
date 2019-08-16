@@ -5,24 +5,10 @@ import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 import "./Verifier.sol";
 import "./VerificationKey.sol";
 
-interface IVerifier {
-    function Verify(
-        uint256[14] calldata in_vk,
-        uint256[] calldata vk_gammaABC,
-        uint256[8] calldata in_proof,
-        uint256[] calldata proof_inputs
-    ) external view returns (bool);
-}
-
-interface IVerificationKey {
-    function getVk() external pure returns (uint256[14] memory vk, uint256[] memory gammaABC);
-}
-
 contract Franklin {
+    VerificationKey verificationKey;
+    Verifier verifier;
 
-    IVerificationKey verificationKey;
-    IVerifier verifier;
-    
     // chunks per block; each chunk has 8 bytes of public data
     uint256 constant BLOCK_SIZE = 10;
     // must fit into uint112
@@ -92,7 +78,7 @@ contract Franklin {
 
     // List of root-chain balances (per owner and tokenId)
     mapping(address => mapping(uint32 => Balance)) public balances;
-    mapping (address => bool) public depositWasDone;
+    mapping(address => bool) public depositWasDone;
     mapping(bytes => address) public depositFranklinToETH;
 
     // TODO: - fix
@@ -144,7 +130,7 @@ contract Franklin {
         uint112 amount;
     }
 
-// Total number of registered OnchainOps
+    // Total number of registered OnchainOps
     uint64 totalOnchainOps;
 
     // List of OnchainOps by index
@@ -197,8 +183,8 @@ contract Franklin {
         address _exitQueue,
         address _networkGovernor
     ) public {
-        verifier = IVerifier(_verifierAddress);
-        verificationKey = IVerificationKey(_vkAddress);
+        verifier = Verifier(_verifierAddress);
+        verificationKey = VerificationKey(_vkAddress);
 
         blocks[0].stateRoot = _genesisRoot;
         exitQueue = _exitQueue;
@@ -221,7 +207,7 @@ contract Franklin {
         tokenAddresses[totalTokens + 1] = _token; // Adding one because tokenId = 0 is reserved for ETH
         tokenIds[_token] = totalTokens + 1;
         totalTokens++;
-         emit TokenAdded(_token, totalTokens);
+        emit TokenAdded(_token, totalTokens);
     }
 
     function setValidator(address _validator, bool _active) external {
@@ -268,7 +254,11 @@ contract Franklin {
         msg.sender.transfer(_amount);
     }
 
-    function depositERC20(address _token, uint112 _amount, bytes calldata _franklin_addr) external {
+    function depositERC20(
+        address _token,
+        uint112 _amount,
+        bytes calldata _franklin_addr
+    ) external {
         require(
             IERC20(_token).transferFrom(msg.sender, address(this), _amount),
             "transfer failed"
@@ -302,7 +292,10 @@ contract Franklin {
         balances[msg.sender][_tokenId].lockedUntilBlock = lockedUntilBlock;
 
         if (depositWasDone[msg.sender]) {
-            require(depositFranklinToETH[_franklin_addr] == msg.sender, "ETH depositor mismatch");
+            require(
+                depositFranklinToETH[_franklin_addr] == msg.sender,
+                "ETH depositor mismatch"
+            );
         } else {
             depositFranklinToETH[_franklin_addr] = msg.sender;
             depositWasDone[msg.sender] = true;
@@ -356,14 +349,8 @@ contract Franklin {
 
         // TODO: make efficient padding here
 
-        (uint64 startId, uint64 totalProcessed) = commitOnchainOps(
-            _publicData
-        );
-        emit BlockCommitmentInfo( _blockNumber,
-            _feeAccount,
-            blocks[_blockNumber - 1].stateRoot,
-            _newRoot,
-            _publicData);
+        (uint64 startId, uint64 totalProcessed) = commitOnchainOps(_publicData);
+
         bytes32 commitment = createBlockCommitment(
             _blockNumber,
             _feeAccount,
@@ -371,7 +358,7 @@ contract Franklin {
             _newRoot,
             _publicData
         );
-        emit BlockCommitment(commitment);
+
         blocks[_blockNumber] = Block(
             commitment,
             _newRoot,
@@ -390,13 +377,6 @@ contract Franklin {
     }
 
     // TODO: make the same as in the spec.
-    event BlockCommitment(bytes32 _pubData);
-    event BlockCommitmentInfo(
-        uint32 _blockNumber,
-        uint24 _feeAccount,
-        bytes32 _oldRoot,
-        bytes32 _newRoot,
-        bytes _publicData);
     function createBlockCommitment(
         uint32 _blockNumber,
         uint24 _feeAccount,
@@ -422,10 +402,7 @@ contract Franklin {
 
     function commitOnchainOps(bytes memory _publicData)
         internal
-        returns (
-            uint64 onchainOpsStartId,
-            uint64 processedOnchainOps
-        )
+        returns (uint64 onchainOpsStartId, uint64 processedOnchainOps)
     {
         require(_publicData.length % 8 == 0, "pubdata.len % 8 != 0");
 
@@ -473,17 +450,15 @@ contract Franklin {
             // to_account: 3, token: 2, amount: 3, fee: 1, new_pubkey_hash: 27
 
             uint16 tokenId = uint16(
-            (uint256(uint8(_publicData[opDataPointer + 3])) << 8)
-                + uint256(uint8(_publicData[opDataPointer + 4]))
+                (uint256(uint8(_publicData[opDataPointer + 3])) << 8) +
+                    uint256(uint8(_publicData[opDataPointer + 4]))
             );
-
 
             uint8[3] memory amountPacked;
             amountPacked[0] = uint8(_publicData[opDataPointer + 5]);
             amountPacked[1] = uint8(_publicData[opDataPointer + 6]);
             amountPacked[2] = uint8(_publicData[opDataPointer + 7]);
             uint112 amount = unpackAmount(amountPacked);
-
 
             uint8 feePacked = uint8(_publicData[opDataPointer + 8]);
             uint112 fee = unpackFee(feePacked);
@@ -519,8 +494,8 @@ contract Franklin {
             // pubdata account: 3, token: 2, amount: 3, fee: 1, eth_key: 20
 
             uint16 tokenId = uint16(
-                (uint256(uint8(_publicData[opDataPointer + 3])) << 8)
-                + uint256(uint8(_publicData[opDataPointer + 4]))
+                (uint256(uint8(_publicData[opDataPointer + 3])) << 8) +
+                    uint256(uint8(_publicData[opDataPointer + 4]))
             );
 
             uint8[3] memory amountPacked;
@@ -575,14 +550,11 @@ contract Franklin {
         returns (bool valid)
     {
         uint256 mask = (~uint256(0)) >> 3;
-//        emit BlockCommitment(bytes32(mask));
         uint256[14] memory vk;
         uint256[] memory gammaABC;
         (vk, gammaABC) = verificationKey.getVk();
         uint256[] memory inputs = new uint256[](1);
         inputs[0] = uint256(commitment) & mask;
-//        emit BlockCommitment(bytes32(inputs[0]));
-//        return true;
         return verifier.Verify(vk, gammaABC, proof, inputs);
     }
 
@@ -680,24 +652,50 @@ contract Franklin {
                     EXPECT_VERIFICATION_IN;
     }
 
+    function unpackAmount(uint8[3] memory _amount)
+        internal
+        pure
+        returns (uint112)
+    {
+        uint112 n = uint112(bitwise_reverse(_amount));
+        return (n >> 5) * (uint112(10) ** (n & 0x1f));
+    }
 
-    function unpackAmount(
-        uint8[3] memory _amount
-    ) internal pure returns (uint112) {
-        uint24 n = uint24(_amount[0]) << 2*8
-        + uint24(_amount[1]) << 8
-        + uint24(_amount[2]);
+    function reverse_byte(uint8 b) internal pure returns (uint8) {
+        uint8 res = 0;
+        for (uint256 i = 0; i < 8; ++i) {
+            res <<= 1;
+            res |= (b >> i) & 1;
+        }
+        return res;
+    }
 
-        return uint112(n >> 5) * (uint112(10) ** (n & 0x1f));
+    function bitwise_reverse(uint8[3] memory arr)
+        internal
+        pure
+        returns (uint256)
+    {
+        uint112 res = 0;
+        for (uint256 i = arr.length; i-- > 0; ) {
+            uint8 reversed = reverse_byte(arr[i]);
+            res <<= 8;
+            res |= reversed;
+        }
+        return res;
     }
 
     function unpackFee(uint8 encoded_fee) internal pure returns (uint112) {
-        return uint112(encoded_fee >> 4) * uint112(10) ** (encoded_fee & 0x0f);
+        uint112 n = reverse_byte(encoded_fee);
+        return (n >> 4) * uint112(10) ** (n & 0x0f);
     }
 
-    function bytesToAddress(bytes memory bys) internal pure returns (address addr) {
+    function bytesToAddress(bytes memory bys)
+        internal
+        pure
+        returns (address addr)
+    {
         assembly {
-            addr := mload(add(bys,20))
+            addr := mload(add(bys, 20))
         }
     }
 }
