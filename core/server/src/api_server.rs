@@ -298,190 +298,198 @@ fn handle_get_tokens(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
 //    Ok(HttpResponse::Ok().json(tx))
 //}
 
-//fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-//    let pool = req.state().connection_pool.clone();
-//
-//    let storage = pool.access_storage();
-//    if storage.is_err() {
-//        return Ok(HttpResponse::Ok().json(ApiError {
-//            error: "rate limit".to_string(),
-//        }));
-//    }
-//    let storage = storage.unwrap();
-//
-//    let block_id_string = req.match_info().get("block_id");
-//    if block_id_string.is_none() {
-//        return Ok(HttpResponse::Ok().json(ApiError {
-//            error: "invalid parameters".to_string(),
-//        }));
-//    }
-//    let block_id = block_id_string.unwrap().parse::<u32>();
-//    if block_id.is_err() {
-//        return Ok(HttpResponse::Ok().json(ApiError {
-//            error: "invalid block_id".to_string(),
-//        }));
-//    }
-//
-//    let block_id_u32 = block_id.unwrap();
-//
-//    let result = storage.load_transactions_in_block(block_id_u32);
-//    match result {
-//        Ok(txs) => Ok(HttpResponse::Ok().json(txs)),
-//        Err(err) => Ok(HttpResponse::Ok().json(ApiError {
-//            error: format!("error: {}", err),
-//        })),
-//    }
-//}
+fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    let pool = req.state().connection_pool.clone();
 
-//fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-//    let pool = req.state().connection_pool.clone();
-//
-//    let storage = pool.access_storage();
-//    if storage.is_err() {
-//        return Ok(HttpResponse::Ok().json(ApiError {
-//            error: "rate limit".to_string(),
-//        }));
-//    }
-//    let storage = storage.unwrap();
-//
-//    let block_id_string = req.match_info().get("block_id");
-//    if block_id_string.is_none() {
-//        return Ok(HttpResponse::Ok().json(ApiError {
-//            error: "invalid parameters".to_string(),
-//        }));
-//    }
-//    let block_id = block_id_string.unwrap().parse::<u32>();
-//    if block_id.is_err() {
-//        return Ok(HttpResponse::Ok().json(ApiError {
-//            error: "invalid block_id".to_string(),
-//        }));
-//    }
-//
-//    let block_id_u32 = block_id.unwrap();
-//
-//    // FIXME: no expects in API server db requests, because they might fail temporarily and bring down the server!
-//    let stored_commit_operation =
-//        storage.load_stored_op_with_block_number(block_id_u32, ActionType::COMMIT);
-//    if stored_commit_operation.is_none() {
-//        return Ok(HttpResponse::Ok().json(ApiError {
-//            error: "not found".to_string(),
-//        }));
-//    }
-//
-//    let commit = stored_commit_operation.unwrap();
-//    let operation = commit.clone().into_op(&storage);
-//    if let Err(ref err) = &operation {
-//        return Ok(HttpResponse::Ok().json(ApiError {
-//            error: format!("db error: {}", err),
-//        }));
-//    }
-//    let operation = operation.unwrap();
-//
-//    let verify = storage.load_stored_op_with_block_number(block_id_u32, ActionType::VERIFY);
-//
-//    let response = BlockDetails {
-//        block_number: commit.block_number as i32,
-//        new_state_root: format!("0x{}", operation.block.new_root_hash.to_hex()),
-//        commit_tx_hash: commit.tx_hash,
-//        verify_tx_hash: verify.as_ref().and_then(|op| op.tx_hash.clone()),
-//        committed_at: commit.created_at,
-//        verified_at: verify.as_ref().map(|op| op.created_at),
-//    };
-//
-//    Ok(HttpResponse::Ok().json(response))
-//}
+    let storage = pool.access_storage();
+    if storage.is_err() {
+        return Ok(HttpResponse::Ok().json(ApiError {
+            error: "rate limit".to_string(),
+        }));
+    }
+    let storage = storage.unwrap();
+
+    let block_id_string = req.match_info().get("block_id");
+    if block_id_string.is_none() {
+        return Ok(HttpResponse::Ok().json(ApiError {
+            error: "invalid parameters".to_string(),
+        }));
+    }
+    let block_id = block_id_string.unwrap().parse::<u32>();
+    if block_id.is_err() {
+        return Ok(HttpResponse::Ok().json(ApiError {
+            error: "invalid block_id".to_string(),
+        }));
+    }
+
+    let block_id_u32 = block_id.unwrap();
+
+    let stored_commit_operation =
+        storage.load_stored_op_with_block_number(block_id_u32, ActionType::COMMIT);
+    if stored_commit_operation.is_none() {
+        return Ok(HttpResponse::Ok().json(ApiError {
+            error: "not found".to_string(),
+        }));
+    }
+
+    let commit = stored_commit_operation.unwrap();
+    let operation = commit.clone().into_op(&storage);
+    if let Err(ref err) = &operation {
+        return Ok(HttpResponse::Ok().json(ApiError {
+            error: format!("db error: {}", err),
+        }));
+    }
+    let operation = operation.unwrap();
+
+    let verify = storage.load_stored_op_with_block_number(block_id_u32, ActionType::VERIFY);
+
+    let response = BlockDetails {
+        block_number: commit.block_number as i32,
+        new_state_root: format!("0x{}", operation.block.new_root_hash.to_hex()),
+        commit_tx_hash: commit.tx_hash,
+        verify_tx_hash: verify.as_ref().and_then(|op| op.tx_hash.clone()),
+        committed_at: commit.created_at,
+        verified_at: verify.as_ref().map(|op| op.created_at),
+    };
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+fn handle_get_blocks(
+   req: &HttpRequest<AppState>,
+) -> Box<Future<Item = HttpResponse, Error = Error>> {
+    let pool = req.state().connection_pool.clone();
+
+    let max_block = req
+        .query()
+        .get("max_block")
+        .cloned()
+        .unwrap_or_else(|| "99999999".to_string());
+    let limit = req
+        .query()
+        .get("limit")
+        .cloned()
+        .unwrap_or_else(|| "20".to_string());
+
+    req.body()
+        .map_err(|err| format!("{}", err))
+        .and_then(move |_| {
+            let storage = pool
+                .access_storage()
+                .map_err(|err| format!("db err: {}", err))?;
+
+            let max_block: u32 = max_block
+                .parse()
+                .map_err(|_| "invalid max_block".to_string())?;
+            let limit: u32 = limit.parse().map_err(|_| "invalid limit".to_string())?;
+            if limit > 100 {
+                
+                return Err("limit can not exceed 100".to_string());
+            }
+
+            let response: Vec<BlockDetails> = storage
+                .load_block_range(max_block, limit)
+                .map_err(|e| format!("db err: {}", e))?;
+
+            // let commited_stored_operations = storage.load_stored_ops_in_blocks_range(max_block, limit, ActionType::COMMIT);
+            // let verified_operations = storage.load_stored_ops_in_blocks_range(max_block, limit, ActionType::VERIFY);
+
+            // let commited_operations: Vec<Operation> = commited_stored_operations.clone().iter()
+            // .map(|x| x.clone().into_op(&storage).expect("into_op must work")).collect();
+
+            // // FIXME: oy vey!
+            // let response: Vec<BlockDetailsResponse> = commited_stored_operations.into_iter().map(|x|
+            //     BlockDetailsResponse {
+            //         block_number:        x.clone().block_number as u32,
+            //         new_state_root:      commited_operations.iter().find(|&y| y.id.unwrap() == x.id).unwrap().block.new_root_hash.to_hex(),
+            //         commit_tx_hash:      x.clone().tx_hash,
+            //         verify_tx_hash:      verified_operations.iter().find(|&y| y.id == x.id).map_or(None, |x| x.clone().tx_hash),
+            //         committed_at:        None,
+            //         verified_at:         None,
+            //     }
+            // ).collect();
+            Ok(HttpResponse::Ok().json(response))
+
+            //Ok(HttpResponse::Ok().json(format!("offset = {:?}", offset)))
+        })
+        .or_else(|err: String| {
+            let resp = TransactionResponse {
+                accepted: false,
+                error: Some(err),
+            };
+            Ok(HttpResponse::Ok().json(resp))
+        })
+        .responder()
+}
+
+fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    let pool = req.state().connection_pool.clone();
+
+    let storage = pool.access_storage();
+    if storage.is_err() {
+        return Ok(HttpResponse::Ok().json(ApiError {
+            error: "rate limit".to_string(),
+        }));
+    }
+    let storage = storage.unwrap();
+
+    let block_id_string = req.match_info().get("block_id");
+    if block_id_string.is_none() {
+        return Ok(HttpResponse::Ok().json(ApiError {
+            error: "invalid parameters".to_string(),
+        }));
+    }
+    let block_id = block_id_string.unwrap().parse::<u32>();
+    if block_id.is_err() {
+        return Ok(HttpResponse::Ok().json(ApiError {
+            error: "invalid block_id".to_string(),
+        }));
+    }
+
+    let block_id_u32 = block_id.unwrap();
+
+    let stored_commit_operation =
+        storage.load_stored_op_with_block_number(block_id_u32, ActionType::COMMIT);
+    if stored_commit_operation.is_none() {
+        return Ok(HttpResponse::Ok().json(ApiError {
+            error: "not found".to_string(),
+        }));
+    }
+
+    let commit = stored_commit_operation.unwrap();
+
+    let txs = commit.get_txs();
+    match txs {
+        Ok(res) => Ok(HttpResponse::Ok().json(res)),
+        Err(err) => Ok(HttpResponse::Ok().json(ApiError {
+            error: format!("error: {}", err),
+        })),
+    }
+}
 
 //#[allow(dead_code)]
 //struct GetBlocksQuery {
 //    pub from_block: Option<u32>,
 //}
-//
-//// ***
-//fn handle_get_blocks(
-//    req: &HttpRequest<AppState>,
-//) -> Box<Future<Item = HttpResponse, Error = Error>> {
-//    let pool = req.state().connection_pool.clone();
-//
-//    let max_block = req
-//        .query()
-//        .get("max_block")
-//        .cloned()
-//        .unwrap_or_else(|| "99999999".to_string());
-//    let limit = req
-//        .query()
-//        .get("limit")
-//        .cloned()
-//        .unwrap_or_else(|| "20".to_string());
-//
-//    req.body()
-//        .map_err(|err| format!("{}", err))
-//        .and_then(move |_| {
-//            let storage = pool
-//                .access_storage()
-//                .map_err(|err| format!("db err: {}", err))?;
-//
-//            let max_block: u32 = max_block
-//                .parse()
-//                .map_err(|_| "invalid max_block".to_string())?;
-//            let limit: u32 = limit.parse().map_err(|_| "invalid limit".to_string())?;
-//            if limit > 100 {
-//                return Err("limit can not exceed 100".to_string());
-//            }
-//
-//            let response: Vec<BlockDetails> = storage
-//                .load_block_range(max_block, limit)
-//                .map_err(|e| format!("db err: {}", e))?;
-//
-//            // let commited_stored_operations = storage.load_stored_ops_in_blocks_range(max_block, limit, ActionType::COMMIT);
-//            // let verified_operations = storage.load_stored_ops_in_blocks_range(max_block, limit, ActionType::VERIFY);
-//
-//            // let commited_operations: Vec<Operation> = commited_stored_operations.clone().iter()
-//            // .map(|x| x.clone().into_op(&storage).expect("into_op must work")).collect();
-//
-//            // // FIXME: oy vey!
-//            // let response: Vec<BlockDetailsResponse> = commited_stored_operations.into_iter().map(|x|
-//            //     BlockDetailsResponse {
-//            //         block_number:        x.clone().block_number as u32,
-//            //         new_state_root:      commited_operations.iter().find(|&y| y.id.unwrap() == x.id).unwrap().block.new_root_hash.to_hex(),
-//            //         commit_tx_hash:      x.clone().tx_hash,
-//            //         verify_tx_hash:      verified_operations.iter().find(|&y| y.id == x.id).map_or(None, |x| x.clone().tx_hash),
-//            //         committed_at:        None,
-//            //         verified_at:         None,
-//            //     }
-//            // ).collect();
-//            Ok(HttpResponse::Ok().json(response))
-//
-//            //Ok(HttpResponse::Ok().json(format!("offset = {:?}", offset)))
-//        })
-//        .or_else(|err: String| {
-//            let resp = TransactionResponse {
-//                accepted: false,
-//                error: Some(err),
-//                confirmation: None,
-//            };
-//            Ok(HttpResponse::Ok().json(resp))
-//        })
-//        .responder()
-//}
-//
-//fn handle_search(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
-//    let pool = req.state().connection_pool.clone();
-//    let query = req.query().get("query").cloned().unwrap_or_default();
-//    req.body()
-//        .map_err(|err| format!("{}", err))
-//        .and_then(move |_| {
-//            let storage = pool
-//                .access_storage()
-//                .map_err(|err| format!("db err: {}", err))?;
-//            let response: BlockDetails = storage.handle_search(query).ok_or("db err")?;
-//            Ok(HttpResponse::Ok().json(response))
-//        })
-//        .or_else(|err: String| {
-//            let resp = ApiError { error: err };
-//            Ok(HttpResponse::Ok().json(resp))
-//        })
-//        .responder()
-//}
+
+fn handle_search(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+    let pool = req.state().connection_pool.clone();
+    let query = req.query().get("query").cloned().unwrap_or_default();
+    req.body()
+        .map_err(|err| format!("{}", err))
+        .and_then(move |_| {
+            let storage = pool
+                .access_storage()
+                .map_err(|err| format!("db err: {}", err))?;
+            let response: BlockDetails = storage.handle_search(query).ok_or("db err")?;
+            Ok(HttpResponse::Ok().json(response))
+        })
+        .or_else(|err: String| {
+            let resp = ApiError { error: err };
+            Ok(HttpResponse::Ok().json(resp))
+        })
+        .responder()
+}
 
 fn start_server(state: AppState, bind_to: String) {
     server::new(move || {
@@ -505,24 +513,24 @@ fn start_server(state: AppState, bind_to: String) {
                     .resource("/tokens", |r| {
                         r.method(Method::GET).f(handle_get_tokens);
                     })
-                //                    .resource("/account/{id}/transactions", |r| {
-                //                        r.method(Method::GET).f(handle_get_account_transactions);
-                //                    })
-                //                    .resource("/blocks/transactions/{tx_id}", |r| {
-                //                        r.method(Method::GET).f(handle_get_transaction_by_id);
-                //                    })
-                //                    .resource("/blocks/{block_id}/transactions", |r| {
-                //                        r.method(Method::GET).f(handle_get_block_transactions);
-                //                    })
-                //                    .resource("/blocks/{block_id}", |r| {
-                //                        r.method(Method::GET).f(handle_get_block_by_id);
-                //                    })
-                //                    .resource("/blocks", |r| {
-                //                        r.method(Method::GET).f(handle_get_blocks);
-                //                    })
-                //                    .resource("/search", |r| {
-                //                        r.method(Method::GET).f(handle_search);
-                //                    })
+                    // .resource("/account/{id}/transactions", |r| {
+                    //     r.method(Method::GET).f(handle_get_account_transactions);
+                    // })
+                    // .resource("/blocks/transactions/{tx_id}", |r| {
+                    //     r.method(Method::GET).f(handle_get_transaction_by_id);
+                    // })
+                    .resource("/blocks/{block_id}/transactions", |r| {
+                        r.method(Method::GET).f(handle_get_block_transactions);
+                    })
+                    .resource("/blocks/{block_id}", |r| {
+                        r.method(Method::GET).f(handle_get_block_by_id);
+                    })
+                    .resource("/blocks", |r| {
+                        r.method(Method::GET).f(handle_get_blocks);
+                    })
+                    .resource("/search", |r| {
+                        r.method(Method::GET).f(handle_search);
+                    })
             })
     })
     .bind(&bind_to)
