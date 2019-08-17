@@ -7,8 +7,16 @@ const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/
 
 
 async function main() {
-    const verifierContractCode = require('../build/VerifyTest.json');
-    let contract = await deployContract(wallet, verifierContractCode, [], {
+    const vkContractCode = require('../build/VerificationKey');
+    const verifierContractCode = require('../build/Verifier');
+    let verifier = await deployContract(wallet, verifierContractCode, [], {
+        gasLimit: 1000000,
+    });
+    let vk = await deployContract(wallet, vkContractCode, [], {
+        gasLimit: 1000000,
+    });
+    const verifierTesterCode = require('../build/VerifyTest.json');
+    let contract = await deployContract(wallet, verifierTesterCode, [verifier.address, vk.address], {
         gasLimit: 8000000,
     });
     console.log("contract deployed: ",contract.address);

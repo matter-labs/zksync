@@ -533,9 +533,11 @@ export default {
                 this.alert('starting deposit onchain');
                 await wallet.depositOnchain(token, amount);
         
-                await new Promise(r => setTimeout(r, 5000));
+                await new Promise(r => setTimeout(r, 25000));
 
                 this.alert('starting deposit offchain');
+                amount = amount.sub(1);
+                console.log(amount)
                 let res = await wallet.depositOffchain(token, amount, new BN("0x1"));
 
                 this.alert("status of this transaction: " + JSON.stringify(res));
@@ -595,46 +597,62 @@ export default {
                 //     this.alert('recepient not found')
                 //     return
                 // }
-                await this.plasmaTransfer(to, this.transferAmount)
+                let to = this.transferTo;
+                let token = this.tokenToTransferFranklin;
+                let amount = this.transferAmount;
+                
+                await this.plasmaTransfer(token, to, amount);
             } finally {
                 this.transferPending = false
             }
         },
-        async plasmaTransfer(to, amount) {
+        async plasmaTransfer(tokenName, to, amount) {
             console.log('initiating transfer to', to, amount)
 
-            const from = store.account.plasma.id
-
+            let from = store.plasma.address;
             amount = Eth.toWei(amount, 'ether').div(new BN('1000000000000')).toNumber();
 
-            const privateKey = store.account.plasma.key.privateKey
-            const nonce = this.nonce //store.account.plasma.nonce;
-            const good_until_block = 10000;
-            const fee = 0;
-
-            console.log(from, to, amount, fee, nonce, good_until_block, privateKey)
-
-            const apiForm = transactionLib.createTransaction(from, to, amount, fee, nonce, good_until_block, privateKey);
-            const result = await axios({
-                method:     'post',
-                url:        this.baseUrl + '/submit_tx',
-                data:       apiForm
-            });
-            if(result.data.accepted) {
-                this.alert(`Transaction with nonce #${this.nonce} accepted`, 'success')
-                let new_nonce_result = await axios({
-                        method: 'get',
-                        url:    this.baseUrl + '/account/' + from,
-                    })
-                if(!new_nonce_result.error) {
-                    let new_nonce = new_nonce_result.data.pending_nonce
-                    this.nonce = new_nonce
-                } else {
-                    console.log('could not fetch data from server: ', new_nonce_result.error)
+            let token = (() => {
+                for (let i = 0; i < wallet.supportedTokens.length; i++) {
+                    let t = wallet.supportedTokens[i];
+                    if (t.symbol == tokenName) {
+                        return t;
+                    }
                 }
-            } else  {
-                this.alert(`Transaction rejected: ` + result.data.error)
-            }
+            })();
+
+            let res = await wallet.transfer(to, token, amount, new BN(1));
+
+            alert('transfer: ' + JSON.stringify(res));
+
+            // const privateKey = store.account.plasma.key.privateKey
+            // const nonce = this.nonce //store.account.plasma.nonce;
+            // const good_until_block = 10000;
+            // const fee = 0;
+
+            // console.log(from, to, amount, fee, nonce, good_until_block, privateKey)
+
+            // const apiForm = transactionLib.createTransaction(from, to, amount, fee, nonce, good_until_block, privateKey);
+            // const result = await axios({
+            //     method:     'post',
+            //     url:        this.baseUrl + '/submit_tx',
+            //     data:       apiForm
+            // });
+                // if(result.data.accepted) {
+                //     this.alert(`Transaction with nonce #${this.nonce} accepted`, 'success')
+                //     let new_nonce_result = await axios({
+                //             method: 'get',
+                //             url:    this.baseUrl + '/account/' + from,
+                //         })
+                //     if(!new_nonce_result.error) {
+                //         let new_nonce = new_nonce_result.data.pending_nonce
+                //         this.nonce = new_nonce
+                //     } else {
+                //         console.log('could not fetch data from server: ', new_nonce_result.error)
+                //     }
+                // } else  {
+                //     this.alert(`Transaction rejected: ` + result.data.error)
+                // }
         },
         parseStateResult(data) {
             if (data.error !== undefined && data.error == "non-existent") {
@@ -852,7 +870,7 @@ export default {
             };
             try {
                 // ******************* get the info from wallet *******************
-                await wallet.getState();
+                await wallet.fetchFranklinState();
 
                 onchain.address = wallet.ethWallet.address;
         

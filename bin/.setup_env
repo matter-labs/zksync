@@ -3,7 +3,7 @@
 if [ -z "$FRANKLIN_ENV" ]
 then
 
-    cd `dirname $0`/..
+    pushd `dirname $0`/.. > /dev/null
 
     if [ -f etc/env/current ]; then
         export FRANKLIN_ENV=`cat etc/env/current`
@@ -35,4 +35,6 @@ then
     # if [[ $FIXMODE ]]; then
     #     export WEB3_URL=http://localhost:8545
     # fi
+
+    popd > /dev/null
 fi
