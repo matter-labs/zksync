@@ -4,7 +4,7 @@
 
 if [ -z "$1" ]
 then
-    echo "Usage: tx-info <TX_HASH>"
+    echo "Usage: revert-reason <TX_HASH>"
     exit
 fi
 

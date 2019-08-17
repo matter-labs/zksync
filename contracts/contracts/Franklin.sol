@@ -376,7 +376,6 @@ contract Franklin {
         emit BlockCommitted(_blockNumber);
     }
 
-    // TODO: make the same as in the spec.
     function createBlockCommitment(
         uint32 _blockNumber,
         uint24 _feeAccount,
@@ -536,8 +535,7 @@ contract Franklin {
         );
 
         require(
-//TODO! uncomment
-//            verifyBlockProof(proof, blocks[_blockNumber].commitment),
+            verifyBlockProof(proof, blocks[_blockNumber].commitment),
             true,
             "verification failed"
         );
