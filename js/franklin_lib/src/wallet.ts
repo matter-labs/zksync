@@ -1,5 +1,4 @@
 import BN = require('bn.js');
-import { integerToFloat } from './utils';
 import Axios from 'axios';
 import { altjubjubCurve, pedersenHash } from './sign';
 import { curve } from 'elliptic';
@@ -7,11 +6,10 @@ import EdwardsPoint = curve.edwards.EdwardsPoint;
 import { HmacSHA512 } from 'crypto-js';
 import 'ethers';
 import {Contract, ethers} from 'ethers';
-import {franklinContractCode} from "../../../contracts/src.ts/deploy";
 import {BigNumber, bigNumberify, BigNumberish, parseEther} from "ethers/utils";
-import {expect} from "chai";
 
 const IERC20Conract = require("openzeppelin-solidity/build/contracts/IERC20");
+import {franklinContractCode} from "../../../contracts/src.ts/deploy";
 
 export type Address = string;
 
@@ -113,7 +111,6 @@ export class Wallet {
 
     async widthdrawOnchain(token: Token, amount: BigNumber) {
         const franklinDeployedContract = new Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, this.ethWallet);
-        const franklinAddressBinary = Buffer.from(this.address.substr(2), "hex");
         if (token.id == 0) {
             const tx = await franklinDeployedContract.withdrawETH(amount);
             await tx.wait(2);
@@ -157,7 +154,7 @@ export class Wallet {
     }
 
     async getNonce(): Promise<number> {
-        await this.getState();
+        await this.fetchFranklinState();
         return this.franklinState.commited.nonce
     }
 
@@ -168,8 +165,36 @@ export class Wallet {
         return frankinWallet;
     }
 
-    async getState() {
+    async fetchEthState() {
+        let onchainBalances = new Array<string>(this.supportedTokens.length);
+        let contractBalances = new Array<string>(this.supportedTokens.length);
+        let lockedBlocksLeft = new Array<string>(this.supportedTokens.length);
+
+        const currentBlock = await this.ethWallet.provider.getBlockNumber();
+
+        const franklinDeployedContract = new Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, this.ethWallet);
+        for(let token  of this.supportedTokens) {
+            if (token.id == 0) {
+                onchainBalances[token.id] = await this.ethWallet.getBalance().then(b => b.toString())
+            } else {
+                const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
+                onchainBalances[token.id] = await erc20DeployedToken.balanceOf(this.ethWallet.address).then(n => n.toString());
+            }
+            const balanceStorage = await franklinDeployedContract.balances(this.ethWallet.address, token.id);
+            contractBalances[token.id] = balanceStorage.balance.toString();
+            lockedBlocksLeft[token.id] = Math.max(balanceStorage.lockedUntilBlock - currentBlock, 0).toString();
+        }
+
+        this.ethState = {onchainBalances, contractBalances, lockedBlocksLeft};
+    }
+
+    async fetchFranklinState() {
         this.supportedTokens = await this.provider.getTokens();
         this.franklinState = await this.provider.getState(this.address);
+    }
+
+    async updateState() {
+        await this.fetchFranklinState();
+        await this.fetchEthState();
     }
 }

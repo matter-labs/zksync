@@ -1,10 +1,12 @@
 #!/bin/bash
 
+set -e
+
 # Force read env
 FRANKLIN_ENV=
 . .setup_env
 cd core/storage
 
 echo DATABASE_URL=$DATABASE_URL
-diesel database setup || exit 1
-diesel migration run || exit 1
+diesel database setup
+diesel migration run
