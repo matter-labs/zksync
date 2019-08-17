@@ -8,7 +8,9 @@ use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::CircuitAccountTree;
 use franklinmodels::merkle_tree::hasher::Hasher;
 use franklinmodels::merkle_tree::PedersenHasher;
+use franklinmodels::node::TransferToNewOp;
 use franklinmodels::params as franklin_constants;
+use num_traits::cast::ToPrimitive;
 use pairing::bn256::*;
 
 pub struct TransferToNewData {
@@ -79,7 +81,23 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
         pubdata_bits
     }
 }
+pub fn apply_transfer_to_new_tx(
+    tree: &mut CircuitAccountTree,
+    transfer_to_new: &TransferToNewOp,
+) -> TransferToNewWitness<Bn256> {
+    let new_pubkey_hash = Fr::from_hex(&transfer_to_new.tx.to.to_hex()).unwrap();
 
+    let transfer_data = TransferToNewData {
+        amount: transfer_to_new.tx.amount.to_u128().unwrap(),
+        fee: transfer_to_new.tx.fee.to_u128().unwrap(),
+        token: transfer_to_new.tx.token as u32,
+        from_account_address: transfer_to_new.from as u32,
+        to_account_address: transfer_to_new.to as u32,
+        new_pub_key_hash: new_pubkey_hash,
+    };
+    // le_bit_vector_into_field_element()
+    apply_transfer_to_new(tree, &transfer_data)
+}
 pub fn apply_transfer_to_new(
     tree: &mut CircuitAccountTree,
     transfer_to_new: &TransferToNewData,
@@ -200,7 +218,6 @@ pub fn apply_transfer_to_new(
     let a = balance_from_before.clone();
     let mut b = amount_as_field_element.clone();
     b.add_assign(&fee_as_field_element);
-    println!("b in trasfer_to_new_test equals {}", b.to_string());
     TransferToNewWitness {
         from_before: OperationBranch {
             address: Some(account_address_from_fe),
@@ -386,8 +403,8 @@ fn test_transfer_to_new() {
     use franklinmodels::circuit::account::{
         Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
-    use merkle_tree::hasher::Hasher;
-    use merkle_tree::PedersenHasher;
+    use franklinmodels::merkle_tree::hasher::Hasher;
+    use franklinmodels::merkle_tree::PedersenHasher;
     use pairing::bn256::*;
     use rand::{Rng, SeedableRng, XorShiftRng};
 
@@ -587,6 +604,7 @@ fn test_transfer_to_new() {
         let mut cs = TestConstraintSystem::<Bn256>::new();
 
         let instance = FranklinCircuit {
+            operation_batch_size: 10,
             params,
             old_root: transfer_witness.before_root,
             new_root: transfer_witness.after_root,

@@ -499,7 +499,7 @@ impl StorageProcessor {
         Ok(())
     }
 
-    fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {
+    pub fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {
         let executed_txs: Vec<_> = executed_transactions::table
             .filter(executed_transactions::block_number.eq(block as i64))
             .load::<StoredExecutedTransaction>(self.conn())?;

@@ -62,16 +62,19 @@ export function integerToFloat(integer: BN, exp_bits: number, mantissa_bits: num
         assert((mantissa_bits + exp_bits) % 8 === 0);
         const totalBits = mantissa_bits + exp_bits - 1;
         const encoding = new BN(0);
-        for (let i = 0; i < exp_bits; i++) {
-            if (exponent.testn(i)) {
-                encoding.bincn(totalBits - i);
-            }
-        }
-        for (let i = 0; i < mantissa_bits; i++) {
+        //todo: it is probably enough to use 'le' here
+        for (let i = mantissa_bits; i > 0; i--) {
             if (mantissa.testn(i)) {
                 encoding.bincn(totalBits - exp_bits - i);
             }
         }
+
+        for (let i = exp_bits; i > 0; i--) {
+            if (exponent.testn(i)) {
+                encoding.bincn(totalBits - i);
+            }
+        }
+
         return encoding.toArrayLike(Buffer, 'be', (exp_bits + mantissa_bits) / 8);
     }
     return integerToFloatInner(integer, exp_bits, mantissa_bits, exp_base, false);

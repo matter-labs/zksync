@@ -1,17 +1,40 @@
 use crate::account::*;
 
+use crate::operation::TransactionSignature;
 use crate::utils::*;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use ff::Field;
 use ff::{BitIterator, PrimeField, PrimeFieldRepr};
+use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use franklin_crypto::eddsa::PrivateKey;
 use franklin_crypto::eddsa::PublicKey;
+use franklin_crypto::jubjub::FixedGenerators;
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::{Balance, CircuitAccount, CircuitAccountTree};
 use franklinmodels::merkle_tree::hasher::Hasher;
 use franklinmodels::params as franklin_constants;
 use pairing::bn256::*;
+use rand::{Rng, SeedableRng, XorShiftRng};
 
+pub fn generate_dummy_sig_data() -> (Option<TransactionSignature<Bn256>>, Fr, Fr, Fr) {
+    let params = &AltJubjubBn256::new();
+    let p_g = FixedGenerators::SpendingKeyGenerator;
+    let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+    let sender_sk = PrivateKey::<Bn256>(rng.gen());
+    let sender_pk = PublicKey::from_private(&sender_sk, p_g, &params);
+    let (sender_x, sender_y) = sender_pk.0.into_xy();
+    let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
+    let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
+    sig_bits.reverse();
+    sig_bits.truncate(80);
+
+    // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
+    let signature = sign(&sig_bits, &sender_sk, p_g, &params, rng);
+    (signature, sig_msg, sender_x, sender_y)
+
+    //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+}
 pub fn pub_key_hash<E: JubjubEngine, H: Hasher<E::Fr>>(
     pub_key: &PublicKey<E>,
     hasher: &H,
@@ -130,7 +153,7 @@ pub fn public_data_commitment<E: JubjubEngine>(
 }
 
 pub fn get_audits(
-    tree: &mut CircuitAccountTree,
+    tree: &CircuitAccountTree,
     account_address: u32,
     token: u32,
 ) -> (Vec<Option<Fr>>, Vec<Option<Fr>>) {
@@ -201,13 +224,14 @@ pub fn apply_fee(
     fee: u128,
 ) -> (Fr, AccountWitness<Bn256>) {
     let fee_fe = Fr::from_str(&fee.to_string()).unwrap();
-    let mut validator_leaf = tree.remove(validator_address).unwrap();
+    let mut validator_leaf = tree
+        .remove(validator_address)
+        .expect("validator_leaf not empty");
     let validator_account_witness = AccountWitness {
         nonce: Some(validator_leaf.nonce.clone()),
         pub_key_hash: Some(validator_leaf.pub_key_hash.clone()),
     };
     let validator_balance_root = validator_leaf.subtree.root_hash();
-    println!("validator_balance_root: {}", validator_balance_root);
 
     let mut balance = validator_leaf
         .subtree
@@ -215,12 +239,15 @@ pub fn apply_fee(
         .unwrap_or(Balance::default());
     balance.value.add_assign(&fee_fe);
     validator_leaf.subtree.insert(token, balance);
-    println!(
-        "validator_balance_root after applying fee: {}",
-        validator_leaf.subtree.root_hash()
-    );
+
     tree.insert(validator_address, validator_leaf);
 
     let root_after_fee = tree.root_hash();
     (root_after_fee, validator_account_witness)
+}
+
+pub fn fr_from_bytes(bytes: Vec<u8>) -> Fr {
+    let mut fr_repr = <Fr as PrimeField>::Repr::default();
+    fr_repr.read_be(&*bytes).unwrap();
+    Fr::from_repr(fr_repr).unwrap()
 }

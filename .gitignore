@@ -14,6 +14,7 @@ env-config.js
 a.out 
 .gitconfig
 
+franklin_pk.key
 dist
 npm-debug.log
 

@@ -7,7 +7,11 @@ use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::CircuitAccountTree;
 use franklinmodels::params as franklin_constants;
+use num_traits::cast::ToPrimitive;
 use pairing::bn256::*;
+
+use franklinmodels::node::tx::Transfer;
+use franklinmodels::node::TransferOp;
 
 pub struct TransferData {
     pub amount: u128,
@@ -71,7 +75,20 @@ impl<E: JubjubEngine> TransferWitness<E> {
         pubdata_bits
     }
 }
-
+pub fn apply_transfer_tx(
+    tree: &mut CircuitAccountTree,
+    transfer: &TransferOp,
+) -> TransferWitness<Bn256> {
+    let transfer_data = TransferData {
+        amount: transfer.tx.amount.to_u128().unwrap(),
+        fee: transfer.tx.fee.to_u128().unwrap(),
+        token: transfer.tx.token as u32,
+        from_account_address: transfer.from as u32,
+        to_account_address: transfer.to as u32,
+    };
+    // le_bit_vector_into_field_element()
+    apply_transfer(tree, &transfer_data)
+}
 pub fn apply_transfer(
     tree: &mut CircuitAccountTree,
     transfer: &TransferData,
@@ -303,8 +320,8 @@ fn test_transfer() {
     use franklinmodels::circuit::account::{
         Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
-    use merkle_tree::hasher::Hasher;
-    use merkle_tree::PedersenHasher;
+    use franklinmodels::merkle_tree::hasher::Hasher;
+    use franklinmodels::merkle_tree::PedersenHasher;
     use pairing::bn256::*;
     use rand::{Rng, SeedableRng, XorShiftRng};
 
@@ -492,6 +509,7 @@ fn test_transfer() {
         &from_leaf_number_fe,
         franklin_constants::ACCOUNT_TREE_DEPTH,
     );
+    // append_le_fixed_width(&mut sig_bits, , franklin_constants::NEW_PUBKEY_HASH_WIDTH);
     append_le_fixed_width(
         &mut sig_bits,
         &token_fe,
@@ -560,6 +578,7 @@ fn test_transfer() {
         let mut cs = TestConstraintSystem::<Bn256>::new();
 
         let instance = FranklinCircuit {
+            operation_batch_size: 10,
             params,
             old_root: transfer_witness.before_root,
             new_root: Some(root_after_fee),

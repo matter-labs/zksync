@@ -257,7 +257,8 @@ pub fn pack_bits_into_bytes_in_order(bits: Vec<bool>) -> Vec<u8> {
 pub fn pack_as_float(number: &BigDecimal, exponent_len: usize, mantissa_len: usize) -> Vec<u8> {
     let uint = number.to_u128().expect("should be in u128");
 
-    let vec = convert_to_float(uint, exponent_len, mantissa_len, 10).expect("packing error");
+    let mut vec = convert_to_float(uint, exponent_len, mantissa_len, 10).expect("packing error");
+    vec.reverse();
     pack_bits_into_bytes_in_order(vec)
 }
 

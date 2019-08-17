@@ -27,6 +27,7 @@
     "lint:solidity": "solhint contracts/**/*.sol",
     "lint:ts": "tslint -c tslint.json {scripts,test}/**/*.ts",
     "lint:ts-fix": "tslint -c tslint.json --fix {scripts,test}/**/*.ts",
-    "prettier:solidity": "prettier --write contracts/**/*.sol"
+    "prettier:solidity": "prettier --write contracts/**/*.sol",
+    "exampleDeposits": "ts-node scripts/exampleDeposits.ts"
   }
 }

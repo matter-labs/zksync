@@ -50,7 +50,6 @@ type UpdatedAccounts = AccountMap;
 impl PlasmaStateKeeper {
     pub fn new(pool: ConnectionPool, eth_state: Arc<RwLock<ETHState>>) -> Self {
         info!("constructing state keeper instance");
-
         let storage = pool
             .access_storage()
             .expect("db connection failed for statekeeper");

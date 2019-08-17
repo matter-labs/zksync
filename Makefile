@@ -100,14 +100,15 @@ rust-musl-builder = @docker run $(docker-options) ekidd/rust-musl-builder
 
 # Rust: main stuff
 
-prover:
-	@bin/.load_keys && cargo run --release --bin prover
 
 dummy-prover:
 	cargo run --bin dummy_prover
 
+prover:
+	@cargo run --release --bin franklin_prover
+
 server:
-	@cargo run --bin server
+	@cargo run --bin server --release
 
 sandbox:
 	@cargo run --bin sandbox

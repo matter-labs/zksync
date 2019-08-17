@@ -1,11 +1,15 @@
 use super::utils::*;
-
-use crate::operation::*;
 use crate::utils::*;
 
+use crate::operation::*;
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
+use num_traits::cast::ToPrimitive;
 
 use crate::account::AccountWitness;
+use bellman::groth16::generate_random_parameters;
+use bellman::groth16::{
+    create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
+};
 use franklin_crypto::circuit::float_point::{convert_to_float, parse_float_to_u128};
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::{
@@ -13,6 +17,8 @@ use franklinmodels::circuit::account::{
 };
 use franklinmodels::merkle_tree::hasher::Hasher;
 use franklinmodels::merkle_tree::PedersenHasher;
+use franklinmodels::node::tx::Deposit;
+use franklinmodels::node::DepositOp;
 use franklinmodels::params as franklin_constants;
 use pairing::bn256::*;
 
@@ -81,10 +87,44 @@ impl<E: JubjubEngine> DepositWitness<E> {
             &self.args.new_pub_key_hash.unwrap(),
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         );
-        assert_eq!(pubdata_bits.len(), 37 * 8);
+        //        assert_eq!(pubdata_bits.len(), 37 * 8);
         pubdata_bits.resize(40 * 8, false);
         pubdata_bits
     }
+}
+
+pub fn apply_deposit_tx(
+    tree: &mut CircuitAccountTree,
+    deposit: &DepositOp,
+) -> DepositWitness<Bn256> {
+    let alt_new_pubkey_hash = Fr::from_hex(&deposit.tx.to.to_hex()).unwrap();
+    //    let mut fr_repr = <Fr as PrimeField>::Repr::default();
+    //    let mut addr_vec = deposit.tx.to.data.to_vec();
+    //    addr_vec.reverse();
+    //    addr_vec.resize(32, 0u8);
+    //    addr_vec.reverse();
+    //    fr_repr.read_be(&*addr_vec).unwrap();
+    //    let new_pubkey_hash = Fr::from_repr(fr_repr).unwrap();
+    //    println!("alt_new_pubkey_hash {} \n new_pubkey_hash {}", alt_new_pubkey_hash, new_pubkey_hash);
+    println!(
+        "before converting amount: {:?}, after converting amount: {:?}",
+        deposit.tx.amount,
+        deposit.tx.amount.to_u128().unwrap()
+    );
+    println!(
+        "before converting fee: {:?}, after converting fee: {:?}",
+        deposit.tx.fee,
+        deposit.tx.fee.to_u128().unwrap()
+    );
+    let deposit_data = DepositData {
+        amount: deposit.tx.amount.to_u128().unwrap(),
+        fee: deposit.tx.fee.to_u128().unwrap(),
+        token: deposit.tx.token as u32,
+        account_address: deposit.account_id as u32,
+        new_pub_key_hash: alt_new_pubkey_hash,
+    };
+    // le_bit_vector_into_field_element()
+    apply_deposit(tree, &deposit_data)
 }
 pub fn apply_deposit(
     tree: &mut CircuitAccountTree,
@@ -92,7 +132,7 @@ pub fn apply_deposit(
 ) -> DepositWitness<Bn256> {
     //preparing data and base witness
     let before_root = tree.root_hash();
-    println!("Initial root = {}", before_root);
+    println!("deposit Initial root = {}", before_root);
     let (audit_path_before, audit_balance_path_before) =
         get_audits(tree, deposit.account_address, deposit.token);
 
@@ -161,7 +201,7 @@ pub fn apply_deposit(
         );
 
     let after_root = tree.root_hash();
-    println!("After root = {}", after_root);
+    println!("deposit After root = {}", after_root);
     let (audit_path_after, audit_balance_path_after) =
         get_audits(tree, deposit.account_address, deposit.token);
 
@@ -212,6 +252,12 @@ pub fn calculate_deposit_operations_from_witness(
         .chunks(64)
         .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
         .collect();
+
+    println!(
+        "acc_path{} \n bal_path {} ",
+        deposit_witness.before.witness.account_path.len(),
+        deposit_witness.before.witness.balance_subtree_path.len()
+    );
     let operation_zero = Operation {
         new_root: deposit_witness.after_root.clone(),
         tx_type: deposit_witness.tx_type,
@@ -290,6 +336,7 @@ pub fn calculate_deposit_operations_from_witness(
     ];
     operations
 }
+
 #[test]
 fn test_deposit_franklin_in_empty_leaf() {
     use super::utils::public_data_commitment;
@@ -318,12 +365,12 @@ fn test_deposit_franklin_in_empty_leaf() {
     let validator_address_number = 7;
     let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
     let block_number = Fr::from_str("1").unwrap();
-    let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+    let mut rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let phasher = PedersenHasher::<Bn256>::default();
 
     let mut tree: CircuitAccountTree =
         CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
-
+    println!("empty tree root_hash is: {}", tree.root_hash());
     let sender_sk = PrivateKey::<Bn256>(rng.gen());
     let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
     let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
@@ -404,11 +451,170 @@ fn test_deposit_franklin_in_empty_leaf() {
         Some(validator_address),
         Some(block_number),
     );
+    println!("validator balances: {}", validator_balances.len());
 
     {
         let mut cs = TestConstraintSystem::<Bn256>::new();
 
         let instance = FranklinCircuit {
+            operation_batch_size: 10,
+            params,
+            old_root: deposit_witness.before_root.clone(),
+            new_root: Some(root_after_fee.clone()),
+            operations: operations.clone(),
+            pub_data_commitment: Some(public_data_commitment.clone()),
+            block_number: Some(block_number.clone()),
+            validator_account: validator_account_witness.clone(),
+            validator_address: Some(validator_address.clone()),
+            validator_balances: validator_balances.clone(),
+            validator_audit_path: validator_audit_path.clone(),
+        };
+        instance.synthesize(&mut cs).unwrap();
+
+        println!("unconstrained: {}", cs.find_unconstrained());
+        println!("number of constraints {}", cs.num_constraints());
+        let err = cs.which_is_unsatisfied();
+        if err.is_some() {
+            panic!("ERROR satisfying in {}", err.unwrap());
+        }
+    }
+}
+
+#[test]
+fn test_deposit_franklin_in_empty_leaf_proof() {
+    use super::utils::public_data_commitment;
+
+    use crate::circuit::FranklinCircuit;
+    use crate::operation::*;
+    use crate::utils::*;
+    use bellman::Circuit;
+
+    use ff::{BitIterator, Field, PrimeField};
+    use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+
+    use franklin_crypto::circuit::test::*;
+    use franklin_crypto::eddsa::{PrivateKey, PublicKey};
+    use franklin_crypto::jubjub::FixedGenerators;
+    use franklinmodels::circuit::account::{
+        Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
+    };
+    use franklinmodels::params as franklin_constants;
+
+    use pairing::bn256::*;
+    use rand::{Rng, SeedableRng, XorShiftRng};
+
+    let params = &AltJubjubBn256::new();
+    let p_g = FixedGenerators::SpendingKeyGenerator;
+    let validator_address_number = 7;
+    let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
+    let block_number = Fr::from_str("1").unwrap();
+    let mut rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+    let phasher = PedersenHasher::<Bn256>::default();
+
+    let mut tree: CircuitAccountTree =
+        CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
+    println!("empty tree root_hash is: {}", tree.root_hash());
+    let sender_sk = PrivateKey::<Bn256>(rng.gen());
+    let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
+    let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
+    let (sender_x, sender_y) = sender_pk.0.into_xy();
+    let sender_leaf = CircuitAccount::<Bn256> {
+        subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
+        nonce: Fr::zero(),
+        pub_key_hash: sender_pub_key_hash
+        // pub_x: validator_x.clone(),
+        // pub_y: validator_y.clone(),
+    };
+    println!("zero root_hash equals: {}", sender_leaf.subtree.root_hash());
+
+    // give some funds to sender and make zero balance for recipient
+    let validator_sk = PrivateKey::<Bn256>(rng.gen());
+    let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
+    let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
+    let (validator_x, validator_y) = validator_pk.0.into_xy();
+
+    let validator_leaf = CircuitAccount::<Bn256> {
+        subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
+        nonce: Fr::zero(),
+        pub_key_hash: validator_pub_key_hash,
+    };
+
+    let mut validator_balances = vec![];
+    for _ in 0..1 << *franklin_constants::BALANCE_TREE_DEPTH {
+        validator_balances.push(Some(Fr::zero()));
+    }
+    tree.insert(validator_address_number, validator_leaf);
+
+    let mut account_address: u32 = rng.gen();
+    account_address %= tree.capacity();
+    let amount: u128 = 500;
+    let fee: u128 = 80;
+    let token: u32 = 2;
+
+    //-------------- Start applying changes to state
+    let deposit_witness = apply_deposit(
+        &mut tree,
+        &DepositData {
+            amount: amount,
+            fee: fee,
+            token: token,
+            account_address: account_address,
+            new_pub_key_hash: sender_pub_key_hash,
+        },
+    );
+
+    let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
+    let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
+    sig_bits.reverse();
+    sig_bits.truncate(80);
+
+    // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
+    let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
+    //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+
+    let operations = calculate_deposit_operations_from_witness(
+        &deposit_witness,
+        &sig_msg,
+        signature,
+        &sender_x,
+        &sender_y,
+    );
+
+    println!("tree before_applying fees: {}", tree.root_hash());
+
+    let (root_after_fee, validator_account_witness) =
+        apply_fee(&mut tree, validator_address_number, token, fee);
+    println!("test root after fees {}", root_after_fee);
+    let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
+
+    let public_data_commitment = public_data_commitment::<Bn256>(
+        &deposit_witness.get_pubdata(),
+        deposit_witness.before_root,
+        Some(root_after_fee),
+        Some(validator_address),
+        Some(block_number),
+    );
+    println!("validator balances: {}", validator_balances.len());
+
+    {
+        let instance = FranklinCircuit {
+            operation_batch_size: 10,
+            params,
+            old_root: deposit_witness.before_root.clone(),
+            new_root: Some(root_after_fee.clone()),
+            operations: operations.clone(),
+            pub_data_commitment: Some(public_data_commitment.clone()),
+            block_number: Some(block_number.clone()),
+            validator_account: validator_account_witness.clone(),
+            validator_address: Some(validator_address.clone()),
+            validator_balances: validator_balances.clone(),
+            validator_audit_path: validator_audit_path.clone(),
+        };
+
+        let tmp_cirtuit_params = generate_random_parameters(instance, &mut rng).unwrap();
+        println!("len a is {}", tmp_cirtuit_params.a.len());
+        let instance = FranklinCircuit {
+            operation_batch_size: 10,
             params,
             old_root: deposit_witness.before_root,
             new_root: Some(root_after_fee),
@@ -421,15 +627,25 @@ fn test_deposit_franklin_in_empty_leaf() {
             validator_audit_path: validator_audit_path,
         };
 
-        instance.synthesize(&mut cs).unwrap();
-
-        println!("{}", cs.find_unconstrained());
-
-        println!("number of constraints {}", cs.num_constraints());
-        let err = cs.which_is_unsatisfied();
-        if err.is_some() {
-            panic!("ERROR satisfying in {}", err.unwrap());
+        let proof = create_random_proof(instance, &tmp_cirtuit_params, &mut rng);
+        if proof.is_err() {
+            panic!("proof can not be created: {}", proof.err().unwrap());
+            //             return Err(BabyProverErr::Other("proof.is_err()".to_owned()));
         }
-        // assert_eq!(cs.num_constraints(), 1)
+
+        let p = proof.unwrap();
+
+        let pvk = prepare_verifying_key(&tmp_cirtuit_params.vk);
+
+        let success = verify_proof(&pvk, &p.clone(), &[public_data_commitment]);
+        if success.is_err() {
+            panic!(
+                "Proof is verification failed with error {}",
+                success.err().unwrap()
+            );
+        }
+        if !success.unwrap() {
+            panic!("Proof is invalid");
+        }
     }
 }

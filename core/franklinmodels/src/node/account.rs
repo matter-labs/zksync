@@ -6,6 +6,7 @@ use std::convert::TryInto;
 use bigdecimal::BigDecimal;
 use failure::ensure;
 use ff::PrimeField;
+use ff::PrimeFieldRepr;
 use franklin_crypto::alt_babyjubjub::JubjubEngine;
 use franklin_crypto::jubjub::{edwards, Unknown};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -16,7 +17,7 @@ use crate::circuit::account::{Balance, CircuitAccount};
 
 #[derive(Clone, PartialEq, Default, Eq, Hash)]
 pub struct AccountAddress {
-    pub data: [u8; 27],
+    pub data: [u8; params::FR_ADDRESS_LEN],
 }
 
 impl std::fmt::Debug for AccountAddress {
@@ -33,14 +34,14 @@ impl AccountAddress {
     pub fn from_hex(s: &str) -> Result<Self, failure::Error> {
         ensure!(s.starts_with("0x"), "Address should start with 0x");
         let bytes = hex::decode(&s[2..])?;
-        ensure!(bytes.len() == 27, "Size mismatch");
+        ensure!(bytes.len() == params::FR_ADDRESS_LEN, "Size mismatch");
         Ok(AccountAddress {
             data: bytes.as_slice().try_into().unwrap(),
         })
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, failure::Error> {
-        ensure!(bytes.len() == 27, "Size mismatch");
+        ensure!(bytes.len() == params::FR_ADDRESS_LEN, "Size mismatch");
         Ok(AccountAddress {
             data: bytes.try_into().unwrap(),
         })
@@ -112,7 +113,13 @@ impl From<Account> for CircuitAccount<super::Engine> {
 
         circuit_account.nonce = Fr::from_str(&acc.nonce.to_string()).unwrap();
         circuit_account.pub_key_hash = Fr::from_hex(&acc.address.to_hex()).unwrap();
-
+        //        let mut fr_repr = <Fr as PrimeField>::Repr::default();
+        //        let mut addr_vec = acc.address.data.to_vec();
+        //        addr_vec.reverse();
+        //        addr_vec.resize(32, 0u8);
+        //        addr_vec.reverse();
+        //        fr_repr.read_be(&*addr_vec).unwrap();
+        //        circuit_account.pub_key_hash = Fr::from_repr(fr_repr).unwrap();
         circuit_account
     }
 }
