@@ -3,17 +3,14 @@ use super::utils::*;
 use crate::operation::*;
 use crate::utils::*;
 
-use crate::account::AccountWitness;
-use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
-use franklin_crypto::circuit::float_point::{convert_to_float, parse_float_to_u128};
+use ff::{Field, PrimeField};
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::{
-    Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
+    CircuitAccountTree
 };
 use franklinmodels::merkle_tree::hasher::Hasher;
 use franklinmodels::merkle_tree::PedersenHasher;
 use franklinmodels::node::operations::CloseOp;
-use franklinmodels::node::tx::Close;
 use franklinmodels::params as franklin_constants;
 use pairing::bn256::*;
 

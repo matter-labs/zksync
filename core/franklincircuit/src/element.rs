@@ -1,7 +1,6 @@
 use crate::utils::pack_bits_to_element;
 use bellman::{ConstraintSystem, SynthesisError};
 use ff::Field;
-use ff::PrimeField;
 use franklin_crypto::circuit::boolean::Boolean;
 
 use franklin_crypto::circuit::expression::Expression;

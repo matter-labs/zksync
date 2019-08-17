@@ -2,7 +2,7 @@ use super::utils::*;
 use crate::utils::*;
 
 use crate::operation::*;
-use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
+use ff::{ Field, PrimeField};
 use num_traits::cast::ToPrimitive;
 
 use crate::account::AccountWitness;

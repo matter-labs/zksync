@@ -177,7 +177,7 @@ impl PlasmaStateKeeper {
             .db_conn_pool
             .access_storage()
             .map(|m| {
-                m.mempool_get_txs(config::RUNTIME_CONFIG.transfer_batch_size)
+                m.mempool_get_txs(config::RUNTIME_CONFIG.tx_batch_size)
                     .expect("Failed to get tx from db")
             })
             .expect("Failed to get txs from mempool");

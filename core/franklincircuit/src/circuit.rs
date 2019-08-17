@@ -12,7 +12,7 @@ use franklin_crypto::circuit::ecc;
 use franklin_crypto::circuit::sha256;
 
 use franklin_crypto::circuit::expression::Expression;
-use franklin_crypto::circuit::num::{AllocatedNum, Num};
+use franklin_crypto::circuit::num::AllocatedNum;
 use franklin_crypto::circuit::pedersen_hash;
 use franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
 use franklin_crypto::circuit::Assignment;

@@ -1,7 +1,7 @@
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::params as franklin_constants;
 
-use crate::element::{CircuitElement, CircuitPubkey};
+use crate::element::CircuitElement ;
 use bellman::{ConstraintSystem, SynthesisError};
 use franklin_crypto::circuit::Assignment;
 #[derive(Clone, Debug)]

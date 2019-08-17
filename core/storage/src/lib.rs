@@ -1870,7 +1870,7 @@ mod test {
         //        assert_eq!(txs.len(), 6);
     }
 
-    fn dummy_op(action: Action, block_number: BlockNumber) -> Operation {
+    fn dummy_op(_action: Action, _block_number: BlockNumber) -> Operation {
         unimplemented!()
         //        Operation {
         //            id: None,

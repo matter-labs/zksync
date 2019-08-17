@@ -56,8 +56,6 @@ pub fn pack_fee_amount(amount: &BigDecimal) -> Vec<u8> {
 mod test {
     use crate::node::pack_token_amount;
     use bigdecimal::BigDecimal;
-    use franklin_crypto::circuit::float_point::parse_float_to_u128;
-
     #[test]
     fn test_pack() {
         println!("{:x?}", pack_token_amount(&BigDecimal::from(4)));
