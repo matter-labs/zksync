@@ -307,6 +307,17 @@ impl StoredOperation {
 
         Ok(op)
     }
+
+    pub fn get_txs(&self) -> QueryResult<Vec<FranklinTx>> {
+        let debug_data = format!("data: {}", &self.data);
+        let op: Result<Operation, serde_json::Error> = serde_json::from_str(&self.data.to_string());
+        if let Err(err) = &op {
+            debug!("Error: {} on {}", err, debug_data)
+        }
+        let mut op = op.expect("Operation deserialization");
+        let txs = op.block.block_transactions.into_iter().map(|x| x.tx).collect();
+        Ok(txs)
+    }
 }
 
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
