@@ -61,6 +61,6 @@ mod test {
 
     #[test]
     fn test_pack() {
-        println!("{:x?}",pack_token_amount(&BigDecimal::from(4)));
+        println!("{:x?}", pack_token_amount(&BigDecimal::from(4)));
     }
 }
