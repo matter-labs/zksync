@@ -100,10 +100,11 @@ rust-musl-builder = @docker run $(docker-options) ekidd/rust-musl-builder
 
 # Rust: main stuff
 
-prover:
-	@bin/.load_keys && cargo run --release --bin prover
 
-franklin-prover:
+dummy-prover:
+	cargo run --bin dummy_prover
+
+prover:
 	@cargo run --release --bin franklin_prover
 
 server:
@@ -265,11 +266,11 @@ nodes:
 
 # Dev environment
 
-dev-up: tesseracts-up
+dev-up:
 	@{ docker ps | grep -q "$(GETH_DOCKER_IMAGE)" && echo "Dev env already running" && exit 1; } || echo -n
 	@docker-compose up -d postgres geth
 
-dev-down: tesseracts-down
+dev-down:
 	@docker-compose stop postgres geth
 
 geth-up: geth
@@ -312,11 +313,3 @@ tesseracts-up:
 
 tesseracts-down:
 	@docker-compose stop tesseracts
-submit-proof:
-	@cd contracts && yarn submit-proof
-
-submit-test-proof:
-	@cd contracts && yarn submit-test-proof
-
-block-commitment:
-	@cd contracts && yarn exampleDeposits

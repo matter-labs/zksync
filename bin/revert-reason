@@ -13,7 +13,6 @@ fi
 # geth --exec "$SCRIPT" attach http://localhost:8545 | cut -d '"' -f 2 | cut -c139- | xxd -r -p
 # echo
 
-. `dirname $0`/.setup_env
-
-cd `dirname $0`/../contracts
-npx ts-node scripts/revert-reason.ts $1
+FRANKLIN_HOME=`dirname $0`/../
+cd $FRANKLIN_HOME/contracts/
+f npx ts-node scripts/revert-reason.ts $1
