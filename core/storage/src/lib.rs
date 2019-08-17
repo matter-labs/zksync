@@ -9,30 +9,23 @@ use diesel::dsl::*;
 use models::node::block::{Block, ExecutedTx};
 use models::node::{
     apply_updates, reverse_updates, tx::FranklinTx, Account, AccountId, AccountMap, AccountUpdate,
-    AccountUpdates, BlockNumber, Fr, FranklinOp, Nonce, TokenId,
+    AccountUpdates, BlockNumber, FranklinOp, Nonce, TokenId,
 };
 use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
-use std::collections::HashMap;
 use std::convert::TryInto;
 
-mod helpers;
 mod schema;
-
-use self::helpers::{fr_from_bytes, fr_to_bytes};
 
 use crate::schema::*;
 
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool, PoolError, PooledConnection};
-use diesel::result::Error;
 
 use serde_json::value::Value;
 use std::env;
-
-use ff::Field;
 
 use diesel::sql_types::{Integer, Nullable, Text, Timestamp};
 sql_function!(coalesce, Coalesce, (x: Nullable<Integer>, y: Integer) -> Integer);

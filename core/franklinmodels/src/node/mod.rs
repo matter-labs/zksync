@@ -1,7 +1,6 @@
 use super::merkle_tree::{PedersenHasher, SparseMerkleTree};
 use super::primitives::pack_as_float;
 use bigdecimal::BigDecimal;
-use franklin_crypto::eddsa;
 use pairing::bn256;
 
 pub mod account;

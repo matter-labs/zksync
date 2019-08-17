@@ -1,4 +1,3 @@
-use eth_client::ETHClient;
 use models::{Action, CommitRequest, Operation};
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;

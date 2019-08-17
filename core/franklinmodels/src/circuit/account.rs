@@ -3,7 +3,6 @@ use crate::params;
 use ff::Field;
 use franklin_crypto::alt_babyjubjub::JubjubEngine;
 
-use crate::merkle_tree::hasher::Hasher;
 use crate::merkle_tree::{PedersenHasher, SparseMerkleTree};
 use crate::primitives::{GetBits, GetBitsFixed};
 use pairing::bn256::{Bn256, Fr};

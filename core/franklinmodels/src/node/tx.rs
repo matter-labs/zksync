@@ -1,21 +1,9 @@
-use super::{AccountId, BlockNumber, Nonce, TokenId};
-use super::{Engine, Fr};
-//use crate::plasma::circuit::sig::TransactionSignature;
-//use crate::plasma::circuit::transfer::Tx;
-//use crate::plasma::circuit::utils::{
-//    encode_fr_into_fs, encode_fs_into_fr, le_bit_vector_into_field_element,
-//};
+use super::{Nonce, TokenId};
 use crate::node::{pack_fee_amount, pack_token_amount};
-use crate::primitives::{get_bits_le_fixed_u128, pack_bits_into_bytes};
-use bigdecimal::{BigDecimal, ToPrimitive};
+use bigdecimal::BigDecimal;
 use crypto::{digest::Digest, sha2::Sha256};
-use ff::{PrimeField, PrimeFieldRepr};
-use franklin_crypto::circuit::float_point::convert_to_float;
-use franklin_crypto::eddsa::Signature;
-use franklin_crypto::jubjub::{edwards, FixedGenerators, JubjubEngine, Unknown};
 
 use super::account::AccountAddress;
-use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
 use web3::types::Address;
 
 /// Signed by user.
