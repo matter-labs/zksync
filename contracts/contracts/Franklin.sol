@@ -536,7 +536,6 @@ contract Franklin {
 
         require(
             verifyBlockProof(proof, blocks[_blockNumber].commitment),
-            true,
             "verification failed"
         );
 
