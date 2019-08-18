@@ -85,7 +85,7 @@
                     </b-card>
                     <b-row class="mb-0 mt-0">
                         <b-col sm class="mb-2">
-                            <div id="depositBtn">
+                            <div id="depositOnchainBtn">
                                 <b-btn variant="outline-primary" class="w-100" 
                                     v-b-modal.depositModal :disabled="!!depositProblem">&#x21E9; Deposit</b-btn>
                             </div>
@@ -94,9 +94,45 @@
                             </b-tooltip>
                         </b-col>
                         <b-col sm class="mb-2">
-                            <div id="withdrawBtn">
+                            <div id="withdrawOnchainBtn">
                                 <b-btn variant="outline-primary" class="w-100" 
                                     v-b-modal.withdrawModal :disabled="!!withdrawProblem">Withdraw &#x21E7;</b-btn>
+                            </div>
+                            <b-tooltip target="withdrawBtn" :disabled="!withdrawProblem" triggers="hover">
+                                Withdrawal not possible: {{ withdrawProblem }}
+                            </b-tooltip>
+                        </b-col>
+                    </b-row>
+                    <b-card class="mb-3">
+                        <p class="mb-2"><strong>Gateway contract</strong></p>
+                        <label for="addr">Address</label>
+                        (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+store.account.address"
+                            target="blanc">block explorer</a>):
+                        <b-form-input id="addr" v-model="store.account.address" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
+                        <b-row class="mt-2">
+                            <b-col cols="6">Balance:</b-col> <b-col>ETH {{store.account.balance}}</b-col>
+                        </b-row>
+                        <b-row class="mt-2" style="color: grey" v-if="pendingWithdraw">
+                            <b-col cols="6">Pending:</b-col> <b-col>ETH {{store.account.onchain.balance}}</b-col>
+                        </b-row>
+                        <b-row class="mt-2 mx-auto" v-if="pendingWithdraw">
+                            <b-btn variant="primary" class="mt-2 mx-auto" @click="completeWithdraw">Complete withdrawal</b-btn>
+                        </b-row>
+                    </b-card>
+                    <b-row class="mb-0 mt-0">
+                        <b-col sm class="mb-2">
+                            <div id="depositOffchainBtn">
+                                <b-btn variant="outline-primary" class="w-100"
+                                       v-b-modal.depositModal :disabled="!!depositProblem">&#x21E9; Deposit</b-btn>
+                            </div>
+                            <b-tooltip target="depositBtn" :disabled="!depositProblem" triggers="hover">
+                                Deposit not possible: {{ depositProblem }}
+                            </b-tooltip>
+                        </b-col>
+                        <b-col sm class="mb-2">
+                            <div id="withdrawOffchainBtn">
+                                <b-btn variant="outline-primary" class="w-100"
+                                       v-b-modal.withdrawModal :disabled="!!withdrawProblem">Withdraw &#x21E7;</b-btn>
                             </div>
                             <b-tooltip target="withdrawBtn" :disabled="!withdrawProblem" triggers="hover">
                                 Withdrawal not possible: {{ withdrawProblem }}
