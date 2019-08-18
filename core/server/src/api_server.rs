@@ -7,7 +7,7 @@ use actix_web::{
 use models::node::{tx::FranklinTx, Account, AccountId};
 use models::{NetworkStatus, StateKeeperRequest, ActionType};
 use std::sync::mpsc;
-use storage::{ConnectionPool, TxAddError, BlockDetails};
+use storage::{ConnectionPool, BlockDetails};
 
 use actix_web::Result as ActixResult;
 use failure::format_err;
@@ -78,7 +78,7 @@ pub struct AppState {
 #[derive(Debug, Serialize, Deserialize)]
 struct NewTxResponse {
     hash: String,
-    err: Option<TxAddError>,
+    err: Option<String>,
 }
 
 fn handle_submit_tx(
@@ -90,6 +90,7 @@ fn handle_submit_tx(
         .map_err(|e| format!("{}", e)) // convert all errors to String
         .and_then(move |tx: FranklinTx| {
             // Rate limit check
+            let tx_hash = hex::encode(&tx.hash());
 
             let storage = pool
                 .access_storage()
@@ -99,17 +100,27 @@ fn handle_submit_tx(
                 .map(|tx_add_result| {
                     let resp = match tx_add_result {
                         Ok(_) => NewTxResponse {
-                            hash: hex::encode(&tx.hash()),
+                            hash: tx_hash.clone(),
                             err: None,
                         },
                         Err(e) => NewTxResponse {
-                            hash: hex::encode(&tx.hash()),
-                            err: Some(e),
+                            hash: tx_hash.clone(),
+                            err: Some(format!("{}", e)),
                         },
                     };
                     HttpResponse::Ok().json(resp)
                 })
-                .map_err(|e| format!("mempool error: {}", e))?;
+                .map_err(|e| {
+                    let resp = NewTxResponse {
+                        hash: tx_hash.clone(),
+                        err: Some(format!("mempool_error: {}", e)),
+                    };
+                    HttpResponse::Ok().json(resp)
+                });
+            let response = match response {
+                Ok(ok) => ok,
+                Err(err) => err,
+            };
             Ok(response)
         })
         .or_else(|err: String| Ok(HttpResponse::InternalServerError().json(err)))

@@ -1,7 +1,8 @@
-use crate::params::{self, TOTAL_TOKENS};
+use crate::params;
 use crate::primitives::GetBits;
 
 use std::convert::TryInto;
+use std::collections::HashMap;
 
 use bigdecimal::BigDecimal;
 use failure::ensure;
@@ -69,7 +70,7 @@ impl<'de> Deserialize<'de> for AccountAddress {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Account {
     pub address: AccountAddress,
-    balances: Vec<BigDecimal>,
+    balances: HashMap<TokenId, BigDecimal>,
     pub nonce: Nonce,
 }
 
@@ -99,24 +100,19 @@ impl From<Account> for CircuitAccount<super::Engine> {
         let balances: Vec<_> = acc
             .balances
             .iter()
-            .map(|b| Balance {
+            .map(|(id, b)|
+                     (*id,
+                Balance {
                 value: Fr::from_str(&b.to_string()).unwrap(),
-            })
+                               }))
             .collect();
 
-        for (i, b) in balances.into_iter().enumerate() {
+        for (i, b) in balances.into_iter() {
             circuit_account.subtree.insert(i as u32, b);
         }
 
         circuit_account.nonce = Fr::from_str(&acc.nonce.to_string()).unwrap();
         circuit_account.pub_key_hash = Fr::from_hex(&acc.address.to_hex()).unwrap();
-        //        let mut fr_repr = <Fr as PrimeField>::Repr::default();
-        //        let mut addr_vec = acc.address.data.to_vec();
-        //        addr_vec.reverse();
-        //        addr_vec.resize(32, 0u8);
-        //        addr_vec.reverse();
-        //        fr_repr.read_be(&*addr_vec).unwrap();
-        //        circuit_account.pub_key_hash = Fr::from_repr(fr_repr).unwrap();
         circuit_account
     }
 }
@@ -152,7 +148,7 @@ impl AccountUpdate {
 impl Default for Account {
     fn default() -> Self {
         Self {
-            balances: vec![BigDecimal::from(0); TOTAL_TOKENS],
+            balances: HashMap::new(),
             nonce: 0,
             address: AccountAddress::default(),
         }
@@ -180,19 +176,23 @@ impl Account {
     }
 
     pub fn get_balance(&self, token: TokenId) -> BigDecimal {
-        self.balances[token as usize].clone()
+        self.balances.get(&token).cloned().unwrap_or_default()
     }
 
     pub fn set_balance(&mut self, token: TokenId, amount: BigDecimal) {
-        self.balances[token as usize] = amount;
+        self.balances.insert(token, amount);
     }
 
     pub fn add_balance(&mut self, token: TokenId, amount: &BigDecimal) {
-        self.balances[token as usize] += amount;
+        let mut balance = self.balances.remove(&token).unwrap_or_default();
+        balance += amount;
+        self.balances.insert(token, balance);
     }
 
     pub fn sub_balance(&mut self, token: TokenId, amount: &BigDecimal) {
-        self.balances[token as usize] -= amount;
+        let mut balance = self.balances.remove(&token).unwrap_or_default();
+        balance -= amount;
+        self.balances.insert(token, balance);
     }
 
     pub fn apply_update(account: Option<Self>, update: AccountUpdate) -> Option<Self> {
