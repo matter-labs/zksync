@@ -1,7 +1,7 @@
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::params as franklin_constants;
 
-use crate::element::CircuitElement ;
+use crate::element::CircuitElement;
 use bellman::{ConstraintSystem, SynthesisError};
 use franklin_crypto::circuit::Assignment;
 #[derive(Clone, Debug)]
@@ -18,7 +18,6 @@ impl<E: JubjubEngine> AccountContent<E> {
     pub fn from_witness<CS: ConstraintSystem<E>>(
         mut cs: CS,
         witness: &AccountWitness<E>,
-        params: &E::Params,
     ) -> Result<Self, SynthesisError> {
         let nonce = CircuitElement::from_fe_strict(
             cs.namespace(|| "nonce"),

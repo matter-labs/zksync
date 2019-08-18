@@ -83,7 +83,7 @@ struct NewTxResponse {
 
 fn handle_submit_tx(
     req: &HttpRequest<AppState>,
-) -> Box<Future<Item = HttpResponse, Error = Error>> {
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let pool = req.state().connection_pool.clone();
 
     req.json()
