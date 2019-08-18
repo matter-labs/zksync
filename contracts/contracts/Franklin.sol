@@ -134,7 +134,7 @@ contract Franklin {
     uint64 totalOnchainOps;
 
     // List of OnchainOps by index
-    mapping(uint64 => OnchainOp) onchainOps;
+    mapping(uint64 => OnchainOp) public onchainOps;
 
     // Reverting expired blocks
 
@@ -656,9 +656,9 @@ contract Franklin {
         pure
         returns (uint112)
     {
-        uint24 n = uint24(_amount[0]) << 2*8
-        + uint24(_amount[1]) << 8
-        + uint24(_amount[2]);
+        uint24 n = (uint24(_amount[0]) << 2*8)
+        + (uint24(_amount[1]) << 8)
+        + (uint24(_amount[2]));
         return uint112(n >> 5) * (uint112(10) ** (n & 0x1f));
     }
 

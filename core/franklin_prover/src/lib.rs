@@ -11,14 +11,11 @@ use std::sync::{
 use std::thread;
 use std::time::Duration;
 
-use bellman::groth16::generate_random_parameters;
 use bellman::groth16::{
     create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
 };
-use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use circuit::account::AccountWitness;
 use circuit::circuit::FranklinCircuit;
-use circuit::operation::Operation;
 use circuit::tests::close_account::*;
 use circuit::tests::deposit::*;
 use circuit::tests::noop::noop_operation;
@@ -26,28 +23,17 @@ use circuit::tests::partial_exit::*;
 use circuit::tests::transfer::*;
 use circuit::tests::transfer_to_new::*;
 use circuit::tests::utils::*;
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
-use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
+use ff::{Field, PrimeField};
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-use franklin_crypto::circuit::float_point::parse_float_to_u128;
-use franklin_crypto::circuit::test::TestConstraintSystem;
-use franklin_crypto::jubjub::{edwards, JubjubEngine};
-use models::circuit::account::{Balance, CircuitAccount};
+use franklin_crypto::jubjub::JubjubEngine;
+use models::circuit::account::CircuitAccount;
 use models::circuit::CircuitAccountTree;
-use models::merkle_tree::*;
-use models::node::block::{Block, ExecutedTx};
-use models::node::config::*;
-use models::node::operations::*;
 use models::node::Account;
 use models::node::*;
 use models::params as franklin_constants;
 use models::primitives::pack_bits_into_bytes_in_order;
-use models::primitives::*;
 use models::EncodedProof;
 use plasma::state::PlasmaState;
-use rustc_hex::ToHex;
-use storage::ProverRun;
 use tokio::prelude::*;
 use tokio::runtime::current_thread::Handle;
 use tokio::sync::oneshot::Sender;
@@ -61,14 +47,7 @@ use num_traits::cast::ToPrimitive;
 // };
 use storage::StorageProcessor;
 
-use circuit::utils::be_bit_vector_into_bytes;
-
-// use circuit::transfer::circuit::{TransactionWitness, Transfer};
-use circuit::operation::*;
-
-use models::primitives::{
-    field_element_to_u32, serialize_g1_for_ethereum, serialize_g2_for_ethereum,
-};
+use models::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum};
 
 pub struct Prover<E: JubjubEngine> {
     pub operation_batch_size: usize,
@@ -215,13 +194,15 @@ impl BabyProver {
 
         info!("Reading proving key, may take a while");
 
-        //    let keys_path = &RUNTIME_CONFIG.keys_path;
-
-        //    let path = format!("{}/transfer_pk.key", keys_path);
-
-        let path = format!("core/franklin_key_generator/franklin_pk.key");
-        debug!("Reading key from {}", path);
-        let franklin_circuit_params = read_parameters(&path);
+        let path = {
+            let mut key_file_path = std::path::PathBuf::new();
+            key_file_path.push(&std::env::var("KEY_DIR").expect("KEY_DIR not set"));
+            key_file_path.push(&format!("{}", franklin_constants::BLOCK_SIZE_CHUNKS));
+            key_file_path.push(franklin_constants::KEY_FILENAME);
+            key_file_path
+        };
+        debug!("Reading key from {}", path.to_str().unwrap());
+        let franklin_circuit_params = read_parameters(&path.to_str().unwrap());
         if franklin_circuit_params.is_err() {
             return Err(franklin_circuit_params.err().unwrap());
         }
@@ -296,7 +277,7 @@ impl BabyProver {
         let storage = StorageProcessor::establish_connection()
             .map_err(|e| format!("establish_connection failed: {}", e))?;
         let job = storage
-            .fetch_prover_job(&self.worker, PROVER_TIMEOUT)
+            .fetch_prover_job(&self.worker, config::PROVER_TIMEOUT)
             .map_err(|e| format!("fetch_prover_job failed: {}", e))?;
 
         if let Some(job) = job {
@@ -564,7 +545,7 @@ impl BabyProver {
                 .store_proof(block_number, &encoded)
                 .map_err(|e| format!("store_proof failed: {}", e))?;
         } else {
-            thread::sleep(Duration::from_secs(PROVER_CYCLE_WAIT));
+            thread::sleep(Duration::from_secs(config::PROVER_CYCLE_WAIT));
         }
         Ok(())
     }
@@ -572,7 +553,7 @@ impl BabyProver {
     pub fn start_timer_interval(&self, rt: &Handle) {
         let job_ref = self.current_job.clone();
         rt.spawn(
-            timer::Interval::new_interval(Duration::from_secs(PROVER_TIMER_TICK))
+            timer::Interval::new_interval(Duration::from_secs(config::PROVER_TIMER_TICK))
                 .fold(job_ref, |job_ref, _| {
                     let job = job_ref.load(Ordering::Relaxed);
                     if job > 0 {

@@ -5,7 +5,7 @@ use models::{Action, Operation};
 use std::str::FromStr;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use storage::ConnectionPool;
-use web3::types::{H256, U128, U256};
+use web3::types::{H256, U256};
 
 fn run_eth_sender(
     pool: ConnectionPool,

@@ -55,3 +55,5 @@ pub const BLOCK_SIZE_CHUNKS: usize = 10;
 /// Lock onchain deposits for this number of eth blocks.
 pub const LOCK_DEPOSITS_FOR: u64 = 8 * 60 * 100;
 pub const FR_ADDRESS_LEN: usize = 27;
+
+pub const KEY_FILENAME: &str = "franklin_pk.key";

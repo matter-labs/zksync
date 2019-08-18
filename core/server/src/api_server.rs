@@ -4,19 +4,15 @@ use actix_web::{
     http::Method, middleware, middleware::cors::Cors, server, App, AsyncResponder, Body, Error,
     HttpMessage, HttpRequest, HttpResponse,
 };
-use models::node::config::RUNTIME_CONFIG;
 use models::node::{tx::FranklinTx, Account, AccountId};
-use models::{ActionType, NetworkStatus, StateKeeperRequest};
+use models::{NetworkStatus, StateKeeperRequest};
 use std::sync::mpsc;
-use storage::{BlockDetails, ConnectionPool, TxAddError};
+use storage::{ConnectionPool, TxAddError};
 
 use actix_web::Result as ActixResult;
-use bigdecimal::BigDecimal;
-use ethabi::Address;
 use failure::format_err;
-use futures::{sync::oneshot, Future};
+use futures::Future;
 use models::node::AccountAddress;
-use models::node::Fr;
 use std::env;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
@@ -50,6 +46,7 @@ struct TestnetConfigResponse {
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
 
 impl SharedNetworkStatus {
+    #[allow(dead_code)]
     fn read(&self) -> NetworkStatus {
         (*self.0.as_ref().read().unwrap()).clone()
     }
@@ -86,9 +83,7 @@ struct NewTxResponse {
 
 fn handle_submit_tx(
     req: &HttpRequest<AppState>,
-) -> Box<Future<Item = HttpResponse, Error = Error>> {
-    let tx_for_state = req.state().tx_for_state.clone();
-    let network_status = req.state().network_status.read();
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let pool = req.state().connection_pool.clone();
 
     req.json()
@@ -130,8 +125,6 @@ struct AccountStateResponce {
     pending_txs: Vec<FranklinTx>,
 }
 fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-    let tx_for_state = req.state().tx_for_state.clone();
-
     // check that something like this exists in state keeper's memory at all
     let account_address = req.match_info().get("address");
     let address = if let Some(account_address) = account_address {
@@ -194,8 +187,6 @@ fn handle_get_account_state(req: &HttpRequest<AppState>) -> ActixResult<HttpResp
 }
 
 fn handle_get_tokens(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-    let address = req.state().contract_address.clone();
-
     let pool = req.state().connection_pool.clone();
     let storage = pool.access_storage();
     if storage.is_err() {

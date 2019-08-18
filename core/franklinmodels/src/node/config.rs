@@ -1,8 +1,6 @@
 use lazy_static::lazy_static;
 
-pub const TRANSFER_BATCH_SIZE: usize = 8;
-pub const DEPOSIT_BATCH_SIZE: usize = 1;
-pub const EXIT_BATCH_SIZE: usize = 1;
+pub const TX_BATCH_SIZE: usize = 50;
 pub const PADDING_INTERVAL: u64 = 5; // sec
 pub const PROVER_TIMEOUT: usize = 60; // sec
 pub const PROVER_TIMER_TICK: u64 = 5; // sec
@@ -18,8 +16,7 @@ use std::env;
 
 #[derive(Debug, Clone)]
 pub struct RuntimeConfig {
-    pub transfer_batch_size: usize,
-    pub keys_path: String,
+    pub tx_batch_size: usize,
     pub max_outstanding_txs: u32,
     pub contract_addr: String,
     pub mainnet_http_endpoint_string: String,
@@ -30,17 +27,8 @@ pub struct RuntimeConfig {
 
 impl RuntimeConfig {
     pub fn new() -> Self {
-        let transfer_batch_size_env =
-            env::var("TRANSFER_BATCH_SIZE").expect("TRANSFER_BATCH_SIZE env missing");
-        let transfer_size = usize::from_str_radix(&(transfer_batch_size_env), 10)
-            .expect("TRANSFER_BATCH_SIZE invalid");
-        let keys_path = env::var("KEY_DIR")
-            .ok()
-            .unwrap_or_else(|| DEFAULT_KEYS_PATH.to_string());
-
         Self {
-            transfer_batch_size: transfer_size,
-            keys_path,
+            tx_batch_size: TX_BATCH_SIZE,
             contract_addr: env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR env missing"),
             max_outstanding_txs: env::var("MAX_OUTSTANDING_TXS")
                 .ok()
