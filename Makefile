@@ -269,9 +269,11 @@ nodes:
 dev-up:
 	@{ docker ps | grep -q "$(GETH_DOCKER_IMAGE)" && echo "Dev env already running" && exit 1; } || echo -n
 	@docker-compose up -d postgres geth
+	@docker-compose up -d tesseracts
 
 dev-down:
 	@docker-compose stop postgres geth
+	@docker-compose stop tesseracts
 
 geth-up: geth
 	@docker-compose up geth
@@ -305,11 +307,3 @@ dev-push-flattener:
 
 make-keys:
 	@cargo run -p key_generator --release --bin key_generator
-
-# Tesseracts
-
-tesseracts-up:
-	@docker-compose up -d tesseracts
-
-tesseracts-down:
-	@docker-compose stop tesseracts

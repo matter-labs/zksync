@@ -1,8 +1,6 @@
 use super::tx::{Close, Deposit, Transfer, Withdraw};
-use super::Fr;
-use super::{AccountId, BlockNumber, Nonce, TokenId};
+use super::AccountId;
 use crate::node::{pack_fee_amount, pack_token_amount};
-use web3::types::Address;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositOp {

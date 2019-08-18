@@ -6,13 +6,10 @@ use std::convert::TryInto;
 use bigdecimal::BigDecimal;
 use failure::ensure;
 use ff::PrimeField;
-use ff::PrimeFieldRepr;
-use franklin_crypto::alt_babyjubjub::JubjubEngine;
-use franklin_crypto::jubjub::{edwards, Unknown};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use super::Fr;
 use super::{AccountId, AccountUpdates, Nonce, TokenId};
-use super::{Engine, Fr};
 use crate::circuit::account::{Balance, CircuitAccount};
 
 #[derive(Clone, PartialEq, Default, Eq, Hash)]
@@ -172,7 +169,7 @@ impl Account {
     pub fn create_account(id: AccountId, address: AccountAddress) -> (Account, AccountUpdates) {
         let mut account = Account::default();
         account.address = address;
-        let mut updates = vec![(
+        let updates = vec![(
             id,
             AccountUpdate::Create {
                 address: account.address.clone(),

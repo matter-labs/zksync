@@ -1,6 +1,5 @@
 use bigdecimal::BigDecimal;
 use failure::{bail, ensure, format_err, Error};
-use ff::PrimeField;
 use models::node::operations::{
     CloseOp, DepositOp, FranklinOp, PartialExitOp, TransferOp, TransferToNewOp,
 };

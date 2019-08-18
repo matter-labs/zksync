@@ -3,6 +3,6 @@ use server::eth_watch::EthWatch;
 fn main() {
     env_logger::init();
 
-    let mut watcher = EthWatch::new();
+    let watcher = EthWatch::new();
     watcher.run();
 }

@@ -14,10 +14,8 @@ pub mod primitives;
 
 use crate::node::account::{Account, AccountAddress};
 use crate::node::block::Block;
-use crate::node::tx::FranklinTx;
 use crate::node::AccountUpdates;
 use crate::node::BlockNumber;
-use futures::sync::oneshot;
 use serde_bytes;
 use std::sync::mpsc::Sender;
 use web3::types::U256;
