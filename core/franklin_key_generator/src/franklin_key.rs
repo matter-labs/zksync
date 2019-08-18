@@ -37,8 +37,14 @@ pub fn make_franklin_key() {
         contract_file_path
     };
 
-    info!("Generating key file into: {}", key_file_path.to_str().unwrap());
-    info!("Generating contract key file into: {}", contract_file_path.to_str().unwrap());
+    info!(
+        "Generating key file into: {}",
+        key_file_path.to_str().unwrap()
+    );
+    info!(
+        "Generating contract key file into: {}",
+        contract_file_path.to_str().unwrap()
+    );
 
     // let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &AltJubjubBn256::new();

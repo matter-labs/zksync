@@ -1,5 +1,4 @@
 use super::utils::*;
-use crate::account::AccountWitness;
 use crate::operation::*;
 use crate::utils::*;
 use ff::{Field, PrimeField};
@@ -10,7 +9,6 @@ use franklinmodels::params as franklin_constants;
 use num_traits::cast::ToPrimitive;
 use pairing::bn256::*;
 
-use franklinmodels::node::tx::Transfer;
 use franklinmodels::node::TransferOp;
 
 pub struct TransferData {
@@ -301,8 +299,9 @@ pub fn calculate_transfer_operations_from_witness(
     };
     vec![operation_zero, operation_one]
 }
-#[test]
-fn test_transfer() {
+#[cfg(test)]
+mod test {
+    use super::*;
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklinmodels::params as franklin_constants;
 
@@ -324,282 +323,286 @@ fn test_transfer() {
     use franklinmodels::merkle_tree::PedersenHasher;
     use pairing::bn256::*;
     use rand::{Rng, SeedableRng, XorShiftRng};
+    #[test]
+    fn test_transfer() {
+        let params = &AltJubjubBn256::new();
+        let p_g = FixedGenerators::SpendingKeyGenerator;
 
-    let params = &AltJubjubBn256::new();
-    let p_g = FixedGenerators::SpendingKeyGenerator;
+        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
 
-    let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+        let validator_address_number = 7;
+        let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
 
-    let validator_address_number = 7;
-    let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
+        let phasher = PedersenHasher::<Bn256>::default();
 
-    let phasher = PedersenHasher::<Bn256>::default();
+        let mut tree = CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
 
-    let mut tree = CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
+        let capacity = tree.capacity();
+        assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
 
-    let capacity = tree.capacity();
-    assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
+        let from_sk = PrivateKey::<Bn256>(rng.gen());
+        let from_pk = PublicKey::from_private(&from_sk, p_g, params);
+        let (from_x, from_y) = from_pk.0.into_xy();
+        println!("x = {}, y = {}", from_x, from_y);
+        let mut from_key_bits = vec![];
+        append_le_fixed_width(&mut from_key_bits, &from_x, Fr::NUM_BITS as usize);
+        append_le_fixed_width(&mut from_key_bits, &from_y, Fr::NUM_BITS as usize);
+        let from_pub_key_hash = phasher.hash_bits(from_key_bits);
+        let mut from_pub_key_hash_bits = vec![];
+        append_le_fixed_width(
+            &mut from_pub_key_hash_bits,
+            &from_pub_key_hash,
+            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+        );
+        let from_pub_key_hash = le_bit_vector_into_field_element(&from_pub_key_hash_bits);
 
-    let from_sk = PrivateKey::<Bn256>(rng.gen());
-    let from_pk = PublicKey::from_private(&from_sk, p_g, params);
-    let (from_x, from_y) = from_pk.0.into_xy();
-    println!("x = {}, y = {}", from_x, from_y);
-    let mut from_key_bits = vec![];
-    append_le_fixed_width(&mut from_key_bits, &from_x, Fr::NUM_BITS as usize);
-    append_le_fixed_width(&mut from_key_bits, &from_y, Fr::NUM_BITS as usize);
-    let from_pub_key_hash = phasher.hash_bits(from_key_bits);
-    let mut from_pub_key_hash_bits = vec![];
-    append_le_fixed_width(
-        &mut from_pub_key_hash_bits,
-        &from_pub_key_hash,
-        franklin_constants::NEW_PUBKEY_HASH_WIDTH,
-    );
-    let from_pub_key_hash = le_bit_vector_into_field_element(&from_pub_key_hash_bits);
+        let to_sk = PrivateKey::<Bn256>(rng.gen());
+        let to_pk = PublicKey::from_private(&to_sk, p_g, params);
+        let (to_x, to_y) = to_pk.0.into_xy();
+        println!("x = {}, y = {}", to_x, to_y);
+        let mut to_key_bits = vec![];
+        append_le_fixed_width(&mut to_key_bits, &from_x, Fr::NUM_BITS as usize);
+        append_le_fixed_width(&mut to_key_bits, &from_y, Fr::NUM_BITS as usize);
+        let to_pub_key_hash = phasher.hash_bits(to_key_bits);
+        let mut to_pub_key_hash_bits = vec![];
+        append_le_fixed_width(
+            &mut to_pub_key_hash_bits,
+            &to_pub_key_hash,
+            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+        );
+        let to_pub_key_hash = le_bit_vector_into_field_element(&to_pub_key_hash_bits);
 
-    let to_sk = PrivateKey::<Bn256>(rng.gen());
-    let to_pk = PublicKey::from_private(&to_sk, p_g, params);
-    let (to_x, to_y) = to_pk.0.into_xy();
-    println!("x = {}, y = {}", to_x, to_y);
-    let mut to_key_bits = vec![];
-    append_le_fixed_width(&mut to_key_bits, &from_x, Fr::NUM_BITS as usize);
-    append_le_fixed_width(&mut to_key_bits, &from_y, Fr::NUM_BITS as usize);
-    let to_pub_key_hash = phasher.hash_bits(to_key_bits);
-    let mut to_pub_key_hash_bits = vec![];
-    append_le_fixed_width(
-        &mut to_pub_key_hash_bits,
-        &to_pub_key_hash,
-        franklin_constants::NEW_PUBKEY_HASH_WIDTH,
-    );
-    let to_pub_key_hash = le_bit_vector_into_field_element(&to_pub_key_hash_bits);
+        // give some funds to sender and make zero balance for recipient
+        let validator_sk = PrivateKey::<Bn256>(rng.gen());
+        let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
+        let (validator_x, validator_y) = validator_pk.0.into_xy();
+        println!("x = {}, y = {}", validator_x, validator_y);
+        let mut validator_key_bits = vec![];
+        append_le_fixed_width(&mut validator_key_bits, &validator_x, Fr::NUM_BITS as usize);
+        append_le_fixed_width(&mut validator_key_bits, &validator_y, Fr::NUM_BITS as usize);
+        let validator_pub_key_hash = phasher.hash_bits(validator_key_bits);
+        let mut validator_pub_key_hash_bits = vec![];
+        append_le_fixed_width(
+            &mut validator_pub_key_hash_bits,
+            &validator_pub_key_hash,
+            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+        );
+        let validator_pub_key_hash = le_bit_vector_into_field_element(&validator_pub_key_hash_bits);
 
-    // give some funds to sender and make zero balance for recipient
-    let validator_sk = PrivateKey::<Bn256>(rng.gen());
-    let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
-    let (validator_x, validator_y) = validator_pk.0.into_xy();
-    println!("x = {}, y = {}", validator_x, validator_y);
-    let mut validator_key_bits = vec![];
-    append_le_fixed_width(&mut validator_key_bits, &validator_x, Fr::NUM_BITS as usize);
-    append_le_fixed_width(&mut validator_key_bits, &validator_y, Fr::NUM_BITS as usize);
-    let validator_pub_key_hash = phasher.hash_bits(validator_key_bits);
-    let mut validator_pub_key_hash_bits = vec![];
-    append_le_fixed_width(
-        &mut validator_pub_key_hash_bits,
-        &validator_pub_key_hash,
-        franklin_constants::NEW_PUBKEY_HASH_WIDTH,
-    );
-    let validator_pub_key_hash = le_bit_vector_into_field_element(&validator_pub_key_hash_bits);
-
-    let validator_leaf = CircuitAccount::<Bn256> {
-        subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
-        nonce: Fr::zero(),
-        pub_key_hash: validator_pub_key_hash,
-    };
-
-    let mut validator_balances = vec![];
-    for _ in 0..1 << *franklin_constants::BALANCE_TREE_DEPTH {
-        validator_balances.push(Some(Fr::zero()));
-    }
-    tree.insert(validator_address_number, validator_leaf);
-
-    let mut from_leaf_number: u32 = rng.gen();
-    from_leaf_number %= capacity;
-    let from_leaf_number_fe = Fr::from_str(&from_leaf_number.to_string()).unwrap();
-
-    let mut to_leaf_number: u32 = rng.gen();
-    to_leaf_number %= capacity;
-    let _to_leaf_number_fe = Fr::from_str(&to_leaf_number.to_string()).unwrap();
-
-    let from_balance_before: u128 = 2000;
-
-    let from_balance_before_as_field_element =
-        Fr::from_str(&from_balance_before.to_string()).unwrap();
-
-    let to_balance_before: u128 = 2100;
-
-    let to_balance_before_as_field_element = Fr::from_str(&to_balance_before.to_string()).unwrap();
-
-    let transfer_amount: u128 = 500;
-
-    let _transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
-
-    let transfer_amount_bits = convert_to_float(
-        transfer_amount,
-        *franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        *franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap();
-
-    let transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
-
-    let fee: u128 = 7;
-
-    let _fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
-
-    let fee_bits = convert_to_float(
-        fee,
-        *franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-        *franklin_constants::FEE_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap();
-
-    let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
-
-    let token: u32 = 2;
-    let token_fe = Fr::from_str(&token.to_string()).unwrap();
-    let block_number = Fr::from_str("1").unwrap();
-    // prepare state, so that we could make transfer
-    let mut from_balance_tree =
-        CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
-    let mut to_balance_tree =
-        CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
-    from_balance_tree.insert(
-        token,
-        Balance {
-            value: from_balance_before_as_field_element,
-        },
-    );
-
-    let from_leaf_initial = CircuitAccount::<Bn256> {
-        subtree: from_balance_tree,
-        nonce: Fr::zero(),
-        pub_key_hash: from_pub_key_hash,
-    };
-
-    to_balance_tree.insert(
-        token,
-        Balance {
-            value: to_balance_before_as_field_element,
-        },
-    );
-    let to_leaf_initial = CircuitAccount::<Bn256> {
-        subtree: to_balance_tree,
-        nonce: Fr::zero(),
-        pub_key_hash: to_pub_key_hash,
-    };
-    tree.insert(from_leaf_number, from_leaf_initial);
-    tree.insert(to_leaf_number, to_leaf_initial);
-
-    let transfer_witness = apply_transfer(
-        &mut tree,
-        &TransferData {
-            amount: transfer_amount,
-            fee: fee,
-            token: token,
-            from_account_address: from_leaf_number,
-            to_account_address: to_leaf_number,
-        },
-    );
-    println!(
-        "transfer_witness calculated a is: {}",
-        transfer_witness.args.a.unwrap()
-    );
-    // construct signature
-    let mut sig_bits = vec![];
-
-    let transfer_tx_type = Fr::from_str("5").unwrap();
-    append_le_fixed_width(
-        &mut sig_bits,
-        &transfer_tx_type,
-        *franklin_constants::TX_TYPE_BIT_WIDTH,
-    );
-    append_le_fixed_width(
-        &mut sig_bits,
-        &from_leaf_number_fe,
-        franklin_constants::ACCOUNT_TREE_DEPTH,
-    );
-    // append_le_fixed_width(&mut sig_bits, , franklin_constants::NEW_PUBKEY_HASH_WIDTH);
-    append_le_fixed_width(
-        &mut sig_bits,
-        &token_fe,
-        *franklin_constants::BALANCE_TREE_DEPTH,
-    );
-    append_le_fixed_width(
-        &mut sig_bits,
-        &transfer_witness
-            .from_after
-            .witness
-            .account_witness
-            .nonce
-            .unwrap(),
-        // &transfer_witness.nonce,
-        franklin_constants::NONCE_BIT_WIDTH,
-    );
-    append_le_fixed_width(
-        &mut sig_bits,
-        &transfer_amount_encoded,
-        franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
-            + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-    );
-    append_le_fixed_width(
-        &mut sig_bits,
-        &fee_encoded,
-        franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-    );
-    let sig_msg = le_bit_vector_into_field_element::<Fr>(&sig_bits);
-    let sig_msg_hash = phasher.hash_bits(sig_bits.clone());
-    let mut sig_msg_hash_bits = vec![];
-    append_le_fixed_width(
-        &mut sig_msg_hash_bits,
-        &sig_msg_hash,
-        franklin_constants::FR_BIT_WIDTH - 8,
-    ); //TODO: not clear what capacity is
-
-    println!(
-        "test sig_msg_hash={} sig_msg_hash_bits.len={}",
-        sig_msg_hash,
-        sig_msg_hash_bits.len()
-    );
-
-    let signature = sign(&sig_bits, &from_sk, p_g, params, rng);
-
-    let operations = calculate_transfer_operations_from_witness(
-        &transfer_witness,
-        &sig_msg,
-        signature,
-        &from_x,
-        &from_y,
-    );
-
-    let (root_after_fee, validator_account_witness) =
-        apply_fee(&mut tree, validator_address_number, token, fee);
-
-    let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
-    let public_data_commitment = public_data_commitment::<Bn256>(
-        &transfer_witness.get_pubdata(),
-        transfer_witness.before_root,
-        Some(root_after_fee),
-        Some(validator_address),
-        Some(block_number),
-    );
-
-    {
-        let mut cs = TestConstraintSystem::<Bn256>::new();
-
-        let instance = FranklinCircuit {
-            operation_batch_size: 10,
-            params,
-            old_root: transfer_witness.before_root,
-            new_root: Some(root_after_fee),
-            operations: operations,
-            pub_data_commitment: Some(public_data_commitment),
-            block_number: Some(block_number),
-            validator_account: validator_account_witness,
-            validator_address: Some(validator_address),
-            validator_balances: validator_balances,
-            validator_audit_path: validator_audit_path,
+        let validator_leaf = CircuitAccount::<Bn256> {
+            subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
+            nonce: Fr::zero(),
+            pub_key_hash: validator_pub_key_hash,
         };
 
-        instance.synthesize(&mut cs).unwrap();
+        let mut validator_balances = vec![];
+        for _ in 0..1 << *franklin_constants::BALANCE_TREE_DEPTH {
+            validator_balances.push(Some(Fr::zero()));
+        }
+        tree.insert(validator_address_number, validator_leaf);
 
-        println!("{}", cs.find_unconstrained());
+        let mut from_leaf_number: u32 = rng.gen();
+        from_leaf_number %= capacity;
+        let from_leaf_number_fe = Fr::from_str(&from_leaf_number.to_string()).unwrap();
 
-        println!("{}", cs.num_constraints());
+        let mut to_leaf_number: u32 = rng.gen();
+        to_leaf_number %= capacity;
+        let _to_leaf_number_fe = Fr::from_str(&to_leaf_number.to_string()).unwrap();
 
-        let err = cs.which_is_unsatisfied();
-        if err.is_some() {
-            panic!("ERROR satisfying in {}", err.unwrap());
+        let from_balance_before: u128 = 2000;
+
+        let from_balance_before_as_field_element =
+            Fr::from_str(&from_balance_before.to_string()).unwrap();
+
+        let to_balance_before: u128 = 2100;
+
+        let to_balance_before_as_field_element =
+            Fr::from_str(&to_balance_before.to_string()).unwrap();
+
+        let transfer_amount: u128 = 500;
+
+        let _transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
+
+        let transfer_amount_bits = convert_to_float(
+            transfer_amount,
+            *franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+            *franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
+            10,
+        )
+        .unwrap();
+
+        let transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
+
+        let fee: u128 = 7;
+
+        let _fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
+
+        let fee_bits = convert_to_float(
+            fee,
+            *franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+            *franklin_constants::FEE_MANTISSA_BIT_WIDTH,
+            10,
+        )
+        .unwrap();
+
+        let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
+
+        let token: u32 = 2;
+        let token_fe = Fr::from_str(&token.to_string()).unwrap();
+        let block_number = Fr::from_str("1").unwrap();
+        // prepare state, so that we could make transfer
+        let mut from_balance_tree =
+            CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
+        let mut to_balance_tree =
+            CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
+        from_balance_tree.insert(
+            token,
+            Balance {
+                value: from_balance_before_as_field_element,
+            },
+        );
+
+        let from_leaf_initial = CircuitAccount::<Bn256> {
+            subtree: from_balance_tree,
+            nonce: Fr::zero(),
+            pub_key_hash: from_pub_key_hash,
+        };
+
+        to_balance_tree.insert(
+            token,
+            Balance {
+                value: to_balance_before_as_field_element,
+            },
+        );
+        let to_leaf_initial = CircuitAccount::<Bn256> {
+            subtree: to_balance_tree,
+            nonce: Fr::zero(),
+            pub_key_hash: to_pub_key_hash,
+        };
+        tree.insert(from_leaf_number, from_leaf_initial);
+        tree.insert(to_leaf_number, to_leaf_initial);
+
+        let transfer_witness = apply_transfer(
+            &mut tree,
+            &TransferData {
+                amount: transfer_amount,
+                fee: fee,
+                token: token,
+                from_account_address: from_leaf_number,
+                to_account_address: to_leaf_number,
+            },
+        );
+        println!(
+            "transfer_witness calculated a is: {}",
+            transfer_witness.args.a.unwrap()
+        );
+        // construct signature
+        let mut sig_bits = vec![];
+
+        let transfer_tx_type = Fr::from_str("5").unwrap();
+        append_le_fixed_width(
+            &mut sig_bits,
+            &transfer_tx_type,
+            *franklin_constants::TX_TYPE_BIT_WIDTH,
+        );
+        append_le_fixed_width(
+            &mut sig_bits,
+            &from_leaf_number_fe,
+            franklin_constants::ACCOUNT_TREE_DEPTH,
+        );
+        // append_le_fixed_width(&mut sig_bits, , franklin_constants::NEW_PUBKEY_HASH_WIDTH);
+        append_le_fixed_width(
+            &mut sig_bits,
+            &token_fe,
+            *franklin_constants::BALANCE_TREE_DEPTH,
+        );
+        append_le_fixed_width(
+            &mut sig_bits,
+            &transfer_witness
+                .from_after
+                .witness
+                .account_witness
+                .nonce
+                .unwrap(),
+            // &transfer_witness.nonce,
+            franklin_constants::NONCE_BIT_WIDTH,
+        );
+        append_le_fixed_width(
+            &mut sig_bits,
+            &transfer_amount_encoded,
+            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
+                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+        );
+        append_le_fixed_width(
+            &mut sig_bits,
+            &fee_encoded,
+            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+        );
+        let sig_msg = le_bit_vector_into_field_element::<Fr>(&sig_bits);
+        let sig_msg_hash = phasher.hash_bits(sig_bits.clone());
+        let mut sig_msg_hash_bits = vec![];
+        append_le_fixed_width(
+            &mut sig_msg_hash_bits,
+            &sig_msg_hash,
+            franklin_constants::FR_BIT_WIDTH - 8,
+        ); //TODO: not clear what capacity is
+
+        println!(
+            "test sig_msg_hash={} sig_msg_hash_bits.len={}",
+            sig_msg_hash,
+            sig_msg_hash_bits.len()
+        );
+
+        let signature = sign(&sig_bits, &from_sk, p_g, params, rng);
+
+        let operations = calculate_transfer_operations_from_witness(
+            &transfer_witness,
+            &sig_msg,
+            signature,
+            &from_x,
+            &from_y,
+        );
+
+        let (root_after_fee, validator_account_witness) =
+            apply_fee(&mut tree, validator_address_number, token, fee);
+
+        let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
+        let public_data_commitment = public_data_commitment::<Bn256>(
+            &transfer_witness.get_pubdata(),
+            transfer_witness.before_root,
+            Some(root_after_fee),
+            Some(validator_address),
+            Some(block_number),
+        );
+
+        {
+            let mut cs = TestConstraintSystem::<Bn256>::new();
+
+            let instance = FranklinCircuit {
+                operation_batch_size: 10,
+                params,
+                old_root: transfer_witness.before_root,
+                new_root: Some(root_after_fee),
+                operations: operations,
+                pub_data_commitment: Some(public_data_commitment),
+                block_number: Some(block_number),
+                validator_account: validator_account_witness,
+                validator_address: Some(validator_address),
+                validator_balances: validator_balances,
+                validator_audit_path: validator_audit_path,
+            };
+
+            instance.synthesize(&mut cs).unwrap();
+
+            println!("{}", cs.find_unconstrained());
+
+            println!("{}", cs.num_constraints());
+
+            let err = cs.which_is_unsatisfied();
+            if err.is_some() {
+                panic!("ERROR satisfying in {}", err.unwrap());
+            }
         }
     }
+
 }
