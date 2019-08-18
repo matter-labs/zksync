@@ -627,16 +627,49 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             pk: sender_pk,
         };
 
+        let mut data_bits = op_data.sig_msg.get_bits_le();
+        data_bits.resize(256, Boolean::constant(false));
+        
+        let mut hash_bits: Vec<Boolean> = vec![];
+
+        let mut pk_x_serialized = signature.pk.get_x().clone().into_bits_le(cs.namespace(||"pk_x_bits"))?;
+        pk_x_serialized.resize(256,Boolean::constant(false));
+        hash_bits.extend(pk_x_serialized);
+        let mut r_x_serialized = signature.r.get_x().clone().into_bits_le(cs.namespace(||"r_x_bits"))?;
+        r_x_serialized.resize(256,Boolean::constant(false));
+        hash_bits.extend(r_x_serialized);
+
+        let sig_hash = pedersen_hash::pedersen_hash(
+            cs.namespace(|| "hash_sig"),
+            pedersen_hash::Personalization::NoteCommitment,
+            &hash_bits,
+            self.params,
+        )?;
+        let mut first_hash_bits = sig_hash.get_x().into_bits_le(cs.namespace(||"first_hash_bits"))?;
+        first_hash_bits.resize(256, Boolean::constant(false));
+
+        let mut second_hash_bits = vec![];
+        second_hash_bits.extend(first_hash_bits);
+        second_hash_bits.extend(data_bits);
+        let second_hash = pedersen_hash::pedersen_hash(
+            cs.namespace(|| "second_hash"),
+            pedersen_hash::Personalization::NoteCommitment,
+            &second_hash_bits,
+            self.params,
+        )?.get_x().clone();
+       
+       let h_bits = second_hash.into_bits_le(cs.namespace(||"h_bits"))?;
+
         let max_message_len = 32 as usize; //TODO fix when clear
                                            //TOdO: we should always use the same length
         signature.verify_raw_message_signature(
             cs.namespace(|| "verify transaction signature"),
             self.params,
-            &op_data.sig_msg.get_bits_le(),
+            &h_bits,
             generator,
             max_message_len,
         )?;
-
+      
         let diff_a_b =
             Expression::from(&op_data.a.get_number()) - Expression::from(&op_data.b.get_number());
         let mut diff_a_b_bits = diff_a_b.into_bits_le(cs.namespace(|| "balance-fee bits"))?;
@@ -1389,6 +1422,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         sig_bits.extend(chunk_data.tx_type.get_bits_le());
         sig_bits.extend(lhs.account_address.get_bits_le());
+        sig_bits.extend(lhs.account.pub_key_hash.get_bits_le());
         sig_bits.extend(lhs.token.get_bits_le());
         sig_bits.extend(lhs.account.nonce.get_bits_le());
         sig_bits.extend(op_data.amount_packed.get_bits_le().clone());
