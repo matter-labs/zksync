@@ -199,6 +199,7 @@ export class Wallet {
     }
 
     async waitPendingTxsExecuted() {
+        await this.fetchFranklinState();
         while (this.franklinState.pending_txs.length > 0) {
             await sleep(1000);
             await this.fetchFranklinState();
