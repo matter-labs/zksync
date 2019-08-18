@@ -4,6 +4,7 @@
   "devDependencies": {
     "@types/chai": "^4.1.7",
     "@types/mocha": "^5.2.7",
+    "axios": "^0.19.0",
     "chai": "^4.2.0",
     "ethereum-waffle": "^2.0.12",
     "ethers": "^4.0.33",
@@ -12,6 +13,7 @@
     "openzeppelin-solidity": "^2.3.0",
     "prettier": "^1.18.2",
     "prettier-plugin-solidity": "^1.0.0-alpha.27",
+    "querystring": "^0.2.0",
     "solhint": "^2.1.2",
     "solhint-plugin-prettier": "^0.0.3",
     "ts-node": "^8.3.0",
