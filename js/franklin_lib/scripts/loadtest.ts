@@ -19,15 +19,21 @@ async function main() {
     await wallet.updateState();
     await wallet2.updateState();
 
-    console.log(await wallet.depositOnchain(wallet.supportedTokens['0'], bigNumberify(20)));
-    await sleep(5000);
+
+    // console.log(await wallet.depositOffchain(wallet.supportedTokens['0'], new BN(18), new BN(2)));
+    // await wallet.updateState();
+    // console.log(wallet.franklinState);
+
+    // console.log(await wallet.depositOnchain(wallet.supportedTokens['0'], bigNumberify(20)));
+    await wallet.updateState();
+    console.log(wallet.franklinState);
+    return;
+    // await wallet.waitPendingTxsExecuted();
     console.log(await wallet.depositOffchain(wallet.supportedTokens['0'], new BN(18), new BN(2)));
-    await sleep(5000);
-    console.log(await wallet.transfer(wallet2.address, wallet.supportedTokens['0'], new BN(3), new BN(0)));
-    await sleep(5000);
-    //
+    await wallet.waitPendingTxsExecuted();
+    console.log(await wallet.transfer(wallet2.address, wallet.supportedTokens['0'], new BN(5000), new BN(0)));
+    await wallet.waitPendingTxsExecuted();
     console.log(await wallet2.widthdrawOffchain(wallet2.supportedTokens['0'],new BN(1), new BN(0)));
-    await sleep(5000);
     // console.log(await wallet2.widthdrawOnchain(wallet2.supportedTokens['0'],bigNumberify(1));
 
     await wallet2.updateState();

@@ -197,4 +197,17 @@ export class Wallet {
         await this.fetchFranklinState();
         await this.fetchEthState();
     }
+
+    async waitPendingTxsExecuted() {
+        while (this.franklinState.pending_txs.length > 0) {
+            await sleep(1000);
+            await this.fetchFranklinState();
+        }
+    }
+}
+
+function sleep(ms) {
+    return new Promise(resolve => {
+        setTimeout(resolve, ms);
+    });
 }
