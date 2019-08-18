@@ -219,12 +219,12 @@ fn handle_get_tokens(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     Ok(HttpResponse::Ok().json(tokens))
 }
 
-//fn handle_get_testnet_config(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-//    let address = req.state().contract_address.clone();
-//    Ok(HttpResponse::Ok().json(TestnetConfigResponse {
-//        address: format!("0x{}", address),
-//    }))
-//}
+fn handle_get_testnet_config(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+   let address = req.state().contract_address.clone();
+   Ok(HttpResponse::Ok().json(TestnetConfigResponse {
+       address: format!("0x{}", address),
+   }))
+}
 
 // fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
 //     let tx_for_state = req.state().tx_for_state.clone();
@@ -260,11 +260,6 @@ fn handle_get_tokens(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
 //     Ok(HttpResponse::Ok().json(status))
 // }
 
-//fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-//    let network_status = req.state().network_status.read();
-//    Ok(HttpResponse::Ok().json(network_status))
-//}
-
 //fn handle_get_account_transactions(_req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
 //    Ok(HttpResponse::Ok().json("{}"))
 //}
@@ -299,6 +294,11 @@ fn handle_get_tokens(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
 //
 //    Ok(HttpResponse::Ok().json(tx))
 //}
+
+fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+   let network_status = req.state().network_status.read();
+   Ok(HttpResponse::Ok().json(network_status))
+}
 
 fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let pool = req.state().connection_pool.clone();
@@ -500,12 +500,12 @@ fn start_server(state: AppState, bind_to: String) {
             .middleware(Cors::build().send_wildcard().max_age(3600).finish())
             .scope("/api/v0.1", |api_scope| {
                 api_scope
-                    //                    .resource("/testnet_config", |r| {
-                    //                        r.method(Method::GET).f(handle_get_testnet_config);
-                    //                    })
-                    //                    .resource("/status", |r| {
-                    //                        r.method(Method::GET).f(handle_get_network_status);
-                    //                    })
+                    .resource("/testnet_config", |r| {
+                        r.method(Method::GET).f(handle_get_testnet_config);
+                    })
+                    .resource("/status", |r| {
+                        r.method(Method::GET).f(handle_get_network_status);
+                    })
                     .resource("/submit_tx", |r| {
                         r.method(Method::POST).f(handle_submit_tx);
                     })
