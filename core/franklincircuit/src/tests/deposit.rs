@@ -301,11 +301,10 @@ mod test {
     use franklinmodels::merkle_tree::hasher::Hasher;
     use franklinmodels::merkle_tree::PedersenHasher;
 
-    use crate::account::AccountWitness;
     use crate::tests::utils::public_data_commitment;
     use bellman::groth16::generate_random_parameters;
     use bellman::groth16::{
-        create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
+        create_random_proof, prepare_verifying_key, verify_proof,
     };
 
     use crate::circuit::FranklinCircuit;
@@ -334,7 +333,7 @@ mod test {
         let validator_address_number = 7;
         let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
         let block_number = Fr::from_str("1").unwrap();
-        let mut rng =
+        let rng =
             &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
         let phasher = PedersenHasher::<Bn256>::default();
 
@@ -390,10 +389,24 @@ mod test {
             },
         );
 
-        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
+        //------------- Calculate sig bits
+        let mut sig_bits_to_hash = vec![];
+        append_be_fixed_width(&mut sig_bits_to_hash, &Fr::from_str("1").unwrap(), *franklin_constants::TX_TYPE_BIT_WIDTH);
+        append_be_fixed_width(&mut sig_bits_to_hash, &deposit_witness.args.new_pub_key_hash.unwrap(), franklin_constants::NEW_PUBKEY_HASH_WIDTH);
+        append_be_fixed_width(&mut sig_bits_to_hash, &deposit_witness.before.token.unwrap(), *franklin_constants::TOKEN_EXT_BIT_WIDTH);
+        append_be_fixed_width(&mut sig_bits_to_hash,&deposit_witness.args.amount.unwrap(), franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
+                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH);
+        append_be_fixed_width(
+            &mut sig_bits_to_hash,
+            &deposit_witness.args.fee.unwrap(),
+            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+        );
+        append_be_fixed_width(&mut sig_bits_to_hash, &deposit_witness.before.witness.account_witness.nonce.unwrap(), franklin_constants::NONCE_BIT_WIDTH);
+
+        // let sig_msg: Fr = le_bit_vector_into_field_element(&sig_bits);
+        let sig_msg= phasher.hash_bits(sig_bits_to_hash.clone());
         let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
         sig_bits.reverse();
-        sig_bits.truncate(80);
 
         // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
         let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
@@ -451,7 +464,7 @@ mod test {
     }
 
     #[test]
-    fn test_deposit_franklin_in_empty_leaf_proof() {
+    fn test_deposit_franklin_proof() {
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let validator_address_number = 7;
@@ -512,7 +525,6 @@ mod test {
                 new_pub_key_hash: sender_pub_key_hash,
             },
         );
-
         let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
         let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
         sig_bits.reverse();
