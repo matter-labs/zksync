@@ -297,7 +297,7 @@ impl PlasmaStateKeeper {
                     ops.push(exec_result);
                 }
                 Err(e) => {
-                    error!("Failed to execute transaction: {:?}, {:?}", tx, e);
+                    error!("Failed to execute transaction: {:?}, {}", tx, e);
                     let exec_result = ExecutedTx {
                         tx,
                         success: false,

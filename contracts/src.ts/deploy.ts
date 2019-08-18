@@ -1,6 +1,8 @@
 import {deployContract} from 'ethereum-waffle';
 import {ethers} from 'ethers';
 import {bigNumberify} from "ethers/utils";
+import Axios from "axios";
+const qs = require('querystring');
 
 export const ERC20MintableContract = function () {
     let contract = require('openzeppelin-solidity/build/contracts/ERC20Mintable');
@@ -34,6 +36,22 @@ export async function deployFranklin(
     } catch (err) {
         console.log("Error:" + err);
     }
+}
+
+export async function postContractToTesseracts(contractCode, contractName: string, address: string) {
+    let req = {
+        contract_source: JSON.stringify(contractCode.abi),
+        contract_compiler: "abi-only",
+        contract_name: contractName,
+        contract_optimized: false
+    };
+
+    const config = {
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+    };
+    await Axios.post(`http://localhost:8000/${address}/contract`, qs.stringify(req), config);
 }
 
 export async function addTestERC20Token(wallet, franklin) {
