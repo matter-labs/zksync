@@ -47,9 +47,7 @@ use num_traits::cast::ToPrimitive;
 // };
 use storage::StorageProcessor;
 
-use models::primitives::{
-    serialize_g1_for_ethereum, serialize_g2_for_ethereum,
-};
+use models::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum};
 
 pub struct Prover<E: JubjubEngine> {
     pub operation_batch_size: usize,
@@ -197,11 +195,11 @@ impl BabyProver {
         info!("Reading proving key, may take a while");
 
         let path = {
-                let mut key_file_path = std::path::PathBuf::new();
-                key_file_path.push(&std::env::var("KEY_DIR").expect("KEY_DIR not set"));
-                key_file_path.push(&format!("{}", franklin_constants::BLOCK_SIZE_CHUNKS));
-                key_file_path.push(franklin_constants::KEY_FILENAME);
-                key_file_path
+            let mut key_file_path = std::path::PathBuf::new();
+            key_file_path.push(&std::env::var("KEY_DIR").expect("KEY_DIR not set"));
+            key_file_path.push(&format!("{}", franklin_constants::BLOCK_SIZE_CHUNKS));
+            key_file_path.push(franklin_constants::KEY_FILENAME);
+            key_file_path
         };
         debug!("Reading key from {}", path.to_str().unwrap());
         let franklin_circuit_params = read_parameters(&path.to_str().unwrap());

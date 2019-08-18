@@ -1,6 +1,5 @@
 use crate::utils::pack_bits_to_element;
 use bellman::{ConstraintSystem, SynthesisError};
-use ff::Field;
 use franklin_crypto::circuit::boolean::Boolean;
 
 use franklin_crypto::circuit::expression::Expression;
@@ -54,8 +53,7 @@ impl<E: JubjubEngine> CircuitElement<E> {
         max_length: usize,
     ) -> Result<Self, SynthesisError> {
         // let mut bits = number.into_bits_le(cs.namespace(|| "into_bits_le"))?;
-        let mut bits =
-            number.into_bits_le_fixed(cs.namespace(|| "into_bits_le_fixed"), max_length)?;
+        let bits = number.into_bits_le_fixed(cs.namespace(|| "into_bits_le_fixed"), max_length)?;
 
         let ce = CircuitElement {
             number: number,

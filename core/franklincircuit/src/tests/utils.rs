@@ -231,7 +231,6 @@ pub fn apply_fee(
         nonce: Some(validator_leaf.nonce.clone()),
         pub_key_hash: Some(validator_leaf.pub_key_hash.clone()),
     };
-    let validator_balance_root = validator_leaf.subtree.root_hash();
 
     let mut balance = validator_leaf
         .subtree

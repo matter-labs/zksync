@@ -26,7 +26,6 @@ impl<E: JubjubEngine> AllocatedOperationBranch<E> {
     pub fn from_witness<CS: ConstraintSystem<E>>(
         mut cs: CS,
         operation_branch: &OperationBranch<E>,
-        params: &E::Params,
     ) -> Result<AllocatedOperationBranch<E>, SynthesisError> {
         let account_address = CircuitElement::from_fe_strict(
             cs.namespace(|| "account_address"),
@@ -46,7 +45,6 @@ impl<E: JubjubEngine> AllocatedOperationBranch<E> {
         let account = account::AccountContent::from_witness(
             cs.namespace(|| "allocate account_content"),
             &operation_branch.witness.account_witness,
-            &params,
         )?;
 
         let balance = CircuitElement::from_fe_strict(
