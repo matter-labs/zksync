@@ -1399,7 +1399,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             sig_bits,
             sig_bit_len,
         )?; //TODO; think of ommiting 3rd argument
-        let sig_hash = pedersen_hash::pedersen_hash(
+        let _sig_hash = pedersen_hash::pedersen_hash(
             cs.namespace(|| "hash_sig_bits"),
             pedersen_hash::Personalization::NoteCommitment,
             &sig_msg.get_bits_le(),
@@ -1409,7 +1409,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         .clone();
         //TODO: rhs_pubkey
 
-        let is_sig_msg_correct = CircuitElement::equals(
+        let _is_sig_msg_correct = CircuitElement::equals(
             cs.namespace(|| "is_sig_msg_correct"),
             &op_data.sig_msg,
             &sig_msg,

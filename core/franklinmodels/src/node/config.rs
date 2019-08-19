@@ -1,6 +1,5 @@
 use lazy_static::lazy_static;
 
-pub const TX_BATCH_SIZE: usize = 50;
 pub const PADDING_INTERVAL: u64 = 5; // sec
 pub const PROVER_TIMEOUT: usize = 60; // sec
 pub const PROVER_TIMER_TICK: u64 = 5; // sec
@@ -27,8 +26,14 @@ pub struct RuntimeConfig {
 
 impl RuntimeConfig {
     pub fn new() -> Self {
+        let tx_batch_size_env =
+            env::var("TX_BATCH_SIZE").expect("TX_BATCH_SIZE env missing");
+        let tx_size = usize::from_str_radix(&(tx_batch_size_env), 10)
+            .ok()
+            .expect("TX_BATCH_SIZE invalid");
+
         Self {
-            tx_batch_size: TX_BATCH_SIZE,
+            tx_batch_size: tx_size,
             contract_addr: env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR env missing"),
             max_outstanding_txs: env::var("MAX_OUTSTANDING_TXS")
                 .ok()

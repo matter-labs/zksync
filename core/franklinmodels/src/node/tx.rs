@@ -8,6 +8,14 @@ use web3::types::Address;
 
 /// Signed by user.
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub enum TxType {
+    Transfer,
+    Deposit,
+    Withdraw,
+    Close
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transfer {
     // TODO: derrive account address from signature
