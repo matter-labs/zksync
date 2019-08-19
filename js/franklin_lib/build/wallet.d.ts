@@ -6,9 +6,10 @@ import { ethers } from 'ethers';
 declare type BigNumber = ethers.utils.BigNumber;
 declare type BigNumberish = ethers.utils.BigNumberish;
 export declare type Address = string;
-declare class FranklinProvider {
+export declare class FranklinProvider {
     providerAddress: string;
-    constructor(providerAddress?: string);
+    contractAddress: string;
+    constructor(providerAddress?: string, contractAddress?: string);
     submitTx(tx: any): Promise<any>;
     getTokens(): Promise<any>;
     getState(address: Address): Promise<FranklinAccountState>;
@@ -51,7 +52,7 @@ export declare class Wallet {
     widthdrawOffchain(token: Token, amount: BigNumberish, fee: BigNumberish): Promise<any>;
     transfer(address: Address, token: Token, amount: BigNumberish, fee: BigNumberish): Promise<any>;
     getNonce(): Promise<number>;
-    static fromEthWallet(wallet: ethers.Signer): Promise<Wallet>;
+    static fromEthWallet(wallet: ethers.Signer, franklinProvider?: FranklinProvider): Promise<Wallet>;
     fetchEthState(): Promise<void>;
     fetchFranklinState(): Promise<void>;
     updateState(): Promise<void>;

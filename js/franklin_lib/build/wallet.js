@@ -47,9 +47,11 @@ var bigNumberify = ethers_1.ethers.utils.bigNumberify;
 var IERC20Conract = require("../abi/IERC20");
 var franklinContractCode = require("../abi/Franklin");
 var FranklinProvider = /** @class */ (function () {
-    function FranklinProvider(providerAddress) {
+    function FranklinProvider(providerAddress, contractAddress) {
         if (providerAddress === void 0) { providerAddress = 'http://127.0.0.1:3000'; }
+        if (contractAddress === void 0) { contractAddress = process.env.CONTRACT_ADDR; }
         this.providerAddress = providerAddress;
+        this.contractAddress = contractAddress;
     }
     FranklinProvider.prototype.submitTx = function (tx) {
         return __awaiter(this, void 0, void 0, function () {
@@ -83,6 +85,7 @@ var FranklinProvider = /** @class */ (function () {
     };
     return FranklinProvider;
 }());
+exports.FranklinProvider = FranklinProvider;
 var Wallet = /** @class */ (function () {
     function Wallet(seed, provider, ethWallet, ethAddress) {
         this.provider = provider;
@@ -102,7 +105,7 @@ var Wallet = /** @class */ (function () {
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
-                        franklinDeployedContract = new ethers_1.Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, this.ethWallet);
+                        franklinDeployedContract = new ethers_1.Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
                         franklinAddressBinary = Buffer.from(this.address.substr(2), "hex");
                         if (!(token.id == 0)) return [3 /*break*/, 3];
                         return [4 /*yield*/, franklinDeployedContract.depositETH(franklinAddressBinary, { value: amount })];
@@ -156,7 +159,7 @@ var Wallet = /** @class */ (function () {
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
-                        franklinDeployedContract = new ethers_1.Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, this.ethWallet);
+                        franklinDeployedContract = new ethers_1.Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
                         if (!(token.id == 0)) return [3 /*break*/, 3];
                         return [4 /*yield*/, franklinDeployedContract.withdrawETH(amount, { gasLimit: 200000 })];
                     case 1:
@@ -237,20 +240,19 @@ var Wallet = /** @class */ (function () {
             });
         });
     };
-    Wallet.fromEthWallet = function (wallet) {
+    Wallet.fromEthWallet = function (wallet, franklinProvider) {
+        if (franklinProvider === void 0) { franklinProvider = new FranklinProvider(); }
         return __awaiter(this, void 0, void 0, function () {
-            var defaultFranklinProvider, seed, ethAddress, frankinWallet;
+            var seed, ethAddress, frankinWallet;
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0:
-                        defaultFranklinProvider = new FranklinProvider();
-                        return [4 /*yield*/, wallet.signMessage('Matter login')];
+                    case 0: return [4 /*yield*/, wallet.signMessage('Matter login')];
                     case 1:
                         seed = (_a.sent()).substr(2);
                         return [4 /*yield*/, wallet.getAddress()];
                     case 2:
                         ethAddress = _a.sent();
-                        frankinWallet = new Wallet(Buffer.from(seed, 'hex'), defaultFranklinProvider, wallet, ethAddress);
+                        frankinWallet = new Wallet(Buffer.from(seed, 'hex'), franklinProvider, wallet, ethAddress);
                         return [2 /*return*/, frankinWallet];
                 }
             });
@@ -268,7 +270,7 @@ var Wallet = /** @class */ (function () {
                         return [4 /*yield*/, this.ethWallet.provider.getBlockNumber()];
                     case 1:
                         currentBlock = _f.sent();
-                        franklinDeployedContract = new ethers_1.Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, this.ethWallet);
+                        franklinDeployedContract = new ethers_1.Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
                         _i = 0, _a = this.supportedTokens;
                         _f.label = 2;
                     case 2:

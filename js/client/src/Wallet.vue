@@ -74,20 +74,14 @@
                                 target="blanc">block explorer</a>):
                         <b-form-input id="addr" v-model="store.account.address" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                         <b-row class="mt-2">
-                            <b-col cols="6">Balance:</b-col> <b-col>ETH {{store.account.balance}}</b-col>
-                        </b-row>
-                        <b-row class="mt-2" style="color: grey" v-if="pendingWithdraw">
-                           <b-col cols="6">Pending:</b-col> <b-col>ETH {{store.account.onchain.balance}}</b-col>
-                        </b-row>
-                        <b-row class="mt-2 mx-auto" v-if="pendingWithdraw">
-                            <b-btn variant="primary" class="mt-2 mx-auto" @click="completeWithdraw">Complete withdrawal</b-btn>                            
+                            <b-table class="mt-2" striped hover :items="store.account.ethBalances"></b-table>
                         </b-row>
                     </b-card>
                     <b-row class="mb-0 mt-0">
                         <b-col sm class="mb-2">
                             <div id="depositOnchainBtn">
                                 <b-btn variant="outline-primary" class="w-100" 
-                                    v-b-modal.depositModal :disabled="!!depositProblem">&#x21E9; Deposit</b-btn>
+                                    v-b-modal.depositModal :disabled="false">&#x21E9; Deposit</b-btn>
                             </div>
                             <b-tooltip target="depositBtn" :disabled="!depositProblem" triggers="hover">
                                 Deposit not possible: {{ depositProblem }}
@@ -108,16 +102,15 @@
                         <label for="addr">Address</label>
                         (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+store.account.address"
                             target="blanc">block explorer</a>):
-                        <b-form-input id="addr" v-model="store.account.address" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                         <b-row class="mt-2">
-                            <b-col cols="6">Balance:</b-col> <b-col>ETH {{store.account.balance}}</b-col>
+                            <b-table class="mt-2" striped hover :items="store.account.contractBalances"></b-table>
                         </b-row>
-                        <b-row class="mt-2" style="color: grey" v-if="pendingWithdraw">
-                            <b-col cols="6">Pending:</b-col> <b-col>ETH {{store.account.onchain.balance}}</b-col>
-                        </b-row>
-                        <b-row class="mt-2 mx-auto" v-if="pendingWithdraw">
-                            <b-btn variant="primary" class="mt-2 mx-auto" @click="completeWithdraw">Complete withdrawal</b-btn>
-                        </b-row>
+<!--                        <b-row class="mt-2" style="color: grey" v-if="pendingWithdraw">-->
+<!--                            <b-col cols="6">Pending:</b-col> <b-col>ETH {{store.account.onchain.balance}}</b-col>-->
+<!--                        </b-row>-->
+<!--                        <b-row class="mt-2 mx-auto" v-if="pendingWithdraw">-->
+<!--                            <b-btn variant="primary" class="mt-2 mx-auto" @click="completeWithdraw">Complete withdrawal</b-btn>-->
+<!--                        </b-row>-->
                     </b-card>
                     <b-row class="mb-0 mt-0">
                         <b-col sm class="mb-2">
@@ -184,9 +177,9 @@
             (max ETH <a href="#" @click="depositAmount=store.account.balance">{{store.account.balance}}</a>):
         <b-form-input id="depositAmountInput" type="number" placeholder="7.50" v-model="depositAmount"></b-form-input>
         <div id="doDepositBtn" class="mt-4 float-right">
-            <b-btn variant="primary" @click="deposit" :disabled="!!doDepositProblem">Deposit</b-btn>
+            <b-btn variant="primary" @click="deposit" :disabled="!!false">Deposit</b-btn>
         </div>
-        <b-tooltip target="doDepositBtn" :disabled="!doDepositProblem" triggers="hover">
+        <b-tooltip target="doDepositBtn" :disabled="!false" triggers="hover">
             Deposit not possible: {{ doDepositProblem }}
         </b-tooltip>
     </b-modal>
@@ -333,12 +326,11 @@ export default {
     methods: {
         async deposit() {
             this.$refs.depositModal.hide()
-            let pub = store.account.plasma.key.publicKey
-            let maxFee = new BN(0)
             let value = Eth.toWei(this.depositAmount, 'ether')
-            let from = store.account.address
-            let hash = await contract.deposit([pub.x, pub.y], maxFee, { value, from })
-            this.alert('Deposit initiated, tx: ' + hash, 'success')
+            let wallet = window.wallet;
+            await wallet.updateState();
+            let tx_hash = await wallet.depositOnchain(wallet.supportedTokens[0], ethers.utils.parseEther("1.0"))
+            this.alert('Onchain deposit initiated, tx: ' + tx_hash, 'success')
         },
         async withdrawSome() {
             try {
@@ -546,29 +538,36 @@ export default {
         },
         async updateAccountInfo() {
 
-            //this.network = web3.version.network
-
             let newData = {}
             let timer = this.updateTimer
             let plasmaData = {}
             let onchain = {}
             try {
-                newData.address = window.ethereum ? ethereum.selectedAddress : (await eth.accounts())[0]
-                //console.log('1', newData.address)
-                let balance = (await eth.getBalance(newData.address)).toString(10)
+                let wallet = window.wallet;
 
-                newData.balance = Eth.fromWei(new BN(balance), 'ether')
-                let id = (await contract.ethereumAddressToAccountID(newData.address))[0].toNumber();
-
-                if( store.account.plasma.id && id !== store.account.plasma.id ) {
-                    // FIXME:
-                    //store.account.plasma.id = null // display loading.gif
-                    store.account.plasma.id = null
-                    this.$router.push('/login')
-                    return
+                await wallet.updateState();
+                newData.address = wallet.ethAddress;
+                newData.ethBalances = []
+                newData.contractBalances = []
+                plasmaData.committedBalances = []
+                plasmaData.verifiedBalances = []
+                let commitedBalances = wallet.franklinState.commited.balances;
+                let verifiedBalances = wallet.franklinState.verified.balances;
+                for (let token of wallet.supportedTokens) {
+                    let tokenName = token.symbol || `ERC20:${token.id}`;
+                    newData.ethBalances.push({name: tokenName, balance: wallet.ethState.onchainBalances[token.id].toString() })
+                    newData.contractBalances.push({name: tokenName, balance: wallet.ethState.contractBalances[token.id].toString() })
+                    let commitedBalance = 0;
+                    let verifidBalance = 0;
+                    if (token.id in commitedBalances) {
+                        commitedBalance = commitedBalances[token.id]
+                    }
+                    if (token.id in verifiedBalances) {
+                        verifidBalance = verifiedBalances[token.id]
+                    }
+                    plasmaData.committedBalances.push({name: tokenName, balance: commitedBalance });
+                    plasmaData.verifiedBalances.push({name: tokenName, balance: verifidBalance });
                 }
-
-                let accountState = await contract.accounts(id);
 
                 // let accountState = await ethersContract.accounts(id);
                 plasmaData.closing = accountState.state.toNumber() > 1;
@@ -587,7 +586,11 @@ export default {
             }
             if(timer === this.updateTimer) { // if this handler is still valid
                 store.account.address = newData.address
-                store.account.balance = newData.balance
+                store.account.ethBalances = newData.ethBalances;
+                store.account.contractBalances = newData.contractBalances;
+
+                store.account.plasma.committed.balances = plasmaData.committedBalances
+                store.account.plasma.verified.balances = plasmaData.verifiedBalances
 
                 store.account.onchain = onchain
 
@@ -602,9 +605,9 @@ export default {
                     store.account.plasma.pending = plasmaData.pending || {}
 
                     if(store.account.plasma.pending.nonce !== null) {
-                        
+
                         this.nonce = store.account.plasma.pending.nonce
-                        
+
                         // if (store.account.plasma.pending.nonce > Number(this.nonce)) {
                         //     this.nonce = store.account.plasma.pending.nonce
                         // }

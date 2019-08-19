@@ -17,8 +17,8 @@ const franklinContractCode = require("../abi/Franklin");
 export type Address = string;
 
 
-class FranklinProvider {
-    constructor(public providerAddress: string = 'http://127.0.0.1:3000') {}
+export class FranklinProvider {
+    constructor(public providerAddress: string = 'http://127.0.0.1:3000', public contractAddress: string = process.env.CONTRACT_ADDR) {}
 
     async submitTx(tx) {
         return await Axios.post(this.providerAddress + '/api/v0.1/submit_tx', tx).then(reps => reps.data);
@@ -77,7 +77,7 @@ export class Wallet {
     }
 
     async depositOnchain(token: Token, amount: BigNumberish) {
-        const franklinDeployedContract = new Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, this.ethWallet);
+        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
         const franklinAddressBinary = Buffer.from(this.address.substr(2), "hex");
         if (token.id == 0) {
             // console.log(await franklinDeployedContract.balances(this.ethWallet.address, 0));
@@ -110,7 +110,7 @@ export class Wallet {
 
 
     async widthdrawOnchain(token: Token, amount: BigNumberish) {
-        const franklinDeployedContract = new Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, this.ethWallet);
+        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
         if (token.id == 0) {
             const tx = await franklinDeployedContract.withdrawETH(amount, {gasLimit: 200000});
             await tx.wait(2);
@@ -158,11 +158,10 @@ export class Wallet {
         return this.franklinState.commited.nonce
     }
 
-    static async fromEthWallet(wallet: ethers.Signer) {
-        let defaultFranklinProvider = new FranklinProvider();
+    static async fromEthWallet(wallet: ethers.Signer, franklinProvider: FranklinProvider = new FranklinProvider()) {
         let seed = (await wallet.signMessage('Matter login')).substr(2);
         let ethAddress = await wallet.getAddress();
-        let frankinWallet = new Wallet(Buffer.from(seed, 'hex'), defaultFranklinProvider, wallet, ethAddress);
+        let frankinWallet = new Wallet(Buffer.from(seed, 'hex'), franklinProvider, wallet, ethAddress);
         return frankinWallet;
     }
 
@@ -173,7 +172,7 @@ export class Wallet {
 
         const currentBlock = await this.ethWallet.provider.getBlockNumber();
 
-        const franklinDeployedContract = new Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, this.ethWallet);
+        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
         for(let token  of this.supportedTokens) {
             if (token.id == 0) {
                 onchainBalances[token.id] = await this.ethWallet.provider.getBalance(this.ethAddress);

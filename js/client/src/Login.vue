@@ -17,7 +17,7 @@
 
 <script>
 
-import {Wallet} from 'franklin_lib';
+import {Wallet, FranklinProvider} from 'franklin_lib';
 
 export default {
     name: 'login',
@@ -27,7 +27,9 @@ export default {
     methods: {
         async login() {
             try {
-                window.wallet = await Wallet.fromEthWallet(ethersProvider.getSigner())
+
+                let franklinProvider = new FranklinProvider('http://localhost:3000', '0xc56E79CAA94C96DE01eF36560ac215cC7A4F0F47');
+                window.wallet = await Wallet.fromEthWallet(ethersProvider.getSigner(), franklinProvider);
                 this.$parent.$router.push('/wallet')
             } catch (e) {
                 // TODO: replace with alert

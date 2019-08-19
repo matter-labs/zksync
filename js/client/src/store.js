@@ -4,26 +4,20 @@ const store = {
     account: {
         // ethereum part
         address:    null,
-        balance:    null,
-        onchain:    {
-            //isClosing: false,
-            balance:    null,
-            completeWithdrawArgs: null,
-        },
+        balance: null,
+        ethBalances: null,
+        contractBalances: null,
         plasma: {
             id:         null,
             closing:    false,
-            key:        null,
-            pending_nonce: 0,
-            pending: {
-                nonce:   0
-            },
+            address:        null,
+            tx_pending: false,
             committed: {
-                balance: null,
+                balances: null,
                 nonce:   0
             },
             verified: {
-                balance: null,
+                balances: null,
                 nonce:   0
             }
         }
