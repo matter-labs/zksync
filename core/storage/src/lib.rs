@@ -319,7 +319,7 @@ impl StoredOperation {
         if let Err(err) = &op {
             debug!("Error: {} on {}", err, debug_data)
         }
-        let mut op = op.expect("Operation deserialization");
+        let op = op.expect("Operation deserialization");
         let txs: Vec<StoredTx> = op.block.block_transactions.into_iter().map(|x| {
             match x.tx {
                 FranklinTx::Transfer(transfer) => {
