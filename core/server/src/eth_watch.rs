@@ -1,22 +1,20 @@
 use ethabi::{decode, ParamType, Token};
 use failure::format_err;
-use futures::{Future, Stream};
+use futures::Future;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::env;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use tokio::prelude::FutureExt;
-use web3::contract::{Contract, Options};
-use web3::types::{Address, BlockNumber, Filter, FilterBuilder, Log, H160, H256, U256};
+use web3::contract::Contract;
+use web3::types::{Address, BlockNumber, Filter, FilterBuilder, Log, H160, U256};
 use web3::Web3;
 
 use bigdecimal::BigDecimal;
-use hyper::client::connect::Connect;
 use models::node::{AccountAddress, TokenId};
 use models::params::LOCK_DEPOSITS_FOR;
-use storage::{ConnectionPool, StorageProcessor};
+use storage::ConnectionPool;
 
 pub struct EthWatch {
     contract_addr: H160,
@@ -168,16 +166,10 @@ impl EthWatch {
         }
     }
 
-    fn restore_state_from_eth<T: web3::Transport>(
-        &mut self,
-        web3: &Web3<T>,
-        contract: &Contract<T>,
-        block: u64,
-    ) {
+    fn restore_state_from_eth<T: web3::Transport>(&mut self, web3: &Web3<T>, block: u64) {
         let mut eth_state = self.eth_state.write().expect("ETH state lock");
         let deposit_events = self.get_onchain_deposit_events(
             web3,
-            contract,
             BlockNumber::Number(block.saturating_sub(LOCK_DEPOSITS_FOR)),
             BlockNumber::Number(block),
         );
@@ -187,12 +179,8 @@ impl EthWatch {
                 LockedBalance::from_event(deposit, block),
             );
         }
-        let new_tokens = self.get_new_token_events(
-            web3,
-            contract,
-            BlockNumber::Earliest,
-            BlockNumber::Number(block),
-        );
+        let new_tokens =
+            self.get_new_token_events(web3, BlockNumber::Earliest, BlockNumber::Number(block));
         for token in new_tokens.into_iter() {
             eth_state.add_new_token(token.id as TokenId, token.address)
         }
@@ -213,7 +201,6 @@ impl EthWatch {
     fn get_new_token_events<T: web3::Transport>(
         &self,
         web3: &Web3<T>,
-        contract: &Contract<T>,
         from: BlockNumber,
         to: BlockNumber,
     ) -> Vec<TokenAddedEvent> {
@@ -226,7 +213,7 @@ impl EthWatch {
             .into_iter()
             .filter_map(|event| {
                 TokenAddedEvent::try_from(event)
-                    .map_err(|e| error!("Failed to parse TokanAdded event log from ETH"))
+                    .map_err(|e| error!("Failed to parse TokanAdded event log from ETH: {}", e))
                     .ok()
             })
             .collect()
@@ -246,7 +233,6 @@ impl EthWatch {
     fn get_onchain_deposit_events<T: web3::Transport>(
         &self,
         web3: &Web3<T>,
-        contract: &Contract<T>,
         from: BlockNumber,
         to: BlockNumber,
     ) -> Vec<OnchainDepositEvent> {
@@ -276,7 +262,6 @@ impl EthWatch {
 
         let new_tokens = self.get_new_token_events(
             web3,
-            contract,
             BlockNumber::Number(self.processed_block + 1),
             BlockNumber::Number(last_block),
         );
@@ -287,7 +272,6 @@ impl EthWatch {
 
         let deposit_events = self.get_onchain_deposit_events(
             web3,
-            contract,
             BlockNumber::Number(self.processed_block + 1),
             BlockNumber::Number(last_block),
         );
@@ -314,7 +298,7 @@ impl EthWatch {
                     )
                     .wait();
                 match res {
-                    Ok((value, locked_untill)) => {
+                    Ok((value, _)) => {
                         let new_amount = BigDecimal::from_str(&format!("{}", value)).unwrap();
                         if new_amount != v.amount {
                             v.amount = new_amount;
@@ -345,7 +329,7 @@ impl EthWatch {
             .access_storage()
             .map(|storage| {
                 for (id, address) in &eth_state.tokens {
-                    if let Err(e) = storage.store_token(*id, &address.hex(), None) {
+                    if let Err(e) = storage.store_token(*id, &format!("0x{:x}", address), None) {
                         warn!("Failed to add token to db: {:?}", e);
                     }
                 }
@@ -369,7 +353,7 @@ impl EthWatch {
             .expect("Block number")
             .as_u64();
         self.processed_block = block;
-        self.restore_state_from_eth(&web3, &contract, block);
+        self.restore_state_from_eth(&web3, block);
 
         loop {
             std::thread::sleep(Duration::from_secs(1));
@@ -387,7 +371,7 @@ impl EthWatch {
     }
 }
 
-pub fn start_eth_watch(mut eth_watch: EthWatch) {
+pub fn start_eth_watch(eth_watch: EthWatch) {
     std::thread::Builder::new()
         .name("eth_watch".to_string())
         .spawn(move || {

@@ -1,22 +1,21 @@
-use crate::params::{self, TOTAL_TOKENS};
+use crate::params;
 use crate::primitives::GetBits;
 
 use std::convert::TryInto;
+use std::collections::HashMap;
 
 use bigdecimal::BigDecimal;
 use failure::ensure;
 use ff::PrimeField;
-use franklin_crypto::alt_babyjubjub::JubjubEngine;
-use franklin_crypto::jubjub::{edwards, Unknown};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use super::Fr;
 use super::{AccountId, AccountUpdates, Nonce, TokenId};
-use super::{Engine, Fr};
 use crate::circuit::account::{Balance, CircuitAccount};
 
 #[derive(Clone, PartialEq, Default, Eq, Hash)]
 pub struct AccountAddress {
-    pub data: [u8; 27],
+    pub data: [u8; params::FR_ADDRESS_LEN],
 }
 
 impl std::fmt::Debug for AccountAddress {
@@ -33,14 +32,14 @@ impl AccountAddress {
     pub fn from_hex(s: &str) -> Result<Self, failure::Error> {
         ensure!(s.starts_with("0x"), "Address should start with 0x");
         let bytes = hex::decode(&s[2..])?;
-        ensure!(bytes.len() == 27, "Size mismatch");
+        ensure!(bytes.len() == params::FR_ADDRESS_LEN, "Size mismatch");
         Ok(AccountAddress {
             data: bytes.as_slice().try_into().unwrap(),
         })
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, failure::Error> {
-        ensure!(bytes.len() == 27, "Size mismatch");
+        ensure!(bytes.len() == params::FR_ADDRESS_LEN, "Size mismatch");
         Ok(AccountAddress {
             data: bytes.try_into().unwrap(),
         })
@@ -71,7 +70,7 @@ impl<'de> Deserialize<'de> for AccountAddress {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Account {
     pub address: AccountAddress,
-    balances: Vec<BigDecimal>,
+    balances: HashMap<TokenId, BigDecimal>,
     pub nonce: Nonce,
 }
 
@@ -101,18 +100,19 @@ impl From<Account> for CircuitAccount<super::Engine> {
         let balances: Vec<_> = acc
             .balances
             .iter()
-            .map(|b| Balance {
+            .map(|(id, b)|
+                     (*id,
+                Balance {
                 value: Fr::from_str(&b.to_string()).unwrap(),
-            })
+                               }))
             .collect();
 
-        for (i, b) in balances.into_iter().enumerate() {
+        for (i, b) in balances.into_iter() {
             circuit_account.subtree.insert(i as u32, b);
         }
 
         circuit_account.nonce = Fr::from_str(&acc.nonce.to_string()).unwrap();
         circuit_account.pub_key_hash = Fr::from_hex(&acc.address.to_hex()).unwrap();
-
         circuit_account
     }
 }
@@ -148,7 +148,7 @@ impl AccountUpdate {
 impl Default for Account {
     fn default() -> Self {
         Self {
-            balances: vec![BigDecimal::from(0); TOTAL_TOKENS],
+            balances: HashMap::new(),
             nonce: 0,
             address: AccountAddress::default(),
         }
@@ -165,7 +165,7 @@ impl Account {
     pub fn create_account(id: AccountId, address: AccountAddress) -> (Account, AccountUpdates) {
         let mut account = Account::default();
         account.address = address;
-        let mut updates = vec![(
+        let updates = vec![(
             id,
             AccountUpdate::Create {
                 address: account.address.clone(),
@@ -176,19 +176,23 @@ impl Account {
     }
 
     pub fn get_balance(&self, token: TokenId) -> BigDecimal {
-        self.balances[token as usize].clone()
+        self.balances.get(&token).cloned().unwrap_or_default()
     }
 
     pub fn set_balance(&mut self, token: TokenId, amount: BigDecimal) {
-        self.balances[token as usize] = amount;
+        self.balances.insert(token, amount);
     }
 
     pub fn add_balance(&mut self, token: TokenId, amount: &BigDecimal) {
-        self.balances[token as usize] += amount;
+        let mut balance = self.balances.remove(&token).unwrap_or_default();
+        balance += amount;
+        self.balances.insert(token, balance);
     }
 
     pub fn sub_balance(&mut self, token: TokenId, amount: &BigDecimal) {
-        self.balances[token as usize] -= amount;
+        let mut balance = self.balances.remove(&token).unwrap_or_default();
+        balance -= amount;
+        self.balances.insert(token, balance);
     }
 
     pub fn apply_update(account: Option<Self>, update: AccountUpdate) -> Option<Self> {

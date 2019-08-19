@@ -5,7 +5,7 @@ use models::{Action, Operation};
 use std::str::FromStr;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use storage::ConnectionPool;
-use web3::types::{H256, U128, U256};
+use web3::types::{H256, U256};
 
 fn run_eth_sender(
     pool: ConnectionPool,
@@ -29,7 +29,11 @@ fn run_eth_sender(
                     .write_be(&mut be_bytes)
                     .expect("Write commit bytes");
                 let root = H256::from(U256::from_big_endian(&be_bytes));
-
+                debug!(
+                    "public_data for block_number {}: {:x?}",
+                    op.block.block_number,
+                    op.block.get_eth_public_data()
+                );
                 // function commitBlock(uint32 _blockNumber, uint24 _feeAccount, bytes32 _newRoot, bytes calldata _publicData)
                 eth_client.call(
                     "commitBlock",

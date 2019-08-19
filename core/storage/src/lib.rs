@@ -6,33 +6,27 @@ extern crate log;
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
+use failure::Fail;
 use models::node::block::{Block, ExecutedTx};
 use models::node::{
     apply_updates, reverse_updates, tx::FranklinTx, Account, AccountId, AccountMap, AccountUpdate,
-    AccountUpdates, BlockNumber, Fr, FranklinOp, Nonce, TokenId,
+    AccountUpdates, BlockNumber, FranklinOp, Nonce, TokenId,
 };
 use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
-use std::collections::HashMap;
 use std::convert::TryInto;
 
-mod helpers;
 mod schema;
-
-use self::helpers::{fr_from_bytes, fr_to_bytes};
 
 use crate::schema::*;
 
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool, PoolError, PooledConnection};
-use diesel::result::Error;
 
 use serde_json::value::Value;
 use std::env;
-
-use ff::Field;
 
 use diesel::sql_types::{Integer, Nullable, Text, Timestamp};
 sql_function!(coalesce, Coalesce, (x: Nullable<Integer>, y: Integer) -> Integer);
@@ -396,9 +390,11 @@ struct ReadTx {
     created_at: NaiveDateTime,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Fail)]
 pub enum TxAddError {
+    #[fail(display = "Tx nonce is too low.")]
     NonceTooLow,
+    #[fail(display = "Tx signature is incorrect.")]
     InvalidSignature,
 }
 
@@ -499,7 +495,7 @@ impl StorageProcessor {
         Ok(())
     }
 
-    fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {
+    pub fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {
         let executed_txs: Vec<_> = executed_transactions::table
             .filter(executed_transactions::block_number.eq(block as i64))
             .load::<StoredExecutedTransaction>(self.conn())?;
@@ -1278,24 +1274,24 @@ impl StorageProcessor {
             .filter(executed_transactions::success.eq(false))
             .first::<StoredExecutedTransaction>(self.conn())
             .optional()?;
-        // Remove from db
+        // Remove executed tx from db
         if let Some(tx_failed) = tx_failed {
             diesel::delete(
                 executed_transactions::table.filter(executed_transactions::id.eq(tx_failed.id)),
             )
             .execute(self.conn())?;
+        } else {
+            // TODO Check tx and add only txs with valid nonce.
+            insert_into(mempool::table)
+                .values(&InsertTx {
+                    hash: tx.hash(),
+                    primary_account_address: tx.account().data.to_vec(),
+                    nonce: i64::from(tx.nonce()),
+                    tx: serde_json::to_value(tx).unwrap(),
+                })
+                .execute(self.conn())
+                .map(drop)?;
         }
-
-        // TODO Check tx and add only txs with valid nonce.
-        insert_into(mempool::table)
-            .values(&InsertTx {
-                hash: tx.hash(),
-                primary_account_address: tx.account().data.to_vec(),
-                nonce: i64::from(tx.nonce()),
-                tx: serde_json::to_value(tx).unwrap(),
-            })
-            .execute(self.conn())
-            .map(drop)?;
 
         Ok(Ok(()))
     }
@@ -1307,11 +1303,15 @@ impl StorageProcessor {
         let pending_txs: Vec<_> = mempool::table
             .filter(mempool::primary_account_address.eq(address.data.to_vec()))
             .filter(mempool::nonce.ge(commited_nonce))
-            .load::<(ReadTx)>(self.conn())?;
+            .left_join(
+                executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),
+            )
+            .filter(executed_transactions::tx_hash.is_null())
+            .load::<(ReadTx, Option<StoredExecutedTransaction>)>(self.conn())?;
 
         Ok(pending_txs
             .into_iter()
-            .map(|stored_tx| serde_json::from_value(stored_tx.tx).unwrap())
+            .map(|(stored_tx, _)| serde_json::from_value(stored_tx.tx).unwrap())
             .collect())
     }
 
@@ -1877,7 +1877,7 @@ mod test {
         //        assert_eq!(txs.len(), 6);
     }
 
-    fn dummy_op(action: Action, block_number: BlockNumber) -> Operation {
+    fn dummy_op(_action: Action, _block_number: BlockNumber) -> Operation {
         unimplemented!()
         //        Operation {
         //            id: None,

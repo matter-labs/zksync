@@ -5,7 +5,6 @@ extern crate log;
 
 use ethereum_types::{H160, H256, U256};
 use hex;
-use models::abi::ABI;
 use models::TxMeta;
 use reqwest;
 use reqwest::header::CONTENT_TYPE;
@@ -216,49 +215,4 @@ where
         )));
     }
     Ok(Out::from_str(&s[2..])?)
-}
-
-#[test]
-fn test_eth() {
-
-    // let mut client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
-
-    // let block_num: u64 = 1;
-    // let total_fees: U128 = U128::from_dec_str("0").unwrap();
-    // let tx_data_packed: Vec<u8> = vec![];
-    // let new_root: H256 = H256::zero();
-
-    // let proof: [U256; 8] = [U256::zero(); 8];
-
-    // debug!("committing block...");
-    // let r = client.commit_block(block_num, total_fees, tx_data_packed, new_root);
-    // match r {
-    //     Err(e) => debug!("{:#?}", e),
-    //     Ok(hash) => debug!("https://rinkeby.etherscan.io/tx/{:?}", hash),
-    // };
-
-    // debug!("verifying block...");
-    // let r = client.verify_block(block_num, proof);
-    // match r {
-    //     Err(e) => debug!("{:#?}", e),
-    //     Ok(hash) => debug!("https://rinkeby.etherscan.io/tx/{:?}", hash),
-    // };
-}
-
-#[test]
-fn test_encoding() {
-    use models::abi::TEST_PLASMA_ALWAYS_VERIFY;
-
-    let contract = ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap();
-    let f = contract
-        .function("commitDepositBlock")
-        .expect("failed to get function");
-    let inputs = &f.inputs;
-    for i in inputs {
-        debug!("{} = {}", i.name, i.kind);
-    }
-    let params = (U256::from(0), [0u64; 1], 1u64, H256::zero());
-    let _data = f
-        .encode_input(&params.into_tokens())
-        .expect("failed to encode parameters");
 }

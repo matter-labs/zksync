@@ -5,12 +5,11 @@ pub const TX_TYPE_BIT_WIDTH: &'static usize = &8;
 
 /// Account tree depth
 pub const ACCOUNT_TREE_DEPTH: usize = 24;
-
-/// Account subtree depth
-pub const ACCOUNT_SUBTREE_DEPTH: &'static usize = &9;
+// pub const ACCOUNT_TREE_DEPTH: usize = 3;
 
 /// Balance tree depth
-pub const BALANCE_TREE_DEPTH: &'static usize = &8;
+pub const BALANCE_TREE_DEPTH: &'static usize = &10;
+// pub const BALANCE_TREE_DEPTH: &'static usize = &3;
 
 /// Account subtree hash width
 pub const SUBTREE_HASH_WIDTH: &'static usize = &254; //seems to be equal to Bn256::NUM_BITS could be replaced
@@ -56,3 +55,5 @@ pub const BLOCK_SIZE_CHUNKS: usize = 10;
 /// Lock onchain deposits for this number of eth blocks.
 pub const LOCK_DEPOSITS_FOR: u64 = 8 * 60 * 100;
 pub const FR_ADDRESS_LEN: usize = 27;
+
+pub const KEY_FILENAME: &str = "franklin_pk.key";

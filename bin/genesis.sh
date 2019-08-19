@@ -4,7 +4,7 @@
 
 set -e
 
-cargo run --bin server -- --genesis | tee genesis.log
+cargo run --bin server --release -- --genesis | tee genesis.log
 
 GENESIS_ROOT_NEW_VALUE=`grep GENESIS_ROOT genesis.log`
 

@@ -11,8 +11,10 @@ create table executed_transactions
 (
     id           serial primary key,
     block_number bigint not null,
-    tx_hash      bytea not null references mempool(hash),
+    tx_hash      bytea  not null references mempool (hash),
     operation    jsonb,
     success      bool   not null,
     fail_reason  text
 );
+
+drop table if exists transactions cascade;

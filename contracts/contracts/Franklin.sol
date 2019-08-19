@@ -134,7 +134,7 @@ contract Franklin {
     uint64 totalOnchainOps;
 
     // List of OnchainOps by index
-    mapping(uint64 => OnchainOp) onchainOps;
+    mapping(uint64 => OnchainOp) public onchainOps;
 
     // Reverting expired blocks
 
@@ -376,7 +376,6 @@ contract Franklin {
         emit BlockCommitted(_blockNumber);
     }
 
-    // TODO: make the same as in the spec.
     function createBlockCommitment(
         uint32 _blockNumber,
         uint24 _feeAccount,
@@ -387,16 +386,16 @@ contract Franklin {
         bytes32 hash = sha256(
             abi.encodePacked(uint256(_blockNumber), uint256(_feeAccount))
         );
-        hash = sha256(abi.encodePacked(hash, _oldRoot));
-        hash = sha256(abi.encodePacked(hash, _newRoot));
+        hash = sha256(abi.encodePacked(hash, uint256(_oldRoot)));
+        hash = sha256(abi.encodePacked(hash, uint256(_newRoot)));
         // public data is committed with padding (TODO: check assembly and optimize to avoid copying data)
         hash = sha256(
             abi.encodePacked(
                 hash,
-                _publicData,
-                new bytes(BLOCK_SIZE * 8 - _publicData.length)
+                _publicData
             )
         );
+
         return hash;
     }
 
@@ -524,7 +523,6 @@ contract Franklin {
     }
 
     // Block verification
-
     function verifyBlock(uint32 _blockNumber, uint256[8] calldata proof)
         external
     {
@@ -536,9 +534,7 @@ contract Franklin {
         );
 
         require(
-//TODO! uncomment
-//            verifyBlockProof(proof, blocks[_blockNumber].commitment),
-            true,
+            verifyBlockProof(proof, blocks[_blockNumber].commitment),
             "verification failed"
         );
 
@@ -660,36 +656,15 @@ contract Franklin {
         pure
         returns (uint112)
     {
-        uint112 n = uint112(bitwise_reverse(_amount));
-        return (n >> 5) * (uint112(10) ** (n & 0x1f));
+        uint24 n = (uint24(_amount[0]) << 2*8)
+        + (uint24(_amount[1]) << 8)
+        + (uint24(_amount[2]));
+        return uint112(n >> 5) * (uint112(10) ** (n & 0x1f));
     }
 
-    function reverse_byte(uint8 b) internal pure returns (uint8) {
-        uint8 res = 0;
-        for (uint256 i = 0; i < 8; ++i) {
-            res <<= 1;
-            res |= (b >> i) & 1;
-        }
-        return res;
-    }
-
-    function bitwise_reverse(uint8[3] memory arr)
-        internal
-        pure
-        returns (uint256)
-    {
-        uint112 res = 0;
-        for (uint256 i = arr.length; i-- > 0; ) {
-            uint8 reversed = reverse_byte(arr[i]);
-            res <<= 8;
-            res |= reversed;
-        }
-        return res;
-    }
 
     function unpackFee(uint8 encoded_fee) internal pure returns (uint112) {
-        uint112 n = reverse_byte(encoded_fee);
-        return (n >> 4) * uint112(10) ** (n & 0x0f);
+        return uint112(encoded_fee >> 4) * uint112(10) ** (encoded_fee & 0x0f);
     }
 
     function bytesToAddress(bytes memory bys)

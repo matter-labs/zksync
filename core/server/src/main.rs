@@ -17,7 +17,7 @@ use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
 use models::{node::config, StateKeeperRequest};
 use storage::ConnectionPool;
 
-use clap::{App, Arg, SubCommand};
+use clap::{App, Arg};
 
 fn main() {
     env_logger::init();

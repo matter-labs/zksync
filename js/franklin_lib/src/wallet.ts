@@ -135,7 +135,7 @@ export class Wallet {
     async widthdrawOnchain(token: Token, amount: BigNumber) {
         const franklinDeployedContract = new Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, this.ethWallet);
         if (token.id == 0) {
-            const tx = await franklinDeployedContract.withdrawETH(amount);
+            const tx = await franklinDeployedContract.withdrawETH(amount, {gasLimit: 200000});
             await tx.wait(2);
             return tx.hash;
         } else {
@@ -476,4 +476,18 @@ export class Wallet {
         await this.fetchFranklinState();
         await this.fetchEthState();
     }
+
+    async waitPendingTxsExecuted() {
+        await this.fetchFranklinState();
+        while (this.franklinState.pending_txs.length > 0) {
+            await sleep(1000);
+            await this.fetchFranklinState();
+        }
+    }
+}
+
+function sleep(ms) {
+    return new Promise(resolve => {
+        setTimeout(resolve, ms);
+    });
 }

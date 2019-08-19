@@ -3,9 +3,10 @@ members = [
     "core/key_generator",
     "core/eth_client",
     "core/plasma",
-    "core/prover",
     "core/server",
     "core/storage",
     "core/franklincircuit",
     "core/franklinmodels",
+    "core/franklin_prover",
+    "core/franklin_key_generator",
 ]

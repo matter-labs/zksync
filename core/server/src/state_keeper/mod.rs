@@ -1,15 +1,8 @@
-use pairing::bn256::Bn256;
-// use franklin_crypto::jubjub::{FixedGenerators};
-// use franklin_crypto::alt_babyjubjub::{AltJubjubBn256};
-
 use failure::{bail, ensure};
-use franklin_crypto::eddsa::PrivateKey;
 use models::node::block::{Block, ExecutedTx};
 use models::node::tx::FranklinTx;
-use models::node::{Account, AccountAddress, AccountId, AccountMap, AccountUpdate, Fr};
+use models::node::{Account, AccountAddress, AccountMap, AccountUpdate};
 use plasma::state::{PlasmaState, TxSuccess};
-use rayon::prelude::*;
-use std::collections::VecDeque;
 use std::sync::{Arc, RwLock};
 use web3::types::H256;
 
@@ -18,13 +11,11 @@ use models::node::config;
 use models::{CommitRequest, NetworkStatus, StateKeeperRequest};
 use storage::ConnectionPool;
 
-use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive, Zero};
 use std::sync::mpsc::{Receiver, Sender};
 
 use crate::eth_watch::ETHState;
 use itertools::Itertools;
 use models::params::BLOCK_SIZE_CHUNKS;
-use std::io::BufReader;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Coordinator of tx processing and generation of proofs
@@ -50,12 +41,11 @@ type UpdatedAccounts = AccountMap;
 impl PlasmaStateKeeper {
     pub fn new(pool: ConnectionPool, eth_state: Arc<RwLock<ETHState>>) -> Self {
         info!("constructing state keeper instance");
-
         let storage = pool
             .access_storage()
             .expect("db connection failed for statekeeper");
 
-        let (last_committed, mut accounts) = storage.load_committed_state(None).expect("db failed");
+        let (last_committed, accounts) = storage.load_committed_state(None).expect("db failed");
         let last_verified = storage.get_last_verified_block().expect("db failed");
         let state = PlasmaState::new(accounts, last_committed + 1);
 
@@ -187,7 +177,7 @@ impl PlasmaStateKeeper {
             .db_conn_pool
             .access_storage()
             .map(|m| {
-                m.mempool_get_txs(config::RUNTIME_CONFIG.transfer_batch_size)
+                m.mempool_get_txs(config::RUNTIME_CONFIG.tx_batch_size)
                     .expect("Failed to get tx from db")
             })
             .expect("Failed to get txs from mempool");
@@ -287,7 +277,7 @@ impl PlasmaStateKeeper {
                 continue;
             }
 
-            let mut tx_updates = self.state.apply_tx(tx.clone());
+            let tx_updates = self.state.apply_tx(tx.clone());
 
             match tx_updates {
                 Ok(TxSuccess {
@@ -307,7 +297,7 @@ impl PlasmaStateKeeper {
                     ops.push(exec_result);
                 }
                 Err(e) => {
-                    error!("Failed to execute transaction: {:?}, {:?}", tx, e);
+                    error!("Failed to execute transaction: {:?}, {}", tx, e);
                     let exec_result = ExecutedTx {
                         tx,
                         success: false,
