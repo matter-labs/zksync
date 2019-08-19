@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import BN = require('bn.js');
 
 export function floatToInteger(floatBytes: Buffer, exp_bits: number, mantissa_bits: number, exp_base: number): BN {
-    assert(floatBytes.length * 8 == exp_bits + mantissa_bits);
+    // assert(floatBytes.length * 8 == exp_bits + mantissa_bits);
     const floatHolder = new BN(floatBytes, 16, 'be'); // keep bit order
     const totalBits = floatBytes.length * 8 - 1; // starts from zero
     let expBase = new BN(exp_base);
@@ -32,7 +32,7 @@ export function integerToFloat(integer: BN, exp_bits: number, mantissa_bits: num
         // change strategy. First try to guess the precision, and then reparse;
         const maxMantissa = new BN(1).ushln(mantissa_bits).subn(1);
         const maxExponent = new BN(exp_base).pow(new BN(1).ushln(exp_bits).subn(1));
-        assert(integer.lte(maxMantissa.mul(maxExponent)));
+        // assert(integer.lte(maxMantissa.mul(maxExponent)));
         // try to get the best precision
         const exponentBase = new BN(exp_base);
         let exponent = new BN(0);
@@ -59,7 +59,7 @@ export function integerToFloat(integer: BN, exp_bits: number, mantissa_bits: num
             return integerToFloatInner(down_to_precision, exp_bits, mantissa_bits, exp_base, true);
         }
         // pack
-        assert((mantissa_bits + exp_bits) % 8 === 0);
+        // assert((mantissa_bits + exp_bits) % 8 === 0);
         const totalBits = mantissa_bits + exp_bits - 1;
         const encoding = new BN(0);
         //todo: it is probably enough to use 'le' here

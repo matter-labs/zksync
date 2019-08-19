@@ -9,7 +9,7 @@ import {Contract, ethers} from 'ethers';
 import {BigNumber, bigNumberify, BigNumberish, parseEther} from "ethers/utils";
 
 const IERC20Conract = require("openzeppelin-solidity/build/contracts/IERC20");
-import {franklinContractCode} from "../../../contracts/src.ts/deploy";
+const franklinContractCode = require('../../../contracts/build/Franklin');
 
 export type Address = string;
 
