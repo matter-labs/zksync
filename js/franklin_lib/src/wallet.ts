@@ -154,8 +154,9 @@ export class Wallet {
     async widthdrawOffchain(token: Token, amount: BN, fee: BN) {
         let nonce = await this.getNonce();
         if (this.franklinState.pending_txs.length > 0) {
-            console.log("please wait for all pending transactions to complete before sending a new one.");
-            return;
+            return {
+                error: "please wait for all pending transactions to complete before sending a new one."
+            };
         }
 
         let tx = {
@@ -167,6 +168,8 @@ export class Wallet {
             fee: fee.toString(10),
             nonce: nonce,
         };
+
+        console.log('submitting withdrawOffchain tx' + JSON.stringify(tx));
 
         return await this.provider.submitTx(tx);
     }

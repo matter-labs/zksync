@@ -83,11 +83,11 @@
                             </b-tooltip> -->
                         </b-col>
                         <b-col sm class="mb-2">
-                            <div id="withdrawBtn">
+                            <div id="onchainWithdrawBtn">
                                 <b-btn variant="outline-primary" class="w-100" 
-                                    v-b-modal.onchainWithdrawModal :disabled="!!withdrawProblem">Withdraw &#x21E7;</b-btn>
+                                    v-b-modal.onchainWithdrawModal>Withdraw &#x21E7;</b-btn>
                             </div>
-                            <b-tooltip target="withdrawBtn" :disabled="!withdrawProblem" triggers="hover">
+                            <b-tooltip target="onchainWithdrawBtn" triggers="hover">
                                 Withdrawal not possible: {{ withdrawProblem }}
                             </b-tooltip>
                         </b-col>
@@ -130,7 +130,7 @@
                         <b-col sm class="mb-2">
                             <div id="withdrawBtn">
                                 <b-btn variant="outline-primary" class="w-100" 
-                                    v-b-modal.withdrawModal :disabled="!!withdrawProblem">Withdraw &#x21E7;</b-btn>
+                                    v-b-modal.offchainWithdrawModal :disabled="!!withdrawProblem">Withdraw &#x21E7;</b-btn>
                             </div>
                             <b-tooltip target="withdrawBtn" :disabled="!withdrawProblem" triggers="hover">
                                 Withdrawal not possible: {{ withdrawProblem }}
@@ -320,7 +320,75 @@
 ##  ##  ##  ##     ##    ##     ## ##     ## ##    ##  ##     ## ##  ##  ## 
  ###  ###  ####    ##    ##     ## ########  ##     ## ##     ##  ###  ###  
  -->
-    <b-modal ref="withdrawModal" id="withdrawModal" title="Withdrawal" hide-footer>
+    <b-modal ref="onchainWithdrawModal" id="onchainWithdrawModal" title="Onchains withdrawal" hide-footer>
+        <b-tabs pills card>
+            <b-form-select v-model="tokenForWithdrawal" :option="store.coins" class="mb-3">
+                <option v-for="token in store.contract.allTokensInfo    " v-bind:key="token.elemId" @click="tokenForWithdrawal=token.tokenName">{{ token.tokenName }}</option>
+            </b-form-select>
+
+            <b-tab title="Partial withdrawal" active>
+                <label for="withdrawAmountInput" class="mt-4">Amount</label>
+                    (max <span>{{tokenForWithdrawal}}</span> <a href="#" @click="withdrawAmount=store.contract.committed.balanceDict[tokenForWithdrawal].toString(10)">{{store.contract.committed.balanceDict[tokenForWithdrawal].toString(10)}}</a>):
+                <b-form-input id="withdrawAmountInput" type="number" placeholder="7.50" v-model="withdrawAmount"></b-form-input>
+                <label for="transferNonceInput" class="mt-4">Nonce:</label>
+                <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
+                <div id="doWithdrawBtn" class="mt-4 float-right">
+                    <!-- :disabled="!!doWithdrawProblem" -->
+                    <b-btn variant="primary" @click="onchainWithdrawSome">Withdraw</b-btn>
+                </div>
+                <!-- :disabled="!doWithdrawProblem" -->
+                <b-tooltip target="doWithdrawBtn" triggers="hover">
+                    Withdraw not possible: {{ doWithdrawProblem }}
+                </b-tooltip>
+            </b-tab>
+            <!--<b-tab title="Full exit" class="mb-4">-->
+                <p>This will close your account and withdraw all money from it.</p>
+                <div id="doExitBtn" class="mt-4 float-right">
+                    <!-- :disabled="!!withdrawProblem" -->
+                    <b-btn variant="danger" @click="withdrawAll">Close & withdraw</b-btn>
+                </div>
+                <!-- :disabled="!withdrawProblem" -->
+                <b-tooltip target="doExitBtn" triggers="hover">
+                    Withdraw not possible: {{ withdrawProblem }}
+                </b-tooltip>
+            <!--</b-tab>-->
+        </b-tabs>
+    </b-modal>
+    <b-modal ref="offchainWithdrawModal" id="offchainWithdrawModal" title="Offchains withdrawal" hide-footer>
+        <b-tabs pills card>
+            <b-form-select v-model="tokenForWithdrawal" :option="store.coins" class="mb-3">
+                <option v-for="token in store.plasma.allTokensInfo    " v-bind:key="token.elemId" @click="tokenForWithdrawal=token.tokenName">{{ token.tokenName }}</option>
+            </b-form-select>
+
+            <b-tab title="Partial withdrawal" active>
+                <label for="withdrawAmountInput" class="mt-4">Amount</label>
+                    (max <span>{{tokenForWithdrawal}}</span> <a href="#" @click="withdrawAmount=store.plasma.committed.balanceDict[tokenForWithdrawal].toString(10)">{{store.plasma.committed.balanceDict[tokenForWithdrawal].toString(10)}}</a>):
+                <b-form-input id="withdrawAmountInput" type="number" placeholder="7.50" v-model="withdrawAmount"></b-form-input>
+                <label for="transferNonceInput" class="mt-4">Nonce:</label>
+                <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
+                <div id="doWithdrawBtn" class="mt-4 float-right">
+                    <!-- :disabled="!!doWithdrawProblem" -->
+                    <b-btn variant="primary" @click="offchainWithdrawSome">Withdraw</b-btn>
+                </div>
+                <!-- :disabled="!doWithdrawProblem" -->
+                <b-tooltip target="doWithdrawBtn" triggers="hover">
+                    Withdraw not possible: {{ doWithdrawProblem }}
+                </b-tooltip>
+            </b-tab>
+            <!--<b-tab title="Full exit" class="mb-4">-->
+                <p>This will close your account and withdraw all money from it.</p>
+                <div id="doExitBtn" class="mt-4 float-right">
+                    <!-- :disabled="!!withdrawProblem" -->
+                    <b-btn variant="danger" @click="withdrawAll">Close & withdraw</b-btn>
+                </div>
+                <!-- :disabled="!withdrawProblem" -->
+                <b-tooltip target="doExitBtn" triggers="hover">
+                    Withdraw not possible: {{ withdrawProblem }}
+                </b-tooltip>
+            <!--</b-tab>-->
+        </b-tabs>
+    </b-modal>
+    <!-- <b-modal ref="offchainWithdrawModal" id="offchainWithdrawModal" title="Offchain withdrawal" hide-footer>
         <b-tabs pills card>
             <b-tab title="Partial withdrawal" active>
                 <label for="withdrawAmountInput" class="mt-4">Amount</label>
@@ -345,7 +413,7 @@
                 </b-tooltip>
             <!--</b-tab>-->
         </b-tabs>
-    </b-modal>
+    </b-modal> -->
 </div>
 </template>
 <!--
@@ -385,6 +453,7 @@ export default {
         nonce:              0,
         tokenToTransferFranklin: 'ETH',
         tokenForDeposit:    'ETH',
+        tokenForWithdrawal: 'ETH',
         transferTo:         '',
         transferAmount:     '0.001',
         transferPending:    false,
@@ -632,6 +701,64 @@ export default {
             await wallet.depositOnchain(token, amount);
 
             this.alert('awaited deposit onchain');
+        },
+        async offchainWithdrawSome() {
+            try {
+                this.$refs.offchainWithdrawModal.hide();
+
+                let token = (tokenName => {
+                    for (let i = 0; i < wallet.supportedTokens.length; i++) {
+                        let token = wallet.supportedTokens[i];
+                        if (token.symbol == tokenName) {
+                            return token;
+                        }
+                    }
+                    throw new Error(`token not found, offchainWithdrawSome ${tokenName}`);
+                })(this.tokenForWithdrawal);
+
+                let fee = ethers.utils.bigNumberify(1);
+
+                let amount = ethers.utils.bigNumberify(this.withdrawAmount);
+                amount = amount.sub(fee);
+
+
+                this.alert(`offchainWithdraw ${token} ${amount}`);
+                console.log('offchainWithdraw', token, amount)
+                await new Promise(r => setTimeout(r, 5000));
+
+                let res = await wallet.widthdrawOffchain(token, amount, fee);
+                
+                this.alert('offchainWithdraw res:', res);
+                console.log('offchainWithdraw res:', res);
+            } catch (e) {
+                this.alert('offchainWithdraw error: ' + e);
+            }
+        },
+        async onchainWithdrawSome() {
+            try {
+                this.$refs.onchainWithdrawModal.hide();
+
+                let token = (tokenName => {
+                    for (let i = 0; i < wallet.supportedTokens.length; i++) {
+                        let token = wallet.supportedTokens[i];
+                        if (token.symbol == tokenName) {
+                            return token;
+                        }
+                    }
+                    throw new Error(`token not found, onchainWithdrawSome ${tokenName}`);
+                })(this.tokenForWithdrawal);
+
+                let amount = ethers.utils.bigNumberify(this.withdrawAmount);
+
+                this.alert(`onchainWithdraw ${token} ${amount}`);
+                console.log('onchainWithdraw', token, amount)
+
+                let res = await wallet.widthdrawOnchain(token, amount);
+                
+                this.alert('onchainWithdraw res:', res);
+            } catch (e) {
+                this.alert('onchainWithdraw error: ' + e);
+            }
         },
         async withdrawSome() {
             try {
@@ -961,7 +1088,7 @@ export default {
                 plasma.committed = await wallet.getCommittedFranklinState();
                 plasma.verified  = await wallet.getVerifiedFranklinState();
                 console.log("new franklinState:", wallet.franklinState);
-                this.nonce = plasma.nonce = wallet.franklinState.commited.nonce;
+                // this.nonce = plasma.nonce = wallet.franklinState.commited.nonce;
 
 
                 contract.committed.lockedUnlockedBalances = 
@@ -996,11 +1123,18 @@ export default {
                     Object.keys(contract.pending.balanceDict)
                 ]);
 
+                contract.allTokensList = uniqueElements([
+                    Object.keys(contract.committed.balanceDict),
+                    Object.keys(contract.pending.balanceDict)
+                ]);
+
                 plasma.allTokensList = uniqueElements([
                     Object.keys(plasma.pending.balanceDict),
                     Object.keys(plasma.committed.balanceDict),
                     Object.keys(plasma.verified.balanceDict)
                 ]);
+
+                console.log('contract.committed', contract.committed);
 
                 // ************************* all the information for frontend *************************
 
@@ -1039,6 +1173,8 @@ export default {
                     res.contractShortBalanceInfo = 
                     res.contractLongBalanceInfo = (() => {
                         let res = '';
+
+                        res += tokenName;
                         
                         let committedAmount = contract.committed.balanceDict[tokenName];
 
@@ -1085,6 +1221,16 @@ export default {
                         default: throw new Error(`switch reached default, ${res.lowestMaturityOnchainLevel}`);
                     }
 
+                    return res;
+                });
+
+                contract.allTokensInfo = contract.allTokensList.map(tokenName => {
+                    let res = {};
+                    res.tokenName = tokenName;
+                    res.elemId = `contractBalance__${tokenName}`;
+                    
+                    res.maxWithdrawalAmount = contract.committed.balanceDict[tokenName];
+                    
                     return res;
                 });
 
