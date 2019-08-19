@@ -895,14 +895,14 @@ export default {
                 onchain.committed.balanceDict = balanceArrayToDict(onchain.committed.balances)
                 onchain.pending.balanceDict   = balanceArrayToDict(onchain.pending.balances)
                 
-                contract.committed.lockedDict = 
-                    objectArrayToDict(contract.committed.lockedUnlockedBalances, "token", "locked");
-                contract.committed.unlockedDict = 
-                    objectArrayToDict(contract.committed.lockedUnlockedBalances, "token", "unlocked");
-                contract.pending.lockedDict = 
-                    objectArrayToDict(contract.pending.lockedUnlockedBalances, "token", "locked");
-                contract.pending.unlockedDict = 
-                    objectArrayToDict(contract.pending.lockedUnlockedBalances, "token", "unlocked");
+                contract.committed.balanceDict = 
+                    objectArrayToDict(contract.committed.lockedUnlockedBalances, "token", "balance");
+                contract.committed.isLockedDict = 
+                    objectArrayToDict(contract.committed.lockedUnlockedBalances, "token", "isLocked");
+                contract.pending.balanceDict = 
+                    objectArrayToDict(contract.pending.lockedUnlockedBalances, "token", "balance");
+                contract.pending.isLockedDict = 
+                    objectArrayToDict(contract.pending.lockedUnlockedBalances, "token", "isLocked");
                 
                 plasma.pending.balanceDict   = balanceArrayToDict(plasma.pending.balances);
                 plasma.committed.balanceDict = balanceArrayToDict(plasma.committed.balances);
@@ -913,10 +913,8 @@ export default {
                 onchain.allTokensList = uniqueElements([
                     Object.keys(onchain.committed.balanceDict),
                     Object.keys(onchain.pending.balanceDict),
-                    Object.keys(contract.committed.lockedDict),
-                    Object.keys(contract.committed.unlockedDict),
-                    Object.keys(contract.pending.lockedDict),
-                    Object.keys(contract.pending.unlockedDict)
+                    Object.keys(contract.committed.balanceDict),
+                    Object.keys(contract.pending.balanceDict)
                 ]);
 
                 plasma.allTokensList = uniqueElements([
@@ -943,36 +941,49 @@ export default {
                         ', pending'
                     );
 
-                    res.longBalanceInfo += appendableBalancesString(
-                        contract.committed.lockedDict[tokenName],
-                        contract.pending.lockedDict[tokenName],
-                        ', locked', 
-                        ', locked pending'
-                    );
+                    console.log('res.longBalanceInfo', res.longBalanceInfo);
 
-                    res.longBalanceInfo += appendableBalancesString(
-                        contract.committed.unlockedDict[tokenName],
-                        contract.pending.unlockedDict[tokenName],
-                        ', unlocked', 
-                        ', unlocked pending'
-                    );
+
+                    try {
+                        res.longBalanceInfo += (() => {
+                            let res = '';
+                            
+                            let committedAmount = contract.committed.balanceDict[tokenName];
+                            let committedIsLockedStr = 
+                                contract.committed.isLockedDict[tokenName] ? ', locked' : ', unlocked';
+                            
+                            let pendingAmount = contract.pending.balanceDict[tokenName];
+                            let pendingIsLockedStr = 
+                                contract.pending.isLockedDict[tokenName] ? ', pending locked' : ', pending unlocked';
+
+                            if (!!Number(committedAmount)) {
+                                res += `${committedIsLockedStr} ${committedAmount}`;
+                            }
+                            if (!!Number(pendingAmount) && committedAmount !== pendingAmount) {
+                                res += `${pendingIsLockedStr} ${pendingAmount}`;
+                            }
+                            return res;
+                        })();
+                    } catch (e) {
+                        res.longBalanceInfo += " (error occured) ";
+                    }
 
                     // *************** make short description to be shown on the page ***************
 
                     res.shortBalanceInfo = `${tokenName} ${onchain.pending.balanceDict[tokenName]}`;
-                    if (contract.pending.lockedDict[tokenName]) {
-                        res.shortBalanceInfo += `, locked ${contract.pending.lockedDict[tokenName]}`;
-                    }
-                    if (contract.pending.unlockedDict[tokenName]) {
-                        res.shortBalanceInfo += `, unlocked ${contract.pending.unlockedDict[tokenName]}`;
+                    if (!!Number(contract.pending.balanceDict[tokenName])) {
+                        if (contract.pending.isLockedDict[tokenName]) {
+                            res.shortBalanceInfo += `, locked ${contract.pending.balanceDict[tokenName]}`;
+                        } else {
+                            res.shortBalanceInfo += `, unlocked ${contract.pending.balanceDict[tokenName]}`;
+                        }
                     }
 
                     // ***************************** decide on colors *****************************
 
                     res.lowestMaturityOnchainLevel = 
                         onchain.committed.balanceDict[tokenName] === onchain.pending.balanceDict[tokenName]
-                        && contract.committed.lockedDict[tokenName] === contract.pending.lockedDict[tokenName] 
-                        && contract.committed.unlockedDict[tokenName] === contract.pending.unlockedDict[tokenName] 
+                        && contract.committed.balanceDict[tokenName] === contract.pending.balanceDict[tokenName]
                         ? MaturityLevel.high
                         : MaturityLevel.low;
 
@@ -1052,10 +1063,10 @@ export default {
 
                 function appendableBalancesString(committed, pending, committedMessage, pendingMessage) {
                     let res = '';
-                    if (committed) {
+                    if (!!committed) {
                         res += `${committedMessage} ${committed}`;
                     }
-                    if (pending && committed !== pending) {
+                    if (!!pending && committed !== pending) {
                         res += `${pendingMessage} ${pending}`;
                     }
                     return res;
