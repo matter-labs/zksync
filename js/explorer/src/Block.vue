@@ -47,7 +47,7 @@ export default {
             const block = await client.getBlock(this.blockNumber)
             if (!block) return
 
-            this.type            = block.type
+            // this.type            = block.type
             this.new_state_root  = block.new_state_root
             this.commit_tx_hash  = block.commit_tx_hash || ''
             this.verify_tx_hash  = block.verify_tx_hash || ''
@@ -58,6 +58,7 @@ export default {
             let txs = await client.getBlockTransactions(this.blockNumber)
             this.transactions = txs.map( (tx, index) => ({
                 number:     index+1,
+                type:       tx.tx_type,
                 from:       tx.from,
                 to:         tx.to,
                 amount:     this.formatFranklin(tx.amount) + ' ETH',
@@ -88,7 +89,7 @@ export default {
         props() {
             return [
                 { name: 'Block #',          value: `<b>${this.blockNumber}</b>`},
-                //{ name: 'Type',             value: this.type, },
+                // { name: 'Type',             value: this.transactions.first().tx_type, },
                 { name: 'New root hash',    value: this.new_state_root, },
                 // { name: 'Transactions',     value: client.TX_PER_BLOCK(), },
                 { name: 'Status',           value: this.status, },
@@ -100,7 +101,7 @@ export default {
     data() {
         return {
             new_state_root: null,
-            type:           null,
+            // type:           null,
             commit_tx_hash: null,
             verify_tx_hash: null,
             committed_at:   null,
