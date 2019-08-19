@@ -182,8 +182,8 @@ export default {
                     block_number:   b.block_number,
                     status:         b.verified_at ? 'Verified' : 'Committed',
                     new_state_root: b.new_state_root.slice(0, 16) + '...' + b.new_state_root.slice(50, 66),
-                    committed_at:   b.committed_at,
-                    verified_at:    b.verified_at,
+                    committed_at:   b.committed_at.toString().split('T')[0] + " " + b.committed_at.toString().split('T')[1].split('.')[0],
+                    verified_at:    b.verified_at.toString().split('T')[0] + " " + b.committed_at.toString().split('T')[1].split('.')[0],
                 }))
                 this.currentPage = this.page
                 this.ready = true
