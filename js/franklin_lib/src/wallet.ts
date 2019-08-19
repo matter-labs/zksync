@@ -204,8 +204,9 @@ export class Wallet {
     }
 
     async getNonce(): Promise<number> {
+        await this.updateState();
         await this.fetchFranklinState();
-        return this.franklinState.commited.nonce + 1
+        return this.franklinState.commited.nonce
     }
 
     static async fromEthWallet(wallet: ethers.Wallet) {
@@ -318,7 +319,7 @@ export class Wallet {
         let address = this.ethWallet.address;
         let [balance, block] = await this.contract.balances(address, token.id);
         let currBlock = await this.ethWallet.provider.getBlockNumber();
-        let isLocked = currBlock < block ? 'locked' : 'unlocked';
+        let isLocked = currBlock < block; // ? 'locked' : 'unlocked';
         balance = balance.toString(10);
         return {
             balance,
@@ -394,7 +395,7 @@ export class Wallet {
         let res = [];
         for (let t = 0; t < tokens.length; t++) {
             let token = tokens[t];
-            let balance = balances[t];
+            let balance = balances[t] || 0;
             res.push({
                 token: token.symbol,
                 balance: balance,
@@ -425,12 +426,17 @@ export class Wallet {
                 let cmp1 = String(symbol);
                 let cmp2 = String(balance.token);
 
-                console.log('symboll:', cmp1, cmp2, cmp1 === cmp2);
+                // console.log('symboll:', cmp1, cmp2, cmp1 === cmp2);
+
+                let n1 = balance.balance;
+                let n2 = tx.amount;
+
+                // console.log('symboll3:', n1, n2);
 
                 let add1 = bigNumberify(balance.balance);
                 let add2 = bigNumberify(tx.amount);
 
-                console.log('symboll2:', add1, add2);
+                // console.log('symboll2:', add1, add2)
 
                 if (cmp1 !== cmp2) continue;
 

@@ -1164,6 +1164,8 @@ export default {
                         
                         let committedAmount = contract.committed.balanceDict(tokenName);
 
+                        console.log('islocked:', contract.committed.isLockedDict[tokenName]);
+
                         let committedIsLockedStr = 
                             contract.committed.isLockedDict[tokenName] ? ', locked' : ', unlocked';
                         
