@@ -7,20 +7,10 @@ const store = {
         balance: null,
         ethBalances: null,
         contractBalances: null,
-        plasma: {
-            id:         null,
-            closing:    false,
-            address:        null,
-            tx_pending: false,
-            committed: {
-                balances: null,
-                nonce:   0
-            },
-            verified: {
-                balances: null,
-                nonce:   0
-            }
-        }
+        // plasma part
+        franklinAddress: null,
+        commitedPlasmaBalances: null,
+        verifiedPlasmaBalances: null,
     }
 }
 

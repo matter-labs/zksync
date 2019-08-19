@@ -12,7 +12,7 @@
             </b-navbar-nav>
             <!-- Right aligned nav items -->
             <b-navbar-nav class="ml-auto">
-                <span style="color: white">{{ store.account.address }}</span>
+                <span style="color: white">{{ store.account.franklinAddress }}</span>
             </b-navbar-nav>
         </b-collapse>
     </b-container>
@@ -42,7 +42,7 @@
                     </p>
 
                     <label for="transferAmountInput" class="mt-4">Amount</label>
-                            (max ETH <a href="#" @click="transferAmount=store.account.plasma.committed.balance">{{store.account.plasma.committed.balance || 0}}</a>):
+                            (max ETH <a href="#" @click="transferAmount=store.account.plasma.committed.balance">0</a>):
                     <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
 
                     <label for="transferNonceInput" class="mt-4">Nonce (autoincrementing):</label>
@@ -50,7 +50,7 @@
 
                     <div id="transferBtn" class="right">
                         <img v-if="transferPending" style="margin-right: 1.5em" src="./assets/loading.gif" width="100em">
-                        <b-btn v-else class="mt-4" variant="outline-primary" @click="transfer" :disabled="!!transferProblem">Submit transaction</b-btn>
+                        <b-btn v-else class="mt-4" variant="outline-primary" @click="transfer" >Submit transaction</b-btn>
                     </div>
 
                     <p class="mt-2" style="color: grey">
@@ -59,9 +59,9 @@
                     <p class="mt-2" style="color: grey">
                          Once a block is committed, it takes about 5 minutes to verify it.
                     </p>
-                    <b-tooltip target="transferBtn" :disabled="transferPending || !transferProblem" triggers="hover">
-                        Transfer not possible: {{ transferProblem }}
-                    </b-tooltip>
+<!--                    <b-tooltip target="transferBtn" :disabled="transferPending" triggers="hover">-->
+<!--                        Transfer not possible: Tx pending-->
+<!--                    </b-tooltip>-->
                 </b-card>
 
             </b-col>
@@ -81,20 +81,20 @@
                         <b-col sm class="mb-2">
                             <div id="depositOnchainBtn">
                                 <b-btn variant="outline-primary" class="w-100" 
-                                    v-b-modal.depositModal :disabled="false">&#x21E9; Deposit</b-btn>
+                                    v-b-modal.depositModal >&#x21E9; Deposit</b-btn>
                             </div>
-                            <b-tooltip target="depositBtn" :disabled="!depositProblem" triggers="hover">
-                                Deposit not possible: {{ depositProblem }}
-                            </b-tooltip>
+<!--                            <b-tooltip target="depositBtn" :disabled="!depositProblem" triggers="hover">-->
+<!--                                Deposit not possible: {{ depositProblem }}-->
+<!--                            </b-tooltip>-->
                         </b-col>
                         <b-col sm class="mb-2">
                             <div id="withdrawOnchainBtn">
                                 <b-btn variant="outline-primary" class="w-100" 
-                                    v-b-modal.withdrawModal :disabled="!!withdrawProblem">Withdraw &#x21E7;</b-btn>
+                                    v-b-modal.withdrawModal >Withdraw &#x21E7;</b-btn>
                             </div>
-                            <b-tooltip target="withdrawBtn" :disabled="!withdrawProblem" triggers="hover">
-                                Withdrawal not possible: {{ withdrawProblem }}
-                            </b-tooltip>
+<!--                            <b-tooltip target="withdrawBtn" :disabled="!withdrawProblem" triggers="hover">-->
+<!--                                Withdrawal not possible: {{ withdrawProblem }}-->
+<!--                            </b-tooltip>-->
                         </b-col>
                     </b-row>
                     <b-card class="mb-3">
@@ -116,55 +116,51 @@
                         <b-col sm class="mb-2">
                             <div id="depositOffchainBtn">
                                 <b-btn variant="outline-primary" class="w-100"
-                                       v-b-modal.depositModal :disabled="!!depositProblem">&#x21E9; Deposit</b-btn>
+                                       v-b-modal.depositModal >&#x21E9; Deposit</b-btn>
                             </div>
-                            <b-tooltip target="depositBtn" :disabled="!depositProblem" triggers="hover">
-                                Deposit not possible: {{ depositProblem }}
-                            </b-tooltip>
+<!--                            <b-tooltip target="depositBtn" :disabled="!depositProblem" triggers="hover">-->
+<!--                                Deposit not possible: {{ depositProblem }}-->
+<!--                            </b-tooltip>-->
                         </b-col>
                         <b-col sm class="mb-2">
                             <div id="withdrawOffchainBtn">
                                 <b-btn variant="outline-primary" class="w-100"
-                                       v-b-modal.withdrawModal :disabled="!!withdrawProblem">Withdraw &#x21E7;</b-btn>
+                                       v-b-modal.withdrawModal >Withdraw &#x21E7;</b-btn>
                             </div>
-                            <b-tooltip target="withdrawBtn" :disabled="!withdrawProblem" triggers="hover">
-                                Withdrawal not possible: {{ withdrawProblem }}
-                            </b-tooltip>
+<!--                            <b-tooltip target="withdrawBtn" :disabled="!withdrawProblem" triggers="hover">-->
+<!--                                Withdrawal not possible: {{ withdrawProblem }}-->
+<!--                            </b-tooltip>-->
                         </b-col>
                     </b-row>
                     <b-card class="mt-2">
                         <p class="mb-2"><strong>Matter Network</strong>
                             (<a href="/explorer/" target="_blank">block explorer</a>)</p>
 
-                        <img src="./assets/loading.gif" width="100em" v-if="store.account.plasma.id === null">
-                        <div v-if="store.account.plasma.id === 0">
-                            <p>No account yet.</p>
-                        </div>
-                        <div v-if="store.account.plasma.id > 0 && store.account.plasma.closing">
-                            <p>Closing account #{{store.account.plasma.id}}: please complete pending withdrawal.</p>
-                        </div>
-                        <div v-if="store.account.plasma.id > 0 && !store.account.plasma.closing">
-                            <label for="acc_id">Account ID:</label>
-                            <b-form-input id="acc_id" v-model="store.account.plasma.id" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
+<!--                        <img src="./assets/loading.gif" width="100em" v-if="store.account.plasma.id === null">-->
+<!--                        <div v-if="store.account.plasma.id === 0">-->
+<!--                            <p>No account yet.</p>-->
+<!--                        </div>-->
+<!--                        <div v-if="store.account.plasma.id > 0 && store.account.plasma.closing">-->
+<!--                            <p>Closing account #{{store.account.plasma.id}}: please complete pending withdrawal.</p>-->
+<!--                        </div>-->
+                        <div>
+<!--                            <label for="acc_id">Account ID:</label>-->
+<!--                            <b-form-input id="acc_id" v-model="store.account.plasma.id" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>-->
                             <b-row class="mt-2">
                                 <b-col cols="8">Verified balance:</b-col> 
-                                <b-col>ETH {{store.account.plasma.verified.balance || 0}}</b-col>
+                                <b-table class="mt-2" striped hover :items="store.account.verifiedPlasmaBalances"></b-table>
                             </b-row>
-                            <b-row class="mt-2" style="color: grey" v-if="store.account.plasma.verified.balance != store.account.plasma.committed.balance">
+                            <b-row class="mt-2" style="color: grey">
                                 <b-col cols="8">Committed balance:</b-col> 
-                                <b-col>ETH {{store.account.plasma.committed.balance || 0}}</b-col>
+                                <b-table class="mt-2" striped hover :items="store.account.commitedPlasmaBalances"></b-table>
                             </b-row>
-                            <b-row class="mt-2" style="color: grey" v-if="store.account.plasma.pending.balance != store.account.plasma.committed.balance">
-                                <b-col cols="8">Pending balance:</b-col> 
-                                <b-col>ETH {{store.account.plasma.pending.balance || 0}}</b-col>
-                            </b-row>
-                            <b-row class="mt-2">                    
-                                <b-col cols="8">Latest nonce:</b-col> 
-                                <b-col>{{store.account.plasma.committed.nonce || 0}}</b-col>
-                            </b-row>
-                            <b-row class="mt-2" style="color: grey" v-if="store.account.plasma.pending.nonce !== store.account.plasma.committed.nonce">
-                                <b-col cols="8">Next nonce:</b-col> <b-col>{{store.account.plasma.pending.nonce || store.account.plasma.committed.nonce || 0}}</b-col>
-                            </b-row>
+<!--                            <b-row class="mt-2">                    -->
+<!--                                <b-col cols="8">Latest nonce:</b-col> -->
+<!--                                <b-col>{{store.account.plasma.committed.nonce || 0}}</b-col>-->
+<!--                            </b-row>-->
+<!--                            <b-row class="mt-2" style="color: grey" v-if="store.account.plasma.pending.nonce !== store.account.plasma.committed.nonce">-->
+<!--                                <b-col cols="8">Next nonce:</b-col> <b-col>{{store.account.plasma.pending.nonce || store.account.plasma.committed.nonce || 0}}</b-col>-->
+<!--                            </b-row>-->
                         </div>
                     </b-card>
                 </b-card>
@@ -174,7 +170,7 @@
 
     <b-modal ref="depositModal" id="depositModal" title="Deposit" hide-footer>
         <label for="depositAmountInput">Amount</label> 
-            (max ETH <a href="#" @click="depositAmount=store.account.balance">{{store.account.balance}}</a>):
+            (max ETH <a href="#" @click="depositAmount=store.account.balance">0</a>):
         <b-form-input id="depositAmountInput" type="number" placeholder="7.50" v-model="depositAmount"></b-form-input>
         <div id="doDepositBtn" class="mt-4 float-right">
             <b-btn variant="primary" @click="deposit" :disabled="!!false">Deposit</b-btn>
@@ -202,10 +198,10 @@
             <!--<b-tab title="Full exit" class="mb-4">-->
                 <p>This will close your account and withdraw all money from it.</p>
                 <div id="doExitBtn" class="mt-4 float-right">
-                    <b-btn variant="danger" :disabled="!!withdrawProblem" @click="withdrawAll">Close & withdraw</b-btn>
+                    <b-btn variant="danger" @click="withdrawAll">Close & withdraw</b-btn>
                 </div>
-                <b-tooltip target="doExitBtn" :disabled="!withdrawProblem" triggers="hover">
-                    Withdraw not possible: {{ withdrawProblem }}
+                <b-tooltip target="doExitBtn" triggers="hover">
+                    Withdraw not possible
                 </b-tooltip>
             <!--</b-tab>-->
         </b-tabs>
@@ -291,36 +287,6 @@ export default {
         // baseUrl: () => 'https://api.Matter Network.thematter.io',
         store: () => store,
         contractAddress: () => window.contractAddress,
-        depositProblem() {
-            if(store.account.plasma.closing) return "pending closing account, please complete exit first"
-            if(!(Number(store.account.balance) > 0)) return "empty balance in the mainchain account"
-        },
-        doDepositProblem() {
-            if(this.depositProblem) return this.depositProblem
-            if(!(this.depositAmount > 0)) return "invalid deposit amount: " + this.depositAmount
-            if(Number(this.depositAmount) > Number(store.account.balance)) return "deposit amount exceeds mainchain account balance: " 
-                + this.depositAmount + " > " + store.account.balance
-        }, 
-        withdrawProblem() {
-            if(!(Number(store.account.plasma.committed.balance) > 0)) return "empty balance in the Matter Network account"
-            if(!(Number(store.account.plasma.verified.balance) > 0)) return "empty balance in the Matter Network account"
-        },
-        doWithdrawProblem() {
-            if(this.depositProblem) return this.depositProblem
-            if(Number(this.withdrawAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Matter Network balance"
-            if(Number(this.nonce) < Number(store.account.plasma.committed.nonce)) return "nonce must be greater then confirmed in Matter Network: got " 
-                + this.nonce + ", expected >= " + store.account.plasma.committed.nonce
-        },
-        transferProblem() {
-            if(!store.account.plasma.id) return "no Matter Network account exists yet"
-            if(!(Number(store.account.plasma.committed.balance) > 0)) return "Matter Network account has empty balance"
-            if(!(Number(store.account.plasma.verified.balance) > 0)) return "empty balance in the Matter Network account"
-            if(!ethUtil.isHexString(this.transferTo)) return "`To` is not a valid ethereum address: " + this.transferTo
-            if(!(this.transferAmount > 0)) return "positive amount required, e.g. 100.55"
-            if(Number(this.transferAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Matter Network balance"
-            if(Number(this.nonce) < Number(store.account.plasma.committed.nonce)) return "nonce must be greater then confirmed in Matter Network: got " 
-                + this.nonce + ", expected >= " + store.account.plasma.committed.nonce
-        },
         pendingWithdraw: () => Number(store.account.onchain.balance) > 0,
     },
     methods: {
@@ -364,21 +330,9 @@ export default {
             this.alertType = alertType || 'danger'
         },
         async transfer() {
-            try {
-            this.transferPending = true
-                if(!ethUtil.isHexString(this.transferTo)) {
-                    this.alert('to is not a hex string')
-                    return  
-                }
-                const to = (await contract.ethereumAddressToAccountID(this.transferTo))[0].toNumber()
-                if(0 === to) {
-                    this.alert('recepient not found')
-                    return
-                }
-                await this.plasmaTransfer(to, this.transferAmount)
-            } finally {
-                this.transferPending = false
-            }
+            let wallet = window.wallet;
+            await wallet.transfer(this.transferTo, wallet.supportedTokens[0], 1, 0);
+
         },
         async plasmaTransfer(to, amount) {
             console.log('initiating transfer to', to, amount)
@@ -547,6 +501,7 @@ export default {
 
                 await wallet.updateState();
                 newData.address = wallet.ethAddress;
+                newData.franklinAddress = wallet.address;
                 newData.ethBalances = []
                 newData.contractBalances = []
                 plasmaData.committedBalances = []
@@ -568,54 +523,19 @@ export default {
                     plasmaData.committedBalances.push({name: tokenName, balance: commitedBalance });
                     plasmaData.verifiedBalances.push({name: tokenName, balance: verifidBalance });
                 }
-
-                // let accountState = await ethersContract.accounts(id);
-                plasmaData.closing = accountState.state.toNumber() > 1;
-
-                let {blocks, pendingBalance} = await this.loadEvents(newData.address, plasmaData.closing)
-                onchain.completeWithdrawArgs = blocks
-                onchain.balance = pendingBalance
-
-                newData.plasmaId = id
-                if(id > 0) {
-                    plasmaData = await this.getPlasmaInfo(id)
-                }
             } catch (err) {
                 this.alert('Status update failed: ' + err)
                 console.log(err)
             }
             if(timer === this.updateTimer) { // if this handler is still valid
                 store.account.address = newData.address
+                store.account.franklinAddress = newData.franklinAddress
                 store.account.ethBalances = newData.ethBalances;
                 store.account.contractBalances = newData.contractBalances;
 
-                store.account.plasma.committed.balances = plasmaData.committedBalances
-                store.account.plasma.verified.balances = plasmaData.verifiedBalances
+                store.account.commitedPlasmaBalances = plasmaData.committedBalances
+                store.account.verifiedPlasmaBalances = plasmaData.verifiedBalances
 
-                store.account.onchain = onchain
-
-                store.account.plasma.id = newData.plasmaId
-                store.account.plasma.closing = plasmaData.closing
-
-                if(store.account.plasma.id) {
-
-                    //console.log('plasmaData', plasmaData)
-                    store.account.plasma.verified = plasmaData.verified || {}
-                    store.account.plasma.committed = plasmaData.committed || {}
-                    store.account.plasma.pending = plasmaData.pending || {}
-
-                    if(store.account.plasma.pending.nonce !== null) {
-
-                        this.nonce = store.account.plasma.pending.nonce
-
-                        // if (store.account.plasma.pending.nonce > Number(this.nonce)) {
-                        //     this.nonce = store.account.plasma.pending.nonce
-                        // }
-                        // if (store.account.plasma.pending_nonce > Number(this.nonce)) {
-                        //     this.nonce = store.account.plasma.pending_nonce
-                        // }
-                    }
-                }
                 this.updateTimer = setTimeout(() => this.updateAccountInfo(), 1000)
             }
         },
