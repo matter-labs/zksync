@@ -62,8 +62,53 @@
                             <b-col>Balances:
                                 <b-row v-for="token in store.onchain.allTokensInfo" class="amount_show" v-bind:key="token.elemId" v-bind:id="token.elemId">
                                     <span v-bind:style="{color: token.color}">
-                                        <span>{{token.shortBalanceInfo}}</span>
-                                        <b-tooltip v-bind:target="token.elemId">{{token.longBalanceInfo}}</b-tooltip>
+                                        <span>{{token.onchainShortBalanceInfo}}</span>
+                                        <b-tooltip v-bind:target="token.elemId">{{token.onchainLongBalanceInfo}}</b-tooltip>
+                                    </span>
+                                </b-row>
+                            </b-col>
+                        </b-row>
+                        <b-row class="mt-2 mx-auto" v-if="pendingWithdraw">
+                            <b-btn variant="primary" class="mt-2 mx-auto" @click="completeWithdraw">Complete withdrawal</b-btn>                            
+                        </b-row>
+                    </b-card>
+                    <b-row class="mb-0 mt-0">
+                        <b-col sm class="mb-2">
+                            <div id="onchainDepositBtn">
+                                <b-btn variant="outline-primary" class="w-100" 
+                                    v-b-modal.onchainDepositModal>&#x21E9; Deposit</b-btn>
+                            </div>
+                            <!-- <b-tooltip target="onchainDepositBtn" :disabled="!depositProblem" triggers="hover">
+                                Deposit not possible: {{ depositProblem }}
+                            </b-tooltip> -->
+                        </b-col>
+                        <b-col sm class="mb-2">
+                            <div id="withdrawBtn">
+                                <b-btn variant="outline-primary" class="w-100" 
+                                    v-b-modal.onchainWithdrawModal :disabled="!!withdrawProblem">Withdraw &#x21E7;</b-btn>
+                            </div>
+                            <b-tooltip target="withdrawBtn" :disabled="!withdrawProblem" triggers="hover">
+                                Withdrawal not possible: {{ withdrawProblem }}
+                            </b-tooltip>
+                        </b-col>
+                    </b-row>
+ <!-- 
+ ######   #######  ##    ## ######## ########     ###     ######  ######## 
+##    ## ##     ## ###   ##    ##    ##     ##   ## ##   ##    ##    ##    
+##       ##     ## ####  ##    ##    ##     ##  ##   ##  ##          ##    
+##       ##     ## ## ## ##    ##    ########  ##     ## ##          ##    
+##       ##     ## ##  ####    ##    ##   ##   ######### ##          ##    
+##    ## ##     ## ##   ###    ##    ##    ##  ##     ## ##    ##    ##    
+ ######   #######  ##    ##    ##    ##     ## ##     ##  ######     ##
+ -->    
+                    <b-card class="mb-3">
+                        <p class="mb-2"><strong>Contract</strong></p>
+                        <b-row class="mt-2">
+                            <b-col>Balances:
+                                <b-row v-for="token in store.onchain.allTokensInfo" class="amount_show" v-bind:key="token.elemId" v-bind:id="token.elemId">
+                                    <span v-bind:style="{color: token.color}">
+                                        <span>{{token.contractShortBalanceInfo}}</span>
+                                        <b-tooltip v-bind:target="token.elemId">{{token.contractLongBalanceInfo}}</b-tooltip>
                                     </span>
                                 </b-row>
                             </b-col>
@@ -238,7 +283,7 @@
 ##     ## ##       ##        ##     ## ##    ##  ##     ##    
 ########  ######## ##         #######   ######  ####    ##    
  -->
-    <b-modal ref="depositModal" id="depositModal" title="Deposit" hide-footer>
+    <b-modal ref="onchainDepositModal" id="onchainDepositModal" title="Onchain deposit" hide-footer>
         <b-form-select v-model="tokenForDeposit" :option="store.coins" class="mb-3">
             <option v-for="token in store.onchain.allTokensInfo" v-bind:key="token.elemId" @click="tokenForDeposit=token.tokenName">{{ token.tokenName }}</option>
         </b-form-select>
@@ -246,7 +291,21 @@
             (max <span>{{ tokenForDeposit }}</span> <a href="#" @click="depositAmount=store.onchain.committed.balanceDict[tokenForDeposit]">{{store.onchain.committed.balanceDict[tokenForDeposit]}}</a>):
         <b-form-input id="depositAmountInput" type="number" placeholder="7.50" v-model="depositAmount"></b-form-input>
         <div id="doDepositBtn" class="mt-4 float-right">
-            <b-btn variant="primary" @click="deposit" :disabled="!!doDepositProblem">Deposit</b-btn>
+            <b-btn variant="primary" @click="onchainDeposit" >Deposit</b-btn>
+        </div>
+        <!-- <b-tooltip target="doDepositBtn" :disabled="!doDepositProblem" triggers="hover">
+            Deposit not possible: {{ doDepositProblem }}
+        </b-tooltip> -->
+    </b-modal>
+    <b-modal ref="depositModal" id="depositModal" title="Offchain deposit" hide-footer>
+        <b-form-select v-model="tokenForDeposit" :option="store.coins" class="mb-3">
+            <option v-for="token in store.onchain.allTokensInfo" v-bind:key="token.elemId" @click="tokenForDeposit=token.tokenName">{{ token.tokenName }}</option>
+        </b-form-select>
+        <label for="depositAmountInput">Amount</label> 
+            (max <span>{{ tokenForDeposit }}</span> <a href="#" @click="depositAmount=store.onchain.committed.balanceDict[tokenForDeposit]">{{store.onchain.committed.balanceDict[tokenForDeposit]}}</a>):
+        <b-form-input id="depositAmountInput" type="number" placeholder="7.50" v-model="depositAmount"></b-form-input>
+        <div id="doDepositBtn" class="mt-4 float-right">
+            <b-btn variant="primary" @click="offchainDeposit" :disabled="!!doDepositProblem">Deposit</b-btn>
         </div>
         <b-tooltip target="doDepositBtn" :disabled="!doDepositProblem" triggers="hover">
             Deposit not possible: {{ doDepositProblem }}
@@ -512,10 +571,10 @@ export default {
                 'ZEC': 789
             })[token];
         },
-        async deposit() {
+        async offchainDeposit() {
             this.$refs.depositModal.hide();
             try {
-                this.alert('starting deposit onchain');
+                this.alert('starting deposit offchain');
             
                 let token = ((tokenSymbol) => {
                     let allTokens = wallet.supportedTokens;
@@ -530,11 +589,6 @@ export default {
 
                 let amount = ethers.utils.bigNumberify(this.depositAmount);
                 console.log('amount for deposit', amount);
-
-                this.alert('starting deposit onchain');
-                await wallet.depositOnchain(token, amount);
-        
-                await new Promise(r => setTimeout(r, 25000));
 
                 this.alert('starting deposit offchain');
                 amount = amount.sub(1);
@@ -554,6 +608,30 @@ export default {
             // let from = store.account.address
             // let hash = await contract.deposit([pub.x, pub.y], maxFee, { value, from })
             // this.alert('Deposit initiated, tx: ' + hash, 'success')
+        },
+        async onchainDeposit() {
+            this.$refs.onchainDepositModal.hide();
+
+            this.alert('starting onchainDeposit');
+            
+            let token = ((tokenSymbol) => {
+                let allTokens = wallet.supportedTokens;
+                    for (let i = 0; i < allTokens.length; i++) {
+                    if (String(allTokens[i].symbol) == tokenSymbol) {
+                        return allTokens[i];
+                    }
+                }
+                throw new Error("hey " + tokenSymbol);
+            })(this.tokenForDeposit);
+            console.log('token for deposit: ', token);
+
+            let amount = ethers.utils.bigNumberify(this.depositAmount);
+            console.log('amount for deposit', amount);
+
+            this.alert('starting deposit onchain');
+            await wallet.depositOnchain(token, amount);
+
+            this.alert('awaited deposit onchain');
         },
         async withdrawSome() {
             try {
@@ -882,6 +960,7 @@ export default {
                 plasma.pending   = await wallet.getPendingFranklinState();
                 plasma.committed = await wallet.getCommittedFranklinState();
                 plasma.verified  = await wallet.getVerifiedFranklinState();
+                console.log("new franklinState:", wallet.franklinState);
                 this.nonce = plasma.nonce = wallet.franklinState.commited.nonce;
 
 
@@ -926,58 +1005,70 @@ export default {
                 // ************************* all the information for frontend *************************
 
                 onchain.allTokensInfo = onchain.allTokensList.map(tokenName => {
+                    let token = ((tokenName) => {
+                        for (let i = 0; i < wallet.supportedTokens.length; i++) {
+                            let token = wallet.supportedTokens[i];
+                            // console.log('wallet.supportedTokens', wallet.supportedTokens);
+                            // console.log('token', token);
+                            if (token.symbol === tokenName) {
+                                return token;
+                            }
+                        }
+                    })(tokenName);
+
+                    // if (tokenName.startsWith('ERC20')) {
+                    //     tokenName += token.address;
+                    // }
+
                     let res = {};
                     res.tokenName = tokenName;
                     res.elemId = `ethBalance__${tokenName}`;
 
-                    res.longBalanceInfo = "";
+                    res.longBalanceInfo = "NENADA";
 
                     // ***** make string with all info about onchain balance to be shown on hover ***** 
 
-                    res.longBalanceInfo += appendableBalancesString(
+                    res.onchainShortBalanceInfo = 
+                    res.onchainLongBalanceInfo = appendableBalancesString(
                         onchain.committed.balanceDict[tokenName],
                         onchain.pending.balanceDict[tokenName],
                         'committed', 
                         ', pending'
                     );
 
-                    console.log('res.longBalanceInfo', res.longBalanceInfo);
+                    res.contractShortBalanceInfo = 
+                    res.contractLongBalanceInfo = (() => {
+                        let res = '';
+                        
+                        let committedAmount = contract.committed.balanceDict[tokenName];
 
+                        let committedIsLockedStr = 
+                            contract.committed.isLockedDict[tokenName] ? ', locked' : ', unlocked';
+                        
+                        let pendingAmount = contract.pending.balanceDict[tokenName];
+                        let pendingIsLockedStr = 
+                            contract.pending.isLockedDict[tokenName] ? ', pending locked' : ', pending unlocked';
 
-                    try {
-                        res.longBalanceInfo += (() => {
-                            let res = '';
-                            
-                            let committedAmount = contract.committed.balanceDict[tokenName];
-                            let committedIsLockedStr = 
-                                contract.committed.isLockedDict[tokenName] ? ', locked' : ', unlocked';
-                            
-                            let pendingAmount = contract.pending.balanceDict[tokenName];
-                            let pendingIsLockedStr = 
-                                contract.pending.isLockedDict[tokenName] ? ', pending locked' : ', pending unlocked';
+                        if (true || !!Number(committedAmount)) {
+                            res += `${committedIsLockedStr} ${committedAmount}`;
+                        }
+                        if (true || !!Number(pendingAmount) && committedAmount !== pendingAmount) {
+                            res += `${pendingIsLockedStr} ${pendingAmount}`;
+                        }
 
-                            if (!!Number(committedAmount)) {
-                                res += `${committedIsLockedStr} ${committedAmount}`;
-                            }
-                            if (!!Number(pendingAmount) && committedAmount !== pendingAmount) {
-                                res += `${pendingIsLockedStr} ${pendingAmount}`;
-                            }
-                            return res;
-                        })();
-                    } catch (e) {
-                        res.longBalanceInfo += " (error occured) ";
-                    }
+                        return res;
+                    })();
 
                     // *************** make short description to be shown on the page ***************
 
-                    res.shortBalanceInfo = `${tokenName} ${onchain.pending.balanceDict[tokenName]}`;
-                    if (!!Number(contract.pending.balanceDict[tokenName])) {
-                        if (contract.pending.isLockedDict[tokenName]) {
-                            res.shortBalanceInfo += `, locked ${contract.pending.balanceDict[tokenName]}`;
-                        } else {
-                            res.shortBalanceInfo += `, unlocked ${contract.pending.balanceDict[tokenName]}`;
-                        }
-                    }
+                    // res.contractShortBalanceInfo = `${tokenName} ${onchain.pending.balanceDict[tokenName]}`;
+                    // if (!!Number(contract.pending.balanceDict[tokenName])) {
+                    //     if (contract.pending.isLockedDict[tokenName]) {
+                    //         res.shortBalanceInfo += `, locked ${contract.pending.balanceDict[tokenName]}`;
+                    //     } else {
+                    //         res.shortBalanceInfo += `, unlocked ${contract.pending.balanceDict[tokenName]}`;
+                    //     }
+                    // }
 
                     // ***************************** decide on colors *****************************
 
