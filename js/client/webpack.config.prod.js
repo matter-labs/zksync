@@ -6,6 +6,10 @@ const CleanWebpackPlugin = require('clean-webpack-plugin');
 
 module.exports = {
   target: 'web',
+  node: {
+    fs: 'empty',
+    child_process: 'empty'
+  },  
   entry: './src/main.js',
   output: {
     path: path.resolve(__dirname, './dist'),
@@ -29,6 +33,11 @@ module.exports = {
         exclude: /node_modules/
       },
       {
+        test: /\.tsx?$/,
+        loader: 'ts-loader',
+        exclude: /node_modules/
+      },
+      {
         test: /\.css$/,
         use: ExtractTextPlugin.extract({
           fallback: "style-loader",
@@ -47,7 +56,8 @@ module.exports = {
   resolve: {
     alias: {
       'vue$': 'vue/dist/vue.esm.js'
-    }
+    },
+    extensions: [ '.tsx', '.ts', '.js', '.json', '.vue' ]
   },
   devServer: {
     historyApiFallback: true,

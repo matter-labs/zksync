@@ -32,6 +32,11 @@ module.exports = {
         exclude: /node_modules/
       },
       {
+        test: /\.tsx?$/,
+        loader: 'ts-loader',
+        exclude: /node_modules/
+      },
+      {
         test: /\.css$/,
         use: ExtractTextPlugin.extract({
           fallback: "style-loader",
@@ -50,7 +55,8 @@ module.exports = {
   resolve: {
     alias: {
       'vue$': 'vue/dist/vue.esm.js'
-    }
+    },
+    extensions: [ '.tsx', '.ts', '.js', '.json', '.vue' ]
   },
   devServer: {
     historyApiFallback: true,

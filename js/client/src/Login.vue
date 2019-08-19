@@ -23,7 +23,7 @@ import transactionLib from './transaction'
 const newKey = transactionLib.newKey
 import {keccak256} from 'js-sha3'
 const ethers = require('ethers')
-import * as Wallet from '../../franklin_lib/dist/src/wallet'
+import * as Wallet from '../../franklin_lib/src/wallet'
 
 export default {
     name: 'login',

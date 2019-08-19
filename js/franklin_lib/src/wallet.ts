@@ -8,7 +8,7 @@ import 'ethers';
 import {Contract, ethers} from 'ethers';
 import {BigNumber, bigNumberify, BigNumberish, parseEther} from "ethers/utils";
 
-const franklinContractCode = require(`${process.env.FRANKLIN_HOME}/contracts/build/Franklin`)
+const franklinContractCode = require('../../../contracts/build/Franklin')
 const IERC20Conract = require("openzeppelin-solidity/build/contracts/IERC20");
 // import {franklinContractCode} from "../../../contracts/src.ts/deploy";
 
@@ -76,10 +76,9 @@ export class Wallet {
         let buff = Buffer.from(x.toString('hex') + y.toString('hex'), 'hex');
         let hash = pedersenHash(buff);
         this.address = '0x' + (hash.getX().toString('hex') + hash.getY().toString('hex')).slice(0, 27 * 2);
-        console.log('process.env.CONTRACT_ADDR', process.env.CONTRACT_ADDR);
         this.contract = new ethers.Contract(
             process.env.CONTRACT_ADDR,
-            require(`${process.env.FRANKLIN_HOME}/contracts/build/Franklin`).abi, 
+            require('../../../contracts/build/Franklin').abi, 
             ethWallet);
         this.contract.connect(this.ethWallet);
     }

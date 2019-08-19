@@ -308,7 +308,8 @@ import {ethers} from 'ethers'
 import axios from 'axios'
 import ethUtil from 'ethjs-util'
 import transactionLib from './transaction'
-import * as Wallet from '../../franklin_lib/dist/src/wallet'
+import * as Wallet from "../../franklin_lib/src/wallet"
+
 window.transactionLib = transactionLib
 
 import ABI from './contract'
