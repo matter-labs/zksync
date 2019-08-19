@@ -54,7 +54,7 @@
                     </div>
 
                     <p class="mt-2" style="color: grey">
-                        To commit a new block, either submit {{store.config.TRANSFER_BATCH_SIZE}} transactions, or wait 1 minute until timer triggers block generation.
+                        To commit a new block, either submit {{store.config.TX_BATCH_SIZE}} transactions, or wait 1 minute until timer triggers block generation.
                     </p>
                     <p class="mt-2" style="color: grey">
                          Once a block is committed, it takes about 5 minutes to verify it.

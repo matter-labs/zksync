@@ -15,7 +15,7 @@
 //use circuit::transfer::transaction::Transaction;
 //use models::plasma::params as plasma_constants;
 //
-//const TRANSFER_BATCH_SIZE: usize = 8;
+//const TX_BATCH_SIZE: usize = 50;
 //const FILENAME: &str = "transfer_pk.key";
 //const CONTRACT_FILENAME: &str = "TransferVerificationKey.sol";
 //const CONTRACT_NAME: &str = "TransferVerificationKey";
@@ -53,13 +53,13 @@
 //
 //    let instance_for_generation: Transfer<'_, Bn256> = Transfer {
 //        params,
-//        number_of_transactions: TRANSFER_BATCH_SIZE,
+//        number_of_transactions: TX_BATCH_SIZE,
 //        old_root: None,
 //        new_root: None,
 //        public_data_commitment: None,
 //        block_number: None,
 //        total_fee: None,
-//        transactions: vec![(empty_transaction, empty_witness); TRANSFER_BATCH_SIZE],
+//        transactions: vec![(empty_transaction, empty_witness); TX_BATCH_SIZE],
 //    };
 //
 //    info!("generating setup...");
