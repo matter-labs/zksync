@@ -57,12 +57,11 @@ export default {
 
             let txs = await client.getBlockTransactions(this.blockNumber)
             this.transactions = txs.map( (tx, index) => ({
-                number:     index+1,
-                type:       tx.tx_type,
-                from:       tx.from,
-                to:         tx.to,
-                amount:     this.formatFranklin(tx.amount) + ' ETH',
-                nonce:      tx.nonce,
+                number:      index+1,
+                type:        tx.tx_type,
+                "from / to": tx.from + " / " + tx.to,
+                amount:      this.formatFranklin(tx.amount) + ' ETH',
+                nonce:       tx.nonce,
             }))
         },
     },
