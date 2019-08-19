@@ -56,9 +56,10 @@ export default {
             this.status          = block.verified_at ? 'Verified' : 'Committed'
 
             let txs = await client.getBlockTransactions(this.blockNumber)
-            this.transactions = txs.map( tx => ({
-                from:       tx.from_account,
-                to:         tx.to_account,
+            this.transactions = txs.map( (tx, index) => ({
+                number:     index+1,
+                from:       tx.from,
+                to:         tx.to,
                 amount:     this.formatFranklin(tx.amount) + ' ETH',
                 nonce:      tx.nonce,
             }))
@@ -89,7 +90,7 @@ export default {
                 { name: 'Block #',          value: `<b>${this.blockNumber}</b>`},
                 //{ name: 'Type',             value: this.type, },
                 { name: 'New root hash',    value: this.new_state_root, },
-                { name: 'Transactions',     value: client.TX_PER_BLOCK(), },
+                // { name: 'Transactions',     value: client.TX_PER_BLOCK(), },
                 { name: 'Status',           value: this.status, },
                 { name: 'Commit tx hash',   value: `<a target="blanc" href="${this.etherscan}/tx/${this.commit_tx_hash}">${this.commit_tx_hash}</a>`, },
                 { name: 'Verify tx hash',   value: `<a target="blanc" href="${this.etherscan}/tx/${this.verify_tx_hash}">${this.verify_tx_hash}</a>`, },

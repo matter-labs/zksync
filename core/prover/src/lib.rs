@@ -54,7 +54,7 @@
 //};
 //
 ////pub struct Prover<E: JubjubEngine> {
-////    pub transfer_batch_size: usize,
+////    pub tx_batch_size: usize,
 ////    pub deposit_batch_size: usize,
 ////    pub exit_batch_size: usize,
 ////    pub current_block_number: BlockNumber,
@@ -269,7 +269,7 @@
 //            .expect("getting prover id failed");
 //
 //        Ok(Self {
-//            transfer_batch_size: RUNTIME_CONFIG.transfer_batch_size,
+//            tx_batch_size: RUNTIME_CONFIG.tx_batch_size,
 //            deposit_batch_size: DEPOSIT_BATCH_SIZE,
 //            exit_batch_size: EXIT_BATCH_SIZE,
 //            current_block_number: state_block_number,
@@ -325,9 +325,9 @@
 //        //let transactions = &block.transactions;
 //        let num_txes = transactions.len();
 //
-//        if num_txes != self.transfer_batch_size {
+//        if num_txes != self.tx_batch_size {
 //            return Err(BabyProverErr::Other(
-//                "num_txes != self.transfer_batch_size".to_owned(),
+//                "num_txes != self.tx_batch_size".to_owned(),
 //            ));
 //        }
 //

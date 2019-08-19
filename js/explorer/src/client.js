@@ -19,7 +19,7 @@ let self = {
     PAGE_SIZE:      20, // blocks per page
 
     TX_PER_BLOCK() {
-        return store.config.TRANSFER_BATCH_SIZE 
+        return store.config.TX_BATCH_SIZE 
     },
     
     async status() {

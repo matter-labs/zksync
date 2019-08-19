@@ -1,4 +1,4 @@
-import assert from 'assert';
+import * as assert from 'assert';
 import BN = require('bn.js');
 
 export function floatToInteger(floatBytes: Buffer, exp_bits: number, mantissa_bits: number, exp_base: number): BN {

@@ -45,15 +45,20 @@ Geth: ```geth attach http://localhost:8545```
 
 NOTE: if you are resetting geth, each Metamask account must be manually reset via Settings > Advanced > Reset account.
 
-## Tesseract (local blockchain explorer)
+# Blockscout (local blockchain explorer)
 
-Start tesseracts:
-```franklin tesseracts-up```
+It generates quite some CPU load, but might be useful to visualize blockchain activity. Use with caution.
 
-And visit `localhost:8000`.
+- Migrate blockscout (do this once to setup database):
+```franklin blockscout-migrate```
 
-Stop tesseracts:
-```franklin tesseracts-down```
+- Start:
+```franklin blockscout-up```
+
+- Stop:
+```franklin blockscout-down```
+
+Blockscout will be available at http://localhost:4000/txs
 
 ## Build and run server + prover locally:
 
