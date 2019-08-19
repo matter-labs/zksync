@@ -310,24 +310,15 @@ export class Wallet {
         return await this.getOnchainTokensList();
     }
 
-    private async getLockedContractBalanceForToken(token: Token) {
+    private async getContractBalanceForToken(token: Token) {
         let address = this.ethWallet.address;
         let [balance, block] = await this.contract.balances(address, token.id);
         let currBlock = await this.ethWallet.provider.getBlockNumber();
-        if (currBlock < block) {
-            return balance;
-        }
-        return new BN(0);
-    }
-
-    private async getUnlockedContractBalanceForToken(token: Token) {
-        let address = this.ethWallet.address;
-        let [balance, block] = await this.contract.balances(address, token.id);
-        let currBlock = await this.ethWallet.provider.getBlockNumber();
-        if (currBlock >= block) {
-            return balance;
-        }
-        return new BN(0);
+        let isLocked = currBlock < block ? 'locked' : 'unlocked';
+        return {
+            balance,
+            isLocked
+        };
     }
 
     /**
@@ -338,12 +329,11 @@ export class Wallet {
         let res = [];
         for (let i = 0; i < tokens.length; i++) {
             let token: Token = tokens[i];
-            let lockedBalance = await this.getLockedContractBalanceForToken(token);
-            let unlockedBalance = await this.getUnlockedContractBalanceForToken(token);
+            let balanceInfo = await this.getContractBalanceForToken(token);
             res.push({
                 token: token.symbol,
-                locked: lockedBalance,
-                unlocked: unlockedBalance
+                balance: balanceInfo.balance,
+                isLocked: balanceInfo.isLocked
             });
         }
         return {
@@ -355,8 +345,8 @@ export class Wallet {
         return {
             contractBalances: (await this.getCommittedContractBalances()).contractBalances.map(balance => ({
                 token: balance.token,
-                locked: balance.locked.toString(10),
-                unlocked: balance.unlocked.toString(10)
+                balance: balance.balance.toString(10),
+                isLocked: balance.isLocked
             }))
         };
     }
