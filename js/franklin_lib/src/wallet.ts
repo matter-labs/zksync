@@ -26,6 +26,7 @@ class FranklinProvider {
     constructor(public providerAddress: string = 'http://127.0.0.1:3000') {}
 
     async submitTx(tx) {
+        console.log('submitting tx', tx);
         return await Axios.post(this.providerAddress + '/api/v0.1/submit_tx', tx).then(reps => reps.data);
     }
 
@@ -204,7 +205,7 @@ export class Wallet {
 
     async getNonce(): Promise<number> {
         await this.fetchFranklinState();
-        return this.franklinState.commited.nonce
+        return this.franklinState.commited.nonce + 1
     }
 
     static async fromEthWallet(wallet: ethers.Wallet) {
@@ -318,6 +319,7 @@ export class Wallet {
         let [balance, block] = await this.contract.balances(address, token.id);
         let currBlock = await this.ethWallet.provider.getBlockNumber();
         let isLocked = currBlock < block ? 'locked' : 'unlocked';
+        balance = balance.toString(10);
         return {
             balance,
             isLocked
@@ -409,6 +411,9 @@ export class Wallet {
      */
     async getPendingFranklinState() {
         let committed = (await this.getCommittedFranklinState()).balances;
+        // return {
+        //     balances: committed
+        // };
         
         let pendingTransactions = this.franklinState.pending_txs;
         for (let i = 0; i < pendingTransactions.length; i++) {
@@ -417,12 +422,22 @@ export class Wallet {
                 let balance = committed[j];
                 let symbol = this.supportedTokens[tx.token].symbol
                 
-                if (symbol == balance.token) continue;
+                let cmp1 = String(symbol);
+                let cmp2 = String(balance.token);
+
+                console.log('symboll:', cmp1, cmp2, cmp1 === cmp2);
+
+                let add1 = bigNumberify(balance.balance);
+                let add2 = bigNumberify(tx.amount);
+
+                console.log('symboll2:', add1, add2);
+
+                if (cmp1 !== cmp2) continue;
 
                 if (tx.to === this.address) {
-                    balance.balance += tx.amount;
+                    balance.balance = bigNumberify(balance.balance).add(bigNumberify(tx.amount));
                 } else if (tx.from === this.address) {
-                    balance.balance -= tx.amount;
+                    balance.balance = bigNumberify(balance.balance).sub(bigNumberify(tx.amount));
                 } else {
                     throw new Error ('pending transactions must be related to this account.');
                 }

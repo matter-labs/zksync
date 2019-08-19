@@ -249,7 +249,7 @@
                         <option v-for="token in store.plasma.allTokensInfo" v-bind:key="token.elemId" @click="tokenToTransferFranklin=token.tokenName">{{ token.tokenName   }}</option>
                     </b-form-select>
                     <label for="transferAmountInput" class="mt-4">Amount</label>
-                            (max {{tokenToTransferFranklin}}&nbsp;<a href="#" @click="transferAmount=store.plasma.committed.balanceDict[tokenToTransferFranklin]">{{store.plasma.committed.balanceDict[tokenToTransferFranklin]}}</a>):
+                            (max {{tokenToTransferFranklin}}&nbsp;<a href="#" @click="transferAmount=store.plasma.committed.balanceDict(tokenToTransferFranklin)">{{store.plasma.committed.balanceDict(tokenToTransferFranklin)}}</a>):
                     <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
 
                     <label for="transferNonceInput" class="mt-4">Nonce (autoincrementing):</label>
@@ -288,7 +288,7 @@
             <option v-for="token in store.onchain.allTokensInfo" v-bind:key="token.elemId" @click="tokenForDeposit=token.tokenName">{{ token.tokenName }}</option>
         </b-form-select>
         <label for="depositAmountInput">Amount</label> 
-            (max <span>{{ tokenForDeposit }}</span> <a href="#" @click="depositAmount=store.onchain.committed.balanceDict[tokenForDeposit]">{{store.onchain.committed.balanceDict[tokenForDeposit]}}</a>):
+            (max <span>{{ tokenForDeposit }}</span> <a href="#" @click="depositAmount=store.onchain.committed.balanceDict(tokenForDeposit)">{{store.onchain.committed.balanceDict(tokenForDeposit)}}</a>):
         <b-form-input id="depositAmountInput" type="number" placeholder="7.50" v-model="depositAmount"></b-form-input>
         <div id="doDepositBtn" class="mt-4 float-right">
             <b-btn variant="primary" @click="onchainDeposit" >Deposit</b-btn>
@@ -299,10 +299,10 @@
     </b-modal>
     <b-modal ref="depositModal" id="depositModal" title="Offchain deposit" hide-footer>
         <b-form-select v-model="tokenForDeposit" :option="store.coins" class="mb-3">
-            <option v-for="token in store.onchain.allTokensInfo" v-bind:key="token.elemId" @click="tokenForDeposit=token.tokenName">{{ token.tokenName }}</option>
+            <option v-for="token in store.contract.allTokensInfo" v-bind:key="token.elemId" @click="tokenForDeposit=token.tokenName">{{ token.tokenName }}</option>
         </b-form-select>
         <label for="depositAmountInput">Amount</label> 
-            (max <span>{{ tokenForDeposit }}</span> <a href="#" @click="depositAmount=store.onchain.committed.balanceDict[tokenForDeposit]">{{store.onchain.committed.balanceDict[tokenForDeposit]}}</a>):
+            (max <span>{{ tokenForDeposit }}</span> <a href="#" @click="depositAmount=store.contract.committed.balanceDict(tokenForDeposit)">{{store.contract.committed.balanceDict(tokenForDeposit)}}</a>):
         <b-form-input id="depositAmountInput" type="number" placeholder="7.50" v-model="depositAmount"></b-form-input>
         <div id="doDepositBtn" class="mt-4 float-right">
             <b-btn variant="primary" @click="offchainDeposit" :disabled="!!doDepositProblem">Deposit</b-btn>
@@ -328,7 +328,7 @@
 
             <b-tab title="Partial withdrawal" active>
                 <label for="withdrawAmountInput" class="mt-4">Amount</label>
-                    (max <span>{{tokenForWithdrawal}}</span> <a href="#" @click="withdrawAmount=store.contract.committed.balanceDict[tokenForWithdrawal].toString(10)">{{store.contract.committed.balanceDict[tokenForWithdrawal].toString(10)}}</a>):
+                    (max <span>{{tokenForWithdrawal}}</span> <a href="#" @click="withdrawAmount=store.contract.committed.balanceDict(tokenForWithdrawal).toString(10)">{{store.contract.committed.balanceDict(tokenForWithdrawal).toString(10)}}</a>):
                 <b-form-input id="withdrawAmountInput" type="number" placeholder="7.50" v-model="withdrawAmount"></b-form-input>
                 <label for="transferNonceInput" class="mt-4">Nonce:</label>
                 <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
@@ -362,7 +362,7 @@
 
             <b-tab title="Partial withdrawal" active>
                 <label for="withdrawAmountInput" class="mt-4">Amount</label>
-                    (max <span>{{tokenForWithdrawal}}</span> <a href="#" @click="withdrawAmount=store.plasma.committed.balanceDict[tokenForWithdrawal].toString(10)">{{store.plasma.committed.balanceDict[tokenForWithdrawal].toString(10)}}</a>):
+                    (max <span>{{tokenForWithdrawal}}</span> <a href="#" @click="withdrawAmount=store.plasma.committed.balanceDict(tokenForWithdrawal).toString(10)">{{store.plasma.committed.balanceDict(tokenForWithdrawal).toString(10)}}</a>):
                 <b-form-input id="withdrawAmountInput" type="number" placeholder="7.50" v-model="withdrawAmount"></b-form-input>
                 <label for="transferNonceInput" class="mt-4">Nonce:</label>
                 <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
@@ -388,32 +388,6 @@
             <!--</b-tab>-->
         </b-tabs>
     </b-modal>
-    <!-- <b-modal ref="offchainWithdrawModal" id="offchainWithdrawModal" title="Offchain withdrawal" hide-footer>
-        <b-tabs pills card>
-            <b-tab title="Partial withdrawal" active>
-                <label for="withdrawAmountInput" class="mt-4">Amount</label>
-                    <!-- (max ETH <a href="#" @click="withdrawAmount=store.plasma.verified.balances">{{store.plasma.verified.balances}}</a>): -->
-                <b-form-input id="withdrawAmountInput" type="number" placeholder="7.50" v-model="withdrawAmount"></b-form-input>
-                <label for="transferNonceInput" class="mt-4">Nonce:</label>
-                <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
-                <div id="doWithdrawBtn" class="mt-4 float-right">
-                    <b-btn variant="primary"  :disabled="!!doWithdrawProblem" @click="withdrawSome">Withdraw</b-btn>
-                </div>
-                <b-tooltip target="doWithdrawBtn" :disabled="!doWithdrawProblem" triggers="hover">
-                    Withdraw not possible: {{ doWithdrawProblem }}
-                </b-tooltip>
-            </b-tab>
-            <!--<b-tab title="Full exit" class="mb-4">-->
-                <p>This will close your account and withdraw all money from it.</p>
-                <div id="doExitBtn" class="mt-4 float-right">
-                    <b-btn variant="danger" :disabled="!!withdrawProblem" @click="withdrawAll">Close & withdraw</b-btn>
-                </div>
-                <b-tooltip target="doExitBtn" :disabled="!withdrawProblem" triggers="hover">
-                    Withdraw not possible: {{ withdrawProblem }}
-                </b-tooltip>
-            <!--</b-tab>-->
-        </b-tabs>
-    </b-modal> -->
 </div>
 </template>
 <!--
@@ -558,7 +532,7 @@ export default {
             if(!(this.depositAmount > 0)) return "invalid deposit amount: " + this.depositAmount
             console.log('tokenForDEposit: ', this.tokenForDeposit);
             let token = this.tokenForDeposit;
-            let onchainBalance = store.onchain.committed.balanceDict[token];
+            let onchainBalance = store.onchain.committed.balanceDict(token);
             if(Number(this.depositAmount) > Number(onchainBalance)) return "deposit amount exceeds mainchain account balance: " 
                 + this.depositAmount + " > " + onchainBalance;
         }, 
@@ -589,7 +563,7 @@ export default {
             // if(Number(this.transferAmount) > Number(store.account.plasma.committed.balance)) return "specified amount exceeds Matter Network balance"
 
             let token = this.tokenToTransferFranklin;
-            let plasmaBalance = store.plasma.committed.balanceDict[token];
+            let plasmaBalance = store.plasma.committed.balanceDict(token);
             console.log('token trnasfer', token);
             console.log('plasmaBalance for this token', plasmaBalance)
 
@@ -1004,6 +978,8 @@ export default {
             // this.$parent.$router.push('/wallet')
         },
         async updateAccountInfo() {
+            const zeroDecorator = store => k => store[k] !== undefined ? store[k] : 0;
+
             // *************** helper *****************
             const MaturityLevel = Object.freeze({
                 low: 'pending',
@@ -1098,8 +1074,8 @@ export default {
                 
                 // ************************ transform to dicts ************************
 
-                onchain.committed.balanceDict = balanceArrayToDict(onchain.committed.balances)
-                onchain.pending.balanceDict   = balanceArrayToDict(onchain.pending.balances)
+                onchain.committed.balanceDict = balanceArrayToDict(onchain.committed.balances);
+                onchain.pending.balanceDict   = balanceArrayToDict(onchain.pending.balances);
                 
                 contract.committed.balanceDict = 
                     objectArrayToDict(contract.committed.lockedUnlockedBalances, "token", "balance");
@@ -1134,6 +1110,16 @@ export default {
                     Object.keys(plasma.verified.balanceDict)
                 ]);
 
+                onchain.committed.balanceDict = zeroDecorator(onchain.committed.balanceDict);
+                onchain.pending.balanceDict = zeroDecorator(onchain.pending.balanceDict);
+                contract.committed.balanceDict = zeroDecorator(contract.committed.balanceDict);
+                contract.committed.isLockedDict = zeroDecorator(contract.committed.isLockedDict);
+                contract.pending.balanceDict = zeroDecorator(contract.pending.balanceDict);
+                contract.pending.isLockedDict = zeroDecorator(contract.pending.isLockedDict);
+                plasma.pending.balanceDict = zeroDecorator(plasma.pending.balanceDict);
+                plasma.committed.balanceDict = zeroDecorator(plasma.committed.balanceDict);
+                plasma.verified.balanceDict = zeroDecorator(plasma.verified.balanceDict);
+
                 console.log('contract.committed', contract.committed);
 
                 // ************************* all the information for frontend *************************
@@ -1164,8 +1150,8 @@ export default {
 
                     res.onchainShortBalanceInfo = 
                     res.onchainLongBalanceInfo = appendableBalancesString(
-                        onchain.committed.balanceDict[tokenName],
-                        onchain.pending.balanceDict[tokenName],
+                        onchain.committed.balanceDict(tokenName),
+                        onchain.pending.balanceDict(tokenName),
                         'committed', 
                         ', pending'
                     );
@@ -1176,12 +1162,12 @@ export default {
 
                         res += tokenName;
                         
-                        let committedAmount = contract.committed.balanceDict[tokenName];
+                        let committedAmount = contract.committed.balanceDict(tokenName);
 
                         let committedIsLockedStr = 
                             contract.committed.isLockedDict[tokenName] ? ', locked' : ', unlocked';
                         
-                        let pendingAmount = contract.pending.balanceDict[tokenName];
+                        let pendingAmount = contract.pending.balanceDict(tokenName);
                         let pendingIsLockedStr = 
                             contract.pending.isLockedDict[tokenName] ? ', pending locked' : ', pending unlocked';
 
@@ -1197,20 +1183,20 @@ export default {
 
                     // *************** make short description to be shown on the page ***************
 
-                    // res.contractShortBalanceInfo = `${tokenName} ${onchain.pending.balanceDict[tokenName]}`;
-                    // if (!!Number(contract.pending.balanceDict[tokenName])) {
+                    // res.contractShortBalanceInfo = `${tokenName} ${onchain.pending.balanceDict(tokenName)}`;
+                    // if (!!Number(contract.pending.balanceDict(tokenName))) {
                     //     if (contract.pending.isLockedDict[tokenName]) {
-                    //         res.shortBalanceInfo += `, locked ${contract.pending.balanceDict[tokenName]}`;
+                    //         res.shortBalanceInfo += `, locked ${contract.pending.balanceDict(tokenName)}`;
                     //     } else {
-                    //         res.shortBalanceInfo += `, unlocked ${contract.pending.balanceDict[tokenName]}`;
+                    //         res.shortBalanceInfo += `, unlocked ${contract.pending.balanceDict(tokenName)}`;
                     //     }
                     // }
 
                     // ***************************** decide on colors *****************************
 
                     res.lowestMaturityOnchainLevel = 
-                        onchain.committed.balanceDict[tokenName] === onchain.pending.balanceDict[tokenName]
-                        && contract.committed.balanceDict[tokenName] === contract.pending.balanceDict[tokenName]
+                        onchain.committed.balanceDict(tokenName) === onchain.pending.balanceDict(tokenName)
+                        && contract.committed.balanceDict(tokenName) === contract.pending.balanceDict(tokenName)
                         ? MaturityLevel.high
                         : MaturityLevel.low;
 
@@ -1229,7 +1215,7 @@ export default {
                     res.tokenName = tokenName;
                     res.elemId = `contractBalance__${tokenName}`;
                     
-                    res.maxWithdrawalAmount = contract.committed.balanceDict[tokenName];
+                    res.maxWithdrawalAmount = contract.committed.balanceDict(tokenName);
                     
                     return res;
                 });
@@ -1244,9 +1230,9 @@ export default {
                     // ***** make string with all info about onchain balance to be shown on hover ***** 
 
                     res.longBalanceInfo += appendableBalancesStringThreeLevels(
-                        plasma.pending.balanceDict[tokenName],
-                        plasma.committed.balanceDict[tokenName],
-                        plasma.verified.balanceDict[tokenName],
+                        plasma.pending.balanceDict(tokenName),
+                        plasma.committed.balanceDict(tokenName),
+                        plasma.verified.balanceDict(tokenName),
                         ', pending', ', committed', ', verified'
                     );
 
@@ -1255,9 +1241,9 @@ export default {
                     // *************** make short description to be shown on the page ***************
 
                     res.lowestMaturityPlasmaLevel = MaturityLevel.lowestMaturityLevel(
-                        plasma.pending.balanceDict[tokenName],
-                        plasma.committed.balanceDict[tokenName],
-                        plasma.verified.balanceDict[tokenName]
+                        plasma.pending.balanceDict(tokenName),
+                        plasma.committed.balanceDict(tokenName),
+                        plasma.verified.balanceDict(tokenName)
                     );
 
                     // ***************************** decide on colors *****************************
@@ -1267,15 +1253,15 @@ export default {
                     switch (res.lowestMaturityPlasmaLevel) {
                         case MaturityLevel.low:  
                             res.color = '#999'; 
-                            res.shortBalanceInfo = `${tokenName} ${plasma.pending.balanceDict[tokenName]}`;
+                            res.shortBalanceInfo = `${tokenName} ${plasma.pending.balanceDict(tokenName)}`;
                             break;
                         case MaturityLevel.mid:  
                             res.color = '#555'; 
-                            res.shortBalanceInfo = `${tokenName} ${plasma.committed.balanceDict[tokenName]}`;
+                            res.shortBalanceInfo = `${tokenName} ${plasma.committed.balanceDict(tokenName)}`;
                             break;
                         case MaturityLevel.high: 
                             res.color = '#000'; 
-                            res.shortBalanceInfo = `${tokenName} ${plasma.verified.balanceDict[tokenName]}`;
+                            res.shortBalanceInfo = `${tokenName} ${plasma.verified.balanceDict(tokenName)}`;
                             break;
                         default: throw new Error(`switch reached default, ${res.lowestMaturityPlasmaLevel}`);
                     }
