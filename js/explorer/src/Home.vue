@@ -51,9 +51,6 @@
             <div class="col-sm text-center">
             <i class="fas fa-list"></i> <b>Total transactions</b><br><span class="num">{{totalTransactions}}</span>
             </div>
-            <div class="col-sm text-center">
-            <i class="fas fa-archive"></i> <b>Tx per block</b><br><span class="num">{{txPerBlock}}</span>
-            </div>
         </div>
         </b-card>
         <br>
