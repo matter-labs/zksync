@@ -64,7 +64,7 @@ export class Wallet {
     supportedTokens: Token[];
     franklinState: FranklinAccountState;
     ethState: ETHAccountState;
-
+    ethAddress: string
 
 
     constructor(seed: Buffer, public provider: FranklinProvider, public ethWallet: ethers.Wallet) {
@@ -173,16 +173,17 @@ export class Wallet {
 
         const currentBlock = await this.ethWallet.provider.getBlockNumber();
 
-        console.log('process.env.CONTRACT_ADDR', process.env.CONTRACT_ADDR);
+        this.ethAddress = await this.ethWallet.getAddress();
+
         const franklinDeployedContract = new Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, this.ethWallet);
-        for(let token of this.supportedTokens) {
+        for (let token of this.supportedTokens) {
             if (token.id == 0) {
-                onchainBalances[token.id] = await this.ethWallet.getBalance().then(b => b.toString())
+                onchainBalances[token.id] = await this.ethWallet.provider.getBalance(this.ethAddress).then(b => b.toString())
             } else {
                 const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
-                onchainBalances[token.id] = await erc20DeployedToken.balanceOf(this.ethWallet.address).then(n => n.toString());
+                onchainBalances[token.id] = await erc20DeployedToken.balanceOf(this.ethAddress).then(n => n.toString());
             }
-            const balanceStorage = await franklinDeployedContract.balances(this.ethWallet.address, token.id);
+            const balanceStorage = await franklinDeployedContract.balances(this.ethAddress, token.id);
             contractBalances[token.id] = balanceStorage.balance.toString();
             lockedBlocksLeft[token.id] = Math.max(balanceStorage.lockedUntilBlock - currentBlock, 0).toString();
         }

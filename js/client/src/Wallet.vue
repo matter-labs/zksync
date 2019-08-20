@@ -57,7 +57,7 @@
                         <label for="addr">Address</label> 
                             (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+store.onchain.address"
                                 target="blanc">block explorer</a>):
-                        <b-form-input id="addr" v-model="ethereumAddress" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
+                        <b-form-input id="addr" v-model="store.onchain.address" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
                         <b-row class="mt-2">
                             <b-col>Balances:
                                 <b-row v-for="token in store.onchain.allTokensInfo" class="amount_show" v-bind:key="token.elemId" v-bind:id="token.elemId">
@@ -442,9 +442,6 @@ export default {
         },
         franklinAddress() {
             return wallet.address;
-        },
-        ethereumAddress() {
-            return wallet.ethWallet.address;
         },
         isTestnet() {
             return this.network === '9'
@@ -938,7 +935,7 @@ export default {
                 // console.log('wallet.franklinState', wallet.franklinState);
                 // console.log('wallet.ethState', wallet.ethState);
 
-                onchain.address = wallet.ethWallet.address;
+                onchain.address = wallet.ethAddress;
                 onchain.allTokensInfo = wallet.getCommittedOnchainState().onchainState;
                 onchain.allTokensInfo = onchain.allTokensInfo.map(token => {
                     token.tokenName = token.token.symbol 
