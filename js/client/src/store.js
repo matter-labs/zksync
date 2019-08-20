@@ -14,14 +14,19 @@ const store = {
             balanceDict: {}
         },
         allTokensList: [],
-        allTokensInfo: []
+        allTokensInfo: [{}],
+        allTokensDict: {
+            'ETH': {}
+        }
     },
     contract: {
         committed: {
-            lockedUnlockedBalances: {}
+            lockedUnlockedBalances: {},
+            balanceDict: {}
         }, 
         pending: {
-            lockedUnlockedBalances: {}
+            lockedUnlockedBalances: {},
+            balanceDict: {}
         }
     },
     plasma: {
@@ -42,7 +47,10 @@ const store = {
             nonce:   0
         },
         allTokensList: [],
-        allTokensInfo: []
+        allTokensInfo: [],
+        allTokensDict: {
+            'ETH': {}
+        }
     },
     account: {
         // ethereum part
