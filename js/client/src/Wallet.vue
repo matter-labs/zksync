@@ -291,38 +291,47 @@ export default {
     methods: {
         async depositOnchain() {
             this.$refs.depositOnchainModal.hide()
-            let amount = ethers.utils.bigNumberify(this.depositAmount);
+            let amount;
             if (this.selectedToken.id == 0) {
               amount = ethers.utils.parseEther(this.depositAmount);
+            } else {
+                amount = ethers.utils.bigNumberify(this.depositAmount);
             }
             let tx_hash = await wallet.depositOnchain(this.selectedToken, amount);
             this.alert('Onchain deposit initiated, tx: ' + tx_hash, 'success')
         },
         async depositOffchain() {
             this.$refs.depositOffchainModal.hide()
-            let amount = ethers.utils.bigNumberify(this.depositAmount);
+            let amount;
             if (this.selectedToken.id == 0) {
                 amount = ethers.utils.parseEther(this.depositAmount);
+            } else {
+                amount = ethers.utils.bigNumberify(this.depositAmount);
             }
             let tx_hash = await wallet.depositOffchain(this.selectedToken, amount, 0);
-            this.alert('Offchain deposit initiated, tx: ' + tx_hash, 'success')
+            this.alert('Offchain deposit initiated, tx: ' + tx_has.hash, 'success')
         },
         async withdrawOnchain() {
             this.$refs.withdrawOnchainModal.hide()
-            let amount = ethers.utils.bigNumberify(this.withdrawAmount);
+            let amount;
             if (this.selectedToken.id == 0) {
                 amount = ethers.utils.parseEther(this.withdrawAmount);
+            } else {
+                amount = ethers.utils.bigNumberify(this.withdrawAmount);
             }
             let tx_hash = await wallet.widthdrawOnchain(this.selectedToken, amount);
             this.alert('Onchain withdraw initiated, tx: ' + tx_hash, 'success')
         },
         async withdrawOffchain() {
             this.$refs.withdrawOffchainModal.hide()
+            let amount;
             if (this.selectedToken.id == 0) {
                 amount = ethers.utils.parseEther(this.withdrawAmount);
+            } else {
+                amount = ethers.utils.bigNumberify(this.withdrawAmount);
             }
-            let tx_hash = await wallet.widthdrawOffchain(this.selectedToken, amount, 0);
-            this.alert('Offchain deposit initiated, tx: ' + tx_hash, 'success')
+            let tx= await wallet.widthdrawOffchain(this.selectedToken, amount, 0);
+            this.alert('Offchain deposit initiated, tx: ' + tx.hash, 'success')
         },
         alert(msg, alertType) {
             this.result = msg
@@ -332,7 +341,14 @@ export default {
         async transfer() {
             let wallet = window.wallet;
 
-            await wallet.transfer(this.transferTo, this.selectedToken, this.transferAmount, 0);
+            let amount;
+            if (this.selectedToken.id == 0) {
+                amount = ethers.utils.parseEther(this.transferAmount);
+            } else {
+                amount = ethers.utils.bigNumberify(this.transferAmount);
+            }
+
+            await wallet.transfer(this.transferTo, this.selectedToken, amount, 0);
         },
         async updateAccountInfo() {
 
