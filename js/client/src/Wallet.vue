@@ -164,16 +164,12 @@
         </b-row>
     </b-container>
 
-    <b-modal ref="depositModal" id="depositModal" title="Deposit" hide-footer>
+    <b-modal ref="depositModal" id="depositModal" title="Deposit onchain" hide-footer>
         <label for="depositAmountInput">Amount</label> 
-            (max ETH <a href="#" @click="depositAmount=store.account.balance">0</a>):
-        <b-form-input id="depositAmountInput" type="number" placeholder="7.50" v-model="depositAmount"></b-form-input>
+        <b-form-input id="depositAmountInput" type="number" placeholder="10" v-model="depositAmount"></b-form-input>
         <div id="doDepositBtn" class="mt-4 float-right">
-            <b-btn variant="primary" @click="deposit" :disabled="!!false">Deposit</b-btn>
+            <b-btn variant="primary" @click="depositOnchain" >Deposit</b-btn>
         </div>
-        <b-tooltip target="doDepositBtn" :disabled="!false" triggers="hover">
-            Deposit not possible: {{ doDepositProblem }}
-        </b-tooltip>
     </b-modal>
 
     <b-modal ref="withdrawModal" id="withdrawModal" title="Withdrawal" hide-footer>
@@ -230,7 +226,8 @@ export default {
         transferTo:         '',
         transferAmount:     '10',
         transferPending:    false,
-        depositAmount:      null,
+        depositType: 'onchain',
+        depositAmount:      '1',
         withdrawAmount:     null,
 
         updateTimer:        0,
@@ -292,6 +289,11 @@ export default {
             let wallet = window.wallet;
             await wallet.updateState();
             let tx_hash = await wallet.depositOnchain(wallet.supportedTokens[0], ethers.utils.parseEther("1.0"))
+            this.alert('Onchain deposit initiated, tx: ' + tx_hash, 'success')
+        },
+        async depositOnchain() {
+            this.$refs.depositModal.hide()
+            let tx_hash = await wallet.depositOnchain(wallet.supportedTokens[0], ethers.utils.bigNumberify(this.depositAmount));
             this.alert('Onchain deposit initiated, tx: ' + tx_hash, 'success')
         },
         async withdrawSome() {
@@ -499,6 +501,7 @@ export default {
                 newData.franklinAddress = wallet.address;
                 newData.ethBalances = []
                 newData.contractBalances = []
+                newData.supportedTokens = []
                 plasmaData.committedBalances = []
                 plasmaData.verifiedBalances = []
                 let commitedBalances = wallet.franklinState.commited.balances;
@@ -517,12 +520,14 @@ export default {
                     }
                     plasmaData.committedBalances.push({name: tokenName, balance: commitedBalance });
                     plasmaData.verifiedBalances.push({name: tokenName, balance: verifidBalance });
+                    newData.supportedTokens.push({name: tokenName, token: token});
                 }
             } catch (err) {
                 this.alert('Status update failed: ' + err)
                 console.log(err)
             }
             if(timer === this.updateTimer) { // if this handler is still valid
+                store.supportedTokens = newData.supportedTokens;
                 store.account.address = newData.address
                 store.account.franklinAddress = newData.franklinAddress
                 store.account.ethBalances = newData.ethBalances;

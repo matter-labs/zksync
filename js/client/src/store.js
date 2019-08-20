@@ -1,6 +1,7 @@
 const store = {
     config:          null,
     contractAddress: null,
+    supportedTokens: null,
     account: {
         // ethereum part
         address:    null,
