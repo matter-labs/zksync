@@ -7,7 +7,7 @@
         <b-collapse id="nav-collapse" is-nav>
         <b-navbar-nav>
             <b-nav-item href="/client/" target="_blanc">MatterMask</b-nav-item>
-            <b-nav-item v-bind:href="`${etherscan}/address/0x${store.config.CONTRACT_ADDR}`" target="_blanc">
+            <b-nav-item v-bind:href="`${blockchain_explorer_address}/${store.config.CONTRACT_ADDR}`" target="_blanc">
                 Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
             </b-nav-item>
         </b-navbar-nav>
