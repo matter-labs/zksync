@@ -41,10 +41,11 @@ export default {
                     account = ethereum.selectedAddress
                 }
                 console.log('Logging in with', account)
-                let provider = new ethers.providers.Web3Provider(web3.currentProvider);
-                window.signer = provider.getSigner();
-                // let provider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
-                // window.signer = ethers.Wallet.fromMnemonic("fine music test violin matrix prize squirrel panther purchase material script deal").connect(provider);
+                // let provider = new ethers.providers.Web3Provider(web3.currentProvider);
+                // window.signer = provider.getSigner();
+
+                let provider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
+                window.signer = ethers.Wallet.fromMnemonic("fine music test violin matrix prize squirrel panther purchase material script deal").connect(provider);
                 console.log("Wallet: ", Wallet);
                 window.wallet = await Wallet.Wallet.fromEthWallet(signer);
                 console.log("Your new Franklin address: ", window.wallet.address);

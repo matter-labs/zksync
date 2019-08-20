@@ -61,10 +61,10 @@
                         <b-row class="mt-2">
                             <b-col>Balances:
                                 <b-row v-for="token in store.onchain.allTokensInfo" class="amount_show" v-bind:key="token.elemId" v-bind:id="token.elemId">
-                                    <span v-bind:style="{color: token.color}">
-                                        <span>{{token.shortBalanceString}}</span>
+                                    <div class='balance_shower' v-bind:style="{color: token.color}">
+                                        <span v-bind:title="'address ' + token.token.address">{{token.tokenName}}</span>{{token.balance}}
                                         <b-tooltip v-bind:target="token.elemId">{{token.onchainLongBalanceInfo}}</b-tooltip>
-                                    </span>
+                                    </div>
                                 </b-row>
                             </b-col>
                         </b-row>
@@ -106,10 +106,10 @@
                         <b-row class="mt-2">
                             <b-col>Balances:
                                 <b-row v-for="token in store.contract.allTokensInfo" class="amount_show" v-bind:key="token.elemId" v-bind:id="token.elemId">
-                                    <span v-bind:style="{color: token.color}">
-                                        <span>{{token.shortBalanceString}}</span>
-                                        <b-tooltip v-bind:target="token.elemId">{{token.shortBalanceString}}</b-tooltip>
-                                    </span>
+                                    <div class='balance_shower' v-bind:style="{color: token.color}">
+                                        <span v-bind:title="'address ' + token.token.address">{{token.tokenName}}</span>{{token.balance}}
+                                        <b-tooltip v-bind:target="token.elemId">{{token.longBalanceString}}</b-tooltip>
+                                    </div>
                                 </b-row>
                             </b-col>
                         </b-row>
@@ -154,10 +154,10 @@
                         <b-row class="mt-2">
                             <b-col>Balances:
                                 <b-row v-for="token in store.plasma.allTokensInfo" class="amount_show" v-bind:key="token.elemId" v-bind:id="token.elemId">
-                                    <span v-bind:style="{color: token.color}">
-                                        <span>{{token.shortBalanceString}}</span>
-                                        <b-tooltip v-bind:target="token.elemId">{{token.shortBalanceString}}</b-tooltip>
-                                    </span>
+                                    <div class='balance_shower' v-bind:style="{color: token.color}">
+                                        <span v-bind:title="'address ' + token.token.address">{{token.tokenName}}</span>{{token.balance}}
+                                        <b-tooltip v-bind:target="token.elemId">{{token.longBalanceString}}</b-tooltip>
+                                    </div>
                                 </b-row>
                             </b-col>
                         </b-row>
@@ -187,7 +187,7 @@
                     </p>
                     <label for="transferToken" class="mt-4">Token</label>
                     <b-form-select v-model="tokenToTransferFranklin" :option="store.plasma.allTokensList" class="mb-3">
-                        <option v-for="token in store.plasma.allTokensInfo" v-bind:key="token.elemId" @click="tokenToTransferFranklin=token.tokenName">{{ token.tokenName   }}</option>
+                        <option v-for="token in store.plasma.allTokensInfo" v-bind:key="token.elemId" @click="tokenToTransferFranklin=token.tokenName">{{ token.tokenName }}</option>
                     </b-form-select>
                     <label for="transferAmountInput" class="mt-4">Amount</label>
                             <!-- (max {{tokenToTransferFranklin}}&nbsp;<a href="#" @click="transferAmount=store.plasma.committed.balanceDict[tokenToTransferFranklin]">{{store.plasma.committed.balanceDict[tokenToTransferFranklin]}}</a>): -->
@@ -226,26 +226,25 @@
 ##     ## ##       ##        ##     ## ##    ##  ##     ##    
 ########  ######## ##         #######   ######  ####    ##    
  -->
-    <b-modal ref="onchainDepositModal" id="onchainDepositModal" title="Onchain deposit" hide-footer>
-        <b-form-select v-model="tokenForDeposit.tokenName" class="mb-3">
-            <option v-for="token in store.onchain.allTokensInfo" v-bind:key="token.elemId" @click="tokenForDeposit.amount=token.balance">{{ token.tokenName }}</option>
+    <b-modal ref="onchainDepositModal" id="onchainDepositModal" title="onchain deposit" hide-footer>
+        <b-form-select v-model="tokenForDepositOnchain.tokenName" class="mb-3">
+            <option v-for="token in store.contract.allTokensInfo" v-bind:key="token.elemId" @click="tokenForDepositOnchain.amount=token.balance">{{ token.tokenName }}</option>
         </b-form-select>
         <label for="depositAmountInput">Amount</label> 
-            (max <span>{{ tokenForDeposit.tokenName }}</span> <a href="#">{{ tokenForDeposit.amount }}</a>:
+            (max <span>{{ tokenForDepositOnchain.tokenName }}</span> <a href="#" @click="depositAmount=store.onchain.allTokensDict[tokenForDepositOnchain.tokenName].balance">{{ store.onchain.allTokensDict[tokenForDepositOnchain.tokenName].balance }}</a>:
         <b-form-input id="depositAmountInput" type="number" placeholder="7.50" v-model="depositAmount"></b-form-input>
+        <label for="depositFeeInput">Fee</label> 
+        <b-form-input id="depositFeeInput" type="number" placeholder="2" v-model="depositFee"></b-form-input>
         <div id="doDepositBtn" class="mt-4 float-right">
             <b-btn variant="primary" @click="onchainDeposit" >Deposit</b-btn>
         </div>
-        <b-tooltip target="doDepositBtn" :disabled="!doDepositProblem" triggers="hover">
-            Deposit not possible: {{ doDepositProblem }}
-        </b-tooltip>
     </b-modal>
     <b-modal ref="offchainDepositModal" id="offchainDepositModal" title="offchain deposit" hide-footer>
-        <b-form-select v-model="tokenForDeposit.tokenName" class="mb-3">
-            <option v-for="token in store.contract.allTokensInfo" v-bind:key="token.elemId" @click="tokenForDeposit.amount=token.balance">{{ token.tokenName }}</option>
+        <b-form-select v-model="tokenForDepositOffchain.tokenName" class="mb-3">
+            <option v-for="token in store.contract.allTokensInfo" v-bind:key="token.elemId" @click="tokenForDepositOffchain.amount=token.balance">{{ token.tokenName }}</option>
         </b-form-select>
         <label for="depositAmountInput">Amount</label> 
-            (max <span>{{ tokenForDeposit.tokenName }}</span> <a href="#">{{ tokenForDeposit.amount }}</a>:
+            (max <span>{{ tokenForDepositOffchain.tokenName }}</span> <a href="#" @click="depositAmount=store.contract.allTokensDict[tokenForDepositOffchain.tokenName].balance">{{ store.contract.allTokensDict[tokenForDepositOffchain.tokenName].balance }}</a>:
         <b-form-input id="depositAmountInput" type="number" placeholder="7.50" v-model="depositAmount"></b-form-input>
         <label for="depositFeeInput">Fee</label> 
         <b-form-input id="depositFeeInput" type="number" placeholder="2" v-model="depositFee"></b-form-input>
@@ -253,20 +252,6 @@
             <b-btn variant="primary" @click="offchainDeposit" >Deposit</b-btn>
         </div>
     </b-modal>
-    <!-- <b-modal ref="depositModal" id="depositModal" title="Offchain deposit" hide-footer>
-        <b-form-select v-model="tokenForDeposit.name" class="mb-3">
-            <option v-for="token in store.contract.allTokensInfo" v-bind:key="token.elemId" @click="tokenForDeposit.amount=token.balance">{{ token.tokenName }}</option>
-        </b-form-select>
-        <label for="depositAmountInput">Amount</label> 
-            (max <span>{{ tokenForDeposit.tokenName }}</span> <a href="#" @click="tokenForDeposit.amount=store.contract.committed.balanceDict[tokenForDeposit]">{{store.contract.committed.balanceDict[tokenForDeposit]}}</a>):
-        <b-form-input id="depositAmountInput" type="number" placeholder="7.50" v-model="depositAmount"></b-form-input>
-        <div id="doDepositBtn" class="mt-4 float-right">
-            <b-btn variant="primary" @click="offchainDeposit" :disabled="!!doDepositProblem">Deposit</b-btn>
-        </div>
-        <b-tooltip target="doDepositBtn" :disabled="!doDepositProblem" triggers="hover">
-            Deposit not possible: {{ doDepositProblem }}
-        </b-tooltip>
-    </b-modal> -->
 <!-- 
 ##      ## #### ######## ##     ## ########  ########     ###    ##      ## 
 ##  ##  ##  ##     ##    ##     ## ##     ## ##     ##   ## ##   ##  ##  ## 
@@ -279,7 +264,7 @@
     <b-modal ref="onchainWithdrawModal" id="onchainWithdrawModal" title="Onchains withdrawal" hide-footer>
         <b-tabs pills card>
             <b-form-select v-model="tokenForWithdrawal" :option="store.coins" class="mb-3">
-                <option v-for="token in store.contract.allTokensInfo    " v-bind:key="token.elemId" @click="tokenForWithdrawal=token.tokenName">{{ token.tokenName }}</option>
+                <option v-for="token in store.contract.allTokensInfo" v-bind:key="token.elemId" @click="tokenForWithdrawal=token.tokenName">{{ token.tokenName }}</option>
             </b-form-select>
 
             <b-tab title="Partial withdrawal" active>
@@ -372,7 +357,8 @@ export default {
 
         nonce:              0,
         tokenToTransferFranklin: 'ETH',
-        tokenForDeposit:    { tokenName: '', balance: '', amount: '' },
+        tokenForDepositOnchain:    { tokenName: '', balance: '', amount: '' },
+        tokenForDepositOffchain:    { tokenName: '', balance: '', amount: '' },
         tokenForWithdrawal: {},
         transferFee:        0,
         depositFee:         0,
@@ -560,13 +546,13 @@ export default {
             try {
                 this.alert('starting deposit offchain');
             
-                let token = store.contract.allTokensDict[this.tokenForDeposit.tokenName].token;
+                let token = store.contract.allTokensDict[this.tokenForDepositOffchain.tokenName].token;
                 console.log('token for deposit: ', token);
 
                 let amount = new BN(this.depositAmount);
                 console.log('amount for deposit', amount);
 
-                this.alert('starting deposit offchain');
+                this.alert('Deposit from locked contract balance');
                 let fee = new BN(this.depositFee);
                 console.log(amount)
                 let res = await wallet.depositOffchain(token, amount, fee);
@@ -587,20 +573,18 @@ export default {
         },
         async onchainDeposit() {
             this.$refs.onchainDepositModal.hide();
-
-            this.alert('starting onchainDeposit');
             
-            let token = store.onchain.allTokensDict[this.tokenForDeposit.tokenName].token;
+            let token = store.onchain.allTokensDict[this.tokenForDepositOnchain.tokenName].token;
 
             console.log('token for deposit: ', token);
 
             let amount = ethers.utils.bigNumberify(this.depositAmount);
             console.log('amount for deposit', amount);
 
-            this.alert('starting deposit onchain');
-            await wallet.depositOnchain(token, amount);
+            this.alert('Deposit from mainchain');
+            let res = await wallet.depositOnchain(token, amount);
 
-            this.alert('awaited deposit onchain');
+            this.alert('success, tx hash: ' + res);
         },
         async offchainWithdrawSome() {
             try {
@@ -720,7 +704,11 @@ export default {
 
             let res = await wallet.transfer(to, token, amount, fee);
 
-            this.alert('transfer: ' + JSON.stringify(res));
+            if (res.err) {
+                this.alert('transfer error: ' + res.err);
+            } else {
+                this.alert('tx sent, ' + res.hash);
+            }
 
             // const privateKey = store.account.plasma.key.privateKey
             // const nonce = this.nonce //store.account.plasma.nonce;
@@ -872,28 +860,6 @@ export default {
             let pendingBalance = Eth.fromWei(finalBalance.mul(multiplier), 'ether')
             return {blocks: entries, pendingBalance}
         },
-        async generateFranklinAddressss() {
-            // let accounts = await eth.accounts()
-            // console.log('Accounts: ', accounts);
-            // let account = accounts[0]
-            // this.acc = account
-            // if (!account) {
-            //     await ethereum.enable()
-            //     account = ethereum.selectedAddress
-            // }
-            // console.log('Logging in with', account)
-            // let sig = await eth.personal_sign(ethUtil.fromUtf8(new Buffer('Login Franklin v0.1')), account)
-            // store.account.address = account
-
-            // let hash = keccak256(sig)
-            // console.log('sig', sig)
-            // console.log('hash', hash)
-
-            // store.account.plasma.key = newKey(sig)
-            // console.log(store.account.plasma.key)
-
-            // this.$parent.$router.push('/wallet')
-        },
         async updateAccountInfo() {
             const zeroDecorator = store => k => store[k] !== undefined ? store[k] : 0;
 
@@ -938,8 +904,7 @@ export default {
                 onchain.address = wallet.ethAddress;
                 onchain.allTokensInfo = wallet.getCommittedOnchainState().onchainState;
                 onchain.allTokensInfo = onchain.allTokensInfo.map(token => {
-                    token.tokenName = token.token.symbol 
-                        || 'erc20' + token.token.address;
+                    token.tokenName = token.token.symbol || 'erc20';
                     token.elemId = `onchain_balance__${token.tokenName}`;
                     token.shortBalanceString = `${token.tokenName}: ${token.balance}`;
                     return token;
@@ -949,10 +914,10 @@ export default {
 
                 contract.allTokensInfo = wallet.getContractTokenInfo();
                 contract.allTokensInfo = contract.allTokensInfo.map(token => {
-                    token.tokenName = token.token.symbol 
-                        || 'erc20' + token.token.address;
+                    token.tokenName = token.token.symbol || 'erc20';
                     token.elemId = `contract_balance__${token.tokenName}`;
                     token.shortBalanceString = `${token.tokenName}: ${token.balance}, ${token.lockedBlocksLeft} left`;
+                    token.longBalanceString = token.shortBalanceString;
                     return token;
                 });
                 contract.allTokensDict = {};
@@ -960,14 +925,14 @@ export default {
                     contract.allTokensDict[info.tokenName] = info;
                 });
 
-
                 plasma.address = wallet.address;
                 plasma.allTokensInfo = wallet.getFranklinTokensInfo(); 
                 plasma.allTokensInfo = plasma.allTokensInfo.map(token => {
-                    token.tokenName = token.token.symbol 
-                        || 'erc20' + token.token.address;
+                    token.tokenName = token.token.symbol || 'erc20';
+                    token.balance = token.committedBalance;
                     token.elemId = `plasma_balance__${token.tokenName}`;
                     token.shortBalanceString = `${token.tokenName}: ${token.committedBalance}`;
+                    token.longBalanceString = token.shortBalanceString;
                     return token;
                 });
                 plasma.allTokensDict = {};
@@ -979,6 +944,16 @@ export default {
                 console.log(err)
             }
             if(timer === this.updateTimer) { // if this handler is still valid
+                if ( ! this.tokenForDepositOnchain.tokenName) 
+                    this.tokenForDepositOnchain.tokenName = onchain.allTokensInfo.length 
+                    ? onchain.allTokensInfo[0].tokenName : '';
+                if ( ! this.tokenForDepositOffchain.tokenName) 
+                    this.tokenForDepositOffchain.tokenName = contract.allTokensInfo.length 
+                    ? contract.allTokensInfo[0].tokenName : '';
+                if ( ! this.tokenToTransferFranklin)
+                    this.tokenToTransferFranklin = plasma.allTokensInfo.length
+                    ? plasma.allTokensInfo[0] : '';
+
                 store.onchain = onchain;
                 store.plasma = plasma;
                 store.contract = contract;
@@ -1029,6 +1004,21 @@ function uniqueElements(arrays) {
     overflow: auto;
     margin-left: 0;
     position: relative;
+}
+
+.balance_shower {
+    overflow: hidden;
+    line-height: 2;
+    height: 2em;
+    position: relative;
+}
+.balance_shower *:first-child {
+    background: #eee;
+    font-weight: 500;
+    border-radius: 0.2em;
+    padding: 0.2em;
+    margin-right: 0.3em;
+    min-width: 3em;
 }
 /* 
 .amount_show::after {
