@@ -77,7 +77,7 @@
                         <b-col sm class="mb-2">
                             <div id="depositOnchainBtn">
                                 <b-btn variant="outline-primary" class="w-100" 
-                                    v-b-modal.depositModal >&#x21E9; Deposit</b-btn>
+                                    v-b-modal.depositOnchainModal >&#x21E9; Deposit</b-btn>
                             </div>
 <!--                            <b-tooltip target="depositBtn" :disabled="!depositProblem" triggers="hover">-->
 <!--                                Deposit not possible: {{ depositProblem }}-->
@@ -112,7 +112,7 @@
                         <b-col sm class="mb-2">
                             <div id="depositOffchainBtn">
                                 <b-btn variant="outline-primary" class="w-100"
-                                       v-b-modal.depositModal >&#x21E9; Deposit</b-btn>
+                                       v-b-modal.depositOffchainModal >&#x21E9; Deposit</b-btn>
                             </div>
 <!--                            <b-tooltip target="depositBtn" :disabled="!depositProblem" triggers="hover">-->
 <!--                                Deposit not possible: {{ depositProblem }}-->
@@ -164,11 +164,19 @@
         </b-row>
     </b-container>
 
-    <b-modal ref="depositModal" id="depositModal" title="Deposit onchain" hide-footer>
+    <b-modal ref="depositOnchainModal" id="depositOnchainModal" title="Deposit onchain" hide-footer>
         <label for="depositAmountInput">Amount</label> 
         <b-form-input id="depositAmountInput" type="number" placeholder="10" v-model="depositAmount"></b-form-input>
         <div id="doDepositBtn" class="mt-4 float-right">
             <b-btn variant="primary" @click="depositOnchain" >Deposit</b-btn>
+        </div>
+    </b-modal>
+
+    <b-modal ref="depositOffchainModal" id="depositOffchainModal" title="Deposit offchain" hide-footer>
+        <label for="depositAmountInput">Amount</label>
+        <b-form-input id="depositAmountInput" type="number" placeholder="10" v-model="depositAmount"></b-form-input>
+        <div id="doDepositBtn" class="mt-4 float-right">
+            <b-btn variant="primary" @click="depositOffchain" >Deposit</b-btn>
         </div>
     </b-modal>
 
@@ -292,9 +300,16 @@ export default {
             this.alert('Onchain deposit initiated, tx: ' + tx_hash, 'success')
         },
         async depositOnchain() {
-            this.$refs.depositModal.hide()
-            let tx_hash = await wallet.depositOnchain(wallet.supportedTokens[0], ethers.utils.bigNumberify(this.depositAmount));
+            this.$refs.depositOnchainModal.hide()
+            let amount = ethers.utils.bigNumberify(this.depositAmount);
+            let tx_hash = await wallet.depositOnchain(wallet.supportedTokens[0], amount);
             this.alert('Onchain deposit initiated, tx: ' + tx_hash, 'success')
+        },
+        async depositOffchain() {
+            this.$refs.depositOffchainModal.hide()
+            let amount = ethers.utils.bigNumberify(this.depositAmount);
+            let tx_hash = await wallet.depositOffchain(wallet.supportedTokens[0], amount, 0);
+            this.alert('Offchain deposit initiated, tx: ' + tx_hash, 'success')
         },
         async withdrawSome() {
             try {
