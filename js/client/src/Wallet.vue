@@ -34,6 +34,8 @@
         <b-row>
             <b-col sm="6" order="2" class="col-xl-8 col-lg-7 col-md-6 col-sm-12">
                 <b-card title="Transfer in Matter Network" class="mb-4 d-flex">
+
+
                     <label for="transferToInput">To (recepient ETH address): </label>
                     <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0x149e5ba19e2db1dbd58b54c088666c5a2f5b7fc4b8cf5c59614728" autocomplete="off"></b-form-input>
                     <p class="mt-2" style="color: grey">
@@ -133,7 +135,9 @@
                         <p class="mb-2"><strong>Matter Network</strong>
                             (<a href="/explorer/" target="_blank">block explorer</a>)</p>
 
-<!--                        <img src="./assets/loading.gif" width="100em" v-if="store.account.plasma.id === null">-->
+                        <label for="addr">Address</label>
+                        <b-form-input id="addr" v-model="store.account.franklinAddress" type="text" readonly bg-variant="light" class="mr-2"></b-form-input>
+                        <!--                        <img src="./assets/loading.gif" width="100em" v-if="store.account.plasma.id === null">-->
 <!--                        <div v-if="store.account.plasma.id === 0">-->
 <!--                            <p>No account yet.</p>-->
 <!--                        </div>-->
@@ -309,7 +313,7 @@ export default {
                 amount = ethers.utils.bigNumberify(this.depositAmount);
             }
             let tx_hash = await wallet.depositOffchain(this.selectedToken, amount, 0);
-            this.alert('Offchain deposit initiated, tx: ' + tx_has.hash, 'success')
+            this.alert('Offchain deposit initiated, tx: ' + tx_hash.hash, 'success')
         },
         async withdrawOnchain() {
             this.$refs.withdrawOnchainModal.hide()
@@ -380,7 +384,7 @@ export default {
                             return balance.toString()
                         }
                     }
-                    let tokenName = token.symbol || `ERC20:${token.id}`;
+                    let tokenName = token.symbol || 'FNT';
                     newData.ethBalances.push({name: tokenName, balance: balanceToString(wallet.ethState.onchainBalances[token.id], isEther) })
                     newData.contractBalances.push({name: tokenName, balance: balanceToString(wallet.ethState.contractBalances[token.id], isEther) })
                     let commitedBalance = 0;
