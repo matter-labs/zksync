@@ -86,7 +86,7 @@
                         <b-col sm class="mb-2">
                             <div id="withdrawOnchainBtn">
                                 <b-btn variant="outline-primary" class="w-100" 
-                                    v-b-modal.withdrawModal >Withdraw &#x21E7;</b-btn>
+                                    v-b-modal.withdrawOnchainModal >Withdraw &#x21E7;</b-btn>
                             </div>
 <!--                            <b-tooltip target="withdrawBtn" :disabled="!withdrawProblem" triggers="hover">-->
 <!--                                Withdrawal not possible: {{ withdrawProblem }}-->
@@ -121,7 +121,7 @@
                         <b-col sm class="mb-2">
                             <div id="withdrawOffchainBtn">
                                 <b-btn variant="outline-primary" class="w-100"
-                                       v-b-modal.withdrawModal >Withdraw &#x21E7;</b-btn>
+                                       v-b-modal.withdrawOffchainModal >Withdraw &#x21E7;</b-btn>
                             </div>
 <!--                            <b-tooltip target="withdrawBtn" :disabled="!withdrawProblem" triggers="hover">-->
 <!--                                Withdrawal not possible: {{ withdrawProblem }}-->
@@ -180,32 +180,22 @@
         </div>
     </b-modal>
 
-    <b-modal ref="withdrawModal" id="withdrawModal" title="Withdrawal" hide-footer>
-        <b-tabs pills card>
-            <!--<b-tab title="Partial withdrawal" active>
-                <label for="withdrawAmountInput" class="mt-4">Amount</label>
-                    (max ETH <a href="#" @click="withdrawAmount=store.account.plasma.verified.balance">{{store.account.plasma.verified.balance}}</a>):
-                <b-form-input id="withdrawAmountInput" type="number" placeholder="7.50" v-model="withdrawAmount"></b-form-input>
-                <label for="transferNonceInput" class="mt-4">Nonce:</label>
-                <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
-                <div id="doWithdrawBtn" class="mt-4 float-right">
-                    <b-btn variant="primary"  :disabled="!!doWithdrawProblem" @click="withdrawSome">Withdraw</b-btn>
-                </div>
-                <b-tooltip target="doWithdrawBtn" :disabled="!doWithdrawProblem" triggers="hover">
-                    Withdraw not possible: {{ doWithdrawProblem }}
-                </b-tooltip>
-            </b-tab>-->
-            <!--<b-tab title="Full exit" class="mb-4">-->
-                <p>This will close your account and withdraw all money from it.</p>
-                <div id="doExitBtn" class="mt-4 float-right">
-                    <b-btn variant="danger" @click="withdrawAll">Close & withdraw</b-btn>
-                </div>
-                <b-tooltip target="doExitBtn" triggers="hover">
-                    Withdraw not possible
-                </b-tooltip>
-            <!--</b-tab>-->
-        </b-tabs>
+    <b-modal ref="withdrawOnchainModal" id="withdrawOnchainModal" title="Withdraw onchain" hide-footer>
+        <label for="withdrawAmountInput">Amount</label>
+        <b-form-input id="withdrawAmountInput" type="number" placeholder="10" v-model="withdrawAmount"></b-form-input>
+        <div id="doWithdrawOnchainBtn" class="mt-4 float-right">
+            <b-btn variant="primary" @click="withdrawOnchain" >Withdraw</b-btn>
+        </div>
     </b-modal>
+
+    <b-modal ref="withdrawOffchainModal" id="withdrawOffchainModal" title="Withdraw offchain" hide-footer>
+        <label for="withdrawAmountInput">Amount</label>
+        <b-form-input id="withdrawAmountInput" type="number" placeholder="10" v-model="withdrawAmount"></b-form-input>
+        <div id="doWithdrawOffchainBtn" class="mt-4 float-right">
+            <b-btn variant="primary" @click="withdrawOffchain" >Withdraw</b-btn>
+        </div>
+    </b-modal>
+
 </div>
 </template>
 
@@ -309,6 +299,18 @@ export default {
             this.$refs.depositOffchainModal.hide()
             let amount = ethers.utils.bigNumberify(this.depositAmount);
             let tx_hash = await wallet.depositOffchain(wallet.supportedTokens[0], amount, 0);
+            this.alert('Offchain deposit initiated, tx: ' + tx_hash, 'success')
+        },
+        async withdrawOnchain() {
+            this.$refs.withdrawOnchainModal.hide()
+            let amount = ethers.utils.bigNumberify(this.withdrawAmount);
+            let tx_hash = await wallet.widthdrawOnchain(wallet.supportedTokens[0], amount);
+            this.alert('Onchain withdraw initiated, tx: ' + tx_hash, 'success')
+        },
+        async withdrawOffchain() {
+            this.$refs.withdrawOffchainModal.hide()
+            let amount = ethers.utils.bigNumberify(this.withdrawAmount);
+            let tx_hash = await wallet.widthdrawOffchain(wallet.supportedTokens[0], amount, 0);
             this.alert('Offchain deposit initiated, tx: ' + tx_hash, 'success')
         },
         async withdrawSome() {
