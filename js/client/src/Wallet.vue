@@ -292,24 +292,35 @@ export default {
         async depositOnchain() {
             this.$refs.depositOnchainModal.hide()
             let amount = ethers.utils.bigNumberify(this.depositAmount);
+            if (this.selectedToken.id == 0) {
+              amount = ethers.utils.parseEther(this.depositAmount);
+            }
             let tx_hash = await wallet.depositOnchain(this.selectedToken, amount);
             this.alert('Onchain deposit initiated, tx: ' + tx_hash, 'success')
         },
         async depositOffchain() {
             this.$refs.depositOffchainModal.hide()
             let amount = ethers.utils.bigNumberify(this.depositAmount);
+            if (this.selectedToken.id == 0) {
+                amount = ethers.utils.parseEther(this.depositAmount);
+            }
             let tx_hash = await wallet.depositOffchain(this.selectedToken, amount, 0);
             this.alert('Offchain deposit initiated, tx: ' + tx_hash, 'success')
         },
         async withdrawOnchain() {
             this.$refs.withdrawOnchainModal.hide()
             let amount = ethers.utils.bigNumberify(this.withdrawAmount);
+            if (this.selectedToken.id == 0) {
+                amount = ethers.utils.parseEther(this.withdrawAmount);
+            }
             let tx_hash = await wallet.widthdrawOnchain(this.selectedToken, amount);
             this.alert('Onchain withdraw initiated, tx: ' + tx_hash, 'success')
         },
         async withdrawOffchain() {
             this.$refs.withdrawOffchainModal.hide()
-            let amount = ethers.utils.bigNumberify(this.withdrawAmount);
+            if (this.selectedToken.id == 0) {
+                amount = ethers.utils.parseEther(this.withdrawAmount);
+            }
             let tx_hash = await wallet.widthdrawOffchain(this.selectedToken, amount, 0);
             this.alert('Offchain deposit initiated, tx: ' + tx_hash, 'success')
         },
@@ -322,162 +333,6 @@ export default {
             let wallet = window.wallet;
 
             await wallet.transfer(this.transferTo, this.selectedToken, this.transferAmount, 0);
-        },
-        async plasmaTransfer(to, amount) {
-            console.log('initiating transfer to', to, amount)
-
-            const from = store.account.plasma.id
-
-            amount = Eth.toWei(amount, 'ether').div(new BN('1000000000000')).toNumber();
-
-            const privateKey = store.account.plasma.key.privateKey
-            const nonce = this.nonce //store.account.plasma.nonce;
-            const good_until_block = 10000;
-            const fee = 0;
-
-            console.log(from, to, amount, fee, nonce, good_until_block, privateKey)
-
-            const apiForm = transactionLib.createTransaction(from, to, amount, fee, nonce, good_until_block, privateKey);
-            const result = await axios({
-                method:     'post',
-                url:        this.baseUrl + '/submit_tx',
-                data:       apiForm
-            });
-            if(result.data.accepted) {
-                this.alert(`Transaction with nonce #${this.nonce} accepted`, 'success')
-                let new_nonce_result = await axios({
-                        method: 'get',
-                        url:    this.baseUrl + '/account/' + from,
-                    })
-                if(!new_nonce_result.error) {
-                    let new_nonce = new_nonce_result.data.pending_nonce
-                    this.nonce = new_nonce
-                } else {
-                    console.log('could not fetch data from server: ', new_nonce_result.error)
-                }
-            } else  {
-                this.alert(`Transaction rejected: ` + result.data.error)
-            }
-        },
-        parseStateResult(data) {
-            if (data.error !== undefined && data.error == "non-existent") {
-                data.closing = true
-            } else {
-                data.closing = false
-            }
-            const multiplier = new BN('1000000000000')
-            data.verified.balance = Eth.fromWei((new BN(data.verified.balance)).mul(multiplier), 'ether')
-            data.committed.balance = Eth.fromWei((new BN(data.committed.balance)).mul(multiplier), 'ether')
-            data.pending.balance = Eth.fromWei((new BN(data.pending.balance)).mul(multiplier), 'ether')
-            // TODO: remove when server updated
-            if (Number(data.pending_nonce) > Number(data.pending.nonce)) {
-                data.pending.nonce = data.pending_nonce
-            }
-            return data
-        },
-        async getPlasmaInfo(accountId) {
-            //console.log(`getAccountInfo ${accountId}`)
-            let result = (await axios({
-                method: 'get',
-                url:    this.baseUrl + '/account/' + accountId,
-            }))
-            if(result.status !== 200) {
-                throw `Could not load data for account ${accountId}: ${result.error}`
-            }
-            if(result.data.error === 'non-existing account') {
-                return { closing: true }
-            }
-            if(result.data.error) {
-                throw `Getting data for account ${accountId} failed: ${result.data.error}`
-            }
-            return this.parseStateResult(result.data)
-        },
-        async loadEvents(address, closing) {
-
-            // let id = await ethersContract.ethereumAddressToAccountID(address);
-            // if (id === 0) {
-            //     return {blocks: [], pendingBalance: Eth.fromWei(new BN(0), 'ether')}
-            // }
-            // let accountInfo = await ethersContract.accounts(id);
-   
-            // if (accountInfo.exitListHead.toNumber() === 0) {
-            //     return {blocks: [], pendingBalance: Eth.fromWei(new BN(0), 'ether')}
-            // }
-
-            // return {blocks: nonEmptyBlocks, pendingBalance}
-
-            // let partialsFilter = contractForLogs.filters.LogExit(address, null)
-
-            // let fullFilter = {
-            //     fromBlock: 1,
-            //     toBlock: 'latest',
-            //     address: partialsFilter.address,
-            //     topics: partialsFilter.topics
-            // }
-
-            // let events = await ethersProvider.getLogs(fullFilter)
-
-            // if(closing) {
-            //     let completeExitsFilter = contractForLogs.filters.LogCompleteExit(address, null)
-
-            //     fullFilter = {
-            //         fromBlock: 1,
-            //         toBlock: 'latest',
-            //         address: completeExitsFilter.address,
-            //         topics: completeExitsFilter.topics
-            //     }
-
-            //     let completeExitEvents = await ethersProvider.getLogs(fullFilter)
-
-            //     for (let i = 0; i < completeExitEvents; i++) {
-            //         events.push(completeExitEvents[i]);
-            //     }
-            // }
-
-            // const multiplier = new BN('1000000000000')
-            // let finalBalance = new BN(0)
-            // const nonEmptyBlocks = [];
-
-            // for (let i = 0; i < events.length; i++) {
-            //     let ev = events[i];
-            //     let blockNumber = ethers.utils.bigNumberify(ev.topics[2]);
-            //     let amount = (await contract.exitLeafs(address, blockNumber))[0];
-            //     if (!amount.eq(new BN(0))) {
-            //         let convertedBlockNumber = new BN(blockNumber.toString(10))
-            //         nonEmptyBlocks.push(convertedBlockNumber);
-            //         finalBalance = finalBalance.add(amount)
-            //     }
-            // }
-
-            const multiplier = new BN('1000000000000')
-            let finalBalance = new BN(0);
-
-            let id = (await contract.ethereumAddressToAccountID(address))[0].toNumber();
-            if (id === 0) {
-                return {blocks: 0, pendingBalance: Eth.fromWei(new BN(0), 'ether')}
-            }
-            let accountInfo = await contract.accounts(id);
-   
-            if (accountInfo.exitListHead.toNumber() === 0) {
-                // no entries
-                return {blocks: 0, pendingBalance: Eth.fromWei(new BN(0), 'ether')}
-            }
-
-            let head = accountInfo.exitListHead;
-            let entries = 0;
-            for (let i = 0; i < maxExitEntries; i ++) {
-                let entry = await contract.exitLeafs(address, head);
-                finalBalance = finalBalance.add(entry.amount);
-                entries = i + 1;
-                if (entry.nextID.toNumber() === 0) {
-                    break
-                } else {
-                    head = entry.nextID;
-                }
-            }
-
-            let pendingBalance = Eth.fromWei(finalBalance.mul(multiplier), 'ether')
-            return {blocks: entries, pendingBalance}
         },
         async updateAccountInfo() {
 
@@ -501,9 +356,17 @@ export default {
                 let verifiedBalances = wallet.franklinState.verified.balances;
 
                 for (let token of wallet.supportedTokens) {
+                    let isEther = (token.id == 0);
+                    function balanceToString(balance, isEther) {
+                        if (isEther) {
+                            return ethers.utils.formatEther(balance)
+                        } else {
+                            return balance.toString()
+                        }
+                    }
                     let tokenName = token.symbol || `ERC20:${token.id}`;
-                    newData.ethBalances.push({name: tokenName, balance: wallet.ethState.onchainBalances[token.id].toString() })
-                    newData.contractBalances.push({name: tokenName, balance: wallet.ethState.contractBalances[token.id].toString() })
+                    newData.ethBalances.push({name: tokenName, balance: balanceToString(wallet.ethState.onchainBalances[token.id], isEther) })
+                    newData.contractBalances.push({name: tokenName, balance: balanceToString(wallet.ethState.contractBalances[token.id], isEther) })
                     let commitedBalance = 0;
                     let verifidBalance = 0;
                     if (token.id in commitedBalances) {
@@ -512,8 +375,8 @@ export default {
                     if (token.id in verifiedBalances) {
                         verifidBalance = verifiedBalances[token.id]
                     }
-                    plasmaData.committedBalances.push({name: tokenName, balance: commitedBalance });
-                    plasmaData.verifiedBalances.push({name: tokenName, balance: verifidBalance });
+                    plasmaData.committedBalances.push({name: tokenName, balance: balanceToString(commitedBalance, isEther) });
+                    plasmaData.verifiedBalances.push({name: tokenName, balance: balanceToString(verifidBalance, isEther) });
                     newData.supportedTokens.push({name: tokenName, token: token});
                     tokenSelectorData.push({value: token, text: tokenName});
                 }
