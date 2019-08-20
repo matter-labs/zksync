@@ -25,6 +25,7 @@ class FranklinProvider {
     constructor(public providerAddress: string = 'http://127.0.0.1:3000') {}
 
     async submitTx(tx) {
+        console.log('submitting tx:', tx);
         return await Axios.post(this.providerAddress + '/api/v0.1/submit_tx', tx).then(reps => reps.data);
     }
 
@@ -172,8 +173,9 @@ export class Wallet {
 
         const currentBlock = await this.ethWallet.provider.getBlockNumber();
 
+        console.log('process.env.CONTRACT_ADDR', process.env.CONTRACT_ADDR);
         const franklinDeployedContract = new Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, this.ethWallet);
-        for(let token  of this.supportedTokens) {
+        for(let token of this.supportedTokens) {
             if (token.id == 0) {
                 onchainBalances[token.id] = await this.ethWallet.getBalance().then(b => b.toString())
             } else {
@@ -204,6 +206,77 @@ export class Wallet {
             await sleep(1000);
             await this.fetchFranklinState();
         }
+    }
+    getCommittedOnchainState() {
+        let res = [];
+        for (let i = 0; i < this.ethState.onchainBalances.length; i++) {
+            let balance = this.ethState.onchainBalances[i];
+            let token = this.supportedTokens[i];
+            res.push({
+                i, token, balance
+            });
+        }
+        return {
+            onchainState: res
+        };
+    }
+    getFranklinTokensInfo() {
+        let res = [];
+        let allTokens = Object.keys(this.franklinState.commited.balances);
+        for (let i = 0; i < allTokens.length; i++) {
+            let k = allTokens[i];
+            let token = this.supportedTokens[k];
+            let committedBalance = this.franklinState.commited.balances[k];
+            res.push({
+                token, 
+                committedBalance
+            });
+        }
+        return res;
+    }
+    getFranklinStateHelper(access) {
+        let res = [];
+        let balancesKeys = Object.keys(this.franklinState[access].balances)
+        for (let i = 0; i < balancesKeys.length; i++) {
+            let key = balancesKeys[i];
+            let balance = this.franklinState[access].balances[key];
+            let token = this.supportedTokens[key];
+            res.push({
+                token, balance
+            });
+        }
+    }
+    getVerifiedFranklinState() {
+        return this.getFranklinStateHelper('verified');
+    }
+    getCommittedFranklinState() {
+        return this.getFranklinStateHelper('committed');
+    }
+    getPendingFranklinState() {
+        // TODO: compute pending
+        return this.getFranklinStateHelper('committed');
+    }
+    getContractTokenInfo() {
+        return this.getCommittedContractBalances().contractBalances;
+    }
+    getCommittedContractBalances() {
+        let res = [];
+        for (let i = 0; i < this.ethState.contractBalances.length; i++) {
+            let token = this.supportedTokens[i];
+            let balance = this.ethState.contractBalances[i];
+            let lockedBlocksLeft = this.ethState.lockedBlocksLeft[i];
+            res.push({
+                token, 
+                balance,
+                lockedBlocksLeft
+            });
+        }
+        return {
+            contractBalances: res
+        };
+    }
+    getPendingContractBalances() {
+        return this.getCommittedContractBalances();
     }
 }
 
