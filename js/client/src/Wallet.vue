@@ -43,6 +43,7 @@
                     <label for="transferAmountInput" class="mt-4">Amount</label>
 <!--                            (max ETH <a href="#" @click="transferAmount=store.account.plasma.committed.balance">0</a>):-->
                     <b-form-input id="transferAmountInput" placeholder="10" type="number" v-model="transferAmount"></b-form-input>
+                    <b-form-select v-model="selectedToken" :options="tokens"></b-form-select>
 
                     <div id="transferBtn" class="right">
 <!--                        <img v-if="transferPending" style="margin-right: 1.5em" src="./assets/loading.gif" width="100em">-->
@@ -167,6 +168,7 @@
     <b-modal ref="depositOnchainModal" id="depositOnchainModal" title="Deposit onchain" hide-footer>
         <label for="depositAmountInput">Amount</label> 
         <b-form-input id="depositAmountInput" type="number" placeholder="10" v-model="depositAmount"></b-form-input>
+        <b-form-select v-model="selectedToken" :options="tokens"></b-form-select>
         <div id="doDepositBtn" class="mt-4 float-right">
             <b-btn variant="primary" @click="depositOnchain" >Deposit</b-btn>
         </div>
@@ -175,6 +177,7 @@
     <b-modal ref="depositOffchainModal" id="depositOffchainModal" title="Deposit offchain" hide-footer>
         <label for="depositAmountInput">Amount</label>
         <b-form-input id="depositAmountInput" type="number" placeholder="10" v-model="depositAmount"></b-form-input>
+        <b-form-select v-model="selectedToken" :options="tokens"></b-form-select>
         <div id="doDepositBtn" class="mt-4 float-right">
             <b-btn variant="primary" @click="depositOffchain" >Deposit</b-btn>
         </div>
@@ -183,6 +186,7 @@
     <b-modal ref="withdrawOnchainModal" id="withdrawOnchainModal" title="Withdraw onchain" hide-footer>
         <label for="withdrawAmountInput">Amount</label>
         <b-form-input id="withdrawAmountInput" type="number" placeholder="10" v-model="withdrawAmount"></b-form-input>
+        <b-form-select v-model="selectedToken" :options="tokens"></b-form-select>
         <div id="doWithdrawOnchainBtn" class="mt-4 float-right">
             <b-btn variant="primary" @click="withdrawOnchain" >Withdraw</b-btn>
         </div>
@@ -191,6 +195,7 @@
     <b-modal ref="withdrawOffchainModal" id="withdrawOffchainModal" title="Withdraw offchain" hide-footer>
         <label for="withdrawAmountInput">Amount</label>
         <b-form-input id="withdrawAmountInput" type="number" placeholder="10" v-model="withdrawAmount"></b-form-input>
+        <b-form-select v-model="selectedToken" :options="tokens"></b-form-select>
         <div id="doWithdrawOffchainBtn" class="mt-4 float-right">
             <b-btn variant="primary" @click="withdrawOffchain" >Withdraw</b-btn>
         </div>
@@ -227,6 +232,9 @@ export default {
         depositType: 'onchain',
         depositAmount:      '1',
         withdrawAmount:     null,
+
+        selectedToken: {id: 0, address: '', symbol: 'ETH'},
+        tokens: [{value: {id: 0, address: '', symbol: 'ETH'}, text: "ETH"}],
 
         updateTimer:        0,
         countdown:          0,
@@ -281,63 +289,29 @@ export default {
         pendingWithdraw: () => Number(store.account.onchain.balance) > 0,
     },
     methods: {
-        async deposit() {
-            this.$refs.depositModal.hide()
-            let value = Eth.toWei(this.depositAmount, 'ether')
-            let wallet = window.wallet;
-            await wallet.updateState();
-            let tx_hash = await wallet.depositOnchain(wallet.supportedTokens[0], ethers.utils.parseEther("1.0"))
-            this.alert('Onchain deposit initiated, tx: ' + tx_hash, 'success')
-        },
         async depositOnchain() {
             this.$refs.depositOnchainModal.hide()
             let amount = ethers.utils.bigNumberify(this.depositAmount);
-            let tx_hash = await wallet.depositOnchain(wallet.supportedTokens[0], amount);
+            let tx_hash = await wallet.depositOnchain(this.selectedToken, amount);
             this.alert('Onchain deposit initiated, tx: ' + tx_hash, 'success')
         },
         async depositOffchain() {
             this.$refs.depositOffchainModal.hide()
             let amount = ethers.utils.bigNumberify(this.depositAmount);
-            let tx_hash = await wallet.depositOffchain(wallet.supportedTokens[0], amount, 0);
+            let tx_hash = await wallet.depositOffchain(this.selectedToken, amount, 0);
             this.alert('Offchain deposit initiated, tx: ' + tx_hash, 'success')
         },
         async withdrawOnchain() {
             this.$refs.withdrawOnchainModal.hide()
             let amount = ethers.utils.bigNumberify(this.withdrawAmount);
-            let tx_hash = await wallet.widthdrawOnchain(wallet.supportedTokens[0], amount);
+            let tx_hash = await wallet.widthdrawOnchain(this.selectedToken, amount);
             this.alert('Onchain withdraw initiated, tx: ' + tx_hash, 'success')
         },
         async withdrawOffchain() {
             this.$refs.withdrawOffchainModal.hide()
             let amount = ethers.utils.bigNumberify(this.withdrawAmount);
-            let tx_hash = await wallet.widthdrawOffchain(wallet.supportedTokens[0], amount, 0);
+            let tx_hash = await wallet.widthdrawOffchain(this.selectedToken, amount, 0);
             this.alert('Offchain deposit initiated, tx: ' + tx_hash, 'success')
-        },
-        async withdrawSome() {
-            try {
-                this.transferPending = true
-                this.$refs.withdrawModal.hide()
-                await this.plasmaTransfer(0, this.withdrawAmount)
-            } finally {
-                this.transferPending = false
-            }
-        },
-        async withdrawAll() {
-            this.$refs.withdrawModal.hide()
-            let from = store.account.address
-            let hash = await contract.exit({ from })
-            this.alert('Full exit initiated, tx: ' + hash, 'success')
-        },
-        async completeWithdraw() {
-            try {
-                // for now - one by one
-                let from = store.account.address
-                let maxIterations = store.account.onchain.completeWithdrawArgs;
-                await contract.withdrawUserBalance(maxIterations, {from})
-                this.updateAccountInfo();
-            } catch(err) {
-                this.alert('Exit request failed: ' + err)
-            }
         },
         alert(msg, alertType) {
             this.result = msg
@@ -346,7 +320,8 @@ export default {
         },
         async transfer() {
             let wallet = window.wallet;
-            await wallet.transfer(this.transferTo, wallet.supportedTokens[0], this.transferAmount, 0);
+
+            await wallet.transfer(this.transferTo, this.selectedToken, this.transferAmount, 0);
         },
         async plasmaTransfer(to, amount) {
             console.log('initiating transfer to', to, amount)
@@ -510,6 +485,7 @@ export default {
             let timer = this.updateTimer
             let plasmaData = {}
             let onchain = {}
+            let tokenSelectorData = []
             try {
                 let wallet = window.wallet;
 
@@ -523,6 +499,7 @@ export default {
                 plasmaData.verifiedBalances = []
                 let commitedBalances = wallet.franklinState.commited.balances;
                 let verifiedBalances = wallet.franklinState.verified.balances;
+
                 for (let token of wallet.supportedTokens) {
                     let tokenName = token.symbol || `ERC20:${token.id}`;
                     newData.ethBalances.push({name: tokenName, balance: wallet.ethState.onchainBalances[token.id].toString() })
@@ -538,6 +515,7 @@ export default {
                     plasmaData.committedBalances.push({name: tokenName, balance: commitedBalance });
                     plasmaData.verifiedBalances.push({name: tokenName, balance: verifidBalance });
                     newData.supportedTokens.push({name: tokenName, token: token});
+                    tokenSelectorData.push({value: token, text: tokenName});
                 }
             } catch (err) {
                 this.alert('Status update failed: ' + err)
@@ -552,6 +530,7 @@ export default {
 
                 store.account.commitedPlasmaBalances = plasmaData.committedBalances
                 store.account.verifiedPlasmaBalances = plasmaData.verifiedBalances
+                this.tokens = tokenSelectorData
 
                 this.updateTimer = setTimeout(() => this.updateAccountInfo(), 1000)
             }
