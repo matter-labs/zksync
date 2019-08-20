@@ -41,23 +41,20 @@
                     </p>
 
                     <label for="transferAmountInput" class="mt-4">Amount</label>
-                            (max ETH <a href="#" @click="transferAmount=store.account.plasma.committed.balance">0</a>):
-                    <b-form-input id="transferAmountInput" placeholder="7.50" type="number" v-model="transferAmount"></b-form-input>
-
-                    <label for="transferNonceInput" class="mt-4">Nonce (autoincrementing):</label>
-                    <b-form-input id="transferNonceInput" placeholder="0" type="number" v-model="nonce"></b-form-input>
+<!--                            (max ETH <a href="#" @click="transferAmount=store.account.plasma.committed.balance">0</a>):-->
+                    <b-form-input id="transferAmountInput" placeholder="10" type="number" v-model="transferAmount"></b-form-input>
 
                     <div id="transferBtn" class="right">
-                        <img v-if="transferPending" style="margin-right: 1.5em" src="./assets/loading.gif" width="100em">
-                        <b-btn v-else class="mt-4" variant="outline-primary" @click="transfer" >Submit transaction</b-btn>
+<!--                        <img v-if="transferPending" style="margin-right: 1.5em" src="./assets/loading.gif" width="100em">-->
+                        <b-btn class="mt-4" variant="outline-primary" @click="transfer" >Submit transaction</b-btn>
                     </div>
 
-                    <p class="mt-2" style="color: grey">
-                        To commit a new block, either submit {{store.config.TX_BATCH_SIZE}} transactions, or wait 1 minute until timer triggers block generation.
-                    </p>
-                    <p class="mt-2" style="color: grey">
-                         Once a block is committed, it takes about 5 minutes to verify it.
-                    </p>
+<!--                    <p class="mt-2" style="color: grey">-->
+<!--                        To commit a new block, either submit {{store.config.TX_BATCH_SIZE}} transactions, or wait 1 minute until timer triggers block generation.-->
+<!--                    </p>-->
+<!--                    <p class="mt-2" style="color: grey">-->
+<!--                         Once a block is committed, it takes about 5 minutes to verify it.-->
+<!--                    </p>-->
 <!--                    <b-tooltip target="transferBtn" :disabled="transferPending" triggers="hover">-->
 <!--                        Transfer not possible: Tx pending-->
 <!--                    </b-tooltip>-->
@@ -231,7 +228,7 @@ export default {
 
         nonce:              0,
         transferTo:         '',
-        transferAmount:     '0.001',
+        transferAmount:     '10',
         transferPending:    false,
         depositAmount:      null,
         withdrawAmount:     null,
@@ -330,8 +327,7 @@ export default {
         },
         async transfer() {
             let wallet = window.wallet;
-            await wallet.transfer(this.transferTo, wallet.supportedTokens[0], 1, 0);
-
+            await wallet.transfer(this.transferTo, wallet.supportedTokens[0], this.transferAmount, 0);
         },
         async plasmaTransfer(to, amount) {
             console.log('initiating transfer to', to, amount)
