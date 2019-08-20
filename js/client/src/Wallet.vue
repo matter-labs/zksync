@@ -35,10 +35,9 @@
             <b-col sm="6" order="2" class="col-xl-8 col-lg-7 col-md-6 col-sm-12">
                 <b-card title="Transfer in Matter Network" class="mb-4 d-flex">
                     <label for="transferToInput">To (recepient ETH address): </label>
-                    <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0xb4aaffeaacb27098d9545a3c0e36924af9eedfe0" autocomplete="off"></b-form-input>
+                    <b-form-input id="transferToInput" type="text" v-model="transferTo" placeholder="0x149e5ba19e2db1dbd58b54c088666c5a2f5b7fc4b8cf5c59614728" autocomplete="off"></b-form-input>
                     <p class="mt-2" style="color: grey">
-                        Note: your recipient must register in Matter Network first. For testing, try 
-                        <a href="#" @click="transferTo='0x'+store.config.SENDER_ACCOUNT">0x{{store.config.SENDER_ACCOUNT}}</a>
+                        For testing, try <a href="#" @click="transferTo=store.config.SENDER_ACCOUNT">0x{{store.config.SENDER_ACCOUNT}}</a>
                     </p>
 
                     <label for="transferAmountInput" class="mt-4">Amount</label>
