@@ -97,7 +97,7 @@ export default {
                 { name: 'Commit tx hash',   value: `<a target="blanc" href="${this.blockchain_explorer_tx}/${this.commit_tx_hash}">${this.commit_tx_hash}</a>`, },
                 { name: 'Committed at',     value: this.committed_at},
                 { name: 'Verify tx hash',   value: `<a target="blanc" href="${this.blockchain_explorer_tx}/${this.verify_tx_hash}">${this.verify_tx_hash}</a>`, },
-                { name: 'Committed at',     value: this.verified_at},
+                { name: 'Verified at',      value: this.verified_at},
             ]
         }
     },

@@ -346,7 +346,7 @@ fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpRespon
     let verify = storage.load_stored_op_with_block_number(block_id_u32, ActionType::VERIFY);
 
     let response = BlockDetails {
-        block_number: commit.block_number as i32,
+        block_number: commit.block_number as i64,
         new_state_root: format!("0x{}", operation.block.new_root_hash.to_hex()),
         commit_tx_hash: commit.tx_hash,
         verify_tx_hash: verify.as_ref().and_then(|op| op.tx_hash.clone()),

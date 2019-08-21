@@ -16,7 +16,7 @@ values (0, '', 'ETH');
 
 CREATE TABLE balances
 (
-    account_id integer REFERENCES accounts (id) ON UPDATE CASCADE ON DELETE CASCADE,
+    account_id bigint REFERENCES accounts (id) ON UPDATE CASCADE ON DELETE CASCADE,
     coin_id    integer REFERENCES tokens (id) ON UPDATE CASCADE,
     balance    numeric not null default 0,
     PRIMARY KEY (account_id, coin_id)
@@ -28,8 +28,8 @@ DROP TABLE account_updates cascade;
 create TABLE account_balance_updates
 (
     balance_update_id serial  not null,
-    account_id        integer not null,
-    block_number      integer not null,
+    account_id        bigint not null,
+    block_number      bigint not null,
     coin_id           integer not null references tokens (id) on update cascade,
     old_balance       numeric not null,
     new_balance       numeric not null,
@@ -40,9 +40,9 @@ create TABLE account_balance_updates
 
 CREATE TABLE account_creates
 (
-    account_id   integer not null,
+    account_id   bigint not null,
     is_create    bool    not null,
-    block_number integer not null,
+    block_number bigint not null,
     address      bytea   not null,
     nonce        bigint  not null,
     PRIMARY KEY (account_id, block_number)
@@ -51,5 +51,5 @@ CREATE TABLE account_creates
 
 ALTER TABLE transactions
     drop column nonce cascade,
-    add column nonce integer not null,
+    add column nonce bigint not null,
     add column token integer not null;

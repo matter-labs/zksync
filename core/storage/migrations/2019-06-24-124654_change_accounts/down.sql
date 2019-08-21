@@ -17,8 +17,8 @@ DROP TABLE account_creates cascade;
 
 CREATE TABLE account_updates
 (
-    account_id   integer not null,
-    block_number integer not null,
+    account_id   bigint not null,
+    block_number bigint not null,
     data         json    not null,
     PRIMARY KEY (account_id, block_number)
 );

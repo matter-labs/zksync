@@ -28,8 +28,8 @@ use diesel::r2d2::{ConnectionManager, Pool, PoolError, PooledConnection};
 use serde_json::value::Value;
 use std::env;
 
-use diesel::sql_types::{Integer, Nullable, Text, Timestamp};
-sql_function!(coalesce, Coalesce, (x: Nullable<Integer>, y: Integer) -> Integer);
+use diesel::sql_types::{BigInt, Nullable, Text, Timestamp};
+sql_function!(coalesce, Coalesce, (x: Nullable<BigInt>, y: BigInt) -> BigInt);
 
 use models::node::AccountAddress;
 
@@ -67,8 +67,8 @@ impl Default for ConnectionPool {
 #[derive(Identifiable, Insertable, QueryableByName, Queryable)]
 #[table_name = "accounts"]
 struct StorageAccount {
-    pub id: i32,
-    pub last_block: i32,
+    pub id: i64,
+    pub last_block: i64,
     pub nonce: i64,
     pub address: Vec<u8>,
 }
@@ -78,7 +78,7 @@ struct StorageAccount {
 #[primary_key(account_id, coin_id)]
 #[table_name = "balances"]
 struct StorageBalance {
-    pub account_id: i32,
+    pub account_id: i64,
     pub coin_id: i32,
     pub balance: BigDecimal,
 }
@@ -94,8 +94,8 @@ pub struct Token {
 #[derive(Debug, Insertable)]
 #[table_name = "account_balance_updates"]
 struct StorageAccountUpdateInsert {
-    pub account_id: i32,
-    pub block_number: i32,
+    pub account_id: i64,
+    pub block_number: i64,
     pub coin_id: i32,
     pub old_balance: BigDecimal,
     pub new_balance: BigDecimal,
@@ -107,8 +107,8 @@ struct StorageAccountUpdateInsert {
 #[table_name = "account_balance_updates"]
 struct StorageAccountUpdate {
     balance_update_id: i32,
-    pub account_id: i32,
-    pub block_number: i32,
+    pub account_id: i64,
+    pub block_number: i64,
     pub coin_id: i32,
     pub old_balance: BigDecimal,
     pub new_balance: BigDecimal,
@@ -119,9 +119,9 @@ struct StorageAccountUpdate {
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
 #[table_name = "account_creates"]
 struct StorageAccountCreation {
-    account_id: i32,
+    account_id: i64,
     is_create: bool,
-    block_number: i32,
+    block_number: i64,
     address: Vec<u8>,
     nonce: i64,
 }
@@ -238,7 +238,7 @@ impl StorageAccountDiff {
             .then(type_cmp_number(self).cmp(&type_cmp_number(other)))
     }
 
-    fn block_number(&self) -> i32 {
+    fn block_number(&self) -> i64 {
         *match self {
             StorageAccountDiff::BalanceUpdate(StorageAccountUpdate { block_number, .. }) => {
                 block_number
@@ -253,18 +253,18 @@ impl StorageAccountDiff {
 #[table_name = "operations"]
 struct NewOperation {
     pub data: Value,
-    pub block_number: i32,
+    pub block_number: i64,
     pub action_type: String,
 }
 
 #[derive(Debug, Clone, Queryable, QueryableByName)]
 #[table_name = "operations"]
 pub struct StoredOperation {
-    pub id: i32,
+    pub id: i64,
     pub data: serde_json::Value,
     pub addr: String,
-    pub nonce: i32,
-    pub block_number: i32,
+    pub nonce: i64,
+    pub block_number: i64,
     pub action_type: String,
     pub tx_hash: Option<String>,
     pub created_at: NaiveDateTime,
@@ -375,14 +375,14 @@ impl StoredOperation {
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
 #[table_name = "proofs"]
 pub struct NewProof {
-    pub block_number: i32,
+    pub block_number: i64,
     pub proof: serde_json::Value,
 }
 
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
 #[table_name = "proofs"]
 pub struct StoredProof {
-    pub block_number: i32,
+    pub block_number: i64,
     pub proof: serde_json::Value,
     pub created_at: NaiveDateTime,
 }
@@ -392,7 +392,7 @@ pub struct StoredProof {
 #[table_name = "prover_runs"]
 pub struct ProverRun {
     pub id: i32,
-    pub block_number: i32,
+    pub block_number: i64,
     pub worker: Option<String>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
@@ -409,8 +409,8 @@ pub struct ActiveProver {
 
 #[derive(Debug, QueryableByName)]
 pub struct IntegerNumber {
-    #[sql_type = "Integer"]
-    pub integer_value: i32,
+    #[sql_type = "BigInt"]
+    pub integer_value: i64,
 }
 
 #[derive(Debug, Queryable, QueryableByName)]
@@ -422,8 +422,8 @@ pub struct ServerConfig {
 
 #[derive(Debug, Serialize, Deserialize, QueryableByName)]
 pub struct BlockDetails {
-    #[sql_type = "Integer"]
-    pub block_number: i32,
+    #[sql_type = "BigInt"]
+    pub block_number: i64,
 
     #[sql_type = "Text"]
     pub new_state_root: String,
@@ -536,7 +536,7 @@ impl StorageProcessor {
             // see SQL migration code for `operations` table
             let stored: StoredOperation = diesel::insert_into(operations::table)
                 .values(&NewOperation {
-                    block_number: op.block.block_number as i32,
+                    block_number: op.block.block_number as i64,
                     action_type: op.action.to_string(),
                     data: serde_json::to_value(&op).unwrap(),
                 })
@@ -545,7 +545,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn save_operation_tx_hash(&self, op_id: i32, hash: String) -> QueryResult<()> {
+    pub fn save_operation_tx_hash(&self, op_id: i64, hash: String) -> QueryResult<()> {
         use crate::schema::operations::dsl::*;
         let target = operations.filter(id.eq(op_id));
         diesel::update(target)
@@ -593,9 +593,9 @@ impl StorageProcessor {
                     AccountUpdate::Create { ref address, nonce } => {
                         diesel::insert_into(account_creates::table)
                             .values(&StorageAccountCreation {
-                                account_id: *id as i32,
+                                account_id: *id as i64,
                                 is_create: true,
-                                block_number: block_number as i32,
+                                block_number: block_number as i64,
                                 address: address.data.to_vec(),
                                 nonce: i64::from(nonce),
                             })
@@ -604,9 +604,9 @@ impl StorageProcessor {
                     AccountUpdate::Delete { ref address, nonce } => {
                         diesel::insert_into(account_creates::table)
                             .values(&StorageAccountCreation {
-                                account_id: *id as i32,
+                                account_id: *id as i64,
                                 is_create: false,
-                                block_number: block_number as i32,
+                                block_number: block_number as i64,
                                 address: address.data.to_vec(),
                                 nonce: i64::from(nonce),
                             })
@@ -619,8 +619,8 @@ impl StorageProcessor {
                     } => {
                         diesel::insert_into(account_balance_updates::table)
                             .values(&StorageAccountUpdateInsert {
-                                account_id: *id as i32,
-                                block_number: block_number as i32,
+                                account_id: *id as i64,
+                                block_number: block_number as i64,
                                 coin_id: token as i32,
                                 old_balance: old_balance.clone(),
                                 new_balance: new_balance.clone(),
@@ -639,11 +639,11 @@ impl StorageProcessor {
         info!("Applying state update for block: {}", block_number);
         self.conn().transaction(|| {
             let account_balance_diff = account_balance_updates::table
-                .filter(account_balance_updates::block_number.eq(&(block_number as i32)))
+                .filter(account_balance_updates::block_number.eq(&(block_number as i64)))
                 .load::<StorageAccountUpdate>(self.conn())?;
 
             let account_creation_diff = account_creates::table
-                .filter(account_creates::block_number.eq(&(block_number as i32)))
+                .filter(account_creates::block_number.eq(&(block_number as i64)))
                 .load::<StorageAccountCreation>(self.conn())?;
 
             let account_updates: Vec<StorageAccountDiff> = {
@@ -781,19 +781,19 @@ impl StorageProcessor {
             let account_balance_diff = account_balance_updates::table
                 .filter(
                     account_balance_updates::block_number
-                        .gt(&(start_block as i32))
+                        .gt(&(start_block as i64))
                         .and(
                             account_balance_updates::block_number
-                                .le(&(end_block as i32))
+                                .le(&(end_block as i64))
                                 .or(unbounded),
                         ),
                 )
                 .load::<StorageAccountUpdate>(self.conn())?;
             let account_creation_diff = account_creates::table
                 .filter(
-                    account_creates::block_number.gt(&(start_block as i32)).and(
+                    account_creates::block_number.gt(&(start_block as i64)).and(
                         account_creates::block_number
-                            .le(&(end_block as i32))
+                            .le(&(end_block as i64))
                             .or(unbounded),
                     ),
                 )
@@ -871,7 +871,7 @@ impl StorageProcessor {
                 ) t
             ) s",
                 addr = sender,
-                current_nonce = current_nonce as i32
+                current_nonce = current_nonce as i64
             )
             .as_str(),
         )
@@ -886,7 +886,7 @@ impl StorageProcessor {
     ) -> Option<StoredOperation> {
         use crate::schema::operations::dsl;
         dsl::operations
-            .filter(dsl::block_number.eq(block_number as i32))
+            .filter(dsl::block_number.eq(block_number as i64))
             .filter(dsl::action_type.eq(action_type.to_string().as_str()))
             .get_result(self.conn())
             .ok()
@@ -923,14 +923,14 @@ impl StorageProcessor {
                 and action_type = 'Verify'
             order by committed.block_number desc
         ",
-            max_block = max_block as i32,
-            limit = limit as i32
+            max_block = max_block as i64,
+            limit = limit as i64
         );
         diesel::sql_query(query).load(self.conn())
     }
 
     pub fn handle_search(&self, query: String) -> Option<BlockDetails> {
-        let block_number = query.parse::<i32>().unwrap_or(i32::max_value());
+        let block_number = query.parse::<i64>().unwrap_or(i64::max_value());
         let l_query = query.to_lowercase();
         let has_prefix = l_query.starts_with("0x");
         let prefix = "0x".to_owned();
@@ -968,7 +968,7 @@ impl StorageProcessor {
             order by committed.block_number desc
             limit 1
         ",
-            block_number = block_number as i32
+            block_number = block_number as i64
         );
         diesel::sql_query(sql_query)
             .bind::<Text, _>(query_with_prefix)
@@ -983,7 +983,7 @@ impl StorageProcessor {
     //         ORDER BY block_number
     //         DESC
     //         LIMIT {limit}
-    //     ", max_block = max_block as i32, limit = limit as i32, action_type = action_type.to_string());
+    //     ", max_block = max_block as i64, limit = limit as i64, action_type = action_type.to_string());
     //     let r = diesel::sql_query(query)
     //         .load(self.conn());
     //     r.unwrap_or(vec![])
@@ -1003,7 +1003,7 @@ impl StorageProcessor {
         use crate::schema::operations::dsl;
         self.conn().transaction(|| {
             let ops: Vec<StoredOperation> = dsl::operations
-                .filter(dsl::nonce.ge(current_nonce as i32)) // WHERE nonce >= current_nonce
+                .filter(dsl::nonce.ge(current_nonce as i64)) // WHERE nonce >= current_nonce
                 .load(self.conn())?;
             ops.into_iter().map(|o| o.into_op(self)).collect()
         })
@@ -1041,13 +1041,13 @@ impl StorageProcessor {
         })
     }
 
-    fn load_number(&self, query: &str) -> QueryResult<i32> {
+    fn load_number(&self, query: &str) -> QueryResult<i64> {
         diesel::sql_query(query)
             .get_result::<IntegerNumber>(self.conn())
             .map(|r| r.integer_value)
     }
 
-    pub fn load_last_committed_deposit_batch(&self) -> QueryResult<i32> {
+    pub fn load_last_committed_deposit_batch(&self) -> QueryResult<i64> {
         self.load_number("
             SELECT COALESCE(max((data->'block'->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
             WHERE data->'action'->>'type' = 'Commit' 
@@ -1055,7 +1055,7 @@ impl StorageProcessor {
         ")
     }
 
-    pub fn load_last_committed_exit_batch(&self) -> QueryResult<i32> {
+    pub fn load_last_committed_exit_batch(&self) -> QueryResult<i64> {
         self.load_number("
             SELECT COALESCE(max((data->'block'->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
             WHERE data->'action'->>'type' = 'Commit' 
@@ -1066,10 +1066,10 @@ impl StorageProcessor {
     fn get_account_and_last_block(
         &self,
         account_id: AccountId,
-    ) -> QueryResult<(i32, Option<Account>)> {
+    ) -> QueryResult<(i64, Option<Account>)> {
         self.conn().transaction(|| {
             if let Some(account) = accounts::table
-                .find(account_id as i32)
+                .find(account_id as i64)
                 .first::<StorageAccount>(self.conn())
                 .optional()?
             {
@@ -1117,14 +1117,14 @@ impl StorageProcessor {
 
             let account_balance_diff: Vec<StorageAccountUpdate> = {
                 account_balance_updates::table
-                    .filter(account_balance_updates::account_id.eq(&(account_id as i32)))
+                    .filter(account_balance_updates::account_id.eq(&(account_id as i64)))
                     .filter(account_balance_updates::block_number.gt(&last_block))
                     .load::<StorageAccountUpdate>(self.conn())?
             };
 
             let account_creation_diff: Vec<StorageAccountCreation> = {
                 account_creates::table
-                    .filter(account_creates::account_id.eq(&(account_id as i32)))
+                    .filter(account_creates::account_id.eq(&(account_id as i64)))
                     .filter(account_creates::block_number.gt(&last_block))
                     .load::<StorageAccountCreation>(self.conn())?
             };
@@ -1185,14 +1185,14 @@ impl StorageProcessor {
         // use crate::schema::account_updates::dsl::*;
         // account_updates
         //     .select(max(block_number))
-        //     .get_result::<Option<i32>>(self.conn())
+        //     .get_result::<Option<i64>>(self.conn())
         //     .map(|max| max.unwrap_or(0))
 
         use crate::schema::operations::dsl::*;
         operations
             .select(max(block_number))
             .filter(action_type.eq(ACTION_COMMIT))
-            .get_result::<Option<i32>>(self.conn())
+            .get_result::<Option<i64>>(self.conn())
             .map(|max| max.unwrap_or(0) as BlockNumber)
 
         //self.load_number("SELECT COALESCE(max(block_number), 0) AS integer_value FROM account_updates")
@@ -1202,14 +1202,14 @@ impl StorageProcessor {
         // use crate::schema::accounts::dsl::*;
         // accounts
         //     .select(max(last_block))
-        //     .get_result::<Option<i32>>(self.conn())
+        //     .get_result::<Option<i64>>(self.conn())
         //     .map(|max| max.unwrap_or(0))
 
         use crate::schema::operations::dsl::*;
         operations
             .select(max(block_number))
             .filter(action_type.eq(ACTION_VERIFY))
-            .get_result::<Option<i32>>(self.conn())
+            .get_result::<Option<i64>>(self.conn())
             .map(|max| max.unwrap_or(0) as BlockNumber)
 
         //self.load_number("SELECT COALESCE(max(last_block), 0) AS integer_value FROM accounts")
@@ -1237,13 +1237,13 @@ impl StorageProcessor {
                 .map(|i| i.integer_value as BlockNumber);
             if let Some(block_number_) = job {
                 // let to_store = NewProverRun{
-                //     block_number: block_number as i32,
+                //     block_number: block_number as i64,
                 //     worker: worker.to_string(),
                 // };
                 use crate::schema::prover_runs::dsl::*;
                 let inserted: ProverRun = insert_into(prover_runs)
                     .values(&vec![(
-                        block_number.eq(block_number_ as i32),
+                        block_number.eq(block_number_ as i64),
                         worker.eq(worker_.to_string())
                     )])
                     .get_result(self.conn())?;
@@ -1289,7 +1289,7 @@ impl StorageProcessor {
         proof: &EncodedProof,
     ) -> QueryResult<usize> {
         let to_store = NewProof {
-            block_number: block_number as i32,
+            block_number: block_number as i64,
             proof: serde_json::to_value(proof).unwrap(),
         };
         use crate::schema::proofs::dsl::proofs;
@@ -1299,7 +1299,7 @@ impl StorageProcessor {
     pub fn load_proof(&self, block_number: BlockNumber) -> QueryResult<EncodedProof> {
         use crate::schema::proofs::dsl;
         let stored: StoredProof = dsl::proofs
-            .filter(dsl::block_number.eq(block_number as i32))
+            .filter(dsl::block_number.eq(block_number as i64))
             .get_result(self.conn())?;
         Ok(serde_json::from_value(stored.proof).unwrap())
     }

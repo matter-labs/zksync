@@ -1,8 +1,8 @@
 table! {
     account_balance_updates (balance_update_id) {
         balance_update_id -> Int4,
-        account_id -> Int4,
-        block_number -> Int4,
+        account_id -> Int8,
+        block_number -> Int8,
         coin_id -> Int4,
         old_balance -> Numeric,
         new_balance -> Numeric,
@@ -13,9 +13,9 @@ table! {
 
 table! {
     account_creates (account_id, block_number) {
-        account_id -> Int4,
+        account_id -> Int8,
         is_create -> Bool,
-        block_number -> Int4,
+        block_number -> Int8,
         address -> Bytea,
         nonce -> Int8,
     }
@@ -23,8 +23,8 @@ table! {
 
 table! {
     accounts (id) {
-        id -> Int4,
-        last_block -> Int4,
+        id -> Int8,
+        last_block -> Int8,
         nonce -> Int8,
         address -> Bytea,
     }
@@ -41,7 +41,7 @@ table! {
 
 table! {
     balances (account_id, coin_id) {
-        account_id -> Int4,
+        account_id -> Int8,
         coin_id -> Int4,
         balance -> Numeric,
     }
@@ -71,17 +71,17 @@ table! {
 table! {
     op_config (addr) {
         addr -> Text,
-        next_nonce -> Nullable<Int4>,
+        next_nonce -> Nullable<Int8>,
     }
 }
 
 table! {
     operations (id) {
-        id -> Int4,
+        id -> Int8,
         data -> Jsonb,
         addr -> Text,
-        nonce -> Int4,
-        block_number -> Int4,
+        nonce -> Int8,
+        block_number -> Int8,
         action_type -> Text,
         tx_hash -> Nullable<Text>,
         created_at -> Timestamp,
@@ -90,7 +90,7 @@ table! {
 
 table! {
     proofs (block_number) {
-        block_number -> Int4,
+        block_number -> Int8,
         proof -> Jsonb,
         created_at -> Timestamp,
     }
@@ -99,7 +99,7 @@ table! {
 table! {
     prover_runs (id) {
         id -> Int4,
-        block_number -> Int4,
+        block_number -> Int8,
         worker -> Nullable<Text>,
         created_at -> Timestamp,
         updated_at -> Timestamp,
@@ -118,22 +118,6 @@ table! {
         id -> Int4,
         address -> Text,
         symbol -> Nullable<Text>,
-    }
-}
-
-table! {
-    transactions (id) {
-        id -> Int4,
-        tx_type -> Text,
-        from_account -> Int4,
-        to_account -> Nullable<Int4>,
-        amount -> Int4,
-        fee -> Int4,
-        block_number -> Nullable<Int4>,
-        state_root -> Nullable<Text>,
-        created_at -> Timestamp,
-        nonce -> Int4,
-        token -> Int4,
     }
 }
 
@@ -156,5 +140,4 @@ allow_tables_to_appear_in_same_query!(
     prover_runs,
     server_config,
     tokens,
-    transactions,
 );
