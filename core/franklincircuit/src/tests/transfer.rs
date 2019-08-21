@@ -306,8 +306,6 @@ mod test {
     use franklinmodels::params as franklin_constants;
 
     use crate::circuit::FranklinCircuit;
-    use crate::operation::*;
-    use crate::utils::*;
     use bellman::Circuit;
 
     use ff::Field;
@@ -321,7 +319,6 @@ mod test {
     };
     use franklinmodels::merkle_tree::hasher::Hasher;
     use franklinmodels::merkle_tree::PedersenHasher;
-    use pairing::bn256::*;
     use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
     fn test_transfer() {

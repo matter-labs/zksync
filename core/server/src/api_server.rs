@@ -5,9 +5,9 @@ use actix_web::{
     HttpMessage, HttpRequest, HttpResponse,
 };
 use models::node::{tx::FranklinTx, Account, AccountId};
-use models::{NetworkStatus, StateKeeperRequest, ActionType};
+use models::{ActionType, NetworkStatus, StateKeeperRequest};
 use std::sync::mpsc;
-use storage::{ConnectionPool, BlockDetails};
+use storage::{BlockDetails, ConnectionPool};
 
 use actix_web::Result as ActixResult;
 use failure::format_err;
@@ -220,10 +220,10 @@ fn handle_get_tokens(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
 }
 
 fn handle_get_testnet_config(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-   let address = req.state().contract_address.clone();
-   Ok(HttpResponse::Ok().json(TestnetConfigResponse {
-       address: format!("{}", address),
-   }))
+    let address = req.state().contract_address.clone();
+    Ok(HttpResponse::Ok().json(TestnetConfigResponse {
+        address: format!("{}", address),
+    }))
 }
 
 // fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
@@ -296,8 +296,8 @@ fn handle_get_testnet_config(req: &HttpRequest<AppState>) -> ActixResult<HttpRes
 //}
 
 fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-   let network_status = req.state().network_status.read();
-   Ok(HttpResponse::Ok().json(network_status))
+    let network_status = req.state().network_status.read();
+    Ok(HttpResponse::Ok().json(network_status))
 }
 
 fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
@@ -358,7 +358,7 @@ fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpRespon
 }
 
 fn handle_get_blocks(
-   req: &HttpRequest<AppState>,
+    req: &HttpRequest<AppState>,
 ) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let pool = req.state().connection_pool.clone();
 
@@ -385,7 +385,6 @@ fn handle_get_blocks(
                 .map_err(|_| "invalid max_block".to_string())?;
             let limit: u32 = limit.parse().map_err(|_| "invalid limit".to_string())?;
             if limit > 100 {
-                
                 return Err("limit can not exceed 100".to_string());
             }
 

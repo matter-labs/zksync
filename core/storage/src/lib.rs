@@ -9,8 +9,10 @@ use diesel::dsl::*;
 use failure::Fail;
 use models::node::block::{Block, ExecutedTx};
 use models::node::{
-    apply_updates, reverse_updates, tx::{FranklinTx, TxType}, Account, AccountId, AccountMap, AccountUpdate,
-    AccountUpdates, BlockNumber, FranklinOp, Nonce, TokenId,
+    apply_updates, reverse_updates,
+    tx::{FranklinTx, TxType},
+    Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, FranklinOp, Nonce,
+    TokenId,
 };
 use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
@@ -278,7 +280,7 @@ pub struct StoredTx {
     pub nonce: Option<Nonce>,
     pub token: Option<TokenId>,
     pub amount: Option<BigDecimal>,
-    pub fee: Option<BigDecimal>
+    pub fee: Option<BigDecimal>,
 }
 
 impl StoredOperation {
@@ -320,54 +322,49 @@ impl StoredOperation {
             debug!("Error: {} on {}", err, debug_data)
         }
         let op = op.expect("Operation deserialization");
-        let txs: Vec<StoredTx> = op.block.block_transactions.into_iter().map(|x| {
-            match x.tx {
-                FranklinTx::Transfer(transfer) => {
-                    StoredTx{
-                        tx_type: TxType::Transfer,
-                        from: Some(transfer.from),
-                        to: Some(transfer.to),
-                        nonce: Some(transfer.nonce),
-                        token: Some(transfer.token),
-                        amount: Some(transfer.amount),
-                        fee: Some(transfer.fee)
-                    }
+        let txs: Vec<StoredTx> = op
+            .block
+            .block_transactions
+            .into_iter()
+            .map(|x| match x.tx {
+                FranklinTx::Transfer(transfer) => StoredTx {
+                    tx_type: TxType::Transfer,
+                    from: Some(transfer.from),
+                    to: Some(transfer.to),
+                    nonce: Some(transfer.nonce),
+                    token: Some(transfer.token),
+                    amount: Some(transfer.amount),
+                    fee: Some(transfer.fee),
                 },
-                FranklinTx::Deposit(deposit) => {
-                    StoredTx{
-                        tx_type: TxType::Deposit,
-                        from: None,
-                        to: Some(deposit.to),
-                        nonce: Some(deposit.nonce),
-                        token: Some(deposit.token),
-                        amount: Some(deposit.amount),
-                        fee: Some(deposit.fee)
-                    }
+                FranklinTx::Deposit(deposit) => StoredTx {
+                    tx_type: TxType::Deposit,
+                    from: None,
+                    to: Some(deposit.to),
+                    nonce: Some(deposit.nonce),
+                    token: Some(deposit.token),
+                    amount: Some(deposit.amount),
+                    fee: Some(deposit.fee),
                 },
-                FranklinTx::Withdraw(withdraw) => {
-                    StoredTx{
-                        tx_type: TxType::Withdraw,
-                        from: Some(withdraw.account),
-                        to: None,
-                        nonce: Some(withdraw.nonce),
-                        token: Some(withdraw.token),
-                        amount: Some(withdraw.amount),
-                        fee: Some(withdraw.fee)
-                    }
+                FranklinTx::Withdraw(withdraw) => StoredTx {
+                    tx_type: TxType::Withdraw,
+                    from: Some(withdraw.account),
+                    to: None,
+                    nonce: Some(withdraw.nonce),
+                    token: Some(withdraw.token),
+                    amount: Some(withdraw.amount),
+                    fee: Some(withdraw.fee),
                 },
-                FranklinTx::Close(close) => {
-                    StoredTx{
-                        tx_type: TxType::Close,
-                        from: Some(close.account),
-                        to: None,
-                        nonce: Some(close.nonce),
-                        token: None,
-                        amount: None,
-                        fee: None
-                    }
+                FranklinTx::Close(close) => StoredTx {
+                    tx_type: TxType::Close,
+                    from: Some(close.account),
+                    to: None,
+                    nonce: Some(close.nonce),
+                    token: None,
+                    amount: None,
+                    fee: None,
                 },
-            }
-        }).collect();
+            })
+            .collect();
         Ok(txs)
     }
 }

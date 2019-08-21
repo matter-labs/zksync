@@ -13,7 +13,7 @@ pub enum TxType {
     Transfer,
     Deposit,
     Withdraw,
-    Close
+    Close,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

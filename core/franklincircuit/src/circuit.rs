@@ -222,11 +222,23 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         )?;
 
         let mut operator_account_data = vec![];
+        let mut old_operator_balance_root_bits = old_operator_balance_root
+            .into_bits_le(cs.namespace(|| "old_operator_balance_root_bits"))?;
+        old_operator_balance_root_bits.resize(
+            franklin_constants::FR_BIT_WIDTH_PADDED,
+            Boolean::constant(false),
+        );
         operator_account_data.extend(validator_account.nonce.get_bits_le());
         operator_account_data.extend(validator_account.pub_key_hash.get_bits_le());
-        operator_account_data.extend(
-            old_operator_balance_root
-                .into_bits_le(cs.namespace(|| "old_operator_balance_root_bits"))?,
+        operator_account_data.extend(old_operator_balance_root_bits);
+        println!("validator_account_nonce_len: {:?}, validator_account.pub_key_hash: {:?}, old_operator_balance_root: {:?}",
+                 validator_account.nonce.get_bits_le().len(),validator_account.pub_key_hash.get_bits_le().len(), old_operator_balance_root.get_value());
+
+        println!("validator_account_nonce: {:?}, validator_account.pub_key_hash: {:?}, old_operator_balance_root: {:?}",
+                 validator_account.nonce.get_number().get_value(),validator_account.pub_key_hash.get_number().get_value(), old_operator_balance_root.get_value());
+        println!(
+            "validator_account_data_len: {}",
+            operator_account_data.len()
         );
 
         let root_from_operator = allocate_merkle_root(
@@ -262,12 +274,16 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         )?;
 
         let mut operator_account_data = vec![];
+        let mut new_operator_balance_root_bits = new_operator_balance_root
+            .into_bits_le(cs.namespace(|| "new_operator_balance_root_bits"))?;
+        new_operator_balance_root_bits.resize(
+            franklin_constants::FR_BIT_WIDTH_PADDED,
+            Boolean::constant(false),
+        );
+
         operator_account_data.extend(validator_account.nonce.get_bits_le());
         operator_account_data.extend(validator_account.pub_key_hash.get_bits_le());
-        operator_account_data.extend(
-            new_operator_balance_root
-                .into_bits_le(cs.namespace(|| "new_operator_balance_root_bits"))?,
-        );
+        operator_account_data.extend(new_operator_balance_root_bits);
 
         let root_from_operator_after_fees = allocate_merkle_root(
             cs.namespace(|| "root from operator_account after fees"),

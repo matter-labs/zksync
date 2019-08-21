@@ -22,10 +22,10 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
         let mut leaf_content = Vec::new();
         //TODO: verify_order
 
-        leaf_content.extend(self.nonce.get_bits_le_fixed(params::NONCE_BIT_WIDTH));
+        leaf_content.extend(self.nonce.get_bits_le_fixed(params::NONCE_BIT_WIDTH)); //32
         leaf_content.extend(
             self.pub_key_hash
-                .get_bits_le_fixed(params::NEW_PUBKEY_HASH_WIDTH),
+                .get_bits_le_fixed(params::NEW_PUBKEY_HASH_WIDTH), //160
         );
 
         // let mut phash = self
@@ -39,7 +39,7 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
             .subtree
             .root_hash()
             .get_bits_le_fixed(params::FR_BIT_WIDTH);
-        root_hash_bits.resize(params::FR_BIT_WIDTH_PADDED, false);
+        root_hash_bits.resize(params::FR_BIT_WIDTH_PADDED, false); //256
 
         leaf_content.extend(root_hash_bits);
 

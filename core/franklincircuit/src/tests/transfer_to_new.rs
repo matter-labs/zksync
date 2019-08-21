@@ -388,8 +388,6 @@ mod test {
     use franklinmodels::params as franklin_constants;
 
     use crate::circuit::FranklinCircuit;
-    use crate::operation::*;
-    use crate::utils::*;
     use bellman::Circuit;
 
     use ff::Field;
@@ -403,7 +401,6 @@ mod test {
     };
     use franklinmodels::merkle_tree::hasher::Hasher;
     use franklinmodels::merkle_tree::PedersenHasher;
-    use pairing::bn256::*;
     use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
     fn test_transfer_to_new() {
@@ -495,8 +492,6 @@ mod test {
         let block_number = Fr::from_str("1").unwrap();
         // prepare state, so that we could make transfer
         let mut from_balance_tree =
-            CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
-        let mut to_balance_tree =
             CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
         from_balance_tree.insert(
             token,

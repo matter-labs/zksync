@@ -157,8 +157,6 @@ mod test {
     use franklinmodels::merkle_tree::PedersenHasher;
 
     use crate::circuit::FranklinCircuit;
-    use crate::operation::*;
-    use crate::utils::*;
     use bellman::Circuit;
 
     use ff::{BitIterator, Field, PrimeField};
@@ -168,11 +166,10 @@ mod test {
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklin_crypto::jubjub::FixedGenerators;
     use franklinmodels::circuit::account::{
-        Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
+     CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
     use franklinmodels::params as franklin_constants;
 
-    use pairing::bn256::*;
     use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
     fn test_close_account_franklin_empty_leaf() {
@@ -204,7 +201,6 @@ mod test {
         let validator_sk = PrivateKey::<Bn256>(rng.gen());
         let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
         let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
-        let (validator_x, validator_y) = validator_pk.0.into_xy();
 
         let validator_leaf = CircuitAccount::<Bn256> {
             subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
