@@ -82,7 +82,7 @@ pub fn noop_operation(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::tests::utils::public_data_commitment;
+    use crate::witness::utils::public_data_commitment;
 
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;

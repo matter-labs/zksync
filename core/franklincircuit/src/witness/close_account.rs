@@ -153,7 +153,7 @@ pub fn calculate_close_account_operations_from_witness(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::tests::utils::public_data_commitment;
+    use crate::witness::utils::public_data_commitment;
     use franklinmodels::merkle_tree::PedersenHasher;
 
     use crate::circuit::FranklinCircuit;

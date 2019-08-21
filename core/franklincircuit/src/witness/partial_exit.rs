@@ -1,26 +1,27 @@
 use super::utils::*;
-use crate::utils::*;
 
 use crate::operation::*;
-use ff::{Field, PrimeField};
-use num_traits::cast::ToPrimitive;
+use crate::utils::*;
 
-use franklin_crypto::circuit::float_point::{convert_to_float, parse_float_to_u128};
+use ff::{Field, PrimeField};
+
+use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::CircuitAccountTree;
+use num_traits::cast::ToPrimitive;
 
-use franklinmodels::node::DepositOp;
+use franklinmodels::node::PartialExitOp;
 use franklinmodels::params as franklin_constants;
 use pairing::bn256::*;
 
-pub struct DepositData {
+pub struct PartialExitData {
     pub amount: u128,
     pub fee: u128,
     pub token: u32,
     pub account_address: u32,
-    pub new_pub_key_hash: Fr,
+    pub ethereum_key: Fr,
 }
-pub struct DepositWitness<E: JubjubEngine> {
+pub struct PartialExitWitness<E: JubjubEngine> {
     pub before: OperationBranch<E>,
     pub after: OperationBranch<E>,
     pub args: OperationArguments<E>,
@@ -28,7 +29,7 @@ pub struct DepositWitness<E: JubjubEngine> {
     pub after_root: Option<E::Fr>,
     pub tx_type: Option<E::Fr>,
 }
-impl<E: JubjubEngine> DepositWitness<E> {
+impl<E: JubjubEngine> PartialExitWitness<E> {
     pub fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
         append_be_fixed_width(
@@ -62,109 +63,98 @@ impl<E: JubjubEngine> DepositWitness<E> {
 
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.new_pub_key_hash.unwrap(),
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+            &self.args.ethereum_key.unwrap(),
+            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
         );
-        //        assert_eq!(pubdata_bits.len(), 37 * 8);
-        pubdata_bits.resize(40 * 8, false);
+        assert_eq!(pubdata_bits.len(), 30 * 8);
+        pubdata_bits.resize(32 * 8, false);
         pubdata_bits
     }
 }
-
-pub fn apply_deposit_tx(
+pub fn apply_partial_exit_tx(
     tree: &mut CircuitAccountTree,
-    deposit: &DepositOp,
-) -> DepositWitness<Bn256> {
-    let alt_new_pubkey_hash = Fr::from_hex(&deposit.tx.to.to_hex()).unwrap();
-    let deposit_data = DepositData {
-        amount: deposit.tx.amount.to_u128().unwrap(),
-        fee: deposit.tx.fee.to_u128().unwrap(),
-        token: deposit.tx.token as u32,
-        account_address: deposit.account_id as u32,
-        new_pub_key_hash: alt_new_pubkey_hash,
+    partial_exit: &PartialExitOp,
+) -> PartialExitWitness<Bn256> {
+    let transfer_data = PartialExitData {
+        amount: partial_exit.tx.amount.to_u128().unwrap(),
+        fee: partial_exit.tx.fee.to_u128().unwrap(),
+        token: partial_exit.tx.token as u32,
+        account_address: partial_exit.account_id as u32,
+        ethereum_key: Fr::from_hex(&format!("{:x}", &partial_exit.tx.eth_address)).unwrap(),
     };
-    apply_deposit(tree, &deposit_data)
+    // le_bit_vector_into_field_element()
+    apply_partial_exit(tree, &transfer_data)
 }
-pub fn apply_deposit(
+pub fn apply_partial_exit(
     tree: &mut CircuitAccountTree,
-    deposit: &DepositData,
-) -> DepositWitness<Bn256> {
+    partial_exit: &PartialExitData,
+) -> PartialExitWitness<Bn256> {
     //preparing data and base witness
     let before_root = tree.root_hash();
-    println!("deposit Initial root = {}", before_root);
+    println!("Initial root = {}", before_root);
     let (audit_path_before, audit_balance_path_before) =
-        get_audits(tree, deposit.account_address, deposit.token);
+        get_audits(tree, partial_exit.account_address, partial_exit.token);
 
     let capacity = tree.capacity();
     assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
-    let account_address_fe = Fr::from_str(&deposit.account_address.to_string()).unwrap();
-    let token_fe = Fr::from_str(&deposit.token.to_string()).unwrap();
-    let amount_as_field_element = Fr::from_str(&deposit.amount.to_string()).unwrap();
+    let account_address_fe = Fr::from_str(&partial_exit.account_address.to_string()).unwrap();
+    let token_fe = Fr::from_str(&partial_exit.token.to_string()).unwrap();
+    let amount_as_field_element = Fr::from_str(&partial_exit.amount.to_string()).unwrap();
 
     let amount_bits = convert_to_float(
-        deposit.amount,
+        partial_exit.amount,
         *franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
         *franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
         10,
     )
     .unwrap();
-    let reparsed_amount = parse_float_to_u128(
-        amount_bits.clone(),
-        *franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        *franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap();
-    assert_eq!(reparsed_amount, deposit.amount);
 
     let amount_encoded: Fr = le_bit_vector_into_field_element(&amount_bits);
 
-    let fee_as_field_element = Fr::from_str(&deposit.fee.to_string()).unwrap();
+    let fee_as_field_element = Fr::from_str(&partial_exit.fee.to_string()).unwrap();
 
     let fee_bits = convert_to_float(
-        deposit.fee,
+        partial_exit.fee,
         *franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         *franklin_constants::FEE_MANTISSA_BIT_WIDTH,
         10,
     )
     .unwrap();
-    let reparsed_fee = parse_float_to_u128(
-        fee_bits.clone(),
-        *franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-        *franklin_constants::FEE_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap();
-    assert_eq!(reparsed_fee, deposit.fee);
+
     let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
 
     //calculate a and b
-    let a = amount_as_field_element.clone();
-    let b = fee_as_field_element.clone();
 
-    //applying deposit
+    //applying partial_exit
+
     let (account_witness_before, account_witness_after, balance_before, balance_after) =
         apply_leaf_operation(
             tree,
-            deposit.account_address,
-            deposit.token,
+            partial_exit.account_address,
+            partial_exit.token,
             |acc| {
-                assert!(
-                    (acc.pub_key_hash == deposit.new_pub_key_hash)
-                        || (acc.pub_key_hash == Fr::zero())
-                );
-                acc.pub_key_hash = deposit.new_pub_key_hash;
                 acc.nonce.add_assign(&Fr::from_str("1").unwrap());
             },
-            |bal| bal.value.add_assign(&amount_as_field_element),
+            |bal| {
+                if partial_exit.amount == 0 {
+                    bal.value = Fr::zero();
+                } else {
+                    bal.value.sub_assign(&amount_as_field_element);
+                    bal.value.sub_assign(&fee_as_field_element);
+                }
+            },
         );
 
     let after_root = tree.root_hash();
-    println!("deposit After root = {}", after_root);
+    println!("After root = {}", after_root);
     let (audit_path_after, audit_balance_path_after) =
-        get_audits(tree, deposit.account_address, deposit.token);
+        get_audits(tree, partial_exit.account_address, partial_exit.token);
 
-    DepositWitness {
+    let a = balance_before.clone();
+    let mut b = amount_as_field_element.clone();
+    b.add_assign(&fee_as_field_element);
+
+    PartialExitWitness {
         before: OperationBranch {
             address: Some(account_address_fe),
             token: Some(token_fe),
@@ -186,187 +176,146 @@ pub fn apply_deposit(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(Fr::zero()),
+            ethereum_key: Some(partial_exit.ethereum_key),
             amount: Some(amount_encoded),
             fee: Some(fee_encoded),
             a: Some(a),
             b: Some(b),
-            new_pub_key_hash: Some(deposit.new_pub_key_hash),
+            new_pub_key_hash: Some(Fr::zero()),
         },
         before_root: Some(before_root),
         after_root: Some(after_root),
-        tx_type: Some(Fr::from_str("1").unwrap()),
+        tx_type: Some(Fr::from_str("3").unwrap()),
     }
 }
-
-pub fn calculate_deposit_operations_from_witness(
-    deposit_witness: &DepositWitness<Bn256>,
+pub fn calculate_partial_exit_operations_from_witness(
+    partial_exit_witness: &PartialExitWitness<Bn256>,
     sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
 ) -> Vec<Operation<Bn256>> {
-    let pubdata_chunks: Vec<_> = deposit_witness
+    let pubdata_chunks: Vec<_> = partial_exit_witness
         .get_pubdata()
         .chunks(64)
         .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
         .collect();
 
-    println!(
-        "acc_path{} \n bal_path {} ",
-        deposit_witness.before.witness.account_path.len(),
-        deposit_witness.before.witness.balance_subtree_path.len()
-    );
     let operation_zero = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
+        new_root: partial_exit_witness.after_root.clone(),
+        tx_type: partial_exit_witness.tx_type,
         chunk: Some(Fr::from_str("0").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[0]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.before.clone(),
-        rhs: deposit_witness.before.clone(),
+        args: partial_exit_witness.args.clone(),
+        lhs: partial_exit_witness.before.clone(),
+        rhs: partial_exit_witness.before.clone(),
     };
 
+    println!("pubdata_chunk number {} is {}", 1, pubdata_chunks[1]);
     let operation_one = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
+        new_root: partial_exit_witness.after_root.clone(),
+        tx_type: partial_exit_witness.tx_type,
         chunk: Some(Fr::from_str("1").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[1]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.after.clone(),
-        rhs: deposit_witness.after.clone(),
+        args: partial_exit_witness.args.clone(),
+        lhs: partial_exit_witness.after.clone(),
+        rhs: partial_exit_witness.after.clone(),
     };
 
+    println!("pubdata_chunk number {} is {}", 2, pubdata_chunks[2]);
     let operation_two = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
+        new_root: partial_exit_witness.after_root.clone(),
+        tx_type: partial_exit_witness.tx_type,
         chunk: Some(Fr::from_str("2").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[2]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.after.clone(),
-        rhs: deposit_witness.after.clone(),
+        args: partial_exit_witness.args.clone(),
+        lhs: partial_exit_witness.after.clone(),
+        rhs: partial_exit_witness.after.clone(),
     };
 
     let operation_three = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
+        new_root: partial_exit_witness.after_root.clone(),
+        tx_type: partial_exit_witness.tx_type,
         chunk: Some(Fr::from_str("3").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[3]),
         sig_msg: Some(sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.after.clone(),
-        rhs: deposit_witness.after.clone(),
+        args: partial_exit_witness.args.clone(),
+        lhs: partial_exit_witness.after.clone(),
+        rhs: partial_exit_witness.after.clone(),
     };
-    let operation_four = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
-        chunk: Some(Fr::from_str("4").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[4]),
-        sig_msg: Some(sig_msg.clone()),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(signer_pub_key_x.clone()),
-        signer_pub_key_y: Some(signer_pub_key_y.clone()),
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.after.clone(),
-        rhs: deposit_witness.after.clone(),
-    };
-
-    let operations: Vec<Operation<_>> = vec![
+    vec![
         operation_zero,
         operation_one,
         operation_two,
         operation_three,
-        operation_four,
-    ];
-    operations
+    ]
 }
 #[cfg(test)]
 mod test {
     use super::*;
-    use franklinmodels::merkle_tree::PedersenHasher;
 
-    use crate::tests::utils::public_data_commitment;
-    use bellman::groth16::generate_random_parameters;
-    use bellman::groth16::{
-        create_random_proof, prepare_verifying_key, verify_proof,
-    };
+    use crate::witness::utils::public_data_commitment;
 
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
+
     use ff::{BitIterator, Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-    use franklinmodels::primitives::{GetBits};
 
     use franklin_crypto::circuit::test::*;
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklin_crypto::jubjub::FixedGenerators;
     use franklinmodels::circuit::account::{
-         CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
+        Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
+    use franklinmodels::merkle_tree::PedersenHasher;
     use franklinmodels::params as franklin_constants;
-
     use rand::{Rng, SeedableRng, XorShiftRng};
-
     #[test]
-    fn test_deposit_franklin_in_empty_leaf() {
+    fn test_partial_exit_franklin() {
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let validator_address_number = 7;
         let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
         let block_number = Fr::from_str("1").unwrap();
-        let rng =
-            &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
         let phasher = PedersenHasher::<Bn256>::default();
 
         let mut tree: CircuitAccountTree =
             CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
-        println!("empty tree root_hash is: {}", tree.root_hash());
+
         let sender_sk = PrivateKey::<Bn256>(rng.gen());
         let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
         let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
         let (sender_x, sender_y) = sender_pk.0.into_xy();
-        let sender_leaf = CircuitAccount::<Bn256> {
-        subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
-        nonce: Fr::zero(),
-        pub_key_hash: sender_pub_key_hash
-        // pub_x: validator_x.clone(),
-        // pub_y: validator_y.clone(),
-    };
-        println!("zero root_hash equals: {}", sender_leaf.subtree.root_hash());
+        println!("x = {}, y = {}", sender_x, sender_y);
 
         // give some funds to sender and make zero balance for recipient
         let validator_sk = PrivateKey::<Bn256>(rng.gen());
         let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
         let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
-
+        let (validator_x, validator_y) = validator_pk.0.into_xy();
+        println!("x = {}, y = {}", validator_x, validator_y);
         let validator_leaf = CircuitAccount::<Bn256> {
             subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
-            pub_key_hash: validator_pub_key_hash,
+            pub_key_hash: validator_pub_key_hash.clone(),
         };
-        println!(
-            "validator_leaf_len {:?}",
-            validator_leaf.get_bits_le().len()
-        );
-        println!(
-            "validator_leaf_subree {:?}",
-            validator_leaf.subtree.root_hash()
-        );
 
         let mut validator_balances = vec![];
         for _ in 0..1 << *franklin_constants::BALANCE_TREE_DEPTH {
@@ -377,22 +326,44 @@ mod test {
         let mut account_address: u32 = rng.gen();
         account_address %= tree.capacity();
         let amount: u128 = 500;
-        let fee: u128 = 80;
+        let fee: u128 = 100;
         let token: u32 = 2;
+        let ethereum_key = Fr::from_str("124").unwrap();
 
-        //-------------- Start applying changes to state
-        let deposit_witness = apply_deposit(
+        let sender_balance_before: u128 = 2000;
+
+        let sender_balance_before_as_field_element =
+            Fr::from_str(&sender_balance_before.to_string()).unwrap();
+
+        let mut sender_balance_tree =
+            CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
+        sender_balance_tree.insert(
+            token,
+            Balance {
+                value: sender_balance_before_as_field_element,
+            },
+        );
+
+        let sender_leaf_initial = CircuitAccount::<Bn256> {
+            subtree: sender_balance_tree,
+            nonce: Fr::zero(),
+            pub_key_hash: sender_pub_key_hash.clone(),
+        };
+
+        tree.insert(account_address, sender_leaf_initial);
+
+        let partial_exit_witness = apply_partial_exit(
             &mut tree,
-            &DepositData {
+            &PartialExitData {
                 amount: amount,
                 fee: fee,
                 token: token,
                 account_address: account_address,
-                new_pub_key_hash: sender_pub_key_hash,
+                ethereum_key: ethereum_key,
             },
         );
 
-        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
+        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on partial_exit proof
         let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
         sig_bits.reverse();
         sig_bits.truncate(80);
@@ -401,171 +372,33 @@ mod test {
         let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
         //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
-        let operations = calculate_deposit_operations_from_witness(
-            &deposit_witness,
+        let operations = calculate_partial_exit_operations_from_witness(
+            &partial_exit_witness,
             &sig_msg,
             signature,
             &sender_x,
             &sender_y,
         );
 
-        println!("tree before_applying fees: {}", tree.root_hash());
-
         let (root_after_fee, validator_account_witness) =
             apply_fee(&mut tree, validator_address_number, token, fee);
-        println!("test root after fees {}", root_after_fee);
+
         let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
 
         let public_data_commitment = public_data_commitment::<Bn256>(
-            &deposit_witness.get_pubdata(),
-            deposit_witness.before_root,
+            &partial_exit_witness.get_pubdata(),
+            partial_exit_witness.before_root,
             Some(root_after_fee),
             Some(validator_address),
             Some(block_number),
         );
-        println!("validator balances: {}", validator_balances.len());
-
         {
             let mut cs = TestConstraintSystem::<Bn256>::new();
 
             let instance = FranklinCircuit {
                 operation_batch_size: 10,
                 params,
-                old_root: deposit_witness.before_root.clone(),
-                new_root: Some(root_after_fee.clone()),
-                operations: operations.clone(),
-                pub_data_commitment: Some(public_data_commitment.clone()),
-                block_number: Some(block_number.clone()),
-                validator_account: validator_account_witness.clone(),
-                validator_address: Some(validator_address.clone()),
-                validator_balances: validator_balances.clone(),
-                validator_audit_path: validator_audit_path.clone(),
-            };
-            instance.synthesize(&mut cs).unwrap();
-
-            println!("unconstrained: {}", cs.find_unconstrained());
-            println!("number of constraints {}", cs.num_constraints());
-            let err = cs.which_is_unsatisfied();
-            if err.is_some() {
-                panic!("ERROR satisfying in {}", err.unwrap());
-            }
-        }
-    }
-
-    #[test]
-    fn test_deposit_franklin_proof() {
-        let params = &AltJubjubBn256::new();
-        let p_g = FixedGenerators::SpendingKeyGenerator;
-        let validator_address_number = 7;
-        let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
-        let block_number = Fr::from_str("1").unwrap();
-        let mut rng =
-            &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
-        let phasher = PedersenHasher::<Bn256>::default();
-
-        let mut tree: CircuitAccountTree =
-            CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
-        println!("empty tree root_hash is: {}", tree.root_hash());
-        let sender_sk = PrivateKey::<Bn256>(rng.gen());
-        let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
-        let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
-        let (sender_x, sender_y) = sender_pk.0.into_xy();
-        let sender_leaf = CircuitAccount::<Bn256> {
-            subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
-            nonce: Fr::zero(),
-            pub_key_hash: sender_pub_key_hash,
-        };
-        println!("zero root_hash equals: {}", sender_leaf.subtree.root_hash());
-
-        // give some funds to sender and make zero balance for recipient
-        let validator_sk = PrivateKey::<Bn256>(rng.gen());
-        let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
-        let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
-
-        let validator_leaf = CircuitAccount::<Bn256> {
-            subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
-            nonce: Fr::zero(),
-            pub_key_hash: validator_pub_key_hash,
-        };
-
-        let mut validator_balances = vec![];
-        for _ in 0..1 << *franklin_constants::BALANCE_TREE_DEPTH {
-            validator_balances.push(Some(Fr::zero()));
-        }
-        tree.insert(validator_address_number, validator_leaf);
-
-        let mut account_address: u32 = rng.gen();
-        account_address %= tree.capacity();
-        let amount: u128 = 500;
-        let fee: u128 = 80;
-        let token: u32 = 2;
-
-        //-------------- Start applying changes to state
-        let deposit_witness = apply_deposit(
-            &mut tree,
-            &DepositData {
-                amount: amount,
-                fee: fee,
-                token: token,
-                account_address: account_address,
-                new_pub_key_hash: sender_pub_key_hash,
-            },
-        );
-
-        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
-        let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
-        sig_bits.reverse();
-        sig_bits.truncate(80);
-
-        // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
-        let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
-        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-
-        let operations = calculate_deposit_operations_from_witness(
-            &deposit_witness,
-            &sig_msg,
-            signature,
-            &sender_x,
-            &sender_y,
-        );
-
-        println!("tree before_applying fees: {}", tree.root_hash());
-
-        let (root_after_fee, validator_account_witness) =
-            apply_fee(&mut tree, validator_address_number, token, fee);
-        println!("test root after fees {}", root_after_fee);
-        let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
-
-        let public_data_commitment = public_data_commitment::<Bn256>(
-            &deposit_witness.get_pubdata(),
-            deposit_witness.before_root,
-            Some(root_after_fee),
-            Some(validator_address),
-            Some(block_number),
-        );
-        println!("validator balances: {}", validator_balances.len());
-
-        {
-            let instance = FranklinCircuit {
-                operation_batch_size: 10,
-                params,
-                old_root: deposit_witness.before_root.clone(),
-                new_root: Some(root_after_fee.clone()),
-                operations: operations.clone(),
-                pub_data_commitment: Some(public_data_commitment.clone()),
-                block_number: Some(block_number.clone()),
-                validator_account: validator_account_witness.clone(),
-                validator_address: Some(validator_address.clone()),
-                validator_balances: validator_balances.clone(),
-                validator_audit_path: validator_audit_path.clone(),
-            };
-
-            let tmp_cirtuit_params = generate_random_parameters(instance, &mut rng).unwrap();
-            println!("len a is {}", tmp_cirtuit_params.a.len());
-            let instance = FranklinCircuit {
-                operation_batch_size: 10,
-                params,
-                old_root: deposit_witness.before_root,
+                old_root: partial_exit_witness.before_root,
                 new_root: Some(root_after_fee),
                 operations: operations,
                 pub_data_commitment: Some(public_data_commitment),
@@ -576,25 +409,151 @@ mod test {
                 validator_audit_path: validator_audit_path,
             };
 
-            let proof = create_random_proof(instance, &tmp_cirtuit_params, &mut rng);
-            if proof.is_err() {
-                panic!("proof can not be created: {}", proof.err().unwrap());
-                //             return Err(BabyProverErr::Other("proof.is_err()".to_owned()));
+            instance.synthesize(&mut cs).unwrap();
+
+            println!("{}", cs.find_unconstrained());
+
+            println!("{}", cs.num_constraints());
+
+            let err = cs.which_is_unsatisfied();
+            if err.is_some() {
+                panic!("ERROR satisfying in {}", err.unwrap());
             }
+        }
+    }
 
-            let p = proof.unwrap();
+    #[test]
+    fn test_full_exit_franklin() {
+        let params = &AltJubjubBn256::new();
+        let p_g = FixedGenerators::SpendingKeyGenerator;
+        let validator_address_number = 7;
+        let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
+        let block_number = Fr::from_str("1").unwrap();
+        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+        let phasher = PedersenHasher::<Bn256>::default();
 
-            let pvk = prepare_verifying_key(&tmp_cirtuit_params.vk);
+        let mut tree: CircuitAccountTree =
+            CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
 
-            let success = verify_proof(&pvk, &p.clone(), &[public_data_commitment]);
-            if success.is_err() {
-                panic!(
-                    "Proof is verification failed with error {}",
-                    success.err().unwrap()
-                );
-            }
-            if !success.unwrap() {
-                panic!("Proof is invalid");
+        let sender_sk = PrivateKey::<Bn256>(rng.gen());
+        let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
+        let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
+        let (sender_x, sender_y) = sender_pk.0.into_xy();
+        println!("x = {}, y = {}", sender_x, sender_y);
+
+        // give some funds to sender and make zero balance for recipient
+        let validator_sk = PrivateKey::<Bn256>(rng.gen());
+        let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
+        let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
+        let (validator_x, validator_y) = validator_pk.0.into_xy();
+        println!("x = {}, y = {}", validator_x, validator_y);
+        let validator_leaf = CircuitAccount::<Bn256> {
+            subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
+            nonce: Fr::zero(),
+            pub_key_hash: validator_pub_key_hash,
+        };
+
+        let mut validator_balances = vec![];
+        for _ in 0..1 << *franklin_constants::BALANCE_TREE_DEPTH {
+            validator_balances.push(Some(Fr::zero()));
+        }
+        tree.insert(validator_address_number, validator_leaf);
+
+        let mut account_address: u32 = rng.gen();
+        account_address %= tree.capacity();
+        let amount: u128 = 0;
+        let fee: u128 = 100;
+        let token: u32 = 2;
+        let ethereum_key = Fr::from_str("124").unwrap();
+
+        let sender_balance_before: u128 = 2000;
+
+        let sender_balance_before_as_field_element =
+            Fr::from_str(&sender_balance_before.to_string()).unwrap();
+
+        let mut sender_balance_tree =
+            CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32);
+        sender_balance_tree.insert(
+            token,
+            Balance {
+                value: sender_balance_before_as_field_element,
+            },
+        );
+
+        let sender_leaf_initial = CircuitAccount::<Bn256> {
+            subtree: sender_balance_tree,
+            nonce: Fr::zero(),
+            pub_key_hash: sender_pub_key_hash.clone(),
+        };
+
+        tree.insert(account_address, sender_leaf_initial);
+
+        let partial_exit_witness = apply_partial_exit(
+            &mut tree,
+            &PartialExitData {
+                amount: amount,
+                fee: fee,
+                token: token,
+                account_address: account_address,
+                ethereum_key: ethereum_key,
+            },
+        );
+
+        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on partial_exit proof
+        let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
+        sig_bits.reverse();
+        sig_bits.truncate(80);
+
+        // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
+        let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
+        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+
+        let operations = calculate_partial_exit_operations_from_witness(
+            &partial_exit_witness,
+            &sig_msg,
+            signature,
+            &sender_x,
+            &sender_y,
+        );
+
+        let (root_after_fee, validator_account_witness) =
+            apply_fee(&mut tree, validator_address_number, token, fee);
+
+        let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
+
+        let public_data_commitment = public_data_commitment::<Bn256>(
+            &partial_exit_witness.get_pubdata(),
+            partial_exit_witness.before_root,
+            Some(root_after_fee),
+            Some(validator_address),
+            Some(block_number),
+        );
+        {
+            let mut cs = TestConstraintSystem::<Bn256>::new();
+
+            let instance = FranklinCircuit {
+                operation_batch_size: 10,
+                params,
+                old_root: partial_exit_witness.before_root,
+                new_root: Some(root_after_fee),
+                operations: operations,
+                pub_data_commitment: Some(public_data_commitment),
+                block_number: Some(block_number),
+                validator_account: validator_account_witness,
+                validator_address: Some(validator_address),
+                validator_balances: validator_balances,
+                validator_audit_path: validator_audit_path,
+            };
+
+            instance.synthesize(&mut cs).unwrap();
+
+            println!("{}", cs.find_unconstrained());
+
+            println!("{}", cs.num_constraints());
+
+            let err = cs.which_is_unsatisfied();
+            if err.is_some() {
+                panic!("ERROR satisfying in {}", err.unwrap());
             }
         }
     }
