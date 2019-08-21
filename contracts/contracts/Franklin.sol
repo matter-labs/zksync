@@ -20,6 +20,7 @@ contract Franklin {
     // To make sure that all reverted blocks can be copied under block gas limit!
     uint256 constant MAX_UNVERIFIED_BLOCKS = 4 * 60 * 100;
 
+    uint8 constant PUBKEY_HASH_LEN = 20;
     event BlockCommitted(uint32 indexed blockNumber);
     event BlockVerified(uint32 indexed blockNumber);
 
@@ -446,7 +447,7 @@ contract Franklin {
 
         // deposit
         if (opType == 0x01) {
-            // to_account: 3, token: 2, amount: 3, fee: 1, new_pubkey_hash: 27
+            // to_account: 3, token: 2, amount: 3, fee: 1, new_pubkey_hash: 20
 
             uint16 tokenId = uint16(
                 (uint256(uint8(_publicData[opDataPointer + 3])) << 8) +
@@ -462,8 +463,8 @@ contract Franklin {
             uint8 feePacked = uint8(_publicData[opDataPointer + 8]);
             uint112 fee = unpackFee(feePacked);
 
-            bytes memory franklin_address_ = new bytes(27);
-            for (uint256 i = 0; i < 27; i++) {
+            bytes memory franklin_address_ = new bytes(PUBKEY_HASH_LEN);
+            for (uint8 i = 0; i < PUBKEY_HASH_LEN; i++) {
                 franklin_address_[i] = _publicData[opDataPointer + 9 + i];
             }
             address account = depositFranklinToETH[franklin_address_];

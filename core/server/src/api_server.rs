@@ -359,7 +359,7 @@ fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpRespon
 
 fn handle_get_blocks(
     req: &HttpRequest<AppState>,
-) -> Box<Future<Item = HttpResponse, Error = Error>> {
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let pool = req.state().connection_pool.clone();
 
     let max_block = req
@@ -473,7 +473,7 @@ fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<Htt
 //    pub from_block: Option<u32>,
 //}
 
-fn handle_search(req: &HttpRequest<AppState>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn handle_search(req: &HttpRequest<AppState>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let pool = req.state().connection_pool.clone();
     let query = req.query().get("query").cloned().unwrap_or_default();
     req.body()

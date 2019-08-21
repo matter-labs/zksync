@@ -66,7 +66,6 @@ impl<E: JubjubEngine> PartialExitWitness<E> {
             &self.args.ethereum_key.unwrap(),
             franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
         );
-        assert_eq!(pubdata_bits.len(), 30 * 8);
         pubdata_bits.resize(32 * 8, false);
         pubdata_bits
     }

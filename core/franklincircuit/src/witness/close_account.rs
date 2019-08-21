@@ -36,7 +36,6 @@ impl<E: JubjubEngine> CloseAccountWitness<E> {
             franklin_constants::ACCOUNT_TREE_DEPTH,
         );
 
-        assert_eq!(pubdata_bits.len(), 4 * 8);
         pubdata_bits.resize(8 * 8, false);
         pubdata_bits
     }

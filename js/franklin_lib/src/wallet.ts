@@ -9,6 +9,7 @@ import {Contract, ethers} from 'ethers';
 import {BigNumber, bigNumberify, BigNumberish, parseEther} from "ethers/utils";
 
 const IERC20Conract = require("openzeppelin-solidity/build/contracts/IERC20");
+const PUBKEY_HASH_LEN=20;
 import {franklinContractCode} from "../../../contracts/src.ts/deploy";
 
 export type Address = string;
@@ -73,7 +74,7 @@ export class Wallet {
         let [x, y] = [this.publicKey.getX(), this.publicKey.getY()];
         let buff = Buffer.from(x.toString('hex') + y.toString('hex'), 'hex');
         let hash = pedersenHash(buff);
-        this.address = '0x' + (hash.getX().toString('hex') + hash.getY().toString('hex')).slice(0, 27 * 2);
+        this.address = '0x' + (hash.getX().toString('hex') + hash.getY().toString('hex')).slice(0, PUBKEY_HASH_LEN * 2);
     }
 
     async depositOnchain(token: Token, amount: BigNumber) {

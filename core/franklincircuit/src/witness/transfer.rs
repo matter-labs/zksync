@@ -68,7 +68,6 @@ impl<E: JubjubEngine> TransferWitness<E> {
             &self.args.fee.unwrap(),
             franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         );
-        assert_eq!(pubdata_bits.len(), 13 * 8);
         pubdata_bits.resize(16 * 8, false); //TODO verify if right padding is okay
         pubdata_bits
     }

@@ -5,7 +5,7 @@ use crate::element::{CircuitElement, CircuitPubkey};
 use crate::operation::Operation;
 use crate::utils::{allocate_audit_path, allocate_sum, pack_bits_to_element};
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
-use ff::{Field, PrimeField};
+use ff::{Field, PrimeField, PrimeFieldRepr};
 use franklin_crypto::circuit::baby_eddsa::EddsaSignature;
 use franklin_crypto::circuit::boolean::Boolean;
 use franklin_crypto::circuit::ecc;
@@ -18,6 +18,7 @@ use franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers
 use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
 use franklinmodels::params as franklin_constants;
+use franklinmodels::circuit::account::CircuitAccount;
 
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 6;
 #[derive(Clone)]
@@ -964,9 +965,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //AMOUNT_PACKED=24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //FEE_PACKED=8
         pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //NEW_PUBKEY_HASH_WIDTH=216
-                                                                    // assert_eq!(pubdata_bits.len(), 37 * 8);
         pubdata_bits.resize(
-            5 * franklin_constants::CHUNK_BIT_WIDTH,
+            4 * franklin_constants::CHUNK_BIT_WIDTH, //TODO: move to constant
             Boolean::constant(false),
         );
 
@@ -974,7 +974,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
             &chunk_data.chunk_number,
-            5,
+            4,
         )?;
 
         let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
@@ -1078,7 +1078,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
         pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
-                                                                //        assert_eq!(pubdata_bits.len(), 4 * 8);
         pubdata_bits.resize(
             1 * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
@@ -1105,14 +1104,16 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?);
         is_valid_flags.push(is_close_account.clone());
 
+        let tmp = CircuitAccount::<E>::empty_balances_root_hash();
+        let mut r_repr = E::Fr::zero().into_repr();
+        r_repr.read_be(&tmp[..]).unwrap();
+        let empty_root = E::Fr::from_repr(r_repr).unwrap();
+
         let are_balances_empty = Boolean::from(Expression::equals(
             cs.namespace(|| "are_balances_empty"),
             &subtree_root.get_number(),
             Expression::constant::<CS>(
-                E::Fr::from_str(
-                    "12664135291474228520400367798299639483374948309969244932763243939023372626162",
-                )
-                .unwrap(),
+                empty_root,
             ), //This is precalculated root_hash of subtree with empty balances
         )?);
         is_valid_flags.push(are_balances_empty);
@@ -1201,10 +1202,9 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(lhs.account_address.get_bits_be()); //24
         pubdata_bits.extend(pub_token_bits.clone()); //16
         pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //24
-        pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //224
+        pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //160
         pubdata_bits.extend(rhs.account_address.get_bits_be()); //24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //8
-                                                               //        assert_eq!(pubdata_bits.len(), 40 * 8);
         pubdata_bits.resize(
             5 * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
@@ -1361,7 +1361,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(rhs.account_address.get_bits_be());
         pubdata_bits.extend(op_data.amount_packed.get_bits_be());
         pubdata_bits.extend(op_data.fee_packed.get_bits_be());
-        //        assert_eq!(pubdata_bits.len(), 13 * 8);
 
         pubdata_bits.resize(
             2 * franklin_constants::CHUNK_BIT_WIDTH,
@@ -1788,15 +1787,15 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
         let y = E::Fr::from_str("1").unwrap();
         points.push((x, y));
     }
-    for i in &[3] {
-        //partial exit
+    for i in &[1,3] {
+        //deposit, partial exit
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let y = E::Fr::from_str("3").unwrap();
         points.push((x, y));
     }
 
-    for i in &[1, 2] {
-        //deposit, transfer_to_new
+    for i in &[ 2] {
+        //transfer_to_new
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let y = E::Fr::from_str("4").unwrap();
         points.push((x, y));
