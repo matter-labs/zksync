@@ -5,7 +5,7 @@
   "author": "Alex <ag@thematter.io>",
   "private": true,
   "scripts": {
-    "dev": "webpack-dev-server --port 9000 --open --hot --define process.env.NODE_ENV='\"development\"'",
+    "dev": "webpack-dev-server --port 7000 --open --hot --define process.env.NODE_ENV='\"development\"'",
     "build": "NODE_ENV=production webpack --config webpack.config.prod.js --progress --hide-modules"
   },
   "dependencies": {

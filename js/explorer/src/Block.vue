@@ -47,7 +47,7 @@ export default {
             const block = await client.getBlock(this.blockNumber)
             if (!block) return
 
-            this.type            = block.type
+            // this.type            = block.type
             this.new_state_root  = block.new_state_root
             this.commit_tx_hash  = block.commit_tx_hash || ''
             this.verify_tx_hash  = block.verify_tx_hash || ''
@@ -57,11 +57,14 @@ export default {
 
             let txs = await client.getBlockTransactions(this.blockNumber)
             this.transactions = txs.map( (tx, index) => ({
-                number:     index+1,
-                from:       tx.from,
-                to:         tx.to,
-                amount:     this.formatFranklin(tx.amount) + ' ETH',
-                nonce:      tx.nonce,
+                number:      index+1,
+                type:        tx.tx_type,
+                from:        tx.from ? (tx.from.slice(0, 8) + '...' + tx.from.slice(36, 42)) : "Ext",
+                to:          tx.to ? (tx.to.slice(0, 8) + '...' + tx.to.slice(36, 42)) : "Ext",
+                token:       tx.token,
+                amount:      tx.amount ? (this.formatFranklin(tx.amount) + ' ETH') : "None",
+                fee:         tx.fee ? (this.formatFranklin(tx.fee) + ' ETH') : "None",
+                nonce:       tx.nonce,
             }))
         },
     },
@@ -88,19 +91,20 @@ export default {
         props() {
             return [
                 { name: 'Block #',          value: `<b>${this.blockNumber}</b>`},
-                //{ name: 'Type',             value: this.type, },
                 { name: 'New root hash',    value: this.new_state_root, },
                 // { name: 'Transactions',     value: client.TX_PER_BLOCK(), },
                 { name: 'Status',           value: this.status, },
-                { name: 'Commit tx hash',   value: `<a target="blanc" href="${this.etherscan}/tx/${this.commit_tx_hash}">${this.commit_tx_hash}</a>`, },
-                { name: 'Verify tx hash',   value: `<a target="blanc" href="${this.etherscan}/tx/${this.verify_tx_hash}">${this.verify_tx_hash}</a>`, },
+                { name: 'Commit tx hash',   value: `<a target="blanc" href="${this.blockchain_explorer_tx}/${this.commit_tx_hash}">${this.commit_tx_hash}</a>`, },
+                { name: 'Committed at',     value: this.committed_at},
+                { name: 'Verify tx hash',   value: `<a target="blanc" href="${this.blockchain_explorer_tx}/${this.verify_tx_hash}">${this.verify_tx_hash}</a>`, },
+                { name: 'Committed at',     value: this.verified_at},
             ]
         }
     },
     data() {
         return {
             new_state_root: null,
-            type:           null,
+            // type:           null,
             commit_tx_hash: null,
             verify_tx_hash: null,
             committed_at:   null,

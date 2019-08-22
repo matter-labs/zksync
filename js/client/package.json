@@ -5,7 +5,7 @@
   "author": "Alex <gluk64@gmail.com>",
   "private": true,
   "scripts": {
-    "dev": "webpack-dev-server --port 8000 --open --hot --define process.env.NODE_ENV='\"development\"'",
+    "dev": "webpack-dev-server --port 9000 --open --hot --define process.env.NODE_ENV='\"development\"'",
     "build": "NODE_ENV=production webpack --config webpack.config.prod.js --progress --hide-modules"
   },
   "dependencies": {
@@ -19,6 +19,7 @@
     "ethers": "^4.0.20",
     "ethjs": "^0.4.0",
     "ethjs-util": "^0.1.6",
+    "franklin_lib": "../franklin_lib",
     "html-webpack-plugin": "^3.2.0",
     "js-sha3": "^0.8.0",
     "popper.js": "^1.12.9",
