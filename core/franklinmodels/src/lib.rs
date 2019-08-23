@@ -70,7 +70,7 @@ impl std::fmt::Debug for Action {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Operation {
-    pub id: Option<i32>,
+    pub id: Option<i64>,
     pub action: Action,
     pub block: Block,
     pub accounts_updated: AccountUpdates,

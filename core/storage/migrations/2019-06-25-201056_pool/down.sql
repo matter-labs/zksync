@@ -6,13 +6,13 @@ CREATE TABLE transactions
     id           serial primary key,
 
     tx_type      text      not null,
-    from_account integer   not null,
-    to_account   integer,
-    nonce        integer,
+    from_account bigint   not null,
+    to_account   bigint,
+    nonce        bigint,
     amount       integer   not null,
     fee          integer   not null,
 
-    block_number integer,
+    block_number bigint,
     state_root   text,
 
     created_at   timestamp not null default now()
