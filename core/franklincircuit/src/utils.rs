@@ -281,14 +281,3 @@ pub fn encode_fr_into_fs<E: JubjubEngine>(input: E::Fr) -> E::Fs {
 
     converted
 }
-
-#[test]
-fn test_be_bytes_to_bit_conversion() {
-    let a = 7 as u8;
-    let mut acum = 1 as u8;
-    for i in 0..8 {
-        let bit = a & acum;
-        println!("bit: {}", bit);
-        acum *= 2;
-    }
-}

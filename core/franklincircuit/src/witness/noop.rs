@@ -82,9 +82,7 @@ pub fn noop_operation(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::tests::utils::public_data_commitment;
-    use franklin_crypto::circuit::float_point::convert_to_float;
-    use franklin_crypto::jubjub::JubjubEngine;
+    use crate::witness::utils::public_data_commitment;
 
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
@@ -100,11 +98,8 @@ mod test {
     };
     use franklinmodels::params as franklin_constants;
 
-    use num_traits::cast::ToPrimitive;
-    use pairing::bn256::*;
     use rand::{Rng, SeedableRng, XorShiftRng};
 
-    use franklinmodels::merkle_tree::hasher::Hasher;
     use franklinmodels::merkle_tree::PedersenHasher;
 
     #[test]
@@ -146,10 +141,7 @@ mod test {
 
         let mut account_address: u32 = rng.gen();
         account_address %= tree.capacity();
-        let amount: u128 = 0;
-        let fee: u128 = 100;
         let token: u32 = 2;
-        let ethereum_key = Fr::from_str("124").unwrap();
 
         let sender_balance_before: u128 = 2000;
 
@@ -190,7 +182,7 @@ mod test {
             &sender_x,
             &sender_y,
         );
-        let (root_after_fee, validator_account_witness) =
+        let (_, validator_account_witness) =
             apply_fee(&mut tree, validator_address_number, 0, 0);
         let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
 

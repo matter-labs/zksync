@@ -66,7 +66,6 @@ impl<E: JubjubEngine> PartialExitWitness<E> {
             &self.args.ethereum_key.unwrap(),
             franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
         );
-        assert_eq!(pubdata_bits.len(), 30 * 8);
         pubdata_bits.resize(32 * 8, false);
         pubdata_bits
     }
@@ -269,7 +268,7 @@ pub fn calculate_partial_exit_operations_from_witness(
 mod test {
     use super::*;
 
-    use crate::tests::utils::public_data_commitment;
+    use crate::witness::utils::public_data_commitment;
 
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
@@ -283,10 +282,8 @@ mod test {
     use franklinmodels::circuit::account::{
         Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
-    use franklinmodels::merkle_tree::hasher::Hasher;
     use franklinmodels::merkle_tree::PedersenHasher;
     use franklinmodels::params as franklin_constants;
-    use pairing::bn256::*;
     use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
     fn test_partial_exit_franklin() {

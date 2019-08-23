@@ -66,7 +66,7 @@ impl<E: JubjubEngine> DepositWitness<E> {
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         );
         //        assert_eq!(pubdata_bits.len(), 37 * 8);
-        pubdata_bits.resize(40 * 8, false);
+        pubdata_bits.resize(32 * 8, false);
         pubdata_bits
     }
 }
@@ -272,59 +272,40 @@ pub fn calculate_deposit_operations_from_witness(
         lhs: deposit_witness.after.clone(),
         rhs: deposit_witness.after.clone(),
     };
-    let operation_four = Operation {
-        new_root: deposit_witness.after_root.clone(),
-        tx_type: deposit_witness.tx_type,
-        chunk: Some(Fr::from_str("4").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[4]),
-        sig_msg: Some(sig_msg.clone()),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(signer_pub_key_x.clone()),
-        signer_pub_key_y: Some(signer_pub_key_y.clone()),
-        args: deposit_witness.args.clone(),
-        lhs: deposit_witness.after.clone(),
-        rhs: deposit_witness.after.clone(),
-    };
 
     let operations: Vec<Operation<_>> = vec![
         operation_zero,
         operation_one,
         operation_two,
         operation_three,
-        operation_four,
     ];
     operations
 }
 #[cfg(test)]
 mod test {
     use super::*;
-    use franklinmodels::merkle_tree::hasher::Hasher;
     use franklinmodels::merkle_tree::PedersenHasher;
 
-    use crate::account::AccountWitness;
-    use crate::tests::utils::public_data_commitment;
+    use crate::witness::utils::public_data_commitment;
     use bellman::groth16::generate_random_parameters;
     use bellman::groth16::{
-        create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
+        create_random_proof, prepare_verifying_key, verify_proof,
     };
 
     use crate::circuit::FranklinCircuit;
-    use crate::operation::*;
-    use crate::utils::*;
     use bellman::Circuit;
-
     use ff::{BitIterator, Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+    use franklinmodels::primitives::{GetBits};
 
     use franklin_crypto::circuit::test::*;
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklin_crypto::jubjub::FixedGenerators;
     use franklinmodels::circuit::account::{
-        Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
+         CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
     use franklinmodels::params as franklin_constants;
 
-    use pairing::bn256::*;
     use rand::{Rng, SeedableRng, XorShiftRng};
 
     #[test]
@@ -334,7 +315,7 @@ mod test {
         let validator_address_number = 7;
         let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
         let block_number = Fr::from_str("1").unwrap();
-        let mut rng =
+        let rng =
             &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
         let phasher = PedersenHasher::<Bn256>::default();
 
@@ -358,13 +339,20 @@ mod test {
         let validator_sk = PrivateKey::<Bn256>(rng.gen());
         let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
         let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
-        let (validator_x, validator_y) = validator_pk.0.into_xy();
 
         let validator_leaf = CircuitAccount::<Bn256> {
             subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
             pub_key_hash: validator_pub_key_hash,
         };
+        println!(
+            "validator_leaf_len {:?}",
+            validator_leaf.get_bits_le().len()
+        );
+        println!(
+            "validator_leaf_subree {:?}",
+            validator_leaf.subtree.root_hash()
+        );
 
         let mut validator_balances = vec![];
         for _ in 0..1 << *franklin_constants::BALANCE_TREE_DEPTH {
@@ -451,7 +439,7 @@ mod test {
     }
 
     #[test]
-    fn test_deposit_franklin_in_empty_leaf_proof() {
+    fn test_deposit_franklin_proof() {
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let validator_address_number = 7;
@@ -469,19 +457,16 @@ mod test {
         let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
         let (sender_x, sender_y) = sender_pk.0.into_xy();
         let sender_leaf = CircuitAccount::<Bn256> {
-        subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
-        nonce: Fr::zero(),
-        pub_key_hash: sender_pub_key_hash
-        // pub_x: validator_x.clone(),
-        // pub_y: validator_y.clone(),
-    };
+            subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
+            nonce: Fr::zero(),
+            pub_key_hash: sender_pub_key_hash,
+        };
         println!("zero root_hash equals: {}", sender_leaf.subtree.root_hash());
 
         // give some funds to sender and make zero balance for recipient
         let validator_sk = PrivateKey::<Bn256>(rng.gen());
         let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
         let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
-        let (validator_x, validator_y) = validator_pk.0.into_xy();
 
         let validator_leaf = CircuitAccount::<Bn256> {
             subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),

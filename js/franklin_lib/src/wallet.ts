@@ -10,7 +10,7 @@ import {Contract, ethers} from 'ethers';
 type BigNumber = ethers.utils.BigNumber;
 type BigNumberish = ethers.utils.BigNumberish;
 const bigNumberify = ethers.utils.bigNumberify;
-
+const PUBKEY_HASH_LEN=20;
 const IERC20Conract = require("../abi/IERC20");
 const franklinContractCode = require("../abi/Franklin");
 
@@ -73,7 +73,7 @@ export class Wallet {
         let [x, y] = [this.publicKey.getX(), this.publicKey.getY()];
         let buff = Buffer.from(x.toString('hex').padStart(64,'0') + y.toString('hex').padStart(64, '0'), 'hex');
         let hash = pedersenHash(buff);
-        this.address = '0x' + (hash.getX().toString('hex').padStart(64, '0') + hash.getY().toString('hex').padStart(64,'0')).slice(0, 27 * 2);
+        this.address = '0x' + (hash.getX().toString('hex').padStart(64, '0') + hash.getY().toString('hex').padStart(64,'0')).slice(0, PUBKEY_HASH_LEN * 2);
     }
 
     async depositOnchain(token: Token, amount: BigNumberish) {

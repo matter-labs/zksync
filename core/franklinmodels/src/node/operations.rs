@@ -9,7 +9,7 @@ pub struct DepositOp {
 }
 
 impl DepositOp {
-    const CHUNKS: usize = 5;
+    const CHUNKS: usize = 4;
     const OP_CODE: u8 = 0x01;
 
     fn get_public_data(&self) -> Vec<u8> {

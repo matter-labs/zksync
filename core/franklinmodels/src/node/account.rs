@@ -1,8 +1,8 @@
 use crate::params;
 use crate::primitives::GetBits;
 
-use std::convert::TryInto;
 use std::collections::HashMap;
+use std::convert::TryInto;
 
 use bigdecimal::BigDecimal;
 use failure::ensure;
@@ -100,11 +100,14 @@ impl From<Account> for CircuitAccount<super::Engine> {
         let balances: Vec<_> = acc
             .balances
             .iter()
-            .map(|(id, b)|
-                     (*id,
-                Balance {
-                value: Fr::from_str(&b.to_string()).unwrap(),
-                               }))
+            .map(|(id, b)| {
+                (
+                    *id,
+                    Balance {
+                        value: Fr::from_str(&b.to_string()).unwrap(),
+                    },
+                )
+            })
             .collect();
 
         for (i, b) in balances.into_iter() {

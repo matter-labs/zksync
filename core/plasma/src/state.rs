@@ -85,7 +85,10 @@ impl PlasmaState {
     }
 
     fn apply_deposit(&mut self, tx: Deposit) -> Result<TxSuccess, Error> {
-        ensure!(tx.token < (params::TOTAL_TOKENS as TokenId), "Token id is not supported");
+        ensure!(
+            tx.token < (params::TOTAL_TOKENS as TokenId),
+            "Token id is not supported"
+        );
         let account_id = if let Some((account_id, _)) = self.get_account_by_address(&tx.to) {
             account_id
         } else {
@@ -102,7 +105,10 @@ impl PlasmaState {
     }
 
     fn apply_transfer(&mut self, tx: Transfer) -> Result<TxSuccess, Error> {
-        ensure!(tx.token < (params::TOTAL_TOKENS as TokenId), "Token id is not supported");
+        ensure!(
+            tx.token < (params::TOTAL_TOKENS as TokenId),
+            "Token id is not supported"
+        );
         let (from, _) = self
             .get_account_by_address(&tx.from)
             .ok_or_else(|| format_err!("From account does not exist"))?;
@@ -130,7 +136,10 @@ impl PlasmaState {
     }
 
     fn apply_withdraw(&mut self, tx: Withdraw) -> Result<TxSuccess, Error> {
-        ensure!(tx.token < (params::TOTAL_TOKENS as TokenId), "Token id is not supported");
+        ensure!(
+            tx.token < (params::TOTAL_TOKENS as TokenId),
+            "Token id is not supported"
+        );
         let (account_id, _) = self
             .get_account_by_address(&tx.account)
             .ok_or_else(|| format_err!("Account does not exist"))?;
