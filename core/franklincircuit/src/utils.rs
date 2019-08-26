@@ -37,17 +37,13 @@ where
     }
     println!("message_len {}", message_bytes.len());
     let max_message_len = 31 as usize; //todo
-    let signature = private_key.sign_raw_message(&message_bytes, rng, p_g, params, max_message_len);
-    // let signature = private_key.musig_pedersen_sign(&message_bytes, rng, p_g, params);
+                                       // let signature = private_key.sign_raw_message(&message_bytes, rng, p_g, params, max_message_len);
+    let signature = private_key.musig_pedersen_sign(&message_bytes, rng, p_g, params);
 
     let pk = PublicKey::from_private(&private_key, p_g, params);
-    let is_valid_signature = pk.verify_for_raw_message(
-        &message_bytes,
-        &signature.clone(),
-        p_g,
-        params,
-        max_message_len,
-    );
+    // let is_valid_signature = pk.verify_for_raw_message(
+    let is_valid_signature =
+        pk.verify_musig_pedersen(&message_bytes, &signature.clone(), p_g, params);
     if !is_valid_signature {
         return None;
     }

@@ -53,8 +53,10 @@ pub struct Deposit {
 }
 
 impl Deposit {
+    const TX_TYPE: u8 = 1;
     fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
+        out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.to.data);
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&pack_token_amount(&self.amount));

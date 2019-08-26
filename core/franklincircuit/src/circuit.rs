@@ -644,12 +644,57 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             pk: sender_pk,
         };
 
+        let mut data_bits = op_data.sig_msg.get_bits_le();
+        data_bits.resize(256, Boolean::constant(false));
+
+        let mut hash_bits: Vec<Boolean> = vec![];
+
+        let mut pk_x_serialized = signature
+            .pk
+            .get_x()
+            .clone()
+            .into_bits_le(cs.namespace(|| "pk_x_bits"))?;
+        pk_x_serialized.resize(256, Boolean::constant(false));
+        hash_bits.extend(pk_x_serialized);
+        let mut r_x_serialized = signature
+            .r
+            .get_x()
+            .clone()
+            .into_bits_le(cs.namespace(|| "r_x_bits"))?;
+        r_x_serialized.resize(256, Boolean::constant(false));
+        hash_bits.extend(r_x_serialized);
+
+        let sig_hash = pedersen_hash::pedersen_hash(
+            cs.namespace(|| "hash_sig"),
+            pedersen_hash::Personalization::NoteCommitment,
+            &hash_bits,
+            self.params,
+        )?;
+        let mut first_hash_bits = sig_hash
+            .get_x()
+            .into_bits_le(cs.namespace(|| "first_hash_bits"))?;
+        first_hash_bits.resize(256, Boolean::constant(false));
+
+        let mut second_hash_bits = vec![];
+        second_hash_bits.extend(first_hash_bits);
+        second_hash_bits.extend(data_bits);
+        let second_hash = pedersen_hash::pedersen_hash(
+            cs.namespace(|| "second_hash"),
+            pedersen_hash::Personalization::NoteCommitment,
+            &second_hash_bits,
+            self.params,
+        )?
+        .get_x()
+        .clone();
+
+        let h_bits = second_hash.into_bits_le(cs.namespace(|| "h_bits"))?;
+
         let max_message_len = 32 as usize; //TODO fix when clear
                                            //TOdO: we should always use the same length
         signature.verify_raw_message_signature(
             cs.namespace(|| "verify transaction signature"),
             self.params,
-            &op_data.sig_msg.get_bits_le(),
+            &h_bits,
             generator,
             max_message_len,
         )?;
@@ -1031,6 +1076,40 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &is_first_chunk,
         )?;
 
+        // construct signature message
+        let mut sig_bits = vec![];
+
+        sig_bits.extend(chunk_data.tx_type.get_bits_be());
+        sig_bits.extend(op_data.new_pubkey_hash.get_bits_be());
+        sig_bits.extend(cur.token.get_bits_be());
+        sig_bits.extend(op_data.amount_packed.get_bits_be());
+        sig_bits.extend(op_data.fee_packed.get_bits_be());
+        sig_bits.extend(cur.account.nonce.get_bits_be());
+
+        let sig_bit_len = sig_bits.len();
+        let sig_msg = CircuitElement::from_le_bits(
+            cs.namespace(|| "sig_msg from bits"),
+            sig_bits,
+            sig_bit_len,
+        )?; //TODO; think of ommiting 3rd argument
+        let sig_hash = pedersen_hash::pedersen_hash(
+            cs.namespace(|| "hash_sig_bits"),
+            pedersen_hash::Personalization::NoteCommitment,
+            &sig_msg.get_bits_le(),
+            self.params,
+        )?
+        .get_x()
+        .clone();
+        //TODO: rhs_pubkey
+
+        let is_sig_msg_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_sig_msg_correct"),
+            &op_data.sig_msg.get_number(),
+            Expression::from(&sig_hash),
+        )?);
+
+        
+        is_valid_flags.push(is_sig_msg_correct);
         // below we conditionally (if first chunk) update leaf
 
         // update balance
@@ -1404,6 +1483,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         sig_bits.extend(chunk_data.tx_type.get_bits_le());
         sig_bits.extend(lhs.account_address.get_bits_le());
+        sig_bits.extend(lhs.account.pub_key_hash.get_bits_le());
         sig_bits.extend(lhs.token.get_bits_le());
         sig_bits.extend(lhs.account.nonce.get_bits_le());
         sig_bits.extend(op_data.amount_packed.get_bits_le().clone());

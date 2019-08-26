@@ -378,10 +378,24 @@ mod test {
             },
         );
 
-        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
+        //------------- Calculate sig bits
+        let mut sig_bits_to_hash = vec![];
+        append_be_fixed_width(&mut sig_bits_to_hash, &Fr::from_str("1").unwrap(), *franklin_constants::TX_TYPE_BIT_WIDTH);
+        append_be_fixed_width(&mut sig_bits_to_hash, &deposit_witness.args.new_pub_key_hash.unwrap(), franklin_constants::NEW_PUBKEY_HASH_WIDTH);
+        append_be_fixed_width(&mut sig_bits_to_hash, &deposit_witness.before.token.unwrap(), *franklin_constants::TOKEN_EXT_BIT_WIDTH);
+        append_be_fixed_width(&mut sig_bits_to_hash,&deposit_witness.args.amount.unwrap(), franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
+                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH);
+        append_be_fixed_width(
+            &mut sig_bits_to_hash,
+            &deposit_witness.args.fee.unwrap(),
+            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+        );
+        append_be_fixed_width(&mut sig_bits_to_hash, &deposit_witness.before.witness.account_witness.nonce.unwrap(), franklin_constants::NONCE_BIT_WIDTH);
+
+        // let sig_msg: Fr = le_bit_vector_into_field_element(&sig_bits);
+        let sig_msg= phasher.hash_bits(sig_bits_to_hash.clone());
         let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
         sig_bits.reverse();
-        sig_bits.truncate(80);
 
         // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
         let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
@@ -497,7 +511,6 @@ mod test {
                 new_pub_key_hash: sender_pub_key_hash,
             },
         );
-
         let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
         let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
         sig_bits.reverse();
