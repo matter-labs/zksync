@@ -17,8 +17,8 @@ use franklin_crypto::circuit::pedersen_hash;
 use franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
 use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
-use franklinmodels::params as franklin_constants;
 use franklinmodels::circuit::account::CircuitAccount;
+use franklinmodels::params as franklin_constants;
 
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 6;
 #[derive(Clone)]
@@ -1108,7 +1108,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             Expression::from(&sig_hash),
         )?);
 
-        
         is_valid_flags.push(is_sig_msg_correct);
         // below we conditionally (if first chunk) update leaf
 
@@ -1191,9 +1190,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let are_balances_empty = Boolean::from(Expression::equals(
             cs.namespace(|| "are_balances_empty"),
             &subtree_root.get_number(),
-            Expression::constant::<CS>(
-                empty_root,
-            ), //This is precalculated root_hash of subtree with empty balances
+            Expression::constant::<CS>(empty_root), //This is precalculated root_hash of subtree with empty balances
         )?);
         is_valid_flags.push(are_balances_empty);
         let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
@@ -1867,14 +1864,14 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
         let y = E::Fr::from_str("1").unwrap();
         points.push((x, y));
     }
-    for i in &[1,3] {
+    for i in &[1, 3] {
         //deposit, partial exit
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let y = E::Fr::from_str("3").unwrap();
         points.push((x, y));
     }
 
-    for i in &[ 2] {
+    for i in &[2] {
         //transfer_to_new
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let y = E::Fr::from_str("4").unwrap();

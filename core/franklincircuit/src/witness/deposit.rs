@@ -283,11 +283,11 @@ pub fn calculate_deposit_operations_from_witness(
 #[cfg(test)]
 mod test {
     use super::*;
-    use franklinmodels::merkle_tree::PedersenHasher;
-    use franklinmodels::merkle_tree::hasher::Hasher;
     use crate::witness::utils::public_data_commitment;
     use bellman::groth16::generate_random_parameters;
     use bellman::groth16::{create_random_proof, prepare_verifying_key, verify_proof};
+    use franklinmodels::merkle_tree::hasher::Hasher;
+    use franklinmodels::merkle_tree::PedersenHasher;
 
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
