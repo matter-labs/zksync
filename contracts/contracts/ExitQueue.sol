@@ -30,6 +30,8 @@ contract ExitQueue is Ownable {
         // fee: 1
         // signature: 32,
         // proof: 32
+        
+        require(exitRequests[msg.sender] == 0, "Exit request from this sender exists");
         accountsQueue[totalRequests] = msg.sender;
         exitRequests[msg.sender] = publicData;
         totalRequests++;
@@ -37,9 +39,14 @@ contract ExitQueue is Ownable {
         // TODO: - need to unpack?
     }
 
-    function peek(uint32 requestsCount) external returns (ExitRequest[] memory) {
-        ExitRequest[requestsCount] requests = new ExitRequest(requestsCount);
-        for (uint32 i = 0; i < requestsCount; i++) {
+    function getRequests(uint32 requestsCount) external returns (ExitRequest[] memory) {
+        require(totalRequests > 0, "No exit requests");
+        uint32 count = requestsCount;
+        if (totalRequests < requestsCount) {
+            count = totalRequests;
+        }
+        ExitRequest[count] requests = new ExitRequest(count);
+        for (uint32 i = 0; i < count; i++) {
             requests[i] = exitRequests[accountsQueue[i]].toExitRequest();
         }
         return requests;
@@ -52,7 +59,12 @@ contract ExitQueue is Ownable {
     }
 
     function removeRequests(uint32 requestsCount) external {
-        for (uint32 i = 0; i < requestsCount; i++) {
+        require(totalRequests > 0, "No exit requests");
+        uint32 count = requestsCount;
+        if (totalRequests < requestsCount) {
+            count = totalRequests;
+        }
+        for (uint32 i = 0; i < count; i++) {
             address account = accountsQueue[i];
             delete accountsQueue[i];
             delete exitRequests[account];
