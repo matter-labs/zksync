@@ -8,7 +8,6 @@ use num_traits::cast::ToPrimitive;
 use franklin_crypto::circuit::float_point::{convert_to_float, parse_float_to_u128};
 use franklin_crypto::jubjub::JubjubEngine;
 use franklinmodels::circuit::account::CircuitAccountTree;
-
 use franklinmodels::node::DepositOp;
 use franklinmodels::params as franklin_constants;
 use pairing::bn256::*;
@@ -285,24 +284,22 @@ pub fn calculate_deposit_operations_from_witness(
 mod test {
     use super::*;
     use franklinmodels::merkle_tree::PedersenHasher;
-
+    use franklinmodels::merkle_tree::hasher::Hasher;
     use crate::witness::utils::public_data_commitment;
     use bellman::groth16::generate_random_parameters;
-    use bellman::groth16::{
-        create_random_proof, prepare_verifying_key, verify_proof,
-    };
+    use bellman::groth16::{create_random_proof, prepare_verifying_key, verify_proof};
 
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
     use ff::{BitIterator, Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-    use franklinmodels::primitives::{GetBits};
+    use franklinmodels::primitives::GetBits;
 
     use franklin_crypto::circuit::test::*;
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklin_crypto::jubjub::FixedGenerators;
     use franklinmodels::circuit::account::{
-         CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
+        CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
     use franklinmodels::params as franklin_constants;
 
@@ -315,8 +312,7 @@ mod test {
         let validator_address_number = 7;
         let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
         let block_number = Fr::from_str("1").unwrap();
-        let rng =
-            &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
         let phasher = PedersenHasher::<Bn256>::default();
 
         let mut tree: CircuitAccountTree =
@@ -327,12 +323,11 @@ mod test {
         let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
         let (sender_x, sender_y) = sender_pk.0.into_xy();
         let sender_leaf = CircuitAccount::<Bn256> {
-        subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
-        nonce: Fr::zero(),
-        pub_key_hash: sender_pub_key_hash
-        // pub_x: validator_x.clone(),
-        // pub_y: validator_y.clone(),
-    };
+            subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
+            nonce: Fr::zero(),
+            pub_key_hash: sender_pub_key_hash, // pub_x: validator_x.clone(),
+                                               // pub_y: validator_y.clone(),
+        };
         println!("zero root_hash equals: {}", sender_leaf.subtree.root_hash());
 
         // give some funds to sender and make zero balance for recipient
@@ -380,20 +375,45 @@ mod test {
 
         //------------- Calculate sig bits
         let mut sig_bits_to_hash = vec![];
-        append_be_fixed_width(&mut sig_bits_to_hash, &Fr::from_str("1").unwrap(), *franklin_constants::TX_TYPE_BIT_WIDTH);
-        append_be_fixed_width(&mut sig_bits_to_hash, &deposit_witness.args.new_pub_key_hash.unwrap(), franklin_constants::NEW_PUBKEY_HASH_WIDTH);
-        append_be_fixed_width(&mut sig_bits_to_hash, &deposit_witness.before.token.unwrap(), *franklin_constants::TOKEN_EXT_BIT_WIDTH);
-        append_be_fixed_width(&mut sig_bits_to_hash,&deposit_witness.args.amount.unwrap(), franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
-                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH);
+        append_be_fixed_width(
+            &mut sig_bits_to_hash,
+            &Fr::from_str("1").unwrap(),
+            *franklin_constants::TX_TYPE_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits_to_hash,
+            &deposit_witness.args.new_pub_key_hash.unwrap(),
+            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits_to_hash,
+            &deposit_witness.before.token.unwrap(),
+            *franklin_constants::TOKEN_EXT_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits_to_hash,
+            &deposit_witness.args.amount.unwrap(),
+            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
+                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+        );
         append_be_fixed_width(
             &mut sig_bits_to_hash,
             &deposit_witness.args.fee.unwrap(),
             franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         );
-        append_be_fixed_width(&mut sig_bits_to_hash, &deposit_witness.before.witness.account_witness.nonce.unwrap(), franklin_constants::NONCE_BIT_WIDTH);
+        append_be_fixed_width(
+            &mut sig_bits_to_hash,
+            &deposit_witness
+                .before
+                .witness
+                .account_witness
+                .nonce
+                .unwrap(),
+            franklin_constants::NONCE_BIT_WIDTH,
+        );
 
         // let sig_msg: Fr = le_bit_vector_into_field_element(&sig_bits);
-        let sig_msg= phasher.hash_bits(sig_bits_to_hash.clone());
+        let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
         let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
         sig_bits.reverse();
 
