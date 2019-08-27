@@ -3,14 +3,23 @@ pragma solidity ^0.5.8;
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
 contract ExitQueue is Ownable {
+
+    // Franklin contract address
+    address private franklinAddress;
+
     // Contains not satisfied exit requests
     mapping(uint32 => address) private accountsQueue;
     mapping(address => bytes) private exitRequests; // TODO: -in bytes or struct?
     uint32 public totalRequests;
 
+    constructor(address _franklinAddress) public {
+        franklinAddress = _franklinAddress;
+    }
+
     // ExitRequest sctructure
     // TODO: - is it final?
     struct ExitRequest {
+        uint32 untilEthBlock;
         address accountId;
         address ethereumAddress;
         uint32 blockNumber;
@@ -39,14 +48,10 @@ contract ExitQueue is Ownable {
         // TODO: - need to unpack?
     }
 
-    function getRequests(uint32 requestsCount) external returns (ExitRequest[] memory) {
+    function getRequests() external returns (ExitRequest[] memory) {
         require(totalRequests > 0, "No exit requests");
-        uint32 count = requestsCount;
-        if (totalRequests < requestsCount) {
-            count = totalRequests;
-        }
-        ExitRequest[count] requests = new ExitRequest(count);
-        for (uint32 i = 0; i < count; i++) {
+        ExitRequest[totalRequests] requests = new ExitRequest(totalRequests);
+        for (uint32 i = 0; i < totalRequests; i++) {
             requests[i] = exitRequests[accountsQueue[i]].toExitRequest();
         }
         return requests;
@@ -58,16 +63,21 @@ contract ExitQueue is Ownable {
         });
     }
 
-    function removeRequests(uint32 requestsCount) external {
+    function removeRequests() external {
         require(totalRequests > 0, "No exit requests");
-        uint32 count = requestsCount;
-        if (totalRequests < requestsCount) {
-            count = totalRequests;
-        }
-        for (uint32 i = 0; i < count; i++) {
+        for (uint32 i = 0; i < totalRequests; i++) {
             address account = accountsQueue[i];
-            delete accountsQueue[i];
             delete exitRequests[account];
+            delete accountsQueue[i];
+        }
+
+    }
+
+    function checkForExodus() external {
+        // TODO: - recode
+        if (exitRequests[0].untilEthBlock > block.number) {
+            // TODO: - trigger exodus
+            
         }
     }
 
