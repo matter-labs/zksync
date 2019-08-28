@@ -224,7 +224,7 @@ impl PlasmaStateKeeper {
         filtered_txs
             .into_iter()
             .take_while(|tx| {
-                total_chunks += tx.min_number_of_chunks();
+                total_chunks += self.state.chunks_for_tx(&tx);
                 total_chunks <= BLOCK_SIZE_CHUNKS
             })
             .collect()
@@ -238,8 +238,8 @@ impl PlasmaStateKeeper {
                 .get(&(deposit.to.clone(), deposit.token))
             {
                 ensure!(
-                    locked_balance.amount >= deposit.amount,
-                    format!("Locked amount insufficient, locked: {}, deposit: {}", locked_balance.amount, deposit.amount)
+                    locked_balance.amount >= &deposit.amount + &deposit.fee,
+                    "Locked amount insufficient, locked: {}, deposit: {}", locked_balance.amount, deposit.amount
                 );
                 ensure!(
                     locked_balance.blocks_left_until_unlock > 10,

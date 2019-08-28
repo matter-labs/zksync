@@ -72,7 +72,7 @@ impl PlasmaState {
 
     pub fn chunks_for_tx(&self, franklin_tx: &FranklinTx) -> usize {
         match franklin_tx {
-            FranklinTx::Transfer(tx) => if let Some((_, _)) = self.get_account_by_address(&tx.to) {
+            FranklinTx::Transfer(tx) => if self.get_account_by_address(&tx.to).is_some() {
                 TransferOp::CHUNKS
             } else {
                 TransferToNewOp::CHUNKS
