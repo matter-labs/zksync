@@ -1,97 +1,113 @@
 pragma solidity ^0.5.8;
+pragma experimental ABIEncoderV2;
 
-import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
+contract ExitQueue {
 
-contract ExitQueue is Ownable {
+    //TODO
+    uint256 constant requestLength = ;
+
+    struct ExitRequest {
+        address accountAddress;
+        address ethereumAddress;
+        uint16 token;
+        bytes20 signature;
+        uint expirationBlock;
+    }
+
+    struct RequestCreds {
+        address accountAddress;
+        uint16 token;
+    }
 
     // Franklin contract address
     address private franklinAddress;
 
     // Contains not satisfied exit requests
-    mapping(uint32 => address) private accountsQueue;
-    mapping(address => bytes) private exitRequests; // TODO: -in bytes or struct?
+    mapping(uint32 => RequestCreds) private exitRequestsCreds;
+    mapping(address => mapping(uint16 => ExitRequest)) private exitRequests;
     uint32 public totalRequests;
+
+    modifier onlyFranklin() {
+        require(msg.sender == franklinAddress, "Not the main Franklin contract");
+        _;
+    }
 
     constructor(address _franklinAddress) public {
         franklinAddress = _franklinAddress;
     }
 
-    // ExitRequest sctructure
-    // TODO: - is it final?
-    struct ExitRequest {
-        uint32 untilEthBlock;
-        address accountId;
-        address ethereumAddress;
-        uint32 blockNumber;
-        uint16 tokenId;
-        uint128 balance;
-        uint128 fee;
-        bytes32 signature;
-        uint256[8] proof;
+    function validateSignature(address accountAddress, bytes memory signature) internal returns (bytes20 pedersenHash) {
+        // TODO
     }
 
-    function addRequest(bytes memory publicData) external {
-        // TODO: what chanks? - discuss
-        // Pubdata:
-        // ethereumAddress: 20
-        // blockNumber: 32
-        // tokenId: 2
-        // fee: 1
-        // signature: 32,
-        // proof: 32
-        
-        require(exitRequests[msg.sender] == 0, "Exit request from this sender exists");
-        accountsQueue[totalRequests] = msg.sender;
-        exitRequests[msg.sender] = publicData;
+    function requestToBytes(ExitRequest memory request) internal returns (bytes memory requestBytes) {
+        // TODO
+    }
+
+    function addRequest(address accountAddress, address ethereumAddress, uint16 token, bytes calldata signature) external {
+        require(exitRequests[accountAddress][token].expirationBlock == 0, "Exit request from this sender for chosen token exists");
+
+        bytes20 signatureHash = validateSignature(accountAddress, signature);
+
+        exitRequestsCreds[totalRequests] = RequestCreds(
+            accountAddress,
+            token
+        );
+        exitRequests[accountAddress][token] = ExitRequest(
+            accountAddress,
+            ethereumAddress,
+            token,
+            signatureHash,
+            block.number+250
+        );
         totalRequests++;
-        // TODO: - who need to validate proof?
-        // TODO: - need to unpack?
     }
 
-    function getRequests(uint32 _count) external returns (ExitRequest[] memory) {
+    function getRequests(uint32 _count) external view returns (bytes memory) {
         require(totalRequests > 0, "No exit requests");
-        uint32 requestsToRemove = _count;
+
+        uint32 requestsToGet = _count;
         if (_count > totalRequests) {
-            requestsToRemove = totalRequests;
+            requestsToGet = totalRequests;
         }
-        ExitRequest[requestsToRemove] requests = new ExitRequest(requestsToRemove);
-        for (uint32 i = 0; i < requestsToRemove; i++) {
-            requests[i] = exitRequests[accountsQueue[i]].toExitRequest();
+
+        bytes memory requests = new bytes(requestsToGet*requestLength);
+        for (uint32 i = 0; i < requestsToGet; i++) {
+            RequestCreds memory creds = exitRequestsCreds[i];
+            // TODO
+            requests.concat(exitRequests[creds.accountAddress][creds.token].requestToBytes());
         }
         return requests;
     }
 
-    function toExitRequest(bytes memory publicData) internal returns (ExitRequest) {
-        return ExitRequest({
-            /// TODO
-        });
-    }
-
-    function removeRequests(uint32 _count) external {
+    function removeRequests(uint32 _count) external onlyFranklin {
         require(totalRequests > 0, "No exit requests");
+
         uint32 requestsToRemove = _count;
         if (_count > totalRequests) {
             requestsToRemove = totalRequests;
         }
+
         for (uint32 i = 0; i < requestsToRemove; i++) {
-            address account = accountsQueue[i];
-            delete exitRequests[account];
-            delete accountsQueue[i];
+            RequestCreds memory creds = exitRequestsCreds[i];
+            delete exitRequestsCreds[i];
+            delete exitRequests[creds.accountAddress][creds.token];
         }
+
         uint32 nonremovedCount = totalRequests - requestsToRemove;
         if (nonremovedCount > 0) {
             for (uint32 i = requestsToRemove; i < totalRequests; i++) {
-                accountsQueue[i-requestsToRemove] = accountsQueue[i];
+                exitRequestsCreds[i-requestsToRemove] = exitRequestsCreds[i];
+                delete exitRequestsCreds[i];
             }
         }
+
+        totalRequests -= _count;
     }
 
-    function checkForExodus() external {
-        // TODO: - recode
-        if (exitRequests[0].untilEthBlock > block.number) {
-            // TODO: - trigger exodus
-            
-        }
+    function isExodusActivated(uint currentBlock) external view returns (bool) {
+        uint expirationBlock = exitRequests[exitRequestsCreds[0].accountAddress][exitRequestsCreds[0].token].expirationBlock;
+        return currentBlock >= expirationBlock;
     }
 
 }
