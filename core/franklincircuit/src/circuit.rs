@@ -643,61 +643,63 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             s: signature_s,
             pk: sender_pk,
         };
+   
+        verify_pedersen(cs.namespace(||"musig pedersen"), &op_data.sig_msg, &signature, self.params, generator)?;
 
-        let mut data_bits = op_data.sig_msg.get_bits_le();
-        data_bits.resize(256, Boolean::constant(false));
+        // let mut data_bits = op_data.sig_msg.get_bits_le();
+        // data_bits.resize(256, Boolean::constant(false));
 
-        let mut hash_bits: Vec<Boolean> = vec![];
+        // let mut hash_bits: Vec<Boolean> = vec![];
 
-        let mut pk_x_serialized = signature
-            .pk
-            .get_x()
-            .clone()
-            .into_bits_le(cs.namespace(|| "pk_x_bits"))?;
-        pk_x_serialized.resize(256, Boolean::constant(false));
-        hash_bits.extend(pk_x_serialized);
-        let mut r_x_serialized = signature
-            .r
-            .get_x()
-            .clone()
-            .into_bits_le(cs.namespace(|| "r_x_bits"))?;
-        r_x_serialized.resize(256, Boolean::constant(false));
-        hash_bits.extend(r_x_serialized);
+        // let mut pk_x_serialized = signature
+        //     .pk
+        //     .get_x()
+        //     .clone()
+        //     .into_bits_le(cs.namespace(|| "pk_x_bits"))?;
+        // pk_x_serialized.resize(256, Boolean::constant(false));
+        // hash_bits.extend(pk_x_serialized);
+        // let mut r_x_serialized = signature
+        //     .r
+        //     .get_x()
+        //     .clone()
+        //     .into_bits_le(cs.namespace(|| "r_x_bits"))?;
+        // r_x_serialized.resize(256, Boolean::constant(false));
+        // hash_bits.extend(r_x_serialized);
 
-        let sig_hash = pedersen_hash::pedersen_hash(
-            cs.namespace(|| "hash_sig"),
-            pedersen_hash::Personalization::NoteCommitment,
-            &hash_bits,
-            self.params,
-        )?;
-        let mut first_hash_bits = sig_hash
-            .get_x()
-            .into_bits_le(cs.namespace(|| "first_hash_bits"))?;
-        first_hash_bits.resize(256, Boolean::constant(false));
+        // let sig_hash = pedersen_hash::pedersen_hash(
+        //     cs.namespace(|| "hash_sig"),
+        //     pedersen_hash::Personalization::NoteCommitment,
+        //     &hash_bits,
+        //     self.params,
+        // )?;
+        // let mut first_hash_bits = sig_hash
+        //     .get_x()
+        //     .into_bits_le(cs.namespace(|| "first_hash_bits"))?;
+        // first_hash_bits.resize(256, Boolean::constant(false));
 
-        let mut second_hash_bits = vec![];
-        second_hash_bits.extend(first_hash_bits);
-        second_hash_bits.extend(data_bits);
-        let second_hash = pedersen_hash::pedersen_hash(
-            cs.namespace(|| "second_hash"),
-            pedersen_hash::Personalization::NoteCommitment,
-            &second_hash_bits,
-            self.params,
-        )?
-        .get_x()
-        .clone();
+        // let mut second_hash_bits = vec![];
+        // second_hash_bits.extend(first_hash_bits);
+        // second_hash_bits.extend(data_bits);
+        // let second_hash = pedersen_hash::pedersen_hash(
+        //     cs.namespace(|| "second_hash"),
+        //     pedersen_hash::Personalization::NoteCommitment,
+        //     &second_hash_bits,
+        //     self.params,
+        // )?
+        // .get_x()
+        // .clone();
 
-        let h_bits = second_hash.into_bits_le(cs.namespace(|| "h_bits"))?;
+        // let h_bits = second_hash.into_bits_le(cs.namespace(|| "h_bits"))?;
 
-        let max_message_len = 32 as usize; //TODO fix when clear
-                                           //TOdO: we should always use the same length
-        signature.verify_raw_message_signature(
-            cs.namespace(|| "verify transaction signature"),
-            self.params,
-            &h_bits,
-            generator,
-            max_message_len,
-        )?;
+        // let max_message_len = 32 as usize; //TODO fix when clear
+        //                                    //TOdO: we should always use the same length
+        // signature.verify_raw_message_signature(
+        //     cs.namespace(|| "verify transaction signature"),
+        //     self.params,
+        //     &h_bits,
+        //     generator,
+        //     max_message_len,
+        // )?;
 
         let diff_a_b =
             Expression::from(&op_data.a.get_number()) - Expression::from(&op_data.b.get_number());
@@ -1746,6 +1748,71 @@ fn multi_and<E: JubjubEngine, CS: ConstraintSystem<E>>(
     }
 
     Ok(result)
+}
+
+fn verify_pedersen<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    sig_msg: &CircuitElement<E>,
+    signature: &EddsaSignature<E>,
+    params: &E::Params,
+    generator: ecc::EdwardsPoint<E>,
+) -> Result<(), SynthesisError> {
+    let mut sig_data_bits = sig_msg.get_bits_le();
+    sig_data_bits.resize(256, Boolean::constant(false));
+
+    let mut first_round_bits: Vec<Boolean> = vec![];
+
+    let mut pk_x_serialized = signature
+        .pk
+        .get_x()
+        .clone()
+        .into_bits_le(cs.namespace(|| "pk_x_bits"))?;
+    pk_x_serialized.resize(256, Boolean::constant(false));
+
+    let mut r_x_serialized = signature
+        .r
+        .get_x()
+        .clone()
+        .into_bits_le(cs.namespace(|| "r_x_bits"))?;
+    r_x_serialized.resize(256, Boolean::constant(false));
+
+    first_round_bits.extend(pk_x_serialized);
+    first_round_bits.extend(r_x_serialized);
+
+    let first_round_hash = pedersen_hash::pedersen_hash(
+        cs.namespace(|| "first_round_hash"),
+        pedersen_hash::Personalization::NoteCommitment,
+        &first_round_bits,
+        params,
+    )?;
+    let mut first_round_hash_bits = first_round_hash
+        .get_x()
+        .into_bits_le(cs.namespace(|| "first_round_hash_bits"))?;
+    first_round_hash_bits.resize(256, Boolean::constant(false));
+
+    let mut second_round_bits = vec![];
+    second_round_bits.extend(first_round_hash_bits);
+    second_round_bits.extend(sig_data_bits);
+    let second_round_hash = pedersen_hash::pedersen_hash(
+        cs.namespace(|| "second_hash"),
+        pedersen_hash::Personalization::NoteCommitment,
+        &second_round_bits,
+        params,
+    )?
+    .get_x()
+    .clone();
+
+    let h_bits = second_round_hash.into_bits_le(cs.namespace(|| "h_bits"))?;
+
+    let max_message_len = 32 as usize; //since it is the result of pedersen hash
+    signature.verify_raw_message_signature(
+        cs.namespace(|| "verify transaction signature"),
+        params,
+        &h_bits,
+        generator,
+        max_message_len,
+    )?;
+    Ok(())
 }
 
 fn select_pubdata_chunk<E: JubjubEngine, CS: ConstraintSystem<E>>(

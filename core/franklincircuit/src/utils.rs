@@ -10,7 +10,7 @@ use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
 use crate::operation::TransactionSignature;
 use franklinmodels::params as franklin_constants;
 
-pub fn sign<R, E>(
+pub fn sign_pedersen<R, E>(
     msg_data: &[bool],
     private_key: &PrivateKey<E>,
     p_g: FixedGenerators,

@@ -39,6 +39,26 @@ impl<E: JubjubEngine> CloseAccountWitness<E> {
         pubdata_bits.resize(8 * 8, false);
         pubdata_bits
     }
+    pub fn get_sig_bits(&self) -> Vec<bool> {
+        let mut sig_bits = vec![];
+        append_be_fixed_width(
+            &mut sig_bits,
+            &Fr::from_str("4").unwrap(), //Corresponding tx_type
+            *franklin_constants::TX_TYPE_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.before.witness.account_witness.pub_key_hash.unwrap(),
+            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+        );
+       
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.before.witness.account_witness.nonce.unwrap(),
+            franklin_constants::NONCE_BIT_WIDTH,
+        );
+        sig_bits
+    }
 }
 pub fn apply_close_account_tx(
     tree: &mut CircuitAccountTree,
@@ -229,7 +249,7 @@ mod test {
         sig_bits.truncate(80);
 
         // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
-        let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
+        let signature = sign_pedersen(&sig_bits, &sender_sk, p_g, params, rng);
         //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
         let operations = calculate_close_account_operations_from_witness(

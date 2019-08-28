@@ -77,6 +77,52 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
         pubdata_bits.resize(40 * 8, false);
         pubdata_bits
     }
+    pub fn get_sig_bits(&self) -> Vec<bool> {
+        let mut sig_bits = vec![];
+        append_be_fixed_width(
+            &mut sig_bits,
+            &Fr::from_str("5").unwrap(), //Corresponding tx_type
+            *franklin_constants::TX_TYPE_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self
+                .from_before
+                .witness
+                .account_witness
+                .pub_key_hash
+                .unwrap(),
+            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.args.new_pub_key_hash.unwrap(),
+            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+        );
+
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.from_before.token.unwrap(),
+            *franklin_constants::TOKEN_EXT_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.args.amount.unwrap(),
+            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
+                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.args.fee.unwrap(),
+            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.from_before.witness.account_witness.nonce.unwrap(),
+            franklin_constants::NONCE_BIT_WIDTH,
+        );
+        sig_bits
+    }
 }
 pub fn apply_transfer_to_new_tx(
     tree: &mut CircuitAccountTree,
@@ -575,7 +621,7 @@ mod test {
             sig_msg_hash_bits.len()
         );
 
-        let signature = sign(&sig_bits, &from_sk, p_g, params, rng);
+        let signature = sign_pedersen(&sig_bits, &from_sk, p_g, params, rng);
         let operations = calculate_transfer_to_new_operations_from_witness(
             &transfer_witness,
             &sig_msg,

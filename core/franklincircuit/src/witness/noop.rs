@@ -171,7 +171,7 @@ mod test {
         sig_bits.truncate(80);
 
         // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
-        let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
+        let signature = sign_pedersen(&sig_bits, &sender_sk, p_g, params, rng);
         //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
         let operation = noop_operation(

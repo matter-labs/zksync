@@ -152,7 +152,7 @@ mod test {
         sig_bits.truncate(80);
 
         // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
-        let signature = sign(&sig_bits, &sender_sk, p_g, &params, rng);
+        let signature = sign_pedersen(&sig_bits, &sender_sk, p_g, &params, rng);
         let circ = SignatureCircuit {
             signature: signature,
             pub_x: Some(sender_x),
