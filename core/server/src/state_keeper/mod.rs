@@ -238,7 +238,7 @@ impl PlasmaStateKeeper {
                 .get(&(deposit.to.clone(), deposit.token))
             {
                 ensure!(
-                    locked_balance.amount > deposit.amount,
+                    locked_balance.amount >= &deposit.amount + &deposit.fee,
                     "Locked amount insufficient"
                 );
                 ensure!(
