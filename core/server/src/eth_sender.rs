@@ -1,26 +1,113 @@
+//! Transaction processing policy.
+//! only one pending tx at a time.
+//! poll for tx execu
+//!
+
 use eth_client::ETHClient;
 use ff::{PrimeField, PrimeFieldRepr};
 use models::abi::TEST_PLASMA2_ALWAYS_VERIFY;
 use models::{Action, Operation};
+use std::collections::VecDeque;
 use std::str::FromStr;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use storage::ConnectionPool;
 use web3::types::{H256, U256};
 
-fn run_eth_sender(
-    pool: ConnectionPool,
-    rx_for_eth: Receiver<Operation>,
-    mut eth_client: ETHClient,
-) {
-    let storage = pool
-        .access_storage()
-        .expect("db connection failed for eth sender");
-    for op in rx_for_eth {
-        debug!(
-            "Operation requested: {:?}, {}",
-            &op.action, op.block.block_number
+struct ETHSender {
+    eth_client: ETHClient,
+    op_queue: VecDeque<Operation>,
+    pending_transaction: Option<H256>,
+    db_pool: ConnectionPool,
+}
+
+impl ETHSender {
+    fn new(db_pool: ConnectionPool) -> Self {
+        let eth_client = {
+            let abi_string = serde_json::Value::from_str(TEST_PLASMA2_ALWAYS_VERIFY)
+                .unwrap()
+                .get("abi")
+                .unwrap()
+                .to_string();
+            ETHClient::new(abi_string)
+        };
+        let mut sender = Self {
+            eth_client,
+            op_queue: VecDeque::new(),
+            pending_transaction: None,
+            db_pool,
+        };
+        sender.restore_state();
+        sender
+    }
+
+    fn restore_state(&mut self) {
+        let current_nonce = self
+            .eth_client
+            .current_nonce()
+            .expect("could not fetch current nonce");
+        let storage = self.db_pool.access_storage().expect("db fail");
+        info!(
+            "Starting eth_sender: sender = {}, current_nonce = {}",
+            self.eth_client.current_sender(),
+            current_nonce
         );
-        let tx = match op.action {
+        // execute pending transactions
+        let ops = storage
+            .load_unsent_ops(current_nonce)
+            .expect("db must be functional");
+        for pending_op in ops {
+            self.op_queue.push_back(pending_op);
+        }
+
+        // TODO: restore pending tx from eth.
+    }
+
+    fn run(&mut self, rx_for_eth: Receiver<Operation>) {
+        // check pending tx
+        // success? -> pop next operation
+        // timeout? -> resend with higher gas price
+        // fail? -> notify state_keeper.
+        let storage = self
+            .db_pool
+            .access_storage()
+            .expect("db connection failed for eth sender");
+
+        loop {
+            let new_op = rx_for_eth.recv_timeout(std::time::Duration::from_secs(5));
+            match new_op {
+                Ok(op) => self.op_queue.push_back(op),
+                _ => (),
+            }
+
+            if let Some(pending_tx) = self.pending_transaction.take() {
+                // check tx status.
+                unimplemented!();
+            } else {
+                if let Some(new_op) = self.op_queue.pop_front() {
+                    let tx_hash = self.send_operation(&new_op);
+                    match tx_hash {
+                        Ok(hash) => {
+                            debug!("Commitment tx hash = {:?}", hash);
+                            storage
+                                .save_operation_tx_hash(
+                                    new_op.id.expect("trying to send not stored op?"),
+                                    format!("{:?}", hash),
+                                )
+                                .expect("Failed to save tx hash to db");
+                            self.pending_transaction = Some(hash);
+                        }
+                        Err(err) => {
+                            error!("Error sending tx {}", err);
+                            self.op_queue.push_front(new_op);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn send_operation(&mut self, op: &Operation) -> eth_client::Result<H256> {
+        match &op.action {
             Action::Commit => {
                 let mut be_bytes: Vec<u8> = Vec::new();
                 op.block
@@ -35,9 +122,9 @@ fn run_eth_sender(
                     op.block.get_eth_public_data()
                 );
                 // function commitBlock(uint32 _blockNumber, uint24 _feeAccount, bytes32 _newRoot, bytes calldata _publicData)
-                eth_client.call(
+                self.eth_client.call(
                     "commitBlock",
-                    op.tx_meta.expect("tx meta missing"),
+                    op.tx_meta.clone().expect("tx meta missing"),
                     (
                         u64::from(op.block.block_number),
                         u64::from(op.block.fee_account),
@@ -48,63 +135,24 @@ fn run_eth_sender(
             }
             Action::Verify { proof } => {
                 // function verifyBlock(uint32 _blockNumber, uint256[8] calldata proof) external {
-                eth_client.call(
+                self.eth_client.call(
                     "verifyBlock",
-                    op.tx_meta.expect("tx meta missing"),
-                    (u64::from(op.block.block_number), *proof),
+                    op.tx_meta.clone().expect("tx meta missing"),
+                    (u64::from(op.block.block_number), *proof.clone()),
                 )
             }
-        };
-        // TODO: process tx sending failure
-        // proposal - if there is gas problems - retry with new gas price/gas volume according to policy
-        // if there is tx fail -- propogate error to state keeper.
-        match tx {
-            Ok(hash) => {
-                debug!("Commitment tx hash = {:?}", hash);
-                let _ = storage.save_operation_tx_hash(
-                    op.id.expect("trying to send not stored op?"),
-                    format!("{:?}", hash),
-                );
-            }
-            Err(err) => error!("Error sending tx {}", err),
         }
     }
 }
 
 pub fn start_eth_sender(pool: ConnectionPool) -> Sender<Operation> {
     let (tx_for_eth, rx_for_eth) = channel::<Operation>();
-    let abi_string = serde_json::Value::from_str(TEST_PLASMA2_ALWAYS_VERIFY)
-        .unwrap()
-        .get("abi")
-        .unwrap()
-        .to_string();
-    let eth_client = ETHClient::new(abi_string);
-    let storage = pool
-        .access_storage()
-        .expect("db connection failed for eth sender");
-    let current_nonce = eth_client
-        .current_nonce()
-        .expect("could not fetch current nonce");
-    info!(
-        "Starting eth_sender: sender = {}, current_nonce = {}",
-        eth_client.current_sender(),
-        current_nonce
-    );
-
-    // execute pending transactions
-    let ops = storage
-        .load_unsent_ops(current_nonce)
-        .expect("db must be functional");
-    for pending_op in ops {
-        tx_for_eth
-            .send(pending_op)
-            .expect("must send a request for ethereum transaction for pending operations");
-    }
 
     std::thread::Builder::new()
         .name("eth_sender".to_string())
         .spawn(move || {
-            run_eth_sender(pool, rx_for_eth, eth_client);
+            let mut eth_sender = ETHSender::new(pool);
+            eth_sender.run(rx_for_eth);
         })
         .expect("Eth sender thread");
 

@@ -14,7 +14,7 @@ use web3::contract::tokens::Tokenize;
 
 pub mod signer;
 
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 pub type U32 = u64; // because missing in web3::types; u64 is fine since only used for tokenization
 
