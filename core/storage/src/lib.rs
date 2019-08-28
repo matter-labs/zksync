@@ -973,19 +973,6 @@ impl StorageProcessor {
             .ok()
     }
 
-    // pub fn load_stored_ops_in_blocks_range(&self, max_block: BlockNumber, limit: u32, action_type: ActionType) -> Vec<StoredOperation> {
-    //     let query = format!("
-    //         SELECT * FROM operations
-    //         WHERE block_number <= {max_block} AND action_type = '{action_type}'
-    //         ORDER BY block_number
-    //         DESC
-    //         LIMIT {limit}
-    //     ", max_block = max_block as i64, limit = limit as i64, action_type = action_type.to_string());
-    //     let r = diesel::sql_query(query)
-    //         .load(self.conn());
-    //     r.unwrap_or(vec![])
-    // }
-
     pub fn load_commit_op(&self, block_number: BlockNumber) -> Option<Operation> {
         let op = self.load_stored_op_with_block_number(block_number, ActionType::COMMIT);
         op.and_then(|r| r.into_op(self).ok())
@@ -1008,20 +995,6 @@ impl StorageProcessor {
 
     pub fn load_unverified_commitments(&self) -> QueryResult<Vec<Operation>> {
         self.conn().transaction(|| {
-            // // https://docs.diesel.rs/diesel/query_dsl/trait.QueryDsl.html
-            // use crate::schema::operations::dsl::{*};
-            // let ops: Vec<StoredOperation> = operations
-            //     .filter(action_type.eq(ACTION_COMMIT)
-            //             .and(block_number.gt(
-            //                 coalesce(
-            //                     operations
-            //                     .select(block_number)
-            //                     .filter(action_type.eq(ACTION_VERIFY))
-            //                     .single_value(), 0)
-            //             ))
-            //     )
-            //     .load(self.conn())?;
-
             let ops: Vec<StoredOperation> = diesel::sql_query(
                 "
                 SELECT * FROM operations
@@ -1036,28 +1009,6 @@ impl StorageProcessor {
             .load(self.conn())?;
             ops.into_iter().map(|o| o.into_op(self)).collect()
         })
-    }
-
-    fn load_number(&self, query: &str) -> QueryResult<i64> {
-        diesel::sql_query(query)
-            .get_result::<IntegerNumber>(self.conn())
-            .map(|r| r.integer_value)
-    }
-
-    pub fn load_last_committed_deposit_batch(&self) -> QueryResult<i64> {
-        self.load_number("
-            SELECT COALESCE(max((data->'block'->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
-            WHERE data->'action'->>'type' = 'Commit' 
-            AND data->'block'->'block_data'->>'type' = 'Deposit'
-        ")
-    }
-
-    pub fn load_last_committed_exit_batch(&self) -> QueryResult<i64> {
-        self.load_number("
-            SELECT COALESCE(max((data->'block'->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
-            WHERE data->'action'->>'type' = 'Commit' 
-            AND data->'block'->'block_data'->>'type' = 'Exit'
-        ")
     }
 
     fn get_account_and_last_block(
@@ -1179,37 +1130,21 @@ impl StorageProcessor {
     }
 
     pub fn get_last_committed_block(&self) -> QueryResult<BlockNumber> {
-        // use crate::schema::account_updates::dsl::*;
-        // account_updates
-        //     .select(max(block_number))
-        //     .get_result::<Option<i64>>(self.conn())
-        //     .map(|max| max.unwrap_or(0))
-
         use crate::schema::operations::dsl::*;
         operations
             .select(max(block_number))
             .filter(action_type.eq(ACTION_COMMIT))
             .get_result::<Option<i64>>(self.conn())
             .map(|max| max.unwrap_or(0) as BlockNumber)
-
-        //self.load_number("SELECT COALESCE(max(block_number), 0) AS integer_value FROM account_updates")
     }
 
     pub fn get_last_verified_block(&self) -> QueryResult<BlockNumber> {
-        // use crate::schema::accounts::dsl::*;
-        // accounts
-        //     .select(max(last_block))
-        //     .get_result::<Option<i64>>(self.conn())
-        //     .map(|max| max.unwrap_or(0))
-
         use crate::schema::operations::dsl::*;
         operations
             .select(max(block_number))
             .filter(action_type.eq(ACTION_VERIFY))
             .get_result::<Option<i64>>(self.conn())
             .map(|max| max.unwrap_or(0) as BlockNumber)
-
-        //self.load_number("SELECT COALESCE(max(last_block), 0) AS integer_value FROM accounts")
     }
 
     pub fn fetch_prover_job(
