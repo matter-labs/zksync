@@ -258,10 +258,11 @@ impl PlasmaStateKeeper {
         let mut accounts_updated = Vec::new();
         let mut fees = Vec::new();
         let mut ops = Vec::new();
-        let mut chunks_used = 0;
+        let mut chunks_left = BLOCK_SIZE_CHUNKS;
 
         for tx in transactions.into_iter() {
-            if chunks_used >= BLOCK_SIZE_CHUNKS {
+            let chunks_needed = self.state.chunks_for_tx(&tx);
+            if chunks_left < chunks_needed {
                 break;
             }
 
@@ -285,7 +286,8 @@ impl PlasmaStateKeeper {
                     mut updates,
                     executed_op,
                 }) => {
-                    chunks_used += executed_op.chunks();
+                    assert!(chunks_needed == executed_op.chunks());
+                    chunks_left -= chunks_needed;
                     accounts_updated.append(&mut updates);
                     fees.push(fee);
                     let exec_result = ExecutedTx {

@@ -131,8 +131,6 @@ async function main() {
         console.log(`${w.wallet.address} com: ${w.wallet.franklinState.commited.balances[0]}, d verif: ${diff}`);
     }); 
 
-    return;
-
     const prando = new Prando();
     for (let i = 0; i < 10; i++) {
         console.log(`loop iteration ${i}:`);
@@ -149,11 +147,11 @@ async function main() {
 
             let token = w.wallet.supportedTokens[0];
 
-            let amount = new BN("1");
-            let have = new BN(w.wallet.franklinState.verified.balances[token.id] || "0");
+            let amount = ethers.utils.parseEther("1");
+            let have = ethers.utils.parseEther(w.wallet.franklinState.verified.balances[token.id] || "0");
             amount = amount.lt(have) ? amount : have;
 
-            let fee = new BN("0");
+            let fee = ethers.utils.parseEther("0");
 
             let res = await w.wallet.transfer(address, token, amount, fee);
             console.log(`${w.wallet.address} sent ${res.hash}`);
