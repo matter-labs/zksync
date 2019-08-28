@@ -10,9 +10,9 @@ use franklinmodels::params as franklin_constants;
 use franklin_crypto::circuit::boolean::Boolean;
 use franklin_crypto::circuit::num::AllocatedNum;
 
+use ff::PrimeField;
 use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::JubjubEngine;
-
 pub struct AllocatedOperationBranch<E: JubjubEngine> {
     pub account: AccountContent<E>,
     pub account_audit_path: Vec<AllocatedNum<E>>, //we do not need their bit representations
@@ -92,7 +92,8 @@ pub struct AllocatedOperationData<E: JubjubEngine> {
     pub fee_packed: CircuitElement<E>,
     pub amount: CircuitElement<E>,
     pub fee: CircuitElement<E>,
-    pub sig_msg: CircuitElement<E>,
+    pub first_sig_msg: CircuitElement<E>,
+    pub second_sig_msg: CircuitElement<E>,
     pub new_pubkey_hash: CircuitElement<E>,
     pub ethereum_key: CircuitElement<E>,
     pub a: CircuitElement<E>,
@@ -155,11 +156,18 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
         //            "fee_parsed in allocated_operation_data equals {}",
         //            fee.get_number().get_value().grab()?
         //        );
-        let sig_msg = CircuitElement::from_fe_strict(
-            cs.namespace(|| "signature_message_x"),
-            || op.sig_msg.grab(),
-            franklin_constants::FR_BIT_WIDTH,
-        )?; //TODO: not sure if this is correct length
+        let first_sig_msg = CircuitElement::from_fe_strict(
+            cs.namespace(|| "first_part_signature_message"),
+            || op.first_sig_msg.grab(),
+            E::Fr::CAPACITY as usize,
+        )?;
+
+        let second_sig_msg = CircuitElement::from_fe_strict(
+            cs.namespace(|| "second_part_signature_message"),
+            || op.second_sig_msg.grab(),
+            E::Fr::CAPACITY as usize, //TODO: think of more consistent constant flow
+        )?;
+
         let sig_pubkey = CircuitPubkey::from_xy_fe(
             cs.namespace(|| "signer_pubkey"),
             || op.signer_pub_key_x.grab(),
@@ -192,7 +200,8 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             fee_packed: fee_packed,
             fee: fee,
             amount: amount,
-            sig_msg: sig_msg,
+            first_sig_msg: first_sig_msg,
+            second_sig_msg: second_sig_msg,
             new_pubkey_hash: new_pubkey_hash,
             a: a,
             b: b,

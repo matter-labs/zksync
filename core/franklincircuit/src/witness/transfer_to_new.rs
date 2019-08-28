@@ -339,7 +339,8 @@ pub fn apply_transfer_to_new(
 
 pub fn calculate_transfer_to_new_operations_from_witness(
     transfer_witness: &TransferToNewWitness<Bn256>,
-    sig_msg: &Fr,
+    first_sig_msg: &Fr,
+    second_sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
@@ -355,7 +356,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         tx_type: transfer_witness.tx_type,
         chunk: Some(Fr::from_str("0").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[0]),
-        sig_msg: Some(sig_msg.clone()),
+        first_sig_msg: Some(first_sig_msg.clone()),
+        second_sig_msg: Some(second_sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
@@ -369,7 +371,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         tx_type: transfer_witness.tx_type,
         chunk: Some(Fr::from_str("1").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[1]),
-        sig_msg: Some(sig_msg.clone()),
+        first_sig_msg: Some(first_sig_msg.clone()),
+        second_sig_msg: Some(second_sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
@@ -383,7 +386,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         tx_type: transfer_witness.tx_type,
         chunk: Some(Fr::from_str("2").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[2]),
-        sig_msg: Some(sig_msg.clone()),
+        first_sig_msg: Some(first_sig_msg.clone()),
+        second_sig_msg: Some(second_sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
@@ -397,7 +401,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         tx_type: transfer_witness.tx_type,
         chunk: Some(Fr::from_str("3").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[3]),
-        sig_msg: Some(sig_msg.clone()),
+        first_sig_msg: Some(first_sig_msg.clone()),
+        second_sig_msg: Some(second_sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
@@ -411,7 +416,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         tx_type: transfer_witness.tx_type,
         chunk: Some(Fr::from_str("4").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[4]),
-        sig_msg: Some(sig_msg.clone()),
+        first_sig_msg: Some(first_sig_msg.clone()),
+        second_sig_msg: Some(second_sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
@@ -436,8 +442,7 @@ mod test {
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
 
-    use ff::Field;
-    use ff::PrimeField;
+    use ff::{BitIterator, Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
     use franklin_crypto::circuit::float_point::convert_to_float;
     use franklin_crypto::circuit::test::*;
@@ -565,66 +570,27 @@ mod test {
                 new_pub_key_hash: to_pub_key_hash,
             },
         );
-        // construct signature
-        let mut sig_bits = vec![];
+        let mut sig_bits_to_hash = transfer_witness.get_sig_bits();
+        sig_bits_to_hash.resize((Fr::CAPACITY as usize) * 2, false);
+        let (first_sig_part_bits, second_sig_part_bits) =
+            sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
+        let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits.to_vec());
+        let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits.to_vec());
+        println!("first_sig_part: {}", first_sig_part);
+        println!("second_sig_part: {}", second_sig_part);
+        // let sig_msg: Fr = le_bit_vector_into_field_element(&sig_bits);
+        let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
+        println!("sig_msg: {}", sig_msg);
+        let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
+        sig_bits.reverse();
 
-        let transfer_tx_type = Fr::from_str("5").unwrap();
-        append_le_fixed_width(
-            &mut sig_bits,
-            &transfer_tx_type,
-            *franklin_constants::TX_TYPE_BIT_WIDTH,
-        );
-        append_le_fixed_width(
-            &mut sig_bits,
-            &from_leaf_number_fe,
-            franklin_constants::ACCOUNT_TREE_DEPTH,
-        );
-        append_le_fixed_width(
-            &mut sig_bits,
-            &token_fe,
-            *franklin_constants::BALANCE_TREE_DEPTH,
-        );
-        append_le_fixed_width(
-            &mut sig_bits,
-            &transfer_witness
-                .from_after
-                .witness
-                .account_witness
-                .nonce
-                .unwrap(),
-            // &transfer_witness.nonce,
-            franklin_constants::NONCE_BIT_WIDTH,
-        );
-        append_le_fixed_width(
-            &mut sig_bits,
-            &transfer_amount_encoded,
-            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
-                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        );
-        append_le_fixed_width(
-            &mut sig_bits,
-            &fee_encoded,
-            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-        );
-        let sig_msg = le_bit_vector_into_field_element::<Fr>(&sig_bits);
-        let sig_msg_hash = phasher.hash_bits(sig_bits.clone());
-        let mut sig_msg_hash_bits = vec![];
-        append_le_fixed_width(
-            &mut sig_msg_hash_bits,
-            &sig_msg_hash,
-            franklin_constants::FR_BIT_WIDTH - 8,
-        ); //TODO: not clear what capacity is
-
-        println!(
-            "test sig_msg_hash={} sig_msg_hash_bits.len={}",
-            sig_msg_hash,
-            sig_msg_hash_bits.len()
-        );
-
+        // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
         let signature = sign_pedersen(&sig_bits, &from_sk, p_g, params, rng);
+
         let operations = calculate_transfer_to_new_operations_from_witness(
             &transfer_witness,
-            &sig_msg,
+            &first_sig_part,
+            &second_sig_part,
             signature,
             &from_x,
             &from_y,

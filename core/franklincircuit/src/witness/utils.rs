@@ -42,8 +42,16 @@ pub fn pub_key_hash<E: JubjubEngine, H: Hasher<E::Fr>>(
     let (pub_x, pub_y) = pub_key.0.into_xy();
     println!("x = {}, y = {}", pub_x, pub_y);
     let mut pub_key_bits = vec![];
-    append_le_fixed_width(&mut pub_key_bits, &pub_x, Fr::NUM_BITS as usize);
-    append_le_fixed_width(&mut pub_key_bits, &pub_y, Fr::NUM_BITS as usize);
+    append_le_fixed_width(
+        &mut pub_key_bits,
+        &pub_x,
+        franklin_constants::FR_BIT_WIDTH_PADDED,
+    );
+    append_le_fixed_width(
+        &mut pub_key_bits,
+        &pub_y,
+        franklin_constants::FR_BIT_WIDTH_PADDED,
+    );
     let pub_key_hash = hasher.hash_bits(pub_key_bits);
     let mut pub_key_hash_bits = vec![];
     append_le_fixed_width(
