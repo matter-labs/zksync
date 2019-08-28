@@ -48,10 +48,14 @@ contract ExitQueue is Ownable {
         // TODO: - need to unpack?
     }
 
-    function getRequests() external returns (ExitRequest[] memory) {
+    function getRequests(uint32 _count) external returns (ExitRequest[] memory) {
         require(totalRequests > 0, "No exit requests");
-        ExitRequest[totalRequests] requests = new ExitRequest(totalRequests);
-        for (uint32 i = 0; i < totalRequests; i++) {
+        uint32 requestsToRemove = _count;
+        if (_count > totalRequests) {
+            requestsToRemove = totalRequests;
+        }
+        ExitRequest[requestsToRemove] requests = new ExitRequest(requestsToRemove);
+        for (uint32 i = 0; i < requestsToRemove; i++) {
             requests[i] = exitRequests[accountsQueue[i]].toExitRequest();
         }
         return requests;
