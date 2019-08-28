@@ -63,14 +63,23 @@ contract ExitQueue is Ownable {
         });
     }
 
-    function removeRequests() external {
+    function removeRequests(uint32 _count) external {
         require(totalRequests > 0, "No exit requests");
-        for (uint32 i = 0; i < totalRequests; i++) {
+        uint32 requestsToRemove = _count;
+        if (_count > totalRequests) {
+            requestsToRemove = totalRequests;
+        }
+        for (uint32 i = 0; i < requestsToRemove; i++) {
             address account = accountsQueue[i];
             delete exitRequests[account];
             delete accountsQueue[i];
         }
-
+        uint32 nonremovedCount = totalRequests - requestsToRemove;
+        if (nonremovedCount > 0) {
+            for (uint32 i = requestsToRemove; i < totalRequests; i++) {
+                accountsQueue[i-requestsToRemove] = accountsQueue[i];
+            }
+        }
     }
 
     function checkForExodus() external {
