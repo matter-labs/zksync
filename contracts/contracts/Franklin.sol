@@ -22,6 +22,10 @@ contract Franklin {
     // Offchain address length.
     uint8 constant PUBKEY_HASH_LEN = 20;
 
+    struct ValidatedTokenId {
+        uint32 id;
+    }
+
     event BlockCommitted(uint32 indexed blockNumber);
     event BlockVerified(uint32 indexed blockNumber);
 
@@ -248,11 +252,11 @@ contract Franklin {
     // Deposit ETH (simply by sending it to the contract)
     function depositETH(bytes calldata _franklin_addr) external payable {
         require(msg.value <= MAX_VALUE, "sorry Joe");
-        registerDeposit(0, uint112(msg.value), _franklin_addr);
+        registerDeposit(ValidatedTokenId(0), uint112(msg.value), _franklin_addr);
     }
 
     function withdrawETH(uint112 _amount) external {
-        registerWithdrawal(0, _amount);
+        registerWithdrawal(ValidatedTokenId(0), _amount);
         msg.sender.transfer(_amount);
     }
 
@@ -265,11 +269,13 @@ contract Franklin {
             IERC20(_token).transferFrom(msg.sender, address(this), _amount),
             "transfer failed"
         );
-        registerDeposit(tokenIds[_token], _amount, _franklin_addr);
+        ValidatedTokenId memory tokenId = validateERC20Token(_token);
+        registerDeposit(tokenId, _amount, _franklin_addr);
     }
 
     function withdrawERC20(address _token, uint112 _amount) external {
-        registerWithdrawal(tokenIds[_token], _amount);
+        ValidatedTokenId memory tokenId = validateERC20Token(_token);
+        registerWithdrawal(tokenId, _amount);
         require(
             IERC20(_token).transfer(msg.sender, _amount),
             "transfer failed"
@@ -277,21 +283,20 @@ contract Franklin {
     }
 
     function registerDeposit(
-        uint32 _tokenId,
+        ValidatedTokenId memory _token,
         uint112 _amount,
         bytes memory _franklin_addr
     ) internal {
         requireActive();
-        requireValidToken(_tokenId);
         require(
-            uint256(_amount) + balances[msg.sender][_tokenId].balance <
+            uint256(_amount) + balances[msg.sender][_token.id].balance <
                 MAX_VALUE,
             "overflow"
         );
 
-        balances[msg.sender][_tokenId].balance += _amount;
+        balances[msg.sender][_token.id].balance += _amount;
         uint32 lockedUntilBlock = uint32(block.number + LOCK_DEPOSITS_FOR);
-        balances[msg.sender][_tokenId].lockedUntilBlock = lockedUntilBlock;
+        balances[msg.sender][_token.id].lockedUntilBlock = lockedUntilBlock;
 
         if (depositWasDone[msg.sender]) {
             require(
@@ -305,26 +310,25 @@ contract Franklin {
 
         emit OnchainDeposit(
             msg.sender,
-            _tokenId,
-            balances[msg.sender][_tokenId].balance,
+            _token.id,
+            balances[msg.sender][_token.id].balance,
             lockedUntilBlock,
             _franklin_addr
         );
     }
 
-    function registerWithdrawal(uint32 _tokenId, uint112 _amount) internal {
+    function registerWithdrawal(ValidatedTokenId memory _token, uint112 _amount) internal {
         requireActive();
-        requireValidToken(_tokenId);
         require(
-            block.number >= balances[msg.sender][_tokenId].lockedUntilBlock,
+            block.number >= balances[msg.sender][_token.id].lockedUntilBlock,
             "balance locked"
         );
         require(
-            balances[msg.sender][_tokenId].balance >= _amount,
+            balances[msg.sender][_token.id].balance >= _amount,
             "insufficient balance"
         );
-        balances[msg.sender][_tokenId].balance -= _amount;
-        emit OnchainWithdrawal(msg.sender, _tokenId, _amount);
+        balances[msg.sender][_token.id].balance -= _amount;
+        emit OnchainWithdrawal(msg.sender, _token.id, _amount);
     }
 
     // Block committment
@@ -470,7 +474,7 @@ contract Franklin {
             }
             address account = depositFranklinToETH[franklin_address_];
 
-            requireValidToken(tokenId);
+            requireValidTokenId(tokenId);
             require(
                 block.number < balances[account][tokenId].lockedUntilBlock,
                 "balance must be locked"
@@ -510,8 +514,8 @@ contract Franklin {
                 ethAddress[i] = _publicData[opDataPointer + 9 + i];
             }
 
-            requireValidToken(tokenId);
-
+            requireValidTokenId(tokenId);
+            // TODO!: balances[ethAddress][tokenId] possible overflow (uint112)
             onchainOps[currentOnchainOp] = OnchainOp(
                 OnchainOpType.Withdrawal,
                 tokenId,
@@ -641,8 +645,14 @@ contract Franklin {
         require(!exodusMode, "exodus mode");
     }
 
-    function requireValidToken(uint32 _tokenId) internal view {
+    function requireValidTokenId(uint32 _tokenId) internal view {
         require(_tokenId < totalTokens + 1, "unknown token");
+    }
+
+    function validateERC20Token(address tokenAddr) internal view returns (ValidatedTokenId memory) {
+        uint32 tokenId = tokenIds[tokenAddr];
+        require(tokenAddresses[tokenId] == tokenAddr, "unknown ERC20 token");
+        return ValidatedTokenId(tokenId);
     }
 
     function blockCommitmentExpired() internal view returns (bool) {
