@@ -74,6 +74,11 @@ impl ETHClient {
             .map(|nonce| nonce.as_u32())
     }
 
+    pub fn pending_nonce(&self) -> Result<u32> {
+        self.get_pending_nonce(&format!("0x{}", self.sender_account))
+            .map(|nonce| nonce.as_u32())
+    }
+
     pub fn default_account(&self) -> String {
         format!("0x{}", self.sender_account)
     }
@@ -117,26 +122,6 @@ impl ETHClient {
         self.send_raw_tx(&raw_tx_hex)
     }
 
-    /// Returns tx hash
-    // pub fn commit_block(
-    //     & mut self,
-    //     block_num: U32,
-    //     total_fees: U128,
-    //     tx_data_packed: Vec<u8>,
-    //     new_root: H256) -> Result<H256>
-    // {
-    //     self.call("commitBlock", (block_num, total_fees, tx_data_packed, new_root))
-    // }
-
-    // /// Returns tx hash
-    // pub fn verify_block(
-    //     & mut self,
-    //     block_num: U32,
-    //     proof: [U256; 8]) -> Result<H256>
-    // {
-    //     self.call("verifyBlock", (block_num, proof))
-    // }
-
     fn post(&self, method: &str, params: &[&str]) -> Result<String> {
         let request = InfuraRequest {
             id: 1,
@@ -172,35 +157,17 @@ impl ETHClient {
     }
 
     /// Get nonce for an address
-    pub fn get_nonce(&self, addr: &str) -> Result<U256> {
+    fn get_nonce(&self, addr: &str) -> Result<U256> {
         from_0x(&self.post("eth_getTransactionCount", &[addr, "latest"])?)
+    }
+
+    fn get_pending_nonce(&self, addr: &str) -> Result<U256> {
+        from_0x(&self.post("eth_getTransactionCount", &[addr, "pending"])?)
     }
 
     pub fn send_raw_tx(&self, tx: &str) -> Result<H256> {
         from_0x(&self.post("eth_sendRawTransaction", &[tx])?)
     }
-}
-
-#[derive(Serialize, Debug)]
-struct InfuraRequest<'a> {
-    jsonrpc: &'a str,
-    method: &'a str,
-    params: &'a [&'a str],
-    id: i64,
-}
-
-#[derive(Deserialize, Debug)]
-struct InfuraError {
-    code: i64,
-    message: String,
-}
-
-#[derive(Deserialize, Debug)]
-struct InfuraResponse {
-    jsonrpc: String,
-    id: i64,
-    error: Option<InfuraError>,
-    result: Option<String>,
 }
 
 fn from_0x<Out>(s: &str) -> Result<Out>

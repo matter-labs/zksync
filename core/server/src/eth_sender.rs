@@ -59,7 +59,21 @@ impl ETHSender {
             self.op_queue.push_back(pending_op);
         }
 
-        // TODO: restore pending tx from eth.
+        let commited_nonce = self.eth_client.current_nonce().expect("eth nonce");
+        let pending_nonce = self.eth_client.pending_nonce().expect("eth pending nonce");
+        if commited_nonce == pending_nonce {
+            self.pending_transaction = None;
+        } else if commited_nonce + 1 == pending_nonce{
+            let last_sent_op = storage.load_last_sent_operation().expect("db error");
+            if let Some(op) = last_sent_op {
+                assert_eq!(op.nonce, pending_nonce as i64);
+                self.pending_transaction = Some(op.tx_hash.unwrap()[2..].parse());
+            } else {
+                self.pending_transaction = None;
+            }
+        } else {
+            panic!("Only one transaction can be pending at once.");
+        }
     }
 
     fn run(&mut self, rx_for_eth: Receiver<Operation>) {

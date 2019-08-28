@@ -993,6 +993,14 @@ impl StorageProcessor {
         })
     }
 
+    pub fn load_last_sent_operation(&self) -> QueryResult<Option<StoredOperation>> {
+            operations::table
+                .filter( operations::tx_hash.is_not_null() )
+                .order(  operations::id.desc())
+                .first::<StoredOperation>(self.conn())
+                .optional()?
+    }
+
     pub fn load_unverified_commitments(&self) -> QueryResult<Vec<Operation>> {
         self.conn().transaction(|| {
             let ops: Vec<StoredOperation> = diesel::sql_query(
