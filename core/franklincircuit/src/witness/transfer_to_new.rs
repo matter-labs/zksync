@@ -444,7 +444,6 @@ mod test {
 
     use ff::{BitIterator, Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-    use franklin_crypto::circuit::float_point::convert_to_float;
     use franklin_crypto::circuit::test::*;
     use franklin_crypto::jubjub::FixedGenerators;
     use franklinmodels::circuit::account::{
@@ -501,11 +500,9 @@ mod test {
 
         let mut from_leaf_number: u32 = rng.gen();
         from_leaf_number %= capacity;
-        let from_leaf_number_fe = Fr::from_str(&from_leaf_number.to_string()).unwrap();
 
         let mut to_leaf_number: u32 = rng.gen();
         to_leaf_number %= capacity;
-        let _to_leaf_number_fe = Fr::from_str(&to_leaf_number.to_string()).unwrap();
 
         let from_balance_before: u128 = 2000;
 
@@ -514,32 +511,9 @@ mod test {
 
         let transfer_amount: u128 = 500;
 
-        let _transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
-
-        let transfer_amount_bits = convert_to_float(
-            transfer_amount,
-            *franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-            *franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
-            10,
-        )
-        .unwrap();
-
-        let transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
-
         let fee: u128 = 20;
 
-        let fee_bits = convert_to_float(
-            fee,
-            *franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-            *franklin_constants::FEE_MANTISSA_BIT_WIDTH,
-            10,
-        )
-        .unwrap();
-
-        let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
-
         let token: u32 = 2;
-        let token_fe = Fr::from_str(&token.to_string()).unwrap();
         let block_number = Fr::from_str("1").unwrap();
         // prepare state, so that we could make transfer
         let mut from_balance_tree =

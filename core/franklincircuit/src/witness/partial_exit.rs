@@ -229,7 +229,8 @@ pub fn apply_partial_exit(
 }
 pub fn calculate_partial_exit_operations_from_witness(
     partial_exit_witness: &PartialExitWitness<Bn256>,
-    sig_msg: &Fr,
+    first_sig_msg: &Fr,
+    second_sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
@@ -245,7 +246,8 @@ pub fn calculate_partial_exit_operations_from_witness(
         tx_type: partial_exit_witness.tx_type,
         chunk: Some(Fr::from_str("0").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[0]),
-        sig_msg: Some(sig_msg.clone()),
+        first_sig_msg: Some(first_sig_msg.clone()),
+        second_sig_msg: Some(second_sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
@@ -260,7 +262,8 @@ pub fn calculate_partial_exit_operations_from_witness(
         tx_type: partial_exit_witness.tx_type,
         chunk: Some(Fr::from_str("1").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[1]),
-        sig_msg: Some(sig_msg.clone()),
+        first_sig_msg: Some(first_sig_msg.clone()),
+        second_sig_msg: Some(second_sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
@@ -275,7 +278,8 @@ pub fn calculate_partial_exit_operations_from_witness(
         tx_type: partial_exit_witness.tx_type,
         chunk: Some(Fr::from_str("2").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[2]),
-        sig_msg: Some(sig_msg.clone()),
+        first_sig_msg: Some(first_sig_msg.clone()),
+        second_sig_msg: Some(second_sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
@@ -289,7 +293,8 @@ pub fn calculate_partial_exit_operations_from_witness(
         tx_type: partial_exit_witness.tx_type,
         chunk: Some(Fr::from_str("3").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[3]),
-        sig_msg: Some(sig_msg.clone()),
+        first_sig_msg: Some(first_sig_msg.clone()),
+        second_sig_msg: Some(second_sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
@@ -315,13 +320,13 @@ mod test {
 
     use ff::{BitIterator, Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-
     use franklin_crypto::circuit::test::*;
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklin_crypto::jubjub::FixedGenerators;
     use franklinmodels::circuit::account::{
         Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
+    use franklinmodels::merkle_tree::hasher::Hasher;
     use franklinmodels::merkle_tree::PedersenHasher;
     use franklinmodels::params as franklin_constants;
     use rand::{Rng, SeedableRng, XorShiftRng};
@@ -402,18 +407,27 @@ mod test {
             },
         );
 
-        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on partial_exit proof
+        let mut sig_bits_to_hash = partial_exit_witness.get_sig_bits();
+        sig_bits_to_hash.resize((Fr::CAPACITY as usize) * 2, false);
+        let (first_sig_part_bits, second_sig_part_bits) =
+            sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
+        let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits.to_vec());
+        let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits.to_vec());
+        println!("first_sig_part: {}", first_sig_part);
+        println!("second_sig_part: {}", second_sig_part);
+        // let sig_msg: Fr = le_bit_vector_into_field_element(&sig_bits);
+        let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
+        println!("sig_msg: {}", sig_msg);
         let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
         sig_bits.reverse();
-        sig_bits.truncate(80);
 
         // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
         let signature = sign_pedersen(&sig_bits, &sender_sk, p_g, params, rng);
-        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
         let operations = calculate_partial_exit_operations_from_witness(
             &partial_exit_witness,
-            &sig_msg,
+            &first_sig_part,
+            &second_sig_part,
             signature,
             &sender_x,
             &sender_y,
@@ -538,18 +552,26 @@ mod test {
             },
         );
 
-        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on partial_exit proof
+        let mut sig_bits_to_hash = partial_exit_witness.get_sig_bits();
+        sig_bits_to_hash.resize((Fr::CAPACITY as usize) * 2, false);
+        let (first_sig_part_bits, second_sig_part_bits) =
+            sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
+        let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits.to_vec());
+        let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits.to_vec());
+        println!("first_sig_part: {}", first_sig_part);
+        println!("second_sig_part: {}", second_sig_part);
+        // let sig_msg: Fr = le_bit_vector_into_field_element(&sig_bits);
+        let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
+        println!("sig_msg: {}", sig_msg);
         let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
         sig_bits.reverse();
-        sig_bits.truncate(80);
 
         // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
         let signature = sign_pedersen(&sig_bits, &sender_sk, p_g, params, rng);
-        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-
         let operations = calculate_partial_exit_operations_from_witness(
             &partial_exit_witness,
-            &sig_msg,
+            &first_sig_part,
+            &second_sig_part,
             signature,
             &sender_x,
             &sender_y,

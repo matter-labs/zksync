@@ -35,15 +35,13 @@ where
         }
         message_bytes.push(byte);
     }
-    println!("message_len {}", message_bytes.len());
-    let max_message_len = 31 as usize; //todo
-                                       // let signature = private_key.sign_raw_message(&message_bytes, rng, p_g, params, max_message_len);
+
     let signature = private_key.musig_pedersen_sign(&message_bytes, rng, p_g, params);
 
     let pk = PublicKey::from_private(&private_key, p_g, params);
-    // let is_valid_signature = pk.verify_for_raw_message(
     let is_valid_signature =
         pk.verify_musig_pedersen(&message_bytes, &signature.clone(), p_g, params);
+
     if !is_valid_signature {
         return None;
     }
@@ -58,6 +56,71 @@ where
     // let mut sigs_repr = E::Fr::zero().into_repr();
     // sigs_repr.read_le(&sigs_bytes[..]).expect("interpret S as field element representation");
     // let sigs_converted = E::Fr::from_repr(sigs_repr).unwrap();
+
+    Some(TransactionSignature {
+        r: signature.r,
+        s: sigs_converted,
+    })
+}
+
+pub fn sign_sha<R, E>(
+    msg_data: &[bool],
+    private_key: &PrivateKey<E>,
+    p_g: FixedGenerators,
+    params: &E::Params,
+    rng: &mut R,
+) -> Option<TransactionSignature<E>>
+where
+    R: rand::Rng,
+    E: JubjubEngine,
+{
+    let raw_data: Vec<bool> = msg_data.to_vec();
+
+    let mut message_bytes: Vec<u8> = vec![];
+
+    let byte_chunks = raw_data.chunks(8);
+    for byte_chunk in byte_chunks {
+        let mut byte = 0u8;
+        for (i, bit) in byte_chunk.iter().enumerate() {
+            if *bit {
+                byte |= 1 << i;
+            }
+        }
+        message_bytes.push(byte);
+    }
+
+    let mut input = vec![];
+    println!("message_byts outside of circuit: {:x?}", message_bytes);
+    for input_byte in message_bytes.clone().iter() {
+        for bit_i in (0..8).rev() {
+            input.push((input_byte >> bit_i) & 1u8 == 1u8);
+        }
+    }
+    println!("outside of circuit: ");
+    for bit in input {
+        let num = {
+            if bit {
+                1
+            } else {
+                0
+            }
+        };
+        print!("{} ", num);
+    }
+
+    let signature = private_key.musig_sha256_sign(&message_bytes, rng, p_g, params);
+
+    let pk = PublicKey::from_private(&private_key, p_g, params);
+    let is_valid_signature =
+        pk.verify_musig_sha256(&message_bytes, &signature.clone(), p_g, params);
+    if !is_valid_signature {
+        return None;
+    }
+
+    let mut sigs_le_bits: Vec<bool> = BitIterator::new(signature.s.into_repr()).collect();
+    sigs_le_bits.reverse();
+
+    let sigs_converted = le_bit_vector_into_field_element(&sigs_le_bits);
 
     Some(TransactionSignature {
         r: signature.r,

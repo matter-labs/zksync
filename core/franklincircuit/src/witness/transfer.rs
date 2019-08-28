@@ -389,7 +389,7 @@ mod test {
         let (from_x, from_y) = from_pk.0.into_xy();
         println!("x = {}, y = {}", from_x, from_y);
         let from_pub_key_hash = pub_key_hash(&from_pk, &phasher);
-        
+
         let to_sk = PrivateKey::<Bn256>(rng.gen());
         let to_pk = PublicKey::from_private(&to_sk, p_g, params);
         let (to_x, to_y) = to_pk.0.into_xy();
@@ -435,8 +435,6 @@ mod test {
 
         let transfer_amount: u128 = 500;
 
-        let _transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
-
         let transfer_amount_bits = convert_to_float(
             transfer_amount,
             *franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
@@ -448,8 +446,6 @@ mod test {
         let transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
 
         let fee: u128 = 7;
-
-        let _fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
 
         let fee_bits = convert_to_float(
             fee,
@@ -566,8 +562,8 @@ mod test {
         let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
         sig_bits.reverse();
 
-        // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
         let signature = sign_pedersen(&sig_bits, &from_sk, p_g, params, rng);
+        // let signature = sign_sha(&sig_bits, &from_sk, p_g, params, rng);
 
         let operations = calculate_transfer_operations_from_witness(
             &transfer_witness,

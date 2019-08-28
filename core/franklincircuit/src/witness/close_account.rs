@@ -51,7 +51,7 @@ impl<E: JubjubEngine> CloseAccountWitness<E> {
             &self.before.witness.account_witness.pub_key_hash.unwrap(),
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         );
-       
+
         append_be_fixed_width(
             &mut sig_bits,
             &self.before.witness.account_witness.nonce.unwrap(),
@@ -142,7 +142,8 @@ pub fn apply_close_account(
 
 pub fn calculate_close_account_operations_from_witness(
     close_account_witness: &CloseAccountWitness<Bn256>,
-    sig_msg: &Fr,
+    first_sig_msg: &Fr,
+    second_sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
@@ -157,7 +158,8 @@ pub fn calculate_close_account_operations_from_witness(
         tx_type: close_account_witness.tx_type,
         chunk: Some(Fr::from_str("0").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[0]),
-        sig_msg: Some(sig_msg.clone()),
+        first_sig_msg: Some(first_sig_msg.clone()),
+        second_sig_msg: Some(second_sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
@@ -180,13 +182,13 @@ mod test {
 
     use ff::{BitIterator, Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-
     use franklin_crypto::circuit::test::*;
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklin_crypto::jubjub::FixedGenerators;
     use franklinmodels::circuit::account::{
         CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
+    use franklinmodels::merkle_tree::hasher::Hasher;
     use franklinmodels::params as franklin_constants;
 
     use rand::{Rng, SeedableRng, XorShiftRng};
@@ -202,6 +204,7 @@ mod test {
 
         let mut tree: CircuitAccountTree =
             CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
+        let capacity = tree.capacity();
 
         let sender_sk = PrivateKey::<Bn256>(rng.gen());
         let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
@@ -213,7 +216,10 @@ mod test {
             pub_key_hash: sender_pub_key_hash, // pub_x: validator_x.clone(),
                                                // pub_y: validator_y.clone(),
         };
-        println!("zero root_hash equals: {}", sender_leaf.subtree.root_hash());
+        let mut sender_leaf_number: u32 = rng.gen();
+        sender_leaf_number %= capacity;
+
+        tree.insert(sender_leaf_number, sender_leaf);
 
         // give some funds to sender and make zero balance for recipient
         let validator_sk = PrivateKey::<Bn256>(rng.gen());
@@ -232,8 +238,7 @@ mod test {
         }
         tree.insert(validator_address_number, validator_leaf);
 
-        let mut account_address: u32 = rng.gen();
-        account_address %= tree.capacity();
+        let account_address = sender_leaf_number;
 
         //-------------- Start applying changes to state
         let close_account_witness = apply_close_account(
@@ -242,19 +247,26 @@ mod test {
                 account_address: account_address,
             },
         );
-
-        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on close_account proof
+        let mut sig_bits_to_hash = close_account_witness.get_sig_bits();
+        sig_bits_to_hash.resize((Fr::CAPACITY as usize) * 2, false);
+        let (first_sig_part_bits, second_sig_part_bits) =
+            sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
+        let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits.to_vec());
+        let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits.to_vec());
+        println!("first_sig_part: {}", first_sig_part);
+        println!("second_sig_part: {}", second_sig_part);
+        // let sig_msg: Fr = le_bit_vector_into_field_element(&sig_bits);
+        let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
+        println!("sig_msg: {}", sig_msg);
         let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
         sig_bits.reverse();
-        sig_bits.truncate(80);
 
         // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
         let signature = sign_pedersen(&sig_bits, &sender_sk, p_g, params, rng);
-        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-
         let operations = calculate_close_account_operations_from_witness(
             &close_account_witness,
-            &sig_msg,
+            &first_sig_part,
+            &second_sig_part,
             signature,
             &sender_x,
             &sender_y,

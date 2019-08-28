@@ -648,7 +648,31 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?
         .get_x()
         .clone();
-        let sig_msg_bits = sig_msg.into_bits_le(cs.namespace(|| "sig_msg_bits"))?;
+        let mut sig_msg_bits = sig_msg.into_bits_le(cs.namespace(|| "sig_msg_bits"))?;
+        sig_msg_bits.resize(256, Boolean::constant(false));
+        for bit in &sig_msg_bits {
+            let num = {
+                if bit.get_value().unwrap() {
+                    1
+                } else {
+                    0
+                }
+            };
+            print!("{} ", num);
+        }
+        // signature.verify_sha256_musig(
+        //     cs.namespace(|| "verify_sha"),
+        //     self.params,
+        //     &sig_msg_bits,
+        //     generator,
+        // )?;
+        // _verify_sha(
+        //     cs.namespace(|| "musig pedersen"),
+        //     &sig_msg_bits,
+        //     &signature,
+        //     self.params,
+        //     generator,
+        // )?;
         verify_pedersen(
             cs.namespace(|| "musig pedersen"),
             &sig_msg_bits,
@@ -714,6 +738,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &mut cur,
             &chunk_data,
             &ext_pubdata_chunk,
+            &op_data,
             &subtree_root,
         )?);
         op_flags.push(self.noop(cs.namespace(|| "noop"), &chunk_data, &ext_pubdata_chunk)?);
@@ -809,16 +834,75 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?);
         base_valid_flags.push(is_partial_exit.clone());
 
+        // construct signature message
+
+        let mut sig_bits = vec![];
+
+        sig_bits.extend(chunk_data.tx_type.get_bits_be());
+        sig_bits.extend(cur.account.pub_key_hash.get_bits_be());
+        sig_bits.extend(op_data.ethereum_key.get_bits_be());
+        let mut token_bits = cur.token.get_bits_le().clone();
+        token_bits.resize(
+            *franklin_constants::TOKEN_EXT_BIT_WIDTH,
+            Boolean::constant(false),
+        );
+        token_bits.reverse();
+        sig_bits.extend(token_bits);
+        sig_bits.extend(op_data.amount_packed.get_bits_be());
+        sig_bits.extend(op_data.fee_packed.get_bits_be());
+        sig_bits.extend(cur.account.nonce.get_bits_be());
+
+        sig_bits.resize(E::Fr::CAPACITY as usize * 2, Boolean::constant(false));
+        let (first_sig_part_bits, second_sig_part_bits) =
+            sig_bits.split_at(E::Fr::CAPACITY as usize);
+        let first_sig_part =
+            pack_bits_to_element(cs.namespace(|| "first_sig_part"), &first_sig_part_bits)?;
+
+        let second_sig_part =
+            pack_bits_to_element(cs.namespace(|| "second_sig_part"), &second_sig_part_bits)?;
+        println!("first_sig_part {:?}", first_sig_part.get_value());
+        println!("second_sig_part {:?}", second_sig_part.get_value());
+
+        let is_first_sig_part_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_first_sig_part_correct"),
+            Expression::from(&first_sig_part),
+            Expression::from(&op_data.first_sig_msg.get_number()),
+        )?);
+
+        let is_second_sig_part_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_second_sig_part_correct"),
+            Expression::from(&second_sig_part),
+            Expression::from(&op_data.second_sig_msg.get_number()),
+        )?);
+
+        let is_signer_valid = Boolean::from(CircuitElement::equals(
+            cs.namespace(|| "signer_key_correect"),
+            &op_data.signer_pubkey.get_hash(),
+            &cur.account.pub_key_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
+        )?);
+
+        let mut is_sig_valid_flags = vec![];
+
+        is_sig_valid_flags.push(is_first_sig_part_correct);
+        is_sig_valid_flags.push(is_second_sig_part_correct);
+        is_sig_valid_flags.push(is_signer_valid);
+        let is_sig_valid = multi_and(cs.namespace(|| "is_sig_valid"), &is_sig_valid_flags)?;
+        let is_sig_correct = multi_or(
+            cs.namespace(|| "sig is valid or not first chunk"),
+            &[is_sig_valid, is_first_chunk.clone().not()],
+        )?;
+        base_valid_flags.push(is_sig_correct);
+        let is_base_valid = multi_and(
+            cs.namespace(|| "valid base partial_exit"),
+            &base_valid_flags,
+        )?;
         //here we verify whether exit should be full
         let is_full_exit = Boolean::from(Expression::equals(
             cs.namespace(|| "amount is zero"),
             &op_data.amount.get_number(),
             Expression::constant::<CS>(E::Fr::zero()),
         )?);
-        let is_base_valid = multi_and(
-            cs.namespace(|| "valid base partial_exit"),
-            &base_valid_flags,
-        )?;
+
         let lhs_partial_valid: Boolean;
         {
             let mut lhs_partial_valid_flags = vec![];
@@ -1129,6 +1213,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         cur: &mut AllocatedOperationBranch<E>,
         chunk_data: &AllocatedChunkData<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
+        op_data: &AllocatedOperationData<E>,
         subtree_root: &CircuitElement<E>,
     ) -> Result<Boolean, SynthesisError> {
         let mut is_valid_flags = vec![];
@@ -1173,6 +1258,60 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             Expression::constant::<CS>(empty_root), //This is precalculated root_hash of subtree with empty balances
         )?);
         is_valid_flags.push(are_balances_empty);
+
+        // construct signature message
+
+        let mut sig_bits = vec![];
+
+        sig_bits.extend(chunk_data.tx_type.get_bits_be());
+        sig_bits.extend(cur.account.pub_key_hash.get_bits_be());
+        sig_bits.extend(cur.account.nonce.get_bits_be());
+
+        sig_bits.resize(E::Fr::CAPACITY as usize * 2, Boolean::constant(false));
+        let (first_sig_part_bits, second_sig_part_bits) =
+            sig_bits.split_at(E::Fr::CAPACITY as usize);
+        let first_sig_part =
+            pack_bits_to_element(cs.namespace(|| "first_sig_part"), &first_sig_part_bits)?;
+
+        let second_sig_part =
+            pack_bits_to_element(cs.namespace(|| "second_sig_part"), &second_sig_part_bits)?;
+        println!("first_sig_part {:?}", first_sig_part.get_value());
+        println!("second_sig_part {:?}", second_sig_part.get_value());
+
+        let is_first_sig_part_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_first_sig_part_correct"),
+            Expression::from(&first_sig_part),
+            Expression::from(&op_data.first_sig_msg.get_number()),
+        )?);
+
+        let is_second_sig_part_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_second_sig_part_correct"),
+            Expression::from(&second_sig_part),
+            Expression::from(&op_data.second_sig_msg.get_number()),
+        )?);
+
+        let is_signer_valid = Boolean::from(CircuitElement::equals(
+            cs.namespace(|| "signer_key_correect"),
+            &op_data.signer_pubkey.get_hash(),
+            &cur.account.pub_key_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
+        )?);
+        println!("is signer_valid {:?}", is_signer_valid.get_value());
+        println!(
+            "is op_data_pubkey {:?}",
+            op_data.signer_pubkey.get_hash().get_number().get_value()
+        );
+        println!(
+            "is cur_pub_key {:?}",
+            &cur.account.pub_key_hash.get_number().get_value()
+        );
+        let mut is_sig_valid_flags = vec![];
+
+        is_sig_valid_flags.push(is_first_sig_part_correct);
+        is_sig_valid_flags.push(is_second_sig_part_correct);
+        is_sig_valid_flags.push(is_signer_valid);
+        let is_sig_valid = multi_and(cs.namespace(|| "is_sig_valid"), &is_sig_valid_flags)?;
+
+        is_valid_flags.push(is_sig_valid);
         let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
 
         // below we conditionally if it is valid operation
@@ -1313,11 +1452,14 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &cur.account.nonce.get_number(),
         )?);
 
-
         // construct signature message
 
         let mut sig_bits = vec![];
-        let tx_code = CircuitElement::from_fe_strict(cs.namespace(||"5_ce"), || Ok(E::Fr::from_str("5").unwrap()), 8)?;//we use here transfer tx_code=5 to allow user sign message without knowing whether it is transfer_to_new or transfer
+        let tx_code = CircuitElement::from_fe_strict(
+            cs.namespace(|| "5_ce"),
+            || Ok(E::Fr::from_str("5").unwrap()),
+            8,
+        )?; //we use here transfer tx_code=5 to allow user sign message without knowing whether it is transfer_to_new or transfer
         sig_bits.extend(tx_code.get_bits_be());
         sig_bits.extend(lhs.account.pub_key_hash.get_bits_be());
         sig_bits.extend(op_data.new_pubkey_hash.get_bits_be());
@@ -1336,8 +1478,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             sig_bits.split_at(E::Fr::CAPACITY as usize);
         let first_sig_part =
             pack_bits_to_element(cs.namespace(|| "first_sig_part"), &first_sig_part_bits)?;
-        println!("first_sig_part : {:?}", first_sig_part.get_value());
-
         let second_sig_part =
             pack_bits_to_element(cs.namespace(|| "second_sig_part"), &second_sig_part_bits)?;
 
@@ -1346,27 +1486,18 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             Expression::from(&first_sig_part),
             Expression::from(&op_data.first_sig_msg.get_number()),
         )?);
-        println!(
-            "is_first_sig_part_correct: {:?}",
-            is_first_sig_part_correct.get_value()
-        );
 
         let is_second_sig_part_correct = Boolean::from(Expression::equals(
             cs.namespace(|| "is_second_sig_part_correct"),
             Expression::from(&second_sig_part),
             Expression::from(&op_data.second_sig_msg.get_number()),
         )?);
-        println!(
-            "is_second_sig_part_correct: {:?}",
-            is_second_sig_part_correct.get_value()
-        );
 
         let is_signer_valid = Boolean::from(CircuitElement::equals(
             cs.namespace(|| "signer_key_correect"),
             &op_data.signer_pubkey.get_hash(),
             &lhs.account.pub_key_hash,
         )?);
-        println!("is_signer_valid: {:?}", is_signer_valid.get_value());
 
         let mut is_sig_valid_flags = vec![];
 
@@ -1379,7 +1510,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &[is_sig_valid, is_first_chunk.clone().not()],
         )?; //actually redundant due to check only on lhs
         lhs_valid_flags.push(is_sig_correct);
-
 
         let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
 
@@ -1793,6 +1923,49 @@ fn multi_and<E: JubjubEngine, CS: ConstraintSystem<E>>(
     }
 
     Ok(result)
+}
+
+fn _verify_sha<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    sig_data_bits: &[Boolean],
+    signature: &EddsaSignature<E>,
+    params: &E::Params,
+    generator: ecc::EdwardsPoint<E>,
+) -> Result<(), SynthesisError> {
+    let mut sig_data_bits = sig_data_bits.to_vec();
+    sig_data_bits.resize(256, Boolean::constant(false));
+
+    let mut first_round_bits: Vec<Boolean> = vec![];
+
+    let mut pk_x_serialized = signature
+        .pk
+        .get_x()
+        .clone()
+        .into_bits_le(cs.namespace(|| "pk_x_bits"))?;
+    pk_x_serialized.resize(256, Boolean::constant(false));
+
+    let mut r_x_serialized = signature
+        .r
+        .get_x()
+        .clone()
+        .into_bits_le(cs.namespace(|| "r_x_bits"))?;
+    r_x_serialized.resize(256, Boolean::constant(false));
+
+    first_round_bits.extend(pk_x_serialized);
+    first_round_bits.extend(r_x_serialized);
+    first_round_bits.extend(sig_data_bits);
+    let mut h_bits = sha256::sha256(cs.namespace(|| "first_round_hash"), &first_round_bits)?;
+    h_bits.resize(256, Boolean::constant(false));
+
+    let max_message_len = 32 as usize; //since it is the result of sha hash
+    signature.verify_raw_message_signature(
+        cs.namespace(|| "verify transaction signature"),
+        params,
+        &h_bits,
+        generator,
+        max_message_len,
+    )?;
+    Ok(())
 }
 
 fn verify_pedersen<E: JubjubEngine, CS: ConstraintSystem<E>>(

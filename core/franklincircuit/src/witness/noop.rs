@@ -14,7 +14,8 @@ use pairing::bn256::*;
 pub fn noop_operation(
     tree: &CircuitAccountTree,
     acc_id: u32,
-    sig_msg: &Fr,
+    first_sig_msg: &Fr,
+    second_sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
@@ -38,7 +39,8 @@ pub fn noop_operation(
         tx_type: Some(Fr::from_str("0").unwrap()),
         chunk: Some(Fr::from_str("0").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[0]),
-        sig_msg: Some(sig_msg.clone()),
+        first_sig_msg: Some(first_sig_msg.clone()),
+        second_sig_msg: Some(second_sig_msg.clone()),
         signature: signature.clone(),
         signer_pub_key_x: Some(signer_pub_key_x.clone()),
         signer_pub_key_y: Some(signer_pub_key_y.clone()),
@@ -108,6 +110,7 @@ mod test {
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let validator_address_number = 7;
         let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
+        use franklinmodels::merkle_tree::hasher::Hasher;
         let block_number = Fr::from_str("1").unwrap();
         let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
         let phasher = PedersenHasher::<Bn256>::default();
@@ -164,20 +167,28 @@ mod test {
         };
 
         tree.insert(account_address, sender_leaf_initial);
-
-        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on partial_exit proof
+        let mut sig_bits_to_hash = vec![false; 1];
+        sig_bits_to_hash.resize((Fr::CAPACITY as usize) * 2, false);
+        let (first_sig_part_bits, second_sig_part_bits) =
+            sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
+        let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits.to_vec());
+        let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits.to_vec());
+        println!("first_sig_part: {}", first_sig_part);
+        println!("second_sig_part: {}", second_sig_part);
+        // let sig_msg: Fr = le_bit_vector_into_field_element(&sig_bits);
+        let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
+        println!("sig_msg: {}", sig_msg);
         let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
         sig_bits.reverse();
-        sig_bits.truncate(80);
 
         // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
         let signature = sign_pedersen(&sig_bits, &sender_sk, p_g, params, rng);
-        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
         let operation = noop_operation(
             &tree,
             validator_address_number,
-            &sig_msg,
+            &first_sig_part,
+            &second_sig_part,
             signature,
             &sender_x,
             &sender_y,

@@ -427,9 +427,20 @@ mod test {
         let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
         sig_bits.reverse();
 
-        // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
+        sig_bits.resize(256, false); //todo: ?
+
+        println!("outside of sha: ");
+        for bit in sig_bits.clone() {
+            let num = {
+                if bit {
+                    1
+                } else {
+                    0
+                }
+            };
+            print!("{} ", num);
+        }
         let signature = sign_pedersen(&sig_bits, &sender_sk, p_g, params, rng);
-        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
         let operations = calculate_deposit_operations_from_witness(
             &deposit_witness,
@@ -542,14 +553,6 @@ mod test {
                 new_pub_key_hash: sender_pub_key_hash,
             },
         );
-        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
-        let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
-        sig_bits.reverse();
-        sig_bits.truncate(80);
-
-        // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
-        let signature = sign_pedersen(&sig_bits, &sender_sk, p_g, params, rng);
-        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
         let mut sig_bits_to_hash = deposit_witness.get_sig_bits();
         sig_bits_to_hash.resize((Fr::CAPACITY as usize) * 2, false);
