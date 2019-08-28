@@ -19,8 +19,9 @@ contract Franklin {
     uint256 constant EXPECT_VERIFICATION_IN = 8 * 60 * 100;
     // To make sure that all reverted blocks can be copied under block gas limit!
     uint256 constant MAX_UNVERIFIED_BLOCKS = 4 * 60 * 100;
-
+    // Offchain address length.
     uint8 constant PUBKEY_HASH_LEN = 20;
+
     event BlockCommitted(uint32 indexed blockNumber);
     event BlockVerified(uint32 indexed blockNumber);
 
