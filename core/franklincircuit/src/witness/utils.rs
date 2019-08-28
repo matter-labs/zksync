@@ -30,11 +30,8 @@ pub fn generate_dummy_sig_data() -> (Option<TransactionSignature<Bn256>>, Fr, Fr
     sig_bits.reverse();
     sig_bits.truncate(80);
 
-    // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
     let signature = sign_pedersen(&sig_bits, &sender_sk, p_g, &params, rng);
     (signature, sig_msg, sender_x, sender_y)
-
-    //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 }
 
 pub fn generate_sig_data(
@@ -54,7 +51,10 @@ pub fn generate_sig_data(
     let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
     let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
     sig_bits.reverse();
+    sig_bits.resize(256, false);
+
     let signature = sign_pedersen(&sig_bits, &private_key, p_g, params, rng);
+    // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
     (signature, first_sig_part, second_sig_part)
 }
 pub fn pub_key_hash<E: JubjubEngine, H: Hasher<E::Fr>>(
@@ -84,6 +84,7 @@ pub fn pub_key_hash<E: JubjubEngine, H: Hasher<E::Fr>>(
     let pub_key_hash = le_bit_vector_into_field_element(&pub_key_hash_bits);
     pub_key_hash
 }
+
 pub fn public_data_commitment<E: JubjubEngine>(
     pubdata_bits: &[bool],
     initial_root: Option<E::Fr>,

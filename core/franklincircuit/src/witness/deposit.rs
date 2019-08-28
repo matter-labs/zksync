@@ -326,12 +326,11 @@ mod test {
     use crate::witness::utils::public_data_commitment;
     use bellman::groth16::generate_random_parameters;
     use bellman::groth16::{create_random_proof, prepare_verifying_key, verify_proof};
-    use franklinmodels::merkle_tree::hasher::Hasher;
     use franklinmodels::merkle_tree::PedersenHasher;
 
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
-    use ff::{BitIterator, Field, PrimeField};
+    use ff::{Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
     use franklinmodels::primitives::GetBits;
 
@@ -412,35 +411,12 @@ mod test {
                 new_pub_key_hash: sender_pub_key_hash,
             },
         );
-
-        let mut sig_bits_to_hash = deposit_witness.get_sig_bits();
-        sig_bits_to_hash.resize((Fr::CAPACITY as usize) * 2, false);
-        let (first_sig_part_bits, second_sig_part_bits) =
-            sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
-        let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits.to_vec());
-        let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits.to_vec());
-        println!("first_sig_part: {}", first_sig_part);
-        println!("second_sig_part: {}", second_sig_part);
-        // let sig_msg: Fr = le_bit_vector_into_field_element(&sig_bits);
-        let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
-        println!("sig_msg: {}", sig_msg);
-        let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
-        sig_bits.reverse();
-
-        sig_bits.resize(256, false); //todo: ?
-
-        println!("outside of sha: ");
-        for bit in sig_bits.clone() {
-            let num = {
-                if bit {
-                    1
-                } else {
-                    0
-                }
-            };
-            print!("{} ", num);
-        }
-        let signature = sign_pedersen(&sig_bits, &sender_sk, p_g, params, rng);
+        let (signature, first_sig_part, second_sig_part) = generate_sig_data(
+            &deposit_witness.get_sig_bits(),
+            &phasher,
+            &sender_sk,
+            params,
+        );
 
         let operations = calculate_deposit_operations_from_witness(
             &deposit_witness,
@@ -554,20 +530,12 @@ mod test {
             },
         );
 
-        let mut sig_bits_to_hash = deposit_witness.get_sig_bits();
-        sig_bits_to_hash.resize((Fr::CAPACITY as usize) * 2, false);
-        let (first_sig_part_bits, second_sig_part_bits) =
-            sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
-        let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits.to_vec());
-        let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits.to_vec());
-        // let sig_msg: Fr = le_bit_vector_into_field_element(&sig_bits);
-        let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
-        let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
-        sig_bits.reverse();
-
-        // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
-        let signature = sign_pedersen(&sig_bits, &sender_sk, p_g, params, rng);
-        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+        let (signature, first_sig_part, second_sig_part) = generate_sig_data(
+            &deposit_witness.get_sig_bits(),
+            &phasher,
+            &sender_sk,
+            params,
+        );
 
         let operations = calculate_deposit_operations_from_witness(
             &deposit_witness,

@@ -232,15 +232,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         operator_account_data.extend(validator_account.nonce.get_bits_le());
         operator_account_data.extend(validator_account.pub_key_hash.get_bits_le());
         operator_account_data.extend(old_operator_balance_root_bits);
-        println!("validator_account_nonce_len: {:?}, validator_account.pub_key_hash: {:?}, old_operator_balance_root: {:?}",
-                 validator_account.nonce.get_bits_le().len(),validator_account.pub_key_hash.get_bits_le().len(), old_operator_balance_root.get_value());
-
-        println!("validator_account_nonce: {:?}, validator_account.pub_key_hash: {:?}, old_operator_balance_root: {:?}",
-                 validator_account.nonce.get_number().get_value(),validator_account.pub_key_hash.get_number().get_value(), old_operator_balance_root.get_value());
-        println!(
-            "validator_account_data_len: {}",
-            operator_account_data.len()
-        );
 
         let root_from_operator = allocate_merkle_root(
             cs.namespace(|| "root from operator_account"),
@@ -344,7 +335,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             hash_block.truncate(E::Fr::CAPACITY as usize);
 
             let final_hash = pack_bits_to_element(cs.namespace(|| "final_hash"), &hash_block)?;
-            println!("public data is: {:?}", public_data_commitment.get_value());
             cs.enforce(
                 || "enforce external data hash equality",
                 |lc| lc + public_data_commitment.get_variable(),
@@ -650,29 +640,14 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         .clone();
         let mut sig_msg_bits = sig_msg.into_bits_le(cs.namespace(|| "sig_msg_bits"))?;
         sig_msg_bits.resize(256, Boolean::constant(false));
-        for bit in &sig_msg_bits {
-            let num = {
-                if bit.get_value().unwrap() {
-                    1
-                } else {
-                    0
-                }
-            };
-            print!("{} ", num);
-        }
+
         // signature.verify_sha256_musig(
         //     cs.namespace(|| "verify_sha"),
         //     self.params,
         //     &sig_msg_bits,
         //     generator,
         // )?;
-        // _verify_sha(
-        //     cs.namespace(|| "musig pedersen"),
-        //     &sig_msg_bits,
-        //     &signature,
-        //     self.params,
-        //     generator,
-        // )?;
+
         verify_pedersen(
             cs.namespace(|| "musig pedersen"),
             &sig_msg_bits,
@@ -860,8 +835,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let second_sig_part =
             pack_bits_to_element(cs.namespace(|| "second_sig_part"), &second_sig_part_bits)?;
-        println!("first_sig_part {:?}", first_sig_part.get_value());
-        println!("second_sig_part {:?}", second_sig_part.get_value());
 
         let is_first_sig_part_correct = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_sig_part_correct"),
@@ -1275,8 +1248,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let second_sig_part =
             pack_bits_to_element(cs.namespace(|| "second_sig_part"), &second_sig_part_bits)?;
-        println!("first_sig_part {:?}", first_sig_part.get_value());
-        println!("second_sig_part {:?}", second_sig_part.get_value());
 
         let is_first_sig_part_correct = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_sig_part_correct"),
@@ -1295,15 +1266,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &op_data.signer_pubkey.get_hash(),
             &cur.account.pub_key_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
         )?);
-        println!("is signer_valid {:?}", is_signer_valid.get_value());
-        println!(
-            "is op_data_pubkey {:?}",
-            op_data.signer_pubkey.get_hash().get_number().get_value()
-        );
-        println!(
-            "is cur_pub_key {:?}",
-            &cur.account.pub_key_hash.get_number().get_value()
-        );
+
         let mut is_sig_valid_flags = vec![];
 
         is_sig_valid_flags.push(is_first_sig_part_correct);
@@ -1923,49 +1886,6 @@ fn multi_and<E: JubjubEngine, CS: ConstraintSystem<E>>(
     }
 
     Ok(result)
-}
-
-fn _verify_sha<E: JubjubEngine, CS: ConstraintSystem<E>>(
-    mut cs: CS,
-    sig_data_bits: &[Boolean],
-    signature: &EddsaSignature<E>,
-    params: &E::Params,
-    generator: ecc::EdwardsPoint<E>,
-) -> Result<(), SynthesisError> {
-    let mut sig_data_bits = sig_data_bits.to_vec();
-    sig_data_bits.resize(256, Boolean::constant(false));
-
-    let mut first_round_bits: Vec<Boolean> = vec![];
-
-    let mut pk_x_serialized = signature
-        .pk
-        .get_x()
-        .clone()
-        .into_bits_le(cs.namespace(|| "pk_x_bits"))?;
-    pk_x_serialized.resize(256, Boolean::constant(false));
-
-    let mut r_x_serialized = signature
-        .r
-        .get_x()
-        .clone()
-        .into_bits_le(cs.namespace(|| "r_x_bits"))?;
-    r_x_serialized.resize(256, Boolean::constant(false));
-
-    first_round_bits.extend(pk_x_serialized);
-    first_round_bits.extend(r_x_serialized);
-    first_round_bits.extend(sig_data_bits);
-    let mut h_bits = sha256::sha256(cs.namespace(|| "first_round_hash"), &first_round_bits)?;
-    h_bits.resize(256, Boolean::constant(false));
-
-    let max_message_len = 32 as usize; //since it is the result of sha hash
-    signature.verify_raw_message_signature(
-        cs.namespace(|| "verify transaction signature"),
-        params,
-        &h_bits,
-        generator,
-        max_message_len,
-    )?;
-    Ok(())
 }
 
 fn verify_pedersen<E: JubjubEngine, CS: ConstraintSystem<E>>(

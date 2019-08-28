@@ -356,7 +356,7 @@ mod test {
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
 
-    use ff::{BitIterator, Field, PrimeField};
+    use ff::{Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
     use franklin_crypto::circuit::float_point::convert_to_float;
     use franklin_crypto::circuit::test::*;
@@ -364,7 +364,6 @@ mod test {
     use franklinmodels::circuit::account::{
         Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
-    use franklinmodels::merkle_tree::hasher::Hasher;
     use franklinmodels::merkle_tree::PedersenHasher;
     use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
@@ -548,22 +547,9 @@ mod test {
             &fee_encoded,
             franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         );
-        let mut sig_bits_to_hash = transfer_witness.get_sig_bits();
-        sig_bits_to_hash.resize((Fr::CAPACITY as usize) * 2, false);
-        let (first_sig_part_bits, second_sig_part_bits) =
-            sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
-        let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits.to_vec());
-        let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits.to_vec());
-        println!("first_sig_part: {}", first_sig_part);
-        println!("second_sig_part: {}", second_sig_part);
-        // let sig_msg: Fr = le_bit_vector_into_field_element(&sig_bits);
-        let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
-        println!("sig_msg: {}", sig_msg);
-        let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
-        sig_bits.reverse();
 
-        let signature = sign_pedersen(&sig_bits, &from_sk, p_g, params, rng);
-        // let signature = sign_sha(&sig_bits, &from_sk, p_g, params, rng);
+        let (signature, first_sig_part, second_sig_part) =
+            generate_sig_data(&transfer_witness.get_sig_bits(), &phasher, &from_sk, params);
 
         let operations = calculate_transfer_operations_from_witness(
             &transfer_witness,

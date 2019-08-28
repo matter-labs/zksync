@@ -51,12 +51,6 @@ where
 
     let sigs_converted = le_bit_vector_into_field_element(&sigs_le_bits);
 
-    // let mut sigs_bytes = [0u8; 32];
-    // signature.s.into_repr().write_le(& mut sigs_bytes[..]).expect("get LE bytes of signature S");
-    // let mut sigs_repr = E::Fr::zero().into_repr();
-    // sigs_repr.read_le(&sigs_bytes[..]).expect("interpret S as field element representation");
-    // let sigs_converted = E::Fr::from_repr(sigs_repr).unwrap();
-
     Some(TransactionSignature {
         r: signature.r,
         s: sigs_converted,
@@ -83,29 +77,10 @@ where
         let mut byte = 0u8;
         for (i, bit) in byte_chunk.iter().enumerate() {
             if *bit {
-                byte |= 1 << i;
+                byte |= 1 << (7 - i); //TODO: ask shamatar why do we need rev here, but not in pedersen
             }
         }
         message_bytes.push(byte);
-    }
-
-    let mut input = vec![];
-    println!("message_byts outside of circuit: {:x?}", message_bytes);
-    for input_byte in message_bytes.clone().iter() {
-        for bit_i in (0..8).rev() {
-            input.push((input_byte >> bit_i) & 1u8 == 1u8);
-        }
-    }
-    println!("outside of circuit: ");
-    for bit in input {
-        let num = {
-            if bit {
-                1
-            } else {
-                0
-            }
-        };
-        print!("{} ", num);
     }
 
     let signature = private_key.musig_sha256_sign(&message_bytes, rng, p_g, params);

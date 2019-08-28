@@ -89,7 +89,7 @@ mod test {
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
 
-    use ff::{BitIterator, Field, PrimeField};
+    use ff::{Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 
     use franklin_crypto::circuit::test::*;
@@ -110,7 +110,6 @@ mod test {
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let validator_address_number = 7;
         let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
-        use franklinmodels::merkle_tree::hasher::Hasher;
         let block_number = Fr::from_str("1").unwrap();
         let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
         let phasher = PedersenHasher::<Bn256>::default();
@@ -167,22 +166,12 @@ mod test {
         };
 
         tree.insert(account_address, sender_leaf_initial);
-        let mut sig_bits_to_hash = vec![false; 1];
-        sig_bits_to_hash.resize((Fr::CAPACITY as usize) * 2, false);
-        let (first_sig_part_bits, second_sig_part_bits) =
-            sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
-        let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits.to_vec());
-        let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits.to_vec());
-        println!("first_sig_part: {}", first_sig_part);
-        println!("second_sig_part: {}", second_sig_part);
-        // let sig_msg: Fr = le_bit_vector_into_field_element(&sig_bits);
-        let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
-        println!("sig_msg: {}", sig_msg);
-        let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
-        sig_bits.reverse();
+
+        let sig_bits_to_hash = vec![false; 1]; //just a trash for consistency
+        let (signature, first_sig_part, second_sig_part) =
+            generate_sig_data(&sig_bits_to_hash, &phasher, &sender_sk, params);
 
         // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
-        let signature = sign_pedersen(&sig_bits, &sender_sk, p_g, params, rng);
 
         let operation = noop_operation(
             &tree,
