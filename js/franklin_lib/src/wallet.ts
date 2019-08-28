@@ -16,6 +16,7 @@ const franklinContractCode = require("../abi/Franklin");
 
 export type Address = string;
 
+const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
 
 export class FranklinProvider {
     constructor(public providerAddress: string = 'http://127.0.0.1:3000', public contractAddress: string = process.env.CONTRACT_ADDR) {}
@@ -83,6 +84,7 @@ export class Wallet {
             // console.log(await franklinDeployedContract.balances(this.ethWallet.address, 0));
             const tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: amount});
             await tx.wait(2);
+            let receipt = await this.ethWallet.provider.getTransactionReceipt(tx.hash);
             return tx.hash;
         } else {
             const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
@@ -165,6 +167,10 @@ export class Wallet {
         return frankinWallet;
     }
 
+    async fetchEthStateFromOurServer() {
+        
+    }
+
     async fetchEthState() {
         let onchainBalances = new Array<BigNumber>(this.supportedTokens.length);
         let contractBalances = new Array<BigNumber>(this.supportedTokens.length);
@@ -201,6 +207,14 @@ export class Wallet {
     async waitPendingTxsExecuted() {
         await this.fetchFranklinState();
         while (this.franklinState.pending_txs.length > 0) {
+            await this.fetchFranklinState();
+        }
+    }
+
+    async waitProved() {
+        await this.fetchFranklinState();
+        while (JSON.stringify(this.franklinState.commited.balances) !== JSON.stringify(this.franklinState.verified.balances)) {
+            await sleep(1000);
             await this.fetchFranklinState();
         }
     }

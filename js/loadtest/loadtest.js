@@ -1,4 +1,3 @@
-const axios = require('axios')
 const ethers = require('ethers')
 const Franklin = require('../franklin/src/franklin')
 var Prando = require('prando')
