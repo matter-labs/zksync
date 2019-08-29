@@ -48,6 +48,7 @@ impl<E: JubjubEngine> Circuit<E> for SmallCircuit<E> {
 }
 
 #[test]
+#[ignore]
 fn test_small_circuit_franklin() {
     use super::utils::public_data_commitment;
 

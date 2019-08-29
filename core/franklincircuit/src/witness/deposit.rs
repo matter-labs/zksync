@@ -288,35 +288,33 @@ mod test {
 
     use crate::witness::utils::public_data_commitment;
     use bellman::groth16::generate_random_parameters;
-    use bellman::groth16::{
-        create_random_proof, prepare_verifying_key, verify_proof,
-    };
+    use bellman::groth16::{create_random_proof, prepare_verifying_key, verify_proof};
 
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
     use ff::{BitIterator, Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-    use franklinmodels::primitives::{GetBits};
+    use franklinmodels::primitives::GetBits;
 
     use franklin_crypto::circuit::test::*;
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklin_crypto::jubjub::FixedGenerators;
     use franklinmodels::circuit::account::{
-         CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
+        CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
     use franklinmodels::params as franklin_constants;
 
     use rand::{Rng, SeedableRng, XorShiftRng};
 
     #[test]
+    #[ignore]
     fn test_deposit_franklin_in_empty_leaf() {
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let validator_address_number = 7;
         let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
         let block_number = Fr::from_str("1").unwrap();
-        let rng =
-            &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
         let phasher = PedersenHasher::<Bn256>::default();
 
         let mut tree: CircuitAccountTree =
@@ -327,12 +325,11 @@ mod test {
         let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
         let (sender_x, sender_y) = sender_pk.0.into_xy();
         let sender_leaf = CircuitAccount::<Bn256> {
-        subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
-        nonce: Fr::zero(),
-        pub_key_hash: sender_pub_key_hash
-        // pub_x: validator_x.clone(),
-        // pub_y: validator_y.clone(),
-    };
+            subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
+            nonce: Fr::zero(),
+            pub_key_hash: sender_pub_key_hash, // pub_x: validator_x.clone(),
+                                               // pub_y: validator_y.clone(),
+        };
         println!("zero root_hash equals: {}", sender_leaf.subtree.root_hash());
 
         // give some funds to sender and make zero balance for recipient
@@ -439,6 +436,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_deposit_franklin_proof() {
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;

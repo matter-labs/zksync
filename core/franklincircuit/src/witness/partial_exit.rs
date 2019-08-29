@@ -286,6 +286,7 @@ mod test {
     use franklinmodels::params as franklin_constants;
     use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
+    #[ignore]
     fn test_partial_exit_franklin() {
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;
@@ -422,6 +423,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_full_exit_franklin() {
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;

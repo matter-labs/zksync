@@ -103,6 +103,7 @@ mod test {
     use franklinmodels::merkle_tree::PedersenHasher;
 
     #[test]
+    #[ignore]
     fn test_noop_franklin() {
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;
@@ -182,8 +183,7 @@ mod test {
             &sender_x,
             &sender_y,
         );
-        let (_, validator_account_witness) =
-            apply_fee(&mut tree, validator_address_number, 0, 0);
+        let (_, validator_account_witness) = apply_fee(&mut tree, validator_address_number, 0, 0);
         let (validator_audit_path, _) = get_audits(&mut tree, validator_address_number, 0);
 
         let public_data_commitment = public_data_commitment::<Bn256>(

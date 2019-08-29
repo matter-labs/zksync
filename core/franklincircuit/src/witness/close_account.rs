@@ -165,12 +165,13 @@ mod test {
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklin_crypto::jubjub::FixedGenerators;
     use franklinmodels::circuit::account::{
-     CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
+        CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
     use franklinmodels::params as franklin_constants;
 
     use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
+    #[ignore]
     fn test_close_account_franklin_empty_leaf() {
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;
@@ -188,12 +189,11 @@ mod test {
         let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
         let (sender_x, sender_y) = sender_pk.0.into_xy();
         let sender_leaf = CircuitAccount::<Bn256> {
-        subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
-        nonce: Fr::zero(),
-        pub_key_hash: sender_pub_key_hash
-        // pub_x: validator_x.clone(),
-        // pub_y: validator_y.clone(),
-    };
+            subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
+            nonce: Fr::zero(),
+            pub_key_hash: sender_pub_key_hash, // pub_x: validator_x.clone(),
+                                               // pub_y: validator_y.clone(),
+        };
         println!("zero root_hash equals: {}", sender_leaf.subtree.root_hash());
 
         // give some funds to sender and make zero balance for recipient

@@ -1418,6 +1418,7 @@ mod test {
     use diesel::Connection;
 
     #[test]
+    #[ignore]
     fn test_store_proof() {
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
@@ -1542,6 +1543,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_commit_rewind() {
         let _ = env_logger::try_init();
 
@@ -1678,6 +1680,7 @@ mod test {
     //    }
 
     #[test]
+    #[ignore]
     fn test_store_txs() {
         unimplemented!()
         //        let pool = ConnectionPool::new();
@@ -1768,6 +1771,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_store_proof_reqs() {
         unimplemented!()
         //        let pool = ConnectionPool::new();
@@ -1817,6 +1821,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_store_helpers() {
         unimplemented!()
         //        let pool = ConnectionPool::new();
@@ -1866,6 +1871,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_store_txs_2() {
         unimplemented!()
         //        let pool = ConnectionPool::new();
@@ -1965,6 +1971,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_nonce_fast_forward() {
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();

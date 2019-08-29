@@ -74,7 +74,7 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
             &self.args.fee.unwrap(),
             franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         );
-        pubdata_bits.resize(40*8, false);
+        pubdata_bits.resize(40 * 8, false);
         pubdata_bits
     }
 }
@@ -403,6 +403,7 @@ mod test {
     use franklinmodels::merkle_tree::PedersenHasher;
     use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
+    #[ignore]
     fn test_transfer_to_new() {
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;
