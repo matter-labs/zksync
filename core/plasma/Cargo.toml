@@ -9,7 +9,7 @@ authors = [
 ]
 
 [dependencies]
-models = { package = "franklinmodels", path = "../franklinmodels" }
+models = { package = "models", path = "../models" }
 bigdecimal = { version = "0.0.14", features = ["serde"]}
 log = "0.4"
 failure = "0.1"

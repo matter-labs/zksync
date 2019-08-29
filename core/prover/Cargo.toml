@@ -5,8 +5,9 @@ edition = "2018"
 
 [dependencies]
 plasma = { path = "../plasma" }
-models = { package = "franklinmodels", path = "../franklinmodels" }
+models = { package = "models", path = "../models" }
 storage = { path = "../storage" }
+circuit = { package = "circuit", path = "../circuit"}
 
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
 pairing = { package = "pairing_ce", version = "0.17.0" }
@@ -35,3 +36,4 @@ bigdecimal = { version = "0.0.14", features = ["serde"]}
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 log = "0.4"
 env_logger = "0.6"
+num-traits = "0.2"

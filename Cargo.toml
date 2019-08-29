@@ -5,8 +5,8 @@ members = [
     "core/plasma",
     "core/server",
     "core/storage",
-    "core/franklincircuit",
-    "core/franklinmodels",
-    "core/franklin_prover",
-    "core/franklin_key_generator",
+    "core/circuit",
+    "core/models",
+    "core/prover",
+    "core/key_generator",
 ]
