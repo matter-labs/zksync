@@ -66,6 +66,7 @@ export class Wallet {
     supportedTokens: Token[];
     franklinState: FranklinAccountState;
     ethState: ETHAccountState;
+    nonce: number;
 
     constructor(seed: Buffer, public provider: FranklinProvider, public ethWallet: ethers.Signer, public ethAddress: string) {
         let privateKey = new BN(HmacSHA512(seed.toString('hex'), 'Matter seed').toString(), 'hex');
@@ -75,6 +76,9 @@ export class Wallet {
         let buff = Buffer.from(x.toString('hex').padStart(64,'0') + y.toString('hex').padStart(64, '0'), 'hex');
         let hash = pedersenHash(buff);
         this.address = '0x' + (hash.getX().toString('hex').padStart(64, '0') + hash.getY().toString('hex').padStart(64,'0')).slice(0, PUBKEY_HASH_LEN * 2);
+        
+
+        this.nonce = null;
     }
 
     async depositOnchain(token: Token, amount: BigNumberish) {
@@ -156,8 +160,11 @@ export class Wallet {
     }
 
     async getNonce(): Promise<number> {
-        await this.fetchFranklinState();
-        return this.franklinState.commited.nonce
+        if (this.nonce === null) {
+            await this.fetchFranklinState();
+            this.nonce = this.franklinState.commited.nonce;
+        }
+        return this.nonce++;
     }
 
     static async fromEthWallet(wallet: ethers.Signer, franklinProvider: FranklinProvider = new FranklinProvider()) {
@@ -200,8 +207,12 @@ export class Wallet {
     }
 
     async updateState() {
-        await this.fetchFranklinState();
-        await this.fetchEthState();
+        try {
+            await this.fetchFranklinState();
+            await this.fetchEthState();
+        } catch (err) {
+            console.log(`... wallet.updateState failed with ${err.message}`)
+        }
     }
 
     async waitPendingTxsExecuted() {
