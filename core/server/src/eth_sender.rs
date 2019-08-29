@@ -5,30 +5,35 @@
 
 use eth_client::ETHClient;
 use ff::{PrimeField, PrimeFieldRepr};
+use futures::Future;
 use models::abi::TEST_PLASMA2_ALWAYS_VERIFY;
 use models::{Action, Operation};
 use std::collections::VecDeque;
 use std::str::FromStr;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use storage::ConnectionPool;
+use web3::contract::Options;
+use web3::transports::{EventLoopHandle, Http};
 use web3::types::{H256, U256};
+use web3::Transport;
 
-struct ETHSender {
-    eth_client: ETHClient,
+struct ETHSender<T: Transport> {
+    eth_client: ETHClient<T>,
     op_queue: VecDeque<Operation>,
     pending_transaction: Option<H256>,
     db_pool: ConnectionPool,
 }
 
-impl ETHSender {
-    fn new(db_pool: ConnectionPool) -> Self {
+impl<T: Transport> ETHSender<T> {
+    fn new(transport: T, db_pool: ConnectionPool) -> Self {
         let eth_client = {
             let abi_string = serde_json::Value::from_str(TEST_PLASMA2_ALWAYS_VERIFY)
                 .unwrap()
                 .get("abi")
                 .unwrap()
                 .to_string();
-            ETHClient::new(abi_string)
+
+            ETHClient::new(transport, abi_string)
         };
         let mut sender = Self {
             eth_client,
@@ -44,30 +49,35 @@ impl ETHSender {
         let current_nonce = self
             .eth_client
             .current_nonce()
+            .wait()
             .expect("could not fetch current nonce");
         let storage = self.db_pool.access_storage().expect("db fail");
         info!(
             "Starting eth_sender: sender = {}, current_nonce = {}",
-            self.eth_client.current_sender(),
-            current_nonce
+            self.eth_client.sender_account, current_nonce
         );
         // execute pending transactions
         let ops = storage
-            .load_unsent_ops(current_nonce)
+            .load_unsent_ops(current_nonce.as_u32())
             .expect("db must be functional");
         for pending_op in ops {
             self.op_queue.push_back(pending_op);
         }
 
-        let commited_nonce = self.eth_client.current_nonce().expect("eth nonce");
-        let pending_nonce = self.eth_client.pending_nonce().expect("eth pending nonce");
+        let commited_nonce = self.eth_client.current_nonce().wait().expect("eth nonce");
+        let pending_nonce = self
+            .eth_client
+            .pending_nonce()
+            .wait()
+            .expect("eth pending nonce");
         if commited_nonce == pending_nonce {
             self.pending_transaction = None;
         } else if commited_nonce + 1 == pending_nonce {
             let last_sent_op = storage.load_last_sent_operation().expect("db error");
             if let Some(op) = last_sent_op {
-                assert_eq!(op.nonce, pending_nonce as i64);
-                self.pending_transaction = Some(op.tx_hash.unwrap()[2..].parse());
+                assert_eq!(op.nonce, pending_nonce.as_u32() as i64);
+                //                self.pending_transaction = Some(op.tx_hash.unwrap()[2..].parse());
+                unimplemented!()
             } else {
                 self.pending_transaction = None;
             }
@@ -120,7 +130,7 @@ impl ETHSender {
         }
     }
 
-    fn send_operation(&mut self, op: &Operation) -> eth_client::Result<H256> {
+    fn send_operation(&mut self, op: &Operation) -> Result<H256, web3::Error> {
         match &op.action {
             Action::Commit => {
                 let mut be_bytes: Vec<u8> = Vec::new();
@@ -136,24 +146,28 @@ impl ETHSender {
                     op.block.get_eth_public_data()
                 );
                 // function commitBlock(uint32 _blockNumber, uint24 _feeAccount, bytes32 _newRoot, bytes calldata _publicData)
-                self.eth_client.call(
-                    "commitBlock",
-                    op.tx_meta.clone().expect("tx meta missing"),
-                    (
-                        u64::from(op.block.block_number),
-                        u64::from(op.block.fee_account),
-                        root,
-                        op.block.get_eth_public_data(),
-                    ),
-                )
+                self.eth_client
+                    .call(
+                        "commitBlock",
+                        (
+                            u64::from(op.block.block_number),
+                            u64::from(op.block.fee_account),
+                            root,
+                            op.block.get_eth_public_data(),
+                        ),
+                        Options::default(),
+                    )
+                    .wait()
             }
             Action::Verify { proof } => {
                 // function verifyBlock(uint32 _blockNumber, uint256[8] calldata proof) external {
-                self.eth_client.call(
-                    "verifyBlock",
-                    op.tx_meta.clone().expect("tx meta missing"),
-                    (u64::from(op.block.block_number), *proof.clone()),
-                )
+                self.eth_client
+                    .call(
+                        "verifyBlock",
+                        (u64::from(op.block.block_number), *proof.clone()),
+                        Options::default(),
+                    )
+                    .wait()
             }
         }
     }
@@ -165,7 +179,11 @@ pub fn start_eth_sender(pool: ConnectionPool) -> Sender<Operation> {
     std::thread::Builder::new()
         .name("eth_sender".to_string())
         .spawn(move || {
-            let mut eth_sender = ETHSender::new(pool);
+            let web3_url = std::env::var("WEB3_URL").expect("WEB3_URL env var not found");
+            let (_event_loop, transport) =
+                Http::new(&web3_url).expect("failed to start web3 transport");
+
+            let mut eth_sender = ETHSender::new(transport, pool);
             eth_sender.run(rx_for_eth);
         })
         .expect("Eth sender thread");

@@ -972,7 +972,7 @@ impl StorageProcessor {
             .filter(operations::tx_hash.is_not_null())
             .order(operations::id.desc())
             .first::<StoredOperation>(self.conn())
-            .optional()?
+            .optional()
     }
 
     pub fn load_unverified_commitments(&self) -> QueryResult<Vec<Operation>> {

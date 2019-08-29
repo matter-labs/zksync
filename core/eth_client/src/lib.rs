@@ -16,7 +16,7 @@ pub mod signer;
 
 pub struct ETHClient<T: Transport> {
     private_key: H256,
-    sender_account: Address,
+    pub sender_account: Address,
     contract_addr: H160,
     contract: ethabi::Contract,
     chain_id: u8,
