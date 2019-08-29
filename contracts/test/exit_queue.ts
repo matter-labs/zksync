@@ -1,5 +1,5 @@
 import {ethers} from "ethers";
-import {addTestERC20Token, deployFranklin, deployExitQueue} from "../src.ts/deploy";
+import {addTestERC20Token, deployFranklin, deployPriorityQueue} from "../src.ts/deploy";
 
 import {BN} from "bn.js";
 import {expect, use} from "chai";
