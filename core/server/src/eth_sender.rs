@@ -63,7 +63,7 @@ impl ETHSender {
         let pending_nonce = self.eth_client.pending_nonce().expect("eth pending nonce");
         if commited_nonce == pending_nonce {
             self.pending_transaction = None;
-        } else if commited_nonce + 1 == pending_nonce{
+        } else if commited_nonce + 1 == pending_nonce {
             let last_sent_op = storage.load_last_sent_operation().expect("db error");
             if let Some(op) = last_sent_op {
                 assert_eq!(op.nonce, pending_nonce as i64);
