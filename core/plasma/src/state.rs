@@ -1,38 +1,57 @@
-use bigdecimal::{BigDecimal, Zero};
-use merkle_tree::AccountTree;
-use models::plasma::account::Account;
-use models::plasma::params;
-use models::plasma::tx::{DepositTx, ExitTx, TransferTx};
-use models::plasma::{AccountId, AccountMap, Fr, TransferApplicationError};
+use bigdecimal::BigDecimal;
+use failure::{bail, ensure, format_err, Error};
+use models::node::operations::{
+    CloseOp, DepositOp, FranklinOp, PartialExitOp, TransferOp, TransferToNewOp,
+};
+use models::node::tx::{Close, Deposit, FranklinTx, Transfer, Withdraw};
+use models::node::{Account, AccountAddress, AccountTree};
+use models::node::{
+    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr, TokenId,
+};
+use models::params;
+use std::collections::HashMap;
+
+#[derive(Debug)]
+pub struct TxSuccess {
+    pub fee: CollectedFee,
+    pub updates: AccountUpdates,
+    pub executed_op: FranklinOp,
+}
 
 pub struct PlasmaState {
     /// Accounts stored in a sparse Merkle tree
-    pub balance_tree: AccountTree,
+    balance_tree: AccountTree,
+
+    account_id_by_address: HashMap<AccountAddress, AccountId>,
 
     /// Current block number
-    pub block_number: u32,
+    pub block_number: BlockNumber,
+}
+
+#[derive(Debug)]
+pub struct CollectedFee {
+    pub token: TokenId,
+    pub amount: BigDecimal,
 }
 
 impl PlasmaState {
     pub fn empty() -> Self {
-        let tree_depth = params::BALANCE_TREE_DEPTH as u32;
+        let tree_depth = params::ACCOUNT_TREE_DEPTH as u32;
         let balance_tree = AccountTree::new(tree_depth);
         Self {
             balance_tree,
             block_number: 0,
+            account_id_by_address: HashMap::new(),
         }
     }
 
     pub fn new(accounts: AccountMap, current_block: u32) -> Self {
-        let tree_depth = params::BALANCE_TREE_DEPTH as u32;
-        let mut balance_tree = AccountTree::new(tree_depth);
+        let mut empty = Self::empty();
+        empty.block_number = current_block;
         for (id, account) in accounts {
-            balance_tree.insert(id, account);
+            empty.insert_account(id, account);
         }
-        Self {
-            balance_tree,
-            block_number: current_block,
-        }
+        empty
     }
 
     pub fn get_accounts(&self) -> Vec<(u32, Account)> {
@@ -47,107 +66,406 @@ impl PlasmaState {
         self.balance_tree.root_hash()
     }
 
-    pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
+    fn get_account(&self, account_id: AccountId) -> Option<Account> {
         self.balance_tree.items.get(&account_id).cloned()
     }
 
-    pub fn apply_transfer(
-        &mut self,
-        tx: &TransferTx,
-    ) -> Result<BigDecimal, TransferApplicationError> {
-        if let Some(mut from) = self.balance_tree.items.get(&tx.from).cloned() {
-            // TODO: take from `from` instead and uncomment below
-            let pub_key = self
-                .get_account(tx.from)
-                .and_then(|a| a.get_pub_key())
-                .ok_or(TransferApplicationError::UnknownSigner)?;
-            if let Some(verified_against) = tx.cached_pub_key.as_ref() {
-                if pub_key.0 != verified_against.0 {
-                    return Err(TransferApplicationError::InvalidSigner);
-                }
-            } else {
-                return Err(TransferApplicationError::InvalidSigner);
-            }
-
-            let mut transacted_amount = BigDecimal::zero();
-            transacted_amount += &tx.amount;
-            transacted_amount += &tx.fee;
-
-            if tx.nonce > from.nonce {
-                //debug!("Nonce is too high");
-                return Err(TransferApplicationError::NonceIsTooHigh);
-            } else if tx.nonce < from.nonce {
-                //debug!("Nonce is too low");
-                return Err(TransferApplicationError::NonceIsTooLow);
-            }
-
-            if from.balance < transacted_amount {
-                //debug!("Insufficient balance");
-                return Err(TransferApplicationError::InsufficientBalance);
-            }
-
-            if tx.good_until_block < self.block_number {
-                //debug!("Transaction is outdated");
-                return Err(TransferApplicationError::ExpiredTransaction);
-            }
-
-            // update state
-
-            // allow to send to non-existing accounts
-            // let mut to = self.balance_tree.items.get(&tx.to).ok_or(())?.clone();
-
-            let mut to = Account::default();
-            if let Some(existing_to) = self.balance_tree.items.get(&tx.to) {
-                to = existing_to.clone();
-            }
-
-            from.balance -= transacted_amount;
-
-            from.nonce += 1;
-            if tx.to != 0 {
-                to.balance += &tx.amount;
-            }
-
-            self.balance_tree.insert(tx.from, from);
-            self.balance_tree.insert(tx.to, to);
-
-            let collected_fee = tx.fee.clone();
-
-            return Ok(collected_fee);
+    pub fn apply_tx(&mut self, tx: FranklinTx) -> Result<TxSuccess, Error> {
+        match tx {
+            FranklinTx::Transfer(tx) => self.apply_transfer(tx),
+            FranklinTx::Deposit(tx) => self.apply_deposit(tx),
+            FranklinTx::Withdraw(tx) => self.apply_withdraw(tx),
+            FranklinTx::Close(tx) => self.apply_close(tx),
         }
-
-        Err(TransferApplicationError::InvalidSigner)
     }
 
-    pub fn apply_deposit(&mut self, tx: &DepositTx) -> Result<(), ()> {
-        let existing_acc = self.balance_tree.items.get(&tx.account);
+    fn get_free_account_id(&self) -> AccountId {
+        // TODO check for collisions.
+        self.balance_tree.items.len() as u32
+    }
 
-        if existing_acc.is_none() {
-            let mut acc = Account::default();
-            let tx = tx.clone();
-            acc.public_key_x = tx.pub_x;
-            acc.public_key_y = tx.pub_y;
-            acc.balance = tx.amount;
-            self.balance_tree.insert(tx.account, acc);
+    fn apply_deposit(&mut self, tx: Deposit) -> Result<TxSuccess, Error> {
+        ensure!(
+            tx.token < (params::TOTAL_TOKENS as TokenId),
+            "Token id is not supported"
+        );
+        let account_id = if let Some((account_id, _)) = self.get_account_by_address(&tx.to) {
+            account_id
         } else {
-            let mut acc = existing_acc.unwrap().clone();
-            acc.balance += &tx.amount;
-            self.balance_tree.insert(tx.account, acc);
-        }
-        Ok(())
+            self.get_free_account_id()
+        };
+        let deposit_op = DepositOp { tx, account_id };
+
+        let (fee, updates) = self.apply_deposit_op(&deposit_op)?;
+        Ok(TxSuccess {
+            fee,
+            updates,
+            executed_op: FranklinOp::Deposit(deposit_op),
+        })
     }
 
-    pub fn apply_exit(&mut self, tx: &ExitTx) -> Result<ExitTx, ()> {
-        let acc = self.balance_tree.items.get(&tx.account).ok_or(())?.clone();
+    fn apply_transfer(&mut self, tx: Transfer) -> Result<TxSuccess, Error> {
+        ensure!(
+            tx.token < (params::TOTAL_TOKENS as TokenId),
+            "Token id is not supported"
+        );
+        let (from, _) = self
+            .get_account_by_address(&tx.from)
+            .ok_or_else(|| format_err!("From account does not exist"))?;
 
-        let mut agumented_tx = tx.clone();
+        if let Some((to, _)) = self.get_account_by_address(&tx.to) {
+            let transfer_op = TransferOp { tx, from, to };
 
-        debug!("Adding account balance to ExitTx, value = {}", acc.balance);
+            let (fee, updates) = self.apply_transfer_op(&transfer_op)?;
+            Ok(TxSuccess {
+                fee,
+                updates,
+                executed_op: FranklinOp::Transfer(transfer_op),
+            })
+        } else {
+            let to = self.get_free_account_id();
+            let transfer_to_new_op = TransferToNewOp { tx, from, to };
 
-        agumented_tx.amount = acc.balance;
+            let (fee, updates) = self.apply_transfer_to_new_op(&transfer_to_new_op)?;
+            Ok(TxSuccess {
+                fee,
+                updates,
+                executed_op: FranklinOp::TransferToNew(transfer_to_new_op),
+            })
+        }
+    }
 
-        self.balance_tree.delete(tx.account);
+    fn apply_withdraw(&mut self, tx: Withdraw) -> Result<TxSuccess, Error> {
+        ensure!(
+            tx.token < (params::TOTAL_TOKENS as TokenId),
+            "Token id is not supported"
+        );
+        let (account_id, _) = self
+            .get_account_by_address(&tx.account)
+            .ok_or_else(|| format_err!("Account does not exist"))?;
+        let partial_exit_op = PartialExitOp { tx, account_id };
 
-        Ok(agumented_tx)
+        let (fee, updates) = self.apply_partial_exit_op(&partial_exit_op)?;
+        Ok(TxSuccess {
+            fee,
+            updates,
+            executed_op: FranklinOp::PartialExit(partial_exit_op),
+        })
+    }
+
+    fn apply_close(&mut self, tx: Close) -> Result<TxSuccess, Error> {
+        let (account_id, _) = self
+            .get_account_by_address(&tx.account)
+            .ok_or_else(|| format_err!("Account does not exist"))?;
+        let close_op = CloseOp { tx, account_id };
+
+        let (fee, updates) = self.apply_close_op(&close_op)?;
+        Ok(TxSuccess {
+            fee,
+            updates,
+            executed_op: FranklinOp::Close(close_op),
+        })
+    }
+
+    pub fn collect_fee(
+        &mut self,
+        fees: &[CollectedFee],
+        fee_account: &AccountAddress,
+    ) -> (AccountId, AccountUpdates) {
+        let mut updates = Vec::new();
+
+        let (id, mut account) =
+            if let Some((id, account)) = self.get_account_by_address(fee_account) {
+                (id, account)
+            } else {
+                panic!(
+                    "Fee account should be present in the account tree: {}",
+                    fee_account.to_hex()
+                );
+            };
+
+        for fee in fees {
+            if fee.amount == BigDecimal::from(0) {
+                continue;
+            }
+
+            let old_amount = account.get_balance(fee.token).clone();
+            let nonce = account.nonce;
+            account.add_balance(fee.token, &fee.amount);
+            let new_amount = account.get_balance(fee.token).clone();
+
+            updates.push((
+                id,
+                AccountUpdate::UpdateBalance {
+                    balance_update: (fee.token, old_amount, new_amount),
+                    old_nonce: nonce,
+                    new_nonce: nonce,
+                },
+            ));
+        }
+
+        self.insert_account(id, account);
+
+        (id, updates)
+    }
+
+    pub fn get_account_by_address(&self, address: &AccountAddress) -> Option<(AccountId, Account)> {
+        let account_id = *self.account_id_by_address.get(address)?;
+        Some((
+            account_id,
+            self.get_account(account_id)
+                .expect("Failed to get account by cached pubkey"),
+        ))
+    }
+
+    fn insert_account(&mut self, id: AccountId, account: Account) {
+        self.account_id_by_address
+            .insert(account.address.clone(), id);
+        self.balance_tree.insert(id, account);
+    }
+
+    fn remove_account(&mut self, id: AccountId) {
+        if let Some(account) = self.get_account(id) {
+            self.account_id_by_address.remove(&account.address);
+            self.balance_tree.delete(id);
+        }
+    }
+
+    fn apply_deposit_op(
+        &mut self,
+        op: &DepositOp,
+    ) -> Result<(CollectedFee, AccountUpdates), Error> {
+        let mut updates = Vec::new();
+
+        let mut account = self.get_account(op.account_id).unwrap_or_else(|| {
+            let (account, upd) = Account::create_account(op.account_id, op.tx.to.clone());
+            updates.extend(upd.into_iter());
+            account
+        });
+
+        let old_amount = account.get_balance(op.tx.token).clone();
+        let old_nonce = account.nonce;
+        ensure!(
+            op.tx.nonce == old_nonce,
+            "Nonce mismatch tx: {}, account: {}",
+            op.tx.nonce,
+            old_nonce
+        );
+        // TODO: (Drogan) check eth state balance.
+        account.add_balance(op.tx.token, &op.tx.amount);
+        account.nonce += 1;
+        let new_amount = account.get_balance(op.tx.token).clone();
+        let new_nonce = account.nonce;
+
+        self.insert_account(op.account_id, account);
+
+        updates.push((
+            op.account_id,
+            AccountUpdate::UpdateBalance {
+                balance_update: (op.tx.token, old_amount, new_amount),
+                old_nonce,
+                new_nonce,
+            },
+        ));
+
+        let fee = CollectedFee {
+            token: op.tx.token,
+            amount: op.tx.fee.clone(),
+        };
+
+        Ok((fee, updates))
+    }
+
+    fn apply_transfer_to_new_op(
+        &mut self,
+        op: &TransferToNewOp,
+    ) -> Result<(CollectedFee, AccountUpdates), Error> {
+        let mut updates = Vec::new();
+
+        assert!(
+            self.get_account(op.to).is_none(),
+            "Transfer to new account exists"
+        );
+        let mut to_account = {
+            let (acc, upd) = Account::create_account(op.to, op.tx.to.clone());
+            updates.extend(upd.into_iter());
+            acc
+        };
+
+        let mut from_account = self.get_account(op.from).unwrap();
+        let from_old_balance = from_account.get_balance(op.tx.token).clone();
+        let from_old_nonce = from_account.nonce;
+        ensure!(op.tx.nonce == from_old_nonce, "Nonce mismatch");
+        ensure!(
+            from_old_balance >= &op.tx.amount + &op.tx.fee,
+            "Not enough balance"
+        );
+        from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
+        from_account.nonce += 1;
+        let from_new_balance = from_account.get_balance(op.tx.token).clone();
+        let from_new_nonce = from_account.nonce;
+
+        let to_old_balance = to_account.get_balance(op.tx.token).clone();
+        let to_account_nonce = to_account.nonce;
+        to_account.add_balance(op.tx.token, &op.tx.amount);
+        let to_new_balance = to_account.get_balance(op.tx.token).clone();
+
+        self.insert_account(op.from, from_account);
+        self.insert_account(op.to, to_account);
+
+        updates.push((
+            op.from,
+            AccountUpdate::UpdateBalance {
+                balance_update: (op.tx.token, from_old_balance, from_new_balance),
+                old_nonce: from_old_nonce,
+                new_nonce: from_new_nonce,
+            },
+        ));
+        updates.push((
+            op.to,
+            AccountUpdate::UpdateBalance {
+                balance_update: (op.tx.token, to_old_balance, to_new_balance),
+                old_nonce: to_account_nonce,
+                new_nonce: to_account_nonce,
+            },
+        ));
+
+        let fee = CollectedFee {
+            token: op.tx.token,
+            amount: op.tx.fee.clone(),
+        };
+
+        Ok((fee, updates))
+    }
+
+    fn apply_partial_exit_op(
+        &mut self,
+        op: &PartialExitOp,
+    ) -> Result<(CollectedFee, AccountUpdates), Error> {
+        let mut updates = Vec::new();
+        let mut from_account = self.get_account(op.account_id).unwrap();
+
+        let from_old_balance = from_account.get_balance(op.tx.token).clone();
+        let from_old_nonce = from_account.nonce;
+
+        ensure!(op.tx.nonce == from_old_nonce, "Nonce mismatch");
+        ensure!(
+            from_old_balance >= &op.tx.amount + &op.tx.fee,
+            "Not enough balance"
+        );
+
+        from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
+        from_account.nonce += 1;
+
+        let from_new_balance = from_account.get_balance(op.tx.token).clone();
+        let from_new_nonce = from_account.nonce;
+
+        self.insert_account(op.account_id, from_account);
+
+        updates.push((
+            op.account_id,
+            AccountUpdate::UpdateBalance {
+                balance_update: (op.tx.token, from_old_balance, from_new_balance),
+                old_nonce: from_old_nonce,
+                new_nonce: from_new_nonce,
+            },
+        ));
+
+        let fee = CollectedFee {
+            token: op.tx.token,
+            amount: op.tx.fee.clone(),
+        };
+
+        Ok((fee, updates))
+    }
+
+    fn apply_close_op(&mut self, op: &CloseOp) -> Result<(CollectedFee, AccountUpdates), Error> {
+        let mut updates = Vec::new();
+        let account = self.get_account(op.account_id).unwrap();
+
+        for token in 0..params::TOTAL_TOKENS {
+            if account.get_balance(token as TokenId) != BigDecimal::from(0) {
+                bail!("Account is not empty, token id: {}", token);
+            }
+        }
+
+        ensure!(op.tx.nonce == account.nonce, "Nonce mismatch");
+
+        self.remove_account(op.account_id);
+
+        updates.push((
+            op.account_id,
+            AccountUpdate::Delete {
+                address: account.address,
+                nonce: account.nonce,
+            },
+        ));
+
+        let fee = CollectedFee {
+            token: params::ETH_TOKEN_ID,
+            amount: BigDecimal::from(0),
+        };
+
+        Ok((fee, updates))
+    }
+
+    fn apply_transfer_op(
+        &mut self,
+        op: &TransferOp,
+    ) -> Result<(CollectedFee, AccountUpdates), Error> {
+        let mut updates = Vec::new();
+
+        let mut from_account = self.get_account(op.from).unwrap();
+        let mut to_account = self.get_account(op.to).unwrap();
+
+        let from_old_balance = from_account.get_balance(op.tx.token).clone();
+        let from_old_nonce = from_account.nonce;
+
+        ensure!(op.tx.nonce == from_old_nonce, "Nonce mismatch");
+        ensure!(
+            from_old_balance >= &op.tx.amount + &op.tx.fee,
+            "Not enough balance"
+        );
+
+        from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
+        from_account.nonce += 1;
+
+        let from_new_balance = from_account.get_balance(op.tx.token).clone();
+        let from_new_nonce = from_account.nonce;
+
+        let to_old_balance = to_account.get_balance(op.tx.token).clone();
+        let to_account_nonce = to_account.nonce;
+
+        to_account.add_balance(op.tx.token, &op.tx.amount);
+
+        let to_new_balance = to_account.get_balance(op.tx.token).clone();
+
+        self.insert_account(op.from, from_account);
+        self.insert_account(op.to, to_account);
+
+        updates.push((
+            op.from,
+            AccountUpdate::UpdateBalance {
+                balance_update: (op.tx.token, from_old_balance, from_new_balance),
+                old_nonce: from_old_nonce,
+                new_nonce: from_new_nonce,
+            },
+        ));
+
+        updates.push((
+            op.to,
+            AccountUpdate::UpdateBalance {
+                balance_update: (op.tx.token, to_old_balance, to_new_balance),
+                old_nonce: to_account_nonce,
+                new_nonce: to_account_nonce,
+            },
+        ));
+
+        let fee = CollectedFee {
+            token: op.tx.token,
+            amount: op.tx.fee.clone(),
+        };
+
+        Ok((fee, updates))
     }
 }

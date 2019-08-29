@@ -12,7 +12,9 @@ yarn-error.log
 target
 env-config.js
 a.out 
+.gitconfig
 
+franklin_pk.key
 dist
 npm-debug.log
 
@@ -23,6 +25,7 @@ Cargo.lock
 !/etc/env/dev.env.example
 /contracts/yarn-error.log
 /deploy.log
+/genesis.log
 /keys
 /tmp
 /volumes

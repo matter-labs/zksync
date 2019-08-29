@@ -15,7 +15,7 @@ init:
 	@bin/init
 
 yarn:
-	@cd js/franklin && yarn
+	@cd js/franklin_lib && yarn
 	@cd js/client && yarn
 	@cd js/loadtest && yarn
 	@cd js/explorer && yarn
@@ -43,7 +43,7 @@ db-setup:
 	@bin/db-setup
 
 db-insert-contract:
-	@bin/db-insert-contract
+	@bin/db-insert-contract.sh
 
 db-reset: confirm_action db-drop db-setup db-insert-contract
 	@echo database is ready
@@ -59,6 +59,9 @@ db-drop: confirm_action
 
 db-wait:
 	@bin/db-wait
+
+genesis: confirm_action db-reset
+	@bin/genesis.sh
 
 # Frontend clients
 
@@ -97,11 +100,15 @@ rust-musl-builder = @docker run $(docker-options) ekidd/rust-musl-builder
 
 # Rust: main stuff
 
+
+dummy-prover:
+	cargo run --bin dummy_prover
+
 prover:
-	@bin/.load_keys && cargo run --release --bin prover
+	@cargo run --release --bin franklin_prover
 
 server:
-	@cargo run --bin server
+	@cargo run --bin server --release
 
 sandbox:
 	@cargo run --bin sandbox
@@ -128,21 +135,30 @@ push-image-rust: image-rust
 # Contracts
 
 deploy-contracts: confirm_action
-	@bin/deploy-contracts
+	@bin/deploy-contracts.sh
 
-flattener = @docker run --rm -v $(shell pwd)/contracts:/home/contracts -it "${FLATTENER_DOCKER_IMAGE}"
-define flatten_file
-	@echo flattening $(1)
-	$(flattener) -c 'solidity_flattener --output /home/contracts/flat/$(1) /home/contracts/contracts/$(1)'
-endef
+test-contracts: confirm_action
+	@cd contracts && yarn test
 
-# Flatten contract source
-flatten:
-	@mkdir -p contracts/flat
-	$(call flatten_file,FranklinProxy.sol)
-	$(call flatten_file,Depositor.sol)
-	$(call flatten_file,Exitor.sol)
-	$(call flatten_file,Transactor.sol)
+build-contracts: confirm_action
+	@cd contracts && yarn build
+
+# deploy-contracts: confirm_action
+# 	@bin/deploy-contracts
+
+# flattener = @docker run --rm -v $(shell pwd)/contracts:/home/contracts -it "${FLATTENER_DOCKER_IMAGE}"
+# define flatten_file
+# 	@echo flattening $(1)
+# 	$(flattener) -c 'solidity_flattener --output /home/contracts/flat/$(1) /home/contracts/contracts/$(1)'
+# endef
+
+# # Flatten contract source
+# flatten:
+# 	@mkdir -p contracts/flat
+# 	$(call flatten_file,FranklinProxy.sol)
+# 	$(call flatten_file,Depositor.sol)
+# 	$(call flatten_file,Exitor.sol)
+# 	$(call flatten_file,Transactor.sol)
 
 # Publish source to etherscan.io
 source: #flatten
@@ -156,7 +172,7 @@ price:
 # Loadtest
 
 run-loadtest: confirm_action
-	@node js/loadtest/loadtest.js
+	@cd js/franklin_lib && yarn loadtest
 
 prepare-loadtest: confirm_action
 	@node js/loadtest/loadtest.js prepare
@@ -170,7 +186,7 @@ deposit: confirm_action
 # Devops: main
 
 # (Re)deploy contracts and database
-redeploy: confirm_action stop deploy-contracts db-reset
+redeploy: confirm_action stop deploy-contracts db-insert-contract
 
 dev-ready = docker ps | grep -q "$(GETH_DOCKER_IMAGE)"
 
@@ -256,9 +272,11 @@ nodes:
 dev-up:
 	@{ docker ps | grep -q "$(GETH_DOCKER_IMAGE)" && echo "Dev env already running" && exit 1; } || echo -n
 	@docker-compose up -d postgres geth
+	@docker-compose up -d tesseracts
 
 dev-down:
 	@docker-compose stop postgres geth
+	@docker-compose stop tesseracts
 
 geth-up: geth
 	@docker-compose up geth
@@ -292,14 +310,6 @@ dev-push-flattener:
 
 make-keys:
 	@cargo run -p key_generator --release --bin key_generator
-
-# Tesseracts
-
-tesseracts-up:
-	@docker-compose up -d tesseracts
-
-tesseracts-down:
-	@docker-compose stop tesseracts
 
  # Data Restore
 

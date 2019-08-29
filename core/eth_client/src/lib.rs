@@ -5,7 +5,6 @@ extern crate log;
 
 use ethereum_types::{H160, H256, U256};
 use hex;
-use models::abi::ABI;
 use models::TxMeta;
 use reqwest;
 use reqwest::header::CONTENT_TYPE;
@@ -34,23 +33,25 @@ pub struct ETHClient {
 /// ETH client for Plasma contract
 /// All methods are blocking for now
 impl ETHClient {
-    pub fn new(contract_abi: ABI) -> Self {
+    pub fn new(contract_abi: String) -> Self {
         Self {
             web3_url: env::var("WEB3_URL").unwrap_or_else(|_| "http://localhost:8545".to_string()),
-            private_key: H256::from_str(&env::var("PRIVATE_KEY").unwrap_or_else(|_| {
-                "aa8564af9bef22f581e99125d1829b76c45d08e4f6f0b74d586911f4318b6776".to_string()
-            }))
+            private_key: H256::from_str(
+                &env::var("OPERATOR_PRIVATE_KEY").expect("OPERATOR_PRIVATE_KEY"),
+            )
             .expect("private key must be correct"),
             contract_addr: H160::from_str(
                 &env::var("CONTRACT_ADDR")
-                    .unwrap_or_else(|_| "616e08c733fe20e99bf70c5088635694d5e25c54".to_string()),
+                    .map(|s| s[2..].to_string())
+                    .expect("CONTRACT_ADDR"),
             )
             .expect("contract address must be correct"),
-            sender_account: env::var("SENDER_ACCOUNT")
-                .unwrap_or_else(|_| "e5d0efb4756bd5cdd4b5140d3d2e08ca7e6cf644".to_string()),
+            sender_account: env::var("OPERATOR_ETH_ADDRESS")
+                .map(|s| s[2..].to_string())
+                .expect("OPERATOR_ETH_ADDRESS"),
             chain_id: u8::from_str(&env::var("CHAIN_ID").unwrap_or_else(|_| "4".to_string()))
                 .expect("chain id must be correct"),
-            contract: ethabi::Contract::load(contract_abi.0)
+            contract: ethabi::Contract::load(contract_abi.as_bytes())
                 .expect("contract must be loaded correctly"),
             reqwest_client: reqwest::Client::new(),
             gas_price_factor: usize::from_str(
@@ -214,49 +215,4 @@ where
         )));
     }
     Ok(Out::from_str(&s[2..])?)
-}
-
-#[test]
-fn test_eth() {
-
-    // let mut client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
-
-    // let block_num: u64 = 1;
-    // let total_fees: U128 = U128::from_dec_str("0").unwrap();
-    // let tx_data_packed: Vec<u8> = vec![];
-    // let new_root: H256 = H256::zero();
-
-    // let proof: [U256; 8] = [U256::zero(); 8];
-
-    // debug!("committing block...");
-    // let r = client.commit_block(block_num, total_fees, tx_data_packed, new_root);
-    // match r {
-    //     Err(e) => debug!("{:#?}", e),
-    //     Ok(hash) => debug!("https://rinkeby.etherscan.io/tx/{:?}", hash),
-    // };
-
-    // debug!("verifying block...");
-    // let r = client.verify_block(block_num, proof);
-    // match r {
-    //     Err(e) => debug!("{:#?}", e),
-    //     Ok(hash) => debug!("https://rinkeby.etherscan.io/tx/{:?}", hash),
-    // };
-}
-
-#[test]
-fn test_encoding() {
-    use models::abi::TEST_PLASMA_ALWAYS_VERIFY;
-
-    let contract = ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap();
-    let f = contract
-        .function("commitDepositBlock")
-        .expect("failed to get function");
-    let inputs = &f.inputs;
-    for i in inputs {
-        debug!("{} = {}", i.name, i.kind);
-    }
-    let params = (U256::from(0), [0u64; 1], 1u64, H256::zero());
-    let _data = f
-        .encode_input(&params.into_tokens())
-        .expect("failed to encode parameters");
 }

@@ -1,14 +1,12 @@
 [workspace]
 members = [
-    "core/data_restore",
     "core/key_generator",
-    "core/merkle_tree",
     "core/eth_client",
-    "core/models",
     "core/plasma",
-    "core/prover",
-    "core/sandbox",
     "core/server",
     "core/storage",
-    "core/circuit",
+    "core/franklincircuit",
+    "core/franklinmodels",
+    "core/franklin_prover",
+    "core/franklin_key_generator",
 ]

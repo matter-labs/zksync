@@ -49,9 +49,13 @@ Vue.mixin({
         // },
     },
     computed: {
-        etherscan() {
-            if (this.store.network === 'localhost') return 'http://localhost:4000'
-            return 'https://' + (this.store.network === 'mainnet' ? '' : `${this.store.network}.`) + 'etherscan.io'
+        blockchain_explorer_tx() {
+            if (this.store.network === 'localhost') return 'http://localhost:8000'
+            return 'https://' + (this.store.network === 'mainnet' ? '' : `${this.store.network}.`) + 'etherscan.io/tx'
+        },
+        blockchain_explorer_address() {
+            if (this.store.network === 'localhost') return 'http://localhost:8000'
+            return 'https://' + (this.store.network === 'mainnet' ? '' : `${this.store.network}.`) + 'etherscan.io/address'
         },
     },
 })
