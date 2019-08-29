@@ -4,7 +4,7 @@ pragma experimental ABIEncoderV2;
 contract ExitQueue {
 
     //TODO
-    uint256 constant requestLength = ;
+    uint256 public constant requestLength = ;
 
     struct ExitRequest {
         address accountAddress;

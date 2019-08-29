@@ -12,6 +12,7 @@ export const ERC20MintableContract = function () {
 export const franklinContractCode = require('../build/Franklin');
 export const vkContractCode = require('../build/VerificationKey');
 export const verifierContractCode = require('../build/Verifier');
+export const exitQueueContractCode = require('../build/ExitQueue');
 
 export async function deployFranklin(
     wallet,
@@ -31,6 +32,23 @@ export async function deployFranklin(
             gasLimit: 8000000,
         });
         console.log(`CONTRACT_ADDR=${contract.address}`);
+
+        return contract
+    } catch (err) {
+        console.log("Error:" + err);
+    }
+}
+
+export async function deployExitQueue(
+    wallet,
+    franklinAddress,
+    exitQueueCode = exitQueueContractCode,
+    ) {
+    try {
+        let contract = await deployContract(wallet, exitQueueCode, [franklinAddress], {
+            gasLimit: 8000000,
+        });
+        console.log(`EXIT_QUEUE_ADDR=${contract.address}`);
 
         return contract
     } catch (err) {
