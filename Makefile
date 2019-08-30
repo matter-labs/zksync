@@ -140,6 +140,9 @@ deploy-contracts: confirm_action
 test-contracts: confirm_action
 	@cd contracts && yarn test
 
+build-contracts: confirm_action
+	@cd contracts && yarn build
+
 # deploy-contracts: confirm_action
 # 	@bin/deploy-contracts
 
