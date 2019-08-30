@@ -54,7 +54,6 @@ fn run_committer(
                 action: Action::Commit,
                 block,
                 accounts_updated,
-                tx_meta: None,
                 id: None,
             };
             info!("commit block #{}", op.block.block_number);
@@ -82,7 +81,6 @@ fn run_committer(
                         },
                         block,
                         accounts_updated: Vec::new(),
-                        tx_meta: None,
                         id: None,
                     };
                     let op = storage

@@ -99,7 +99,8 @@ impl TryFrom<Log> for OnchainDepositEvent {
             event
                 .topics
                 .get(1)
-                .ok_or_else(|| format_err!("Failed to get address topic"))?,
+                .ok_or_else(|| format_err!("Failed to get address topic"))?
+                .as_ref(),
         )
         .map_err(|e| format_err!("Address topic data decode: {:?}", e))?;
 

@@ -3,13 +3,13 @@ extern crate serde_derive;
 #[macro_use]
 extern crate log;
 
-use ethereum_types::{H160, H256, U256};
 use futures::Future;
 use std::env;
 use std::str::FromStr;
 use web3::contract::tokens::Tokenize;
 use web3::contract::Options;
 use web3::types::{Address, BlockNumber, Bytes};
+use web3::types::{H160, H256, U256};
 use web3::{Error, Transport, Web3};
 
 pub mod signer;
@@ -22,7 +22,13 @@ pub struct ETHClient<T: Transport> {
     chain_id: u8,
     gas_price_factor: usize,
     min_gas_price: usize,
-    web3: Web3<T>,
+    pub web3: Web3<T>,
+}
+
+pub struct CallResult {
+    pub gas_price: U256,
+    pub hash: H256,
+    pub nonce: U256,
 }
 
 impl<T: Transport> ETHClient<T> {
@@ -77,7 +83,7 @@ impl<T: Transport> ETHClient<T> {
         func: &str,
         params: P,
         options: Options,
-    ) -> impl Future<Item = H256, Error = Error> {
+    ) -> impl Future<Item = CallResult, Error = Error> {
         let f = self
             .contract
             .function(func)
@@ -87,21 +93,19 @@ impl<T: Transport> ETHClient<T> {
             .expect("failed to encode parameters");
 
         // fetch current gas_price
-        let orig_gas_price = self.web3.eth().gas_price().wait().expect("get gas error");
-        let mut gas_price = orig_gas_price * U256::from(self.gas_price_factor);
+        let mut gas_price = options.gas_price.unwrap_or_else(|| {
+            let network_gas_price = self.web3.eth().gas_price().wait().expect("get gas error");
+            network_gas_price * U256::from(self.gas_price_factor)
+        });
         let min_gas_price = U256::from(self.min_gas_price) * U256::from_str("3B9ACA00").unwrap(); // gwei x 10^9
 
         let nonce = options
             .nonce
-            .unwrap_or_else(|| self.current_nonce().wait().expect("get nonce error"));
+            .unwrap_or_else(|| self.pending_nonce().wait().expect("get nonce error"));
 
         if gas_price < min_gas_price {
             gas_price = min_gas_price;
         }
-        info!(
-            "Sending tx: gas price = {}, min = {}, factored = {}, nonce = {}",
-            orig_gas_price, min_gas_price, gas_price, nonce
-        );
 
         // form and sign tx
         let tx = signer::RawTransaction {
@@ -110,11 +114,18 @@ impl<T: Transport> ETHClient<T> {
             to: Some(self.contract_addr),
             value: U256::zero(),
             gas_price,
-            gas: U256::from(3_000_000),
+            gas: options.gas.unwrap_or_else(|| U256::from(3_000_000)),
             data,
         };
 
         let signed = tx.sign(&self.private_key);
-        self.web3.eth().send_raw_transaction(Bytes(signed))
+        self.web3
+            .eth()
+            .send_raw_transaction(Bytes(signed))
+            .map(move |hash| CallResult {
+                nonce,
+                gas_price,
+                hash,
+            })
     }
 }

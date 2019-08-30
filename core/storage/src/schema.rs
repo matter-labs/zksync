@@ -48,6 +48,17 @@ table! {
 }
 
 table! {
+    eth_operations (id) {
+        id -> Int8,
+        op_id -> Int8,
+        nonce -> Int8,
+        gas_price -> Numeric,
+        tx_hash -> Text,
+        confirmed -> Bool,
+    }
+}
+
+table! {
     executed_transactions (id) {
         id -> Int4,
         block_number -> Int8,
@@ -79,11 +90,8 @@ table! {
     operations (id) {
         id -> Int8,
         data -> Jsonb,
-        addr -> Text,
-        nonce -> Int8,
         block_number -> Int8,
         action_type -> Text,
-        tx_hash -> Nullable<Text>,
         created_at -> Timestamp,
     }
 }
@@ -124,6 +132,7 @@ table! {
 joinable!(account_balance_updates -> tokens (coin_id));
 joinable!(balances -> accounts (account_id));
 joinable!(balances -> tokens (coin_id));
+joinable!(eth_operations -> operations (op_id));
 joinable!(executed_transactions -> mempool (tx_hash));
 
 allow_tables_to_appear_in_same_query!(
@@ -132,6 +141,7 @@ allow_tables_to_appear_in_same_query!(
     accounts,
     active_provers,
     balances,
+    eth_operations,
     executed_transactions,
     mempool,
     op_config,

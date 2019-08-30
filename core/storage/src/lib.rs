@@ -18,6 +18,7 @@ use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT,
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
 use std::convert::TryInto;
+use web3::types::H256;
 
 mod schema;
 
@@ -264,12 +265,29 @@ struct NewOperation {
 pub struct StoredOperation {
     pub id: i64,
     pub data: serde_json::Value,
-    pub addr: String,
-    pub nonce: i64,
     pub block_number: i64,
     pub action_type: String,
-    pub tx_hash: Option<String>,
     pub created_at: NaiveDateTime,
+}
+
+#[derive(Debug, Clone, Queryable, QueryableByName)]
+#[table_name = "eth_operations"]
+pub struct StorageETHOperation {
+    pub id: i64,
+    pub op_id: i64,
+    pub nonce: i64,
+    pub gas_price: BigDecimal,
+    pub tx_hash: String,
+    pub confirmed: bool,
+}
+
+#[derive(Debug, Insertable)]
+#[table_name = "eth_operations"]
+struct NewETHOperation {
+    op_id: i64,
+    nonce: i64,
+    gas_price: BigDecimal,
+    tx_hash: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Queryable)]
@@ -284,16 +302,7 @@ pub struct StoredTx {
 }
 
 impl StoredOperation {
-    pub fn get_meta(&self) -> TxMeta {
-        TxMeta {
-            addr: self.addr.clone(),
-            nonce: self.nonce as u32,
-        }
-    }
-
     pub fn into_op(self, conn: &StorageProcessor) -> QueryResult<Operation> {
-        let meta = self.get_meta();
-
         let debug_data = format!("data: {}", &self.data);
 
         // let op: Result<Operation, serde_json::Error> = serde_json::from_value(self.data);
@@ -304,7 +313,6 @@ impl StoredOperation {
         }
 
         let mut op = op.expect("Operation deserialization");
-        op.tx_meta = Some(meta);
         op.id = Some(self.id);
 
         if op.accounts_updated.is_empty() {
@@ -540,15 +548,6 @@ impl StorageProcessor {
                 .get_result(self.conn())?;
             stored.into_op(self)
         })
-    }
-
-    pub fn save_operation_tx_hash(&self, op_id: i64, hash: String) -> QueryResult<()> {
-        use crate::schema::operations::dsl::*;
-        let target = operations.filter(id.eq(op_id));
-        diesel::update(target)
-            .set(tx_hash.eq(hash))
-            .execute(self.conn())
-            .map(|_| ())
     }
 
     pub fn save_block_transactions(&self, block: &Block) -> QueryResult<()> {
@@ -957,22 +956,53 @@ impl StorageProcessor {
         op.and_then(|r| Some(r.block))
     }
 
-    pub fn load_unsent_ops(&self, current_nonce: Nonce) -> QueryResult<Vec<Operation>> {
-        use crate::schema::operations::dsl;
+    pub fn load_unsent_ops(&self) -> QueryResult<Vec<Operation>> {
         self.conn().transaction(|| {
-            let ops: Vec<StoredOperation> = dsl::operations
-                .filter(dsl::nonce.ge(current_nonce as i64)) // WHERE nonce >= current_nonce
-                .load(self.conn())?;
-            ops.into_iter().map(|o| o.into_op(self)).collect()
+            let ops: Vec<_> = operations::table
+                .left_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
+                .filter(eth_operations::id.is_null())
+                .order(operations::id.asc())
+                .load::<(StoredOperation, Option<StorageETHOperation>)>(self.conn())?;
+            ops.into_iter().map(|(o, _)| o.into_op(self)).collect()
         })
     }
 
-    pub fn load_last_sent_operation(&self) -> QueryResult<Option<StoredOperation>> {
-        operations::table
-            .filter(operations::tx_hash.is_not_null())
-            .order(operations::id.desc())
-            .first::<StoredOperation>(self.conn())
-            .optional()
+    pub fn load_sent_unconfirmed_ops(&self) -> QueryResult<Vec<(Operation, StorageETHOperation)>> {
+        self.conn().transaction(|| {
+            let ops: Vec<_> = operations::table
+                .inner_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
+                .filter(eth_operations::confirmed.eq(false))
+                .order(operations::id.asc())
+                .load::<(StoredOperation, StorageETHOperation)>(self.conn())?;
+            ops.into_iter()
+                .map(|(o, eth_op)| o.into_op(self).map(|o| (o, eth_op)))
+                .collect()
+        })
+    }
+
+    pub fn save_operation_eth_tx(
+        &self,
+        op_id: i64,
+        hash: H256,
+        nonce: u32,
+        gas_price: BigDecimal,
+    ) -> QueryResult<()> {
+        insert_into(eth_operations::table)
+            .values(&NewETHOperation {
+                op_id,
+                nonce: i64::from(nonce),
+                gas_price,
+                tx_hash: format!("{:#x}", hash),
+            })
+            .execute(self.conn())
+            .map(drop)
+    }
+
+    pub fn confirm_eth_tx(&self, hash: &H256) -> QueryResult<()> {
+        update(eth_operations::table.filter(eth_operations::tx_hash.eq(format!("{:#x}", hash))))
+            .set(eth_operations::confirmed.eq(true))
+            .execute(self.conn())
+            .map(drop)
     }
 
     pub fn load_unverified_commitments(&self) -> QueryResult<Vec<Operation>> {

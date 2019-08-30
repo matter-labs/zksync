@@ -3,24 +3,31 @@
 //! poll for tx execu
 //!
 
-use eth_client::ETHClient;
+use bigdecimal::BigDecimal;
+use eth_client::{CallResult, ETHClient};
+use failure::format_err;
 use ff::{PrimeField, PrimeFieldRepr};
 use futures::Future;
 use models::abi::TEST_PLASMA2_ALWAYS_VERIFY;
 use models::{Action, Operation};
+use num_traits::cast::FromPrimitive;
 use std::collections::VecDeque;
 use std::str::FromStr;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use storage::ConnectionPool;
 use web3::contract::Options;
-use web3::transports::{EventLoopHandle, Http};
-use web3::types::{H256, U256};
+use web3::transports::Http;
+use web3::types::H256;
 use web3::Transport;
+
+const EXPECTED_WAIT_TIME_BLOCKS: usize = 10;
+const MAX_UNCONFIRMED_TX: usize = 5;
 
 struct ETHSender<T: Transport> {
     eth_client: ETHClient<T>,
-    op_queue: VecDeque<Operation>,
-    pending_transaction: Option<H256>,
+    unsent_ops: VecDeque<Operation>,
+    unconfirmed_ops: VecDeque<(H256, Operation)>,
+    //(tx hash, operation)
     db_pool: ConnectionPool,
 }
 
@@ -37,109 +44,120 @@ impl<T: Transport> ETHSender<T> {
         };
         let mut sender = Self {
             eth_client,
-            op_queue: VecDeque::new(),
-            pending_transaction: None,
+            unsent_ops: VecDeque::new(),
+            unconfirmed_ops: VecDeque::new(),
             db_pool,
         };
-        sender.restore_state();
+        sender.restore_state().expect("Eth sender state restore");
         sender
     }
 
-    fn restore_state(&mut self) {
+    fn restore_state(&mut self) -> Result<(), failure::Error> {
         let current_nonce = self
             .eth_client
             .current_nonce()
             .wait()
-            .expect("could not fetch current nonce");
-        let storage = self.db_pool.access_storage().expect("db fail");
+            .map_err(|_| format_err!("get nonce error"))?;
+
+        let storage = self.db_pool.access_storage()?;
         info!(
-            "Starting eth_sender: sender = {}, current_nonce = {}",
+            "Starting eth_sender: sender = {:#x}, current_nonce = {}",
             self.eth_client.sender_account, current_nonce
         );
-        // execute pending transactions
-        let ops = storage
-            .load_unsent_ops(current_nonce.as_u32())
-            .expect("db must be functional");
-        for pending_op in ops {
-            self.op_queue.push_back(pending_op);
-        }
 
-        let commited_nonce = self.eth_client.current_nonce().wait().expect("eth nonce");
-        let pending_nonce = self
-            .eth_client
-            .pending_nonce()
-            .wait()
-            .expect("eth pending nonce");
-        if commited_nonce == pending_nonce {
-            self.pending_transaction = None;
-        } else if commited_nonce + 1 == pending_nonce {
-            let last_sent_op = storage.load_last_sent_operation().expect("db error");
-            if let Some(op) = last_sent_op {
-                assert_eq!(op.nonce, pending_nonce.as_u32() as i64);
-                //                self.pending_transaction = Some(op.tx_hash.unwrap()[2..].parse());
-                unimplemented!()
-            } else {
-                self.pending_transaction = None;
-            }
-        } else {
-            panic!("Only one transaction can be pending at once.");
-        }
+        self.unsent_ops.extend(storage.load_unsent_ops()?);
+
+        self.unconfirmed_ops = storage
+            .load_sent_unconfirmed_ops()?
+            .into_iter()
+            .map(|(op, eth_op)| (eth_op.tx_hash[2..].parse().unwrap(), op))
+            .collect();
+
+        Ok(())
     }
 
     fn run(&mut self, rx_for_eth: Receiver<Operation>) {
-        // check pending tx
-        // success? -> pop next operation
-        // timeout? -> resend with higher gas price
-        // fail? -> notify state_keeper.
-        let storage = self
-            .db_pool
-            .access_storage()
-            .expect("db connection failed for eth sender");
-
+        let storage = self.db_pool.access_storage().expect("db access");
         loop {
-            let new_op = rx_for_eth.recv_timeout(std::time::Duration::from_secs(5));
-            match new_op {
-                Ok(op) => self.op_queue.push_back(op),
-                _ => (),
+            while let Ok(op) = rx_for_eth.try_recv() {
+                self.unsent_ops.push_back(op);
             }
 
-            if let Some(pending_tx) = self.pending_transaction.take() {
-                // check tx status.
-                unimplemented!();
-            } else {
-                if let Some(new_op) = self.op_queue.pop_front() {
-                    let tx_hash = self.send_operation(&new_op);
-                    match tx_hash {
-                        Ok(hash) => {
-                            debug!("Commitment tx hash = {:?}", hash);
+            while self.unconfirmed_ops.len() < MAX_UNCONFIRMED_TX && !self.unsent_ops.is_empty() {
+                if let Some(op) = self.unsent_ops.pop_front() {
+                    match self.send_operation(&op) {
+                        Ok(res) => {
+                            info!(
+                                "Operation {} sent, tx_hash: {:#x}, gas_price: {}, nonce: {}",
+                                op.id.unwrap(),
+                                res.hash,
+                                res.gas_price,
+                                res.nonce
+                            );
                             storage
-                                .save_operation_tx_hash(
-                                    new_op.id.expect("trying to send not stored op?"),
-                                    format!("{:?}", hash),
+                                .save_operation_eth_tx(
+                                    op.id.unwrap(),
+                                    res.hash,
+                                    res.nonce.as_u32(),
+                                    BigDecimal::from_u128(res.gas_price.as_u128()).unwrap(),
                                 )
-                                .expect("Failed to save tx hash to db");
-                            self.pending_transaction = Some(hash);
+                                .expect("db fail");
+                            self.unconfirmed_ops.push_back((res.hash, op));
                         }
-                        Err(err) => {
-                            error!("Error sending tx {}", err);
-                            self.op_queue.push_front(new_op);
+                        Err(e) => {
+                            error!("Failed to send eth tx: {}", e);
+                            self.unsent_ops.push_front(op);
+                            break;
                         }
                     }
                 }
             }
+
+            // check pending txs
+            while let Some((hash, op)) = self.unconfirmed_ops.front() {
+                match self.eth_client.web3.eth().transaction_receipt(*hash).wait() {
+                    Ok(tx_receipt) => {
+                        if let Some(tx_receipt) = tx_receipt {
+                            if let Some(status) = tx_receipt.status {
+                                info!(
+                                    "Operation {} confirmed, tx_hash: {:#x}, gas_used: {:?}",
+                                    op.id.unwrap(),
+                                    hash,
+                                    tx_receipt.gas_used
+                                );
+                                storage.confirm_eth_tx(hash).expect("db fail");
+                                if status.as_u64() != 1 {
+                                    error!(
+                                        "Operation {} failed, tx_hash: {:#x}",
+                                        op.id.unwrap(),
+                                        hash
+                                    )
+                                }
+                                self.unconfirmed_ops.pop_front();
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("Error while checking pending transaction: {}", e);
+                        break;
+                    }
+                }
+            }
+
+            std::thread::sleep(std::time::Duration::from_secs(5));
         }
     }
 
-    fn send_operation(&mut self, op: &Operation) -> Result<H256, web3::Error> {
+    fn send_operation(&mut self, op: &Operation) -> Result<CallResult, web3::Error> {
         match &op.action {
             Action::Commit => {
-                let mut be_bytes: Vec<u8> = Vec::new();
+                let mut be_bytes = [0u8; 32];
                 op.block
                     .new_root_hash
                     .into_repr()
-                    .write_be(&mut be_bytes)
+                    .write_be(be_bytes.as_mut())
                     .expect("Write commit bytes");
-                let root = H256::from(U256::from_big_endian(&be_bytes));
+                let root = H256::from(be_bytes);
                 debug!(
                     "public_data for block_number {}: {:x?}",
                     op.block.block_number,
