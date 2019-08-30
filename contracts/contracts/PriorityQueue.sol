@@ -1,28 +1,10 @@
 pragma solidity ^0.5.8;
-pragma experimental ABIEncoderV2;
 
 contract PriorityQueue {
 
-    // Structs
-    struct DepositRequest {
-        address sender; // 20 bytes
-        address toAccount; // 20 bytes
-        uint16 token; // 2 bytes
-        uint112 amount; // 3 bytes
-        bytes20 signatureHash; // 20 bytes
-        uint expirationBlock; // 32 bytes
-    }
-
-    struct ExitRequest {
-        address accountAddress; // 20 bytes
-        address ethereumAddress; // 20 bytes
-        uint16 token; // 2 bytes
-        bytes20 signatureHash; // 20 bytes
-        uint expirationBlock; // 32 bytes
-    }
-
     struct RequestCreds {
         bytes20 signatureHash;
+        uint expirationBlock;
     }
 
     // Events
@@ -43,11 +25,7 @@ contract PriorityQueue {
         uint expirationBlock
     );
 
-    event RemovedDepositRequest(
-        bytes20 indexed signatureHash
-    );
-
-    event RemovedExitRequest(
+    event RemovedRequest(
         bytes20 indexed signatureHash
     );
 
@@ -55,107 +33,83 @@ contract PriorityQueue {
     address private franklinAddress;
 
     // Not satisfied requests
-    mapping(uint32 => RequestCreds) public exitRequestsCreds;
-    mapping(bytes20 => ExitRequest) public exitRequests;
-    uint32 public totalExitRequests;
-
-
-    mapping(uint32 => RequestCreds) public depositRequestsCreds;
-    mapping(bytes20 => DepositRequest) public depositRequests;
-    uint32 public totalDepositRequests;
+    mapping(uint32 => RequestCreds) public requestsCreds;
+    mapping(bytes20 => bool) public requestsExistance;
+    uint32 public totalRequests;
 
     //OPnly Franklin contract permission modifier
     modifier onlyFranklin() {
         require(msg.sender == franklinAddress, "Not the main Franklin contract");
         _;
     }
-    
+
     // Constructor - sets Franklin contract address
     constructor(address _franklinAddress) public {
         franklinAddress = _franklinAddress;
     }
 
-    // Exit Queue
+    // Interface
 
     function addExitRequest(address accountAddress, address ethereumAddress, uint16 token, bytes20 signatureHash) external {
-        require(exitRequests[signatureHash].expirationBlock == 0, "Exit request from this sender for chosen token exists");
-
-        exitRequestsCreds[totalExitRequests] = RequestCreds(
-            signatureHash
+        require(!requestsExistance[signatureHash], "Exit request from this sender for chosen token exists");
+        uint expirationBlock = block.number+250;
+        requestsCreds[totalRequests] = RequestCreds(
+            signatureHash,
+            expirationBlock
         );
-        exitRequests[signatureHash] = ExitRequest(
+        requestsExistance[signatureHash] = true;
+        totalRequests++;
+        emit NewExitRequest(
             accountAddress,
             ethereumAddress,
             token,
             signatureHash,
-            block.number+250
+            expirationBlock
         );
-        totalExitRequests++;
     }
-
-    function removeExitRequest(bytes20 signatureHash) external onlyFranklin {
-        require(exitRequests[signatureHash].expirationBlock != 0, "Exit request from this sender for chosen token doesn't exists");
-        
-        delete exitRequests[signatureHash];
-
-        for (uint32 i = 0; i < totalExitRequests; i++) {
-            if (exitRequestsCreds[i].signatureHash == signatureHash) {
-                delete exitRequestsCreds[i];
-                for (uint32 j = i; j < totalExitRequests-1; j++) {
-                    exitRequestsCreds[j] = exitRequestsCreds[j+1];
-                    delete exitRequestsCreds[j+1];
-                }
-                break;
-            }
-        }
-
-        totalExitRequests--;
-    }
-
-    // Deposit Queue
 
     function addDepositRequest(address sender, address toAccount, uint16 token, uint112 amount, bytes20 signatureHash) external {
-        require(depositRequests[signatureHash].expirationBlock == 0, "Deposit request from this sender for chosen token and value exists");
-
-        depositRequestsCreds[totalDepositRequests] = RequestCreds(
-            signatureHash
+        require(!requestsExistance[signatureHash], "Deposit request from this sender for chosen token and value exists");
+        uint expirationBlock = block.number+250;
+        requestsCreds[totalRequests] = RequestCreds(
+            signatureHash,
+            expirationBlock
         );
-        depositRequests[signatureHash] = DepositRequest(
+        requestsExistance[signatureHash] = true;
+        totalRequests++;
+        emit NewDepositRequest(
             sender,
             toAccount,
             token,
             amount,
             signatureHash,
-            block.number+250
+            expirationBlock
         );
-        totalDepositRequests++;
     }
 
-    function removeDepositRequest(bytes20 signatureHash) external onlyFranklin {
-        require(depositRequests[signatureHash].expirationBlock != 0, "Deposit request from this sender for chosen token and value doesn't exists");
-        
-        delete depositRequests[signatureHash];
-
-        for (uint32 i = 0; i < totalDepositRequests; i++) {
-            if (exitRequestsCreds[i].signatureHash == signatureHash) {
-                delete exitRequestsCreds[i];
-                for (uint32 j = i; j < totalDepositRequests-1; j++) {
-                    exitRequestsCreds[j] = exitRequestsCreds[j+1];
-                    delete exitRequestsCreds[j+1];
+    function removeRequest(bytes20 signatureHash) external onlyFranklin {
+        require(requestsExistance[signatureHash], "Exit request from this sender for chosen token doesn't exists");
+        delete requestsExistance[signatureHash];
+        for (uint32 i = 0; i < totalRequests; i++) {
+            if (requestsCreds[i].signatureHash == signatureHash) {
+                delete requestsCreds[i];
+                for (uint32 j = i; j < totalRequests-1; j++) {
+                    requestsCreds[j] = requestsCreds[j+1];
+                    delete requestsCreds[j+1];
                 }
                 break;
             }
         }
-
-        totalDepositRequests--;
+        totalRequests--;
+        emit RemovedRequest(
+            signatureHash
+        );
     }
 
     // Exodus Mode
 
     function isExodusActivated(uint currentBlock) external view returns (bool) {
-        uint expirationExitBlock = exitRequests[exitRequestsCreds[0].signatureHash].expirationBlock;
-        uint expirationDepositBlock = depositRequests[depositRequestsCreds[0].signatureHash].expirationBlock;
-        return currentBlock >= expirationExitBlock || currentBlock >= expirationDepositBlock;
+        uint expirationBlock = requestsCreds[0].expirationBlock;
+        return currentBlock >= expirationBlock;
     }
-
 }

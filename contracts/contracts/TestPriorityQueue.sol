@@ -14,7 +14,7 @@ contract TestPriorityQueue {
 
     // TODO
     function testAdd10DepositRequests() external view returns (bool) {
-        uint beforeCount = priorityQueue.totalDepositRequests;
+        uint beforeCount = priorityQueue.totalRequests;
         priorityQueue.addDepositRequest(fromAddress, ethereumAddress, token, signature);
         priorityQueue.addDepositRequest(fromAddress, ethereumAddress, token, signature);
         priorityQueue.addDepositRequest(fromAddress, ethereumAddress, token, signature);
@@ -25,20 +25,13 @@ contract TestPriorityQueue {
         priorityQueue.addDepositRequest(fromAddress, ethereumAddress, token, signature);
         priorityQueue.addDepositRequest(fromAddress, ethereumAddress, token, signature);
         priorityQueue.addDepositRequest(fromAddress, ethereumAddress, token, signature);
-        uint afterCount = priorityQueue.totalDepositRequests;
+        uint afterCount = priorityQueue.totalRequests;
         return afterCount - beforeCount == 10;
-    }
-
-    // TODO
-    function testGet5DepositRequests() external view returns (bool) {
-        require(priorityQueue.totalDepositRequests >= 5, "Not enough deposit requests added");
-        bytes memory requests = priorityQueue.getDepositRequests(5);
-        return requests.length == 5 * priorityQueue.depositRequestLength;
     }
 
     // TODO
     function testAdd10ExitRequests() external view returns (bool) {
-        uint beforeCount = priorityQueue.totalExitRequests;
+        uint beforeCount = priorityQueue.totalRequests;
         priorityQueue.addExitRequest(sender, toAddress, token, amount, signature);
         priorityQueue.addExitRequest(sender, toAddress, token, amount, signature);
         priorityQueue.addExitRequest(sender, toAddress, token, amount, signature);
@@ -49,25 +42,12 @@ contract TestPriorityQueue {
         priorityQueue.addExitRequest(sender, toAddress, token, amount, signature);
         priorityQueue.addExitRequest(sender, toAddress, token, amount, signature);
         priorityQueue.addExitRequest(sender, toAddress, token, amount, signature);
-        uint afterCount = priorityQueue.totalExitRequests;
-        return afterCount - beforeCount == 10;
-    }
+        uint afterCount = priorityQueue.totalRequests;
+        r
 
     // TODO
-    function testGet5ExitRequests() external view returns (bool) {
-        require(priorityQueue.totalExitRequests >= 5, "Not enough exit requests added");
-        bytes memory requests = priorityQueue.getExitRequests(5);
-        return requests.length == 5 * priorityQueue.exitRequestLength;
-    }
-
-    // TODO
-    function testAllDepositRequestsRemoved() external view returns (bool) {
-        return priorityQueue.totalDepositRequests == 0;
-    }
-
-    // TODO
-    function testAllExitRequestsRemoved() external view returns (bool) {
-        return priorityQueue.totalExitRequests == 0;
+    function testAllRequestsRemoved() external view returns (bool) {
+        return priorityQueue.totalRequests == 0;
     }
 
     // TODO
