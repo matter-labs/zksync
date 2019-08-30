@@ -221,9 +221,7 @@ fn handle_get_tokens(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
 
 fn handle_get_testnet_config(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let address = req.state().contract_address.clone();
-    Ok(HttpResponse::Ok().json(TestnetConfigResponse {
-        address: format!("{}", address),
-    }))
+    Ok(HttpResponse::Ok().json(TestnetConfigResponse { address }))
 }
 
 // fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
