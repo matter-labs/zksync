@@ -3,7 +3,7 @@ extern crate diesel;
 #[macro_use]
 extern crate log;
 
-use bigdecimal::BigDecimal;
+use bigdecimal::{BigDecimal, Zero};
 use chrono::prelude::*;
 use diesel::dsl::*;
 use failure::Fail;
@@ -462,6 +462,8 @@ pub enum TxAddError {
     NonceTooLow,
     #[fail(display = "Tx signature is incorrect.")]
     InvalidSignature,
+    #[fail(display = "Tx amount is zero.")]
+    ZeroAmount
 }
 
 enum ConnectionHolder {
@@ -1338,6 +1340,12 @@ impl StorageProcessor {
             return Ok(Err(TxAddError::NonceTooLow));
         }
 
+        if let FranklinTx::Deposit(deposit_tx) = tx {
+            if deposit_tx.amount == bigdecimal::BigDecimal::zero() {
+                return Ok(Err(TxAddError::ZeroAmount));
+            }
+        }
+        
         let tx_failed = executed_transactions::table
             .filter(executed_transactions::tx_hash.eq(tx.hash()))
             .filter(executed_transactions::success.eq(false))
