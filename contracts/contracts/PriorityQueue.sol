@@ -3,10 +3,6 @@ pragma experimental ABIEncoderV2;
 
 contract PriorityQueue {
 
-    // Constants
-    uint public constant depositRequestLength = 97;
-    uint public constant exitRequestLength = 94;
-
     // Structs
     struct DepositRequest {
         address sender; // 20 bytes
@@ -29,17 +25,43 @@ contract PriorityQueue {
         bytes20 signatureHash;
     }
 
+    // Events
+    event NewDepositRequest(
+        address indexed sender,
+        address indexed toAccount,
+        uint16 token,
+        uint112 amount,
+        bytes20 indexed signatureHash,
+        uint expirationBlock
+    );
+
+    event NewExitRequest(
+        address indexed accountAddress,
+        address indexed ethereumAddress,
+        uint16 token,
+        bytes20 indexed signatureHash,
+        uint expirationBlock
+    );
+
+    event RemovedDepositRequest(
+        bytes20 indexed signatureHash
+    );
+
+    event RemovedExitRequest(
+        bytes20 indexed signatureHash
+    );
+
     // Franklin contract address
     address private franklinAddress;
 
-    // Contains not satisfied requests
-    mapping(uint32 => RequestCreds) private exitRequestsCreds;
-    mapping(bytes20 => ExitRequest) private exitRequests;
+    // Not satisfied requests
+    mapping(uint32 => RequestCreds) public exitRequestsCreds;
+    mapping(bytes20 => ExitRequest) public exitRequests;
     uint32 public totalExitRequests;
 
 
-    mapping(uint32 => RequestCreds) private depositRequestsCreds;
-    mapping(bytes20 => DepositRequest) private depositRequests;
+    mapping(uint32 => RequestCreds) public depositRequestsCreds;
+    mapping(bytes20 => DepositRequest) public depositRequests;
     uint32 public totalDepositRequests;
 
     //OPnly Franklin contract permission modifier
@@ -53,32 +75,13 @@ contract PriorityQueue {
         franklinAddress = _franklinAddress;
     }
 
-    // Helpers
-    function validateDepositSignature(DepositRequest memory request) internal returns (bytes20 pedersenHash) {
-        // TODO
-    }
-
-    function validateExitSignature(address accountAddress, address ethereumAddress, uint16 token, bytes calldata signature) internal returns (bytes20 pedersenHash) {
-        // TODO
-    }
-
-    function exitRequestToBytes(ExitRequest memory request) internal returns (bytes memory requestBytes) {
-        // TODO
-    }
-
-    function depositRequestToBytes(DepositRequest memory request) internal returns (bytes memory requestBytes) {
-        // TODO
-    }
-
     // Exit Queue
 
-    function addExitRequest(address accountAddress, address ethereumAddress, uint16 token, bytes calldata signature) external {
-        bytes20 signatureHash = validateExitSignature(accountAddress, ethereumAddress, token, signature);
+    function addExitRequest(address accountAddress, address ethereumAddress, uint16 token, bytes20 signatureHash) external {
         require(exitRequests[signatureHash].expirationBlock == 0, "Exit request from this sender for chosen token exists");
 
-        exitRequestsCreds[totalExitRequests] = ExitRequestCreds(
-            accountAddress,
-            token
+        exitRequestsCreds[totalExitRequests] = RequestCreds(
+            signatureHash
         );
         exitRequests[signatureHash] = ExitRequest(
             accountAddress,
@@ -88,23 +91,6 @@ contract PriorityQueue {
             block.number+250
         );
         totalExitRequests++;
-    }
-
-    function getExitRequests(uint32 _count) external view returns (bytes memory) {
-        require(totalExitRequests > 0, "No exit requests");
-
-        uint32 requestsToGet = _count;
-        if (_count > totalExitRequests) {
-            requestsToGet = totalExitRequests;
-        }
-
-        bytes memory requests = new bytes(requestsToGet*exitRequestLength);
-        for (uint32 i = 0; i < requestsToGet; i++) {
-            RequestCreds memory creds = exitRequestsCreds[i];
-            // TODO
-            requests.concat(exitRequests[creds.signatureHash].exitRequestToBytes());
-        }
-        return requests;
     }
 
     function removeExitRequest(bytes20 signatureHash) external onlyFranklin {
@@ -126,38 +112,12 @@ contract PriorityQueue {
         totalExitRequests--;
     }
 
-    // function removeRequests(uint32 _count) external onlyFranklin {
-    //     require(totalRequests > 0, "No exit requests");
-
-    //     uint32 requestsToRemove = _count;
-    //     if (_count > totalRequests) {
-    //         requestsToRemove = totalRequests;
-    //     }
-
-    //     for (uint32 i = 0; i < requestsToRemove; i++) {
-    //         RequestCreds memory creds = exitRequestsCreds[i];
-    //         delete exitRequestsCreds[i];
-    //         delete exitRequests[creds.accountAddress][creds.token];
-    //     }
-
-    //     uint32 nonremovedCount = totalRequests - requestsToRemove;
-    //     if (nonremovedCount > 0) {
-    //         for (uint32 i = requestsToRemove; i < totalRequests; i++) {
-    //             exitRequestsCreds[i-requestsToRemove] = exitRequestsCreds[i];
-    //             delete exitRequestsCreds[i];
-    //         }
-    //     }
-
-    //     totalRequests -= _count;
-    // }
-
     // Deposit Queue
 
-    function addDepositRequest(address sender, address toAccount, uint16 token, uint112 amount, bytes calldata signature) external {
-        bytes20 signatureHash = validateDepositSignature(sender, toAccount, token, amount, signature);
+    function addDepositRequest(address sender, address toAccount, uint16 token, uint112 amount, bytes20 signatureHash) external {
         require(depositRequests[signatureHash].expirationBlock == 0, "Deposit request from this sender for chosen token and value exists");
 
-        depositRequestsCreds[totalDepositRequests] = DepositRequestCreds(
+        depositRequestsCreds[totalDepositRequests] = RequestCreds(
             signatureHash
         );
         depositRequests[signatureHash] = DepositRequest(
@@ -169,23 +129,6 @@ contract PriorityQueue {
             block.number+250
         );
         totalDepositRequests++;
-    }
-
-    function getDeposiRequests(uint32 _count) external view returns (bytes memory) {
-        require(totalDepositRequests > 0, "No deposit requests");
-
-        uint32 requestsToGet = _count;
-        if (_count > totalDepositRequests) {
-            requestsToGet = totalDepositRequests;
-        }
-
-        bytes memory requests = new bytes(requestsToGet*depositRequestLength);
-        for (uint32 i = 0; i < requestsToGet; i++) {
-            RequestCreds memory creds = depositRequestsCreds[i];
-            // TODO
-            requests.concat(depositRequests[creds.signatureHash].depositRequestToBytes());
-        }
-        return requests;
     }
 
     function removeDepositRequest(bytes20 signatureHash) external onlyFranklin {
