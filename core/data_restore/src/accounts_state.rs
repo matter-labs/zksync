@@ -92,14 +92,12 @@ impl FranklinAccountsStates {
         &mut self,
         op_block: &FranklinOpBlock,
     ) -> Result<(), DataRestoreError> {
-        // debug!("tx: {:?}", transaction.ethereum_transaction.hash);
         let transfer_txs_block = self
             .get_all_transactions_from_transfer_block(op_block)
             .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         for tx in transfer_txs_block {
             if let Some(mut from) = self.plasma_state.balance_tree.items.get(&tx.from).cloned() {
                 let mut transacted_amount = BigDecimal::zero();
-                // debug!("amount tx: {:?}", &tx.amount);
                 transacted_amount += &tx.amount;
                 transacted_amount += &tx.fee;
 
@@ -139,7 +137,6 @@ impl FranklinAccountsStates {
         op_block: &FranklinOpBlock,
     ) -> Result<(), DataRestoreError> {
         let batch_number = self.get_batch_number(op_block);
-        // let block_number = self.get_block_number_from_deposit(op_block);
         let deposit_txs_block = self
             .get_all_transactions_from_deposit_batch(batch_number)
             .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
@@ -172,7 +169,6 @@ impl FranklinAccountsStates {
         op_block: &FranklinOpBlock,
     ) -> Result<(), DataRestoreError> {
         let batch_number = self.get_batch_number(op_block);
-        // let block_number = self.get_block_number_from_full_exit(op_block);
         let exit_txs_block = self
             .get_all_transactions_from_full_exit_batch(batch_number)
             .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
@@ -203,18 +199,6 @@ impl FranklinAccountsStates {
         H256::from(commitment_data)
     }
 
-    // fn get_block_number_from_deposit(&self, transaction: &FranklinOpBlock) -> U256 {
-    //     let block_vec = transaction.commitment_data[64..96].to_vec();
-    //     let block_slice = block_vec.as_slice();
-    //     U256::from(block_slice)
-    // }
-
-    // fn get_block_number_from_full_exit(&self, transaction: &FranklinOpBlock) -> U256 {
-    //     let block_vec = transaction.commitment_data[64..96].to_vec();
-    //     let block_slice = block_vec.as_slice();
-    //     U256::from(block_slice)
-    // }
-
     /// Returns all transfer transactions from operations block
     ///
     /// # Arguments
@@ -226,38 +210,14 @@ impl FranklinAccountsStates {
         op_block: &FranklinOpBlock,
     ) -> Result<Vec<TransferTx>, DataRestoreError> {
         let mut tx_data_vec = op_block.commitment_data.clone();
-        // debug!("tx_data_vec: {:?}", tx_data_vec);
-        // let block_number = &op_block.commitment_data.clone()[0..32];
-        // debug!("block_number: {:?}", block_number);
         let tx_data_len = tx_data_vec.len();
-        // debug!("tx_data_len: {:?}", tx_data_len);
         tx_data_vec.reverse();
         tx_data_vec.truncate(tx_data_len - 160);
         tx_data_vec.reverse();
-        // debug!("tx_data_vec final: {:?}", tx_data_vec);
-        // tx_data_len = tx_data_vec.len();
-        // debug!("tx_data_len final: {:?}", tx_data_len);
         let txs = tx_data_vec.chunks(9);
 
         let mut transfers: Vec<TransferTx> = vec![];
         for (i, tx) in txs.enumerate() {
-            // if tx != [0, 0, 2, 0, 0, 0, 0, 0, 0] {
-            //     let from = U256::from(&tx[0..3]);
-            //     let to = U256::from(&tx[3..6]);
-            //     let amount = U256::from(&tx[6..8]);
-            //     let fee = U256::from(tx[8]);
-            //     let transfer_tx = TransferTx {
-            //         from: from.as_u32(),
-            //         to: to.as_u32(),
-            //         amount: BigDecimal::from_str_radix(&format!("{}", amount), 10).unwrap(),
-            //         fee: BigDecimal::from_str_radix(&format!("{}", fee), 10).unwrap(),
-            //         nonce: 0,
-            //         good_until_block: 0,
-            //         signature: TxSignature::default(),
-            //         cached_pub_key: None,
-            //     };
-            //     transfers.push(transfer_tx);
-            // }
             let from = U256::from(&tx[0..3]).as_u32();
             let to = U256::from(&tx[3..6]).as_u32();
             let amount = amount_bytes_slice_to_big_decimal(&tx[6..8]);
@@ -310,7 +270,6 @@ impl FranklinAccountsStates {
             .wait()
             .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
 
-        // now we have to merge and apply
         let mut all_events = vec![];
         all_events.extend(action_events.into_iter());
         all_events.extend(cancel_events.into_iter());
@@ -320,7 +279,6 @@ impl FranklinAccountsStates {
             .filter(|el| !el.is_removed())
             .collect();
 
-        // sort by index
         let mut error_flag = false;
         all_events.sort_by(|l, r| {
             let l_block = l

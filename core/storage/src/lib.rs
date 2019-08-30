@@ -478,22 +478,6 @@ pub struct StoredBlockLog {
     pub block_num: i64,
 }
 
-// impl StoredBlockLog {
-//     pub fn into_block_log(&self) -> QueryResult<EventData> {
-//         let mut block_log = EventData {
-//             block_num: self.block_num as u32,
-//             transaction_hash: H256::from_str(transaction_hash.as_str()).unwrap(),
-//             block_type: BlockType::Unknown,
-//         };
-//         match &self.tx_type {
-//             c if c == "Committed" => block_log.block_type: BlockType::Committed,
-//             v if v == "Verified" => block_log.block_type: BlockType::Verified,
-//             _ => return Err(Error::NotFound),
-//         };
-//         Ok(block_log)
-//     }
-// }
-
 #[derive(Insertable)]
 #[table_name = "franklin_op_blocks"]
 pub struct NewFranklinOpBlock {

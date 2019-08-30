@@ -60,25 +60,6 @@ fn load_new_states_for_data_restore_driver(driver: &mut DataRestoreDriver) {
     driver.run_state_updates().expect("Cant update state");
 }
 
-// pub fn load_new_states_for_stored_data_restore_driver() {
-//     std::thread::Builder::new()
-//         .name("data_restore".to_string())
-//         .spawn(move || {
-//             driver.run_state_updates().expect("Cant update state");
-//         })
-//         .expect("Load new states for data restore thread");
-// }
-
-// pub fn start_data_restore_driver(driver: &'static mut DataRestoreDriver) {
-//     std::thread::Builder::new()
-//         .name("data_restore".to_string())
-//         .spawn(move || {
-//             driver.load_past_state().expect("Cant get past state");
-//             driver.run_state_updates().expect("Cant update state");
-//         })
-//         .expect("Data restore driver thread");
-// }
-
 /// Loads states from empty state
 ///
 /// # Arguments
@@ -168,12 +149,6 @@ fn load_past_state_from_storage(
     driver
         .update_accounts_state_from_op_blocks(blocks.as_slice())
         .expect("Cant update accounts state from op blocks in load_past_state_from_storage");
-    // for tx in blocks {
-    //     driver
-    //         .account_states
-    //         .update_accounts_states_from_transaction(&tx)
-    //         .expect("Cant update accounts state");
-    // }
     info!("Stored state loaded");
 }
 
@@ -190,20 +165,3 @@ fn main() {
         load_states_from_beginning(args);
     }
 }
-
-// #[cfg(test)]
-// mod test {
-//     use super::*;
-
-//     #[test]
-//     fn test_complete_task() {
-//         let config = helpers::DataRestoreConfig::new(helpers::InfuraEndpoint::Rinkeby);
-//         let from = U256::from(0);
-//         let delta = U256::from(15);
-//         let mut data_restore_driver = create_new_data_restore_driver(config, from, delta);
-//         data_restore_driver
-//             .load_past_state()
-//             .expect("Cant get past state");
-//         data_restore_driver.run_state_updates();
-//     }
-// }

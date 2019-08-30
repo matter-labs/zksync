@@ -321,8 +321,8 @@ data-restore-build:
 	@cargo build -p data_restore --release --bin data_restore
 
 data-restore-run:
-	@RUST_LOG=INFO ./target/release/data_restore 15
+	@./target/release/data_restore 15
 
 data-restore-continue:
-	@RUST_LOG=INFO ./target/release/data_restore storage 15
+	@./target/release/data_restore storage 15
 	

@@ -114,7 +114,6 @@ pub fn fee_bytes_slice_to_big_decimal(byte: u8) -> BigDecimal {
     )
     .unwrap_or(0);
     let fee_u64 = fee_u128 as u64;
-    // fee_f64 = fee_f64 / f64::from(1000000);
     BigDecimal::from(fee_u64)
 }
 
