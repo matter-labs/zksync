@@ -103,6 +103,18 @@ class LocalWallet {
         let signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/3/" + this.id).connect(provider);
         this.wallet = await Wallet.fromEthWallet(signer);        
         await this.wallet.updateState();
+        for (let i = 0; i < this.wallet.supportedTokens.length; i++) {
+            let token = this.wallet.supportedTokens[i];
+            if (this.wallet.ethState.onchainBalances[token.id] !== undefined) {
+                this.computedOnchainBalances[token.id] = this.wallet.ethState.onchainBalances[token.id];
+            }
+            if (this.wallet.ethState.contractBalances[token.id] !== undefined) {
+                this.computedLockedBalances[token.id] = this.wallet.ethState.contractBalances[token.id];
+            }
+            if (this.wallet.franklinState.commited.balances[token.id] !== undefined) {
+                this.computedFranklinBalances[token.id] = bigNumberify(this.wallet.franklinState.commited.balances[token.id]);
+            }
+        }
     }
 
     onchainBalance(id) {
@@ -135,6 +147,7 @@ class LocalWallet {
         // if we have less 
         let total_amount = amount.add(fee);
         if (this.getComputedOnchainBalance(token).lt(total_amount)) {
+            console.log(`I don't send this stuff`);
             return;
         }
 
@@ -297,13 +310,13 @@ async function test() {
     //     await addRandomPendingActionToWallet();
     // }
     let wallet = commonWallets[0];
-    Actions.receive_money({wallet, amount: bigNumberify('10000000000000000000')});
-    Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('1000')});
+    // Actions.receive_money({wallet, amount: bigNumberify('10000000000000000000')});
     Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
     Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
     // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('1000')});
+    Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('1000')});
 
     
     await Promise.all(commonWallets.map(async w => {
