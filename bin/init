@@ -7,4 +7,6 @@ franklin env
 franklin yarn || true # It can fail.
 franklin db-wait
 franklin db-setup
+franklin build-contracts
+franklin genesis
 franklin redeploy

@@ -9,15 +9,12 @@ authors = [
 ]
 
 [dependencies]
-merkle_tree = { path = "../merkle_tree" }
-models = { path = "../models" }
+models = { path = "../models", version = "0.0.1" }
 pairing = { package = "pairing_ce", version = "0.17.0" }
 bellman = { package = "bellman_ce", version = "0.3.0" }
-sapling_crypto = { package = "sapling-crypto_ce", version = "0.0.5" }
+franklin_crypto = { package = "franklin-crypto", git = "ssh://git@github.com/matter-labs/franklin-crypto.git", branch="master"}
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
 rand = "0.4"
 rust-crypto = "0.2"
 hex = "0.3.2"
-
-[dev-dependencies]
-log = "0.4"
+num-traits = "0.2"

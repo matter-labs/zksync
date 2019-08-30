@@ -1,7 +1,7 @@
 -- op_config table is used to keep track of nonce sequences for different sender addresses
 CREATE TABLE op_config(
     addr        text primary key,   -- sender address for ETH
-    next_nonce  integer             -- nonce sequence holder
+    next_nonce  bigint             -- nonce sequence holder
 );
 INSERT INTO op_config VALUES ('0x0', 0);
 CREATE RULE noins_op_config AS ON INSERT TO op_config DO NOTHING;
@@ -23,11 +23,11 @@ END;
 $$ LANGUAGE 'plpgsql';
 
 CREATE TABLE operations (
-    id              serial primary key,
+    id              bigserial primary key,
     data            jsonb not null,
     addr            text not null default op_config_addr(),
-    nonce           integer not null default op_config_next_nonce(),
-    block_number    integer not null,
+    nonce           bigint not null default op_config_next_nonce(),
+    block_number    bigint not null,
     action_type     text not null,
     tx_hash         text,
     created_at      timestamp not null default now()
@@ -36,16 +36,16 @@ CREATE TABLE operations (
 CREATE INDEX operations_block_index ON operations (block_number);
 
 CREATE TABLE accounts (
-    id              integer not null primary key,
-    last_block      integer not null,
+    id              bigint not null primary key,
+    last_block      bigint not null,
     data            json not null
 );
 
 CREATE INDEX accounts_block_index ON accounts (last_block);
 
 CREATE TABLE account_updates (
-    account_id      integer not null,
-    block_number    integer not null,
+    account_id      bigint not null,
+    block_number    bigint not null,
     data            json not null,
     PRIMARY KEY (account_id, block_number)
 );

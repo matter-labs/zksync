@@ -7,7 +7,7 @@
         <b-collapse id="nav-collapse" is-nav>
         <b-navbar-nav>
             <b-nav-item href="/client/" target="_blanc">MatterMask</b-nav-item>
-            <b-nav-item v-bind:href="`${etherscan}/address/0x${store.config.CONTRACT_ADDR}`" target="_blanc">
+            <b-nav-item v-bind:href="`${blockchain_explorer_address}/${store.config.CONTRACT_ADDR}`" target="_blanc">
                 Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
             </b-nav-item>
         </b-navbar-nav>
@@ -50,9 +50,6 @@
             </div>
             <div class="col-sm text-center">
             <i class="fas fa-list"></i> <b>Total transactions</b><br><span class="num">{{totalTransactions}}</span>
-            </div>
-            <div class="col-sm text-center">
-            <i class="fas fa-archive"></i> <b>Tx per block</b><br><span class="num">{{txPerBlock}}</span>
             </div>
         </div>
         </b-card>
@@ -185,8 +182,8 @@ export default {
                     block_number:   b.block_number,
                     status:         b.verified_at ? 'Verified' : 'Committed',
                     new_state_root: b.new_state_root.slice(0, 16) + '...' + b.new_state_root.slice(50, 66),
-                    committed_at:   b.committed_at,
-                    verified_at:    b.verified_at,
+                    committed_at:   b.committed_at.toString().split('T')[0] + " " + b.committed_at.toString().split('T')[1].split('.')[0],
+                    verified_at:    b.verified_at ? (b.verified_at.toString().split('T')[0] + " " + b.committed_at.toString().split('T')[1].split('.')[0]) : null,
                 }))
                 this.currentPage = this.page
                 this.ready = true

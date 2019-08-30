@@ -1,9 +1,10 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
 use ff::ScalarEngine;
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
+use franklin_crypto::circuit::float_point::convert_to_float;
+use franklin_crypto::jubjub::{edwards, JubjubEngine, Unknown};
 use pairing::bn256::Bn256;
 use pairing::{CurveAffine, Engine};
-use sapling_crypto::jubjub::{edwards, JubjubEngine, Unknown};
 use web3::types::U256;
 
 // TODO: replace Vec with Iterator?
@@ -233,6 +234,32 @@ pub fn pack_bits_into_bytes(bits: Vec<bool>) -> Vec<u8> {
     }
 
     message_bytes
+}
+
+pub fn pack_bits_into_bytes_in_order(bits: Vec<bool>) -> Vec<u8> {
+    assert_eq!(bits.len() % 8, 0);
+    let mut message_bytes: Vec<u8> = vec![];
+
+    let byte_chunks = bits.chunks(8);
+    for byte_chunk in byte_chunks {
+        let mut byte = 0u8;
+        for (i, bit) in byte_chunk.iter().rev().enumerate() {
+            if *bit {
+                byte |= 1 << i;
+            }
+        }
+        message_bytes.push(byte);
+    }
+
+    message_bytes
+}
+
+pub fn pack_as_float(number: &BigDecimal, exponent_len: usize, mantissa_len: usize) -> Vec<u8> {
+    let uint = number.to_u128().expect("should be in u128");
+
+    let mut vec = convert_to_float(uint, exponent_len, mantissa_len, 10).expect("packing error");
+    vec.reverse();
+    pack_bits_into_bytes_in_order(vec)
 }
 
 #[test]

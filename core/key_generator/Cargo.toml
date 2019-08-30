@@ -12,10 +12,10 @@ authors = [
 rand = "0.4"
 time = "0.1"
 pairing = { package = "pairing_ce", version = "0.17.0" }
-sapling_crypto = { package = "sapling-crypto_ce", version = "0.0.5" }
+franklin_crypto = { package = "franklin-crypto", git = "ssh://git@github.com/matter-labs/franklin-crypto.git"}
 bellman = { package = "bellman_ce", version = "0.3.0" }
-circuit = { path = "../circuit" }
-models = { path = "../models" }
+models = { path = "../models", version = "0.0.1" }
+circuit= { path = "../circuit", version = "0.1.1" }
 hex = "0.3.2"
 rust-crypto = "0.2"
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }

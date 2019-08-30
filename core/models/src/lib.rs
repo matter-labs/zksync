@@ -1,33 +1,30 @@
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
-extern crate lazy_static;
-#[macro_use]
 extern crate log;
 
 pub mod abi;
-pub mod config;
-pub mod plasma;
+pub mod circuit;
+pub mod merkle_tree;
+pub mod node;
+pub mod params;
 pub mod primitives;
 
-use crate::plasma::block::Block;
-use crate::plasma::*;
+// TODO: refactor, find new home for all this stuff
+
+use crate::node::account::{Account, AccountAddress};
+use crate::node::block::Block;
+use crate::node::AccountUpdates;
+use crate::node::BlockNumber;
 use serde_bytes;
 use std::sync::mpsc::Sender;
+use web3::types::U256;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxMeta {
     pub addr: String,
     pub nonce: u32,
 }
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TransferTxConfirmation {
-    pub block_number: BlockNumber,
-    pub signature: String,
-}
-
-pub type TransferTxResult = Result<TransferTxConfirmation, TransferApplicationError>;
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkStatus {
@@ -42,22 +39,9 @@ pub type EncodedProof = [U256; 8];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub enum EthBlockData {
-    Transfer {
-        total_fees: U128,
-
-        #[serde(with = "serde_bytes")]
-        public_data: Vec<u8>,
-    },
-    Deposit {
-        batch_number: BatchNumber,
-    },
-    Exit {
-        batch_number: BatchNumber,
-
-        #[serde(with = "serde_bytes")]
-        public_data: Vec<u8>,
-    },
+pub struct EthBlockData {
+    #[serde(with = "serde_bytes")]
+    public_data: Vec<u8>,
 }
 
 pub struct ProverRequest(pub BlockNumber);
@@ -84,27 +68,19 @@ impl std::fmt::Debug for Action {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Operation {
-    pub id: Option<i32>,
+    pub id: Option<i64>,
     pub action: Action,
     pub block: Block,
-    pub accounts_updated: Option<AccountMap>,
+    pub accounts_updated: AccountUpdates,
 
     #[serde(skip)]
     pub tx_meta: Option<TxMeta>,
 }
 
-pub enum ProtoBlock {
-    Transfer,
-    Deposit(BatchNumber, Vec<DepositTx>),
-    Exit(BatchNumber, Vec<ExitTx>),
-}
-
 pub enum StateKeeperRequest {
-    AddTransferTx(Box<TransferTx>, Sender<TransferTxResult>),
-    AddBlock(ProtoBlock),
-    GetAccount(u32, Sender<Option<Account>>),
+    GetAccount(AccountAddress, Sender<Option<Account>>),
     GetNetworkStatus(Sender<NetworkStatus>),
     TimerTick,
 }
@@ -112,7 +88,7 @@ pub enum StateKeeperRequest {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CommitRequest {
     pub block: Block,
-    pub accounts_updated: AccountMap,
+    pub accounts_updated: AccountUpdates,
 }
 
 pub const ACTION_COMMIT: &str = "Commit";

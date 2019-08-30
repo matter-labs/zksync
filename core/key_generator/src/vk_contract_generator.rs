@@ -3,11 +3,6 @@
 use bellman::groth16;
 use pairing::{CurveAffine, Engine};
 
-// fn unpack<T: CurveAffine>(t: &T) -> Vec<String>
-// {
-//     t.into_uncompressed().as_ref().chunks(32).map(|c| "0x".to_owned() + &hex::encode(c)).collect()
-// }
-
 fn unpack_g1<E: Engine>(point: &E::G1Affine) -> Vec<String> {
     let uncompressed = point.into_uncompressed();
     let uncompressed_slice = uncompressed.as_ref();
@@ -25,10 +20,6 @@ fn unpack_g2<E: Engine>(point: &E::G2Affine) -> Vec<String> {
         .chunks(32)
         .map(|c| "0x".to_owned() + &hex::encode(c))
         .collect()
-
-    // let to_reorder: Vec<String> = uncompressed_slice.chunks(32).map(|c| "0x".to_owned() + &hex::encode(c)).collect();
-
-    // vec![to_reorder[1].clone(), to_reorder[0].clone(), to_reorder[3].clone(), to_reorder[2].clone()]
 }
 
 const SHIFT: &str = "        ";
@@ -77,13 +68,13 @@ pub fn generate_vk_contract<E: Engine>(
         r#"
 // This contract is generated programmatically
 
-pragma solidity ^0.4.24;
+pragma solidity ^0.5.1;
 
 
 // Hardcoded constants to avoid accessing store
 contract {contract_name} {{
 
-    function {function_name}() internal pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {{
+    function {function_name}() external pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {{
 
         {vk}
 

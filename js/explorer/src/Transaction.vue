@@ -53,6 +53,7 @@ export default {
         props() {
             return [
                 { name: 'Id', value: `<b>${this.id}</b>`, empty1: '', empty2: ''},
+                { name: 'Type', value: 'Unknown', },
                 { name: 'From', value: '', },
                 { name: 'To', value: '256', },
                 { name: 'Amount', value: '1200', },

@@ -1,13 +1,12 @@
 [workspace]
 members = [
     "core/key_generator",
-    "core/merkle_tree",
     "core/eth_client",
-    "core/models",
     "core/plasma",
-    "core/prover",
-    "core/sandbox",
     "core/server",
     "core/storage",
     "core/circuit",
+    "core/models",
+    "core/prover",
+    "core/key_generator",
 ]
