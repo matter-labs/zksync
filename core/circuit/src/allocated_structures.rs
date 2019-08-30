@@ -152,10 +152,7 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             fee_parsed,
             franklin_constants::BALANCE_BIT_WIDTH,
         )?;
-        //        println!(
-        //            "fee_parsed in allocated_operation_data equals {}",
-        //            fee.get_number().get_value().grab()?
-        //        );
+
         let first_sig_msg = CircuitElement::from_fe_strict(
             cs.namespace(|| "first_part_signature_message"),
             || op.first_sig_msg.grab(),
