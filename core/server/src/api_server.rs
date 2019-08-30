@@ -221,9 +221,7 @@ fn handle_get_tokens(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
 
 fn handle_get_testnet_config(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let address = req.state().contract_address.clone();
-    Ok(HttpResponse::Ok().json(TestnetConfigResponse {
-        address: format!("{}", address),
-    }))
+    Ok(HttpResponse::Ok().json(TestnetConfigResponse { address }))
 }
 
 // fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
@@ -473,7 +471,9 @@ fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<Htt
 //    pub from_block: Option<u32>,
 //}
 
-fn handle_search(req: &HttpRequest<AppState>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+fn handle_search(
+    req: &HttpRequest<AppState>,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let pool = req.state().connection_pool.clone();
     let query = req.query().get("query").cloned().unwrap_or_default();
     req.body()
