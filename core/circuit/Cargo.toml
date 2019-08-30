@@ -9,7 +9,7 @@ authors = [
 ]
 
 [dependencies]
-models = { path = "../models" }
+models = { path = "../models", version = "0.0.1" }
 pairing = { package = "pairing_ce", version = "0.17.0" }
 bellman = { package = "bellman_ce", version = "0.3.0" }
 franklin_crypto = { package = "franklin-crypto", git = "ssh://git@github.com/matter-labs/franklin-crypto.git", branch="master"}

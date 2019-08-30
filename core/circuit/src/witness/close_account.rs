@@ -189,8 +189,7 @@ mod test {
         let sender_leaf = CircuitAccount::<Bn256> {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
-            pub_key_hash: sender_pub_key_hash, // pub_x: validator_x.clone(),
-                                               // pub_y: validator_y.clone(),
+            pub_key_hash: sender_pub_key_hash,
         };
         println!("zero root_hash equals: {}", sender_leaf.subtree.root_hash());
 
@@ -223,9 +222,7 @@ mod test {
         sig_bits.reverse();
         sig_bits.truncate(80);
 
-        // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
         let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
-        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
         let operations = calculate_close_account_operations_from_witness(
             &close_account_witness,
@@ -276,7 +273,6 @@ mod test {
             if err.is_some() {
                 panic!("ERROR satisfying in {}", err.unwrap());
             }
-            // assert_eq!(cs.num_constraints(), 1)
         }
     }
 
