@@ -288,21 +288,19 @@ mod test {
 
     use crate::witness::utils::public_data_commitment;
     use bellman::groth16::generate_random_parameters;
-    use bellman::groth16::{
-        create_random_proof, prepare_verifying_key, verify_proof,
-    };
+    use bellman::groth16::{create_random_proof, prepare_verifying_key, verify_proof};
 
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
     use ff::{BitIterator, Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-    use franklinmodels::primitives::{GetBits};
+    use franklinmodels::primitives::GetBits;
 
     use franklin_crypto::circuit::test::*;
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklin_crypto::jubjub::FixedGenerators;
     use franklinmodels::circuit::account::{
-         CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
+        CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
     use franklinmodels::params as franklin_constants;
 
@@ -315,8 +313,7 @@ mod test {
         let validator_address_number = 7;
         let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
         let block_number = Fr::from_str("1").unwrap();
-        let rng =
-            &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
         let phasher = PedersenHasher::<Bn256>::default();
 
         let mut tree: CircuitAccountTree =

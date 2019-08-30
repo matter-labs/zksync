@@ -1425,7 +1425,10 @@ impl StorageProcessor {
         Ok(Ok(()))
     }
 
-    pub fn save_franklin_op_blocks(&self, blocks: &[NewFranklinOpBlock]) -> QueryResult<Result<(), String>> {
+    pub fn save_franklin_op_blocks(
+        &self,
+        blocks: &[NewFranklinOpBlock],
+    ) -> QueryResult<Result<(), String>> {
         for block in blocks.iter() {
             let inserted = diesel::insert_into(franklin_op_blocks::table)
                 .values(block)
@@ -1452,7 +1455,9 @@ impl StorageProcessor {
             diesel::delete(data_restore_last_watched_eth_block::table).execute(self.conn())?;
         if 0 == deleted {
             error!("Error: could not delete last watched eth block number!");
-            return Ok(Err(format!("Could not delete last watched eth block number!")));
+            return Ok(Err(format!(
+                "Could not delete last watched eth block number!"
+            )));
         }
         Ok(Ok(()))
     }
