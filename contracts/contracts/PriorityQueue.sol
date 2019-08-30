@@ -37,7 +37,7 @@ contract PriorityQueue {
     mapping(bytes20 => bool) public requestsExistance;
     uint32 public totalRequests;
 
-    //OPnly Franklin contract permission modifier
+    //Only Franklin contract permission modifier
     modifier onlyFranklin() {
         require(msg.sender == franklinAddress, "Not the main Franklin contract");
         _;
