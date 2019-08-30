@@ -105,7 +105,7 @@ dummy-prover:
 	cargo run --bin dummy_prover
 
 prover:
-	@cargo run --release --bin franklin_prover
+	@cargo run --release --bin prover
 
 server:
 	@cargo run --bin server --release

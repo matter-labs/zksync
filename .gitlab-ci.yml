@@ -19,7 +19,6 @@ compile:
   <<: *rust-template
   stage: build
   script:
-    - cargo fmt --all -- --check
     - cargo build --verbose
   only:
     - master
@@ -36,6 +35,7 @@ tests:
   stage: tests
   when: manual
   script:
+    - cargo fmt --all -- --check
     - cargo clippy --tests --benches -- -D warnings
     - cargo test --verbose
   only:
