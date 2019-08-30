@@ -822,7 +822,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         sig_bits.extend(op_data.ethereum_key.get_bits_be());
         let mut token_bits = cur.token.get_bits_le().clone();
         token_bits.resize(
-            *franklin_constants::TOKEN_EXT_BIT_WIDTH,
+            franklin_constants::TOKEN_EXT_BIT_WIDTH,
             Boolean::constant(false),
         );
         token_bits.reverse();
@@ -852,11 +852,11 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             Expression::from(&op_data.second_sig_msg.get_number()),
         )?);
 
-        let is_signer_valid = Boolean::from(CircuitElement::equals(
+        let is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correect"),
             &op_data.signer_pubkey.get_hash(),
             &cur.account.pub_key_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
-        )?);
+        )?;
 
         let mut is_sig_valid_flags = vec![];
 
@@ -1098,7 +1098,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         sig_bits.extend(op_data.new_pubkey_hash.get_bits_be());
         let mut token_bits = cur.token.get_bits_le().clone();
         token_bits.resize(
-            *franklin_constants::TOKEN_EXT_BIT_WIDTH,
+            franklin_constants::TOKEN_EXT_BIT_WIDTH,
             Boolean::constant(false),
         );
         token_bits.reverse();
@@ -1127,11 +1127,11 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             Expression::from(&op_data.second_sig_msg.get_number()),
         )?);
 
-        let is_signer_valid = Boolean::from(CircuitElement::equals(
+        let is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correect"),
             &op_data.signer_pubkey.get_hash(),
             &op_data.new_pubkey_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
-        )?);
+        )?;
 
         let mut is_sig_valid_flags = vec![];
 
@@ -1265,11 +1265,11 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             Expression::from(&op_data.second_sig_msg.get_number()),
         )?);
 
-        let is_signer_valid = Boolean::from(CircuitElement::equals(
+        let is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correect"),
             &op_data.signer_pubkey.get_hash(),
             &cur.account.pub_key_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
-        )?);
+        )?;
 
         let mut is_sig_valid_flags = vec![];
 
@@ -1432,7 +1432,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         sig_bits.extend(op_data.new_pubkey_hash.get_bits_be());
         let mut token_bits = cur.token.get_bits_le().clone(); //TODO: make util to get this token bits
         token_bits.resize(
-            *franklin_constants::TOKEN_EXT_BIT_WIDTH,
+            franklin_constants::TOKEN_EXT_BIT_WIDTH,
             Boolean::constant(false),
         );
         token_bits.reverse();
@@ -1460,11 +1460,11 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             Expression::from(&op_data.second_sig_msg.get_number()),
         )?);
 
-        let is_signer_valid = Boolean::from(CircuitElement::equals(
+        let is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correect"),
             &op_data.signer_pubkey.get_hash(),
             &lhs.account.pub_key_hash,
-        )?);
+        )?;
 
         let mut is_sig_valid_flags = vec![];
 
@@ -1642,7 +1642,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         sig_bits.extend(rhs.account.pub_key_hash.get_bits_be());
         let mut token_bits = cur.token.get_bits_le().clone(); //TODO: make util to get this token bits
         token_bits.resize(
-            *franklin_constants::TOKEN_EXT_BIT_WIDTH,
+            franklin_constants::TOKEN_EXT_BIT_WIDTH,
             Boolean::constant(false),
         );
         token_bits.reverse();
@@ -1671,11 +1671,11 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             Expression::from(&op_data.second_sig_msg.get_number()),
         )?);
 
-        let is_signer_valid = Boolean::from(CircuitElement::equals(
+        let is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correect"),
             &op_data.signer_pubkey.get_hash(),
             &lhs.account.pub_key_hash,
-        )?);
+        )?;
 
         let mut is_sig_valid_flags = vec![];
 

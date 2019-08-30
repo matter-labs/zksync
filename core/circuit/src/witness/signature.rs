@@ -7,7 +7,6 @@ use franklin_crypto::circuit::num::AllocatedNum;
 use franklin_crypto::circuit::pedersen_hash;
 use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
-use models::params as franklin_constants;
 
 #[derive(Clone)]
 pub struct SignatureCircuit<'a, E: JubjubEngine> {
@@ -125,14 +124,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for SignatureCircuit<'a, E> {
 #[cfg(test)]
 mod test {
     use super::*;
-
-#[test]
-#[ignore]
-fn test_small_circuit_franklin() {
-    use super::utils::public_data_commitment;
-
-    use crate::circuit::FranklinCircuit;
-    use crate::operation::*;
     use crate::utils::*;
     use bellman::Circuit;
 
@@ -142,15 +133,13 @@ fn test_small_circuit_franklin() {
     use franklin_crypto::circuit::test::*;
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklin_crypto::jubjub::FixedGenerators;
-    use models::circuit::account::{
-        Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
-    };
-    use models::params as franklin_constants;
 
     use pairing::bn256::*;
     use rand::{Rng, SeedableRng, XorShiftRng};
 
     #[test]
+    #[ignore]
+
     fn test_signature_circuit_franklin() {
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;
@@ -166,11 +155,11 @@ fn test_small_circuit_franklin() {
         // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
         let signature = sign_pedersen(&sig_bits, &sender_sk, p_g, &params, rng);
         let circ = SignatureCircuit {
-            signature: signature,
+            signature,
             pub_x: Some(sender_x),
             pub_y: Some(sender_y),
             data: Some(sig_msg),
-            params: params,
+            params,
         };
         let mut cs = TestConstraintSystem::<Bn256>::new();
 
@@ -185,5 +174,4 @@ fn test_small_circuit_franklin() {
             panic!("ERROR satisfying in {}", err.unwrap());
         }
     }
-
 }

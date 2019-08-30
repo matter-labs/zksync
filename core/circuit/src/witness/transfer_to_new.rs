@@ -82,7 +82,7 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
         append_be_fixed_width(
             &mut sig_bits,
             &Fr::from_str("5").unwrap(), //Corresponding tx_type
-            *franklin_constants::TX_TYPE_BIT_WIDTH,
+            franklin_constants::TX_TYPE_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
@@ -103,7 +103,7 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
         append_be_fixed_width(
             &mut sig_bits,
             &self.from_before.token.unwrap(),
-            *franklin_constants::TOKEN_EXT_BIT_WIDTH,
+            franklin_constants::TOKEN_EXT_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
@@ -356,8 +356,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         tx_type: transfer_witness.tx_type,
         chunk: Some(Fr::from_str("0").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[0]),
-        first_sig_msg: Some(first_sig_msg.clone()),
-        second_sig_msg: Some(second_sig_msg.clone()),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -371,8 +371,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         tx_type: transfer_witness.tx_type,
         chunk: Some(Fr::from_str("1").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[1]),
-        first_sig_msg: Some(first_sig_msg.clone()),
-        second_sig_msg: Some(second_sig_msg.clone()),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -386,8 +386,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         tx_type: transfer_witness.tx_type,
         chunk: Some(Fr::from_str("2").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[2]),
-        first_sig_msg: Some(first_sig_msg.clone()),
-        second_sig_msg: Some(second_sig_msg.clone()),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -401,8 +401,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         tx_type: transfer_witness.tx_type,
         chunk: Some(Fr::from_str("3").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[3]),
-        first_sig_msg: Some(first_sig_msg.clone()),
-        second_sig_msg: Some(second_sig_msg.clone()),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -416,8 +416,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         tx_type: transfer_witness.tx_type,
         chunk: Some(Fr::from_str("4").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[4]),
-        first_sig_msg: Some(first_sig_msg.clone()),
-        second_sig_msg: Some(second_sig_msg.clone()),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),

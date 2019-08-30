@@ -317,6 +317,7 @@ impl BabyProver {
                         let deposit_operations = calculate_deposit_operations_from_witness(
                             &deposit_witness,
                             &sig_msg,
+                            &Fr::zero(),
                             signature,
                             &sender_x,
                             &sender_y,
@@ -332,6 +333,7 @@ impl BabyProver {
                         let transfer_operations = calculate_transfer_operations_from_witness(
                             &transfer_witness,
                             &sig_msg,
+                            &Fr::zero(),
                             signature,
                             &sender_x,
                             &sender_y,
@@ -348,6 +350,7 @@ impl BabyProver {
                             calculate_transfer_to_new_operations_from_witness(
                                 &transfer_to_new_witness,
                                 &sig_msg,
+                                &Fr::zero(),
                                 signature,
                                 &sender_x,
                                 &sender_y,
@@ -364,6 +367,7 @@ impl BabyProver {
                             calculate_partial_exit_operations_from_witness(
                                 &partial_exit_witness,
                                 &sig_msg,
+                                &Fr::zero(),
                                 signature,
                                 &sender_x,
                                 &sender_y,
@@ -380,6 +384,7 @@ impl BabyProver {
                             calculate_close_account_operations_from_witness(
                                 &close_account_witness,
                                 &sig_msg,
+                                &Fr::zero(),
                                 signature,
                                 &sender_x,
                                 &sender_y,
@@ -396,6 +401,7 @@ impl BabyProver {
                         &self.accounts_tree,
                         block.fee_account,
                         &sig_msg,
+                        &Fr::zero(),
                         signature,
                         &sender_x,
                         &sender_y,
@@ -444,7 +450,7 @@ impl BabyProver {
 
             info!("Data for public commitment. pub_data: {:x?}, initial_root: {}, final_root: {}, validator_address: {}, block_number: {}",
                   pack_bits_into_bytes_in_order(pub_data.clone()), initial_root, root_after_fee, Fr::from_str(&block.fee_account.to_string()).unwrap(), Fr::from_str(&(block_number + 1).to_string()).unwrap()
-                );
+            );
             let public_data_commitment = public_data_commitment::<Engine>(
                 &pub_data,
                 Some(initial_root),

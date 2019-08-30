@@ -44,7 +44,7 @@ impl<E: JubjubEngine> CloseAccountWitness<E> {
         append_be_fixed_width(
             &mut sig_bits,
             &Fr::from_str("4").unwrap(), //Corresponding tx_type
-            *franklin_constants::TX_TYPE_BIT_WIDTH,
+            franklin_constants::TX_TYPE_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
@@ -158,8 +158,8 @@ pub fn calculate_close_account_operations_from_witness(
         tx_type: close_account_witness.tx_type,
         chunk: Some(Fr::from_str("0").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[0]),
-        first_sig_msg: Some(first_sig_msg.clone()),
-        second_sig_msg: Some(second_sig_msg.clone()),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -189,6 +189,7 @@ mod test {
     use models::params as franklin_constants;
 
     use rand::{Rng, SeedableRng, XorShiftRng};
+
     #[test]
     #[ignore]
     fn test_close_account_franklin_empty_leaf() {
@@ -209,19 +210,15 @@ mod test {
         let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
         let (sender_x, sender_y) = sender_pk.0.into_xy();
         let sender_leaf = CircuitAccount::<Bn256> {
-            subtree: CircuitBalanceTree::new(*franklin_constants::BALANCE_TREE_DEPTH as u32),
+            subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
             pub_key_hash: sender_pub_key_hash,
         };
         let mut sender_leaf_number: u32 = rng.gen();
         sender_leaf_number %= capacity;
+        println!("zero root_hash equals: {}", sender_leaf.subtree.root_hash());
 
         tree.insert(sender_leaf_number, sender_leaf);
-            subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
-            nonce: Fr::zero(),
-            pub_key_hash: sender_pub_key_hash,
-        };
-        println!("zero root_hash equals: {}", sender_leaf.subtree.root_hash());
 
         // give some funds to sender and make zero balance for recipient
         let validator_sk = PrivateKey::<Bn256>(rng.gen());
@@ -243,12 +240,8 @@ mod test {
         let account_address = sender_leaf_number;
 
         //-------------- Start applying changes to state
-        let close_account_witness = apply_close_account(
-            &mut tree,
-            &CloseAccountData {
-                account_address: account_address,
-            },
-        );
+        let close_account_witness =
+            apply_close_account(&mut tree, &CloseAccountData { account_address });
         let (signature, first_sig_part, second_sig_part) = generate_sig_data(
             &close_account_witness.get_sig_bits(),
             &phasher,
@@ -308,5 +301,4 @@ mod test {
             }
         }
     }
-
 }

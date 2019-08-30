@@ -196,15 +196,15 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
         Ok(AllocatedOperationData {
             ethereum_key,
             signer_pubkey: sig_pubkey,
-            amount_packed: amount_packed,
-            fee_packed: fee_packed,
-            fee: fee,
-            amount: amount,
-            first_sig_msg: first_sig_msg,
-            second_sig_msg: second_sig_msg,
-            new_pubkey_hash: new_pubkey_hash,
-            a: a,
-            b: b,
+            amount_packed,
+            fee_packed,
+            fee,
+            amount,
+            first_sig_msg,
+            second_sig_msg,
+            new_pubkey_hash,
+            a,
+            b,
         })
     }
 }
