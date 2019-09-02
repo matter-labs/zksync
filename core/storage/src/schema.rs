@@ -52,6 +52,7 @@ table! {
         id -> Int8,
         op_id -> Int8,
         nonce -> Int8,
+        deadline_block -> Int8,
         gas_price -> Numeric,
         tx_hash -> Text,
         confirmed -> Bool,

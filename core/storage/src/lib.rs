@@ -14,7 +14,7 @@ use models::node::{
     Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, FranklinOp, Nonce,
     TokenId,
 };
-use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
+use models::{Action, ActionType, EncodedProof, Operation, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
 use std::convert::TryInto;
@@ -276,6 +276,7 @@ pub struct StorageETHOperation {
     pub id: i64,
     pub op_id: i64,
     pub nonce: i64,
+    pub deadline_block: i64,
     pub gas_price: BigDecimal,
     pub tx_hash: String,
     pub confirmed: bool,
@@ -1893,22 +1894,22 @@ mod test {
         //        assert_eq!(txs.len(), 6);
     }
 
-    fn dummy_op(_action: Action, _block_number: BlockNumber) -> Operation {
-        unimplemented!()
-        //        Operation {
-        //            id: None,
-        //            action,
-        //            block: Block {
-        //                block_number,
-        //                new_root_hash: Fr::default(),
-        //                block_data: BlockData::Deposit {
-        //                    batch_number: 1,
-        //                    transactions: Vec::new(),
-        //                },
-        //            },
-        //            accounts_updated: AccountUpdates::default(),
-        //            tx_meta: None,
-        //        }
-    }
+    //    fn dummy_op(_action: Action, _block_number: BlockNumber) -> Operation {
+    //        unimplemented!()
+    //        Operation {
+    //            id: None,
+    //            action,
+    //            block: Block {
+    //                block_number,
+    //                new_root_hash: Fr::default(),
+    //                block_data: BlockData::Deposit {
+    //                    batch_number: 1,
+    //                    transactions: Vec::new(),
+    //                },
+    //            },
+    //            accounts_updated: AccountUpdates::default(),
+    //            tx_meta: None,
+    //        }
+    //    }
 
 }

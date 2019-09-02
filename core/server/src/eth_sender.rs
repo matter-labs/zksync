@@ -14,20 +14,27 @@ use num_traits::cast::FromPrimitive;
 use std::collections::VecDeque;
 use std::str::FromStr;
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::time::{Duration, Instant};
 use storage::ConnectionPool;
 use web3::contract::Options;
 use web3::transports::Http;
-use web3::types::H256;
+use web3::types::{TransactionReceipt, H256};
 use web3::Transport;
 
-const EXPECTED_WAIT_TIME_BLOCKS: usize = 10;
+const EXPECTED_WAIT_TIME_BLOCKS: u64 = 10;
 const MAX_UNCONFIRMED_TX: usize = 5;
+const TX_POLL_PERIOD: Duration = Duration::from_secs(5);
+
+struct UnconfirmedOperation {
+    hash: H256,
+    deadline_block: u64,
+    op: Operation,
+}
 
 struct ETHSender<T: Transport> {
     eth_client: ETHClient<T>,
     unsent_ops: VecDeque<Operation>,
-    unconfirmed_ops: VecDeque<(H256, Operation)>,
-    //(tx hash, operation)
+    unconfirmed_ops: VecDeque<UnconfirmedOperation>,
     db_pool: ConnectionPool,
 }
 
@@ -70,7 +77,11 @@ impl<T: Transport> ETHSender<T> {
         self.unconfirmed_ops = storage
             .load_sent_unconfirmed_ops()?
             .into_iter()
-            .map(|(op, eth_op)| (eth_op.tx_hash[2..].parse().unwrap(), op))
+            .map(|(op, eth_op)| UnconfirmedOperation {
+                hash: eth_op.tx_hash[2..].parse().unwrap(),
+                deadline_block: eth_op.deadline_block as u64,
+                op,
+            })
             .collect();
 
         Ok(())
@@ -78,11 +89,21 @@ impl<T: Transport> ETHSender<T> {
 
     fn run(&mut self, rx_for_eth: Receiver<Operation>) {
         let storage = self.db_pool.access_storage().expect("db access");
+
+        let mut last_tx_poll_time = Instant::now();
+
         loop {
             while let Ok(op) = rx_for_eth.try_recv() {
                 self.unsent_ops.push_back(op);
             }
 
+            let block_number = match self.eth_client.web3.eth().block_number().wait() {
+                Ok(block) => block.as_u64(),
+                Err(e) => {
+                    warn!("Failed to get block number: {}", e);
+                    continue;
+                }
+            };
             while self.unconfirmed_ops.len() < MAX_UNCONFIRMED_TX && !self.unsent_ops.is_empty() {
                 if let Some(op) = self.unsent_ops.pop_front() {
                     match self.send_operation(&op) {
@@ -102,7 +123,11 @@ impl<T: Transport> ETHSender<T> {
                                     BigDecimal::from_u128(res.gas_price.as_u128()).unwrap(),
                                 )
                                 .expect("db fail");
-                            self.unconfirmed_ops.push_back((res.hash, op));
+                            self.unconfirmed_ops.push_back(UnconfirmedOperation {
+                                hash: res.hash,
+                                op,
+                                deadline_block: block_number + EXPECTED_WAIT_TIME_BLOCKS,
+                            });
                         }
                         Err(e) => {
                             error!("Failed to send eth tx: {}", e);
@@ -114,27 +139,43 @@ impl<T: Transport> ETHSender<T> {
             }
 
             // check pending txs
-            while let Some((hash, op)) = self.unconfirmed_ops.front() {
+            let since_last_poll = last_tx_poll_time.elapsed();
+            if since_last_poll < TX_POLL_PERIOD {
+                std::thread::sleep(TX_POLL_PERIOD - since_last_poll);
+            }
+            while let Some(UnconfirmedOperation {
+                hash,
+                deadline_block,
+                op,
+            }) = self.unconfirmed_ops.front()
+            {
                 match self.eth_client.web3.eth().transaction_receipt(*hash).wait() {
-                    Ok(tx_receipt) => {
-                        if let Some(tx_receipt) = tx_receipt {
-                            if let Some(status) = tx_receipt.status {
-                                info!(
-                                    "Operation {} confirmed, tx_hash: {:#x}, gas_used: {:?}",
-                                    op.id.unwrap(),
-                                    hash,
-                                    tx_receipt.gas_used
-                                );
-                                storage.confirm_eth_tx(hash).expect("db fail");
-                                if status.as_u64() != 1 {
-                                    error!(
-                                        "Operation {} failed, tx_hash: {:#x}",
-                                        op.id.unwrap(),
-                                        hash
-                                    )
-                                }
-                                self.unconfirmed_ops.pop_front();
-                            }
+                    Ok(Some(TransactionReceipt {
+                        status: Some(status),
+                        gas_used,
+                        ..
+                    })) => {
+                        if status.as_u64() != 1 {
+                            panic!("Operation {} failed, tx_hash: {:#x}", op.id.unwrap(), hash)
+                        }
+
+                        info!(
+                            "Operation {} confirmed, tx_hash: {:#x}, gas_used: {:?}",
+                            op.id.unwrap(),
+                            hash,
+                            gas_used
+                        );
+                        storage.confirm_eth_tx(hash).expect("db fail");
+                        self.unconfirmed_ops.pop_front();
+                    }
+                    // op is not confirmed yet
+                    Ok(_) => {
+                        if block_number > *deadline_block {
+                            info!(
+                                "Operation {} is not commited before deadline, resending tx",
+                                op.id.unwrap()
+                            );
+                            unimplemented!();
                         }
                     }
                     Err(e) => {
@@ -143,8 +184,7 @@ impl<T: Transport> ETHSender<T> {
                     }
                 }
             }
-
-            std::thread::sleep(std::time::Duration::from_secs(5));
+            last_tx_poll_time = Instant::now();
         }
     }
 
