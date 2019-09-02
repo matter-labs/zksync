@@ -8,7 +8,7 @@ bigdecimal = { version = "0.0.14", features = ["serde"]}
 futures = "0.1.28"
 web3 = { git = "https://github.com/tomusdrw/rust-web3" }
 tiny-keccak = "1.4.2"
-ethabi = "7.0.0"
+ethabi = "8.0.0"
 hex = "0.3.2"
 franklin_crypto = { package = "franklin-crypto", git = "ssh://git@github.com/matter-labs/franklin-crypto.git" }
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
@@ -16,6 +16,9 @@ pairing = { package = "pairing_ce", version = "0.17.0" }
 tokio = "0.1"
 bitvec = "0.11"
 log = "0.4"
+env_logger = "0.6"
+signal-hook = { version = "0.1.8", features = ["tokio-support"] }
 
 plasma = { path = "../plasma", version = "0.1.1" }
-models = { path = "../models", version = "0.0.1" }
+models = { path = "../models", version = "0.1.1" }
+storage = { path = "../storage", version = "0.1.1" }
