@@ -97,7 +97,7 @@ contract PriorityQueue {
             identifier,
             opType,
             franklinAccountAddress,
-            addethAddressress2,
+            ethAddress,
             token,
             amount,
             signatureHash,
