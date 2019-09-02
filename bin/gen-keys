@@ -6,6 +6,6 @@ FRANKLIN_HOME=`dirname $0`/..
 
 
 mkdir -p $FRANKLIN_HOME/$KEY_DIR/$BLOCK_SIZE_CHUNKS
-cargo run --bin franklin_key_generator --release
+cargo run --bin key_generator --release
 
 cp $FRANKLIN_HOME/$KEY_DIR/$BLOCK_SIZE_CHUNKS/VerificationKey.sol $FRANKLIN_HOME/contracts/contracts

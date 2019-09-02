@@ -38,6 +38,13 @@ jq is used to work with json when managing DigitalOcean.
 
 ```brew install jq```
 
+# envsubst
+
+```bash
+brew install gettext
+brew link --force gettext 
+```
+
 # PSQL
 
 Install `psql` CLI tool to interact with postgres.

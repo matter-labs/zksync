@@ -17,5 +17,5 @@ tokio = "0.1"
 bitvec = "0.11"
 log = "0.4"
 
-plasma = { path = "../plasma" }
-models = { path = "../models" }
+plasma = { path = "../plasma", version = "0.1.1" }
+models = { path = "../models", version = "0.0.1" }

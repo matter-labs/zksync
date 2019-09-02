@@ -4,10 +4,10 @@ version = "0.0.1"
 edition = "2018"
 
 [dependencies]
-eth_client = { path = "../eth_client" }
-plasma = { path = "../plasma" }
-models = { package = "franklinmodels", path = "../franklinmodels" }
-storage = { path = "../storage" }
+eth_client = { path = "../eth_client", version = "0.1.0"  }
+plasma = { path = "../plasma", version = "0.1.1" }
+models = { path = "../models", version = "0.0.1" }
+storage = { path = "../storage", version = "0.0.1" }
 
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
 pairing = { package = "pairing_ce", version = "0.17.0" }

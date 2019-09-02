@@ -105,7 +105,7 @@ dummy-prover:
 	cargo run --bin dummy_prover
 
 prover:
-	@cargo run --release --bin franklin_prover
+	@cargo run --release --bin prover
 
 server:
 	@cargo run --bin server --release
@@ -139,6 +139,9 @@ deploy-contracts: confirm_action
 
 test-contracts: confirm_action
 	@cd contracts && yarn test
+
+build-contracts: confirm_action
+	@cd contracts && yarn build
 
 # deploy-contracts: confirm_action
 # 	@bin/deploy-contracts
