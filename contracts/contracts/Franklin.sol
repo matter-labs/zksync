@@ -384,6 +384,11 @@ contract Franklin {
 
         totalBlocksCommitted += 1;
         emit BlockCommitted(_blockNumber);
+
+        // Check for Exodus mode
+        if (priorityQueue.isExodusActivated(block.number)) {
+            triggerExodus();
+        }
     }
 
     function createBlockCommitment(
