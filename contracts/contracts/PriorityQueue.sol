@@ -70,7 +70,12 @@ contract PriorityQueue {
     /// - ethereumAddress - address of root-chain account to which the funds must be sent
     /// - token - chosen token to withdraw
     /// - signatureHash - user signature hash
-    function addExitRequest(address accountAddress, address ethereumAddress, uint16 token, bytes20 signatureHash) external {
+    function addExitRequest(
+        address accountAddress,
+        address ethereumAddress,
+        uint16 token,
+        bytes20 signatureHash
+    ) external {
         require(!requestsExistance[signatureHash], "Exit request from this sender for chosen token exists");
         uint expirationBlock = block.number+250;
         requestsCreds[totalRequests] = RequestCreds(
@@ -95,7 +100,13 @@ contract PriorityQueue {
     /// - token - chosen token to deposit
     /// - amount - amount of the chosen token
     /// - signatureHash - user signature hash
-    function addDepositRequest(address sender, address toAccount, uint16 token, uint112 amount, bytes20 signatureHash) external {
+    function addDepositRequest(
+        address sender,
+        address toAccount,
+        uint16 token,
+        uint112 amount,
+        bytes20 signatureHash
+    ) external {
         require(!requestsExistance[signatureHash], "Deposit request from this sender for chosen token and value exists");
         uint expirationBlock = block.number+250;
         requestsCreds[totalRequests] = RequestCreds(

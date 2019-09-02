@@ -12,28 +12,35 @@ contract TestPriorityQueue {
         priorityQueue = PriorityQueue(priorityQueueAddress);
     }
 
-    // TODO
-    function testAdd10DepositRequests() external view returns (bool) {
+    function testAddDepositRequests(
+        address sender,
+        address toAddress,
+        uint16 token,
+        uint112 amount,
+        bytes20 signature
+    ) external view returns (bool) {
         uint beforeCount = priorityQueue.totalRequests;
         priorityQueue.addDepositRequest(sender, toAddress, token, amount, signature);
         uint afterCount = priorityQueue.totalRequests;
         return afterCount - beforeCount == 1;
     }
 
-    // TODO
-    function testAdd10ExitRequests() external view returns (bool) {
+    function testAddExitRequests(
+        address fromAddress,
+        address ethereumAddress,
+        uint16 token,
+        bytes20 signature
+    ) external view returns (bool) {
         uint beforeCount = priorityQueue.totalRequests;
         priorityQueue.addExitRequest(fromAddress, ethereumAddress, token, signature);
         uint afterCount = priorityQueue.totalRequests;
         return afterCount - beforeCount == 1;
     }
 
-    // TODO
     function testAllRequestsRemoved() external view returns (bool) {
         return priorityQueue.totalRequests == 0;
     }
 
-    // TODO
     function testIsExodusActivate() external view returns (bool) {
         return franklin.isExodusActivated(0);
     }
