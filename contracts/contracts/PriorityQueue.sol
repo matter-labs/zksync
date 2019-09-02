@@ -24,7 +24,7 @@ contract PriorityQueue {
     /// - signatureHash - the user signature hash
     /// - expirationBlock - the number of Ethereum block when request becomes expired
     event NewRequest(
-        uint indexed identifier,
+        uint16 indexed identifier,
         uint8 indexed opType,
         bytes franklinAccountAddress,
         address ethAddress,
@@ -55,7 +55,7 @@ contract PriorityQueue {
     uint public totalRequests;
 
     /// Incremented requests identifier
-    uint private counter;
+    uint16 private counter;
 
     /// Only Franklin contract permission modifier
     modifier onlyFranklin() {
@@ -84,15 +84,24 @@ contract PriorityQueue {
         uint112 amount,
         bytes20 signatureHash
     ) external {
-        uint identifier = counter;
+        require(!requestsExistance[counter], "Request with same identifier exists");
+        uint16 identifier = counter;
+
         uint expirationBlock = block.number+250;
+
         requestsCreds[totalRequests] = RequestCreds(
             identifier,
             expirationBlock
         );
+
         requestsExistance[identifier] = true;
+
         totalRequests++;
-        counter++;
+
+        counter = counter == 0xFFFF
+            ? 0
+            : counter + 1;
+
         emit NewRequest(
             identifier,
             opType,
@@ -108,7 +117,7 @@ contract PriorityQueue {
     /// Remove request external function. Can be used only from Franklin contract
     /// Params:
     /// - identifier - request identifier
-    function removeRequest(uint identifier) external onlyFranklin {
+    function removeRequest(uint16 identifier) external onlyFranklin {
         require(requestsExistance[identifier], "This request doesn't exists");
         delete requestsExistance[identifier];
         for (uint32 i = 0; i < totalRequests; i++) {
