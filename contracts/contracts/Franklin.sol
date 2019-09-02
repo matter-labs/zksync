@@ -654,8 +654,7 @@ contract Franklin {
 
     // Exodus mode
 
-    function triggerExodus() external {
-        require(msg.sender == exitQueue, "only by exit queue");
+    function triggerExodus() internal {
         exodusMode = true;
     }
 
