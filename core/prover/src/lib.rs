@@ -28,6 +28,7 @@ use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccount;
 use models::circuit::CircuitAccountTree;
+use models::merkle_tree::PedersenHasher;
 use models::node::Account;
 use models::node::*;
 use models::params as franklin_constants;
@@ -274,6 +275,9 @@ impl BabyProver {
     }
 
     fn make_proving_attempt(&mut self) -> Result<(), String> {
+        let phasher = PedersenHasher::<Engine>::default();
+        let params = &AltJubjubBn256::new();
+
         let storage = StorageProcessor::establish_connection()
             .map_err(|e| format!("establish_connection failed: {}", e))?;
         let job = storage
@@ -312,12 +316,16 @@ impl BabyProver {
                     FranklinOp::Deposit(deposit) => {
                         let deposit_witness = apply_deposit_tx(&mut self.accounts_tree, &deposit);
 
-                        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
-                        let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
+                        let (signature, first_sig_msg, second_sig_msg, sender_x, sender_y) =
+                            generate_dummy_sig_data(
+                                &deposit_witness.get_sig_bits(),
+                                &phasher,
+                                &params,
+                            );
                         let deposit_operations = calculate_deposit_operations_from_witness(
                             &deposit_witness,
-                            &sig_msg,
-                            &Fr::zero(),
+                            &first_sig_msg,
+                            &second_sig_msg,
                             signature,
                             &sender_x,
                             &sender_y,
@@ -329,11 +337,16 @@ impl BabyProver {
                     FranklinOp::Transfer(transfer) => {
                         let transfer_witness =
                             apply_transfer_tx(&mut self.accounts_tree, &transfer);
-                        let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
+                        let (signature, first_sig_msg, second_sig_msg, sender_x, sender_y) =
+                            generate_dummy_sig_data(
+                                &transfer_witness.get_sig_bits(),
+                                &phasher,
+                                &params,
+                            );
                         let transfer_operations = calculate_transfer_operations_from_witness(
                             &transfer_witness,
-                            &sig_msg,
-                            &Fr::zero(),
+                            &first_sig_msg,
+                            &second_sig_msg,
                             signature,
                             &sender_x,
                             &sender_y,
@@ -345,12 +358,17 @@ impl BabyProver {
                     FranklinOp::TransferToNew(transfer_to_new) => {
                         let transfer_to_new_witness =
                             apply_transfer_to_new_tx(&mut self.accounts_tree, &transfer_to_new);
-                        let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
+                        let (signature, first_sig_msg, second_sig_msg, sender_x, sender_y) =
+                            generate_dummy_sig_data(
+                                &transfer_to_new_witness.get_sig_bits(),
+                                &phasher,
+                                &params,
+                            );
                         let transfer_to_new_operations =
                             calculate_transfer_to_new_operations_from_witness(
                                 &transfer_to_new_witness,
-                                &sig_msg,
-                                &Fr::zero(),
+                                &first_sig_msg,
+                                &second_sig_msg,
                                 signature,
                                 &sender_x,
                                 &sender_y,
@@ -362,12 +380,17 @@ impl BabyProver {
                     FranklinOp::PartialExit(partial_exit) => {
                         let partial_exit_witness =
                             apply_partial_exit_tx(&mut self.accounts_tree, &partial_exit);
-                        let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
+                        let (signature, first_sig_msg, second_sig_msg, sender_x, sender_y) =
+                            generate_dummy_sig_data(
+                                &partial_exit_witness.get_sig_bits(),
+                                &phasher,
+                                &params,
+                            );
                         let partial_exit_operations =
                             calculate_partial_exit_operations_from_witness(
                                 &partial_exit_witness,
-                                &sig_msg,
-                                &Fr::zero(),
+                                &first_sig_msg,
+                                &second_sig_msg,
                                 signature,
                                 &sender_x,
                                 &sender_y,
@@ -379,12 +402,17 @@ impl BabyProver {
                     FranklinOp::Close(close) => {
                         let close_account_witness =
                             apply_close_account_tx(&mut self.accounts_tree, &close);
-                        let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
+                        let (signature, first_sig_msg, second_sig_msg, sender_x, sender_y) =
+                            generate_dummy_sig_data(
+                                &close_account_witness.get_sig_bits(),
+                                &phasher,
+                                &params,
+                            );
                         let close_account_operations =
                             calculate_close_account_operations_from_witness(
                                 &close_account_witness,
-                                &sig_msg,
-                                &Fr::zero(),
+                                &first_sig_msg,
+                                &second_sig_msg,
                                 signature,
                                 &sender_x,
                                 &sender_y,
@@ -396,12 +424,13 @@ impl BabyProver {
             }
             if operations.len() < franklin_constants::BLOCK_SIZE_CHUNKS {
                 for _ in 0..franklin_constants::BLOCK_SIZE_CHUNKS - operations.len() {
-                    let (signature, sig_msg, sender_x, sender_y) = generate_dummy_sig_data();
+                    let (signature, first_sig_msg, second_sig_msg, sender_x, sender_y) =
+                        generate_dummy_sig_data(&[false], &phasher, &params);
                     operations.push(noop_operation(
                         &self.accounts_tree,
                         block.fee_account,
-                        &sig_msg,
-                        &Fr::zero(),
+                        &first_sig_msg,
+                        &second_sig_msg,
                         signature,
                         &sender_x,
                         &sender_y,

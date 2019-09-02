@@ -862,7 +862,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         is_sig_valid_flags.push(is_first_sig_part_correct);
         is_sig_valid_flags.push(is_second_sig_part_correct);
-        is_sig_valid_flags.push(is_signer_valid);
+        //        is_sig_valid_flags.push(is_signer_valid);
         let is_sig_valid = multi_and(cs.namespace(|| "is_sig_valid"), &is_sig_valid_flags)?;
         let is_sig_correct = multi_or(
             cs.namespace(|| "sig is valid or not first chunk"),
@@ -1137,7 +1137,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         is_sig_valid_flags.push(is_first_sig_part_correct);
         is_sig_valid_flags.push(is_second_sig_part_correct);
-        is_sig_valid_flags.push(is_signer_valid);
+        //        is_sig_valid_flags.push(is_signer_valid);
         let is_sig_valid = multi_and(cs.namespace(|| "is_sig_valid"), &is_sig_valid_flags)?;
         let is_sig_correct = multi_or(
             cs.namespace(|| "sig is valid or not first chunk"),
@@ -1275,7 +1275,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         is_sig_valid_flags.push(is_first_sig_part_correct);
         is_sig_valid_flags.push(is_second_sig_part_correct);
-        is_sig_valid_flags.push(is_signer_valid);
+        //        is_sig_valid_flags.push(is_signer_valid);
         let is_sig_valid = multi_and(cs.namespace(|| "is_sig_valid"), &is_sig_valid_flags)?;
 
         is_valid_flags.push(is_sig_valid);
@@ -1470,7 +1470,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         is_sig_valid_flags.push(is_first_sig_part_correct);
         is_sig_valid_flags.push(is_second_sig_part_correct);
-        is_sig_valid_flags.push(is_signer_valid);
+        //        is_sig_valid_flags.push(is_signer_valid);
         let is_sig_valid = multi_and(cs.namespace(|| "is_sig_valid"), &is_sig_valid_flags)?;
         let is_sig_correct = multi_or(
             cs.namespace(|| "sig is valid or not first chunk"),
@@ -1681,7 +1681,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         is_sig_valid_flags.push(is_first_sig_part_correct);
         is_sig_valid_flags.push(is_second_sig_part_correct);
-        is_sig_valid_flags.push(is_signer_valid);
+        //        is_sig_valid_flags.push(is_signer_valid);
         let is_sig_valid = multi_and(cs.namespace(|| "is_sig_valid"), &is_sig_valid_flags)?;
         let is_sig_correct = multi_or(
             cs.namespace(|| "sig is valid or not first chunk"),
