@@ -30,6 +30,8 @@ use diesel::r2d2::{ConnectionManager, Pool, PoolError, PooledConnection};
 use serde_json::value::Value;
 use std::env;
 
+use hex;
+
 use diesel::sql_types::{BigInt, Nullable, Text, Timestamp};
 sql_function!(coalesce, Coalesce, (x: Nullable<BigInt>, y: BigInt) -> BigInt);
 
@@ -147,6 +149,12 @@ struct StoredExecutedTransaction {
     operation: Option<Value>,
     success: bool,
     fail_reason: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct IsTxSuccessfulResponse {
+    tx_hash: Vec<u8>,
+    success: bool
 }
 
 impl NewExecutedTransaction {
@@ -1107,6 +1115,36 @@ impl StorageProcessor {
         let commited_state = self.last_committed_state_for_account(account_id)?;
         let verified_state = self.last_verified_state_for_account(account_id)?;
         Ok((Some(account_id), verified_state, commited_state))
+    }
+
+    pub fn is_tx_successful(&self, hash: &str) -> QueryResult<(Option<IsTxSuccessfulResponse>)> {
+        self.conn().transaction(|| {
+            let hash = hex::decode(hash).unwrap();
+
+            let tx = executed_transactions::table
+                .filter(executed_transactions::tx_hash.eq(&hash))
+                .first::<StoredExecutedTransaction>(self.conn())
+                .optional()?;
+
+            let is_success = if tx.is_some() {
+                let tx = tx.unwrap();
+
+                let confirm = operations::table 
+                    .filter(operations::block_number.eq(tx.block_number))
+                    .filter(operations::action_type.eq("Verify"))
+                    .first::<StoredOperation>(self.conn()) 
+                    .optional()?;
+
+                confirm.is_some()
+            } else {
+                false
+            };
+
+            Ok(Some(IsTxSuccessfulResponse {
+                tx_hash: hash,
+                success: is_success
+            }))
+        })
     }
 
     pub fn last_committed_state_for_account(

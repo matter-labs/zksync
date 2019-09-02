@@ -32,6 +32,10 @@ export class FranklinProvider {
     async getState(address: Address): Promise<FranklinAccountState> {
         return await Axios.get(this.providerAddress + '/api/v0.1/account/' + address).then(reps => reps.data);
     }
+
+    async txSuccess(tx_hash) {
+        return await Axios.get(this.providerAddress + '/api/v0.1/transactions/' + tx_hash).then(reps => reps.data);
+    }
 }
 
 export interface Token {
@@ -114,6 +118,11 @@ export class Wallet {
         return await this.provider.submitTx(tx);
     }
 
+    async waitForTxSuccess(tx_hash) {
+        while ((await this.provider.txSuccess(tx_hash)).success == false)
+            await sleep(1000);
+    }
+
 
     async widthdrawOnchain(token: Token, amount: BigNumberish) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
@@ -140,7 +149,10 @@ export class Wallet {
             nonce: nonce,
         };
 
-        return await this.provider.submitTx(tx);
+        let res = await this.provider.submitTx(tx);
+        console.log("RESS");
+        console.log(res);
+        return res;
     }
 
     async transfer(address: Address, token: Token, amount: BigNumberish, fee: BigNumberish) {
@@ -162,7 +174,7 @@ export class Wallet {
     async getNonce(): Promise<number> {
         if (this.nonce === null) {
             await this.fetchFranklinState();
-            this.nonce = this.franklinState.commited.nonce;
+            this.nonce = this.franklinState.commited.nonce + this.franklinState.pending_txs.length;
         }
         return this.nonce++;
     }

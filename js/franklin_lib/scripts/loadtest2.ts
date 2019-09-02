@@ -106,10 +106,10 @@ class LocalWallet {
         for (let i = 0; i < this.wallet.supportedTokens.length; i++) {
             let token = this.wallet.supportedTokens[i];
             if (this.wallet.ethState.onchainBalances[token.id] !== undefined) {
-                this.computedOnchainBalances[token.id] = this.wallet.ethState.onchainBalances[token.id];
+                this.computedOnchainBalances[token.id] = bigNumberify(this.wallet.ethState.onchainBalances[token.id]);
             }
             if (this.wallet.ethState.contractBalances[token.id] !== undefined) {
-                this.computedLockedBalances[token.id] = this.wallet.ethState.contractBalances[token.id];
+                this.computedLockedBalances[token.id] = bigNumberify(this.wallet.ethState.contractBalances[token.id]);
             }
             if (this.wallet.franklinState.commited.balances[token.id] !== undefined) {
                 this.computedFranklinBalances[token.id] = bigNumberify(this.wallet.franklinState.commited.balances[token.id]);
@@ -137,28 +137,26 @@ class LocalWallet {
 
     private async depositOffchain(token: Token, amount: BigNumber, fee: BigNumber) {
         let res = await this.wallet.depositOffchain(token, amount, fee);
+        console.log('deposit res', res);
         if (res.err) {
             throw new Error(res.err);
         }
+        await this.wallet.waitForTxSuccess(res.hash);
     }
 
     async deposit(token: Token, amount: BigNumber, fee: BigNumber) {
-        // if (token.address)
-        // if we have less 
         let total_amount = amount.add(fee);
-        if (this.getComputedOnchainBalance(token).lt(total_amount)) {
-            console.log(`I don't send this stuff`);
-            return;
-        }
 
-        // after the feat, 
         const zero = bigNumberify(0);
         const negative_amount = zero.sub(total_amount);
-        if (false == zero.gte(negative_amount)) throw new Error('assertion failed');
-        this.addToComputedOnchainBalance(token, negative_amount);
         
         let feeless_amount = amount.sub(fee);
-        this.addToComputedFranklinBalance(token, feeless_amount);
+
+        if (this.getComputedOnchainBalance(token).gte(total_amount)) {
+            // console.log("transaction should work");
+            this.addToComputedOnchainBalance(token, negative_amount);
+            this.addToComputedFranklinBalance(token, feeless_amount);
+        }
 
         await this.depositOnchain(token, amount);
         await this.depositOffchain(token, feeless_amount, fee);
@@ -311,12 +309,26 @@ async function test() {
     // }
     let wallet = commonWallets[0];
     // Actions.receive_money({wallet, amount: bigNumberify('10000000000000000000')});
+    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet, amount: bigNumberify('1000000'), fee: bigNumberify('1000')});
+    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
     Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
     Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('1000')});
-    Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('1000')});
+    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet, token: tokens[1], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
 
     
     await Promise.all(commonWallets.map(async w => {
@@ -325,17 +337,22 @@ async function test() {
         }
     }));
     
+
+    await sleep(3000);
+    await Promise.all(commonWallets.map(w => w.wallet.updateState()));
+
     commonWallets.forEach(wallet => {
         let token = tokens[0];
-        console.log(`wallet ${wallet.wallet.address} has computed `
-            + `onchain ${wallet.getComputedOnchainBalance(token)}, `
-            + `locked ${wallet.getComputedLockedBalance(token)}, `
-            + `franklin ${wallet.getComputedFranklinBalance(token)}, `
-            + `and actual `
+        console.log('\n\n');
+        console.log(`wallet ${wallet.wallet.address} has computed\n`
+            + `onchain: ${wallet.getComputedOnchainBalance(token)}, `
+            + `locked: ${wallet.getComputedLockedBalance(token)}, `
+            + `franklin: ${wallet.getComputedFranklinBalance(token)}, `
+            + `and actual\n`
             + `onchain: ${wallet.onchainBalance(token.id)}`
             + `, locked: ${wallet.lockedBalance(token.id)}`
             + `, franklin: ${wallet.franklinCommittedBalance(token.id)}`
-            + `, and its history is ${wallet.history.join(' \n ')}`);
+            + `, and its history is:\n${wallet.history.join(' \n ')}`);
     });
 }
 
