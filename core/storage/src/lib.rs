@@ -1391,7 +1391,7 @@ impl StorageProcessor {
                 .execute(self.conn())?;
             if 0 == inserted {
                 error!("Error: could not commit all new events!");
-                return Ok(Err(format!("Could not commit all new events!")));
+                return Ok(Err("Could not commit all new events!".to_string()));
             }
         }
         Ok(Ok(()))
@@ -1406,7 +1406,7 @@ impl StorageProcessor {
             .execute(self.conn())?;
         if 0 == inserted {
             error!("Error: could not save last watched eth block number!");
-            return Ok(Err(format!("Could not commit all new events!")));
+            return Ok(Err("Could not commit all new events!".to_string()));
         }
         Ok(Ok(()))
     }
@@ -1418,7 +1418,7 @@ impl StorageProcessor {
                 .execute(self.conn())?;
             if 0 == inserted {
                 error!("Error: could not commit all new op blocks!");
-                return Ok(Err(format!("Could not commit all new op blocks!")));
+                return Ok(Err("Could not commit all new op blocks!".to_string()));
             }
         }
         Ok(Ok(()))
@@ -1428,7 +1428,7 @@ impl StorageProcessor {
         let deleted = diesel::delete(events_state::table).execute(self.conn())?;
         if 0 == deleted {
             error!("Error: could not delete block events!");
-            return Ok(Err(format!("Could not delete block events!")));
+            return Ok(Err("Could not delete block events!".to_string()));
         }
         Ok(Ok(()))
     }
@@ -1438,7 +1438,7 @@ impl StorageProcessor {
             diesel::delete(data_restore_last_watched_eth_block::table).execute(self.conn())?;
         if 0 == deleted {
             error!("Error: could not delete last watched eth block number!");
-            return Ok(Err(format!("Could not delete last watched eth block number!")));
+            return Ok(Err("Could not delete last watched eth block number!".to_string()));
         }
         Ok(Ok(()))
     }
@@ -1447,7 +1447,7 @@ impl StorageProcessor {
         let deleted = diesel::delete(franklin_op_blocks::table).execute(self.conn())?;
         if 0 == deleted {
             error!("Error: could not delete franklin op blocks!");
-            return Ok(Err(format!("Could not delete franklin op blocks!")));
+            return Ok(Err("Could not delete franklin op blocks!".to_string()));
         }
         Ok(Ok(()))
     }
