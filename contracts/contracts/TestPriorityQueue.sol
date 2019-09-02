@@ -15,35 +15,18 @@ contract TestPriorityQueue {
     // TODO
     function testAdd10DepositRequests() external view returns (bool) {
         uint beforeCount = priorityQueue.totalRequests;
-        priorityQueue.addDepositRequest(fromAddress, ethereumAddress, token, signature);
-        priorityQueue.addDepositRequest(fromAddress, ethereumAddress, token, signature);
-        priorityQueue.addDepositRequest(fromAddress, ethereumAddress, token, signature);
-        priorityQueue.addDepositRequest(fromAddress, ethereumAddress, token, signature);
-        priorityQueue.addDepositRequest(fromAddress, ethereumAddress, token, signature);
-        priorityQueue.addDepositRequest(fromAddress, ethereumAddress, token, signature);
-        priorityQueue.addDepositRequest(fromAddress, ethereumAddress, token, signature);
-        priorityQueue.addDepositRequest(fromAddress, ethereumAddress, token, signature);
-        priorityQueue.addDepositRequest(fromAddress, ethereumAddress, token, signature);
-        priorityQueue.addDepositRequest(fromAddress, ethereumAddress, token, signature);
+        priorityQueue.addDepositRequest(sender, toAddress, token, amount, signature);
         uint afterCount = priorityQueue.totalRequests;
-        return afterCount - beforeCount == 10;
+        return afterCount - beforeCount == 1;
     }
 
     // TODO
     function testAdd10ExitRequests() external view returns (bool) {
         uint beforeCount = priorityQueue.totalRequests;
-        priorityQueue.addExitRequest(sender, toAddress, token, amount, signature);
-        priorityQueue.addExitRequest(sender, toAddress, token, amount, signature);
-        priorityQueue.addExitRequest(sender, toAddress, token, amount, signature);
-        priorityQueue.addExitRequest(sender, toAddress, token, amount, signature);
-        priorityQueue.addExitRequest(sender, toAddress, token, amount, signature);
-        priorityQueue.addExitRequest(sender, toAddress, token, amount, signature);
-        priorityQueue.addExitRequest(sender, toAddress, token, amount, signature);
-        priorityQueue.addExitRequest(sender, toAddress, token, amount, signature);
-        priorityQueue.addExitRequest(sender, toAddress, token, amount, signature);
-        priorityQueue.addExitRequest(sender, toAddress, token, amount, signature);
+        priorityQueue.addExitRequest(fromAddress, ethereumAddress, token, signature);
         uint afterCount = priorityQueue.totalRequests;
-        r
+        return afterCount - beforeCount == 1;
+    }
 
     // TODO
     function testAllRequestsRemoved() external view returns (bool) {
