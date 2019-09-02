@@ -461,25 +461,31 @@ contract Franklin {
 
         // deposit
         if (opType == 0x01) {
-            // to_account: 3, token: 2, amount: 3, fee: 1, new_pubkey_hash: 20
+            // pubdata identifier: 2, to_account: 3, token: 2, amount: 3, fee: 1, new_pubkey_hash: 20
+
+            bytes memory identifierBytes = new bytes(2);
+            for (uint256 i = 0; i < 2; ++i) {
+                fullAmountBytes[i] = _publicData[opDataPointer + i];
+            }
+            uint16 identifier = bytesToUint16(identifierBytes);
 
             uint16 tokenId = uint16(
-                (uint256(uint8(_publicData[opDataPointer + 3])) << 8) +
-                    uint256(uint8(_publicData[opDataPointer + 4]))
+                (uint256(uint8(_publicData[opDataPointer + 5])) << 8) +
+                    uint256(uint8(_publicData[opDataPointer + 6]))
             );
 
             uint8[3] memory amountPacked;
-            amountPacked[0] = uint8(_publicData[opDataPointer + 5]);
-            amountPacked[1] = uint8(_publicData[opDataPointer + 6]);
-            amountPacked[2] = uint8(_publicData[opDataPointer + 7]);
+            amountPacked[0] = uint8(_publicData[opDataPointer + 7]);
+            amountPacked[1] = uint8(_publicData[opDataPointer + 8]);
+            amountPacked[2] = uint8(_publicData[opDataPointer + 9]);
             uint112 amount = unpackAmount(amountPacked);
 
-            uint8 feePacked = uint8(_publicData[opDataPointer + 8]);
+            uint8 feePacked = uint8(_publicData[opDataPointer + 10]);
             uint112 fee = unpackFee(feePacked);
 
             bytes memory franklin_address_ = new bytes(PUBKEY_HASH_LEN);
             for (uint8 i = 0; i < PUBKEY_HASH_LEN; i++) {
-                franklin_address_[i] = _publicData[opDataPointer + 9 + i];
+                franklin_address_[i] = _publicData[opDataPointer + 11 + i];
             }
             address account = depositFranklinToETH[franklin_address_];
 
@@ -500,6 +506,9 @@ contract Franklin {
                 account,
                 (amount + fee)
             );
+
+            priorityQueue.removeRequest(identifier);
+
             return (5 * 8, 1);
         }
 
@@ -536,26 +545,32 @@ contract Franklin {
 
         // full_exit
         if (opType == 0x06) {
-            // pubdata account: 3, eth_address: 20, token: 2, signature_hash: 20, full_amount: 14
+            // pubdata identifier: 2, account: 3, eth_address: 20, token: 2, signature_hash: 20, full_amount: 14
+
+            bytes memory identifierBytes = new bytes(2);
+            for (uint256 i = 0; i < 2; ++i) {
+                fullAmountBytes[i] = _publicData[opDataPointer + i];
+            }
+            uint16 identifier = bytesToUint16(identifierBytes);
 
             uint16 tokenId = uint16(
-                (uint256(uint8(_publicData[opDataPointer + 23])) << 8) +
-                    uint256(uint8(_publicData[opDataPointer + 24]))
+                (uint256(uint8(_publicData[opDataPointer + 25])) << 8) +
+                    uint256(uint8(_publicData[opDataPointer + 26]))
             );
 
             bytes memory ethAddress = new bytes(20);
             for (uint256 i = 0; i < 20; ++i) {
-                ethAddress[i] = _publicData[opDataPointer + 3 + i];
+                ethAddress[i] = _publicData[opDataPointer + 5 + i];
             }
 
             bytes memory signatureHash = new bytes(20);
             for (uint256 i = 0; i < 20; ++i) {
-                signatureHash[i] = _publicData[opDataPointer + 25 + i];
+                signatureHash[i] = _publicData[opDataPointer + 27 + i];
             }
 
             bytes memory fullAmountBytes = new bytes(14);
             for (uint256 i = 0; i < 14; ++i) {
-                fullAmountBytes[i] = _publicData[opDataPointer + 45 + i];
+                fullAmountBytes[i] = _publicData[opDataPointer + 27 + i];
             }
             uint112 fullAmount = bytesToUint112(fullAmountBytes);
 
@@ -567,6 +582,9 @@ contract Franklin {
                 bytesToAddress(ethAddress),
                 fullAmount
             );
+
+            priorityQueue.removeRequest(identifier);
+
             return (7 * 8, 1);
         }
 
@@ -747,4 +765,20 @@ contract Franklin {
 
         return tempUint;
     }
+
+    function bytesToUint16(bytes memory _bytes)
+        internal
+        pure
+        returns (uint16) 
+    {
+        require(_bytes.length >= 2);
+        uint16 tempUint;
+
+        assembly {
+            tempUint := mload(add(add(_bytes, 0x2), 0))
+        }
+
+        return tempUint;
+    }
+
 }
