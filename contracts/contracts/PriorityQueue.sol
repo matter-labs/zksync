@@ -17,8 +17,8 @@ contract PriorityQueue {
     /// Params:
     /// - identifier - request unique identifier
     /// - opType - operation type
-    /// - address1 - account #1
-    /// - address2 - account #2
+    /// - franklinAccountAddress - Franklin address
+    /// - ethAddress - Ethereum address
     /// - token - selected token
     /// - amount - the amount of selected token
     /// - signatureHash - the user signature hash
@@ -26,8 +26,8 @@ contract PriorityQueue {
     event NewRequest(
         uint indexed identifier,
         uint8 indexed opType,
-        address address1,
-        address address2,
+        bytes franklinAccountAddress,
+        address ethAddress,
         uint16 token,
         uint112 amount,
         bytes20 signatureHash,
@@ -71,15 +71,15 @@ contract PriorityQueue {
     /// Add request external function
     /// Params:
     /// - opType - operation type
-    /// - address1 - account #1
-    /// - address2 - account #2
+    /// - franklinAccountAddress - Franklin address
+    /// - ethAddress - Ethereum address
     /// - token - the selected token
     /// - amount - the amount of selected token
     /// - signatureHash - the user signature hash
     function addRequest(
         uint8 opType,
-        address address1,
-        address address2,
+        bytes calldata franklinAccountAddress,
+        address ethAddress,
         uint16 token,
         uint112 amount,
         bytes20 signatureHash
@@ -96,8 +96,8 @@ contract PriorityQueue {
         emit NewRequest(
             identifier,
             opType,
-            address1,
-            address2,
+            franklinAccountAddress,
+            addethAddressress2,
             token,
             amount,
             signatureHash,

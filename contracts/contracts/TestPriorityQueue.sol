@@ -14,8 +14,8 @@ contract TestPriorityQueue {
 
     function testAddDepositRequests(
         uint8 opType,
-        address address1,
-        address address2,
+        bytes calldata franklinAccountAddress,
+        address ethAddress,
         uint16 token,
         uint112 amount,
         bytes20 signature
@@ -23,8 +23,8 @@ contract TestPriorityQueue {
         uint beforeCount = priorityQueue.totalRequests;
         priorityQueue.addRequest(
             opType,
-            address1,
-            address2,
+            franklinAccountAddress,
+            ethAddress,
             token,
             amount,
             signature
