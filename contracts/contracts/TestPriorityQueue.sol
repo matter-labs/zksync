@@ -13,26 +13,22 @@ contract TestPriorityQueue {
     }
 
     function testAddDepositRequests(
-        address sender,
-        address toAddress,
+        uint8 opType,
+        address address1,
+        address address2,
         uint16 token,
         uint112 amount,
         bytes20 signature
     ) external view returns (bool) {
         uint beforeCount = priorityQueue.totalRequests;
-        priorityQueue.addDepositRequest(sender, toAddress, token, amount, signature);
-        uint afterCount = priorityQueue.totalRequests;
-        return afterCount - beforeCount == 1;
-    }
-
-    function testAddExitRequests(
-        address fromAddress,
-        address ethereumAddress,
-        uint16 token,
-        bytes20 signature
-    ) external view returns (bool) {
-        uint beforeCount = priorityQueue.totalRequests;
-        priorityQueue.addExitRequest(fromAddress, ethereumAddress, token, signature);
+        priorityQueue.addRequest(
+            opType,
+            address1,
+            address2,
+            token,
+            amount,
+            signature
+        );
         uint afterCount = priorityQueue.totalRequests;
         return afterCount - beforeCount == 1;
     }

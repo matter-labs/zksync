@@ -6,7 +6,7 @@ contract PriorityQueue {
     /// Allows to identify (find and delete) the request from mapping
     /// Fields:
     /// - identifier - incremented request identifier
-    /// - expirationBlock - number of Ethereum block when request becomes expired
+    /// - expirationBlock - the number of Ethereum block when request becomes expired
     struct RequestCreds {
         uint identifier;
         uint expirationBlock;
@@ -14,9 +14,23 @@ contract PriorityQueue {
 
     /// New request event
     /// Emitted when a request is placed into mapping
+    /// Params:
+    /// - identifier - request unique identifier
+    /// - opType - operation type
+    /// - address1 - account #1
+    /// - address2 - account #2
+    /// - token - selected token
+    /// - amount - the amount of selected token
+    /// - signatureHash - the user signature hash
+    /// - expirationBlock - the number of Ethereum block when request becomes expired
     event NewRequest(
         uint indexed identifier,
-        bytes pubData,
+        uint8 indexed opType,
+        address address1,
+        address address2,
+        uint16 token,
+        uint112 amount,
+        bytes20 signatureHash,
         uint indexed expirationBlock
     );
 
@@ -56,9 +70,19 @@ contract PriorityQueue {
 
     /// Add request external function
     /// Params:
-    /// - pubData - public data (payload) of this request
+    /// - opType - operation type
+    /// - address1 - account #1
+    /// - address2 - account #2
+    /// - token - the selected token
+    /// - amount - the amount of selected token
+    /// - signatureHash - the user signature hash
     function addRequest(
-        bytes calldata pubData
+        uint8 opType,
+        address address1,
+        address address2,
+        uint16 token,
+        uint112 amount,
+        bytes20 signatureHash
     ) external {
         uint identifier = counter;
         uint expirationBlock = block.number+250;
@@ -71,7 +95,12 @@ contract PriorityQueue {
         counter++;
         emit NewRequest(
             identifier,
-            pubData,
+            opType,
+            address1,
+            address2,
+            token,
+            amount,
+            signatureHash,
             expirationBlock
         );
     }
