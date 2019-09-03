@@ -669,6 +669,7 @@ contract Franklin {
     // Exodus mode
 
     function triggerExodus() internal {
+        // TODO: unlock locked deposits
         exodusMode = true;
     }
 
