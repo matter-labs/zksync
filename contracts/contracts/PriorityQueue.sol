@@ -47,7 +47,7 @@ contract PriorityQueue {
     }
 
     /// Changes expiration delta. Only by onwner
-    function changeFranlkinContractAddress(uint _expiration_delta) public {
+    function changeExpirationDelta(uint _expiration_delta) public {
         requireOwner();
         expiration_delta = _expiration_delta;
     }
