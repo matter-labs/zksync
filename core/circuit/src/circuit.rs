@@ -135,7 +135,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             tx_type: zero_circuit_element,
         };
         for (i, operation) in self.operations.iter().enumerate() {
-            println!("\n operation number {} processing started \n", i);
+            println!("operation number {} processing started \n", i);
             let cs = &mut cs.namespace(|| format!("chunk number {}", i));
 
             let (next_chunk, chunk_data) = self.verify_correct_chunking(
@@ -629,12 +629,17 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             s: signature_s,
             pk: sender_pk,
         };
-        let mut temp_bits = op_data.first_sig_msg.get_bits_le();
-        temp_bits.extend(op_data.second_sig_msg.get_bits_le());
+
+        let serialized_sig_preimage_bits = {
+            let mut temp_bits = op_data.first_sig_msg.get_bits_le();
+            temp_bits.extend(op_data.second_sig_msg.get_bits_le());
+            temp_bits
+        };
+
         let sig_msg = pedersen_hash::pedersen_hash(
             cs.namespace(|| "sig_msg"),
             pedersen_hash::Personalization::NoteCommitment,
-            &temp_bits,
+            &serialized_sig_preimage_bits,
             self.params,
         )?
         .get_x()
@@ -815,25 +820,25 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         // construct signature message
 
-        let mut sig_bits = vec![];
+        let mut serialized_tx_bits = vec![];
 
-        sig_bits.extend(chunk_data.tx_type.get_bits_be());
-        sig_bits.extend(cur.account.pub_key_hash.get_bits_be());
-        sig_bits.extend(op_data.ethereum_key.get_bits_be());
+        serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits.extend(cur.account.pub_key_hash.get_bits_be());
+        serialized_tx_bits.extend(op_data.ethereum_key.get_bits_be());
         let mut token_bits = cur.token.get_bits_le().clone();
         token_bits.resize(
             franklin_constants::TOKEN_EXT_BIT_WIDTH,
             Boolean::constant(false),
         );
         token_bits.reverse();
-        sig_bits.extend(token_bits);
-        sig_bits.extend(op_data.amount_packed.get_bits_be());
-        sig_bits.extend(op_data.fee_packed.get_bits_be());
-        sig_bits.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits.extend(token_bits);
+        serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
 
-        sig_bits.resize(E::Fr::CAPACITY as usize * 2, Boolean::constant(false));
+        serialized_tx_bits.resize(E::Fr::CAPACITY as usize * 2, Boolean::constant(false));
         let (first_sig_part_bits, second_sig_part_bits) =
-            sig_bits.split_at(E::Fr::CAPACITY as usize);
+            serialized_tx_bits.split_at(E::Fr::CAPACITY as usize);
         let first_sig_part =
             pack_bits_to_element(cs.namespace(|| "first_sig_part"), &first_sig_part_bits)?;
 
@@ -852,7 +857,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             Expression::from(&op_data.second_sig_msg.get_number()),
         )?);
 
-        let is_signer_valid = CircuitElement::equals(
+        let _is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correect"),
             &op_data.signer_pubkey.get_hash(),
             &cur.account.pub_key_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
@@ -862,7 +867,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         is_sig_valid_flags.push(is_first_sig_part_correct);
         is_sig_valid_flags.push(is_second_sig_part_correct);
-        //        is_sig_valid_flags.push(is_signer_valid);
+        //        is_sig_valid_flags.push(_is_signer_valid);
         let is_sig_valid = multi_and(cs.namespace(|| "is_sig_valid"), &is_sig_valid_flags)?;
         let is_sig_correct = multi_or(
             cs.namespace(|| "sig is valid or not first chunk"),
@@ -1092,23 +1097,23 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         // construct signature message
 
-        let mut sig_bits = vec![];
+        let mut serialized_tx_bits = vec![];
 
-        sig_bits.extend(chunk_data.tx_type.get_bits_be());
-        sig_bits.extend(op_data.new_pubkey_hash.get_bits_be());
+        serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits.extend(op_data.new_pubkey_hash.get_bits_be());
         let mut token_bits = cur.token.get_bits_le().clone();
         token_bits.resize(
             franklin_constants::TOKEN_EXT_BIT_WIDTH,
             Boolean::constant(false),
         );
         token_bits.reverse();
-        sig_bits.extend(token_bits);
-        sig_bits.extend(op_data.amount_packed.get_bits_be());
-        sig_bits.extend(op_data.fee_packed.get_bits_be());
-        sig_bits.extend(cur.account.nonce.get_bits_be());
-        sig_bits.resize(E::Fr::CAPACITY as usize * 2, Boolean::constant(false));
+        serialized_tx_bits.extend(token_bits);
+        serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits.resize(E::Fr::CAPACITY as usize * 2, Boolean::constant(false));
         let (first_sig_part_bits, second_sig_part_bits) =
-            sig_bits.split_at(E::Fr::CAPACITY as usize);
+            serialized_tx_bits.split_at(E::Fr::CAPACITY as usize);
         let first_sig_part =
             pack_bits_to_element(cs.namespace(|| "first_sig_part"), &first_sig_part_bits)?;
 
@@ -1127,7 +1132,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             Expression::from(&op_data.second_sig_msg.get_number()),
         )?);
 
-        let is_signer_valid = CircuitElement::equals(
+        let _is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correect"),
             &op_data.signer_pubkey.get_hash(),
             &op_data.new_pubkey_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
@@ -1137,7 +1142,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         is_sig_valid_flags.push(is_first_sig_part_correct);
         is_sig_valid_flags.push(is_second_sig_part_correct);
-        //        is_sig_valid_flags.push(is_signer_valid);
+        //        is_sig_valid_flags.push(_is_signer_valid);
         let is_sig_valid = multi_and(cs.namespace(|| "is_sig_valid"), &is_sig_valid_flags)?;
         let is_sig_correct = multi_or(
             cs.namespace(|| "sig is valid or not first chunk"),
@@ -1238,15 +1243,15 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         // construct signature message
 
-        let mut sig_bits = vec![];
+        let mut serialized_tx_bits = vec![];
 
-        sig_bits.extend(chunk_data.tx_type.get_bits_be());
-        sig_bits.extend(cur.account.pub_key_hash.get_bits_be());
-        sig_bits.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits.extend(cur.account.pub_key_hash.get_bits_be());
+        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
 
-        sig_bits.resize(E::Fr::CAPACITY as usize * 2, Boolean::constant(false));
+        serialized_tx_bits.resize(E::Fr::CAPACITY as usize * 2, Boolean::constant(false));
         let (first_sig_part_bits, second_sig_part_bits) =
-            sig_bits.split_at(E::Fr::CAPACITY as usize);
+            serialized_tx_bits.split_at(E::Fr::CAPACITY as usize);
         let first_sig_part =
             pack_bits_to_element(cs.namespace(|| "first_sig_part"), &first_sig_part_bits)?;
 
@@ -1265,7 +1270,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             Expression::from(&op_data.second_sig_msg.get_number()),
         )?);
 
-        let is_signer_valid = CircuitElement::equals(
+        let _is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correect"),
             &op_data.signer_pubkey.get_hash(),
             &cur.account.pub_key_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
@@ -1275,7 +1280,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         is_sig_valid_flags.push(is_first_sig_part_correct);
         is_sig_valid_flags.push(is_second_sig_part_correct);
-        //        is_sig_valid_flags.push(is_signer_valid);
+        //        is_sig_valid_flags.push(_is_signer_valid);
         let is_sig_valid = multi_and(cs.namespace(|| "is_sig_valid"), &is_sig_valid_flags)?;
 
         is_valid_flags.push(is_sig_valid);
@@ -1421,28 +1426,28 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         // construct signature message
 
-        let mut sig_bits = vec![];
+        let mut serialized_tx_bits = vec![];
         let tx_code = CircuitElement::from_fe_strict(
             cs.namespace(|| "5_ce"),
             || Ok(E::Fr::from_str("5").unwrap()),
             8,
         )?; //we use here transfer tx_code=5 to allow user sign message without knowing whether it is transfer_to_new or transfer
-        sig_bits.extend(tx_code.get_bits_be());
-        sig_bits.extend(lhs.account.pub_key_hash.get_bits_be());
-        sig_bits.extend(op_data.new_pubkey_hash.get_bits_be());
+        serialized_tx_bits.extend(tx_code.get_bits_be());
+        serialized_tx_bits.extend(lhs.account.pub_key_hash.get_bits_be());
+        serialized_tx_bits.extend(op_data.new_pubkey_hash.get_bits_be());
         let mut token_bits = cur.token.get_bits_le().clone(); //TODO: make util to get this token bits
         token_bits.resize(
             franklin_constants::TOKEN_EXT_BIT_WIDTH,
             Boolean::constant(false),
         );
         token_bits.reverse();
-        sig_bits.extend(token_bits);
-        sig_bits.extend(op_data.amount_packed.get_bits_be());
-        sig_bits.extend(op_data.fee_packed.get_bits_be());
-        sig_bits.extend(cur.account.nonce.get_bits_be());
-        sig_bits.resize(E::Fr::CAPACITY as usize * 2, Boolean::constant(false));
+        serialized_tx_bits.extend(token_bits);
+        serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits.resize(E::Fr::CAPACITY as usize * 2, Boolean::constant(false));
         let (first_sig_part_bits, second_sig_part_bits) =
-            sig_bits.split_at(E::Fr::CAPACITY as usize);
+            serialized_tx_bits.split_at(E::Fr::CAPACITY as usize);
         let first_sig_part =
             pack_bits_to_element(cs.namespace(|| "first_sig_part"), &first_sig_part_bits)?;
         let second_sig_part =
@@ -1460,7 +1465,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             Expression::from(&op_data.second_sig_msg.get_number()),
         )?);
 
-        let is_signer_valid = CircuitElement::equals(
+        let _is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correect"),
             &op_data.signer_pubkey.get_hash(),
             &lhs.account.pub_key_hash,
@@ -1470,7 +1475,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         is_sig_valid_flags.push(is_first_sig_part_correct);
         is_sig_valid_flags.push(is_second_sig_part_correct);
-        //        is_sig_valid_flags.push(is_signer_valid);
+        //        is_sig_valid_flags.push(_is_signer_valid);
         let is_sig_valid = multi_and(cs.namespace(|| "is_sig_valid"), &is_sig_valid_flags)?;
         let is_sig_correct = multi_or(
             cs.namespace(|| "sig is valid or not first chunk"),
@@ -1635,24 +1640,24 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         // construct signature message
 
-        let mut sig_bits = vec![];
+        let mut serialized_tx_bits = vec![];
 
-        sig_bits.extend(chunk_data.tx_type.get_bits_be());
-        sig_bits.extend(lhs.account.pub_key_hash.get_bits_be());
-        sig_bits.extend(rhs.account.pub_key_hash.get_bits_be());
+        serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits.extend(lhs.account.pub_key_hash.get_bits_be());
+        serialized_tx_bits.extend(rhs.account.pub_key_hash.get_bits_be());
         let mut token_bits = cur.token.get_bits_le().clone(); //TODO: make util to get this token bits
         token_bits.resize(
             franklin_constants::TOKEN_EXT_BIT_WIDTH,
             Boolean::constant(false),
         );
         token_bits.reverse();
-        sig_bits.extend(token_bits);
-        sig_bits.extend(op_data.amount_packed.get_bits_be());
-        sig_bits.extend(op_data.fee_packed.get_bits_be());
-        sig_bits.extend(cur.account.nonce.get_bits_be());
-        sig_bits.resize(E::Fr::CAPACITY as usize * 2, Boolean::constant(false));
+        serialized_tx_bits.extend(token_bits);
+        serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
+        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+        serialized_tx_bits.resize(E::Fr::CAPACITY as usize * 2, Boolean::constant(false));
         let (first_sig_part_bits, second_sig_part_bits) =
-            sig_bits.split_at(E::Fr::CAPACITY as usize);
+            serialized_tx_bits.split_at(E::Fr::CAPACITY as usize);
         let first_sig_part =
             pack_bits_to_element(cs.namespace(|| "first_sig_part"), &first_sig_part_bits)?;
 
@@ -1671,7 +1676,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             Expression::from(&op_data.second_sig_msg.get_number()),
         )?);
 
-        let is_signer_valid = CircuitElement::equals(
+        let _is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correect"),
             &op_data.signer_pubkey.get_hash(),
             &lhs.account.pub_key_hash,
@@ -1681,7 +1686,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         is_sig_valid_flags.push(is_first_sig_part_correct);
         is_sig_valid_flags.push(is_second_sig_part_correct);
-        //        is_sig_valid_flags.push(is_signer_valid);
+        //        is_sig_valid_flags.push(_is_signer_valid);
         let is_sig_valid = multi_and(cs.namespace(|| "is_sig_valid"), &is_sig_valid_flags)?;
         let is_sig_correct = multi_or(
             cs.namespace(|| "sig is valid or not first chunk"),
