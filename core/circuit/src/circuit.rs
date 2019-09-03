@@ -1553,7 +1553,6 @@ fn allocate_merkle_root<E: JubjubEngine, CS: ConstraintSystem<E>>(
 ) -> Result<AllocatedNum<E>, SynthesisError> {
     // only first bits of index are considered valuable
     assert!(index.len() > audit_path.len());
-    let index = index.clone();
     let index = &index[0..audit_path.len()];
 
     let account_leaf_hash = pedersen_hash::pedersen_hash(
