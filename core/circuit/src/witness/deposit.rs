@@ -83,7 +83,7 @@ impl<E: JubjubEngine> DepositWitness<E> {
         append_be_fixed_width(
             &mut sig_bits,
             &self.before.token.unwrap(),
-            franklin_constants::TOKEN_EXT_BIT_WIDTH,
+            franklin_constants::TOKEN_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
