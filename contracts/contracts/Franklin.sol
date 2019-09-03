@@ -260,7 +260,7 @@ contract Franklin {
     // - _pubData - request data
     function addPriorityRequest(uint _opType, bytes calldata _pubData) internal {
         uint expirationBlock = block.number + EXPECT_VERIFICATION_IN;
-        priorityRequestsParams[totalPriorityRequests] = PriorityRequestParams({
+        priorityRequestsParams[firstPriorityRequestId+totalPriorityRequests] = PriorityRequestParams({
             opType: _opType,
             expirationBlock: expirationBlock
         });
