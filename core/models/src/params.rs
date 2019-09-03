@@ -1,15 +1,15 @@
 use crate::node::TokenId;
 
 /// Account tree depth
-pub const TX_TYPE_BIT_WIDTH: usize = 8;
-
-/// Account tree depth
-pub const ACCOUNT_TREE_DEPTH: usize = 24;
-//pub const ACCOUNT_TREE_DEPTH: usize = 4;
+pub const ACCOUNT_TREE_DEPTH: usize = 5;
+pub const ACCOUNT_ID_BIT_WIDTH: usize = 24;
 
 /// Balance tree depth
-pub const BALANCE_TREE_DEPTH: usize = 10;
-//pub const BALANCE_TREE_DEPTH: usize = 4;
+pub const BALANCE_TREE_DEPTH: usize = 5;
+pub const TOKEN_BIT_WIDTH: usize = 16;
+
+/// Account tree depth
+pub const TX_TYPE_BIT_WIDTH: usize = 8;
 
 /// Account subtree hash width
 pub const SUBTREE_HASH_WIDTH: usize = 254; //seems to be equal to Bn256::NUM_BITS could be replaced
@@ -21,7 +21,6 @@ pub const NEW_PUBKEY_HASH_WIDTH: usize = FR_ADDRESS_LEN * 8;
 /// Nonce bit width
 pub const NONCE_BIT_WIDTH: usize = 32;
 //
-pub const TOKEN_EXT_BIT_WIDTH: usize = 16;
 //
 pub const CHUNK_BIT_WIDTH: usize = 64;
 

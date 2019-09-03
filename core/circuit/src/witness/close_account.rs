@@ -33,7 +33,7 @@ impl<E: JubjubEngine> CloseAccountWitness<E> {
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.before.address.unwrap(),
-            franklin_constants::ACCOUNT_TREE_DEPTH,
+            franklin_constants::ACCOUNT_ID_BIT_WIDTH,
         );
 
         pubdata_bits.resize(8 * 8, false);
