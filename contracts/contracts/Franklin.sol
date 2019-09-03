@@ -16,8 +16,6 @@ contract Franklin {
     // must fit into uint112
     uint256 constant MAX_VALUE = 2 ** 112 - 1;
     // ETH blocks
-    uint256 constant LOCK_DEPOSITS_FOR = 8 * 60 * 100;
-    // ETH blocks
     uint256 constant EXPECT_VERIFICATION_IN = 8 * 60 * 100;
     // To make sure that all reverted blocks can be copied under block gas limit!
     uint256 constant MAX_UNVERIFIED_BLOCKS = 4 * 60 * 100;
@@ -40,7 +38,6 @@ contract Franklin {
         address indexed owner,
         uint32 tokenId,
         uint112 amount,
-        uint32 lockedUntilBlock,
         bytes franklinAddress
     );
     event OnchainWithdrawal(
@@ -78,10 +75,10 @@ contract Franklin {
     // from the root-chain balances only (see docs)
     struct Balance {
         uint112 balance;
+        // Some part of balance will be locked on deposit in order to let validators deposit some of it into Franklin
         // Balance can be locked in order to let validators deposit some of it into Franklin
-        // Locked balances becomes free at ETH blockNumber = lockedUntilBlock
-        // To re-lock, users can make a deposit with zero amount
-        uint32 lockedUntilBlock;
+        // Locked balances becomes free when block with deposit commits or when exodus mode is activated
+        uint112 lockedBalance;
     }
 
     // List of root-chain balances (per owner and tokenId)
@@ -293,14 +290,12 @@ contract Franklin {
     ) internal {
         requireActive();
         require(
-            uint256(_amount) + balances[msg.sender][_token.id].balance <
+            uint256(_amount) + balances[msg.sender][_token.id].lockedBalance <
                 MAX_VALUE,
             "overflow"
         );
 
-        balances[msg.sender][_token.id].balance += _amount;
-        uint32 lockedUntilBlock = uint32(block.number + LOCK_DEPOSITS_FOR);
-        balances[msg.sender][_token.id].lockedUntilBlock = lockedUntilBlock;
+        balances[msg.sender][_token.id].lockedBalance += _amount;
 
         if (depositWasDone[msg.sender]) {
             require(
@@ -315,24 +310,37 @@ contract Franklin {
         emit OnchainDeposit(
             msg.sender,
             _token.id,
-            balances[msg.sender][_token.id].balance,
-            lockedUntilBlock,
+            _amount,
             _franklin_addr
         );
+
+        // TODO: - collect bytes data
+        priorityQueue.addRequest(pubData);
+    }
+
+    function registerFullExit(
+        bytes memory _franklin_addr,
+        address _eth_addr,
+        ValidatedTokenId memory _token,
+        bytes20 signature
+    ) internal {
+        requireActive();
+        // TODO: - collect bytes data
+        priorityQueue.addRequest(pubData);
     }
 
     function registerWithdrawal(ValidatedTokenId memory _token, uint112 _amount) internal {
         requireActive();
         require(
-            block.number >= balances[msg.sender][_token.id].lockedUntilBlock,
-            "balance locked"
-        );
-        require(
             balances[msg.sender][_token.id].balance >= _amount,
             "insufficient balance"
         );
         balances[msg.sender][_token.id].balance -= _amount;
-        emit OnchainWithdrawal(msg.sender, _token.id, _amount);
+        emit OnchainWithdrawal(
+            msg.sender,
+            _token.id,
+            _amount
+        );
     }
 
     // Block committment
@@ -355,7 +363,10 @@ contract Franklin {
             "too many committed"
         );
 
-        // TODO: check exit queue: it will require certains records to appear on `_publicData`
+        // Check for Exodus mode
+        if (priorityQueue.isExodusActivated(block.number)) {
+            triggerExodus();
+        }
 
         // TODO: make efficient padding here
 
@@ -384,11 +395,6 @@ contract Franklin {
 
         totalBlocksCommitted += 1;
         emit BlockCommitted(_blockNumber);
-
-        // Check for Exodus mode
-        if (priorityQueue.isExodusActivated(block.number)) {
-            triggerExodus();
-        }
     }
 
     function createBlockCommitment(
@@ -461,54 +467,41 @@ contract Franklin {
 
         // deposit
         if (opType == 0x01) {
-            // pubdata identifier: 2, to_account: 3, token: 2, amount: 3, fee: 1, new_pubkey_hash: 20
-
-            bytes memory identifierBytes = new bytes(2);
-            for (uint256 i = 0; i < 2; ++i) {
-                fullAmountBytes[i] = _publicData[opDataPointer + i];
-            }
-            uint16 identifier = bytesToUint16(identifierBytes);
+            // to_account: 3, token: 2, amount: 3, fee: 1, new_pubkey_hash: 20
 
             uint16 tokenId = uint16(
-                (uint256(uint8(_publicData[opDataPointer + 5])) << 8) +
-                    uint256(uint8(_publicData[opDataPointer + 6]))
+                (uint256(uint8(_publicData[opDataPointer + 3])) << 8) +
+                    uint256(uint8(_publicData[opDataPointer + 4]))
             );
 
             uint8[3] memory amountPacked;
-            amountPacked[0] = uint8(_publicData[opDataPointer + 7]);
-            amountPacked[1] = uint8(_publicData[opDataPointer + 8]);
-            amountPacked[2] = uint8(_publicData[opDataPointer + 9]);
+            amountPacked[0] = uint8(_publicData[opDataPointer + 5]);
+            amountPacked[1] = uint8(_publicData[opDataPointer + 6]);
+            amountPacked[2] = uint8(_publicData[opDataPointer + 7]);
             uint112 amount = unpackAmount(amountPacked);
 
-            uint8 feePacked = uint8(_publicData[opDataPointer + 10]);
+            uint8 feePacked = uint8(_publicData[opDataPointer + 8]);
             uint112 fee = unpackFee(feePacked);
 
             bytes memory franklin_address_ = new bytes(PUBKEY_HASH_LEN);
             for (uint8 i = 0; i < PUBKEY_HASH_LEN; i++) {
-                franklin_address_[i] = _publicData[opDataPointer + 11 + i];
+                franklin_address_[i] = _publicData[opDataPointer + 9 + i];
             }
             address account = depositFranklinToETH[franklin_address_];
 
             requireValidTokenId(tokenId);
             require(
-                block.number < balances[account][tokenId].lockedUntilBlock,
-                "balance must be locked"
-            );
-            require(
-                balances[account][tokenId].balance >= (amount + fee),
+                balances[account][tokenId].lockedBalance >= (amount + fee),
                 "balance insufficient"
             );
 
-            balances[account][tokenId].balance -= (amount + fee);
+            balances[account][tokenId].lockedBalance -= (amount + fee);
             onchainOps[currentOnchainOp] = OnchainOp(
                 OnchainOpType.Deposit,
                 tokenId,
                 account,
                 (amount + fee)
             );
-
-            priorityQueue.removeRequest(identifier);
-
             return (5 * 8, 1);
         }
 
@@ -545,32 +538,26 @@ contract Franklin {
 
         // full_exit
         if (opType == 0x06) {
-            // pubdata identifier: 2, account: 3, eth_address: 20, token: 2, signature_hash: 20, full_amount: 14
-
-            bytes memory identifierBytes = new bytes(2);
-            for (uint256 i = 0; i < 2; ++i) {
-                fullAmountBytes[i] = _publicData[opDataPointer + i];
-            }
-            uint16 identifier = bytesToUint16(identifierBytes);
+            // pubdata account: 3, eth_address: 20, token: 2, signature_hash: 20, full_amount: 14
 
             uint16 tokenId = uint16(
-                (uint256(uint8(_publicData[opDataPointer + 25])) << 8) +
-                    uint256(uint8(_publicData[opDataPointer + 26]))
+                (uint256(uint8(_publicData[opDataPointer + 23])) << 8) +
+                    uint256(uint8(_publicData[opDataPointer + 24]))
             );
 
             bytes memory ethAddress = new bytes(20);
             for (uint256 i = 0; i < 20; ++i) {
-                ethAddress[i] = _publicData[opDataPointer + 5 + i];
+                ethAddress[i] = _publicData[opDataPointer + 3 + i];
             }
 
             bytes memory signatureHash = new bytes(20);
             for (uint256 i = 0; i < 20; ++i) {
-                signatureHash[i] = _publicData[opDataPointer + 27 + i];
+                signatureHash[i] = _publicData[opDataPointer + 25 + i];
             }
 
             bytes memory fullAmountBytes = new bytes(14);
             for (uint256 i = 0; i < 14; ++i) {
-                fullAmountBytes[i] = _publicData[opDataPointer + 27 + i];
+                fullAmountBytes[i] = _publicData[opDataPointer + 45 + i];
             }
             uint112 fullAmount = bytesToUint112(fullAmountBytes);
 
@@ -582,9 +569,6 @@ contract Franklin {
                 bytesToAddress(ethAddress),
                 fullAmount
             );
-
-            priorityQueue.removeRequest(identifier);
-
             return (7 * 8, 1);
         }
 
@@ -756,26 +740,11 @@ contract Franklin {
         pure
         returns (uint112)
     {
-        require(_bytes.length >= 14);
+        require(_bytes.length >= 14, "wrong bytes length");
         uint112 tempUint;
 
         assembly {
             tempUint := mload(add(add(_bytes, 0x0e), 0))
-        }
-
-        return tempUint;
-    }
-
-    function bytesToUint16(bytes memory _bytes)
-        internal
-        pure
-        returns (uint16) 
-    {
-        require(_bytes.length >= 2);
-        uint16 tempUint;
-
-        assembly {
-            tempUint := mload(add(add(_bytes, 0x2), 0))
         }
 
         return tempUint;
