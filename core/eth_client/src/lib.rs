@@ -25,9 +25,9 @@ pub struct ETHClient<T: Transport> {
     pub web3: Web3<T>,
 }
 
-pub struct CallResult {
+pub struct SignedCallResult {
+    pub raw_tx: Vec<u8>,
     pub gas_price: U256,
-    pub hash: H256,
     pub nonce: U256,
 }
 
@@ -78,12 +78,13 @@ impl<T: Transport> ETHClient<T> {
             .transaction_count(self.sender_account, Some(BlockNumber::Pending))
     }
 
-    pub fn call<P: Tokenize>(
+    /// Fills in gas/nonce if not supplied inside options.
+    pub fn sign_call_tx<P: Tokenize>(
         &mut self,
         func: &str,
         params: P,
         options: Options,
-    ) -> impl Future<Item = CallResult, Error = Error> {
+    ) -> Result<SignedCallResult, failure::Error> {
         let f = self
             .contract
             .function(func)
@@ -93,19 +94,19 @@ impl<T: Transport> ETHClient<T> {
             .expect("failed to encode parameters");
 
         // fetch current gas_price
-        let mut gas_price = options.gas_price.unwrap_or_else(|| {
-            let network_gas_price = self.web3.eth().gas_price().wait().expect("get gas error");
-            network_gas_price * U256::from(self.gas_price_factor)
-        });
-        let min_gas_price = U256::from(self.min_gas_price) * U256::from_str("3B9ACA00").unwrap(); // gwei x 10^9
+        let mut gas_price = match options.gas_price {
+            Some(gas_price) => gas_price,
+            None => {
+                let mut network_gas_price = self.web3.eth().gas_price().wait()?;
+                network_gas_price *= U256::from(self.gas_price_factor);
+                network_gas_price
+            }
+        };
 
-        let nonce = options
-            .nonce
-            .unwrap_or_else(|| self.pending_nonce().wait().expect("get nonce error"));
-
-        if gas_price < min_gas_price {
-            gas_price = min_gas_price;
-        }
+        let nonce = match options.nonce {
+            Some(nonce) => nonce,
+            None => self.pending_nonce().wait()?,
+        };
 
         // form and sign tx
         let tx = signer::RawTransaction {
@@ -118,14 +119,16 @@ impl<T: Transport> ETHClient<T> {
             data,
         };
 
-        let signed = tx.sign(&self.private_key);
-        self.web3
-            .eth()
-            .send_raw_transaction(Bytes(signed))
-            .map(move |hash| CallResult {
-                nonce,
-                gas_price,
-                hash,
-            })
+        let signed_tx = tx.sign(&self.private_key);
+
+        Ok(SignedCallResult {
+            raw_tx: signed_tx,
+            gas_price,
+            nonce,
+        })
+    }
+
+    pub fn send_raw_tx(&mut self, tx: Vec<u8>) -> Result<H256, failure::Error> {
+        Ok(self.web3.eth().send_raw_transaction(Bytes(tx)).wait()?)
     }
 }

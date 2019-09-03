@@ -619,6 +619,7 @@ version = "0.1.0"
 dependencies = [
  "ethabi 8.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "ethereum-tx-sign 0.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "franklinmodels 0.0.1",
  "futures 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",

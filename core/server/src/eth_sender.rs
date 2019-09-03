@@ -4,7 +4,7 @@
 //!
 
 use bigdecimal::BigDecimal;
-use eth_client::{CallResult, ETHClient};
+use eth_client::{CallResult, ETHClient, SignedCallResult};
 use failure::format_err;
 use ff::{PrimeField, PrimeFieldRepr};
 use futures::Future;
@@ -25,16 +25,21 @@ const EXPECTED_WAIT_TIME_BLOCKS: u64 = 10;
 const MAX_UNCONFIRMED_TX: usize = 5;
 const TX_POLL_PERIOD: Duration = Duration::from_secs(5);
 
-struct UnconfirmedOperation {
-    hash: H256,
-    deadline_block: u64,
-    op: Operation,
+enum TxState {
+    Unsent(SignedCallResult),
+    Pending {
+        hash: H256,
+        signed_tx: SignedCallResult,
+        deadline_block: u64,
+    },
+    /// Success or execution code
+    Executed(Result<(), i64>),
 }
 
 struct ETHSender<T: Transport> {
     eth_client: ETHClient<T>,
     unsent_ops: VecDeque<Operation>,
-    unconfirmed_ops: VecDeque<UnconfirmedOperation>,
+    unconfirmed_ops: VecDeque<(Operation, Vec<TxState>)>,
     db_pool: ConnectionPool,
 }
 
@@ -104,37 +109,22 @@ impl<T: Transport> ETHSender<T> {
                     continue;
                 }
             };
+
             while self.unconfirmed_ops.len() < MAX_UNCONFIRMED_TX && !self.unsent_ops.is_empty() {
                 if let Some(op) = self.unsent_ops.pop_front() {
-                    match self.send_operation(&op) {
-                        Ok(res) => {
-                            info!(
-                                "Operation {} sent, tx_hash: {:#x}, gas_price: {}, nonce: {}",
-                                op.id.unwrap(),
-                                res.hash,
-                                res.gas_price,
-                                res.nonce
-                            );
-                            storage
-                                .save_operation_eth_tx(
-                                    op.id.unwrap(),
-                                    res.hash,
-                                    res.nonce.as_u32(),
-                                    BigDecimal::from_u128(res.gas_price.as_u128()).unwrap(),
-                                )
-                                .expect("db fail");
-                            self.unconfirmed_ops.push_back(UnconfirmedOperation {
-                                hash: res.hash,
-                                op,
-                                deadline_block: block_number + EXPECTED_WAIT_TIME_BLOCKS,
-                            });
-                        }
+                    let signed_tx = match self.sign_operation_tx(&op) {
+                        Ok(singed_tx) => signed_tx,
                         Err(e) => {
-                            error!("Failed to send eth tx: {}", e);
+                            error!("Failed to form signed ETH transaction: {}", e);
                             self.unsent_ops.push_front(op);
-                            break;
+                            continue;
                         }
-                    }
+                    };
+
+                    // TODO: storage save signed transaction to db.
+
+                    self.unconfirmed_ops
+                        .push_back((op, vec![TxState::Unsent(tx_call_result)]));
                 }
             }
 
@@ -188,7 +178,7 @@ impl<T: Transport> ETHSender<T> {
         }
     }
 
-    fn send_operation(&mut self, op: &Operation) -> Result<CallResult, web3::Error> {
+    fn sign_operation_tx(&mut self, op: &Operation) -> Result<SignedCallResult, failure::Error> {
         match &op.action {
             Action::Commit => {
                 let mut be_bytes = [0u8; 32];
@@ -204,28 +194,24 @@ impl<T: Transport> ETHSender<T> {
                     op.block.get_eth_public_data()
                 );
                 // function commitBlock(uint32 _blockNumber, uint24 _feeAccount, bytes32 _newRoot, bytes calldata _publicData)
-                self.eth_client
-                    .call(
-                        "commitBlock",
-                        (
-                            u64::from(op.block.block_number),
-                            u64::from(op.block.fee_account),
-                            root,
-                            op.block.get_eth_public_data(),
-                        ),
-                        Options::default(),
-                    )
-                    .wait()
+                self.eth_client.sign_call_tx(
+                    "commitBlock",
+                    (
+                        u64::from(op.block.block_number),
+                        u64::from(op.block.fee_account),
+                        root,
+                        op.block.get_eth_public_data(),
+                    ),
+                    Options::default(),
+                )
             }
             Action::Verify { proof } => {
                 // function verifyBlock(uint32 _blockNumber, uint256[8] calldata proof) external {
-                self.eth_client
-                    .call(
-                        "verifyBlock",
-                        (u64::from(op.block.block_number), *proof.clone()),
-                        Options::default(),
-                    )
-                    .wait()
+                self.eth_client.sign_call_tx(
+                    "verifyBlock",
+                    (u64::from(op.block.block_number), *proof.clone()),
+                    Options::default(),
+                )
             }
         }
     }
