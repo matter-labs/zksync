@@ -68,12 +68,12 @@ contract PriorityQueue {
         );
     }
 
-    /// Removes executed requests. Can be used only from Franklin contract
+    /// Removes requests. Can be used only from Franklin contract
     /// Params:
-    /// - count - number of executed requests
-    function executeRequests(uint count) external {
+    /// - count - number of requests to remove
+    function removeRequests(uint count) external {
         requireFranklin();
-        require(totalRequests >= count, "Count of executed requests is higher than their count");
+        require(totalRequests >= count, "Count of removed requests is higher than their count");
 
         for (uint i = 0; i < totalRequests; i++) {
             if (i >= count) {

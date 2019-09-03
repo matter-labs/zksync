@@ -379,6 +379,8 @@ contract Franklin {
         if (priorityQueue.isExodusActivated(block.number)) {
             triggerExodus();
         }
+        
+        // TODO: count ops for priority queue
 
         // TODO: make efficient padding here
 

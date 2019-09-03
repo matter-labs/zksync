@@ -1,6 +1,6 @@
 ## Priority Queue
 
-![PriorityQueue Contract architecture](https://i.imgur.com/fSapuew.png)
+![PriorityQueue Contract architecture](https://i.imgur.com/NSfBEBz.png)
 
 This queue will be implemented in separate contract to ensure that _priority_ operations like _deposits_ and _full_exits_ will be processed in a timely manner and will be included in one of Franklin's blocks (a situation that leads to the need to reverse blocks will not happen), and also, in the case of _full_exit_ transactions, the user can always withdraw funds (censorship-resistance). Its' functionality is divided into 2 parts: **Requests Queue** and **Exodus Mode**.
 
@@ -62,7 +62,7 @@ The _full_exit_ transaction included in the **Franklin block** will contain a `f
 
 ### **Franklin** contract responsibility
 
-Every upcoming block will be scanned for existing priority transactions. Then priority transactions count will be sent to **Priority Queue** function `executeRequests(count)` and if corresponding `expirationBlocks` mapping values will be deleted.
+Every upcoming block will be scanned for existing priority transactions. Then priority transactions count will be sent to **Priority Queue** function `removeRequests(count)` and if corresponding `expirationBlocks` mapping values will be deleted.
 
 ### **Exodus Mode**
 
