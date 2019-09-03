@@ -43,12 +43,12 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.from_before.address.unwrap(),
-            franklin_constants::ACCOUNT_TREE_DEPTH,
+            franklin_constants::ACCOUNT_ID_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.from_before.token.unwrap(),
-            franklin_constants::TOKEN_EXT_BIT_WIDTH,
+            franklin_constants::TOKEN_BIT_WIDTH,
         );
 
         append_be_fixed_width(
@@ -67,7 +67,7 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.to_before.address.unwrap(),
-            franklin_constants::ACCOUNT_TREE_DEPTH,
+            franklin_constants::ACCOUNT_ID_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,

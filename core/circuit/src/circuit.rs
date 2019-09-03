@@ -83,12 +83,14 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 self.pub_data_commitment.grab()
             })?;
         public_data_commitment.inputize(cs.namespace(|| "inputize pub_data"))?;
+
         let validator_address_padded =
             CircuitElement::from_fe_padded(cs.namespace(|| "validator_address"), || {
                 self.validator_address.grab()
             })?;
         let mut validator_address = validator_address_padded.get_bits_le();
-        validator_address.truncate(franklin_constants::ACCOUNT_TREE_DEPTH);
+        validator_address.truncate(franklin_constants::ACCOUNT_ID_BIT_WIDTH);
+
         let mut validator_balances = allocate_audit_path(
             cs.namespace(|| "validator_balances"),
             &self.validator_balances,
@@ -762,15 +764,10 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let mut base_valid_flags = vec![];
         //construct pubdata
         let mut pubdata_bits = vec![];
-        let mut pub_token_bits = cur.token.get_bits_le().clone();
-        pub_token_bits.resize(
-            franklin_constants::TOKEN_EXT_BIT_WIDTH,
-            Boolean::constant(false),
-        );
-        pub_token_bits.reverse();
+
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
         pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
-        pubdata_bits.extend(pub_token_bits); //TOKEN_EXT_BIT_WIDTH=16
+        pubdata_bits.extend(cur.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //AMOUNT_PACKED=24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //FEE_PACKED=8
         pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //ETHEREUM_KEY=160
@@ -956,15 +953,9 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let mut is_valid_flags = vec![];
         //construct pubdata
         let mut pubdata_bits = vec![];
-        let mut pub_token_bits = cur.token.get_bits_le().clone();
-        pub_token_bits.resize(
-            franklin_constants::TOKEN_EXT_BIT_WIDTH,
-            Boolean::constant(false),
-        );
-        pub_token_bits.reverse();
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
         pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
-        pubdata_bits.extend(pub_token_bits); //TOKEN_EXT_BIT_WIDTH=16
+        pubdata_bits.extend(cur.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //AMOUNT_PACKED=24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //FEE_PACKED=8
         pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //NEW_PUBKEY_HASH_WIDTH=216
@@ -1193,15 +1184,9 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         ext_pubdata_chunk: &AllocatedNum<E>,
     ) -> Result<Boolean, SynthesisError> {
         let mut pubdata_bits = vec![];
-        let mut pub_token_bits = lhs.token.get_bits_le().clone();
-        pub_token_bits.resize(
-            franklin_constants::TOKEN_EXT_BIT_WIDTH,
-            Boolean::constant(false),
-        );
-        pub_token_bits.reverse();
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //8
         pubdata_bits.extend(lhs.account_address.get_bits_be()); //24
-        pubdata_bits.extend(pub_token_bits.clone()); //16
+        pubdata_bits.extend(cur.token.get_bits_be()); //16
         pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //24
         pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //160
         pubdata_bits.extend(rhs.account_address.get_bits_be()); //24
@@ -1350,15 +1335,9 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
     ) -> Result<Boolean, SynthesisError> {
         // construct pubdata
         let mut pubdata_bits = vec![];
-        let mut pub_token_bits = lhs.token.get_bits_le().clone();
-        pub_token_bits.resize(
-            franklin_constants::TOKEN_EXT_BIT_WIDTH,
-            Boolean::constant(false),
-        );
-        pub_token_bits.reverse();
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be());
         pubdata_bits.extend(lhs.account_address.get_bits_be());
-        pubdata_bits.extend(pub_token_bits.clone());
+        pubdata_bits.extend(cur.token.get_bits_be());
         pubdata_bits.extend(rhs.account_address.get_bits_be());
         pubdata_bits.extend(op_data.amount_packed.get_bits_be());
         pubdata_bits.extend(op_data.fee_packed.get_bits_be());
@@ -1572,7 +1551,10 @@ fn allocate_merkle_root<E: JubjubEngine, CS: ConstraintSystem<E>>(
     audit_path: &[AllocatedNum<E>],
     params: &E::Params,
 ) -> Result<AllocatedNum<E>, SynthesisError> {
-    assert_eq!(index.len(), audit_path.len());
+    // only first bits of index are considered valuable
+    assert!(index.len() > audit_path.len());
+    let index = index.clone();
+    let index = &index[0..audit_path.len()];
 
     let account_leaf_hash = pedersen_hash::pedersen_hash(
         cs.namespace(|| "account leaf content hash"),
