@@ -152,9 +152,12 @@ struct StoredExecutedTransaction {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct IsTxSuccessfulResponse {
+pub struct TxReceiptResponse {
     tx_hash: Vec<u8>,
-    success: bool
+    block_number: Option<i64>,
+    success: bool,
+    verified: bool,
+    fail_reason: Option<String>,
 }
 
 impl NewExecutedTransaction {
@@ -1117,7 +1120,7 @@ impl StorageProcessor {
         Ok((Some(account_id), verified_state, commited_state))
     }
 
-    pub fn is_tx_successful(&self, hash: &str) -> QueryResult<(Option<IsTxSuccessfulResponse>)> {
+    pub fn is_tx_successful(&self, hash: &str) -> QueryResult<(Option<TxReceiptResponse>)> {
         self.conn().transaction(|| {
             let hash = hex::decode(hash).unwrap();
 
@@ -1126,7 +1129,7 @@ impl StorageProcessor {
                 .first::<StoredExecutedTransaction>(self.conn())
                 .optional()?;
 
-            let is_success = if tx.is_some() {
+            if tx.is_some() {
                 let tx = tx.unwrap();
 
                 let confirm = operations::table 
@@ -1135,15 +1138,22 @@ impl StorageProcessor {
                     .first::<StoredOperation>(self.conn()) 
                     .optional()?;
 
-                confirm.is_some()
+                Ok(Some(TxReceiptResponse {
+                    tx_hash: hash,
+                    block_number: Some(tx.block_number),
+                    success: tx.success,
+                    verified: confirm.is_some(),
+                    fail_reason: tx.fail_reason
+                }))
             } else {
-                false
-            };
-
-            Ok(Some(IsTxSuccessfulResponse {
-                tx_hash: hash,
-                success: is_success
-            }))
+                Ok(Some(TxReceiptResponse {
+                    tx_hash: hash,
+                    block_number: None,
+                    success: false,
+                    verified: false,
+                    fail_reason: Some("not committed yet".to_string())
+                }))
+            }
         })
     }
 

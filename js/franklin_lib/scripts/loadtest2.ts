@@ -137,11 +137,13 @@ class LocalWallet {
 
     private async depositOffchain(token: Token, amount: BigNumber, fee: BigNumber) {
         let res = await this.wallet.depositOffchain(token, amount, fee);
-        console.log('deposit res', res);
         if (res.err) {
             throw new Error(res.err);
         }
-        await this.wallet.waitForTxSuccess(res.hash);
+        let receipt = await this.wallet.txReceipt(res.hash);
+        if (receipt.fail_reason) {
+            throw new Error(receipt.fail_reason);
+        }
     }
 
     async deposit(token: Token, amount: BigNumber, fee: BigNumber) {
@@ -161,11 +163,26 @@ class LocalWallet {
         await this.depositOnchain(token, amount);
         await this.depositOffchain(token, feeless_amount, fee);
     }
+
+    async sendTransaction(wallet2: LocalWallet, token: Token, amount: BigNumberish, fee: BigNumberish) {
+        amount = bigNumberify(amount);
+        fee = bigNumberify(fee);
+        let res = await this.wallet.transfer(wallet2.wallet.address, token, amount, fee);
+        if (res.err) throw new Error(res.err);
+        let receipt = await this.wallet.txReceipt(res.hash);
+        if (receipt.fail_reason) throw new Error(receipt.fail_reason);
+        
+        const zero = bigNumberify(0);
+        const total_amount = amount.add(fee);
+        const negative_amount = zero.sub(total_amount);
+        this.addToComputedFranklinBalance(token, negative_amount);
+        wallet2.addToComputedFranklinBalance(token, amount);
+    }
 }
 
-const INIT_NUM_WALLETS = 1;
-const NEW_WALLET_PROB = 0.00;
-const BATCH_SIZE = 3;
+const INIT_NUM_WALLETS = 3;
+const NEW_WALLET_PROB = 0.05;
+const BATCH_SIZE = 20;
 
 let prando = new Prando();
 let richWallet = null;
@@ -182,12 +199,17 @@ let Utils = {
         return prando.nextArrayItem(commonWallets);
     },
     
-    selectTwoRandomDistinctWallets: function() {
+    selectAnotherRandomWallet: function(wallet) {
         if (commonWallets.length < 2) throw new Error('there is no two wallets.');
-        let w1 = Utils.selectRandomWallet();
         do {
-            var w2 = Utils.selectRandomWallet();
-        } while (w1 === w2);
+            var wallet2 = Utils.selectRandomWallet();
+        } while (wallet === wallet2);
+        return wallet2;
+    },
+
+    selectTwoRandomDistinctWallets: function() {
+        let w1 = Utils.selectRandomWallet();
+        let w2 = Utils.selectAnotherRandomWallet(w1);
         return [w1, w2];
     },
     
@@ -209,10 +231,10 @@ let Actions = {
     'deposit': function(kwargs?) {
         let goroutineId = Utils.getGoroutineId();
         kwargs = kwargs || {};
-        let wallet = kwargs.wallet || Utils.selectRandomWallet();
+        let wallet: LocalWallet = kwargs.wallet || Utils.selectRandomWallet();
         let token  = kwargs.token  || Utils.selectRandomToken();
         let amount = kwargs.amount || Utils.selectRandomAmount(0, 1000);
-        let fee    = kwargs.fee    || Utils.selectRandomAmount(0, 1000);
+        let fee    = kwargs.fee    || Utils.selectRandomAmount(0, 10);
         wallet.pendingActions.push(async () => {
             let message = null;
             try {
@@ -231,6 +253,7 @@ let Actions = {
                     + `, fee: ${fee.toString()}`
                     + `, franklin: ${wallet.franklinCommittedBalance(token.id)}`;
             } catch (err) {
+                wallet.wallet.nonce = null;
                 let err_message = err.message;
                 if (err_message.includes('insufficient funds')) {
                     await wallet.wallet.updateState();
@@ -265,6 +288,7 @@ let Actions = {
                 await richWallet.sendSome(wallet, amount);
                 message = `>>> receive money succeded for wallet ${wallet.wallet.address}`;
             } catch (err) {
+                wallet.wallet.nonce = null;
                 message = `<<< receive money failed for wallet ${wallet.wallet.address} with ${err.message}`;
             } finally {
                 wallet.history.push(message);
@@ -273,15 +297,30 @@ let Actions = {
         });
     },
 
-    // 'transfer': function() {
-    //     let [w1, w2] = Utils.selectTwoRandomDistinctWallets();
-    //     let amount = Utils.selectRandomAmount(1000, 10000);
-    //     let fee = Utils.selectRandomAmount(0, 1000);
-    //     return async () => {
-    //         // console.log('transfer');
-    //         // w1.sendTransaction(w2)
-    //     };
-    // },
+    'transfer': function(kwargs?) {
+        let goroutineId = Utils.getGoroutineId();
+        let token = kwargs.token || Utils.selectRandomToken();
+        let wallet1 = kwargs.wallet1 || Utils.selectRandomWallet();
+        let wallet2 = kwargs.wallet2 || Utils.selectAnotherRandomWallet(wallet1);
+        let amount = kwargs.amount || Utils.selectRandomAmount(1000, 10000);
+        let fee = kwargs.fee = Utils.selectRandomAmount(0, 1000);
+        wallet1.pendingActions.push(async () => {
+            let message = null;
+            try {
+                console.log(`${goroutineId} ### trying transfer`);
+                await wallet1.sendTransaction(wallet2, token, amount, fee);
+                message = `>>> transfer succeded for wallets ${wallet1.wallet.address}, ${wallet2.wallet.address}`;
+            } catch (err) {
+                wallet1.wallet.nonce = null;
+                wallet2.wallet.nonce = null;
+                message = `<<< transfer failed for wallets ${wallet1.wallet.address}, ${wallet2.wallet.address} with ${err.message}`;
+            } finally {
+                wallet1.history.push(message);
+                wallet2.history.push(message);
+                console.log(`${goroutineId} ${message}`);
+            }
+        });
+    },
 }
 
 async function addRandomPendingActionToWallet(kwargs?) {
@@ -304,31 +343,39 @@ async function test() {
 
     commonWallets.forEach(w => w.pendingActions = []);
 
+    commonWallets.forEach(w => console.log(w.wallet.address));
+
+    Actions.receive_money({wallet: commonWallets[0], amount: bigNumberify('10000000000000000000')});
+    // Actions.receive_money({wallet: commonWallets[2], amount: bigNumberify('10000000000000000000')});
+    Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('100000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[2], amount: bigNumberify('100000'), fee: bigNumberify('10')});
+
     // for (let j = 0; j < BATCH_SIZE; j++) {
     //     await addRandomPendingActionToWallet();
     // }
-    let wallet = commonWallets[0];
-    // Actions.receive_money({wallet, amount: bigNumberify('10000000000000000000')});
-    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet, amount: bigNumberify('1000000'), fee: bigNumberify('1000')});
-    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet, token: tokens[1], amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet, amount: bigNumberify('1000'), fee: bigNumberify('10')});
+
+    // Actions.receive_money({wallet: commonWallets[0], amount: bigNumberify('10000000000000000000')});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('100000'), fee: bigNumberify('10')});
+    // Actions.transfer({wallet1: commonWallets[0], wallet2: commonWallets[1]});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000000'), fee: bigNumberify('1000')});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[0], token: tokens[1], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
 
     
     await Promise.all(commonWallets.map(async w => {
@@ -338,7 +385,7 @@ async function test() {
     }));
     
 
-    await sleep(3000);
+    await sleep(6000);
     await Promise.all(commonWallets.map(w => w.wallet.updateState()));
 
     commonWallets.forEach(wallet => {

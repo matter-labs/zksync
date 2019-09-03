@@ -118,9 +118,14 @@ export class Wallet {
         return await this.provider.submitTx(tx);
     }
 
-    async waitForTxSuccess(tx_hash) {
-        while ((await this.provider.txSuccess(tx_hash)).success == false)
+    async txReceipt(tx_hash) {
+        while (true) {
+            let receipt = await this.provider.txSuccess(tx_hash);
+            if (receipt.verified == true) return receipt;
+            if (receipt.fail_reason != null && receipt.fail_reason !== "not committed yet") 
+                return receipt;
             await sleep(1000);
+        }
     }
 
 
