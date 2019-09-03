@@ -2,13 +2,6 @@ pragma solidity ^0.5.8;
 
 library Bytes {
 
-    // Compies uint8 'self' into a new 'bytes memory'.
-    // Returns the newly created 'bytes memory'.
-    function toBytesFromUInt8(uint8 self) internal pure returns (bytes memory bts) {
-        bts = new bytes(1);
-        bts[0] = byte(self);
-    }
-
     // Compies uint32 'self' into a new 'bytes memory'.
     // Returns the newly created 'bytes memory'.
     function toBytesFromUInt32(uint32 self) internal pure returns (bytes memory bts) {

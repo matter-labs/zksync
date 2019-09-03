@@ -10,7 +10,6 @@ import "./Bytes.sol";
 contract Franklin {
     VerificationKey verificationKey;
     Verifier verifier;
-    PriorityQueue priorityQueue;
 
     // chunks per block; each chunk has 8 bytes of public data
     uint256 constant BLOCK_SIZE = 10;
@@ -23,33 +22,77 @@ contract Franklin {
     // Offchain address length.
     uint8 constant PUBKEY_HASH_LEN = 20;
 
+    // Possible token
     struct ValidatedTokenId {
         uint32 id;
     }
 
-    event BlockCommitted(uint32 indexed blockNumber);
+    // MARK: - Events
+
+    // Event emitted when block is commited
+    // Structure:
+    // - blockNumber - number of commited block
+    event Blockcommited(uint32 indexed blockNumber);
+    // Event emitted when block is verified
+    // Structure:
+    // - blockNumber - number of verified block
     event BlockVerified(uint32 indexed blockNumber);
 
+    // Event emitted when blocks are reverted
+    // Structure:
+    // - totalBlocksVerified - number of verified blocks
+    // - totalBlocksCommited - number of commited blocks
     event BlocksReverted(
         uint32 indexed totalBlocksVerified,
-        uint32 indexed totalBlocksCommitted
+        uint32 indexed totalBlocksCommited
     );
 
+    // Event emitted when deposit operation comes into this contract
+    // Structure:
+    // - owner - sender
+    // - tokenId - deposited token
+    // - amount - deposited value
+    // - franlkinAddress - address of Franklin account whtere deposit will be sent
     event OnchainDeposit(
         address indexed owner,
         uint32 tokenId,
         uint112 amount,
         bytes franklinAddress
     );
+
+    // Event emitted when user send withdraw transaction from this contract
+    // Structure:
+    // - owner - sender
+    // - tokenId - withdrawed token
+    // - amount - withdrawed value
     event OnchainWithdrawal(
         address indexed owner,
         uint32 tokenId,
         uint112 amount
     );
 
-    event TokenAdded(address token, uint32 tokenId);
+    // Token added to Franklin net
+    // Structure:
+    // - token - added token address
+    // - tokenId - added token id
+    event TokenAdded(
+        address token,
+        uint32 tokenId
+    );
 
-    // ==== STORAGE ====
+    // New priority request event
+    // Emitted when a request is placed into mapping
+    // Params:
+    // - opType - request type
+    // - pubData - request data
+    // - expirationBlock - the number of Ethereum block when request becomes expired
+    event NewPriorityRequest(
+        uint indexed opType,
+        bytes pubData,
+        uint indexed expirationBlock
+    );
+
+    // MARK: - STORAGE
 
     // Governance
 
@@ -70,22 +113,8 @@ contract Franklin {
     // List of permitted validators
     mapping(address => bool) public validators;
 
-    // Root-chain balances
-
-    // Root-chain balance: users can send funds from and to Franklin
-    // from the root-chain balances only (see docs)
-    struct Balance {
-        uint112 balance;
-        // Some part of balance will be locked on deposit in order to let validators deposit some of it into Franklin
-        // Balance can be locked in order to let validators deposit some of it into Franklin
-        // Locked balances becomes free when block with deposit commits or when exodus mode is activated
-        uint112 lockedBalance;
-    }
-
-    // List of root-chain balances (per owner and tokenId)
-    mapping(address => mapping(uint32 => Balance)) public balances;
-    mapping(address => bool) public depositWasDone;
-    mapping(bytes => address) public depositFranklinToETH;
+    // List of root-chain balances (per owner and tokenId) to withdraw
+    mapping(address => mapping(uint32 => uint112)) public balancesToWithdraw;
 
     // TODO: - fix
     // uint32 public totalAccounts;
@@ -98,18 +127,18 @@ contract Franklin {
     // i.e. blocks[totalBlocksVerified] points at the latest verified block (block 0 is genesis)
     uint32 public totalBlocksVerified;
 
-    // Total number of committed blocks
-    // i.e. blocks[totalBlocksCommitted] points at the latest committed block
-    uint32 public totalBlocksCommitted;
+    // Total number of commited blocks
+    // i.e. blocks[totalBlocksCommited] points at the latest commited block
+    uint32 public totalBlocksCommited;
 
     // Block data (once per block)
     struct Block {
-        // Hash of committment the block circuit
+        // Hash of commitment the block circuit
         bytes32 commitment;
         // New root hash
         bytes32 stateRoot;
-        // ETH block number at which this block was committed
-        uint32 committedAtBlock;
+        // ETH block number at which this block was commited
+        uint32 commitedAtBlock;
         // ETH block number at which this block was verified
         uint32 verifiedAtBlock;
         // Validator (aka block producer)
@@ -118,17 +147,33 @@ contract Franklin {
         uint64 operationStartId;
         // Total number of operations to process for this block
         uint64 totalOperations;
+        // Total number of priority operations for this block
+        uint priorityOperations;
     }
 
     // List of blocks by Franklin blockId
     mapping(uint32 => Block) public blocks;
 
+    // Types of franklin operations in blocks
+    enum OpType {
+        Noop,
+        Deposit,
+        TransferToNew,
+        PartialExit,
+        CloseAccount,
+        Transfer,
+        FullExit
+    }
+
     // Onchain operations -- processed inside blocks (see docs)
 
     // Type of block processing operation holder
-    enum OnchainOpType {Deposit, Withdrawal}
+    enum OnchainOpType {
+        Deposit,
+        Withdrawal
+    }
 
-    // OnchainOp keeps a balance for processing the committed data in blocks, see docs
+    // OnchainOp keeps a balance for processing the commited data in blocks, see docs
     struct OnchainOp {
         OnchainOpType opType;
         uint32 tokenId;
@@ -142,6 +187,22 @@ contract Franklin {
     // List of OnchainOps by index
     mapping(uint64 => OnchainOp) public onchainOps;
 
+    // Priority Queue
+
+    // Priority request op type and expiration block
+    struct PriorityRequestParams {
+        uint opType;
+        uint expirationBlock;
+    }
+
+    // Requests params mapping (request id - (type, expiration block))
+    // Contains op type and expiration block of unsatisfied requests. Numbers are in order of requests receiving
+    mapping(uint => PriorityRequestParams) public priorityRequestsParams;
+    // First priority request id
+    uint public firstPriorityRequestId;
+    // Total number of requests
+    uint public totalPriorityRequests;
+
     // Reverting expired blocks
 
     // Total number of registered blocks to revert (see docs)
@@ -149,12 +210,6 @@ contract Franklin {
 
     // List of blocks by revertBlockId (see docs)
     mapping(uint32 => Block) public blocksToRevert;
-
-    // Exit queue & exodus mode
-
-    // Address of the account which is allowed to trigger exodus mode
-    // (mass exits in the case that censorship resistance has failed)
-    address public exitQueue;
 
     // Flag indicating that exodus (mass exit) mode is triggered
     // Once it was raised, it can not be cleared again, and all users must exit
@@ -178,37 +233,89 @@ contract Franklin {
 
     // mapping (uint32 => bool) tokenMigrated;
 
-    // ==== IMPLEMENTATION ====
+    // MARK: - Constructor
 
-    // Constructor
-
+    // Inits verifier and verification key contracts instances, sets genesis root, network governor
     constructor(
         address _verifierAddress,
         address _vkAddress,
         bytes32 _genesisRoot,
-        address _exitQueue,
-        address _networkGovernor,
-        address _priorityQueue
+        address _networkGovernor
     ) public {
         verifier = Verifier(_verifierAddress);
         verificationKey = VerificationKey(_vkAddress);
-        priorityQueue = PriorityQueue(_priorityQueue);
 
         blocks[0].stateRoot = _genesisRoot;
-        exitQueue = _exitQueue;
         networkGovernor = _networkGovernor;
 
         // TODO: remove once proper governance is implemented
         validators[_networkGovernor] = true;
     }
 
-    // Governance
+    // MARK: - Priority Queue
 
+    // Add request
+    // Params:
+    // - _opType - priority request type
+    // - _pubData - request data
+    function addPriorityRequest(uint _opType, bytes calldata _pubData) internal {
+        uint expirationBlock = block.number + EXPECT_VERIFICATION_IN;
+        priorityRequestsParams[totalPriorityRequests] = PriorityRequestParams({
+            opType: _opType,
+            expirationBlock: expirationBlock
+        });
+        totalPriorityRequests++;
+
+        emit NewPriorityRequest(
+            _opType,
+            _pubData,
+            expirationBlock
+        );
+    }
+
+    // Removes requests
+    // Params:
+    // - _count - number of requests to remove
+    function removePriorityRequests(uint _count) internal {
+        require(count <= totalRequests, "Count of removed requests is higher than their count");
+
+        for (uint i = firstPriorityRequestId; i < firstPriorityRequestId+count; i++) {
+            delete priorityRequestsParams[i];
+        }
+        totalPriorityRequests -= count;
+        firstPriorityRequestId += count;
+    }
+
+    // Removes certain requests
+    // Params:
+    // - _opType - operation type
+    // - _anyRequestsCount - count of requests where to look certain requests for
+    function removePriorityRequestsWithType(uint _opType, uint _anyRequestsCount) internal {
+        require(_anyRequestsCount <= totalRequests, "Count of removed requests is higher than their count");
+
+        uint removingPriorityCount = 0;
+        for (uint i = firstPriorityRequestId; i < firstPriorityRequestId + _anyRequestsCount; i++) {
+            if (priorityRequestsParams[i].opType == _opType) {
+                delete priorityRequestsParams[i];
+                removingPriorityCount++;
+            }
+        }
+        totalPriorityRequests -= removingPriorityCount;
+        firstPriorityRequestId += removingPriorityCount;
+    }
+
+    // MARK: - Governance
+
+    // Change current governor
+    // _newGovernor - address of the new governor
     function changeGovernor(address _newGovernor) external {
         requireGovernor();
         networkGovernor = _newGovernor;
     }
 
+    // Add token to the list of possible tokens
+    // Params:
+    // - _token - token address
     function addToken(address _token) external {
         requireGovernor();
         require(tokenIds[_token] == 0, "token exists");
@@ -218,6 +325,10 @@ contract Franklin {
         emit TokenAdded(_token, totalTokens);
     }
 
+    // Set validator status
+    // Params:
+    // - _validator - validator address
+    // - _active - bool value (true if validator is active)
     function setValidator(address _validator, bool _active) external {
         requireGovernor();
         validators[_validator] = _active;
@@ -249,19 +360,29 @@ contract Franklin {
     //     require(false, "unimplemented");
     // }
 
-    // Root-chain balances
+    // MARK: - Root-chain operations
 
     // Deposit ETH (simply by sending it to the contract)
-    function depositETH(bytes calldata _franklin_addr) external payable {
+    // Params:
+    // - _franklinAddr - receiver
+    function depositETH(bytes calldata _franklinAddr) external payable {
         require(msg.value <= MAX_VALUE, "sorry Joe");
-        registerDeposit(ValidatedTokenId(0), uint112(msg.value), _franklin_addr);
+        registerDeposit(ValidatedTokenId(0), uint112(msg.value), _franklinAddr);
     }
 
+    // Withdraw ETH
+    // Params:
+    // - _amount - amount to withdraw
     function withdrawETH(uint112 _amount) external {
         registerWithdrawal(ValidatedTokenId(0), _amount);
         msg.sender.transfer(_amount);
     }
 
+    // Deposit ERC20 token
+    // Params:
+    // - _token - token address
+    // - _amount - amount of token
+    // - _franklin_addr - receiver
     function depositERC20(
         address _token,
         uint112 _amount,
@@ -275,6 +396,10 @@ contract Franklin {
         registerDeposit(tokenId, _amount, _franklin_addr);
     }
 
+    // Withdraw ERC20 token
+    // Params:
+    // - _token - token address
+    // - _amount - amount to withdraw
     function withdrawERC20(address _token, uint112 _amount) external {
         ValidatedTokenId memory tokenId = validateERC20Token(_token);
         registerWithdrawal(tokenId, _amount);
@@ -284,29 +409,39 @@ contract Franklin {
         );
     }
 
+    // Register full exit request
+    // Params:
+    // - _franklin_addr - sender
+    // - _eth_addr - receiver
+    // - _token - token address
+    // - _signature - user signature
+    function registerFullExit(
+        bytes memory _franklin_addr,
+        address _eth_addr,
+        address _token,
+        bytes20 signature
+    ) external {
+        requireActive();
+        ValidatedTokenId memory tokenId = validateERC20Token(_token);
+        // Priority Queue request
+        bytes memory pubData = Bytes.concat(_franklin_addr); // franklin address
+        pubData = Bytes.concat(Bytes.toBytesFromAddress(_eth_addr)); // eth address
+        pubData = Bytes.concat(Bytes.toBytesFromUInt32(tokenId.id)); // token id
+        pubData = Bytes.concat(bytes(signature)); // signature
+        addPriorityRequest(OpType.FullExit, pubData);
+    }
+
+    // Register deposit request
+    // Params:
+    // - _token - token by id
+    // - _amount - token amount
+    // - _franklin_addr - receiver
     function registerDeposit(
         ValidatedTokenId memory _token,
         uint112 _amount,
         bytes memory _franklin_addr
     ) internal {
         requireActive();
-        require(
-            uint256(_amount) + balances[msg.sender][_token.id].lockedBalance <
-                MAX_VALUE,
-            "overflow"
-        );
-
-        balances[msg.sender][_token.id].lockedBalance += _amount;
-
-        if (depositWasDone[msg.sender]) {
-            require(
-                depositFranklinToETH[_franklin_addr] == msg.sender,
-                "ETH depositor mismatch"
-            );
-        } else {
-            depositFranklinToETH[_franklin_addr] = msg.sender;
-            depositWasDone[msg.sender] = true;
-        }
 
         emit OnchainDeposit(
             msg.sender,
@@ -316,38 +451,24 @@ contract Franklin {
         );
 
         // Priority Queue request
-        bytes memory pubData = Bytes.toBytesFromUInt8(0x01); // operation type
-        pubData = Bytes.concat(Bytes.toBytesFromAddress(msg.sender)); // sender
+        bytes memory pubData = Bytes.concat(Bytes.toBytesFromAddress(msg.sender)); // sender
         pubData = Bytes.concat(Bytes.toBytesFromUInt32(_token.id)); // token id
         pubData = Bytes.concat(Bytes.toBytesFromUInt112(_amount)); // amount
         pubData = Bytes.concat(_franklin_addr); // franklin address
-        priorityQueue.addRequest(pubData);
+        addPriorityRequest(OpType.Deposit, pubData);
     }
 
-    function registerFullExit(
-        bytes memory _franklin_addr,
-        address _eth_addr,
-        ValidatedTokenId memory _token,
-        bytes20 signature
-    ) internal {
-        requireActive();
-
-        // Priority Queue request
-        bytes memory pubData = Bytes.toBytesFromUInt8(0x06); // operation type
-        pubData = Bytes.concat(_franklin_addr); // franklin address
-        pubData = Bytes.concat(Bytes.toBytesFromAddress(_eth_addr)); // eth address
-        pubData = Bytes.concat(Bytes.toBytesFromUInt32(_token.id)); // token id
-        pubData = Bytes.concat(bytes(signature)); // signature
-        priorityQueue.addRequest(pubData);
-    }
-
+    // Register withdrawal
+    // Params:
+    // - _token - token by id
+    // - _amount - token amount
     function registerWithdrawal(ValidatedTokenId memory _token, uint112 _amount) internal {
         requireActive();
         require(
-            balances[msg.sender][_token.id].balance >= _amount,
+            balancesToWithdraw[msg.sender][_token.id] >= _amount,
             "insufficient balance"
         );
-        balances[msg.sender][_token.id].balance -= _amount;
+        balancesToWithdraw[msg.sender][_token.id] -= _amount;
         emit OnchainWithdrawal(
             msg.sender,
             _token.id,
@@ -355,8 +476,14 @@ contract Franklin {
         );
     }
 
-    // Block committment
+    // MARK: - Block commitment
 
+    // Commit block
+    // Params:
+    // - _blockNumber - block number
+    // - _feeAccount - account to collect fees
+    // - _newRoot - new tree root
+    // - _publicData - operations
     function commitBlock(
         uint32 _blockNumber,
         uint24 _feeAccount,
@@ -366,25 +493,21 @@ contract Franklin {
         requireActive();
         require(validators[msg.sender], "only by validator");
         require(
-            _blockNumber == totalBlocksCommitted + 1,
+            _blockNumber == totalBlocksCommited + 1,
             "only commit next block"
         );
-        require(blockCommitmentExpired() == false, "committment expired");
+        require(blockCommitmentExpired() == false, "commitment expired");
         require(
-            totalBlocksCommitted - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS,
-            "too many committed"
+            totalBlocksCommited - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS,
+            "too many commited"
         );
 
-        // Check for Exodus mode
-        if (priorityQueue.isExodusActivated(block.number)) {
-            triggerExodus();
-        }
-        
-        // TODO: count ops for priority queue
+        // Enter exodus mode if needed
+        require(!triggerExodusIfNeeded(), "Entered exodus mode");
 
         // TODO: make efficient padding here
 
-        (uint64 startId, uint64 totalProcessed) = commitOnchainOps(_publicData);
+        (uint64 startId, uint64 totalProcessed, uint priorityOperations) = commitOnchainOps(_publicData);
 
         bytes32 commitment = createBlockCommitment(
             _blockNumber,
@@ -397,20 +520,28 @@ contract Franklin {
         blocks[_blockNumber] = Block(
             commitment,
             _newRoot,
-            uint32(block.number), // committed at
+            uint32(block.number), // commited at
             0, // verified at
             msg.sender, // validator
             // onchain-ops
             startId,
-            totalProcessed
+            totalProcessed,
+            priorityOperations
         );
 
         totalOnchainOps = startId + totalProcessed;
 
-        totalBlocksCommitted += 1;
-        emit BlockCommitted(_blockNumber);
+        totalBlocksCommited += 1;
+        emit Blockcommited(_blockNumber);
     }
-
+    
+    // Returns block commitment
+    // Params:
+    // - _blockNumber - block number
+    // - _feeAccount - account to collect fees
+    // - _oldRoot - old tree root
+    // - _newRoot - new tree root
+    // - _publicData - operations
     function createBlockCommitment(
         uint32 _blockNumber,
         uint24 _feeAccount,
@@ -423,7 +554,7 @@ contract Franklin {
         );
         hash = sha256(abi.encodePacked(hash, uint256(_oldRoot)));
         hash = sha256(abi.encodePacked(hash, uint256(_newRoot)));
-        // public data is committed with padding (TODO: check assembly and optimize to avoid copying data)
+        // public data is commited with padding (TODO: check assembly and optimize to avoid copying data)
         hash = sha256(
             abi.encodePacked(
                 hash,
@@ -434,9 +565,12 @@ contract Franklin {
         return hash;
     }
 
+    // Returns operations start id, onchain operations count, priority operations count
+    // Params:
+    // - _publicData - operations
     function commitOnchainOps(bytes memory _publicData)
         internal
-        returns (uint64 onchainOpsStartId, uint64 processedOnchainOps)
+        returns (uint64 onchainOpsStartId, uint64 processedOnchainOps, uint priorityOperations)
     {
         require(_publicData.length % 8 == 0, "pubdata.len % 8 != 0");
 
@@ -448,9 +582,11 @@ contract Franklin {
         // using assembly, replacing ifs with mem lookups and other tricks
         // TODO: optimize
         uint256 currentPointer = 0;
+
+        uint priorityOperations = priorityOps;
         while (currentPointer < _publicData.length) {
-            bytes1 opType = _publicData[currentPointer];
-            (uint256 len, uint64 ops) = processOp(
+            uint opType = uint(bytes1(_publicData[currentPointer]));
+            (uint256 len, uint64 ops, uint priorityOps) = processOp(
                 opType,
                 currentPointer,
                 _publicData,
@@ -458,29 +594,37 @@ contract Franklin {
             );
             currentPointer += len;
             processedOnchainOps += ops;
+            priorityOperations += priorityOps;
         }
         require(
             currentPointer == _publicData.length,
             "last chunk exceeds pubdata"
         );
-        return (onchainOpsStartId, processedOnchainOps);
+        return (onchainOpsStartId, processedOnchainOps, priorityOperations);
     }
 
+    // Returns operation processed length, and indicators if it is onchain operation and if it is priority operation (1 if true)
+    // Params:
+    // - _opType - operation type
+    // - _currentPointer - current pointer
+    // - _publicData - operation data
+    // - _newRoot - new tree root
+    // - _currentOnchainOp - operation identifier
     function processOp(
-        bytes1 opType,
-        uint256 currentPointer,
+        uint _opType,
+        uint256 _currentPointer,
         bytes memory _publicData,
-        uint64 currentOnchainOp
-    ) internal returns (uint256 processedLen, uint64 processedOnchainOps) {
-        uint256 opDataPointer = currentPointer + 1;
+        uint64 _currentOnchainOp
+    ) internal returns (uint256 processedLen, uint64 processedOnchainOps, uint priorityOperations) {
+        uint256 opDataPointer = _currentPointer + 1;
 
-        if (opType == 0x00) return (1 * 8, 0); // noop
-        if (opType == 0x02) return (5 * 8, 0); // transfer_to_new
-        if (opType == 0x05) return (2 * 8, 0); // transfer
-        if (opType == 0x04) return (1 * 8, 0); // close_account
+        if (_opType == OpType.Noop) return (1 * 8, 0, 0); // noop
+        if (_opType == OpType.TransferToNew) return (5 * 8, 0, 0); // transfer_to_new
+        if (_opType == OpType.Transfer) return (2 * 8, 0, 0); // transfer
+        if (_opType == OpType.CloseAccount) return (1 * 8, 0, 0); // close_account
 
         // deposit
-        if (opType == 0x01) {
+        if (_opType == OpType.Deposit) {
             // to_account: 3, token: 2, amount: 3, fee: 1, new_pubkey_hash: 20
 
             uint16 tokenId = uint16(
@@ -504,23 +648,18 @@ contract Franklin {
             address account = depositFranklinToETH[franklin_address_];
 
             requireValidTokenId(tokenId);
-            require(
-                balances[account][tokenId].lockedBalance >= (amount + fee),
-                "balance insufficient"
-            );
 
-            balances[account][tokenId].lockedBalance -= (amount + fee);
-            onchainOps[currentOnchainOp] = OnchainOp(
+            onchainOps[_currentOnchainOp] = OnchainOp(
                 OnchainOpType.Deposit,
                 tokenId,
                 account,
                 (amount + fee)
             );
-            return (5 * 8, 1);
+            return (5 * 8, 1, 1);
         }
 
         // partial_exit
-        if (opType == 0x03) {
+        if (_opType == OpType.PartialExit) {
             // pubdata account: 3, token: 2, amount: 3, fee: 1, eth_key: 20
 
             uint16 tokenId = uint16(
@@ -541,17 +680,17 @@ contract Franklin {
 
             requireValidTokenId(tokenId);
             // TODO!: balances[ethAddress][tokenId] possible overflow (uint112)
-            onchainOps[currentOnchainOp] = OnchainOp(
+            onchainOps[_currentOnchainOp] = OnchainOp(
                 OnchainOpType.Withdrawal,
                 tokenId,
                 Bytes.bytesToAddress(ethAddress),
                 amount
             );
-            return (4 * 8, 1);
+            return (4 * 8, 1, 0);
         }
 
         // full_exit
-        if (opType == 0x06) {
+        if (_opType == OpType.FullExit) {
             // pubdata account: 3, eth_address: 20, token: 2, signature_hash: 20, full_amount: 14
 
             uint16 tokenId = uint16(
@@ -577,19 +716,24 @@ contract Franklin {
 
             requireValidTokenId(tokenId);
             // TODO!: balances[ethAddress][tokenId] possible overflow (uint112)
-            onchainOps[currentOnchainOp] = OnchainOp(
+            onchainOps[_currentOnchainOp] = OnchainOp(
                 OnchainOpType.Withdrawal,
                 tokenId,
                 Bytes.bytesToAddress(ethAddress),
                 fullAmount
             );
-            return (7 * 8, 1);
+            return (7 * 8, 1, 1);
         }
 
         require(false, "unsupported op");
     }
 
+    // MARK: - Block verification
+
     // Block verification
+    // Params:
+    // - blockNumber - block number
+    // - proof - proof
     function verifyBlock(uint32 _blockNumber, uint256[8] calldata proof)
         external
     {
@@ -607,9 +751,16 @@ contract Franklin {
 
         totalBlocksVerified += 1;
         consummateOnchainOps(_blockNumber);
+
+        removePriorityRequests(blocks[_blockNumber].priorityOperations);
+
         emit BlockVerified(_blockNumber);
     }
 
+    // Proof verification
+    // Params:
+    // - proof - block number
+    // - commitment - block commitment
     function verifyBlockProof(uint256[8] memory proof, bytes32 commitment)
         internal
         view
@@ -624,6 +775,9 @@ contract Franklin {
         return verifier.Verify(vk, gammaABC, proof, inputs);
     }
 
+    // If block verified the withdrawal onchain operations from it must be completed (user must have possibility to withdraw funds)
+    // Params:
+    // - _blockNumber - number of block
     function consummateOnchainOps(uint32 _blockNumber) internal {
         uint64 start = blocks[_blockNumber].operationStartId;
         uint64 end = start + blocks[_blockNumber].totalOperations;
@@ -631,18 +785,19 @@ contract Franklin {
             OnchainOp memory op = onchainOps[current];
             if (op.opType == OnchainOpType.Withdrawal) {
                 // withdrawal was successful, accrue balance
-                balances[op.owner][op.tokenId].balance += op.amount;
+                balancesToWithdraw[op.owner][op.tokenId] += op.amount;
             }
             delete onchainOps[current];
         }
     }
 
-    // Reverting committed blocks
+    // MARK: - Reverting commited blocks
 
+    // Fill blocksToRevert mapping and set totalBlocksToRevert value, depending on the difference between totalBlocksVerified and totalBlocksCommited
     function revertExpiredBlocks() external {
         require(blockCommitmentExpired(), "not expired");
-        emit BlocksReverted(totalBlocksVerified, totalBlocksCommitted);
-        uint32 total = totalBlocksCommitted - totalBlocksVerified;
+        emit BlocksReverted(totalBlocksVerified, totalBlocksCommited);
+        uint32 total = totalBlocksCommited - totalBlocksVerified;
         for (uint32 i = 0; i < total; i++) {
             blocksToRevert[totalBlocksToRevert +
                 i] = blocks[totalBlocksVerified + i + 1];
@@ -651,9 +806,13 @@ contract Franklin {
         totalBlocksToRevert += total;
     }
 
+    // Revert block onchain operations and remove deposit priority requests from its mapping
+    // Params:
+    // - _revertedBlockId - block id
     function revertBlock(uint32 _revertedBlockId) external {
         Block memory reverted = blocksToRevert[_revertedBlockId];
-        require(reverted.committedAtBlock > 0, "block not found");
+        require(reverted.commitedAtBlock > 0, "block not found");
+        require(reverted.priorityOperations <= totalRequests, "Count of removed requests is higher than their count");
 
         uint64 current = reverted.operationStartId;
         uint64 end = current + reverted.totalOperations;
@@ -661,20 +820,39 @@ contract Franklin {
             OnchainOp memory op = onchainOps[current];
             if (op.opType == OnchainOpType.Deposit) {
                 // deposit failed, return funds
-                balances[op.owner][op.tokenId].balance += op.amount;
+                balancesToWithdraw[op.owner][op.tokenId] += op.amount;
             }
             delete onchainOps[current];
         }
+
+        // delete deposits in priority requests
+        removePriorityRequestsWithType(OpType.Deposit, reverted.priorityOperations);
+
         delete blocksToRevert[_revertedBlockId];
     }
 
-    // Exodus mode
+    // MARK: - Exodus mode
 
-    function triggerExodus() internal {
-        // TODO: unlock locked deposits
-        exodusMode = true;
+    // Returns bool flag. True if the Exodus mode must be entered
+    function triggerExodusIfNeeded() internal view returns (bool) {
+        if (block.number >= priorityRequestsParams[firstPriorityRequestId]) {
+            exodusMode = true;
+            revertExpiredBlocks();
+            for (uint32 i = 0; i < totalBlocksToRevert; i++) {
+                revertBlock(i);
+            }
+            return true;
+        } else {
+            return false;
+        }
     }
 
+    // Withdraw token from Franklin to root chain
+    // Params:
+    // - _tokenId - verified token id
+    // - _owners - all owners
+    // - _amounts - amounts for owners
+    // - _proof - proof
     function exit(
         uint32 _tokenId,
         address[] calldata _owners,
@@ -691,7 +869,7 @@ contract Franklin {
         // TODO: verify the proof that all users have the specified amounts of this token in the latest state
 
         for (uint256 i = 0; i < _owners.length; i++) {
-            balances[_owners[i]][_tokenId].balance += _amounts[i];
+            balancesToWithdraw[_owners[i]][_tokenId] += _amounts[i];
             exited[_owners[i]][_tokenId] = true;
         }
     }
@@ -718,9 +896,9 @@ contract Franklin {
 
     function blockCommitmentExpired() internal view returns (bool) {
         return
-            totalBlocksCommitted > totalBlocksVerified &&
+            totalBlocksCommited > totalBlocksVerified &&
                 block.number >
-                blocks[totalBlocksVerified + 1].committedAtBlock +
+                blocks[totalBlocksVerified + 1].commitedAtBlock +
                     EXPECT_VERIFICATION_IN;
     }
 
