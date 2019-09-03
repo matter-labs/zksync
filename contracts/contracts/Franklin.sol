@@ -5,6 +5,7 @@ import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 import "./Verifier.sol";
 import "./VerificationKey.sol";
 import "./PriorityQueue.sol";
+import "./Bytes.sol";
 
 contract Franklin {
     VerificationKey verificationKey;
@@ -314,7 +315,12 @@ contract Franklin {
             _franklin_addr
         );
 
-        // TODO: - collect bytes data
+        // Priority Queue request
+        bytes memory pubData = Bytes.toBytesFromUInt8(0x01); // operation type
+        pubData = Bytes.concat(Bytes.toBytesFromAddress(msg.sender)); // sender
+        pubData = Bytes.concat(Bytes.toBytesFromUInt32(_token.id)); // token id
+        pubData = Bytes.concat(Bytes.toBytesFromUInt112(_amount)); // amount
+        pubData = Bytes.concat(_franklin_addr); // franklin address
         priorityQueue.addRequest(pubData);
     }
 
@@ -325,7 +331,13 @@ contract Franklin {
         bytes20 signature
     ) internal {
         requireActive();
-        // TODO: - collect bytes data
+
+        // Priority Queue request
+        bytes memory pubData = Bytes.toBytesFromUInt8(0x06); // operation type
+        pubData = Bytes.concat(_franklin_addr); // franklin address
+        pubData = Bytes.concat(Bytes.toBytesFromAddress(_eth_addr)); // eth address
+        pubData = Bytes.concat(Bytes.toBytesFromUInt32(_token.id)); // token id
+        pubData = Bytes.concat(bytes(signature)); // signature
         priorityQueue.addRequest(pubData);
     }
 
@@ -530,7 +542,7 @@ contract Franklin {
             onchainOps[currentOnchainOp] = OnchainOp(
                 OnchainOpType.Withdrawal,
                 tokenId,
-                bytesToAddress(ethAddress),
+                Bytes.bytesToAddress(ethAddress),
                 amount
             );
             return (4 * 8, 1);
@@ -559,14 +571,14 @@ contract Franklin {
             for (uint256 i = 0; i < 14; ++i) {
                 fullAmountBytes[i] = _publicData[opDataPointer + 45 + i];
             }
-            uint112 fullAmount = bytesToUint112(fullAmountBytes);
+            uint112 fullAmount = Bytes.bytesToUint112(fullAmountBytes);
 
             requireValidTokenId(tokenId);
             // TODO!: balances[ethAddress][tokenId] possible overflow (uint112)
             onchainOps[currentOnchainOp] = OnchainOp(
                 OnchainOpType.Withdrawal,
                 tokenId,
-                bytesToAddress(ethAddress),
+                Bytes.bytesToAddress(ethAddress),
                 fullAmount
             );
             return (7 * 8, 1);
@@ -723,31 +735,6 @@ contract Franklin {
 
     function unpackFee(uint8 encoded_fee) internal pure returns (uint112) {
         return uint112(encoded_fee >> 4) * uint112(10) ** (encoded_fee & 0x0f);
-    }
-
-    function bytesToAddress(bytes memory bys)
-        internal
-        pure
-        returns (address addr)
-    {
-        assembly {
-            addr := mload(add(bys, 20))
-        }
-    }
-
-    function bytesToUint112(bytes memory _bytes)
-        internal
-        pure
-        returns (uint112)
-    {
-        require(_bytes.length >= 14, "wrong bytes length");
-        uint112 tempUint;
-
-        assembly {
-            tempUint := mload(add(add(_bytes, 0x0e), 0))
-        }
-
-        return tempUint;
     }
 
 }
