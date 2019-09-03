@@ -1,14 +1,14 @@
 use crate::node::TokenId;
 
 /// Account tree depth
-pub const TX_TYPE_BIT_WIDTH:  usize = 8;
+pub const TX_TYPE_BIT_WIDTH: usize = 8;
 
 /// Account tree depth
 pub const ACCOUNT_TREE_DEPTH: usize = 24;
 //pub const ACCOUNT_TREE_DEPTH: usize = 4;
 
 /// Balance tree depth
-pub const BALANCE_TREE_DEPTH:  usize = 10;
+pub const BALANCE_TREE_DEPTH: usize = 10;
 //pub const BALANCE_TREE_DEPTH: &'static usize = &4;
 
 /// Account subtree hash width
@@ -21,7 +21,7 @@ pub const NEW_PUBKEY_HASH_WIDTH: usize = FR_ADDRESS_LEN * 8;
 /// Nonce bit width
 pub const NONCE_BIT_WIDTH: usize = 32;
 //
-pub const TOKEN_EXT_BIT_WIDTH:  usize = 16;
+pub const TOKEN_EXT_BIT_WIDTH: usize = 16;
 //
 pub const CHUNK_BIT_WIDTH: usize = 64;
 
@@ -31,16 +31,16 @@ pub const BLOCK_NUMBER_BIT_WIDTH: usize = 32;
 
 /// Amount bit widths
 pub const AMOUNT_EXPONENT_BIT_WIDTH: usize = 5;
-pub const AMOUNT_MANTISSA_BIT_WIDTH:  usize = 19;
+pub const AMOUNT_MANTISSA_BIT_WIDTH: usize = 19;
 
 /// Fee bit widths
-pub const FEE_EXPONENT_BIT_WIDTH: usize = 4;
-pub const FEE_MANTISSA_BIT_WIDTH: usize = 4;
+pub const FEE_EXPONENT_BIT_WIDTH: usize = 6;
+pub const FEE_MANTISSA_BIT_WIDTH: usize = 10;
 
 // Signature data
-pub const SIGNATURE_S_BIT_WIDTH:  usize = 254;
-pub const SIGNATURE_R_X_BIT_WIDTH:  usize = 254;
-pub const SIGNATURE_R_Y_BIT_WIDTH:  usize = 254;
+pub const SIGNATURE_S_BIT_WIDTH: usize = 254;
+pub const SIGNATURE_R_X_BIT_WIDTH: usize = 254;
+pub const SIGNATURE_R_Y_BIT_WIDTH: usize = 254;
 
 // Fr element encoding
 pub const FR_BIT_WIDTH: usize = 254;

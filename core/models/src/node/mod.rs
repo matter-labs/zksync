@@ -1,4 +1,5 @@
 use super::merkle_tree::{PedersenHasher, SparseMerkleTree};
+use super::params;
 use super::primitives::pack_as_float;
 use bigdecimal::BigDecimal;
 use pairing::bn256;
@@ -13,6 +14,7 @@ pub use web3::types::{H256, U128, U256};
 
 pub use self::account::{Account, AccountAddress, AccountUpdate};
 pub use self::operations::{DepositOp, FranklinOp, PartialExitOp, TransferOp, TransferToNewOp};
+use crate::params::AMOUNT_EXPONENT_BIT_WIDTH;
 
 pub type Engine = bn256::Bn256;
 pub type Fr = bn256::Fr;
@@ -45,11 +47,19 @@ pub type BlockNumber = u32;
 pub type Nonce = u32;
 
 pub fn pack_token_amount(amount: &BigDecimal) -> Vec<u8> {
-    pack_as_float(amount, 5, 19)
+    pack_as_float(
+        amount,
+        params::AMOUNT_EXPONENT_BIT_WIDTH,
+        params::AMOUNT_MANTISSA_BIT_WIDTH,
+    )
 }
 
 pub fn pack_fee_amount(amount: &BigDecimal) -> Vec<u8> {
-    pack_as_float(amount, 4, 4)
+    pack_as_float(
+        amount,
+        params::FEE_EXPONENT_BIT_WIDTH,
+        params::FEE_MANTISSA_BIT_WIDTH,
+    )
 }
 
 #[cfg(test)]

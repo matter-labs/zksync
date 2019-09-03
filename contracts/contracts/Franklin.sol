@@ -22,6 +22,9 @@ contract Franklin {
     // Offchain address length.
     uint8 constant PUBKEY_HASH_LEN = 20;
 
+    uint8 constant FEE_EXPONENT_BIT_WIDTH = 6;
+    uint8 constant AMOUNT_EXPONENT_BIT_WIDTH = 5;
+
     struct ValidatedTokenId {
         uint32 id;
     }
@@ -465,12 +468,14 @@ contract Franklin {
             amountPacked[2] = uint8(_publicData[opDataPointer + 7]);
             uint112 amount = unpackAmount(amountPacked);
 
-            uint8 feePacked = uint8(_publicData[opDataPointer + 8]);
+            uint8[2] memory feePacked;
+            feePacked[0] = uint8(_publicData[opDataPointer + 8]);
+            feePacked[1] = uint8(_publicData[opDataPointer + 9]);
             uint112 fee = unpackFee(feePacked);
 
             bytes memory franklin_address_ = new bytes(PUBKEY_HASH_LEN);
             for (uint8 i = 0; i < PUBKEY_HASH_LEN; i++) {
-                franklin_address_[i] = _publicData[opDataPointer + 9 + i];
+                franklin_address_[i] = _publicData[opDataPointer + 10 + i];
             }
             address account = depositFranklinToETH[franklin_address_];
 
@@ -671,12 +676,14 @@ contract Franklin {
         uint24 n = (uint24(_amount[0]) << 2*8)
         + (uint24(_amount[1]) << 8)
         + (uint24(_amount[2]));
-        return uint112(n >> 5) * (uint112(10) ** (n & 0x1f));
+        return uint112(n >> AMOUNT_EXPONENT_BIT_WIDTH) * (uint112(10) ** (n & 0x1f));
     }
 
 
-    function unpackFee(uint8 encoded_fee) internal pure returns (uint112) {
-        return uint112(encoded_fee >> 4) * uint112(10) ** (encoded_fee & 0x0f);
+    function unpackFee(uint8[2] memory encoded_fee) internal pure returns (uint112) {
+        uint16 fee = (uint16(encoded_fee[0]) << 8) + uint16(encoded_fee[1]);
+
+        return uint112(encoded_fee >> FEE_EXPONENT_BIT_WIDTH) * uint112(10) ** (encoded_fee & 0x3f);
     }
 
     function bytesToAddress(bytes memory bys)
