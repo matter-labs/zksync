@@ -12,18 +12,15 @@ contract TestPriorityQueue {
         priorityQueue = PriorityQueue(priorityQueueAddress);
     }
 
-    // function testAddRequest(bytes calldata pubData) external view returns (bool) {
-    //     uint beforeCount = priorityQueue.totalRequests;
-    //     franklin.deposit(pubData);
-    //     uint afterCount = priorityQueue.totalRequests;
-    //     return afterCount - beforeCount == 1;
-    // }
+    function testAllRequestsRemoved() external view returns (bool) {
+        return priorityQueue.totalRequests == 0;
+    }
 
-    // function testAllRequestsRemoved() external view returns (bool) {
-    //     return priorityQueue.totalRequests == 0;
-    // }
+    function testIsExodusActivated() external view returns (bool) {
+        return priorityQueue.isExodusActivated(block.number);
+    }
 
-    // function testIsExodusActivate() external view returns (bool) {
-    //     return franklin.isExodusActivated(0);
-    // }
+    function testExodusAlwaysActivated() external view returns (bool) {
+        return priorityQueue.isExodusActivated(0);
+    }
 }

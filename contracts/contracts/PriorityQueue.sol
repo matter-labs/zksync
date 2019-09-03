@@ -2,6 +2,13 @@ pragma solidity ^0.5.8;
 
 contract PriorityQueue {
 
+    /// Ethereum expiration blocks delta
+    uint constant EXPIRATION_DELTA = 250;
+
+    address private owner;
+    /// Franklin contract address
+    address private franklinAddress;
+
     /// New request event
     /// Emitted when a request is placed into mapping
     /// Params:
@@ -12,25 +19,30 @@ contract PriorityQueue {
         uint indexed expirationBlock
     );
 
-    /// Franklin contract address
-    address private franklinAddress;
-
     /// Requests expiration mapping (request id - expiration block)
     /// Contains expiration block of unsatisfied requests. Numbers are in order of requests receiving
     mapping(uint => uint) public requestsExpiration;
     /// Total number of requests
     uint public totalRequests;
 
-    /// Ethereum expiration blocks delta
-    uint constant EXPIRATION_DELTA = 250;
-
     /// Only Franklin contract permission
     function requireFranklin() internal view {
         require(msg.sender == franklinAddress, "Not the main Franklin contract");
     }
 
-    /// Constructor - sets Franklin contract address
-    constructor(address _franklinAddress) public {
+    /// Only Owner permission
+    function requireOwner() internal view {
+        require(msg.sender == owner, "Not the contract owner");
+    }
+
+    /// Constructor - sets owner
+    constructor() public {
+        owner = msg.sender;
+    }
+
+    /// Changes Franklin contract address
+    function changeFranlkinContractAddress(address _franklinAddress) public {
+        requireOwner();
         franklinAddress = _franklinAddress;
     }
 

@@ -19,7 +19,8 @@ export async function deployFranklin(
     genesisRoot = ethers.constants.HashZero,
     franklinCode = franklinContractCode,
     verifierCode = verifierContractCode,
-    vkCode = vkContractCode
+    vkCode = vkContractCode,
+    priorityQueueCode = priorityQueueContractCode
     ) {
     try {
         let verifier = await deployContract(wallet, verifierCode, [], {
@@ -28,27 +29,24 @@ export async function deployFranklin(
         let vk = await deployContract(wallet, vkCode, [], {
             gasLimit: 1000000,
         });
-        let contract = await deployContract(wallet, franklinCode, [verifier.address, vk.address, genesisRoot, ethers.constants.AddressZero, wallet.address], {
+        let priorityQueue = await deployContract(wallet, priorityQueueCode, [], {
+            gasLimit: 8000000,
+        });
+        let contract = await deployContract(
+            wallet,
+            franklinCode,
+            [
+                verifier.address,
+                vk.address,
+                genesisRoot,
+                ethers.constants.AddressZero,
+                wallet.address,
+                priorityQueue.address
+            ],
+        {
             gasLimit: 8000000,
         });
         console.log(`CONTRACT_ADDR=${contract.address}`);
-
-        return contract
-    } catch (err) {
-        console.log("Error:" + err);
-    }
-}
-
-export async function deployPriorityQueue(
-    wallet,
-    franklinAddress,
-    priorityQueueCode = priorityQueueContractCode,
-    ) {
-    try {
-        let contract = await deployContract(wallet, priorityQueueCode, [franklinAddress], {
-            gasLimit: 8000000,
-        });
-        console.log(`EXIT_QUEUE_ADDR=${contract.address}`);
 
         return contract
     } catch (err) {
