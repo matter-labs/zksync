@@ -3,7 +3,7 @@ pragma solidity ^0.5.8;
 contract PriorityQueue {
 
     /// Ethereum expiration blocks delta
-    uint constant EXPIRATION_DELTA = 250;
+    uint private expiration_delta = 250;
 
     address private owner;
     /// Franklin contract address
@@ -40,10 +40,16 @@ contract PriorityQueue {
         owner = msg.sender;
     }
 
-    /// Changes Franklin contract address
+    /// Changes Franklin contract address. Only by onwner
     function changeFranlkinContractAddress(address _franklinAddress) public {
         requireOwner();
         franklinAddress = _franklinAddress;
+    }
+
+    /// Changes expiration delta. Only by onwner
+    function changeFranlkinContractAddress(uint _expiration_delta) public {
+        requireOwner();
+        expiration_delta = _expiration_delta;
     }
 
     /// Add request. Can be used only from Franklin contract
