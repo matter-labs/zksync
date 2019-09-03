@@ -58,7 +58,7 @@ contract PriorityQueue {
     function addRequest(bytes calldata pubData) external {
         requireFranklin();
 
-        uint expirationBlock = block.number + EXPIRATION_DELTA;
+        uint expirationBlock = block.number + expiration_delta;
         requestsExpiration[totalRequests] = expirationBlock;
         totalRequests++;
 
