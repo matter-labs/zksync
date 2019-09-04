@@ -24,9 +24,9 @@ To make deposit, a user can:
 
 This deposit creates a **priority request** that is placed in corresponding priority requests mapping and also emits **NewPriorityRequest(opType, pubData, expirationBlock)** event to notify validators that they must include this request to upcoming blocks. Complete **PriorityQueue** logic that handles **priority requests** is described in **Priority Requests** section.
 
-When a validator commits a block which contains a **circuit operation** `deposit`, the corresponding **Deposit onchain operation** is created. If the block is verified, this **Deposit onchain operations** are simply discarded.
+When a validator commits a block which contains a **circuit operations** `deposit`, than their count will be added to **priority requests** count for this block.
 
-If the block is reverted, the funds held by **Deposit onchain operations** are acrued to the owners' **root-chain balances** to make them possible to withdraw. **Deposit onchain operations** are simply discarded.
+If the block is reverted, the funds held by this blocks' **Deposit priority requests** are acrued to the owners' **root-chain balances** to make them possible to withdraw.
 
 ## Withdrawals
 
@@ -76,7 +76,7 @@ This queue will be implemented in separate contract to ensure that priority oper
 
 When corresponding transactions are found in the commited block, their count must be recorded. If the block is verified, this count of the satisfied **priority requests** is removed from mapping. 
 
-If the block is reverted, **priority requests** with `deposit` operation type will be removed from the number of **priority requests** that were specified when committing the block.
+If the block is reverted, the funds held by **Deposit priority requests** from this block are acrued to the owners' **root-chain balances** to make them possible to withdraw. And this **Deposit priority requests** will be removed from mapping. 
 
 ### **Validators'** responsibility
 

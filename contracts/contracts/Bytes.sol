@@ -2,23 +2,23 @@ pragma solidity ^0.5.8;
 
 library Bytes {
 
-    // Compies uint32 'self' into a new 'bytes memory'.
+    // Compies uint16 'self' into a new 'bytes memory'.
     // Returns the newly created 'bytes memory'.
-    function toBytesFromUInt32(uint32 self) internal pure returns (bytes memory bts) {
-        bts = toBytesFromBytes32(bytes32(uint(self)), 4);
+    function toBytesFromUInt16(uint16 self) internal pure returns (bytes memory bts) {
+        bts = toBytesFromBytes32(bytes32(uint(self)), 2);
     }
 
-    // Compies uint112 'self' into a new 'bytes memory'.
+    // Compies uint128 'self' into a new 'bytes memory'.
     // Returns the newly created 'bytes memory'.
-    function toBytesFromUInt112(uint112 self) internal pure returns (bytes memory bts) {
-        bts = toBytesFromBytes32(bytes32(uint(self)), 14);
+    function toBytesFromUInt128(uint128 self) internal pure returns (bytes memory bts) {
+        bts = toBytesFromBytes32(bytes32(uint(self)), 16);
     }
 
     // Copies 'len' bytes from 'self' into a new 'bytes memory', starting at index '0'.
     // Returns the newly created 'bytes memory'
     // The returned bytes will be of length 'len'.
     function toBytesFromBytes32(bytes32 self, uint8 len) internal pure returns (bytes memory bts) {
-        require(len <= 32);
+        require(len <= 32, "wrong bytes length");
         bts = new bytes(len);
         // Even though the bytes will allocate a full word, we don't want
         // any potential garbage bytes in there.
@@ -42,23 +42,42 @@ library Bytes {
         pure
         returns (address addr)
     {
+        require(self.length >= 20, "wrong bytes length");
+
         assembly {
-            addr := mload(add(self, 20))
+            addr := div(mload(add(add(self, 0x20), 0)), 0x1000000000000000000000000)
         }
     }
 
-    // Compies bytes 'self' into a new 'uint112'.
-    // Returns the newly created 'uint112'.
-    function bytesToUint112(bytes memory self)
+    // Compies bytes 'self' into a new 'uint16'.
+    // Returns the newly created 'uint16'.
+    function bytesToUint16(bytes memory self)
         internal
         pure
-        returns (uint112)
+        returns (uint16)
     {
-        require(self.length >= 14, "wrong bytes length");
-        uint112 tempUint;
+        require(self.length >= 2, "wrong bytes length");
+        uint16 tempUint;
 
         assembly {
-            tempUint := mload(add(add(self, 0x0e), 0))
+            tempUint := mload(add(add(self, 0x2), 0))
+        }
+
+        return tempUint;
+    }
+
+    // Compies bytes 'self' into a new 'uint128'.
+    // Returns the newly created 'uint128'.
+    function bytesToUint128(bytes memory self)
+        internal
+        pure
+        returns (uint128)
+    {
+        require(self.length >= 16, "wrong bytes length");
+        uint128 tempUint;
+
+        assembly {
+            tempUint := mload(add(add(self, 0x10), 0))
         }
 
         return tempUint;
