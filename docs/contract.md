@@ -12,23 +12,41 @@ Governance of the network will be excerised from a separate contract registered 
 - Add new tokens (tokens can not be removed after being added).
 - Initiate migration to a new contract (see the "Migration" section).
 
+## Cenosorship resistance
+
+To enforece censorship-resistance and enable guaranteed retrievability of the funds, Franklin employs the mechanisms of **Priority queue** (soft enforcement) and **Exodus mode** (hard enforcement).
+
 ## Deposits
 
 To make deposit, a user can:
 - Either send ETH to smart contract (will be handled by the default function),
 - or call `depositERC20()` function to perform transferFrom for a registered ERC20 token. Note: the user must have previously called approve() on the ERC20 token contract in order to authorize Franklin contract to perform this operation.
 
-This deposit creates a **root-chain balance** for the user. To move funds into Franklin, a user must submit a separate signed **circuit operation** `deposit` to the validators. In order to give the validator chance to safely include deposits in the next block, upon each root-chain deposit the **root-chain balance** is locked for a short number of ETH blocks (`LOCK_DEPOSITS_FOR` constant).
+This deposit creates a **priority request** that is placed in corresponding priority requests mapping and also emits **NewPriorityRequest(opType, pubData, expirationBlock)** event to notify validators that they must include this request to upcoming blocks. Complete **PriorityQueue** logic that handles **priority requests** is described in **Priority Requests** section.
 
-When a validator commits a block which contains a **circuit operation** `deposit`, the requested amount is moved from the **root-chain balance** to a separately stored **onchain operation**. If the block is verified, the **onchain operations** are simply discarded. If the block is reverted, the funds held by the **onchain operations** are returned to the owners' **root-chain balances**.
+When a validator commits a block which contains a **circuit operation** `deposit`, the corresponding **Deposit onchain operation** is created. If the block is verified, this **Deposit onchain operations** are simply discarded.
 
-Note: although any validator can try to include locked deposited funds from any user into their block without permission, this situation does not require a special treatment. It constitutes a general DOS attack on the network (because the validator won't be able to prove the authorization), and thus will be ruled out in the generic fashion.
+If the block is reverted, the funds held by **Deposit onchain operations** are acrued to the owners' **root-chain balances** to make them possible to withdraw. **Deposit onchain operations** are simply discarded.
 
 ## Withdrawals
 
-The withdrawals workflow is similar to deposits, but with reverse order. When a block with a `partial_exit` **circuit operation** is committed, an **onchain operation** for the withdrawal is created. If the block is verified, funds from the **onchain operation** are acrued to the users' *root-chain balance*. If the block is reverted, the **onchain operation** is simply discarded.
+### Partial withdrawal
 
-A user can withdraw funds from the **root-chain balance** at any time by calling a `withdrawETH()` or `withdrawERC20()` function, unless the balance is locked by a preceding onchain deposit.
+It is a standard withdrawal operation. When a block with a `partial_exit` **circuit operation** is committed, an **Withdraw onchain operation** for this withdrawal is created. If the block is verified, funds from the **Withdrawal onchain operation** are acrued to the users' **root-chain balances**. 
+
+If the block is reverted, this **Withdraw onchain operations** are simply discarded.
+
+A user can withdraw funds from the **root-chain balance** at any time by calling a `withdrawETH()` or `withdrawERC20()` function.
+
+### Full exit
+
+User can request this expensive operation to withdraw funds if he thinks that his transactions are censored by validators.
+
+The user must send a transaction to **Franklin** contract function `registerFullExit()`. This function creates a **priority request** that is placed in corresponding priority requests mapping and also emits **NewPriorityRequest(opType, pubData, expirationBlock)** event to notify validators that they must include this request to upcoming blocks. Complete **PriorityQueue** logic that handles **priority requests** is described in **Priority Requests** section.
+
+When a validator commits a block which contains a **circuit operation** `full_exit`, the corresponding **Withdraw onchain operation** for this withdrawal is created. If the block is verified, funds from the **Withdrawal onchain operation** are acrued to the users' **root-chain balances**.
+
+If the block is reverted, this **Withdraw onchain operations** are simply discarded.
 
 ## Block committment
 
@@ -44,21 +62,37 @@ Anybody can perform verification for the committed block.
 
 If the first committed block was not verified within `EXPECT_VERIFICATION_IN` ETH blocks, all unverified blocks are moved to a separate list `blocksToRevert`. After that, anybody can release the funds held in **onchain operations** by each block by calling a `revertBlock()` function (the validator who created the block is supposed to do this, because they will get compensation for the money spent on the block -- to be implemented for multi-validator version).
 
-## Cenosorship resistance
+## Priority queue
 
-To enforece censorship-resistance and enable guaranteed retrievability of the funds, Franklin employs the mechanisms of **Exit queue** (soft enforcement) and **Exodus mode** (hard enforcement).
+This queue will be implemented in separate contract to ensure that priority operations like `deposit` and `full_exit` will be processed in a timely manner and will be included in one of Franklin's blocks (a situation that leads to the need to reverse blocks will not happen), and also, in the case of `full_exit` transactions, the user can always withdraw funds (censorship-resistance). Its' functionality is divided into 2 parts: **Requests Queue** and **Exodus Mode**.
 
-### Exit queue
+**NewPriorityRequest** event is emitted when a user send according transaction to Franklin contract. Also some info about it will be stored in the mapping (operation type and expiration block) strictly in the order of arrival.
+**NewPriorityRequest** event structure:
+- `opType` - operation type
+- `pubData` - request data
+- `expirationBlock` - the number of Ethereum block when request becomes expired
+`expirationBlock` is calculated as follows:
+`expirationBlock = block.number + 250` - about 1 hour for the transaction to expire, `block.number` - current Ethereum block number.
 
-If a user is being ignored by all validators, in order to get back her funds she can always submit a request into the **Exit queue**. This queue will be implemented in a separate contract.
+When corresponding transactions are found in the commited block, their count must be recorded. If the block is verified, this count of the satisfied **priority requests** is removed from mapping. 
 
-On each committment, the Franklin contract MUST check with the **Exit queue** if there are **circuit operations** required to be included in the block. A block committment without requried operations MUST be rejected.
+If the block is reverted, **priority requests** with `deposit` operation type will be removed from the number of **priority requests** that were specified when committing the block.
 
-If the exit queue is being processed too slow, it will trigger the **Exodus mode** in the Franklin contract.
+### **Validators'** responsibility
+
+**Validators** MUST subscribe for `NewPriorityRequest` events in the RIGHT order to include priority transactions in some upcoming blocks.
+The need for _Validators_ to include these transactions in blocks as soon as possible is dedicated by the increasing probability of entering the **Exodus Mode** (described below).
+
+A certain value of the selected token will be withdrawn from the _user's_ account, as payment for the _validator’s_ work to include these transactions in the block. One transaction fee is calculated as follows:
+`fee = 3 * gas * mediumFee`, where
+- `gas` - the gas cost of all related operations for the exit
+- `mediumFee` - current average fee in the network.
 
 ### Exodus mode
 
-In the **Exodus mode**, the contract freezes all block processing, and all users must exit. All existing block committments can be reverted after they expire (thus no special handling is required).
+If the **Requests Queue** is being processed too slow, it will trigger the **Exodus mode** in **Franklin** contract. This moment is determined by the first (oldest) **priority request** with oldest `expirationBlock` value . If `current ethereum block number >= oldest expiration block number` the **Exodus Mode** will be entered.
+
+In the **Exodus mode**, the contract freezes all block processing, and all users must exit. All existing block commitments will be reverted.
 
 Every user will be able to submit a SNARK proof that she owns funds in the latest verified state of Franklin by calling `exit()` function. If the proof verification succeeds, the entire user amount will be accrued to her **onchain balance**, and a flag will be set in order to prevent double exits of the same token balance.
 
