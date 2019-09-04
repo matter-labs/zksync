@@ -15,6 +15,16 @@ pub struct CircuitElement<E: JubjubEngine> {
     length: usize,
 }
 impl<E: JubjubEngine> CircuitElement<E> {
+    pub fn pad(self, n: usize) -> Self {
+        assert!(self.length < n);
+        let mut padded_bits = self.get_bits_le();
+        padded_bits.resize(n, Boolean::constant(false));
+        CircuitElement {
+            number: self.number,
+            bits_le: padded_bits,
+            length: n,
+        }
+    }
     pub fn from_fe_strict<CS: ConstraintSystem<E>, F: FnOnce() -> Result<E::Fr, SynthesisError>>(
         mut cs: CS,
         field_element: F,
