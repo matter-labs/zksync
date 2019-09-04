@@ -36,7 +36,7 @@ impl<E: JubjubEngine> CloseAccountWitness<E> {
             franklin_constants::ACCOUNT_ID_BIT_WIDTH,
         );
 
-        pubdata_bits.resize(8 * 8, false);
+        pubdata_bits.resize(franklin_constants::CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
 }
@@ -108,7 +108,8 @@ pub fn apply_close_account(
         },
         args: OperationArguments {
             ethereum_key: Some(Fr::zero()),
-            amount: Some(Fr::zero()),
+            amount_packed: Some(Fr::zero()),
+            full_amount: Some(Fr::zero()),
             fee: Some(Fr::zero()),
             a: Some(a),
             b: Some(b),

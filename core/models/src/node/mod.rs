@@ -14,7 +14,6 @@ pub use web3::types::{H256, U128, U256};
 
 pub use self::account::{Account, AccountAddress, AccountUpdate};
 pub use self::operations::{DepositOp, FranklinOp, PartialExitOp, TransferOp, TransferToNewOp};
-use crate::params::AMOUNT_EXPONENT_BIT_WIDTH;
 
 pub type Engine = bn256::Bn256;
 pub type Fr = bn256::Fr;

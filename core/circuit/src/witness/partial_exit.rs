@@ -50,9 +50,8 @@ impl<E: JubjubEngine> PartialExitWitness<E> {
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.amount.unwrap(),
-            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
-                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+            &self.args.full_amount.unwrap(),
+            franklin_constants::BALANCE_BIT_WIDTH,
         );
 
         append_be_fixed_width(
@@ -66,7 +65,7 @@ impl<E: JubjubEngine> PartialExitWitness<E> {
             &self.args.ethereum_key.unwrap(),
             franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
         );
-        pubdata_bits.resize(32 * 8, false);
+        pubdata_bits.resize(6 * franklin_constants::CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
 }
@@ -176,7 +175,8 @@ pub fn apply_partial_exit(
         },
         args: OperationArguments {
             ethereum_key: Some(partial_exit.ethereum_key),
-            amount: Some(amount_encoded),
+            amount_packed: Some(amount_encoded),
+            full_amount: Some(amount_as_field_element),
             fee: Some(fee_encoded),
             a: Some(a),
             b: Some(b),

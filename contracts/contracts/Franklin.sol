@@ -11,8 +11,8 @@ contract Franklin {
 
     // chunks per block; each chunk has 8 bytes of public data
     uint256 constant BLOCK_SIZE = 10;
-    // must fit into uint112
-    uint256 constant MAX_VALUE = 2 ** 112 - 1;
+    // must fit into uint128
+    uint256 constant MAX_VALUE = 2 ** 128 - 1;
     // ETH blocks
     uint256 constant LOCK_DEPOSITS_FOR = 8 * 60 * 100;
     // ETH blocks
@@ -40,14 +40,14 @@ contract Franklin {
     event OnchainDeposit(
         address indexed owner,
         uint32 tokenId,
-        uint112 amount,
+        uint128 amount,
         uint32 lockedUntilBlock,
         bytes franklinAddress
     );
     event OnchainWithdrawal(
         address indexed owner,
         uint32 tokenId,
-        uint112 amount
+        uint128 amount
     );
 
     event TokenAdded(address token, uint32 tokenId);
@@ -78,7 +78,7 @@ contract Franklin {
     // Root-chain balance: users can send funds from and to Franklin
     // from the root-chain balances only (see docs)
     struct Balance {
-        uint112 balance;
+        uint128 balance;
         // Balance can be locked in order to let validators deposit some of it into Franklin
         // Locked balances becomes free at ETH blockNumber = lockedUntilBlock
         // To re-lock, users can make a deposit with zero amount
@@ -136,7 +136,7 @@ contract Franklin {
         OnchainOpType opType;
         uint32 tokenId;
         address owner;
-        uint112 amount;
+        uint128 amount;
     }
 
     // Total number of registered OnchainOps
@@ -255,17 +255,17 @@ contract Franklin {
     // Deposit ETH (simply by sending it to the contract)
     function depositETH(bytes calldata _franklin_addr) external payable {
         require(msg.value <= MAX_VALUE, "sorry Joe");
-        registerDeposit(ValidatedTokenId(0), uint112(msg.value), _franklin_addr);
+        registerDeposit(ValidatedTokenId(0), uint128(msg.value), _franklin_addr);
     }
 
-    function withdrawETH(uint112 _amount) external {
+    function withdrawETH(uint128 _amount) external {
         registerWithdrawal(ValidatedTokenId(0), _amount);
         msg.sender.transfer(_amount);
     }
 
     function depositERC20(
         address _token,
-        uint112 _amount,
+        uint128 _amount,
         bytes calldata _franklin_addr
     ) external {
         require(
@@ -276,7 +276,7 @@ contract Franklin {
         registerDeposit(tokenId, _amount, _franklin_addr);
     }
 
-    function withdrawERC20(address _token, uint112 _amount) external {
+    function withdrawERC20(address _token, uint128 _amount) external {
         ValidatedTokenId memory tokenId = validateERC20Token(_token);
         registerWithdrawal(tokenId, _amount);
         require(
@@ -287,7 +287,7 @@ contract Franklin {
 
     function registerDeposit(
         ValidatedTokenId memory _token,
-        uint112 _amount,
+        uint128 _amount,
         bytes memory _franklin_addr
     ) internal {
         requireActive();
@@ -320,7 +320,7 @@ contract Franklin {
         );
     }
 
-    function registerWithdrawal(ValidatedTokenId memory _token, uint112 _amount) internal {
+    function registerWithdrawal(ValidatedTokenId memory _token, uint128 _amount) internal {
         requireActive();
         require(
             block.number >= balances[msg.sender][_token.id].lockedUntilBlock,
@@ -461,17 +461,15 @@ contract Franklin {
                 (uint256(uint8(_publicData[opDataPointer + 3])) << 8) +
                     uint256(uint8(_publicData[opDataPointer + 4]))
             );
-
-            uint8[3] memory amountPacked;
-            amountPacked[0] = uint8(_publicData[opDataPointer + 5]);
-            amountPacked[1] = uint8(_publicData[opDataPointer + 6]);
-            amountPacked[2] = uint8(_publicData[opDataPointer + 7]);
-            uint112 amount = unpackAmount(amountPacked);
+            uint128 amount = 0;
+            for (uint8 i = 0; i < 16; i++) {
+               amount += uint128(uint8(_publicData[opDataPointer+5+i])) << (8*(15-i));
+            }
 
             uint8[2] memory feePacked;
             feePacked[0] = uint8(_publicData[opDataPointer + 8]);
             feePacked[1] = uint8(_publicData[opDataPointer + 9]);
-            uint112 fee = unpackFee(feePacked);
+            uint128 fee = unpackFee(feePacked);
 
             bytes memory franklin_address_ = new bytes(PUBKEY_HASH_LEN);
             for (uint8 i = 0; i < PUBKEY_HASH_LEN; i++) {
@@ -496,7 +494,7 @@ contract Franklin {
                 account,
                 (amount + fee)
             );
-            return (4 * 8, 1);
+            return (6 * 8, 1);
         }
 
         // partial_exit
@@ -508,11 +506,10 @@ contract Franklin {
                     uint256(uint8(_publicData[opDataPointer + 4]))
             );
 
-            uint8[3] memory amountPacked;
-            amountPacked[0] = uint8(_publicData[opDataPointer + 5]);
-            amountPacked[1] = uint8(_publicData[opDataPointer + 6]);
-            amountPacked[2] = uint8(_publicData[opDataPointer + 7]);
-            uint112 amount = unpackAmount(amountPacked);
+            uint128 amount = 0;
+            for (uint8 i = 0; i < 16; i++) {
+                amount += uint128(uint8(_publicData[opDataPointer+5+i])) << (8*(15-i));
+            }
 
             bytes memory ethAddress = new bytes(20);
             for (uint256 i = 0; i < 20; ++i) {
@@ -520,14 +517,14 @@ contract Franklin {
             }
 
             requireValidTokenId(tokenId);
-            // TODO!: balances[ethAddress][tokenId] possible overflow (uint112)
+            // TODO!: balances[ethAddress][tokenId] possible overflow (uint128)
             onchainOps[currentOnchainOp] = OnchainOp(
                 OnchainOpType.Withdrawal,
                 tokenId,
                 bytesToAddress(ethAddress),
                 amount
             );
-            return (4 * 8, 1);
+            return (6 * 8, 1);
         }
 
         require(false, "unsupported op");
@@ -622,7 +619,7 @@ contract Franklin {
     function exit(
         uint32 _tokenId,
         address[] calldata _owners,
-        uint112[] calldata _amounts,
+        uint128[] calldata _amounts,
         uint256[8] calldata /*_proof*/
     ) external {
         require(exodusMode, "must be in exodus mode");
@@ -671,19 +668,19 @@ contract Franklin {
     function unpackAmount(uint8[3] memory _amount)
         internal
         pure
-        returns (uint112)
+        returns (uint128)
     {
         uint24 n = (uint24(_amount[0]) << 2*8)
         + (uint24(_amount[1]) << 8)
         + (uint24(_amount[2]));
-        return uint112(n >> AMOUNT_EXPONENT_BIT_WIDTH) * (uint112(10) ** (n & 0x1f));
+        return uint128(n >> AMOUNT_EXPONENT_BIT_WIDTH) * (uint128(10) ** (n & 0x1f));
     }
 
 
-    function unpackFee(uint8[2] memory encoded_fee) internal pure returns (uint112) {
+    function unpackFee(uint8[2] memory encoded_fee) internal pure returns (uint128) {
         uint16 fee = (uint16(encoded_fee[0]) << 8) + uint16(encoded_fee[1]);
 
-        return uint112(fee >> FEE_EXPONENT_BIT_WIDTH) * (uint112(10) ** (fee & 0x3f));
+        return uint128(fee >> FEE_EXPONENT_BIT_WIDTH) * (uint128(10) ** (fee & 0x3f));
     }
 
     function bytesToAddress(bytes memory bys)

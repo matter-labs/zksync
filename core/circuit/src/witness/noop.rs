@@ -45,7 +45,8 @@ pub fn noop_operation(
 
         args: OperationArguments {
             ethereum_key: Some(Fr::zero()),
-            amount: Some(Fr::zero()),
+            amount_packed: Some(Fr::zero()),
+            full_amount: Some(Fr::zero()),
             fee: Some(Fr::zero()),
             a: Some(Fr::zero()),
             b: Some(Fr::zero()),

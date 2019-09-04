@@ -69,9 +69,10 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                     &self.params,
                 )?,
                 amount_packed: zero_circuit_element.clone(),
+                full_amount: zero_circuit_element.clone(),
                 fee_packed: zero_circuit_element.clone(),
                 fee: zero_circuit_element.clone(),
-                amount: zero_circuit_element.clone(),
+                amount_unpacked: zero_circuit_element.clone(),
                 sig_msg: zero_circuit_element.clone(),
                 a: zero_circuit_element.clone(),
                 b: zero_circuit_element.clone(),
@@ -768,12 +769,12 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
         pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
         pubdata_bits.extend(cur.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
-        pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //AMOUNT_PACKED=24
+        pubdata_bits.extend(op_data.full_amount.get_bits_be()); //AMOUNT_PACKED=24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //FEE_PACKED=8
         pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //ETHEREUM_KEY=160
                                                                  //        assert_eq!(pubdata_bits.len(), 30 * 8);
         pubdata_bits.resize(
-            4 * franklin_constants::CHUNK_BIT_WIDTH,
+            6 * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
 
@@ -781,7 +782,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
             &chunk_data.chunk_number,
-            4,
+            6,
         )?;
 
         //TODO: this flag is used too often, we better compute it above
@@ -809,7 +810,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         //here we verify whether exit should be full
         let is_full_exit = Boolean::from(Expression::equals(
             cs.namespace(|| "amount is zero"),
-            &op_data.amount.get_number(),
+            &op_data.full_amount.get_number(),
             Expression::constant::<CS>(E::Fr::zero()),
         )?);
         let is_base_valid = multi_and(
@@ -830,7 +831,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
             lhs_partial_valid_flags.push(is_a_correct);
 
-            let sum_amount_fee = Expression::from(&op_data.amount.get_number())
+            let sum_amount_fee = Expression::from(&op_data.full_amount.get_number())
                 + Expression::from(&op_data.fee.get_number());
 
             let is_b_correct = Boolean::from(Expression::equals(
@@ -956,11 +957,11 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
         pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
         pubdata_bits.extend(cur.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
-        pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //AMOUNT_PACKED=24
+        pubdata_bits.extend(op_data.full_amount.get_bits_be()); //AMOUNT_PACKED=24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //FEE_PACKED=8
         pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //NEW_PUBKEY_HASH_WIDTH=216
         pubdata_bits.resize(
-            4 * franklin_constants::CHUNK_BIT_WIDTH, //TODO: move to constant
+            6 * franklin_constants::CHUNK_BIT_WIDTH, //TODO: move to constant
             Boolean::constant(false),
         );
 
@@ -968,7 +969,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
             &chunk_data.chunk_number,
-            4,
+            6,
         )?;
 
         let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
@@ -1003,8 +1004,11 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         is_valid_flags.push(is_pubkey_correct);
 
         //verify correct amounts
-        let is_a_correct =
-            CircuitElement::equals(cs.namespace(|| "a == amount"), &op_data.amount, &op_data.a)?;
+        let is_a_correct = CircuitElement::equals(
+            cs.namespace(|| "a == amount"),
+            &op_data.full_amount,
+            &op_data.a,
+        )?;
 
         is_valid_flags.push(is_a_correct);
         let is_b_correct =
@@ -1029,7 +1033,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         // update balance
         let updated_balance = Expression::from(&cur.balance.get_number())
-            + Expression::from(&op_data.amount.get_number());
+            + Expression::from(&op_data.full_amount.get_number());
 
         cur.balance = CircuitElement::conditionally_select_with_number_strict(
             cs.namespace(|| "mutated balance"),
@@ -1237,7 +1241,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         lhs_valid_flags.push(is_a_correct);
 
-        let sum_amount_fee = Expression::from(&op_data.amount.get_number())
+        let sum_amount_fee = Expression::from(&op_data.amount_unpacked.get_number())
             + Expression::from(&op_data.fee.get_number());
 
         let is_b_correct = Boolean::from(Expression::equals(
@@ -1292,7 +1296,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         cur.balance = CircuitElement::conditionally_select(
             cs.namespace(|| "mutated balance"),
-            &op_data.amount,
+            &op_data.amount_unpacked,
             &cur.balance,
             &rhs_valid,
         )?;
@@ -1431,7 +1435,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         lhs_valid_flags.push(is_a_correct);
 
-        let sum_amount_fee = Expression::from(&op_data.amount.get_number())
+        let sum_amount_fee = Expression::from(&op_data.amount_unpacked.get_number())
             + Expression::from(&op_data.fee.get_number());
 
         let is_b_correct = Boolean::from(Expression::equals(
@@ -1489,7 +1493,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         // calculate new rhs balance value
         let updated_balance = Expression::from(&cur.balance.get_number())
-            + Expression::from(&op_data.amount.get_number());
+            + Expression::from(&op_data.amount_unpacked.get_number());
 
         //update balance
         cur.balance = CircuitElement::conditionally_select_with_number_strict(

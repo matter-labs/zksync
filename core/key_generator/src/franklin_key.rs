@@ -63,7 +63,8 @@ pub fn make_franklin_key() {
         args: OperationArguments {
             a: None,
             b: None,
-            amount: None,
+            amount_packed: None,
+            full_amount: None,
             fee: None,
             new_pub_key_hash: None,
             ethereum_key: None,

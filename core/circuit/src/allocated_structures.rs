@@ -92,7 +92,8 @@ pub struct AllocatedOperationData<E: JubjubEngine> {
     pub signer_pubkey: CircuitPubkey<E>,
     pub amount_packed: CircuitElement<E>,
     pub fee_packed: CircuitElement<E>,
-    pub amount: CircuitElement<E>,
+    pub amount_unpacked: CircuitElement<E>,
+    pub full_amount: CircuitElement<E>,
     pub fee: CircuitElement<E>,
     pub sig_msg: CircuitElement<E>,
     pub new_pubkey_hash: CircuitElement<E>,
@@ -112,9 +113,15 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             || op.args.ethereum_key.grab(),
             franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
         )?;
+
+        let full_amount = CircuitElement::from_fe_strict(
+            cs.namespace(|| "full_amount"),
+            || op.args.full_amount.grab(),
+            franklin_constants::BALANCE_BIT_WIDTH,
+        )?;
         let amount_packed = CircuitElement::from_fe_strict(
             cs.namespace(|| "amount_packed"),
-            || op.args.amount.grab(),
+            || op.args.amount_packed.grab(),
             franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH
                 + franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
         )?;
@@ -123,10 +130,6 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             || op.args.fee.grab(),
             franklin_constants::FEE_EXPONENT_BIT_WIDTH + franklin_constants::FEE_MANTISSA_BIT_WIDTH,
         )?;
-        //        println!(
-        //            "fee_packed in allocated_operation_data equals {}",
-        //            fee_packed.get_number().get_value().grab()?
-        //        );
 
         let amount_parsed = parse_with_exponent_le(
             cs.namespace(|| "parse amount"),
@@ -143,7 +146,7 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             franklin_constants::FEE_MANTISSA_BIT_WIDTH,
             10,
         )?;
-        let amount = CircuitElement::from_number(
+        let amount_unpacked = CircuitElement::from_number(
             cs.namespace(|| "amount"),
             amount_parsed,
             franklin_constants::BALANCE_BIT_WIDTH,
@@ -190,8 +193,9 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             amount_packed,
             fee_packed,
             fee,
-            amount,
-            sig_msg,
+            amount_unpacked,
+            sig_msg: sig_msg,
+            full_amount: full_amount,
             new_pubkey_hash,
             a,
             b,

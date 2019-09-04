@@ -58,7 +58,7 @@ impl<E: JubjubEngine> TransferWitness<E> {
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.amount.unwrap(),
+            &self.args.amount_packed.unwrap(),
             franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
                 + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
         );
@@ -68,7 +68,7 @@ impl<E: JubjubEngine> TransferWitness<E> {
             &self.args.fee.unwrap(),
             franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         );
-        pubdata_bits.resize(16 * 8, false); //TODO verify if right padding is okay
+        pubdata_bits.resize(2 * franklin_constants::CHUNK_BIT_WIDTH, false); //TODO verify if right padding is okay
         pubdata_bits
     }
 }
@@ -243,7 +243,8 @@ pub fn apply_transfer(
         },
         args: OperationArguments {
             ethereum_key: Some(Fr::zero()),
-            amount: Some(amount_encoded),
+            amount_packed: Some(amount_encoded),
+            full_amount: Some(amount_as_field_element),
             fee: Some(fee_encoded),
             a: Some(a),
             b: Some(b),

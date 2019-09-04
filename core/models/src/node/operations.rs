@@ -1,6 +1,8 @@
 use super::tx::{Close, Deposit, Transfer, Withdraw};
 use super::AccountId;
 use crate::node::{pack_fee_amount, pack_token_amount};
+use bigdecimal::ToPrimitive;
+use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositOp {
@@ -9,7 +11,7 @@ pub struct DepositOp {
 }
 
 impl DepositOp {
-    const CHUNKS: usize = 4;
+    const CHUNKS: usize = 6;
     const OP_CODE: u8 = 0x01;
 
     fn get_public_data(&self) -> Vec<u8> {
@@ -17,7 +19,7 @@ impl DepositOp {
         data.push(Self::OP_CODE); // opcode
         data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
         data.extend_from_slice(&self.tx.token.to_be_bytes());
-        data.extend_from_slice(&pack_token_amount(&self.tx.amount));
+        data.extend_from_slice(&self.tx.amount.to_u128().unwrap().to_be_bytes());
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
         data.extend_from_slice(&self.tx.to.data);
         data.resize(Self::CHUNKS * 8, 0x00);
@@ -81,7 +83,7 @@ pub struct PartialExitOp {
 }
 
 impl PartialExitOp {
-    const CHUNKS: usize = 4;
+    const CHUNKS: usize = 6;
     const OP_CODE: u8 = 0x03;
 
     fn get_public_data(&self) -> Vec<u8> {
@@ -89,7 +91,7 @@ impl PartialExitOp {
         data.push(Self::OP_CODE); // opcode
         data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
         data.extend_from_slice(&self.tx.token.to_be_bytes());
-        data.extend_from_slice(&pack_token_amount(&self.tx.amount));
+        data.extend_from_slice(&self.tx.amount.to_u128().unwrap().to_be_bytes());
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
         data.extend_from_slice(&self.tx.eth_address);
         data.resize(Self::CHUNKS * 8, 0x00);

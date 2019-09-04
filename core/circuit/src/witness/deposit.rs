@@ -49,9 +49,8 @@ impl<E: JubjubEngine> DepositWitness<E> {
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.amount.unwrap(),
-            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
-                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+            &self.args.full_amount.unwrap(),
+            franklin_constants::BALANCE_BIT_WIDTH,
         );
 
         append_be_fixed_width(
@@ -66,7 +65,7 @@ impl<E: JubjubEngine> DepositWitness<E> {
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         );
         //        assert_eq!(pubdata_bits.len(), 37 * 8);
-        pubdata_bits.resize(32 * 8, false);
+        pubdata_bits.resize(6 * franklin_constants::CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
 }
@@ -187,7 +186,8 @@ pub fn apply_deposit(
         },
         args: OperationArguments {
             ethereum_key: Some(Fr::zero()),
-            amount: Some(amount_encoded),
+            amount_packed: Some(amount_encoded),
+            full_amount: Some(amount_as_field_element),
             fee: Some(fee_encoded),
             a: Some(a),
             b: Some(b),
