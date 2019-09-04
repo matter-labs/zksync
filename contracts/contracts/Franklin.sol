@@ -496,7 +496,7 @@ contract Franklin {
                 account,
                 (amount + fee)
             );
-            return (5 * 8, 1);
+            return (4 * 8, 1);
         }
 
         // partial_exit
@@ -683,7 +683,7 @@ contract Franklin {
     function unpackFee(uint8[2] memory encoded_fee) internal pure returns (uint112) {
         uint16 fee = (uint16(encoded_fee[0]) << 8) + uint16(encoded_fee[1]);
 
-        return uint112(encoded_fee >> FEE_EXPONENT_BIT_WIDTH) * uint112(10) ** (encoded_fee & 0x3f);
+        return uint112(fee >> FEE_EXPONENT_BIT_WIDTH) * (uint112(10) ** (fee & 0x3f));
     }
 
     function bytesToAddress(bytes memory bys)

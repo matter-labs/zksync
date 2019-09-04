@@ -43,10 +43,10 @@ async function reason() {
             console.log("revert code", code);
         }
 
-        console.log(franklinDeployedContract.interface.parseLog(receipt.logs[0]));
-        console.log(franklinDeployedContract.interface.parseLog(receipt.logs[1]));
-        console.log(franklinDeployedContract.interface.parseLog(receipt.logs[2]));
-        // console.log("\n \n ");
+        for (let log of receipt.logs){
+            console.log(franklinDeployedContract.interface.parseLog(log));
+
+        }
 
     }
 }
