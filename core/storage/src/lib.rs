@@ -34,6 +34,7 @@ use std::env;
 use diesel::sql_types::{BigInt, Nullable, Text, Timestamp};
 sql_function!(coalesce, Coalesce, (x: Nullable<BigInt>, y: BigInt) -> BigInt);
 
+use itertools::Itertools;
 use models::node::AccountAddress;
 
 #[derive(Clone)]
@@ -268,6 +269,7 @@ pub struct StoredOperation {
     pub block_number: i64,
     pub action_type: String,
     pub created_at: NaiveDateTime,
+    pub confirmed: bool,
 }
 
 #[derive(Debug, Clone, Queryable, QueryableByName)]
@@ -968,16 +970,42 @@ impl StorageProcessor {
         })
     }
 
-    pub fn load_sent_unconfirmed_ops(&self) -> QueryResult<Vec<(Operation, StorageETHOperation)>> {
+    pub fn load_sent_unconfirmed_ops(
+        &self,
+    ) -> QueryResult<Vec<(Operation, Vec<StorageETHOperation>)>> {
         self.conn().transaction(|| {
             let ops: Vec<_> = operations::table
-                .inner_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
                 .filter(eth_operations::confirmed.eq(false))
+                .inner_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
                 .order(operations::id.asc())
                 .load::<(StoredOperation, StorageETHOperation)>(self.conn())?;
-            ops.into_iter()
-                .map(|(o, eth_op)| o.into_op(self).map(|o| (o, eth_op)))
-                .collect()
+            let mut ops_with_eth_actions = Vec::new();
+            for (op, eth_op) in ops.into_iter() {
+                ops_with_eth_actions.push((op.into_op(self)?, eth_op));
+            }
+            Ok(ops_with_eth_actions
+                .into_iter()
+                .group_by(|(o, _)| o.id.unwrap())
+                .into_iter()
+                .map(|(_op_id, group_iter)| {
+                    let fold_result = group_iter.fold(
+                        (None, Vec::new()),
+                        |(mut accum_op, mut accum_eth_ops): (Option<Operation>, _),
+                         (op, eth_op)| {
+                            accum_op
+                                .as_ref()
+                                .map(|accum_op| assert_eq!(accum_op.id, op.id));
+                            if accum_op.is_none() {
+                                accum_op = Some(op);
+                            }
+                            accum_eth_ops.push(eth_op);
+
+                            (accum_op, accum_eth_ops)
+                        },
+                    );
+                    (fold_result.0.unwrap(), fold_result.1)
+                })
+                .collect())
         })
     }
 
@@ -1000,10 +1028,25 @@ impl StorageProcessor {
     }
 
     pub fn confirm_eth_tx(&self, hash: &H256) -> QueryResult<()> {
-        update(eth_operations::table.filter(eth_operations::tx_hash.eq(format!("{:#x}", hash))))
+        self.conn().transaction(|| {
+            update(
+                eth_operations::table.filter(eth_operations::tx_hash.eq(format!("{:#x}", hash))),
+            )
             .set(eth_operations::confirmed.eq(true))
             .execute(self.conn())
-            .map(drop)
+            .map(drop)?;
+
+            let (op, _) = operations::table
+                .filter(eth_operations::confirmed.eq(false))
+                .inner_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
+                .filter(eth_operations::tx_hash.eq(format!("{:#x}", hash)))
+                .first::<(StoredOperation, StorageETHOperation)>(self.conn())?;
+
+            update(operations::table.filter(operations::id.eq(op.id)))
+                .set(operations::confirmed.eq(true))
+                .execute(self.conn())
+                .map(drop)
+        })
     }
 
     pub fn load_unverified_commitments(&self) -> QueryResult<Vec<Operation>> {

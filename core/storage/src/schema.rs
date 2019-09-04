@@ -94,6 +94,7 @@ table! {
         block_number -> Int8,
         action_type -> Text,
         created_at -> Timestamp,
+        confirmed -> Bool,
     }
 }
 

@@ -10,6 +10,7 @@ CREATE TABLE eth_operations
 );
 
 ALTER TABLE operations
+    ADD COLUMN confirmed bool not null default false,
     DROP COLUMN addr CASCADE,
     DROP COLUMN nonce CASCADE,
     DROP COLUMN tx_hash CASCADE
