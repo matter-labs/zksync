@@ -11,6 +11,8 @@ contract Franklin {
     VerificationKey verificationKey;
     Verifier verifier;
 
+    // Expiration delta for priority request to be satisfied (in ETH blocks)
+    uint32 constant EXPIRATION_DELTA = 250; // About 1 hour
     // chunks per block; each chunk has 8 bytes of public data
     uint256 constant BLOCK_SIZE = 10;
     // must fit into uint112
@@ -87,9 +89,9 @@ contract Franklin {
     // - pubData - request data
     // - expirationBlock - the number of Ethereum block when request becomes expired
     event NewPriorityRequest(
-        uint indexed opType,
+        uint8 indexed opType,
         bytes pubData,
-        uint indexed expirationBlock
+        uint32 indexed expirationBlock
     );
 
     // MARK: - STORAGE
@@ -148,7 +150,7 @@ contract Franklin {
         // Total number of operations to process for this block
         uint64 totalOperations;
         // Total number of priority operations for this block
-        uint priorityOperations;
+        uint32 priorityOperations;
     }
 
     // List of blocks by Franklin blockId
@@ -191,17 +193,17 @@ contract Franklin {
 
     // Priority request op type and expiration block
     struct PriorityRequestParams {
-        uint opType;
-        uint expirationBlock;
+        uint8 opType;
+        uint32 expirationBlock;
     }
 
     // Requests params mapping (request id - (type, expiration block))
     // Contains op type and expiration block of unsatisfied requests. Numbers are in order of requests receiving
-    mapping(uint => PriorityRequestParams) public priorityRequestsParams;
+    mapping(uint32 => PriorityRequestParams) public priorityRequestsParams;
     // First priority request id
-    uint public firstPriorityRequestId;
+    uint32 public firstPriorityRequestId;
     // Total number of requests
-    uint public totalPriorityRequests;
+    uint32 public totalPriorityRequests;
 
     // Reverting expired blocks
 
@@ -258,8 +260,8 @@ contract Franklin {
     // Params:
     // - _opType - priority request type
     // - _pubData - request data
-    function addPriorityRequest(uint _opType, bytes calldata _pubData) internal {
-        uint expirationBlock = block.number + EXPECT_VERIFICATION_IN;
+    function addPriorityRequest(uint8 _opType, bytes calldata _pubData) internal {
+        uint32 expirationBlock = block.number + EXPIRATION_DELTA;
         priorityRequestsParams[firstPriorityRequestId+totalPriorityRequests] = PriorityRequestParams({
             opType: _opType,
             expirationBlock: expirationBlock
@@ -276,10 +278,10 @@ contract Franklin {
     // Removes requests
     // Params:
     // - _count - number of requests to remove
-    function removePriorityRequests(uint _count) internal {
+    function removePriorityRequests(uint32 _count) internal {
         require(count <= totalRequests, "Count of removed requests is higher than their count");
 
-        for (uint i = firstPriorityRequestId; i < firstPriorityRequestId+count; i++) {
+        for (uint32 i = firstPriorityRequestId; i < firstPriorityRequestId+count; i++) {
             delete priorityRequestsParams[i];
         }
         totalPriorityRequests -= count;
@@ -290,11 +292,11 @@ contract Franklin {
     // Params:
     // - _opType - operation type
     // - _anyRequestsCount - count of requests where to look certain requests for
-    function removePriorityRequestsWithType(uint _opType, uint _anyRequestsCount) internal {
+    function removePriorityRequestsWithType(uint8 _opType, uint32 _anyRequestsCount) internal {
         require(_anyRequestsCount <= totalRequests, "Count of removed requests is higher than their count");
 
-        uint removingPriorityCount = 0;
-        for (uint i = firstPriorityRequestId; i < firstPriorityRequestId + _anyRequestsCount; i++) {
+        uint32 removingPriorityCount = 0;
+        for (uint32 i = firstPriorityRequestId; i < firstPriorityRequestId + _anyRequestsCount; i++) {
             if (priorityRequestsParams[i].opType == _opType) {
                 delete priorityRequestsParams[i];
                 removingPriorityCount++;
@@ -507,7 +509,7 @@ contract Franklin {
 
         // TODO: make efficient padding here
 
-        (uint64 startId, uint64 totalProcessed, uint priorityOperations) = commitOnchainOps(_publicData);
+        (uint64 startId, uint64 totalProcessed, uint32 priorityOperations) = commitOnchainOps(_publicData);
 
         bytes32 commitment = createBlockCommitment(
             _blockNumber,
@@ -570,7 +572,7 @@ contract Franklin {
     // - _publicData - operations
     function commitOnchainOps(bytes memory _publicData)
         internal
-        returns (uint64 onchainOpsStartId, uint64 processedOnchainOps, uint priorityOperations)
+        returns (uint64 onchainOpsStartId, uint64 processedOnchainOps, uint32 priorityOperations)
     {
         require(_publicData.length % 8 == 0, "pubdata.len % 8 != 0");
 
@@ -583,10 +585,10 @@ contract Franklin {
         // TODO: optimize
         uint256 currentPointer = 0;
 
-        uint priorityOperations = priorityOps;
+        uint32 priorityOperations = priorityOps;
         while (currentPointer < _publicData.length) {
-            uint opType = uint(bytes1(_publicData[currentPointer]));
-            (uint256 len, uint64 ops, uint priorityOps) = processOp(
+            uint8 opType = uint8(_publicData[currentPointer]);
+            (uint256 len, uint64 ops, uint32 priorityOps) = processOp(
                 opType,
                 currentPointer,
                 _publicData,
@@ -611,11 +613,11 @@ contract Franklin {
     // - _newRoot - new tree root
     // - _currentOnchainOp - operation identifier
     function processOp(
-        uint _opType,
+        uint8 _opType,
         uint256 _currentPointer,
         bytes memory _publicData,
         uint64 _currentOnchainOp
-    ) internal returns (uint256 processedLen, uint64 processedOnchainOps, uint priorityOperations) {
+    ) internal returns (uint256 processedLen, uint64 processedOnchainOps, uint32 priorityOperations) {
         uint256 opDataPointer = _currentPointer + 1;
 
         if (_opType == OpType.Noop) return (1 * 8, 0, 0); // noop
