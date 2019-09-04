@@ -1,4 +1,6 @@
-# Franllin ETH contract documentation
+# Franklin ETH contract documentation
+
+![flow](https://i.imgur.com/MNlSf19.jpg)
 
 ## Deployment
 
