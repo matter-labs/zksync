@@ -1,6 +1,7 @@
 import { Tester } from './Tester';
 import fs, { exists } from 'fs';
 import { bigNumberify } from 'ethers/utils';
+
 async function test(): Promise<void> {
     const tester: Tester = await Tester.new({
         initNumWallets: 3,

@@ -293,7 +293,9 @@ fn handle_get_testnet_config(req: &HttpRequest<AppState>) -> ActixResult<HttpRes
 //    Ok(HttpResponse::Ok().json(tx))
 //}
 
-fn handle_get_executed_transaction_by_hash(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+fn handle_get_executed_transaction_by_hash(
+    req: &HttpRequest<AppState>,
+) -> ActixResult<HttpResponse> {
     let pool = req.state().connection_pool.clone();
 
     let storage = pool.access_storage();
@@ -311,13 +313,14 @@ fn handle_get_executed_transaction_by_hash(req: &HttpRequest<AppState>) -> Actix
         }));
     }
     let transaction_hash_string = transaction_hash_string.unwrap();
+    let transaction_hash = hex::decode(transaction_hash_string).unwrap();
 
-    let tx = storage.is_tx_successful(transaction_hash_string);
-    let tx = tx.unwrap();
-
-    Ok(HttpResponse::Ok().json(tx))
+    if let Ok(tx) = storage.tx_receipt(transaction_hash.as_slice()) {
+        Ok(HttpResponse::Ok().json(tx))
+    } else {
+        Ok(HttpResponse::Ok().json(()))
+    }
 }
-
 
 fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let network_status = req.state().network_status.read();
@@ -547,7 +550,8 @@ fn start_server(state: AppState, bind_to: String) {
                     //     r.method(Method::GET).f(handle_get_transaction_by_id);
                     // })
                     .resource("/transactions/{tx_hash}", |r| {
-                        r.method(Method::GET).f(handle_get_executed_transaction_by_hash);
+                        r.method(Method::GET)
+                            .f(handle_get_executed_transaction_by_hash);
                     })
                     .resource("/blocks/{block_id}/transactions", |r| {
                         r.method(Method::GET).f(handle_get_block_transactions);

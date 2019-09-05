@@ -33,7 +33,7 @@ export class FranklinProvider {
         return await Axios.get(this.providerAddress + '/api/v0.1/account/' + address).then(reps => reps.data);
     }
 
-    async txSuccess(tx_hash) {
+    async txReceipt(tx_hash) {
         return await Axios.get(this.providerAddress + '/api/v0.1/transactions/' + tx_hash).then(reps => reps.data);
     }
 }
@@ -130,10 +130,10 @@ export class Wallet {
 
     async txReceipt(tx_hash) {
         while (true) {
-            let receipt = await this.provider.txSuccess(tx_hash);
-            if (receipt.verified == true) return receipt;
-            if (receipt.fail_reason != null && receipt.fail_reason !== "not committed yet") 
-                return receipt;
+            let receipt = await this.provider.txReceipt(tx_hash);
+            if (receipt != null) {
+                return receipt
+            }
             await sleep(1000);
         }
     }

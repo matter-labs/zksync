@@ -34,7 +34,7 @@ export abstract class AbstractOperation {
         this.info.logs.push(msg);
     }
     public logsJSON(): string {
-        return JSON.stringify(this.info);
+        return JSON.stringify(this.info, null, 4);
     }
     public static humanReadableLogsFromJSON(json: string): string {
         let info: AbstractOperationLog = JSON.parse(json);

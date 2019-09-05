@@ -104,7 +104,7 @@ export class LocalWallet {
             address: this.franklinWallet.address,
             balances: await this.getAllBalancesString(),
             actions: this.actions
-        });
+        }, null, 4);
     }
 
     public async getBalanceForTokenAsString(token: Token): Promise<string[]> {
