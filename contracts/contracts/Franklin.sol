@@ -11,7 +11,7 @@ contract Franklin {
     Verifier verifier;
 
     // Expiration delta for priority request to be satisfied (in ETH blocks)
-    uint32 constant EXPIRATION_DELTA = 250; // About 1 hour
+    uint256 constant EXPIRATION_DELTA = 250; // About 1 hour
     // chunks per block; each chunk has 8 bytes of public data
     uint256 constant BLOCK_SIZE = 10;
     // must fit into uint128
@@ -98,9 +98,9 @@ contract Franklin {
     // - pubData - request data
     // - expirationBlock - the number of Ethereum block when request becomes expired
     event NewPriorityRequest(
-        uint8 indexed opType,
+        OpType indexed opType,
         bytes pubData,
-        uint32 indexed expirationBlock
+        uint256 indexed expirationBlock
     );
 
     // MARK: - STORAGE
@@ -202,9 +202,9 @@ contract Franklin {
 
     // Priority request op type and expiration block
     struct PriorityRequestParams {
-        uint8 opType;
+        OpType opType;
         bytes pubData;
-        uint32 expirationBlock;
+        uint256 expirationBlock;
     }
 
     // Requests params mapping (request id - (type, expiration block))
@@ -270,8 +270,8 @@ contract Franklin {
     // Params:
     // - _opType - priority request type
     // - _pubData - request data
-    function addPriorityRequest(uint8 _opType, bytes calldata _pubData) internal {
-        uint32 expirationBlock = block.number + EXPIRATION_DELTA;
+    function addPriorityRequest(OpType _opType, bytes memory _pubData) internal {
+        uint256 expirationBlock = block.number + EXPIRATION_DELTA;
         priorityRequestsParams[firstPriorityRequestId+totalPriorityRequests] = PriorityRequestParams({
             opType: _opType,
             pubData: _pubData,
@@ -290,21 +290,21 @@ contract Franklin {
     // Params:
     // - _count - number of requests to remove
     function removePriorityRequests(uint32 _count) internal {
-        require(count <= totalRequests, "Count of removed requests is higher than their count");
+        require(_count <= totalPriorityRequests, "Count of removed requests is higher than their count");
 
-        for (uint32 i = firstPriorityRequestId; i < firstPriorityRequestId+count; i++) {
+        for (uint32 i = firstPriorityRequestId; i < firstPriorityRequestId + _count; i++) {
             delete priorityRequestsParams[i];
         }
-        totalPriorityRequests -= count;
-        firstPriorityRequestId += count;
+        totalPriorityRequests -= _count;
+        firstPriorityRequestId += _count;
     }
 
     // Removes certain requests
     // Params:
     // - _opType - operation type
     // - _anyRequestsCount - count of requests where to look certain requests for
-    function removePriorityRequestsWithType(uint8 _opType, uint32 _anyRequestsCount) internal {
-        require(_anyRequestsCount <= totalRequests, "Count of removed requests is higher than their count");
+    function removePriorityRequestsWithType(OpType _opType, uint32 _anyRequestsCount) internal {
+        require(_anyRequestsCount <= totalPriorityRequests, "Count of removed requests is higher than their count");
 
         uint32 removingPriorityCount = 0;
         for (uint32 i = firstPriorityRequestId; i < firstPriorityRequestId + _anyRequestsCount; i++) {
@@ -321,22 +321,22 @@ contract Franklin {
     // Params:
     // - _anyRequestsCount - count of requests where to look deposit requests for
     function accrueBalancesFromDeposits(uint32 _anyRequestsCount) internal {
-        require(_anyRequestsCount <= totalRequests, "Count of removed requests is higher than their count");
+        require(_anyRequestsCount <= totalPriorityRequests, "Count of removed requests is higher than their count");
 
         for (uint32 i = firstPriorityRequestId; i < firstPriorityRequestId + _anyRequestsCount; i++) {
             if (priorityRequestsParams[i].opType == OpType.Deposit) {
                 bytes memory pubData = priorityRequestsParams[i].pubData;
                 bytes memory owner = new bytes(20);
-                for (uint256 i = 0; i < 20; ++i) {
-                    owner[i] = pubData[i];
+                for (uint256 j = 0; j < 20; ++j) {
+                    owner[j] = pubData[j];
                 }
                 bytes memory token = new bytes(2);
-                for (uint256 i = 0; i < 2; ++i) {
-                    token[i] = pubData[20 + i];
+                for (uint256 j = 0; j < 2; ++j) {
+                    token[j] = pubData[20 + j];
                 }
                 bytes memory amount = new bytes(16);
-                for (uint256 i = 0; i < 16; ++i) {
-                    amount[i] = pubData[22 + i];
+                for (uint256 j = 0; j < 16; ++j) {
+                    amount[j] = pubData[22 + j];
                 }
                 balancesToWithdraw[Bytes.bytesToAddress(owner)][Bytes.bytesToUInt16(token)] += Bytes.bytesToUInt128(amount);
             }
@@ -455,18 +455,18 @@ contract Franklin {
     // - _token - token address
     // - _signature - user signature
     function registerFullExit(
-        bytes memory _franklin_addr,
+        bytes calldata _franklin_addr,
         address _eth_addr,
         address _token,
-        bytes20 signature
+        bytes calldata signature
     ) external {
         requireActive();
         ValidatedTokenId memory tokenId = validateERC20Token(_token);
         // Priority Queue request
-        bytes memory pubData = Bytes.concat(_franklin_addr); // franklin address
-        pubData = Bytes.concat(Bytes.toBytesFromAddress(_eth_addr)); // eth address
-        pubData = Bytes.concat(Bytes.toBytesFromUInt16(tokenId.id)); // token id
-        pubData = Bytes.concat(bytes(signature)); // signature
+        bytes memory pubData = _franklin_addr; // franklin address
+        pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(_eth_addr)); // eth address
+        pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(tokenId.id)); // token id
+        pubData = Bytes.concat(pubData, signature); // signature
         addPriorityRequest(OpType.FullExit, pubData);
     }
 
@@ -490,10 +490,10 @@ contract Franklin {
         );
 
         // Priority Queue request
-        bytes memory pubData = Bytes.concat(Bytes.toBytesFromAddress(msg.sender)); // sender
-        pubData = Bytes.concat(Bytes.toBytesFromUInt16(_token.id)); // token id
-        pubData = Bytes.concat(Bytes.toBytesFromuint128(_amount)); // amount
-        pubData = Bytes.concat(_franklin_addr); // franklin address
+        bytes memory pubData = Bytes.toBytesFromAddress(msg.sender); // sender
+        pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(_token.id)); // token id
+        pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt128(_amount)); // amount
+        pubData = Bytes.concat(pubData, _franklin_addr); // franklin address
         addPriorityRequest(OpType.Deposit, pubData);
     }
 
@@ -622,7 +622,6 @@ contract Franklin {
         // TODO: optimize
         uint256 currentPointer = 0;
 
-        uint32 priorityOperations = priorityOps;
         while (currentPointer < _publicData.length) {
             uint8 opType = uint8(_publicData[currentPointer]);
             (uint256 len, uint64 ops, uint32 priorityOps) = processOp(
@@ -657,16 +656,16 @@ contract Franklin {
     ) internal returns (uint256 processedLen, uint64 processedOnchainOps, uint32 priorityOperations) {
         uint256 opDataPointer = _currentPointer + 1;
 
-        if (_opType == OpType.Noop) return (NOOP_LENGTH, 0, 0); // noop
-        if (_opType == OpType.TransferToNew) return (TRANSFER_TO_NEW_LENGTH, 0, 0); // transfer_to_new
-        if (_opType == OpType.Transfer) return (TRANSFER_LENGTH, 0, 0); // transfer
-        if (_opType == OpType.CloseAccount) return (CLOSE_ACCOUNT_LENGTH, 0, 0); // close_account
+        if (_opType == uint8(OpType.Noop)) return (NOOP_LENGTH, 0, 0); // noop
+        if (_opType == uint8(OpType.TransferToNew)) return (TRANSFER_TO_NEW_LENGTH, 0, 0); // transfer_to_new
+        if (_opType == uint8(OpType.Transfer)) return (TRANSFER_LENGTH, 0, 0); // transfer
+        if (_opType == uint8(OpType.CloseAccount)) return (CLOSE_ACCOUNT_LENGTH, 0, 0); // close_account
 
         // TODO:
         // This deposit should not be placed to onchain ops. currently priority queue deposit
         // operations are responsible to return funds if there is a block revert, so onchain
         // deposit operation is unused
-        if (_opType == OpType.Deposit) {
+        if (_opType == uint8(OpType.Deposit)) {
             // to_account: 3, token: 2, amount: 16, fee: 2, new_pubkey_hash: 20
 
             uint16 tokenId = uint16(
@@ -678,7 +677,7 @@ contract Franklin {
             for (uint256 i = 0; i < 16; ++i) {
                 amountBytes[i] = _publicData[opDataPointer + 5 + i];
             }
-            uint128 amount = Bytes.bytesToUint128(amountBytes);
+            uint128 amount = Bytes.bytesToUInt128(amountBytes);
 
             bytes memory franklinAddress = new bytes(PUBKEY_HASH_LEN);
             for (uint8 i = 0; i < PUBKEY_HASH_LEN; i++) {
@@ -687,8 +686,7 @@ contract Franklin {
 
             requireValidTokenId(tokenId);
 
-            balances[account][tokenId].balance -= (amount + fee);
-            onchainOps[currentOnchainOp] = OnchainOp(
+            onchainOps[_currentOnchainOp] = OnchainOp(
                 OnchainOpType.Deposit,
                 tokenId,
                 Bytes.bytesToAddress(franklinAddress), // TODO: - this may fail if its length is not 20
@@ -698,7 +696,7 @@ contract Franklin {
         }
 
         // partial_exit
-        if (_opType == OpType.PartialExit) {
+        if (_opType == uint8(OpType.PartialExit)) {
             // pubdata account: 3, token: 2, amount: 16, fee: 2, eth_key: 20
 
             uint16 tokenId = uint16(
@@ -710,7 +708,7 @@ contract Franklin {
             for (uint256 i = 0; i < 16; ++i) {
                 amountBytes[i] = _publicData[opDataPointer + 5 + i];
             }
-            uint128 amount = Bytes.bytesToUint128(amountBytes);
+            uint128 amount = Bytes.bytesToUInt128(amountBytes);
 
             bytes memory ethAddress = new bytes(20);
             for (uint256 i = 0; i < 20; ++i) {
@@ -729,7 +727,7 @@ contract Franklin {
         }
 
         // full_exit
-        if (_opType == OpType.FullExit) {
+        if (_opType == uint8(OpType.FullExit)) {
             // pubdata account: 3, eth_address: 20, token: 2, signature_hash: 20, full_amount: 16
 
             uint16 tokenId = uint16(
@@ -751,7 +749,7 @@ contract Franklin {
             for (uint256 i = 0; i < 14; ++i) {
                 fullAmountBytes[i] = _publicData[opDataPointer + 45 + i];
             }
-            uint128 fullAmount = Bytes.bytesToUint128(fullAmountBytes);
+            uint128 fullAmount = Bytes.bytesToUInt128(fullAmountBytes);
 
             requireValidTokenId(tokenId);
             // TODO!: balances[ethAddress][tokenId] possible overflow (uint128)
@@ -835,7 +833,7 @@ contract Franklin {
     // MARK: - Reverting commited blocks
 
     // Fill blocksToRevert mapping and set totalBlocksToRevert value, depending on the difference between totalBlocksVerified and totalBlocksCommited
-    function revertExpiredBlocks() external {
+    function revertExpiredBlocks() public {
         require(blockCommitmentExpired(), "not expired");
         emit BlocksReverted(totalBlocksVerified, totalBlocksCommited);
         uint32 total = totalBlocksCommited - totalBlocksVerified;
@@ -850,10 +848,10 @@ contract Franklin {
     // Delete block onchain operations, accrue balances from deposits and remove deposit priority requests from its mapping
     // Params:
     // - _revertedBlockId - block id
-    function revertBlock(uint32 _revertedBlockId) external {
+    function revertBlock(uint32 _revertedBlockId) public {
         Block memory reverted = blocksToRevert[_revertedBlockId];
         require(reverted.commitedAtBlock > 0, "block not found");
-        require(reverted.priorityOperations <= totalRequests, "Count of removed requests is higher than their count");
+        require(reverted.priorityOperations <= totalPriorityRequests, "Count of removed requests is higher than their count");
 
         uint64 current = reverted.operationStartId;
         uint64 end = current + reverted.totalOperations;
@@ -871,8 +869,8 @@ contract Franklin {
     // MARK: - Exodus mode
 
     // Returns bool flag. True if the Exodus mode must be entered
-    function triggerExodusIfNeeded() internal view returns (bool) {
-        if (block.number >= priorityRequestsParams[firstPriorityRequestId]) {
+    function triggerExodusIfNeeded() internal returns (bool) {
+        if (block.number >= priorityRequestsParams[firstPriorityRequestId].expirationBlock) {
             exodusMode = true;
             revertExpiredBlocks();
             for (uint32 i = 0; i < totalBlocksToRevert; i++) {

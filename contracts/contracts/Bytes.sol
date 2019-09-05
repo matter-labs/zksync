@@ -51,7 +51,7 @@ library Bytes {
 
     // Compies bytes 'self' into a new 'uint16'.
     // Returns the newly created 'uint16'.
-    function bytesToUint16(bytes memory self)
+    function bytesToUInt16(bytes memory self)
         internal
         pure
         returns (uint16)
@@ -68,7 +68,7 @@ library Bytes {
 
     // Compies bytes 'self' into a new 'uint128'.
     // Returns the newly created 'uint128'.
-    function bytesToUint128(bytes memory self)
+    function bytesToUInt128(bytes memory self)
         internal
         pure
         returns (uint128)
