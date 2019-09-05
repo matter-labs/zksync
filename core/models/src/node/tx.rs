@@ -29,8 +29,10 @@ pub struct Transfer {
 }
 
 impl Transfer {
+    const TX_TYPE: u8 = 5;
     fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
+        out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.from.data);
         out.extend_from_slice(&self.to.data);
         out.extend_from_slice(&self.token.to_be_bytes());
@@ -53,8 +55,10 @@ pub struct Deposit {
 }
 
 impl Deposit {
+    const TX_TYPE: u8 = 1;
     fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
+        out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.to.data);
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&pack_token_amount(&self.amount));
@@ -78,8 +82,10 @@ pub struct Withdraw {
 }
 
 impl Withdraw {
+    const TX_TYPE: u8 = 3;
     fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
+        out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.account.data);
         out.extend_from_slice(&self.eth_address);
         out.extend_from_slice(&self.token.to_be_bytes());
@@ -99,8 +105,11 @@ pub struct Close {
 }
 
 impl Close {
+    const TX_TYPE: u8 = 4;
+
     fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
+        out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.account.data);
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out

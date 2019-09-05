@@ -68,6 +68,46 @@ impl<E: JubjubEngine> WithdrawWitness<E> {
         pubdata_bits.resize(6 * franklin_constants::CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
+    pub fn get_sig_bits(&self) -> Vec<bool> {
+        let mut sig_bits = vec![];
+        append_be_fixed_width(
+            &mut sig_bits,
+            &Fr::from_str("3").unwrap(), //Corresponding tx_type
+            franklin_constants::TX_TYPE_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.before.witness.account_witness.pub_key_hash.unwrap(),
+            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.args.ethereum_key.unwrap(),
+            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.before.token.unwrap(),
+            franklin_constants::TOKEN_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.args.amount.unwrap(),
+            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
+                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.args.fee.unwrap(),
+            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.before.witness.account_witness.nonce.unwrap(),
+            franklin_constants::NONCE_BIT_WIDTH,
+        );
+        sig_bits
+    }
 }
 pub fn apply_withdraw_tx(
     tree: &mut CircuitAccountTree,
@@ -189,7 +229,8 @@ pub fn apply_withdraw(
 }
 pub fn calculate_withdraw_operations_from_witness(
     withdraw_witness: &WithdrawWitness<Bn256>,
-    sig_msg: &Fr,
+    first_sig_msg: &Fr,
+    second_sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
@@ -205,7 +246,8 @@ pub fn calculate_withdraw_operations_from_witness(
         tx_type: withdraw_witness.tx_type,
         chunk: Some(Fr::from_str("0").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[0]),
-        sig_msg: Some(*sig_msg),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -219,7 +261,8 @@ pub fn calculate_withdraw_operations_from_witness(
         tx_type: withdraw_witness.tx_type,
         chunk: Some(Fr::from_str("1").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[1]),
-        sig_msg: Some(*sig_msg),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -233,7 +276,8 @@ pub fn calculate_withdraw_operations_from_witness(
         tx_type: withdraw_witness.tx_type,
         chunk: Some(Fr::from_str("2").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[2]),
-        sig_msg: Some(*sig_msg),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -247,7 +291,8 @@ pub fn calculate_withdraw_operations_from_witness(
         tx_type: withdraw_witness.tx_type,
         chunk: Some(Fr::from_str("3").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[3]),
-        sig_msg: Some(*sig_msg),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -299,9 +344,8 @@ mod test {
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
 
-    use ff::{BitIterator, Field, PrimeField};
+    use ff::{Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-
     use franklin_crypto::circuit::test::*;
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklin_crypto::jubjub::FixedGenerators;
@@ -378,7 +422,143 @@ mod test {
 
         tree.insert(account_address, sender_leaf_initial);
 
-        let withdraw_witness = apply_withdraw(
+        let partial_exit_witness = apply_partial_exit(
+            &mut tree,
+            &PartialExitData {
+                amount,
+                fee,
+                token,
+                account_address,
+                ethereum_key,
+            },
+        );
+
+        let (signature, first_sig_part, second_sig_part) = generate_sig_data(
+            &partial_exit_witness.get_sig_bits(),
+            &phasher,
+            &sender_sk,
+            params,
+        );
+
+        let operations = calculate_partial_exit_operations_from_witness(
+            &partial_exit_witness,
+            &first_sig_part,
+            &second_sig_part,
+            signature,
+            &sender_x,
+            &sender_y,
+        );
+
+        let (root_after_fee, validator_account_witness) =
+            apply_fee(&mut tree, validator_address_number, token, fee);
+
+        let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
+
+        let public_data_commitment = public_data_commitment::<Bn256>(
+            &partial_exit_witness.get_pubdata(),
+            partial_exit_witness.before_root,
+            Some(root_after_fee),
+            Some(validator_address),
+            Some(block_number),
+        );
+        {
+            let mut cs = TestConstraintSystem::<Bn256>::new();
+
+            let instance = FranklinCircuit {
+                operation_batch_size: 10,
+                params,
+                old_root: partial_exit_witness.before_root,
+                new_root: Some(root_after_fee),
+                operations,
+                pub_data_commitment: Some(public_data_commitment),
+                block_number: Some(block_number),
+                validator_account: validator_account_witness,
+                validator_address: Some(validator_address),
+                validator_balances,
+                validator_audit_path,
+            };
+
+            instance.synthesize(&mut cs).unwrap();
+
+            println!("{}", cs.find_unconstrained());
+
+            println!("{}", cs.num_constraints());
+
+            let err = cs.which_is_unsatisfied();
+            if err.is_some() {
+                panic!("ERROR satisfying in {}", err.unwrap());
+            }
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_full_exit_franklin() {
+        let params = &AltJubjubBn256::new();
+        let p_g = FixedGenerators::SpendingKeyGenerator;
+        let validator_address_number = 7;
+        let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
+        let block_number = Fr::from_str("1").unwrap();
+        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+        let phasher = PedersenHasher::<Bn256>::default();
+
+        let mut tree: CircuitAccountTree =
+            CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
+
+        let sender_sk = PrivateKey::<Bn256>(rng.gen());
+        let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
+        let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
+        let (sender_x, sender_y) = sender_pk.0.into_xy();
+        println!("x = {}, y = {}", sender_x, sender_y);
+
+        // give some funds to sender and make zero balance for recipient
+        let validator_sk = PrivateKey::<Bn256>(rng.gen());
+        let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
+        let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
+        let (validator_x, validator_y) = validator_pk.0.into_xy();
+        println!("x = {}, y = {}", validator_x, validator_y);
+        let validator_leaf = CircuitAccount::<Bn256> {
+            subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
+            nonce: Fr::zero(),
+            pub_key_hash: validator_pub_key_hash,
+        };
+
+        let mut validator_balances = vec![];
+        for _ in 0..1 << franklin_constants::BALANCE_TREE_DEPTH {
+            validator_balances.push(Some(Fr::zero()));
+        }
+        tree.insert(validator_address_number, validator_leaf);
+
+        let mut account_address: u32 = rng.gen();
+        account_address %= tree.capacity();
+        let amount: u128 = 0;
+        let fee: u128 = 100;
+        let token: u32 = 2;
+        let ethereum_key = Fr::from_str("124").unwrap();
+
+        let sender_balance_before: u128 = 2000;
+
+        let sender_balance_before_as_field_element =
+            Fr::from_str(&sender_balance_before.to_string()).unwrap();
+
+        let mut sender_balance_tree =
+            CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32);
+        sender_balance_tree.insert(
+            token,
+            Balance {
+                value: sender_balance_before_as_field_element,
+            },
+        );
+
+        let sender_leaf_initial = CircuitAccount::<Bn256> {
+            subtree: sender_balance_tree,
+            nonce: Fr::zero(),
+            pub_key_hash: sender_pub_key_hash,
+        };
+
+        tree.insert(account_address, sender_leaf_initial);
+
+        let partial_exit_witness = apply_partial_exit(
             &mut tree,
             &WithdrawData {
                 amount,
@@ -389,18 +569,17 @@ mod test {
             },
         );
 
-        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on withdraw proof
-        let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
-        sig_bits.reverse();
-        sig_bits.truncate(80);
-
-        // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
-        let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
-        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+        let (signature, first_sig_part, second_sig_part) = generate_sig_data(
+            &partial_exit_witness.get_sig_bits(),
+            &phasher,
+            &sender_sk,
+            params,
+        );
 
         let operations = calculate_withdraw_operations_from_witness(
             &withdraw_witness,
-            &sig_msg,
+            &first_sig_part,
+            &second_sig_part,
             signature,
             &sender_x,
             &sender_y,
