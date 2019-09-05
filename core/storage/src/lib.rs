@@ -3,7 +3,7 @@ extern crate diesel;
 #[macro_use]
 extern crate log;
 
-use bigdecimal::BigDecimal;
+use bigdecimal::{BigDecimal, Zero};
 use chrono::prelude::*;
 use diesel::dsl::*;
 use failure::Fail;
@@ -146,6 +146,15 @@ struct StoredExecutedTransaction {
     tx_hash: Vec<u8>,
     operation: Option<Value>,
     success: bool,
+    fail_reason: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TxReceiptResponse {
+    tx_hash: Vec<u8>,
+    block_number: i64,
+    success: bool,
+    verified: bool,
     fail_reason: Option<String>,
 }
 
@@ -541,6 +550,8 @@ pub enum TxAddError {
     NonceTooLow,
     #[fail(display = "Tx signature is incorrect.")]
     InvalidSignature,
+    #[fail(display = "Tx amount is zero.")]
+    ZeroAmount,
 }
 
 enum ConnectionHolder {
@@ -1186,6 +1197,33 @@ impl StorageProcessor {
         Ok((Some(account_id), verified_state, commited_state))
     }
 
+    pub fn tx_receipt(&self, hash: &[u8]) -> QueryResult<Option<TxReceiptResponse>> {
+        self.conn().transaction(|| {
+            let tx = executed_transactions::table
+                .filter(executed_transactions::tx_hash.eq(hash))
+                .first::<StoredExecutedTransaction>(self.conn())
+                .optional()?;
+
+            if let Some(tx) = tx {
+                let confirm = operations::table
+                    .filter(operations::block_number.eq(tx.block_number))
+                    .filter(operations::action_type.eq("Verify"))
+                    .first::<StoredOperation>(self.conn())
+                    .optional()?;
+
+                Ok(Some(TxReceiptResponse {
+                    tx_hash: hash.to_vec(),
+                    block_number: tx.block_number,
+                    success: tx.success,
+                    verified: confirm.is_some(),
+                    fail_reason: tx.fail_reason,
+                }))
+            } else {
+                Ok(None)
+            }
+        })
+    }
+
     pub fn last_committed_state_for_account(
         &self,
         account_id: AccountId,
@@ -1411,7 +1449,10 @@ impl StorageProcessor {
         Ok(Ok(()))
     }
 
-    pub fn save_franklin_op_blocks(&self, blocks: &[NewFranklinOpBlock]) -> QueryResult<Result<(), String>> {
+    pub fn save_franklin_op_blocks(
+        &self,
+        blocks: &[NewFranklinOpBlock],
+    ) -> QueryResult<Result<(), String>> {
         for block in blocks.iter() {
             let inserted = diesel::insert_into(franklin_op_blocks::table)
                 .values(block)
@@ -1438,7 +1479,9 @@ impl StorageProcessor {
             diesel::delete(data_restore_last_watched_eth_block::table).execute(self.conn())?;
         if 0 == deleted {
             error!("Error: could not delete last watched eth block number!");
-            return Ok(Err("Could not delete last watched eth block number!".to_string()));
+            return Ok(Err(
+                "Could not delete last watched eth block number!".to_string()
+            ));
         }
         Ok(Ok(()))
     }
@@ -1518,6 +1561,12 @@ impl StorageProcessor {
         let lowest_possible_nonce = commited_state.map(|a| a.nonce as u32).unwrap_or_default();
         if tx.nonce() < lowest_possible_nonce {
             return Ok(Err(TxAddError::NonceTooLow));
+        }
+
+        if let FranklinTx::Deposit(deposit_tx) = tx {
+            if deposit_tx.amount == bigdecimal::BigDecimal::zero() {
+                return Ok(Err(TxAddError::ZeroAmount));
+            }
         }
 
         let tx_failed = executed_transactions::table

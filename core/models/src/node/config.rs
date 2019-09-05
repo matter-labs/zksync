@@ -25,8 +25,8 @@ pub struct RuntimeConfig {
 impl RuntimeConfig {
     pub fn new() -> Self {
         let tx_batch_size_env = env::var("TX_BATCH_SIZE").expect("TX_BATCH_SIZE env missing");
-        let tx_size = usize::from_str_radix(&(tx_batch_size_env), 10)
-            .expect("TX_BATCH_SIZE invalid");
+        let tx_size =
+            usize::from_str_radix(&(tx_batch_size_env), 10).expect("TX_BATCH_SIZE invalid");
 
         Self {
             tx_batch_size: tx_size,

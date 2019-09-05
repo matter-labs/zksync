@@ -460,7 +460,7 @@ contract Franklin {
 
             uint16 tokenId = uint16(
                 (uint256(uint8(_publicData[opDataPointer + 3])) << 8) +
-                    uint256(uint8(_publicData[opDataPointer + 4]))
+                (uint256(uint8(_publicData[opDataPointer + 4])) << 0)
             );
             uint128 amount = 0;
             for (uint8 i = 0; i < 16; i++) {
