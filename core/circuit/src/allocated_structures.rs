@@ -32,6 +32,7 @@ impl<E: JubjubEngine> AllocatedOperationBranch<E> {
             || Ok(operation_branch.address.grab()?),
             franklin_constants::ACCOUNT_TREE_DEPTH,
         )?;
+        let account_address = account_address.pad(franklin_constants::ACCOUNT_ID_BIT_WIDTH);
 
         let account_audit_path = utils::allocate_audit_path(
             cs.namespace(|| "account_audit_path"),
@@ -58,6 +59,7 @@ impl<E: JubjubEngine> AllocatedOperationBranch<E> {
             || Ok(operation_branch.token.grab()?),
             franklin_constants::BALANCE_TREE_DEPTH,
         )?;
+        let token = token.pad(franklin_constants::TOKEN_BIT_WIDTH);
         let balance_audit_path = utils::allocate_audit_path(
             cs.namespace(|| "balance_audit_path"),
             &operation_branch.witness.balance_subtree_path,

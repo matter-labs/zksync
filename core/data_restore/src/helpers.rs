@@ -21,44 +21,27 @@ pub struct DataRestoreConfig {
 
 impl DataRestoreConfig {
     /// Return the configuration for setted Infura web3 endpoint
-    ///
-    /// # Arguments
-    ///
-    /// * `network` - Infura web3 endpoint
-    ///
-    pub fn new(network: InfuraEndpoint) -> Self {
+    pub fn new() -> Self {
         let config = RuntimeConfig::new();
-        match network {
-            InfuraEndpoint::Mainnet => {
-                Self {
-                    web3_endpoint: config.mainnet_http_endpoint_string, //"https://rinkeby.infura.io/".to_string(),
-                    franklin_contract: ethabi::Contract::load(PROD_PLASMA.0).unwrap(),
-                    franklin_contract_address: config
-                        .mainnet_franklin_contract_address
-                        .as_str()
-                        .parse()
-                        .unwrap(), //"4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()
-                }
-            }
-            InfuraEndpoint::Rinkeby => {
-                Self {
-                    web3_endpoint: config.rinkeby_http_endpoint_string, //"https://rinkeby.infura.io/".to_string()
-                    franklin_contract: ethabi::Contract::load(TEST_PLASMA_ALWAYS_VERIFY.0).unwrap(),
-                    franklin_contract_address: config
-                        .rinkeby_franklin_contract_address
-                        .as_str()
-                        .parse()
-                        .unwrap(), //"4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()
-                }
-            }
+        Self {
+            web3_endpoint: config.data_restore_http_endpoint_string, //"https://rinkeby.infura.io/".to_string(),
+            franklin_contract: ethabi::Contract::load(PROD_PLASMA.0)
+                .expect("Cant get plasma contract in data restore config"),
+            franklin_contract_address: config
+                .data_restore_franklin_contract_address
+                .as_str()
+                .parse()
+                .expect("Cant create data restore config"), //"4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()
         }
     }
 }
 
-/// Infura web3 endpoint
+/// Infura web3 endpoints
 #[derive(Debug, Copy, Clone)]
 pub enum InfuraEndpoint {
+    /// Mainnet Infura endpoint
     Mainnet,
+    /// Rinkeby Infura endpoint
     Rinkeby,
 }
 
@@ -131,21 +114,29 @@ pub fn fee_bytes_slice_to_big_decimal(byte: u8) -> BigDecimal {
     )
     .unwrap_or(0);
     let fee_u64 = fee_u128 as u64;
-    // fee_f64 = fee_f64 / f64::from(1000000);
     BigDecimal::from(fee_u64)
 }
 
 /// Specific errors that may occure during data restoring
 #[derive(Debug, Clone)]
 pub enum DataRestoreError {
+    /// Unknown error with description
     Unknown(String),
+    /// Wrong type
     WrongType,
+    /// Got no data with description
     NoData(String),
+    /// Account doesn't exists
     NonexistentAccount,
+    /// Wrong amount
     WrongAmount,
+    /// Wrong endpoint
     WrongEndpoint,
+    /// Wrong public key
     WrongPubKey,
+    /// Double exit in chain
     DoubleExit,
+    /// Updating failed with description
     StateUpdate(String),
 }
 
