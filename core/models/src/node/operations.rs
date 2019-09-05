@@ -11,7 +11,7 @@ pub struct DepositOp {
 }
 
 impl DepositOp {
-    const CHUNKS: usize = 6;
+    pub const CHUNKS: usize = 6;
     const OP_CODE: u8 = 0x01;
 
     fn get_public_data(&self) -> Vec<u8> {
@@ -83,7 +83,7 @@ pub struct PartialExitOp {
 }
 
 impl PartialExitOp {
-    const CHUNKS: usize = 6;
+    pub const CHUNKS: usize = 6;
     const OP_CODE: u8 = 0x03;
 
     fn get_public_data(&self) -> Vec<u8> {

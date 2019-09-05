@@ -456,7 +456,7 @@ contract Franklin {
 
         // deposit
         if (opType == 0x01) {
-            // to_account: 3, token: 2, amount: 3, fee: 1, new_pubkey_hash: 20
+            // to_account: 3, token: 2, amount: 16, fee: 2, new_pubkey_hash: 20
 
             uint16 tokenId = uint16(
                 (uint256(uint8(_publicData[opDataPointer + 3])) << 8) +
@@ -468,13 +468,13 @@ contract Franklin {
             }
 
             uint8[2] memory feePacked;
-            feePacked[0] = uint8(_publicData[opDataPointer + 8]);
-            feePacked[1] = uint8(_publicData[opDataPointer + 9]);
+            feePacked[0] = uint8(_publicData[opDataPointer + 21]);
+            feePacked[1] = uint8(_publicData[opDataPointer + 22]);
             uint128 fee = unpackFee(feePacked);
 
             bytes memory franklin_address_ = new bytes(PUBKEY_HASH_LEN);
             for (uint8 i = 0; i < PUBKEY_HASH_LEN; i++) {
-                franklin_address_[i] = _publicData[opDataPointer + 10 + i];
+                franklin_address_[i] = _publicData[opDataPointer + 23 + i];
             }
             address account = depositFranklinToETH[franklin_address_];
 
@@ -500,7 +500,7 @@ contract Franklin {
 
         // partial_exit
         if (opType == 0x03) {
-            // pubdata account: 3, token: 2, amount: 3, fee: 1, eth_key: 20
+            // pubdata account: 3, token: 2, amount: 16, fee: 2, eth_key: 20
 
             uint16 tokenId = uint16(
                 (uint256(uint8(_publicData[opDataPointer + 3])) << 8) +
@@ -514,7 +514,7 @@ contract Franklin {
 
             bytes memory ethAddress = new bytes(20);
             for (uint256 i = 0; i < 20; ++i) {
-                ethAddress[i] = _publicData[opDataPointer + 9 + i];
+                ethAddress[i] = _publicData[opDataPointer + 23 + i];
             }
 
             requireValidTokenId(tokenId);
