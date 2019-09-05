@@ -1,7 +1,8 @@
-pragma solidity ^0.5.1;
+pragma solidity ^0.5.8;
 
 import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
+import "./Governance.sol";
 import "./Verifier.sol";
 import "./VerificationKey.sol";
 import "./Bytes.sol";
@@ -9,6 +10,7 @@ import "./Bytes.sol";
 contract Franklin {
     VerificationKey verificationKey;
     Verifier verifier;
+    Governance governance;
 
     // Expiration delta for priority request to be satisfied (in ETH blocks)
     uint256 constant EXPIRATION_DELTA = 250; // About 1 hour
@@ -32,11 +34,6 @@ contract Franklin {
     uint256 constant CLOSE_ACCOUNT_LENGTH = 1 * 8;
     uint256 constant TRANSFER_LENGTH = 2 * 8;
     uint256 constant FULL_EXIT_LENGTH = 7 * 8;
-
-    // Possible token
-    struct ValidatedTokenId {
-        uint16 id;
-    }
 
     // MARK: - Events
 
@@ -82,15 +79,6 @@ contract Franklin {
         uint128 amount
     );
 
-    // Token added to Franklin net
-    // Structure:
-    // - token - added token address
-    // - tokenId - added token id
-    event TokenAdded(
-        address token,
-        uint16 tokenId
-    );
-
     // New priority request event
     // Emitted when a request is placed into mapping
     // Params:
@@ -105,24 +93,10 @@ contract Franklin {
 
     // MARK: - STORAGE
 
-    // Governance
-
-    // Address which will excercise governance over the network
-    // i.e. add tokens, change validator set, conduct upgrades
-    address public networkGovernor;
-
-    // Total number of ERC20 tokens registered in the network
-    // (excluding ETH, which is hardcoded as tokenId = 0)
-    uint16 public totalTokens;
-
-    // List of registered tokens by tokenId
-    mapping(uint16 => address) public tokenAddresses;
-
-    // List of registered tokens by address
-    mapping(address => uint16) public tokenIds;
-
-    // List of permitted validators
-    mapping(address => bool) public validators;
+    // Possible token
+    struct ValidatedTokenId {
+        uint16 id;
+    }
 
     // List of root-chain balances (per owner and tokenId) to withdraw
     mapping(address => mapping(uint16 => uint128)) public balancesToWithdraw;
@@ -252,16 +226,13 @@ contract Franklin {
         address _verifierAddress,
         address _vkAddress,
         bytes32 _genesisRoot,
-        address _networkGovernor
+        address _governanceAddress
     ) public {
         verifier = Verifier(_verifierAddress);
         verificationKey = VerificationKey(_vkAddress);
+        governance = Governance(_governanceAddress);
 
         blocks[0].stateRoot = _genesisRoot;
-        networkGovernor = _networkGovernor;
-
-        // TODO: remove once proper governance is implemented
-        validators[_networkGovernor] = true;
     }
 
     // MARK: - Priority Queue
@@ -343,36 +314,6 @@ contract Franklin {
         }
     }
 
-    // MARK: - Governance
-
-    // Change current governor
-    // _newGovernor - address of the new governor
-    function changeGovernor(address _newGovernor) external {
-        requireGovernor();
-        networkGovernor = _newGovernor;
-    }
-
-    // Add token to the list of possible tokens
-    // Params:
-    // - _token - token address
-    function addToken(address _token) external {
-        requireGovernor();
-        require(tokenIds[_token] == 0, "token exists");
-        tokenAddresses[totalTokens + 1] = _token; // Adding one because tokenId = 0 is reserved for ETH
-        tokenIds[_token] = totalTokens + 1;
-        totalTokens++;
-        emit TokenAdded(_token, totalTokens);
-    }
-
-    // Set validator status
-    // Params:
-    // - _validator - validator address
-    // - _active - bool value (true if validator is active)
-    function setValidator(address _validator, bool _active) external {
-        requireGovernor();
-        validators[_validator] = _active;
-    }
-
     // function scheduleMigration(address _migrateTo, uint32 _migrateByBlock) external {
     //     requireGovernor();
     //     require(migrateByBlock == 0, "migration in progress");
@@ -431,7 +372,9 @@ contract Franklin {
             IERC20(_token).transferFrom(msg.sender, address(this), _amount),
             "transfer failed"
         );
-        ValidatedTokenId memory tokenId = validateERC20Token(_token);
+        ValidatedTokenId memory tokenId = ValidatedTokenId({
+            id: governance.validateERC20Token(_token)
+        });
         registerDeposit(tokenId, _amount, _franklinAddr);
     }
 
@@ -440,7 +383,9 @@ contract Franklin {
     // - _token - token address
     // - _amount - amount to withdraw
     function withdrawERC20(address _token, uint128 _amount) external {
-        ValidatedTokenId memory tokenId = validateERC20Token(_token);
+        ValidatedTokenId memory tokenId = ValidatedTokenId({
+            id: governance.validateERC20Token(_token)
+        });
         registerWithdrawal(tokenId, _amount);
         require(
             IERC20(_token).transfer(msg.sender, _amount),
@@ -461,7 +406,9 @@ contract Franklin {
         bytes calldata signature
     ) external {
         requireActive();
-        ValidatedTokenId memory tokenId = validateERC20Token(_token);
+        ValidatedTokenId memory tokenId = ValidatedTokenId({
+            id: governance.validateERC20Token(_token)
+        });
         // Priority Queue request
         bytes memory pubData = _franklinAddr; // franklin address
         pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(_eth_addr)); // eth address
@@ -530,7 +477,7 @@ contract Franklin {
         bytes calldata _publicData
     ) external {
         requireActive();
-        require(validators[msg.sender], "only by validator");
+        governance.requireValidator(msg.sender);
         require(
             _blockNumber == totalBlocksCommited + 1,
             "only commit next block"
@@ -684,7 +631,7 @@ contract Franklin {
                 franklinAddress[i] = _publicData[opDataPointer + 9 + i];
             }
 
-            requireValidTokenId(tokenId);
+            governance.requireValidTokenId(tokenId);
 
             onchainOps[_currentOnchainOp] = OnchainOp(
                 OnchainOpType.Deposit,
@@ -715,7 +662,7 @@ contract Franklin {
                 ethAddress[i] = _publicData[opDataPointer + 23 + i];
             }
 
-            requireValidTokenId(tokenId);
+            governance.requireValidTokenId(tokenId);
             // TODO!: balances[ethAddress][tokenId] possible overflow (uint128)
             onchainOps[_currentOnchainOp] = OnchainOp(
                 OnchainOpType.Withdrawal,
@@ -751,7 +698,7 @@ contract Franklin {
             }
             uint128 fullAmount = Bytes.bytesToUInt128(fullAmountBytes);
 
-            requireValidTokenId(tokenId);
+            governance.requireValidTokenId(tokenId);
             // TODO!: balances[ethAddress][tokenId] possible overflow (uint128)
             onchainOps[_currentOnchainOp] = OnchainOp(
                 OnchainOpType.Withdrawal,
@@ -776,7 +723,7 @@ contract Franklin {
         external
     {
         requireActive();
-        require(validators[msg.sender], "only by validator");
+        governance.requireValidator(msg.sender);
         require(
             _blockNumber == totalBlocksVerified + 1,
             "only verify next block"
@@ -911,22 +858,8 @@ contract Franklin {
 
     // Internal helpers
 
-    function requireGovernor() internal view {
-        require(msg.sender == networkGovernor, "only by governor");
-    }
-
     function requireActive() internal view {
         require(!exodusMode, "exodus mode");
-    }
-
-    function requireValidTokenId(uint16 _tokenId) internal view {
-        require(_tokenId < totalTokens + 1, "unknown token");
-    }
-
-    function validateERC20Token(address tokenAddr) internal view returns (ValidatedTokenId memory) {
-        uint16 tokenId = tokenIds[tokenAddr];
-        require(tokenAddresses[tokenId] == tokenAddr, "unknown ERC20 token");
-        return ValidatedTokenId(tokenId);
     }
 
     function blockCommitmentExpired() internal view returns (bool) {

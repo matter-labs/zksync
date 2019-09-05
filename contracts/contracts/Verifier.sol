@@ -1,5 +1,5 @@
 // from https://github.com/HarryR/ethsnarks/blob/master/contracts/Verifier.sol
-pragma solidity ^0.5.1;
+pragma solidity ^0.5.8;
 
 contract Verifier {
     function NegateY(uint256 Y) internal pure returns (uint256) {
