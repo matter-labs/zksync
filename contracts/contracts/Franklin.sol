@@ -151,14 +151,14 @@ contract Franklin {
     // Onchain operations -- processed inside blocks (see docs)
 
     // Type of block processing operation holder
-    enum OnchainOpType {
-        Deposit,
-        Withdrawal
-    }
+    // enum OnchainOpType {
+    //     Deposit,
+    //     Withdrawal
+    // }
 
     // OnchainOp keeps a balance for processing the commited data in blocks, see docs
     struct OnchainOp {
-        OnchainOpType opType;
+        OpType opType;
         uint16 tokenId;
         address owner;
         uint128 amount;
@@ -186,14 +186,6 @@ contract Franklin {
     uint32 public firstPriorityRequestId;
     // Total number of requests
     uint32 public totalPriorityRequests;
-
-    // Reverting expired blocks
-
-    // Total number of registered blocks to revert (see docs)
-    uint32 totalBlocksToRevert;
-
-    // List of blocks by revertBlockId (see docs)
-    mapping(uint32 => Block) public blocksToRevert;
 
     // Flag indicating that exodus (mass exit) mode is triggered
     // Once it was raised, it can not be cleared again, and all users must exit
@@ -480,7 +472,7 @@ contract Franklin {
             _blockNumber == totalBlocksCommited + 1,
             "only commit next block"
         );
-        require(blockCommitmentExpired() == false, "commitment expired");
+        require(!blockCommitmentExpired(), "commitment expired");
         require(
             totalBlocksCommited - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS,
             "too many commited"
@@ -630,7 +622,7 @@ contract Franklin {
             governance.requireValidTokenId(tokenId);
 
             onchainOps[_currentOnchainOp] = OnchainOp(
-                OnchainOpType.Deposit,
+                OpType.Deposit,
                 tokenId,
                 Bytes.bytesToAddress(franklinAddress), // TODO: - this may fail if its length is not 20
                 amount
@@ -661,7 +653,7 @@ contract Franklin {
             governance.requireValidTokenId(tokenId);
             
             onchainOps[_currentOnchainOp] = OnchainOp(
-                OnchainOpType.Withdrawal,
+                OpType.PartialExit,
                 tokenId,
                 Bytes.bytesToAddress(ethAddress),
                 amount
@@ -692,7 +684,7 @@ contract Franklin {
             governance.requireValidTokenId(tokenId);
 
             onchainOps[_currentOnchainOp] = OnchainOp(
-                OnchainOpType.Withdrawal,
+                OpType.FullExit,
                 tokenId,
                 Bytes.bytesToAddress(ethAddress),
                 fullAmount
@@ -762,7 +754,7 @@ contract Franklin {
         uint64 end = start + blocks[_blockNumber].totalOperations;
         for (uint64 current = start; current < end; ++current) {
             OnchainOp memory op = onchainOps[current];
-            if (op.opType == OnchainOpType.Withdrawal) {
+            if (op.opType == OnchainOpType.PartialExit || op.opType == OnchainOpType.FullExit) {
                 // withdrawal was successful, accrue balance
                 balancesToWithdraw[op.owner][op.tokenId] += op.amount;
             }
@@ -772,26 +764,23 @@ contract Franklin {
 
     // MARK: - Reverting commited blocks
 
-    // Fill blocksToRevert mapping and set totalBlocksToRevert value, depending on the difference between totalBlocksVerified and totalBlocksCommited
-    function revertExpiredBlocks() public {
-        require(blockCommitmentExpired(), "not expired");
-        emit BlocksReverted(totalBlocksVerified, totalBlocksCommited);
-        uint32 total = totalBlocksCommited - totalBlocksVerified;
-        for (uint32 i = 0; i < total; i++) {
-            blocksToRevert[totalBlocksToRevert +
-                i] = blocks[totalBlocksVerified + i + 1];
-            delete blocks[totalBlocksVerified + i + 1];
+    // Revert blocks
+    function revertBlocks() internal {
+        for (uint32 i = totalBlocksCommited-1; i >= totalBlocksVerified; i--) {
+            revertBlock(i);
+            delete blocks[i];
+            totalBlocksCommited--;
         }
-        totalBlocksToRevert += total;
+        emit BlocksReverted(totalBlocksVerified, totalBlocksCommited);
     }
 
     // Delete block onchain operations, accrue balances from deposits and remove deposit priority requests from its mapping
     // Params:
     // - _revertedBlockId - block id
-    function revertBlock(uint32 _revertedBlockId) public {
-        Block memory reverted = blocksToRevert[_revertedBlockId];
+    function revertBlock(uint32 _revertedBlockId) internal {
+        Block memory reverted = blocks[_revertedBlockId];
         require(reverted.commitedAtBlock > 0, "block not found");
-        require(reverted.priorityOperations <= totalPriorityRequests, "Count of removed requests is higher than their count");
+        require(reverted.priorityOperations <= totalPriorityRequests, "priority count too large in revert");
 
         uint64 current = reverted.operationStartId;
         uint64 end = current + reverted.totalOperations;
@@ -802,8 +791,6 @@ contract Franklin {
         // accrue balances from deposits and delete deposits in priority requests
         accrueBalancesFromDeposits(reverted.priorityOperations);
         removePriorityRequestsWithType(OpType.Deposit, reverted.priorityOperations);
-
-        delete blocksToRevert[_revertedBlockId];
     }
 
     // MARK: - Exodus mode
@@ -812,10 +799,10 @@ contract Franklin {
     function triggerExodusIfNeeded() internal returns (bool) {
         if (block.number >= priorityRequestsParams[firstPriorityRequestId].expirationBlock) {
             exodusMode = true;
-            revertExpiredBlocks();
-            for (uint32 i = 0; i < totalBlocksToRevert; i++) {
-                revertBlock(i);
-            }
+            revertBlocks();
+            // for (uint32 i = 0; i < totalBlocksToRevert; i++) {
+            //     revertBlock(i);
+            // }
             return true;
         } else {
             return false;
@@ -855,12 +842,15 @@ contract Franklin {
         require(!exodusMode, "exodus mode");
     }
 
-    function blockCommitmentExpired() internal view returns (bool) {
-        return
-            totalBlocksCommited > totalBlocksVerified &&
+    function triggerRevertIfBlockCommitmentExpired() internal view returns (bool) {
+        if (totalBlocksCommited > totalBlocksVerified &&
                 block.number >
                 blocks[totalBlocksVerified + 1].commitedAtBlock +
-                    EXPECT_VERIFICATION_IN;
+                    EXPECT_VERIFICATION_IN) {
+            revertBlocks();
+            return true;
+        }
+        return false;
     }
 
 }
