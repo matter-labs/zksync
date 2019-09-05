@@ -472,7 +472,7 @@ contract Franklin {
             _blockNumber == totalBlocksCommited + 1,
             "only commit next block"
         );
-        require(!blockCommitmentExpired(), "commitment expired");
+        require(!triggerRevertIfBlockCommitmentExpired(), "commitment expired");
         require(
             totalBlocksCommited - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS,
             "too many commited"
@@ -842,7 +842,7 @@ contract Franklin {
         require(!exodusMode, "exodus mode");
     }
 
-    function triggerRevertIfBlockCommitmentExpired() internal view returns (bool) {
+    function triggerRevertIfBlockCommitmentExpired() public view returns (bool) {
         if (totalBlocksCommited > totalBlocksVerified &&
                 block.number >
                 blocks[totalBlocksVerified + 1].commitedAtBlock +
