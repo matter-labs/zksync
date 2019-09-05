@@ -7,6 +7,9 @@ import "./Verifier.sol";
 import "./VerificationKey.sol";
 import "./Bytes.sol";
 
+// GLOBAL TODOS:
+// - check overflows
+
 contract Franklin {
     VerificationKey verificationKey;
     Verifier verifier;
@@ -100,11 +103,6 @@ contract Franklin {
 
     // List of root-chain balances (per owner and tokenId) to withdraw
     mapping(address => mapping(uint16 => uint128)) public balancesToWithdraw;
-
-    // TODO: - fix
-    // uint32 public totalAccounts;
-    // mapping (address => uint32) public accountIdByAddress;
-    ///////////////
 
     // Blocks
 
@@ -491,8 +489,6 @@ contract Franklin {
         // Enter exodus mode if needed
         require(!triggerExodusIfNeeded(), "Entered exodus mode");
 
-        // TODO: make efficient padding here
-
         (uint64 startId, uint64 totalProcessed, uint32 priorityOperations) = commitOnchainOps(_publicData);
 
         bytes32 commitment = createBlockCommitment(
@@ -663,7 +659,7 @@ contract Franklin {
             }
 
             governance.requireValidTokenId(tokenId);
-            // TODO!: balances[ethAddress][tokenId] possible overflow (uint128)
+            
             onchainOps[_currentOnchainOp] = OnchainOp(
                 OnchainOpType.Withdrawal,
                 tokenId,
@@ -699,7 +695,7 @@ contract Franklin {
             uint128 fullAmount = Bytes.bytesToUInt128(fullAmountBytes);
 
             governance.requireValidTokenId(tokenId);
-            // TODO!: balances[ethAddress][tokenId] possible overflow (uint128)
+
             onchainOps[_currentOnchainOp] = OnchainOp(
                 OnchainOpType.Withdrawal,
                 tokenId,
