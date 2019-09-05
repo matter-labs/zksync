@@ -86,9 +86,8 @@ impl<E: JubjubEngine> DepositWitness<E> {
         );
         append_be_fixed_width(
             &mut sig_bits,
-            &self.args.amount.unwrap(),
-            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
-                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+            &self.args.full_amount.unwrap(),
+            franklin_constants::BALANCE_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
@@ -317,7 +316,8 @@ pub fn calculate_deposit_operations_from_witness(
         tx_type: deposit_witness.tx_type,
         chunk: Some(Fr::from_str("4").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[4]),
-        sig_msg: Some(*sig_msg),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -331,7 +331,8 @@ pub fn calculate_deposit_operations_from_witness(
         tx_type: deposit_witness.tx_type,
         chunk: Some(Fr::from_str("5").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[5]),
-        sig_msg: Some(*sig_msg),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),

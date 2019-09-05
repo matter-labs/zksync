@@ -796,7 +796,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         serialized_tx_bits.extend(cur.account.pub_key_hash.get_bits_be());
         serialized_tx_bits.extend(op_data.ethereum_key.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
-        serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits.extend(op_data.full_amount.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
         serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
 
@@ -829,7 +829,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?);
         base_valid_flags.push(is_withdraw.clone());
 
-        let is_base_valid = multi_and(cs.namespace(|| "valid base withdraw"), &base_valid_flags)?;
         let is_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_serialized_tx_correct"),
             serialized_tx_bits,
@@ -849,16 +848,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
 
         // base_valid_flags.push(_is_signer_valid);
-        let is_base_valid = multi_and(
-            cs.namespace(|| "valid base partial_exit"),
-            &base_valid_flags,
-        )?;
-        //here we verify whether exit should be full
-        let is_full_exit = Boolean::from(Expression::equals(
-            cs.namespace(|| "amount is zero"),
-            &op_data.amount.get_number(),
-            Expression::constant::<CS>(E::Fr::zero()),
-        )?);
+        let is_base_valid = multi_and(cs.namespace(|| "valid base withdraw"), &base_valid_flags)?;
 
         let mut lhs_valid_flags = vec![];
         lhs_valid_flags.push(is_first_chunk.clone());
@@ -954,7 +944,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
         serialized_tx_bits.extend(op_data.new_pubkey_hash.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
-        serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
+        serialized_tx_bits.extend(op_data.full_amount.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
         serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
 
@@ -1735,7 +1725,6 @@ fn multi_and<E: JubjubEngine, CS: ConstraintSystem<E>>(
             &result,
             bool_x,
         )?;
-        //        println!("and number i:{} value:{}", i, result.get_value().grab()?);
     }
 
     Ok(result)

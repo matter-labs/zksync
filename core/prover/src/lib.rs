@@ -379,7 +379,7 @@ impl BabyProver {
                     }
                     FranklinOp::Withdraw(withdraw) => {
                         let withdraw_witness =
-                            apply_partial_exit_tx(&mut self.accounts_tree, &withdraw);
+                            apply_withdraw_tx(&mut self.accounts_tree, &withdraw);
                         let (signature, first_sig_msg, second_sig_msg, sender_x, sender_y) =
                             generate_dummy_sig_data(
                                 &withdraw_witness.get_sig_bits(),

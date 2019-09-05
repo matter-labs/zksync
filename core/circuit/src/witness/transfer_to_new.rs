@@ -107,7 +107,7 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
         );
         append_be_fixed_width(
             &mut sig_bits,
-            &self.args.amount.unwrap(),
+            &self.args.amount_packed.unwrap(),
             franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
                 + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
         );

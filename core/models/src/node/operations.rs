@@ -2,7 +2,6 @@ use super::tx::{Close, Deposit, Transfer, Withdraw};
 use super::AccountId;
 use crate::node::{pack_fee_amount, pack_token_amount};
 use bigdecimal::ToPrimitive;
-use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositOp {
