@@ -313,11 +313,13 @@ fn handle_get_executed_transaction_by_hash(
         }));
     }
     let transaction_hash_string = transaction_hash_string.unwrap();
+    let transaction_hash = hex::decode(transaction_hash_string).unwrap();
 
-    let tx = storage.is_tx_successful(transaction_hash_string);
-    let tx = tx.unwrap();
-
-    Ok(HttpResponse::Ok().json(tx))
+    if let Ok(tx) = storage.tx_receipt(transaction_hash.as_slice()) {
+        Ok(HttpResponse::Ok().json(tx))
+    } else {
+        Ok(HttpResponse::Ok().json(()))
+    }
 }
 
 fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
