@@ -43,7 +43,7 @@ contract Franklin {
     // Event emitted when block is commited
     // Structure:
     // - blockNumber - number of commited block
-    event Blockcommited(uint32 indexed blockNumber);
+    event BlockCommited(uint32 indexed blockNumber);
     // Event emitted when block is verified
     // Structure:
     // - blockNumber - number of verified block
@@ -571,7 +571,7 @@ contract Franklin {
         totalOnchainOps = startId + totalProcessed;
 
         totalBlocksCommited += 1;
-        emit Blockcommited(_blockNumber);
+        emit BlockCommited(_blockNumber);
     }
     
     // Returns block commitment
