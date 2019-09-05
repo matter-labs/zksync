@@ -24,7 +24,6 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
                 .get_bits_le_fixed(params::NEW_PUBKEY_HASH_WIDTH), //160
         );
 
-
         let mut root_hash_bits = self
             .subtree
             .root_hash()
@@ -36,14 +35,17 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
         leaf_content
     }
 }
-impl<E: JubjubEngine> CircuitAccount<E>{
+impl<E: JubjubEngine> CircuitAccount<E> {
     //we temporary pass it as repr. TODO: return Fr, when we could provide proper trait bound
-    pub fn empty_balances_root_hash() -> Vec<u8>{
+    pub fn empty_balances_root_hash() -> Vec<u8> {
         let balances_smt = CircuitBalanceTree::new(params::BALANCE_TREE_DEPTH as u32);
         let mut tmp = [0u8; 32];
-        balances_smt.root_hash().into_repr().write_be(&mut tmp[..]).unwrap();
+        balances_smt
+            .root_hash()
+            .into_repr()
+            .write_be(&mut tmp[..])
+            .unwrap();
         tmp.to_vec()
-
     }
 }
 
