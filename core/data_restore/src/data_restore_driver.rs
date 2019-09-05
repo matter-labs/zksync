@@ -1,112 +1,101 @@
 use crate::accounts_state::FranklinAccountsStates;
-use crate::block_events::BlockEventsFranklin;
-use crate::blocks::LogBlockData;
-use crate::franklin_transaction::FranklinTransaction;
+use crate::events::EventData;
+use crate::events_state::EventsState;
+use crate::franklin_op_block::FranklinOpBlock;
 use crate::helpers::*;
-use models::plasma::Fr;
-use std::sync::mpsc::Sender;
+use crate::storage_interactor;
+use storage::ConnectionPool;
 use web3::types::U256;
 
-#[allow(dead_code)]
-pub struct ProtoAccountsState {
-    errored: bool,
-    root_hash: Fr,
-}
-
+/// Description of data restore driver
 pub struct DataRestoreDriver {
-    pub channel: Option<Sender<ProtoAccountsState>>,
+    /// Database connection pool
+    pub connection_pool: ConnectionPool,
+    /// Driver config
     pub config: DataRestoreConfig,
+    /// Start ethereum block
     pub genesis_block: U256,
+    /// Delta between last ethereum block and last watched ethereum block
     pub blocks_delta: U256,
+    /// Flag that indicates that state updates are running
     pub run_updates: bool,
-    pub block_events: BlockEventsFranklin,
+    /// Franklin contract events state
+    pub events_state: EventsState,
+    /// Franklin accounts state
     pub account_states: FranklinAccountsStates,
+    /// Franklin operations blocks
+    pub op_blocks: Vec<FranklinOpBlock>,
 }
 
 impl DataRestoreDriver {
+    /// Create new data restore driver
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Driver config
+    /// * `genesis_block` - Start ethereum block
+    /// * `blocks_delta` - Delta between last ethereum block and last watched ethereum block
+    /// * `connection_pool` - Database connection pool
+    ///
     pub fn new(
         config: DataRestoreConfig,
         genesis_block: U256,
         blocks_delta: U256,
-        channel: Option<Sender<ProtoAccountsState>>,
+        connection_pool: ConnectionPool,
     ) -> Self {
         Self {
-            channel,
+            connection_pool,
             config: config.clone(),
             genesis_block,
             blocks_delta,
             run_updates: false,
-            block_events: BlockEventsFranklin::new(config.clone()),
+            events_state: EventsState::new(config.clone()),
             account_states: FranklinAccountsStates::new(config.clone()),
+            op_blocks: vec![],
         }
     }
 
-    pub fn load_past_state(&mut self) -> Result<(), DataRestoreError> {
+    /// Load past events and accounts states
+    ///
+    /// # Arguments
+    ///
+    /// * `until_block` - if some than it will return accounts states until specified Franklin block number
+    ///
+    pub fn load_past_state(&mut self, until_block: Option<u32>) -> Result<(), DataRestoreError> {
         info!("Loading past state");
-        let states = DataRestoreDriver::get_past_franklin_blocks_events_and_accounts_tree_state(
-            self.config.clone(),
-            self.genesis_block,
-            self.blocks_delta,
-        )
-        .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-        self.block_events = states.0;
-        self.account_states = states.1;
+        self.update_past_franklin_blocks_events_and_accounts_tree_state(until_block)
+            .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
 
-        // let accs = &self.account_states.get_accounts();
-        // debug!("Accs: {:?}", accs);
-        let root = self.account_states.root_hash();
-        debug!("Root: {:?}", &root);
-        debug!("______________");
+        self.save_complete_storage_state();
 
-        if let Some(ref _channel) = self.channel {
-            let state = ProtoAccountsState {
-                errored: false,
-                root_hash: root,
-            };
-            let _send_result = _channel.send(state);
-            if _send_result.is_err() {
-                return Err(DataRestoreError::StateUpdate(
-                    "Cant send last state".to_string(),
-                ));
-            }
-        }
-        debug!("Finished loading past state");
+        info!("Finished loading past state");
         Ok(())
     }
 
+    /// Stop states updates by setting run_updates flag to false
     pub fn stop_state_updates(&mut self) {
         self.run_updates = false
     }
 
+    /// Run updating events and accounts states. May produce error
     pub fn run_state_updates(&mut self) -> Option<DataRestoreError> {
         info!("Start state updates");
         self.run_updates = true;
         let mut err: Option<DataRestoreError> = None;
         while self.run_updates {
-            // match DataRestoreDriver::update_franklin_blocks_events_and_accounts_tree_state(self) {
-            //     Err(error) => {
-            //         error!("Something goes wrong: {:?}", error);
-            //         self.run_updates = false;
-            //         err = Some(DataRestoreError::StateUpdate(format!(
-            //             "Error occured: {:?}",
-            //             error
-            //         )));
-            //     }
-            //     Ok(()) => {
-            //         // debug!("Updated, last watched ethereum block: {:?}", &self.block_events.last_watched_block_number);
-            //         // debug!("Committed franklin blocks count: {:?}", &self.block_events.committed_blocks.len());
-            //         // debug!("Last committed franklin block: {:?}", &self.block_events.committed_blocks.last());
-            //         // debug!("Verified franklin blocks count: {:?}", &self.block_events.verified_blocks.len());
-            //         // debug!("Last verified franklin block: {:?}", &self.block_events.verified_blocks.last());
-            //         // let accs = self.account_states.get_accounts();
-            //         // let root = self.account_states.root_hash();
-            //         // debug!("Accs: {:?}", accs);
-            //         // debug!("Root: {:?}", &root);
-            //     }
-            // };
-            if let Err(error) =
-                DataRestoreDriver::update_franklin_blocks_events_and_accounts_tree_state(self)
-            {
+            info!(
+                "Last watched ethereum block: {:?}",
+                &self.events_state.last_watched_block_number
+            );
+            info!(
+                "Committed franklin blocks count: {:?}",
+                &self.events_state.committed_blocks.len()
+            );
+            info!(
+                "Verified franklin blocks count: {:?}",
+                &self.events_state.verified_blocks.len()
+            );
+            if let Err(error) = self.update_franklin_blocks_events_and_accounts_tree_state() {
                 error!("Something goes wrong: {:?}", error);
                 self.run_updates = false;
                 err = Some(DataRestoreError::StateUpdate(format!(
@@ -114,70 +103,92 @@ impl DataRestoreDriver {
                     error
                 )));
             }
-            let root = self.account_states.root_hash();
-            debug!("New root: {:?}", root);
-            debug!("______________");
-            if let Some(ref _channel) = self.channel {
-                let state = ProtoAccountsState {
-                    errored: !self.run_updates,
-                    root_hash: root,
-                };
-                let _send_result = _channel.send(state);
-                if _send_result.is_err() {
-                    self.run_updates = false;
-                    err = Some(DataRestoreError::StateUpdate(
-                        "Cant send last state".to_string(),
-                    ));
-                }
-            }
         }
-        debug!("Stopped state updates");
+        info!("Stopped state updates");
         err
     }
 
-    fn get_past_franklin_blocks_events_and_accounts_tree_state(
-        config: DataRestoreConfig,
-        genesis_block: U256,
-        blocks_delta: U256,
-    ) -> Result<(BlockEventsFranklin, FranklinAccountsStates), DataRestoreError> {
-        let events_state =
-            DataRestoreDriver::get_past_blocks_state(config.clone(), genesis_block, blocks_delta)
-                .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-        // debug!("Last watched block: {:?}", events_state.last_watched_block_number);
-        let verified_blocks = events_state.verified_blocks.clone();
-        let txs = DataRestoreDriver::get_verified_committed_blocks_transactions_from_blocks_state(
-            &events_state,
-            &verified_blocks,
-        );
-        let sorted_txs = DataRestoreDriver::sort_transactions_by_block_number(txs);
-        // debug!("Transactions: {:?}", sorted_txs);
+    /// Update past events and accounts states
+    ///
+    /// # Arguments
+    ///
+    /// * `until_block` - if some than it will update accounts states until specified Franklin block number
+    ///
+    fn update_past_franklin_blocks_events_and_accounts_tree_state(
+        &mut self,
+        until_block: Option<u32>,
+    ) -> Result<(), DataRestoreError> {
+        let mut got_events = false;
+        while !got_events {
+            if let Ok(()) = self.update_past_blocks_events_state() {
+                got_events = true;
+            }
+        }
+        let verified_blocks = self.events_state.verified_blocks.clone();
 
-        let mut accounts_state = FranklinAccountsStates::new(config.clone());
-        DataRestoreDriver::update_accounts_state_from_transactions(
-            &mut accounts_state,
-            &sorted_txs,
-        )
-        .map_err(|e| DataRestoreError::StateUpdate(e.to_string()))?;
-        info!("Accounts and events state finished update");
-        Ok((events_state, accounts_state))
+        let op_blocks = self.get_verified_committed_op_blocks_from_blocks_state(&verified_blocks);
+        let mut sorted_op_blocks = DataRestoreDriver::sort_op_blocks_by_block_number(op_blocks);
+
+        self.op_blocks.append(&mut sorted_op_blocks.clone());
+
+        self.account_states = FranklinAccountsStates::new(self.config.clone());
+
+        if let Some(block) = until_block {
+            sorted_op_blocks.retain(|x| x.block_number <= block);
+        }
+        self.update_accounts_state_from_op_blocks(&sorted_op_blocks)
+            .map_err(|e| DataRestoreError::StateUpdate(e.to_string()))?;
+
+        Ok(())
     }
 
-    fn get_past_blocks_state(
-        config: DataRestoreConfig,
-        genesis_block: U256,
-        blocks_delta: U256,
-    ) -> Result<BlockEventsFranklin, DataRestoreError> {
-        let events = BlockEventsFranklin::get_past_state_from_genesis_with_blocks_delta(
-            config,
-            genesis_block,
-            blocks_delta,
+    /// Save complete storage state: events, last watched ethereum block number, franklin operations blocks
+    fn save_complete_storage_state(&mut self) {
+        info!("Saving storage state");
+        let mut logs = self.events_state.committed_blocks.clone();
+        logs.append(&mut self.events_state.verified_blocks.clone());
+
+        storage_interactor::save_events_state(&logs, self.connection_pool.clone());
+        storage_interactor::save_last_watched_block_number(
+            &mut self.events_state.last_watched_block_number,
+            self.connection_pool.clone(),
+        );
+        storage_interactor::save_franklin_op_blocks(&self.op_blocks, self.connection_pool.clone());
+        info!("Storage state saved");
+    }
+
+    /// Update storage state
+    ///
+    /// # Arguments
+    ///
+    /// * `logs` - Franklin contract events
+    /// * `blocks` - Franklin operations blocks
+    ///
+    fn update_storage_state(&mut self, logs: &Vec<EventData>, blocks: &Vec<FranklinOpBlock>) {
+        info!("Updating storage state");
+        storage_interactor::save_events_state(&logs, self.connection_pool.clone());
+        storage_interactor::save_last_watched_block_number(
+            &self.events_state.last_watched_block_number,
+            self.connection_pool.clone(),
+        );
+        storage_interactor::save_franklin_op_blocks(blocks, self.connection_pool.clone());
+        info!("Storage state updated");
+    }
+
+    /// Update blocks events state
+    fn update_past_blocks_events_state(&mut self) -> Result<(), DataRestoreError> {
+        info!("Loading events");
+        let events = EventsState::get_past_state_from_genesis_with_blocks_delta(
+            self.config.clone(),
+            self.genesis_block.clone(),
+            self.blocks_delta.clone(),
         )
         .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-        debug!(
+        info!(
             "Got past events state till ethereum block: {:?}",
             &events.last_watched_block_number
         );
-        debug!(
+        info!(
             "Committed franklin blocks count: {:?}",
             &events.committed_blocks.len()
         );
@@ -185,7 +196,7 @@ impl DataRestoreDriver {
             "Last committed franklin block: {:?}",
             &events.committed_blocks.last()
         );
-        debug!(
+        info!(
             "Verified franklin blocks count: {:?}",
             &events.verified_blocks.len()
         );
@@ -193,114 +204,137 @@ impl DataRestoreDriver {
             "Last verified franklin block: {:?}",
             &events.verified_blocks.last()
         );
-        Ok(events)
-    }
-
-    fn get_verified_committed_blocks_transactions_from_blocks_state(
-        block_events_state: &BlockEventsFranklin,
-        verified_blocks: &[LogBlockData],
-    ) -> Vec<FranklinTransaction> {
-        let committed_blocks =
-            block_events_state.get_only_verified_committed_blocks(verified_blocks);
-        // debug!("Committed verified blocks: {:?}", committed_blocks);
-        let mut transactions = vec![];
-        for block in committed_blocks {
-            let tx = FranklinTransaction::get_transaction(&block_events_state.config, &block);
-            if tx.is_none() {
-                continue;
-            }
-            transactions.push(tx.unwrap());
-        }
-        debug!("Transactions sorted: only verified commited");
-        transactions
-    }
-
-    fn sort_transactions_by_block_number(
-        transactions: Vec<FranklinTransaction>,
-    ) -> Vec<FranklinTransaction> {
-        let mut sorted_transactions = transactions;
-        sorted_transactions.sort_by_key(|x| x.block_number);
-        debug!("Transactions sorted: by number");
-        sorted_transactions
-    }
-
-    fn update_accounts_state_from_transactions(
-        state: &mut FranklinAccountsStates,
-        transactions: &[FranklinTransaction],
-    ) -> Result<(), DataRestoreError> {
-        // let mut state = accounts_state::FranklinAccountsStates::new(config);
-        debug!("Start accounts state updating");
-        for transaction in transactions {
-            state
-                .update_accounts_states_from_transaction(&transaction)
-                .map_err(|e| DataRestoreError::StateUpdate(e.to_string()))?;
-        }
-        debug!("Finished accounts state updating");
+        self.events_state = events;
         Ok(())
     }
 
-    fn update_franklin_blocks_events_and_accounts_tree_state(
-        data_restore_driver: &mut DataRestoreDriver,
+    /// Return verified comitted operations blocks from verified op blocks events
+    ///
+    /// # Arguments
+    ///
+    /// * `verified_blocks` - Franklin verified op blocks events
+    ///
+    fn get_verified_committed_op_blocks_from_blocks_state(
+        &mut self,
+        verified_blocks: &[EventData],
+    ) -> Vec<FranklinOpBlock> {
+        info!("Loading new verified op_blocks");
+        let committed_blocks = self
+            .events_state
+            .get_only_verified_committed_blocks(verified_blocks);
+        let mut op_blocks = vec![];
+        for block in committed_blocks {
+            let tx = FranklinOpBlock::get_franklin_op_block(&self.events_state.config, &block);
+            if tx.is_none() {
+                continue;
+            }
+            op_blocks.push(tx.expect(
+                "No franklin op_blocks in get_verified_committed_op_blocks_from_blocks_state",
+            ));
+        }
+        info!("Operation blocks loaded and sorted");
+        op_blocks
+    }
+
+    /// Return operations blocks sorted by number
+    ///
+    /// # Arguments
+    ///
+    /// * `op_blocks` - Franklin operations blocks
+    ///
+    fn sort_op_blocks_by_block_number(op_blocks: Vec<FranklinOpBlock>) -> Vec<FranklinOpBlock> {
+        let mut sorted_op_blocks = op_blocks;
+        sorted_op_blocks.sort_by_key(|x| x.block_number);
+        debug!("Op blocks sorted: by number");
+        sorted_op_blocks
+    }
+
+    /// Update accounts state from operations blocks
+    ///
+    /// # Arguments
+    ///
+    /// * `op_blocks` - Franklin operations blocks
+    ///
+    pub fn update_accounts_state_from_op_blocks(
+        &mut self,
+        op_blocks: &[FranklinOpBlock],
     ) -> Result<(), DataRestoreError> {
-        let mut new_events: (Vec<LogBlockData>, Vec<LogBlockData>) = (vec![], vec![]);
-        while data_restore_driver.run_updates {
-            let ne = data_restore_driver
-                .block_events
+        info!("Start accounts state updating");
+        for op_block in op_blocks {
+            self.account_states
+                .update_accounts_states_from_op_block(&op_block)
+                .map_err(|e| DataRestoreError::StateUpdate(e.to_string()))?;
+        }
+        info!("Finished accounts state updating");
+
+        let root = self.account_states.root_hash();
+        info!("Root: {:?}", &root);
+        Ok(())
+    }
+
+    /// Update events and accounts states
+    fn update_franklin_blocks_events_and_accounts_tree_state(
+        &mut self,
+    ) -> Result<(), DataRestoreError> {
+        let mut new_events: (Vec<EventData>, Vec<EventData>) = (vec![], vec![]);
+        while self.run_updates {
+            info!("Loading new events");
+            let ne = self
+                .events_state
                 .update_state_from_last_watched_block_with_blocks_delta_and_return_new_blocks(
-                    data_restore_driver.blocks_delta,
+                    self.blocks_delta,
                 );
             match ne {
                 Ok(result) => new_events = result,
                 Err(error) => {
-                    debug!("Got no events: {:?}", error);
+                    info!("Got no events: {:?}", error);
                     continue;
                 }
             }
             if new_events.1.is_empty() {
-                debug!("No new verified blocks");
+                info!("No new verified blocks");
                 continue;
-            // return Err(DataRestoreError::NoData("No verified blocks".to_string()))
             } else {
-                debug!(
+                info!(
                     "Got new events state till ethereum block: {:?}",
-                    &data_restore_driver.block_events.last_watched_block_number
+                    &self.events_state.last_watched_block_number
                 );
-                debug!(
+                info!(
                     "Committed franklin blocks count: {:?}",
-                    &data_restore_driver.block_events.committed_blocks.len()
+                    &self.events_state.committed_blocks.len()
                 );
                 debug!(
                     "Last committed franklin block: {:?}",
-                    &data_restore_driver.block_events.committed_blocks.last()
+                    &self.events_state.committed_blocks.last()
                 );
-                debug!(
+                info!(
                     "Verified franklin blocks count: {:?}",
-                    &data_restore_driver.block_events.verified_blocks.len()
+                    &self.events_state.verified_blocks.len()
                 );
                 debug!(
                     "Last verified franklin block: {:?}",
-                    &data_restore_driver.block_events.verified_blocks.last()
+                    &self.events_state.verified_blocks.last()
                 );
                 break;
             }
         }
-        if !data_restore_driver.run_updates {
+        if !self.run_updates {
             return Err(DataRestoreError::StateUpdate(
                 "Stopped getting new blocks".to_string(),
             ));
         }
         let verified_blocks = &new_events.1;
-        let txs = DataRestoreDriver::get_verified_committed_blocks_transactions_from_blocks_state(
-            &data_restore_driver.block_events,
-            &verified_blocks,
-        );
-        let sorted_txs = DataRestoreDriver::sort_transactions_by_block_number(txs);
+        let op_blocks = self.get_verified_committed_op_blocks_from_blocks_state(&verified_blocks);
+        let sorted_op_blocks = DataRestoreDriver::sort_op_blocks_by_block_number(op_blocks);
+        self.op_blocks.append(&mut sorted_op_blocks.clone());
 
-        DataRestoreDriver::update_accounts_state_from_transactions(
-            &mut data_restore_driver.account_states,
-            &sorted_txs,
-        )
-        .map_err(|e| DataRestoreError::StateUpdate(e.to_string()))?;
+        self.update_accounts_state_from_op_blocks(&sorted_op_blocks)
+            .map_err(|e| DataRestoreError::StateUpdate(e.to_string()))?;
+
+        let mut logs = new_events.0.clone();
+        logs.append(&mut new_events.1.clone());
+
+        self.update_storage_state(&logs, &sorted_op_blocks);
 
         Ok(())
     }

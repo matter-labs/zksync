@@ -1,7 +1,5 @@
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
-extern crate log;
 
 use futures::Future;
 use std::env;
@@ -21,7 +19,6 @@ pub struct ETHClient<T: Transport> {
     contract: ethabi::Contract,
     chain_id: u8,
     gas_price_factor: usize,
-    min_gas_price: usize,
     pub web3: Web3<T>,
 }
 
@@ -60,10 +57,6 @@ impl<T: Transport> ETHClient<T> {
                 &env::var("GAS_PRICE_FACTOR").unwrap_or_else(|_| "2".to_string()),
             )
             .expect("GAS_PRICE_FACTOR not set"),
-            min_gas_price: usize::from_str(
-                &env::var("MIN_GAS_PRICE").unwrap_or_else(|_| "1".to_string()),
-            )
-            .expect("MIN_GAS_PRICE not set"),
             web3: Web3::new(transport),
         }
     }
@@ -102,7 +95,7 @@ impl<T: Transport> ETHClient<T> {
             .expect("failed to encode parameters");
 
         // fetch current gas_price
-        let mut gas_price = match options.gas_price {
+        let gas_price = match options.gas_price {
             Some(gas_price) => gas_price,
             None => {
                 let mut network_gas_price = self.web3.eth().gas_price().wait()?;

@@ -37,8 +37,8 @@ impl LockedBalance {
     fn from_event(event: OnchainDepositEvent, current_block: u64) -> Self {
         Self {
             amount: event.amount,
-            locked_until_block: event.locked_until_block as u64,
-            blocks_left_until_unlock: (event.locked_until_block as u64)
+            locked_until_block: u64::from(event.locked_until_block),
+            blocks_left_until_unlock: u64::from(event.locked_until_block)
                 .saturating_sub(current_block),
             eth_address: event.address,
         }
@@ -138,6 +138,11 @@ impl TryFrom<Log> for OnchainDepositEvent {
                 AccountAddress::from_bytes(&addr_bytes)?
             },
         })
+    }
+}
+impl Default for EthWatch {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -292,7 +297,7 @@ impl EthWatch {
                 let res: Result<(U256, U256), _> = contract
                     .query(
                         "balances",
-                        (Token::Address(v.eth_address), token as u64),
+                        (Token::Address(v.eth_address), u64::from(token)),
                         None,
                         Default::default(),
                         Some(BlockNumber::Number(last_block)),

@@ -105,7 +105,7 @@ dummy-prover:
 	cargo run --bin dummy_prover
 
 prover:
-	@cargo run --release --bin franklin_prover
+	@cargo run --release --bin prover
 
 server:
 	@cargo run --bin server --release
@@ -139,6 +139,9 @@ deploy-contracts: confirm_action
 
 test-contracts: confirm_action
 	@cd contracts && yarn test
+
+build-contracts: confirm_action
+	@cd contracts && yarn build
 
 # deploy-contracts: confirm_action
 # 	@bin/deploy-contracts
@@ -307,3 +310,19 @@ dev-push-flattener:
 
 make-keys:
 	@cargo run -p key_generator --release --bin key_generator
+
+ # Data Restore
+
+data-restore-setup-and-run: data-restore-db-prepare data-restore-build data-restore-run
+
+data-restore-db-prepare: db-drop db-wait db-setup
+
+data-restore-build:
+	@cargo build -p data_restore --release --bin data_restore
+
+data-restore-run:
+	@./target/release/data_restore 15
+
+data-restore-continue:
+	@./target/release/data_restore storage 15
+	
