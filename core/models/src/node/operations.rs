@@ -77,12 +77,12 @@ impl TransferOp {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PartialExitOp {
+pub struct WithdrawOp {
     pub tx: Withdraw,
     pub account_id: AccountId,
 }
 
-impl PartialExitOp {
+impl WithdrawOp {
     pub const CHUNKS: usize = 6;
     const OP_CODE: u8 = 0x03;
 
@@ -123,7 +123,7 @@ impl CloseOp {
 pub enum FranklinOp {
     Deposit(DepositOp),
     TransferToNew(TransferToNewOp),
-    PartialExit(PartialExitOp),
+    Withdraw(WithdrawOp),
     Close(CloseOp),
     Transfer(TransferOp),
 }
@@ -133,7 +133,7 @@ impl FranklinOp {
         match self {
             FranklinOp::Deposit(_) => DepositOp::CHUNKS,
             FranklinOp::TransferToNew(_) => TransferToNewOp::CHUNKS,
-            FranklinOp::PartialExit(_) => PartialExitOp::CHUNKS,
+            FranklinOp::Withdraw(_) => WithdrawOp::CHUNKS,
             FranklinOp::Close(_) => CloseOp::CHUNKS,
             FranklinOp::Transfer(_) => TransferOp::CHUNKS,
         }
@@ -143,7 +143,7 @@ impl FranklinOp {
         match self {
             FranklinOp::Deposit(op) => op.get_public_data(),
             FranklinOp::TransferToNew(op) => op.get_public_data(),
-            FranklinOp::PartialExit(op) => op.get_public_data(),
+            FranklinOp::Withdraw(op) => op.get_public_data(),
             FranklinOp::Close(op) => op.get_public_data(),
             FranklinOp::Transfer(op) => op.get_public_data(),
         }

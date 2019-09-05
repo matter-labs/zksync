@@ -335,7 +335,6 @@ contract Franklin {
     }
 
     // Block committment
-    event DebugCommitBlock(bytes _publicData, bytes32 commitment);
     function commitBlock(
         uint32 _blockNumber,
         uint24 _feeAccount,
@@ -382,7 +381,6 @@ contract Franklin {
         totalOnchainOps = startId + totalProcessed;
 
         totalBlocksCommitted += 1;
-        emit DebugCommitBlock(_publicData, commitment);
         emit BlockCommitted(_blockNumber);
     }
 
@@ -498,7 +496,7 @@ contract Franklin {
             return (6 * 8, 1);
         }
 
-        // partial_exit
+        // withdraw
         if (opType == 0x03) {
             // pubdata account: 3, token: 2, amount: 16, fee: 2, eth_key: 20
 

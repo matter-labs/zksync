@@ -701,8 +701,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &op_data,
             &ext_pubdata_chunk,
         )?);
-        op_flags.push(self.partial_exit(
-            cs.namespace(|| "partial_exit"),
+        op_flags.push(self.withdraw(
+            cs.namespace(|| "withdraw"),
             &mut cur,
             &chunk_data,
             &is_a_geq_b,
@@ -753,7 +753,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         Ok(())
     }
 
-    fn partial_exit<CS: ConstraintSystem<E>>(
+    fn withdraw<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
         cur: &mut AllocatedOperationBranch<E>,
@@ -800,73 +800,43 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         base_valid_flags.push(is_pubdata_chunk_correct);
 
         // verify correct tx_code
-        let is_partial_exit = Boolean::from(Expression::equals(
-            cs.namespace(|| "is_partial_exit"),
+        let is_withdraw = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_withdraw"),
             &chunk_data.tx_type.get_number(),
-            Expression::u64::<CS>(3), //partial_exit tx code
+            Expression::u64::<CS>(3), //withdraw tx code
         )?);
-        base_valid_flags.push(is_partial_exit.clone());
+        base_valid_flags.push(is_withdraw.clone());
 
-        let is_base_valid = multi_and(
-            cs.namespace(|| "valid base partial_exit"),
-            &base_valid_flags,
-        )?;
-        let lhs_partial_valid: Boolean;
-        {
-            let mut lhs_partial_valid_flags = vec![];
+        let is_base_valid = multi_and(cs.namespace(|| "valid base withdraw"), &base_valid_flags)?;
 
-            let cs = &mut cs.namespace(|| "partial_exit");
-            lhs_partial_valid_flags.push(is_base_valid.clone());
+        let mut lhs_valid_flags = vec![];
+        lhs_valid_flags.push(is_first_chunk.clone());
 
-            // check operation arguments
-            let is_a_correct =
-                CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
+        lhs_valid_flags.push(is_base_valid.clone());
 
-            lhs_partial_valid_flags.push(is_a_correct);
+        // check operation arguments
+        let is_a_correct =
+            CircuitElement::equals(cs.namespace(|| "is_a_correct"), &op_data.a, &cur.balance)?;
 
-            let sum_amount_fee = Expression::from(&op_data.full_amount.get_number())
-                + Expression::from(&op_data.fee.get_number());
+        lhs_valid_flags.push(is_a_correct);
 
-            let is_b_correct = Boolean::from(Expression::equals(
-                cs.namespace(|| "is_b_correct"),
-                &op_data.b.get_number(),
-                sum_amount_fee.clone(),
-            )?);
-            lhs_partial_valid_flags.push(is_b_correct);
-            lhs_partial_valid_flags.push(is_a_geq_b.clone());
+        let sum_amount_fee = Expression::from(&op_data.full_amount.get_number())
+            + Expression::from(&op_data.fee.get_number());
 
-            lhs_partial_valid_flags.push(no_nonce_overflow(
-                cs.namespace(|| "no nonce overflow"),
-                &cur.account.nonce.get_number(),
-            )?);
+        let is_b_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_b_correct"),
+            &op_data.b.get_number(),
+            sum_amount_fee.clone(),
+        )?);
+        lhs_valid_flags.push(is_b_correct);
+        lhs_valid_flags.push(is_a_geq_b.clone());
 
-            lhs_partial_valid_flags.push(is_first_chunk.clone());
-            lhs_partial_valid =
-                multi_and(cs.namespace(|| "is_lhs_valid"), &lhs_partial_valid_flags)?;
+        lhs_valid_flags.push(no_nonce_overflow(
+            cs.namespace(|| "no nonce overflow"),
+            &cur.account.nonce.get_number(),
+        )?);
 
-            let updated_balance = Expression::from(&cur.balance.get_number()) - sum_amount_fee;
-
-            //mutate current branch if it is first chunk of valid partial_exit transaction
-            cur.balance = CircuitElement::conditionally_select_with_number_strict(
-                cs.namespace(|| "mutated balance"),
-                updated_balance,
-                &cur.balance,
-                &lhs_partial_valid,
-            )?;
-            cur.balance
-                .enforce_length(cs.namespace(|| "mutated balance is still correct length"))?;
-
-            let updated_nonce =
-                Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1);
-
-            //update nonce
-            cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
-                cs.namespace(|| "update cur nonce"),
-                updated_nonce,
-                &cur.account.nonce,
-                &lhs_partial_valid,
-            )?;
-        }
+        let lhs_valid = multi_and(cs.namespace(|| "is_lhs_valid"), &lhs_valid_flags)?;
 
         let mut ohs_valid_flags = vec![];
         ohs_valid_flags.push(is_base_valid);
@@ -875,8 +845,32 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let tx_valid = multi_or(
             cs.namespace(|| "tx_valid"),
-            &[lhs_partial_valid, is_ohs_valid],
+            &[lhs_valid.clone(), is_ohs_valid],
         )?;
+
+        let updated_balance = Expression::from(&cur.balance.get_number()) - sum_amount_fee;
+
+        //mutate current branch if it is first chunk of valid withdraw transaction
+        cur.balance = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "mutated balance"),
+            updated_balance,
+            &cur.balance,
+            &lhs_valid,
+        )?;
+        cur.balance
+            .enforce_length(cs.namespace(|| "mutated balance is still correct length"))?;
+
+        let updated_nonce =
+            Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1);
+
+        //update nonce
+        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "update cur nonce"),
+            updated_nonce,
+            &cur.account.nonce,
+            &lhs_valid,
+        )?;
+
         Ok(tx_valid)
     }
 
@@ -1701,20 +1695,20 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
 
     let mut points: Vec<(E::Fr, E::Fr)> = vec![];
     for i in &[0, 4] {
-        //noop, increment_nonce, partial_exit, close_account, escalation
+        //noop, increment_nonce, withdraw, close_account, escalation
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let y = E::Fr::zero();
         points.push((x, y));
     }
 
     for i in &[5] {
-        //transfer, create_subaccount, close_subaccount, fill_orders
+        //transfer,
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let y = E::Fr::from_str("1").unwrap();
         points.push((x, y));
     }
     for i in &[1, 3] {
-        //deposit, partial exit
+        //deposit, withdraw
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let y = E::Fr::from_str("5").unwrap();
         points.push((x, y));

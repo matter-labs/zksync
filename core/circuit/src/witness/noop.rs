@@ -167,7 +167,7 @@ mod test {
 
         tree.insert(account_address, sender_leaf_initial);
 
-        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on partial_exit proof
+        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on withdraw proof
         let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
         sig_bits.reverse();
         sig_bits.truncate(80);

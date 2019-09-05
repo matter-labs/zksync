@@ -26,7 +26,7 @@ Note: although any validator can try to include locked deposited funds from any 
 
 ## Withdrawals
 
-The withdrawals workflow is similar to deposits, but with reverse order. When a block with a `partial_exit` **circuit operation** is committed, an **onchain operation** for the withdrawal is created. If the block is verified, funds from the **onchain operation** are acrued to the users' *root-chain balance*. If the block is reverted, the **onchain operation** is simply discarded.
+The withdrawals workflow is similar to deposits, but with reverse order. When a block with a `withdraw` **circuit operation** is committed, an **onchain operation** for the withdrawal is created. If the block is verified, funds from the **onchain operation** are acrued to the users' *root-chain balance*. If the block is reverted, the **onchain operation** is simply discarded.
 
 A user can withdraw funds from the **root-chain balance** at any time by calling a `withdrawETH()` or `withdrawERC20()` function, unless the balance is locked by a preceding onchain deposit.
 

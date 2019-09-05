@@ -86,7 +86,7 @@ Comments:
 - Account leaf and the subtree is cleared
 - `account_subtree_hash` is stored in the smart contract and requires another SNARK transaction to withdraw individual balances (tbd)
 
-#### partial_exit
+#### withdraw
 
 Withdraw part of a particular token balance to the mainchain.
 
