@@ -1,4 +1,3 @@
-import BN = require('bn.js');
 import { Wallet, Token } from '../src/wallet';
 import { ethers } from 'ethers';
 import {bigNumberify, parseEther, BigNumber, BigNumberish} from "ethers/utils";
@@ -11,11 +10,20 @@ const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms))
 
 class RichEthWallet {
     source: ethers.Wallet;
+    franklinWallet: Wallet;
     sourceNonce: number;
 
     static async new() {
         let wallet = new RichEthWallet();
         await wallet.prepare();
+
+        wallet.franklinWallet = await Wallet.fromEthWallet(wallet.source);
+        await wallet.franklinWallet.updateState();
+        let amountsString = wallet.franklinWallet.ethState.onchainBalances
+            .map((val, idx) => `token ${idx}: ${val.toString()}`);
+
+        console.log(`RichEthWallet has amounts ${amountsString}`)
+        
         return wallet;
     }
 
@@ -27,28 +35,35 @@ class RichEthWallet {
         this.sourceNonce = await this.source.getTransactionCount("pending")
     }
 
-    async sendSome(wallet: LocalWallet, amount: BigNumberish) {
+    async sendSome(wallet: LocalWallet, token: Token, amount: BigNumberish) {
         let to = wallet.wallet.ethWallet;
         let txAddr = await to.getAddress();
         let txAmount = amount;
         let txNonce = this.sourceNonce
         
         ++this.sourceNonce;
-        
-        let promiseToSend = this.source.sendTransaction({
-            to:     txAddr,
-            value:  txAmount,
-            nonce:  txNonce,
-        });
-        
-        let mining = await promiseToSend;
-        let mined = await mining.wait();
-        console.log(`${txAddr} onchain ${await to.provider.getBalance(txAddr)}`);
 
-        wallet.addToComputedOnchainBalance(tokens[0], txAmount);
-        console.log(wallet.computedOnchainBalances);
-
-        return mined;
+        if (token.id == 0) {
+            let promiseToSend = this.source.sendTransaction({
+                to:     txAddr,
+                value:  txAmount,
+                nonce:  txNonce,
+            });
+            
+            let mining = await promiseToSend;
+            let mined = await mining.wait();
+            // console.log(`${txAddr} onchain ${await to.provider.getBalance(txAddr)}`);
+    
+            wallet.addToComputedOnchainBalance(token, txAmount);
+            // console.log(wallet.computedOnchainBalances);
+    
+            return mined;
+        } else {
+            let toAddress = await wallet.wallet.ethWallet.getAddress();
+            let res = await this.franklinWallet.transferOnchain(toAddress, token.address, amount, txNonce);
+            wallet.addToComputedOnchainBalance(token, txAmount);
+            return res;
+        }
     }
 }
 
@@ -152,16 +167,15 @@ class LocalWallet {
         const zero = bigNumberify(0);
         const negative_amount = zero.sub(total_amount);
         
-        let feeless_amount = amount.sub(fee);
 
         if (this.getComputedOnchainBalance(token).gte(total_amount)) {
             // console.log("transaction should work");
             this.addToComputedOnchainBalance(token, negative_amount);
-            this.addToComputedFranklinBalance(token, feeless_amount);
+            this.addToComputedFranklinBalance(token, amount);
         }
 
-        await this.depositOnchain(token, amount);
-        await this.depositOffchain(token, feeless_amount, fee);
+        await this.depositOnchain(token, total_amount);
+        await this.depositOffchain(token, amount, fee);
     }
 
     async sendTransaction(wallet2: LocalWallet, token: Token, amount: BigNumberish, fee: BigNumberish) {
@@ -185,14 +199,18 @@ const NEW_WALLET_PROB = 0.05;
 const BATCH_SIZE = 20;
 
 let prando = new Prando();
-let richWallet = null;
+let richWallet: RichEthWallet = null;
 let tokens = null;
 let commonWallets = [];
 
 let Utils = {
     addNewWallet: async function() {
         console.log(`create_new`)
-        commonWallets.push( await LocalWallet.new(richWallet) );
+        let wallet = await LocalWallet.new(richWallet)
+        tokens = wallet.wallet.supportedTokens;
+        await richWallet.sendSome(wallet, tokens[0], bigNumberify('100000000000000000'));
+        await richWallet.sendSome(wallet, tokens[1], bigNumberify('1000000'));
+        commonWallets.push( wallet );
     },
 
     selectRandomWallet: function() {
@@ -220,8 +238,7 @@ let Utils = {
     },
 
     selectRandomToken: function() {
-        return tokens[0]; // TODO
-        // return prando.nextArrayItem(tokens);
+        return prando.nextArrayItem(tokens);
     },
 
     getGoroutineId: (counter => () => String(++counter).padStart(3, '0'))(0),
@@ -235,10 +252,11 @@ let Actions = {
         let token  = kwargs.token  || Utils.selectRandomToken();
         let amount = kwargs.amount || Utils.selectRandomAmount(0, 1000);
         let fee    = kwargs.fee    || Utils.selectRandomAmount(0, 10);
+        let walletId = wallet.wallet.address;
         wallet.pendingActions.push(async () => {
             let message = null;
             try {
-                console.log(`${goroutineId} ### trying deposit`);
+                console.log(`${walletId} ${goroutineId} ### trying deposit`);
                 wallet.history.push(`depositing token(${token.id}) `
                     + `amount(${amount.toString()}) `
                     + `fee(${fee.toString()})`);
@@ -266,8 +284,8 @@ let Actions = {
                 message = `<<< deposit failed for wallet ${wallet.wallet.address} with ${err_message}`;
             } finally {
                 wallet.history.push(message);
-                console.log(`${goroutineId} ${message}`);
-                if (message.slice(0, 3) === '<<<') {
+                console.log(`${walletId} ${goroutineId} ${message}`);
+                if (message.includes('<<<')) {
                     console.log(`history of wallet: ${wallet.history.join(' \n ')}`);
                 }
             }
@@ -281,18 +299,19 @@ let Actions = {
         let wallet = kwargs.wallet || Utils.selectRandomWallet();
         let token  = kwargs.token  || Utils.selectRandomToken();
         let amount = kwargs.amount || Utils.selectRandomAmount(0, 1000000000000000);
+        let walletId = wallet.wallet.address;
         wallet.pendingActions.push(async () => {
             let message = null;
             try {
-                console.log(`${goroutineId} ### trying receive money`);
-                await richWallet.sendSome(wallet, amount);
+                console.log(`${walletId} ${goroutineId} ### trying receive money(${token.id}|${amount.toString()})`);
+                await richWallet.sendSome(wallet, token, amount);
                 message = `>>> receive money succeded for wallet ${wallet.wallet.address}`;
             } catch (err) {
                 wallet.wallet.nonce = null;
                 message = `<<< receive money failed for wallet ${wallet.wallet.address} with ${err.message}`;
             } finally {
                 wallet.history.push(message);
-                console.log(`${goroutineId} ${message}`);
+                console.log(`${walletId} ${goroutineId} ${message}`);
             }
         });
     },
@@ -304,10 +323,11 @@ let Actions = {
         let wallet2 = kwargs.wallet2 || Utils.selectAnotherRandomWallet(wallet1);
         let amount = kwargs.amount || Utils.selectRandomAmount(1000, 10000);
         let fee = kwargs.fee = Utils.selectRandomAmount(0, 1000);
+        let walletId = wallet1.wallet.address;
         wallet1.pendingActions.push(async () => {
             let message = null;
             try {
-                console.log(`${goroutineId} ### trying transfer`);
+                console.log(`${walletId} ${goroutineId} ### trying transfer`);
                 await wallet1.sendTransaction(wallet2, token, amount, fee);
                 message = `>>> transfer succeded for wallets ${wallet1.wallet.address}, ${wallet2.wallet.address}`;
             } catch (err) {
@@ -317,10 +337,35 @@ let Actions = {
             } finally {
                 wallet1.history.push(message);
                 wallet2.history.push(message);
-                console.log(`${goroutineId} ${message}`);
+                console.log(`${walletId} ${goroutineId} ${message}`);
             }
         });
     },
+
+    // 'partialWithdraw': function(kwargs?) {
+    //     let goroutineId = Utils.getGoroutineId();
+    //     let token = kwargs.token || Utils.selectRandomToken();
+    //     let wallet = kwargs.wallet || Utils.selectRandomWallet();
+    //     let amount = kwargs.amount || Utils.selectRandomAmount(1000, 10000);
+    //     let fee = kwargs.fee = Utils.selectRandomAmount(0, 1000);
+    //     let walletId = wallet.wallet.address;
+    //     wallet.pendingActions.push(async () => {
+    //         let message = null;
+    //         try {
+    //             console.log(`${goroutineId} ### trying transfer`);
+    //             await wallet.partialWithdraw(token, amount);
+    //             message = `>>> transfer succeded for wallets ${wallet.wallet.address}, ${wallet2.wallet.address}`;
+    //         } catch (err) {
+    //             wallet.wallet.nonce = null;
+    //             wallet2.wallet.nonce = null;
+    //             message = `<<< transfer failed for wallets ${wallet.wallet.address}, ${wallet2.wallet.address} with ${err.message}`;
+    //         } finally {
+    //             wallet.history.push(message);
+    //             wallet2.history.push(message);
+    //             console.log(`${walletId} ${goroutineId} ${message}`);
+    //         }
+    //     });
+    // }
 }
 
 async function addRandomPendingActionToWallet(kwargs?) {
@@ -339,44 +384,22 @@ async function test() {
     for (let i = 0; i < INIT_NUM_WALLETS; i++)
         await Utils.addNewWallet();
 
-    tokens = commonWallets[0].wallet.supportedTokens;
-
     commonWallets.forEach(w => w.pendingActions = []);
 
     commonWallets.forEach(w => console.log(w.wallet.address));
-
-    Actions.receive_money({wallet: commonWallets[0], amount: bigNumberify('10000000000000000000')});
-    // Actions.receive_money({wallet: commonWallets[2], amount: bigNumberify('10000000000000000000')});
-    Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('100000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet: commonWallets[2], amount: bigNumberify('100000'), fee: bigNumberify('10')});
-
-    // for (let j = 0; j < BATCH_SIZE; j++) {
-    //     await addRandomPendingActionToWallet();
+    // for (let i = 0; i < commonWallets.length; i++) {
+    //     await richWallet.sendSome(commonWallets[i], tokens[0], bigNumberify('100000000000000000000'));
+    //     await richWallet.sendSome(commonWallets[i], tokens[1], bigNumberify('1000000'));
     // }
 
-    // Actions.receive_money({wallet: commonWallets[0], amount: bigNumberify('10000000000000000000')});
+    // Actions.receive_money({wallet: commonWallets[0], amount: bigNumberify('1000000')});
+    // Actions.receive_money({wallet: commonWallets[2], amount: bigNumberify('1000000')});
     // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('100000'), fee: bigNumberify('10')});
-    // Actions.transfer({wallet1: commonWallets[0], wallet2: commonWallets[1]});
-    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000000'), fee: bigNumberify('1000')});
-    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet: commonWallets[0], token: tokens[1], amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
-    // Actions.deposit({wallet: commonWallets[0], amount: bigNumberify('1000'), fee: bigNumberify('10')});
+    // Actions.deposit({wallet: commonWallets[2], amount: bigNumberify('100000'), fee: bigNumberify('10')});
 
+    for (let j = 0; j < BATCH_SIZE; j++) {
+        await addRandomPendingActionToWallet();
+    }
     
     await Promise.all(commonWallets.map(async w => {
         for (let i = 0; i < w.pendingActions.length; i++) {
@@ -389,17 +412,20 @@ async function test() {
     await Promise.all(commonWallets.map(w => w.wallet.updateState()));
 
     commonWallets.forEach(wallet => {
-        let token = tokens[0];
         console.log('\n\n');
-        console.log(`wallet ${wallet.wallet.address} has computed\n`
-            + `onchain: ${wallet.getComputedOnchainBalance(token)}, `
-            + `locked: ${wallet.getComputedLockedBalance(token)}, `
-            + `franklin: ${wallet.getComputedFranklinBalance(token)}, `
-            + `and actual\n`
-            + `onchain: ${wallet.onchainBalance(token.id)}`
-            + `, locked: ${wallet.lockedBalance(token.id)}`
-            + `, franklin: ${wallet.franklinCommittedBalance(token.id)}`
-            + `, and its history is:\n${wallet.history.join(' \n ')}`);
+        console.log(`wallet ${wallet.wallet.address} `)
+        for (let i = 0; i < tokens.length; ++i) {
+            let token = tokens[i];
+            console.log(`for token(${token.id}) has computed\n`
+                + `onchain: ${wallet.getComputedOnchainBalance(token)}, `
+                + `locked: ${wallet.getComputedLockedBalance(token)}, `
+                + `franklin: ${wallet.getComputedFranklinBalance(token)}, `
+                + `and actual\n`
+                + `onchain: ${wallet.onchainBalance(token.id)}`
+                + `, locked: ${wallet.lockedBalance(token.id)}`
+                + `, franklin: ${wallet.franklinCommittedBalance(token.id)}`);
+        }
+        console.log(`, and its history is:\n${wallet.history.join(' \n ')}`);
     });
 }
 

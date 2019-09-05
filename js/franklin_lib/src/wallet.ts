@@ -85,6 +85,16 @@ export class Wallet {
         this.nonce = null;
     }
 
+    async transferOnchain(toEthAddress: Address, tokenAddress: Address, amount: BigNumberish, nonce: number) {
+        const contract = new Contract(tokenAddress, IERC20Conract.abi, this.ethWallet);
+        let tx = await contract.transfer(toEthAddress, bigNumberify(amount), {nonce: nonce, gasLimit: bigNumberify("150000")});
+        // console.log("TX: ", tx);
+        await tx.wait(2)
+        let receipt = await this.ethWallet.provider.getTransactionReceipt(tx.hash);
+        // console.log('transferOnchain receipt:', receipt);
+        return tx;
+    }
+
     async depositOnchain(token: Token, amount: BigNumberish) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
         const franklinAddressBinary = Buffer.from(this.address.substr(2), "hex");
@@ -155,8 +165,6 @@ export class Wallet {
         };
 
         let res = await this.provider.submitTx(tx);
-        console.log("RESS");
-        console.log(res);
         return res;
     }
 
@@ -224,12 +232,8 @@ export class Wallet {
     }
 
     async updateState() {
-        try {
-            await this.fetchFranklinState();
-            await this.fetchEthState();
-        } catch (err) {
-            console.log(`... wallet.updateState failed with ${err.message}`)
-        }
+        await this.fetchFranklinState();
+        await this.fetchEthState();
     }
 
     async waitPendingTxsExecuted() {
