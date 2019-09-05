@@ -71,6 +71,52 @@ impl<E: JubjubEngine> TransferWitness<E> {
         pubdata_bits.resize(16 * 8, false); //TODO verify if right padding is okay
         pubdata_bits
     }
+    pub fn get_sig_bits(&self) -> Vec<bool> {
+        let mut sig_bits = vec![];
+        append_be_fixed_width(
+            &mut sig_bits,
+            &Fr::from_str("5").unwrap(), //Corresponding tx_type
+            franklin_constants::TX_TYPE_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self
+                .from_before
+                .witness
+                .account_witness
+                .pub_key_hash
+                .unwrap(),
+            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.to_before.witness.account_witness.pub_key_hash.unwrap(),
+            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+        );
+
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.from_before.token.unwrap(),
+            franklin_constants::TOKEN_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.args.amount.unwrap(),
+            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
+                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.args.fee.unwrap(),
+            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.from_before.witness.account_witness.nonce.unwrap(),
+            franklin_constants::NONCE_BIT_WIDTH,
+        );
+        sig_bits
+    }
 }
 pub fn apply_transfer_tx(
     tree: &mut CircuitAccountTree,
@@ -258,7 +304,8 @@ pub fn apply_transfer(
 
 pub fn calculate_transfer_operations_from_witness(
     transfer_witness: &TransferWitness<Bn256>,
-    sig_msg: &Fr,
+    first_sig_msg: &Fr,
+    second_sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
@@ -274,7 +321,8 @@ pub fn calculate_transfer_operations_from_witness(
         tx_type: transfer_witness.tx_type,
         chunk: Some(Fr::from_str("0").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[0]),
-        sig_msg: Some(*sig_msg),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -288,7 +336,8 @@ pub fn calculate_transfer_operations_from_witness(
         tx_type: transfer_witness.tx_type,
         chunk: Some(Fr::from_str("1").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[1]),
-        sig_msg: Some(*sig_msg),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -307,8 +356,7 @@ mod test {
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
 
-    use ff::Field;
-    use ff::PrimeField;
+    use ff::{Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
     use franklin_crypto::circuit::float_point::convert_to_float;
     use franklin_crypto::circuit::test::*;
@@ -316,7 +364,6 @@ mod test {
     use models::circuit::account::{
         Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
-    use models::merkle_tree::hasher::Hasher;
     use models::merkle_tree::PedersenHasher;
     use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
@@ -341,50 +388,20 @@ mod test {
         let from_pk = PublicKey::from_private(&from_sk, p_g, params);
         let (from_x, from_y) = from_pk.0.into_xy();
         println!("x = {}, y = {}", from_x, from_y);
-        let mut from_key_bits = vec![];
-        append_le_fixed_width(&mut from_key_bits, &from_x, Fr::NUM_BITS as usize);
-        append_le_fixed_width(&mut from_key_bits, &from_y, Fr::NUM_BITS as usize);
-        let from_pub_key_hash = phasher.hash_bits(from_key_bits);
-        let mut from_pub_key_hash_bits = vec![];
-        append_le_fixed_width(
-            &mut from_pub_key_hash_bits,
-            &from_pub_key_hash,
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
-        );
-        let from_pub_key_hash = le_bit_vector_into_field_element(&from_pub_key_hash_bits);
+        let from_pub_key_hash = pub_key_hash(&from_pk, &phasher);
 
         let to_sk = PrivateKey::<Bn256>(rng.gen());
         let to_pk = PublicKey::from_private(&to_sk, p_g, params);
         let (to_x, to_y) = to_pk.0.into_xy();
         println!("x = {}, y = {}", to_x, to_y);
-        let mut to_key_bits = vec![];
-        append_le_fixed_width(&mut to_key_bits, &from_x, Fr::NUM_BITS as usize);
-        append_le_fixed_width(&mut to_key_bits, &from_y, Fr::NUM_BITS as usize);
-        let to_pub_key_hash = phasher.hash_bits(to_key_bits);
-        let mut to_pub_key_hash_bits = vec![];
-        append_le_fixed_width(
-            &mut to_pub_key_hash_bits,
-            &to_pub_key_hash,
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
-        );
-        let to_pub_key_hash = le_bit_vector_into_field_element(&to_pub_key_hash_bits);
+        let to_pub_key_hash = pub_key_hash(&to_pk, &phasher);
 
         // give some funds to sender and make zero balance for recipient
         let validator_sk = PrivateKey::<Bn256>(rng.gen());
         let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
         let (validator_x, validator_y) = validator_pk.0.into_xy();
         println!("x = {}, y = {}", validator_x, validator_y);
-        let mut validator_key_bits = vec![];
-        append_le_fixed_width(&mut validator_key_bits, &validator_x, Fr::NUM_BITS as usize);
-        append_le_fixed_width(&mut validator_key_bits, &validator_y, Fr::NUM_BITS as usize);
-        let validator_pub_key_hash = phasher.hash_bits(validator_key_bits);
-        let mut validator_pub_key_hash_bits = vec![];
-        append_le_fixed_width(
-            &mut validator_pub_key_hash_bits,
-            &validator_pub_key_hash,
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
-        );
-        let validator_pub_key_hash = le_bit_vector_into_field_element(&validator_pub_key_hash_bits);
+        let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
 
         let validator_leaf = CircuitAccount::<Bn256> {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
@@ -418,8 +435,6 @@ mod test {
 
         let transfer_amount: u128 = 500;
 
-        let _transfer_amount_as_field_element = Fr::from_str(&transfer_amount.to_string()).unwrap();
-
         let transfer_amount_bits = convert_to_float(
             transfer_amount,
             franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
@@ -431,8 +446,6 @@ mod test {
         let transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
 
         let fee: u128 = 7;
-
-        let _fee_as_field_element = Fr::from_str(&fee.to_string()).unwrap();
 
         let fee_bits = convert_to_float(
             fee,
@@ -535,26 +548,14 @@ mod test {
             &fee_encoded,
             franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         );
-        let sig_msg = le_bit_vector_into_field_element::<Fr>(&sig_bits);
-        let sig_msg_hash = phasher.hash_bits(sig_bits.clone());
-        let mut sig_msg_hash_bits = vec![];
-        append_le_fixed_width(
-            &mut sig_msg_hash_bits,
-            &sig_msg_hash,
-            franklin_constants::FR_BIT_WIDTH - 8,
-        ); //TODO: not clear what capacity is
 
-        println!(
-            "test sig_msg_hash={} sig_msg_hash_bits.len={}",
-            sig_msg_hash,
-            sig_msg_hash_bits.len()
-        );
-
-        let signature = sign(&sig_bits, &from_sk, p_g, params, rng);
+        let (signature, first_sig_part, second_sig_part) =
+            generate_sig_data(&transfer_witness.get_sig_bits(), &phasher, &from_sk, params);
 
         let operations = calculate_transfer_operations_from_witness(
             &transfer_witness,
-            &sig_msg,
+            &first_sig_part,
+            &second_sig_part,
             signature,
             &from_x,
             &from_y,

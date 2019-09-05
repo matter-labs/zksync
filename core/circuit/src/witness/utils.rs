@@ -13,11 +13,12 @@ use franklin_crypto::jubjub::FixedGenerators;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::{Balance, CircuitAccount, CircuitAccountTree};
 use models::merkle_tree::hasher::Hasher;
+use models::merkle_tree::PedersenHasher;
 use models::params as franklin_constants;
 use pairing::bn256::*;
 use rand::{Rng, SeedableRng, XorShiftRng};
 
-pub fn generate_dummy_sig_data() -> (Option<TransactionSignature<Bn256>>, Fr, Fr, Fr) {
+pub fn _generate_dummy_sig_data() -> (Option<TransactionSignature<Bn256>>, Fr, Fr, Fr) {
     let params = &AltJubjubBn256::new();
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
@@ -29,11 +30,62 @@ pub fn generate_dummy_sig_data() -> (Option<TransactionSignature<Bn256>>, Fr, Fr
     sig_bits.reverse();
     sig_bits.truncate(80);
 
-    // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
-    let signature = sign(&sig_bits, &sender_sk, p_g, &params, rng);
+    let signature = sign_pedersen(&sig_bits, &sender_sk, p_g, &params, rng);
     (signature, sig_msg, sender_x, sender_y)
+}
+pub fn generate_dummy_sig_data(
+    bits: &[bool],
+    phasher: &PedersenHasher<Bn256>,
+    params: &AltJubjubBn256,
+) -> (Option<TransactionSignature<Bn256>>, Fr, Fr, Fr, Fr) {
+    let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+    let p_g = FixedGenerators::SpendingKeyGenerator;
+    let private_key = PrivateKey::<Bn256>(rng.gen());
+    let sender_pk = PublicKey::from_private(&private_key, p_g, &params);
+    let (sender_x, sender_y) = sender_pk.0.into_xy();
+    let mut sig_bits_to_hash = bits.to_vec();
+    sig_bits_to_hash.resize((Fr::CAPACITY as usize) * 2, false);
+    let (first_sig_part_bits, second_sig_part_bits) =
+        sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
+    let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits.to_vec());
+    let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits.to_vec());
+    let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
+    let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
+    sig_bits.reverse();
+    sig_bits.resize(256, false);
 
-    //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+    let signature = sign_pedersen(&sig_bits, &private_key, p_g, params, rng);
+    // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
+    (
+        signature,
+        first_sig_part,
+        second_sig_part,
+        sender_x,
+        sender_y,
+    )
+}
+pub fn generate_sig_data(
+    bits: &[bool],
+    phasher: &PedersenHasher<Bn256>,
+    private_key: &PrivateKey<Bn256>,
+    params: &AltJubjubBn256,
+) -> (Option<TransactionSignature<Bn256>>, Fr, Fr) {
+    let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+    let p_g = FixedGenerators::SpendingKeyGenerator;
+    let mut sig_bits_to_hash = bits.to_vec();
+    sig_bits_to_hash.resize((Fr::CAPACITY as usize) * 2, false);
+    let (first_sig_part_bits, second_sig_part_bits) =
+        sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
+    let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits.to_vec());
+    let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits.to_vec());
+    let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
+    let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
+    sig_bits.reverse();
+    sig_bits.resize(256, false);
+
+    let signature = sign_pedersen(&sig_bits, &private_key, p_g, params, rng);
+    // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
+    (signature, first_sig_part, second_sig_part)
 }
 pub fn pub_key_hash<E: JubjubEngine, H: Hasher<E::Fr>>(
     pub_key: &PublicKey<E>,
@@ -42,8 +94,16 @@ pub fn pub_key_hash<E: JubjubEngine, H: Hasher<E::Fr>>(
     let (pub_x, pub_y) = pub_key.0.into_xy();
     println!("x = {}, y = {}", pub_x, pub_y);
     let mut pub_key_bits = vec![];
-    append_le_fixed_width(&mut pub_key_bits, &pub_x, Fr::NUM_BITS as usize);
-    append_le_fixed_width(&mut pub_key_bits, &pub_y, Fr::NUM_BITS as usize);
+    append_le_fixed_width(
+        &mut pub_key_bits,
+        &pub_x,
+        franklin_constants::FR_BIT_WIDTH_PADDED,
+    );
+    append_le_fixed_width(
+        &mut pub_key_bits,
+        &pub_y,
+        franklin_constants::FR_BIT_WIDTH_PADDED,
+    );
     let pub_key_hash = hasher.hash_bits(pub_key_bits);
     let mut pub_key_hash_bits = vec![];
     append_le_fixed_width(
@@ -53,6 +113,7 @@ pub fn pub_key_hash<E: JubjubEngine, H: Hasher<E::Fr>>(
     );
     le_bit_vector_into_field_element(&pub_key_hash_bits)
 }
+
 pub fn public_data_commitment<E: JubjubEngine>(
     pubdata_bits: &[bool],
     initial_root: Option<E::Fr>,
