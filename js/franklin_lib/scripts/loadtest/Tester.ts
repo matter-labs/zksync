@@ -137,7 +137,7 @@ export class Tester {
     }
 
     public async dump(): Promise<string> {
-        return '[' + this.wallets.map(async w => w.toJSON()).join(', ') + ']';
+        return '[' + (await Promise.all(this.wallets.map(async w => w.toJSON()))).join(', ') + ']';
         
         // return '[' + this.wallets.map(w => '[' + w.actions.map(a => a.logsJSON()).join(', ') + ']').join(', ') + ']';
         
