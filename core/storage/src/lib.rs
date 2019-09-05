@@ -289,6 +289,7 @@ pub struct StorageETHOperation {
 struct NewETHOperation {
     op_id: i64,
     nonce: i64,
+    deadline_block: i64,
     gas_price: BigDecimal,
     tx_hash: String,
 }
@@ -1013,6 +1014,7 @@ impl StorageProcessor {
         &self,
         op_id: i64,
         hash: H256,
+        deadline_block: u64,
         nonce: u32,
         gas_price: BigDecimal,
     ) -> QueryResult<()> {
@@ -1020,6 +1022,7 @@ impl StorageProcessor {
             .values(&NewETHOperation {
                 op_id,
                 nonce: i64::from(nonce),
+                deadline_block: deadline_block as i64,
                 gas_price,
                 tx_hash: format!("{:#x}", hash),
             })
@@ -1035,9 +1038,7 @@ impl StorageProcessor {
             .set(eth_operations::confirmed.eq(true))
             .execute(self.conn())
             .map(drop)?;
-
             let (op, _) = operations::table
-                .filter(eth_operations::confirmed.eq(false))
                 .inner_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
                 .filter(eth_operations::tx_hash.eq(format!("{:#x}", hash)))
                 .first::<(StoredOperation, StorageETHOperation)>(self.conn())?;

@@ -300,7 +300,7 @@ fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpRes
     Ok(HttpResponse::Ok().json(network_status))
 }
 
-fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+fn handle_get_block_by_id(_req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     unimplemented!()
     //    let pool = req.state().connection_pool.clone();
     //

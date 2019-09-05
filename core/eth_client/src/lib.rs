@@ -25,6 +25,7 @@ pub struct ETHClient<T: Transport> {
     pub web3: Web3<T>,
 }
 
+#[derive(Debug, Clone)]
 pub struct SignedCallResult {
     pub raw_tx: Vec<u8>,
     pub gas_price: U256,
@@ -127,11 +128,13 @@ impl<T: Transport> ETHClient<T> {
         };
 
         let signed_tx = tx.sign(&self.private_key);
+        let hash = self.web3.web3().sha3(Bytes(signed_tx.clone())).wait()?;
 
         Ok(SignedCallResult {
             raw_tx: signed_tx,
             gas_price,
             nonce,
+            hash,
         })
     }
 
