@@ -421,18 +421,18 @@ contract Franklin {
     // Params:
     // - _token - token address
     // - _amount - amount of token
-    // - _franklin_addr - receiver
+    // - _franklinAddr - receiver
     function depositERC20(
         address _token,
         uint128 _amount,
-        bytes calldata _franklin_addr
+        bytes calldata _franklinAddr
     ) external {
         require(
             IERC20(_token).transferFrom(msg.sender, address(this), _amount),
             "transfer failed"
         );
         ValidatedTokenId memory tokenId = validateERC20Token(_token);
-        registerDeposit(tokenId, _amount, _franklin_addr);
+        registerDeposit(tokenId, _amount, _franklinAddr);
     }
 
     // Withdraw ERC20 token
@@ -450,12 +450,12 @@ contract Franklin {
 
     // Register full exit request
     // Params:
-    // - _franklin_addr - sender
+    // - _franklinAddr - sender
     // - _eth_addr - receiver
     // - _token - token address
     // - _signature - user signature
     function registerFullExit(
-        bytes calldata _franklin_addr,
+        bytes calldata _franklinAddr,
         address _eth_addr,
         address _token,
         bytes calldata signature
@@ -463,7 +463,7 @@ contract Franklin {
         requireActive();
         ValidatedTokenId memory tokenId = validateERC20Token(_token);
         // Priority Queue request
-        bytes memory pubData = _franklin_addr; // franklin address
+        bytes memory pubData = _franklinAddr; // franklin address
         pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(_eth_addr)); // eth address
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(tokenId.id)); // token id
         pubData = Bytes.concat(pubData, signature); // signature
@@ -474,11 +474,11 @@ contract Franklin {
     // Params:
     // - _token - token by id
     // - _amount - token amount
-    // - _franklin_addr - receiver
+    // - _franklinAddr - receiver
     function registerDeposit(
         ValidatedTokenId memory _token,
         uint128 _amount,
-        bytes memory _franklin_addr
+        bytes memory _franklinAddr
     ) internal {
         requireActive();
 
@@ -486,14 +486,14 @@ contract Franklin {
             msg.sender,
             _token.id,
             _amount,
-            _franklin_addr
+            _franklinAddr
         );
 
         // Priority Queue request
         bytes memory pubData = Bytes.toBytesFromAddress(msg.sender); // sender
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(_token.id)); // token id
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt128(_amount)); // amount
-        pubData = Bytes.concat(pubData, _franklin_addr); // franklin address
+        pubData = Bytes.concat(pubData, _franklinAddr); // franklin address
         addPriorityRequest(OpType.Deposit, pubData);
     }
 
