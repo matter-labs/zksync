@@ -299,15 +299,15 @@ contract Franklin {
                 for (uint256 j = 0; j < 20; ++j) {
                     owner[j] = pubData[j];
                 }
-                bytes memory token = new bytes(2);
-                for (uint256 j = 0; j < 2; ++j) {
-                    token[j] = pubData[20 + j];
-                }
+                uint16 token = uint16(
+                    (uint256(uint8(_publicData[opDataPointer + 20])) << 8) +
+                        uint256(uint8(_publicData[opDataPointer + 21]))
+                );
                 bytes memory amount = new bytes(16);
                 for (uint256 j = 0; j < 16; ++j) {
                     amount[j] = pubData[22 + j];
                 }
-                balancesToWithdraw[Bytes.bytesToAddress(owner)][Bytes.bytesToUInt16(token)] += Bytes.bytesToUInt128(amount);
+                balancesToWithdraw[Bytes.bytesToAddress(owner)][token] += Bytes.bytesToUInt128(amount);
             }
         }
     }
@@ -681,11 +681,6 @@ contract Franklin {
             bytes memory ethAddress = new bytes(20);
             for (uint256 i = 0; i < 20; ++i) {
                 ethAddress[i] = _publicData[opDataPointer + 3 + i];
-            }
-
-            bytes memory signatureHash = new bytes(20);
-            for (uint256 i = 0; i < 20; ++i) {
-                signatureHash[i] = _publicData[opDataPointer + 25 + i];
             }
 
             bytes memory fullAmountBytes = new bytes(16);
