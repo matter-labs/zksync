@@ -5,8 +5,8 @@ interface AbstractOperationLog {
     logs: string[],
     finish: string,
     success: boolean,
-    balanceAtStart: string,
-    balanceAtEnd: string
+    balanceAtStart: string[],
+    balanceAtEnd: string[]
 }
 export abstract class AbstractOperation {
     private static getOperationId = (counter => () => String(++counter).padStart(3, '0'))(0);
@@ -53,7 +53,7 @@ export abstract class AbstractOperation {
     protected abstract kwargs: any;
     public async start() {
         try {
-            this.info.balanceAtStart = (await this.mainWallet.getAllBalancesString()).join('\n');
+            this.info.balanceAtStart = await this.mainWallet.getAllBalancesString();
             await this.action();
             this.log(`succeeded`);
             this.info.success = true;
@@ -64,7 +64,7 @@ export abstract class AbstractOperation {
         }
         let balanceStrings = await this.mainWallet.getBalanceForTokenAsString(this.kwargs.token);
         balanceStrings.forEach(this.log.bind(this));
-        this.info.balanceAtEnd = balanceStrings.join('\n');
+        this.info.balanceAtEnd = balanceStrings;
         this.logFinish(`finished.`);
     }
 }

@@ -181,11 +181,33 @@ export class LocalWallet {
         // }
     }
 
+    public static async reason(hash: string): Promise<string> {
+        const tx = await provider.getTransaction(hash);
+        if (!tx) return "tx not found";
+
+        const receipt = await provider.getTransactionReceipt(hash);
+        
+        if (receipt.status) return receipt.status.toString();
+
+        const code = await provider.call(tx, tx.blockNumber);
+        const reason = hex_to_ascii(code.substr(138));
+        return reason;
+
+        function hex_to_ascii(str1) {
+            const hex  = str1.toString();
+            let str = "";
+            for (let n = 0; n < hex.length; n += 2) {
+                str += String.fromCharCode(parseInt(hex.substr(n, 2), 16));
+            }
+            return str;
+        }        
+    }
+
     private async depositOnchain(token: Token, amount: BigNumber) {
         await this.franklinWallet.updateState();
         let res = await this.franklinWallet.depositOnchain(token, amount);
-        // console.log('deposit onchain res');
-        // console.log(res);
+        console.log('deposit onchain res');
+        console.log(res);
         await this.franklinWallet.updateState();
     }
 

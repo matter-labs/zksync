@@ -9,6 +9,10 @@ import Prando from 'prando';
 import { AbstractOperation } from './AbstractOperation';
 const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms))
 
+interface TesterKwargs {
+    initNumWallets: number,
+    randomSeed: string | number | null
+}
 export class Tester {
     wallets: LocalWallet[] = [];
     prando: Prando;
@@ -16,10 +20,10 @@ export class Tester {
 
     private constructor() {}
     
-    public static async new(initNumWallets: number): Promise<Tester> {
+    public static async new(kwargs: TesterKwargs): Promise<Tester> {
         const tester: Tester = new Tester();        
-        tester.prando = new Prando();
-        for (let i = 0; i < initNumWallets; i++) {
+        tester.prando = new Prando(kwargs.randomSeed);
+        for (let i = 0; i < kwargs.initNumWallets; i++) {
             await tester.addNewWallet();
         }
         tester.tokens = tester.wallets[0].franklinWallet.supportedTokens;
@@ -103,7 +107,7 @@ export class Tester {
             'randomDepositOperation': 0.3,
             'randomTransferOperation': 0.4
         };
-        let num = Math.random();
+        let num = this.prando.next();
         let keys = Object.keys(opsProbs);
         for (let i = 0; i < keys.length; i++) {
             let opName = keys[i];
@@ -138,15 +142,5 @@ export class Tester {
 
     public async dump(): Promise<string> {
         return '[' + (await Promise.all(this.wallets.map(async w => w.toJSON()))).join(', ') + ']';
-        
-        // return '[' + this.wallets.map(w => '[' + w.actions.map(a => a.logsJSON()).join(', ') + ']').join(', ') + ']';
-        
-        // for (let i = 0; i < this.wallets.length; ++i) {
-        //     let wallet = this.wallets[i];
-        //     for (let j = 0; j < wallet.actions.length; ++j) {
-        //         let action = wallet.actions[j];
-        //         action.logsJSON()
-        //     }
-        // }
     }
 }
