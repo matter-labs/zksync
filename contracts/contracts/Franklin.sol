@@ -335,7 +335,7 @@ contract Franklin {
     }
 
     // Block committment
-
+    event DebugCommitBlock(bytes _publicData, bytes32 commitment);
     function commitBlock(
         uint32 _blockNumber,
         uint24 _feeAccount,
@@ -382,6 +382,7 @@ contract Franklin {
         totalOnchainOps = startId + totalProcessed;
 
         totalBlocksCommitted += 1;
+        emit DebugCommitBlock(_publicData, commitment);
         emit BlockCommitted(_blockNumber);
     }
 

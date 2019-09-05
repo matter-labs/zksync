@@ -403,8 +403,8 @@ impl BabyProver {
                     pub_data.extend(vec![false; 64]);
                 }
             }
-            assert_eq!(pub_data.len(), 64 * 10);
-            assert_eq!(operations.len(), 10);
+            assert_eq!(pub_data.len(), 64 * franklin_constants::BLOCK_SIZE_CHUNKS);
+            assert_eq!(operations.len(), franklin_constants::BLOCK_SIZE_CHUNKS);
 
             let validator_acc = self
                 .accounts_tree

@@ -1716,7 +1716,7 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
     for i in &[1, 3] {
         //deposit, partial exit
         let x = E::Fr::from_str(&i.to_string()).unwrap();
-        let y = E::Fr::from_str("3").unwrap();
+        let y = E::Fr::from_str("5").unwrap();
         points.push((x, y));
     }
 

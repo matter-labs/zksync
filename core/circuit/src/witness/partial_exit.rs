@@ -255,11 +255,39 @@ pub fn calculate_partial_exit_operations_from_witness(
         lhs: partial_exit_witness.after.clone(),
         rhs: partial_exit_witness.after.clone(),
     };
+    let operation_four = Operation {
+        new_root: partial_exit_witness.after_root,
+        tx_type: partial_exit_witness.tx_type,
+        chunk: Some(Fr::from_str("4").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[4]),
+        sig_msg: Some(*sig_msg),
+        signature: signature.clone(),
+        signer_pub_key_x: Some(*signer_pub_key_x),
+        signer_pub_key_y: Some(*signer_pub_key_y),
+        args: partial_exit_witness.args.clone(),
+        lhs: partial_exit_witness.after.clone(),
+        rhs: partial_exit_witness.after.clone(),
+    };
+    let operation_five = Operation {
+        new_root: partial_exit_witness.after_root,
+        tx_type: partial_exit_witness.tx_type,
+        chunk: Some(Fr::from_str("5").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[5]),
+        sig_msg: Some(*sig_msg),
+        signature: signature.clone(),
+        signer_pub_key_x: Some(*signer_pub_key_x),
+        signer_pub_key_y: Some(*signer_pub_key_y),
+        args: partial_exit_witness.args.clone(),
+        lhs: partial_exit_witness.after.clone(),
+        rhs: partial_exit_witness.after.clone(),
+    };
     vec![
         operation_zero,
         operation_one,
         operation_two,
         operation_three,
+        operation_four,
+        operation_five,
     ]
 }
 #[cfg(test)]

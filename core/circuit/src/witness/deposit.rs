@@ -273,11 +273,40 @@ pub fn calculate_deposit_operations_from_witness(
         rhs: deposit_witness.after.clone(),
     };
 
+    let operation_four = Operation {
+        new_root: deposit_witness.after_root,
+        tx_type: deposit_witness.tx_type,
+        chunk: Some(Fr::from_str("4").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[4]),
+        sig_msg: Some(*sig_msg),
+        signature: signature.clone(),
+        signer_pub_key_x: Some(*signer_pub_key_x),
+        signer_pub_key_y: Some(*signer_pub_key_y),
+        args: deposit_witness.args.clone(),
+        lhs: deposit_witness.after.clone(),
+        rhs: deposit_witness.after.clone(),
+    };
+
+    let operation_five = Operation {
+        new_root: deposit_witness.after_root,
+        tx_type: deposit_witness.tx_type,
+        chunk: Some(Fr::from_str("5").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[5]),
+        sig_msg: Some(*sig_msg),
+        signature: signature.clone(),
+        signer_pub_key_x: Some(*signer_pub_key_x),
+        signer_pub_key_y: Some(*signer_pub_key_y),
+        args: deposit_witness.args.clone(),
+        lhs: deposit_witness.after.clone(),
+        rhs: deposit_witness.after.clone(),
+    };
     let operations: Vec<Operation<_>> = vec![
         operation_zero,
         operation_one,
         operation_two,
         operation_three,
+        operation_four,
+        operation_five,
     ];
     operations
 }

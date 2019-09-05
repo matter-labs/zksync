@@ -27,7 +27,7 @@ async function main() {
     console.log(await wallet.depositOnchain(wallet.supportedTokens['0'], 10));
     console.log("sending another token");
     console.log(await wallet.depositOnchain(wallet.supportedTokens['1'], 20));
-    await sleep(5000);
+    await sleep(3000);
     console.log("deposit offchain");
     console.log(await wallet.depositOffchain(wallet.supportedTokens['0'], 10, 0));
     await wallet.waitPendingTxsExecuted();
