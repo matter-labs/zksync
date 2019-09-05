@@ -807,12 +807,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?);
         base_valid_flags.push(is_partial_exit.clone());
 
-        //here we verify whether exit should be full
-        let is_full_exit = Boolean::from(Expression::equals(
-            cs.namespace(|| "amount is zero"),
-            &op_data.full_amount.get_number(),
-            Expression::constant::<CS>(E::Fr::zero()),
-        )?);
         let is_base_valid = multi_and(
             cs.namespace(|| "valid base partial_exit"),
             &base_valid_flags,
@@ -822,7 +816,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             let mut lhs_partial_valid_flags = vec![];
 
             let cs = &mut cs.namespace(|| "partial_exit");
-            lhs_partial_valid_flags.push(is_full_exit.not().clone());
             lhs_partial_valid_flags.push(is_base_valid.clone());
 
             // check operation arguments
@@ -875,60 +868,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             )?;
         }
 
-        let lhs_full_valid: Boolean;
-        {
-            let mut lhs_full_valid_flags = vec![];
-
-            let cs = &mut cs.namespace(|| "full_exit");
-            lhs_full_valid_flags.push(is_full_exit.clone());
-            lhs_full_valid_flags.push(is_base_valid.clone());
-            lhs_full_valid_flags.push(is_first_chunk.clone());
-
-            let diff_balance_fee = Expression::from(&cur.balance.get_number())
-                - Expression::from(&op_data.fee.get_number());
-            let mut diff_balance_fee_bits =
-                diff_balance_fee.into_bits_le(cs.namespace(|| "balance-fee bits"))?;
-            diff_balance_fee_bits.truncate(franklin_constants::BALANCE_BIT_WIDTH); //TODO: can be made inside helpers
-            let diff_balance_fee_bits_repacked = Expression::le_bits::<CS>(&diff_balance_fee_bits);
-
-            let is_balance_geq_fee = Boolean::from(Expression::equals(
-                cs.namespace(|| "diff equal to repacked"),
-                diff_balance_fee,
-                diff_balance_fee_bits_repacked,
-            )?);
-            lhs_full_valid_flags.push(is_balance_geq_fee);
-
-            lhs_full_valid_flags.push(no_nonce_overflow(
-                cs.namespace(|| "no nonce overflow"),
-                &cur.account.nonce.get_number(),
-            )?);
-
-            lhs_full_valid = multi_and(cs.namespace(|| "lhs_full_valid"), &lhs_full_valid_flags)?;
-
-            //update cur data if we are processing first operation of valid partial_exit transaction
-            let updated_balance_value = Expression::constant::<CS>(E::Fr::zero());
-
-            //mutate current branch if it is first chunk of valid partial_exit transaction
-            cur.balance = CircuitElement::conditionally_select_with_number_strict(
-                cs.namespace(|| "mutated balance"),
-                updated_balance_value,
-                &cur.balance,
-                &lhs_full_valid,
-            )?;
-            cur.balance
-                .enforce_length(cs.namespace(|| "mutated balance is still correct length"))?;
-
-            let updated_nonce =
-                Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1);
-            //update nonce
-            cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
-                cs.namespace(|| "update cur nonce"),
-                updated_nonce,
-                &cur.account.nonce,
-                &lhs_full_valid,
-            )?;
-        }
-
         let mut ohs_valid_flags = vec![];
         ohs_valid_flags.push(is_base_valid);
         ohs_valid_flags.push(is_first_chunk.not());
@@ -936,7 +875,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let tx_valid = multi_or(
             cs.namespace(|| "tx_valid"),
-            &[lhs_partial_valid, lhs_full_valid, is_ohs_valid],
+            &[lhs_partial_valid, is_ohs_valid],
         )?;
         Ok(tx_valid)
     }
