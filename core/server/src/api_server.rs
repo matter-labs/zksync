@@ -293,7 +293,9 @@ fn handle_get_testnet_config(req: &HttpRequest<AppState>) -> ActixResult<HttpRes
 //    Ok(HttpResponse::Ok().json(tx))
 //}
 
-fn handle_get_executed_transaction_by_hash(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+fn handle_get_executed_transaction_by_hash(
+    req: &HttpRequest<AppState>,
+) -> ActixResult<HttpResponse> {
     let pool = req.state().connection_pool.clone();
 
     let storage = pool.access_storage();
@@ -317,7 +319,6 @@ fn handle_get_executed_transaction_by_hash(req: &HttpRequest<AppState>) -> Actix
 
     Ok(HttpResponse::Ok().json(tx))
 }
-
 
 fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let network_status = req.state().network_status.read();
@@ -547,7 +548,8 @@ fn start_server(state: AppState, bind_to: String) {
                     //     r.method(Method::GET).f(handle_get_transaction_by_id);
                     // })
                     .resource("/transactions/{tx_hash}", |r| {
-                        r.method(Method::GET).f(handle_get_executed_transaction_by_hash);
+                        r.method(Method::GET)
+                            .f(handle_get_executed_transaction_by_hash);
                     })
                     .resource("/blocks/{block_id}/transactions", |r| {
                         r.method(Method::GET).f(handle_get_block_transactions);

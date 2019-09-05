@@ -72,11 +72,13 @@ impl PlasmaState {
 
     pub fn chunks_for_tx(&self, franklin_tx: &FranklinTx) -> usize {
         match franklin_tx {
-            FranklinTx::Transfer(tx) => if self.get_account_by_address(&tx.to).is_some() {
-                TransferOp::CHUNKS
-            } else {
-                TransferToNewOp::CHUNKS
-            },
+            FranklinTx::Transfer(tx) => {
+                if self.get_account_by_address(&tx.to).is_some() {
+                    TransferOp::CHUNKS
+                } else {
+                    TransferToNewOp::CHUNKS
+                }
+            }
             FranklinTx::Deposit(_) => DepositOp::CHUNKS,
             FranklinTx::Withdraw(_) => PartialExitOp::CHUNKS,
             FranklinTx::Close(_) => CloseOp::CHUNKS,

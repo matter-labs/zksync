@@ -239,7 +239,9 @@ impl PlasmaStateKeeper {
             {
                 ensure!(
                     locked_balance.amount >= &deposit.amount + &deposit.fee,
-                    "Locked amount insufficient, locked: {}, deposit: {}", locked_balance.amount, deposit.amount
+                    "Locked amount insufficient, locked: {}, deposit: {}",
+                    locked_balance.amount,
+                    deposit.amount
                 );
                 ensure!(
                     locked_balance.blocks_left_until_unlock > 10,

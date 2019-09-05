@@ -553,7 +553,7 @@ pub enum TxAddError {
     #[fail(display = "Tx signature is incorrect.")]
     InvalidSignature,
     #[fail(display = "Tx amount is zero.")]
-    ZeroAmount
+    ZeroAmount,
 }
 
 enum ConnectionHolder {
@@ -1211,10 +1211,10 @@ impl StorageProcessor {
             if tx.is_some() {
                 let tx = tx.unwrap();
 
-                let confirm = operations::table 
+                let confirm = operations::table
                     .filter(operations::block_number.eq(tx.block_number))
                     .filter(operations::action_type.eq("Verify"))
-                    .first::<StoredOperation>(self.conn()) 
+                    .first::<StoredOperation>(self.conn())
                     .optional()?;
 
                 Ok(Some(TxReceiptResponse {
@@ -1222,7 +1222,7 @@ impl StorageProcessor {
                     block_number: Some(tx.block_number),
                     success: tx.success,
                     verified: confirm.is_some(),
-                    fail_reason: tx.fail_reason
+                    fail_reason: tx.fail_reason,
                 }))
             } else {
                 Ok(Some(TxReceiptResponse {
@@ -1230,7 +1230,7 @@ impl StorageProcessor {
                     block_number: None,
                     success: false,
                     verified: false,
-                    fail_reason: Some("not committed yet".to_string())
+                    fail_reason: Some("not committed yet".to_string()),
                 }))
             }
         })
@@ -1461,7 +1461,10 @@ impl StorageProcessor {
         Ok(Ok(()))
     }
 
-    pub fn save_franklin_op_blocks(&self, blocks: &[NewFranklinOpBlock]) -> QueryResult<Result<(), String>> {
+    pub fn save_franklin_op_blocks(
+        &self,
+        blocks: &[NewFranklinOpBlock],
+    ) -> QueryResult<Result<(), String>> {
         for block in blocks.iter() {
             let inserted = diesel::insert_into(franklin_op_blocks::table)
                 .values(block)
@@ -1488,7 +1491,9 @@ impl StorageProcessor {
             diesel::delete(data_restore_last_watched_eth_block::table).execute(self.conn())?;
         if 0 == deleted {
             error!("Error: could not delete last watched eth block number!");
-            return Ok(Err("Could not delete last watched eth block number!".to_string()));
+            return Ok(Err(
+                "Could not delete last watched eth block number!".to_string()
+            ));
         }
         Ok(Ok(()))
     }
@@ -1575,7 +1580,7 @@ impl StorageProcessor {
                 return Ok(Err(TxAddError::ZeroAmount));
             }
         }
-        
+
         let tx_failed = executed_transactions::table
             .filter(executed_transactions::tx_hash.eq(tx.hash()))
             .filter(executed_transactions::success.eq(false))
