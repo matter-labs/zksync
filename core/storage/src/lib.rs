@@ -3,7 +3,7 @@ extern crate diesel;
 #[macro_use]
 extern crate log;
 
-use bigdecimal::BigDecimal;
+use bigdecimal::{BigDecimal, Zero};
 use chrono::prelude::*;
 use diesel::dsl::*;
 use failure::Fail;
@@ -29,6 +29,8 @@ use diesel::r2d2::{ConnectionManager, Pool, PoolError, PooledConnection};
 
 use serde_json::value::Value;
 use std::env;
+
+use hex;
 
 use diesel::sql_types::{BigInt, Nullable, Text, Timestamp};
 sql_function!(coalesce, Coalesce, (x: Nullable<BigInt>, y: BigInt) -> BigInt);
@@ -146,6 +148,15 @@ struct StoredExecutedTransaction {
     tx_hash: Vec<u8>,
     operation: Option<Value>,
     success: bool,
+    fail_reason: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TxReceiptResponse {
+    tx_hash: Vec<u8>,
+    block_number: Option<i64>,
+    success: bool,
+    verified: bool,
     fail_reason: Option<String>,
 }
 
@@ -541,6 +552,8 @@ pub enum TxAddError {
     NonceTooLow,
     #[fail(display = "Tx signature is incorrect.")]
     InvalidSignature,
+    #[fail(display = "Tx amount is zero.")]
+    ZeroAmount
 }
 
 enum ConnectionHolder {
@@ -1186,6 +1199,43 @@ impl StorageProcessor {
         Ok((Some(account_id), verified_state, commited_state))
     }
 
+    pub fn is_tx_successful(&self, hash: &str) -> QueryResult<(Option<TxReceiptResponse>)> {
+        self.conn().transaction(|| {
+            let hash = hex::decode(hash).unwrap();
+
+            let tx = executed_transactions::table
+                .filter(executed_transactions::tx_hash.eq(&hash))
+                .first::<StoredExecutedTransaction>(self.conn())
+                .optional()?;
+
+            if tx.is_some() {
+                let tx = tx.unwrap();
+
+                let confirm = operations::table 
+                    .filter(operations::block_number.eq(tx.block_number))
+                    .filter(operations::action_type.eq("Verify"))
+                    .first::<StoredOperation>(self.conn()) 
+                    .optional()?;
+
+                Ok(Some(TxReceiptResponse {
+                    tx_hash: hash,
+                    block_number: Some(tx.block_number),
+                    success: tx.success,
+                    verified: confirm.is_some(),
+                    fail_reason: tx.fail_reason
+                }))
+            } else {
+                Ok(Some(TxReceiptResponse {
+                    tx_hash: hash,
+                    block_number: None,
+                    success: false,
+                    verified: false,
+                    fail_reason: Some("not committed yet".to_string())
+                }))
+            }
+        })
+    }
+
     pub fn last_committed_state_for_account(
         &self,
         account_id: AccountId,
@@ -1520,6 +1570,12 @@ impl StorageProcessor {
             return Ok(Err(TxAddError::NonceTooLow));
         }
 
+        if let FranklinTx::Deposit(deposit_tx) = tx {
+            if deposit_tx.amount == bigdecimal::BigDecimal::zero() {
+                return Ok(Err(TxAddError::ZeroAmount));
+            }
+        }
+        
         let tx_failed = executed_transactions::table
             .filter(executed_transactions::tx_hash.eq(tx.hash()))
             .filter(executed_transactions::success.eq(false))

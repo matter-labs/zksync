@@ -17,6 +17,7 @@ ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 log = "0.4"
 failure = "0.1"
+hex = "0.3"
 
 [dev-dependencies]
 env_logger = "0.6"

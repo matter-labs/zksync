@@ -224,7 +224,7 @@ impl PlasmaStateKeeper {
         filtered_txs
             .into_iter()
             .take_while(|tx| {
-                total_chunks += tx.min_number_of_chunks();
+                total_chunks += self.state.chunks_for_tx(&tx);
                 total_chunks <= BLOCK_SIZE_CHUNKS
             })
             .collect()
@@ -239,7 +239,7 @@ impl PlasmaStateKeeper {
             {
                 ensure!(
                     locked_balance.amount >= &deposit.amount + &deposit.fee,
-                    "Locked amount insufficient"
+                    "Locked amount insufficient, locked: {}, deposit: {}", locked_balance.amount, deposit.amount
                 );
                 ensure!(
                     locked_balance.blocks_left_until_unlock > 10,
@@ -258,10 +258,11 @@ impl PlasmaStateKeeper {
         let mut accounts_updated = Vec::new();
         let mut fees = Vec::new();
         let mut ops = Vec::new();
-        let mut chunks_used = 0;
+        let mut chunks_left = BLOCK_SIZE_CHUNKS;
 
         for tx in transactions.into_iter() {
-            if chunks_used >= BLOCK_SIZE_CHUNKS {
+            let chunks_needed = self.state.chunks_for_tx(&tx);
+            if chunks_left < chunks_needed {
                 break;
             }
 
@@ -285,7 +286,8 @@ impl PlasmaStateKeeper {
                     mut updates,
                     executed_op,
                 }) => {
-                    chunks_used += executed_op.chunks();
+                    assert!(chunks_needed == executed_op.chunks());
+                    chunks_left -= chunks_needed;
                     accounts_updated.append(&mut updates);
                     fees.push(fee);
                     let exec_result = ExecutedTx {

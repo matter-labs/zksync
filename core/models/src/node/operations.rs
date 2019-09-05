@@ -9,8 +9,8 @@ pub struct DepositOp {
 }
 
 impl DepositOp {
-    const CHUNKS: usize = 4;
-    const OP_CODE: u8 = 0x01;
+    pub const CHUNKS: usize = 4;
+    pub const OP_CODE: u8 = 0x01;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -33,8 +33,8 @@ pub struct TransferToNewOp {
 }
 
 impl TransferToNewOp {
-    const CHUNKS: usize = 5;
-    const OP_CODE: u8 = 0x02;
+    pub const CHUNKS: usize = 5;
+    pub const OP_CODE: u8 = 0x02;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -58,8 +58,8 @@ pub struct TransferOp {
 }
 
 impl TransferOp {
-    const CHUNKS: usize = 2;
-    const OP_CODE: u8 = 0x05;
+    pub const CHUNKS: usize = 2;
+    pub const OP_CODE: u8 = 0x05;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -81,8 +81,8 @@ pub struct PartialExitOp {
 }
 
 impl PartialExitOp {
-    const CHUNKS: usize = 4;
-    const OP_CODE: u8 = 0x03;
+    pub const CHUNKS: usize = 4;
+    pub const OP_CODE: u8 = 0x03;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -104,8 +104,8 @@ pub struct CloseOp {
 }
 
 impl CloseOp {
-    const CHUNKS: usize = 1;
-    const OP_CODE: u8 = 0x04;
+    pub const CHUNKS: usize = 1;
+    pub const OP_CODE: u8 = 0x04;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();

@@ -456,7 +456,7 @@ contract Franklin {
 
             uint16 tokenId = uint16(
                 (uint256(uint8(_publicData[opDataPointer + 3])) << 8) +
-                    uint256(uint8(_publicData[opDataPointer + 4]))
+                (uint256(uint8(_publicData[opDataPointer + 4])) << 0)
             );
 
             uint8[3] memory amountPacked;
@@ -491,7 +491,7 @@ contract Franklin {
                 account,
                 (amount + fee)
             );
-            return (5 * 8, 1);
+            return (4 * 8, 1);
         }
 
         // partial_exit

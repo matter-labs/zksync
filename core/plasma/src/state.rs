@@ -70,6 +70,19 @@ impl PlasmaState {
         self.balance_tree.items.get(&account_id).cloned()
     }
 
+    pub fn chunks_for_tx(&self, franklin_tx: &FranklinTx) -> usize {
+        match franklin_tx {
+            FranklinTx::Transfer(tx) => if self.get_account_by_address(&tx.to).is_some() {
+                TransferOp::CHUNKS
+            } else {
+                TransferToNewOp::CHUNKS
+            },
+            FranklinTx::Deposit(_) => DepositOp::CHUNKS,
+            FranklinTx::Withdraw(_) => PartialExitOp::CHUNKS,
+            FranklinTx::Close(_) => CloseOp::CHUNKS,
+        }
+    }
+
     pub fn apply_tx(&mut self, tx: FranklinTx) -> Result<TxSuccess, Error> {
         match tx {
             FranklinTx::Transfer(tx) => self.apply_transfer(tx),
