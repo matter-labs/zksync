@@ -619,7 +619,8 @@ contract Franklin {
                 franklinAddress[i] = _publicData[opDataPointer + 9 + i];
             }
 
-            governance.requireValidTokenId(tokenId);
+            // TODO: make the decision based on whether the validator can commit transactions with an invalid token
+            // governance.requireValidTokenId(tokenId);
 
             onchainOps[_currentOnchainOp] = OnchainOp(
                 OpType.Deposit,
@@ -650,7 +651,8 @@ contract Franklin {
                 ethAddress[i] = _publicData[opDataPointer + 23 + i];
             }
 
-            governance.requireValidTokenId(tokenId);
+            // TODO: make the decision based on whether the validator can commit transactions with an invalid token
+            // governance.requireValidTokenId(tokenId);
             
             onchainOps[_currentOnchainOp] = OnchainOp(
                 OpType.PartialExit,
@@ -681,7 +683,8 @@ contract Franklin {
             }
             uint128 fullAmount = Bytes.bytesToUInt128(fullAmountBytes);
 
-            governance.requireValidTokenId(tokenId);
+            // TODO: make the decision based on whether the validator can commit transactions with an invalid token
+            // governance.requireValidTokenId(tokenId);
 
             onchainOps[_currentOnchainOp] = OnchainOp(
                 OpType.FullExit,
