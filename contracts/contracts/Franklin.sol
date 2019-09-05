@@ -259,7 +259,7 @@ contract Franklin {
     // Params:
     // - _count - number of requests to remove
     function removePriorityRequests(uint32 _count) internal {
-        require(_count <= totalPriorityRequests, "Count of removed requests is higher than their count");
+        require(_count <= totalPriorityRequests, "large count for remove priority");
 
         for (uint32 i = firstPriorityRequestId; i < firstPriorityRequestId + _count; i++) {
             delete priorityRequestsParams[i];
@@ -273,7 +273,7 @@ contract Franklin {
     // - _opType - operation type
     // - _anyRequestsCount - count of requests where to look certain requests for
     function removePriorityRequestsWithType(OpType _opType, uint32 _anyRequestsCount) internal {
-        require(_anyRequestsCount <= totalPriorityRequests, "Count of removed requests is higher than their count");
+        require(_anyRequestsCount <= totalPriorityRequests, "large count for remove priority with type");
 
         uint32 removingPriorityCount = 0;
         for (uint32 i = firstPriorityRequestId; i < firstPriorityRequestId + _anyRequestsCount; i++) {
@@ -290,7 +290,7 @@ contract Franklin {
     // Params:
     // - _anyRequestsCount - count of requests where to look deposit requests for
     function accrueBalancesFromDeposits(uint32 _anyRequestsCount) internal {
-        require(_anyRequestsCount <= totalPriorityRequests, "Count of removed requests is higher than their count");
+        require(_anyRequestsCount <= totalPriorityRequests, "large count for accrue deposit balances");
 
         for (uint32 i = firstPriorityRequestId; i < firstPriorityRequestId + _anyRequestsCount; i++) {
             if (priorityRequestsParams[i].opType == OpType.Deposit) {
@@ -344,7 +344,7 @@ contract Franklin {
     // Params:
     // - _franklinAddr - receiver
     function depositETH(bytes calldata _franklinAddr) external payable {
-        require(msg.value <= MAX_VALUE, "sorry Joe");
+        require(msg.value <= MAX_VALUE, "deposit value over max");
         registerDeposit(ValidatedTokenId(0), uint128(msg.value), _franklinAddr);
     }
 
@@ -368,7 +368,7 @@ contract Franklin {
     ) external {
         require(
             IERC20(_token).transferFrom(msg.sender, address(this), _amount),
-            "transfer failed"
+            "token transfer failed deposit"
         );
         ValidatedTokenId memory tokenId = ValidatedTokenId({
             id: governance.validateERC20Token(_token)
@@ -387,19 +387,17 @@ contract Franklin {
         registerWithdrawal(tokenId, _amount);
         require(
             IERC20(_token).transfer(msg.sender, _amount),
-            "transfer failed"
+            "token transfer failed withdraw"
         );
     }
 
     // Register full exit request
     // Params:
     // - _franklinAddr - sender
-    // - _eth_addr - receiver
     // - _token - token address
     // - _signature - user signature
     function registerFullExit(
         bytes calldata _franklinAddr,
-        address _eth_addr,
         address _token,
         bytes calldata signature
     ) external {
@@ -409,7 +407,7 @@ contract Franklin {
         });
         // Priority Queue request
         bytes memory pubData = _franklinAddr; // franklin address
-        pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(_eth_addr)); // eth address
+        pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(msg.sender)); // eth address
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(tokenId.id)); // token id
         pubData = Bytes.concat(pubData, signature); // signature
         addPriorityRequest(OpType.FullExit, pubData);
@@ -450,7 +448,7 @@ contract Franklin {
         requireActive();
         require(
             balancesToWithdraw[msg.sender][_token.id] >= _amount,
-            "insufficient balance"
+            "insufficient balance withdraw"
         );
         balancesToWithdraw[msg.sender][_token.id] -= _amount;
         emit OnchainWithdrawal(
@@ -475,7 +473,9 @@ contract Franklin {
         bytes calldata _publicData
     ) external {
         requireActive();
-        governance.requireValidator(msg.sender);
+        require(
+            governance.isValidator(msg.sender),
+            "not a validator in commit");
         require(
             _blockNumber == totalBlocksCommited + 1,
             "only commit next block"
@@ -487,7 +487,7 @@ contract Franklin {
         );
 
         // Enter exodus mode if needed
-        require(!triggerExodusIfNeeded(), "Entered exodus mode");
+        require(!triggerExodusIfNeeded(), "entered exodus mode");
 
         (uint64 startId, uint64 totalProcessed, uint32 priorityOperations) = commitOnchainOps(_publicData);
 
@@ -700,7 +700,7 @@ contract Franklin {
             return (FULL_EXIT_LENGTH, 1, 1);
         }
 
-        require(false, "unsupported op");
+        revert("unsupported op");
     }
 
     // MARK: - Block verification
@@ -714,7 +714,9 @@ contract Franklin {
         external
     {
         requireActive();
-        governance.requireValidator(msg.sender);
+        require(
+            governance.isValidator(msg.sender),
+            "not a validator in verify");
         require(
             _blockNumber == totalBlocksVerified + 1,
             "only verify next block"

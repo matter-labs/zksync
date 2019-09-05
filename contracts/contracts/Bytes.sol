@@ -18,7 +18,7 @@ library Bytes {
     // Returns the newly created 'bytes memory'
     // The returned bytes will be of length 'len'.
     function toBytesFromBytes32(bytes32 self, uint8 len) internal pure returns (bytes memory bts) {
-        require(len <= 32, "wrong bytes length");
+        require(len <= 32, "wrong bytes length from 32");
         bts = new bytes(len);
         // Even though the bytes will allocate a full word, we don't want
         // any potential garbage bytes in there.
@@ -42,7 +42,7 @@ library Bytes {
         pure
         returns (address addr)
     {
-        require(self.length >= 20, "wrong bytes length");
+        require(self.length >= 20, "wrong bytes length to address");
 
         assembly {
             addr := div(mload(add(add(self, 0x20), 0)), 0x1000000000000000000000000)
@@ -56,7 +56,7 @@ library Bytes {
         pure
         returns (uint128)
     {
-        require(self.length >= 16, "wrong bytes length");
+        require(self.length >= 16, "wrong bytes length to 128");
         uint128 tempUint;
 
         assembly {

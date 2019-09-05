@@ -80,15 +80,15 @@ When corresponding transactions are found in the commited block, their count mus
 
 If the block is reverted, the funds held by **Deposit priority requests** from this block are acrued to the owners' **root-chain balances** to make them possible to withdraw. And this **Deposit priority requests** will be removed from mapping. 
 
+A certain value of the selected token will be withdrawn from the _user's_ account immediately when he send a request, as payment for the _validator’s_ work to include these transactions in the block. One transaction fee is calculated as follows:
+`fee = 3 * gas * mediumFee`, where
+- `gas` - the gas cost of all related operations for the exit
+- `mediumFee` - current average fee in the network.
+
 ### **Validators'** responsibility
 
 **Validators** MUST subscribe for `NewPriorityRequest` events in the RIGHT order to include priority transactions in some upcoming blocks.
 The need for _Validators_ to include these transactions in blocks as soon as possible is dedicated by the increasing probability of entering the **Exodus Mode** (described below).
-
-A certain value of the selected token will be withdrawn from the _user's_ account, as payment for the _validator’s_ work to include these transactions in the block. One transaction fee is calculated as follows:
-`fee = 3 * gas * mediumFee`, where
-- `gas` - the gas cost of all related operations for the exit
-- `mediumFee` - current average fee in the network.
 
 ### Exodus mode
 

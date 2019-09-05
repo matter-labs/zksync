@@ -67,8 +67,8 @@ contract Governance {
     }
 
     // Check if sender is validator
-    function requireValidator(address sender) external view {
-        require(validators[sender], "only by validator");
+    function isValidator(address sender) external view returns (bool) {
+        return validators[sender];
     }
 
     // Check if token is known
