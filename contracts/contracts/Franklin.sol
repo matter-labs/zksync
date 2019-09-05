@@ -4,7 +4,6 @@ import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
 import "./Verifier.sol";
 import "./VerificationKey.sol";
-import "./PriorityQueue.sol";
 import "./Bytes.sol";
 
 contract Franklin {
