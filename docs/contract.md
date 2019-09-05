@@ -1,6 +1,6 @@
 # Franklin ETH contract documentation
 
-![flow](https://i.imgur.com/MNlSf19.jpg)
+![flow](https://i.imgur.com/ZsLCxpI.png)
 
 ## Deployment
 
