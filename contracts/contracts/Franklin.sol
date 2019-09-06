@@ -116,20 +116,20 @@ contract Franklin {
 
     // Block data (once per block)
     struct Block {
-        // Hash of commitment the block circuit
-        bytes32 commitment;
-        // New root hash
-        bytes32 stateRoot;
-        // ETH block number at which this block was commited
-        uint32 commitedAtBlock;
-        // Validator (aka block producer)
-        address validator;
         // Index of the first operation to process for this block
         uint64 operationStartId;
         // Total number of operations to process for this block
         uint64 onchainOperations;
         // Total number of priority operations for this block
         uint32 priorityOperations;
+        // ETH block number at which this block was commited
+        uint32 commitedAtBlock;
+        // Hash of commitment the block circuit
+        bytes32 commitment;
+        // New root hash
+        bytes32 stateRoot;
+        // Validator (aka block producer)
+        address validator;
     }
 
     // List of blocks by Franklin blockId
@@ -247,7 +247,10 @@ contract Franklin {
     // Params:
     // - _count - number of requests to remove
     function removePriorityRequests(uint32 _count) internal {
-        require(_count <= totalPriorityRequests, "c1"); // c1 - count is heigher than total priority requests count
+        require(
+            _count <= totalPriorityRequests,
+            "rprcnt"
+        ); // rprcnt - count is heigher than total priority requests count
 
         for (uint32 i = firstPriorityRequestId; i < firstPriorityRequestId + _count; i++) {
             delete priorityRequests[i];
@@ -261,7 +264,10 @@ contract Franklin {
     // Params:
     // - _anyRequestsCount - count of requests where to look deposit requests for
     function accrueBalancesForDepositsFromBlockPriorityOpsAndRemoveItsRequests(uint32 _count) internal {
-        require(_count <= totalPriorityRequests, "c2"); // c2 - count is heigher than total priority requests count
+        require(
+            _count <= totalPriorityRequests,
+            "abfcnt"
+        ); // abfcnt - count is heigher than total priority requests count
 
         for (uint32 i = firstPriorityRequestId; i < firstPriorityRequestId + _count; i++) {
             if (priorityRequests[i].opType == OpType.Deposit) {
@@ -318,7 +324,10 @@ contract Franklin {
     // Params:
     // - _franklinAddr - receiver
     function depositETH(bytes calldata _franklinAddr) external payable {
-        require(msg.value <= MAX_VALUE, "d1"); // d1 - deposit value is heighr
+        require(
+            msg.value <= MAX_VALUE,
+            "detval"
+        ); // d1 - deposit value is heighr
         registerDeposit(0, uint128(msg.value), _franklinAddr);
     }
 
@@ -342,8 +351,8 @@ contract Franklin {
     ) external {
         require(
             IERC20(_token).transferFrom(msg.sender, address(this), _amount),
-            "token transfer failed deposit"
-        );
+            "dertrf"
+        ); // dertrf - token transfer failed deposit
         uint16 tokenId = governance.validateERC20Token(_token);
         registerDeposit(tokenId, _amount, _franklinAddr);
     }
@@ -357,8 +366,8 @@ contract Franklin {
         registerWithdrawal(tokenId, _amount);
         require(
             IERC20(_token).transfer(msg.sender, _amount),
-            "token transfer failed withdraw"
-        );
+            "wertrf"
+        ); // wertrf - token transfer failed withdraw
     }
 
     // Register full exit request
@@ -372,8 +381,14 @@ contract Franklin {
         bytes calldata _signature
     ) external {
         requireActive();
-        require(_franklinAddr.length == PUBKEY_HASH_LEN, "wrong pubkey length");
-        require(_signature.length == SIGNATURE_LEN, "wrong signature length");
+        require(
+            _franklinAddr.length == PUBKEY_HASH_LEN,
+            "rfepkl"
+        ); // rfepkl - wrong pubkey length
+        require(
+            _signature.length == SIGNATURE_LEN,
+            "rfesnl"
+        ); // rfesnl - wrong signature length
 
         uint16 tokenId = governance.validateERC20Token(_token);
         // Priority Queue request
@@ -405,7 +420,7 @@ contract Franklin {
 
         emit OnchainDeposit(
             msg.sender,
-            _token.id,
+            _token,
             _amount,
             _franklinAddr
         );
@@ -419,14 +434,14 @@ contract Franklin {
         requireActive();
         require(
             balancesToWithdraw[msg.sender][_token] >= _amount,
-            "insufficient balance withdraw"
-        );
+            "rwthamt"
+        ); // rwthamt - insufficient balance withdraw
 
         balancesToWithdraw[msg.sender][_token] -= _amount;
 
         emit OnchainWithdrawal(
             msg.sender,
-            _token.id,
+            _token,
             _amount
         );
     }
@@ -445,20 +460,27 @@ contract Franklin {
         bytes32 _newRoot,
         bytes calldata _publicData
     ) external {
-        require(!triggerExodusIfNeeded(), "entered exodus mode");
         requireActive();
         require(
-            governance.isValidator(msg.sender),
-            "not a validator in commit");
-        require(
             _blockNumber == totalBlocksCommited + 1,
-            "only commit next block"
-        );
-        require(!triggerRevertIfBlockCommitmentExpired(), "commitment expired");
+            "cbkbnr"
+        ); // rwthamt - only commit next block
         require(
             totalBlocksCommited - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS,
-            "too many commited"
-        );
+            "cbkmub"
+        ); // cbkmub - too many commited
+        require(
+            governance.isValidator(msg.sender),
+            "cbkvlr"
+        ); // cbkvlr - not a validator in commit
+        require(
+            !triggerRevertIfBlockCommitmentExpired(),
+            "cbkcex"
+        ); // cbkcex - commitment expired
+        require(
+            !triggerExodusIfNeeded(),
+            "cbkexm"
+        ); // cbkexm - entered exodus mode
 
         (uint64 startId, uint64 totalProcessed, uint32 priorityCount) = collectOnchainOps(_publicData);
         if (blockPriorityOperationsValid(startId, totalProcessed, priorityCount)) {
@@ -471,14 +493,14 @@ contract Franklin {
             );
 
             blocks[_blockNumber] = Block(
-                commitment,
-                _newRoot,
-                uint32(block.number), // commited at
-                msg.sender, // validator
                 // onchain-ops
                 startId,
                 totalProcessed,
-                priorityCount
+                priorityCount,
+                uint32(block.number), // commited at
+                commitment,
+                _newRoot,
+                msg.sender // validator
             );
 
             totalOnchainOps = startId + totalProcessed;
@@ -487,7 +509,7 @@ contract Franklin {
             emit BlockCommited(_blockNumber);
         } else {
             removeOnchainOps(startId, totalProcessed);
-            revert("wrong onchain ops");
+            revert("cbkwoo"); // cbkwoo - wrong onchain ops
         }
     }
 
@@ -498,7 +520,10 @@ contract Franklin {
         internal
         returns (uint64 onchainOpsStartId, uint64 processedOnchainOps, uint32 priorityCount)
     {
-        require(_publicData.length % 8 == 0, "pubdata.len % 8 != 0");
+        require(
+            _publicData.length % 8 == 0,
+            "coopln"
+        ); // coopdn - pubdata.len % 8 != 0
 
         onchainOpsStartId = totalOnchainOps;
         uint64 currentOnchainOp = totalOnchainOps;
@@ -519,8 +544,8 @@ contract Franklin {
         }
         require(
             currentPointer == _publicData.length,
-            "last chunk exceeds pubdata"
-        );
+            "cooprn"
+        ); // cooprn - last chunk exceeds pubdata
     }
 
     // Returns operation processed length, and indicators if it is onchain operation and if it is priority operation (1 if true)
@@ -570,7 +595,7 @@ contract Franklin {
             return (FULL_EXIT_LENGTH, 1, 1);
         }
 
-        revert("unsupported op");
+        revert("popuop"); // popuop - unsupported op
     }
     
     // Returns block commitment
@@ -609,7 +634,10 @@ contract Franklin {
     // - totalProcessed - how many ops are procceeded
     // - priorityCount - priority ops count
     function blockPriorityOperationsValid(uint64 startId, uint64 totalProcessed, uint32 priorityCount) internal view returns (bool) {
-        require(priorityCount <= totalPriorityRequests, "too much priority requests");
+        require(
+            priorityCount <= totalPriorityRequests,
+            "bpoprc"
+        ); // bpoprc - too much priority requests
         
         uint64 start = startId;
         uint64 end = start + totalProcessed;
@@ -654,7 +682,7 @@ contract Franklin {
             onchainPubData = Bytes.slice(onchainOp.pubData, 0, 54);
             operation = OpType.FullExit;
         } else {
-            revert("Wrong operation");
+            revert("cpowop"); // cpowop - wrong operation
         }
         return (priorityPubData.length > 0) &&
             (keccak256(onchainPubData) == keccak256(priorityPubData));
@@ -685,17 +713,17 @@ contract Franklin {
     {
         requireActive();
         require(
-            governance.isValidator(msg.sender),
-            "not a validator in verify");
-        require(
             _blockNumber == totalBlocksVerified + 1,
-            "only verify next block"
-        );
-
+            "vbknbk"
+        ); // vbknbk - only verify next block
+        require(
+            governance.isValidator(msg.sender),
+            "vbkvdr"
+        ); // vbkvdr - not a validator in verify
         require(
             verifyBlockProof(proof, blocks[_blockNumber].commitment),
-            "verification failed"
-        );
+            "vbkvbp"
+        ); // vbkvbp - verification failed
         
         consummateOnchainOps(_blockNumber);
 
@@ -807,8 +835,14 @@ contract Franklin {
     // Params:
     // - _revertedBlockId - block id
     function revertBlock(Block memory reverted) internal {
-        require(reverted.commitedAtBlock > 0, "block not found");
-        require(reverted.priorityOperations <= totalPriorityRequests, "priority count too large in revert");
+        require(
+            reverted.commitedAtBlock > 0,
+            "rbkbnf"
+        ); // rbkbnf - block not found
+        require(
+            reverted.priorityOperations <= totalPriorityRequests,
+            "rbkprc"
+        ); // rbkprc - priority count too large in revert
         removeOnchainOps(reverted.operationStartId, reverted.onchainOperations);
     }
 
@@ -816,7 +850,10 @@ contract Franklin {
 
     // Check that current state not is exodus mode
     function requireActive() internal view {
-        require(!exodusMode, "exodus mode");
+        require(
+            !exodusMode,
+            "racexa"
+        ); // racexa - exodus mode activated
     }
 
     // Returns bool flag. True if the Exodus mode must be entered
@@ -843,11 +880,20 @@ contract Franklin {
         uint128[] calldata _amounts,
         uint256[8] calldata /*_proof*/
     ) external {
-        require(exodusMode, "must be in exodus mode");
-        require(_owners.length == _amounts.length, "|owners| != |amounts|");
+        require(
+            exodusMode,
+            "extexm"
+        ); // extexm - must be in exodus mode
+        require(
+            _owners.length == _amounts.length,
+            "extaml"
+        ); // extaml - |owners| != |amounts|
 
         for (uint256 i = 0; i < _owners.length; i++) {
-            require(exited[_owners[i]][_tokenId] == false, "already exited");
+            require(
+                exited[_owners[i]][_tokenId] == false,
+                "extaex"
+            ); // extaex - already exited
         }
 
         // TODO: verify the proof that all users have the specified amounts of this token in the latest state
