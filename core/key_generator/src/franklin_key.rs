@@ -61,6 +61,7 @@ pub fn make_franklin_key() {
         signer_pub_key_y: None,
         first_sig_msg: None,
         second_sig_msg: None,
+        third_sig_msg: None,
         signature: None,
         args: OperationArguments {
             a: None,

@@ -1,11 +1,11 @@
 use crate::node::TokenId;
 
 /// Account tree depth
-pub const ACCOUNT_TREE_DEPTH: usize = 5;
+pub const ACCOUNT_TREE_DEPTH: usize = 24;
 pub const ACCOUNT_ID_BIT_WIDTH: usize = 24;
 
 /// Balance tree depth
-pub const BALANCE_TREE_DEPTH: usize = 5;
+pub const BALANCE_TREE_DEPTH: usize = 10;
 pub const TOKEN_BIT_WIDTH: usize = 16;
 
 /// Account tree depth
@@ -23,6 +23,8 @@ pub const NONCE_BIT_WIDTH: usize = 32;
 //
 //
 pub const CHUNK_BIT_WIDTH: usize = 64;
+
+pub const MAX_CIRCUIT_PEDERSEN_HASH_BITS: usize = 738;
 
 pub const ETHEREUM_KEY_BIT_WIDTH: usize = 160;
 /// Block number bit width

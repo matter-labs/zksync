@@ -145,6 +145,7 @@ pub fn calculate_close_account_operations_from_witness(
     close_account_witness: &CloseAccountWitness<Bn256>,
     first_sig_msg: &Fr,
     second_sig_msg: &Fr,
+    third_sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
@@ -161,6 +162,7 @@ pub fn calculate_close_account_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[0]),
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -243,7 +245,7 @@ mod test {
         //-------------- Start applying changes to state
         let close_account_witness =
             apply_close_account(&mut tree, &CloseAccountData { account_address });
-        let (signature, first_sig_part, second_sig_part) = generate_sig_data(
+        let (signature, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
             &close_account_witness.get_sig_bits(),
             &phasher,
             &sender_sk,
@@ -254,6 +256,7 @@ mod test {
             &close_account_witness,
             &first_sig_part,
             &second_sig_part,
+            &third_sig_part,
             signature,
             &sender_x,
             &sender_y,

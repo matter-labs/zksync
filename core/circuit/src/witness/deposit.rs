@@ -236,6 +236,7 @@ pub fn calculate_deposit_operations_from_witness(
     deposit_witness: &DepositWitness<Bn256>,
     first_sig_msg: &Fr,
     second_sig_msg: &Fr,
+    third_sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
@@ -258,6 +259,7 @@ pub fn calculate_deposit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[0]),
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -273,6 +275,7 @@ pub fn calculate_deposit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[1]),
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -288,6 +291,7 @@ pub fn calculate_deposit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[2]),
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -303,6 +307,7 @@ pub fn calculate_deposit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[3]),
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -318,6 +323,7 @@ pub fn calculate_deposit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[4]),
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -333,6 +339,7 @@ pub fn calculate_deposit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[5]),
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -439,7 +446,7 @@ mod test {
                 new_pub_key_hash: sender_pub_key_hash,
             },
         );
-        let (signature, first_sig_part, second_sig_part) = generate_sig_data(
+        let (signature, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
             &deposit_witness.get_sig_bits(),
             &phasher,
             &sender_sk,
@@ -450,6 +457,7 @@ mod test {
             &deposit_witness,
             &first_sig_part,
             &second_sig_part,
+            &third_sig_part,
             signature,
             &sender_x,
             &sender_y,
@@ -559,7 +567,7 @@ mod test {
             },
         );
 
-        let (signature, first_sig_part, second_sig_part) = generate_sig_data(
+        let (signature, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
             &deposit_witness.get_sig_bits(),
             &phasher,
             &sender_sk,
@@ -570,6 +578,7 @@ mod test {
             &deposit_witness,
             &first_sig_part,
             &second_sig_part,
+            &third_sig_part,
             signature,
             &sender_x,
             &sender_y,

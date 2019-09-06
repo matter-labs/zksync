@@ -16,6 +16,7 @@ pub fn noop_operation(
     acc_id: u32,
     first_sig_msg: &Fr,
     second_sig_msg: &Fr,
+    third_sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
@@ -41,6 +42,7 @@ pub fn noop_operation(
         pubdata_chunk: Some(pubdata_chunks[0]),
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -170,7 +172,7 @@ mod test {
         tree.insert(account_address, sender_leaf_initial);
 
         let sig_bits_to_hash = vec![false; 1]; //just a trash for consistency
-        let (signature, first_sig_part, second_sig_part) =
+        let (signature, first_sig_part, second_sig_part, third_sig_part) =
             generate_sig_data(&sig_bits_to_hash, &phasher, &sender_sk, params);
 
         // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
@@ -180,6 +182,7 @@ mod test {
             validator_address_number,
             &first_sig_part,
             &second_sig_part,
+            &third_sig_part,
             signature,
             &sender_x,
             &sender_y,

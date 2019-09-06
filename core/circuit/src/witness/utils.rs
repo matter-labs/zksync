@@ -37,18 +37,23 @@ pub fn generate_dummy_sig_data(
     bits: &[bool],
     phasher: &PedersenHasher<Bn256>,
     params: &AltJubjubBn256,
-) -> (Option<TransactionSignature<Bn256>>, Fr, Fr, Fr, Fr) {
+) -> (Option<TransactionSignature<Bn256>>, Fr, Fr, Fr, Fr, Fr) {
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let private_key = PrivateKey::<Bn256>(rng.gen());
     let sender_pk = PublicKey::from_private(&private_key, p_g, &params);
     let (sender_x, sender_y) = sender_pk.0.into_xy();
     let mut sig_bits_to_hash = bits.to_vec();
-    sig_bits_to_hash.resize((Fr::CAPACITY as usize) * 2, false);
-    let (first_sig_part_bits, second_sig_part_bits) =
+    assert!(sig_bits_to_hash.len()<franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
+
+    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS, false);
+    let (first_sig_part_bits, remaining) =
         sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
-    let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits.to_vec());
-    let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits.to_vec());
+    let remaining = remaining.to_vec();
+    let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
+    let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits);
+    let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits);
+    let third_sig_part: Fr = le_bit_vector_into_field_element(&third_sig_part_bits);
     let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
     let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
     sig_bits.reverse();
@@ -60,6 +65,7 @@ pub fn generate_dummy_sig_data(
         signature,
         first_sig_part,
         second_sig_part,
+        third_sig_part,
         sender_x,
         sender_y,
     )
@@ -69,23 +75,29 @@ pub fn generate_sig_data(
     phasher: &PedersenHasher<Bn256>,
     private_key: &PrivateKey<Bn256>,
     params: &AltJubjubBn256,
-) -> (Option<TransactionSignature<Bn256>>, Fr, Fr) {
+) -> (Option<TransactionSignature<Bn256>>, Fr, Fr, Fr) {
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let mut sig_bits_to_hash = bits.to_vec();
-    sig_bits_to_hash.resize((Fr::CAPACITY as usize) * 2, false);
-    let (first_sig_part_bits, second_sig_part_bits) =
+    assert!(sig_bits_to_hash.len()<franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
+
+    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS, false);
+    let (first_sig_part_bits, remaining) =
         sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
-    let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits.to_vec());
-    let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits.to_vec());
+    let remaining = remaining.to_vec();
+    let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
+    let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits);
+    let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits);
+    let third_sig_part: Fr = le_bit_vector_into_field_element(&third_sig_part_bits);
     let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
+
     let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
     sig_bits.reverse();
     sig_bits.resize(256, false);
 
     let signature = sign_pedersen(&sig_bits, &private_key, p_g, params, rng);
     // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
-    (signature, first_sig_part, second_sig_part)
+    (signature, first_sig_part, second_sig_part, third_sig_part)
 }
 pub fn pub_key_hash<E: JubjubEngine, H: Hasher<E::Fr>>(
     pub_key: &PublicKey<E>,

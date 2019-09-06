@@ -75,6 +75,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 amount_unpacked: zero_circuit_element.clone(),
                 first_sig_msg: zero_circuit_element.clone(),
                 second_sig_msg: zero_circuit_element.clone(),
+                third_sig_msg: zero_circuit_element.clone(),
                 a: zero_circuit_element.clone(),
                 b: zero_circuit_element.clone(),
             },
@@ -636,6 +637,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let serialized_tx_bits = {
             let mut temp_bits = op_data.first_sig_msg.get_bits_le();
             temp_bits.extend(op_data.second_sig_msg.get_bits_le());
+            temp_bits.extend(op_data.third_sig_msg.get_bits_le());
             temp_bits
         };
 
@@ -1593,16 +1595,22 @@ fn verify_signature_message_construction<E: JubjubEngine, CS: ConstraintSystem<E
     mut serialized_tx_bits: Vec<Boolean>,
     op_data: &AllocatedOperationData<E>,
 ) -> Result<Boolean, SynthesisError> {
-    assert!(serialized_tx_bits.len() < E::Fr::CAPACITY as usize * 2);
+    assert!(serialized_tx_bits.len() < franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
 
-    serialized_tx_bits.resize(E::Fr::CAPACITY as usize * 2, Boolean::constant(false));
-    let (first_sig_part_bits, second_sig_part_bits) =
-        serialized_tx_bits.split_at(E::Fr::CAPACITY as usize);
+    serialized_tx_bits.resize(
+        franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS,
+        Boolean::constant(false),
+    );
+    let (first_sig_part_bits, remaining) = serialized_tx_bits.split_at(E::Fr::CAPACITY as usize);
+    let remaining = remaining.to_vec();
+    let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(E::Fr::CAPACITY as usize);
     let first_sig_part =
         pack_bits_to_element(cs.namespace(|| "first_sig_part"), &first_sig_part_bits)?;
 
     let second_sig_part =
         pack_bits_to_element(cs.namespace(|| "second_sig_part"), &second_sig_part_bits)?;
+    let third_sig_part =
+        pack_bits_to_element(cs.namespace(|| "third_sig_part"), &third_sig_part_bits)?;
 
     let is_first_sig_part_correct = Boolean::from(Expression::equals(
         cs.namespace(|| "is_first_sig_part_correct"),
@@ -1615,10 +1623,19 @@ fn verify_signature_message_construction<E: JubjubEngine, CS: ConstraintSystem<E
         Expression::from(&second_sig_part),
         Expression::from(&op_data.second_sig_msg.get_number()),
     )?);
-    let is_serialized_transaction_correct = Boolean::and(
+
+    let is_third_sig_part_correct = Boolean::from(Expression::equals(
+        cs.namespace(|| "is_third_sig_part_correct"),
+        Expression::from(&third_sig_part),
+        Expression::from(&op_data.third_sig_msg.get_number()),
+    )?);
+    let is_serialized_transaction_correct = multi_and(
         cs.namespace(|| "first part and second part"),
-        &is_first_sig_part_correct,
-        &is_second_sig_part_correct,
+        &[
+            is_first_sig_part_correct,
+            is_second_sig_part_correct,
+            is_third_sig_part_correct,
+        ],
     )?;
     Ok(is_serialized_transaction_correct)
 }
@@ -1630,7 +1647,7 @@ fn allocate_merkle_root<E: JubjubEngine, CS: ConstraintSystem<E>>(
     params: &E::Params,
 ) -> Result<AllocatedNum<E>, SynthesisError> {
     // only first bits of index are considered valuable
-    assert!(index.len() > audit_path.len());
+    assert!(index.len() >= audit_path.len());
     let index = &index[0..audit_path.len()];
 
     let account_leaf_hash = pedersen_hash::pedersen_hash(
