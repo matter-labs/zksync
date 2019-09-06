@@ -170,11 +170,8 @@ impl<T: Transport> ETHSender<T> {
                 .into_iter()
                 .map(|(op, mut op_state)| {
                     if op_state.is_unsent() {
-                        match self.drive_to_completion(&op, &mut op_state) {
-                            Err(e) => {
-                                warn!("Error while sending unsent op: {}", e);
-                            }
-                            _ => {}
+                        if let Err(e) = self.drive_to_completion(&op, &mut op_state) {
+                            warn!("Error while sending unsent op: {}", e);
                         }
                     }
                     (op, op_state)

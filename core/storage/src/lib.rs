@@ -1085,10 +1085,9 @@ impl StorageProcessor {
                         (None, Vec::new()),
                         |(mut accum_op, mut accum_eth_ops): (Option<Operation>, _),
                          (op, eth_op)| {
-                            accum_op
-                                .as_ref()
-                                .map(|accum_op| assert_eq!(accum_op.id, op.id));
-                            if accum_op.is_none() {
+                            if let Some(accum_op) = accum_op.as_ref() {
+                                assert_eq!(accum_op.id, op.id);
+                            } else {
                                 accum_op = Some(op);
                             }
                             accum_eth_ops.push(eth_op);
