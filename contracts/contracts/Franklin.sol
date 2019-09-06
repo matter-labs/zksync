@@ -261,13 +261,14 @@ contract Franklin {
         firstPriorityRequestId += _count;
     }
 
-    // Accrues balances from deposits from certain count of priority requests
+    // Accrues balances from deposits from block and removes requests.
+    // WARNING: Only for Exodus mode
     // Params:
     // - _anyRequestsCount - count of requests where to look deposit requests for
-    function accrueBalancesFromDeposits(uint32 _anyRequestsCount) internal {
-        require(_anyRequestsCount <= totalPriorityRequests, "large count for accrue deposit balances");
+    function accrueBalancesForDepositsFromBlockPriorityOpsAndRemoveItsRequests(uint32 _count) internal {
+        require(_count <= totalPriorityRequests, "large count for accrue deposit balances");
 
-        for (uint32 i = firstPriorityRequestId; i < firstPriorityRequestId + _anyRequestsCount; i++) {
+        for (uint32 i = firstPriorityRequestId; i < firstPriorityRequestId + _count; i++) {
             if (priorityRequestsParams[i].opType == OpType.Deposit) {
                 bytes memory pubData = priorityRequestsParams[i].pubData;
                 bytes memory owner = new bytes(20);
@@ -284,7 +285,10 @@ contract Franklin {
                 }
                 balancesToWithdraw[Bytes.bytesToAddress(owner)][token] += Bytes.bytesToUInt128(amount);
             }
+            delete priorityRequestsParams[i];
         }
+        totalPriorityRequests -= _count;
+        firstPriorityRequestId += _count;
     }
 
     // function scheduleMigration(address _migrateTo, uint32 _migrateByBlock) external {
@@ -797,16 +801,16 @@ contract Franklin {
 
     // Revert blocks
     function revertBlocks(bool fromExodus) internal {
-        for (uint32 i = totalBlocksCommited-1; i >= totalBlocksVerified; i--) {
+        for (uint32 i = totalBlocksVerified; i < totalBlocksCommited-1; i++) {
             Block memory reverted = blocks[i];
             if (fromExodus) {
                 // in case of exodus accrue balances from deposits
-                accrueBalancesFromDeposits(reverted.priorityOperations);
+                accrueBalancesForDepositsFromBlockPriorityOpsAndRemoveItsRequests(reverted.priorityOperations);
             }
             revertBlock(reverted);
             delete blocks[i];
-            totalBlocksCommited--;
         }
+        totalBlocksCommited -= totalBlocksCommited - totalBlocksVerified;
         emit BlocksReverted(totalBlocksVerified, totalBlocksCommited);
     }
 
