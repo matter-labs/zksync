@@ -1,7 +1,15 @@
-//! Transaction processing policy.
-//! only one pending tx at a time.
-//! poll for tx execu
+//! Transaction sending policy.
 //!
+//! Goal is to handle stuck transactions.
+//! When we try to commit operation to ETH we select nonce, gas price, sign transaction and
+//! watch for its confirmations.
+//!
+//! If transaction is not confirmed for a while we increase gas price and do the same, but we
+//! keep list of all sent transactions for one particular operations, since we can't be sure which
+//! one will be commited so we track all of them.
+//!
+//! Note: make sure to save signed tx to db before sending it to ETH, this way we can be sure
+//! that state is always recoverable.
 
 use bigdecimal::BigDecimal;
 use eth_client::{ETHClient, SignedCallResult};
@@ -166,11 +174,14 @@ impl<T: Transport> ETHSender<T> {
                 }
             }
 
+            // Try sending all txs in queue.
+            let mut sending_error = false;
             self.unconfirmed_ops = std::mem::replace(&mut self.unconfirmed_ops, VecDeque::new())
                 .into_iter()
                 .map(|(op, mut op_state)| {
-                    if op_state.is_unsent() {
+                    if op_state.is_unsent() && !sending_error {
                         if let Err(e) = self.drive_to_completion(&op, &mut op_state) {
+                            sending_error = true;
                             warn!("Error while sending unsent op: {}", e);
                         }
                     }
@@ -273,8 +284,8 @@ impl<T: Transport> ETHSender<T> {
         match tx_state {
             SignedTxState::Unsent => {
                 let deadline_block = self.block_number()? + EXPECTED_WAIT_TIME_BLOCKS;
-                *tx_state = SignedTxState::Pending { deadline_block };
                 self.save_signed_tx_to_db(op, tx, deadline_block)?;
+                *tx_state = SignedTxState::Pending { deadline_block };
                 let hash = self.eth_client.send_raw_tx(tx.raw_tx.clone())?;
                 assert_eq!(hash, tx.hash, "bug in signed tx offline hash calculation");
             }

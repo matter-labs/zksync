@@ -54,7 +54,7 @@ impl<T: Transport> ETHClient<T> {
             contract: ethabi::Contract::load(contract_abi.as_bytes())
                 .expect("contract must be loaded correctly"),
             gas_price_factor: usize::from_str(
-                &env::var("GAS_PRICE_FACTOR").unwrap_or_else(|_| "2".to_string()),
+                &env::var("GAS_PRICE_FACTOR").unwrap_or_else(|_| "1".to_string()),
             )
             .expect("GAS_PRICE_FACTOR not set"),
             web3: Web3::new(transport),
