@@ -44,11 +44,10 @@ pub fn generate_dummy_sig_data(
     let sender_pk = PublicKey::from_private(&private_key, p_g, &params);
     let (sender_x, sender_y) = sender_pk.0.into_xy();
     let mut sig_bits_to_hash = bits.to_vec();
-    assert!(sig_bits_to_hash.len()<franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
+    assert!(sig_bits_to_hash.len() < franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
 
     sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS, false);
-    let (first_sig_part_bits, remaining) =
-        sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
+    let (first_sig_part_bits, remaining) = sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
     let remaining = remaining.to_vec();
     let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
     let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits);
@@ -79,11 +78,10 @@ pub fn generate_sig_data(
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let mut sig_bits_to_hash = bits.to_vec();
-    assert!(sig_bits_to_hash.len()<franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
+    assert!(sig_bits_to_hash.len() < franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
 
     sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS, false);
-    let (first_sig_part_bits, remaining) =
-        sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
+    let (first_sig_part_bits, remaining) = sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
     let remaining = remaining.to_vec();
     let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
     let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits);

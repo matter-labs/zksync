@@ -559,7 +559,7 @@ mod test {
             &transfer_witness,
             &first_sig_part,
             &second_sig_part,
-                        &third_sig_part,
+            &third_sig_part,
             signature,
             &from_x,
             &from_y,
