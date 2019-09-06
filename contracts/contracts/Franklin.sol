@@ -275,8 +275,8 @@ contract Franklin {
                     owner[j] = pubData[j];
                 }
                 uint16 token = uint16(
-                    (uint256(uint8(_publicData[opDataPointer + 20])) << 8) +
-                        uint256(uint8(_publicData[opDataPointer + 21]))
+                    (uint256(uint8(pubData[20])) << 8) +
+                        uint256(uint8(pubData[21]))
                 );
                 bytes memory amount = new bytes(16);
                 for (uint256 j = 0; j < 16; ++j) {
@@ -528,7 +528,6 @@ contract Franklin {
             currentPointer == _publicData.length,
             "last chunk exceeds pubdata"
         );
-        _;
     }
 
     // Returns operation processed length, and indicators if it is onchain operation and if it is priority operation (1 if true)
@@ -552,7 +551,7 @@ contract Franklin {
         if (_opType == uint8(OpType.CloseAccount)) return (CLOSE_ACCOUNT_LENGTH, 0, 0);
 
         if (_opType == uint8(OpType.Deposit)) {
-            ops[_currentOnchainOp] = Operation(
+            onchainOps[_currentOnchainOp] = Operation(
                 OpType.Deposit,
                 Bytes.slice(_publicData, opDataPointer + 3, 38),
                 0
@@ -616,20 +615,22 @@ contract Franklin {
     // - startId - onchain op start id
     // - totalProcessed - how many ops are procceeded
     // - priorityCount - priority ops count
-    function areBlockPriorityOperationValid(uint64 startId, uint64 totalProcessed, uint32 priorityCount) internal returns (bool) {
+    function areBlockPriorityOperationValid(uint64 startId, uint64 totalProcessed, uint32 priorityCount) internal view returns (bool) {
         uint64 start = startId;
         uint64 end = start + totalProcessed;
 
         Operation[] memory priorityOps;
-
+        
+        uint32 counter = 0;
         for (uint64 current = start; current < end; ++current) {
             Operation memory op = onchainOps[current];
-            if (op.opType == OnchainOpType.FullExit || op.opType == OnchainOpType.Deposit) {
-                priorityOps[priorityOpsCount] = op;
+            if (op.opType == OpType.FullExit || op.opType == OpType.Deposit) {
+                priorityOps[counter] = op;
+                counter++;
             }
         }
 
-        if (priorityOps.length != priorityCount) {
+        if (counter != priorityCount) {
             return false;
         }
         
@@ -650,7 +651,7 @@ contract Franklin {
     function comparePriorityOps(Operation memory onchainOp, uint32 priorityRequestId) internal view returns (bool) {
         bytes memory priorityPubData;
         bytes memory onchainPubData;
-        OpType memory operation;
+        OpType operation;
         if (onchainOp.opType == OpType.Deposit && priorityRequestsParams[priorityRequestId].opType == OpType.Deposit) {
             priorityPubData = Bytes.slice(priorityRequestsParams[priorityRequestId].pubData, 20, PUBKEY_HASH_LEN + 18);
             onchainPubData = onchainOp.pubData;
@@ -737,44 +738,44 @@ contract Franklin {
         uint64 start = blocks[_blockNumber].operationStartId;
         uint64 end = start + blocks[_blockNumber].onchainOperations;
         for (uint64 current = start; current < end; ++current) {
-            OnchainOp memory op = onchainOps[current];
-            if (op.opType == OnchainOpType.PartialExit) {
-                // withdrawal was successful, accrue balance
+            Operation memory op = onchainOps[current];
+            if (op.opType == OpType.PartialExit) {
+                // partial exit was successful, accrue balance
                 uint16 tokenId = uint16(
-                    (uint256(uint8(_publicData[0])) << 8) +
-                        uint256(uint8(_publicData[1]))
+                    (uint256(uint8(op.pubData[0])) << 8) +
+                        uint256(uint8(op.pubData[1]))
                 );
 
                 bytes memory amountBytes = new bytes(16);
                 for (uint256 i = 0; i < 16; ++i) {
-                    amountBytes[i] = _publicData[opDataPointer + 2 + i];
+                    amountBytes[i] = op.pubData[2 + i];
                 }
                 uint128 amount = Bytes.bytesToUInt128(amountBytes);
 
                 bytes memory ethAddress = new bytes(20);
                 for (uint256 i = 0; i < 20; ++i) {
-                    ethAddress[i] = _publicData[opDataPointer + 20 + i];
+                    ethAddress[i] = op.pubData[20 + i];
                 }
-                balancesToWithdraw[ethAddress][tokenId] += amount;
+                balancesToWithdraw[Bytes.bytesToAddress(ethAddress)][tokenId] += amount;
             }
-            if (op.opType == OnchainOpType.FullExit) {
-                // withdrawal was successful, accrue balance
+            if (op.opType == OpType.FullExit) {
+                // full exit was successful, accrue balance
                 uint16 tokenId = uint16(
-                    (uint256(uint8(_publicData[23])) << 8) +
-                        uint256(uint8(_publicData[24]))
+                    (uint256(uint8(op.pubData[20])) << 8) +
+                        uint256(uint8(op.pubData[21]))
                 );
 
                 bytes memory amountBytes = new bytes(16);
                 for (uint256 i = 0; i < 16; ++i) {
-                    amountBytes[i] = _publicData[opDataPointer + 45 + i];
+                    amountBytes[i] = op.pubData[42 + i];
                 }
                 uint128 amount = Bytes.bytesToUInt128(amountBytes);
 
                 bytes memory ethAddress = new bytes(20);
                 for (uint256 i = 0; i < 20; ++i) {
-                    ethAddress[i] = _publicData[opDataPointer + 3 + i];
+                    ethAddress[i] = op.pubData[i];
                 }
-                balancesToWithdraw[ethAddress][tokenId] += amount;
+                balancesToWithdraw[Bytes.bytesToAddress(ethAddress)][tokenId] += amount;
             }
             delete onchainOps[current];
         }
@@ -783,7 +784,7 @@ contract Franklin {
     // MARK: - Reverting commited blocks
 
     // Check that commitment is expired and revert blocks
-    function triggerRevertIfBlockCommitmentExpired() public view returns (bool) {
+    function triggerRevertIfBlockCommitmentExpired() public returns (bool) {
         if (totalBlocksCommited > totalBlocksVerified &&
                 block.number >
                 blocks[totalBlocksVerified + 1].commitedAtBlock +
