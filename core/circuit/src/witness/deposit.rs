@@ -225,6 +225,7 @@ pub fn apply_deposit(
             a: Some(a),
             b: Some(b),
             new_pub_key_hash: Some(deposit.new_pub_key_hash),
+            pub_signature: Some(Fr::zero()),
         },
         before_root: Some(before_root),
         after_root: Some(after_root),

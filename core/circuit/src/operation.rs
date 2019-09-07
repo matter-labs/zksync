@@ -47,6 +47,7 @@ pub struct OperationArguments<E: JubjubEngine> {
     pub fee: Option<E::Fr>,
     pub new_pub_key_hash: Option<E::Fr>,
     pub ethereum_key: Option<E::Fr>,
+    pub pub_signature: Option<E::Fr>,
 }
 
 #[derive(Clone)]

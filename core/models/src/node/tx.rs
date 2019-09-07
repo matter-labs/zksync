@@ -1,10 +1,11 @@
+use super::account::AccountAddress;
 use super::{Nonce, TokenId};
 use crate::node::{pack_fee_amount, pack_token_amount};
 use bigdecimal::BigDecimal;
+use bigdecimal::ToPrimitive;
 use crypto::{digest::Digest, sha2::Sha256};
-
-use super::account::AccountAddress;
 use web3::types::Address;
+use web3::types::U256;
 
 /// Signed by user.
 
@@ -91,6 +92,33 @@ impl Withdraw {
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&pack_token_amount(&self.amount));
         out.extend_from_slice(&pack_fee_amount(&self.fee));
+        out.extend_from_slice(&self.nonce.to_be_bytes());
+        out
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FullExit {
+    // TODO: derrive account address from signature
+    pub account: AccountAddress,
+    pub eth_address: Address,
+    pub signature: Vec<u8>,
+    pub token: TokenId,
+    /// None -> withdraw all
+    pub amount: BigDecimal,
+    pub nonce: Nonce,
+    // TODO: Signature unimplemented
+}
+
+impl FullExit {
+    const TX_TYPE: u8 = 3;
+    fn get_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&self.account.data);
+        out.extend_from_slice(&self.eth_address);
+        out.extend_from_slice(&self.token.to_be_bytes());
+        out.extend_from_slice(&self.amount.to_u128().unwrap().to_be_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }

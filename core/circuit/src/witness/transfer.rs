@@ -295,6 +295,7 @@ pub fn apply_transfer(
             a: Some(a),
             b: Some(b),
             new_pub_key_hash: Some(Fr::zero()),
+            pub_signature: Some(Fr::zero()),
         },
         before_root: Some(before_root),
         intermediate_root: Some(intermediate_root),

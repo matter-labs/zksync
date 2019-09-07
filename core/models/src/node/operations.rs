@@ -1,4 +1,4 @@
-use super::tx::{Close, Deposit, Transfer, Withdraw};
+use super::tx::{Close, Deposit, FullExit, Transfer, Withdraw};
 use super::AccountId;
 use crate::node::{pack_fee_amount, pack_token_amount};
 use bigdecimal::ToPrimitive;
@@ -93,6 +93,30 @@ impl WithdrawOp {
         data.extend_from_slice(&self.tx.amount.to_u128().unwrap().to_be_bytes());
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
         data.extend_from_slice(&self.tx.eth_address);
+        data.resize(Self::CHUNKS * 8, 0x00);
+        data
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FullExitOp {
+    pub tx: FullExit,
+    pub account_id: AccountId,
+}
+
+impl FullExitOp {
+    pub const CHUNKS: usize = 10;
+    const OP_CODE: u8 = 0x06;
+
+    fn get_public_data(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.push(Self::OP_CODE); // opcode
+        data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
+        data.extend_from_slice(&self.tx.eth_address);
+        data.extend_from_slice(&self.tx.token.to_be_bytes());
+        data.extend_from_slice(&self.tx.signature);
+        data.extend_from_slice(&self.tx.amount.to_u128().unwrap().to_be_bytes());
+
         data.resize(Self::CHUNKS * 8, 0x00);
         data
     }

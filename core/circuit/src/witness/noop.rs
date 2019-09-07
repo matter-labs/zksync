@@ -55,6 +55,7 @@ pub fn noop_operation(
             a: Some(Fr::zero()),
             b: Some(Fr::zero()),
             new_pub_key_hash: Some(Fr::zero()),
+            pub_signature: Some(Fr::zero()),
         },
         lhs: OperationBranch {
             address: Some(account_address_fe),

@@ -112,7 +112,7 @@ pub fn apply_withdraw_tx(
     tree: &mut CircuitAccountTree,
     withdraw: &WithdrawOp,
 ) -> WithdrawWitness<Bn256> {
-    let transfer_data = WithdrawData {
+    let withdraw_data = WithdrawData {
         amount: withdraw.tx.amount.to_u128().unwrap(),
         fee: withdraw.tx.fee.to_u128().unwrap(),
         token: u32::from(withdraw.tx.token),
@@ -120,7 +120,7 @@ pub fn apply_withdraw_tx(
         ethereum_key: Fr::from_hex(&format!("{:x}", &withdraw.tx.eth_address)).unwrap(),
     };
     // le_bit_vector_into_field_element()
-    apply_withdraw(tree, &transfer_data)
+    apply_withdraw(tree, &withdraw_data)
 }
 pub fn apply_withdraw(
     tree: &mut CircuitAccountTree,
@@ -173,12 +173,8 @@ pub fn apply_withdraw(
                 acc.nonce.add_assign(&Fr::from_str("1").unwrap());
             },
             |bal| {
-                if withdraw.amount == 0 {
-                    bal.value = Fr::zero();
-                } else {
-                    bal.value.sub_assign(&amount_as_field_element);
-                    bal.value.sub_assign(&fee_as_field_element);
-                }
+                bal.value.sub_assign(&amount_as_field_element);
+                bal.value.sub_assign(&fee_as_field_element);
             },
         );
 
@@ -216,6 +212,7 @@ pub fn apply_withdraw(
             ethereum_key: Some(withdraw.ethereum_key),
             amount_packed: Some(amount_encoded),
             full_amount: Some(amount_as_field_element),
+            pub_signature: Some(Fr::zero()),
             fee: Some(fee_encoded),
             a: Some(a),
             b: Some(b),

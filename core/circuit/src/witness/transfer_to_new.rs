@@ -330,6 +330,7 @@ pub fn apply_transfer_to_new(
             a: Some(a),
             b: Some(b),
             new_pub_key_hash: Some(transfer_to_new.new_pub_key_hash),
+            pub_signature: Some(Fr::zero()),
         },
         before_root: Some(before_root),
         intermediate_root: Some(intermediate_root),
