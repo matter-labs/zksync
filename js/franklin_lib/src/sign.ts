@@ -1,6 +1,9 @@
 import BN = require('bn.js');
 import { curve } from 'elliptic';
 import EdwardsPoint = curve.edwards.EdwardsPoint;
+import {BigNumberish} from "ethers/utils";
+
+const blake2b = require('blake2b');
 
 const elliptic = require('elliptic');
 
@@ -190,6 +193,67 @@ export function pedersenHash(input: Buffer): EdwardsPoint {
 
     return result.normalize();
 }
+
+function to_uniform(bytes: Buffer): BN {
+
+    let bits = new Array(bytes.length * 8);
+    let bit_n = 0;
+    for (let i = bytes.length - 1; i >= 0; --i) {
+        const b = bytes[i];
+        bits[bit_n] = (b & 0x80) != 0;
+        bits[bit_n + 1] = (b & 0x40) != 0;
+        bits[bit_n + 2] = (b & 0x20) != 0;
+        bits[bit_n + 3] = (b & 0x10) != 0;
+        bits[bit_n + 4] = (b & 0x08) != 0;
+        bits[bit_n + 5] = (b & 0x04) != 0;
+        bits[bit_n + 6] = (b & 0x02) != 0;
+        bits[bit_n + 7] = (b & 0x01) != 0;
+        bit_n+=8;
+    }
+
+    let res = new BN(0);
+    console.log(bytes);
+    for (let n = 0; n < bits.length; n++) {
+        res = res.muln(2);
+        if (n % 4 == 0) {
+            process.stdout.write("\n");
+        }
+        if (bits[n]) {
+            process.stdout.write("1");
+        } else {
+            process.stdout.write("0");
+        }
+        if (bits[n]) {
+            res = res.addn(1)
+        }
+    }
+    console.log();
+
+    return wrapFs(res);
+}
+
+function h_star(a: Buffer, b: Buffer) {
+    let output = new Uint8Array(64);
+    let hash = blake2b(64, null, null, Buffer.from("Zcash_RedJubjubH"));
+    hash.update(a);
+    hash.update(b);
+    hash.digest(output)
+    let buff = Buffer.from(output);
+
+    // let point = new BN(buff.toString("hex"), "hex");
+    // point = wrapFs(point)
+
+    console.log(to_uniform(buff).toString("hex"))
+    // let bits = buffer2bits(buff.reverse());
+    // console.log(bits)
+}
+
+async function main() {
+ h_star(Buffer.from([1]), Buffer.from([2]));
+}
+
+main();
+
 
 function testCalculate() {
     for (let w = 0; w < 3; ++w) {
