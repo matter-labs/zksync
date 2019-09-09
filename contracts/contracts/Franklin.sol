@@ -15,6 +15,10 @@ contract Franklin {
     Verifier verifier;
     Governance governance;
 
+    // Base gas for transaction
+    uint256 constant FEE_COEFF = 21000;
+    // Base gas cost for transaction
+    uint256 constant BASE_GAS = 21000;
     // Expiration delta for priority request to be satisfied (in ETH blocks)
     uint256 constant PRIORITY_EXPIRATION = 250; // About 1 hour
     // chunks per block; each chunk has 8 bytes of public data
@@ -167,7 +171,7 @@ contract Franklin {
         OpType opType;
         bytes pubData;
         uint256 expirationBlock;
-        uint128 fee;
+        uint256 fee;
     }
 
     // Priority Requests  mapping (request id - operation)
@@ -221,22 +225,26 @@ contract Franklin {
     // Add request
     // Params:
     // - _opType - priority request type
+    // - _startGasLeft - start remaining gas
     // - _pubData - request data
-    function addPriorityRequest(OpType _opType, bytes memory _pubData) internal {
-        uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
-        priorityRequests[firstPriorityRequestId+totalPriorityRequests] = PriorityOperation({
-            opType: _opType,
-            pubData: _pubData,
-            expirationBlock: expirationBlock,
-            fee: 0
-        });
-        totalPriorityRequests++;
-
+    function addPriorityRequest(
+        OpType _opType,
+        uint256 _startGasLeft,
+        bytes memory _pubData
+    ) internal {
         emit NewPriorityRequest(
             _opType,
             _pubData,
             expirationBlock
         );
+
+        priorityRequests[firstPriorityRequestId+totalPriorityRequests] = PriorityOperation({
+            opType: _opType,
+            pubData: _pubData,
+            expirationBlock: block.number + PRIORITY_EXPIRATION, // Expiration block is: current block number + priority expiration delta
+            fee: FEE_COEFF * (BASE_GAS + _startGasLeft - gasleft()) * tx.gasprice // Resulting fee is: fee coeff * (base tx gas cost + gas used for code completion) * gas price
+        });
+        totalPriorityRequests++;
     }
 
     // Removes requests
@@ -320,17 +328,20 @@ contract Franklin {
     // Params:
     // - _franklinAddr - receiver
     function depositETH(bytes calldata _franklinAddr) external payable {
+        uint256 startGasLeft = gasleft();
+        requireActive();
         require(
             msg.value <= MAX_VALUE,
             "detval"
         ); // d1 - deposit value is heighr
-        registerDeposit(0, uint128(msg.value), _franklinAddr);
+        registerDeposit(0, uint128(msg.value), startGasLeft, _franklinAddr);
     }
 
     // Withdraw ETH
     // Params:
     // - _amount - amount to withdraw
     function withdrawETH(uint128 _amount) external {
+        requireActive();
         registerWithdrawal(0, _amount);
         msg.sender.transfer(_amount);
     }
@@ -345,12 +356,14 @@ contract Franklin {
         uint128 _amount,
         bytes calldata _franklinAddr
     ) external {
+        uint256 startGasLeft = gasleft();
+        requireActive();
         require(
             IERC20(_token).transferFrom(msg.sender, address(this), _amount),
             "dertrf"
         ); // dertrf - token transfer failed deposit
         uint16 tokenId = governance.validateERC20Token(_token);
-        registerDeposit(tokenId, _amount, _franklinAddr);
+        registerDeposit(tokenId, _amount, startGasLeft, _franklinAddr);
     }
 
     // Withdraw ERC20 token
@@ -358,6 +371,7 @@ contract Franklin {
     // - _token - token address
     // - _amount - amount to withdraw
     function withdrawERC20(address _token, uint128 _amount) external {
+        requireActive();
         uint16 tokenId = governance.validateERC20Token(_token);
         registerWithdrawal(tokenId, _amount);
         require(
@@ -376,6 +390,7 @@ contract Franklin {
         address _token,
         bytes calldata _signature
     ) external {
+        uint256 startGasLeft = gasleft();
         requireActive();
         require(
             _franklinAddr.length == PUBKEY_HASH_LEN,
@@ -392,34 +407,34 @@ contract Franklin {
         pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(msg.sender)); // eth address
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(tokenId)); // token id
         pubData = Bytes.concat(pubData, _signature); // signature
-        addPriorityRequest(OpType.FullExit, pubData);
+        addPriorityRequest(OpType.FullExit, startGasLeft, pubData);
     }
 
     // Register deposit request
     // Params:
     // - _token - token by id
     // - _amount - token amount
+    // - _startGasLeft - start remaining gas
     // - _franklinAddr - receiver
     function registerDeposit(
         uint16 _token,
         uint128 _amount,
+        uint256 _startGasLeft,
         bytes memory _franklinAddr
     ) internal {
-        requireActive();
-
-        // Priority Queue request
-        bytes memory pubData = Bytes.toBytesFromAddress(msg.sender); // sender
-        pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(_token)); // token id
-        pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt128(_amount)); // amount
-        pubData = Bytes.concat(pubData, _franklinAddr); // franklin address
-        addPriorityRequest(OpType.Deposit, pubData);
-
         emit OnchainDeposit(
             msg.sender,
             _token,
             _amount,
             _franklinAddr
         );
+
+        // Priority Queue request
+        bytes memory pubData = Bytes.toBytesFromAddress(msg.sender); // sender
+        pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(_token)); // token id
+        pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt128(_amount)); // amount
+        pubData = Bytes.concat(pubData, _franklinAddr); // franklin address
+        addPriorityRequest(OpType.Deposit, _startGasLeft, pubData);
     }
 
     // Register withdrawal
@@ -427,7 +442,6 @@ contract Franklin {
     // - _token - token by id
     // - _amount - token amount
     function registerWithdrawal(uint16 _token, uint128 _amount) internal {
-        requireActive();
         require(
             balancesToWithdraw[msg.sender][_token] >= _amount,
             "rwthamt"
