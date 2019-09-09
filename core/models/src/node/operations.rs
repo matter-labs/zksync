@@ -92,7 +92,7 @@ impl WithdrawOp {
         data.extend_from_slice(&self.tx.token.to_be_bytes());
         data.extend_from_slice(&self.tx.amount.to_u128().unwrap().to_be_bytes());
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
-        data.extend_from_slice(&self.tx.eth_address);
+        data.extend_from_slice(self.tx.eth_address.as_bytes());
         data.resize(Self::CHUNKS * 8, 0x00);
         data
     }
