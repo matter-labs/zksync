@@ -64,19 +64,6 @@ contract Franklin {
         uint32 indexed totalBlocksCommited
     );
 
-    // Event emitted when deposit operation comes into this contract
-    // Structure:
-    // - owner - sender
-    // - tokenId - deposited token
-    // - amount - deposited value
-    // - franlkinAddress - address of Franklin account whtere deposit will be sent
-    event OnchainDeposit(
-        address indexed owner,
-        uint16 tokenId,
-        uint128 amount,
-        bytes franklinAddress
-    );
-
     // Event emitted when user send withdraw transaction from this contract
     // Structure:
     // - owner - sender
@@ -253,20 +240,25 @@ contract Franklin {
         totalPriorityRequests++;
     }
 
-    // Removes requests
+    // Pays validator fee and removes requests
     // Params:
     // - _count - number of requests to remove
-    function removePriorityRequests(uint32 _count) internal {
+    // - _validator - address to pay fee
+    function payValidatorFeeAndRemovePriorityRequests(uint32 _count, address _validator) internal {
         require(
             _count <= totalPriorityRequests,
             "rprcnt"
         ); // rprcnt - count is heigher than total priority requests count
 
+        uint256 totalFee = 0;
         for (uint32 i = firstPriorityRequestId; i < firstPriorityRequestId + _count; i++) {
+            totalFee += priorityRequests[i].fee;
             delete priorityRequests[i];
         }
         totalPriorityRequests -= _count;
         firstPriorityRequestId += _count;
+
+        _validator.transfer(totalFee);
     }
 
     // Accrues balances from deposits from block and removes requests.
@@ -337,12 +329,13 @@ contract Franklin {
         // Fee is:
         //   fee coeff * (base tx gas cost + remained gas) * gas price
         uint256 fee = FEE_COEFF * (BASE_GAS + gasleft()) * tx.gasprice;
+
+        requireActive();
+
         require(
             msg.value >= fee,
             "detlwv"
         ); // derlwv - Not enough ETH provided to pay the fee
-
-        requireActive();
 
         uint128 amount = uint128(msg.value-fee);
         require(
@@ -375,12 +368,13 @@ contract Franklin {
         // Fee is:
         //   fee coeff * (base tx gas cost + remained gas) * gas price
         uint256 fee = FEE_COEFF * (BASE_GAS + gasleft()) * tx.gasprice;
+
+        requireActive();
+
         require(
             msg.value >= fee,
             "derlwv"
         ); // derlwv - Not enough ETH provided to pay the fee
-
-        requireActive();
 
         require(
             IERC20(_token).transferFrom(msg.sender, address(this), _amount),
@@ -418,12 +412,13 @@ contract Franklin {
         // Fee is:
         //   fee coeff * (base tx gas cost + remained gas) * gas price
         uint256 fee = FEE_COEFF * (BASE_GAS + gasleft()) * tx.gasprice;
+
+        requireActive();
+
         require(
             msg.value >= fee,
             "derlwv"
         ); // derlwv - Not enough ETH provided to pay the fee
-
-        requireActive();
         require(
             _franklinAddr.length == PUBKEY_HASH_LEN,
             "rfepkl"
@@ -766,7 +761,10 @@ contract Franklin {
         
         consummateOnchainOps(_blockNumber);
 
-        removePriorityRequests(blocks[_blockNumber].priorityOperations);
+        payValidatorFeeAndRemovePriorityRequests(
+            blocks[_blockNumber].priorityOperations,
+            blocks[_blockNumber].validator
+        );
 
         totalBlocksVerified += 1;
 
