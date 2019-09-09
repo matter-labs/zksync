@@ -1,11 +1,12 @@
 import BN = require('bn.js');
 import { curve } from 'elliptic';
 import EdwardsPoint = curve.edwards.EdwardsPoint;
-import {BigNumberish} from "ethers/utils";
+import {sha256} from "js-sha256";
+import BasePoint = curve.base.BasePoint;
 
 const blake2b = require('blake2b');
-
 const elliptic = require('elliptic');
+const crypto = require('crypto');
 
 //! `Fr modulus = 21888242871839275222246405745257275088548364400416034343698204186575808495617`
 //!
@@ -212,47 +213,94 @@ function to_uniform(bytes: Buffer): BN {
     }
 
     let res = new BN(0);
-    console.log(bytes);
     for (let n = 0; n < bits.length; n++) {
         res = res.muln(2);
-        if (n % 4 == 0) {
-            process.stdout.write("\n");
-        }
-        if (bits[n]) {
-            process.stdout.write("1");
-        } else {
-            process.stdout.write("0");
-        }
         if (bits[n]) {
             res = res.addn(1)
         }
     }
-    console.log();
 
     return wrapFs(res);
 }
 
-function h_star(a: Buffer, b: Buffer) {
+function balke2bHStar(a: Buffer, b: Buffer): BN {
     let output = new Uint8Array(64);
     let hash = blake2b(64, null, null, Buffer.from("Zcash_RedJubjubH"));
     hash.update(a);
     hash.update(b);
-    hash.digest(output)
+    output = hash.digest();
     let buff = Buffer.from(output);
 
-    // let point = new BN(buff.toString("hex"), "hex");
-    // point = wrapFs(point)
-
-    console.log(to_uniform(buff).toString("hex"))
-    // let bits = buffer2bits(buff.reverse());
-    // console.log(bits)
+    return to_uniform(buff);
 }
 
-async function main() {
- h_star(Buffer.from([1]), Buffer.from([2]));
+function sha256HStart(a: Buffer, b: Buffer): BN {
+    let hasher = sha256.create();
+    let personaization = "";
+    hasher.update(personaization);
+    hasher.update(a);
+    hasher.update(b);
+    let hash = Buffer.from(hasher.array());
+    let point = to_uniform(hash);
+    // console.log("sha256: ", hash.toString("hex"));
+    // console.log("sha256 point: ", point);
+    return point;
 }
 
-main();
+function pedersenHStar(input: Buffer) : BN {
+    let p_hash_start_res = pedersenHash(input);
+    // console.log("p_hash_start_hash_result ", p_hash_start_res);
+    let p_hash_star_fe = to_uniform(p_hash_start_res.getX().toBuffer("le", 32));
+    // console.log("p h* fe: ", p_hash_star_fe);
+    return p_hash_star_fe;
+}
+
+export function musigSHA256(priv_key: BN, msg: Buffer) {
+    const t = crypto.randomBytes(80);
+
+    const pub_key = privateKeyToPublicKey(priv_key);
+    const pk_bytes = pub_key.getX().toBuffer("le", 32);
+
+    const r = balke2bHStar(t , msg);
+    const r_g = altjubjubCurve.g.mul(r);
+    const r_g_bytes = r_g.getX().toBuffer("le", 32);
+
+    const concat = Buffer.concat([pk_bytes, r_g_bytes]);
+
+    let msg_padded = Buffer.alloc(32, 0);
+    msg.copy(msg_padded, 0, 0, 32);
+
+    // console.log("concat: ", concat.toString("hex"));
+    // console.log("msg_padded: ", msg_padded.toString("hex"));
+
+    const s = wrapFs(sha256HStart(concat, msg_padded).mul(priv_key).add(r));
+    return {r: { x: r_g.getX().toString("hex"), y: r_g.getY().toString("hex")}, s: s.toString("hex")};
+}
+
+export function musigPedersen(priv_key: BN, msg: Buffer) {
+
+    const t = crypto.randomBytes(80);
+
+    const pub_key = privateKeyToPublicKey(priv_key);
+    const pk_bytes = pub_key.getX().toBuffer("le", 32);
+
+    const r = balke2bHStar(t , msg);
+    const r_g = altjubjubCurve.g.mul(r);
+    const r_g_bytes = r_g.getX().toBuffer("le", 32);
+
+    const concat = Buffer.concat([pk_bytes, r_g_bytes]);
+    let concat_hash_bytes =  pedersenHash(concat).getX().toBuffer("le", 32);
+
+    let msg_padded = Buffer.alloc(32, 0);
+    msg.copy(msg_padded, 0, 0, 32);
+
+    const s = wrapFs(pedersenHStar(Buffer.concat([concat_hash_bytes, msg_padded])).mul(priv_key).add(r));
+    return {r: { x: r_g.getX().toString("hex"), y: r_g.getY().toString("hex")}, s: s.toString("hex")};
+}
+
+export function privateKeyToPublicKey(pk: BN): BasePoint  {
+    return altjubjubCurve.g.mul(pk);
+}
 
 
 function testCalculate() {

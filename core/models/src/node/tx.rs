@@ -4,6 +4,10 @@ use bigdecimal::BigDecimal;
 use crypto::{digest::Digest, sha2::Sha256};
 
 use super::account::AccountAddress;
+use super::{Fr, Engine};
+use franklin_crypto::eddsa::Signature;
+use franklin_crypto::alt_babyjubjub::{edwards, Unknown};
+use franklin_crypto::alt_babyjubjub::JubjubEngine;
 use web3::types::Address;
 
 /// Signed by user.
@@ -257,37 +261,21 @@ impl FranklinTx {
 //    }
 //}
 //
-//#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-//pub struct TxSignature {
-//    pub r_x: Fr,
-//    pub r_y: Fr,
-//    pub s: Fr,
-//}
-//
-//impl TxSignature {
-//    pub fn try_from(signature: TransactionSignature<Engine>) -> Result<Self, String> {
-//        let (x, y) = signature.r.into_xy();
-//
-//        Ok(Self {
-//            r_x: x,
-//            r_y: y,
-//            s: signature.s,
-//        })
-//    }
-//
-//    pub fn from(signature: Signature<Engine>) -> Self {
-//        let (r_x, r_y) = signature.r.into_xy();
-//        let s = encode_fs_into_fr::<Engine>(signature.s);
-//
-//        Self { r_x, r_y, s }
-//    }
-//
-//    pub fn to_jubjub_eddsa(&self) -> Result<Signature<Engine>, String> {
-//        let r =
-//            edwards::Point::<Engine, Unknown>::from_xy(self.r_x, self.r_y, &params::JUBJUB_PARAMS)
-//                .expect("make point from X and Y");
-//        let s: <Engine as JubjubEngine>::Fs = encode_fr_into_fs::<Engine>(self.s);
-//
-//        Ok(Signature::<Engine> { r, s })
-//    }
-//}
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TxSignature {
+    pub r_x: Fr,
+    pub r_y: Fr,
+    pub s: Fr,
+}
+
+impl std::convert::TryInto<Signature<Engine>> for TxSignature {
+    type Error = failure::Error;
+
+    fn try_into(self) -> Result<Signature<Engine>, Self::Error> {
+        let r =
+            edwards::Point::<Engine, Unknown>::from_xy(self.r_x, self.r_y, &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new())?;
+        let s: <Engine as JubjubEngine>::Fs = encode_fr_into_fs::<Engine>(self.s);
+
+        Ok(Signature::<Engine> { r, s })
+    }
+}
