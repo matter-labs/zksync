@@ -14,10 +14,11 @@ use models::node::{
     Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, FranklinOp, Nonce,
     TokenId,
 };
-use models::{Action, ActionType, EncodedProof, Operation, TxMeta, ACTION_COMMIT, ACTION_VERIFY};
+use models::{Action, ActionType, EncodedProof, Operation, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
 use std::convert::TryInto;
+use web3::types::H256;
 
 mod schema;
 
@@ -33,6 +34,7 @@ use std::env;
 use diesel::sql_types::{BigInt, Nullable, Text, Timestamp};
 sql_function!(coalesce, Coalesce, (x: Nullable<BigInt>, y: BigInt) -> BigInt);
 
+use itertools::Itertools;
 use models::node::AccountAddress;
 
 #[derive(Clone)]
@@ -273,12 +275,32 @@ struct NewOperation {
 pub struct StoredOperation {
     pub id: i64,
     pub data: serde_json::Value,
-    pub addr: String,
-    pub nonce: i64,
     pub block_number: i64,
     pub action_type: String,
-    pub tx_hash: Option<String>,
     pub created_at: NaiveDateTime,
+    pub confirmed: bool,
+}
+
+#[derive(Debug, Clone, Queryable, QueryableByName)]
+#[table_name = "eth_operations"]
+pub struct StorageETHOperation {
+    pub id: i64,
+    pub op_id: i64,
+    pub nonce: i64,
+    pub deadline_block: i64,
+    pub gas_price: BigDecimal,
+    pub tx_hash: String,
+    pub confirmed: bool,
+}
+
+#[derive(Debug, Insertable)]
+#[table_name = "eth_operations"]
+struct NewETHOperation {
+    op_id: i64,
+    nonce: i64,
+    deadline_block: i64,
+    gas_price: BigDecimal,
+    tx_hash: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Queryable)]
@@ -293,16 +315,7 @@ pub struct StoredTx {
 }
 
 impl StoredOperation {
-    pub fn get_meta(&self) -> TxMeta {
-        TxMeta {
-            addr: self.addr.clone(),
-            nonce: self.nonce as u32,
-        }
-    }
-
     pub fn into_op(self, conn: &StorageProcessor) -> QueryResult<Operation> {
-        let meta = self.get_meta();
-
         let debug_data = format!("data: {}", &self.data);
 
         // let op: Result<Operation, serde_json::Error> = serde_json::from_value(self.data);
@@ -313,7 +326,6 @@ impl StoredOperation {
         }
 
         let mut op = op.expect("Operation deserialization");
-        op.tx_meta = Some(meta);
         op.id = Some(self.id);
 
         if op.accounts_updated.is_empty() {
@@ -632,15 +644,6 @@ impl StorageProcessor {
         })
     }
 
-    pub fn save_operation_tx_hash(&self, op_id: i64, hash: String) -> QueryResult<()> {
-        use crate::schema::operations::dsl::*;
-        let target = operations.filter(id.eq(op_id));
-        diesel::update(target)
-            .set(tx_hash.eq(hash))
-            .execute(self.conn())
-            .map(|_| ())
-    }
-
     pub fn save_block_transactions(&self, block: &Block) -> QueryResult<()> {
         for block_tx in block.block_transactions.iter() {
             let stored_tx = NewExecutedTransaction::prepare_stored_tx(block_tx, block.block_number);
@@ -942,32 +945,6 @@ impl StorageProcessor {
             .map(|diff| diff.unwrap_or_default().1)
     }
 
-    /// Sets up `op_config` to new address and nonce for scheduling ETH transactions for operations
-    /// If current nonce from ETH netorkw is higher, nonce config is fast-forwarded to the new value
-    pub fn prepare_nonce_scheduling(&self, sender: &str, current_nonce: Nonce) -> QueryResult<()> {
-        // The code below does this:
-        // next_nonce = max( current_nonce, max(nonces from ops scheduled for this sender) + 1 )
-        diesel::sql_query(
-            format!(
-                "
-            UPDATE op_config 
-            SET addr = '{addr}', next_nonce = s.next_nonce
-            FROM (
-                SELECT max(t.next_nonce) AS next_nonce
-                FROM (
-                    SELECT max(nonce) + 1 AS next_nonce FROM operations WHERE addr = '{addr}' 
-                    UNION SELECT {current_nonce} AS next_nonce
-                ) t
-            ) s",
-                addr = sender,
-                current_nonce = i64::from(current_nonce)
-            )
-            .as_str(),
-        )
-        .execute(self.conn())
-        .map(|_| ())
-    }
-
     pub fn load_stored_op_with_block_number(
         &self,
         block_number: BlockNumber,
@@ -1065,19 +1042,6 @@ impl StorageProcessor {
             .ok()
     }
 
-    // pub fn load_stored_ops_in_blocks_range(&self, max_block: BlockNumber, limit: u32, action_type: ActionType) -> Vec<StoredOperation> {
-    //     let query = format!("
-    //         SELECT * FROM operations
-    //         WHERE block_number <= {max_block} AND action_type = '{action_type}'
-    //         ORDER BY block_number
-    //         DESC
-    //         LIMIT {limit}
-    //     ", max_block = max_block as i64, limit = limit as i64, action_type = action_type.to_string());
-    //     let r = diesel::sql_query(query)
-    //         .load(self.conn());
-    //     r.unwrap_or(vec![])
-    // }
-
     pub fn load_commit_op(&self, block_number: BlockNumber) -> Option<Operation> {
         let op = self.load_stored_op_with_block_number(block_number, ActionType::COMMIT);
         op.and_then(|r| r.into_op(self).ok())
@@ -1088,32 +1052,97 @@ impl StorageProcessor {
         op.and_then(|r| Some(r.block))
     }
 
-    pub fn load_unsent_ops(&self, current_nonce: Nonce) -> QueryResult<Vec<Operation>> {
-        use crate::schema::operations::dsl;
+    pub fn load_unsent_ops(&self) -> QueryResult<Vec<Operation>> {
         self.conn().transaction(|| {
-            let ops: Vec<StoredOperation> = dsl::operations
-                .filter(dsl::nonce.ge(i64::from(current_nonce))) // WHERE nonce >= current_nonce
-                .load(self.conn())?;
-            ops.into_iter().map(|o| o.into_op(self)).collect()
+            let ops: Vec<_> = operations::table
+                .left_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
+                .filter(eth_operations::id.is_null())
+                .order(operations::id.asc())
+                .load::<(StoredOperation, Option<StorageETHOperation>)>(self.conn())?;
+            ops.into_iter().map(|(o, _)| o.into_op(self)).collect()
+        })
+    }
+
+    pub fn load_sent_unconfirmed_ops(
+        &self,
+    ) -> QueryResult<Vec<(Operation, Vec<StorageETHOperation>)>> {
+        self.conn().transaction(|| {
+            let ops: Vec<_> = operations::table
+                .filter(eth_operations::confirmed.eq(false))
+                .inner_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
+                .order(operations::id.asc())
+                .load::<(StoredOperation, StorageETHOperation)>(self.conn())?;
+            let mut ops_with_eth_actions = Vec::new();
+            for (op, eth_op) in ops.into_iter() {
+                ops_with_eth_actions.push((op.into_op(self)?, eth_op));
+            }
+            Ok(ops_with_eth_actions
+                .into_iter()
+                .group_by(|(o, _)| o.id.unwrap())
+                .into_iter()
+                .map(|(_op_id, group_iter)| {
+                    let fold_result = group_iter.fold(
+                        (None, Vec::new()),
+                        |(mut accum_op, mut accum_eth_ops): (Option<Operation>, _),
+                         (op, eth_op)| {
+                            if let Some(accum_op) = accum_op.as_ref() {
+                                assert_eq!(accum_op.id, op.id);
+                            } else {
+                                accum_op = Some(op);
+                            }
+                            accum_eth_ops.push(eth_op);
+
+                            (accum_op, accum_eth_ops)
+                        },
+                    );
+                    (fold_result.0.unwrap(), fold_result.1)
+                })
+                .collect())
+        })
+    }
+
+    pub fn save_operation_eth_tx(
+        &self,
+        op_id: i64,
+        hash: H256,
+        deadline_block: u64,
+        nonce: u32,
+        gas_price: BigDecimal,
+    ) -> QueryResult<()> {
+        insert_into(eth_operations::table)
+            .values(&NewETHOperation {
+                op_id,
+                nonce: i64::from(nonce),
+                deadline_block: deadline_block as i64,
+                gas_price,
+                tx_hash: format!("{:#x}", hash),
+            })
+            .execute(self.conn())
+            .map(drop)
+    }
+
+    pub fn confirm_eth_tx(&self, hash: &H256) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            update(
+                eth_operations::table.filter(eth_operations::tx_hash.eq(format!("{:#x}", hash))),
+            )
+            .set(eth_operations::confirmed.eq(true))
+            .execute(self.conn())
+            .map(drop)?;
+            let (op, _) = operations::table
+                .inner_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
+                .filter(eth_operations::tx_hash.eq(format!("{:#x}", hash)))
+                .first::<(StoredOperation, StorageETHOperation)>(self.conn())?;
+
+            update(operations::table.filter(operations::id.eq(op.id)))
+                .set(operations::confirmed.eq(true))
+                .execute(self.conn())
+                .map(drop)
         })
     }
 
     pub fn load_unverified_commitments(&self) -> QueryResult<Vec<Operation>> {
         self.conn().transaction(|| {
-            // // https://docs.diesel.rs/diesel/query_dsl/trait.QueryDsl.html
-            // use crate::schema::operations::dsl::{*};
-            // let ops: Vec<StoredOperation> = operations
-            //     .filter(action_type.eq(ACTION_COMMIT)
-            //             .and(block_number.gt(
-            //                 coalesce(
-            //                     operations
-            //                     .select(block_number)
-            //                     .filter(action_type.eq(ACTION_VERIFY))
-            //                     .single_value(), 0)
-            //             ))
-            //     )
-            //     .load(self.conn())?;
-
             let ops: Vec<StoredOperation> = diesel::sql_query(
                 "
                 SELECT * FROM operations
@@ -1128,28 +1157,6 @@ impl StorageProcessor {
             .load(self.conn())?;
             ops.into_iter().map(|o| o.into_op(self)).collect()
         })
-    }
-
-    fn load_number(&self, query: &str) -> QueryResult<i64> {
-        diesel::sql_query(query)
-            .get_result::<IntegerNumber>(self.conn())
-            .map(|r| r.integer_value)
-    }
-
-    pub fn load_last_committed_deposit_batch(&self) -> QueryResult<i64> {
-        self.load_number("
-            SELECT COALESCE(max((data->'block'->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
-            WHERE data->'action'->>'type' = 'Commit' 
-            AND data->'block'->'block_data'->>'type' = 'Deposit'
-        ")
-    }
-
-    pub fn load_last_committed_exit_batch(&self) -> QueryResult<i64> {
-        self.load_number("
-            SELECT COALESCE(max((data->'block'->'block_data'->>'batch_number')::int), -1) as integer_value FROM operations 
-            WHERE data->'action'->>'type' = 'Commit' 
-            AND data->'block'->'block_data'->>'type' = 'Exit'
-        ")
     }
 
     fn get_account_and_last_block(
@@ -1298,37 +1305,21 @@ impl StorageProcessor {
     }
 
     pub fn get_last_committed_block(&self) -> QueryResult<BlockNumber> {
-        // use crate::schema::account_updates::dsl::*;
-        // account_updates
-        //     .select(max(block_number))
-        //     .get_result::<Option<i64>>(self.conn())
-        //     .map(|max| max.unwrap_or(0))
-
         use crate::schema::operations::dsl::*;
         operations
             .select(max(block_number))
             .filter(action_type.eq(ACTION_COMMIT))
             .get_result::<Option<i64>>(self.conn())
             .map(|max| max.unwrap_or(0) as BlockNumber)
-
-        //self.load_number("SELECT COALESCE(max(block_number), 0) AS integer_value FROM account_updates")
     }
 
     pub fn get_last_verified_block(&self) -> QueryResult<BlockNumber> {
-        // use crate::schema::accounts::dsl::*;
-        // accounts
-        //     .select(max(last_block))
-        //     .get_result::<Option<i64>>(self.conn())
-        //     .map(|max| max.unwrap_or(0))
-
         use crate::schema::operations::dsl::*;
         operations
             .select(max(block_number))
             .filter(action_type.eq(ACTION_VERIFY))
             .get_result::<Option<i64>>(self.conn())
             .map(|max| max.unwrap_or(0) as BlockNumber)
-
-        //self.load_number("SELECT COALESCE(max(last_block), 0) AS integer_value FROM accounts")
     }
 
     pub fn fetch_prover_job(
@@ -2185,89 +2176,22 @@ mod test {
         //        assert_eq!(txs.len(), 6);
     }
 
-    fn dummy_op(_action: Action, _block_number: BlockNumber) -> Operation {
-        unimplemented!()
-        //        Operation {
-        //            id: None,
-        //            action,
-        //            block: Block {
-        //                block_number,
-        //                new_root_hash: Fr::default(),
-        //                block_data: BlockData::Deposit {
-        //                    batch_number: 1,
-        //                    transactions: Vec::new(),
-        //                },
-        //            },
-        //            accounts_updated: AccountUpdates::default(),
-        //            tx_meta: None,
-        //        }
-    }
+    //    fn dummy_op(_action: Action, _block_number: BlockNumber) -> Operation {
+    //        unimplemented!()
+    //        Operation {
+    //            id: None,
+    //            action,
+    //            block: Block {
+    //                block_number,
+    //                new_root_hash: Fr::default(),
+    //                block_data: BlockData::Deposit {
+    //                    batch_number: 1,
+    //                    transactions: Vec::new(),
+    //                },
+    //            },
+    //            accounts_updated: AccountUpdates::default(),
+    //            tx_meta: None,
+    //        }
+    //    }
 
-    #[test]
-    #[ignore]
-    fn test_nonce_fast_forward() {
-        let pool = ConnectionPool::new();
-        let conn = pool.access_storage().unwrap();
-        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
-
-        conn.prepare_nonce_scheduling("0x123", 0).expect("failed");
-
-        let mut i = 0;
-        let stored_op = loop {
-            let stored_op = conn
-                .execute_operation(&dummy_op(Action::Commit, 1))
-                .unwrap();
-            i += 1;
-            if i >= 6 {
-                break stored_op;
-            }
-        };
-
-        // after 6 iterations starting with nonce = 0, last inserted nonce should be 5
-        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 5);
-
-        // addr for
-        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").addr, "0x123");
-
-        // if the nonce from network is lower than expected, this should not affect the scheduler
-        conn.prepare_nonce_scheduling("0x123", 3).expect("failed");
-        let stored_op = conn
-            .execute_operation(&dummy_op(Action::Commit, 1))
-            .unwrap();
-        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 6);
-
-        // if the nonce from network is same as expected, this should not affect the scheduler
-        conn.prepare_nonce_scheduling("0x123", 7).expect("failed");
-        let stored_op = conn
-            .execute_operation(&dummy_op(Action::Commit, 1))
-            .unwrap();
-        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 7);
-
-        // if the nonce from network is higher than expected, scheduler should be fast-forwarded
-        conn.prepare_nonce_scheduling("0x123", 9).expect("failed");
-        let stored_op = conn
-            .execute_operation(&dummy_op(Action::Commit, 1))
-            .unwrap();
-        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 9);
-
-        // if the address is new, nonces start from the given value
-        conn.prepare_nonce_scheduling("0x456", 2).expect("failed");
-        let stored_op = conn
-            .execute_operation(&dummy_op(Action::Commit, 1))
-            .unwrap();
-        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 2);
-
-        // addr should now switch
-        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").addr, "0x456");
-
-        // if we switch back to existing sender, nonce sequence should continue from where it started with that addr
-        conn.prepare_nonce_scheduling("0x123", 0).expect("failed");
-        let stored_op = conn
-            .execute_operation(&dummy_op(Action::Commit, 1))
-            .unwrap();
-        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").nonce, 10);
-
-        // add should now switch back
-        assert_eq!(stored_op.tx_meta.as_ref().expect("no meta?").addr, "0x123");
-    }
 }

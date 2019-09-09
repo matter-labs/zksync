@@ -87,7 +87,7 @@ impl Withdraw {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.account.data);
-        out.extend_from_slice(&self.eth_address);
+        out.extend_from_slice(self.eth_address.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&pack_token_amount(&self.amount));
         out.extend_from_slice(&pack_fee_amount(&self.fee));

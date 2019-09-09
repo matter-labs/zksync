@@ -7,7 +7,7 @@ use self::secp256k1::key::SecretKey;
 use self::secp256k1::Message;
 use self::secp256k1::Secp256k1;
 use self::tiny_keccak::keccak256;
-use ethereum_types::{H160, H256, U256};
+use web3::types::{H160, H256, U256};
 
 /// Description of a Transaction, pending or in the chain.
 #[derive(Debug, Default, Clone, PartialEq, Deserialize, Serialize)]
