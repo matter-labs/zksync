@@ -11,8 +11,8 @@ type BigNumber = ethers.utils.BigNumber;
 type BigNumberish = ethers.utils.BigNumberish;
 const bigNumberify = ethers.utils.bigNumberify;
 const PUBKEY_HASH_LEN=20;
-const IERC20Conract = require("../abi/IERC20");
-const franklinContractCode = require("../abi/Franklin");
+const IERC20Conract = require("openzeppelin-solidity/build/contracts/ERC20Mintable.json");
+const franklinContractCode = require("../abi/Franklin.json");
 
 export type Address = string;
 
@@ -83,16 +83,6 @@ export class Wallet {
         
 
         this.nonce = null;
-    }
-
-    async transferOnchain(toEthAddress: Address, tokenAddress: Address, amount: BigNumberish, nonce: number) {
-        const contract = new Contract(tokenAddress, IERC20Conract.abi, this.ethWallet);
-        let tx = await contract.transfer(toEthAddress, bigNumberify(amount), {nonce: nonce, gasLimit: bigNumberify("150000")});
-        // console.log("TX: ", tx);
-        await tx.wait(2)
-        let receipt = await this.ethWallet.provider.getTransactionReceipt(tx.hash);
-        // console.log('transferOnchain receipt:', receipt);
-        return tx;
     }
 
     async depositOnchain(token: Token, amount: BigNumberish) {
@@ -199,10 +189,6 @@ export class Wallet {
         return frankinWallet;
     }
 
-    async fetchEthStateFromOurServer() {
-        
-    }
-
     async fetchEthState() {
         let onchainBalances = new Array<BigNumber>(this.supportedTokens.length);
         let contractBalances = new Array<BigNumber>(this.supportedTokens.length);
@@ -239,14 +225,6 @@ export class Wallet {
     async waitPendingTxsExecuted() {
         await this.fetchFranklinState();
         while (this.franklinState.pending_txs.length > 0) {
-            await this.fetchFranklinState();
-        }
-    }
-
-    async waitProved() {
-        await this.fetchFranklinState();
-        while (JSON.stringify(this.franklinState.commited.balances) !== JSON.stringify(this.franklinState.verified.balances)) {
-            await sleep(1000);
             await this.fetchFranklinState();
         }
     }

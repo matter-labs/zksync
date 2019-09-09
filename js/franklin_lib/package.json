@@ -2,7 +2,8 @@
   "name": "franklin_lib",
   "version": "1.0.0",
   "license": "MIT",
-  "main": "./build/wallet.js",
+  "main": "build/wallet.js",
+  "types": "build/wallet.d.ts",
   "dependencies": {
     "axios": "^0.19.0",
     "bn.js": "^5.0.0",
@@ -29,6 +30,7 @@
     "test": "mocha -r ts-node/register tests/**/*.test.ts",
     "loadtest": "ts-node scripts/loadtest.ts",
     "fmt": "prettier --parser typescript --write \"**/*.ts\"",
-    "build": "tsc"
+    "build": "tsc",
+    "prepublish": "tsc"
   }
 }

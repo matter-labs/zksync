@@ -54,7 +54,7 @@ export class Tester {
     
     private selectRandomAmount(from: number, to: number): BigNumber {
         // TODO
-        return bigNumberify(to);
+        return bigNumberify(this.prando.nextBoolean() ? from : to);
         // return bigNumberify(prando.nextInt(from, to).toString());
     }
     
@@ -67,9 +67,9 @@ export class Tester {
         kwargs.wallet = kwargs.wallet || this.selectRandomWallet();
         kwargs.token  = kwargs.token  || this.selectRandomToken();
         kwargs.amount = kwargs.amount || 
-            kwargs.token.id == 0 
+            (kwargs.token.id == 0 
             ? bigNumberify('10000000000000000') 
-            : bigNumberify('1000000');
+            : bigNumberify('1000000'));
         return new ReceiveMoneyOperation(kwargs);
     }
 
@@ -96,11 +96,16 @@ export class Tester {
         kwargs.wallet1 = kwargs.wallet1 || this.selectRandomWallet();
         kwargs.wallet2 = kwargs.wallet2 || this.selectAnotherRandomWallet(kwargs.wallet1);
         kwargs.token   = kwargs.token   || this.selectRandomToken();
-        kwargs.amount  = kwargs.amount  || this.selectRandomAmount(0, 1000);
-        kwargs.fee     = kwargs.fee     || this.selectRandomAmount(0, 1000);
+        kwargs.amount  = kwargs.amount  || this.selectRandomAmount(10, 1000);
+        kwargs.fee     = kwargs.fee     || this.selectRandomAmount(10, 1000);
         return new TransferOperation(kwargs);
     }
 
+    /**
+     * it creates one of the available operations.
+     * The operation should be passed to addOperation() method.
+     * 
+     */
     randomOperation(): AbstractOperation {
         const opsProbs = {
             'randomReceiveMoneyOperation': 0.3,
@@ -119,6 +124,10 @@ export class Tester {
         }
     }
 
+    /**
+     * adds some random operation to one of the wallets[].
+     * @param op 
+     */
     addOperation(op: AbstractOperation) {
         op = op || this.randomOperation();
         op.mainWallet.addAction(op);
@@ -140,6 +149,9 @@ export class Tester {
         }));
     }
 
+    /**
+     * returns json string of every operation on every wallet.
+     */
     public async dump(): Promise<string> {
         return '[' + (await Promise.all(this.wallets.map(async w => w.toJSON()))).join(', ') + ']';
     }

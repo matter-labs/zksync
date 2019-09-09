@@ -1,8 +1,9 @@
 import { AbstractOperation } from './AbstractOperation'
 import { Wallet, Token } from '../../src/wallet';
 import { LocalWallet } from './LocalWallet';
-import { BigNumberish, BigNumber } from 'ethers/utils';
-import { ethers } from 'ethers';
+import { bigNumberify, BigNumberish, BigNumber } from 'ethers/utils';
+import { Contract, ethers } from 'ethers';
+const IERC20Conract = require('openzeppelin-solidity/build/contracts/ERC20Mintable.json');
 
 const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms))
 
@@ -55,6 +56,16 @@ class RichEthWallet {
         this.sourceNonce = await this.source.getTransactionCount("pending")
     }
 
+    async transferOnchain(toEthAddress: string, tokenAddress: string, amount: BigNumberish, nonce: number) {
+        const contract = new Contract(tokenAddress, IERC20Conract.abi, this.franklinWallet.ethWallet);
+        let tx = await contract.transfer(toEthAddress, bigNumberify(amount), {nonce: nonce, gasLimit: bigNumberify("150000")});
+        // console.log("TX: ", tx);
+        await tx.wait(2)
+        let receipt = await this.franklinWallet.ethWallet.provider.getTransactionReceipt(tx.hash);
+        // console.log('transferOnchain receipt:', receipt);
+        return tx;
+    }
+
     async sendSome(wallet: LocalWallet, token: Token, amount: BigNumberish) {
         let to = wallet.franklinWallet.ethWallet;
         let txAddr = await to.getAddress();
@@ -80,7 +91,7 @@ class RichEthWallet {
             return mined;
         } else {
             let toAddress = await wallet.franklinWallet.ethWallet.getAddress();
-            let res = await this.franklinWallet.transferOnchain(toAddress, token.address, amount, txNonce);
+            let res = await this.transferOnchain(toAddress, token.address, amount, txNonce);
             // console.log('res: ', res);
             wallet.addToComputedOnchainBalance(token, txAmount);
             return res;

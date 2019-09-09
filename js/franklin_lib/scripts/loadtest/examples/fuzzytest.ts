@@ -1,4 +1,9 @@
-import { Tester } from './Tester';
+/**
+ * Here we create a lot of wallets, 
+ * assign a lot of totally random operations to them,
+ * and watch the server struggle.
+ */
+import { Tester } from '../Tester';
 import fs, { exists } from 'fs';
 async function test(): Promise<void> {
     const tester: Tester = await Tester.new({
