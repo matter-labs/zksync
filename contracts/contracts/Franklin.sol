@@ -94,10 +94,12 @@ contract Franklin {
     // - opType - request type
     // - pubData - request data
     // - expirationBlock - the number of Ethereum block when request becomes expired
+    // - fee - validator fee
     event NewPriorityRequest(
         OpType indexed opType,
         bytes pubData,
-        uint256 indexed expirationBlock
+        uint256 indexed expirationBlock,
+        uint256 fee
     );
 
     // Exodus mode entered event
@@ -225,24 +227,28 @@ contract Franklin {
     // Add request
     // Params:
     // - _opType - priority request type
-    // - _startGasLeft - start remaining gas
+    // - _fee - validatorFee
     // - _pubData - request data
     function addPriorityRequest(
         OpType _opType,
-        uint256 _startGasLeft,
+        uint256 _fee,
         bytes memory _pubData
     ) internal {
+        // Expiration block is: current block number + priority expiration delta
+        uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
+
         emit NewPriorityRequest(
             _opType,
             _pubData,
-            expirationBlock
+            expirationBlock,
+            _fee
         );
 
         priorityRequests[firstPriorityRequestId+totalPriorityRequests] = PriorityOperation({
             opType: _opType,
             pubData: _pubData,
-            expirationBlock: block.number + PRIORITY_EXPIRATION, // Expiration block is: current block number + priority expiration delta
-            fee: FEE_COEFF * (BASE_GAS + _startGasLeft - gasleft()) * tx.gasprice // Resulting fee is: fee coeff * (base tx gas cost + gas used for code completion) * gas price
+            expirationBlock: expirationBlock,
+            fee: _fee
         });
         totalPriorityRequests++;
     }
@@ -328,13 +334,23 @@ contract Franklin {
     // Params:
     // - _franklinAddr - receiver
     function depositETH(bytes calldata _franklinAddr) external payable {
-        uint256 startGasLeft = gasleft();
-        requireActive();
+        // Fee is:
+        //   fee coeff * (base tx gas cost + remained gas) * gas price
+        uint256 fee = FEE_COEFF * (BASE_GAS + gasleft()) * tx.gasprice;
         require(
-            msg.value <= MAX_VALUE,
-            "detval"
-        ); // d1 - deposit value is heighr
-        registerDeposit(0, uint128(msg.value), startGasLeft, _franklinAddr);
+            msg.value >= fee,
+            "detlwv"
+        ); // derlwv - Not enough ETH provided to pay the fee
+
+        requireActive();
+
+        uint128 amount = uint128(msg.value-fee);
+        require(
+            amount <= MAX_VALUE,
+            "detamt"
+        ); // detamt - deposit amount value is heigher than Franklin is able to process
+
+        registerDeposit(0, amount, fee, _franklinAddr);
     }
 
     // Withdraw ETH
@@ -355,15 +371,24 @@ contract Franklin {
         address _token,
         uint128 _amount,
         bytes calldata _franklinAddr
-    ) external {
-        uint256 startGasLeft = gasleft();
+    ) external payable {
+        // Fee is:
+        //   fee coeff * (base tx gas cost + remained gas) * gas price
+        uint256 fee = FEE_COEFF * (BASE_GAS + gasleft()) * tx.gasprice;
+        require(
+            msg.value >= fee,
+            "derlwv"
+        ); // derlwv - Not enough ETH provided to pay the fee
+
         requireActive();
+
         require(
             IERC20(_token).transferFrom(msg.sender, address(this), _amount),
             "dertrf"
         ); // dertrf - token transfer failed deposit
+
         uint16 tokenId = governance.validateERC20Token(_token);
-        registerDeposit(tokenId, _amount, startGasLeft, _franklinAddr);
+        registerDeposit(tokenId, _amount, fee, _franklinAddr);
     }
 
     // Withdraw ERC20 token
@@ -389,8 +414,15 @@ contract Franklin {
         bytes calldata _franklinAddr,
         address _token,
         bytes calldata _signature
-    ) external {
-        uint256 startGasLeft = gasleft();
+    ) external payable {
+        // Fee is:
+        //   fee coeff * (base tx gas cost + remained gas) * gas price
+        uint256 fee = FEE_COEFF * (BASE_GAS + gasleft()) * tx.gasprice;
+        require(
+            msg.value >= fee,
+            "derlwv"
+        ); // derlwv - Not enough ETH provided to pay the fee
+
         requireActive();
         require(
             _franklinAddr.length == PUBKEY_HASH_LEN,
@@ -407,19 +439,19 @@ contract Franklin {
         pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(msg.sender)); // eth address
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(tokenId)); // token id
         pubData = Bytes.concat(pubData, _signature); // signature
-        addPriorityRequest(OpType.FullExit, startGasLeft, pubData);
+        addPriorityRequest(OpType.FullExit, fee, pubData);
     }
 
     // Register deposit request
     // Params:
     // - _token - token by id
     // - _amount - token amount
-    // - _startGasLeft - start remaining gas
+    // - _fee - validator fee
     // - _franklinAddr - receiver
     function registerDeposit(
         uint16 _token,
         uint128 _amount,
-        uint256 _startGasLeft,
+        uint256 _fee,
         bytes memory _franklinAddr
     ) internal {
         emit OnchainDeposit(
@@ -434,7 +466,7 @@ contract Franklin {
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(_token)); // token id
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt128(_amount)); // amount
         pubData = Bytes.concat(pubData, _franklinAddr); // franklin address
-        addPriorityRequest(OpType.Deposit, _startGasLeft, pubData);
+        addPriorityRequest(OpType.Deposit, _fee, pubData);
     }
 
     // Register withdrawal
