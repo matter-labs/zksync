@@ -64,6 +64,19 @@ contract Franklin {
         uint32 indexed totalBlocksCommited
     );
 
+    // Event emitted when deposit operation comes into this contract
+    // Structure:
+    // - owner - sender
+    // - tokenId - deposited token
+    // - amount - deposited value
+    // - franlkinAddress - address of Franklin account whtere deposit will be sent
+    event OnchainDeposit(
+        address indexed owner,
+        uint16 tokenId,
+        uint128 amount,
+        bytes franklinAddress
+    );
+
     // Event emitted when user send withdraw transaction from this contract
     // Structure:
     // - owner - sender
@@ -244,7 +257,7 @@ contract Franklin {
     // Params:
     // - _count - number of requests to remove
     // - _validator - address to pay fee
-    function payValidatorFeeAndRemovePriorityRequests(uint32 _count, address _validator) internal {
+    function payValidatorFeeAndRemovePriorityRequests(uint32 _count, address payable _validator) internal {
         require(
             _count <= totalPriorityRequests,
             "rprcnt"
@@ -763,7 +776,7 @@ contract Franklin {
 
         payValidatorFeeAndRemovePriorityRequests(
             blocks[_blockNumber].priorityOperations,
-            blocks[_blockNumber].validator
+            address(uint160(blocks[_blockNumber].validator))
         );
 
         totalBlocksVerified += 1;
@@ -942,5 +955,4 @@ contract Franklin {
             exited[_owners[i]][_tokenId] = true;
         }
     }
-
 }
