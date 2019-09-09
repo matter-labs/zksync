@@ -558,7 +558,7 @@ contract Franklin {
     function processOp(
         uint8 _opType,
         uint256 _currentPointer,
-        bytes memory _publicData,
+        bytes memory _publicData
         uint64 _currentOnchainOp
     ) internal returns (uint256 processedLen, uint64 processedOnchainOps, uint32 priorityCount) {
         uint256 opDataPointer = _currentPointer + 1;

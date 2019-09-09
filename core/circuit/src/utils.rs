@@ -10,7 +10,7 @@ use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
 use crate::operation::TransactionSignature;
 use models::params as franklin_constants;
 
-pub fn sign<R, E>(
+pub fn sign_pedersen<R, E>(
     msg_data: &[bool],
     private_key: &PrivateKey<E>,
     p_g: FixedGenerators,
@@ -35,19 +35,13 @@ where
         }
         message_bytes.push(byte);
     }
-    println!("message_len {}", message_bytes.len());
-    let max_message_len = 31 as usize; //todo
-    let signature = private_key.sign_raw_message(&message_bytes, rng, p_g, params, max_message_len);
-    // let signature = private_key.musig_pedersen_sign(&message_bytes, rng, p_g, params);
+
+    let signature = private_key.musig_pedersen_sign(&message_bytes, rng, p_g, params);
 
     let pk = PublicKey::from_private(&private_key, p_g, params);
-    let is_valid_signature = pk.verify_for_raw_message(
-        &message_bytes,
-        &signature.clone(),
-        p_g,
-        params,
-        max_message_len,
-    );
+    let is_valid_signature =
+        pk.verify_musig_pedersen(&message_bytes, &signature.clone(), p_g, params);
+
     if !is_valid_signature {
         return None;
     }
@@ -57,11 +51,51 @@ where
 
     let sigs_converted = le_bit_vector_into_field_element(&sigs_le_bits);
 
-    // let mut sigs_bytes = [0u8; 32];
-    // signature.s.into_repr().write_le(& mut sigs_bytes[..]).expect("get LE bytes of signature S");
-    // let mut sigs_repr = E::Fr::zero().into_repr();
-    // sigs_repr.read_le(&sigs_bytes[..]).expect("interpret S as field element representation");
-    // let sigs_converted = E::Fr::from_repr(sigs_repr).unwrap();
+    Some(TransactionSignature {
+        r: signature.r,
+        s: sigs_converted,
+    })
+}
+
+pub fn sign_sha<R, E>(
+    msg_data: &[bool],
+    private_key: &PrivateKey<E>,
+    p_g: FixedGenerators,
+    params: &E::Params,
+    rng: &mut R,
+) -> Option<TransactionSignature<E>>
+where
+    R: rand::Rng,
+    E: JubjubEngine,
+{
+    let raw_data: Vec<bool> = msg_data.to_vec();
+
+    let mut message_bytes: Vec<u8> = vec![];
+
+    let byte_chunks = raw_data.chunks(8);
+    for byte_chunk in byte_chunks {
+        let mut byte = 0u8;
+        for (i, bit) in byte_chunk.iter().enumerate() {
+            if *bit {
+                byte |= 1 << (7 - i); //TODO: ask shamatar why do we need rev here, but not in pedersen
+            }
+        }
+        message_bytes.push(byte);
+    }
+
+    let signature = private_key.musig_sha256_sign(&message_bytes, rng, p_g, params);
+
+    let pk = PublicKey::from_private(&private_key, p_g, params);
+    let is_valid_signature =
+        pk.verify_musig_sha256(&message_bytes, &signature.clone(), p_g, params);
+    if !is_valid_signature {
+        return None;
+    }
+
+    let mut sigs_le_bits: Vec<bool> = BitIterator::new(signature.s.into_repr()).collect();
+    sigs_le_bits.reverse();
+
+    let sigs_converted = le_bit_vector_into_field_element(&sigs_le_bits);
 
     Some(TransactionSignature {
         r: signature.r,
@@ -201,29 +235,6 @@ pub fn le_bit_vector_into_field_element<P: PrimeField>(bits: &[bool]) -> P {
     }
 
     fe
-    // // TODO remove representation length hardcode
-    // let mut bytes = [0u8; 32];
-
-    // let byte_chunks = bits.chunks(8);
-
-    // for (i, byte_chunk) in byte_chunks.enumerate()
-    // {
-    //     let mut byte = 0u8;
-    //     for (j, bit) in byte_chunk.into_iter().enumerate()
-    //     {
-    //         if *bit {
-    //             byte |= 1 << j;
-    //         }
-    //     }
-    //     bytes[i] = byte;
-    // }
-
-    // let mut repr : P::Repr = P::zero().into_repr();
-    // repr.read_le(&bytes[..]).expect("interpret as field element");
-
-    // let field_element = P::from_repr(repr).unwrap();
-
-    // field_element
 }
 
 pub fn be_bit_vector_into_bytes(bits: &[bool]) -> Vec<u8> {
