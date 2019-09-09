@@ -84,10 +84,14 @@ When corresponding transactions are found in the commited block, their count mus
 
 If the block is reverted via Exodus Mode, the funds held by **Deposit priority requests** from this block are accrued to the owners' **root-chain balances** to make them possible to withdraw. And this **Deposit priority requests** will be removed from mapping. 
 
-A certain value of the selected token will be withdrawn from the _user's_ account immediately when he send a request, as payment for the _validator’s_ work to include these transactions in the block. One transaction fee is calculated as follows:
-`fee = 3 * gas * mediumFee`, where
-- `gas` - the gas cost of all related operations for the exit
-- `mediumFee` - current average fee in the network.
+### Fees for Priority Requests
+
+In order to send priority request, the _user_ MUST pay some extra fee. That fee will be subtracted from the amount of Ether that the user sent to Deposit funciton in both cases of Ether and ERC-20 tokens deposits. That fee will be the payment for the _validator’s_ work to include these transactions in the block. One transaction fee is calculated as follows:
+`fee = FEE_COEFF * (BASE_GAS + gasleft) * gasprice`, where
+- `FEE_COEFF` - fee coefficient for priority request transaction
+- `BASE_GAS` - base gas cost for transaction (usually 21000)
+- `gasleft` - remaining gas for transaction code execution
+- `gasprice` - gas price of the transaction
 
 ### **Validators'** responsibility
 

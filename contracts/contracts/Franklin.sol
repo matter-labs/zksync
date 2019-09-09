@@ -15,7 +15,7 @@ contract Franklin {
     Verifier verifier;
     Governance governance;
 
-    // Base gas for transaction
+    // Fee coefficient for priority request transaction
     uint256 constant FEE_COEFF = 4;
     // Base gas cost for transaction
     uint256 constant BASE_GAS = 21000;
