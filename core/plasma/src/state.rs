@@ -1,7 +1,7 @@
 use bigdecimal::BigDecimal;
 use failure::{bail, ensure, format_err, Error};
 use models::node::operations::{
-    CloseOp, DepositOp, FranklinOp, PartialExitOp, TransferOp, TransferToNewOp,
+    CloseOp, DepositOp, FranklinOp, TransferOp, TransferToNewOp, WithdrawOp,
 };
 use models::node::tx::{Close, Deposit, FranklinTx, Transfer, Withdraw};
 use models::node::{Account, AccountAddress, AccountTree};
@@ -80,7 +80,7 @@ impl PlasmaState {
                 }
             }
             FranklinTx::Deposit(_) => DepositOp::CHUNKS,
-            FranklinTx::Withdraw(_) => PartialExitOp::CHUNKS,
+            FranklinTx::Withdraw(_) => WithdrawOp::CHUNKS,
             FranklinTx::Close(_) => CloseOp::CHUNKS,
         }
     }
@@ -158,13 +158,13 @@ impl PlasmaState {
         let (account_id, _) = self
             .get_account_by_address(&tx.account)
             .ok_or_else(|| format_err!("Account does not exist"))?;
-        let partial_exit_op = PartialExitOp { tx, account_id };
+        let withdraw_op = WithdrawOp { tx, account_id };
 
-        let (fee, updates) = self.apply_partial_exit_op(&partial_exit_op)?;
+        let (fee, updates) = self.apply_withdraw_op(&withdraw_op)?;
         Ok(TxSuccess {
             fee,
             updates,
-            executed_op: FranklinOp::PartialExit(partial_exit_op),
+            executed_op: FranklinOp::Withdraw(withdraw_op),
         })
     }
 
@@ -353,9 +353,9 @@ impl PlasmaState {
         Ok((fee, updates))
     }
 
-    fn apply_partial_exit_op(
+    fn apply_withdraw_op(
         &mut self,
-        op: &PartialExitOp,
+        op: &WithdrawOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
         let mut updates = Vec::new();
         let mut from_account = self.get_account(op.account_id).unwrap();

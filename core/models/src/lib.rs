@@ -74,9 +74,6 @@ pub struct Operation {
     pub action: Action,
     pub block: Block,
     pub accounts_updated: AccountUpdates,
-
-    #[serde(skip)]
-    pub tx_meta: Option<TxMeta>,
 }
 
 pub enum StateKeeperRequest {

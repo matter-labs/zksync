@@ -14,7 +14,9 @@ use pairing::bn256::*;
 pub fn noop_operation(
     tree: &CircuitAccountTree,
     acc_id: u32,
-    sig_msg: &Fr,
+    first_sig_msg: &Fr,
+    second_sig_msg: &Fr,
+    third_sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
@@ -38,14 +40,17 @@ pub fn noop_operation(
         tx_type: Some(Fr::from_str("0").unwrap()),
         chunk: Some(Fr::from_str("0").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[0]),
-        sig_msg: Some(*sig_msg),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
 
         args: OperationArguments {
             ethereum_key: Some(Fr::zero()),
-            amount: Some(Fr::zero()),
+            amount_packed: Some(Fr::zero()),
+            full_amount: Some(Fr::zero()),
             fee: Some(Fr::zero()),
             a: Some(Fr::zero()),
             b: Some(Fr::zero()),
@@ -87,7 +92,7 @@ mod test {
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
 
-    use ff::{BitIterator, Field, PrimeField};
+    use ff::{Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 
     use franklin_crypto::circuit::test::*;
@@ -166,19 +171,18 @@ mod test {
 
         tree.insert(account_address, sender_leaf_initial);
 
-        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on partial_exit proof
-        let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
-        sig_bits.reverse();
-        sig_bits.truncate(80);
+        let sig_bits_to_hash = vec![false; 1]; //just a trash for consistency
+        let (signature, first_sig_part, second_sig_part, third_sig_part) =
+            generate_sig_data(&sig_bits_to_hash, &phasher, &sender_sk, params);
 
         // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
-        let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
-        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
 
         let operation = noop_operation(
             &tree,
             validator_address_number,
-            &sig_msg,
+            &first_sig_part,
+            &second_sig_part,
+            &third_sig_part,
             signature,
             &sender_x,
             &sender_y,

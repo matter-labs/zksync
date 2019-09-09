@@ -212,7 +212,7 @@ def execute_op(op, cur, computed):
     op_valid = op_valid or transfer_to_new(op, cur, computed)
     op_valid = op_valid or deposit(op, cur, computed)
     op_valid = op_valid or close_account(op, cur, computed)
-    op_valid = op_valid or partial_exit(op, cur, computed)
+    op_valid = op_valid or withdraw(op, cur, computed)
     op_valid = op_valid or escalation(op, cur, computed)
 
     op_valid = op_valid or create_subaccount(op, cur, computed)
@@ -305,14 +305,14 @@ def no_nonce_overflow(nonce):
     nonce_overflow := cur.leaf_nonce == 0x10000-1 # nonce is 2 bytes long
     return not nonce_overflow
 
-def partial_exit(op, cur, computed):
+def withdraw(op, cur, computed):
 
     tx_valid := 
-        op.tx_type == 'partial_exit'
+        op.tx_type == 'withdraw'
         and computed.compact_amount_correct
         and pubdata == (op.tx_type, cur.account, cur.token, op.args.amount, op.args.fee)
         and computed.range_checked and (op.a == cur.balance) and (op.b == (op.args.amount + op.args.fee) )
-        and cur.sig_msg == ('partial_exit', cur.account, cur.token, cur.account_nonce, cur.amount, cur.fee)
+        and cur.sig_msg == ('withdraw', cur.account, cur.token, cur.account_nonce, cur.amount, cur.fee)
         and cur.signer_pubkey == cur.owner_pub_key
         and no_nonce_overflow(cur.leaf_nonce)
 

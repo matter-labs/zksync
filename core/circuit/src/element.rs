@@ -16,7 +16,7 @@ pub struct CircuitElement<E: JubjubEngine> {
 }
 impl<E: JubjubEngine> CircuitElement<E> {
     pub fn pad(self, n: usize) -> Self {
-        assert!(self.length < n);
+        assert!(self.length <= n);
         let mut padded_bits = self.get_bits_le();
         padded_bits.resize(n, Boolean::constant(false));
         CircuitElement {

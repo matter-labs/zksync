@@ -8,7 +8,6 @@ use num_traits::cast::ToPrimitive;
 use franklin_crypto::circuit::float_point::{convert_to_float, parse_float_to_u128};
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
-
 use models::node::DepositOp;
 use models::params as franklin_constants;
 use pairing::bn256::*;
@@ -49,9 +48,8 @@ impl<E: JubjubEngine> DepositWitness<E> {
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.amount.unwrap(),
-            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
-                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+            &self.args.full_amount.unwrap(),
+            franklin_constants::BALANCE_BIT_WIDTH,
         );
 
         append_be_fixed_width(
@@ -66,8 +64,42 @@ impl<E: JubjubEngine> DepositWitness<E> {
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         );
         //        assert_eq!(pubdata_bits.len(), 37 * 8);
-        pubdata_bits.resize(32 * 8, false);
+        pubdata_bits.resize(6 * franklin_constants::CHUNK_BIT_WIDTH, false);
         pubdata_bits
+    }
+    pub fn get_sig_bits(&self) -> Vec<bool> {
+        let mut sig_bits = vec![];
+        append_be_fixed_width(
+            &mut sig_bits,
+            &Fr::from_str("1").unwrap(), //Corresponding tx_type
+            franklin_constants::TX_TYPE_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.args.new_pub_key_hash.unwrap(),
+            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.before.token.unwrap(),
+            franklin_constants::TOKEN_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.args.full_amount.unwrap(),
+            franklin_constants::BALANCE_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.args.fee.unwrap(),
+            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.before.witness.account_witness.nonce.unwrap(),
+            franklin_constants::NONCE_BIT_WIDTH,
+        );
+        sig_bits
     }
 }
 
@@ -187,7 +219,8 @@ pub fn apply_deposit(
         },
         args: OperationArguments {
             ethereum_key: Some(Fr::zero()),
-            amount: Some(amount_encoded),
+            amount_packed: Some(amount_encoded),
+            full_amount: Some(amount_as_field_element),
             fee: Some(fee_encoded),
             a: Some(a),
             b: Some(b),
@@ -201,7 +234,9 @@ pub fn apply_deposit(
 
 pub fn calculate_deposit_operations_from_witness(
     deposit_witness: &DepositWitness<Bn256>,
-    sig_msg: &Fr,
+    first_sig_msg: &Fr,
+    second_sig_msg: &Fr,
+    third_sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
@@ -222,7 +257,9 @@ pub fn calculate_deposit_operations_from_witness(
         tx_type: deposit_witness.tx_type,
         chunk: Some(Fr::from_str("0").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[0]),
-        sig_msg: Some(*sig_msg),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -236,7 +273,9 @@ pub fn calculate_deposit_operations_from_witness(
         tx_type: deposit_witness.tx_type,
         chunk: Some(Fr::from_str("1").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[1]),
-        sig_msg: Some(*sig_msg),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -250,7 +289,9 @@ pub fn calculate_deposit_operations_from_witness(
         tx_type: deposit_witness.tx_type,
         chunk: Some(Fr::from_str("2").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[2]),
-        sig_msg: Some(*sig_msg),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -264,7 +305,9 @@ pub fn calculate_deposit_operations_from_witness(
         tx_type: deposit_witness.tx_type,
         chunk: Some(Fr::from_str("3").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[3]),
-        sig_msg: Some(*sig_msg),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -273,26 +316,58 @@ pub fn calculate_deposit_operations_from_witness(
         rhs: deposit_witness.after.clone(),
     };
 
+    let operation_four = Operation {
+        new_root: deposit_witness.after_root,
+        tx_type: deposit_witness.tx_type,
+        chunk: Some(Fr::from_str("4").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[4]),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
+        signature: signature.clone(),
+        signer_pub_key_x: Some(*signer_pub_key_x),
+        signer_pub_key_y: Some(*signer_pub_key_y),
+        args: deposit_witness.args.clone(),
+        lhs: deposit_witness.after.clone(),
+        rhs: deposit_witness.after.clone(),
+    };
+
+    let operation_five = Operation {
+        new_root: deposit_witness.after_root,
+        tx_type: deposit_witness.tx_type,
+        chunk: Some(Fr::from_str("5").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[5]),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
+        signature: signature.clone(),
+        signer_pub_key_x: Some(*signer_pub_key_x),
+        signer_pub_key_y: Some(*signer_pub_key_y),
+        args: deposit_witness.args.clone(),
+        lhs: deposit_witness.after.clone(),
+        rhs: deposit_witness.after.clone(),
+    };
     let operations: Vec<Operation<_>> = vec![
         operation_zero,
         operation_one,
         operation_two,
         operation_three,
+        operation_four,
+        operation_five,
     ];
     operations
 }
 #[cfg(test)]
 mod test {
     use super::*;
-    use models::merkle_tree::PedersenHasher;
-
     use crate::witness::utils::public_data_commitment;
     use bellman::groth16::generate_random_parameters;
     use bellman::groth16::{create_random_proof, prepare_verifying_key, verify_proof};
+    use models::merkle_tree::PedersenHasher;
 
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
-    use ff::{BitIterator, Field, PrimeField};
+    use ff::{Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
     use models::primitives::GetBits;
 
@@ -325,8 +400,7 @@ mod test {
         let sender_leaf = CircuitAccount::<Bn256> {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
-            pub_key_hash: sender_pub_key_hash, // pub_x: validator_x.clone(),
-                                               // pub_y: validator_y.clone(),
+            pub_key_hash: sender_pub_key_hash,
         };
         println!("zero root_hash equals: {}", sender_leaf.subtree.root_hash());
 
@@ -372,19 +446,18 @@ mod test {
                 new_pub_key_hash: sender_pub_key_hash,
             },
         );
-
-        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
-        let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
-        sig_bits.reverse();
-        sig_bits.truncate(80);
-
-        // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
-        let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
-        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+        let (signature, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
+            &deposit_witness.get_sig_bits(),
+            &phasher,
+            &sender_sk,
+            params,
+        );
 
         let operations = calculate_deposit_operations_from_witness(
             &deposit_witness,
-            &sig_msg,
+            &first_sig_part,
+            &second_sig_part,
+            &third_sig_part,
             signature,
             &sender_x,
             &sender_y,
@@ -494,18 +567,18 @@ mod test {
             },
         );
 
-        let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
-        let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
-        sig_bits.reverse();
-        sig_bits.truncate(80);
-
-        // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
-        let signature = sign(&sig_bits, &sender_sk, p_g, params, rng);
-        //assert!(tree.verify_proof(sender_leaf_number, sender_leaf.clone(), tree.merkle_path(sender_leaf_number)));
+        let (signature, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
+            &deposit_witness.get_sig_bits(),
+            &phasher,
+            &sender_sk,
+            params,
+        );
 
         let operations = calculate_deposit_operations_from_witness(
             &deposit_witness,
-            &sig_msg,
+            &first_sig_part,
+            &second_sig_part,
+            &third_sig_part,
             signature,
             &sender_x,
             &sender_y,

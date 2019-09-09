@@ -82,7 +82,7 @@ export function packAmount(amount: BN): Buffer {
 }
 
 export function packFee(amount: BN): Buffer {
-    return integerToFloat(amount, 4, 4, 10);
+    return integerToFloat(amount, 6, 10, 10);
 }
 
 function packedHelper(amount: BigNumberish, AMOUNT_EXPONENT_BIT_WIDTH: number, AMOUNT_MANTISSA_BIT_WIDTH: number) {
