@@ -1,6 +1,6 @@
 # Franklin ETH contract documentation
 
-![flow](https://i.imgur.com/ZsLCxpI.png)
+![Franklin Contract Onchain Operations](https://i.imgur.com/Y3taY1y.png)
 
 ## Deployment
 
@@ -24,19 +24,21 @@ To make deposit, a user can:
 - Either send ETH to smart contract (will be handled by the default function),
 - or call `depositERC20()` function to perform transferFrom for a registered ERC20 token. Note: the user must have previously called approve() on the ERC20 token contract in order to authorize Franklin contract to perform this operation.
 
-This deposit creates a **priority request** that is placed in corresponding priority requests mapping and also emits **NewPriorityRequest(opType, pubData, expirationBlock)** event to notify validators that they must include this request to upcoming blocks. Complete **PriorityQueue** logic that handles **priority requests** is described in **Priority Requests** section.
+This deposit creates **deposit priority request** that is placed in corresponding priority requests mapping and also emits **NewPriorityRequest(opType, pubData, expirationBlock)** event to notify validators that they must include this request to upcoming blocks. Complete **PriorityQueue** logic that handles **priority requests** is described in **Priority Requests** section.
 
-When a validator commits a block which contains a **circuit operations** `deposit`, than their count will be added to **priority requests** count for this block.
+When a validator commits a block which contains **circuit operations** `deposit`, **deposit onchain operation** for this deposit is created to verify compliance with priority queue requests. If it succeeds than their count will be added to **priority requests** count for this block. If the block is verified, **deposit onchain operations** and **deposit priority request** are simply discarded. 
 
-If the block is reverted, the funds held by this blocks' **Deposit priority requests** are acrued to the owners' **root-chain balances** to make them possible to withdraw.
+If the block is reverted **deposit onchain operations** are siply discarded.
+
+If Franklin contract has entered Exodus mode and the block is unverified, the funds held by this blocks' **Deposit priority requests** are accrued to the owners' **root-chain balances** to make them possible to withdraw. This **withdraw onchain operations** and **full exit priority requests** are simply discarded.
 
 ## Withdrawals
 
 ### Partial withdrawal
 
-It is a standard withdrawal operation. When a block with a `partial_exit` **circuit operation** is committed, an **Withdraw onchain operation** for this withdrawal is created. If the block is verified, funds from the **Withdrawal onchain operation** are acrued to the users' **root-chain balances**. 
+It is a standard withdrawal operation. When a block with `partial_exit` **circuit operation** is committed, **withdraw onchain operation** for this withdrawal is created. If the block is verified, funds from the **withdrawal onchain operation** are acrued to the users' **root-chain balances**. 
 
-If the block is reverted, this **Withdraw onchain operations** are simply discarded.
+If the block is reverted, this **withdraw onchain operations** are simply discarded.
 
 A user can withdraw funds from the **root-chain balance** at any time by calling a `withdrawETH()` or `withdrawERC20()` function.
 
@@ -44,11 +46,13 @@ A user can withdraw funds from the **root-chain balance** at any time by calling
 
 User can request this expensive operation to withdraw funds if he thinks that his transactions are censored by validators.
 
-The user must send a transaction to **Franklin** contract function `registerFullExit()`. This function creates a **priority request** that is placed in corresponding priority requests mapping and also emits **NewPriorityRequest(opType, pubData, expirationBlock)** event to notify validators that they must include this request to upcoming blocks. Complete **PriorityQueue** logic that handles **priority requests** is described in **Priority Requests** section.
+The user must send a transaction to **Franklin** contract function `registerFullExit()`. This function creates **full exit priority request** that is placed in corresponding priority requests mapping and also emits **NewPriorityRequest(opType, pubData, expirationBlock)** event to notify validators that they must include this request to upcoming blocks. Complete **PriorityQueue** logic that handles **priority requests** is described in **Priority Requests** section.
 
-When a validator commits a block which contains a **circuit operation** `full_exit`, the corresponding **Withdraw onchain operation** for this withdrawal is created. If the block is verified, funds from the **Withdrawal onchain operation** are acrued to the users' **root-chain balances**.
+When a validator commits a block which contains a **circuit operation** `full_exit`, the corresponding **withdraw onchain operation** for this withdrawal is created to verify compliance with priority queue requests. If it succeeds than their count will be added to **priority requests** count for this block. If the block is verified, funds from the **withdrawal onchain operation** are accrued to the users' **root-chain balances** and **withdraw onchain operations** and **full exit priority requests** are simply discarded.
 
-If the block is reverted, this **Withdraw onchain operations** are simply discarded.
+If the block is reverted, this **withdraw onchain operations** are simply discarded.
+
+If Franklin contract has entered Exodus mode and the block is unverified, this **withdraw onchain operations** and **full exit priority requests** are simply discarded.
 
 ## Block committment
 
@@ -62,7 +66,7 @@ Anybody can perform verification for the committed block.
 
 ## Reverting expired blocks
 
-If the first committed block was not verified within `EXPECT_VERIFICATION_IN` ETH blocks, all unverified blocks are moved to a separate list `blocksToRevert`. After that, anybody can release the funds held in **onchain operations** by each block by calling a `revertBlock()` function (the validator who created the block is supposed to do this, because they will get compensation for the money spent on the block -- to be implemented for multi-validator version).
+If the first committed block was not verified within `EXPECT_VERIFICATION_IN` ETH blocks, all unverified blocks will be reverted and the funds held by **onchain operations** and **priority requests** will be released and stored on **root-chain balances**..
 
 ## Priority queue
 
@@ -78,7 +82,7 @@ This queue will be implemented in separate contract to ensure that priority oper
 
 When corresponding transactions are found in the commited block, their count must be recorded. If the block is verified, this count of the satisfied **priority requests** is removed from mapping. 
 
-If the block is reverted, the funds held by **Deposit priority requests** from this block are acrued to the owners' **root-chain balances** to make them possible to withdraw. And this **Deposit priority requests** will be removed from mapping. 
+If the block is reverted via Exodus Mode, the funds held by **Deposit priority requests** from this block are accrued to the owners' **root-chain balances** to make them possible to withdraw. And this **Deposit priority requests** will be removed from mapping. 
 
 A certain value of the selected token will be withdrawn from the _user's_ account immediately when he send a request, as payment for the _validator’s_ work to include these transactions in the block. One transaction fee is calculated as follows:
 `fee = 3 * gas * mediumFee`, where
