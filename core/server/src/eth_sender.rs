@@ -298,7 +298,7 @@ impl<T: Transport> ETHSender<T> {
                     .wait()?;
                 match tx_info {
                     Some(Transaction {
-                        block_number: Some(_),
+                        block_number: Some(_), 
                         ..
                     }) => {
                         // transaction was confirmed, get receipt

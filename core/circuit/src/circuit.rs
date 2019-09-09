@@ -70,7 +70,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 )?,
                 amount_packed: zero_circuit_element.clone(),
                 full_amount: zero_circuit_element.clone(),
-                pub_signature: zero_circuit_element.clone(),
+                pub_signature_r: zero_circuit_element.clone(),
+                pub_signature_s: zero_circuit_element.clone(),
                 fee_packed: zero_circuit_element.clone(),
                 fee: zero_circuit_element.clone(),
                 amount_unpacked: zero_circuit_element.clone(),
@@ -741,6 +742,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &op_data,
             &ext_pubdata_chunk,
             &is_sig_verified,
+            &signature,
         )?);
         op_flags.push(self.noop(cs.namespace(|| "noop"), &chunk_data, &ext_pubdata_chunk)?);
 
@@ -941,22 +943,14 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         op_data: &AllocatedOperationData<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
         is_sig_verified: &Boolean,
+        signature: &EddsaSignature<E>,
     ) -> Result<Boolean, SynthesisError> {
-        let mut base_valid_flags = vec![];
-        //construct pubdata
-        let mut pubdata_bits = vec![];
-
-        pubdata_bits.extend(chunk_data.tx_type.get_bits_be());
-        pubdata_bits.extend(cur.account_address.get_bits_be());
-        pubdata_bits.extend(op_data.ethereum_key.get_bits_be());
-        pubdata_bits.extend(cur.token.get_bits_be());
-        pubdata_bits.extend(op_data.full_amount.get_bits_be());
-        pubdata_bits.extend(op_data.pub_signature.get_bits_be());
-
-        pubdata_bits.resize(
-            10 * franklin_constants::CHUNK_BIT_WIDTH,
-            Boolean::constant(false),
-        );
+        //TODO: this flag is used too often, we better compute it above
+        let is_first_chunk = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_first_chunk"),
+            &chunk_data.chunk_number,
+            Expression::constant::<CS>(E::Fr::zero()),
+        )?);
 
         // construct signature message
 
@@ -966,22 +960,60 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         serialized_tx_bits.extend(cur.account.pub_key_hash.get_bits_be());
         serialized_tx_bits.extend(op_data.ethereum_key.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
-        serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
         serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+
+        let is_serialized_tx_correct = verify_signature_message_construction(
+            cs.namespace(|| "is_serialized_tx_correct"),
+            serialized_tx_bits,
+            &op_data,
+        )?;
+
+        let is_serialized_tx_correct = multi_or(
+            cs.namespace(|| "sig is valid or not first chunk"),
+            &[is_serialized_tx_correct, is_first_chunk.clone().not()],
+        )?;
+
+        let _is_signer_valid = CircuitElement::equals(
+            cs.namespace(|| "signer_key_correect"),
+            &op_data.signer_pubkey.get_hash(),
+            &op_data.new_pubkey_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
+        )?;
+
+        let is_signed_correctly = multi_and(
+            cs.namespace(|| "is_signed_correctly"),
+            &[is_serialized_tx_correct, is_sig_verified.clone()],
+        )?;
+
+        let amount_to_exit = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "amount_to_exit"),
+            Expression::constant::<CS>(E::Fr::zero()),
+            &cur.balance,
+            &is_signed_correctly.not(),
+        )?;
+
+        let mut base_valid_flags = vec![];
+        //construct pubdata
+        let mut pubdata_bits = vec![];
+
+        pubdata_bits.extend(chunk_data.tx_type.get_bits_be());
+        pubdata_bits.extend(cur.account_address.get_bits_be());
+        pubdata_bits.extend(op_data.ethereum_key.get_bits_be());
+        pubdata_bits.extend(cur.token.get_bits_be());
+        pubdata_bits.extend(op_data.amount_to_exit.get_bits_be());
+        pubdata_bits.extend(op_data.pub_signature_s.get_bits_be());
+        pubdata_bits.extend(op_data.pub_signature_r.get_bits_be());
+
+        pubdata_bits.resize(
+            14 * franklin_constants::CHUNK_BIT_WIDTH,
+            Boolean::constant(false),
+        );
 
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
             &chunk_data.chunk_number,
-            6,
+            14,
         )?;
-
-        //TODO: this flag is used too often, we better compute it above
-        let is_first_chunk = Boolean::from(Expression::equals(
-            cs.namespace(|| "is_first_chunk"),
-            &chunk_data.chunk_number,
-            Expression::constant::<CS>(E::Fr::zero()),
-        )?);
 
         let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
             cs.namespace(|| "is_pubdata_equal"),
@@ -1615,7 +1647,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         lhs_valid_flags.push(is_pubdata_chunk_correct.clone());
         lhs_valid_flags.push(is_transfer.clone());
-        
 
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),

@@ -112,12 +112,13 @@ impl FullExitOp {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
         data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
-        data.extend_from_slice(&self.tx.eth_address);
+        data.extend_from_slice(&self.tx.eth_address.as_bytes());
         data.extend_from_slice(&self.tx.token.to_be_bytes());
-        data.extend_from_slice(&self.tx.signature);
+        data.extend_from_slice(&self.tx.signature_s);
+        data.extend_from_slice(&self.tx.signature_r);
         data.extend_from_slice(&self.tx.amount.to_u128().unwrap().to_be_bytes());
 
-        data.resize(Self::CHUNKS * 8, 0x00);
+        data.resize(Self::CHUNKS * 14, 0x00);
         data
     }
 }

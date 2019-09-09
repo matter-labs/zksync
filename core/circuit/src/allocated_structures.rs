@@ -99,7 +99,8 @@ pub struct AllocatedOperationData<E: JubjubEngine> {
     pub second_sig_msg: CircuitElement<E>,
     pub third_sig_msg: CircuitElement<E>,
     pub new_pubkey_hash: CircuitElement<E>,
-    pub pub_signature: CircuitElement<E>,
+    pub pub_signature_r: CircuitElement<E>,
+    pub pub_signature_s: CircuitElement<E>,
     pub ethereum_key: CircuitElement<E>,
     pub a: CircuitElement<E>,
     pub b: CircuitElement<E>,
@@ -191,10 +192,16 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         )?;
 
-        let pub_signature =
-            CircuitElement::from_fe_padded(cs.namespace(|| "pub_signature"), || {
-                op.args.pub_signature.grab()
+        let pub_signature_r =
+            CircuitElement::from_fe_padded(cs.namespace(|| "pub_signature_r"), || {
+                op.args.pub_signature_r.grab()
             })?;
+
+        
+        let pub_signature_s =
+            CircuitElement::from_fe_padded(cs.namespace(|| "pub_signature_s"), || {
+                op.args.pub_signature_s.grab()
+        })?;
         // let new_pubkey_hash = new_pubkey.get_hash().clone();
 
         let a = CircuitElement::from_fe_strict(
@@ -216,7 +223,8 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             fee,
             amount_unpacked,
             full_amount,
-            pub_signature,
+            pub_signature_r,
+            pub_signature_s,
             first_sig_msg,
             second_sig_msg,
             third_sig_msg,

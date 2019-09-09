@@ -19,7 +19,8 @@ pub struct FullExitData {
     pub token: u32,
     pub account_address: u32,
     pub ethereum_key: Fr,
-    pub pub_signature: Fr,
+    pub pub_signature_s: Fr,
+    pub pub_signature_r: Fr,
 }
 pub struct FullExitWitness<E: JubjubEngine> {
     pub before: OperationBranch<E>,
@@ -56,8 +57,14 @@ impl<E: JubjubEngine> FullExitWitness<E> {
 
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.pub_signature.unwrap(),
-            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+            &self.args.pub_signature_s.unwrap(),
+            franklin_constants::FR_BIT_WIDTH_PADDED,
+        );
+
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.args.pub_signature_r.unwrap(),
+            franklin_constants::FR_BIT_WIDTH_PADDED,
         );
 
         append_be_fixed_width(
@@ -66,7 +73,7 @@ impl<E: JubjubEngine> FullExitWitness<E> {
             franklin_constants::BALANCE_BIT_WIDTH,
         );
 
-        pubdata_bits.resize(10 * franklin_constants::CHUNK_BIT_WIDTH, false);
+        pubdata_bits.resize(14 * franklin_constants::CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
 
@@ -114,7 +121,8 @@ pub fn apply_full_exit_tx(
         token: u32::from(full_exit.tx.token),
         account_address: full_exit.account_id,
         ethereum_key: Fr::from_hex(&format!("{:x}", &full_exit.tx.eth_address)).unwrap(),
-        pub_signature: fr_from_bytes(full_exit.tx.signature.clone()),
+        pub_signature_s: fr_from_bytes(full_exit.tx.signature.clone()),
+        pub_signature_r: fr_from_bytes(full_exit.tx.signature.clone()),
     };
     // le_bit_vector_into_field_element()
     apply_full_exit(tree, &full_exit)
@@ -332,7 +340,6 @@ mod test {
             &mut tree,
             &FullExitData {
                 amount,
-                fee,
                 token,
                 account_address,
                 ethereum_key,

@@ -90,7 +90,7 @@ impl Withdraw {
         out.extend_from_slice(&self.account.data);
         out.extend_from_slice(self.eth_address.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
-        out.extend_from_slice(&pack_token_amount(&self.amount));
+        out.extend_from_slice(&self.amount.to_u128().unwrap().to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
@@ -102,7 +102,8 @@ pub struct FullExit {
     // TODO: derrive account address from signature
     pub account: AccountAddress,
     pub eth_address: Address,
-    pub signature: Vec<u8>,
+    pub signature_s: Vec<u8>,
+    pub signature_r: Vec<u8>,
     pub token: TokenId,
     /// None -> withdraw all
     pub amount: BigDecimal,
@@ -111,14 +112,13 @@ pub struct FullExit {
 }
 
 impl FullExit {
-    const TX_TYPE: u8 = 3;
+    const TX_TYPE: u8 = 6;
     fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.account.data);
-        out.extend_from_slice(&self.eth_address);
+        out.extend_from_slice(&self.eth_address.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
-        out.extend_from_slice(&self.amount.to_u128().unwrap().to_be_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }
