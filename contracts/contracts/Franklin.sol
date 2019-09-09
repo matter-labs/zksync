@@ -483,7 +483,7 @@ contract Franklin {
         ); // cbkexm - entered exodus mode
 
         (uint64 startId, uint64 totalProcessed, uint32 priorityCount) = collectOnchainOps(_publicData);
-        if (blockPriorityOperationsValid(startId, totalProcessed, priorityCount)) {
+        if (areBlockPriorityOperationsValid(startId, totalProcessed, priorityCount)) {
             bytes32 commitment = createBlockCommitment(
                 _blockNumber,
                 _feeAccount,
@@ -630,17 +630,17 @@ contract Franklin {
 
     // Check if blocks' priority operations are valid
     // Params:
-    // - startId - onchain op start id
-    // - totalProcessed - how many ops are procceeded
-    // - priorityCount - priority ops count
-    function blockPriorityOperationsValid(uint64 startId, uint64 totalProcessed, uint32 priorityCount) internal view returns (bool) {
+    // - _startId - onchain op start id
+    // - _totalProcessed - how many ops are procceeded
+    // - _priorityCount - priority ops count
+    function areBlockPriorityOperationsValid(uint64 _startId, uint64 _totalProcessed, uint32 _priorityCount) internal view returns (bool) {
         require(
-            priorityCount <= totalPriorityRequests,
+            _priorityCount <= totalPriorityRequests,
             "bpoprc"
         ); // bpoprc - too much priority requests
         
-        uint64 start = startId;
-        uint64 end = start + totalProcessed;
+        uint64 start = _startId;
+        uint64 end = start + _totalProcessed;
 
         Operation[] memory priorityOps;
         
@@ -653,11 +653,11 @@ contract Franklin {
             }
         }
 
-        if (counter != priorityCount) {
+        if (counter != _priorityCount) {
             return false;
         }
         
-        for (uint32 i = 0; i < priorityCount; i++) {
+        for (uint32 i = 0; i < _priorityCount; i++) {
             if (!comparePriorityOps(priorityOps[i], i+firstPriorityRequestId)) {
                 return false;
             }
@@ -667,19 +667,19 @@ contract Franklin {
 
     // Compare operation from block with corresponding priority requests' operation
     // Params:
-    // - onchainOp - operation from block
-    // - priorityRequestId - priority request id
-    function comparePriorityOps(Operation memory onchainOp, uint32 priorityRequestId) internal view returns (bool) {
+    // - _onchainOp - operation from block
+    // - _priorityRequestId - priority request id
+    function comparePriorityOps(Operation memory _onchainOp, uint32 _priorityRequestId) internal view returns (bool) {
         bytes memory priorityPubData;
         bytes memory onchainPubData;
         OpType operation;
-        if (onchainOp.opType == OpType.Deposit && priorityRequests[priorityRequestId].opType == OpType.Deposit) {
-            priorityPubData = Bytes.slice(priorityRequests[priorityRequestId].pubData, 20, PUBKEY_HASH_LEN + 18);
-            onchainPubData = onchainOp.pubData;
+        if (_onchainOp.opType == OpType.Deposit && priorityRequests[_priorityRequestId].opType == OpType.Deposit) {
+            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 20, PUBKEY_HASH_LEN + 18);
+            onchainPubData = _onchainOp.pubData;
             operation = OpType.Deposit;
-        } else if (onchainOp.opType == OpType.FullExit && priorityRequests[priorityRequestId].opType == OpType.FullExit) {
-            priorityPubData = Bytes.slice(priorityRequests[priorityRequestId].pubData, PUBKEY_HASH_LEN, 54);
-            onchainPubData = Bytes.slice(onchainOp.pubData, 0, 54);
+        } else if (_onchainOp.opType == OpType.FullExit && priorityRequests[_priorityRequestId].opType == OpType.FullExit) {
+            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, PUBKEY_HASH_LEN, 54);
+            onchainPubData = Bytes.slice(_onchainOp.pubData, 0, 54);
             operation = OpType.FullExit;
         } else {
             revert("cpowop"); // cpowop - wrong operation
@@ -690,11 +690,11 @@ contract Franklin {
 
     // Remove some onchain ops (for example in case of wrong priority comparison)
     // Params:
-    // - startId - onchain op start id
-    // - totalProcessed - how many ops are procceeded
-    function removeOnchainOps(uint64 startId, uint64 totalProcessed) internal {
-        uint64 start = startId;
-        uint64 end = start + totalProcessed;
+    // - _startId - onchain op start id
+    // - _totalProcessed - how many ops are procceeded
+    function removeOnchainOps(uint64 _startId, uint64 _totalProcessed) internal {
+        uint64 start = _startId;
+        uint64 end = start + _totalProcessed;
 
         for (uint64 current = start; current < end; ++current) {
             delete onchainOps[current];
@@ -707,8 +707,8 @@ contract Franklin {
     // Verify proof -> consummate onchain ops (accrue balances from withdrawls) -> remove priority requests
     // Params:
     // - blockNumber - block number
-    // - proof - proof
-    function verifyBlock(uint32 _blockNumber, uint256[8] calldata proof)
+    // - _proof - proof
+    function verifyBlock(uint32 _blockNumber, uint256[8] calldata _proof)
         external
     {
         requireActive();
@@ -721,7 +721,7 @@ contract Franklin {
             "vbkvdr"
         ); // vbkvdr - not a validator in verify
         require(
-            verifyBlockProof(proof, blocks[_blockNumber].commitment),
+            verifyBlockProof(_proof, blocks[_blockNumber].commitment),
             "vbkvbp"
         ); // vbkvbp - verification failed
         
@@ -736,9 +736,9 @@ contract Franklin {
 
     // Proof verification
     // Params:
-    // - proof - block number
-    // - commitment - block commitment
-    function verifyBlockProof(uint256[8] memory proof, bytes32 commitment)
+    // - _proof - block number
+    // - _commitment - block commitment
+    function verifyBlockProof(uint256[8] memory _proof, bytes32 _commitment)
         internal
         view
         returns (bool valid)
@@ -748,8 +748,8 @@ contract Franklin {
         uint256[] memory gammaABC;
         (vk, gammaABC) = verificationKey.getVk();
         uint256[] memory inputs = new uint256[](1);
-        inputs[0] = uint256(commitment) & mask;
-        return verifier.Verify(vk, gammaABC, proof, inputs);
+        inputs[0] = uint256(_commitment) & mask;
+        return verifier.Verify(vk, gammaABC, _proof, inputs);
     }
 
     // If block verified the onchain operations from it must be completed (user must have possibility to withdraw funds if withdrawed)
@@ -817,10 +817,12 @@ contract Franklin {
     }
 
     // Revert blocks
-    function revertBlocks(bool fromExodus) internal {
+    // Params:
+    // - _fromExodus - if revert caused by exodus mode
+    function revertBlocks(bool _fromExodus) internal {
         for (uint32 i = totalBlocksVerified; i < totalBlocksCommited-1; i++) {
             Block memory reverted = blocks[i];
-            if (fromExodus) {
+            if (_fromExodus) {
                 // in case of exodus accrue balances from deposits
                 accrueBalancesForDepositsFromBlockPriorityOpsAndRemoveItsRequests(reverted.priorityOperations);
             }
@@ -833,17 +835,17 @@ contract Franklin {
 
     // Delete block onchain operations, accrue balances from deposits and remove deposit priority requests from its mapping
     // Params:
-    // - _revertedBlockId - block id
-    function revertBlock(Block memory reverted) internal {
+    // - _reverted - reverted block
+    function revertBlock(Block memory _reverted) internal {
         require(
-            reverted.commitedAtBlock > 0,
+            _reverted.commitedAtBlock > 0,
             "rbkbnf"
         ); // rbkbnf - block not found
         require(
-            reverted.priorityOperations <= totalPriorityRequests,
+            _reverted.priorityOperations <= totalPriorityRequests,
             "rbkprc"
         ); // rbkprc - priority count too large in revert
-        removeOnchainOps(reverted.operationStartId, reverted.onchainOperations);
+        removeOnchainOps(_reverted.operationStartId, _reverted.onchainOperations);
     }
 
     // MARK: - Exodus mode
