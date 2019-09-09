@@ -45,7 +45,10 @@ db-setup:
 db-insert-contract:
 	@bin/db-insert-contract.sh
 
-db-reset: confirm_action db-drop db-setup db-insert-contract
+update-frontend-contract:
+	@bin/update-frontend-contract.sh
+
+db-reset: confirm_action db-drop db-setup db-insert-contract update-frontend-contract
 	@echo database is ready
 
 db-migrate: confirm_action

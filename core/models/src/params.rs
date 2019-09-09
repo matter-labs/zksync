@@ -24,6 +24,8 @@ pub const NONCE_BIT_WIDTH: usize = 32;
 //
 pub const CHUNK_BIT_WIDTH: usize = 64;
 
+pub const MAX_CIRCUIT_PEDERSEN_HASH_BITS: usize = 738;
+
 pub const ETHEREUM_KEY_BIT_WIDTH: usize = 160;
 /// Block number bit width
 pub const BLOCK_NUMBER_BIT_WIDTH: usize = 32;
@@ -33,8 +35,8 @@ pub const AMOUNT_EXPONENT_BIT_WIDTH: usize = 5;
 pub const AMOUNT_MANTISSA_BIT_WIDTH: usize = 19;
 
 /// Fee bit widths
-pub const FEE_EXPONENT_BIT_WIDTH: usize = 4;
-pub const FEE_MANTISSA_BIT_WIDTH: usize = 4;
+pub const FEE_EXPONENT_BIT_WIDTH: usize = 6;
+pub const FEE_MANTISSA_BIT_WIDTH: usize = 10;
 
 // Signature data
 pub const SIGNATURE_S_BIT_WIDTH: usize = 254;
@@ -49,7 +51,7 @@ pub const FR_BIT_WIDTH_PADDED: usize = 256;
 pub const TOTAL_TOKENS: usize = 1 << BALANCE_TREE_DEPTH;
 pub const ETH_TOKEN_ID: TokenId = 0;
 
-pub const BLOCK_SIZE_CHUNKS: usize = 10;
+pub const BLOCK_SIZE_CHUNKS: usize = 12;
 
 /// Lock onchain deposits for this number of eth blocks.
 pub const LOCK_DEPOSITS_FOR: u64 = 8 * 60 * 100;

@@ -11,8 +11,8 @@ contract Franklin {
 
     // chunks per block; each chunk has 8 bytes of public data
     uint256 constant BLOCK_SIZE = 10;
-    // must fit into uint112
-    uint256 constant MAX_VALUE = 2 ** 112 - 1;
+    // must fit into uint128
+    uint256 constant MAX_VALUE = 2 ** 128 - 1;
     // ETH blocks
     uint256 constant LOCK_DEPOSITS_FOR = 8 * 60 * 100;
     // ETH blocks
@@ -21,6 +21,9 @@ contract Franklin {
     uint256 constant MAX_UNVERIFIED_BLOCKS = 4 * 60 * 100;
     // Offchain address length.
     uint8 constant PUBKEY_HASH_LEN = 20;
+
+    uint8 constant FEE_EXPONENT_BIT_WIDTH = 6;
+    uint8 constant AMOUNT_EXPONENT_BIT_WIDTH = 5;
 
     struct ValidatedTokenId {
         uint32 id;
@@ -37,14 +40,14 @@ contract Franklin {
     event OnchainDeposit(
         address indexed owner,
         uint32 tokenId,
-        uint112 amount,
+        uint128 amount,
         uint32 lockedUntilBlock,
         bytes franklinAddress
     );
     event OnchainWithdrawal(
         address indexed owner,
         uint32 tokenId,
-        uint112 amount
+        uint128 amount
     );
 
     event TokenAdded(address token, uint32 tokenId);
@@ -75,7 +78,7 @@ contract Franklin {
     // Root-chain balance: users can send funds from and to Franklin
     // from the root-chain balances only (see docs)
     struct Balance {
-        uint112 balance;
+        uint128 balance;
         // Balance can be locked in order to let validators deposit some of it into Franklin
         // Locked balances becomes free at ETH blockNumber = lockedUntilBlock
         // To re-lock, users can make a deposit with zero amount
@@ -133,7 +136,7 @@ contract Franklin {
         OnchainOpType opType;
         uint32 tokenId;
         address owner;
-        uint112 amount;
+        uint128 amount;
     }
 
     // Total number of registered OnchainOps
@@ -252,17 +255,17 @@ contract Franklin {
     // Deposit ETH (simply by sending it to the contract)
     function depositETH(bytes calldata _franklin_addr) external payable {
         require(msg.value <= MAX_VALUE, "sorry Joe");
-        registerDeposit(ValidatedTokenId(0), uint112(msg.value), _franklin_addr);
+        registerDeposit(ValidatedTokenId(0), uint128(msg.value), _franklin_addr);
     }
 
-    function withdrawETH(uint112 _amount) external {
+    function withdrawETH(uint128 _amount) external {
         registerWithdrawal(ValidatedTokenId(0), _amount);
         msg.sender.transfer(_amount);
     }
 
     function depositERC20(
         address _token,
-        uint112 _amount,
+        uint128 _amount,
         bytes calldata _franklin_addr
     ) external {
         require(
@@ -273,7 +276,7 @@ contract Franklin {
         registerDeposit(tokenId, _amount, _franklin_addr);
     }
 
-    function withdrawERC20(address _token, uint112 _amount) external {
+    function withdrawERC20(address _token, uint128 _amount) external {
         ValidatedTokenId memory tokenId = validateERC20Token(_token);
         registerWithdrawal(tokenId, _amount);
         require(
@@ -284,7 +287,7 @@ contract Franklin {
 
     function registerDeposit(
         ValidatedTokenId memory _token,
-        uint112 _amount,
+        uint128 _amount,
         bytes memory _franklin_addr
     ) internal {
         requireActive();
@@ -317,7 +320,7 @@ contract Franklin {
         );
     }
 
-    function registerWithdrawal(ValidatedTokenId memory _token, uint112 _amount) internal {
+    function registerWithdrawal(ValidatedTokenId memory _token, uint128 _amount) internal {
         requireActive();
         require(
             block.number >= balances[msg.sender][_token.id].lockedUntilBlock,
@@ -332,7 +335,6 @@ contract Franklin {
     }
 
     // Block committment
-
     function commitBlock(
         uint32 _blockNumber,
         uint24 _feeAccount,
@@ -452,25 +454,25 @@ contract Franklin {
 
         // deposit
         if (opType == 0x01) {
-            // to_account: 3, token: 2, amount: 3, fee: 1, new_pubkey_hash: 20
+            // to_account: 3, token: 2, amount: 16, fee: 2, new_pubkey_hash: 20
 
             uint16 tokenId = uint16(
                 (uint256(uint8(_publicData[opDataPointer + 3])) << 8) +
                 (uint256(uint8(_publicData[opDataPointer + 4])) << 0)
             );
+            uint128 amount = 0;
+            for (uint8 i = 0; i < 16; i++) {
+               amount += uint128(uint8(_publicData[opDataPointer+5+i])) << (8*(15-i));
+            }
 
-            uint8[3] memory amountPacked;
-            amountPacked[0] = uint8(_publicData[opDataPointer + 5]);
-            amountPacked[1] = uint8(_publicData[opDataPointer + 6]);
-            amountPacked[2] = uint8(_publicData[opDataPointer + 7]);
-            uint112 amount = unpackAmount(amountPacked);
-
-            uint8 feePacked = uint8(_publicData[opDataPointer + 8]);
-            uint112 fee = unpackFee(feePacked);
+            uint8[2] memory feePacked;
+            feePacked[0] = uint8(_publicData[opDataPointer + 21]);
+            feePacked[1] = uint8(_publicData[opDataPointer + 22]);
+            uint128 fee = unpackFee(feePacked);
 
             bytes memory franklin_address_ = new bytes(PUBKEY_HASH_LEN);
             for (uint8 i = 0; i < PUBKEY_HASH_LEN; i++) {
-                franklin_address_[i] = _publicData[opDataPointer + 9 + i];
+                franklin_address_[i] = _publicData[opDataPointer + 23 + i];
             }
             address account = depositFranklinToETH[franklin_address_];
 
@@ -491,38 +493,37 @@ contract Franklin {
                 account,
                 (amount + fee)
             );
-            return (4 * 8, 1);
+            return (6 * 8, 1);
         }
 
-        // partial_exit
+        // withdraw
         if (opType == 0x03) {
-            // pubdata account: 3, token: 2, amount: 3, fee: 1, eth_key: 20
+            // pubdata account: 3, token: 2, amount: 16, fee: 2, eth_key: 20
 
             uint16 tokenId = uint16(
                 (uint256(uint8(_publicData[opDataPointer + 3])) << 8) +
                     uint256(uint8(_publicData[opDataPointer + 4]))
             );
 
-            uint8[3] memory amountPacked;
-            amountPacked[0] = uint8(_publicData[opDataPointer + 5]);
-            amountPacked[1] = uint8(_publicData[opDataPointer + 6]);
-            amountPacked[2] = uint8(_publicData[opDataPointer + 7]);
-            uint112 amount = unpackAmount(amountPacked);
+            uint128 amount = 0;
+            for (uint8 i = 0; i < 16; i++) {
+                amount += uint128(uint8(_publicData[opDataPointer+5+i])) << (8*(15-i));
+            }
 
             bytes memory ethAddress = new bytes(20);
             for (uint256 i = 0; i < 20; ++i) {
-                ethAddress[i] = _publicData[opDataPointer + 9 + i];
+                ethAddress[i] = _publicData[opDataPointer + 23 + i];
             }
 
             requireValidTokenId(tokenId);
-            // TODO!: balances[ethAddress][tokenId] possible overflow (uint112)
+            // TODO!: balances[ethAddress][tokenId] possible overflow (uint128)
             onchainOps[currentOnchainOp] = OnchainOp(
                 OnchainOpType.Withdrawal,
                 tokenId,
                 bytesToAddress(ethAddress),
                 amount
             );
-            return (4 * 8, 1);
+            return (6 * 8, 1);
         }
 
         require(false, "unsupported op");
@@ -617,7 +618,7 @@ contract Franklin {
     function exit(
         uint32 _tokenId,
         address[] calldata _owners,
-        uint112[] calldata _amounts,
+        uint128[] calldata _amounts,
         uint256[8] calldata /*_proof*/
     ) external {
         require(exodusMode, "must be in exodus mode");
@@ -666,17 +667,19 @@ contract Franklin {
     function unpackAmount(uint8[3] memory _amount)
         internal
         pure
-        returns (uint112)
+        returns (uint128)
     {
         uint24 n = (uint24(_amount[0]) << 2*8)
         + (uint24(_amount[1]) << 8)
         + (uint24(_amount[2]));
-        return uint112(n >> 5) * (uint112(10) ** (n & 0x1f));
+        return uint128(n >> AMOUNT_EXPONENT_BIT_WIDTH) * (uint128(10) ** (n & 0x1f));
     }
 
 
-    function unpackFee(uint8 encoded_fee) internal pure returns (uint112) {
-        return uint112(encoded_fee >> 4) * uint112(10) ** (encoded_fee & 0x0f);
+    function unpackFee(uint8[2] memory encoded_fee) internal pure returns (uint128) {
+        uint16 fee = (uint16(encoded_fee[0]) << 8) + uint16(encoded_fee[1]);
+
+        return uint128(fee >> FEE_EXPONENT_BIT_WIDTH) * (uint128(10) ** (fee & 0x3f));
     }
 
     function bytesToAddress(bytes memory bys)

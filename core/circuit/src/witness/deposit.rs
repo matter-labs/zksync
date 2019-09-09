@@ -48,9 +48,8 @@ impl<E: JubjubEngine> DepositWitness<E> {
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.amount.unwrap(),
-            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
-                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+            &self.args.full_amount.unwrap(),
+            franklin_constants::BALANCE_BIT_WIDTH,
         );
 
         append_be_fixed_width(
@@ -65,7 +64,7 @@ impl<E: JubjubEngine> DepositWitness<E> {
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         );
         //        assert_eq!(pubdata_bits.len(), 37 * 8);
-        pubdata_bits.resize(32 * 8, false);
+        pubdata_bits.resize(6 * franklin_constants::CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
     pub fn get_sig_bits(&self) -> Vec<bool> {
@@ -87,9 +86,8 @@ impl<E: JubjubEngine> DepositWitness<E> {
         );
         append_be_fixed_width(
             &mut sig_bits,
-            &self.args.amount.unwrap(),
-            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
-                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
+            &self.args.full_amount.unwrap(),
+            franklin_constants::BALANCE_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
@@ -221,7 +219,8 @@ pub fn apply_deposit(
         },
         args: OperationArguments {
             ethereum_key: Some(Fr::zero()),
-            amount: Some(amount_encoded),
+            amount_packed: Some(amount_encoded),
+            full_amount: Some(amount_as_field_element),
             fee: Some(fee_encoded),
             a: Some(a),
             b: Some(b),
@@ -237,6 +236,7 @@ pub fn calculate_deposit_operations_from_witness(
     deposit_witness: &DepositWitness<Bn256>,
     first_sig_msg: &Fr,
     second_sig_msg: &Fr,
+    third_sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
@@ -259,6 +259,7 @@ pub fn calculate_deposit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[0]),
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -274,6 +275,7 @@ pub fn calculate_deposit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[1]),
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -289,6 +291,7 @@ pub fn calculate_deposit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[2]),
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -304,6 +307,7 @@ pub fn calculate_deposit_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[3]),
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -312,11 +316,44 @@ pub fn calculate_deposit_operations_from_witness(
         rhs: deposit_witness.after.clone(),
     };
 
+    let operation_four = Operation {
+        new_root: deposit_witness.after_root,
+        tx_type: deposit_witness.tx_type,
+        chunk: Some(Fr::from_str("4").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[4]),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
+        signature: signature.clone(),
+        signer_pub_key_x: Some(*signer_pub_key_x),
+        signer_pub_key_y: Some(*signer_pub_key_y),
+        args: deposit_witness.args.clone(),
+        lhs: deposit_witness.after.clone(),
+        rhs: deposit_witness.after.clone(),
+    };
+
+    let operation_five = Operation {
+        new_root: deposit_witness.after_root,
+        tx_type: deposit_witness.tx_type,
+        chunk: Some(Fr::from_str("5").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[5]),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
+        signature: signature.clone(),
+        signer_pub_key_x: Some(*signer_pub_key_x),
+        signer_pub_key_y: Some(*signer_pub_key_y),
+        args: deposit_witness.args.clone(),
+        lhs: deposit_witness.after.clone(),
+        rhs: deposit_witness.after.clone(),
+    };
     let operations: Vec<Operation<_>> = vec![
         operation_zero,
         operation_one,
         operation_two,
         operation_three,
+        operation_four,
+        operation_five,
     ];
     operations
 }
@@ -409,7 +446,7 @@ mod test {
                 new_pub_key_hash: sender_pub_key_hash,
             },
         );
-        let (signature, first_sig_part, second_sig_part) = generate_sig_data(
+        let (signature, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
             &deposit_witness.get_sig_bits(),
             &phasher,
             &sender_sk,
@@ -420,6 +457,7 @@ mod test {
             &deposit_witness,
             &first_sig_part,
             &second_sig_part,
+            &third_sig_part,
             signature,
             &sender_x,
             &sender_y,
@@ -529,7 +567,7 @@ mod test {
             },
         );
 
-        let (signature, first_sig_part, second_sig_part) = generate_sig_data(
+        let (signature, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
             &deposit_witness.get_sig_bits(),
             &phasher,
             &sender_sk,
@@ -540,6 +578,7 @@ mod test {
             &deposit_witness,
             &first_sig_part,
             &second_sig_part,
+            &third_sig_part,
             signature,
             &sender_x,
             &sender_y,

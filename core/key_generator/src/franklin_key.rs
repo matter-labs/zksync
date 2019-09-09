@@ -45,6 +45,7 @@ pub fn make_franklin_key() {
         "Generating contract key file into: {}",
         contract_file_path.to_str().unwrap()
     );
+    let f_cont = File::create(contract_file_path).expect("Unable to create file");
 
     // let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &AltJubjubBn256::new();
@@ -60,11 +61,13 @@ pub fn make_franklin_key() {
         signer_pub_key_y: None,
         first_sig_msg: None,
         second_sig_msg: None,
+        third_sig_msg: None,
         signature: None,
         args: OperationArguments {
             a: None,
             b: None,
-            amount: None,
+            amount_packed: None,
+            full_amount: None,
             fee: None,
             new_pub_key_hash: None,
             ethereum_key: None,
@@ -145,7 +148,6 @@ pub fn make_franklin_key() {
         CONTRACT_FUNCTION_NAME.to_string(),
     );
 
-    let f_cont = File::create(contract_file_path).expect("Unable to create file");
     let mut f_cont = BufWriter::new(f_cont);
     f_cont
         .write_all(contract_content.as_bytes())
