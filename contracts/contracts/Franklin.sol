@@ -16,7 +16,7 @@ contract Franklin {
     Governance governance;
 
     // Base gas for transaction
-    uint256 constant FEE_COEFF = 21000;
+    uint256 constant FEE_COEFF = 4;
     // Base gas cost for transaction
     uint256 constant BASE_GAS = 21000;
     // Expiration delta for priority request to be satisfied (in ETH blocks)
