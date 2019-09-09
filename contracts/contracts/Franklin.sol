@@ -148,36 +148,31 @@ contract Franklin {
 
     // Onchain operations -- processed inside blocks (see docs)
 
-    // Type of block processing operation holder
-    // enum OnchainOpType {
-    //     Deposit,
-    //     Withdrawal
-    // }
-
     // Operation keeps a balance for processing the commited data in blocks, see docs
-    // struct Operation {
-    //     OpType opType;
-    //     uint16 tokenId;
-    //     address owner;
-    //     uint128 amount;
-    // }
-    struct Operation {
+    struct OnchainOperation {
         OpType opType;
         bytes pubData;
-        uint256 expirationBlock;
     }
 
     // Total number of registered OnchainOps
     uint64 totalOnchainOps;
 
     // List of OnchainOps by index
-    mapping(uint64 => Operation) public onchainOps;
+    mapping(uint64 => OnchainOperation) public onchainOps;
 
     // Priority Queue
 
+    // Operation keeps a balance for processing the commited data in blocks, see docs
+    struct PriorityOperation {
+        OpType opType;
+        bytes pubData;
+        uint256 expirationBlock;
+        uint128 fee;
+    }
+
     // Priority Requests  mapping (request id - operation)
     // Contains op type, pubdata and expiration block of unsatisfied requests. Numbers are in order of requests receiving
-    mapping(uint32 => Operation) public priorityRequests;
+    mapping(uint32 => PriorityOperation) public priorityRequests;
     // First priority request id
     uint32 public firstPriorityRequestId;
     // Total number of requests
@@ -229,10 +224,11 @@ contract Franklin {
     // - _pubData - request data
     function addPriorityRequest(OpType _opType, bytes memory _pubData) internal {
         uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
-        priorityRequests[firstPriorityRequestId+totalPriorityRequests] = Operation({
+        priorityRequests[firstPriorityRequestId+totalPriorityRequests] = PriorityOperation({
             opType: _opType,
             pubData: _pubData,
-            expirationBlock: expirationBlock
+            expirationBlock: expirationBlock,
+            fee: 0
         });
         totalPriorityRequests++;
 
@@ -558,7 +554,7 @@ contract Franklin {
     function processOp(
         uint8 _opType,
         uint256 _currentPointer,
-        bytes memory _publicData
+        bytes memory _publicData,
         uint64 _currentOnchainOp
     ) internal returns (uint256 processedLen, uint64 processedOnchainOps, uint32 priorityCount) {
         uint256 opDataPointer = _currentPointer + 1;
@@ -569,28 +565,25 @@ contract Franklin {
         if (_opType == uint8(OpType.CloseAccount)) return (CLOSE_ACCOUNT_LENGTH, 0, 0);
 
         if (_opType == uint8(OpType.Deposit)) {
-            onchainOps[_currentOnchainOp] = Operation(
+            onchainOps[_currentOnchainOp] = OnchainOperation(
                 OpType.Deposit,
-                Bytes.slice(_publicData, opDataPointer + 3, 38),
-                0
+                Bytes.slice(_publicData, opDataPointer + 3, 38)
             );
             return (DEPOSIT_LENGTH, 1, 1);
         }
 
         if (_opType == uint8(OpType.PartialExit)) {
-            onchainOps[_currentOnchainOp] = Operation(
+            onchainOps[_currentOnchainOp] = OnchainOperation(
                 OpType.PartialExit,
-                Bytes.slice(_publicData, opDataPointer + 3, 40),
-                0
+                Bytes.slice(_publicData, opDataPointer + 3, 40)
             );
             return (PARTIAL_EXIT_LENGTH, 1, 0);
         }
 
         if (_opType == uint8(OpType.FullExit)) {
-            onchainOps[_currentOnchainOp] = Operation(
+            onchainOps[_currentOnchainOp] = OnchainOperation(
                 OpType.FullExit,
-                Bytes.slice(_publicData, opDataPointer + 3, 70),
-                0
+                Bytes.slice(_publicData, opDataPointer + 3, 70)
             );
             return (FULL_EXIT_LENGTH, 1, 1);
         }
@@ -642,11 +635,11 @@ contract Franklin {
         uint64 start = _startId;
         uint64 end = start + _totalProcessed;
 
-        Operation[] memory priorityOps;
+        OnchainOperation[] memory priorityOps;
         
         uint32 counter = 0;
         for (uint64 current = start; current < end; ++current) {
-            Operation memory op = onchainOps[current];
+            OnchainOperation memory op = onchainOps[current];
             if (op.opType == OpType.FullExit || op.opType == OpType.Deposit) {
                 priorityOps[counter] = op;
                 counter++;
@@ -669,7 +662,7 @@ contract Franklin {
     // Params:
     // - _onchainOp - operation from block
     // - _priorityRequestId - priority request id
-    function comparePriorityOps(Operation memory _onchainOp, uint32 _priorityRequestId) internal view returns (bool) {
+    function comparePriorityOps(OnchainOperation memory _onchainOp, uint32 _priorityRequestId) internal view returns (bool) {
         bytes memory priorityPubData;
         bytes memory onchainPubData;
         OpType operation;
@@ -759,7 +752,7 @@ contract Franklin {
         uint64 start = blocks[_blockNumber].operationStartId;
         uint64 end = start + blocks[_blockNumber].onchainOperations;
         for (uint64 current = start; current < end; ++current) {
-            Operation memory op = onchainOps[current];
+            OnchainOperation memory op = onchainOps[current];
             if (op.opType == OpType.PartialExit) {
                 // partial exit was successful, accrue balance
                 uint16 tokenId = uint16(
