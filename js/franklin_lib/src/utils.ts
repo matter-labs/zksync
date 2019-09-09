@@ -1,4 +1,5 @@
 import BN = require('bn.js');
+import { bigNumberify, BigNumber, BigNumberish } from 'ethers/utils';
 
 export function floatToInteger(floatBytes: Buffer, exp_bits: number, mantissa_bits: number, exp_base: number): BN {
     const floatHolder = new BN(floatBytes, 16, 'be'); // keep bit order
@@ -82,4 +83,25 @@ export function packAmount(amount: BN): Buffer {
 
 export function packFee(amount: BN): Buffer {
     return integerToFloat(amount, 4, 4, 10);
+}
+
+function packedHelper(amount: BigNumberish, AMOUNT_EXPONENT_BIT_WIDTH: number, AMOUNT_MANTISSA_BIT_WIDTH: number) {
+    let amountStr10 = bigNumberify(amount).toString();
+    let bn = new BN(amountStr10, 10);
+    
+    let packed = integerToFloat(bn, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, 10);
+    let unpacked = floatToInteger(packed, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, 10);    
+    return unpacked.toString(10);
+}
+
+export function packedAmount(amount: BigNumberish) {
+    const AMOUNT_EXPONENT_BIT_WIDTH = 5;
+    const AMOUNT_MANTISSA_BIT_WIDTH = 19;
+    return packedHelper(amount, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH);
+}
+
+export function packedFee(fee: BigNumberish) {
+    const FEE_EXPONENT_BIT_WIDTH = 4;
+    const FEE_MANTISSA_BIT_WIDTH = 4;
+    return packedHelper(fee, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH);
 }

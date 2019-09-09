@@ -4,9 +4,10 @@ import { ReceiveMoneyOperation } from './ReceiveMoneyOperation';
 import { DepositOperation } from './DepositOperation';
 import { WithdrawOperation } from './WithdrawOperation';
 import { TransferOperation } from './TransferOperation';
-import { bigNumberify, BigNumber } from "ethers/utils";
+import { bigNumberify, BigNumber, BigNumberish } from "ethers/utils";
 import Prando from 'prando';
 import { AbstractOperation } from './AbstractOperation';
+import * as Utils from '../../src/utils';
 const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms))
 
 interface TesterKwargs {
@@ -51,11 +52,18 @@ export class Tester {
         let w2 = this.selectAnotherRandomWallet(w1);
         return [w1, w2];
     }
+
+    private randomNum(from: number, to: number): BigNumberish {
+        // return (this.prando.nextBoolean() ? from : to).toString();
+        return this.prando.nextInt(from, to).toString();
+    }
     
     private selectRandomAmount(from: number, to: number): BigNumber {
-        // TODO
-        return bigNumberify(this.prando.nextBoolean() ? from : to);
-        // return bigNumberify(prando.nextInt(from, to).toString());
+        return bigNumberify(Utils.packedAmount(bigNumberify(this.randomNum(from, to))));
+    }
+
+    private selectRandomFee(from: number, to: number): BigNumber {
+        return bigNumberify(Utils.packedFee(bigNumberify(this.randomNum(from, to))));
     }
     
     private selectRandomToken(): Token {
@@ -78,7 +86,7 @@ export class Tester {
         kwargs.wallet = kwargs.wallet || this.selectRandomWallet();
         kwargs.token  = kwargs.token  || this.selectRandomToken();
         kwargs.amount = kwargs.amount || this.selectRandomAmount(0, 1000);
-        kwargs.fee    = kwargs.fee    || this.selectRandomAmount(0, 1000);
+        kwargs.fee    = kwargs.fee    || this.selectRandomFee(0, 1000);
         return new DepositOperation(kwargs);
     }
 
@@ -87,7 +95,7 @@ export class Tester {
         kwargs.wallet = kwargs.wallet || this.selectRandomWallet();
         kwargs.token  = kwargs.token  || this.selectRandomToken();
         kwargs.amount = kwargs.amount || this.selectRandomAmount(0, 1000);
-        kwargs.fee    = kwargs.fee    || this.selectRandomAmount(0, 1000);
+        kwargs.fee    = kwargs.fee    || this.selectRandomFee(0, 1000);
         return new WithdrawOperation(kwargs);
     }
 
@@ -97,7 +105,7 @@ export class Tester {
         kwargs.wallet2 = kwargs.wallet2 || this.selectAnotherRandomWallet(kwargs.wallet1);
         kwargs.token   = kwargs.token   || this.selectRandomToken();
         kwargs.amount  = kwargs.amount  || this.selectRandomAmount(10, 1000);
-        kwargs.fee     = kwargs.fee     || this.selectRandomAmount(10, 1000);
+        kwargs.fee     = kwargs.fee     || this.selectRandomFee(10, 1000);
         return new TransferOperation(kwargs);
     }
 
