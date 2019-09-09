@@ -277,8 +277,8 @@ contract Franklin {
     // Accrues balances from deposits from block and removes requests.
     // WARNING: Only for Exodus mode
     // Params:
-    // - _anyRequestsCount - count of requests where to look deposit requests for
-    function accrueBalancesForDepositsFromBlockPriorityOpsAndRemoveItsRequests(uint32 _count) internal {
+    // - _count - count of requests where to look deposit requests for
+    function accrueDepositsPriorityBalancesAndRemoveRequests(uint32 _count) internal {
         require(
             _count <= totalPriorityRequests,
             "abfcnt"
@@ -363,7 +363,6 @@ contract Franklin {
     // Params:
     // - _amount - amount to withdraw
     function withdrawETH(uint128 _amount) external {
-        requireActive();
         registerWithdrawal(0, _amount);
         msg.sender.transfer(_amount);
     }
@@ -403,7 +402,6 @@ contract Franklin {
     // - _token - token address
     // - _amount - amount to withdraw
     function withdrawERC20(address _token, uint128 _amount) external {
-        requireActive();
         uint16 tokenId = governance.validateERC20Token(_token);
         registerWithdrawal(tokenId, _amount);
         require(
@@ -619,25 +617,40 @@ contract Franklin {
         if (_opType == uint8(OpType.CloseAccount)) return (CLOSE_ACCOUNT_LENGTH, 0, 0);
 
         if (_opType == uint8(OpType.Deposit)) {
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer + 3, 38);
+            require(
+                pubData.length > 0,
+                "psodpl"
+            ); // psodpl - wrong deposit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
                 OpType.Deposit,
-                Bytes.slice(_publicData, opDataPointer + 3, 38)
+                pubData
             );
             return (DEPOSIT_LENGTH, 1, 1);
         }
 
         if (_opType == uint8(OpType.PartialExit)) {
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer + 3, 40);
+            require(
+                pubData.length > 0,
+                "psopel"
+            ); // psopel - wrong partial exit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
                 OpType.PartialExit,
-                Bytes.slice(_publicData, opDataPointer + 3, 40)
+                pubData
             );
             return (PARTIAL_EXIT_LENGTH, 1, 0);
         }
 
         if (_opType == uint8(OpType.FullExit)) {
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer + 3, 70);
+            require(
+                pubData.length > 0,
+                "psofel"
+            ); // psofel - wrong full exit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
                 OpType.FullExit,
-                Bytes.slice(_publicData, opDataPointer + 3, 70)
+                pubData
             );
             return (FULL_EXIT_LENGTH, 1, 1);
         }
@@ -719,15 +732,12 @@ contract Franklin {
     function comparePriorityOps(OnchainOperation memory _onchainOp, uint32 _priorityRequestId) internal view returns (bool) {
         bytes memory priorityPubData;
         bytes memory onchainPubData;
-        OpType operation;
         if (_onchainOp.opType == OpType.Deposit && priorityRequests[_priorityRequestId].opType == OpType.Deposit) {
             priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 20, PUBKEY_HASH_LEN + 18);
             onchainPubData = _onchainOp.pubData;
-            operation = OpType.Deposit;
         } else if (_onchainOp.opType == OpType.FullExit && priorityRequests[_priorityRequestId].opType == OpType.FullExit) {
             priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, PUBKEY_HASH_LEN, 54);
             onchainPubData = Bytes.slice(_onchainOp.pubData, 0, 54);
-            operation = OpType.FullExit;
         } else {
             revert("cpowop"); // cpowop - wrong operation
         }
@@ -874,7 +884,7 @@ contract Franklin {
             Block memory reverted = blocks[i];
             if (_fromExodus) {
                 // in case of exodus accrue balances from deposits
-                accrueBalancesForDepositsFromBlockPriorityOpsAndRemoveItsRequests(reverted.priorityOperations);
+                accrueDepositsPriorityBalancesAndRemoveRequests(reverted.priorityOperations);
             }
             revertBlock(reverted);
             delete blocks[i];
