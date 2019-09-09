@@ -3,7 +3,8 @@ import { bigNumberify, BigNumber, BigNumberish } from "ethers/utils";
 import { ethers } from 'ethers';
 import { Wallet, Token } from '../../src/wallet';
 
-const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL)
+const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
+const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 
 export class LocalWallet {
     public resetNonce(): void {
@@ -149,7 +150,7 @@ export class LocalWallet {
         if (receipt.fail_reason) {
             throw new Error(receipt.fail_reason);
         }
-        await this.franklinWallet.widthdrawOnchain(token, amount);
+        // await this.franklinWallet.widthdrawOnchain(token, amount);
         
         // async widthdrawOnchain(token: Token, amount: BigNumberish) {
         //     const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
@@ -236,21 +237,24 @@ export class LocalWallet {
 
         await this.depositOnchain(token, total_amount);
         await this.depositOffchain(token, amount, fee);
+        await sleep(1000);
     }
 
-    async sendTransaction(wallet2: LocalWallet, token: Token, amount: BigNumberish, fee: BigNumberish) {
+    async sendTransaction(wallet2: LocalWallet, token: Token, amount: BigNumberish, fee: BigNumberish) {        
         amount = bigNumberify(amount);
         fee = bigNumberify(fee);
+        const zero = bigNumberify(0);
+        const total_amount = amount.add(fee);
+        const negative_amount = zero.sub(total_amount);
+        if (this.getComputedFranklinBalance(token).gte(total_amount)) {
+            this.addToComputedFranklinBalance(token, negative_amount);
+            wallet2.addToComputedFranklinBalance(token, amount);
+        }
+
         let res = await this.franklinWallet.transfer(wallet2.franklinWallet.address, token, amount, fee);
         if (res.err) throw new Error(res.err);
         let receipt = await this.franklinWallet.txReceipt(res.hash);
         if (receipt.fail_reason) throw new Error(receipt.fail_reason);
-        
-        const zero = bigNumberify(0);
-        const total_amount = amount.add(fee);
-        const negative_amount = zero.sub(total_amount);
-        this.addToComputedFranklinBalance(token, negative_amount);
-        wallet2.addToComputedFranklinBalance(token, amount);
     }
 
     // #endregion
