@@ -393,7 +393,7 @@ contract Franklin {
             "dertrf"
         ); // dertrf - token transfer failed deposit
 
-        uint16 tokenId = governance.validateERC20Token(_token);
+        uint16 tokenId = governance.validateTokenAddress(_token);
         registerDeposit(tokenId, _amount, fee, _franklinAddr);
     }
 
@@ -402,7 +402,7 @@ contract Franklin {
     // - _token - token address
     // - _amount - amount to withdraw
     function withdrawERC20(address _token, uint128 _amount) external {
-        uint16 tokenId = governance.validateERC20Token(_token);
+        uint16 tokenId = governance.validateTokenAddress(_token);
         registerWithdrawal(tokenId, _amount);
         require(
             IERC20(_token).transfer(msg.sender, _amount),
@@ -439,7 +439,7 @@ contract Franklin {
             "rfesnl"
         ); // rfesnl - wrong signature length
 
-        uint16 tokenId = governance.validateERC20Token(_token);
+        uint16 tokenId = governance.validateTokenAddress(_token);
         // Priority Queue request
         bytes memory pubData = _franklinAddr; // franklin address
         pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(msg.sender)); // eth address
