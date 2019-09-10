@@ -1,5 +1,4 @@
 import {franklinContractCode} from "../src.ts/deploy";
-import {parseEther} from "ethers/utils";
 import {Contract, ethers} from "ethers";
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
@@ -9,7 +8,7 @@ async function main() {
     const franklinDeployedContract = new Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, wallet);
     let value = await franklinDeployedContract.onchainOps(2);
     console.log(value);
-    value = await franklinDeployedContract.balances(wallet.address, 0);
+    value = await franklinDeployedContract.balancesToWithdraw(wallet.address, 0);
     console.log(value);
 }
 
