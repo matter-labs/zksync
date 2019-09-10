@@ -60,7 +60,7 @@ describe("INTEGRATION: Deposit", function() {
 
         // Commit block with eth partial exit.
         const exitValue = parseEther("0.2");
-        const exitBlockPublicData = createPartialExitPublicData(0, exitValue, exitWallet.address);
+        const exitBlockPublicData = createWithdrawPublicData(0, exitValue, exitWallet.address);
         const commitExitTx = await franklinDeployedContract.commitBlock(2, 22,
             Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
             exitBlockPublicData,
@@ -120,7 +120,7 @@ describe("INTEGRATION: Deposit", function() {
 
         // Commit block with erc20 partial exit.
         const exitValue = bigNumberify("45");
-        const exitBlockPublicData = createPartialExitPublicData(1, exitValue, exitWallet.address);
+        const exitBlockPublicData = createWithdrawPublicData(1, exitValue, exitWallet.address);
         const commitExitTx = await franklinDeployedContract.commitBlock(2, 22,
             Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
             exitBlockPublicData,
@@ -145,3 +145,31 @@ describe("INTEGRATION: Deposit", function() {
         expect((await franklinDeployedContract.balances(exitWallet.address, 1)).balance).equal(bigNumberify(0));
     });
 });
+
+function createDepositPublicData(tokenId, amount: BigNumber, fee: BigNumber, franklinAddress: string): Buffer {
+    const txId = Buffer.from("01", "hex");
+    const accountId = Buffer.alloc(3, 0);
+    accountId.writeUIntBE(0, 0, 3);
+    const tokenBytes = Buffer.alloc(2);
+    tokenBytes.writeUInt16BE(tokenId, 0);
+    const amountBytes = packAmount(new BN(amount.toString()));
+    const feeBytes = packFee(new BN(fee.toString()));
+    const addressBytes = Buffer.from(franklinAddress, "hex");
+    const padBytes = Buffer.alloc(3, 0);
+
+    return Buffer.concat([txId, accountId, tokenBytes, amountBytes, feeBytes, addressBytes, padBytes]);
+}
+
+function createWithdrawPublicData(tokenId, amount: BigNumber, ethAddress: string): Buffer {
+    const txId = Buffer.from("03", "hex");
+    const accountId = Buffer.alloc(3, 0);
+    accountId.writeUIntBE(0, 0, 3);
+    const tokenBytes = Buffer.alloc(2);
+    tokenBytes.writeUInt16BE(tokenId, 0);
+    const amountBytes = packAmount(new BN(amount.toString()));
+    const feeBytes = packFee(new BN("0"));
+    const addressBytes = Buffer.from(ethAddress.substr(2), "hex");
+    const padBytes = Buffer.alloc(2, 0);
+
+    return Buffer.concat([txId, accountId, tokenBytes, amountBytes, feeBytes, addressBytes, padBytes]);
+}

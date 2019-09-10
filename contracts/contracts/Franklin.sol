@@ -237,13 +237,6 @@ contract Franklin {
         // Expiration block is: current block number + priority expiration delta
         uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
 
-        emit NewPriorityRequest(
-            _opType,
-            _pubData,
-            expirationBlock,
-            _fee
-        );
-
         priorityRequests[firstPriorityRequestId+totalPriorityRequests] = PriorityOperation({
             opType: _opType,
             pubData: _pubData,
@@ -251,6 +244,13 @@ contract Franklin {
             fee: _fee
         });
         totalPriorityRequests++;
+
+        emit NewPriorityRequest(
+            _opType,
+            _pubData,
+            expirationBlock,
+            _fee
+        );
     }
 
     // Pays validator fee and removes requests
@@ -288,18 +288,18 @@ contract Franklin {
             if (priorityRequests[i].opType == OpType.Deposit) {
                 bytes memory pubData = priorityRequests[i].pubData;
                 bytes memory owner = new bytes(20);
-                for (uint256 j = 0; j < 20; ++j) {
+                for (uint8 j = 0; j < 20; ++j) {
                     owner[j] = pubData[j];
                 }
-                uint16 token = uint16(
-                    (uint256(uint8(pubData[20])) << 8) +
-                        uint256(uint8(pubData[21]))
-                );
+                bytes memory token = new bytes(2);
+                for (uint8 j = 0; j < 2; j++) {
+                    token[j] = pubData[20+j];
+                }
                 bytes memory amount = new bytes(16);
-                for (uint256 j = 0; j < 16; ++j) {
+                for (uint8 j = 0; j < 16; ++j) {
                     amount[j] = pubData[22 + j];
                 }
-                balancesToWithdraw[Bytes.bytesToAddress(owner)][token] += Bytes.bytesToUInt128(amount);
+                balancesToWithdraw[Bytes.bytesToAddress(owner)][Bytes.bytesToUInt16(token)] += Bytes.bytesToUInt128(amount);
             }
             delete priorityRequests[i];
         }
@@ -460,19 +460,19 @@ contract Franklin {
         uint256 _fee,
         bytes memory _franklinAddr
     ) internal {
-        emit OnchainDeposit(
-            msg.sender,
-            _token,
-            _amount,
-            _franklinAddr
-        );
-
         // Priority Queue request
         bytes memory pubData = Bytes.toBytesFromAddress(msg.sender); // sender
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(_token)); // token id
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt128(_amount)); // amount
         pubData = Bytes.concat(pubData, _franklinAddr); // franklin address
         addPriorityRequest(OpType.Deposit, _fee, pubData);
+
+        emit OnchainDeposit(
+            msg.sender,
+            _token,
+            _amount,
+            _franklinAddr
+        );
     }
 
     // Register withdrawal
@@ -822,10 +822,11 @@ contract Franklin {
             OnchainOperation memory op = onchainOps[current];
             if (op.opType == OpType.PartialExit) {
                 // partial exit was successful, accrue balance
-                uint16 tokenId = uint16(
-                    (uint256(uint8(op.pubData[0])) << 8) +
-                        uint256(uint8(op.pubData[1]))
-                );
+                bytes memory tokenBytes = new bytes(2);
+                for (uint8 j = 0; j < 2; j++) {
+                    tokenBytes[j] = op.pubData[j];
+                }
+                uint16 tokenId = Bytes.bytesToUInt16(tokenBytes);
 
                 bytes memory amountBytes = new bytes(16);
                 for (uint256 i = 0; i < 16; ++i) {
@@ -841,10 +842,11 @@ contract Franklin {
             }
             if (op.opType == OpType.FullExit) {
                 // full exit was successful, accrue balance
-                uint16 tokenId = uint16(
-                    (uint256(uint8(op.pubData[20])) << 8) +
-                        uint256(uint8(op.pubData[21]))
-                );
+                bytes memory tokenBytes = new bytes(2);
+                for (uint8 j = 0; j < 2; j++) {
+                    tokenBytes[j] = op.pubData[20+j];
+                }
+                uint16 tokenId = Bytes.bytesToUInt16(tokenBytes);
 
                 bytes memory amountBytes = new bytes(16);
                 for (uint256 i = 0; i < 16; ++i) {

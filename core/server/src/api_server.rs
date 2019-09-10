@@ -327,61 +327,62 @@ fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpRes
     Ok(HttpResponse::Ok().json(network_status))
 }
 
-fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-    let pool = req.state().connection_pool.clone();
-
-    let storage = pool.access_storage();
-    if storage.is_err() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "rate limit".to_string(),
-        }));
-    }
-    let storage = storage.unwrap();
-
-    let block_id_string = req.match_info().get("block_id");
-    if block_id_string.is_none() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "invalid parameters".to_string(),
-        }));
-    }
-    let block_id = block_id_string.unwrap().parse::<u32>();
-    if block_id.is_err() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "invalid block_id".to_string(),
-        }));
-    }
-
-    let block_id_u32 = block_id.unwrap();
-
-    let stored_commit_operation =
-        storage.load_stored_op_with_block_number(block_id_u32, ActionType::COMMIT);
-    if stored_commit_operation.is_none() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "not found".to_string(),
-        }));
-    }
-
-    let commit = stored_commit_operation.unwrap();
-    let operation = commit.clone().into_op(&storage);
-    if let Err(ref err) = &operation {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: format!("db error: {}", err),
-        }));
-    }
-    let operation = operation.unwrap();
-
-    let verify = storage.load_stored_op_with_block_number(block_id_u32, ActionType::VERIFY);
-
-    let response = BlockDetails {
-        block_number: commit.block_number as i64,
-        new_state_root: format!("0x{}", operation.block.new_root_hash.to_hex()),
-        commit_tx_hash: commit.tx_hash,
-        verify_tx_hash: verify.as_ref().and_then(|op| op.tx_hash.clone()),
-        committed_at: commit.created_at,
-        verified_at: verify.as_ref().map(|op| op.created_at),
-    };
-
-    Ok(HttpResponse::Ok().json(response))
+fn handle_get_block_by_id(_req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    unimplemented!()
+    //    let pool = req.state().connection_pool.clone();
+    //
+    //    let storage = pool.access_storage();
+    //    if storage.is_err() {
+    //        return Ok(HttpResponse::Ok().json(ApiError {
+    //            error: "rate limit".to_string(),
+    //        }));
+    //    }
+    //    let storage = storage.unwrap();
+    //
+    //    let block_id_string = req.match_info().get("block_id");
+    //    if block_id_string.is_none() {
+    //        return Ok(HttpResponse::Ok().json(ApiError {
+    //            error: "invalid parameters".to_string(),
+    //        }));
+    //    }
+    //    let block_id = block_id_string.unwrap().parse::<u32>();
+    //    if block_id.is_err() {
+    //        return Ok(HttpResponse::Ok().json(ApiError {
+    //            error: "invalid block_id".to_string(),
+    //        }));
+    //    }
+    //
+    //    let block_id_u32 = block_id.unwrap();
+    //
+    //    let stored_commit_operation =
+    //        storage.load_stored_op_with_block_number(block_id_u32, ActionType::COMMIT);
+    //    if stored_commit_operation.is_none() {
+    //        return Ok(HttpResponse::Ok().json(ApiError {
+    //            error: "not found".to_string(),
+    //        }));
+    //    }
+    //
+    //    let commit = stored_commit_operation.unwrap();
+    //    let operation = commit.clone().into_op(&storage);
+    //    if let Err(ref err) = &operation {
+    //        return Ok(HttpResponse::Ok().json(ApiError {
+    //            error: format!("db error: {}", err),
+    //        }));
+    //    }
+    //    let operation = operation.unwrap();
+    //
+    //    let verify = storage.load_stored_op_with_block_number(block_id_u32, ActionType::VERIFY);
+    //
+    //    let response = BlockDetails {
+    //        block_number: commit.block_number as i64,
+    //        new_state_root: format!("0x{}", operation.block.new_root_hash.to_hex()),
+    //        commit_tx_hash: commit.tx_hash,
+    //        verify_tx_hash: verify.as_ref().and_then(|op| op.tx_hash.clone()),
+    //        committed_at: commit.created_at,
+    //        verified_at: verify.as_ref().map(|op| op.created_at),
+    //    };
+    //
+    //    Ok(HttpResponse::Ok().json(response))
 }
 
 fn handle_get_blocks(

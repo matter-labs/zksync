@@ -1,6 +1,7 @@
 use super::tx::{Close, Deposit, Transfer, Withdraw};
 use super::AccountId;
 use crate::node::{pack_fee_amount, pack_token_amount};
+use bigdecimal::ToPrimitive;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositOp {
@@ -9,15 +10,15 @@ pub struct DepositOp {
 }
 
 impl DepositOp {
-    pub const CHUNKS: usize = 4;
-    pub const OP_CODE: u8 = 0x01;
+    pub const CHUNKS: usize = 6;
+    const OP_CODE: u8 = 0x01;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
         data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
         data.extend_from_slice(&self.tx.token.to_be_bytes());
-        data.extend_from_slice(&pack_token_amount(&self.tx.amount));
+        data.extend_from_slice(&self.tx.amount.to_u128().unwrap().to_be_bytes());
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
         data.extend_from_slice(&self.tx.to.data);
         data.resize(Self::CHUNKS * 8, 0x00);
@@ -75,23 +76,23 @@ impl TransferOp {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PartialExitOp {
+pub struct WithdrawOp {
     pub tx: Withdraw,
     pub account_id: AccountId,
 }
 
-impl PartialExitOp {
-    pub const CHUNKS: usize = 4;
-    pub const OP_CODE: u8 = 0x03;
+impl WithdrawOp {
+    pub const CHUNKS: usize = 6;
+    const OP_CODE: u8 = 0x03;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
         data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
         data.extend_from_slice(&self.tx.token.to_be_bytes());
-        data.extend_from_slice(&pack_token_amount(&self.tx.amount));
+        data.extend_from_slice(&self.tx.amount.to_u128().unwrap().to_be_bytes());
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
-        data.extend_from_slice(&self.tx.eth_address);
+        data.extend_from_slice(self.tx.eth_address.as_bytes());
         data.resize(Self::CHUNKS * 8, 0x00);
         data
     }
@@ -121,7 +122,7 @@ impl CloseOp {
 pub enum FranklinOp {
     Deposit(DepositOp),
     TransferToNew(TransferToNewOp),
-    PartialExit(PartialExitOp),
+    Withdraw(WithdrawOp),
     Close(CloseOp),
     Transfer(TransferOp),
 }
@@ -131,7 +132,7 @@ impl FranklinOp {
         match self {
             FranklinOp::Deposit(_) => DepositOp::CHUNKS,
             FranklinOp::TransferToNew(_) => TransferToNewOp::CHUNKS,
-            FranklinOp::PartialExit(_) => PartialExitOp::CHUNKS,
+            FranklinOp::Withdraw(_) => WithdrawOp::CHUNKS,
             FranklinOp::Close(_) => CloseOp::CHUNKS,
             FranklinOp::Transfer(_) => TransferOp::CHUNKS,
         }
@@ -141,7 +142,7 @@ impl FranklinOp {
         match self {
             FranklinOp::Deposit(op) => op.get_public_data(),
             FranklinOp::TransferToNew(op) => op.get_public_data(),
-            FranklinOp::PartialExit(op) => op.get_public_data(),
+            FranklinOp::Withdraw(op) => op.get_public_data(),
             FranklinOp::Close(op) => op.get_public_data(),
             FranklinOp::Transfer(op) => op.get_public_data(),
         }

@@ -53,7 +53,7 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
 
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.amount.unwrap(),
+            &self.args.amount_packed.unwrap(),
             franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
                 + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
         );
@@ -74,7 +74,7 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
             &self.args.fee.unwrap(),
             franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         );
-        pubdata_bits.resize(40 * 8, false);
+        pubdata_bits.resize(5 * franklin_constants::CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
     pub fn get_sig_bits(&self) -> Vec<bool> {
@@ -107,7 +107,7 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
         );
         append_be_fixed_width(
             &mut sig_bits,
-            &self.args.amount.unwrap(),
+            &self.args.amount_packed.unwrap(),
             franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
                 + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
         );
@@ -324,7 +324,8 @@ pub fn apply_transfer_to_new(
         },
         args: OperationArguments {
             ethereum_key: Some(Fr::zero()),
-            amount: Some(amount_encoded),
+            amount_packed: Some(amount_encoded),
+            full_amount: Some(amount_as_field_element),
             fee: Some(fee_encoded),
             a: Some(a),
             b: Some(b),
@@ -341,6 +342,7 @@ pub fn calculate_transfer_to_new_operations_from_witness(
     transfer_witness: &TransferToNewWitness<Bn256>,
     first_sig_msg: &Fr,
     second_sig_msg: &Fr,
+    third_sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
@@ -358,6 +360,7 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[0]),
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -373,6 +376,7 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[1]),
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -388,6 +392,7 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[2]),
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -403,6 +408,7 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[3]),
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -418,6 +424,7 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         pubdata_chunk: Some(pubdata_chunks[4]),
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
         signature: signature.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
@@ -545,13 +552,14 @@ mod test {
             },
         );
 
-        let (signature, first_sig_part, second_sig_part) =
+        let (signature, first_sig_part, second_sig_part, third_sig_part) =
             generate_sig_data(&transfer_witness.get_sig_bits(), &phasher, &from_sk, params);
 
         let operations = calculate_transfer_to_new_operations_from_witness(
             &transfer_witness,
             &first_sig_part,
             &second_sig_part,
+            &third_sig_part,
             signature,
             &from_x,
             &from_y,

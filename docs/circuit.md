@@ -107,7 +107,7 @@ Verification:
 Comments:
 - Splitting into `transfer_to_new` and `deposit_from` operations is necessary because for each operation in this circuit we only update one account/balance leaf in the tree.
 
-#### partial_exit
+#### withdraw
 
 Withdraw part of a particular token balance to the mainchain.
 
