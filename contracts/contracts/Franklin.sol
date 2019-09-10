@@ -281,8 +281,8 @@ contract Franklin {
     function accrueDepositsPriorityBalancesAndRemoveRequests(uint32 _count) internal {
         require(
             _count <= totalPriorityRequests,
-            "abfcnt"
-        ); // abfcnt - count is heigher than total priority requests count
+            "abrcnt"
+        ); // abrcnt - count is heigher than total priority requests count
 
         for (uint32 i = firstPriorityRequestId; i < firstPriorityRequestId + _count; i++) {
             if (priorityRequests[i].opType == OpType.Deposit) {

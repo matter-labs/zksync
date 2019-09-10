@@ -45,7 +45,10 @@ contract Governance {
     // - _token - token address
     function addToken(address _token) external {
         requireGovernor();
-        require(tokenIds[_token] == 0, "token exists");
+        require(
+            tokenIds[_token] == 0,
+            "atntex"
+        ); // atntex - token exists
         tokenAddresses[totalTokens + 1] = _token; // Adding one because tokenId = 0 is reserved for ETH
         tokenIds[_token] = totalTokens + 1;
         totalTokens++;
@@ -63,23 +66,32 @@ contract Governance {
 
     // Check if the sender is governor
     function requireGovernor() internal view {
-        require(msg.sender == networkGovernor, "only by governor");
+        require(
+            msg.sender == networkGovernor,
+            "rqgobg"
+        ); // rqgobg - only by governor
     }
 
     // Check if sender is validator
-    function isValidator(address sender) external view returns (bool) {
-        return validators[sender];
+    function isValidator(address _sender) external view returns (bool) {
+        return validators[_sender];
     }
 
     // Check if token is known
     function requireValidTokenId(uint16 _tokenId) external view {
-        require(_tokenId < totalTokens + 1, "unknown token");
+        require(
+            _tokenId < totalTokens + 1,
+            "rvtunt"
+        ); // rvtunt - unknown token id
     }
 
     // Validate token address
-    function validateERC20Token(address tokenAddr) external view returns (uint16) {
-        uint16 tokenId = tokenIds[tokenAddr];
-        require(tokenAddresses[tokenId] == tokenAddr, "unknown ERC20 token");
+    function validateTokenAddress(address _tokenAddr) external view returns (uint16) {
+        uint16 tokenId = tokenIds[_tokenAddr];
+        require(
+            tokenAddresses[tokenId] == _tokenAddr,
+            "vetuet"
+        ); // vetuet - unknown ERC20 token address
         return tokenId;
     }
 
