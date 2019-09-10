@@ -16,10 +16,11 @@ export const governanceContractCode = require('../build/Governance');
 
 export async function depoloyGovernance(
     wallet,
+    governorAddress = wallet.address,
     governanceCode = governanceContractCode
     ) {
     try {
-        let governance = await deployContract(wallet, governanceCode, [], {
+        let governance = await deployContract(wallet, governanceCode, [governorAddress], {
             gasLimit: 3000000,
         });
         console.log(`GOVERNANCE_ADDR=${governance.address}`);
@@ -52,8 +53,6 @@ export async function deployFranklin(
                 verifier.address,
                 vk.address,
                 genesisRoot,
-                ethers.constants.AddressZero,
-                wallet.address,
                 governanceAddress
             ],
         {

@@ -23,7 +23,7 @@ describe("INTEGRATION: Deposit", function() {
     let erc20DeployedToken;
 
     beforeEach(async () => {
-        governanceDeployedContract = await depoloyGovernance(wallet);
+        governanceDeployedContract = await depoloyGovernance(wallet, wallet.address);
         franklinDeployedContract = await deployFranklin(wallet, governanceDeployedContract.address);
         erc20DeployedToken = await addTestERC20Token(wallet, governanceDeployedContract);
         // Make sure that exit wallet can execute transactions.

@@ -3,11 +3,8 @@ import {addTestERC20Token, deployFranklin, franklinContractCode, depoloyGovernan
 
 async function main() {
     const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-    console.log("provider: ",provider);
     const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
-    console.log("wallet: ",wallet);
-    const governance = await depoloyGovernance(wallet);
-    console.log("governance: ",governance);
+    const governance = await depoloyGovernance(wallet, wallet.address);
     const franklin = await deployFranklin(wallet, governance.address, process.env.GENESIS_ROOT);
     await postContractToTesseracts(governanceContractCode, "Governance", governance.address);
     await postContractToTesseracts(franklinContractCode, "Franklin", franklin.address);
