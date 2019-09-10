@@ -4,10 +4,14 @@ use bigdecimal::BigDecimal;
 use crypto::{digest::Digest, sha2::Sha256};
 
 use super::account::AccountAddress;
-use super::{Fr, Engine};
-use franklin_crypto::eddsa::Signature;
-use franklin_crypto::alt_babyjubjub::{edwards, Unknown};
+use super::Engine;
+use ff::{PrimeField, PrimeFieldRepr};
+use franklin_crypto::alt_babyjubjub::edwards;
+use franklin_crypto::alt_babyjubjub::fs::FsRepr;
 use franklin_crypto::alt_babyjubjub::JubjubEngine;
+use franklin_crypto::eddsa::{PublicKey, Signature};
+use franklin_crypto::jubjub::FixedGenerators;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use web3::types::Address;
 
 /// Signed by user.
@@ -22,14 +26,13 @@ pub enum TxType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transfer {
-    // TODO: derrive account address from signature
     pub from: AccountAddress,
     pub to: AccountAddress,
     pub token: TokenId,
     pub amount: BigDecimal,
     pub fee: BigDecimal,
     pub nonce: Nonce,
-    // TODO: Signature unimplemented
+    pub signature: TxSignature,
 }
 
 impl Transfer {
@@ -45,6 +48,18 @@ impl Transfer {
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }
+
+    pub fn verify_signature(&self) -> bool {
+        if let Some(pub_key) = self.signature.verify_musig_pedersen(&self.get_bytes()) {
+            if AccountAddress::from_pubkey(pub_key) == self.from {
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,6 +71,7 @@ pub struct Deposit {
     pub fee: BigDecimal,
     pub nonce: Nonce,
     // TODO: Signature unimplemented
+    pub signature: TxSignature,
 }
 
 impl Deposit {
@@ -70,6 +86,18 @@ impl Deposit {
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }
+
+    pub fn verify_signature(&self) -> bool {
+        if let Some(pub_key) = self.signature.verify_musig_pedersen(&self.get_bytes()) {
+            if AccountAddress::from_pubkey(pub_key) == self.to {
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,7 +110,7 @@ pub struct Withdraw {
     pub amount: BigDecimal,
     pub fee: BigDecimal,
     pub nonce: Nonce,
-    // TODO: Signature unimplemented
+    pub signature: TxSignature,
 }
 
 impl Withdraw {
@@ -98,6 +126,18 @@ impl Withdraw {
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }
+
+    pub fn verify_signature(&self) -> bool {
+        if let Some(pub_key) = self.signature.verify_musig_pedersen(&self.get_bytes()) {
+            if AccountAddress::from_pubkey(pub_key) == self.account {
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -106,6 +146,7 @@ pub struct Close {
     pub account: AccountAddress,
     pub nonce: Nonce,
     // TODO: Signature unimplemented
+    pub signature: TxSignature,
 }
 
 impl Close {
@@ -117,6 +158,18 @@ impl Close {
         out.extend_from_slice(&self.account.data);
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
+    }
+
+    pub fn verify_signature(&self) -> bool {
+        if let Some(pub_key) = self.signature.verify_musig_pedersen(&self.get_bytes()) {
+            if AccountAddress::from_pubkey(pub_key) == self.account {
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }
     }
 }
 
@@ -169,113 +222,175 @@ impl FranklinTx {
     }
 
     pub fn check_signature(&self) -> bool {
-        true
+        match self {
+            FranklinTx::Transfer(tx) => tx.verify_signature(),
+            FranklinTx::Deposit(tx) => tx.verify_signature(),
+            FranklinTx::Withdraw(tx) => tx.verify_signature(),
+            FranklinTx::Close(tx) => tx.verify_signature(),
+        }
     }
 }
 
-//impl TransferTx {
-//    pub fn create_signed_tx(
-//        from: u32,
-//        to: u32,
-//        amount: BigDecimal,
-//        fee: BigDecimal,
-//        nonce: u32,
-//        good_until_block: u32,
-//        private_key: &PrivateKey,
-//    ) -> Self {
-//        let tx = TransferTx {
-//            from,
-//            to,
-//            token: 0,
-//            amount: amount.clone(),
-//            fee: fee.clone(),
-//            nonce,
-//            good_until_block,
-//            signature: TxSignature::default(),
-//        };
-//
-//        let message_bits = tx.message_bits();
-//        let as_bytes = pack_bits_into_bytes(message_bits);
-//
-//        let rng = &mut rand::thread_rng();
-//        let p_g = FixedGenerators::SpendingKeyGenerator;
-//
-//        let signature = TxSignature::from(private_key.sign_raw_message(
-//            &as_bytes,
-//            rng,
-//            p_g,
-//            &params::JUBJUB_PARAMS,
-//            as_bytes.len(),
-//        ));
-//
-//        TransferTx {
-//            from,
-//            to,
-//            token: 0,
-//            amount,
-//            fee,
-//            nonce,
-//            good_until_block,
-//            signature,
-//        }
-//    }
-//
-//    pub fn verify_sig(&self, public_key: &PublicKey) -> bool {
-//        let message_bits = self.message_bits();
-//        if message_bits.len() % 8 != 0 {
-//            error!("Invalid message length");
-//            return false;
-//        }
-//        let as_bytes = pack_bits_into_bytes(message_bits);
-//        //use rustc_hex::ToHex;
-//        //let hex: String = as_bytes.clone().to_hex();
-//        //debug!("Transaction bytes = {}", hex);
-//        if let Ok(signature) = self.signature.to_jubjub_eddsa() {
-//            //debug!("Successfuly converted to eddsa signature");
-//            let p_g = FixedGenerators::SpendingKeyGenerator;
-//            let valid = public_key.verify_for_raw_message(
-//                &as_bytes,
-//                &signature,
-//                p_g,
-//                &params::JUBJUB_PARAMS,
-//                30,
-//            );
-//
-//            return valid;
-//        }
-//        //debug!("Signature was not deserialized");
-//
-//        false
-//    }
-//
-//    pub fn validate(&self) -> Result<(), String> {
-//        use bigdecimal::Zero;
-//        if self.from == self.to {
-//            return Err(format!("tx.from may not equal tx.to: {}", self.from));
-//        }
-//        if self.amount == BigDecimal::zero() {
-//            return Err("zero amount is not allowed".to_string());
-//        }
-//
-//        Ok(())
-//    }
-//}
-//
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct TxSignature {
-    pub r_x: Fr,
-    pub r_y: Fr,
-    pub s: Fr,
+    pub_key: PackedPublicKey,
+    sign: PackedSignature,
 }
 
-impl std::convert::TryInto<Signature<Engine>> for TxSignature {
-    type Error = failure::Error;
+impl TxSignature {
+    pub fn verify_musig_pedersen(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
+        let valid = self.pub_key.0.verify_musig_pedersen(
+            msg,
+            &self.sign.0,
+            FixedGenerators::SpendingKeyGenerator,
+            &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new(),
+        );
+        if valid {
+            Some(self.pub_key.0.clone())
+        } else {
+            None
+        }
+    }
 
-    fn try_into(self) -> Result<Signature<Engine>, Self::Error> {
-        let r =
-            edwards::Point::<Engine, Unknown>::from_xy(self.r_x, self.r_y, &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new())?;
-        let s: <Engine as JubjubEngine>::Fs = encode_fr_into_fs::<Engine>(self.s);
+    pub fn verify_musig_sha256(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
+        let valid = self.pub_key.0.verify_musig_sha256(
+            msg,
+            &self.sign.0,
+            FixedGenerators::SpendingKeyGenerator,
+            &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new(),
+        );
+        if valid {
+            Some(self.pub_key.0.clone())
+        } else {
+            None
+        }
+    }
+}
 
-        Ok(Signature::<Engine> { r, s })
+impl std::fmt::Debug for TxSignature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let hex_pk = hex::encode(&self.pub_key.serialize_packed().unwrap());
+        let hex_sign = hex::encode(&self.sign.serialize_packed().unwrap());
+        write!(f, "{{ pub_key: {}, sign: {} }}", hex_pk, hex_sign)
+    }
+}
+
+#[derive(Clone)]
+pub struct PackedPublicKey(PublicKey<Engine>);
+
+impl PackedPublicKey {
+    fn serialize_packed(&self) -> std::io::Result<Vec<u8>> {
+        let mut packed_point = [0u8; 32];
+        (self.0).0.write(packed_point.as_mut())?;
+        Ok(packed_point.to_vec())
+    }
+}
+
+impl Serialize for PackedPublicKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::Error;
+        let packed_point = self
+            .serialize_packed()
+            .map_err(|e| Error::custom(e.to_string()))?;
+
+        serializer.serialize_str(&hex::encode(packed_point))
+    }
+}
+
+impl<'de> Deserialize<'de> for PackedPublicKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+        String::deserialize(deserializer).and_then(|string| {
+            let bytes = hex::decode(&string).map_err(|e| Error::custom(e.to_string()))?;
+            if bytes.len() != 32 {
+                return Err(Error::custom("PublicKey size mismatch"));
+            }
+            Ok(PackedPublicKey(PublicKey::<Engine>(
+                edwards::Point::read(
+                    &*bytes,
+                    &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new(),
+                )
+                .map_err(|e| {
+                    Error::custom(format!("Failed to restore point: {}", e.to_string()))
+                })?,
+            )))
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct PackedSignature(Signature<Engine>);
+
+impl PackedSignature {
+    fn serialize_packed(&self) -> std::io::Result<Vec<u8>> {
+        let mut packed_signature = [0u8; 64];
+        let (r_bar, s_bar) = packed_signature.as_mut().split_at_mut(32);
+
+        (self.0).r.write(r_bar)?;
+        (self.0).s.into_repr().write_le(s_bar)?;
+
+        Ok(packed_signature.to_vec())
+    }
+}
+
+impl Serialize for PackedSignature {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::Error;
+
+        let packed_signature = self
+            .serialize_packed()
+            .map_err(|e| Error::custom(e.to_string()))?;
+        serializer.serialize_str(&hex::encode(&packed_signature))
+    }
+}
+
+impl<'de> Deserialize<'de> for PackedSignature {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+        String::deserialize(deserializer).and_then(|string| {
+            let bytes = hex::decode(&string).map_err(|e| Error::custom(e.to_string()))?;
+            if bytes.len() != 64 {
+                return Err(Error::custom("Signature size mismatch"));
+            }
+
+            let (r_bar, s_bar) = bytes.split_at(32);
+
+            let r = edwards::Point::read(
+                r_bar,
+                &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new(),
+            )
+            .map_err(|e| {
+                Error::custom(format!(
+                    "Failed to restore R point from R_bar: {}",
+                    e.to_string()
+                ))
+            })?;
+
+            let mut s_repr = FsRepr::default();
+            s_repr
+                .read_le(s_bar)
+                .map_err(|e| Error::custom(format!("s read err: {}", e.to_string())))?;
+
+            let s = <Engine as JubjubEngine>::Fs::from_repr(s_repr).map_err(|e| {
+                Error::custom(format!(
+                    "Failed to restore s scalar from s_bar: {}",
+                    e.to_string()
+                ))
+            })?;
+
+            Ok(PackedSignature(Signature { r, s }))
+        })
     }
 }

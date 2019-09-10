@@ -1,8 +1,9 @@
 import BN = require('bn.js');
-import { curve } from 'elliptic';
+import {curve} from 'elliptic';
 import EdwardsPoint = curve.edwards.EdwardsPoint;
 import {sha256} from "js-sha256";
 import BasePoint = curve.base.BasePoint;
+import edwards = curve.edwards;
 
 const blake2b = require('blake2b');
 const elliptic = require('elliptic');
@@ -59,7 +60,7 @@ let gen5 = altjubjubCurve.point(
 );
 const basicGenerators = [gen1, gen2, gen3, gen4, gen5];
 
-function wrapFs(fs) {
+function wrapFs(fs: BN): BN {
     while (fs.ltn(0)) {
         fs = fs.add(fsModulus);
     }
@@ -274,7 +275,10 @@ export function musigSHA256(priv_key: BN, msg: Buffer) {
     // console.log("msg_padded: ", msg_padded.toString("hex"));
 
     const s = wrapFs(sha256HStart(concat, msg_padded).mul(priv_key).add(r));
-    return {r: { x: r_g.getX().toString("hex"), y: r_g.getY().toString("hex")}, s: s.toString("hex")};
+
+    let signature = Buffer.concat([serializePointPacked(r_g), s.toBuffer("le", 32)]).toString("hex");
+    let pubkey = serializePointPacked(pub_key).toString("hex");
+    return {pub_key: pubkey, sign: signature};
 }
 
 export function musigPedersen(priv_key: BN, msg: Buffer) {
@@ -295,13 +299,28 @@ export function musigPedersen(priv_key: BN, msg: Buffer) {
     msg.copy(msg_padded, 0, 0, 32);
 
     const s = wrapFs(pedersenHStar(Buffer.concat([concat_hash_bytes, msg_padded])).mul(priv_key).add(r));
-    return {r: { x: r_g.getX().toString("hex"), y: r_g.getY().toString("hex")}, s: s.toString("hex")};
+
+    let signature = Buffer.concat([serializePointPacked(r_g), s.toBuffer("le", 32)]).toString("hex");
+    let pubkey = serializePointPacked(pub_key).toString("hex");
+    return {pub_key: pubkey, sign: signature};
 }
 
-export function privateKeyToPublicKey(pk: BN): BasePoint  {
+console.log(JSON.stringify(musigPedersen(new BN(5), Buffer.from([1,2,3]))));
+
+export function privateKeyToPublicKey(pk: BN): edwards.EdwardsPoint  {
     return altjubjubCurve.g.mul(pk);
 }
 
+function serializePointPacked(point: edwards.EdwardsPoint) {
+    let y = point.getY();
+    let y_buff = y.toBuffer("le", 32);
+
+    if (altjubjubCurve.pointFromY(y, true).getX().eq(point.getX())) {
+        //x is odd
+        y_buff[y_buff.length - 1] |= (1 << 7);
+    }
+    return y_buff;
+}
 
 function testCalculate() {
     for (let w = 0; w < 3; ++w) {
