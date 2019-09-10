@@ -32,11 +32,11 @@ export async function depoloyGovernance(
 
 export async function deployFranklin(
     wallet,
+    governanceContranct,
     genesisRoot = ethers.constants.HashZero,
     franklinCode = franklinContractCode,
     verifierCode = verifierContractCode,
-    vkCode = vkContractCode,
-    governanceContranct
+    vkCode = vkContractCode
     ) {
     try {
         let verifier = await deployContract(wallet, verifierCode, [], {

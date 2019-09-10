@@ -1,5 +1,5 @@
 import {ethers} from "ethers";
-import {addTestERC20Token, deployFranklin} from "../src.ts/deploy";
+import {addTestERC20Token, deployFranklin, depoloyGovernance} from "../src.ts/deploy";
 
 import {expect, use} from "chai";
 import {solidity} from "ethereum-waffle";
@@ -19,11 +19,13 @@ describe("INTEGRATION: Deposit", function() {
     this.timeout(30000);
 
     let franklinDeployedContract;
+    let governanceDeployedContract;
     let erc20DeployedToken;
 
     beforeEach(async () => {
-        franklinDeployedContract = await deployFranklin(wallet);
-        erc20DeployedToken = await addTestERC20Token(wallet, franklinDeployedContract);
+        governanceDeployedContract = await depoloyGovernance(wallet);
+        franklinDeployedContract = await deployFranklin(wallet, governanceDeployedContract);
+        erc20DeployedToken = await addTestERC20Token(wallet, governanceDeployedContract);
         // Make sure that exit wallet can execute transactions.
         await wallet.sendTransaction({to: exitWallet.address, value: parseEther("1.0")});
     });
