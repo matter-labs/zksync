@@ -70,7 +70,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 )?,
                 amount_packed: zero_circuit_element.clone(),
                 full_amount: zero_circuit_element.clone(),
-                pub_signature_r: zero_circuit_element.clone(),
+                pub_signature_r_x: zero_circuit_element.clone(),
+                pub_signature_r_y: zero_circuit_element.clone(),
                 pub_signature_s: zero_circuit_element.clone(),
                 fee_packed: zero_circuit_element.clone(),
                 fee: zero_circuit_element.clone(),
@@ -964,7 +965,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let is_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_serialized_tx_correct"),
-            serialized_tx_bits,
+            serialized_tx_bits.clone(),
             &op_data,
         )?;
 
@@ -999,9 +1000,16 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(cur.account_address.get_bits_be());
         pubdata_bits.extend(op_data.ethereum_key.get_bits_be());
         pubdata_bits.extend(cur.token.get_bits_be());
-        pubdata_bits.extend(op_data.amount_to_exit.get_bits_be());
+        pubdata_bits.extend(amount_to_exit.get_bits_be());
         pubdata_bits.extend(op_data.pub_signature_s.get_bits_be());
-        pubdata_bits.extend(op_data.pub_signature_r.get_bits_be());
+
+        let mut r_y_bits = op_data.pub_signature_r_y.get_bits_be();
+        r_y_bits.truncate(franklin_constants::FR_BIT_WIDTH_PADDED - 1);
+        let mut r_x_bits = op_data.pub_signature_r_x.get_bits_be();
+        r_x_bits.truncate(1);
+
+        pubdata_bits.extend(r_y_bits);
+        pubdata_bits.extend(r_x_bits);
 
         pubdata_bits.resize(
             14 * franklin_constants::CHUNK_BIT_WIDTH,

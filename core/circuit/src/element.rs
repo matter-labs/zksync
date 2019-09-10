@@ -1,4 +1,4 @@
-use crate::utils::pack_bits_to_element;
+use crate::utils::{allocate_bits_vector, pack_bits_to_element};
 use bellman::{ConstraintSystem, SynthesisError};
 use franklin_crypto::circuit::boolean::Boolean;
 
@@ -43,6 +43,23 @@ impl<E: JubjubEngine> CircuitElement<E> {
             AllocatedNum::alloc(cs.namespace(|| "number from field element"), field_element)?;
         CircuitElement::from_number_padded(cs.namespace(|| "circuit_element"), number)
     }
+
+    pub fn from_witness_be_bits_padded<CS: ConstraintSystem<E>>(
+        mut cs: CS,
+        witness_bits: &[Option<bool>],
+    ) -> Result<Self, SynthesisError> {
+        let mut allocated_bits =
+            allocate_bits_vector(cs.namespace(|| "allocate bits"), witness_bits)?;
+        allocated_bits.reverse();
+        let length = allocated_bits.len();
+        let number = pack_bits_to_element(cs.namespace(|| "ce from bits"), &allocated_bits)?;
+        Ok(Self {
+            number,
+            bits_le: allocated_bits,
+            length,
+        })
+    }
+
     pub fn from_number<CS: ConstraintSystem<E>>(
         mut cs: CS,
         number: AllocatedNum<E>,

@@ -8,7 +8,7 @@ use ff::{Field, PrimeField};
 use crate::account::AccountWitness;
 
 use models::circuit::account::CircuitAccountTree;
-
+use models::params as franklin_constants;
 use pairing::bn256::*;
 
 pub fn noop_operation(
@@ -55,7 +55,9 @@ pub fn noop_operation(
             a: Some(Fr::zero()),
             b: Some(Fr::zero()),
             new_pub_key_hash: Some(Fr::zero()),
-            pub_signature: Some(Fr::zero()),
+            pub_signature_s: vec![Some(false); franklin_constants::FR_BIT_WIDTH_PADDED],
+            pub_signature_r_x: vec![Some(false); franklin_constants::FR_BIT_WIDTH_PADDED],
+            pub_signature_r_y: vec![Some(false); franklin_constants::FR_BIT_WIDTH_PADDED],
         },
         lhs: OperationBranch {
             address: Some(account_address_fe),

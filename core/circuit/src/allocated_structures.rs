@@ -99,7 +99,8 @@ pub struct AllocatedOperationData<E: JubjubEngine> {
     pub second_sig_msg: CircuitElement<E>,
     pub third_sig_msg: CircuitElement<E>,
     pub new_pubkey_hash: CircuitElement<E>,
-    pub pub_signature_r: CircuitElement<E>,
+    pub pub_signature_r_x: CircuitElement<E>,
+    pub pub_signature_r_y: CircuitElement<E>,
     pub pub_signature_s: CircuitElement<E>,
     pub ethereum_key: CircuitElement<E>,
     pub a: CircuitElement<E>,
@@ -191,17 +192,31 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             || op.args.new_pub_key_hash.grab(),
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         )?;
+        assert_eq!(
+            op.args.pub_signature_r_x.len(),
+            franklin_constants::FR_BIT_WIDTH_PADDED
+        );
+        let pub_signature_r_x = CircuitElement::from_witness_be_bits_padded(
+            cs.namespace(|| "pub_signature_r_x"),
+            &op.args.pub_signature_r_x,
+        )?;
+        assert_eq!(
+            op.args.pub_signature_r_y.len(),
+            franklin_constants::FR_BIT_WIDTH_PADDED
+        );
+        let pub_signature_r_y = CircuitElement::from_witness_be_bits_padded(
+            cs.namespace(|| "pub_signature_r_y"),
+            &op.args.pub_signature_r_y,
+        )?;
 
-        let pub_signature_r =
-            CircuitElement::from_fe_padded(cs.namespace(|| "pub_signature_r"), || {
-                op.args.pub_signature_r.grab()
-            })?;
-
-        
-        let pub_signature_s =
-            CircuitElement::from_fe_padded(cs.namespace(|| "pub_signature_s"), || {
-                op.args.pub_signature_s.grab()
-        })?;
+        assert_eq!(
+            op.args.pub_signature_s.len(),
+            franklin_constants::FR_BIT_WIDTH_PADDED
+        );
+        let pub_signature_s = CircuitElement::from_witness_be_bits_padded(
+            cs.namespace(|| "pub_signature_s"),
+            &op.args.pub_signature_s,
+        )?;
         // let new_pubkey_hash = new_pubkey.get_hash().clone();
 
         let a = CircuitElement::from_fe_strict(
@@ -223,7 +238,8 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             fee,
             amount_unpacked,
             full_amount,
-            pub_signature_r,
+            pub_signature_r_x,
+            pub_signature_r_y,
             pub_signature_s,
             first_sig_msg,
             second_sig_msg,

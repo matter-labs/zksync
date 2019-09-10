@@ -195,6 +195,26 @@ where
     Ok(allocated)
 }
 
+pub fn allocate_bits_vector<E, CS>(
+    mut cs: CS,
+    bits: &[Option<bool>],
+) -> Result<Vec<boolean::Boolean>, SynthesisError>
+where
+    E: JubjubEngine,
+    CS: ConstraintSystem<E>,
+{
+    let mut allocated = vec![];
+    for (i, e) in bits.iter().enumerate() {
+        let element = boolean::Boolean::from(boolean::AllocatedBit::alloc(
+            cs.namespace(|| format!("path element{}", i)),
+            e.clone(),
+        )?);
+        allocated.push(element);
+    }
+
+    Ok(allocated)
+}
+
 pub fn append_packed_public_key(
     content: &mut Vec<boolean::Boolean>,
     x_bits: Vec<boolean::Boolean>,
@@ -221,7 +241,15 @@ pub fn append_be_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, widt
     token_bits.reverse();
     content.extend(token_bits.clone());
 }
-
+pub fn be_bytes_into_bits(bytes: &[u8]) -> Vec<bool> {
+    let mut bits = vec![];
+    for byte in bytes {
+        for i in 0..8 {
+            bits.push((byte >> (7 - i)) % 2u8 == 1u8);
+        }
+    }
+    bits
+}
 pub fn le_bit_vector_into_field_element<P: PrimeField>(bits: &[bool]) -> P {
     // double and add
     let mut fe = P::zero();
