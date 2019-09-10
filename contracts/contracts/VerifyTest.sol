@@ -15,6 +15,7 @@ contract VerifyTest {
 
     function verifyProof(bytes32 commitment, uint256[8] calldata proof)
         external
+        view
     {
         require(verifyBlockProof(proof, commitment), "verification failed");
     }
