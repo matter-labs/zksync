@@ -14,7 +14,7 @@ export const vkContractCode = require('../build/VerificationKey');
 export const verifierContractCode = require('../build/Verifier');
 export const governanceContractCode = require('../build/Governance');
 
-export async function depoloyGovernance(
+export async function deployGovernance(
     wallet,
     governorAddress = wallet.address,
     governanceCode = governanceContractCode
