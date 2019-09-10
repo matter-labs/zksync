@@ -32,7 +32,7 @@ export async function depoloyGovernance(
 
 export async function deployFranklin(
     wallet,
-    governanceContranct,
+    governanceAddress,
     genesisRoot = ethers.constants.HashZero,
     franklinCode = franklinContractCode,
     verifierCode = verifierContractCode,
@@ -54,7 +54,7 @@ export async function deployFranklin(
                 genesisRoot,
                 ethers.constants.AddressZero,
                 wallet.address,
-                governanceContranct.address
+                governanceAddress
             ],
         {
             gasLimit: 6500000,
