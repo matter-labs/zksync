@@ -2,12 +2,22 @@
 <b-row>
     <b-col sm="6" class="col-xl-4 col-lg-5 col-md-6 col-sm-12 mb-5">
         <Alert v-bind:message="message">asd</Alert>
-        Onchain balances:
         <BalancesList balanceListId="onchain" v-bind:balances="onchainBalances"></BalancesList>
-        Contract balances:
+        <DepositButtons 
+            componentId="onchain"
+            v-bind:topBalances="onchainBalances" 
+            v-bind:bottomBalances="contractBalances"
+            v-on:depositEvent="depositOnchain"
+            v-on:withdrawEvent="withdrawOnchain"
+        ></DepositButtons>
         <BalancesList balanceListId="contract" v-bind:balances="contractBalances"></BalancesList>
-        <DepositButtons></DepositButtons>
-        Franklin balances:
+        <DepositButtons 
+            componentId="offchain"
+            v-bind:topBalances="contractBalances" 
+            v-bind:bottomBalances="franklinBalances"
+            v-on:depositEvent="depositOffchain"
+            v-on:withdrawEvent="withdrawOffchain"
+        ></DepositButtons>
         <BalancesList balanceListId="franklin" v-bind:balances="franklinBalances"></BalancesList>
     </b-col>
     <b-col sm="6" class="col-xl-4 col-lg-5 col-md-6 col-sm-12 mb-5">
@@ -23,13 +33,11 @@ import { Wallet, FranklinProvider } from 'franklin_lib'
 import { WalletDecorator } from '../WalletDecorator'
 // END-TODO
 
-import Deposit from '../components/Deposit.vue'
 import Alert from '../components/Alert.vue'
 import BalancesList from '../components/BalancesList.vue'
 import DepositButtons from '../components/DepositButtons.vue'
 
 const components = {
-    Deposit,
     Alert,
     BalancesList,
     DepositButtons
@@ -54,13 +62,41 @@ export default {
         window.wallet = await Wallet.fromEthWallet(signer, franklinProvider);
         window.walletDecorator = new WalletDecorator(window.wallet);
 
-
         this.updateAccountInfo();
     },
     methods: {
         displayAlert(msg) {
             this.message = String(msg);
             alert(msg);
+        },
+        async depositOnchain(kwargs) {
+            console.log('depositOnchain', kwargs);
+            try {
+                if ( ! window.wallet) {
+                    this.$emit('alert', `Wallet is ${window.wallet}`);
+                    return;
+                }
+
+                await window.wallet.deposit();
+
+                console.log('token', kwargs.token);
+                console.log('amount', kwargs.amount);
+
+                this.displayAlert(`deposit succeeded or something`);
+                this.$emit('alert', `deposit succeeded or something`);
+            } catch (e) {
+                this.$emit('alert', `unknown error: ${e}`);
+                this.displayAlert(`unknown error: ${e}`);
+            }
+        },
+        async withdrawOnchain(kwargs) {
+            console.log('withdrawOnchain', kwargs);
+        },
+        async depositOffchain(kwargs) {
+            this.displayAlert(`depositOffchain ${JSON.stringify(kwargs)}`);
+        },
+        async withdrawOffchain(kwargs) {
+            this.displayAlert(`withdrawOffchain ${JSON.stringify(kwargs)}`);
         },
         async updateAccountInfo() {
             await window.walletDecorator.updateState();
