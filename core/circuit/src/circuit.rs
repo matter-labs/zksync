@@ -620,12 +620,18 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             Ok(op.signature.get()?.r.into_xy().1)
         })?;
 
-        let signature_r = ecc::EdwardsPoint::interpret(
-            cs.namespace(|| "signature r as point"),
+        let (signature_r, is_sig_r_correct) = ecc::EdwardsPoint::from_x_y_unchecked(
+            cs.namespace(|| "interpet siganture_r"),
             &signature_r_x,
             &signature_r_y,
             self.params,
         )?;
+        // let signature_r = ecc::EdwardsPoint::interpret(
+        //     cs.namespace(|| "signature r as point"),
+        //     &signature_r_x,
+        //     &signature_r_y,
+        //     self.params,
+        // )?;
 
         let signature_s = AllocatedNum::alloc(cs.namespace(|| "signature s witness"), || {
             Ok(op.signature.get()?.s)
@@ -671,6 +677,12 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             generator,
         )?;
 
+        let is_signature_correctly_verified = Boolean::from(Boolean::and(
+            cs.namespace(|| "is_signature_correctly_verified"),
+            &is_sig_verified,
+            &is_sig_r_correct,
+        )?);
+
         let diff_a_b =
             Expression::from(&op_data.a.get_number()) - Expression::from(&op_data.b.get_number());
         let mut diff_a_b_bits = diff_a_b.into_bits_le(cs.namespace(|| "balance-fee bits"))?;
@@ -684,57 +696,57 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?);
 
         let mut op_flags = vec![];
-        // op_flags.push(self.deposit(
-        //     cs.namespace(|| "deposit"),
-        //     &mut cur,
-        //     &chunk_data,
-        //     &is_a_geq_b,
-        //     &is_account_empty,
-        //     &op_data,
-        //     &ext_pubdata_chunk,
-        // )?);
-        // op_flags.push(self.transfer(
-        //     cs.namespace(|| "transfer"),
-        //     &mut cur,
-        //     &lhs,
-        //     &rhs,
-        //     &chunk_data,
-        //     &is_a_geq_b,
-        //     &is_account_empty,
-        //     &op_data,
-        //     &ext_pubdata_chunk,
-        //     &is_sig_verified,
-        // )?);
-        // op_flags.push(self.transfer_to_new(
-        //     cs.namespace(|| "transfer_to_new"),
-        //     &mut cur,
-        //     &lhs,
-        //     &rhs,
-        //     &chunk_data,
-        //     &is_a_geq_b,
-        //     &is_account_empty,
-        //     &op_data,
-        //     &ext_pubdata_chunk,
-        //     &is_sig_verified,
-        // )?);
-        // op_flags.push(self.withdraw(
-        //     cs.namespace(|| "withdraw"),
-        //     &mut cur,
-        //     &chunk_data,
-        //     &is_a_geq_b,
-        //     &op_data,
-        //     &ext_pubdata_chunk,
-        //     &is_sig_verified,
-        // )?);
-        // op_flags.push(self.close_account(
-        //     cs.namespace(|| "close_account"),
-        //     &mut cur,
-        //     &chunk_data,
-        //     &ext_pubdata_chunk,
-        //     &op_data,
-        //     &subtree_root,
-        //     &is_sig_verified,
-        // )?);
+        op_flags.push(self.deposit(
+            cs.namespace(|| "deposit"),
+            &mut cur,
+            &chunk_data,
+            &is_a_geq_b,
+            &is_account_empty,
+            &op_data,
+            &ext_pubdata_chunk,
+        )?);
+        op_flags.push(self.transfer(
+            cs.namespace(|| "transfer"),
+            &mut cur,
+            &lhs,
+            &rhs,
+            &chunk_data,
+            &is_a_geq_b,
+            &is_account_empty,
+            &op_data,
+            &ext_pubdata_chunk,
+            &is_signature_correctly_verified,
+        )?);
+        op_flags.push(self.transfer_to_new(
+            cs.namespace(|| "transfer_to_new"),
+            &mut cur,
+            &lhs,
+            &rhs,
+            &chunk_data,
+            &is_a_geq_b,
+            &is_account_empty,
+            &op_data,
+            &ext_pubdata_chunk,
+            &is_signature_correctly_verified,
+        )?);
+        op_flags.push(self.withdraw(
+            cs.namespace(|| "withdraw"),
+            &mut cur,
+            &chunk_data,
+            &is_a_geq_b,
+            &op_data,
+            &ext_pubdata_chunk,
+            &is_signature_correctly_verified,
+        )?);
+        op_flags.push(self.close_account(
+            cs.namespace(|| "close_account"),
+            &mut cur,
+            &chunk_data,
+            &ext_pubdata_chunk,
+            &op_data,
+            &subtree_root,
+            &is_signature_correctly_verified,
+        )?);
         op_flags.push(self.full_exit(
             cs.namespace(|| "full_exit"),
             &mut cur,
@@ -742,7 +754,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &is_a_geq_b,
             &op_data,
             &ext_pubdata_chunk,
-            &is_sig_verified,
+            &is_signature_correctly_verified,
             &signature,
         )?);
         op_flags.push(self.noop(cs.namespace(|| "noop"), &chunk_data, &ext_pubdata_chunk)?);
@@ -946,7 +958,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         is_sig_verified: &Boolean,
         signature: &EddsaSignature<E>,
     ) -> Result<Boolean, SynthesisError> {
-        println!("sig_valid_full_exit: {:?}", is_sig_verified.get_value());
+        // println!("sig_valid_full_exit: {:?}", is_sig_verified.get_value());
         //TODO: this flag is used too often, we better compute it above
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
@@ -970,6 +982,22 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &op_data,
         )?;
 
+        let is_r_x_correct = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is r_x correct"),
+            signature.r.get_x(),
+            &op_data.pub_signature_r_x.get_number(),
+        )?);
+        let is_r_y_correct = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is r_y correct"),
+            signature.r.get_y(),
+            &op_data.pub_signature_r_y.get_number(),
+        )?);
+        let is_s_correct = Boolean::from(AllocatedNum::equals(
+            cs.namespace(|| "is s correct"),
+            &signature.s,
+            &op_data.pub_signature_s.get_number(),
+        )?);
+
         let is_serialized_tx_correct = multi_or(
             cs.namespace(|| "sig is valid or not first chunk"),
             &[is_serialized_tx_correct, is_first_chunk.clone().not()],
@@ -983,7 +1011,13 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let is_signed_correctly = multi_and(
             cs.namespace(|| "is_signed_correctly"),
-            &[is_serialized_tx_correct, is_sig_verified.clone()],
+            &[
+                is_serialized_tx_correct,
+                is_sig_verified.clone(),
+                is_r_x_correct,
+                is_r_y_correct,
+                is_s_correct,
+            ],
         )?;
 
         let amount_to_exit = CircuitElement::conditionally_select_with_number_strict(
@@ -992,12 +1026,11 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &cur.balance,
             &is_signed_correctly.not(),
         )?;
-        println!("amount_to_exit full_exit: {:?}", amount_to_exit.get_number().get_value());
         let mut base_valid_flags = vec![];
         //construct pubdata
         let mut pubdata_bits = vec![];
 
-        pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //1 
+        pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //1
         pubdata_bits.extend(cur.account_address.get_bits_be()); //3
         pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //20
         pubdata_bits.extend(cur.token.get_bits_be()); // 2
@@ -1020,21 +1053,20 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         );
 
         println!("pub_data: ");
-        for (i, bit) in pubdata_bits.iter().enumerate(){
-            if i%64 ==0{
+        for (i, bit) in pubdata_bits.iter().enumerate() {
+            if i % 64 == 0 {
                 println!("")
-            }else if i%8==0{
+            } else if i % 8 == 0 {
                 print!(" ")
             };
             let numb = {
-                if bit.get_value().unwrap(){
+                if bit.get_value().unwrap_or(false) {
                     1
-                }else{
+                } else {
                     0
                 }
             };
             print!("{}", numb);
-            
         }
         println!("");
         let pubdata_chunk = select_pubdata_chunk(
@@ -1075,7 +1107,10 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?);
 
         let lhs_valid = multi_and(cs.namespace(|| "is_lhs_valid"), &lhs_valid_flags)?;
-        let lhs_valid_signed = multi_and(cs.namespace(||"lhs_valid_signed"), &[lhs_valid.clone(), is_signed_correctly])?;
+        let lhs_valid_signed = multi_and(
+            cs.namespace(|| "lhs_valid_signed"),
+            &[lhs_valid.clone(), is_signed_correctly],
+        )?;
         let mut ohs_valid_flags = vec![];
         ohs_valid_flags.push(is_base_valid);
         ohs_valid_flags.push(is_first_chunk.not());
@@ -1086,18 +1121,17 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &[lhs_valid.clone(), is_ohs_valid],
         )?;
 
-        let updated_balance = Expression::from(&cur.balance.get_number()) - Expression::from(&amount_to_exit.get_number());
-                println!("balance before change: {:?}", cur.balance .get_number().get_value());
+        let updated_balance = Expression::from(&cur.balance.get_number())
+            - Expression::from(&amount_to_exit.get_number());
 
         //mutate current branch if it is first chunk of valid withdraw transaction
         cur.balance = CircuitElement::conditionally_select_with_number_strict(
             cs.namespace(|| "mutated balance"),
             updated_balance,
             &cur.balance,
-            &lhs_valid_signed ,
+            &lhs_valid_signed,
         )?;
-        println!("balance after change: {:?}", cur.balance .get_number().get_value());
-    
+
         let updated_nonce =
             Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1);
 
@@ -1108,7 +1142,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &cur.account.nonce,
             &lhs_valid,
         )?;
-
 
         Ok(tx_valid)
     }
@@ -1937,7 +1970,7 @@ fn multi_and<E: JubjubEngine, CS: ConstraintSystem<E>>(
             &result,
             bool_x,
         )?;
-        println!("multi and iteration number: {} : result {:?}", i, result.get_value());
+        // println!("multi and iteration number: {} : result {:?}", i, result.get_value());
     }
 
     Ok(result)
