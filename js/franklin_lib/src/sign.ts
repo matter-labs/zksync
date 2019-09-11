@@ -250,9 +250,7 @@ function sha256HStart(a: Buffer, b: Buffer): BN {
 
 function pedersenHStar(input: Buffer) : BN {
     let p_hash_start_res = pedersenHash(input);
-    // console.log("p_hash_start_hash_result ", p_hash_start_res);
     let p_hash_star_fe = to_uniform(p_hash_start_res.getX().toBuffer("le", 32));
-    // console.log("p h* fe: ", p_hash_star_fe);
     return p_hash_star_fe;
 }
 
@@ -270,9 +268,6 @@ export function musigSHA256(priv_key: BN, msg: Buffer) {
 
     let msg_padded = Buffer.alloc(32, 0);
     msg.copy(msg_padded, 0, 0, 32);
-
-    // console.log("concat: ", concat.toString("hex"));
-    // console.log("msg_padded: ", msg_padded.toString("hex"));
 
     const s = wrapFs(sha256HStart(concat, msg_padded).mul(priv_key).add(r));
 
@@ -305,10 +300,12 @@ export function musigPedersen(priv_key: BN, msg: Buffer) {
     return {pub_key: pubkey, sign: signature};
 }
 
-console.log(JSON.stringify(musigPedersen(new BN(5), Buffer.from([1,2,3]))));
-
 export function privateKeyToPublicKey(pk: BN): edwards.EdwardsPoint  {
     return altjubjubCurve.g.mul(pk);
+}
+
+export function pubkeyToAddress(pubKey) {
+
 }
 
 function serializePointPacked(point: edwards.EdwardsPoint) {
@@ -320,14 +317,4 @@ function serializePointPacked(point: edwards.EdwardsPoint) {
         y_buff[y_buff.length - 1] |= (1 << 7);
     }
     return y_buff;
-}
-
-function testCalculate() {
-    for (let w = 0; w < 3; ++w) {
-        let p1 = lookupGeneratorFromTable(0, w, w * 7 + 2);
-        // let p1 = basicGenerators[0].mul(new BN(256)).normalize();
-        let p2 = calulateGenerator(0, w, w * 7 + 2);
-        // console.log(p2);
-        console.log(p1, p2);
-    }
 }

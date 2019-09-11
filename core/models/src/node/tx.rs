@@ -6,13 +6,14 @@ use crypto::{digest::Digest, sha2::Sha256};
 use super::account::AccountAddress;
 use super::Engine;
 use ff::{PrimeField, PrimeFieldRepr};
-use franklin_crypto::alt_babyjubjub::edwards;
+use franklin_crypto::alt_babyjubjub::{edwards, AltJubjubBn256};
 use franklin_crypto::alt_babyjubjub::fs::FsRepr;
 use franklin_crypto::alt_babyjubjub::JubjubEngine;
 use franklin_crypto::eddsa::{PublicKey, Signature};
 use franklin_crypto::jubjub::FixedGenerators;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use web3::types::Address;
+use crate::params::JUBJUB_PARAMS;
 
 /// Signed by user.
 
@@ -243,7 +244,7 @@ impl TxSignature {
             msg,
             &self.sign.0,
             FixedGenerators::SpendingKeyGenerator,
-            &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new(),
+            &JUBJUB_PARAMS
         );
         if valid {
             Some(self.pub_key.0.clone())
@@ -257,7 +258,7 @@ impl TxSignature {
             msg,
             &self.sign.0,
             FixedGenerators::SpendingKeyGenerator,
-            &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new(),
+            &JUBJUB_PARAMS
         );
         if valid {
             Some(self.pub_key.0.clone())
@@ -276,7 +277,7 @@ impl std::fmt::Debug for TxSignature {
 }
 
 #[derive(Clone)]
-pub struct PackedPublicKey(PublicKey<Engine>);
+pub struct PackedPublicKey(pub PublicKey<Engine>);
 
 impl PackedPublicKey {
     fn serialize_packed(&self) -> std::io::Result<Vec<u8>> {
@@ -314,7 +315,7 @@ impl<'de> Deserialize<'de> for PackedPublicKey {
             Ok(PackedPublicKey(PublicKey::<Engine>(
                 edwards::Point::read(
                     &*bytes,
-                    &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new(),
+                    &JUBJUB_PARAMS as &AltJubjubBn256
                 )
                 .map_err(|e| {
                     Error::custom(format!("Failed to restore point: {}", e.to_string()))
@@ -369,7 +370,7 @@ impl<'de> Deserialize<'de> for PackedSignature {
 
             let r = edwards::Point::read(
                 r_bar,
-                &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new(),
+                &JUBJUB_PARAMS as &AltJubjubBn256
             )
             .map_err(|e| {
                 Error::custom(format!(

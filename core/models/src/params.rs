@@ -1,4 +1,6 @@
 use crate::node::TokenId;
+use lazy_static::lazy_static;
+use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 
 /// Account tree depth
 pub const ACCOUNT_TREE_DEPTH: usize = 5;
@@ -56,3 +58,7 @@ pub const LOCK_DEPOSITS_FOR: u64 = 8 * 60 * 100;
 pub const FR_ADDRESS_LEN: usize = 20;
 
 pub const KEY_FILENAME: &str = "franklin_pk.key";
+
+lazy_static! {
+    pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
+}

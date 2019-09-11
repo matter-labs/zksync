@@ -31,7 +31,7 @@
     "loadtest": "ts-node scripts/loadtest.ts",
     "fmt": "prettier --parser typescript --write \"**/*.ts\"",
     "build": "tsc",
-    "sign-gen": "ts-node tests/gen-singatures.ts",
-    "sign": "ts-node src/sign.ts"
+    "sign-gen": "ts-node tests/spec-test.ts",
+    "spec-test": "ts-node tests/spec-test.ts"
   }
 }

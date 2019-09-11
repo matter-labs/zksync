@@ -12,9 +12,10 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use super::Engine;
 use super::Fr;
 use super::{AccountId, AccountUpdates, Nonce, TokenId};
-use crate::circuit::account::{Balance, CircuitAccount};
+use crate::circuit::account::{Balance, CircuitAccount, pub_key_hash_bytes};
 use franklin_crypto::eddsa::PublicKey;
 use franklin_crypto::pedersen_hash::{baby_pedersen_hash, Personalization};
+use crate::merkle_tree::PedersenHasher;
 
 #[derive(Clone, PartialEq, Default, Eq, Hash)]
 pub struct AccountAddress {
@@ -49,25 +50,10 @@ impl AccountAddress {
     }
 
     pub fn from_pubkey(public_key: PublicKey<Engine>) -> Self {
-        let (x, y) = public_key.0.into_xy();
-        let pubkey_bits = {
-            let mut x_bits = x.get_bits_le_fixed(256);
-            x_bits.extend(y.get_bits_le_fixed(256).into_iter());
-            x_bits.into_iter()
-        };
-        let hash_x = baby_pedersen_hash::<Engine, _>(
-            Personalization::NoteCommitment,
-            pubkey_bits,
-            &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new(),
-        )
-        .into_xy()
-        .0;
-        let mut ped_hash_bytes = [0u8; 32];
-        hash_x
-            .into_repr()
-            .write_be(ped_hash_bytes.as_mut())
-            .expect("failed to serialize Fr");
-        Self::from_bytes(&ped_hash_bytes[0..params::FR_ADDRESS_LEN]).unwrap()
+        let phasher = PedersenHasher::<Bn256>::default();
+        let pk_hash = pub_key_hash_bytes(&public_key, &phasher);
+
+        Self::from_bytes(&pk_hash).expect("pk convert error")
     }
 }
 
