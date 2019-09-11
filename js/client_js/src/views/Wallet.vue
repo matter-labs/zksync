@@ -3,11 +3,12 @@
     <b-col sm="6" class="col-xl-4 col-lg-5 col-md-6 col-sm-12 mb-5">
         <Alert v-bind:message="message">asd</Alert>
         Onchain balances:
-        <BalancesList v-bind:balances="onchainBalances"></BalancesList>
+        <BalancesList balanceListId="onchain" v-bind:balances="onchainBalances"></BalancesList>
         Contract balances:
-        <BalancesList v-bind:balances="contractBalances"></BalancesList>
+        <BalancesList balanceListId="contract" v-bind:balances="contractBalances"></BalancesList>
+        <DepositButtons></DepositButtons>
         Franklin balances:
-        <BalancesList v-bind:balances="franklinBalances"></BalancesList>
+        <BalancesList balanceListId="franklin" v-bind:balances="franklinBalances"></BalancesList>
     </b-col>
     <b-col sm="6" class="col-xl-4 col-lg-5 col-md-6 col-sm-12 mb-5">
         else
@@ -25,12 +26,14 @@ import { WalletDecorator } from '../WalletDecorator'
 import Deposit from '../components/Deposit.vue'
 import Alert from '../components/Alert.vue'
 import BalancesList from '../components/BalancesList.vue'
+import DepositButtons from '../components/DepositButtons.vue'
 
 const components = {
     Deposit,
     Alert,
-    BalancesList
-}
+    BalancesList,
+    DepositButtons
+};
 
 const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
 

@@ -1,10 +1,12 @@
 <template>
-    <b-col>
-        <b-row v-for="balance in balances" v-bind:key=" `${balanceListId}_${balance.token}` ">
-            <b-col class="col-sm-3"> {{ balance.tokenName }} </b-col>
-            <b-col class="col-sm-9"> {{ balance.amount }} </b-col>
-        </b-row>
-    </b-col>
+    <b-card v-bind:title="balanceListId">
+        <b-col>
+            <b-row v-for="balance in balances" v-bind:key=" `${balanceListId}_${balance.tokenName}` ">
+                <b-col class="col-sm-3"> {{ balance.tokenName }} </b-col>
+                <b-col class="col-sm-9"> {{ balance.amount }} </b-col>
+            </b-row>
+        </b-col>
+    </b-card>
 </template>
 
 <script>

@@ -11,7 +11,6 @@ export class WalletDecorator {
     }
 
     tokenNameFromId(tokenId) {
-        console.log(tokenId);
         let token = this.wallet.supportedTokens[tokenId];
         let res = token.symbol;
         if (res) return res;
