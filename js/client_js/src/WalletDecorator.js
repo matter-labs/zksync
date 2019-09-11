@@ -66,6 +66,20 @@ export class WalletDecorator {
     }
 
     async depositOffchain(kwargs) {
+        let token = this.tokenFromName(kwargs.token);
+        let amount = bigNumberify(kwargs.amount);
+        let fee = bigNumberify(0);
 
+        let res = await this.wallet.depositOffchain(token, amount, fee);
+        console.log(res);
+        if (res.err) {
+            throw new Error(res.err);
+        }
+        let receipt = await this.wallet.txReceipt(res.hash);
+        console.log(receipt);
+        if (receipt.fail_reason) {
+            throw new Error(receipt.fail_reason);
+        }
+        return 0;
     }
 }

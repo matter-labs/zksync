@@ -79,9 +79,6 @@ export default {
 
                 await window.walletDecorator.depositOnchain(kwargs);
 
-                console.log('token', kwargs.token);
-                console.log('amount', kwargs.amount);
-
                 this.displayAlert(`deposit succeeded or something`);
                 this.$emit('alert', `deposit succeeded or something`);
             } catch (e) {
@@ -94,6 +91,13 @@ export default {
         },
         async depositOffchain(kwargs) {
             this.displayAlert(`depositOffchain ${JSON.stringify(kwargs)}`);
+            try {
+                await window.walletDecorator.depositOffchain(kwargs);
+
+                this.displayAlert(`deposit succeeded or something`);
+            } catch (e) {
+                this.displayAlert(`unknown error: ${e}`);
+            }
         },
         async withdrawOffchain(kwargs) {
             this.displayAlert(`withdrawOffchain ${JSON.stringify(kwargs)}`);
