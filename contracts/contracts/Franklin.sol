@@ -42,7 +42,7 @@ contract Franklin {
     uint256 constant PARTIAL_EXIT_LENGTH = 6 * 8;
     uint256 constant CLOSE_ACCOUNT_LENGTH = 1 * 8;
     uint256 constant TRANSFER_LENGTH = 2 * 8;
-    uint256 constant FULL_EXIT_LENGTH = 10 * 8;
+    uint256 constant FULL_EXIT_LENGTH = 14 * 8;
 
     // MARK: - Events
 
@@ -161,7 +161,7 @@ contract Franklin {
     }
 
     // Total number of registered OnchainOps
-    uint64 totalOnchainOps;
+    uint64 public totalOnchainOps;
 
     // List of OnchainOps by index
     mapping(uint64 => OnchainOperation) public onchainOps;
@@ -460,6 +460,11 @@ contract Franklin {
         uint256 _fee,
         bytes memory _franklinAddr
     ) internal {
+        require(
+            _franklinAddr.length == PUBKEY_HASH_LEN,
+            "rdpfal"
+        ); // rdpfal - wrong franklin address hash
+        
         // Priority Queue request
         bytes memory pubData = Bytes.toBytesFromAddress(msg.sender); // sender
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(_token)); // token id
@@ -619,7 +624,7 @@ contract Franklin {
         if (_opType == uint8(OpType.Deposit)) {
             bytes memory pubData = Bytes.slice(_publicData, opDataPointer + 3, 38);
             require(
-                pubData.length > 0,
+                pubData.length == 38,
                 "psodpl"
             ); // psodpl - wrong deposit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
@@ -632,7 +637,7 @@ contract Franklin {
         if (_opType == uint8(OpType.PartialExit)) {
             bytes memory pubData = Bytes.slice(_publicData, opDataPointer + 3, 40);
             require(
-                pubData.length > 0,
+                pubData.length == 40,
                 "psopel"
             ); // psopel - wrong partial exit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
@@ -643,9 +648,9 @@ contract Franklin {
         }
 
         if (_opType == uint8(OpType.FullExit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer + 3, 70);
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer + 3, 102);
             require(
-                pubData.length > 0,
+                pubData.length == 102,
                 "psofel"
             ); // psofel - wrong full exit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
@@ -701,25 +706,15 @@ contract Franklin {
         
         uint64 start = _startId;
         uint64 end = start + _totalProcessed;
-
-        OnchainOperation[] memory priorityOps;
         
         uint32 counter = 0;
         for (uint64 current = start; current < end; ++current) {
-            OnchainOperation memory op = onchainOps[current];
-            if (op.opType == OpType.FullExit || op.opType == OpType.Deposit) {
-                priorityOps[counter] = op;
+            if (onchainOps[current].opType == OpType.FullExit || onchainOps[current].opType == OpType.Deposit) {
+                OnchainOperation memory op = onchainOps[current];
+                if (!comparePriorityOps(op, counter+firstPriorityRequestId)) {
+                    return false;
+                }
                 counter++;
-            }
-        }
-
-        if (counter != _priorityCount) {
-            return false;
-        }
-        
-        for (uint32 i = 0; i < _priorityCount; i++) {
-            if (!comparePriorityOps(priorityOps[i], i+firstPriorityRequestId)) {
-                return false;
             }
         }
         return true;
@@ -736,8 +731,8 @@ contract Franklin {
             priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 20, PUBKEY_HASH_LEN + 18);
             onchainPubData = _onchainOp.pubData;
         } else if (_onchainOp.opType == OpType.FullExit && priorityRequests[_priorityRequestId].opType == OpType.FullExit) {
-            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, PUBKEY_HASH_LEN, 54);
-            onchainPubData = Bytes.slice(_onchainOp.pubData, 0, 54);
+            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, PUBKEY_HASH_LEN, 86);
+            onchainPubData = Bytes.slice(_onchainOp.pubData, 0, 86);
         } else {
             revert("cpowop"); // cpowop - wrong operation
         }

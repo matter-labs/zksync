@@ -5,13 +5,13 @@ library Bytes {
     // Compies uint16 'self' into a new 'bytes memory'.
     // Returns the newly created 'bytes memory'.
     function toBytesFromUInt16(uint16 self) internal pure returns (bytes memory bts) {
-        bts = toBytesFromBytes32(bytes32(uint(self)), 2);
+        bts = toBytesFromBytes32(bytes32(uint(self) << 240), 2);
     }
 
     // Compies uint128 'self' into a new 'bytes memory'.
     // Returns the newly created 'bytes memory'.
     function toBytesFromUInt128(uint128 self) internal pure returns (bytes memory bts) {
-        bts = toBytesFromBytes32(bytes32(uint(self)), 16);
+        bts = toBytesFromBytes32(bytes32(uint(self) << 128), 16);
     }
 
     // Copies 'len' bytes from 'self' into a new 'bytes memory', starting at index '0'.

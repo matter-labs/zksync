@@ -3,19 +3,19 @@ import {addTestERC20Token, deployFranklin, deployGovernance} from "../src.ts/dep
 
 import {expect, use} from "chai";
 import {solidity} from "ethereum-waffle";
-import {bigNumberify, parseEther} from "ethers/utils";
-import {createDepositPublicData, createPartialExitPublicData, createWithdrawPublicData} from "./helpers"
+import {bigNumberify, parseEther, hexlify} from "ethers/utils";
+import {createDepositPublicData, createWithdrawPublicData} from "./helpers"
 
 use(solidity);
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
 const exitWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
-const franklinAddress = "010203040506070809101112131415161718192021222334252627";
+const franklinAddress = "0809101112131415161718192021222334252627";
 const franklinAddressBinary = Buffer.from(franklinAddress, "hex");
 const dummyBlockProof = [0, 0, 0, 0, 0, 0, 0, 0];
 
-describe("INTEGRATION: Deposit", function() {
+describe("INTEGRATION: Complete", function() {
     this.timeout(30000);
 
     let franklinDeployedContract;
@@ -35,7 +35,7 @@ describe("INTEGRATION: Deposit", function() {
     it("Ether deposit, commit, withdraw, verify", async () => {
         // Deposit eth
         const depositValue = parseEther("0.3"); // the value passed to tx
-        const depositAmount = parseEther("0.293042748000000000"); // amount after: tx value - some counted fee
+        const depositAmount = parseEther("0.293775600000000000"); // amount after: tx value - some counted fee
         let tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: depositValue});
         let receipt = await tx.wait();
         let events = receipt.events;
@@ -44,8 +44,8 @@ describe("INTEGRATION: Deposit", function() {
         const depositEvent = events[1].args;
 
         expect(priorityEvent.opType).equal(1);
-        expect(priorityEvent.pubData).equal("0x52312ad6f01657413b2eae9287f6b9adad93d5fe000000000000000000000000000000000000010203040506070809101112131415161718192021222334252627");
-        expect(priorityEvent.fee).equal(bigNumberify("0x18b7957612a800"));
+        expect(priorityEvent.pubData).equal("0x52312ad6f01657413b2eae9287f6b9adad93d5fe000000000000000000000413b35a09ad60000809101112131415161718192021222334252627");
+        expect(priorityEvent.fee).equal(bigNumberify("0x161d0f0ef0a000"));
 
         expect(depositEvent.owner).equal(wallet.address);
         expect(depositEvent.tokenId).equal(0);
@@ -57,56 +57,58 @@ describe("INTEGRATION: Deposit", function() {
         expect(totalPriorityRequests).equal(1);
         expect(firstPriorityRequestId).equal(0);
 
-        // // Commit block with eth deposit
-        // const depositBlockPublicData = createDepositPublicData(0, depositValue.sub(depositFee), franklinAddress);
-        // tx = await franklinDeployedContract.commitBlock(1, 22,
-        //     Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
-        //     depositBlockPublicData,
-        //     {
-        //         gasLimit: bigNumberify("500000"),
-        //     },
-        // );
-        // receipt = await tx.wait();
-        // events = receipt.events;
+        // Commit block with eth deposit
+        const depositBlockPublicData = createDepositPublicData(0, hexlify(depositAmount), franklinAddress);
+        tx = await franklinDeployedContract.commitBlock(1, 22,
+            Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
+            depositBlockPublicData,
+            {
+                gasLimit: bigNumberify("500000"),
+            },
+        );
 
-        // const commitedEvent1 = events.pop().args;
+        receipt = await tx.wait();
+        events = receipt.events;
+
+        const commitedEvent1 = events[0].args;
         
-        // expect(commitedEvent1.blockNumber).equal(1);
-
-        // expect(await franklinDeployedContract.onchainOps(0)).equal("0x");
-        // expect(await franklinDeployedContract.totalOnchainOps).equal(1);
+        expect(commitedEvent1.blockNumber).equal(1);
         
-        // expect((await franklinDeployedContract.blocks(1)).onchainOperations).equal(1);
-        // expect((await franklinDeployedContract.blocks(1)).priorityOperations).equal(1);
-        // expect((await franklinDeployedContract.blocks(1)).commitment).equal("0x");
-        // expect((await franklinDeployedContract.blocks(1)).stateRoot).equal("0x");
-        // expect((await franklinDeployedContract.blocks(1)).stateRoot).equal("0x");
-
-        // // Commit block with eth partial exit.
-        // const exitValue = parseEther("0.2");
-        // const exitBlockPublicData = createWithdrawPublicData(0, exitValue, exitWallet.address);
-        // tx = await franklinDeployedContract.commitBlock(2, 22,
-        //     Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
-        //     exitBlockPublicData,
-        //     {
-        //         gasLimit: bigNumberify("500000"),
-        //     },
-        // );
-        // receipt = await tx.wait();
-        // events = receipt.events;
-
-        // const commitedEvent2 = events.pop().args;
-
-        // expect(commitedEvent2.blockNumber).equal(2);
-
-        // expect(await franklinDeployedContract.onchainOps(1)).equal("0x");
-        // expect(await franklinDeployedContract.totalOnchainOps).equal(2);
+        let totalOnchainOps = await franklinDeployedContract.totalOnchainOps();
+        expect(totalOnchainOps).equal(1);
         
-        // expect((await franklinDeployedContract.blocks(2)).onchainOperations).equal(1);
-        // expect((await franklinDeployedContract.blocks(2)).priorityOperations).equal(0);
-        // expect((await franklinDeployedContract.blocks(2)).commitment).equal("0x");
-        // expect((await franklinDeployedContract.blocks(2)).stateRoot).equal("0x");
-        // expect((await franklinDeployedContract.blocks(2)).stateRoot).equal("0x");
+        expect((await franklinDeployedContract.blocks(1)).onchainOperations).equal(1);
+        expect((await franklinDeployedContract.blocks(1)).priorityOperations).equal(1);
+        expect((await franklinDeployedContract.blocks(1)).commitment).equal("0x7b4e12b6adec3e0f9e317e1575d399ef8ed67a7ae798224371afc33e2a0fed81");
+        expect((await franklinDeployedContract.blocks(1)).stateRoot).equal("0x0000000000000000000000000000000000000000000000000000000000000000");
+        expect((await franklinDeployedContract.blocks(1)).validator).equal("0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE");
+
+        // Commit block with eth partial exit.
+        const exitValue = parseEther("0.2");
+        const exitBlockPublicData = createWithdrawPublicData(0, hexlify(exitValue), exitWallet.address);
+
+        tx = await franklinDeployedContract.commitBlock(2, 22,
+            Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
+            exitBlockPublicData,
+            {
+                gasLimit: bigNumberify("500000"),
+            },
+        );
+        receipt = await tx.wait();
+        events = receipt.events;
+
+        const commitedEvent2 = events.pop().args;
+
+        expect(commitedEvent2.blockNumber).equal(2);
+
+        totalOnchainOps = await franklinDeployedContract.totalOnchainOps();
+        expect(totalOnchainOps).equal(2);
+        
+        expect((await franklinDeployedContract.blocks(2)).onchainOperations).equal(1);
+        expect((await franklinDeployedContract.blocks(2)).priorityOperations).equal(0);
+        expect((await franklinDeployedContract.blocks(2)).commitment).equal("0xf7064daefcb240b84ce4f0d8b88d7dcb1cb8aaaf24ccf8a1b9bc42faabc24f15");
+        expect((await franklinDeployedContract.blocks(2)).stateRoot).equal("0x0000000000000000000000000000000000000000000000000000000000000000");
+        expect((await franklinDeployedContract.blocks(2)).validator).equal("0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE");
 
         // // Verify block with deposit and exit.
         // tx = await franklinDeployedContract.verifyBlock(1, dummyBlockProof, {gasLimit: bigNumberify("100000")});
