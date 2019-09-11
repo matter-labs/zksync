@@ -58,6 +58,18 @@ export class WalletDecorator {
     }
     // #endregion
     
+    async transfer(kwargs) {
+        let token = this.tokenFromName(kwargs.token);
+        let amount = bigNumberify(kwargs.amount);
+        let fee = bigNumberify(kwargs.fee);
+        
+        let res = await this.wallet.transfer(kwargs.address, token, amount, fee);
+
+        if (res.err) throw new Error(res.err);
+        let receipt = await this.wallet.txReceipt(res.hash);
+        if (receipt.fail_reason) throw new Error(receipt.fail_reason);
+    }
+
     async depositOnchain(kwargs) {
         let token = this.tokenFromName(kwargs.token);
         let amount = bigNumberify(kwargs.amount);

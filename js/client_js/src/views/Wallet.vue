@@ -56,7 +56,10 @@
             </b-container>
         </b-col>
         <b-col xl="6">
-            else
+            <Transfer
+                v-bind:balances="franklinBalances"
+                v-on:buttonClicked="transferFranklin"
+            ></Transfer>
         </b-col>
     </b-row>
 </b-container>
@@ -72,11 +75,13 @@ import { WalletDecorator } from '../WalletDecorator'
 import Alert from '../components/Alert.vue'
 import BalancesList from '../components/BalancesList.vue'
 import DepositButtons from '../components/DepositButtons.vue'
+import Transfer from '../components/Transfer.vue'
 
 const components = {
     Alert,
     BalancesList,
-    DepositButtons
+    DepositButtons,
+    Transfer
 };
 
 const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
@@ -103,6 +108,19 @@ export default {
     methods: {
         displayAlert(msg) {
             this.message = String(msg);
+        },
+        async transferFranklin(kwargs) {
+            console.log('transfer', kwargs);
+            try {
+                if ( ! window.walletDecorator) {
+                    this.$emit('alert', `Wallet is ${window.walletDecorator}`);
+                    return;
+                }
+
+                await window.walletDecorator.transfer(kwargs);
+            } catch (e) {
+                this.displayAlert(`unknown error: ${e}`);
+            }
         },
         async depositOnchain(kwargs) {
             console.log('depositOnchain', kwargs);
