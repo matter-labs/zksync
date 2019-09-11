@@ -58,7 +58,7 @@ export async function deployFranklin(
         {
             gasLimit: 6500000,
         });
-        console.log(`FRANKLIN_ADDR=${contract.address}`);
+        console.log(`CONTRACT_ADDR=${contract.address}`);
 
         return contract
     } catch (err) {
