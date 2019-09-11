@@ -78,9 +78,14 @@ pub fn generate_sig_data(
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let mut sig_bits_to_hash = bits.to_vec();
-    assert!(sig_bits_to_hash.len() < franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
+    assert!(sig_bits_to_hash.len() <= franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
 
     sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS, false);
+    println!(
+        "inside generation after resize: {}",
+        hex::encode(be_bit_vector_into_bytes(&sig_bits_to_hash))
+    );
+
     let (first_sig_part_bits, remaining) = sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
     let remaining = remaining.to_vec();
     let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
@@ -93,6 +98,10 @@ pub fn generate_sig_data(
     sig_bits.reverse();
     sig_bits.resize(256, false);
 
+    println!(
+        "inside generation: {}",
+        hex::encode(be_bit_vector_into_bytes(&sig_bits))
+    );
     let signature = sign_pedersen(&sig_bits, &private_key, p_g, params, rng);
     // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
     (signature, first_sig_part, second_sig_part, third_sig_part)

@@ -10,7 +10,7 @@ use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::eddsa::Signature;
 use franklin_crypto::jubjub::JubjubEngine;
 use franklin_crypto::jubjub::{edwards, Unknown};
-use models::circuit::account::CircuitAccountTree;
+use models::circuit::account::{Balance, CircuitAccount, CircuitAccountTree};
 use num_traits::cast::ToPrimitive;
 
 use models::node::FullExitOp;
@@ -69,6 +69,24 @@ impl<E: JubjubEngine> FullExitWitness<E> {
         );
 
         pubdata_bits.resize(14 * franklin_constants::CHUNK_BIT_WIDTH, false);
+        println!("pub_data outside: ");
+        for (i,bit) in pubdata_bits.iter().enumerate(){
+            if i%64 ==0{
+                println!("")
+            }else if i%8==0{
+                print!(" ")
+            };
+            let numb = {
+                if *bit{
+                    1
+                }else{
+                    0
+                }
+            };
+            print!("{}", numb);
+            
+        }
+        println!("");
         pubdata_bits
     }
 
@@ -105,6 +123,7 @@ impl<E: JubjubEngine> FullExitWitness<E> {
 pub fn apply_full_exit_tx(
     tree: &mut CircuitAccountTree,
     full_exit: &FullExitOp,
+    is_sig_valid: bool,
 ) -> FullExitWitness<Bn256> {
     let full_exit = FullExitData {
         token: u32::from(full_exit.tx.token),
@@ -115,11 +134,12 @@ pub fn apply_full_exit_tx(
         pub_signature_r_y: be_bytes_into_bits(&full_exit.tx.signature_r_y.clone()),
     };
     // le_bit_vector_into_field_element()
-    apply_full_exit(tree, &full_exit)
+    apply_full_exit(tree, &full_exit, is_sig_valid)
 }
 pub fn apply_full_exit(
     tree: &mut CircuitAccountTree,
     full_exit: &FullExitData,
+    is_sig_valid: bool,
 ) -> FullExitWitness<Bn256> {
     //preparing data and base witness
     let before_root = tree.root_hash();
@@ -133,19 +153,46 @@ pub fn apply_full_exit(
     let token_fe = Fr::from_str(&full_exit.token.to_string()).unwrap();
 
     //applying full_exit
-
-    let (account_witness_before, account_witness_after, balance_before, balance_after) =
-        apply_leaf_operation(
+    let amount_to_exit = {
+        let (_, _, balance, _) = apply_leaf_operation(
             tree,
             full_exit.account_address,
             full_exit.token,
-            |acc| {
-                acc.nonce.add_assign(&Fr::from_str("1").unwrap());
-            },
-            |bal| {
-                bal.value = Fr::zero();
-            },
+            |_| {},
+            |_| {},
         );
+        if is_sig_valid {
+            balance
+        } else {
+            Fr::zero()
+        }
+    };
+
+    let (account_witness_before, account_witness_after, balance_before, balance_after) = {
+        if is_sig_valid {
+            apply_leaf_operation(
+                tree,
+                full_exit.account_address,
+                full_exit.token,
+                |acc| {
+                    acc.nonce.add_assign(&Fr::from_str("1").unwrap());
+                },
+                |bal| {
+                    bal.value = Fr::zero();
+                },
+            )
+        } else {
+            apply_leaf_operation(
+                tree,
+                full_exit.account_address,
+                full_exit.token,
+                |acc| {
+                    acc.nonce.add_assign(&Fr::from_str("1").unwrap());
+                },
+                |_| {},
+            )
+        }
+    };
 
     let after_root = tree.root_hash();
     println!("After root = {}", after_root);
@@ -153,8 +200,26 @@ pub fn apply_full_exit(
         get_audits(tree, full_exit.account_address, full_exit.token);
 
     let a = balance_before;
-    let mut b = Fr::zero();
+    let b = Fr::zero();
 
+    let pub_signature_s: Vec<_> = full_exit
+        .pub_signature_s
+        .clone()
+        .iter()
+        .map(|x| Some(*x))
+        .collect();
+    let pub_signature_r_x: Vec<_> = full_exit
+        .pub_signature_r_x
+        .clone()
+        .iter()
+        .map(|x| Some(*x))
+        .collect();
+    let pub_signature_r_y: Vec<_> = full_exit
+        .pub_signature_r_y
+        .clone()
+        .iter()
+        .map(|x| Some(*x))
+        .collect();
     FullExitWitness {
         before: OperationBranch {
             address: Some(account_address_fe),
@@ -179,14 +244,14 @@ pub fn apply_full_exit(
         args: OperationArguments {
             ethereum_key: Some(full_exit.ethereum_key),
             amount_packed: Some(Fr::zero()),
-            full_amount: Some(Fr::zero()),
+            full_amount: Some(amount_to_exit),
             fee: Some(Fr::zero()),
             a: Some(a),
             b: Some(b),
             new_pub_key_hash: Some(Fr::zero()),
-            pub_signature_s: vec![Some(false);256],
-            pub_signature_r_x: vec![Some(false);256],
-            pub_signature_r_y: vec![Some(false);256],
+            pub_signature_s: pub_signature_s,
+            pub_signature_r_x: pub_signature_r_x,
+            pub_signature_r_y: pub_signature_r_y,
         },
         before_root: Some(before_root),
         after_root: Some(after_root),
@@ -209,7 +274,23 @@ pub fn calculate_full_exit_operations_from_witness(
         .collect();
 
     let mut operations = vec![];
-    for i in 0..14 {
+        operations.push(Operation {
+            new_root: full_exit_witness.after_root,
+            tx_type: full_exit_witness.tx_type,
+            chunk: Some(Fr::from_str("0").unwrap()),
+            pubdata_chunk: Some(pubdata_chunks[0]),
+            first_sig_msg: Some(*first_sig_msg),
+            second_sig_msg: Some(*second_sig_msg),
+            third_sig_msg: Some(*third_sig_msg),
+            signature: signature.clone(),
+            signer_pub_key_x: Some(*signer_pub_key_x),
+            signer_pub_key_y: Some(*signer_pub_key_y),
+            args: full_exit_witness.args.clone(),
+            lhs: full_exit_witness.before.clone(),
+            rhs: full_exit_witness.before.clone(),
+        });
+    
+    for i in 1..14 {
         operations.push(Operation {
             new_root: full_exit_witness.after_root,
             tx_type: full_exit_witness.tx_type,
@@ -222,8 +303,8 @@ pub fn calculate_full_exit_operations_from_witness(
             signer_pub_key_x: Some(*signer_pub_key_x),
             signer_pub_key_y: Some(*signer_pub_key_y),
             args: full_exit_witness.args.clone(),
-            lhs: full_exit_witness.before.clone(),
-            rhs: full_exit_witness.before.clone(),
+            lhs: full_exit_witness.after.clone(),
+            rhs: full_exit_witness.after.clone(),
         });
     }
 
@@ -246,6 +327,7 @@ mod test {
     use models::circuit::account::{
         Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
+    use models::merkle_tree::hasher::Hasher;
     use models::merkle_tree::PedersenHasher;
     use models::params as franklin_constants;
     use rand::{Rng, SeedableRng, XorShiftRng};
@@ -289,7 +371,6 @@ mod test {
 
         let mut account_address: u32 = rng.gen();
         account_address %= tree.capacity();
-        let amount: u128 = 500;
         let token: u32 = 2;
         let token_fe = Fr::from_str(&token.to_string()).unwrap();
         let ethereum_key = Fr::from_str("124").unwrap();
@@ -313,7 +394,6 @@ mod test {
             nonce: Fr::zero(),
             pub_key_hash: sender_pub_key_hash,
         };
-
 
         let mut sig_bits = vec![];
         append_be_fixed_width(
@@ -343,9 +423,23 @@ mod test {
         );
         tree.insert(account_address, sender_leaf_initial);
 
+        sig_bits.resize(franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS, false);
+        println!(
+            "outside generation after resize: {}",
+            hex::encode(be_bit_vector_into_bytes(&sig_bits))
+        );
 
+        let sig_msg = phasher.hash_bits(sig_bits.clone());
+
+        let mut sig_bits_to_check: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
+        sig_bits_to_check.reverse();
+        sig_bits_to_check.resize(256, false);
+        println!(
+            "outside generation: {}",
+            hex::encode(be_bit_vector_into_bytes(&sig_bits_to_check))
+        );
         let mut message_bytes = vec![];
-        let byte_chunks = sig_bits.chunks(8);
+        let byte_chunks = sig_bits_to_check.chunks(8);
         for byte_chunk in byte_chunks {
             let mut byte = 0u8;
             for (i, bit) in byte_chunk.iter().enumerate() {
@@ -387,83 +481,106 @@ mod test {
 
         let mut s_bits = pub_signature_s.clone();
         s_bits.reverse();
-        let s_fr: Fr = le_bit_vector_into_field_element(&s_bits);
-        let s: <Bn256 as JubjubEngine>::Fs = encode_fr_into_fs::<Bn256>(s_fr);
-        let mut is_sig_correct = true;
+
+        // let mut sigs_le_bits: Vec<bool> = BitIterator::new(signature.s.into_repr()).collect();
+        // sigs_le_bits.reverse();
+
+        // let sigs_converted = le_bit_vector_into_field_element(&sigs_le_bits);
+
+        // let s_fs: <Bn256 as JubjubEngine>::Fs = le_bit_vector_into_field_element(&s_bits);
+        let s: <Bn256 as JubjubEngine>::Fs = le_bit_vector_into_field_element(&s_bits);
         let r = edwards::Point::from_xy(r_x, r_y, &AltJubjubBn256::new());
-        if let None = r {
-            is_sig_correct = false;
-            println!("none");
-        }else if let Some(r) = r{
-             println!("some");
-            let signature = Signature { r, s };
-            let is_valid_signature =
-                sender_pk.verify_musig_pedersen(&message_bytes, &signature.clone(), p_g, params);
-            is_sig_correct = is_valid_signature;
+
+        let (is_sig_correct, reconstructed_signature) = match r {
+            None => (false, None),
+            Some(r) => {
+                let sig = Signature { r, s };
+                let is_valid_signature = sender_pk.verify_musig_pedersen(
+                    &message_bytes,
+                    &sig,
+                    p_g,
+                    params,
+                );
+                (is_valid_signature, Some(sig))
+            }
         };
-        println!("is_sig_correct: {}", is_sig_correct);
+        
         assert_eq!(is_sig_correct, true);
-        // let full_exit_witness = apply_full_exit(
-        //     &mut tree,
-        //     &FullExitData {
-        //         token,
-        //         account_address,
-        //         ethereum_key,
-        //         pub_signature_s,
-        //         pub_signature_r_x,
-        //         pub_signature_r_y,
-        //     },
-        // );
 
-        // let operations = calculate_full_exit_operations_from_witness(
-        //     &full_exit_witness,
-        //     &first_sig_part,
-        //     &second_sig_part,
-        //     &third_sig_part,
-        //     signature,
-        //     &sender_x,
-        //     &sender_y,
-        // );
+        let signature = {
+            let mut sigs_le_bits: Vec<bool> =
+                BitIterator::new(reconstructed_signature.clone().unwrap().s.into_repr()).collect();
+            sigs_le_bits.reverse();
 
-        // let (root_after_fee, validator_account_witness) =
-        //     apply_fee(&mut tree, validator_address_number, token, 0);
+            let sigs_converted = le_bit_vector_into_field_element(&sigs_le_bits);
 
-        // let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
+            Some(TransactionSignature {
+                r: reconstructed_signature.clone().unwrap().r,
+                s: sigs_converted,
+            })
+        };
+        let full_exit_witness = apply_full_exit(
+            &mut tree,
+            &FullExitData {
+                token,
+                account_address,
+                ethereum_key,
+                pub_signature_s,
+                pub_signature_r_x,
+                pub_signature_r_y,
+            },
+            is_sig_correct,
+        );
 
-        // let public_data_commitment = public_data_commitment::<Bn256>(
-        //     &full_exit_witness.get_pubdata(),
-        //     full_exit_witness.before_root,
-        //     Some(root_after_fee),
-        //     Some(validator_address),
-        //     Some(block_number),
-        // );
-        // {
-        //     let mut cs = TestConstraintSystem::<Bn256>::new();
+        let operations = calculate_full_exit_operations_from_witness(
+            &full_exit_witness,
+            &first_sig_part,
+            &second_sig_part,
+            &third_sig_part,
+            signature,
+            &sender_x,
+            &sender_y,
+        );
 
-        //     let instance = FranklinCircuit {
-        //         operation_batch_size: 10,
-        //         params,
-        //         old_root: full_exit_witness.before_root,
-        //         new_root: Some(root_after_fee),
-        //         operations,
-        //         pub_data_commitment: Some(public_data_commitment),
-        //         block_number: Some(block_number),
-        //         validator_account: validator_account_witness,
-        //         validator_address: Some(validator_address),
-        //         validator_balances,
-        //         validator_audit_path,
-        //     };
+        let (root_after_fee, validator_account_witness) =
+            apply_fee(&mut tree, validator_address_number, token, 0);
 
-        //     instance.synthesize(&mut cs).unwrap();
+        let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
 
-        //     println!("{}", cs.find_unconstrained());
+        let public_data_commitment = public_data_commitment::<Bn256>(
+            &full_exit_witness.get_pubdata(),
+            full_exit_witness.before_root,
+            Some(root_after_fee),
+            Some(validator_address),
+            Some(block_number),
+        );
+        {
+            let mut cs = TestConstraintSystem::<Bn256>::new();
 
-        //     println!("{}", cs.num_constraints());
+            let instance = FranklinCircuit {
+                operation_batch_size: 10,
+                params,
+                old_root: full_exit_witness.before_root,
+                new_root: Some(root_after_fee),
+                operations,
+                pub_data_commitment: Some(public_data_commitment),
+                block_number: Some(block_number),
+                validator_account: validator_account_witness,
+                validator_address: Some(validator_address),
+                validator_balances,
+                validator_audit_path,
+            };
 
-        //     let err = cs.which_is_unsatisfied();
-        //     if err.is_some() {
-        //         panic!("ERROR satisfying in {}", err.unwrap());
-        //     }
-        // }
+            instance.synthesize(&mut cs).unwrap();
+
+            println!("{}", cs.find_unconstrained());
+
+            println!("{}", cs.num_constraints());
+
+            let err = cs.which_is_unsatisfied();
+            if err.is_some() {
+                panic!("ERROR satisfying in {}", err.unwrap());
+            }
+        }
     }
 }

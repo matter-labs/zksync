@@ -37,6 +37,12 @@ where
     }
 
     let signature = private_key.musig_pedersen_sign(&message_bytes, rng, p_g, params);
+    println!(
+        "s: {:?} . r: {:?}",
+        signature.clone().s,
+        signature.clone().r.into_xy()
+    );
+    println!(" message_byts: {:?}", message_bytes.clone());
 
     let pk = PublicKey::from_private(&private_key, p_g, params);
     let is_valid_signature =
