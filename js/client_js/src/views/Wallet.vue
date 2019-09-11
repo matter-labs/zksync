@@ -58,7 +58,7 @@ export default {
         let franklinProvider = new FranklinProvider('http://localhost:3000', '0xc56E79CAA94C96DE01eF36560ac215cC7A4F0F47');
         // let signer = ethersProvider.getSigner();
         let provider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
-        window.signer = ethers.Wallet.fromMnemonic("fine music test violin matrix prize squirrel panther purchase material script deal").connect(provider);
+        window.signer = ethers.Wallet.fromMnemonic("fine music test violin matrix prize squirrel panther purchase material script deal", "m/44'/60'/0'/0/1").connect(provider);
         window.wallet = await Wallet.fromEthWallet(signer, franklinProvider);
         window.walletDecorator = new WalletDecorator(window.wallet);
 
@@ -77,7 +77,7 @@ export default {
                     return;
                 }
 
-                await window.wallet.deposit();
+                await window.walletDecorator.depositOnchain(kwargs);
 
                 console.log('token', kwargs.token);
                 console.log('amount', kwargs.amount);
