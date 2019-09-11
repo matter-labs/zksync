@@ -11,5 +11,6 @@ export default new Router({
     { path: '/login', component: Login },
     { path: '/wallet', component: Wallet },
     { path: '*', redirect: '/login' },
-  ]
+  ],
+  mode:   'history',
 });

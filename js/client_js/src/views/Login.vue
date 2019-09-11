@@ -16,8 +16,8 @@
 </template>
 
 <script>
-
 import { Wallet, FranklinProvider } from 'franklin_lib';
+import { walletDecorator, WalletDecorator } from '../WalletDecorator'
 
 export default {
     name: 'login',
@@ -30,11 +30,10 @@ export default {
                 let franklinProvider = new FranklinProvider('http://localhost:3000', '0xc56E79CAA94C96DE01eF36560ac215cC7A4F0F47');
                 let signer = ethersProvider.getSigner();
                 window.wallet = await Wallet.fromEthWallet(signer, franklinProvider);
+                window.walletDecorator = new WalletDecorator(window.wallet);
                 this.$parent.$router.push('/wallet')
             } catch (e) {
-                // TODO: replace with alert
-                console.log('Login failed: ', e)
-                this.err = e
+                alert('Login failed: ', e);
             }
         }
     },
@@ -61,5 +60,4 @@ export default {
 h1, h2 {
     font-weight: normal;
 }
-
 </style>
