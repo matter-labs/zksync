@@ -6,27 +6,34 @@
         </b-form-select>
         Amount:
         <b-form-input type="number" v-model="amount"></b-form-input>
+        <b-row v-if="feeNeeded">
+            Fee:
+            <b-form-input type="number" v-model="fee"></b-form-input>
+        </b-row>
         <b-button href="#" variant="primary" @click='buttonClicked'> {{ buttonText }} </b-button>
     </b-card>
 </template>
 
 <script>
 export default {
-    name: 'DepositWithdraw',
+    name: 'DepositWithdrawModal',
     props: [
         'windowTitle',
         'buttonText',
-        'balances'
+        'balances',
+        'feeNeeded',
     ],
     data: () => ({
         'token': null,
-        'amount': null
+        'amount': null,
+        'fee': null,
     }),
     methods: {
         async buttonClicked() {
             this.$emit('buttonClicked', {
                 token: this.token,
-                amount: this.amount
+                amount: this.amount,
+                fee: this.fee,
             });
         }
     }
