@@ -127,7 +127,7 @@ contract Franklin {
         // Total number of operations to process for this block
         uint64 onchainOperations;
         // Total number of priority operations for this block
-        uint32 priorityOperations;
+        uint64 priorityOperations;
         // ETH block number at which this block was commited
         uint32 commitedAtBlock;
         // Hash of commitment the block circuit
@@ -178,11 +178,11 @@ contract Franklin {
 
     // Priority Requests  mapping (request id - operation)
     // Contains op type, pubdata and expiration block of unsatisfied requests. Numbers are in order of requests receiving
-    mapping(uint32 => PriorityOperation) public priorityRequests;
+    mapping(uint64 => PriorityOperation) public priorityRequests;
     // First priority request id
-    uint32 public firstPriorityRequestId;
+    uint64 public firstPriorityRequestId;
     // Total number of requests
-    uint32 public totalPriorityRequests;
+    uint64 public totalPriorityRequests;
 
     // Flag indicating that exodus (mass exit) mode is triggered
     // Once it was raised, it can not be cleared again, and all users must exit
@@ -257,16 +257,16 @@ contract Franklin {
     // Params:
     // - _count - number of requests to remove
     // - _validator - address to pay fee
-    function payValidatorFeeAndRemovePriorityRequests(uint32 _count, address payable _validator) internal {
+    function payValidatorFeeAndRemovePriorityRequests(uint64 _count, address payable _validator) internal {
         require(
             _count <= totalPriorityRequests,
             "rprcnt"
         ); // rprcnt - count is heigher than total priority requests count
 
         uint256 totalFee = 0;
-        for (uint32 i = firstPriorityRequestId; i < firstPriorityRequestId + _count; i++) {
+        for (uint64 i = firstPriorityRequestId; i < firstPriorityRequestId + _count; i++) {
             totalFee += priorityRequests[i].fee;
-            delete priorityRequests[i];
+            delete priorityRequests[i]; // TODO: - reverts with empty reason
         }
         totalPriorityRequests -= _count;
         firstPriorityRequestId += _count;
@@ -278,13 +278,13 @@ contract Franklin {
     // WARNING: Only for Exodus mode
     // Params:
     // - _count - count of requests where to look deposit requests for
-    function accrueDepositsPriorityBalancesAndRemoveRequests(uint32 _count) internal {
+    function accrueDepositsPriorityBalancesAndRemoveRequests(uint64 _count) internal {
         require(
             _count <= totalPriorityRequests,
             "abrcnt"
         ); // abrcnt - count is heigher than total priority requests count
 
-        for (uint32 i = firstPriorityRequestId; i < firstPriorityRequestId + _count; i++) {
+        for (uint64 i = firstPriorityRequestId; i < firstPriorityRequestId + _count; i++) {
             if (priorityRequests[i].opType == OpType.Deposit) {
                 bytes memory pubData = priorityRequests[i].pubData;
                 bytes memory owner = new bytes(20);
@@ -535,7 +535,7 @@ contract Franklin {
             "cbkexm"
         ); // cbkexm - entered exodus mode
 
-        (uint64 startId, uint64 totalProcessed, uint32 priorityCount) = collectOnchainOps(_publicData);
+        (uint64 startId, uint64 totalProcessed, uint64 priorityCount) = collectOnchainOps(_publicData);
         if (areBlockPriorityOperationsValid(startId, totalProcessed, priorityCount)) {
             bytes32 commitment = createBlockCommitment(
                 _blockNumber,
@@ -571,7 +571,7 @@ contract Franklin {
     // - _publicData - operations
     function collectOnchainOps(bytes memory _publicData)
         internal
-        returns (uint64 onchainOpsStartId, uint64 processedOnchainOps, uint32 priorityCount)
+        returns (uint64 onchainOpsStartId, uint64 processedOnchainOps, uint64 priorityCount)
     {
         require(
             _publicData.length % 8 == 0,
@@ -585,7 +585,7 @@ contract Franklin {
 
         while (currentPointer < _publicData.length) {
             uint8 opType = uint8(_publicData[currentPointer]);
-            (uint256 len, uint64 ops, uint32 priority) = processOp(
+            (uint256 len, uint64 ops, uint64 priority) = processOp(
                 opType,
                 currentPointer,
                 _publicData,
@@ -613,7 +613,7 @@ contract Franklin {
         uint256 _currentPointer,
         bytes memory _publicData,
         uint64 _currentOnchainOp
-    ) internal returns (uint256 processedLen, uint64 processedOnchainOps, uint32 priorityCount) {
+    ) internal returns (uint256 processedLen, uint64 processedOnchainOps, uint64 priorityCount) {
         uint256 opDataPointer = _currentPointer + 1;
 
         if (_opType == uint8(OpType.Noop)) return (NOOP_LENGTH, 0, 0);
@@ -698,7 +698,7 @@ contract Franklin {
     // - _startId - onchain op start id
     // - _totalProcessed - how many ops are procceeded
     // - _priorityCount - priority ops count
-    function areBlockPriorityOperationsValid(uint64 _startId, uint64 _totalProcessed, uint32 _priorityCount) internal view returns (bool) {
+    function areBlockPriorityOperationsValid(uint64 _startId, uint64 _totalProcessed, uint64 _priorityCount) internal view returns (bool) {
         require(
             _priorityCount <= totalPriorityRequests,
             "bpoprc"
@@ -707,7 +707,7 @@ contract Franklin {
         uint64 start = _startId;
         uint64 end = start + _totalProcessed;
         
-        uint32 counter = 0;
+        uint64 counter = 0;
         for (uint64 current = start; current < end; ++current) {
             if (onchainOps[current].opType == OpType.FullExit || onchainOps[current].opType == OpType.Deposit) {
                 OnchainOperation memory op = onchainOps[current];
@@ -724,7 +724,7 @@ contract Franklin {
     // Params:
     // - _onchainOp - operation from block
     // - _priorityRequestId - priority request id
-    function comparePriorityOps(OnchainOperation memory _onchainOp, uint32 _priorityRequestId) internal view returns (bool) {
+    function comparePriorityOps(OnchainOperation memory _onchainOp, uint64 _priorityRequestId) internal view returns (bool) {
         bytes memory priorityPubData;
         bytes memory onchainPubData;
         if (_onchainOp.opType == OpType.Deposit && priorityRequests[_priorityRequestId].opType == OpType.Deposit) {
@@ -772,10 +772,12 @@ contract Franklin {
             governance.isValidator(msg.sender),
             "vbkvdr"
         ); // vbkvdr - not a validator in verify
+
+        // TODO: - doesnt work in integration test - revert with vfyfp3 code
         require(
             verifyBlockProof(_proof, blocks[_blockNumber].commitment),
             "vbkvbp"
-        ); // vbkvbp - verification failed
+        ); // vbkvbp - verification failed 
         
         consummateOnchainOps(_blockNumber);
 

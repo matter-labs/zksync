@@ -110,44 +110,44 @@ describe("INTEGRATION: Complete", function() {
         expect((await franklinDeployedContract.blocks(2)).stateRoot).equal("0x0000000000000000000000000000000000000000000000000000000000000000");
         expect((await franklinDeployedContract.blocks(2)).validator).equal("0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE");
 
-        // // Verify block with deposit and exit.
-        // tx = await franklinDeployedContract.verifyBlock(1, dummyBlockProof, {gasLimit: bigNumberify("100000")});
-        // receipt = await tx.wait();
-        // events = receipt.events;
+        // Verify block with deposit and exit.
+        tx = await franklinDeployedContract.verifyBlock(1, dummyBlockProof, {gasLimit: bigNumberify("100000")});
+        receipt = await tx.wait();
+        events = receipt.events;
         
-        // const verifiedEvent1 = events.pop().args;
+        const verifiedEvent1 = events.pop().args;
 
-        // expect(verifiedEvent1.blockNumber).equal(1);
+        expect(verifiedEvent1.blockNumber).equal(1);
 
-        // expect(await franklinDeployedContract.onchainOps(0)).equal("0x");
-        // expect(await franklinDeployedContract.totalOnchainOps).equal(1);
+        totalOnchainOps = await franklinDeployedContract.totalOnchainOps();
+        expect(totalOnchainOps).equal(1);
         
-        // expect(await franklinDeployedContract.priorityRequests(0)).equal("0x");
-        // expect(await franklinDeployedContract.firstPriorityRequestId).equal(0);
-        // expect(await franklinDeployedContract.totalPriorityRequests).equal(0);
+        totalPriorityRequests = await franklinDeployedContract.totalPriorityRequests();
+        firstPriorityRequestId = await franklinDeployedContract.firstPriorityRequestId();
+        expect(totalPriorityRequests).equal(0);
+        expect(firstPriorityRequestId).equal(1);
         
-        // tx = await franklinDeployedContract.verifyBlock(2, dummyBlockProof, {gasLimit: bigNumberify("100000")});
-        // receipt = await tx.wait();
-        // events = receipt.events;
+        tx = await franklinDeployedContract.verifyBlock(2, dummyBlockProof, {gasLimit: bigNumberify("100000")});
+        receipt = await tx.wait();
+        events = receipt.events;
 
-        // const verifiedEvent2 = events.pop().args;
+        const verifiedEvent2 = events.pop().args;
 
-        // expect(verifiedEvent2.blockNumber).equal(1);
+        expect(verifiedEvent2.blockNumber).equal(2);
 
-        // expect(await franklinDeployedContract.onchainOps(1)).equal("0x");
-        // expect(await franklinDeployedContract.totalOnchainOps).equal(0);
+        totalOnchainOps = await franklinDeployedContract.totalOnchainOps();
+        expect(totalOnchainOps).equal(0);
 
-        // expect((await franklinDeployedContract.balancesToWithdraw(exitWallet.address, 0)).balance).equal(exitValue);
+        expect((await franklinDeployedContract.balancesToWithdraw(exitWallet.address, 0)).balance).equal(exitValue);
 
-        // // Withdraw eth.
-        // const oldBalance = await exitWallet.getBalance();
-        // const exitWalletFranklinContract = franklinDeployedContract.connect(exitWallet);
-        // const exitTx = await exitWalletFranklinContract.withdrawETH(exitValue);
-        // const exitTxReceipt = await exitTx.wait();
-        // const gasUsed = exitTxReceipt.gasUsed.mul(await provider.getGasPrice());
-        // const newBalance = await exitWallet.getBalance();
-        // expect(newBalance.sub(oldBalance).add(gasUsed)).eq(exitValue);
-        // expect((await franklinDeployedContract.balancesToWithdraw(exitWallet.address, 0)).balance).equal(bigNumberify(0));
+        // Withdraw eth.
+        const oldBalance = await exitWallet.getBalance();
+        const exitTx = await franklinDeployedContract.withdrawETH(exitValue);
+        const exitTxReceipt = await exitTx.wait();
+        const gasUsed = exitTxReceipt.gasUsed.mul(await provider.getGasPrice());
+        const newBalance = await exitWallet.getBalance();
+        expect(newBalance.sub(oldBalance).add(gasUsed)).eq(exitValue);
+        expect((await franklinDeployedContract.balancesToWithdraw(exitWallet.address, 0)).balance).equal(bigNumberify(0));
     });
 
     // it("ERC20 deposit with commit", async () => {
