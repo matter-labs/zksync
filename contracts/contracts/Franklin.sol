@@ -32,7 +32,14 @@ contract Franklin {
     // Franklin chain address length.
     uint8 constant PUBKEY_HASH_LEN = 20;
     // Signature length.
-    uint8 constant SIGNATURE_LEN = 32;
+    uint8 constant SIGNATURE_LEN = 64;
+
+    // Bytes
+    uint8 TOKEN_BYTES = 2;
+    uint8 AMOUNT_BYTES = 16;
+    uint8 ETH_ADDR_BYTES = 20;
+    uint8 FEE_BYTES = 2;
+    uint8 ACC_NUM_BYTES = 3;
 
     // Operations lengths
 
@@ -287,17 +294,17 @@ contract Franklin {
         for (uint64 i = firstPriorityRequestId; i < firstPriorityRequestId + _count; i++) {
             if (priorityRequests[i].opType == OpType.Deposit) {
                 bytes memory pubData = priorityRequests[i].pubData;
-                bytes memory owner = new bytes(20);
-                for (uint8 j = 0; j < 20; ++j) {
+                bytes memory owner = new bytes(ETH_ADDR_BYTES);
+                for (uint8 j = 0; j < ETH_ADDR_BYTES; ++j) {
                     owner[j] = pubData[j];
                 }
-                bytes memory token = new bytes(2);
-                for (uint8 j = 0; j < 2; j++) {
-                    token[j] = pubData[20+j];
+                bytes memory token = new bytes(TOKEN_BYTES);
+                for (uint8 j = 0; j < TOKEN_BYTES; j++) {
+                    token[j] = pubData[ETH_ADDR_BYTES + j];
                 }
-                bytes memory amount = new bytes(16);
-                for (uint8 j = 0; j < 16; ++j) {
-                    amount[j] = pubData[22 + j];
+                bytes memory amount = new bytes(AMOUNT_BYTES);
+                for (uint8 j = 0; j < AMOUNT_BYTES; ++j) {
+                    amount[j] = pubData[ETH_ADDR_BYTES + TOKEN_BYTES + j];
                 }
                 balancesToWithdraw[Bytes.bytesToAddress(owner)][Bytes.bytesToUInt16(token)] += Bytes.bytesToUInt128(amount);
             }
@@ -630,9 +637,9 @@ contract Franklin {
         if (_opType == uint8(OpType.CloseAccount)) return (CLOSE_ACCOUNT_LENGTH, 0, 0);
 
         if (_opType == uint8(OpType.Deposit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer + 3, 38);
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer + ACC_NUM_BYTES, TOKEN_BYTES + AMOUNT_BYTES + PUBKEY_HASH_LEN);
             require(
-                pubData.length == 38,
+                pubData.length == TOKEN_BYTES + AMOUNT_BYTES + PUBKEY_HASH_LEN,
                 "psodpl"
             ); // psodpl - wrong deposit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
@@ -643,9 +650,9 @@ contract Franklin {
         }
 
         if (_opType == uint8(OpType.PartialExit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer + 3, 40);
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer + ACC_NUM_BYTES, TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES);
             require(
-                pubData.length == 40,
+                pubData.length == TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES,
                 "psopel"
             ); // psopel - wrong partial exit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
@@ -656,9 +663,9 @@ contract Franklin {
         }
 
         if (_opType == uint8(OpType.FullExit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer + 3, 102);
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer + ACC_NUM_BYTES, ETH_ADDR_BYTES + TOKEN_BYTES + SIGNATURE_LEN + AMOUNT_BYTES);
             require(
-                pubData.length == 102,
+                pubData.length == ETH_ADDR_BYTES + TOKEN_BYTES + SIGNATURE_LEN + AMOUNT_BYTES,
                 "psofel"
             ); // psofel - wrong full exit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
@@ -736,11 +743,11 @@ contract Franklin {
         bytes memory priorityPubData;
         bytes memory onchainPubData;
         if (_onchainOp.opType == OpType.Deposit && priorityRequests[_priorityRequestId].opType == OpType.Deposit) {
-            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 20, PUBKEY_HASH_LEN + 18);
+            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, ETH_ADDR_BYTES, PUBKEY_HASH_LEN + AMOUNT_BYTES + TOKEN_BYTES);
             onchainPubData = _onchainOp.pubData;
         } else if (_onchainOp.opType == OpType.FullExit && priorityRequests[_priorityRequestId].opType == OpType.FullExit) {
-            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, PUBKEY_HASH_LEN, 86);
-            onchainPubData = Bytes.slice(_onchainOp.pubData, 0, 86);
+            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, PUBKEY_HASH_LEN, ETH_ADDR_BYTES + TOKEN_BYTES + SIGNATURE_LEN);
+            onchainPubData = Bytes.slice(_onchainOp.pubData, 0, ETH_ADDR_BYTES + TOKEN_BYTES + SIGNATURE_LEN);
         } else {
             revert("cpowop"); // cpowop - wrong operation
         }
@@ -827,40 +834,40 @@ contract Franklin {
             OnchainOperation memory op = onchainOps[current];
             if (op.opType == OpType.PartialExit) {
                 // partial exit was successful, accrue balance
-                bytes memory tokenBytes = new bytes(2);
-                for (uint8 j = 0; j < 2; j++) {
+                bytes memory tokenBytes = new bytes(TOKEN_BYTES);
+                for (uint8 j = 0; j < TOKEN_BYTES; j++) {
                     tokenBytes[j] = op.pubData[j];
                 }
                 uint16 tokenId = Bytes.bytesToUInt16(tokenBytes);
 
-                bytes memory amountBytes = new bytes(16);
-                for (uint256 i = 0; i < 16; ++i) {
-                    amountBytes[i] = op.pubData[2 + i];
+                bytes memory amountBytes = new bytes(AMOUNT_BYTES);
+                for (uint256 i = 0; i < AMOUNT_BYTES; ++i) {
+                    amountBytes[i] = op.pubData[TOKEN_BYTES + i];
                 }
                 uint128 amount = Bytes.bytesToUInt128(amountBytes);
 
-                bytes memory ethAddress = new bytes(20);
-                for (uint256 i = 0; i < 20; ++i) {
-                    ethAddress[i] = op.pubData[20 + i];
+                bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
+                for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
+                    ethAddress[i] = op.pubData[TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
                 }
                 balancesToWithdraw[Bytes.bytesToAddress(ethAddress)][tokenId] += amount;
             }
             if (op.opType == OpType.FullExit) {
                 // full exit was successful, accrue balance
-                bytes memory tokenBytes = new bytes(2);
-                for (uint8 j = 0; j < 2; j++) {
-                    tokenBytes[j] = op.pubData[20+j];
+                bytes memory tokenBytes = new bytes(TOKEN_BYTES);
+                for (uint8 j = 0; j < TOKEN_BYTES; j++) {
+                    tokenBytes[j] = op.pubData[ETH_ADDR_BYTES + j];
                 }
                 uint16 tokenId = Bytes.bytesToUInt16(tokenBytes);
 
-                bytes memory amountBytes = new bytes(16);
-                for (uint256 i = 0; i < 16; ++i) {
-                    amountBytes[i] = op.pubData[54 + i];
+                bytes memory amountBytes = new bytes(AMOUNT_BYTES);
+                for (uint256 i = 0; i < AMOUNT_BYTES; ++i) {
+                    amountBytes[i] = op.pubData[ETH_ADDR_BYTES + TOKEN_BYTES + SIGNATURE_LEN + i];
                 }
                 uint128 amount = Bytes.bytesToUInt128(amountBytes);
 
-                bytes memory ethAddress = new bytes(20);
-                for (uint256 i = 0; i < 20; ++i) {
+                bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
+                for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
                     ethAddress[i] = op.pubData[i];
                 }
                 balancesToWithdraw[Bytes.bytesToAddress(ethAddress)][tokenId] += amount;
