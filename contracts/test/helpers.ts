@@ -65,5 +65,5 @@ export function createFullExitPublicData(ethAddress: string, tokenId, hexAmount:
     const pad1Bytes = Buffer.alloc(pad1BytesLength, 0);
     const pad2Bytes = Buffer.alloc(6, 0);
 
-    return Buffer.concat([txId, accountId, addressBytes, tokenBytes, pad1Bytes, amountBytes, pad2Bytes]);
+    return Buffer.concat([txId, accountId, addressBytes, tokenBytes, signatureBytes, pad1Bytes, amountBytes, pad2Bytes]);
 }
