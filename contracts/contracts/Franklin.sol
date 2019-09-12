@@ -255,18 +255,18 @@ contract Franklin {
 
     // Pays validator fee and removes requests
     // Params:
-    // - _count - number of requests to remove
+    // - _count - number of requests
     // - _validator - address to pay fee
-    function payValidatorFeeAndRemovePriorityRequests(uint64 _count, address payable _validator) internal {
+    function payValidatorFee(uint64 _count, address payable _validator) internal {
         require(
             _count <= totalPriorityRequests,
-            "rprcnt"
-        ); // rprcnt - count is heigher than total priority requests count
+            "pvfcnt"
+        ); // pvfcnt - count is heigher than total priority requests count
 
         uint256 totalFee = 0;
         for (uint64 i = firstPriorityRequestId; i < firstPriorityRequestId + _count; i++) {
             totalFee += priorityRequests[i].fee;
-            delete priorityRequests[i]; // TODO: - reverts with empty reason
+            delete priorityRequests[i];
         }
         totalPriorityRequests -= _count;
         firstPriorityRequestId += _count;
@@ -274,11 +274,11 @@ contract Franklin {
         _validator.transfer(totalFee);
     }
 
-    // Accrues balances from deposits from block and removes requests.
+    // Accrues balances from deposits from block and removes requests
     // WARNING: Only for Exodus mode
     // Params:
     // - _count - count of requests where to look deposit requests for
-    function accrueDepositsPriorityBalancesAndRemoveRequests(uint64 _count) internal {
+    function accrueDepositsPriorityBalances(uint64 _count) internal {
         require(
             _count <= totalPriorityRequests,
             "abrcnt"
@@ -359,6 +359,7 @@ contract Franklin {
         registerDeposit(0, amount, fee, _franklinAddr);
     }
 
+    // TODO: - cant test
     // Withdraw ETH
     // Params:
     // - _amount - amount to withdraw
@@ -777,11 +778,11 @@ contract Franklin {
         require(
             verifyBlockProof(_proof, blocks[_blockNumber].commitment),
             "vbkvbp"
-        ); // vbkvbp - verification failed 
-        
+        ); // vbkvbp - verification failed
+
         consummateOnchainOps(_blockNumber);
 
-        payValidatorFeeAndRemovePriorityRequests(
+        payValidatorFee(
             blocks[_blockNumber].priorityOperations,
             address(uint160(blocks[_blockNumber].validator))
         );
@@ -883,7 +884,7 @@ contract Franklin {
             Block memory reverted = blocks[i];
             if (_fromExodus) {
                 // in case of exodus accrue balances from deposits
-                accrueDepositsPriorityBalancesAndRemoveRequests(reverted.priorityOperations);
+                accrueDepositsPriorityBalances(reverted.priorityOperations);
             }
             revertBlock(reverted);
             delete blocks[i];
