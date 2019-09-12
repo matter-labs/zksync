@@ -134,7 +134,13 @@ describe("INTEGRATION: Complete", function() {
         
         let balanceToWithdraw = await franklinDeployedContract.balancesToWithdraw(exitWallet.address, 0);
         expect(balanceToWithdraw).equal(exitValue);
-        console.log("balanceToWithdraw ", balanceToWithdraw);
+
+        // // Full exit eth
+        // const depositValue = parseEther("0.3"); // the value passed to tx
+        // const depositAmount = parseEther("0.293775600000000000"); // amount after: tx value - some counted fee
+        // tx = await franklinDeployedContract.registerFullExit(franklinAddressBinary, 0, {value: depositValue, gasLimit: bigNumberify("500000")});
+        // let receipt = await tx.wait();
+        // let events = receipt.events;
 
         // TODO: - Withdraw eth. 
         // const oldBalance = await exitWallet.getBalance();

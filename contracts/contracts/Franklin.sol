@@ -395,9 +395,6 @@ contract Franklin {
             msg.value >= fee,
             "derlwv"
         ); // derlwv - Not enough ETH provided to pay the fee
-        if (msg.value != fee) {
-            msg.sender.transfer(msg.value-fee);
-        }
 
         require(
             IERC20(_token).transferFrom(msg.sender, address(this), _amount),
@@ -406,6 +403,10 @@ contract Franklin {
 
         uint16 tokenId = governance.validateTokenAddress(_token);
         registerDeposit(tokenId, _amount, fee, _franklinAddr);
+
+        if (msg.value != fee) {
+            msg.sender.transfer(msg.value-fee);
+        }
     }
 
     // Withdraw ERC20 token
@@ -420,47 +421,54 @@ contract Franklin {
             "wertrf"
         ); // wertrf - token transfer failed withdraw
     }
-
+    
     // Register full exit request
     // Params:
     // - _franklinAddr - sender
-    // - _token - token address
+    // - _token - token address, 0 address for ether
     // - _signature - user signature
-    function registerFullExit(
-        bytes calldata _franklinAddr,
+    function fullExit (
         address _token,
+        bytes calldata _franklinAddr,
         bytes calldata _signature
     ) external payable {
         // Fee is:
         //   fee coeff * (base tx gas cost + remained gas) * gas price
         uint256 fee = FEE_COEFF * (BASE_GAS + gasleft()) * tx.gasprice;
-
+        
+        uint16 tokenId;
+        if (_token == address(0)) {
+            tokenId = 0;
+        } else {
+            tokenId = governance.validateTokenAddress(_token);
+        }
+        
+        require(
+            msg.value >= fee,
+            "fexlwv"
+        ); // fexlwv - Not enough ETH provided to pay the fee
+        
         requireActive();
 
         require(
-            msg.value >= fee,
-            "derlwv"
-        ); // derlwv - Not enough ETH provided to pay the fee
-        if (msg.value != fee) {
-            msg.sender.transfer(msg.value-fee);
-        }
-
-        require(
             _franklinAddr.length == PUBKEY_HASH_LEN,
-            "rfepkl"
-        ); // rfepkl - wrong pubkey length
+            "fexpkl"
+        ); // fexpkl - wrong pubkey length
         require(
             _signature.length == SIGNATURE_LEN,
-            "rfesnl"
-        ); // rfesnl - wrong signature length
+            "fexsnl"
+        ); // fexsnl - wrong signature length
 
-        uint16 tokenId = governance.validateTokenAddress(_token);
         // Priority Queue request
         bytes memory pubData = _franklinAddr; // franklin address
         pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(msg.sender)); // eth address
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(tokenId)); // token id
         pubData = Bytes.concat(pubData, _signature); // signature
         addPriorityRequest(OpType.FullExit, fee, pubData);
+        
+        if (msg.value != fee) {
+            msg.sender.transfer(msg.value-fee);
+        }
     }
 
     // Register deposit request
