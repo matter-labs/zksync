@@ -30,6 +30,28 @@ export class WalletDecorator {
     }
 
     // #region renderable
+    transactionsAsNeeded() {
+        return this.wallet.franklinState.tx_history.map((tx, index) => {
+            let elem_id      = `history_${index}`;
+            let tx_hash      = null;
+            let success      = tx.success     || '';
+            let nonce        = tx.tx.nonce    || '';
+            let from         = null;
+            let type         = tx.tx.type     || '';
+            let to           = tx.tx.to       || '';
+            let token        = tx.tx.token    || '';
+            let amount       = tx.tx.amount   || '';
+            let fee          = tx.tx.fee      || '';
+            let fail_reason  = tx.fail_reason || '';
+            let is_committed = tx.committed   || '';
+            let is_verified  = tx.verified    || '';
+            return {
+                type, to, amount, success, fail_reason, 
+                is_committed, is_verified, elem_id
+            };
+        });
+    }
+
     onchainBalancesAsRenderableList() {
         return this.wallet.ethState.onchainBalances
             .map((balance, tokenId) => ({

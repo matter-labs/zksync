@@ -27,7 +27,10 @@
             v-on:alert="displayAlert"
             v-bind:info="walletInfo"
             ></Wallet>
-        <History v-if="componentToBeShown=='History'"></History>
+        <History 
+            v-if="componentToBeShown=='History'"
+            v-bind:info="historyInfo"
+            ></History>
     </b-container>
 </template>
 
@@ -55,8 +58,14 @@ export default {
     data: () => ({
         componentToBeShown: 'Wallet',
         walletInfo: null,
+        historyInfo: null,
         message: null,
     }),
+    watch: {
+        componentToBeShown: async function() {
+            await this.updateAccountInfo()
+        }
+    },
     async created() {
         // TODO: delete next block of code
         let franklinProvider = new FranklinProvider('http://localhost:3000', '0xc56E79CAA94C96DE01eF36560ac215cC7A4F0F47');
@@ -73,19 +82,22 @@ export default {
             this.message = msg;
         },
         async updateAccountInfo() {
-            console.log('updated');
             await window.walletDecorator.updateState();
             let onchainBalances = window.walletDecorator.onchainBalancesAsRenderableList();
             let contractBalances = window.walletDecorator.contractBalancesAsRenderableList();
             let franklinBalances = window.walletDecorator.franklinBalancesAsRenderableList();
-            let info = {
+            let walletInfo = {
                 onchainBalances,
                 contractBalances,
                 franklinBalances,
             };
-            this.walletInfo = info;
+            this.walletInfo = walletInfo;
 
-            await sleep(2000);
+            this.historyInfo = {
+                transactions: window.walletDecorator.transactionsAsNeeded()
+            };
+
+            await sleep(3000);
             this.updateAccountInfo();
         }
     },
