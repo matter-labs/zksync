@@ -10,7 +10,7 @@
         <b-form-input type="number" v-model="amount"></b-form-input>
         Fee:
         <b-form-input type="number" v-model="fee"></b-form-input>
-        <b-button href="#" variant="primary" @click='buttonClicked'> Transfer </b-button>
+        <b-button class="mt-2" variant="primary" @click='buttonClicked'> Transfer </b-button>
     </b-container>
 </template>
 

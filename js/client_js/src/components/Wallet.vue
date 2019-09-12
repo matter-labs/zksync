@@ -40,16 +40,10 @@
 </template>
 
 <script>
-// TODO: remove this imports
-import { ethers } from 'ethers'
-import { Wallet, FranklinProvider } from 'franklin_lib'
-import { WalletDecorator } from '../WalletDecorator'
-// END-TODO
-
-import Alert from '../components/Alert.vue'
-import BalancesList from '../components/BalancesList.vue'
-import DepositButtons from '../components/DepositButtons.vue'
-import Transfer from '../components/Transfer.vue'
+import Alert from './Alert.vue'
+import BalancesList from './BalancesList.vue'
+import DepositButtons from './DepositButtons.vue'
+import Transfer from './Transfer.vue'
 
 const components = {
     Alert,
@@ -64,7 +58,7 @@ export default {
     name: 'wallet',
     props: ['info'],
     data: () => ({
-        message: 'nn',
+        message: '',
         onchainBalances: [],
         contractBalances: [],
         franklinBalances: [],

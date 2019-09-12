@@ -8,15 +8,12 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarCollapse">
                 <ul class="navbar-nav mr-auto">
-                <li class="nav-item active">
-                    <a class="nav-link" @click="componentToBeShown='Wallet'">Wallet</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" @click="componentToBeShown='History'">History</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true">Disabled</a>
-                </li>
+                    <li class="nav-item" v-bind:class="{active: componentToBeShown=='Wallet'}">
+                        <a class="nav-link" @click="componentToBeShown='Wallet'">Wallet</a>
+                    </li>
+                    <li class="nav-item" v-bind:class="{active: componentToBeShown=='History'}">
+                        <a class="nav-link" @click="componentToBeShown='History'">History</a>
+                    </li>
                 </ul>
             </div>
             </nav>
@@ -41,8 +38,8 @@ import { Wallet as FranklinWallet, FranklinProvider } from 'franklin_lib'
 import { WalletDecorator } from '../WalletDecorator'
 // END-TODO
 
-import History from './History.vue'
-import Wallet from './Wallet.vue'
+import Wallet from '../components/Wallet.vue'
+import History from '../components/History.vue'
 import Alert from '../components/Alert.vue'
 
 const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
