@@ -155,6 +155,11 @@ export class Tester {
         await Promise.all(this.wallets.map(async wallet => {
             console.log(`\n\n${await wallet.getWalletDescriptionString()}`);
         }));
+
+        if (this.wallets.some(w => w.actions.some(a => a.ok() == false))) {
+            console.log(`#######################################`)
+            console.log(`not every operation succeeded, see logs`);
+        }
     }
 
     /**

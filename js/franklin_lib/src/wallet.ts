@@ -175,6 +175,7 @@ export class Wallet {
     }
 
     async getNonce(): Promise<number> {
+        // TODO: is this nonce generating still valid?
         if (this.nonce === null) {
             await this.fetchFranklinState();
             this.nonce = this.franklinState.commited.nonce + this.franklinState.pending_txs.length;

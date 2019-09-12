@@ -24,6 +24,10 @@ export abstract class AbstractOperation {
         };
     }
 
+    public ok() {
+        return this.info.success && this.info.balanceAtStart.join('') == this.info.balanceAtEnd.join('');
+    }
+
     protected logStart(msg: string) {
         this.info.start = msg;
     }
