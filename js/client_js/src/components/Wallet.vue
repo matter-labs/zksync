@@ -33,6 +33,7 @@
             <Transfer
                 v-bind:balances="franklinBalances"
                 v-on:buttonClicked="transferFranklin"
+                v-on:alert="displayAlert"
             ></Transfer>
         </b-col>
     </b-row>

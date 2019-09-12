@@ -76,7 +76,7 @@ export default {
     },
     methods: {
         displayAlert(msg) {
-            this.message = msg;
+            this.message = msg.msg;
         },
         async updateAccountInfo() {
             await window.walletDecorator.updateState();

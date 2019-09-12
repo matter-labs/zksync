@@ -27,14 +27,14 @@ export default {
         'feeNeeded',
     ],
     data: () => ({
-        'token': null,
-        'amount': null,
-        'fee': null,
+        token: null,
+        amount: null,
+        fee: null,
 
-        'maxAmountVisible': false,
-        'balancesDict': {},
-        'alertVisible': false,
-        'alertText': '',
+        maxAmountVisible: false,
+        balancesDict: {},
+        alertVisible: false,
+        alertText: '',
     }),
     watch: {
         balances: function() {
@@ -62,9 +62,20 @@ export default {
                 this.localDisplayAlert(`Select amount, please`);
                 return;
             }
-            if (bigNumberify(this.amount) > bigNumberify(this.balancesDict[this.token])) {
+            if (bigNumberify(this.amount).gt(bigNumberify(this.balancesDict[this.token]))) {
                 this.localDisplayAlert(`It's too much, man!`);
                 return;
+            }
+
+            if (this.feeNeeded) {
+                if (!this.fee) {
+                    this.localDisplayAlert(`Select fee, please`);
+                    return;
+                }
+                if (bigNumberify(this.amount).add(this.fee).gt(bigNumberify(this.balancesDict[this.token]))) {
+                    this.localDisplayAlert(`It's too much, man!`);
+                    return;
+                }
             }
 
             this.$emit('buttonClicked', {
