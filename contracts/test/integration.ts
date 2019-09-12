@@ -197,16 +197,28 @@ describe("INTEGRATION: Complete", function() {
         let balanceToWithdraw2 = await franklinDeployedContract.balancesToWithdraw(wallet.address, 0);
         expect(balanceToWithdraw2).equal(fullExitAmount);
 
-        // TODO: - Withdraw eth. 
-        // const oldBalance = await exitWallet.getBalance();
-        // const exitTx = await franklinDeployedContract.withdrawETH(exitValue);
-        // const exitTxReceipt = await exitTx.wait();
-        // const gasUsed = exitTxReceipt.gasUsed.mul(await provider.getGasPrice());
-        // const newBalance = await exitWallet.getBalance();
-        // expect(newBalance.sub(oldBalance).add(gasUsed)).eq(exitValue);
+        // Withdraw eth for wallet
+        const oldBalance2 = await wallet.getBalance();
+        const exitTx2 = await franklinDeployedContract.withdrawETH(balanceToWithdraw2);
+        const exitTxReceipt2 = await exitTx2.wait();
+        const gasUsed2 = exitTxReceipt2.gasUsed.mul(await provider.getGasPrice());
+        const newBalance2 = await wallet.getBalance();
+        expect(newBalance2.sub(oldBalance2).add(gasUsed2)).eq(balanceToWithdraw2);
 
-        // balanceToWithdraw = await franklinDeployedContract.balancesToWithdraw(exitWallet.address, 0);
-        // expect(balanceToWithdraw).equal(bigNumberify(0));
+        balanceToWithdraw2 = await franklinDeployedContract.balancesToWithdraw(wallet.address, 0);
+        expect(balanceToWithdraw2).equal(bigNumberify(0));
+
+        // Withdraw eth for exitWallet
+        const exitWalletFranklinContract = franklinDeployedContract.connect(exitWallet);
+        const oldBalance1 = await exitWallet.getBalance();
+        const exitTx1 = await exitWalletFranklinContract.withdrawETH(balanceToWithdraw1, {gasLimit: bigNumberify("500000")});
+        const exitTxReceipt1 = await exitTx1.wait();
+        const gasUsed1 = exitTxReceipt1.gasUsed.mul(await provider.getGasPrice());
+        const newBalance1 = await exitWallet.getBalance();
+        expect(newBalance1.sub(oldBalance1).add(gasUsed1)).eq(balanceToWithdraw1);
+
+        balanceToWithdraw1 = await exitWalletFranklinContract.balancesToWithdraw(exitWallet.address, 0);
+        expect(balanceToWithdraw1).equal(bigNumberify(0));
     });
 
     it("ERC20 deposit, part exit, full exit, commit, verify, withdraw", async () => {
@@ -378,11 +390,23 @@ describe("INTEGRATION: Complete", function() {
         let balanceToWithdraw2 = await franklinDeployedContract.balancesToWithdraw(wallet.address, 1);
         expect(balanceToWithdraw2).equal(fullExitAmount);
 
-        // // TODO: - Withdraw erc20.
-        // const exitWalletFranklinContract = franklinDeployedContract.connect(exitWallet);
-        // const exitTx = await exitWalletFranklinContract.withdrawERC20(erc20DeployedToken.address, exitValue);
-        // const recp = await exitTx.wait();
-        // expect(await erc20DeployedToken.balanceOf(exitWallet.address)).eq(exitValue);
-        // expect((await franklinDeployedContract.balancesToWithdraw(exitWallet.address, 1)).balance).equal(bigNumberify(0));
+        // Withdraw erc20 for wallet
+        const oldBalance2 = await erc20DeployedToken.balanceOf(wallet.address);
+        const exitTx2 = await franklinDeployedContract.withdrawERC20(erc20DeployedToken.address, balanceToWithdraw2);
+        await exitTx2.wait();
+        const newBalance2 = await erc20DeployedToken.balanceOf(wallet.address);
+        expect(newBalance2.sub(oldBalance2)).eq(balanceToWithdraw2);
+        balanceToWithdraw2 = await franklinDeployedContract.balancesToWithdraw(wallet.address, 1);
+        expect(balanceToWithdraw2).equal(bigNumberify(0));
+
+        // Withdraw erc20 for exit wallet
+        const exitWalletFranklinContract = franklinDeployedContract.connect(exitWallet);
+        const oldBalance1 = await erc20DeployedToken.balanceOf(exitWallet.address);
+        const exitTx1 = await exitWalletFranklinContract.withdrawERC20(erc20DeployedToken.address, balanceToWithdraw1);
+        await exitTx1.wait();
+        const newBalance1 = await erc20DeployedToken.balanceOf(exitWallet.address);
+        expect(newBalance1.sub(oldBalance1)).eq(balanceToWithdraw1);
+        balanceToWithdraw1 = await exitWalletFranklinContract.balancesToWithdraw(exitWallet.address, 1);
+        expect(balanceToWithdraw1).equal(bigNumberify(0));
     });
 });
