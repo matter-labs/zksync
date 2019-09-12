@@ -29,6 +29,10 @@ export class FranklinProvider {
         return await Axios.get(this.providerAddress + '/api/v0.1/tokens').then(reps => reps.data);
     }
 
+    async getTransactionsHistory(address: Address) {
+        return await Axios.get(this.providerAddress + '/api/v0.1/account/' + address + '/transactions').then(reps => reps.data);
+    }
+
     async getState(address: Address): Promise<FranklinAccountState> {
         return await Axios.get(this.providerAddress + '/api/v0.1/account/' + address).then(reps => reps.data);
     }
@@ -44,7 +48,7 @@ export interface Token {
     symbol?: string,
 }
 
-export interface FranklinAccountState {
+export interface FranklinAccountBalanceState {
     address: Address,
     nonce: number,
     balances: BigNumber[],
@@ -52,9 +56,10 @@ export interface FranklinAccountState {
 
 export interface FranklinAccountState {
     id?: number,
-    commited: FranklinAccountState,
-    verified: FranklinAccountState,
+    commited: FranklinAccountBalanceState,
+    verified: FranklinAccountBalanceState,
     pending_txs: any[],
+    tx_history: any[],
 }
 interface ETHAccountState {
     onchainBalances: BigNumber[],
@@ -215,6 +220,7 @@ export class Wallet {
     async fetchFranklinState() {
         this.supportedTokens = await this.provider.getTokens();
         this.franklinState = await this.provider.getState(this.address);
+        this.franklinState.tx_history = await this.provider.getTransactionsHistory(this.address);
     }
 
     async updateState() {

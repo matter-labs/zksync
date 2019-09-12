@@ -1,7 +1,6 @@
 import Vue from "vue";
-import App from "./views/App.vue";
+import App from "./App.vue";
 import router from "./router";
-import store from './store'
 import BootstrapVue from 'bootstrap-vue';
 import "bootstrap/dist/css/bootstrap.min.css"
 import "bootstrap-vue/dist/bootstrap-vue.css"
@@ -12,15 +11,6 @@ import Eth from 'ethjs'
 Vue.config.productionTip = false;
 
 Vue.use(BootstrapVue);
-
-Vue.mixin({
-  computed: {
-    store: () => store,
-    isDev: () => process.env.NODE_ENV === 'development',
-    apiServer() { return "this.store.config.API_SERVER" },
-  },
-});
-
 
 new Vue({
   router,
