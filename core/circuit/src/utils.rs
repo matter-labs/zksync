@@ -181,7 +181,7 @@ where
     Ok(result)
 }
 
-pub fn allocate_audit_path<E, CS>(
+pub fn allocate_numbers_vec<E, CS>(
     mut cs: CS,
     audit_path: &[Option<E::Fr>],
 ) -> Result<Vec<AllocatedNum<E>>, SynthesisError>

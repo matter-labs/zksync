@@ -34,7 +34,7 @@ impl<E: JubjubEngine> AllocatedOperationBranch<E> {
         )?;
         let account_address = account_address.pad(franklin_constants::ACCOUNT_ID_BIT_WIDTH);
 
-        let account_audit_path = utils::allocate_audit_path(
+        let account_audit_path = utils::allocate_numbers_vec(
             cs.namespace(|| "account_audit_path"),
             &operation_branch.witness.account_path,
         )?;
@@ -60,7 +60,7 @@ impl<E: JubjubEngine> AllocatedOperationBranch<E> {
             franklin_constants::BALANCE_TREE_DEPTH,
         )?;
         let token = token.pad(franklin_constants::TOKEN_BIT_WIDTH);
-        let balance_audit_path = utils::allocate_audit_path(
+        let balance_audit_path = utils::allocate_numbers_vec(
             cs.namespace(|| "balance_audit_path"),
             &operation_branch.witness.balance_subtree_path,
         )?;
@@ -82,6 +82,7 @@ impl<E: JubjubEngine> AllocatedOperationBranch<E> {
 
 pub struct AllocatedChunkData<E: JubjubEngine> {
     pub is_chunk_last: Boolean,
+    pub is_chunk_first: Boolean,
     pub chunk_number: AllocatedNum<E>, //TODO: don't need bit representation here, though make sense to unify probably
     pub tx_type: CircuitElement<E>,
 }

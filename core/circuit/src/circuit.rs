@@ -1,9 +1,10 @@
+use super::operation::TransactionSignature;
 use crate::account::AccountContent;
 use crate::account::AccountWitness;
 use crate::allocated_structures::*;
 use crate::element::{CircuitElement, CircuitPubkey};
 use crate::operation::Operation;
-use crate::utils::{allocate_audit_path, allocate_sum, pack_bits_to_element};
+use crate::utils::{allocate_numbers_vec, allocate_sum, pack_bits_to_element};
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use ff::{Field, PrimeField, PrimeFieldRepr};
 use franklin_crypto::circuit::baby_eddsa::EddsaSignature;
@@ -53,10 +54,9 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         zero.assert_zero(cs.namespace(|| "zero==0"))?;
 
         // we only need this for consistency of first operation
-        let zero_circuit_element = CircuitElement::from_number(
+        let zero_circuit_element = CircuitElement::from_number_padded(
             cs.namespace(|| "zero_circuit_element"),
             zero.clone(),
-            franklin_constants::FR_BIT_WIDTH,
         )?;
         let mut prev = PreviousData {
             op_data: AllocatedOperationData {
@@ -94,10 +94,10 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             CircuitElement::from_fe_padded(cs.namespace(|| "validator_address"), || {
                 self.validator_address.grab()
             })?;
-        let mut validator_address = validator_address_padded.get_bits_le();
-        validator_address.truncate(franklin_constants::ACCOUNT_ID_BIT_WIDTH);
+        let mut validator_address_bits = validator_address_padded.get_bits_le();
+        validator_address_bits.truncate(franklin_constants::ACCOUNT_ID_BIT_WIDTH);
 
-        let mut validator_balances = allocate_audit_path(
+        let mut validator_balances = allocate_numbers_vec(
             cs.namespace(|| "validator_balances"),
             &self.validator_balances,
         )?;
@@ -106,7 +106,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             (1 << franklin_constants::BALANCE_TREE_DEPTH) as usize
         );
 
-        let validator_audit_path = allocate_audit_path(
+        let validator_audit_path = allocate_numbers_vec(
             cs.namespace(|| "validator_audit_path"),
             &self.validator_audit_path,
         )?;
@@ -138,6 +138,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
         let mut allocated_chunk_data: AllocatedChunkData<E> = AllocatedChunkData {
             is_chunk_last: Boolean::constant(false),
+            is_chunk_first: Boolean::constant(false),
             chunk_number: zero.clone(),
             tx_type: zero_circuit_element,
         };
@@ -244,7 +245,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         let root_from_operator = allocate_merkle_root(
             cs.namespace(|| "root from operator_account"),
             &operator_account_data,
-            &validator_address,
+            &validator_address_bits,
             &validator_audit_path,
             self.params,
         )?;
@@ -288,7 +289,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         let root_from_operator_after_fees = allocate_merkle_root(
             cs.namespace(|| "root from operator_account after fees"),
             &operator_account_data,
-            &validator_address,
+            &validator_address_bits,
             &validator_audit_path,
             self.params,
         )?;
@@ -399,6 +400,12 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &max_chunk,
         )?);
 
+        let is_chunk_first = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_chunk_first"),
+            &operation_chunk_number,
+            Expression::constant::<CS>(E::Fr::zero()),
+        )?);
+
         let subseq_chunk = Expression::from(&operation_chunk_number) + Expression::u64::<CS>(1);
 
         let next_chunk_number = Expression::conditionally_select(
@@ -414,6 +421,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 chunk_number: operation_chunk_number,
                 is_chunk_last,
                 tx_type,
+                is_chunk_first,
             },
         ))
     }
@@ -584,104 +592,54 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 &op_data.new_pubkey_hash,
                 &prev.op_data.new_pubkey_hash,
             )?);
+            is_op_data_correct_flags.push(CircuitElement::equals(
+                cs.namespace(|| "is pub_signature_r_x equal to previous"),
+                &op_data.pub_signature_r_x,
+                &prev.op_data.pub_signature_r_x,
+            )?);
+            is_op_data_correct_flags.push(CircuitElement::equals(
+                cs.namespace(|| "is pub_signature_r_y equal to previous"),
+                &op_data.pub_signature_r_y,
+                &prev.op_data.pub_signature_r_y,
+            )?);
+            is_op_data_correct_flags.push(CircuitElement::equals(
+                cs.namespace(|| "is pub_signature_s equal to previous"),
+                &op_data.pub_signature_s,
+                &prev.op_data.pub_signature_s,
+            )?);
+            is_op_data_correct_flags.push(CircuitElement::equals(
+                cs.namespace(|| "is full_amount equal to previous"),
+                &op_data.full_amount,
+                &prev.op_data.full_amount,
+            )?);
+
             let is_op_data_equal_to_previous = multi_and(
                 cs.namespace(|| "is_op_data_equal_to_previous"),
                 &is_op_data_correct_flags,
             )?;
-            let is_chunk_first = Boolean::from(Expression::equals(
-                cs.namespace(|| "is_chunk_first"),
-                &chunk_data.chunk_number,
-                Expression::constant::<CS>(E::Fr::zero()),
-            )?);
+
             let is_op_data_correct = multi_or(
                 cs.namespace(|| "is_op_data_correct"),
-                &[is_op_data_equal_to_previous, is_chunk_first],
+                &[
+                    is_op_data_equal_to_previous,
+                    chunk_data.is_chunk_first.clone(),
+                ],
             )?;
-            cs.enforce(
-                || "ensure op_data correct",
-                |_| is_op_data_correct.lc(CS::one(), E::Fr::one()),
-                |lc| lc + CS::one(),
-                |lc| lc + CS::one(),
-            );
+            Boolean::enforce_equal(
+                cs.namespace(|| "ensure op_data is correctly formed"),
+                &is_op_data_correct,
+                &Boolean::constant(true),
+            )?;
         }
         prev.op_data = op_data.clone();
-        let sender_pk = ecc::EdwardsPoint::interpret(
-            cs.namespace(|| "signer public key"),
-            &op_data.signer_pubkey.get_x().get_number(),
-            &op_data.signer_pubkey.get_y().get_number(),
+ 
+        let (signature, is_signature_correctly_verified) = verify_circuit_signature(
+            cs.namespace(|| "verify circuit signature"),
+            &op_data,
+            op.signature.clone(),
             self.params,
+            generator.clone(),
         )?;
-
-        let signature_r_x = AllocatedNum::alloc(cs.namespace(|| "signature r_x witness"), || {
-            Ok(op.signature.get()?.r.into_xy().0)
-        })?;
-
-        let signature_r_y = AllocatedNum::alloc(cs.namespace(|| "signature r_y witness"), || {
-            Ok(op.signature.get()?.r.into_xy().1)
-        })?;
-
-        let (signature_r, is_sig_r_correct) = ecc::EdwardsPoint::from_x_y_unchecked(
-            cs.namespace(|| "interpet siganture_r"),
-            &signature_r_x,
-            &signature_r_y,
-            self.params,
-        )?;
-        // let signature_r = ecc::EdwardsPoint::interpret(
-        //     cs.namespace(|| "signature r as point"),
-        //     &signature_r_x,
-        //     &signature_r_y,
-        //     self.params,
-        // )?;
-
-        let signature_s = AllocatedNum::alloc(cs.namespace(|| "signature s witness"), || {
-            Ok(op.signature.get()?.s)
-        })?;
-
-        let signature = EddsaSignature {
-            r: signature_r,
-            s: signature_s,
-            pk: sender_pk,
-        };
-
-        let serialized_tx_bits = {
-            let mut temp_bits = op_data.first_sig_msg.get_bits_le();
-            temp_bits.extend(op_data.second_sig_msg.get_bits_le());
-            temp_bits.extend(op_data.third_sig_msg.get_bits_le());
-            temp_bits
-        };
-
-        // signature msg is the hash of serialized transaction
-        let sig_msg = pedersen_hash::pedersen_hash(
-            cs.namespace(|| "sig_msg"),
-            pedersen_hash::Personalization::NoteCommitment,
-            &serialized_tx_bits,
-            self.params,
-        )?
-        .get_x()
-        .clone();
-        let mut sig_msg_bits = sig_msg.into_bits_le(cs.namespace(|| "sig_msg_bits"))?;
-        sig_msg_bits.resize(256, Boolean::constant(false));
-
-        // signature.verify_sha256_musig(
-        //     cs.namespace(|| "verify_sha"),
-        //     self.params,
-        //     &sig_msg_bits,
-        //     generator,
-        // )?;
-
-        let is_sig_verified = verify_pedersen(
-            cs.namespace(|| "musig pedersen"),
-            &sig_msg_bits,
-            &signature,
-            self.params,
-            generator,
-        )?;
-
-        let is_signature_correctly_verified = Boolean::from(Boolean::and(
-            cs.namespace(|| "is_signature_correctly_verified"),
-            &is_sig_verified,
-            &is_sig_r_correct,
-        )?);
 
         let diff_a_b =
             Expression::from(&op_data.a.get_number()) - Expression::from(&op_data.b.get_number());
@@ -690,7 +648,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let diff_a_b_bits_repacked = Expression::le_bits::<CS>(&diff_a_b_bits);
 
         let is_a_geq_b = Boolean::from(Expression::equals(
-            cs.namespace(|| "diff equal to repacked"),
+            cs.namespace(|| "is_a_geq_b: diff equal to repacked"),
             diff_a_b,
             diff_a_b_bits_repacked,
         )?);
@@ -1817,6 +1775,87 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         account_data.extend(subtree_root.get_bits_le());
         Ok((account_data, Boolean::from(is_account_empty), subtree_root))
     }
+}
+
+fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    op_data: &AllocatedOperationData<E>,
+    signature: Option<TransactionSignature<E>>,
+    params: &E::Params,
+    generator: ecc::EdwardsPoint<E>,
+) -> Result<(EddsaSignature<E>, Boolean), SynthesisError> {
+    let signer_pk = ecc::EdwardsPoint::interpret(
+        cs.namespace(|| "signer public key"),
+        &op_data.signer_pubkey.get_x().get_number(),
+        &op_data.signer_pubkey.get_y().get_number(),
+        &params,
+    )?;
+    let signature_r_x = AllocatedNum::alloc(cs.namespace(|| "signature r_x witness"), || {
+        Ok(signature.get()?.r.into_xy().0)
+    })?;
+
+    let signature_r_y = AllocatedNum::alloc(cs.namespace(|| "signature r_y witness"), || {
+        Ok(signature.get()?.r.into_xy().1)
+    })?;
+
+    let (signature_r, is_sig_r_correct) = ecc::EdwardsPoint::from_x_y_unchecked(
+        cs.namespace(|| "interpet signature_r"),
+        &signature_r_x,
+        &signature_r_y,
+        params,
+    )?;
+
+    let signature_s = AllocatedNum::alloc(cs.namespace(|| "signature s witness"), || {
+        Ok(signature.get()?.s)
+    })?;
+
+    let signature = EddsaSignature {
+        r: signature_r,
+        s: signature_s,
+        pk: signer_pk,
+    };
+
+    let serialized_tx_bits = {
+        let mut temp_bits = op_data.first_sig_msg.get_bits_le();
+        temp_bits.extend(op_data.second_sig_msg.get_bits_le());
+        temp_bits.extend(op_data.third_sig_msg.get_bits_le());
+        temp_bits
+    };
+
+    // signature msg is the hash of serialized transaction
+    let sig_msg = pedersen_hash::pedersen_hash(
+        cs.namespace(|| "sig_msg"),
+        pedersen_hash::Personalization::NoteCommitment,
+        &serialized_tx_bits,
+        params,
+    )?
+    .get_x()
+    .clone();
+    let mut sig_msg_bits = sig_msg.into_bits_le(cs.namespace(|| "sig_msg_bits"))?;
+    sig_msg_bits.resize(256, Boolean::constant(false));
+
+    // signature.verify_sha256_musig(
+    //     cs.namespace(|| "verify_sha"),
+    //     self.params,
+    //     &sig_msg_bits,
+    //     generator,
+    // )?;
+
+    let is_sig_verified = verify_pedersen(
+        cs.namespace(|| "musig pedersen"),
+        &sig_msg_bits,
+        &signature,
+        params,
+        generator,
+    )?;
+
+    let is_signature_correctly_verified = Boolean::from(Boolean::and(
+        cs.namespace(|| "is_signature_correctly_verified"),
+        &is_sig_verified,
+        &is_sig_r_correct,
+    )?);
+
+    Ok((signature, is_signature_correctly_verified))
 }
 fn verify_signature_message_construction<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,

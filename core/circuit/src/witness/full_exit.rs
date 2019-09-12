@@ -10,8 +10,7 @@ use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::eddsa::Signature;
 use franklin_crypto::jubjub::JubjubEngine;
 use franklin_crypto::jubjub::{edwards, Unknown};
-use models::circuit::account::{Balance, CircuitAccount, CircuitAccountTree};
-use num_traits::cast::ToPrimitive;
+use models::circuit::account::{CircuitAccountTree};
 
 use models::node::FullExitOp;
 use models::params as franklin_constants;
