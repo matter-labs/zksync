@@ -567,6 +567,15 @@ pub enum TxAddError {
     ZeroAmount,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AccountTransaction {
+    tx: Value,
+    success: bool,
+    fail_reason: Option<String>,
+    committed: bool,
+    verified: bool
+}
+
 enum ConnectionHolder {
     Pooled(PooledConnection<ConnectionManager<PgConnection>>),
     Direct(PgConnection),
@@ -653,6 +662,54 @@ impl StorageProcessor {
                 .execute(self.conn())?;
         }
         Ok(())
+    }
+
+    pub fn get_account_transactions(&self, address: &AccountAddress) -> QueryResult<Vec<AccountTransaction>> {
+        let all_txs: Vec<_> = mempool::table
+            .filter(mempool::primary_account_address.eq(address.data.to_vec()))
+            .left_join(executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),)
+            .left_join(operations::table.on(operations::block_number.eq(executed_transactions::block_number)))
+            .load::<(ReadTx, Option<StoredExecutedTransaction>, Option<StoredOperation>)>(self.conn())?;
+
+        let res = all_txs
+            .into_iter()
+            .group_by(|(mempool_tx, _, _)| mempool_tx.hash.clone())
+            .into_iter()
+            .map(|(_op_id, mut group_iter)| {
+                // TODO: replace the query with pivot
+                let (mempool_tx, executed_tx, operation) = group_iter.next().unwrap();
+                let mut res = AccountTransaction {
+                    tx: mempool_tx.tx,
+                    success: false,
+                    fail_reason: None,
+                    committed: false,
+                    verified: false
+                };
+                if let Some(executed_tx) = executed_tx {
+                    res.success = executed_tx.success;
+                    res.fail_reason = executed_tx.fail_reason;
+                }
+                if let Some(operation) = operation {
+                    if operation.action_type == "Commit" {
+                        res.committed = operation.confirmed;
+                    } else {
+                        res.verified = operation.confirmed;
+                    }
+                }
+                if let Some((_mempool_tx, _executed_tx, operation)) = group_iter.next() {
+                    if let Some(operation) = operation {
+                        if operation.action_type == "Commit" {
+                            res.committed = operation.confirmed;
+                        } else {
+                            res.verified = operation.confirmed;
+                        }
+                    };
+                }
+                res
+            })
+            .collect::<Vec<AccountTransaction>>();
+        
+        Ok(res)
     }
 
     pub fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {
