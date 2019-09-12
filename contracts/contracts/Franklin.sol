@@ -10,7 +10,7 @@ contract Franklin {
     Verifier verifier;
 
     // chunks per block; each chunk has 8 bytes of public data
-    uint256 constant BLOCK_SIZE = 10;
+    uint256 constant BLOCK_SIZE = 14;
     // must fit into uint128
     uint256 constant MAX_VALUE = 2 ** 128 - 1;
     // ETH blocks
