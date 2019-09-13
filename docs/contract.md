@@ -86,12 +86,14 @@ If the block is reverted via Exodus Mode, the funds held by **Deposit priority r
 
 ### Fees for Priority Requests
 
-In order to send priority request, the _user_ MUST pay some extra fee. That fee will be subtracted from the amount of Ether that the user sent to Deposit funciton in both cases of Ether and ERC-20 tokens deposits. That fee will be the payment for the _validator’s_ work to include these transactions in the block. One transaction fee is calculated as follows:
+In order to send priority request, the _user_ MUST pay some extra fee. That fee will be subtracted from the amount of Ether that the user sent to Deposit or Full Exit funcitons. That fee will be the payment for the _validator’s_ work to include these transactions in the block. One transaction fee is calculated as follows:
 `fee = FEE_COEFF * (BASE_GAS + gasleft) * gasprice`, where
 - `FEE_COEFF` - fee coefficient for priority request transaction
 - `BASE_GAS` - base gas cost for transaction (usually 21000)
 - `gasleft` - remaining gas for transaction code execution
 - `gasprice` - gas price of the transaction
+
+If the user sends more Ether than necessary, the difference will be returned to him.
 
 ### **Validators'** responsibility
 
