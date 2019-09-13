@@ -5,7 +5,6 @@ use bigdecimal::BigDecimal;
 use bigdecimal::ToPrimitive;
 use crypto::{digest::Digest, sha2::Sha256};
 use web3::types::Address;
-use web3::types::U256;
 
 /// Signed by user.
 

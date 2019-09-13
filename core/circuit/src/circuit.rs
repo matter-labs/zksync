@@ -49,14 +49,10 @@ struct PreviousData<E: JubjubEngine> {
 // Implementation of our circuit:
 impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
     fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
-        //this is needed for technical purposes and convenience only
-        let zero = AllocatedNum::alloc(cs.namespace(|| "zero"), || Ok(E::Fr::zero()))?;
-        zero.assert_zero(cs.namespace(|| "zero==0"))?;
-
         // we only need this for consistency of first operation
-        let zero_circuit_element = CircuitElement::from_number_padded(
+        let zero_circuit_element = CircuitElement::from_expression_padded(
             cs.namespace(|| "zero_circuit_element"),
-            zero.clone(),
+            Expression::u64::<CS>(0),
         )?;
         let mut prev = PreviousData {
             op_data: AllocatedOperationData {
@@ -64,8 +60,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 new_pubkey_hash: zero_circuit_element.clone(),
                 signer_pubkey: CircuitPubkey::from_xy(
                     cs.namespace(|| "dummy signer_pubkey"),
-                    zero.clone(),
-                    zero.clone(),
+                    zero_circuit_element.get_number(),
+                    zero_circuit_element.get_number(),
                     &self.params,
                 )?,
                 amount_packed: zero_circuit_element.clone(),
@@ -125,13 +121,13 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         let old_root =
             CircuitElement::from_number_padded(cs.namespace(|| "old_root"), rolling_root.clone())?;
         // first chunk of block should always have number 0
-        let mut next_chunk_number = zero.clone();
+        let mut next_chunk_number = zero_circuit_element.get_number();
 
         // declare vector of fees, that will be collected during block processing
         let mut fees = vec![];
         let fees_len = 1 << franklin_constants::BALANCE_TREE_DEPTH;
         for _ in 0..fees_len {
-            fees.push(zero.clone());
+            fees.push(zero_circuit_element.get_number());
         }
         // vector of pub_data_bits that will be aggregated during block processing
         let mut block_pub_data_bits = vec![];
@@ -139,7 +135,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         let mut allocated_chunk_data: AllocatedChunkData<E> = AllocatedChunkData {
             is_chunk_last: Boolean::constant(false),
             is_chunk_first: Boolean::constant(false),
-            chunk_number: zero.clone(),
+            chunk_number: zero_circuit_element.get_number(),
             tx_type: zero_circuit_element,
         };
         for (i, operation) in self.operations.iter().enumerate() {
@@ -200,21 +196,12 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 cs.namespace(|| "calculate new account root"),
                 &current_branch,
             )?;
-            let operation_new_root =
-                AllocatedNum::alloc(cs.namespace(|| "op_new_root"), || operation.new_root.grab())?;
 
-            // ensure that root hash of the state is correct after applying operation
-            cs.enforce(
-                || "new root is correct",
-                |lc| lc + new_state_root.get_variable(),
-                |lc| lc + CS::one(),
-                |lc| lc + operation_new_root.get_variable(),
-            );
             rolling_root = new_state_root;
         }
 
         cs.enforce(
-            || "ensure op_data correct",
+            || "ensure last chunk of the block is a last chunk of corresponding transaction",
             |_| {
                 allocated_chunk_data
                     .is_chunk_last
@@ -632,7 +619,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             )?;
         }
         prev.op_data = op_data.clone();
- 
+
         let (signature, is_signature_correctly_verified) = verify_circuit_signature(
             cs.namespace(|| "verify circuit signature"),
             &op_data,
@@ -1849,11 +1836,11 @@ fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
         generator,
     )?;
 
-    let is_signature_correctly_verified = Boolean::from(Boolean::and(
+    let is_signature_correctly_verified = Boolean::and(
         cs.namespace(|| "is_signature_correctly_verified"),
         &is_sig_verified,
         &is_sig_r_correct,
-    )?);
+    )?;
 
     Ok((signature, is_signature_correctly_verified))
 }

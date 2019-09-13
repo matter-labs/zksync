@@ -91,6 +91,21 @@ impl<E: JubjubEngine> CircuitElement<E> {
 
         Ok(ce)
     }
+    pub fn from_expression_padded<CS: ConstraintSystem<E>>(
+        mut cs: CS,
+        expr: Expression<E>,
+    ) -> Result<Self, SynthesisError> {
+        let mut bits = expr.into_bits_le(cs.namespace(|| "into_bits_le"))?;
+        bits.resize(256, Boolean::constant(false));
+        let number = pack_bits_to_element(cs.namespace(|| "pack back"), &bits)?;
+        let ce = CircuitElement {
+            number,
+            bits_le: bits,
+            length: 256,
+        };
+
+        Ok(ce)
+    }
 
     pub fn from_number_padded<CS: ConstraintSystem<E>>(
         mut cs: CS,
