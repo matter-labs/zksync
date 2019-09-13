@@ -53,10 +53,6 @@ fn main() {
     // create main tokio runtime
     //let rt = Runtime::new().unwrap();
 
-    let eth_watch = EthWatch::new();
-    let state_keeper =
-        PlasmaStateKeeper::new(connection_pool.clone(), eth_watch.get_shared_eth_state());
-
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for committer");
@@ -81,8 +77,9 @@ fn main() {
 
     let (tx_for_state, rx_for_state) = channel();
     start_api_server(tx_for_state.clone(), connection_pool.clone());
-    start_eth_watch(eth_watch);
+    let shared_eth_state = start_eth_watch(connection_pool.clone());
     let (tx_for_ops, rx_for_ops) = channel();
+    let state_keeper = PlasmaStateKeeper::new(connection_pool.clone(), shared_eth_state);
     start_state_keeper(state_keeper, rx_for_state, tx_for_ops.clone());
     let tx_for_eth = eth_sender::start_eth_sender(connection_pool.clone());
     start_committer(rx_for_ops, tx_for_eth, connection_pool.clone());

@@ -230,30 +230,6 @@ impl PlasmaStateKeeper {
             .collect()
     }
 
-    fn precheck_tx(&self, tx: &FranklinTx) -> Result<(), failure::Error> {
-        if let FranklinTx::Deposit(deposit) = tx {
-            let eth_state = self.eth_state.read().expect("eth state rlock");
-            if let Some(locked_balance) = eth_state
-                .locked_balances
-                .get(&(deposit.to.clone(), deposit.token))
-            {
-                ensure!(
-                    locked_balance.amount >= &deposit.amount + &deposit.fee,
-                    "Locked amount insufficient, locked: {}, deposit: {}",
-                    locked_balance.amount,
-                    deposit.amount
-                );
-                ensure!(
-                    locked_balance.blocks_left_until_unlock > 10,
-                    "Locked balance will unlock soon"
-                );
-            } else {
-                bail!("Onchain balance is not locked");
-            }
-        }
-        Ok(())
-    }
-
     fn apply_txs(&mut self, transactions: Vec<FranklinTx>) -> CommitRequest {
         info!("Creating block, size: {}", transactions.len());
         // collect updated state
@@ -268,17 +244,17 @@ impl PlasmaStateKeeper {
                 break;
             }
 
-            if let Err(e) = self.precheck_tx(&tx) {
-                error!("Tx {} is not ready: {}", hex::encode(tx.hash()), e);
-                let exec_result = ExecutedTx {
-                    tx,
-                    success: false,
-                    op: None,
-                    fail_reason: Some(e.to_string()),
-                };
-                ops.push(exec_result);
-                continue;
-            }
+            //            if let Err(e) = self.precheck_tx(&tx) {
+            //                error!("Tx {} is not ready: {}", hex::encode(tx.hash()), e);
+            //                let exec_result = ExecutedTx {
+            //                    tx,
+            //                    success: false,
+            //                    op: None,
+            //                    fail_reason: Some(e.to_string()),
+            //                };
+            //                ops.push(exec_result);
+            //                continue;
+            //            }
 
             let tx_updates = self.state.apply_tx(tx.clone());
 

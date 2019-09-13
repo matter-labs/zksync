@@ -96,9 +96,9 @@ contract Franklin {
     // - expirationBlock - the number of Ethereum block when request becomes expired
     // - fee - validator fee
     event NewPriorityRequest(
-        OpType indexed opType,
+        OpType opType,
         bytes pubData,
-        uint256 indexed expirationBlock,
+        uint256 expirationBlock,
         uint256 fee
     );
 
@@ -417,7 +417,7 @@ contract Franklin {
     // - _token - token address
     // - _signature - user signature
     function registerFullExit(
-        bytes calldata _franklinAddr,
+        uint24 _accountId,
         address _token,
         bytes calldata _signature
     ) external payable {
@@ -432,17 +432,13 @@ contract Franklin {
             "derlwv"
         ); // derlwv - Not enough ETH provided to pay the fee
         require(
-            _franklinAddr.length == PUBKEY_HASH_LEN,
-            "rfepkl"
-        ); // rfepkl - wrong pubkey length
-        require(
             _signature.length == SIGNATURE_LEN,
             "rfesnl"
         ); // rfesnl - wrong signature length
 
         uint16 tokenId = governance.validateTokenAddress(_token);
         // Priority Queue request
-        bytes memory pubData = _franklinAddr; // franklin address
+        bytes memory pubData = Bytes.toBytesFromUInt24(_accountId); // franklin account id
         pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(msg.sender)); // eth address
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(tokenId)); // token id
         pubData = Bytes.concat(pubData, _signature); // signature
@@ -732,7 +728,7 @@ contract Franklin {
             priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 20, PUBKEY_HASH_LEN + 18);
             onchainPubData = _onchainOp.pubData;
         } else if (_onchainOp.opType == OpType.FullExit && priorityRequests[_priorityRequestId].opType == OpType.FullExit) {
-            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, PUBKEY_HASH_LEN, 86);
+            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 0, 89);
             onchainPubData = Bytes.slice(_onchainOp.pubData, 0, 86);
         } else {
             revert("cpowop"); // cpowop - wrong operation

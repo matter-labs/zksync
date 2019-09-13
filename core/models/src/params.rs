@@ -53,8 +53,8 @@ pub const ETH_TOKEN_ID: TokenId = 0;
 
 pub const BLOCK_SIZE_CHUNKS: usize = 14;
 
-/// Lock onchain deposits for this number of eth blocks.
-pub const LOCK_DEPOSITS_FOR: u64 = 8 * 60 * 100;
+/// Priority op should be executed for this number of eth blocks.
+pub const PRIORITY_EXPIRATION: u64 = 250;
 pub const FR_ADDRESS_LEN: usize = 20;
 
 pub const KEY_FILENAME: &str = "franklin_pk.key";

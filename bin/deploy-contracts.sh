@@ -16,6 +16,7 @@ cd ..
 
 CONTRACT_ADDR_NEW_VALUE=`grep "CONTRACT_ADDR" deploy.log`
 ERC20_ADDR_NEW_VALUE=`grep "TEST_ERC20" deploy.log`
+GOVERNANCE_ADDR_NEW_VALUE=`grep "GOVERNANCE_ADDR" deploy.log`
 if [[ ! -z "$CONTRACT_ADDR_NEW_VALUE" ]]
 then
     export LABEL=$FRANKLIN_ENV-Contract_deploy-`date +%Y-%m-%d-%H%M%S`
@@ -25,6 +26,7 @@ then
     echo $CONTRACT_ADDR_NEW_VALUE
     python3 bin/replace-env-variable.py ./$ENV_FILE $CONTRACT_ADDR_NEW_VALUE
     python3 bin/replace-env-variable.py ./$ENV_FILE $ERC20_ADDR_NEW_VALUE
+    python3 bin/replace-env-variable.py ./$ENV_FILE $GOVERNANCE_ADDR_NEW_VALUE
 else
     echo "Contract deployment failed"
     exit 1

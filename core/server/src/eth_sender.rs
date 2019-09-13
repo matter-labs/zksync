@@ -15,7 +15,7 @@ use bigdecimal::BigDecimal;
 use eth_client::{ETHClient, SignedCallResult};
 use ff::{PrimeField, PrimeFieldRepr};
 use futures::Future;
-use models::abi::TEST_PLASMA2_ALWAYS_VERIFY;
+use models::abi::FRANKLIN_CONTRACT;
 use models::{Action, Operation};
 use std::collections::VecDeque;
 use std::str::FromStr;
@@ -88,7 +88,7 @@ struct ETHSender<T: Transport> {
 impl<T: Transport> ETHSender<T> {
     fn new(transport: T, db_pool: ConnectionPool) -> Self {
         let eth_client = {
-            let abi_string = serde_json::Value::from_str(TEST_PLASMA2_ALWAYS_VERIFY)
+            let abi_string = serde_json::Value::from_str(FRANKLIN_CONTRACT)
                 .unwrap()
                 .get("abi")
                 .unwrap()
