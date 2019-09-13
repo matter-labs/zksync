@@ -56,7 +56,7 @@ export async function deployFranklin(
                 governanceAddress
             ],
         {
-            gasLimit: 6500000,
+            gasLimit: 6600000,
         });
         console.log(`CONTRACT_ADDR=${contract.address}`);
 
