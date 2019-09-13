@@ -17,7 +17,7 @@
                 </ul>
             </div>
             </nav>
-            <Alert v-bind:message="message"></Alert>
+            <Alert ref="alert"></Alert>
         </header>
         <Wallet 
             v-if="componentToBeShown=='Wallet'" 
@@ -75,8 +75,8 @@ export default {
         this.updateAccountInfo();
     },
     methods: {
-        displayAlert(msg) {
-            this.message = msg.msg;
+        displayAlert(kwargs) {
+            this.$refs.alert.display(kwargs)
         },
         async updateAccountInfo() {
             await window.walletDecorator.updateState();

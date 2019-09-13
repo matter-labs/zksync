@@ -72,52 +72,54 @@ export default {
         }
     },
     methods: {
-        displayAlert(msg) {
-            this.$emit('alert', msg);
+        displayAlert(kwargs) {
+            this.$emit('alert', kwargs);
         },
         async transferFranklin(kwargs) {
             console.log('transfer', kwargs);
             try {
                 if ( ! window.walletDecorator) {
-                    displayAlert(`Wallet is ${window.walletDecorator}`);
+                    displayAlert({ message: `Wallet is ${window.walletDecorator}` });
                     return;
                 }
 
                 await window.walletDecorator.transfer(kwargs);
             } catch (e) {
-                this.displayAlert(`unknown error: ${e}`);
+                this.displayAlert({ message: `unknown error: ${e}` });
             }
         },
         async depositOnchain(kwargs) {
             console.log('depositOnchain', kwargs);
             try {
                 if ( ! window.wallet) {
-                    displayAlert(`Wallet is ${window.walletDecorator}`);
+                    displayAlert({ message: `Wallet is ${window.walletDecorator}` });
                     return;
                 }
 
                 await window.walletDecorator.depositOnchain(kwargs);
 
-                this.displayAlert(`deposit succeeded or something`);
+                this.displayAlert({ message: `deposit succeeded or something` });
             } catch (e) {
-                this.displayAlert(`unknown error: ${e}`);
+                this.displayAlert({ message: `unknown error: ${e}` });
             }
         },
         async withdrawOnchain(kwargs) {
             console.log('withdrawOnchain', kwargs);
         },
         async depositOffchain(kwargs) {
-            this.displayAlert(`depositOffchain ${JSON.stringify(kwargs)}`);
+            this.displayAlert({ message: `depositOffchain ${JSON.stringify(kwargs)}` });
             try {
                 await window.walletDecorator.depositOffchain(kwargs);
 
-                this.displayAlert(`deposit succeeded or something`);
+                this.displayAlert({ message: `deposit succeeded or something`});
             } catch (e) {
                 this.displayAlert(`unknown error: ${e}`);
             }
         },
         async withdrawOffchain(kwargs) {
-            this.displayAlert(`withdrawOffchain ${JSON.stringify(kwargs)}`);
+            this.displayAlert({
+                message: `withdrawOffchain ${JSON.stringify(kwargs)}`
+            });
         },
     },
     components

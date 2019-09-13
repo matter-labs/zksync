@@ -42,8 +42,8 @@ export default {
         }
     },
     methods: {
-        localDisplayAlert(msg) {
-            this.$emit('alert', { msg });
+        localDisplayAlert(message) {
+            this.$emit('alert', { message });
         },
         buttonClicked() {
             const addressLength = '0x241d9d2eebabfe5c07ea537f9c95ba3dd7fe87074ade45720eca8e'.length;

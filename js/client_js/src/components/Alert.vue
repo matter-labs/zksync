@@ -1,5 +1,5 @@
 <template>
-    <b-alert v-if="message" dismissible variant="warning" fade :show="countdown" @dismissed="countdown=0" class="mt-2">
+    <b-alert dismissible variant="warning" fade :show="countdown" @dismissed="dismissed" class="mt-2">
         {{ message }}
     </b-alert>
 </template>
@@ -7,14 +7,19 @@
 <script>
 export default {
     name: 'Alert',
-    props: ['message'],
     data: () => ({
         countdown: 0,
+        message: '',
     }),
-    watch: {
-        message: function() {
-            this.countdown = 10;
+    methods: {
+        dismissed() {
+            this.message = '';
+            this.countdown = 0;
+        },
+        display(kwargs) {
+            this.message = kwargs.message;
+            this.countdown = kwargs.countdown || 10;
         }
-    },
+    }
 }
 </script>
