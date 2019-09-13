@@ -8,12 +8,15 @@ pub mod account;
 pub mod block;
 pub mod config;
 pub mod operations;
+pub mod priority_ops;
 pub mod tx;
 
 pub use web3::types::{H256, U128, U256};
 
 pub use self::account::{Account, AccountAddress, AccountUpdate};
 pub use self::operations::{DepositOp, FranklinOp, TransferOp, TransferToNewOp, WithdrawOp};
+pub use self::priority_ops::{Deposit, FranklinPriorityOp, FullExit};
+pub use self::tx::{Close, FranklinTx, Transfer, Withdraw};
 
 pub type Engine = bn256::Bn256;
 pub type Fr = bn256::Fr;

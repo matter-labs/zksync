@@ -11,7 +11,7 @@ use std::time::Duration;
 use server::api_server::start_api_server;
 use server::committer::start_committer;
 use server::eth_sender;
-use server::eth_watch::{start_eth_watch, EthWatch};
+use server::eth_watch::start_eth_watch;
 use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
 
 use models::{node::config, StateKeeperRequest};

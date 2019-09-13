@@ -12,7 +12,6 @@ use web3::types::Address;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum TxType {
     Transfer,
-    Deposit,
     Withdraw,
     Close,
 }
@@ -38,31 +37,6 @@ impl Transfer {
         out.extend_from_slice(&self.to.data);
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&pack_token_amount(&self.amount));
-        out.extend_from_slice(&pack_fee_amount(&self.fee));
-        out.extend_from_slice(&self.nonce.to_be_bytes());
-        out
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Deposit {
-    // TODO: derrive account address from signature
-    pub to: AccountAddress,
-    pub token: TokenId,
-    pub amount: BigDecimal,
-    pub fee: BigDecimal,
-    pub nonce: Nonce,
-    // TODO: Signature unimplemented
-}
-
-impl Deposit {
-    const TX_TYPE: u8 = 1;
-    fn get_bytes(&self) -> Vec<u8> {
-        let mut out = Vec::new();
-        out.extend_from_slice(&[Self::TX_TYPE]);
-        out.extend_from_slice(&self.to.data);
-        out.extend_from_slice(&self.token.to_be_bytes());
-        out.extend_from_slice(&self.amount.to_u128().unwrap().to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
@@ -121,7 +95,6 @@ impl Close {
 #[serde(tag = "type")]
 pub enum FranklinTx {
     Transfer(Transfer),
-    Deposit(Deposit),
     Withdraw(Withdraw),
     Close(Close),
 }
@@ -130,7 +103,6 @@ impl FranklinTx {
     pub fn hash(&self) -> Vec<u8> {
         let bytes = match self {
             FranklinTx::Transfer(tx) => tx.get_bytes(),
-            FranklinTx::Deposit(tx) => tx.get_bytes(),
             FranklinTx::Withdraw(tx) => tx.get_bytes(),
             FranklinTx::Close(tx) => tx.get_bytes(),
         };
@@ -145,7 +117,6 @@ impl FranklinTx {
     pub fn account(&self) -> AccountAddress {
         match self {
             FranklinTx::Transfer(tx) => tx.from.clone(),
-            FranklinTx::Deposit(tx) => tx.to.clone(),
             FranklinTx::Withdraw(tx) => tx.account.clone(),
             FranklinTx::Close(tx) => tx.account.clone(),
         }
@@ -154,7 +125,6 @@ impl FranklinTx {
     pub fn nonce(&self) -> Nonce {
         match self {
             FranklinTx::Transfer(tx) => tx.nonce,
-            FranklinTx::Deposit(tx) => tx.nonce,
             FranklinTx::Withdraw(tx) => tx.nonce,
             FranklinTx::Close(tx) => tx.nonce,
         }

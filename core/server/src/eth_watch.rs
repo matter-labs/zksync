@@ -2,7 +2,7 @@ use ethabi::{decode, ParamType};
 use failure::format_err;
 use futures::Future;
 use std::collections::HashMap;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 use std::env;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
@@ -12,15 +12,10 @@ use web3::types::{Address, BlockNumber, Filter, FilterBuilder, Log, H160, U256};
 use web3::{Transport, Web3};
 
 use bigdecimal::BigDecimal;
-use models::node::{AccountAddress, AccountId, TokenId};
-use models::params::{FR_ADDRESS_LEN, PRIORITY_EXPIRATION};
-use num_traits::FromPrimitive;
+use models::node::{FranklinPriorityOp, TokenId};
+use models::params::PRIORITY_EXPIRATION;
 use std::sync::mpsc::sync_channel;
 use storage::ConnectionPool;
-
-// From enum OpType in Franklin.sol
-const DEPOSIT_OPTYPE_ID: u8 = 1u8;
-const FULLEXIT_OPTYPE_ID: u8 = 6u8;
 
 pub struct EthWatch<T: Transport> {
     main_contract: (ethabi::Contract, Contract<T>),
@@ -38,67 +33,8 @@ pub struct ETHState {
 }
 
 #[derive(Debug)]
-pub enum PriorityOpData {
-    Deposit {
-        sender: Address,
-        token: TokenId,
-        amount: BigDecimal,
-        account: AccountAddress,
-    },
-    FullExit {
-        account_id: AccountId,
-        eth_address: Address,
-        token: TokenId,
-        signature: Vec<u8>,
-    },
-}
-
-impl PriorityOpData {
-    fn parse_pubdata(pub_data: &[u8], op_type_id: u8) -> Self {
-        match op_type_id {
-            DEPOSIT_OPTYPE_ID => {
-                let sender = Address::from_slice(&pub_data[0..20]);
-                let token = u16::from_be_bytes(pub_data[20..(20 + 2)].try_into().unwrap());
-                // TODO: bigdecimal -> u128 conversion is buggy.
-                let amount = BigDecimal::from_u128(u128::from_be_bytes(
-                    pub_data[22..(22 + 16)].try_into().unwrap(),
-                ))
-                .unwrap();
-                let account =
-                    AccountAddress::from_bytes(&pub_data[38..(38 + FR_ADDRESS_LEN)]).unwrap();
-                PriorityOpData::Deposit {
-                    sender,
-                    token,
-                    amount,
-                    account,
-                }
-            }
-            FULLEXIT_OPTYPE_ID => {
-                let account_id = {
-                    let mut account_id_bytes = [0u8; 4];
-                    account_id_bytes[1..4].copy_from_slice(&pub_data[0..3]);
-                    u32::from_be_bytes(account_id_bytes)
-                };
-                let eth_address = Address::from_slice(&pub_data[2..(20 + 2)]);
-                let token = u16::from_be_bytes(pub_data[22..(22 + 2)].try_into().unwrap());
-                let signature = pub_data[24..(24 + 64)].to_vec();
-                PriorityOpData::FullExit {
-                    account_id,
-                    eth_address,
-                    token,
-                    signature,
-                }
-            }
-            _ => {
-                panic!("Unsupported priority queue op type.");
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
 pub struct PriorityOp {
-    data: PriorityOpData,
+    data: FranklinPriorityOp,
     deadline_block: u64,
     eth_fee: BigDecimal,
 }
@@ -127,7 +63,8 @@ impl TryFrom<Log> for PriorityOp {
                     .map(|ui| U256::as_u32(ui) as u8)
                     .unwrap();
                 let op_pubdata = dec_ev.remove(0).to_bytes().unwrap();
-                PriorityOpData::parse_pubdata(&op_pubdata, op_type)
+                FranklinPriorityOp::parse_pubdata(&op_pubdata, op_type)
+                    .expect("Failed to parse priority op data")
             },
             deadline_block: dec_ev
                 .remove(0)
@@ -337,6 +274,7 @@ impl<T: Transport> EthWatch<T> {
             debug!("New token added: {:?}", token);
             eth_state.add_new_token(token.id as TokenId, token.address);
         }
+        self.processed_block = last_block;
 
         // TODO: check if op was executed. decide best way.
         Ok(())
@@ -381,7 +319,9 @@ impl<T: Transport> EthWatch<T> {
             };
 
             if block > self.processed_block {
-                self.process_new_blocks(block);
+                self.process_new_blocks(block)
+                    .map_err(|e| warn!("Failed to process new blocks {}", e))
+                    .unwrap_or_default();
                 self.commit_state();
             }
         }

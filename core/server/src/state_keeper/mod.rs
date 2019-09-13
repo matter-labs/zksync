@@ -1,8 +1,7 @@
-use failure::{bail, ensure};
 use models::node::block::{Block, ExecutedTx};
 use models::node::tx::FranklinTx;
 use models::node::{Account, AccountAddress, AccountMap, AccountUpdate};
-use plasma::state::{PlasmaState, TxSuccess};
+use plasma::state::{OpSuccess, PlasmaState};
 use std::sync::{Arc, RwLock};
 use web3::types::H256;
 
@@ -238,28 +237,18 @@ impl PlasmaStateKeeper {
         let mut ops = Vec::new();
         let mut chunks_left = BLOCK_SIZE_CHUNKS;
 
+        // todo select priority ops here.
+
         for tx in transactions.into_iter() {
             let chunks_needed = self.state.chunks_for_tx(&tx);
             if chunks_left < chunks_needed {
                 break;
             }
 
-            //            if let Err(e) = self.precheck_tx(&tx) {
-            //                error!("Tx {} is not ready: {}", hex::encode(tx.hash()), e);
-            //                let exec_result = ExecutedTx {
-            //                    tx,
-            //                    success: false,
-            //                    op: None,
-            //                    fail_reason: Some(e.to_string()),
-            //                };
-            //                ops.push(exec_result);
-            //                continue;
-            //            }
-
-            let tx_updates = self.state.apply_tx(tx.clone());
+            let tx_updates = self.state.execute_tx(tx.clone());
 
             match tx_updates {
-                Ok(TxSuccess {
+                Ok(OpSuccess {
                     fee,
                     mut updates,
                     executed_op,
@@ -267,7 +256,9 @@ impl PlasmaStateKeeper {
                     assert!(chunks_needed == executed_op.chunks());
                     chunks_left -= chunks_needed;
                     accounts_updated.append(&mut updates);
-                    fees.push(fee);
+                    if let Some(fee) = fee {
+                        fees.push(fee);
+                    }
                     let exec_result = ExecutedTx {
                         tx,
                         success: true,

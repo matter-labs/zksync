@@ -5,6 +5,7 @@ import { curve } from 'elliptic';
 import EdwardsPoint = curve.edwards.EdwardsPoint;
 import { HmacSHA512 } from 'crypto-js';
 import {Contract, ethers} from 'ethers';
+import {parseEther} from "ethers/utils";
 
 // ! can't import from 'ethers/utils' it won't work in the browser.
 type BigNumber = ethers.utils.BigNumber;
@@ -76,38 +77,20 @@ export class Wallet {
         this.address = '0x' + (hash.getX().toString('hex').padStart(64, '0') + hash.getY().toString('hex').padStart(64,'0')).slice(0, PUBKEY_HASH_LEN * 2);
     }
 
-    async depositOnchain(token: Token, amount: BigNumberish) {
+    async deposit(token: Token, amount: BigNumberish) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
         const franklinAddressBinary = Buffer.from(this.address.substr(2), "hex");
         if (token.id == 0) {
-            // console.log(await franklinDeployedContract.balances(this.ethWallet.address, 0));
             const tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: amount});
-            await tx.wait(2);
             return tx.hash;
         } else {
             const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
             await erc20DeployedToken.approve(franklinDeployedContract.address, amount);
             const tx = await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, franklinAddressBinary,
-                {gasLimit: bigNumberify("150000")});
-            await tx.wait(2);
+                {gasLimit: bigNumberify("150000"), value: parseEther("0.001")});
             return tx.hash;
         }
     }
-
-    async depositOffchain(token: Token, amount: BigNumberish, fee: BigNumberish) {
-        let nonce = await this.getNonce();
-        let tx = {
-            type: 'Deposit',
-            to: this.address,
-            token: token.id,
-            amount: bigNumberify(amount).toString(),
-            fee: bigNumberify(fee).toString(),
-            nonce: nonce,
-        };
-
-        return await this.provider.submitTx(tx);
-    }
-
 
     async widthdrawOnchain(token: Token, amount: BigNumberish) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
@@ -135,6 +118,12 @@ export class Wallet {
         };
 
         return await this.provider.submitTx(tx);
+    }
+
+    async emergencyWithdraw(token: Token) {
+        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
+        // TODO: use account id
+        await franklinDeployedContract.registerFullExit(0, )
     }
 
     async transfer(address: Address, token: Token, amount: BigNumberish, fee: BigNumberish) {
