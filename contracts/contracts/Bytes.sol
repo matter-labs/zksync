@@ -8,6 +8,12 @@ library Bytes {
         bts = toBytesFromBytes32(bytes32(uint(self) << 240), 2);
     }
 
+    // Compies uint24 'self' into a new 'bytes memory'.
+    // Returns the newly created 'bytes memory'.
+    function toBytesFromUInt24(uint24 self) internal pure returns (bytes memory bts) {
+        bts = toBytesFromBytes32(bytes32(uint(self) << 232), 3);
+    }
+
     // Compies uint128 'self' into a new 'bytes memory'.
     // Returns the newly created 'bytes memory'.
     function toBytesFromUInt128(uint128 self) internal pure returns (bytes memory bts) {

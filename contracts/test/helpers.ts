@@ -6,7 +6,7 @@ import {BN} from "bn.js";
 export function createDepositPublicData(tokenId, hexAmount: string, franklinAddress: string): Buffer {
     const txId = Buffer.from("01", "hex");
     const accountId = Buffer.alloc(3, 0);
-    accountId.writeUIntBE(0, 0, 3);
+    accountId.writeUIntBE(2, 0, 3);
     const tokenBytes = Buffer.alloc(2);
     tokenBytes.writeUInt16BE(tokenId, 0);
     if (hexAmount.charAt(0) === '0' && hexAmount.charAt(1) === 'x') {
@@ -27,7 +27,7 @@ export function createDepositPublicData(tokenId, hexAmount: string, franklinAddr
 export function createWithdrawPublicData(tokenId, hexAmount: string, ethAddress: string): Buffer {
     const txId = Buffer.from("03", "hex");
     const accountId = Buffer.alloc(3, 0);
-    accountId.writeUIntBE(0, 0, 3);
+    accountId.writeUIntBE(2, 0, 3);
     const tokenBytes = Buffer.alloc(2);
     tokenBytes.writeUInt16BE(tokenId, 0);
     if (hexAmount.charAt(0) === '0' && hexAmount.charAt(1) === 'x') {
@@ -49,7 +49,7 @@ export function createWithdrawPublicData(tokenId, hexAmount: string, ethAddress:
 export function createFullExitPublicData(ethAddress: string, tokenId, hexAmount: string): Buffer {
     const txId = Buffer.from("06", "hex");
     const accountId = Buffer.alloc(3, 0);
-    accountId.writeUIntBE(0, 0, 3);
+    accountId.writeUIntBE(2, 0, 3);
     if (ethAddress.charAt(0) === '0' && ethAddress.charAt(1) === 'x') {
         ethAddress = ethAddress.substr(2);
     }
