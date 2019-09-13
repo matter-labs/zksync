@@ -15,8 +15,8 @@ contract Verifier {
     ) public view returns (bool) {
         require(
             ((vk_gammaABC.length / 2) - 1) == proof_inputs.length,
-            "vfyini"
-        ); // vfyini - Invalid number of public inputs
+            "vvy11"
+        ); // vvy11 - Invalid number of public inputs
 
         // Compute the linear combination vk_x
         uint256[3] memory mul_input;
@@ -48,8 +48,8 @@ contract Verifier {
             }
             require(
                 success,
-                "vfyfp1"
-            ); // vfyfp1 - Failed to call ECMUL precompile
+                "vvy12"
+            ); // vvy12 - Failed to call ECMUL precompile
 
             assembly {
                 // ECADD
@@ -64,8 +64,8 @@ contract Verifier {
             }
             require(
                 success,
-                "vfyfp2"
-            ); // vfyfp2 - Failed to call ECADD precompile
+                "vvy13"
+            ); // vvy13 - Failed to call ECADD precompile
         }
 
         uint256[24] memory input = [
@@ -105,8 +105,8 @@ contract Verifier {
         }
         require(
             success,
-            "vfyfp3"
-        ); // vfyfp3 - Failed to call pairing precompile
+            "vvy14"
+        ); // vvy14 - Failed to call pairing precompile
         return out[0] == 1;
     }
 }
