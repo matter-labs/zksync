@@ -56,27 +56,27 @@ contract Franklin {
     uint256 constant TRANSFER_LENGTH = 2 * 8; // transfer
     uint256 constant FULL_EXIT_LENGTH = 14 * 8; // full exit
 
-    // MARK: - Events
+    // MARK: - EVENTS
 
-    // Event emitted when block is commited
+    // Event emitted when a block is committed
     // Structure:
-    // - blockNumber - number of commited block
-    event BlockCommited(uint32 indexed blockNumber);
-    // Event emitted when block is verified
+    // - blockNumber - the number of committed block
+    event BlockCommitted(uint32 indexed blockNumber);
+    // Event emitted when a block is verified
     // Structure:
-    // - blockNumber - number of verified block
+    // - blockNumber - the number of verified block
     event BlockVerified(uint32 indexed blockNumber);
 
     // Event emitted when blocks are reverted
     // Structure:
     // - totalBlocksVerified - number of verified blocks
-    // - totalBlocksCommited - number of commited blocks
+    // - totalBlocksCommitted - number of committed blocks
     event BlocksReverted(
         uint32 indexed totalBlocksVerified,
-        uint32 indexed totalBlocksCommited
+        uint32 indexed totalBlocksCommitted
     );
 
-    // Event emitted when user send a transaction to deposit his funds
+    // Event emitted when user send a transaction to deposit her funds
     // Structure:
     // - owner - sender
     // - tokenId - deposited token
@@ -89,7 +89,7 @@ contract Franklin {
         bytes franklinAddress
     );
 
-    // Event emitted when user send a transaction to withdraw his funds from onchain balance
+    // Event emitted when user send a transaction to withdraw her funds from onchain balance
     // Structure:
     // - owner - sender
     // - tokenId - withdrawed token
@@ -128,16 +128,16 @@ contract Franklin {
     // i.e. blocks[totalBlocksVerified] points at the latest verified block (block 0 is genesis)
     uint32 public totalBlocksVerified;
 
-    // Total number of commited blocks
-    // i.e. blocks[totalBlocksCommited] points at the latest commited block
-    uint32 public totalBlocksCommited;
+    // Total number of committed blocks
+    // i.e. blocks[totalBlocksCommitted] points at the latest committed block
+    uint32 public totalBlocksCommitted;
 
     // Block data (once per block)
     struct Block {
         // Validator (aka block producer)
         address validator;
-        // ETH block number at which this block was commited
-        uint32 commitedAtBlock;
+        // ETH block number at which this block was committed
+        uint32 committedAtBlock;
         // Index of the first operation to process for this block
         uint64 operationStartId;
         // Total number of operations to process for this block
@@ -166,7 +166,7 @@ contract Franklin {
 
     // Onchain operations -- processed inside blocks (see docs)
 
-    // Onchain operation contains operation type and its commited data
+    // Onchain operation contains operation type and its committed data
     struct OnchainOperation {
         OpType opType;
         bytes pubData;
@@ -180,7 +180,7 @@ contract Franklin {
 
     // Priority Queue
 
-    // Priority Operation contains operation type, its data, expiration block and fee
+    // Priority Operation contains operation type, its data, expiration block, and fee
     struct PriorityOperation {
         OpType opType;
         bytes pubData;
@@ -219,10 +219,10 @@ contract Franklin {
 
     // mapping (uint32 => bool) tokenMigrated;
 
-    // MARK: - Constructor
+    // MARK: - CONSTRUCTOR
 
     // Inits verifier, verification key and governance contracts instances,
-    // sets genesis root, network governance
+    // sets genesis root
     constructor(
         address _verifierAddress,
         address _vkAddress,
@@ -236,7 +236,7 @@ contract Franklin {
         blocks[0].stateRoot = _genesisRoot;
     }
 
-    // MARK: - Priority Queue
+    // MARK: - PRIORITY QUEUE
 
     // Calculate expiration block for request, store this request and emit NewPriorityRequest event
     // Params:
@@ -267,7 +267,7 @@ contract Franklin {
         );
     }
 
-    // Collects a fee from provided requests number for validator, store it on her
+    // Collects a fee from provided requests number for the validator, store it on her
     // balance to withdraw in Ether and delete this requests
     // Params:
     // - _number - the number of requests
@@ -339,11 +339,11 @@ contract Franklin {
     //     require(false, "unimplemented");
     // }
 
-    // MARK: - Root-chain operations
+    // MARK: - ROOT-CHAIN OPERATIONS
 
-    // Deposit ETH (simply by sending it to the contract)
+    // Deposit ETH
     // Params:
-    // - _franklinAddr - receiver
+    // - _franklinAddr - the receiver Franklin address
     function depositETH(bytes calldata _franklinAddr) external payable {
         // Fee is:
         //   fee coeff * (base tx gas cost + remained gas) * gas price
@@ -399,7 +399,9 @@ contract Franklin {
             "fd012"
         ); // fd012 - token transfer failed deposit
 
+        // Get token id by its address
         uint16 tokenId = governance.validateTokenAddress(_token);
+        
         registerDeposit(tokenId, _amount, fee, _franklinAddr);
 
         if (msg.value != fee) {
@@ -516,7 +518,7 @@ contract Franklin {
         );
     }
 
-    // MARK: - Block commitment
+    // MARK: - BLOCK COMMITMENT
 
     // Commit block
     // Params:
@@ -532,13 +534,13 @@ contract Franklin {
     ) external {
         requireActive();
         require(
-            _blockNumber == totalBlocksCommited + 1,
+            _blockNumber == totalBlocksCommitted + 1,
             "fck11"
         ); // fck11 - only commit next block
         require(
-            totalBlocksCommited - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS,
+            totalBlocksCommitted - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS,
             "fck12"
-        ); // fck12 - too many commited
+        ); // fck12 - too many committed
         require(
             governance.isValidator(msg.sender),
             "fck13"
@@ -552,33 +554,39 @@ contract Franklin {
             "fck15"
         ); // fck15 - entered exodus mode
 
+        // Unpack onchain operations and store them.
+        // Get onchain operations start id for global onchain operations counter,
+        // onchain operations number for this block, priority operations number for this block.
         (uint64 startId, uint64 totalProcessed, uint64 priorityNumber) = collectOnchainOps(_publicData);
-        if (verifyPriorityOperations(startId, totalProcessed, priorityNumber)) {
-            bytes32 commitment = createBlockCommitment(
-                _blockNumber,
-                _feeAccount,
-                blocks[_blockNumber - 1].stateRoot,
-                _newRoot,
-                _publicData
-            );
 
-            blocks[_blockNumber] = Block(
-                msg.sender, // validator
-                uint32(block.number), // commited at
-                startId, // blocks' onchain ops start id in global operations
-                totalProcessed, // total number of onchain ops in block
-                priorityNumber, // total number of priority onchain ops in block
-                commitment, // blocks' commitment
-                _newRoot // new root
-            );
+        // Verify that priority operations from this block are valid
+        // (their data is similar to data from priority requests mapping)
+        verifyPriorityOperations(startId, totalProcessed, priorityNumber);
 
-            totalOnchainOps = startId + totalProcessed;
+        // Create block commitment for verification proof
+        bytes32 commitment = createBlockCommitment(
+            _blockNumber,
+            _feeAccount,
+            blocks[_blockNumber - 1].stateRoot,
+            _newRoot,
+            _publicData
+        );
 
-            totalBlocksCommited += 1;
-            emit BlockCommited(_blockNumber);
-        } else {
-            revert("fck16"); // fck16 - wrong onchain ops
-        }
+        blocks[_blockNumber] = Block(
+            msg.sender, // validator
+            uint32(block.number), // committed at
+            startId, // blocks' onchain ops start id in global operations
+            totalProcessed, // total number of onchain ops in block
+            priorityNumber, // total number of priority onchain ops in block
+            commitment, // blocks' commitment
+            _newRoot // new root
+        );
+
+        totalOnchainOps = startId + totalProcessed;
+
+        totalBlocksCommitted += 1;
+
+        emit BlockCommitted(_blockNumber);
     }
 
     // Gets operations packed in bytes array. Unpacks it and stores onchain operations.
@@ -699,7 +707,7 @@ contract Franklin {
         );
         hash = sha256(abi.encodePacked(hash, uint256(_oldRoot)));
         hash = sha256(abi.encodePacked(hash, uint256(_newRoot)));
-        // public data is commited with padding (TODO: check assembly and optimize to avoid copying data)
+        // public data is committed with padding (TODO: check assembly and optimize to avoid copying data)
         hash = sha256(
             abi.encodePacked(
                 hash,
@@ -715,7 +723,7 @@ contract Franklin {
     // - _startId - onchain op start id
     // - _totalProcessed - how many ops are procceeded
     // - _number - priority ops number
-    function verifyPriorityOperations(uint64 _startId, uint64 _totalProcessed, uint64 _number) internal view returns (bool) {
+    function verifyPriorityOperations(uint64 _startId, uint64 _totalProcessed, uint64 _number) internal view {
         require(
             _number <= totalOpenPriorityRequests,
             "fvs11"
@@ -735,10 +743,9 @@ contract Franklin {
                 counter++;
             }
         }
-        return true;
     }
 
-    // Compare operation from block with corresponding priority requests' operation
+    // Compares operation from the block with corresponding priority requests' operation
     // Params:
     // - _onchainOp - operation from block
     // - _priorityRequestId - priority request id
@@ -771,7 +778,7 @@ contract Franklin {
         }
     }
 
-    // MARK: - Block verification
+    // MARK: - BLOCK VERIFICATION
 
     // Block verification.
     // Verify proof -> consummate onchain ops (accrue balances from withdrawls) -> remove priority requests
@@ -827,7 +834,8 @@ contract Franklin {
         return verifier.Verify(vk, gammaABC, _proof, inputs);
     }
 
-    // If block verified the onchain operations from it must be completed (user must have possibility to withdraw funds if withdrawed)
+    // If block is verified the onchain operations from it must be completed
+    // (user must have possibility to withdraw funds if withdrawed)
     // Params:
     // - _blockNumber - number of block
     function consummateOnchainOps(uint32 _blockNumber) internal {
@@ -879,13 +887,13 @@ contract Franklin {
         }
     }
 
-    // MARK: - Reverting commited blocks
+    // MARK: - REVERTING COMMITTED BLOCKS
 
-    // Check that commitment is expired and revert blocks
+    // Checks that commitment is expired and revert blocks
     function triggerRevertIfBlockCommitmentExpired() public returns (bool) {
-        if (totalBlocksCommited > totalBlocksVerified &&
+        if (totalBlocksCommitted > totalBlocksVerified &&
                 block.number >
-                blocks[totalBlocksVerified + 1].commitedAtBlock +
+                blocks[totalBlocksVerified + 1].committedAtBlock +
                     EXPECT_VERIFICATION_IN) {
             revertBlocks();
             return true;
@@ -893,27 +901,23 @@ contract Franklin {
         return false;
     }
 
-    // Revert blocks
+    // Reverts unverified blocks
     function revertBlocks() internal {
-        for (uint32 i = totalBlocksVerified; i < totalBlocksCommited-1; i++) {
+        for (uint32 i = totalBlocksVerified; i < totalBlocksCommitted-1; i++) {
             Block memory reverted = blocks[i];
-            // if (_fromExodus) {
-            //     // in case of exodus accrue balances from deposits
-            //     accrueDepositsPriorityBalances(reverted.priorityOperations);
-            // }
             revertBlock(reverted);
             delete blocks[i];
         }
-        totalBlocksCommited -= totalBlocksCommited - totalBlocksVerified;
-        emit BlocksReverted(totalBlocksVerified, totalBlocksCommited);
+        totalBlocksCommitted -= totalBlocksCommitted - totalBlocksVerified;
+        emit BlocksReverted(totalBlocksVerified, totalBlocksCommitted);
     }
 
-    // Revert block onchain operations
+    // Reverts block onchain operations
     // Params:
     // - _reverted - reverted block
     function revertBlock(Block memory _reverted) internal {
         require(
-            _reverted.commitedAtBlock > 0,
+            _reverted.committedAtBlock > 0,
             "frk11"
         ); // frk11 - block not found
         require(
@@ -923,9 +927,9 @@ contract Franklin {
         revertOnchainOps(_reverted.operationStartId, _reverted.onchainOperations);
     }
 
-    // MARK: - Exodus mode
+    // MARK: - EXODUS MODE
 
-    // Check that current state not is exodus mode
+    // Checks that current state not is exodus mode
     function requireActive() internal view {
         require(
             !exodusMode,
@@ -933,13 +937,13 @@ contract Franklin {
         ); // fra11 - exodus mode activated
     }
 
+    // Checks if Exodus mode must be entered. If true - cancels outstanding deposits and emits ExodusMode event.
     // Returns bool flag that is true if the Exodus mode must be entered.
-    // True in case of current ethereum block number is higher than the oldest
-    //  of existed priority requests expiration block number
+    // Exodus mode must be entered in case of current ethereum block number is higher than the oldest
+    // of existed priority requests expiration block number.
     function triggerExodusIfNeeded() internal returns (bool) {
         if (block.number >= priorityRequests[firstPriorityRequestId].expirationBlock) {
             exodusMode = true;
-            // revertBlocks(true);
             cancelOutstandingDepositsForExodusMode();
             emit ExodusMode();
             return true;
@@ -948,7 +952,7 @@ contract Franklin {
         }
     }
 
-    // Withdraw token from Franklin to root chain
+    // Withdraws token from Franklin to root chain
     // Params:
     // - _tokenId - verified token id
     // - _owners - all owners

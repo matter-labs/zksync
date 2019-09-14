@@ -147,7 +147,7 @@ describe("INTEGRATION: Complete", function() {
         const fullExitEvent = events[0].args;
         expect(fullExitEvent.opType).equal(6);
         expect(fullExitEvent.pubData).equal("0x00000252312ad6f01657413b2eae9287f6b9adad93d5fe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
-        expect(fullExitEvent.fee).equal(bigNumberify("0x3fb9583332d000"));
+        expect(fullExitEvent.fee).equal(bigNumberify("0x3fba109a13c000"));
 
         totalOpenPriorityRequests = await franklinDeployedContract.totalOpenPriorityRequests();
         firstPriorityRequestId = await franklinDeployedContract.firstPriorityRequestId();
@@ -195,7 +195,7 @@ describe("INTEGRATION: Complete", function() {
         expect(firstPriorityRequestId).equal(2);
         
         let balanceToWithdraw2 = await franklinDeployedContract.balancesToWithdraw(wallet.address, 0);
-        expect(balanceToWithdraw2).equal("0x01a2fed090bcd000"); // amount - part exit + fee
+        expect(balanceToWithdraw2).equal("0x01A2FF88F79DC000"); // amount - part exit + fee
 
         // Withdraw eth for wallet
         const oldBalance2 = await wallet.getBalance();
@@ -340,7 +340,7 @@ describe("INTEGRATION: Complete", function() {
         const fullExitEvent = events[0].args;
         expect(fullExitEvent.opType).equal(6);
         expect(fullExitEvent.pubData).equal("0x00000252312ad6f01657413b2eae9287f6b9adad93d5fe000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
-        expect(fullExitEvent.fee).equal(bigNumberify("0x3f8f6f5d2ad000"));
+        expect(fullExitEvent.fee).equal(bigNumberify("0x3f9027c40bc000"));
 
         totalOpenPriorityRequests = await franklinDeployedContract.totalOpenPriorityRequests();
         firstPriorityRequestId = await franklinDeployedContract.firstPriorityRequestId();
