@@ -36,15 +36,15 @@ contract FranklinTest {
     // Base gas cost for transaction
     uint256 constant BASE_GAS = 21000;
     // Expiration delta for priority request to be satisfied (in ETH blocks)
-    uint256 constant PRIORITY_EXPIRATION = 250; // About 1 hour
+    uint256 constant PRIORITY_EXPIRATION = 12; // About 1 hour
     // Chunks per block; each chunk has 8 bytes of public data
     uint256 constant BLOCK_SIZE = 14;
     // Max amount of any token must fit into uint128
     uint256 constant MAX_VALUE = 2 ** 112 - 1;
     // ETH blocks verification expectation
-    uint256 constant EXPECT_VERIFICATION_IN = 8 * 60 * 100;
+    uint256 constant EXPECT_VERIFICATION_IN = 8;
     // Max number of unverified blocks. To make sure that all reverted blocks can be copied under block gas limit!
-    uint256 constant MAX_UNVERIFIED_BLOCKS = 4 * 60 * 100;
+    uint256 constant MAX_UNVERIFIED_BLOCKS = 4;
 
     // Operations lengths
 
