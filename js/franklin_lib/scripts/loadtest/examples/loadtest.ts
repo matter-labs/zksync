@@ -29,13 +29,13 @@ async function test(): Promise<void> {
         // tester.addOperation(tester.randomWithdrawOperation({walletr: w, token: tester.tokens[0], amount: bigNumberify('100000')}));
     });
 
-    // for (let i = 0; i < 10; i++) {
-    //     tester.addOperation(tester.randomTransferOperation({}));
-    // }
+    for (let i = 0; i < 10; i++) {
+        tester.addOperation(tester.randomTransferOperation({}));
+    }
 
-    tester.wallets.forEach(w => {
-        tester.addOperation(tester.randomWithdrawOperation({wallet: w, token: tester.tokens[0], amount: bigNumberify('100')}));
-    });
+    // tester.wallets.forEach(w => {
+    //     tester.addOperation(tester.randomWithdrawOperation({wallet: w, token: tester.tokens[0], amount: bigNumberify('100')}));
+    // });
 
     await tester.run();
 

@@ -2,32 +2,30 @@
 <b-container>
     <b-row>
         <b-col xl="6">
-            <b-container>
-                <BalancesList balanceListId="onchain" v-bind:balances="onchainBalances"></BalancesList>
-                <DepositButtons 
-                    componentId="onchain"
-                    v-bind:topBalances="onchainBalances" 
-                    v-bind:bottomBalances="contractBalances"
-                    v-on:depositEvent="depositOnchain"
-                    v-on:withdrawEvent="withdrawOnchain"
-                    ></DepositButtons>
-                <BalancesList 
-                    balanceListId="contract" 
-                    v-bind:balances="contractBalances"
-                    ></BalancesList>
-                <DepositButtons 
-                    componentId="offchain"
-                    v-bind:topBalances="contractBalances" 
-                    v-bind:bottomBalances="franklinBalances"
-                    v-bind:depositFeeNeeded="true"
-                    v-on:depositEvent="depositOffchain"
-                    v-on:withdrawEvent="withdrawOffchain"
-                    ></DepositButtons>
-                <BalancesList 
-                    balanceListId="franklin" 
-                    v-bind:balances="franklinBalances"
-                    ></BalancesList>
-            </b-container>
+            <BalancesList balanceListId="onchain" v-bind:balances="onchainBalances"></BalancesList>
+            <DepositButtons 
+                componentId="onchain"
+                v-bind:topBalances="onchainBalances" 
+                v-bind:bottomBalances="contractBalances"
+                v-on:depositEvent="depositOnchain"
+                v-on:withdrawEvent="withdrawOnchain"
+                ></DepositButtons>
+            <BalancesList 
+                balanceListId="contract" 
+                v-bind:balances="contractBalances"
+                ></BalancesList>
+            <DepositButtons 
+                componentId="offchain"
+                v-bind:topBalances="contractBalances" 
+                v-bind:bottomBalances="franklinBalances"
+                v-bind:depositFeeNeeded="true"
+                v-on:depositEvent="depositOffchain"
+                v-on:withdrawEvent="withdrawOffchain"
+                ></DepositButtons>
+            <BalancesList 
+                balanceListId="franklin" 
+                v-bind:balances="franklinBalances"
+                ></BalancesList>
         </b-col>
         <b-col xl="6">
             <Transfer

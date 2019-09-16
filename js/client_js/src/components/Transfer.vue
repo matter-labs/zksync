@@ -1,5 +1,5 @@
 <template>
-    <b-container>
+    <b-card class="px-0">
         Address (for testing <code>0x241d9d2eebabfe5c07ea537f9c95ba3dd7fe87074ade45720eca8e</code>)
         <b-form-input type="text" v-model="address"></b-form-input>
         Token:
@@ -10,8 +10,8 @@
         <b-form-input type="number" v-model="amount"></b-form-input>
         Fee:
         <b-form-input type="number" v-model="fee"></b-form-input>
-        <b-button class="mt-2" variant="primary" @click='buttonClicked'> Transfer </b-button>
-    </b-container>
+        <b-button class="mt-2 w-50" variant="primary" @click='buttonClicked'> Transfer </b-button>
+    </b-card>
 </template>
 
 <script>
@@ -92,3 +92,6 @@ export default {
     }
 }
 </script>
+
+<style scoped>
+</style>
