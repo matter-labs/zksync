@@ -10,7 +10,7 @@ import "./Bytes.sol";
 // GLOBAL TODOS:
 // - check overflows
 
-contract Franklin {
+contract FranklinTest {
     // Verification key contract
     VerificationKey verificationKey;
     // Verifier contract

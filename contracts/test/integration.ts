@@ -1,5 +1,5 @@
 import {ethers} from "ethers";
-import {addTestERC20Token, deployFranklin, deployGovernance} from "../src.ts/deploy";
+import {addTestERC20Token, deployFranklin, deployGovernance} from "./deploy";
 
 import {expect, use} from "chai";
 import {solidity} from "ethereum-waffle";
