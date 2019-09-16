@@ -29,14 +29,15 @@ pub struct EthWatch<T: Transport> {
 #[derive(Debug)]
 pub struct ETHState {
     pub tokens: HashMap<TokenId, Address>,
-    pub priority_queue: Vec<PriorityOp>,
+    pub priority_queue: HashMap<u64, PriorityOp>,
 }
 
 #[derive(Debug)]
 pub struct PriorityOp {
-    data: FranklinPriorityOp,
-    deadline_block: u64,
-    eth_fee: BigDecimal,
+    pub serial_id: u64,
+    pub data: FranklinPriorityOp,
+    pub deadline_block: u64,
+    pub eth_fee: BigDecimal,
 }
 
 impl TryFrom<Log> for PriorityOp {
@@ -45,6 +46,7 @@ impl TryFrom<Log> for PriorityOp {
     fn try_from(event: Log) -> Result<PriorityOp, failure::Error> {
         let mut dec_ev = decode(
             &[
+                ParamType::Uint(64),  // Serial id
                 ParamType::Uint(8),   // OpType
                 ParamType::Bytes,     // Pubdata
                 ParamType::Uint(256), // expir. block
@@ -55,6 +57,12 @@ impl TryFrom<Log> for PriorityOp {
         .map_err(|e| format_err!("Event data decode: {:?}", e))?;
 
         Ok(PriorityOp {
+            serial_id: dec_ev
+                .remove(0)
+                .to_uint()
+                .as_ref()
+                .map(U256::as_u64)
+                .unwrap(),
             data: {
                 let op_type = dec_ev
                     .remove(0)
@@ -152,7 +160,7 @@ impl<T: Transport> EthWatch<T> {
             processed_block: 0,
             eth_state: Arc::new(RwLock::new(ETHState {
                 tokens: HashMap::new(),
-                priority_queue: Vec::new(),
+                priority_queue: HashMap::new(),
             })),
             web3,
             db_pool,
@@ -238,9 +246,11 @@ impl<T: Transport> EthWatch<T> {
                 BlockNumber::Number(block),
             )
             .expect("Failed to restore priority queue events from ETH");
-        eth_state
-            .priority_queue
-            .extend(prior_queue_events.into_iter());
+        for priority_op in prior_queue_events.into_iter() {
+            eth_state
+                .priority_queue
+                .insert(priority_op.serial_id, priority_op);
+        }
 
         // restore token list from governance contract
         let new_tokens = self
@@ -268,7 +278,9 @@ impl<T: Transport> EthWatch<T> {
         let mut eth_state = self.eth_state.write().expect("ETH state lock");
         for priority_op in priority_op_events.into_iter() {
             debug!("New priority op: {:?}", priority_op);
-            eth_state.priority_queue.push(priority_op);
+            eth_state
+                .priority_queue
+                .insert(priority_op.serial_id, priority_op);
         }
         for token in new_tokens.into_iter() {
             debug!("New token added: {:?}", token);

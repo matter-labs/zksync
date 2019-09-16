@@ -161,18 +161,18 @@ export class Wallet {
 
         const currentBlock = await this.ethWallet.provider.getBlockNumber();
 
-        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
-        for(let token  of this.supportedTokens) {
-            if (token.id == 0) {
-                onchainBalances[token.id] = await this.ethWallet.provider.getBalance(this.ethAddress);
-            } else {
-                const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
-                onchainBalances[token.id] = await erc20DeployedToken.balanceOf(this.ethAddress).then(n => n.toString());
-            }
-            const balanceStorage = await franklinDeployedContract.balances(this.ethAddress, token.id);
-            contractBalances[token.id] = balanceStorage.balance;
-            lockedBlocksLeft[token.id] = Math.max(balanceStorage.lockedUntilBlock - currentBlock, 0);
-        }
+        // const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
+        // for(let token  of this.supportedTokens) {
+        //     if (token.id == 0) {
+        //         onchainBalances[token.id] = await this.ethWallet.provider.getBalance(this.ethAddress);
+        //     } else {
+        //         const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
+        //         onchainBalances[token.id] = await erc20DeployedToken.balanceOf(this.ethAddress).then(n => n.toString());
+        //     }
+        //     const balanceStorage = await franklinDeployedContract.balances(this.ethAddress, token.id);
+        //     contractBalances[token.id] = balanceStorage.balance;
+        //     lockedBlocksLeft[token.id] = Math.max(balanceStorage.lockedUntilBlock - currentBlock, 0);
+        // }
 
         this.ethState = {onchainBalances, contractBalances, lockedBlocksLeft};
     }

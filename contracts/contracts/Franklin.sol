@@ -103,6 +103,7 @@ contract Franklin {
     // - expirationBlock - the number of Ethereum block when request becomes expired
     // - fee - validator fee
     event NewPriorityRequest(
+        uint64 serialId,
         OpType opType,
         bytes pubData,
         uint256 expirationBlock,
@@ -250,14 +251,16 @@ contract Franklin {
             expirationBlock: expirationBlock,
             fee: _fee
         });
-        totalPriorityRequests++;
 
         emit NewPriorityRequest(
+            firstPriorityRequestId+totalPriorityRequests,
             _opType,
             _pubData,
             expirationBlock,
             _fee
         );
+
+        totalPriorityRequests++;
     }
 
     // Pays validator fee and removes requests

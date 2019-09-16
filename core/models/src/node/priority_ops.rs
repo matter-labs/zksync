@@ -1,3 +1,4 @@
+use super::operations::{DepositOp, FullExitOp};
 use super::{AccountAddress, AccountId, TokenId};
 use crate::params::FR_ADDRESS_LEN;
 use bigdecimal::BigDecimal;
@@ -77,6 +78,13 @@ impl FranklinPriorityOp {
             _ => {
                 bail!("Unsupported priority op type");
             }
+        }
+    }
+
+    pub fn chunks(&self) -> usize {
+        match self {
+            Self::Deposit(_) => DepositOp::CHUNKS,
+            Self::FullExit(_) => FullExitOp::CHUNKS,
         }
     }
 }

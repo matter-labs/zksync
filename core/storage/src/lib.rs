@@ -7,7 +7,7 @@ use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
 use failure::Fail;
-use models::node::block::{Block, ExecutedTx};
+use models::node::block::{Block, ExecutedOperations, ExecutedTx};
 use models::node::{
     apply_updates, reverse_updates,
     tx::{FranklinTx, TxType},
@@ -595,10 +595,12 @@ impl StorageProcessor {
 
     pub fn save_block_transactions(&self, block: &Block) -> QueryResult<()> {
         for block_tx in block.block_transactions.iter() {
-            let stored_tx = NewExecutedTransaction::prepare_stored_tx(block_tx, block.block_number);
-            diesel::insert_into(executed_transactions::table)
-                .values(&stored_tx)
-                .execute(self.conn())?;
+            if let ExecutedOperations::Tx(tx) = block_tx {
+                let stored_tx = NewExecutedTransaction::prepare_stored_tx(tx, block.block_number);
+                diesel::insert_into(executed_transactions::table)
+                    .values(&stored_tx)
+                    .execute(self.conn())?;
+            }
         }
         Ok(())
     }

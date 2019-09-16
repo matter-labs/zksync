@@ -1,13 +1,13 @@
-use models::node::block::{Block, ExecutedTx};
+use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::tx::FranklinTx;
-use models::node::{Account, AccountAddress, AccountMap, AccountUpdate};
+use models::node::{Account, AccountAddress, AccountMap, AccountUpdate, FranklinPriorityOp};
 use plasma::state::{OpSuccess, PlasmaState};
 use std::sync::{Arc, RwLock};
 use web3::types::H256;
 
 use models::node::config;
 
-use models::{CommitRequest, NetworkStatus, StateKeeperRequest};
+use models::{ActionType, CommitRequest, NetworkStatus, StateKeeperRequest};
 use storage::ConnectionPool;
 
 use std::sync::mpsc::{Receiver, Sender};
@@ -30,6 +30,7 @@ pub struct PlasmaStateKeeper {
     fee_account_address: AccountAddress,
 
     eth_state: Arc<RwLock<ETHState>>,
+    current_unprocessed_priority_op: u64,
 }
 
 #[allow(dead_code)]
@@ -54,6 +55,18 @@ impl PlasmaStateKeeper {
             })
             .expect("OPERATOR_FRANKLIN_ADDRESS must be set");
 
+        let current_unprocessed_priority_op = storage
+            .load_stored_op_with_block_number(last_committed, ActionType::COMMIT)
+            .map(|storage_op| {
+                storage_op
+                    .into_op(&storage)
+                    .expect("storage_op convert")
+                    .block
+                    .processed_priority_ops
+                    .1
+            })
+            .unwrap_or_default();
+
         info!(
             "last_committed = {}, last_verified = {}",
             last_committed, last_verified
@@ -67,6 +80,7 @@ impl PlasmaStateKeeper {
             // TODO: load pk from config.
             fee_account_address,
             eth_state,
+            current_unprocessed_priority_op,
         };
 
         let root = keeper.state.root_hash();
@@ -155,11 +169,14 @@ impl PlasmaStateKeeper {
 
     fn create_new_block(&mut self, tx_for_commitments: &Sender<CommitRequest>) {
         self.next_block_at_max = SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL);
-        let txs = self.prepare_tx_for_block();
-        if txs.is_empty() {
+        let (chunks_left, prior_ops) = self.select_priority_ops();
+        let txs = self.prepare_tx_for_block(chunks_left);
+        debug!("Priority ops for block: {:#?}", prior_ops);
+        debug!("Txs for block: {:#?}", txs);
+        if prior_ops.is_empty() && txs.is_empty() {
             return;
         }
-        let commit_request = self.apply_txs(txs);
+        let commit_request = self.apply_txs(prior_ops, txs);
 
         if !commit_request.accounts_updated.is_empty() {
             self.state.block_number += 1; // bump current block number as we've made one
@@ -170,7 +187,29 @@ impl PlasmaStateKeeper {
             .expect("Commit request send");
     }
 
-    fn prepare_tx_for_block(&self) -> Vec<FranklinTx> {
+    /// Returns: chunks left, ops selected
+    fn select_priority_ops(&self) -> (usize, Vec<FranklinPriorityOp>) {
+        let eth_state = self.eth_state.read().expect("eth state read");
+
+        let mut selected_ops = Vec::new();
+        let mut chunks_left = BLOCK_SIZE_CHUNKS;
+        let mut unprocessed_op = self.current_unprocessed_priority_op;
+
+        while let Some(op) = eth_state.priority_queue.get(&unprocessed_op) {
+            if chunks_left < op.data.chunks() {
+                break;
+            }
+
+            selected_ops.push(op.data.clone());
+
+            unprocessed_op += 1;
+            chunks_left -= op.data.chunks();
+        }
+
+        (chunks_left, selected_ops)
+    }
+
+    fn prepare_tx_for_block(&self, chunks_left: usize) -> Vec<FranklinTx> {
         // TODO: get proper number of txs from db.
         let txs = self
             .db_conn_pool
@@ -180,13 +219,15 @@ impl PlasmaStateKeeper {
                     .expect("Failed to get tx from db")
             })
             .expect("Failed to get txs from mempool");
-        debug!("Unfiltered txs: {:#?}", txs);
-        let filtered_txs = self.filter_invalid_txs(txs);
-        debug!("Preparing block with txs: {:#?}", filtered_txs);
+        let filtered_txs = self.filter_invalid_txs(chunks_left, txs);
         filtered_txs
     }
 
-    fn filter_invalid_txs(&self, transfer_txs: Vec<FranklinTx>) -> Vec<FranklinTx> {
+    fn filter_invalid_txs(
+        &self,
+        chunks_left: usize,
+        transfer_txs: Vec<FranklinTx>,
+    ) -> Vec<FranklinTx> {
         let mut filtered_txs = Vec::new();
 
         let txs_with_correct_nonce = transfer_txs
@@ -224,20 +265,46 @@ impl PlasmaStateKeeper {
             .into_iter()
             .take_while(|tx| {
                 total_chunks += self.state.chunks_for_tx(&tx);
-                total_chunks <= BLOCK_SIZE_CHUNKS
+                total_chunks <= chunks_left
             })
             .collect()
     }
 
-    fn apply_txs(&mut self, transactions: Vec<FranklinTx>) -> CommitRequest {
+    fn apply_txs(
+        &mut self,
+        priority_ops: Vec<FranklinPriorityOp>,
+        transactions: Vec<FranklinTx>,
+    ) -> CommitRequest {
         info!("Creating block, size: {}", transactions.len());
         // collect updated state
         let mut accounts_updated = Vec::new();
         let mut fees = Vec::new();
         let mut ops = Vec::new();
         let mut chunks_left = BLOCK_SIZE_CHUNKS;
+        let last_unprocessed_prior_op = self.current_unprocessed_priority_op;
 
-        // todo select priority ops here.
+        for priority_op in priority_ops.into_iter() {
+            let chunks_needed = priority_op.chunks();
+            if chunks_left < chunks_needed {
+                break;
+            }
+
+            let OpSuccess {
+                fee,
+                mut updates,
+                executed_op,
+            } = self.state.execute_priority_op(priority_op);
+
+            assert!(chunks_needed == executed_op.chunks());
+            chunks_left -= chunks_needed;
+            accounts_updated.append(&mut updates);
+            if let Some(fee) = fee {
+                fees.push(fee);
+            }
+            let exec_result = ExecutedPriorityOp { op: executed_op };
+            ops.push(ExecutedOperations::PriorityOp(exec_result));
+            self.current_unprocessed_priority_op += 1;
+        }
 
         for tx in transactions.into_iter() {
             let chunks_needed = self.state.chunks_for_tx(&tx);
@@ -265,7 +332,7 @@ impl PlasmaStateKeeper {
                         op: Some(executed_op),
                         fail_reason: None,
                     };
-                    ops.push(exec_result);
+                    ops.push(ExecutedOperations::Tx(exec_result));
                 }
                 Err(e) => {
                     error!("Failed to execute transaction: {:?}, {}", tx, e);
@@ -275,7 +342,7 @@ impl PlasmaStateKeeper {
                         op: None,
                         fail_reason: Some(e.to_string()),
                     };
-                    ops.push(exec_result);
+                    ops.push(ExecutedOperations::Tx(exec_result));
                 }
             };
         }
@@ -289,6 +356,10 @@ impl PlasmaStateKeeper {
             new_root_hash: self.state.root_hash(),
             fee_account: fee_account_id,
             block_transactions: ops,
+            processed_priority_ops: (
+                last_unprocessed_prior_op,
+                self.current_unprocessed_priority_op,
+            ),
         };
 
         CommitRequest {
