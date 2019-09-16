@@ -9,9 +9,13 @@ use failure::ensure;
 use ff::PrimeField;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use super::Engine;
 use super::Fr;
 use super::{AccountId, AccountUpdates, Nonce, TokenId};
 use crate::circuit::account::{Balance, CircuitAccount};
+use crate::circuit::utils::pub_key_hash_bytes;
+use crate::merkle_tree::PedersenHasher;
+use franklin_crypto::eddsa::PublicKey;
 
 #[derive(Clone, PartialEq, Default, Eq, Hash)]
 pub struct AccountAddress {
@@ -43,6 +47,13 @@ impl AccountAddress {
         Ok(AccountAddress {
             data: bytes.try_into().unwrap(),
         })
+    }
+
+    pub fn from_pubkey(public_key: PublicKey<Engine>) -> Self {
+        let phasher = PedersenHasher::<Engine>::default();
+        let pk_hash = pub_key_hash_bytes(&public_key, &phasher);
+
+        Self::from_bytes(&pk_hash).expect("pk convert error")
     }
 }
 

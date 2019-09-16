@@ -1,8 +1,13 @@
 import BN = require('bn.js');
-import { curve } from 'elliptic';
+import {curve} from 'elliptic';
 import EdwardsPoint = curve.edwards.EdwardsPoint;
+import {sha256} from "js-sha256";
+import BasePoint = curve.base.BasePoint;
+import edwards = curve.edwards;
 
+const blake2b = require('blake2b');
 const elliptic = require('elliptic');
+const crypto = require('crypto');
 
 //! `Fr modulus = 21888242871839275222246405745257275088548364400416034343698204186575808495617`
 //!
@@ -55,7 +60,7 @@ let gen5 = altjubjubCurve.point(
 );
 const basicGenerators = [gen1, gen2, gen3, gen4, gen5];
 
-function wrapFs(fs) {
+function wrapFs(fs: BN): BN {
     while (fs.ltn(0)) {
         fs = fs.add(fsModulus);
     }
@@ -191,12 +196,125 @@ export function pedersenHash(input: Buffer): EdwardsPoint {
     return result.normalize();
 }
 
-function testCalculate() {
-    for (let w = 0; w < 3; ++w) {
-        let p1 = lookupGeneratorFromTable(0, w, w * 7 + 2);
-        // let p1 = basicGenerators[0].mul(new BN(256)).normalize();
-        let p2 = calulateGenerator(0, w, w * 7 + 2);
-        // console.log(p2);
-        console.log(p1, p2);
+function to_uniform(bytes: Buffer): BN {
+
+    let bits = new Array(bytes.length * 8);
+    let bit_n = 0;
+    for (let i = bytes.length - 1; i >= 0; --i) {
+        const b = bytes[i];
+        bits[bit_n] = (b & 0x80) != 0;
+        bits[bit_n + 1] = (b & 0x40) != 0;
+        bits[bit_n + 2] = (b & 0x20) != 0;
+        bits[bit_n + 3] = (b & 0x10) != 0;
+        bits[bit_n + 4] = (b & 0x08) != 0;
+        bits[bit_n + 5] = (b & 0x04) != 0;
+        bits[bit_n + 6] = (b & 0x02) != 0;
+        bits[bit_n + 7] = (b & 0x01) != 0;
+        bit_n+=8;
     }
+
+    let res = new BN(0);
+    for (let n = 0; n < bits.length; n++) {
+        res = res.muln(2);
+        if (bits[n]) {
+            res = res.addn(1)
+        }
+    }
+
+    return wrapFs(res);
+}
+
+function balke2bHStar(a: Buffer, b: Buffer): BN {
+    let output = new Uint8Array(64);
+    let hash = blake2b(64, null, null, Buffer.from("Zcash_RedJubjubH"));
+    hash.update(a);
+    hash.update(b);
+    output = hash.digest();
+    let buff = Buffer.from(output);
+
+    return to_uniform(buff);
+}
+
+function sha256HStart(a: Buffer, b: Buffer): BN {
+    let hasher = sha256.create();
+    let personaization = "";
+    hasher.update(personaization);
+    hasher.update(a);
+    hasher.update(b);
+    let hash = Buffer.from(hasher.array());
+    let point = to_uniform(hash);
+    // console.log("sha256: ", hash.toString("hex"));
+    // console.log("sha256 point: ", point);
+    return point;
+}
+
+function pedersenHStar(input: Buffer) : BN {
+    let p_hash_start_res = pedersenHash(input);
+    let p_hash_star_fe = to_uniform(p_hash_start_res.getX().toBuffer("le", 32));
+    return p_hash_star_fe;
+}
+
+export function musigSHA256(priv_key: BN, msg: Buffer) {
+    const t = crypto.randomBytes(80);
+
+    const pub_key = privateKeyToPublicKey(priv_key);
+    const pk_bytes = pub_key.getX().toBuffer("le", 32);
+
+    const r = balke2bHStar(t , msg);
+    const r_g = altjubjubCurve.g.mul(r);
+    const r_g_bytes = r_g.getX().toBuffer("le", 32);
+
+    const concat = Buffer.concat([pk_bytes, r_g_bytes]);
+
+    let msg_padded = Buffer.alloc(32, 0);
+    msg.copy(msg_padded, 0, 0, 32);
+
+    const s = wrapFs(sha256HStart(concat, msg_padded).mul(priv_key).add(r));
+
+    let signature = Buffer.concat([serializePointPacked(r_g), s.toBuffer("le", 32)]).toString("hex");
+    let pubkey = serializePointPacked(pub_key).toString("hex");
+    return {pub_key: pubkey, sign: signature};
+}
+
+export function musigPedersen(priv_key: BN, msg: Buffer) {
+
+    const t = crypto.randomBytes(80);
+
+    const pub_key = privateKeyToPublicKey(priv_key);
+    const pk_bytes = pub_key.getX().toBuffer("le", 32);
+
+    const r = balke2bHStar(t , msg);
+    const r_g = altjubjubCurve.g.mul(r);
+    const r_g_bytes = r_g.getX().toBuffer("le", 32);
+
+    const concat = Buffer.concat([pk_bytes, r_g_bytes]);
+    let concat_hash_bytes =  pedersenHash(concat).getX().toBuffer("le", 32);
+
+    let msg_padded = Buffer.alloc(32, 0);
+    msg.copy(msg_padded, 0, 0, 32);
+
+    const s = wrapFs(pedersenHStar(Buffer.concat([concat_hash_bytes, msg_padded])).mul(priv_key).add(r));
+
+    let signature = Buffer.concat([serializePointPacked(r_g), s.toBuffer("le", 32)]).toString("hex");
+    let pubkey = serializePointPacked(pub_key).toString("hex");
+    return {pub_key: pubkey, sign: signature};
+}
+
+export function privateKeyToPublicKey(pk: BN): edwards.EdwardsPoint  {
+    return altjubjubCurve.g.mul(pk);
+}
+
+export function pubkeyToAddress(pubKey) {
+
+}
+
+function serializePointPacked(point: edwards.EdwardsPoint) {
+    let y = point.getY();
+    let y_buff = y.toBuffer("le", 32);
+
+    if (altjubjubCurve.pointFromY(y, true).getX().eq(point.getX())) {
+        //x is odd
+        y_buff[y_buff.length - 1] |= (1 << 7);
+    }
+    return y_buff;
 }
