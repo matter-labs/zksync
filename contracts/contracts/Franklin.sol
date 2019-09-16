@@ -545,42 +545,40 @@ contract Franklin {
             governance.isValidator(msg.sender),
             "fck13"
         ); // fck13 - not a validator in commit
-        if(!triggerRevertIfBlockCommitmentExpired()) {
-            if (!triggerExodusIfNeeded()) {
-                // Unpack onchain operations and store them.
-                // Get onchain operations start id for global onchain operations counter,
-                // onchain operations number for this block, priority operations number for this block.
-                (uint64 startId, uint64 totalProcessed, uint64 priorityNumber) = collectOnchainOps(_publicData);
+        if(!triggerRevertIfBlockCommitmentExpired() && !triggerExodusIfNeeded()) {
+            // Unpack onchain operations and store them.
+            // Get onchain operations start id for global onchain operations counter,
+            // onchain operations number for this block, priority operations number for this block.
+            (uint64 startId, uint64 totalProcessed, uint64 priorityNumber) = collectOnchainOps(_publicData);
 
-                // Verify that priority operations from this block are valid
-                // (their data is similar to data from priority requests mapping)
-                verifyPriorityOperations(startId, totalProcessed, priorityNumber);
+            // Verify that priority operations from this block are valid
+            // (their data is similar to data from priority requests mapping)
+            verifyPriorityOperations(startId, totalProcessed, priorityNumber);
 
-                // Create block commitment for verification proof
-                bytes32 commitment = createBlockCommitment(
-                    _blockNumber,
-                    _feeAccount,
-                    blocks[_blockNumber - 1].stateRoot,
-                    _newRoot,
-                    _publicData
-                );
+            // Create block commitment for verification proof
+            bytes32 commitment = createBlockCommitment(
+                _blockNumber,
+                _feeAccount,
+                blocks[_blockNumber - 1].stateRoot,
+                _newRoot,
+                _publicData
+            );
 
-                blocks[_blockNumber] = Block(
-                    msg.sender, // validator
-                    uint32(block.number), // committed at
-                    startId, // blocks' onchain ops start id in global operations
-                    totalProcessed, // total number of onchain ops in block
-                    priorityNumber, // total number of priority onchain ops in block
-                    commitment, // blocks' commitment
-                    _newRoot // new root
-                );
+            blocks[_blockNumber] = Block(
+                msg.sender, // validator
+                uint32(block.number), // committed at
+                startId, // blocks' onchain ops start id in global operations
+                totalProcessed, // total number of onchain ops in block
+                priorityNumber, // total number of priority onchain ops in block
+                commitment, // blocks' commitment
+                _newRoot // new root
+            );
 
-                totalOnchainOps = startId + totalProcessed;
+            totalOnchainOps = startId + totalProcessed;
 
-                totalBlocksCommitted += 1;
+            totalBlocksCommitted += 1;
 
-                emit BlockCommitted(_blockNumber);
-            }
+            emit BlockCommitted(_blockNumber);
         }
     }
 
@@ -915,10 +913,6 @@ contract Franklin {
             _reverted.committedAtBlock > 0,
             "frk11"
         ); // frk11 - block not found
-        require(
-            _reverted.priorityOperations <= totalOpenPriorityRequests,
-            "frk12"
-        ); // frk12 - priority number too large in revert
         revertOnchainOps(_reverted.operationStartId, _reverted.onchainOperations);
     }
 

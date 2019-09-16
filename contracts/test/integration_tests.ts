@@ -15,7 +15,7 @@ const franklinAddress = "0809101112131415161718192021222334252627";
 const franklinAddressBinary = Buffer.from(franklinAddress, "hex");
 const dummyBlockProof = [0, 0, 0, 0, 0, 0, 0, 0];
 
-describe("INTEGRATION: Complete", function() {
+describe("INTEGRATION", function() {
     this.timeout(50000);
 
     let franklinDeployedContract;
