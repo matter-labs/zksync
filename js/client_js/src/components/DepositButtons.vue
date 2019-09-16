@@ -47,6 +47,7 @@ export default {
     }),
     methods: {
         emitDeposit(kwargs) {
+            this.$bvModal.hide(`${this.componentId}_depositModal`);
             this.$emit('depositEvent', kwargs);
         },
         emitWithdraw(kwargs) {

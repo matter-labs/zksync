@@ -1,5 +1,5 @@
 <template>
-    <b-alert dismissible variant="warning" fade :show="countdown" @dismissed="dismissed" class="mt-2">
+    <b-alert dismissible v-bind:variant="variant" fade :show="countdown" @dismissed="dismissed" class="mt-2">
         {{ message }}
     </b-alert>
 </template>
@@ -10,6 +10,7 @@ export default {
     data: () => ({
         countdown: 0,
         message: '',
+        variant: 'info'
     }),
     methods: {
         dismissed() {
@@ -18,6 +19,7 @@ export default {
         },
         display(kwargs) {
             this.message = kwargs.message;
+            this.variant = kwargs.variant || this.variant;
             this.countdown = kwargs.countdown || 10;
         }
     }

@@ -94,10 +94,8 @@ export class Wallet {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
         const franklinAddressBinary = Buffer.from(this.address.substr(2), "hex");
         if (token.id == 0) {
-            // console.log(await franklinDeployedContract.balances(this.ethWallet.address, 0));
             const tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: amount});
             await tx.wait(2);
-            let receipt = await this.ethWallet.provider.getTransactionReceipt(tx.hash);
             return tx.hash;
         } else {
             const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);

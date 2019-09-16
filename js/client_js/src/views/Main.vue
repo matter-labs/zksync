@@ -98,12 +98,13 @@ export default {
             let onchainBalances = window.walletDecorator.onchainBalancesAsRenderableList();
             let contractBalances = window.walletDecorator.contractBalancesAsRenderableList();
             let franklinBalances = window.walletDecorator.franklinBalancesAsRenderableList();
-            let walletInfo = {
+            let franklinBalancesWithInfo = window.walletDecorator.franklinBalancesAsRenderableListWithInfo();
+            this.walletInfo = {
                 onchainBalances,
                 contractBalances,
                 franklinBalances,
+                franklinBalancesWithInfo,
             };
-            this.walletInfo = walletInfo;
 
             this.historyInfo = {
                 transactions: window.walletDecorator.transactionsAsNeeded()

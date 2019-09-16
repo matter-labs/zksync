@@ -4,28 +4,17 @@
         <b-col xl="6">
             <BalancesList balanceListId="onchain" v-bind:balances="onchainBalances"></BalancesList>
             <DepositButtons 
-                componentId="onchain"
-                v-bind:topBalances="onchainBalances" 
-                v-bind:bottomBalances="contractBalances"
-                v-on:depositEvent="depositOnchain"
-                v-on:withdrawEvent="withdrawOnchain"
-                ></DepositButtons>
-            <BalancesList 
-                balanceListId="contract" 
-                v-bind:balances="contractBalances"
-                ></BalancesList>
-            <DepositButtons 
                 componentId="offchain"
-                v-bind:topBalances="contractBalances" 
+                v-bind:topBalances="onchainBalances" 
                 v-bind:bottomBalances="franklinBalances"
                 v-bind:depositFeeNeeded="true"
-                v-on:depositEvent="depositOffchain"
+                v-on:depositEvent="deposit"
                 v-on:withdrawEvent="withdrawOffchain"
                 ></DepositButtons>
-            <BalancesList 
+            <FranklinBalancesList 
                 balanceListId="franklin" 
-                v-bind:balances="franklinBalances"
-                ></BalancesList>
+                v-bind:balances="franklinBalancesWithInfo"
+                ></FranklinBalancesList>
         </b-col>
         <b-col xl="6">
             <Transfer
@@ -41,12 +30,14 @@
 <script>
 import Alert from './Alert.vue'
 import BalancesList from './BalancesList.vue'
+import FranklinBalancesList from './FranklinBalancesList.vue'
 import DepositButtons from './DepositButtons.vue'
 import Transfer from './Transfer.vue'
 
 const components = {
     Alert,
     BalancesList,
+    FranklinBalancesList,
     DepositButtons,
     Transfer
 };
@@ -61,6 +52,7 @@ export default {
         onchainBalances: [],
         contractBalances: [],
         franklinBalances: [],
+        franklinBalancesWithInfo: [],
     }),
     watch: {
         info: function() {
@@ -72,6 +64,15 @@ export default {
     methods: {
         displayAlert(kwargs) {
             this.$emit('alert', kwargs);
+        },
+        async deposit(kwargs) {
+            for await (const progress of window.walletDecorator.verboseDeposit(kwargs)) {
+                console.log(progress);
+                this.$emit('alert', {
+                    message: progress.message,
+                    variant: progress.error ? 'danger' : 'success',
+                });
+            }
         },
         async transferFranklin(kwargs) {
             console.log('transfer', kwargs);

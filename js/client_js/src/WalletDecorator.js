@@ -68,6 +68,25 @@ export class WalletDecorator {
             }))
             .filter(tokenInfo => tokenInfo.amount);
     }
+    franklinBalancesAsRenderableListWithInfo() {
+        let res = {};
+        let assign = key => entry => {
+            let [tokenId, balance] = entry;
+            if (res[tokenId] === undefined) {
+                res[tokenId] = {
+                    tokenName: this.tokenNameFromId(tokenId),
+                };
+            }
+            res[tokenId][key] = balance;
+        };
+        Object.entries(this.wallet.franklinState.commited.balances).forEach(assign('committedAmount'))
+        Object.entries(this.wallet.franklinState.verified.balances).forEach(assign('verifiedAmount'))
+        return Object.values(res).map(val => {
+            val['committedAmount'] = val['committedAmount'] || bigNumberify(0);
+            val['verifiedAmount']  = val['verifiedAmount']  || bigNumberify(0);
+            return val;
+        });
+    }
     franklinBalancesAsRenderableList() {
         return Object.entries(this.wallet.franklinState.commited.balances)
             .map(entry => {
@@ -95,8 +114,8 @@ export class WalletDecorator {
     async depositOnchain(kwargs) {
         let token = this.tokenFromName(kwargs.token);
         let amount = bigNumberify(kwargs.amount);
-        let res = await this.wallet.depositOnchain(token, amount);
-        console.log(res);
+        let tx_hash = await this.wallet.depositOnchain(token, amount);
+        return tx_hash;
     }
 
     async depositOffchain(kwargs) {
@@ -105,15 +124,53 @@ export class WalletDecorator {
         let fee = bigNumberify(kwargs.fee);
 
         let res = await this.wallet.depositOffchain(token, amount, fee);
-        console.log(res);
+
         if (res.err) {
             throw new Error(res.err);
         }
+
         let receipt = await this.wallet.txReceipt(res.hash);
-        console.log(receipt);
+
         if (receipt.fail_reason) {
             throw new Error(receipt.fail_reason);
         }
         return 0;
+    }
+
+    async * verboseDeposit(kwargs) {
+        yield {
+            error: null,
+            message: `Sending deposit...`
+        }
+
+        try {
+            let tx_hash = await this.depositOnchain(kwargs);
+            yield {
+                error: null,
+                tx_hash,
+                message: `Onchain deposit succeeded, waiting for offchain...`,
+            };
+        } catch (e) {
+            yield {
+                error: e.message,
+                message: `Onchain deposit failed with "${e.message}"`,
+            };
+            return;
+        }
+
+        try {
+            let _ = await this.depositOffchain(kwargs);
+            yield {
+                error: null,
+                message: `Offchain deposit succeeded.`
+            }
+            return;
+        } catch (e) {
+            yield {
+                error: e.message,
+                message: `Offchain deposit failed with "${e.message}"`,
+            };
+            return;
+        }
     }
 }
