@@ -44,7 +44,7 @@ impl<E: JubjubEngine> CircuitElement<E> {
         CircuitElement::from_number_padded(cs.namespace(|| "circuit_element"), number)
     }
 
-    pub fn from_witness_be_bits_padded<CS: ConstraintSystem<E>>(
+    pub fn from_witness_be_bits<CS: ConstraintSystem<E>>(
         mut cs: CS,
         witness_bits: &[Option<bool>],
     ) -> Result<Self, SynthesisError> {

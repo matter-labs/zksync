@@ -114,9 +114,8 @@ impl FullExitOp {
         data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
         data.extend_from_slice(&self.tx.eth_address.as_bytes());
         data.extend_from_slice(&self.tx.token.to_be_bytes());
+        data.extend_from_slice(&self.tx.signature_r_packed);
         data.extend_from_slice(&self.tx.signature_s);
-        data.extend_from_slice(&self.tx.signature_r_x);
-        data.extend_from_slice(&self.tx.signature_r_y);
         // data.extend_from_slice(&self.tx.amount.to_u128().unwrap().to_be_bytes());
 
         data.resize(Self::CHUNKS * 14, 0x00);

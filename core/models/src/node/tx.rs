@@ -102,8 +102,7 @@ pub struct FullExit {
     pub account: AccountAddress,
     pub eth_address: Address,
     pub signature_s: Vec<u8>,
-    pub signature_r_x: Vec<u8>,
-    pub signature_r_y: Vec<u8>,
+    pub signature_r_packed: Vec<u8>,
     pub token: TokenId,
     pub nonce: Nonce,
     // TODO: Signature unimplemented

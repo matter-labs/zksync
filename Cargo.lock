@@ -821,7 +821,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
-source = "git+ssh://git@github.com/matter-labs/franklin-crypto.git#5fa2cdb56fb577dc2363796ab32fc0f755c207ae"
+source = "git+ssh://git@github.com/matter-labs/franklin-crypto.git#9169ea3ac02a7e387eee9fdc7992e258234d5418"
 dependencies = [
  "bellman_ce 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bit-vec 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",

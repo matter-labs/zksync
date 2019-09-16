@@ -5,13 +5,13 @@ use crate::utils::*;
 
 use ff::{BitIterator, Field, PrimeField};
 
+use crate::operation::SignatureData;
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::eddsa::Signature;
 use franklin_crypto::jubjub::JubjubEngine;
 use franklin_crypto::jubjub::{edwards, Unknown};
-use models::circuit::account::{CircuitAccountTree};
-
+use models::circuit::account::CircuitAccountTree;
 use models::node::FullExitOp;
 use models::params as franklin_constants;
 use pairing::bn256::*;
@@ -20,9 +20,6 @@ pub struct FullExitData {
     pub token: u32,
     pub account_address: u32,
     pub ethereum_key: Fr,
-    pub pub_signature_s: Vec<bool>,
-    pub pub_signature_r_x: Vec<bool>,
-    pub pub_signature_r_y: Vec<bool>,
 }
 pub struct FullExitWitness<E: JubjubEngine> {
     pub before: OperationBranch<E>,
@@ -33,7 +30,7 @@ pub struct FullExitWitness<E: JubjubEngine> {
     pub tx_type: Option<E::Fr>,
 }
 impl<E: JubjubEngine> FullExitWitness<E> {
-    pub fn get_pubdata(&self) -> Vec<bool> {
+    pub fn get_pubdata(&self, sig_data: &SignatureData) -> Vec<bool> {
         let mut pubdata_bits = vec![];
         append_be_fixed_width(
             &mut pubdata_bits,
@@ -57,9 +54,9 @@ impl<E: JubjubEngine> FullExitWitness<E> {
             franklin_constants::TOKEN_BIT_WIDTH,
         );
 
-        pubdata_bits.extend(self.args.pub_signature_s.iter().map(|x| x.unwrap()));
-        pubdata_bits.extend(self.args.pub_signature_r_x.iter().map(|x| x.unwrap()));
-        pubdata_bits.extend(self.args.pub_signature_r_y.iter().map(|x| x.unwrap()));
+        pubdata_bits.extend(sig_data.r_packed.iter().map(|x| x.unwrap()));
+        pubdata_bits.extend(sig_data.s.iter().map(|x| x.unwrap()));
+        // pubdata_bits.extend(self.args.pub_signature_r_y.iter().map(|x| x.unwrap()));
 
         append_be_fixed_width(
             &mut pubdata_bits,
@@ -68,23 +65,23 @@ impl<E: JubjubEngine> FullExitWitness<E> {
         );
 
         pubdata_bits.resize(14 * franklin_constants::CHUNK_BIT_WIDTH, false);
-        println!("pub_data outside: ");
-        for (i, bit) in pubdata_bits.iter().enumerate() {
-            if i % 64 == 0 {
-                println!("")
-            } else if i % 8 == 0 {
-                print!(" ")
-            };
-            let numb = {
-                if *bit {
-                    1
-                } else {
-                    0
-                }
-            };
-            print!("{}", numb);
-        }
-        println!("");
+        // println!("pub_data outside: ");
+        // for (i, bit) in pubdata_bits.iter().enumerate() {
+        //     if i % 64 == 0 {
+        //         println!("")
+        //     } else if i % 8 == 0 {
+        //         print!(" ")
+        //     };
+        //     let numb = {
+        //         if *bit {
+        //             1
+        //         } else {
+        //             0
+        //         }
+        //     };
+        //     print!("{}", numb);
+        // }
+        // println!("");
         pubdata_bits
     }
 
@@ -127,9 +124,8 @@ pub fn apply_full_exit_tx(
         token: u32::from(full_exit.tx.token),
         account_address: full_exit.account_id,
         ethereum_key: Fr::from_hex(&format!("{:x}", &full_exit.tx.eth_address)).unwrap(),
-        pub_signature_s: be_bytes_into_bits(&full_exit.tx.signature_s.clone()),
-        pub_signature_r_x: be_bytes_into_bits(&full_exit.tx.signature_r_x.clone()),
-        pub_signature_r_y: be_bytes_into_bits(&full_exit.tx.signature_r_y.clone()),
+        // sig_s_bits: be_bytes_into_bits(&full_exit.tx.signature_s.clone()),
+        // sig_r_packed_bits: be_bytes_into_bits(&full_exit.tx.signature_r_packed.clone()),
     };
     // le_bit_vector_into_field_element()
     apply_full_exit(tree, &full_exit, is_sig_valid)
@@ -200,24 +196,6 @@ pub fn apply_full_exit(
     let a = balance_before;
     let b = Fr::zero();
 
-    let pub_signature_s: Vec<_> = full_exit
-        .pub_signature_s
-        .clone()
-        .iter()
-        .map(|x| Some(*x))
-        .collect();
-    let pub_signature_r_x: Vec<_> = full_exit
-        .pub_signature_r_x
-        .clone()
-        .iter()
-        .map(|x| Some(*x))
-        .collect();
-    let pub_signature_r_y: Vec<_> = full_exit
-        .pub_signature_r_y
-        .clone()
-        .iter()
-        .map(|x| Some(*x))
-        .collect();
     FullExitWitness {
         before: OperationBranch {
             address: Some(account_address_fe),
@@ -247,9 +225,6 @@ pub fn apply_full_exit(
             a: Some(a),
             b: Some(b),
             new_pub_key_hash: Some(Fr::zero()),
-            pub_signature_s: pub_signature_s,
-            pub_signature_r_x: pub_signature_r_x,
-            pub_signature_r_y: pub_signature_r_y,
         },
         before_root: Some(before_root),
         after_root: Some(after_root),
@@ -262,11 +237,12 @@ pub fn calculate_full_exit_operations_from_witness(
     second_sig_msg: &Fr,
     third_sig_msg: &Fr,
     signature: Option<TransactionSignature<Bn256>>,
+    signature_data: &SignatureData,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
 ) -> Vec<Operation<Bn256>> {
     let pubdata_chunks: Vec<_> = full_exit_witness
-        .get_pubdata()
+        .get_pubdata(signature_data)
         .chunks(64)
         .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
         .collect();
@@ -286,6 +262,7 @@ pub fn calculate_full_exit_operations_from_witness(
         args: full_exit_witness.args.clone(),
         lhs: full_exit_witness.before.clone(),
         rhs: full_exit_witness.before.clone(),
+        signature_data: signature_data.clone(),
     });
 
     for i in 1..14 {
@@ -303,6 +280,7 @@ pub fn calculate_full_exit_operations_from_witness(
             args: full_exit_witness.args.clone(),
             lhs: full_exit_witness.after.clone(),
             rhs: full_exit_witness.after.clone(),
+            signature_data: signature_data.clone(),
         });
     }
 
@@ -450,42 +428,39 @@ mod test {
 
         let (signature, first_sig_part, second_sig_part, third_sig_part) =
             generate_sig_data(&sig_bits, &phasher, &sender_sk, params);
+
         let (sig_x, sig_y) = signature.clone().unwrap().r.into_xy();
-
-        let mut pub_signature_s: Vec<bool> =
+        println!("witness: r_x={:?}", sig_x);
+        println!("witness: r_y={:?}", sig_y);
+        println!("witness: s={:?}", signature.clone().unwrap().s);
+        let mut signature_s_be_bits: Vec<bool> =
             BitIterator::new(signature.unwrap().s.into_repr()).collect();
-        pub_signature_s.reverse();
-        pub_signature_s.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
-        pub_signature_s.reverse();
+        signature_s_be_bits.reverse();
+        signature_s_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+        signature_s_be_bits.reverse();
 
-        let mut pub_signature_r_x: Vec<bool> = BitIterator::new(sig_x.into_repr()).collect();
-        pub_signature_r_x.reverse();
-        pub_signature_r_x.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
-        pub_signature_r_x.reverse();
+        let mut signature_r_x_be_bits: Vec<bool> = BitIterator::new(sig_x.into_repr()).collect();
+        signature_r_x_be_bits.reverse();
+        signature_r_x_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+        signature_r_x_be_bits.reverse();
 
-        let mut pub_signature_r_y: Vec<bool> = BitIterator::new(sig_y.into_repr()).collect();
-        pub_signature_r_y.reverse();
-        pub_signature_r_y.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
-        pub_signature_r_y.reverse();
+        let mut signature_r_y_be_bits: Vec<bool> = BitIterator::new(sig_y.into_repr()).collect();
+        signature_r_y_be_bits.reverse();
+        signature_r_y_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+        signature_r_y_be_bits.reverse();
 
         // move to func
-        let mut r_x_bits = pub_signature_r_x.clone();
+        let mut r_x_bits = signature_r_x_be_bits.clone();
         r_x_bits.reverse();
         let r_x = le_bit_vector_into_field_element(&r_x_bits);
 
-        let mut r_y_bits = pub_signature_r_y.clone();
+        let mut r_y_bits = signature_r_y_be_bits.clone();
         r_y_bits.reverse();
         let r_y = le_bit_vector_into_field_element(&r_y_bits);
 
-        let mut s_bits = pub_signature_s.clone();
+        let mut s_bits = signature_s_be_bits.clone();
         s_bits.reverse();
 
-        // let mut sigs_le_bits: Vec<bool> = BitIterator::new(signature.s.into_repr()).collect();
-        // sigs_le_bits.reverse();
-
-        // let sigs_converted = le_bit_vector_into_field_element(&sigs_le_bits);
-
-        // let s_fs: <Bn256 as JubjubEngine>::Fs = le_bit_vector_into_field_element(&s_bits);
         let s: <Bn256 as JubjubEngine>::Fs = le_bit_vector_into_field_element(&s_bits);
         let r = edwards::Point::from_xy(r_x, r_y, &AltJubjubBn256::new());
 
@@ -498,7 +473,7 @@ mod test {
                 (is_valid_signature, Some(sig))
             }
         };
-
+        // println!("reconstructed_x={:?} reconstructed_y={:?}", reconstructed_signature.unwrap().into_xy(), reconstructed_signature.unwrap().into_xy().1); 
         assert_eq!(is_sig_correct, true);
 
         let signature = {
@@ -513,15 +488,50 @@ mod test {
                 s: sigs_converted,
             })
         };
+
+        let signature_data = {
+            let mut sig_r_packed_bits = signature_r_y_be_bits.clone();
+            sig_r_packed_bits.reverse();
+            sig_r_packed_bits.truncate(franklin_constants::FR_BIT_WIDTH_PADDED - 2);
+            sig_r_packed_bits.reverse();
+
+            sig_r_packed_bits.push(false);
+            
+            sig_r_packed_bits
+                .push(signature_r_x_be_bits[franklin_constants::FR_BIT_WIDTH_PADDED - 1].clone());
+            assert_eq!(
+                sig_r_packed_bits.len(),
+                franklin_constants::FR_BIT_WIDTH_PADDED
+            );
+            println!("sig_r_packed_bits witness:: ");
+            for (i, bit) in sig_r_packed_bits.iter().enumerate() {
+                if i % 64 == 0 {
+                    println!("")
+                } else if i % 8 == 0 {
+                    print!(" ")
+                };
+                let numb = {
+                    if *bit {
+                        1
+                    } else {
+                        0
+                    }
+                };
+                print!("{}", numb);
+            }
+            println!("");
+            let sig_s_bits = signature_s_be_bits.clone();
+            SignatureData {
+                r_packed: sig_r_packed_bits.iter().map(|x| Some(*x)).collect(),
+                s: sig_s_bits.iter().map(|x| Some(*x)).collect(),
+            }
+        };
         let full_exit_witness = apply_full_exit(
             &mut tree,
             &FullExitData {
                 token,
                 account_address,
                 ethereum_key,
-                pub_signature_s,
-                pub_signature_r_x,
-                pub_signature_r_y,
             },
             is_sig_correct,
         );
@@ -532,6 +542,7 @@ mod test {
             &second_sig_part,
             &third_sig_part,
             signature,
+            &signature_data,
             &sender_x,
             &sender_y,
         );
@@ -542,7 +553,7 @@ mod test {
         let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
 
         let public_data_commitment = public_data_commitment::<Bn256>(
-            &full_exit_witness.get_pubdata(),
+            &full_exit_witness.get_pubdata(&signature_data),
             full_exit_witness.before_root,
             Some(root_after_fee),
             Some(validator_address),
@@ -578,260 +589,260 @@ mod test {
         }
     }
 
-    #[test]
-    #[ignore]
-    fn test_full_exit_franklin_failure() {
-        let params = &AltJubjubBn256::new();
-        let p_g = FixedGenerators::SpendingKeyGenerator;
-        let validator_address_number = 7;
-        let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
-        let block_number = Fr::from_str("1").unwrap();
-        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
-        let phasher = PedersenHasher::<Bn256>::default();
+    // #[test]
+    // #[ignore]
+    // fn test_full_exit_franklin_failure() {
+    //     let params = &AltJubjubBn256::new();
+    //     let p_g = FixedGenerators::SpendingKeyGenerator;
+    //     let validator_address_number = 7;
+    //     let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
+    //     let block_number = Fr::from_str("1").unwrap();
+    //     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+    //     let phasher = PedersenHasher::<Bn256>::default();
 
-        let mut tree: CircuitAccountTree =
-            CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
+    //     let mut tree: CircuitAccountTree =
+    //         CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
 
-        let sender_sk = PrivateKey::<Bn256>(rng.gen());
-        let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
-        let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
-        let (sender_x, sender_y) = sender_pk.0.into_xy();
-        println!("x = {}, y = {}", sender_x, sender_y);
+    //     let sender_sk = PrivateKey::<Bn256>(rng.gen());
+    //     let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
+    //     let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
+    //     let (sender_x, sender_y) = sender_pk.0.into_xy();
+    //     println!("x = {}, y = {}", sender_x, sender_y);
 
-        // give some funds to sender and make zero balance for recipient
-        let validator_sk = PrivateKey::<Bn256>(rng.gen());
-        let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
-        let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
-        let (validator_x, validator_y) = validator_pk.0.into_xy();
-        println!("x = {}, y = {}", validator_x, validator_y);
-        let validator_leaf = CircuitAccount::<Bn256> {
-            subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
-            nonce: Fr::zero(),
-            pub_key_hash: validator_pub_key_hash,
-        };
+    //     // give some funds to sender and make zero balance for recipient
+    //     let validator_sk = PrivateKey::<Bn256>(rng.gen());
+    //     let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
+    //     let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
+    //     let (validator_x, validator_y) = validator_pk.0.into_xy();
+    //     println!("x = {}, y = {}", validator_x, validator_y);
+    //     let validator_leaf = CircuitAccount::<Bn256> {
+    //         subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
+    //         nonce: Fr::zero(),
+    //         pub_key_hash: validator_pub_key_hash,
+    //     };
 
-        let mut validator_balances = vec![];
-        for _ in 0..1 << franklin_constants::BALANCE_TREE_DEPTH {
-            validator_balances.push(Some(Fr::zero()));
-        }
-        tree.insert(validator_address_number, validator_leaf);
+    //     let mut validator_balances = vec![];
+    //     for _ in 0..1 << franklin_constants::BALANCE_TREE_DEPTH {
+    //         validator_balances.push(Some(Fr::zero()));
+    //     }
+    //     tree.insert(validator_address_number, validator_leaf);
 
-        let mut account_address: u32 = rng.gen();
-        account_address %= tree.capacity();
-        let token: u32 = 2;
-        let token_fe = Fr::from_str(&token.to_string()).unwrap();
-        let ethereum_key = Fr::from_str("124").unwrap();
+    //     let mut account_address: u32 = rng.gen();
+    //     account_address %= tree.capacity();
+    //     let token: u32 = 2;
+    //     let token_fe = Fr::from_str(&token.to_string()).unwrap();
+    //     let ethereum_key = Fr::from_str("124").unwrap();
 
-        let sender_balance_before: u128 = 2000;
+    //     let sender_balance_before: u128 = 2000;
 
-        let sender_balance_before_as_field_element =
-            Fr::from_str(&sender_balance_before.to_string()).unwrap();
+    //     let sender_balance_before_as_field_element =
+    //         Fr::from_str(&sender_balance_before.to_string()).unwrap();
 
-        let mut sender_balance_tree =
-            CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32);
-        sender_balance_tree.insert(
-            token,
-            Balance {
-                value: sender_balance_before_as_field_element,
-            },
-        );
+    //     let mut sender_balance_tree =
+    //         CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32);
+    //     sender_balance_tree.insert(
+    //         token,
+    //         Balance {
+    //             value: sender_balance_before_as_field_element,
+    //         },
+    //     );
 
-        let sender_leaf_initial = CircuitAccount::<Bn256> {
-            subtree: sender_balance_tree,
-            nonce: Fr::zero(),
-            pub_key_hash: sender_pub_key_hash,
-        };
+    //     let sender_leaf_initial = CircuitAccount::<Bn256> {
+    //         subtree: sender_balance_tree,
+    //         nonce: Fr::zero(),
+    //         pub_key_hash: sender_pub_key_hash,
+    //     };
 
-        let mut sig_bits = vec![];
-        append_be_fixed_width(
-            &mut sig_bits,
-            &Fr::from_str("6").unwrap(), //Corresponding tx_type
-            franklin_constants::TX_TYPE_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &sender_leaf_initial.pub_key_hash,
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &ethereum_key,
-            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &token_fe,
-            franklin_constants::TOKEN_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &sender_leaf_initial.nonce,
-            franklin_constants::NONCE_BIT_WIDTH,
-        );
-        tree.insert(account_address, sender_leaf_initial);
+    //     let mut sig_bits = vec![];
+    //     append_be_fixed_width(
+    //         &mut sig_bits,
+    //         &Fr::from_str("6").unwrap(), //Corresponding tx_type
+    //         franklin_constants::TX_TYPE_BIT_WIDTH,
+    //     );
+    //     append_be_fixed_width(
+    //         &mut sig_bits,
+    //         &sender_leaf_initial.pub_key_hash,
+    //         franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+    //     );
+    //     append_be_fixed_width(
+    //         &mut sig_bits,
+    //         &ethereum_key,
+    //         franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
+    //     );
+    //     append_be_fixed_width(
+    //         &mut sig_bits,
+    //         &token_fe,
+    //         franklin_constants::TOKEN_BIT_WIDTH,
+    //     );
+    //     append_be_fixed_width(
+    //         &mut sig_bits,
+    //         &sender_leaf_initial.nonce,
+    //         franklin_constants::NONCE_BIT_WIDTH,
+    //     );
+    //     tree.insert(account_address, sender_leaf_initial);
 
-        sig_bits.resize(franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS, false);
-        println!(
-            "outside generation after resize: {}",
-            hex::encode(be_bit_vector_into_bytes(&sig_bits))
-        );
+    //     sig_bits.resize(franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS, false);
+    //     println!(
+    //         "outside generation after resize: {}",
+    //         hex::encode(be_bit_vector_into_bytes(&sig_bits))
+    //     );
 
-        let sig_msg = phasher.hash_bits(sig_bits.clone());
+    //     let sig_msg = phasher.hash_bits(sig_bits.clone());
 
-        let mut sig_bits_to_check: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
-        sig_bits_to_check.reverse();
-        sig_bits_to_check.resize(256, false);
-        println!(
-            "outside generation: {}",
-            hex::encode(be_bit_vector_into_bytes(&sig_bits_to_check))
-        );
-        let mut message_bytes = vec![];
-        let byte_chunks = sig_bits_to_check.chunks(8);
-        for byte_chunk in byte_chunks {
-            let mut byte = 0u8;
-            for (i, bit) in byte_chunk.iter().enumerate() {
-                if *bit {
-                    byte |= 1 << i;
-                }
-            }
-            message_bytes.push(byte);
-        }
+    //     let mut sig_bits_to_check: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
+    //     sig_bits_to_check.reverse();
+    //     sig_bits_to_check.resize(256, false);
+    //     println!(
+    //         "outside generation: {}",
+    //         hex::encode(be_bit_vector_into_bytes(&sig_bits_to_check))
+    //     );
+    //     let mut message_bytes = vec![];
+    //     let byte_chunks = sig_bits_to_check.chunks(8);
+    //     for byte_chunk in byte_chunks {
+    //         let mut byte = 0u8;
+    //         for (i, bit) in byte_chunk.iter().enumerate() {
+    //             if *bit {
+    //                 byte |= 1 << i;
+    //             }
+    //         }
+    //         message_bytes.push(byte);
+    //     }
 
-        let (signature, first_sig_part, second_sig_part, third_sig_part) =
-            generate_sig_data(&sig_bits, &phasher, &sender_sk, params);
-        let (sig_x, sig_y) = signature.clone().unwrap().r.into_xy();
+    //     let (signature, first_sig_part, second_sig_part, third_sig_part) =
+    //         generate_sig_data(&sig_bits, &phasher, &sender_sk, params);
+    //     let (sig_x, sig_y) = signature.clone().unwrap().r.into_xy();
 
-        let mut pub_signature_s: Vec<bool> =
-            BitIterator::new(signature.unwrap().s.into_repr()).collect();
-        pub_signature_s.reverse();
-        pub_signature_s.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
-        pub_signature_s.reverse();
+    //     let mut pub_signature_s: Vec<bool> =
+    //         BitIterator::new(signature.unwrap().s.into_repr()).collect();
+    //     pub_signature_s.reverse();
+    //     pub_signature_s.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+    //     pub_signature_s.reverse();
 
-        let mut pub_signature_r_x: Vec<bool> = BitIterator::new(sig_x.into_repr()).collect();
-        pub_signature_r_x.reverse();
-        pub_signature_r_x.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
-        pub_signature_r_x.reverse();
+    //     let mut pub_signature_r_x: Vec<bool> = BitIterator::new(sig_x.into_repr()).collect();
+    //     pub_signature_r_x.reverse();
+    //     pub_signature_r_x.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+    //     pub_signature_r_x.reverse();
 
-        let mut pub_signature_r_y: Vec<bool> = BitIterator::new(Fr::zero().into_repr()).collect();
-        pub_signature_r_y.reverse();
-        pub_signature_r_y.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
-        pub_signature_r_y.reverse();
+    //     let mut pub_signature_r_y: Vec<bool> = BitIterator::new(Fr::zero().into_repr()).collect();
+    //     pub_signature_r_y.reverse();
+    //     pub_signature_r_y.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+    //     pub_signature_r_y.reverse();
 
-        // move to func
-        let mut r_x_bits = pub_signature_r_x.clone();
-        r_x_bits.reverse();
-        let r_x = le_bit_vector_into_field_element(&r_x_bits);
+    //     // move to func
+    //     let mut r_x_bits = pub_signature_r_x.clone();
+    //     r_x_bits.reverse();
+    //     let r_x = le_bit_vector_into_field_element(&r_x_bits);
 
-        let mut r_y_bits = pub_signature_r_y.clone();
-        r_y_bits.reverse();
-        let r_y = le_bit_vector_into_field_element(&r_y_bits);
+    //     let mut r_y_bits = pub_signature_r_y.clone();
+    //     r_y_bits.reverse();
+    //     let r_y = le_bit_vector_into_field_element(&r_y_bits);
 
-        let mut s_bits = pub_signature_s.clone();
-        s_bits.reverse();
+    //     let mut s_bits = pub_signature_s.clone();
+    //     s_bits.reverse();
 
-        // let mut sigs_le_bits: Vec<bool> = BitIterator::new(signature.s.into_repr()).collect();
-        // sigs_le_bits.reverse();
+    //     // let mut sigs_le_bits: Vec<bool> = BitIterator::new(signature.s.into_repr()).collect();
+    //     // sigs_le_bits.reverse();
 
-        // let sigs_converted = le_bit_vector_into_field_element(&sigs_le_bits);
+    //     // let sigs_converted = le_bit_vector_into_field_element(&sigs_le_bits);
 
-        // let s_fs: <Bn256 as JubjubEngine>::Fs = le_bit_vector_into_field_element(&s_bits);
-        let s: <Bn256 as JubjubEngine>::Fs = le_bit_vector_into_field_element(&s_bits);
-        let (r, is_r_correct) = edwards::Point::from_xy_unchecked(r_x, r_y, &AltJubjubBn256::new());
-        let (is_sig_correct, reconstructed_signature) = {
-            let sig = Signature { r, s };
-            let is_valid_signature =
-                sender_pk.verify_musig_pedersen(&message_bytes, &sig, p_g, params);
-            (is_valid_signature && is_r_correct, sig)
-        };
-        // let (is_sig_correct, reconstructed_signature) = match r {
-        //     None => {
-        //         edwards::Point::from_xy_unchecked(x: E::Fr, y: E::Fr, params: &E::Params)
-        //         (false, None)
-        //     },
-        //     Some(r) => {
-        //         let sig = Signature { r, s };
-        //         let is_valid_signature =
-        //             sender_pk.verify_musig_pedersen(&message_bytes, &sig, p_g, params);
-        //         (is_valid_signature, Some(sig))
-        //     }
-        // };
+    //     // let s_fs: <Bn256 as JubjubEngine>::Fs = le_bit_vector_into_field_element(&s_bits);
+    //     let s: <Bn256 as JubjubEngine>::Fs = le_bit_vector_into_field_element(&s_bits);
+    //     let (r, is_r_correct) = edwards::Point::from_xy_unchecked(r_x, r_y, &AltJubjubBn256::new());
+    //     let (is_sig_correct, reconstructed_signature) = {
+    //         let sig = Signature { r, s };
+    //         let is_valid_signature =
+    //             sender_pk.verify_musig_pedersen(&message_bytes, &sig, p_g, params);
+    //         (is_valid_signature && is_r_correct, sig)
+    //     };
+    //     // let (is_sig_correct, reconstructed_signature) = match r {
+    //     //     None => {
+    //     //         edwards::Point::from_xy_unchecked(x: E::Fr, y: E::Fr, params: &E::Params)
+    //     //         (false, None)
+    //     //     },
+    //     //     Some(r) => {
+    //     //         let sig = Signature { r, s };
+    //     //         let is_valid_signature =
+    //     //             sender_pk.verify_musig_pedersen(&message_bytes, &sig, p_g, params);
+    //     //         (is_valid_signature, Some(sig))
+    //     //     }
+    //     // };
 
-        assert_eq!(is_sig_correct, false);
+    //     assert_eq!(is_sig_correct, false);
 
-        let signature = {
-            let mut sigs_le_bits: Vec<bool> =
-                BitIterator::new(reconstructed_signature.clone().s.into_repr()).collect();
-            sigs_le_bits.reverse();
+    //     let signature = {
+    //         let mut sigs_le_bits: Vec<bool> =
+    //             BitIterator::new(reconstructed_signature.clone().s.into_repr()).collect();
+    //         sigs_le_bits.reverse();
 
-            let sigs_converted = le_bit_vector_into_field_element(&sigs_le_bits);
+    //         let sigs_converted = le_bit_vector_into_field_element(&sigs_le_bits);
 
-            Some(TransactionSignature {
-                r: reconstructed_signature.clone().r,
-                s: sigs_converted,
-            })
-        };
-        let full_exit_witness = apply_full_exit(
-            &mut tree,
-            &FullExitData {
-                token,
-                account_address,
-                ethereum_key,
-                pub_signature_s,
-                pub_signature_r_x,
-                pub_signature_r_y,
-            },
-            is_sig_correct,
-        );
+    //         Some(TransactionSignature {
+    //             r: reconstructed_signature.clone().r,
+    //             s: sigs_converted,
+    //         })
+    //     };
+    //     let full_exit_witness = apply_full_exit(
+    //         &mut tree,
+    //         &FullExitData {
+    //             token,
+    //             account_address,
+    //             ethereum_key,
+    //             pub_signature_s,
+    //             pub_signature_r_x,
+    //             pub_signature_r_y,
+    //         },
+    //         is_sig_correct,
+    //     );
 
-        let operations = calculate_full_exit_operations_from_witness(
-            &full_exit_witness,
-            &first_sig_part,
-            &second_sig_part,
-            &third_sig_part,
-            signature,
-            &sender_x,
-            &sender_y,
-        );
+    //     let operations = calculate_full_exit_operations_from_witness(
+    //         &full_exit_witness,
+    //         &first_sig_part,
+    //         &second_sig_part,
+    //         &third_sig_part,
+    //         signature,
+    //         &sender_x,
+    //         &sender_y,
+    //     );
 
-        let (root_after_fee, validator_account_witness) =
-            apply_fee(&mut tree, validator_address_number, token, 0);
+    //     let (root_after_fee, validator_account_witness) =
+    //         apply_fee(&mut tree, validator_address_number, token, 0);
 
-        let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
+    //     let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
 
-        let public_data_commitment = public_data_commitment::<Bn256>(
-            &full_exit_witness.get_pubdata(),
-            full_exit_witness.before_root,
-            Some(root_after_fee),
-            Some(validator_address),
-            Some(block_number),
-        );
-        {
-            let mut cs = TestConstraintSystem::<Bn256>::new();
+    //     let public_data_commitment = public_data_commitment::<Bn256>(
+    //         &full_exit_witness.get_pubdata(),
+    //         full_exit_witness.before_root,
+    //         Some(root_after_fee),
+    //         Some(validator_address),
+    //         Some(block_number),
+    //     );
+    //     {
+    //         let mut cs = TestConstraintSystem::<Bn256>::new();
 
-            let instance = FranklinCircuit {
-                operation_batch_size: 10,
-                params,
-                old_root: full_exit_witness.before_root,
-                new_root: Some(root_after_fee),
-                operations,
-                pub_data_commitment: Some(public_data_commitment),
-                block_number: Some(block_number),
-                validator_account: validator_account_witness,
-                validator_address: Some(validator_address),
-                validator_balances,
-                validator_audit_path,
-            };
+    //         let instance = FranklinCircuit {
+    //             operation_batch_size: 10,
+    //             params,
+    //             old_root: full_exit_witness.before_root,
+    //             new_root: Some(root_after_fee),
+    //             operations,
+    //             pub_data_commitment: Some(public_data_commitment),
+    //             block_number: Some(block_number),
+    //             validator_account: validator_account_witness,
+    //             validator_address: Some(validator_address),
+    //             validator_balances,
+    //             validator_audit_path,
+    //         };
 
-            instance.synthesize(&mut cs).unwrap();
+    //         instance.synthesize(&mut cs).unwrap();
 
-            println!("{}", cs.find_unconstrained());
+    //         println!("{}", cs.find_unconstrained());
 
-            println!("{}", cs.num_constraints());
+    //         println!("{}", cs.num_constraints());
 
-            let err = cs.which_is_unsatisfied();
-            if err.is_some() {
-                panic!("ERROR satisfying in {}", err.unwrap());
-            }
-        }
-    }
+    //         let err = cs.which_is_unsatisfied();
+    //         if err.is_some() {
+    //             panic!("ERROR satisfying in {}", err.unwrap());
+    //         }
+    //     }
+    // }
 }
