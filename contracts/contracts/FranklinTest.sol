@@ -196,6 +196,8 @@ contract FranklinTest {
     uint64 public firstPriorityRequestId;
     // Total number of requests
     uint64 public totalOpenPriorityRequests;
+    // Total number of committed requests
+    uint64 public totalCommittedPriorityRequests;
 
     // Flag indicating that exodus (mass exit) mode is triggered
     // Once it was raised, it can not be cleared again, and all users must exit
@@ -285,6 +287,7 @@ contract FranklinTest {
         }
         totalOpenPriorityRequests -= _number;
         firstPriorityRequestId += _number;
+        totalCommittedPriorityRequests -= _number;
 
         balancesToWithdraw[_validator][0] += uint128(totalFee);
     }
@@ -578,6 +581,8 @@ contract FranklinTest {
 
             totalBlocksCommitted += 1;
 
+            totalCommittedPriorityRequests += priorityNumber;
+
             emit BlockCommitted(_blockNumber);
         }
     }
@@ -730,7 +735,7 @@ contract FranklinTest {
             if (onchainOps[current].opType == OpType.FullExit || onchainOps[current].opType == OpType.Deposit) {
                 OnchainOperation memory op = onchainOps[current];
                 require(
-                    isPriorityOpValid(op, counter+firstPriorityRequestId),
+                    isPriorityOpValid(op, counter+firstPriorityRequestId+totalCommittedPriorityRequests),
                     "fvs12"
                 ); // fvs12 - priority operation is not valid
                 counter++;
@@ -914,6 +919,7 @@ contract FranklinTest {
             "frk11"
         ); // frk11 - block not found
         revertOnchainOps(_reverted.operationStartId, _reverted.onchainOperations);
+        totalCommittedPriorityRequests -= _reverted.priorityOperations;
     }
 
     // MARK: - EXODUS MODE

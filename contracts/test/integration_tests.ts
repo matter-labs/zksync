@@ -147,7 +147,7 @@ describe("INTEGRATION", function() {
         const fullExitEvent = events[0].args;
         expect(fullExitEvent.opType).equal(6);
         expect(fullExitEvent.pubData).equal("0x00000252312ad6f01657413b2eae9287f6b9adad93d5fe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
-        expect(fullExitEvent.fee).equal(bigNumberify("0x3fba109a13c000"));
+        expect(fullExitEvent.fee).equal(bigNumberify("0x3fb9583332d000"));
 
         totalOpenPriorityRequests = await franklinDeployedContract.totalOpenPriorityRequests();
         firstPriorityRequestId = await franklinDeployedContract.firstPriorityRequestId();
@@ -195,7 +195,7 @@ describe("INTEGRATION", function() {
         expect(firstPriorityRequestId).equal(2);
         
         let balanceToWithdraw2 = await franklinDeployedContract.balancesToWithdraw(wallet.address, 0);
-        expect(balanceToWithdraw2).equal("0x01A2FF88F79DC000"); // amount - part exit + fee
+        expect(balanceToWithdraw2).equal("0x01A2FED090BCD000"); // amount - part exit + fee
 
         // Withdraw eth for wallet
         const oldBalance2 = await wallet.getBalance();
@@ -236,7 +236,7 @@ describe("INTEGRATION", function() {
 
         expect(priorityEvent.opType).equal(1);
         expect(priorityEvent.pubData).equal("0x52312ad6f01657413b2eae9287f6b9adad93d5fe00010000000000000000000000000000004e0809101112131415161718192021222334252627");
-        expect(priorityEvent.fee).equal(bigNumberify("0x3f6b283718b000"));
+        expect(priorityEvent.fee).equal(bigNumberify("0x3f6a6fd037c000"));
 
         expect(depositEvent.owner).equal(wallet.address);
         expect(depositEvent.tokenId).equal(1);
@@ -340,7 +340,7 @@ describe("INTEGRATION", function() {
         const fullExitEvent = events[0].args;
         expect(fullExitEvent.opType).equal(6);
         expect(fullExitEvent.pubData).equal("0x00000252312ad6f01657413b2eae9287f6b9adad93d5fe000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
-        expect(fullExitEvent.fee).equal(bigNumberify("0x3f9027c40bc000"));
+        expect(fullExitEvent.fee).equal(bigNumberify("0x3f8f6f5d2ad000"));
 
         totalOpenPriorityRequests = await franklinDeployedContract.totalOpenPriorityRequests();
         firstPriorityRequestId = await franklinDeployedContract.firstPriorityRequestId();
