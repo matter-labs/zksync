@@ -355,14 +355,14 @@ contract FranklinTest {
             msg.value >= fee,
             "fdh11"
         ); // fdh11 - Not enough ETH provided to pay the fee
-
-        uint128 amount = uint128(msg.value-fee);
+        
+        uint256 amount = msg.value-fee;
         require(
             amount <= MAX_VALUE,
             "fdh12"
         ); // fdh12 - deposit amount value is heigher than Franklin is able to process
 
-        registerDeposit(0, amount, fee, _franklinAddr);
+        registerDeposit(0, uint128(amount), fee, _franklinAddr);
     }
 
     // Withdraw ETH
