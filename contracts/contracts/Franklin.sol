@@ -723,7 +723,7 @@ contract Franklin {
     // - _number - priority ops number
     function verifyPriorityOperations(uint64 _startId, uint64 _totalProcessed, uint64 _number) internal view {
         require(
-            _number <= totalOpenPriorityRequests,
+            _number <= totalOpenPriorityRequests-totalCommittedPriorityRequests,
             "fvs11"
         ); // fvs11 - too much priority requests
         
