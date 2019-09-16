@@ -1,5 +1,8 @@
 <template>
 <b-container>
+    <b-row class="w-100">
+        <ProgressBar ref="progress_bar"></ProgressBar>
+    </b-row>
     <b-row>
         <b-col xl="6">
             <BalancesList balanceListId="onchain" v-bind:balances="onchainBalances"></BalancesList>
@@ -33,13 +36,15 @@ import BalancesList from './BalancesList.vue'
 import FranklinBalancesList from './FranklinBalancesList.vue'
 import DepositButtons from './DepositButtons.vue'
 import Transfer from './Transfer.vue'
+import ProgressBar from './ProgressBar.vue'
 
 const components = {
     Alert,
     BalancesList,
     FranklinBalancesList,
     DepositButtons,
-    Transfer
+    Transfer,
+    ProgressBar,
 };
 
 const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
@@ -68,6 +73,13 @@ export default {
         async deposit(kwargs) {
             for await (const progress of window.walletDecorator.verboseDeposit(kwargs)) {
                 console.log(progress);
+                if (progress.message.includes(`started proving block`)) {
+                    console.log('includes, e');
+                    this.$refs.progress_bar.startProgressBarTimer(20000);
+                }
+                if (progress.message.includes(`got proved!`)) {
+                    this.$refs.progress_bar.updateProgressPercent(100);
+                }
                 this.$emit('alert', {
                     message: progress.message,
                     variant: progress.error ? 'danger' : 'success',
