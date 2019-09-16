@@ -1,6 +1,8 @@
 import { BigNumberish, BigNumber, bigNumberify } from 'ethers/utils';
 import { FranklinProvider, Wallet, Address } from 'franklin_lib'
 
+const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
+
 export class WalletDecorator {
     constructor (wallet) {
         this.wallet = wallet;
@@ -137,6 +139,65 @@ export class WalletDecorator {
         return 0;
     }
 
+    async * verboseDepositOffchain(kwargs) {
+        let token = this.tokenFromName(kwargs.token);
+        let amount = bigNumberify(kwargs.amount);
+        let fee = bigNumberify(kwargs.fee);
+
+        let res = await this.wallet.depositOffchain(token, amount, fee);
+
+        if (res.err) {
+            yield {
+                error: res.err,
+                message: `Onchain Deposit Failed with ${res.err}`,
+            }; 
+            return;
+        } else {
+            yield {
+                error: null,
+                message: `Sent tx to Franklin server`,
+            };
+        }
+
+        let receipt = await this.wallet.txReceipt(res.hash);
+
+        if (receipt.fail_reason) {
+            yield {
+                error: receipt.fail_reason,
+                message: `Transaction failed with ${receipt.fail_reason}`
+            };
+            return;
+        } else {
+            yield {
+                error: null,
+                message: `Tx ${res.hash} got included in block ${receipt.block_number}, waiting for prover`,
+            };
+        }
+
+        do {
+            receipt = await this.wallet.txReceipt(res.hash)
+            console.log(receipt.prover_run);
+            await sleep(1000);
+        } while ( ! receipt.prover_run);
+
+        yield {
+            error: null,
+            message: `Prover ${receipt.prover_run.worker} started `
+                + `proving block ${receipt.prover_run.block_number} `
+                + `at ${receipt.prover_run.created_at}`
+        };
+
+        do {
+            receipt = await this.wallet.txReceipt(res.hash)
+            await sleep(1000);
+        } while ( ! receipt.verified);
+
+        yield {
+            error: null,
+            message: `Tx ${res.hash} got proved!`
+        }
+    }
+
     async * verboseDeposit(kwargs) {
         yield {
             error: null,
@@ -158,19 +219,6 @@ export class WalletDecorator {
             return;
         }
 
-        try {
-            let _ = await this.depositOffchain(kwargs);
-            yield {
-                error: null,
-                message: `Offchain deposit succeeded.`
-            }
-            return;
-        } catch (e) {
-            yield {
-                error: e.message,
-                message: `Offchain deposit failed with "${e.message}"`,
-            };
-            return;
-        }
+        yield * this.verboseDepositOffchain(kwargs);
     }
 }

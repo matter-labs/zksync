@@ -159,6 +159,7 @@ pub struct TxReceiptResponse {
     success: bool,
     verified: bool,
     fail_reason: Option<String>,
+    prover_run: Option<ProverRun>,
 }
 
 impl NewExecutedTransaction {
@@ -407,7 +408,7 @@ pub struct StoredProof {
 }
 
 // Every time before a prover worker starts generating the proof, a prover run is recorded for monitoring purposes
-#[derive(Debug, Insertable, Queryable, QueryableByName)]
+#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize, Deserialize)]
 #[table_name = "prover_runs"]
 pub struct ProverRun {
     pub id: i32,
@@ -1276,12 +1277,18 @@ impl StorageProcessor {
                     .first::<StoredOperation>(self.conn())
                     .optional()?;
 
+                let prover_run: Option<ProverRun> = prover_runs::table
+                    .filter(prover_runs::block_number.eq(tx.block_number)) 
+                    .first::<ProverRun>(self.conn())
+                    .optional()?;
+                
                 Ok(Some(TxReceiptResponse {
                     tx_hash: hash.to_vec(),
                     block_number: tx.block_number,
                     success: tx.success,
                     verified: confirm.is_some(),
                     fail_reason: tx.fail_reason,
+                    prover_run: prover_run,
                 }))
             } else {
                 Ok(None)
