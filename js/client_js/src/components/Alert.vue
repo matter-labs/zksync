@@ -1,5 +1,5 @@
 <template>
-    <b-alert dismissible v-bind:variant="variant" fade :show="countdown" @dismissed="dismissed" class="mt-2">
+    <b-alert dismissible v-bind:variant="variant" fade :show="alertVisible" @dismissed="dismiss" class="mt-2">
         {{ message }}
     </b-alert>
 </template>
@@ -8,19 +8,27 @@
 export default {
     name: 'Alert',
     data: () => ({
-        countdown: 0,
+        alertVisible: false,
         message: '',
-        variant: 'info'
+        variant: 'info',
+        timeoutHandle: null,
     }),
     methods: {
-        dismissed() {
-            this.message = '';
-            this.countdown = 0;
+        dismiss() {
+            window.clearTimeout(this.timeoutHandle);
+            this.alertVisible = false;
         },
         display(kwargs) {
             this.message = kwargs.message;
             this.variant = kwargs.variant || this.variant;
-            this.countdown = kwargs.countdown || 10;
+            this.alertVisible = true;
+
+            window.clearTimeout(this.timeoutHandle);
+            
+            const self = this;
+            this.timeoutHandle = setTimeout(() => {
+                self.dismiss();
+            }, (kwargs.countdown || 10) * 1000);
         }
     }
 }
