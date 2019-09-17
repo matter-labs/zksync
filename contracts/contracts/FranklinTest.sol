@@ -889,10 +889,11 @@ contract FranklinTest {
 
     // Checks that commitment is expired and revert blocks
     function triggerRevertIfBlockCommitmentExpired() internal returns (bool) {
-        if (totalBlocksCommitted > totalBlocksVerified &&
-                block.number >
-                blocks[totalBlocksVerified + 1].committedAtBlock +
-                    EXPECT_VERIFICATION_IN) {
+        if (
+            totalBlocksCommitted > totalBlocksVerified
+            && blocks[totalBlocksVerified + 1].committedAtBlock > 0
+            && block.number > blocks[totalBlocksVerified + 1].committedAtBlock + EXPECT_VERIFICATION_IN
+        ) {
             revertBlocks();
             return true;
         }
@@ -937,7 +938,10 @@ contract FranklinTest {
     // Exodus mode must be entered in case of current ethereum block number is higher than the oldest
     // of existed priority requests expiration block number.
     function triggerExodusIfNeeded() internal returns (bool) {
-        if (block.number >= priorityRequests[firstPriorityRequestId].expirationBlock) {
+        if (
+            block.number >= priorityRequests[firstPriorityRequestId].expirationBlock
+            && priorityRequests[firstPriorityRequestId].expirationBlock != 0
+        ) {
             exodusMode = true;
             cancelOutstandingDepositsForExodusMode();
             emit ExodusMode();

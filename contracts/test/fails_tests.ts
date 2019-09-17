@@ -39,7 +39,7 @@ describe("FAILS", function() {
     it("Deposit", async () => {
         // ETH: Wrong tx value (msg.value >= fee)
         const depositETH1Value = parseEther("0.005"); // the value passed to tx
-        let tx1 = await franklinDeployedContract.depositETH(
+        const tx1 = await franklinDeployedContract.depositETH(
             franklinAddressBinary,
             {
                 value: depositETH1Value,
@@ -57,7 +57,7 @@ describe("FAILS", function() {
 
         // ETH: Wrong tx value (amount <= MAX_VALUE)
         const depositETH2Value = parseEther("340282366920938463463.374607431768211456"); // the value passed to tx
-        let tx2 = await franklinDeployedContract.depositETH(
+        const tx2 = await franklinDeployedContract.depositETH(
             franklinAddressBinary,
             {
                 value: depositETH2Value,
@@ -74,13 +74,13 @@ describe("FAILS", function() {
         expect(reason2.substring(0,5)).equal("fdh12");
 
         // ERC20: Wrong tx value (msg.value >= fee)
-        let erc20DeployedToken = await addTestERC20Token(wallet, governanceDeployedContract);
+        const erc20DeployedToken = await addTestERC20Token(wallet, governanceDeployedContract);
 
         const depositERCValue = 78;
         const feeValue = parseEther("0.001");
         await erc20DeployedToken.approve(franklinDeployedContract.address, depositERCValue);
 
-        let tx3 = await franklinDeployedContract.depositERC20(
+        const tx3 = await franklinDeployedContract.depositERC20(
             erc20DeployedToken.address,
             depositERCValue, 
             franklinAddressBinary,
@@ -247,4 +247,127 @@ describe("FAILS", function() {
         balanceToWithdraw = await franklinDeployedContract.balancesToWithdraw(wallet.address, 0);
         expect(balanceToWithdraw).equal(bigNumberify(0));
     });
+
+    // it("Block commit", async () => {
+    //     // Start committing and verifying noop blocks without full exit priority request 12 times
+    //     const noopBlockPublicData = createNoopPublicData();
+
+    //     const tx1 = await franklinDeployedContract.commitBlock(2, 22,
+    //         Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
+    //         noopBlockPublicData,
+    //         {
+    //             gasLimit: bigNumberify("500000"),
+    //         },
+    //     );
+    //     await tx1.wait()
+    //     .catch(() => {});
+
+    //     const code1 = await provider.call(tx1, tx1.blockNumber);
+    //     const reason1 = hex_to_ascii(code1.substr(138));
+        
+    //     expect(reason1.substring(0,5)).equal("fck11");
+
+    //     // Commit and non-verify 5 blocks (> than max unverified blocks = 4)
+    //     let tx = await franklinDeployedContract.commitBlock(1, 22,
+    //         Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
+    //         noopBlockPublicData,
+    //         {
+    //             gasLimit: bigNumberify("500000"),
+    //         },
+    //     );
+    //     await tx.wait();
+    //     console.log(await franklinDeployedContract.totalOpenPriorityRequests());
+    //     console.log(await franklinDeployedContract.exodusMode());
+    //     console.log(await franklinDeployedContract.priorityRequests(0));
+    //     tx = await franklinDeployedContract.commitBlock(2, 22,
+    //         Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
+    //         noopBlockPublicData,
+    //         {
+    //             gasLimit: bigNumberify("500000"),
+    //         },
+    //     );
+    //     await tx.wait();
+    //     // tx = await franklinDeployedContract.commitBlock(3, 22,
+    //     //     Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
+    //     //     noopBlockPublicData,
+    //     //     {
+    //     //         gasLimit: bigNumberify("500000"),
+    //     //     },
+    //     // );
+    //     // await tx.wait();tx = await franklinDeployedContract.commitBlock(4, 22,
+    //     //     Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
+    //     //     noopBlockPublicData,
+    //     //     {
+    //     //         gasLimit: bigNumberify("500000"),
+    //     //     },
+    //     // );
+    //     // await tx.wait();
+
+    //     // const tx2 = await franklinDeployedContract.commitBlock(5, 22,
+    //     //     Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
+    //     //     noopBlockPublicData,
+    //     //     {
+    //     //         gasLimit: bigNumberify("500000"),
+    //     //     },
+    //     // );
+    //     // await tx2.wait()
+    //     // .catch(() => {});
+
+    //     // const code2 = await provider.call(tx2, tx2.blockNumber);
+    //     // const reason2 = hex_to_ascii(code2.substr(138));
+        
+    //     // expect(reason2.substring(0,5)).equal("fck12");
+        
+
+
+    //     // tx = await franklinDeployedContract.commitBlock(3, 22,
+    //     //     Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
+    //     //     noopBlockPublicData,
+    //     //     {
+    //     //         gasLimit: bigNumberify("500000"),
+    //     //     },
+    //     // );
+    //     // receipt = await tx.wait();
+    //     // tx = await franklinDeployedContract.verifyBlock(3, dummyBlockProof, {gasLimit: bigNumberify("500000")});
+    //     // receipt = await tx.wait();
+
+    //     // tx = await franklinDeployedContract.commitBlock(4, 22,
+    //     //     Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
+    //     //     noopBlockPublicData,
+    //     //     {
+    //     //         gasLimit: bigNumberify("500000"),
+    //     //     },
+    //     // );
+    //     // receipt = await tx.wait();
+
+    //     // // Getting exodus mode revert code
+    //     // const exodusTx = await franklinDeployedContract.verifyBlock(4, dummyBlockProof, {gasLimit: bigNumberify("500000")});
+    //     // await exodusTx.wait()
+    //     // .catch(() => {});
+
+    //     // const code1 = await provider.call(exodusTx, exodusTx.blockNumber);
+    //     // const reason1 = hex_to_ascii(code1.substr(138));
+        
+    //     // expect(reason1.substring(0,5)).equal("fre11");
+
+    //     // // Get exodus event
+    //     // events = receipt.events;
+    //     // const exodusEvent = events[0];
+    //     // expect(exodusEvent.event).equal("ExodusMode");
+
+    //     // // Check balance
+    //     // let balanceToWithdraw = await franklinDeployedContract.balancesToWithdraw(wallet.address, 0);
+    //     // expect(balanceToWithdraw).equal(parseEther("10.000540000000000000"));
+
+    //     // // Withdraw eth
+    //     // const oldBalance2 = await wallet.getBalance();
+    //     // const exitTx2 = await franklinDeployedContract.withdrawETH(balanceToWithdraw);
+    //     // const exitTxReceipt2 = await exitTx2.wait();
+    //     // const gasUsed2 = exitTxReceipt2.gasUsed.mul(await provider.getGasPrice());
+    //     // const newBalance2 = await wallet.getBalance();
+    //     // expect(newBalance2.sub(oldBalance2).add(gasUsed2)).eq(balanceToWithdraw);
+
+    //     // balanceToWithdraw = await franklinDeployedContract.balancesToWithdraw(wallet.address, 0);
+    //     // expect(balanceToWithdraw).equal(bigNumberify(0));
+    // });
 });
