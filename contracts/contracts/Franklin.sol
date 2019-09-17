@@ -197,6 +197,8 @@ contract Franklin {
     uint64 public firstPriorityRequestId;
     // Total number of requests
     uint64 public totalOpenPriorityRequests;
+    // Total number of committed requests
+    uint64 public totalCommittedPriorityRequests;
 
     // Flag indicating that exodus (mass exit) mode is triggered
     // Once it was raised, it can not be cleared again, and all users must exit
@@ -288,6 +290,7 @@ contract Franklin {
         }
         totalOpenPriorityRequests -= _number;
         firstPriorityRequestId += _number;
+        totalCommittedPriorityRequests -= _number;
 
         balancesToWithdraw[_validator][0] += uint128(totalFee);
     }
@@ -358,14 +361,14 @@ contract Franklin {
             msg.value >= fee,
             "fdh11"
         ); // fdh11 - Not enough ETH provided to pay the fee
-
-        uint128 amount = uint128(msg.value-fee);
+        
+        uint256 amount = msg.value-fee;
         require(
             amount <= MAX_VALUE,
             "fdh12"
         ); // fdh12 - deposit amount value is heigher than Franklin is able to process
 
-        registerDeposit(0, amount, fee, _franklinAddr);
+        registerDeposit(0, uint128(amount), fee, _franklinAddr);
     }
 
     // Withdraw ETH
@@ -581,6 +584,8 @@ contract Franklin {
 
             totalBlocksCommitted += 1;
 
+            totalCommittedPriorityRequests += priorityNumber;
+
             emit BlockCommitted(_blockNumber);
         }
     }
@@ -721,7 +726,7 @@ contract Franklin {
     // - _number - priority ops number
     function verifyPriorityOperations(uint64 _startId, uint64 _totalProcessed, uint64 _number) internal view {
         require(
-            _number <= totalOpenPriorityRequests,
+            _number <= totalOpenPriorityRequests-totalCommittedPriorityRequests,
             "fvs11"
         ); // fvs11 - too much priority requests
         
@@ -733,7 +738,7 @@ contract Franklin {
             if (onchainOps[current].opType == OpType.FullExit || onchainOps[current].opType == OpType.Deposit) {
                 OnchainOperation memory op = onchainOps[current];
                 require(
-                    isPriorityOpValid(op, counter+firstPriorityRequestId),
+                    isPriorityOpValid(op, counter+firstPriorityRequestId+totalCommittedPriorityRequests),
                     "fvs12"
                 ); // fvs12 - priority operation is not valid
                 counter++;
@@ -886,7 +891,7 @@ contract Franklin {
     // MARK: - REVERTING COMMITTED BLOCKS
 
     // Checks that commitment is expired and revert blocks
-    function triggerRevertIfBlockCommitmentExpired() public returns (bool) {
+    function triggerRevertIfBlockCommitmentExpired() internal returns (bool) {
         if (totalBlocksCommitted > totalBlocksVerified &&
                 block.number >
                 blocks[totalBlocksVerified + 1].committedAtBlock +
@@ -917,6 +922,7 @@ contract Franklin {
             "frk11"
         ); // frk11 - block not found
         revertOnchainOps(_reverted.operationStartId, _reverted.onchainOperations);
+        totalCommittedPriorityRequests -= _reverted.priorityOperations;
     }
 
     // MARK: - EXODUS MODE
@@ -925,8 +931,8 @@ contract Franklin {
     function requireActive() internal view {
         require(
             !exodusMode,
-            "fra11"
-        ); // fra11 - exodus mode activated
+            "fre11"
+        ); // fre11 - exodus mode activated
     }
 
     // Checks if Exodus mode must be entered. If true - cancels outstanding deposits and emits ExodusMode event.
