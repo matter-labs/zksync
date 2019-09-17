@@ -191,8 +191,8 @@ impl FranklinTx {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct TxSignature {
-    pub_key: PackedPublicKey,
-    sign: PackedSignature,
+    pub pub_key: PackedPublicKey,
+    pub sign: PackedSignature,
 }
 
 impl TxSignature {
@@ -279,7 +279,7 @@ impl<'de> Deserialize<'de> for PackedPublicKey {
 }
 
 #[derive(Clone)]
-pub struct PackedSignature(Signature<Engine>);
+pub struct PackedSignature(pub Signature<Engine>);
 
 impl PackedSignature {
     fn serialize_packed(&self) -> std::io::Result<Vec<u8>> {
