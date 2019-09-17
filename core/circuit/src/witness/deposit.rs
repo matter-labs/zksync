@@ -1,5 +1,4 @@
 use super::utils::*;
-use crate::utils::*;
 
 use crate::operation::SignatureData;
 use crate::operation::*;
@@ -7,6 +6,7 @@ use ff::{Field, PrimeField};
 use franklin_crypto::circuit::float_point::{convert_to_float, parse_float_to_u128};
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
+use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
 use models::node::DepositOp;
 use models::params as franklin_constants;
 use num_traits::cast::ToPrimitive;
@@ -95,10 +95,10 @@ pub fn apply_deposit_tx(
     tree: &mut CircuitAccountTree,
     deposit: &DepositOp,
 ) -> DepositWitness<Bn256> {
-    let alt_new_pubkey_hash = Fr::from_hex(&deposit.tx.to.to_hex()).unwrap();
+    let alt_new_pubkey_hash = Fr::from_hex(&deposit.priority_op.account.to_hex()).unwrap();
     let deposit_data = DepositData {
-        amount: deposit.tx.amount.to_u128().unwrap(),
-        token: u32::from(deposit.tx.token),
+        amount: deposit.priority_op.amount.to_u128().unwrap(),
+        token: u32::from(deposit.priority_op.token),
         account_address: deposit.account_id,
         new_pub_key_hash: alt_new_pubkey_hash,
     };
@@ -343,6 +343,7 @@ mod test {
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklin_crypto::jubjub::FixedGenerators;
     use models::circuit::account::{CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
+    use models::circuit::utils::*;
     use models::params as franklin_constants;
 
     use rand::{Rng, SeedableRng, XorShiftRng};
@@ -363,7 +364,7 @@ mod test {
         println!("empty tree root_hash is: {}", tree.root_hash());
         let sender_sk = PrivateKey::<Bn256>(rng.gen());
         let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
-        let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
+        let sender_pub_key_hash = pub_key_hash_fe(&sender_pk, &phasher);
         let (sender_x, sender_y) = sender_pk.0.into_xy();
         let sender_leaf = CircuitAccount::<Bn256> {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
@@ -375,7 +376,7 @@ mod test {
         // give some funds to sender and make zero balance for recipient
         let validator_sk = PrivateKey::<Bn256>(rng.gen());
         let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
-        let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
+        let validator_pub_key_hash = pub_key_hash_fe(&validator_pk, &phasher);
 
         let validator_leaf = CircuitAccount::<Bn256> {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
@@ -489,7 +490,7 @@ mod test {
         println!("empty tree root_hash is: {}", tree.root_hash());
         let sender_sk = PrivateKey::<Bn256>(rng.gen());
         let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
-        let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
+        let sender_pub_key_hash = pub_key_hash_fe(&sender_pk, &phasher);
         let (sender_x, sender_y) = sender_pk.0.into_xy();
         let sender_leaf = CircuitAccount::<Bn256> {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
@@ -501,7 +502,7 @@ mod test {
         // give some funds to sender and make zero balance for recipient
         let validator_sk = PrivateKey::<Bn256>(rng.gen());
         let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
-        let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
+        let validator_pub_key_hash = pub_key_hash_fe(&validator_pk, &phasher);
 
         let validator_leaf = CircuitAccount::<Bn256> {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),

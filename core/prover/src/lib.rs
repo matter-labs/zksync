@@ -48,6 +48,7 @@ use num_traits::cast::ToPrimitive;
 // };
 use storage::StorageProcessor;
 
+use bigdecimal::BigDecimal;
 use models::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum};
 
 pub struct Prover<E: JubjubEngine> {
@@ -453,6 +454,7 @@ impl BabyProver {
                         operations.extend(close_account_operations);
                         pub_data.extend(close_account_witness.get_pubdata());
                     }
+                    FranklinOp::FullExit(_) => unimplemented!("FullExit"),
                 }
             }
             if operations.len() < franklin_constants::BLOCK_SIZE_CHUNKS {

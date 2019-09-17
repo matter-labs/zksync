@@ -1,4 +1,4 @@
-pragma solidity ^0.5.1;
+pragma solidity ^0.5.8;
 
 import "./Verifier.sol";
 import "./VerificationKey.sol";
@@ -15,6 +15,7 @@ contract VerifyTest {
 
     function verifyProof(bytes32 commitment, uint256[8] calldata proof)
         external
+        view
     {
         require(verifyBlockProof(proof, commitment), "verification failed");
     }

@@ -9,6 +9,7 @@ use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
 
 use crate::operation::SignatureData;
 use crate::operation::TransactionSignature;
+use models::circuit::utils::le_bit_vector_into_field_element;
 use models::params as franklin_constants;
 
 pub fn sign_pedersen<R, E>(
@@ -38,12 +39,6 @@ where
     }
 
     let signature = private_key.musig_pedersen_sign(&message_bytes, rng, p_g, params);
-    println!(
-        "s: {:?} . r: {:?}",
-        signature.clone().s,
-        signature.clone().r.into_xy()
-    );
-    println!(" message_byts: {:?}", message_bytes.clone());
 
     let pk = PublicKey::from_private(&private_key, p_g, params);
     let is_valid_signature =
@@ -271,95 +266,4 @@ pub fn append_packed_public_key(
     assert_eq!(1, x_bits.len());
     content.extend(y_bits);
     content.extend(x_bits);
-}
-
-pub fn append_le_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, width: usize) {
-    let mut token_bits: Vec<bool> = BitIterator::new(x.into_repr()).collect();
-    token_bits.reverse();
-    // token_bits.truncate(width);
-    token_bits.resize(width, false);
-    content.extend(token_bits.clone());
-}
-
-pub fn append_be_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, width: usize) {
-    let mut token_bits: Vec<bool> = BitIterator::new(x.into_repr()).collect();
-    token_bits.reverse();
-    token_bits.resize(width, false);
-    token_bits.reverse();
-    content.extend(token_bits.clone());
-}
-pub fn be_bytes_into_bits(bytes: &[u8]) -> Vec<bool> {
-    let mut bits = vec![];
-    for byte in bytes {
-        for i in 0..8 {
-            bits.push((byte >> (7 - i)) % 2u8 == 1u8);
-        }
-    }
-    bits
-}
-pub fn le_bit_vector_into_field_element<P: PrimeField>(bits: &[bool]) -> P {
-    // double and add
-    let mut fe = P::zero();
-    let mut base = P::one();
-
-    for bit in bits {
-        if *bit {
-            fe.add_assign(&base);
-        }
-        base.double();
-    }
-
-    fe
-}
-
-pub fn be_bit_vector_into_bytes(bits: &[bool]) -> Vec<u8> {
-    let mut bytes: Vec<u8> = vec![];
-
-    let byte_chunks = bits.chunks(8);
-
-    for byte_chunk in byte_chunks {
-        let mut byte = 0u8;
-        // pack just in order
-        for (i, bit) in byte_chunk.iter().enumerate() {
-            if *bit {
-                byte |= 1 << (7 - i);
-            }
-        }
-        bytes.push(byte);
-    }
-
-    bytes
-}
-
-pub fn le_bit_vector_into_bytes(bits: &[bool]) -> Vec<u8> {
-    let mut bytes: Vec<u8> = vec![];
-
-    let byte_chunks = bits.chunks(8);
-
-    for byte_chunk in byte_chunks {
-        let mut byte = 0u8;
-        // pack just in order
-        for (i, bit) in byte_chunk.iter().enumerate() {
-            if *bit {
-                byte |= 1 << i;
-            }
-        }
-        bytes.push(byte);
-    }
-
-    bytes
-}
-
-pub fn encode_fs_into_fr<E: JubjubEngine>(input: E::Fs) -> E::Fr {
-    let mut fs_le_bits: Vec<bool> = BitIterator::new(input.into_repr()).collect();
-    fs_le_bits.reverse();
-
-    le_bit_vector_into_field_element::<E::Fr>(&fs_le_bits)
-}
-
-pub fn encode_fr_into_fs<E: JubjubEngine>(input: E::Fr) -> E::Fs {
-    let mut fr_le_bits: Vec<bool> = BitIterator::new(input.into_repr()).collect();
-    fr_le_bits.reverse();
-
-    le_bit_vector_into_field_element::<E::Fs>(&fr_le_bits)
 }

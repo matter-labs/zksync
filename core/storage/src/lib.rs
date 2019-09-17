@@ -3,11 +3,11 @@ extern crate diesel;
 #[macro_use]
 extern crate log;
 
-use bigdecimal::{BigDecimal, Zero};
+use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
 use failure::Fail;
-use models::node::block::{Block, ExecutedTx};
+use models::node::block::{Block, ExecutedOperations, ExecutedTx};
 use models::node::{
     apply_updates, reverse_updates,
     tx::{FranklinTx, TxType},
@@ -337,56 +337,7 @@ impl StoredOperation {
     }
 
     pub fn get_txs(&self) -> QueryResult<Vec<StoredTx>> {
-        let debug_data = format!("data: {}", &self.data);
-        let op: Result<Operation, serde_json::Error> = serde_json::from_str(&self.data.to_string());
-        if let Err(err) = &op {
-            debug!("Error: {} on {}", err, debug_data)
-        }
-        let op = op.expect("Operation deserialization");
-        let txs: Vec<StoredTx> = op
-            .block
-            .block_transactions
-            .into_iter()
-            .map(|x| match x.tx {
-                FranklinTx::Transfer(transfer) => StoredTx {
-                    tx_type: TxType::Transfer,
-                    from: Some(transfer.from),
-                    to: Some(transfer.to),
-                    nonce: Some(transfer.nonce),
-                    token: Some(transfer.token),
-                    amount: Some(transfer.amount),
-                    fee: Some(transfer.fee),
-                },
-                FranklinTx::Deposit(deposit) => StoredTx {
-                    tx_type: TxType::Deposit,
-                    from: None,
-                    to: Some(deposit.to),
-                    nonce: Some(deposit.nonce),
-                    token: Some(deposit.token),
-                    amount: Some(deposit.amount),
-                    fee: None,
-                },
-                FranklinTx::Withdraw(withdraw) => StoredTx {
-                    tx_type: TxType::Withdraw,
-                    from: Some(withdraw.account),
-                    to: None,
-                    nonce: Some(withdraw.nonce),
-                    token: Some(withdraw.token),
-                    amount: Some(withdraw.amount),
-                    fee: Some(withdraw.fee),
-                },
-                FranklinTx::Close(close) => StoredTx {
-                    tx_type: TxType::Close,
-                    from: Some(close.account),
-                    to: None,
-                    nonce: Some(close.nonce),
-                    token: None,
-                    amount: None,
-                    fee: None,
-                },
-            })
-            .collect();
-        Ok(txs)
+        unimplemented!("update with block explorer")
     }
 }
 
@@ -562,8 +513,6 @@ pub enum TxAddError {
     NonceTooLow,
     #[fail(display = "Tx signature is incorrect.")]
     InvalidSignature,
-    #[fail(display = "Tx amount is zero.")]
-    ZeroAmount,
 }
 
 enum ConnectionHolder {
@@ -646,10 +595,12 @@ impl StorageProcessor {
 
     pub fn save_block_transactions(&self, block: &Block) -> QueryResult<()> {
         for block_tx in block.block_transactions.iter() {
-            let stored_tx = NewExecutedTransaction::prepare_stored_tx(block_tx, block.block_number);
-            diesel::insert_into(executed_transactions::table)
-                .values(&stored_tx)
-                .execute(self.conn())?;
+            if let ExecutedOperations::Tx(tx) = block_tx {
+                let stored_tx = NewExecutedTransaction::prepare_stored_tx(tx, block.block_number);
+                diesel::insert_into(executed_transactions::table)
+                    .values(&stored_tx)
+                    .execute(self.conn())?;
+            }
         }
         Ok(())
     }
@@ -1552,12 +1503,6 @@ impl StorageProcessor {
         let lowest_possible_nonce = commited_state.map(|a| a.nonce as u32).unwrap_or_default();
         if tx.nonce() < lowest_possible_nonce {
             return Ok(Err(TxAddError::NonceTooLow));
-        }
-
-        if let FranklinTx::Deposit(deposit_tx) = tx {
-            if deposit_tx.amount == bigdecimal::BigDecimal::zero() {
-                return Ok(Err(TxAddError::ZeroAmount));
-            }
         }
 
         let tx_failed = executed_transactions::table

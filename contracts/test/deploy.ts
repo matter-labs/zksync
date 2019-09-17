@@ -9,7 +9,7 @@ export const ERC20MintableContract = function () {
     contract.evm = {bytecode: contract.bytecode};
     return contract
 }();
-export const franklinContractCode = require('../build/Franklin');
+export const franklinContractCode = require('../build/FranklinTest');
 export const vkContractCode = require('../build/VerificationKey');
 export const verifierContractCode = require('../build/Verifier');
 export const governanceContractCode = require('../build/Governance');

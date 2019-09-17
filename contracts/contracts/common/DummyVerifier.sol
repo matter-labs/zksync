@@ -6,7 +6,7 @@ contract DummyVerifier {
         uint256[] memory,
         uint256[8] memory,
         uint256[] memory
-    ) internal view returns (bool) {
+    ) internal pure returns (bool) {
         return true;
     }
 }

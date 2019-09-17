@@ -19,6 +19,6 @@
   "files": [
     "./src/wallet.ts",
     "./src/utils.ts",
-    "./src/sign.ts"
+    "./src/crypto.ts"
   ]
 }

@@ -1,5 +1,5 @@
 // from https://github.com/HarryR/ethsnarks/blob/master/contracts/Verifier.sol
-pragma solidity ^0.5.1;
+pragma solidity ^0.5.8;
 
 contract Verifier {
     function NegateY(uint256 Y) internal pure returns (uint256) {
@@ -15,8 +15,8 @@ contract Verifier {
     ) public view returns (bool) {
         require(
             ((vk_gammaABC.length / 2) - 1) == proof_inputs.length,
-            "Invalid number of public inputs"
-        );
+            "vvy11"
+        ); // vvy11 - Invalid number of public inputs
 
         // Compute the linear combination vk_x
         uint256[3] memory mul_input;
@@ -46,7 +46,10 @@ contract Verifier {
                     0x40
                 )
             }
-            require(success, "Failed to call ECMUL precompile");
+            require(
+                success,
+                "vvy12"
+            ); // vvy12 - Failed to call ECMUL precompile
 
             assembly {
                 // ECADD
@@ -59,7 +62,10 @@ contract Verifier {
                     0x40
                 )
             }
-            require(success, "Failed to call ECADD precompile");
+            require(
+                success,
+                "vvy13"
+            ); // vvy13 - Failed to call ECADD precompile
         }
 
         uint256[24] memory input = [
@@ -97,7 +103,10 @@ contract Verifier {
         assembly {
             success := staticcall(sub(gas, 2000), 8, input, 768, out, 0x20)
         }
-        require(success, "Failed to call pairing precompile");
+        require(
+            success,
+            "vvy14"
+        ); // vvy14 - Failed to call pairing precompile
         return out[0] == 1;
     }
 }
