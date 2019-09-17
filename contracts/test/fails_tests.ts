@@ -1,5 +1,5 @@
 import {ethers} from "ethers";
-import {addTestERC20Token, deployFranklin, deployGovernance} from "./deploy";
+import {addTestERC20Token, addTestNotApprovedERC20Token, deployFranklin, deployGovernance} from "./deploy";
 
 import {expect, use, assert} from "chai";
 import {solidity} from "ethereum-waffle";
@@ -29,20 +29,22 @@ describe("PLANNED FAILS", function() {
 
     let franklinDeployedContract;
     let governanceDeployedContract;
-    let erc20DeployedToken;
+    let erc20DeployedToken1;
+    let erc20DeployedToken2;
 
     beforeEach(async () => {
         console.log("---\n");
         governanceDeployedContract = await deployGovernance(wallet, wallet.address);
         franklinDeployedContract = await deployFranklin(wallet, governanceDeployedContract.address);
-        erc20DeployedToken = await addTestERC20Token(wallet, governanceDeployedContract);
+        erc20DeployedToken1 = await addTestERC20Token(wallet, governanceDeployedContract);
+        erc20DeployedToken2 = await addTestNotApprovedERC20Token(wallet);
         // Make sure that exit wallet can execute transactions.
         await wallet.sendTransaction({to: exitWallet.address, value: parseEther("1.0")});
     });
 
-    it("Deposit errors", async () => {
-        // ETH: Wrong tx value (msg.value >= fee)
-        console.log("\n - ETH: Wrong tx value (msg.value >= fee) started");
+    it("Onchain errors", async () => {
+        // ETH deposit: Wrong tx value (msg.value >= fee)
+        console.log("\n - ETH deposit: Wrong tx value (msg.value >= fee) started");
         const depositETH1Value = parseEther("0.005"); // the value passed to tx
         const tx1 = await franklinDeployedContract.depositETH(
             franklinAddressBinary,
@@ -59,10 +61,10 @@ describe("PLANNED FAILS", function() {
         const reason1 = hex_to_ascii(code1.substr(138));
         
         expect(reason1.substring(0,5)).equal("fdh11");
-        console.log(" + ETH: Wrong tx value (msg.value >= fee) passed");
+        console.log(" + ETH deposit: Wrong tx value (msg.value >= fee) passed");
 
-        // ETH: Wrong tx value (amount <= MAX_VALUE)
-        console.log("\n - ETH: Wrong tx value (amount <= MAX_VALUE) started");
+        // ETH deposit: Wrong tx value (amount <= MAX_VALUE)
+        console.log("\n - ETH deposit: Wrong tx value (amount <= MAX_VALUE) started");
         const depositETH2Value = parseEther("340282366920938463463.374607431768211456"); // the value passed to tx
         const tx2 = await franklinDeployedContract.depositETH(
             franklinAddressBinary,
@@ -79,19 +81,19 @@ describe("PLANNED FAILS", function() {
         const reason2 = hex_to_ascii(code2.substr(138));
         
         expect(reason2.substring(0,5)).equal("fdh12");
-        console.log(" + ETH: Wrong tx value (amount <= MAX_VALUE) passed");
+        console.log(" + ETH deposit: Wrong tx value (amount <= MAX_VALUE) passed");
 
-        // ERC20: Wrong tx value (msg.value >= fee)
-        console.log("\n - ERC20: Wrong tx value (msg.value >= fee) started");
+        // ERC20 deposit: Wrong tx value (msg.value >= fee)
+        console.log("\n - ERC20 deposit: Wrong tx value (msg.value >= fee) started");
         const depositERCValue = 78;
-        const feeValue = parseEther("0.001");
-        await erc20DeployedToken.approve(franklinDeployedContract.address, depositERCValue);
+        const notCorrectFeeValue = parseEther("0.001");
+        await erc20DeployedToken1.approve(franklinDeployedContract.address, depositERCValue);
 
         const tx3 = await franklinDeployedContract.depositERC20(
-            erc20DeployedToken.address,
+            erc20DeployedToken1.address,
             depositERCValue, 
             franklinAddressBinary,
-            {value: feeValue, gasLimit: bigNumberify("500000")}
+            {value: notCorrectFeeValue, gasLimit: bigNumberify("500000")}
         );
 
         await tx3.wait()
@@ -101,11 +103,57 @@ describe("PLANNED FAILS", function() {
         const reason3 = hex_to_ascii(code3.substr(138));
         
         expect(reason3.substring(0,5)).equal("fd011");
-        console.log(" + ERC20: Wrong tx value (msg.value >= fee) passed");
+        console.log(" + ERC20 deposit: Wrong tx value (msg.value >= fee) passed");
+
+        // ERC20 deposit: Wrong token address
+        console.log("\n - ERC20 deposit: Wrong token address started");
+        const correctFeeValue = parseEther("0.3");
+        await erc20DeployedToken2.approve(franklinDeployedContract.address, depositERCValue);
+
+        const tx4 = await franklinDeployedContract.depositERC20(
+            erc20DeployedToken2.address,
+            depositERCValue, 
+            franklinAddressBinary,
+            {value: correctFeeValue, gasLimit: bigNumberify("500000")}
+        );
+
+        await tx4.wait()
+        .catch(() => {});
+
+        const code4 = await provider.call(tx4, tx4.blockNumber);
+        const reason4 = hex_to_ascii(code4.substr(138));
+        
+        expect(reason4.substring(0,5)).equal("gvs11");
+        console.log(" + Wrong token address passed");
+
+        // ETH withdraw: balance error
+        console.log("\n - ETH withdraw: balance error started");
+        let balanceToWithdraw1 = "0x01A2FED090BCD000"
+        const tx5 = await franklinDeployedContract.withdrawETH(balanceToWithdraw1, {gasLimit: bigNumberify("500000")});
+        await tx5.wait()
+        .catch(() => {});
+
+        const code5 = await provider.call(tx5, tx5.blockNumber);
+        const reason5 = hex_to_ascii(code5.substr(138));
+        
+        expect(reason5.substring(0,5)).equal("frw11");
+        console.log(" + ETH withdraw: balance error passed");
+
+        // ERC20 withdraw: Wrong token address
+        console.log("\n - ERC20 withdraw: Wrong token address started");
+        const tx6 = await franklinDeployedContract.withdrawERC20(erc20DeployedToken2.address ,balanceToWithdraw1, {gasLimit: bigNumberify("500000")});
+        await tx6.wait()
+        .catch(() => {});
+
+        const code6 = await provider.call(tx6, tx6.blockNumber);
+        const reason6 = hex_to_ascii(code6.substr(138));
+        
+        expect(reason6.substring(0,5)).equal("gvs11");
+        console.log(" + ERC20 withdraw: Wrong token address passed");
     });
 
-    it("Exodus Mode", async () => {
-        console.log("\n - Exodus Mode started");
+    it("Enter Exodus Mode", async () => {
+        console.log("\n - test Exodus Mode started");
         // Deposit eth
         const depositValue = parseEther("0.3"); // the value passed to tx
         const depositAmount = parseEther("0.293775816"); // amount after: tx value - some counted fee
@@ -274,7 +322,7 @@ describe("PLANNED FAILS", function() {
 
         console.log("Balances withdrawed");
 
-        console.log(" + Exodus Mode passed");
+        console.log(" + test Exodus Mode passed");
     });
 
     it("Block commit errors", async () => {
@@ -480,7 +528,7 @@ describe("PLANNED FAILS", function() {
         console.log(" + Not gevernor passed");
     });
 
-    it("Blocks revert", async () => {
+    it("Enter blocks revert", async () => {
         console.log("\n - Blocks revert started");
         const noopBlockPublicData = createNoopPublicData();
 
