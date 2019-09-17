@@ -324,7 +324,7 @@ export function serializePointPacked(point: edwards.EdwardsPoint): Buffer {
 }
 
 export function privateKeyFromSeed(seed: Buffer) {
-    let privateKey = wrapScalar(new BN(HmacSHA512(seed.toString('hex'), 'Matter seed').toString(), 'hex'))
+    let privateKey = wrapScalar(new BN(HmacSHA512(seed.toString('hex'), 'Matter seed').toString(), 'hex'));
     let publicKey = privateKeyToPublicKey(privateKey);
     return {privateKey, publicKey};
 }
