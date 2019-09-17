@@ -888,7 +888,7 @@ contract Franklin {
     // MARK: - REVERTING COMMITTED BLOCKS
 
     // Checks that commitment is expired and revert blocks
-    function triggerRevertIfBlockCommitmentExpired() public returns (bool) {
+    function triggerRevertIfBlockCommitmentExpired() internal returns (bool) {
         if (totalBlocksCommitted > totalBlocksVerified &&
                 block.number >
                 blocks[totalBlocksVerified + 1].committedAtBlock +
@@ -928,8 +928,8 @@ contract Franklin {
     function requireActive() internal view {
         require(
             !exodusMode,
-            "fra11"
-        ); // fra11 - exodus mode activated
+            "fre11"
+        ); // fre11 - exodus mode activated
     }
 
     // Checks if Exodus mode must be entered. If true - cancels outstanding deposits and emits ExodusMode event.

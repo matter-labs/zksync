@@ -68,6 +68,13 @@ export function createFullExitPublicData(ethAddress: string, tokenId, hexAmount:
     return Buffer.concat([txId, accountId, addressBytes, tokenBytes, signatureBytes, pad1Bytes, amountBytes, pad2Bytes]);
 }
 
+export function createNoopPublicData(): Buffer {
+    const txId = Buffer.from("00", "hex");
+    const padBytes = Buffer.alloc(7, 0);
+
+    return Buffer.concat([txId, padBytes]);
+}
+
 export function hex_to_ascii(str1) {
 	const hex = str1.toString();
 	let str = "";

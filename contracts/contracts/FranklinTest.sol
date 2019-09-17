@@ -36,7 +36,7 @@ contract FranklinTest {
     // Base gas cost for transaction
     uint256 constant BASE_GAS = 21000;
     // Expiration delta for priority request to be satisfied (in ETH blocks)
-    uint256 constant PRIORITY_EXPIRATION = 12;
+    uint256 constant PRIORITY_EXPIRATION = 16;
     // Chunks per block; each chunk has 8 bytes of public data
     uint256 constant BLOCK_SIZE = 14;
     // Max amount of any token must fit into uint128
@@ -888,7 +888,7 @@ contract FranklinTest {
     // MARK: - REVERTING COMMITTED BLOCKS
 
     // Checks that commitment is expired and revert blocks
-    function triggerRevertIfBlockCommitmentExpired() public returns (bool) {
+    function triggerRevertIfBlockCommitmentExpired() internal returns (bool) {
         if (totalBlocksCommitted > totalBlocksVerified &&
                 block.number >
                 blocks[totalBlocksVerified + 1].committedAtBlock +
@@ -928,8 +928,8 @@ contract FranklinTest {
     function requireActive() internal view {
         require(
             !exodusMode,
-            "fra11"
-        ); // fra11 - exodus mode activated
+            "fre11"
+        ); // fre11 - exodus mode activated
     }
 
     // Checks if Exodus mode must be entered. If true - cancels outstanding deposits and emits ExodusMode event.
