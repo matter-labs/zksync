@@ -17,7 +17,9 @@ fn main() {
             .expect("prover job, db access");
         if let Some(job) = job {
             info!("Received job for block: {}", job.block_number);
-            storage.store_proof(job.block_number as u32, &EncodedProof::default()).expect("db error");
+            storage
+                .store_proof(job.block_number as u32, &EncodedProof::default())
+                .expect("db error");
         }
         std::thread::sleep(Duration::from_secs(PROVER_CYCLE_WAIT));
     }

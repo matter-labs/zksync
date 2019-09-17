@@ -63,10 +63,10 @@ impl FranklinPriorityOp {
                     account_id_bytes[1..4].copy_from_slice(&pub_data[0..3]);
                     u32::from_be_bytes(account_id_bytes)
                 };
-                let eth_address = Address::from_slice(&pub_data[2..(20 + 2)]);
-                let token = u16::from_be_bytes(pub_data[22..(22 + 2)].try_into().unwrap());
-                let signature_r = Box::new(pub_data[24..(24 + 32)].try_into().unwrap());
-                let signature_s = Box::new(pub_data[56..(56 + 32)].try_into().unwrap());
+                let eth_address = Address::from_slice(&pub_data[3..(20 + 3)]);
+                let token = u16::from_be_bytes(pub_data[23..(23 + 2)].try_into().unwrap());
+                let signature_r = Box::new(pub_data[25..(25 + 32)].try_into().unwrap());
+                let signature_s = Box::new(pub_data[57..(57 + 32)].try_into().unwrap());
                 Ok(Self::FullExit(FullExit {
                     account_id,
                     eth_address,

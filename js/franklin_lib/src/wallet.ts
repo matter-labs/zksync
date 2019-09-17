@@ -122,8 +122,11 @@ export class Wallet {
 
     async emergencyWithdraw(token: Token) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
-        // TODO: use account id
-        await franklinDeployedContract.registerFullExit(0, )
+        // TODO: use signature, estimate fee?
+        await this.fetchFranklinState();
+        let tx = await franklinDeployedContract.fullExit(this.franklinState.id, token.address,  Buffer.alloc(64, 7),
+            {gasLimit: bigNumberify("200000"), value: parseEther("0.02")});
+        return tx.hash;
     }
 
     async transfer(address: Address, token: Token, amount: BigNumberish, fee: BigNumberish) {
