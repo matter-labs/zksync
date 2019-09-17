@@ -1,6 +1,6 @@
 use super::AccountId;
 use super::{pack_fee_amount, pack_token_amount, Deposit, FullExit};
-use super::{Close, FullExit, Transfer, Withdraw};
+use super::{Close, Transfer, Withdraw};
 use bigdecimal::BigDecimal;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

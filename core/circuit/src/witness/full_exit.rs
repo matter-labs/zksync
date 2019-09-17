@@ -1,17 +1,15 @@
 use super::utils::*;
 
 use crate::operation::*;
-use crate::utils::*;
-
 use ff::{Field, PrimeField};
 
 use crate::operation::SignatureData;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
+use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
 use models::node::FullExitOp;
 use models::params as franklin_constants;
 use pairing::bn256::*;
-
 pub struct FullExitData {
     pub token: u32,
     pub account_address: u32,
@@ -117,9 +115,9 @@ pub fn apply_full_exit_tx(
     is_sig_valid: bool,
 ) -> FullExitWitness<Bn256> {
     let full_exit = FullExitData {
-        token: u32::from(full_exit.tx.token),
-        account_address: full_exit.account_id,
-        ethereum_key: Fr::from_hex(&format!("{:x}", &full_exit.tx.eth_address)).unwrap(),
+        token: u32::from(full_exit.priority_op.token),
+        account_address: full_exit.priority_op.account_id,
+        ethereum_key: Fr::from_hex(&format!("{:x}", &full_exit.priority_op.eth_address)).unwrap(),
         // sig_s_bits: be_bytes_into_bits(&full_exit.tx.signature_s.clone()),
         // sig_r_packed_bits: be_bytes_into_bits(&full_exit.tx.signature_r_packed.clone()),
     };
@@ -282,8 +280,8 @@ pub fn calculate_full_exit_operations_from_witness(
 #[cfg(test)]
 mod test {
     use super::*;
-
     use crate::witness::utils::public_data_commitment;
+    use models::circuit::utils::*;
 
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
@@ -317,14 +315,14 @@ mod test {
 
         let sender_sk = PrivateKey::<Bn256>(rng.gen());
         let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
-        let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
+        let sender_pub_key_hash = pub_key_hash_fe(&sender_pk, &phasher);
         let (sender_x, sender_y) = sender_pk.0.into_xy();
         println!("x = {}, y = {}", sender_x, sender_y);
 
         // give some funds to sender and make zero balance for recipient
         let validator_sk = PrivateKey::<Bn256>(rng.gen());
         let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
-        let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
+        let validator_pub_key_hash = pub_key_hash_fe(&validator_pk, &phasher);
         let (validator_x, validator_y) = validator_pk.0.into_xy();
         println!("x = {}, y = {}", validator_x, validator_y);
         let validator_leaf = CircuitAccount::<Bn256> {
@@ -527,14 +525,14 @@ mod test {
 
         let sender_sk = PrivateKey::<Bn256>(rng.gen());
         let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
-        let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
+        let sender_pub_key_hash = pub_key_hash_fe(&sender_pk, &phasher);
         let (sender_x, sender_y) = sender_pk.0.into_xy();
         println!("x = {}, y = {}", sender_x, sender_y);
 
         // give some funds to sender and make zero balance for recipient
         let validator_sk = PrivateKey::<Bn256>(rng.gen());
         let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
-        let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
+        let validator_pub_key_hash = pub_key_hash_fe(&validator_pk, &phasher);
         let (validator_x, validator_y) = validator_pk.0.into_xy();
         println!("x = {}, y = {}", validator_x, validator_y);
         let validator_leaf = CircuitAccount::<Bn256> {

@@ -1,4 +1,3 @@
-use super::account::AccountAddress;
 use super::{Nonce, TokenId};
 use crate::node::{pack_fee_amount, pack_token_amount};
 use bigdecimal::BigDecimal;
