@@ -1,11 +1,12 @@
 <template>
 <b-container>
-    <b-row class="w-100">
+    <b-row class="w-100 px-0 mx-0">
         <ProgressBar ref="progress_bar"></ProgressBar>
     </b-row>
     <b-row>
         <b-col xl="6">
             <BalancesList balanceListId="onchain" v-bind:balances="onchainBalances"></BalancesList>
+            <!-- <BalancesList balanceListId="contract" v-bind:balances="contractBalances"></BalancesList> -->
             <DepositButtons 
                 componentId="offchain"
                 v-bind:topBalances="onchainBalances" 

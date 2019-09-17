@@ -33,7 +33,8 @@ export class WalletDecorator {
 
     // #region renderable
     transactionsAsNeeded() {
-        return (this.wallet.franklinState.tx_history || []).map((tx, index) => {
+        console.log(this.wallet.franklinState);
+        return (this.wallet.franklinState.tx_history).map((tx, index) => {
             let elem_id      = `history_${index}`;
             let tx_hash      = null;
             let success      = tx.success     || '';
@@ -261,7 +262,9 @@ export class WalletDecorator {
     async depositOnchain(kwargs) {
         let token = this.tokenFromName(kwargs.token);
         let amount = bigNumberify(kwargs.amount);
-        let tx_hash = await this.wallet.depositOnchain(token, amount);
+        let fee = bigNumberify(kwargs.fee);
+        let fullAmount = amount.add(fee);
+        let tx_hash = await this.wallet.depositOnchain(token, fullAmount);
         return tx_hash;
     }
 

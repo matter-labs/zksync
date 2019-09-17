@@ -1,5 +1,5 @@
 <template>
-    <b-container>
+    <b-container class="p-0">
         <p>
             <b-progress class="w-100" v-if="value != max" :value="value" :max="max" show show-progress animated></b-progress>
         </p>
@@ -20,9 +20,9 @@ export default {
             this.value = percent;
         },
         async startProgressBarTimer(millis) {
-            this.value = 0;
             const num_stops = 100;
             const chunk_time = millis / num_stops;
+            this.value = 0;
             for (let i = 0; this.value < 100 && i < num_stops; i++) {
                 this.value = i;
                 await sleep(chunk_time);
