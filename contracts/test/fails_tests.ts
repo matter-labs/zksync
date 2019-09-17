@@ -441,6 +441,45 @@ describe("PLANNED FAILS", function() {
         console.log(" + Not gevernor passed");
     });
 
+    it("Block verify errors", async () => {
+        const noopBlockPublicData = createNoopPublicData();
+
+        let tx = await franklinDeployedContract.commitBlock(1, 22,
+            Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
+            noopBlockPublicData,
+            {
+                gasLimit: bigNumberify("500000"),
+            },
+        );
+        tx.wait();
+
+        // Wrong commit number
+        console.log("\n - Wrong verify number started");
+
+        const tx1 = await franklinDeployedContract.verifyBlock(2, dummyBlockProof, {gasLimit: bigNumberify("500000")});
+        await tx1.wait()
+        .catch(() => {});
+
+        const code1 = await provider.call(tx1, tx1.blockNumber);
+        const reason1 = hex_to_ascii(code1.substr(138));
+        
+        expect(reason1.substring(0,5)).equal("fvk11");
+        console.log(" + Wrong verify number passed");
+
+        // Not governor commit
+        console.log("\n - Not gevernor started");
+        const exitWalletFranklinContract = franklinDeployedContract.connect(exitWallet);
+        const tx2 = await exitWalletFranklinContract.verifyBlock(1, dummyBlockProof, {gasLimit: bigNumberify("500000")});
+        await tx2.wait()
+        .catch(() => {});
+
+        const code2 = await provider.call(tx2, tx2.blockNumber);
+        const reason2 = hex_to_ascii(code2.substr(138));
+        
+        expect(reason2.substring(0,5)).equal("fvk12");
+        console.log(" + Not gevernor passed");
+    });
+
     it("Blocks revert", async () => {
         console.log("\n - Blocks revert started");
         const noopBlockPublicData = createNoopPublicData();
