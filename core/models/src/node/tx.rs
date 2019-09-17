@@ -105,10 +105,8 @@ impl Withdraw {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Close {
-    // TODO: derrive account address from signature
     pub account: AccountAddress,
     pub nonce: Nonce,
-    // TODO: Signature unimplemented
     pub signature: TxSignature,
 }
 
@@ -175,16 +173,19 @@ impl FranklinTx {
         }
     }
 
-    pub fn min_number_of_chunks(&self) -> usize {
-        // TODO use spec
-        1
-    }
-
     pub fn check_signature(&self) -> bool {
         match self {
             FranklinTx::Transfer(tx) => tx.verify_signature(),
             FranklinTx::Withdraw(tx) => tx.verify_signature(),
             FranklinTx::Close(tx) => tx.verify_signature(),
+        }
+    }
+
+    pub fn get_bytes(&self) -> Vec<u8> {
+        match self {
+            FranklinTx::Transfer(tx) => tx.get_bytes(),
+            FranklinTx::Withdraw(tx) => tx.get_bytes(),
+            FranklinTx::Close(tx) => tx.get_bytes(),
         }
     }
 }

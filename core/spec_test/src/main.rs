@@ -1,7 +1,9 @@
 use actix_web::{web, App, HttpServer, Responder};
-use models::node::tx::{PackedPublicKey, TxSignature};
+use log::info;
+use models::node::tx::{FranklinTx, PackedPublicKey, TxSignature};
 use models::node::AccountAddress;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 #[derive(Deserialize)]
 struct PubkeyPoint {
@@ -51,6 +53,14 @@ fn check_signature(req: web::Json<SignedMessage>) -> impl Responder {
     })
 }
 
+fn check_tx_signature(req: web::Json<FranklinTx>) -> impl Responder {
+    let tx = req.0;
+    info!("tx: {:#?}", tx);
+    info!("tx bytes: {}", hex::encode(tx.get_bytes()));
+    let valid = tx.check_signature();
+    web::Json(json!(format!("{{ valid: {} }}", valid)))
+}
+
 fn main() {
     env_logger::init();
 
@@ -58,6 +68,7 @@ fn main() {
         App::new()
             .service(web::resource("/address").route(web::post().to(address)))
             .service(web::resource("/check_signature").route(web::post().to(check_signature)))
+            .service(web::resource("/check_tx_signature").route(web::post().to(check_tx_signature)))
     })
     .bind("127.0.0.1:8734")
     .expect("Can not bind to port 8734")

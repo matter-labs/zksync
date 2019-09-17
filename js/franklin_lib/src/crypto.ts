@@ -38,7 +38,7 @@ const fsZero = new BN(0);
 export const altjubjubCurve = new elliptic.curve.edwards(babyJubjubParams);
 const curveZero = altjubjubCurve.point('0', '1');
 const chunksPerGenerator = 62;
-const addressLen=20;
+export const addressLen=20;
 
 let gen1 = altjubjubCurve.point(
     '184570ed4909a81b2793320a26e8f956be129e4eed381acf901718dff8802135',
