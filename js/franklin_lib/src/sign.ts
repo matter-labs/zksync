@@ -305,7 +305,7 @@ export function privateKeyToPublicKey(pk: BN): edwards.EdwardsPoint  {
 }
 
 export function pubkeyToAddress(pubKey) {
-
+    throw "unimplemented";
 }
 
 function serializePointPacked(point: edwards.EdwardsPoint) {
