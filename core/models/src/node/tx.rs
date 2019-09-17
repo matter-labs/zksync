@@ -49,7 +49,6 @@ pub struct Deposit {
     pub to: AccountAddress,
     pub token: TokenId,
     pub amount: BigDecimal,
-    pub fee: BigDecimal,
     pub nonce: Nonce,
     // TODO: Signature unimplemented
 }
@@ -62,7 +61,6 @@ impl Deposit {
         out.extend_from_slice(&self.to.data);
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&pack_token_amount(&self.amount));
-        out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }

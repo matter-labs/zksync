@@ -6,9 +6,8 @@ use crate::utils::*;
 use ff::{Field, PrimeField};
 
 use crate::account::AccountWitness;
-
+use crate::operation::SignatureData;
 use models::circuit::account::CircuitAccountTree;
-use models::params as franklin_constants;
 use pairing::bn256::*;
 
 pub fn noop_operation(
@@ -17,7 +16,7 @@ pub fn noop_operation(
     first_sig_msg: &Fr,
     second_sig_msg: &Fr,
     third_sig_msg: &Fr,
-    signature: Option<TransactionSignature<Bn256>>,
+    signature_data: &SignatureData,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
 ) -> Operation<Bn256> {
@@ -43,7 +42,7 @@ pub fn noop_operation(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
+        signature_data: signature_data.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
 
@@ -55,9 +54,6 @@ pub fn noop_operation(
             a: Some(Fr::zero()),
             b: Some(Fr::zero()),
             new_pub_key_hash: Some(Fr::zero()),
-            pub_signature_s: vec![Some(false); franklin_constants::FR_BIT_WIDTH_PADDED],
-            pub_signature_r_x: vec![Some(false); franklin_constants::FR_BIT_WIDTH_PADDED],
-            pub_signature_r_y: vec![Some(false); franklin_constants::FR_BIT_WIDTH_PADDED],
         },
         lhs: OperationBranch {
             address: Some(account_address_fe),
@@ -175,7 +171,7 @@ mod test {
         tree.insert(account_address, sender_leaf_initial);
 
         let sig_bits_to_hash = vec![false; 1]; //just a trash for consistency
-        let (signature, first_sig_part, second_sig_part, third_sig_part) =
+        let (signature_data, first_sig_part, second_sig_part, third_sig_part) =
             generate_sig_data(&sig_bits_to_hash, &phasher, &sender_sk, params);
 
         // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
@@ -186,7 +182,7 @@ mod test {
             &first_sig_part,
             &second_sig_part,
             &third_sig_part,
-            signature,
+            &signature_data,
             &sender_x,
             &sender_y,
         );

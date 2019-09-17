@@ -333,12 +333,11 @@ impl BabyProver {
                             &first_sig_msg,
                             &second_sig_msg,
                             &third_sig_msg,
-                            signature,
+                            &signature,
                             &sender_x,
                             &sender_y,
                         );
                         operations.extend(deposit_operations);
-                        fees.push((deposit.tx.fee, deposit.tx.token));
                         pub_data.extend(deposit_witness.get_pubdata());
                     }
                     FranklinOp::Transfer(transfer) => {
@@ -361,7 +360,7 @@ impl BabyProver {
                             &first_sig_msg,
                             &second_sig_msg,
                             &third_sig_msg,
-                            signature,
+                            &signature,
                             &sender_x,
                             &sender_y,
                         );
@@ -390,7 +389,7 @@ impl BabyProver {
                                 &first_sig_msg,
                                 &second_sig_msg,
                                 &third_sig_msg,
-                                signature,
+                                &signature,
                                 &sender_x,
                                 &sender_y,
                             );
@@ -418,7 +417,7 @@ impl BabyProver {
                             &first_sig_msg,
                             &second_sig_msg,
                             &third_sig_msg,
-                            signature,
+                            &signature,
                             &sender_x,
                             &sender_y,
                         );
@@ -447,7 +446,7 @@ impl BabyProver {
                                 &first_sig_msg,
                                 &second_sig_msg,
                                 &third_sig_msg,
-                                signature,
+                                &signature,
                                 &sender_x,
                                 &sender_y,
                             );
@@ -472,7 +471,7 @@ impl BabyProver {
                         &first_sig_msg,
                         &second_sig_msg,
                         &third_sig_msg,
-                        signature,
+                        &signature,
                         &sender_x,
                         &sender_y,
                     ));

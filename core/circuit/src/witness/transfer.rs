@@ -1,4 +1,5 @@
 use super::utils::*;
+use crate::operation::SignatureData;
 use crate::operation::*;
 use crate::utils::*;
 use ff::{Field, PrimeField};
@@ -295,9 +296,6 @@ pub fn apply_transfer(
             a: Some(a),
             b: Some(b),
             new_pub_key_hash: Some(Fr::zero()),
-            pub_signature_s: vec![Some(false); franklin_constants::FR_BIT_WIDTH_PADDED],
-            pub_signature_r_x: vec![Some(false); franklin_constants::FR_BIT_WIDTH_PADDED],
-            pub_signature_r_y: vec![Some(false); franklin_constants::FR_BIT_WIDTH_PADDED],
         },
         before_root: Some(before_root),
         intermediate_root: Some(intermediate_root),
@@ -311,7 +309,7 @@ pub fn calculate_transfer_operations_from_witness(
     first_sig_msg: &Fr,
     second_sig_msg: &Fr,
     third_sig_msg: &Fr,
-    signature: Option<TransactionSignature<Bn256>>,
+    signature_data: &SignatureData,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
 ) -> Vec<Operation<Bn256>> {
@@ -329,7 +327,7 @@ pub fn calculate_transfer_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
+        signature_data: signature_data.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
         args: transfer_witness.args.clone(),
@@ -345,7 +343,7 @@ pub fn calculate_transfer_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
+        signature_data: signature_data.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
         args: transfer_witness.args.clone(),
@@ -556,7 +554,7 @@ mod test {
             franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         );
 
-        let (signature, first_sig_part, second_sig_part, third_sig_part) =
+        let (signature_data, first_sig_part, second_sig_part, third_sig_part) =
             generate_sig_data(&transfer_witness.get_sig_bits(), &phasher, &from_sk, params);
 
         let operations = calculate_transfer_operations_from_witness(
@@ -564,7 +562,7 @@ mod test {
             &first_sig_part,
             &second_sig_part,
             &third_sig_part,
-            signature,
+            &signature_data,
             &from_x,
             &from_y,
         );

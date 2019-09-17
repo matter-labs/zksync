@@ -32,7 +32,6 @@ pub struct Operation<E: JubjubEngine> {
     pub first_sig_msg: Option<E::Fr>,
     pub second_sig_msg: Option<E::Fr>,
     pub third_sig_msg: Option<E::Fr>,
-    pub signature: Option<TransactionSignature<E>>,
     pub signature_data: SignatureData,
     pub args: OperationArguments<E>,
     pub lhs: OperationBranch<E>,

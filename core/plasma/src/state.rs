@@ -10,6 +10,7 @@ use models::node::{
 };
 use models::params;
 use std::collections::HashMap;
+use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct TxSuccess {
@@ -285,7 +286,7 @@ impl PlasmaState {
 
         let fee = CollectedFee {
             token: op.tx.token,
-            amount: op.tx.fee.clone(),
+            amount: BigDecimal::from_str(&"0").unwrap(),
         };
 
         Ok((fee, updates))

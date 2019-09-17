@@ -1,12 +1,13 @@
 use bellman::{ConstraintSystem, SynthesisError};
 use ff::{BitIterator, Field, PrimeField};
 
-use franklin_crypto::circuit::boolean;
+use franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
 use franklin_crypto::circuit::num::{AllocatedNum, Num};
 use franklin_crypto::circuit::Assignment;
 use franklin_crypto::eddsa::{PrivateKey, PublicKey};
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
 
+use crate::operation::SignatureData;
 use crate::operation::TransactionSignature;
 use models::params as franklin_constants;
 
@@ -16,7 +17,7 @@ pub fn sign_pedersen<R, E>(
     p_g: FixedGenerators,
     params: &E::Params,
     rng: &mut R,
-) -> Option<TransactionSignature<E>>
+) -> SignatureData
 where
     R: rand::Rng,
     E: JubjubEngine,
@@ -48,19 +49,37 @@ where
     let is_valid_signature =
         pk.verify_musig_pedersen(&message_bytes, &signature.clone(), p_g, params);
 
-    if !is_valid_signature {
-        return None;
+    // if !is_valid_signature {
+    //     return None;
+    // }
+    let (sig_x, sig_y) = signature.clone().r.into_xy();
+    let mut signature_s_be_bits: Vec<bool> = BitIterator::new(signature.s.into_repr()).collect();
+    signature_s_be_bits.reverse();
+    signature_s_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+    signature_s_be_bits.reverse();
+    let mut signature_r_x_be_bits: Vec<bool> = BitIterator::new(sig_x.into_repr()).collect();
+    signature_r_x_be_bits.reverse();
+    signature_r_x_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+    signature_r_x_be_bits.reverse();
+    let mut signature_r_y_be_bits: Vec<bool> = BitIterator::new(sig_y.into_repr()).collect();
+    signature_r_y_be_bits.reverse();
+    signature_r_y_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+    signature_r_y_be_bits.reverse();
+
+    let mut sig_r_packed_bits = vec![];
+    sig_r_packed_bits
+        .push(signature_r_x_be_bits[franklin_constants::FR_BIT_WIDTH_PADDED - 1].clone());
+    sig_r_packed_bits.extend(signature_r_y_be_bits[1..].iter());
+    assert_eq!(
+        sig_r_packed_bits.len(),
+        franklin_constants::FR_BIT_WIDTH_PADDED
+    );
+
+    let sig_s_bits = signature_s_be_bits.clone();
+    SignatureData {
+        r_packed: sig_r_packed_bits.iter().map(|x| Some(*x)).collect(),
+        s: sig_s_bits.iter().map(|x| Some(*x)).collect(),
     }
-
-    let mut sigs_le_bits: Vec<bool> = BitIterator::new(signature.s.into_repr()).collect();
-    sigs_le_bits.reverse();
-
-    let sigs_converted = le_bit_vector_into_field_element(&sigs_le_bits);
-
-    Some(TransactionSignature {
-        r: signature.r,
-        s: sigs_converted,
-    })
 }
 
 pub fn sign_sha<R, E>(
@@ -108,6 +127,28 @@ where
         s: sigs_converted,
     })
 }
+pub fn multi_and<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    x: &[Boolean],
+) -> Result<Boolean, SynthesisError> {
+    let mut result = Boolean::constant(true);
+
+    for (i, bool_x) in x.iter().enumerate() {
+        result = Boolean::and(
+            cs.namespace(|| format!("multi and iteration number: {}", i)),
+            &result,
+            bool_x,
+        )?;
+        // println!(
+        //     "multi and iteration number: {} : result {:?}",
+        //     i,
+        //     result.get_value()
+        // );
+    }
+
+    Ok(result)
+}
+
 pub fn allocate_sum<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     a: &AllocatedNum<E>,
@@ -130,7 +171,7 @@ pub fn allocate_sum<E: JubjubEngine, CS: ConstraintSystem<E>>(
 
 pub fn pack_bits_to_element<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
-    bits: &[boolean::Boolean],
+    bits: &[Boolean],
 ) -> Result<AllocatedNum<E>, SynthesisError> {
     let mut data_from_lc = Num::<E>::zero();
     let mut coeff = E::Fr::one();
@@ -156,7 +197,7 @@ pub fn pack_bits_to_element<E: JubjubEngine, CS: ConstraintSystem<E>>(
 // count a number of non-zero bits in a bit decomposition
 pub fn count_number_of_ones<E, CS>(
     mut cs: CS,
-    a: &[boolean::Boolean],
+    a: &[Boolean],
 ) -> Result<AllocatedNum<E>, SynthesisError>
 where
     E: JubjubEngine,
@@ -204,14 +245,14 @@ where
 pub fn allocate_bits_vector<E, CS>(
     mut cs: CS,
     bits: &[Option<bool>],
-) -> Result<Vec<boolean::Boolean>, SynthesisError>
+) -> Result<Vec<Boolean>, SynthesisError>
 where
     E: JubjubEngine,
     CS: ConstraintSystem<E>,
 {
     let mut allocated = vec![];
     for (i, e) in bits.iter().enumerate() {
-        let element = boolean::Boolean::from(boolean::AllocatedBit::alloc(
+        let element = Boolean::from(AllocatedBit::alloc(
             cs.namespace(|| format!("path element{}", i)),
             e.clone(),
         )?);
@@ -222,9 +263,9 @@ where
 }
 
 pub fn append_packed_public_key(
-    content: &mut Vec<boolean::Boolean>,
-    x_bits: Vec<boolean::Boolean>,
-    y_bits: Vec<boolean::Boolean>,
+    content: &mut Vec<Boolean>,
+    x_bits: Vec<Boolean>,
+    y_bits: Vec<Boolean>,
 ) {
     assert_eq!(franklin_constants::FR_BIT_WIDTH - 1, y_bits.len());
     assert_eq!(1, x_bits.len());

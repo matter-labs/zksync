@@ -3,6 +3,7 @@ use super::utils::*;
 use crate::operation::*;
 use crate::utils::*;
 
+use crate::operation::SignatureData;
 use ff::{Field, PrimeField};
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
@@ -134,9 +135,6 @@ pub fn apply_close_account(
             a: Some(a),
             b: Some(b),
             new_pub_key_hash: Some(Fr::zero()),
-            pub_signature_s: vec![Some(false); franklin_constants::FR_BIT_WIDTH_PADDED],
-            pub_signature_r_x: vec![Some(false); franklin_constants::FR_BIT_WIDTH_PADDED],
-            pub_signature_r_y: vec![Some(false); franklin_constants::FR_BIT_WIDTH_PADDED],
         },
         before_root: Some(before_root),
         after_root: Some(after_root),
@@ -149,7 +147,7 @@ pub fn calculate_close_account_operations_from_witness(
     first_sig_msg: &Fr,
     second_sig_msg: &Fr,
     third_sig_msg: &Fr,
-    signature: Option<TransactionSignature<Bn256>>,
+    signature_data: &SignatureData,
     signer_pub_key_x: &Fr,
     signer_pub_key_y: &Fr,
 ) -> Vec<Operation<Bn256>> {
@@ -166,7 +164,7 @@ pub fn calculate_close_account_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
+        signature_data: signature_data.clone(),
         signer_pub_key_x: Some(*signer_pub_key_x),
         signer_pub_key_y: Some(*signer_pub_key_y),
         args: close_account_witness.args.clone(),
@@ -248,7 +246,7 @@ mod test {
         //-------------- Start applying changes to state
         let close_account_witness =
             apply_close_account(&mut tree, &CloseAccountData { account_address });
-        let (signature, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
+        let (signature_data, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
             &close_account_witness.get_sig_bits(),
             &phasher,
             &sender_sk,
@@ -260,7 +258,7 @@ mod test {
             &first_sig_part,
             &second_sig_part,
             &third_sig_part,
-            signature,
+            &signature_data,
             &sender_x,
             &sender_y,
         );

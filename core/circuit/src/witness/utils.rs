@@ -1,6 +1,6 @@
 use crate::account::*;
 
-use crate::operation::TransactionSignature;
+use crate::operation::SignatureData;
 use crate::utils::*;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -18,26 +18,11 @@ use models::params as franklin_constants;
 use pairing::bn256::*;
 use rand::{Rng, SeedableRng, XorShiftRng};
 
-pub fn _generate_dummy_sig_data() -> (Option<TransactionSignature<Bn256>>, Fr, Fr, Fr) {
-    let params = &AltJubjubBn256::new();
-    let p_g = FixedGenerators::SpendingKeyGenerator;
-    let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
-    let sender_sk = PrivateKey::<Bn256>(rng.gen());
-    let sender_pk = PublicKey::from_private(&sender_sk, p_g, &params);
-    let (sender_x, sender_y) = sender_pk.0.into_xy();
-    let sig_msg = Fr::from_str("2").unwrap(); //dummy sig msg cause skipped on deposit proof
-    let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
-    sig_bits.reverse();
-    sig_bits.truncate(80);
-
-    let signature = sign_pedersen(&sig_bits, &sender_sk, p_g, &params, rng);
-    (signature, sig_msg, sender_x, sender_y)
-}
 pub fn generate_dummy_sig_data(
     bits: &[bool],
     phasher: &PedersenHasher<Bn256>,
     params: &AltJubjubBn256,
-) -> (Option<TransactionSignature<Bn256>>, Fr, Fr, Fr, Fr, Fr) {
+) -> (SignatureData, Fr, Fr, Fr, Fr, Fr) {
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let private_key = PrivateKey::<Bn256>(rng.gen());
@@ -58,10 +43,10 @@ pub fn generate_dummy_sig_data(
     sig_bits.reverse();
     sig_bits.resize(256, false);
 
-    let signature = sign_pedersen(&sig_bits, &private_key, p_g, params, rng);
+    let signature_data = sign_pedersen(&sig_bits, &private_key, p_g, params, rng);
     // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
     (
-        signature,
+        signature_data,
         first_sig_part,
         second_sig_part,
         third_sig_part,
@@ -74,7 +59,7 @@ pub fn generate_sig_data(
     phasher: &PedersenHasher<Bn256>,
     private_key: &PrivateKey<Bn256>,
     params: &AltJubjubBn256,
-) -> (Option<TransactionSignature<Bn256>>, Fr, Fr, Fr) {
+) -> (SignatureData, Fr, Fr, Fr) {
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let mut sig_bits_to_hash = bits.to_vec();
@@ -102,9 +87,15 @@ pub fn generate_sig_data(
         "inside generation: {}",
         hex::encode(be_bit_vector_into_bytes(&sig_bits))
     );
-    let signature = sign_pedersen(&sig_bits, &private_key, p_g, params, rng);
+    let signature_data = sign_pedersen(&sig_bits, &private_key, p_g, params, rng);
     // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
-    (signature, first_sig_part, second_sig_part, third_sig_part)
+
+    (
+        signature_data,
+        first_sig_part,
+        second_sig_part,
+        third_sig_part,
+    )
 }
 pub fn pub_key_hash<E: JubjubEngine, H: Hasher<E::Fr>>(
     pub_key: &PublicKey<E>,

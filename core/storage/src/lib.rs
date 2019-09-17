@@ -364,7 +364,7 @@ impl StoredOperation {
                     nonce: Some(deposit.nonce),
                     token: Some(deposit.token),
                     amount: Some(deposit.amount),
-                    fee: Some(deposit.fee),
+                    fee: None,
                 },
                 FranklinTx::Withdraw(withdraw) => StoredTx {
                     tx_type: TxType::Withdraw,
