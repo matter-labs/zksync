@@ -2,7 +2,7 @@
     <div>
         <b-row>
             <b-col align-h="around">
-                <b-button class="my-2 w-100" variant="outline-secondary" v-b-modal="`${componentId}_depositModal`">&#x21E9; Deposit</b-button>
+                <b-button class="my-2 w-100" variant="outline-primary" v-b-modal="`${componentId}_depositModal`">&#x21E9; Deposit</b-button>
             </b-col>
             <b-col align-h="around">
                 <b-button class="my-2 w-100" variant="outline-primary" v-b-modal="`${componentId}_withdrawModal`">Withdraw &#x21E7;</b-button>

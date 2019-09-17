@@ -11,8 +11,9 @@
                 v-bind:topBalances="onchainBalances" 
                 v-bind:bottomBalances="franklinBalances"
                 v-bind:depositFeeNeeded="true"
+                v-bind:withdrawFeeNeeded="true"
                 v-on:depositEvent="deposit"
-                v-on:withdrawEvent="withdrawOffchain"
+                v-on:withdrawEvent="withdraw"
                 ></DepositButtons>
             <FranklinBalancesList 
                 balanceListId="franklin" 
@@ -22,7 +23,7 @@
         <b-col xl="6">
             <Transfer
                 v-bind:balances="franklinBalances"
-                v-on:buttonClicked="transferFranklin"
+                v-on:buttonClicked="transfer"
                 v-on:alert="displayAlert"
             ></Transfer>
         </b-col>
@@ -71,7 +72,16 @@ export default {
             this.$emit('alert', kwargs);
         },
         async deposit(kwargs) {
-            for await (const progress of window.walletDecorator.verboseDeposit(kwargs)) {
+            await this.verboseFunctionShower(window.walletDecorator.verboseDeposit(kwargs));
+        },
+        async withdraw(kwargs) {
+            await this.verboseFunctionShower(window.walletDecorator.verboseWithdraw(kwargs));
+        },
+        async transfer(kwargs) {
+            await this.verboseFunctionShower(window.walletDecorator.verboseTransfer(kwargs));
+        },
+        async verboseFunctionShower(generator) {
+            for await (const progress of generator) {
                 console.log(progress);
                 if (progress.message.includes(`started proving block`)) {
                     console.log('includes, e');
@@ -98,39 +108,6 @@ export default {
             } catch (e) {
                 this.displayAlert({ message: `unknown error: ${e}` });
             }
-        },
-        async depositOnchain(kwargs) {
-            console.log('depositOnchain', kwargs);
-            try {
-                if ( ! window.wallet) {
-                    displayAlert({ message: `Wallet is ${window.walletDecorator}` });
-                    return;
-                }
-
-                await window.walletDecorator.depositOnchain(kwargs);
-
-                this.displayAlert({ message: `deposit succeeded or something` });
-            } catch (e) {
-                this.displayAlert({ message: `unknown error: ${e}` });
-            }
-        },
-        async withdrawOnchain(kwargs) {
-            console.log('withdrawOnchain', kwargs);
-        },
-        async depositOffchain(kwargs) {
-            this.displayAlert({ message: `depositOffchain ${JSON.stringify(kwargs)}` });
-            try {
-                await window.walletDecorator.depositOffchain(kwargs);
-
-                this.displayAlert({ message: `deposit succeeded or something`});
-            } catch (e) {
-                this.displayAlert(`unknown error: ${e}`);
-            }
-        },
-        async withdrawOffchain(kwargs) {
-            this.displayAlert({
-                message: `withdrawOffchain ${JSON.stringify(kwargs)}`
-            });
         },
     },
     components

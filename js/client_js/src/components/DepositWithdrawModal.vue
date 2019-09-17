@@ -1,15 +1,15 @@
 <template>
     <b-card v-bind:title="windowTitle">
         Token:
-        <b-form-select v-model="token" class="mb-3">
+        <b-form-select v-model="token" class="mb-2">
             <option v-for="balance in balances" v-bind:key="balance.tokenName">{{ balance.tokenName }}</option>
         </b-form-select>
         Amount <span v-if="maxAmountVisible">(no more than {{ token }} {{ balancesDict[token] }}</span>:
-        <b-form-input type="number" v-model="amount"></b-form-input>
-        <b-row v-if="feeNeeded">
+        <b-form-input type="number" v-model="amount" class="mb-2"></b-form-input>
+        <div v-if="feeNeeded">
             Fee:
             <b-form-input type="number" v-model="fee"></b-form-input>
-        </b-row>
+        </div>
         <b-row v-if="alertVisible"> {{ alertText }} </b-row>
         <b-button class="mt-3" variant="primary" @click='buttonClicked'> {{ buttonText }} </b-button>
     </b-card>
