@@ -541,14 +541,15 @@ contract FranklinTest {
             "fck11"
         ); // fck11 - only commit next block
         require(
-            totalBlocksCommitted - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS,
-            "fck12"
-        ); // fck12 - too many committed
-        require(
             governance.isValidator(msg.sender),
             "fck13"
         ); // fck13 - not a validator in commit
         if(!triggerRevertIfBlockCommitmentExpired() && !triggerExodusIfNeeded()) {
+            require(
+                totalBlocksCommitted - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS,
+                "fck12"
+            ); // fck12 - too many committed
+            
             // Unpack onchain operations and store them.
             // Get onchain operations start id for global onchain operations counter,
             // onchain operations number for this block, priority operations number for this block.
@@ -902,7 +903,7 @@ contract FranklinTest {
 
     // Reverts unverified blocks
     function revertBlocks() internal {
-        for (uint32 i = totalBlocksVerified; i < totalBlocksCommitted-1; i++) {
+        for (uint32 i = totalBlocksVerified + 1; i <= totalBlocksCommitted; i++) {
             Block memory reverted = blocks[i];
             revertBlock(reverted);
             delete blocks[i];
