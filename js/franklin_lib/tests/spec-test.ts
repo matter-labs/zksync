@@ -1,4 +1,4 @@
-import {musigPedersen, musigSHA256, privateKeyToPublicKey} from "../src/sign";
+import {musigPedersen, musigSHA256, privateKeyToPublicKey, pubkeyToAddress, serializePointPacked} from "../src/crypto";
 import BN = require("bn.js");
 import Axios from 'axios';
 const crypto = require("crypto");
@@ -31,7 +31,17 @@ async function signatureCheck() {
 }
 
 async function addressCheck() {
+    let privKey = new BN(5);
+    let pubKey = privateKeyToPublicKey(privKey);
 
+    let got = pubkeyToAddress(pubKey);
+    let exp = '0x4d48edb9de84103f96bbcf3acb7d3257c41e6c7c';
+    console.log("got: ", got);
+    console.log("expected: ", exp);
+
+
+    // let resp = await Axios.post(specTestServer + '/address', {pub_key: serializePointPacked(pubKey).toString("hex")}).then(reps => reps.data);
+    // console.log(resp);
 }
 
 async function main() {

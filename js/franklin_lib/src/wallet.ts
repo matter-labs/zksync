@@ -1,17 +1,21 @@
 import BN = require('bn.js');
 import Axios from 'axios';
-import { altjubjubCurve, pedersenHash } from './sign';
+import {
+    altjubjubCurve,
+    pedersenHash,
+    privateKeyFromSeed,
+    privateKeyToPublicKey,
+    pubkeyToAddress,
+} from './crypto';
 import { curve } from 'elliptic';
 import EdwardsPoint = curve.edwards.EdwardsPoint;
-import { HmacSHA512 } from 'crypto-js';
 import {Contract, ethers} from 'ethers';
-import {parseEther} from "ethers/utils";
 
 // ! can't import from 'ethers/utils' it won't work in the browser.
 type BigNumber = ethers.utils.BigNumber;
 type BigNumberish = ethers.utils.BigNumberish;
+const parseEther = ethers.utils.parseEther;
 const bigNumberify = ethers.utils.bigNumberify;
-const PUBKEY_HASH_LEN=20;
 const IERC20Conract = require("../abi/IERC20");
 const franklinContractCode = require("../abi/Franklin");
 
@@ -68,13 +72,10 @@ export class Wallet {
     ethState: ETHAccountState;
 
     constructor(seed: Buffer, public provider: FranklinProvider, public ethWallet: ethers.Signer, public ethAddress: string) {
-        let privateKey = new BN(HmacSHA512(seed.toString('hex'), 'Matter seed').toString(), 'hex');
-        this.privateKey = privateKey.mod(altjubjubCurve.n);
-        this.publicKey = altjubjubCurve.g.mul(this.privateKey).normalize();
-        let [x, y] = [this.publicKey.getX(), this.publicKey.getY()];
-        let buff = Buffer.from(x.toString('hex').padStart(64,'0') + y.toString('hex').padStart(64, '0'), 'hex');
-        let hash = pedersenHash(buff);
-        this.address = '0x' + (hash.getX().toString('hex').padStart(64, '0') + hash.getY().toString('hex').padStart(64,'0')).slice(0, PUBKEY_HASH_LEN * 2);
+        let {privateKey, publicKey} = privateKeyFromSeed(seed);
+        this.privateKey = privateKey;
+        this.publicKey = publicKey;
+        this.address = `0x${pubkeyToAddress(this.publicKey).toString("hex")}`;
     }
 
     async deposit(token: Token, amount: BigNumberish) {

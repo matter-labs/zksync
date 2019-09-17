@@ -4,6 +4,7 @@ import EdwardsPoint = curve.edwards.EdwardsPoint;
 import {sha256} from "js-sha256";
 import BasePoint = curve.base.BasePoint;
 import edwards = curve.edwards;
+import { HmacSHA512 } from 'crypto-js';
 
 const blake2b = require('blake2b');
 const elliptic = require('elliptic');
@@ -37,6 +38,7 @@ const fsZero = new BN(0);
 export const altjubjubCurve = new elliptic.curve.edwards(babyJubjubParams);
 const curveZero = altjubjubCurve.point('0', '1');
 const chunksPerGenerator = 62;
+const addressLen=20;
 
 let gen1 = altjubjubCurve.point(
     '184570ed4909a81b2793320a26e8f956be129e4eed381acf901718dff8802135',
@@ -60,7 +62,7 @@ let gen5 = altjubjubCurve.point(
 );
 const basicGenerators = [gen1, gen2, gen3, gen4, gen5];
 
-function wrapFs(fs: BN): BN {
+function wrapScalar(fs: BN): BN {
     while (fs.ltn(0)) {
         fs = fs.add(fsModulus);
     }
@@ -130,7 +132,7 @@ export function pedersenHash(input: Buffer): EdwardsPoint {
     let bits = personaizationBits.concat(buffer2bits(input));
 
     function fsToPoint(fs, generator) {
-        fs = wrapFs(fs);
+        fs = wrapScalar(fs);
 
         let tmpPoint = curveZero;
         let accStr = fs.toString('hex').padStart(64, '0');
@@ -221,7 +223,7 @@ function to_uniform(bytes: Buffer): BN {
         }
     }
 
-    return wrapFs(res);
+    return wrapScalar(res);
 }
 
 function balke2bHStar(a: Buffer, b: Buffer): BN {
@@ -269,7 +271,7 @@ export function musigSHA256(priv_key: BN, msg: Buffer) {
     let msg_padded = Buffer.alloc(32, 0);
     msg.copy(msg_padded, 0, 0, 32);
 
-    const s = wrapFs(sha256HStart(concat, msg_padded).mul(priv_key).add(r));
+    const s = wrapScalar(sha256HStart(concat, msg_padded).mul(priv_key).add(r));
 
     let signature = Buffer.concat([serializePointPacked(r_g), s.toBuffer("le", 32)]).toString("hex");
     let pubkey = serializePointPacked(pub_key).toString("hex");
@@ -293,7 +295,7 @@ export function musigPedersen(priv_key: BN, msg: Buffer) {
     let msg_padded = Buffer.alloc(32, 0);
     msg.copy(msg_padded, 0, 0, 32);
 
-    const s = wrapFs(pedersenHStar(Buffer.concat([concat_hash_bytes, msg_padded])).mul(priv_key).add(r));
+    const s = wrapScalar(pedersenHStar(Buffer.concat([concat_hash_bytes, msg_padded])).mul(priv_key).add(r));
 
     let signature = Buffer.concat([serializePointPacked(r_g), s.toBuffer("le", 32)]).toString("hex");
     let pubkey = serializePointPacked(pub_key).toString("hex");
@@ -304,11 +306,13 @@ export function privateKeyToPublicKey(pk: BN): edwards.EdwardsPoint  {
     return altjubjubCurve.g.mul(pk);
 }
 
-export function pubkeyToAddress(pubKey) {
-    throw "unimplemented";
+export function pubkeyToAddress(pubKey: edwards.EdwardsPoint): Buffer {
+    let x = pubKey.getX().toBuffer("le", 32);
+    let y = pubKey.getY().toBuffer("le", 32);
+    return pedersenHash(Buffer.concat([x,y])).getX().toBuffer("le", 32).slice(0, addressLen);
 }
 
-function serializePointPacked(point: edwards.EdwardsPoint) {
+export function serializePointPacked(point: edwards.EdwardsPoint): Buffer {
     let y = point.getY();
     let y_buff = y.toBuffer("le", 32);
 
@@ -317,4 +321,10 @@ function serializePointPacked(point: edwards.EdwardsPoint) {
         y_buff[y_buff.length - 1] |= (1 << 7);
     }
     return y_buff;
+}
+
+export function privateKeyFromSeed(seed: Buffer) {
+    let privateKey = wrapScalar(new BN(HmacSHA512(seed.toString('hex'), 'Matter seed').toString(), 'hex'))
+    let publicKey = privateKeyToPublicKey(privateKey);
+    return {privateKey, publicKey};
 }
