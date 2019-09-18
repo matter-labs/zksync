@@ -1,5 +1,5 @@
 import {ethers} from "ethers";
-import {addTestERC20Token, deployFranklin, deployGovernance} from "../src.ts/deploy";
+import {addTestERC20Token, deployFranklin, deployGovernance} from "./deploy";
 
 import {expect, use} from "chai";
 import {solidity} from "ethereum-waffle";
@@ -15,7 +15,7 @@ const franklinAddress = "0809101112131415161718192021222334252627";
 const franklinAddressBinary = Buffer.from(franklinAddress, "hex");
 const dummyBlockProof = [0, 0, 0, 0, 0, 0, 0, 0];
 
-describe("INTEGRATION: Complete", function() {
+describe("INTEGRATION", function() {
     this.timeout(50000);
 
     let franklinDeployedContract;
@@ -23,6 +23,7 @@ describe("INTEGRATION: Complete", function() {
     let erc20DeployedToken;
 
     beforeEach(async () => {
+        console.log("---\n");
         governanceDeployedContract = await deployGovernance(wallet, wallet.address);
         franklinDeployedContract = await deployFranklin(wallet, governanceDeployedContract.address);
         erc20DeployedToken = await addTestERC20Token(wallet, governanceDeployedContract);
@@ -31,9 +32,11 @@ describe("INTEGRATION: Complete", function() {
     });
 
     it("ETH deposit, part exit, full exit, commit, verify, withdraw", async () => {
+        console.log("\n - ETH Integration started");
+
         // Deposit eth
         const depositValue = parseEther("0.3"); // the value passed to tx
-        const depositAmount = parseEther("0.293775600000000000"); // amount after: tx value - some counted fee
+        const depositAmount = parseEther("0.293775816"); // amount after: tx value - some counted fee
         let tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: depositValue});
         let receipt = await tx.wait();
         let events = receipt.events;
@@ -42,18 +45,20 @@ describe("INTEGRATION: Complete", function() {
         const depositEvent = events[1].args;
 
         expect(priorityEvent.opType).equal(1);
-        expect(priorityEvent.pubData).equal("0x52312ad6f01657413b2eae9287f6b9adad93d5fe000000000000000000000413b35a09ad60000809101112131415161718192021222334252627");
-        expect(priorityEvent.fee).equal(bigNumberify("0x161d0f0ef0a000"));
+        expect(priorityEvent.pubData).equal("0x52312ad6f01657413b2eae9287f6b9adad93d5fe000000000000000000000413b38c5447d0000809101112131415161718192021222334252627");
+        expect(priorityEvent.fee).equal(bigNumberify("0x161cdcc4563000"));
 
         expect(depositEvent.owner).equal(wallet.address);
         expect(depositEvent.tokenId).equal(0);
         expect(depositEvent.amount).equal(depositAmount);
         expect(depositEvent.franklinAddress).equal("0x" + franklinAddress);
 
-        let totalPriorityRequests = await franklinDeployedContract.totalPriorityRequests();
+        let totalOpenPriorityRequests = await franklinDeployedContract.totalOpenPriorityRequests();
         let firstPriorityRequestId = await franklinDeployedContract.firstPriorityRequestId();
-        expect(totalPriorityRequests).equal(1);
+        expect(totalOpenPriorityRequests).equal(1);
         expect(firstPriorityRequestId).equal(0);
+
+        console.log("Requested deposit");
 
         // Commit block with eth deposit
         const depositBlockPublicData = createDepositPublicData(0, hexlify(depositAmount), franklinAddress);
@@ -77,9 +82,11 @@ describe("INTEGRATION: Complete", function() {
         
         expect((await franklinDeployedContract.blocks(1)).onchainOperations).equal(1);
         expect((await franklinDeployedContract.blocks(1)).priorityOperations).equal(1);
-        expect((await franklinDeployedContract.blocks(1)).commitment).equal("0x25a36b254de632b9aa704cbfaccebac12f503f6ac1607d846b825fee9aab860a");
+        expect((await franklinDeployedContract.blocks(1)).commitment).equal("0xa26d1ddaa435d774cd54b089570fb6d9e94938b46755453f6bfb2f74d7c31776");
         expect((await franklinDeployedContract.blocks(1)).stateRoot).equal("0x0000000000000000000000000000000000000000000000000000000000000000");
         expect((await franklinDeployedContract.blocks(1)).validator).equal("0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE");
+        
+        console.log("Deposit committed");
 
         // Commit block with eth partial exit.
         const exitValue = parseEther("0.2");
@@ -108,7 +115,9 @@ describe("INTEGRATION: Complete", function() {
         expect((await franklinDeployedContract.blocks(2)).stateRoot).equal("0x0000000000000000000000000000000000000000000000000000000000000000");
         expect((await franklinDeployedContract.blocks(2)).validator).equal("0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE");
         
-        // Verify block with deposit and exit.
+        console.log("Partial exit committed");
+
+        // Verify block with deposit and partial exit.
         tx = await franklinDeployedContract.verifyBlock(1, dummyBlockProof, {gasLimit: bigNumberify("500000")});
         receipt = await tx.wait();
         events = receipt.events;
@@ -117,10 +126,12 @@ describe("INTEGRATION: Complete", function() {
 
         expect(verifiedEvent1.blockNumber).equal(1);
         
-        totalPriorityRequests = await franklinDeployedContract.totalPriorityRequests();
+        totalOpenPriorityRequests = await franklinDeployedContract.totalOpenPriorityRequests();
         firstPriorityRequestId = await franklinDeployedContract.firstPriorityRequestId();
-        expect(totalPriorityRequests).equal(0);
+        expect(totalOpenPriorityRequests).equal(0);
         expect(firstPriorityRequestId).equal(1);
+
+        console.log("Verified deposit");
         
         tx = await franklinDeployedContract.verifyBlock(2, dummyBlockProof, {gasLimit: bigNumberify("500000")});
         receipt = await tx.wait();
@@ -133,8 +144,10 @@ describe("INTEGRATION: Complete", function() {
         let balanceToWithdraw1 = await franklinDeployedContract.balancesToWithdraw(exitWallet.address, 0);
         expect(balanceToWithdraw1).equal(exitValue);
 
+        console.log("Verified partial exit");
+
         // Full exit eth
-        const fullExitAmount = parseEther("0.093775600000000000"); // amount after: tx value - some counted fee - exit amount
+        const fullExitAmount = parseEther("0.093775816"); // amount after: tx value - some counted fee - exit amount
         tx = await franklinDeployedContract.fullExit(
             2,
             "0x0000000000000000000000000000000000000000",
@@ -147,12 +160,14 @@ describe("INTEGRATION: Complete", function() {
         const fullExitEvent = events[0].args;
         expect(fullExitEvent.opType).equal(6);
         expect(fullExitEvent.pubData).equal("0x00000252312ad6f01657413b2eae9287f6b9adad93d5fe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
-        expect(fullExitEvent.fee).equal(bigNumberify("0x3fbc42307af800"));
+        expect(fullExitEvent.fee).equal(bigNumberify("0x3fb9583332d000"));
 
-        totalPriorityRequests = await franklinDeployedContract.totalPriorityRequests();
+        totalOpenPriorityRequests = await franklinDeployedContract.totalOpenPriorityRequests();
         firstPriorityRequestId = await franklinDeployedContract.firstPriorityRequestId();
-        expect(totalPriorityRequests).equal(1);
+        expect(totalOpenPriorityRequests).equal(1);
         expect(firstPriorityRequestId).equal(1);
+
+        console.log("Full exit requested");
 
         // Commit block with full exit
         const fullExitBlockPublicData = createFullExitPublicData(wallet.address, 0, hexlify(fullExitAmount));
@@ -176,10 +191,12 @@ describe("INTEGRATION: Complete", function() {
         
         expect((await franklinDeployedContract.blocks(3)).onchainOperations).equal(1);
         expect((await franklinDeployedContract.blocks(3)).priorityOperations).equal(1);
-        expect((await franklinDeployedContract.blocks(3)).commitment).equal("0xd8b37128e81f134d5089c2907e5231bffee92a1e217460be3523fd79fcc0dcbe");
+        expect((await franklinDeployedContract.blocks(3)).commitment).equal("0x484b62c55c1f6b6d4932efbc9536c13cbef899358eb9032df8041a1c7692b6f7");
         expect((await franklinDeployedContract.blocks(3)).stateRoot).equal("0x0000000000000000000000000000000000000000000000000000000000000000");
         expect((await franklinDeployedContract.blocks(3)).validator).equal("0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE");
         
+        console.log("Full exit committed");
+
         // Verify block with full exit.
         tx = await franklinDeployedContract.verifyBlock(3, dummyBlockProof, {gasLimit: bigNumberify("500000")});
         receipt = await tx.wait();
@@ -189,13 +206,15 @@ describe("INTEGRATION: Complete", function() {
 
         expect(verifiedEvent3.blockNumber).equal(3);
         
-        totalPriorityRequests = await franklinDeployedContract.totalPriorityRequests();
+        totalOpenPriorityRequests = await franklinDeployedContract.totalOpenPriorityRequests();
         firstPriorityRequestId = await franklinDeployedContract.firstPriorityRequestId();
-        expect(totalPriorityRequests).equal(0);
+        expect(totalOpenPriorityRequests).equal(0);
         expect(firstPriorityRequestId).equal(2);
         
         let balanceToWithdraw2 = await franklinDeployedContract.balancesToWithdraw(wallet.address, 0);
-        expect(balanceToWithdraw2).equal(fullExitAmount);
+        expect(balanceToWithdraw2).equal("0x01A2FED090BCD000"); // amount - part exit + fee
+
+        console.log("Full exit verified");
 
         // Withdraw eth for wallet
         const oldBalance2 = await wallet.getBalance();
@@ -208,6 +227,8 @@ describe("INTEGRATION: Complete", function() {
         balanceToWithdraw2 = await franklinDeployedContract.balancesToWithdraw(wallet.address, 0);
         expect(balanceToWithdraw2).equal(bigNumberify(0));
 
+        console.log("Withdrawed to 1st wallet");
+
         // Withdraw eth for exitWallet
         const exitWalletFranklinContract = franklinDeployedContract.connect(exitWallet);
         const oldBalance1 = await exitWallet.getBalance();
@@ -219,9 +240,15 @@ describe("INTEGRATION: Complete", function() {
 
         balanceToWithdraw1 = await exitWalletFranklinContract.balancesToWithdraw(exitWallet.address, 0);
         expect(balanceToWithdraw1).equal(bigNumberify(0));
+
+        console.log("Withdrawed to 2nd wallet");
+
+        console.log(" + ETH Integration passed")
     });
 
     it("ERC20 deposit, part exit, full exit, commit, verify, withdraw", async () => {
+        console.log("\n - ERC20 Integration started");
+        
         // erc deposit
         const depositValue = 78;
         const feeValue = parseEther("0.3");
@@ -243,10 +270,12 @@ describe("INTEGRATION: Complete", function() {
         expect(depositEvent.amount).equal(depositValue);
         expect(depositEvent.franklinAddress).equal("0x" + franklinAddress);
 
-        let totalPriorityRequests = await franklinDeployedContract.totalPriorityRequests();
+        let totalOpenPriorityRequests = await franklinDeployedContract.totalOpenPriorityRequests();
         let firstPriorityRequestId = await franklinDeployedContract.firstPriorityRequestId();
-        expect(totalPriorityRequests).equal(1);
+        expect(totalOpenPriorityRequests).equal(1);
         expect(firstPriorityRequestId).equal(0);
+
+        console.log("Requested deposit");
 
         // Commit block with erc deposit
         const depositBlockPublicData = createDepositPublicData(1, hexlify(depositValue), franklinAddress);
@@ -273,6 +302,8 @@ describe("INTEGRATION: Complete", function() {
         expect((await franklinDeployedContract.blocks(1)).commitment).equal("0x7d7043f2983872e7d5632d181b0a8e0308c921b4e12ac24d69eb49def9a67c33");
         expect((await franklinDeployedContract.blocks(1)).stateRoot).equal("0x0000000000000000000000000000000000000000000000000000000000000000");
         expect((await franklinDeployedContract.blocks(1)).validator).equal("0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE");
+
+        console.log("Deposit committed");
 
         // Commit block with erc partial exit.
         const exitValue = 2;
@@ -301,6 +332,8 @@ describe("INTEGRATION: Complete", function() {
         expect((await franklinDeployedContract.blocks(2)).stateRoot).equal("0x0000000000000000000000000000000000000000000000000000000000000000");
         expect((await franklinDeployedContract.blocks(2)).validator).equal("0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE");
         
+        console.log("Partial exit committed");
+
         // Verify block with deposit and exit.
         tx = await franklinDeployedContract.verifyBlock(1, dummyBlockProof, {gasLimit: bigNumberify("500000")});
         receipt = await tx.wait();
@@ -310,10 +343,12 @@ describe("INTEGRATION: Complete", function() {
 
         expect(verifiedEvent1.blockNumber).equal(1);
         
-        totalPriorityRequests = await franklinDeployedContract.totalPriorityRequests();
+        totalOpenPriorityRequests = await franklinDeployedContract.totalOpenPriorityRequests();
         firstPriorityRequestId = await franklinDeployedContract.firstPriorityRequestId();
-        expect(totalPriorityRequests).equal(0);
+        expect(totalOpenPriorityRequests).equal(0);
         expect(firstPriorityRequestId).equal(1);
+
+        console.log("Verified deposit");
         
         tx = await franklinDeployedContract.verifyBlock(2, dummyBlockProof, {gasLimit: bigNumberify("500000")});
         receipt = await tx.wait();
@@ -325,6 +360,8 @@ describe("INTEGRATION: Complete", function() {
         
         let balanceToWithdraw1 = await franklinDeployedContract.balancesToWithdraw(exitWallet.address, 1);
         expect(balanceToWithdraw1).equal(exitValue);
+
+        console.log("Verified partial exit");
 
         // Full exit erc
         const fullExitAmount = 76; // amount after: tx value - some counted fee - exit amount
@@ -340,12 +377,14 @@ describe("INTEGRATION: Complete", function() {
         const fullExitEvent = events[0].args;
         expect(fullExitEvent.opType).equal(6);
         expect(fullExitEvent.pubData).equal("0x00000252312ad6f01657413b2eae9287f6b9adad93d5fe000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
-        expect(fullExitEvent.fee).equal(bigNumberify("0x3f92595a72f800"));
+        expect(fullExitEvent.fee).equal(bigNumberify("0x3f8f6f5d2ad000"));
 
-        totalPriorityRequests = await franklinDeployedContract.totalPriorityRequests();
+        totalOpenPriorityRequests = await franklinDeployedContract.totalOpenPriorityRequests();
         firstPriorityRequestId = await franklinDeployedContract.firstPriorityRequestId();
-        expect(totalPriorityRequests).equal(1);
+        expect(totalOpenPriorityRequests).equal(1);
         expect(firstPriorityRequestId).equal(1);
+
+        console.log("Full exit requested");
 
         // Commit block with full exit
         const fullExitBlockPublicData = createFullExitPublicData(wallet.address, 1, hexlify(fullExitAmount));
@@ -372,7 +411,9 @@ describe("INTEGRATION: Complete", function() {
         expect((await franklinDeployedContract.blocks(3)).commitment).equal("0xa3557778133016f01fc4cfc72a8e73aa8c2984f8c9635d243d59b8f26a496b88");
         expect((await franklinDeployedContract.blocks(3)).stateRoot).equal("0x0000000000000000000000000000000000000000000000000000000000000000");
         expect((await franklinDeployedContract.blocks(3)).validator).equal("0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE");
-        
+            
+        console.log("Full exit committed");
+
         // Verify block with full exit.
         tx = await franklinDeployedContract.verifyBlock(3, dummyBlockProof, {gasLimit: bigNumberify("500000")});
         receipt = await tx.wait();
@@ -382,13 +423,15 @@ describe("INTEGRATION: Complete", function() {
 
         expect(verifiedEvent3.blockNumber).equal(3);
         
-        totalPriorityRequests = await franklinDeployedContract.totalPriorityRequests();
+        totalOpenPriorityRequests = await franklinDeployedContract.totalOpenPriorityRequests();
         firstPriorityRequestId = await franklinDeployedContract.firstPriorityRequestId();
-        expect(totalPriorityRequests).equal(0);
+        expect(totalOpenPriorityRequests).equal(0);
         expect(firstPriorityRequestId).equal(2);
         
         let balanceToWithdraw2 = await franklinDeployedContract.balancesToWithdraw(wallet.address, 1);
         expect(balanceToWithdraw2).equal(fullExitAmount);
+
+        console.log("Full exit verified");
 
         // Withdraw erc20 for wallet
         const oldBalance2 = await erc20DeployedToken.balanceOf(wallet.address);
@@ -399,6 +442,8 @@ describe("INTEGRATION: Complete", function() {
         balanceToWithdraw2 = await franklinDeployedContract.balancesToWithdraw(wallet.address, 1);
         expect(balanceToWithdraw2).equal(bigNumberify(0));
 
+        console.log("Withdrawed to 1st wallet");
+
         // Withdraw erc20 for exit wallet
         const exitWalletFranklinContract = franklinDeployedContract.connect(exitWallet);
         const oldBalance1 = await erc20DeployedToken.balanceOf(exitWallet.address);
@@ -408,5 +453,9 @@ describe("INTEGRATION: Complete", function() {
         expect(newBalance1.sub(oldBalance1)).eq(balanceToWithdraw1);
         balanceToWithdraw1 = await exitWalletFranklinContract.balancesToWithdraw(exitWallet.address, 1);
         expect(balanceToWithdraw1).equal(bigNumberify(0));
+
+        console.log("Withdrawed to 2nd wallet");
+
+        console.log(" + ERC20 Integration passed")
     });
 });

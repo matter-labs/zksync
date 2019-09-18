@@ -47,8 +47,8 @@ contract Governance {
         requireGovernor();
         require(
             tokenIds[_token] == 0,
-            "atntex"
-        ); // atntex - token exists
+            "gan11"
+        ); // gan11 - token exists
         tokenAddresses[totalTokens + 1] = _token; // Adding one because tokenId = 0 is reserved for ETH
         tokenIds[_token] = totalTokens + 1;
         totalTokens++;
@@ -68,8 +68,8 @@ contract Governance {
     function requireGovernor() internal view {
         require(
             msg.sender == networkGovernor,
-            "rqgobg"
-        ); // rqgobg - only by governor
+            "grr11"
+        ); // grr11 - only by governor
     }
 
     // Check if sender is validator
@@ -81,8 +81,8 @@ contract Governance {
     function requireValidTokenId(uint16 _tokenId) external view {
         require(
             _tokenId < totalTokens + 1,
-            "rvtunt"
-        ); // rvtunt - unknown token id
+            "grd11"
+        ); // grd11 - unknown token id
     }
 
     // Validate token address
@@ -90,8 +90,8 @@ contract Governance {
         uint16 tokenId = tokenIds[_tokenAddr];
         require(
             tokenAddresses[tokenId] == _tokenAddr,
-            "vetuet"
-        ); // vetuet - unknown ERC20 token address
+            "gvs11"
+        ); // gvs11 - unknown ERC20 token address
         return tokenId;
     }
 
