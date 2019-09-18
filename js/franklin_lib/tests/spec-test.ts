@@ -40,16 +40,14 @@ async function signatureCheck() {
 }
 
 async function addressCheck() {
-    // TODO: unimplemented.
-    // let privKey = new BN(5);
-    // let pubKey = privateKeyToPublicKey(privKey);
-    //
-    // let got = pubkeyToAddress(pubKey);
-    // let exp = '0x4d48edb9de84103f96bbcf3acb7d3257c41e6c7c';
-    // console.log("got: ", got);
-    // console.log("expected: ", exp);
-    // let resp = await Axios.post(specTestServer + '/address', {pub_key: serializePointPacked(pubKey).toString("hex")}).then(reps => reps.data);
-    // console.log(resp);
+    let keys = new WalletKeys(new BN(crypto.randomBytes(16)));
+
+    let address = pubkeyToAddress(keys.publicKey);
+    let resp = await Axios.post(specTestServer + '/address', {pub_key: serializePointPacked(keys.publicKey).toString("hex")}).then(reps => reps.data);
+    let serverAddress = Buffer.from(resp.address.substr(2), "hex");
+    if (!serverAddress.equals(address)) {
+        throw "Pubkey to address mismatch";
+    }
 }
 
 async function txSignatureCheck() {
