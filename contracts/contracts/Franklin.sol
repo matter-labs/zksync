@@ -551,14 +551,15 @@ contract Franklin {
             "fck11"
         ); // fck11 - only commit next block
         require(
-            totalBlocksCommitted - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS,
-            "fck12"
-        ); // fck12 - too many committed
-        require(
             governance.isValidator(msg.sender),
             "fck13"
         ); // fck13 - not a validator in commit
         if(!triggerRevertIfBlockCommitmentExpired() && !triggerExodusIfNeeded()) {
+            require(
+                totalBlocksCommitted - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS,
+                "fck12"
+            ); // fck12 - too many committed
+            
             // Unpack onchain operations and store them.
             // Get onchain operations start id for global onchain operations counter,
             // onchain operations number for this block, priority operations number for this block.
@@ -899,10 +900,11 @@ contract Franklin {
 
     // Checks that commitment is expired and revert blocks
     function triggerRevertIfBlockCommitmentExpired() internal returns (bool) {
-        if (totalBlocksCommitted > totalBlocksVerified &&
-                block.number >
-                blocks[totalBlocksVerified + 1].committedAtBlock +
-                    EXPECT_VERIFICATION_IN) {
+        if (
+            totalBlocksCommitted > totalBlocksVerified
+            && blocks[totalBlocksVerified + 1].committedAtBlock > 0
+            && block.number > blocks[totalBlocksVerified + 1].committedAtBlock + EXPECT_VERIFICATION_IN
+        ) {
             revertBlocks();
             return true;
         }
@@ -911,7 +913,7 @@ contract Franklin {
 
     // Reverts unverified blocks
     function revertBlocks() internal {
-        for (uint32 i = totalBlocksVerified; i < totalBlocksCommitted-1; i++) {
+        for (uint32 i = totalBlocksVerified + 1; i <= totalBlocksCommitted; i++) {
             Block memory reverted = blocks[i];
             revertBlock(reverted);
             delete blocks[i];
@@ -947,7 +949,10 @@ contract Franklin {
     // Exodus mode must be entered in case of current ethereum block number is higher than the oldest
     // of existed priority requests expiration block number.
     function triggerExodusIfNeeded() internal returns (bool) {
-        if (block.number >= priorityRequests[firstPriorityRequestId].expirationBlock) {
+        if (
+            block.number >= priorityRequests[firstPriorityRequestId].expirationBlock
+            && priorityRequests[firstPriorityRequestId].expirationBlock != 0
+        ) {
             exodusMode = true;
             cancelOutstandingDepositsForExodusMode();
             emit ExodusMode();
