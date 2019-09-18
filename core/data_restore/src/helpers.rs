@@ -8,6 +8,13 @@ use models::plasma::params as plasma_constants;
 use tiny_keccak::keccak256;
 use web3::types::{Address, H256};
 
+use lazy_static::lazy_static;
+use std::env;
+
+lazy_static! {
+    pub static ref DATA_RESTORE_CONFIG: DataRestoreConfig = DataRestoreConfig::new();
+}
+
 /// Configuratoin of DataRestore driver
 #[derive(Debug, Clone)]
 pub struct DataRestoreConfig {
@@ -24,15 +31,20 @@ impl DataRestoreConfig {
     pub fn new() -> Self {
         let config = RuntimeConfig::new();
         Self {
-            web3_endpoint: config.data_restore_http_endpoint_string, //"https://rinkeby.infura.io/".to_string(),
+            web3_endpoint: env::var("WEB3_URL").expect("WEB3_URL env missing"), //"https://rinkeby.infura.io/".to_string(),
             franklin_contract: ethabi::Contract::load(PROD_PLASMA.0)
                 .expect("Cant get plasma contract in data restore config"),
-            franklin_contract_address: config
-                .data_restore_franklin_contract_address
+            franklin_contract_address: env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR env missing")
                 .as_str()
                 .parse()
                 .expect("Cant create data restore config"), //"4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()
         }
+    }
+}
+
+impl Default for DataRestoreConfig {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
