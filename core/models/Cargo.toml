@@ -7,7 +7,7 @@ edition = "2018"
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
 bigdecimal = { version = "0.0.14", features = ["serde"]}
 pairing = { package = "pairing_ce", version = "0.17.0" }
-franklin_crypto = { package = "franklin-crypto", git = "ssh://git@github.com/matter-labs/franklin-crypto.git" }
+franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="master"}
 bellman = { package = "bellman_ce", version = "0.3.0" }
 web3 = "0.8.0"
 serde = "1.0.90"

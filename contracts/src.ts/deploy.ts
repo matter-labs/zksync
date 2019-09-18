@@ -28,7 +28,7 @@ export async function deployFranklin(
             gasLimit: 1000000,
         });
         let contract = await deployContract(wallet, franklinCode, [verifier.address, vk.address, genesisRoot, ethers.constants.AddressZero, wallet.address], {
-            gasLimit: 8000000,
+            gasLimit: 6700000,
         });
         console.log(`CONTRACT_ADDR=${contract.address}`);
 
