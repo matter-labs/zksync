@@ -155,7 +155,7 @@ describe("PLANNED FAILS", function() {
         console.log("\n - Full Exit: Wrong token address started");
         const feeValue = parseEther("0.3"); // the value passed to tx
         const tx7 = await franklinDeployedContract.fullExit(
-            2,
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
             erc20DeployedToken2.address,
             Buffer.from("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "hex"),
             {
@@ -177,7 +177,7 @@ describe("PLANNED FAILS", function() {
         console.log("\n - Full Exit: Wrong tx value (msg.value >= fee) started");
         const wrongFeeValue = parseEther("0.001"); // the value passed to tx
         const tx8 = await franklinDeployedContract.fullExit(
-            2,
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
             erc20DeployedToken1.address,
             Buffer.from("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "hex"),
             {
@@ -198,7 +198,7 @@ describe("PLANNED FAILS", function() {
         // Full Exit: Wrong signature length
         console.log("\n - Full Exit: Wrong signature length started");
         const tx9 = await franklinDeployedContract.fullExit(
-            2,
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
             erc20DeployedToken1.address,
             Buffer.from("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "hex"),
             {
@@ -221,7 +221,7 @@ describe("PLANNED FAILS", function() {
         console.log("\n - test Exodus Mode started");
         // Deposit eth
         const depositValue = parseEther("0.3"); // the value passed to tx
-        const depositAmount = parseEther("0.293775816"); // amount after: tx value - some counted fee
+        const depositAmount = parseEther("0.293753208"); // amount after: tx value - some counted fee
         let tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: depositValue});
         let receipt = await tx.wait();
         let events = receipt.events;
@@ -230,8 +230,8 @@ describe("PLANNED FAILS", function() {
         const depositEvent = events[1].args;
 
         expect(priorityEvent.opType).equal(1);
-        expect(priorityEvent.pubData).equal("0x52312ad6f01657413b2eae9287f6b9adad93d5fe000000000000000000000413b38c5447d0000809101112131415161718192021222334252627");
-        expect(priorityEvent.fee).equal(bigNumberify("0x161cdcc4563000"));
+        expect(priorityEvent.pubData).equal("0x52312ad6f01657413b2eae9287f6b9adad93d5fe0000000000000000000004139efc7e78b0000809101112131415161718192021222334252627");
+        expect(priorityEvent.fee).equal(bigNumberify("0x16316c9a255000"));
 
         expect(depositEvent.owner).equal(wallet.address);
         expect(depositEvent.tokenId).equal(0);
@@ -269,7 +269,7 @@ describe("PLANNED FAILS", function() {
         
         expect((await franklinDeployedContract.blocks(1)).onchainOperations).equal(1);
         expect((await franklinDeployedContract.blocks(1)).priorityOperations).equal(1);
-        expect((await franklinDeployedContract.blocks(1)).commitment).equal("0xa26d1ddaa435d774cd54b089570fb6d9e94938b46755453f6bfb2f74d7c31776");
+        expect((await franklinDeployedContract.blocks(1)).commitment).equal("0x387e39df8d726886ccf16995816306999193abc96f8da43573864b553d876473");
         expect((await franklinDeployedContract.blocks(1)).stateRoot).equal("0x0000000000000000000000000000000000000000000000000000000000000000");
         expect((await franklinDeployedContract.blocks(1)).validator).equal("0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE");
 
@@ -496,7 +496,7 @@ describe("PLANNED FAILS", function() {
         // Wrong priority operation - different data
         console.log("\n - Wrong priority operation - different data started");
         const depositValue = parseEther("0.3"); // the value passed to tx
-        depositAmount = parseEther("0.293775816"); // amount after: tx value - some counted fee
+        depositAmount = parseEther("0.293753208"); // amount after: tx value - some counted fee
         let tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: depositValue});
         let receipt = await tx.wait();
         let events = receipt.events;
@@ -505,8 +505,8 @@ describe("PLANNED FAILS", function() {
         const depositEvent = events[1].args;
 
         expect(priorityEvent.opType).equal(1);
-        expect(priorityEvent.pubData).equal("0x52312ad6f01657413b2eae9287f6b9adad93d5fe000000000000000000000413b38c5447d0000809101112131415161718192021222334252627");
-        expect(priorityEvent.fee).equal(bigNumberify("0x161cdcc4563000"));
+        expect(priorityEvent.pubData).equal("0x52312ad6f01657413b2eae9287f6b9adad93d5fe0000000000000000000004139efc7e78b0000809101112131415161718192021222334252627");
+        expect(priorityEvent.fee).equal(bigNumberify("0x16316c9a255000"));
 
         expect(depositEvent.owner).equal(wallet.address);
         expect(depositEvent.tokenId).equal(0);
