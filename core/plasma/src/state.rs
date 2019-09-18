@@ -10,7 +10,6 @@ use models::node::{
 use models::node::{Close, Deposit, FranklinTx, FullExit, Transfer, Withdraw};
 use models::params;
 use std::collections::HashMap;
-use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct OpSuccess {

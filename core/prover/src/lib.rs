@@ -48,7 +48,6 @@ use num_traits::cast::ToPrimitive;
 // };
 use storage::StorageProcessor;
 
-use bigdecimal::BigDecimal;
 use models::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum};
 
 pub struct Prover<E: JubjubEngine> {
