@@ -58,7 +58,7 @@ impl<E: JubjubEngine> FullExitWitness<E> {
             franklin_constants::BALANCE_BIT_WIDTH,
         );
 
-        pubdata_bits.resize(14 * franklin_constants::CHUNK_BIT_WIDTH, false);
+        pubdata_bits.resize(10 * franklin_constants::CHUNK_BIT_WIDTH, false);
         // println!("pub_data outside: ");
         // for (i, bit) in pubdata_bits.iter().enumerate() {
         //     if i % 64 == 0 {
@@ -257,7 +257,7 @@ pub fn calculate_full_exit_operations_from_witness(
         signature_data: signature_data.clone(),
     });
 
-    for i in 1..14 {
+    for i in 1..10 {
         operations.push(Operation {
             new_root: full_exit_witness.after_root,
             tx_type: full_exit_witness.tx_type,

@@ -944,7 +944,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.full_amount.get_bits_be());
 
         pubdata_bits.resize(
-            14 * franklin_constants::CHUNK_BIT_WIDTH,
+            10 * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
 
@@ -952,7 +952,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
             &chunk_data.chunk_number,
-            14,
+            10,
         )?;
 
         let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
@@ -1917,7 +1917,7 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
     for i in &[6] {
         //full_exit
         let x = E::Fr::from_str(&i.to_string()).unwrap();
-        let y = E::Fr::from_str("13").unwrap();
+        let y = E::Fr::from_str("9").unwrap();
         points.push((x, y));
     }
 
