@@ -20,7 +20,9 @@ async function main() {
     // console.log(dep_tx);
 
     await wallet.updateState();
+    console.log(wallet.supportedTokens);
     console.log(wallet.franklinState);
+    console.log(wallet.ethState);
     // let ethWallet2 = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
     // let wallet2 = await Wallet.fromEthWallet(ethWallet2);
     //

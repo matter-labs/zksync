@@ -24,6 +24,26 @@ export function createDepositPublicData(tokenId, hexAmount: string, franklinAddr
     return Buffer.concat([txId, accountId, tokenBytes, pad1Bytes, amountBytes, addressBytes, pad2Bytes]);
 }
 
+export function createWrongDepositPublicData(tokenId, hexAmount: string, franklinAddress: string): Buffer {
+    const txId = Buffer.from("01", "hex");
+    const accountId = Buffer.alloc(3, 0);
+    accountId.writeUIntBE(2, 0, 3);
+    const tokenBytes = Buffer.alloc(2);
+    tokenBytes.writeUInt16BE(tokenId, 0);
+    if (hexAmount.charAt(0) === '0' && hexAmount.charAt(1) === 'x') {
+        hexAmount = hexAmount.substr(2);
+    }
+    const amountBytes = Buffer.from(hexAmount, "hex");
+    const pad1BytesLength = 14 - amountBytes.length;
+    const pad1Bytes = Buffer.alloc(pad1BytesLength, 0);
+    if (franklinAddress.charAt(0) === '0' && franklinAddress.charAt(1) === 'x') {
+        franklinAddress = franklinAddress.substr(2);
+    }
+    const addressBytes = Buffer.from(franklinAddress, "hex");
+
+    return Buffer.concat([txId, accountId, tokenBytes, pad1Bytes, amountBytes, addressBytes]);
+}
+
 export function createWithdrawPublicData(tokenId, hexAmount: string, ethAddress: string): Buffer {
     const txId = Buffer.from("03", "hex");
     const accountId = Buffer.alloc(3, 0);
@@ -70,6 +90,20 @@ export function createFullExitPublicData(ethAddress: string, tokenId, hexAmount:
 
 export function createNoopPublicData(): Buffer {
     const txId = Buffer.from("00", "hex");
+    const padBytes = Buffer.alloc(7, 0);
+
+    return Buffer.concat([txId, padBytes]);
+}
+
+export function createWrongNoopPublicData(): Buffer {
+    const txId = Buffer.from("00", "hex");
+    const padBytes = Buffer.alloc(6, 0);
+
+    return Buffer.concat([txId, padBytes]);
+}
+
+export function createWrongOperationPublicData(): Buffer {
+    const txId = Buffer.from("07", "hex");
     const padBytes = Buffer.alloc(7, 0);
 
     return Buffer.concat([txId, padBytes]);

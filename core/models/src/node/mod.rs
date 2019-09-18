@@ -68,10 +68,11 @@ pub fn pack_fee_amount(amount: &BigDecimal) -> Vec<u8> {
 
 #[cfg(test)]
 mod test {
-    use crate::node::pack_token_amount;
+    use super::*;
     use bigdecimal::BigDecimal;
     #[test]
     fn test_pack() {
-        println!("{:x?}", pack_token_amount(&BigDecimal::from(4)));
+        //        println!("{:x?}", pack_token_amount(&BigDecimal::from(2)));
+        println!("{:x?}", pack_fee_amount(&BigDecimal::from(1)));
     }
 }

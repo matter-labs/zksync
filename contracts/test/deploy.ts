@@ -93,3 +93,14 @@ export async function addTestERC20Token(wallet, governance) {
         console.log("Add token error:" + err);
     }
 }
+
+export async function addTestNotApprovedERC20Token(wallet) {
+    try {
+        let erc20 = await deployContract(wallet, ERC20MintableContract, []);
+        await erc20.mint(wallet.address, bigNumberify("1000000000"));
+        console.log("TEST_ERC20=" + erc20.address);
+        return erc20
+    } catch (err) {
+        console.log("Add token error:" + err);
+    }
+}

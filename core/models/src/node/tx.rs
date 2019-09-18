@@ -7,6 +7,7 @@ use crypto::{digest::Digest, sha2::Sha256};
 use super::account::AccountAddress;
 use super::Engine;
 use crate::params::JUBJUB_PARAMS;
+use failure::{ensure, format_err};
 use ff::{PrimeField, PrimeFieldRepr};
 use franklin_crypto::alt_babyjubjub::fs::FsRepr;
 use franklin_crypto::alt_babyjubjub::JubjubEngine;
@@ -105,10 +106,8 @@ impl Withdraw {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Close {
-    // TODO: derrive account address from signature
     pub account: AccountAddress,
     pub nonce: Nonce,
-    // TODO: Signature unimplemented
     pub signature: TxSignature,
 }
 
@@ -175,16 +174,19 @@ impl FranklinTx {
         }
     }
 
-    pub fn min_number_of_chunks(&self) -> usize {
-        // TODO use spec
-        1
-    }
-
     pub fn check_signature(&self) -> bool {
         match self {
             FranklinTx::Transfer(tx) => tx.verify_signature(),
             FranklinTx::Withdraw(tx) => tx.verify_signature(),
             FranklinTx::Close(tx) => tx.verify_signature(),
+        }
+    }
+
+    pub fn get_bytes(&self) -> Vec<u8> {
+        match self {
+            FranklinTx::Transfer(tx) => tx.get_bytes(),
+            FranklinTx::Withdraw(tx) => tx.get_bytes(),
+            FranklinTx::Close(tx) => tx.get_bytes(),
         }
     }
 }
@@ -237,10 +239,19 @@ impl std::fmt::Debug for TxSignature {
 pub struct PackedPublicKey(pub PublicKey<Engine>);
 
 impl PackedPublicKey {
-    fn serialize_packed(&self) -> std::io::Result<Vec<u8>> {
+    pub fn serialize_packed(&self) -> std::io::Result<Vec<u8>> {
         let mut packed_point = [0u8; 32];
         (self.0).0.write(packed_point.as_mut())?;
         Ok(packed_point.to_vec())
+    }
+
+    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, failure::Error> {
+        ensure!(bytes.len() == 32, "PublicKey size mismatch");
+
+        Ok(PackedPublicKey(PublicKey::<Engine>(
+            edwards::Point::read(&*bytes, &JUBJUB_PARAMS as &AltJubjubBn256)
+                .map_err(|e| format_err!("Failed to restore point: {}", e.to_string()))?,
+        )))
     }
 }
 
@@ -266,14 +277,7 @@ impl<'de> Deserialize<'de> for PackedPublicKey {
         use serde::de::Error;
         String::deserialize(deserializer).and_then(|string| {
             let bytes = hex::decode(&string).map_err(|e| Error::custom(e.to_string()))?;
-            if bytes.len() != 32 {
-                return Err(Error::custom("PublicKey size mismatch"));
-            }
-            Ok(PackedPublicKey(PublicKey::<Engine>(
-                edwards::Point::read(&*bytes, &JUBJUB_PARAMS as &AltJubjubBn256).map_err(|e| {
-                    Error::custom(format!("Failed to restore point: {}", e.to_string()))
-                })?,
-            )))
+            PackedPublicKey::deserialize_packed(&bytes).map_err(|e| Error::custom(e.to_string()))
         })
     }
 }
@@ -282,7 +286,7 @@ impl<'de> Deserialize<'de> for PackedPublicKey {
 pub struct PackedSignature(pub Signature<Engine>);
 
 impl PackedSignature {
-    fn serialize_packed(&self) -> std::io::Result<Vec<u8>> {
+    pub fn serialize_packed(&self) -> std::io::Result<Vec<u8>> {
         let mut packed_signature = [0u8; 64];
         let (r_bar, s_bar) = packed_signature.as_mut().split_at_mut(32);
 
@@ -290,6 +294,24 @@ impl PackedSignature {
         (self.0).s.into_repr().write_le(s_bar)?;
 
         Ok(packed_signature.to_vec())
+    }
+
+    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, failure::Error> {
+        ensure!(bytes.len() == 64, "Signature size mismatch");
+        let (r_bar, s_bar) = bytes.split_at(32);
+
+        let r = edwards::Point::read(r_bar, &JUBJUB_PARAMS as &AltJubjubBn256)
+            .map_err(|e| format_err!("Failed to restore R point from R_bar: {}", e.to_string()))?;
+
+        let mut s_repr = FsRepr::default();
+        s_repr
+            .read_le(s_bar)
+            .map_err(|e| format_err!("s read err: {}", e.to_string()))?;
+
+        let s = <Engine as JubjubEngine>::Fs::from_repr(s_repr)
+            .map_err(|e| format_err!("Failed to restore s scalar from s_bar: {}", e.to_string()))?;
+
+        Ok(Self(Signature { r, s }))
     }
 }
 
@@ -315,33 +337,7 @@ impl<'de> Deserialize<'de> for PackedSignature {
         use serde::de::Error;
         String::deserialize(deserializer).and_then(|string| {
             let bytes = hex::decode(&string).map_err(|e| Error::custom(e.to_string()))?;
-            if bytes.len() != 64 {
-                return Err(Error::custom("Signature size mismatch"));
-            }
-
-            let (r_bar, s_bar) = bytes.split_at(32);
-
-            let r =
-                edwards::Point::read(r_bar, &JUBJUB_PARAMS as &AltJubjubBn256).map_err(|e| {
-                    Error::custom(format!(
-                        "Failed to restore R point from R_bar: {}",
-                        e.to_string()
-                    ))
-                })?;
-
-            let mut s_repr = FsRepr::default();
-            s_repr
-                .read_le(s_bar)
-                .map_err(|e| Error::custom(format!("s read err: {}", e.to_string())))?;
-
-            let s = <Engine as JubjubEngine>::Fs::from_repr(s_repr).map_err(|e| {
-                Error::custom(format!(
-                    "Failed to restore s scalar from s_bar: {}",
-                    e.to_string()
-                ))
-            })?;
-
-            Ok(PackedSignature(Signature { r, s }))
+            PackedSignature::deserialize_packed(&bytes).map_err(|e| Error::custom(e.to_string()))
         })
     }
 }

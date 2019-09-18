@@ -1,5 +1,6 @@
 use super::operations::{DepositOp, FullExitOp};
-use super::{AccountAddress, AccountId, TokenId};
+use super::tx::{PackedPublicKey, PackedSignature, TxSignature};
+use super::{AccountAddress, TokenId};
 use crate::params::FR_ADDRESS_LEN;
 use bigdecimal::BigDecimal;
 use failure::{bail, ensure};
@@ -20,11 +21,48 @@ pub struct Deposit {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FullExit {
-    pub account_id: AccountId,
+    pub packed_pubkey: Box<[u8; 32]>,
     pub eth_address: Address,
     pub token: TokenId,
     pub signature_r: Box<[u8; 32]>,
     pub signature_s: Box<[u8; 32]>,
+}
+
+impl FullExit {
+    const TX_TYPE: u8 = 6;
+    fn get_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(self.packed_pubkey.as_ref());
+        out.extend_from_slice(&self.eth_address.as_bytes());
+        out.extend_from_slice(&self.token.to_be_bytes());
+        out
+    }
+
+    pub fn verify_signature(&self) -> Option<AccountAddress> {
+        let mut sign = Vec::with_capacity(64);
+        sign.extend_from_slice(self.signature_r.as_ref());
+        sign.extend_from_slice(self.signature_s.as_ref());
+
+        let sign = if let Ok(sign) = PackedSignature::deserialize_packed(&sign) {
+            sign
+        } else {
+            return None;
+        };
+
+        let pub_key =
+            if let Ok(pub_key) = PackedPublicKey::deserialize_packed(self.packed_pubkey.as_ref()) {
+                pub_key
+            } else {
+                return None;
+            };
+
+        let restored_signature = TxSignature { pub_key, sign };
+
+        restored_signature
+            .verify_musig_pedersen(&self.get_bytes())
+            .map(AccountAddress::from_pubkey)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,18 +95,14 @@ impl FranklinPriorityOp {
                 }))
             }
             FULLEXIT_OPTYPE_ID => {
-                ensure!(pub_data.len() == 3 + 20 + 2 + 64, "Pub data len mismatch");
-                let account_id = {
-                    let mut account_id_bytes = [0u8; 4];
-                    account_id_bytes[1..4].copy_from_slice(&pub_data[0..3]);
-                    u32::from_be_bytes(account_id_bytes)
-                };
-                let eth_address = Address::from_slice(&pub_data[3..(20 + 3)]);
-                let token = u16::from_be_bytes(pub_data[23..(23 + 2)].try_into().unwrap());
-                let signature_r = Box::new(pub_data[25..(25 + 32)].try_into().unwrap());
-                let signature_s = Box::new(pub_data[57..(57 + 32)].try_into().unwrap());
+                ensure!(pub_data.len() == 32 + 20 + 2 + 64, "Pub data len mismatch");
+                let packed_pubkey = Box::new(pub_data[0..32].try_into().unwrap());
+                let eth_address = Address::from_slice(&pub_data[32..(32 + 20)]);
+                let token = u16::from_be_bytes(pub_data[52..(52 + 2)].try_into().unwrap());
+                let signature_r = Box::new(pub_data[54..(54 + 32)].try_into().unwrap());
+                let signature_s = Box::new(pub_data[86..(86 + 32)].try_into().unwrap());
                 Ok(Self::FullExit(FullExit {
-                    account_id,
+                    packed_pubkey,
                     eth_address,
                     token,
                     signature_r,
