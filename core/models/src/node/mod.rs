@@ -2,7 +2,6 @@ use super::merkle_tree::{PedersenHasher, SparseMerkleTree};
 use super::params;
 use super::primitives::pack_as_float;
 use bigdecimal::BigDecimal;
-use failure::bail;
 use pairing::bn256;
 
 pub mod account;
@@ -63,85 +62,6 @@ pub fn pack_fee_amount(amount: &BigDecimal) -> Vec<u8> {
         params::FEE_EXPONENT_BIT_WIDTH,
         params::FEE_MANTISSA_BIT_WIDTH,
     )
-}
-
-pub fn convert_to_float(
-    integer: u128,
-    exponent_length: usize,
-    mantissa_length: usize,
-    exponent_base: u32,
-) -> Result<Vec<bool>, failure::Error> {
-    unimplemented!("proper convert to float");
-    //    let integer = BigDecimal::(integer);
-    //    let exponent_base = BigDecimal::from(exponent_base);
-    //    let mut max_exponent = BigDecimal::from(1u128);
-    //    let max_power = (1 << exponent_length) - 1;
-    //
-    //    for _ in 0..max_power
-    //        {
-    //            max_exponent = max_exponent * exponent_base;
-    //        }
-    //
-    //    let max_mantissa = BigDecimal::from((1u128 << mantissa_length) - 1);
-    //
-    //    if BigDecimal::from(integer) > (max_mantissa * max_exponent) {
-    //        bail!("Integer is too big");
-    //    }
-    //
-    //    let mut exponent: usize = 0;
-    //    let mut mantissa = integer;
-    //
-    //    if BigDecimal::from(integer) > max_mantissa.to_u128() {
-    //        // always try best precision
-    //        let exponent_guess = integer / max_mantissa;
-    //        let mut exponent_temp = exponent_guess;
-    //
-    //        loop {
-    //            if exponent_temp < exponent_base {
-    //                break
-    //            }
-    //            exponent_temp = exponent_temp / exponent_base;
-    //            exponent += 1;
-    //        }
-    //
-    //        exponent_temp = 1u128;
-    //        for _ in 0..exponent
-    //            {
-    //                exponent_temp = exponent_temp * exponent_base;
-    //            }
-    //
-    //        if exponent_temp * max_mantissa < integer
-    //        {
-    //            exponent += 1;
-    //            exponent_temp = exponent_temp * exponent_base;
-    //        }
-    //
-    //        mantissa = integer / exponent_temp;
-    //    }
-    //
-    //    // encode into bits. First bits of mantissa in LE order
-    //
-    //    let mut encoding = vec![];
-    //
-    //    for i in 0..exponent_length {
-    //        if exponent & (1 << i) != 0 {
-    //            encoding.extend(&[true; 1]);
-    //        } else {
-    //            encoding.extend(&[false; 1]);
-    //        }
-    //    }
-    //
-    //    for i in 0..mantissa_length {
-    //        if mantissa & (1 << i) != 0 {
-    //            encoding.extend(&[true; 1]);
-    //        } else {
-    //            encoding.extend(&[false; 1]);
-    //        }
-    //    }
-    //
-    //    assert!(encoding.len() == exponent_length + mantissa_length);
-    //
-    //    Ok(encoding)
 }
 
 #[cfg(test)]

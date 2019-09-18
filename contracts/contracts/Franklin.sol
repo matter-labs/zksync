@@ -31,6 +31,8 @@ contract Franklin {
     uint8 constant PUBKEY_HASH_LEN = 20;
     // Signature (for example full exit signature) length
     uint8 constant SIGNATURE_LEN = 64;
+    // Public key length
+    uint8 constant PUBKEY_LEN = 32;
     // Fee coefficient for priority request transaction
     uint256 constant FEE_COEFF = 4;
     // Base gas cost for transaction
@@ -434,7 +436,7 @@ contract Franklin {
     // - _token - token address, 0 address for ether
     // - _signature - user signature
     function fullExit (
-        uint24 _franklinId,
+        bytes calldata _pubKey,
         address _token,
         bytes calldata _signature
     ) external payable {
@@ -461,8 +463,13 @@ contract Franklin {
             "fft12"
         ); // fft12 - wrong signature length
 
+        require(
+            _pubKey.length == PUBKEY_LEN,
+            "fft13"
+        ); // fft13 - wrong pubkey length
+
         // Priority Queue request
-        bytes memory pubData = Bytes.toBytesFromUInt24(_franklinId); // franklin id
+        bytes memory pubData = _pubKey; // franklin id
         pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(msg.sender)); // eth address
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(tokenId)); // token id
         pubData = Bytes.concat(pubData, _signature); // signature
@@ -757,8 +764,8 @@ contract Franklin {
             priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, ETH_ADDR_BYTES, PUBKEY_HASH_LEN + AMOUNT_BYTES + TOKEN_BYTES);
             onchainPubData = _onchainOp.pubData;
         } else if (_onchainOp.opType == OpType.FullExit && priorityRequests[_priorityRequestId].opType == OpType.FullExit) {
-            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 0, ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + SIGNATURE_LEN);
-            onchainPubData = Bytes.slice(_onchainOp.pubData, 0, ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + SIGNATURE_LEN);
+            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, PUBKEY_LEN, ETH_ADDR_BYTES + TOKEN_BYTES + SIGNATURE_LEN);
+            onchainPubData = Bytes.slice(_onchainOp.pubData, ACC_NUM_BYTES, ETH_ADDR_BYTES + TOKEN_BYTES + SIGNATURE_LEN);
         } else {
             revert("fid11"); // fid11 - wrong operation
         }

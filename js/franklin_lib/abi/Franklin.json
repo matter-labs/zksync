@@ -283,6 +283,28 @@
       "constant": false,
       "inputs": [
         {
+          "name": "_pubKey",
+          "type": "bytes"
+        },
+        {
+          "name": "_token",
+          "type": "address"
+        },
+        {
+          "name": "_signature",
+          "type": "bytes"
+        }
+      ],
+      "name": "fullExit",
+      "outputs": [],
+      "payable": true,
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
           "name": "_blockNumber",
           "type": "uint32"
         },
@@ -303,28 +325,6 @@
       "outputs": [],
       "payable": false,
       "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "constant": false,
-      "inputs": [
-        {
-          "name": "_franklinId",
-          "type": "uint24"
-        },
-        {
-          "name": "_token",
-          "type": "address"
-        },
-        {
-          "name": "_signature",
-          "type": "bytes"
-        }
-      ],
-      "name": "fullExit",
-      "outputs": [],
-      "payable": true,
-      "stateMutability": "payable",
       "type": "function"
     },
     {
@@ -837,6 +837,28 @@
       "constant": false,
       "inputs": [
         {
+          "name": "_pubKey",
+          "type": "bytes"
+        },
+        {
+          "name": "_token",
+          "type": "address"
+        },
+        {
+          "name": "_signature",
+          "type": "bytes"
+        }
+      ],
+      "name": "fullExit",
+      "outputs": [],
+      "payable": true,
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
           "name": "_blockNumber",
           "type": "uint32"
         },
@@ -857,28 +879,6 @@
       "outputs": [],
       "payable": false,
       "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "constant": false,
-      "inputs": [
-        {
-          "name": "_franklinId",
-          "type": "uint24"
-        },
-        {
-          "name": "_token",
-          "type": "address"
-        },
-        {
-          "name": "_signature",
-          "type": "bytes"
-        }
-      ],
-      "name": "fullExit",
-      "outputs": [],
-      "payable": true,
-      "stateMutability": "payable",
       "type": "function"
     },
     {

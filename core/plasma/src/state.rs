@@ -126,15 +126,15 @@ impl PlasmaState {
     }
 
     fn apply_full_exit(&mut self, priority_op: FullExit) -> OpSuccess {
-        let amount = {
-            self.get_account(priority_op.account_id).map(|account| {
-                // TODO: check signature here!
-                account.get_balance(priority_op.token)
-            })
+        let account_data = {
+            priority_op
+                .verify_signature()
+                .and_then(|addr| self.get_account_by_address(&addr))
+                .map(|(acc_id, account)| (acc_id, account.get_balance(priority_op.token)))
         };
         let op = FullExitOp {
             priority_op,
-            amount,
+            account_data,
         };
 
         OpSuccess {
@@ -146,13 +146,12 @@ impl PlasmaState {
 
     fn apply_full_exit_op(&mut self, op: &FullExitOp) -> AccountUpdates {
         let mut updates = Vec::new();
-        let amount = if let Some(amount) = &op.amount {
-            amount
+        let (account_id, amount) = if let Some((account_id, amount)) = &op.account_data {
+            (*account_id, amount.clone())
         } else {
             return updates;
         };
-
-        let mut account = if let Some(account) = self.get_account(op.priority_op.account_id) {
+        let mut account = if let Some(account) = self.get_account(account_id) {
             account
         } else {
             return updates;
@@ -160,13 +159,13 @@ impl PlasmaState {
 
         let old_balance = account.get_balance(op.priority_op.token);
         let old_nonce = account.nonce;
-        account.sub_balance(op.priority_op.token, amount);
+        account.sub_balance(op.priority_op.token, &amount);
         let new_balance = account.get_balance(op.priority_op.token);
         assert_eq!(new_balance, BigDecimal::from(0));
 
-        self.insert_account(op.priority_op.account_id, account);
+        self.insert_account(account_id, account);
         updates.push((
-            op.priority_op.account_id,
+            account_id,
             AccountUpdate::UpdateBalance {
                 balance_update: (op.priority_op.token, old_balance, new_balance),
                 old_nonce,

@@ -1,7 +1,7 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
+use failure::bail;
 use ff::ScalarEngine;
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
-use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::jubjub::{edwards, JubjubEngine, Unknown};
 use pairing::bn256::Bn256;
 use pairing::{CurveAffine, Engine};
@@ -260,6 +260,81 @@ pub fn pack_as_float(number: &BigDecimal, exponent_len: usize, mantissa_len: usi
     let mut vec = convert_to_float(uint, exponent_len, mantissa_len, 10).expect("packing error");
     vec.reverse();
     pack_bits_into_bytes_in_order(vec)
+}
+
+pub fn convert_to_float(
+    integer: u128,
+    exponent_length: usize,
+    mantissa_length: usize,
+    exponent_base: u32,
+) -> Result<Vec<bool>, failure::Error> {
+    let exponent_base = u128::from(exponent_base);
+
+    let mut max_exponent = 1u128;
+    let max_power = (1 << exponent_length) - 1;
+
+    for _ in 0..max_power {
+        max_exponent = max_exponent.saturating_mul(exponent_base);
+    }
+
+    let max_mantissa = (1u128 << mantissa_length) - 1;
+
+    if integer > (max_mantissa.saturating_mul(max_exponent)) {
+        bail!("Integer is too big");
+    }
+
+    let mut exponent: usize = 0;
+    let mut mantissa = integer;
+
+    if integer > max_mantissa {
+        // always try best precision
+        let exponent_guess = integer / max_mantissa;
+        let mut exponent_temp = exponent_guess;
+
+        loop {
+            if exponent_temp < exponent_base {
+                break;
+            }
+            exponent_temp = exponent_temp / exponent_base;
+            exponent += 1;
+        }
+
+        exponent_temp = 1u128;
+        for _ in 0..exponent {
+            exponent_temp = exponent_temp * exponent_base;
+        }
+
+        if exponent_temp * max_mantissa < integer {
+            exponent += 1;
+            exponent_temp = exponent_temp * exponent_base;
+        }
+
+        mantissa = integer / exponent_temp;
+    }
+
+    // encode into bits. First bits of mantissa in LE order
+
+    let mut encoding = Vec::with_capacity(exponent_length + mantissa_length);
+
+    for i in 0..exponent_length {
+        if exponent & (1 << i) != 0 {
+            encoding.push(true);
+        } else {
+            encoding.push(false);
+        }
+    }
+
+    for i in 0..mantissa_length {
+        if mantissa & (1 << i) != 0 {
+            encoding.push(true);
+        } else {
+            encoding.push(false);
+        }
+    }
+
+    debug_assert!(encoding.len() == exponent_length + mantissa_length);
+
+    Ok(encoding)
 }
 
 #[test]

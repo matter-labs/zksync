@@ -119,7 +119,7 @@ impl CloseOp {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FullExitOp {
     pub priority_op: FullExit,
-    pub amount: Option<BigDecimal>,
+    pub account_data: Option<(AccountId, BigDecimal)>,
 }
 
 impl FullExitOp {
@@ -129,19 +129,13 @@ impl FullExitOp {
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
-        data.extend_from_slice(&self.priority_op.account_id.to_be_bytes()[1..]);
+        let (account_id, amount) = self.account_data.clone().unwrap_or_default();
+        data.extend_from_slice(&account_id.to_be_bytes()[1..]);
         data.extend_from_slice(self.priority_op.eth_address.as_bytes());
         data.extend_from_slice(&self.priority_op.token.to_be_bytes());
         data.extend_from_slice(&*self.priority_op.signature_r);
         data.extend_from_slice(&*self.priority_op.signature_s);
-        data.extend_from_slice(
-            &self
-                .amount
-                .as_ref()
-                .map(big_decimal_to_u128)
-                .unwrap_or_default()
-                .to_be_bytes(),
-        );
+        data.extend_from_slice(&big_decimal_to_u128(&amount).to_be_bytes());
         data.resize(Self::CHUNKS * 8, 0x00);
         data
     }

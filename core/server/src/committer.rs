@@ -39,7 +39,7 @@ fn run_committer(
             accounts_updated,
         }) = req
         {
-            if accounts_updated.is_empty() {
+            if accounts_updated.is_empty() && block.number_of_processed_prior_ops() == 0 {
                 info!(
                     "Failed transactions commited block: #{}",
                     block.block_number

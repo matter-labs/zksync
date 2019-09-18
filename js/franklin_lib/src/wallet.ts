@@ -4,7 +4,7 @@ import {
     musigPedersen,
     privateKeyFromSeed,
     privateKeyToPublicKey,
-    pubkeyToAddress,
+    pubkeyToAddress, serializePointPacked,
 } from './crypto';
 import { curve } from 'elliptic';
 import EdwardsPoint = curve.edwards.EdwardsPoint;
@@ -64,7 +64,7 @@ export class FranklinProvider {
     }
 
     async getState(address: Address): Promise<FranklinAccountState> {
-        return await Axios.get(this.providerAddress + '/api/v0.1/account/' + address).then(reps => reps.data);
+        return await Axios.get(this.providerAddress + '/api/v0.1/account/' + `0x${address.toString("hex")}`).then(reps => reps.data);
     }
 }
 
@@ -113,6 +113,11 @@ export interface WithdrawTx {
 export interface CloseTx {
     account: Address,
     nonce: number,
+}
+
+export interface FullExitReq {
+    token: number,
+    eth_address: String
 }
 
 export class WalletKeys {
@@ -165,6 +170,17 @@ export class WalletKeys {
         let msg = Buffer.concat([type, account, nonce]);
         return musigPedersen(this.privateKey, msg);
     }
+
+    signFullExit(op: FullExitReq) {
+        let type = Buffer.from([6]);
+        let packed_pubkey = serializePointPacked(this.publicKey);
+        let eth_address = Buffer.from(op.eth_address.slice(2),"hex")
+        let token = Buffer.alloc(2);
+        token.writeUInt16BE(op.token,0);
+
+        let msg = Buffer.concat([type, packed_pubkey, eth_address, token]);
+        return Buffer.from(musigPedersen(this.privateKey, msg).sign, "hex");
+    }
 }
 
 
@@ -183,18 +199,17 @@ export class Wallet {
     }
 
     async deposit(token: Token, amount: BigNumberish) {
-        // const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
-        // const franklinAddressBinary = Buffer.from(this.address.substr(2), "hex");
-        // if (token.id == 0) {
-        //     const tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: amount});
-        //     return tx.hash;
-        // } else {
-        //     const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
-        //     await erc20DeployedToken.approve(franklinDeployedContract.address, amount);
-        //     const tx = await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, franklinAddressBinary,
-        //         {gasLimit: bigNumberify("150000"), value: parseEther("0.001")});
-        //     return tx.hash;
-        // }
+        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
+        if (token.id == 0) {
+            const tx = await franklinDeployedContract.depositETH(this.address, {value: amount});
+            return tx.hash;
+        } else {
+            const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
+            await erc20DeployedToken.approve(franklinDeployedContract.address, amount);
+            const tx = await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address,
+                {gasLimit: bigNumberify("150000"), value: parseEther("0.001")});
+            return tx.hash;
+        }
     }
 
     async widthdrawOnchain(token: Token, amount: BigNumberish) {
@@ -227,10 +242,9 @@ export class Wallet {
 
     async emergencyWithdraw(token: Token) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
-        // TODO: use signature, estimate fee?
-        await this.fetchFranklinState();
-        let tx = await franklinDeployedContract.fullExit(this.franklinState.id, token.address,  Buffer.alloc(64, 7),
-            {gasLimit: bigNumberify("200000"), value: parseEther("0.02")});
+        let signature = this.walletKeys.signFullExit({token: token.id, eth_address: await this.ethWallet.getAddress()})
+        let tx = await franklinDeployedContract.fullExit(serializePointPacked(this.walletKeys.publicKey), token.address,  signature,
+            {gasLimit: bigNumberify("500000"), value: parseEther("0.02")});
         return tx.hash;
     }
 

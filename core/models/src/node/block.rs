@@ -63,4 +63,8 @@ impl Block {
 
         executed_tx_pub_data
     }
+
+    pub fn number_of_processed_prior_ops(&self) -> u64 {
+        self.processed_priority_ops.1 - self.processed_priority_ops.0
+    }
 }
