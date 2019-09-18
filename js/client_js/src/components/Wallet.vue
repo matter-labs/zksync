@@ -5,25 +5,25 @@
     </b-row>
     <b-row>
         <b-col xl="6">
-            <BalancesList balanceListId="onchain" v-bind:balances="onchainBalances"></BalancesList>
-            <!-- <BalancesList balanceListId="contract" v-bind:balances="contractBalances"></BalancesList> -->
+            <BalancesList balanceListId="onchain" :balances="onchainBalances"></BalancesList>
+            <!-- <BalancesList balanceListId="contract" :balances="contractBalances"></BalancesList> -->
             <DepositButtons 
                 componentId="offchain"
-                v-bind:topBalances="onchainBalances" 
-                v-bind:bottomBalances="franklinBalances"
-                v-bind:depositFeeNeeded="true"
-                v-bind:withdrawFeeNeeded="true"
+                :topBalances="onchainBalances" 
+                :bottomBalances="franklinBalances"
+                :depositFeeNeeded="true"
+                :withdrawFeeNeeded="true"
                 v-on:depositEvent="deposit"
                 v-on:withdrawEvent="withdraw"
                 ></DepositButtons>
             <FranklinBalancesList 
                 balanceListId="franklin" 
-                v-bind:balances="franklinBalancesWithInfo"
+                :balances="franklinBalancesWithInfo"
                 ></FranklinBalancesList>
         </b-col>
         <b-col xl="6">
             <Transfer
-                v-bind:balances="franklinBalances"
+                :balances="franklinBalances"
                 v-on:buttonClicked="transfer"
                 v-on:alert="displayAlert"
             ></Transfer>

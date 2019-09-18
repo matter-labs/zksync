@@ -36,7 +36,7 @@ export class WalletDecorator {
         console.log(this.wallet.franklinState);
         return (this.wallet.franklinState.tx_history).map((tx, index) => {
             let elem_id      = `history_${index}`;
-            let tx_hash      = null;
+            let hash      = tx.tx_hash;
             let success      = tx.success     || '';
             let nonce        = tx.tx.nonce    || '';
             let from         = null;
@@ -50,7 +50,8 @@ export class WalletDecorator {
             let is_verified  = tx.verified    || '';
             return {
                 type, to, amount, success, fail_reason, 
-                is_committed, is_verified, elem_id
+                is_committed, is_verified, elem_id,
+                hash
             };
         });
     }

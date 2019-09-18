@@ -1,23 +1,23 @@
 <template>
     <b-container>
-        <b-row v-for="tx in transactions" v-bind:key="tx.elem_id">
-            <b-col> {{ tx.type }} </b-col>
-            <b-col> {{ tx.success }} </b-col>
-            <b-col> {{ tx.fail_reason }} </b-col>
-            <b-col> {{ tx.to }} </b-col>
-            <b-col> {{ tx.amount }} </b-col>
-            <b-col> {{ tx.is_committed }} </b-col>
-            <b-col> {{ tx.is_verified }} </b-col>
-        </b-row>
-    </b-container>    
+        <HistoryRow v-for="txx in transactions" :tx="txx" :key="txx.elem_id"></HistoryRow>
+    </b-container>
 </template>
 
 <script>
+import HistoryRow from './HistoryRow.vue'
+
+const components = {
+    HistoryRow
+};
+
 export default {
     name: 'History',
     props: ['info'],
     data: () => ({
-        transactions: []
+        transactions: [],
+        perPage: 3,
+        currentPage: 1,
     }),
     watch: {
         info: function() {
@@ -26,6 +26,7 @@ export default {
     },
     methods: {
 
-    }
+    },
+    components,
 }
 </script>

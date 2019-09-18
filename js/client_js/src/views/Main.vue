@@ -12,10 +12,10 @@
                     </button>
                     <div class="collapse navbar-collapse" id="navbarCollapse">
                         <ul class="navbar-nav mr-auto">
-                            <li class="nav-item" v-bind:class="{active: componentToBeShown=='Wallet'}">
+                            <li class="nav-item" :class="{active: componentToBeShown=='Wallet'}">
                                 <a class="nav-link" @click="componentToBeShown='Wallet'">Wallet</a>
                             </li>
-                            <li class="nav-item" v-bind:class="{active: componentToBeShown=='History'}">
+                            <li class="nav-item" :class="{active: componentToBeShown=='History'}">
                                 <a class="nav-link" @click="componentToBeShown='History'">History</a>
                             </li>
                         </ul>
@@ -35,11 +35,11 @@
                 <Wallet 
                     v-if="componentToBeShown=='Wallet'" 
                     v-on:alert="displayAlert"
-                    v-bind:info="walletInfo"
+                    :info="walletInfo"
                     ></Wallet>
                 <History 
                     v-if="componentToBeShown=='History'"
-                    v-bind:info="historyInfo"
+                    :info="historyInfo"
                     ></History>
             </b-row>
         </b-container>

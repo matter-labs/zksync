@@ -1,8 +1,8 @@
 <template>
-    <b-card v-bind:title="windowTitle">
+    <div>
         Token:
         <b-form-select v-model="token" class="mb-2">
-            <option v-for="balance in balances" v-bind:key="balance.tokenName">{{ balance.tokenName }}</option>
+            <option v-for="balance in balances" :key="balance.tokenName">{{ balance.tokenName }}</option>
         </b-form-select>
         Amount <span v-if="maxAmountVisible">(no more than {{ token }} {{ balancesDict[token] }}</span>:
         <b-form-input type="number" v-model="amount" class="mb-2"></b-form-input>
@@ -12,7 +12,7 @@
         </div>
         <b-row v-if="alertVisible"> {{ alertText }} </b-row>
         <b-button class="mt-3" variant="primary" @click='buttonClicked'> {{ buttonText }} </b-button>
-    </b-card>
+    </div>
 </template>
 
 <script>
@@ -21,7 +21,6 @@ import { bigNumberify } from 'ethers/utils'
 export default {
     name: 'DepositWithdrawModal',
     props: [
-        'windowTitle',
         'buttonText',
         'balances',
         'feeNeeded',
