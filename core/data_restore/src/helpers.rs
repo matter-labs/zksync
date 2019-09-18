@@ -48,15 +48,6 @@ impl Default for DataRestoreConfig {
     }
 }
 
-/// Infura web3 endpoints
-#[derive(Debug, Copy, Clone)]
-pub enum InfuraEndpoint {
-    /// Mainnet Infura endpoint
-    Mainnet,
-    /// Rinkeby Infura endpoint
-    Rinkeby,
-}
-
 /// Returns bytes vec of keccak256 hash from bytes
 ///
 /// # Arguments

@@ -12,9 +12,9 @@ pub struct DataRestoreDriver {
     /// Database connection pool
     pub connection_pool: ConnectionPool,
     /// Step of the considered blocks ethereum block
-    pub blocks_delta: U256,
+    pub eth_blocks_delta: U256,
     /// Delta between last ethereum block and last watched ethereum block
-    pub end_blocks_delta: U256,
+    pub end_eth_blocks_delta: U256,
     /// Flag that indicates that state updates are running
     pub run_updates: bool,
     /// Franklin contract events state
@@ -31,24 +31,111 @@ impl DataRestoreDriver {
     /// # Arguments
     ///
     /// * `connection_pool` - Database connection pool
-    /// * `blocks_delta` - Step of the considered blocks ethereum block
-    /// * `end_blocks_delta` - Delta between last ethereum block and last watched ethereum block
+    /// * `eth_blocks_delta` - Step of the considered blocks ethereum block
+    /// * `eth_end_blocks_delta` - Delta between last ethereum block and last watched ethereum block
     ///
     pub fn new(
         connection_pool: ConnectionPool,
-        blocks_delta: U256
-        end_blocks_delta: U256
+        eth_blocks_delta: U256
+        end_eth_blocks_delta: U256
     ) -> Self {
         Self {
             connection_pool,
-            blocks_delta,
-            end_blocks_delta,
+            eth_blocks_delta,
+            end_eth_blocks_delta,
             run_updates: false,
             events_state: EventsState::new(config.clone()),
             account_states: FranklinAccountsStates::new(config.clone()),
             op_blocks: vec![],
         }
     }
+
+    /// Stop states updates by setting run_updates flag to false
+    pub fn stop_state_updates(&mut self) {
+        self.run_updates = false
+    }
+
+    pub fn run_state_updates(&mut self) -> Result<(), DataRestoreError> {
+        self.run_updates = true
+        while self.run_updates {
+            info!(
+                "Last watched ethereum block: {:?}",
+                &self.events_state.last_watched_eth_block_number
+            );
+            info!(
+                "Committed franklin blocks count: {:?}",
+                &self.events_state.committed_blocks.len()
+            );
+            info!(
+                "Verified franklin blocks count: {:?}",
+                &self.events_state.verified_blocks.len()
+            );
+            if let Err(error) = self.update_events(),
+                let Err(error) = self.update_accounts() {
+                error!("Something goes wrong: {:?}", error);
+                self.run_updates = false;
+                err = Some(DataRestoreError::StateUpdate(format!(
+                    "Error occured: {:?}",
+                    error
+                )));
+            }
+        }
+        info!("Stopped state updates");
+        err
+        Ok(())
+    }
+
+    /// Update events state
+    fn update_events(&mut self) -> Result<(), DataRestoreError> {
+        self.events_state.update_events_state(
+            self.blocks_delta.clone(),
+            self.end_eth_blocks_delta.clone()
+        )
+        .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+    }
+
+    /// Update accounts state
+    fn update_events(&mut self) -> Result<(), DataRestoreError> {
+        self.accounts_state.update_accounts_state(
+            self.blocks_delta.clone(),
+            self.end_eth_blocks_delta.clone()
+        )
+        .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+    }
+
+    // /// Update past events and accounts states
+    // ///
+    // /// # Arguments
+    // ///
+    // /// * `until_block` - if some than it will update accounts states until specified Franklin block number
+    // ///
+    // fn update_past_franklin_blocks_events_and_accounts_tree_state(
+    //     &mut self,
+    //     until_block: Option<u32>,
+    // ) -> Result<(), DataRestoreError> {
+    //     let mut got_events = false;
+    //     while !got_events {
+    //         if let Ok(()) = self.update_past_blocks_events_state() {
+    //             got_events = true;
+    //         }
+    //     }
+    //     let verified_blocks = self.events_state.verified_blocks.clone();
+
+    //     let op_blocks = self.get_verified_committed_op_blocks_from_blocks_state(&verified_blocks);
+    //     let mut sorted_op_blocks = DataRestoreDriver::sort_op_blocks_by_block_number(op_blocks);
+
+    //     self.op_blocks.append(&mut sorted_op_blocks.clone());
+
+    //     self.account_states = FranklinAccountsStates::new(self.config.clone());
+
+    //     if let Some(block) = until_block {
+    //         sorted_op_blocks.retain(|x| x.block_number <= block);
+    //     }
+    //     self.update_accounts_state_from_op_blocks(&sorted_op_blocks)
+    //         .map_err(|e| DataRestoreError::StateUpdate(e.to_string()))?;
+
+    //     Ok(())
+    // }
 
     // /// Load past events and accounts states
     // ///
@@ -103,39 +190,7 @@ impl DataRestoreDriver {
     //     err
     // }
 
-    // /// Update past events and accounts states
-    // ///
-    // /// # Arguments
-    // ///
-    // /// * `until_block` - if some than it will update accounts states until specified Franklin block number
-    // ///
-    // fn update_past_franklin_blocks_events_and_accounts_tree_state(
-    //     &mut self,
-    //     until_block: Option<u32>,
-    // ) -> Result<(), DataRestoreError> {
-    //     let mut got_events = false;
-    //     while !got_events {
-    //         if let Ok(()) = self.update_past_blocks_events_state() {
-    //             got_events = true;
-    //         }
-    //     }
-    //     let verified_blocks = self.events_state.verified_blocks.clone();
-
-    //     let op_blocks = self.get_verified_committed_op_blocks_from_blocks_state(&verified_blocks);
-    //     let mut sorted_op_blocks = DataRestoreDriver::sort_op_blocks_by_block_number(op_blocks);
-
-    //     self.op_blocks.append(&mut sorted_op_blocks.clone());
-
-    //     self.account_states = FranklinAccountsStates::new(self.config.clone());
-
-    //     if let Some(block) = until_block {
-    //         sorted_op_blocks.retain(|x| x.block_number <= block);
-    //     }
-    //     self.update_accounts_state_from_op_blocks(&sorted_op_blocks)
-    //         .map_err(|e| DataRestoreError::StateUpdate(e.to_string()))?;
-
-    //     Ok(())
-    // }
+    
 
     // /// Save complete storage state: events, last watched ethereum block number, franklin operations blocks
     // fn save_complete_storage_state(&mut self) {
