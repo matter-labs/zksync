@@ -432,7 +432,7 @@ contract Franklin {
     
     // Register full exit request
     // Params:
-    // - _franklinId - sender
+    // - _pubKye - packed public key of the user account
     // - _token - token address, 0 address for ether
     // - _signature - user signature
     function fullExit (
