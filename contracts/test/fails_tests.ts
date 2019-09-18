@@ -150,6 +150,71 @@ describe("PLANNED FAILS", function() {
         
         expect(reason6.substring(0,5)).equal("gvs11");
         console.log(" + ERC20 withdraw: Wrong token address passed");
+
+        // Full Exit: Wrong token address
+        console.log("\n - Full Exit: Wrong token address started");
+        const feeValue = parseEther("0.3"); // the value passed to tx
+        const tx7 = await franklinDeployedContract.fullExit(
+            2,
+            erc20DeployedToken2.address,
+            Buffer.from("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "hex"),
+            {
+                value: feeValue,
+                gasLimit: bigNumberify("500000")
+            }
+        );
+
+        await tx7.wait()
+        .catch(() => {});
+
+        const code7 = await provider.call(tx7, tx7.blockNumber);
+        const reason7 = hex_to_ascii(code7.substr(138));
+
+        expect(reason7.substring(0,5)).equal("gvs11");
+        console.log(" + Full Exit: Wrong token address passed");
+
+        // Full Exit: Wrong tx value (msg.value >= fee)
+        console.log("\n - Full Exit: Wrong tx value (msg.value >= fee) started");
+        const wrongFeeValue = parseEther("0.001"); // the value passed to tx
+        const tx8 = await franklinDeployedContract.fullExit(
+            2,
+            erc20DeployedToken1.address,
+            Buffer.from("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "hex"),
+            {
+                value: wrongFeeValue,
+                gasLimit: bigNumberify("500000")
+            }
+        );
+
+        await tx8.wait()
+        .catch(() => {});
+
+        const code8 = await provider.call(tx8, tx8.blockNumber);
+        const reason8 = hex_to_ascii(code8.substr(138));
+
+        expect(reason8.substring(0,5)).equal("fft11");
+        console.log(" + Full Exit: Wrong tx value (msg.value >= fee) passed");
+
+        // Full Exit: Wrong signature length
+        console.log("\n - Full Exit: Wrong signature length started");
+        const tx9 = await franklinDeployedContract.fullExit(
+            2,
+            erc20DeployedToken1.address,
+            Buffer.from("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "hex"),
+            {
+                value: feeValue,
+                gasLimit: bigNumberify("500000")
+            }
+        );
+
+        await tx9.wait()
+        .catch(() => {});
+
+        const code9 = await provider.call(tx9, tx9.blockNumber);
+        const reason9 = hex_to_ascii(code9.substr(138));
+
+        expect(reason9.substring(0,5)).equal("fft12");
+        console.log(" + Full Exit: Wrong signature length passed");
     });
 
     it("Enter Exodus Mode", async () => {
