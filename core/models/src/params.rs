@@ -53,7 +53,7 @@ pub const FR_BIT_WIDTH_PADDED: usize = 256;
 pub const TOTAL_TOKENS: usize = 1 << BALANCE_TREE_DEPTH;
 pub const ETH_TOKEN_ID: TokenId = 0;
 
-pub const BLOCK_SIZE_CHUNKS: usize = 14;
+pub const BLOCK_SIZE_CHUNKS: usize = 18;
 
 /// Priority op should be executed for this number of eth blocks.
 pub const PRIORITY_EXPIRATION: u64 = 250;

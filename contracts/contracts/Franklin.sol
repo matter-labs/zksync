@@ -39,7 +39,7 @@ contract Franklin {
     // Expiration delta for priority request to be satisfied (in ETH blocks)
     uint256 constant PRIORITY_EXPIRATION = 250; // About 1 hour
     // Chunks per block; each chunk has 8 bytes of public data
-    uint256 constant BLOCK_SIZE = 14;
+    uint256 constant BLOCK_SIZE = 18;
     // Max amount of any token must fit into uint128
     uint256 constant MAX_VALUE = 2 ** 112 - 1;
     // ETH blocks verification expectation
@@ -55,7 +55,7 @@ contract Franklin {
     uint256 constant PARTIAL_EXIT_LENGTH = 6 * 8; // partial exit
     uint256 constant CLOSE_ACCOUNT_LENGTH = 1 * 8; // close account
     uint256 constant TRANSFER_LENGTH = 2 * 8; // transfer
-    uint256 constant FULL_EXIT_LENGTH = 15 * 8; // full exit
+    uint256 constant FULL_EXIT_LENGTH = 18 * 8; // full exit
 
     // MARK: - EVENTS
 
