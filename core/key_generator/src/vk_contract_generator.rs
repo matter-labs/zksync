@@ -74,8 +74,7 @@ pragma solidity ^0.5.1;
 // Hardcoded constants to avoid accessing store
 contract {contract_name} {{
 
-    function {function_name}() interna
-    l pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {{
+    function {function_name}() internal pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {{
 
         {vk}
 
