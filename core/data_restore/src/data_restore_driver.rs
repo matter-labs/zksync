@@ -44,8 +44,8 @@ impl DataRestoreDriver {
             eth_blocks_delta,
             end_eth_blocks_delta,
             run_updates: false,
-            events_state: EventsState::new(config.clone()),
-            account_states: FranklinAccountsStates::new(config.clone()),
+            events_state: EventsState::new(),
+            account_states: FranklinAccountsStates::new(),
             op_blocks: vec![],
         }
     }
@@ -71,57 +71,35 @@ impl DataRestoreDriver {
                 &self.events_state.verified_blocks.len()
             );
 
-            let new_events = match self.events_state.update_events_state(
-                self.blocks_delta.clone(),
+            let new_events = self.events_state.update_events_state(
+                self.eth_blocks_delta.clone(),
                 self.end_eth_blocks_delta.clone()
-            ) {
-                Ok(res) => res,
-                Err(error) => {
-                    self.run_updates = false;
-                    err = Some(DataRestoreError::EventsError(format!(
-                        "Error occured: {:?}",
-                        error
-                    )));
-                }
-            }
+            )?;
             info!(
                 "Got new events"
             );
 
-            storage_interactor.update_events_state(&new_events)
-            .map_err(|e| DataRestoreError::StorageError(e.to_string()))?;
+            storage_interactor.update_events_list(&new_events)?;
             info!(
                 "Updated events storage"
             );
             
-            let new_operations = match get_operations_from_events(&new_events) {
-                Ok(res) => res,
-                Err(error) => {
-                    self.run_updates = false;
-                    err = Some(DataRestoreError::OperationsError(format!(
-                        "Error occured: {:?}",
-                        error
-                    )));
-                }
-            }
+            let new_operations = get_operations_from_events(&new_events)?;
             info!(
                 "Parsed events to operations"
             );
 
-            storage_interactor.update_operations_list(&new_operations)
-            .map_err(|e| DataRestoreError::StorageError(e.to_string()))?;
+            storage_interactor.update_operations_list(&new_operations)?;
             info!(
                 "Updated operations storage"
             );
 
-            self.account_states.update_accounts_state(&new_operations)
-            .map_err(|e| DataRestoreError::AccountsError(e.to_string()))?;
+            self.account_states.update_accounts_state(&new_operations)?;
             info!(
                 "Updated accounts state"
             );
         }
         info!("Stopped state updates");
-        err
         Ok(())
     }
 
