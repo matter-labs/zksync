@@ -11,10 +11,11 @@ use web3::contract::Contract;
 use web3::types::{Address, BlockNumber, Filter, FilterBuilder, Log, H160, U256};
 use web3::{Transport, Web3};
 
+use crate::ThreadPanicNotify;
 use bigdecimal::BigDecimal;
 use models::node::{FranklinPriorityOp, TokenId};
 use models::params::PRIORITY_EXPIRATION;
-use std::sync::mpsc::sync_channel;
+use std::sync::mpsc::{self, sync_channel};
 use storage::ConnectionPool;
 
 pub struct EthWatch<T: Transport> {
@@ -340,12 +341,17 @@ impl<T: Transport> EthWatch<T> {
     }
 }
 
-pub fn start_eth_watch(pool: ConnectionPool) -> Arc<RwLock<ETHState>> {
+pub fn start_eth_watch(
+    pool: ConnectionPool,
+    panic_notify: mpsc::Sender<bool>,
+) -> Arc<RwLock<ETHState>> {
     let (sender, receiver) = sync_channel(1);
 
     std::thread::Builder::new()
         .name("eth_watch".to_string())
         .spawn(move || {
+            let _panic_sentinel = ThreadPanicNotify(panic_notify);
+
             let web3_url = env::var("WEB3_URL").expect("WEB3_URL env var not found");
             let (_eloop, transport) = web3::transports::Http::new(&web3_url).unwrap();
             let web3 = web3::Web3::new(transport);
