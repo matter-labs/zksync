@@ -47,11 +47,7 @@
 </template>
 
 <script>
-// TODO: remove this imports
-import { ethers } from 'ethers'
-import { Wallet as FranklinWallet, FranklinProvider } from 'franklin_lib'
-import { WalletDecorator } from '../WalletDecorator'
-// END-TODO
+import ClipboardJS from 'clipboard'
 
 import Wallet from '../components/Wallet.vue'
 import History from '../components/History.vue'
@@ -79,14 +75,8 @@ export default {
         }
     },
     async created() {
-        // TODO: delete next block of code
-        // let franklinProvider = new FranklinProvider('http://localhost:3000', '0xc56E79CAA94C96DE01eF36560ac215cC7A4F0F47');
-        // let provider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
-        // window.signer = ethers.Wallet.fromMnemonic("fine music test violin matrix prize squirrel panther purchase material script deal", "m/44'/60'/0'/0/1").connect(provider);
-        // window.wallet = await FranklinWallet.fromEthWallet(signer, franklinProvider);
-        // window.walletDecorator = new WalletDecorator(window.wallet);
-
         this.updateAccountInfo();
+        new ClipboardJS('.copyable');
     },
     methods: {
         displayAlert(kwargs) {

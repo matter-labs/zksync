@@ -33,10 +33,9 @@ export class WalletDecorator {
 
     // #region renderable
     transactionsAsNeeded() {
-        console.log(this.wallet.franklinState);
         return (this.wallet.franklinState.tx_history).map((tx, index) => {
             let elem_id      = `history_${index}`;
-            let hash      = tx.tx_hash;
+            let hash         = tx.tx_hash;
             let success      = tx.success     || '';
             let nonce        = tx.tx.nonce    || '';
             let from         = null;
@@ -60,6 +59,7 @@ export class WalletDecorator {
         return this.wallet.ethState.onchainBalances
             .map((balance, tokenId) => ({
                 tokenName: this.tokenNameFromId(tokenId),
+                address: this.wallet.supportedTokens[tokenId].address,
                 amount: balance.toString()
             }))
             .filter(tokenInfo => tokenInfo.amount);
@@ -68,6 +68,7 @@ export class WalletDecorator {
         return this.wallet.ethState.contractBalances
             .map((balance, tokenId) => ({
                 tokenName: this.tokenNameFromId(tokenId),
+                address: this.wallet.supportedTokens[tokenId].address,
                 amount: `${balance.toString()}, blocks left ${this.wallet.ethState.lockedBlocksLeft[tokenId]}`
             }))
             .filter(tokenInfo => true || tokenInfo.amount);

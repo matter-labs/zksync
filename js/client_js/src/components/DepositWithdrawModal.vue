@@ -4,14 +4,14 @@
         <b-form-select autocomplete="off" v-model="token" class="mb-2">
             <option v-for="balance in balances" :key="balance.tokenName">{{ balance.tokenName }}</option>
         </b-form-select>
-        Amount <span v-if="maxAmountVisible">(max: {{ balancesDict[token] }} {{ token }}</span>:
+        Amount <span v-if="maxAmountVisible">(max: {{ balancesDict[token] }} {{ token }})</span>:
         <b-form-input autocomplete="off" type="number" v-model="amount" class="mb-2"></b-form-input>
         <div v-if="feeNeeded">
             Fee:
             <b-form-input autocomplete="off" type="number" v-model="fee"></b-form-input>
         </div>
         <p v-if="alertVisible"> {{ alertText }} </p>
-        <b-button class="mt-3" variant="primary" @click='buttonClicked'> {{ buttonText }} </b-button>
+        <b-button class="w-50 mt-3" variant="primary" @click='buttonClicked'> {{ buttonText }} </b-button>
     </div>
 </template>
 

@@ -22,6 +22,12 @@ Vue.mixin({
 		}
 	},
 	computed: {
+        ethereumAddress() {
+            return window.walletDecorator.wallet.ethWallet.address;
+        },
+        franklinAddress() {
+            return window.walletDecorator.wallet.address;
+        },
         currentLocationNetworkName() {
             return window.location.host.split(/[^\w]/)[0];
         },
