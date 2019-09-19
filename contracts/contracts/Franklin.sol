@@ -30,6 +30,8 @@ contract Franklin {
     uint8 constant SIGNATURE_LEN = 64;
     // Public key length
     uint8 constant PUBKEY_LEN = 32;
+    // Franklin nonce length
+    uint8 constant NONCE_LEN = 4;
     // Fee coefficient for priority request transaction
     uint256 constant FEE_COEFF = 4;
     // Base gas cost for transaction
@@ -53,7 +55,7 @@ contract Franklin {
     uint256 constant PARTIAL_EXIT_LENGTH = 6 * 8; // partial exit
     uint256 constant CLOSE_ACCOUNT_LENGTH = 1 * 8; // close account
     uint256 constant TRANSFER_LENGTH = 2 * 8; // transfer
-    uint256 constant FULL_EXIT_LENGTH = 14 * 8; // full exit
+    uint256 constant FULL_EXIT_LENGTH = 15 * 8; // full exit
 
     // MARK: - EVENTS
 
@@ -433,7 +435,8 @@ contract Franklin {
     function fullExit (
         bytes calldata _pubKey,
         address _token,
-        bytes calldata _signature
+        bytes calldata _signature,
+        uint32 _nonce
     ) external payable {
         // Fee is:
         //   fee coeff * (base tx gas cost + remained gas) * gas price
@@ -467,6 +470,7 @@ contract Franklin {
         bytes memory pubData = _pubKey; // franklin id
         pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(msg.sender)); // eth address
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(tokenId)); // token id
+        pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt32(_nonce)); // token id
         pubData = Bytes.concat(pubData, _signature); // signature
         addPriorityRequest(OpType.FullExit, fee, pubData);
         
@@ -677,9 +681,9 @@ contract Franklin {
         }
 
         if (_opType == uint8(OpType.FullExit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + SIGNATURE_LEN + AMOUNT_BYTES);
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_LEN + SIGNATURE_LEN + AMOUNT_BYTES);
             require(
-                pubData.length == ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + SIGNATURE_LEN + AMOUNT_BYTES,
+                pubData.length == ACC_NUM_BYTES + PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_LEN + SIGNATURE_LEN + AMOUNT_BYTES,
                 "fpp13"
             ); // fpp13 - wrong full exit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
@@ -760,8 +764,8 @@ contract Franklin {
             priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, ETH_ADDR_BYTES, PUBKEY_HASH_LEN + AMOUNT_BYTES + TOKEN_BYTES);
             onchainPubData = _onchainOp.pubData;
         } else if (_onchainOp.opType == OpType.FullExit && priorityRequests[_priorityRequestId].opType == OpType.FullExit) {
-            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, PUBKEY_LEN, ETH_ADDR_BYTES + TOKEN_BYTES + SIGNATURE_LEN);
-            onchainPubData = Bytes.slice(_onchainOp.pubData, ACC_NUM_BYTES, ETH_ADDR_BYTES + TOKEN_BYTES + SIGNATURE_LEN);
+            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 0, PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_LEN + SIGNATURE_LEN);
+            onchainPubData = Bytes.slice(_onchainOp.pubData, ACC_NUM_BYTES, PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_LEN + SIGNATURE_LEN);
         } else {
             revert("fid11"); // fid11 - wrong operation
         }

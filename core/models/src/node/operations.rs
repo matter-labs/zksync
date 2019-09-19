@@ -123,7 +123,7 @@ pub struct FullExitOp {
 }
 
 impl FullExitOp {
-    pub const CHUNKS: usize = 14;
+    pub const CHUNKS: usize = 15;
     const OP_CODE: u8 = 0x06;
 
     fn get_public_data(&self) -> Vec<u8> {
@@ -131,8 +131,10 @@ impl FullExitOp {
         data.push(Self::OP_CODE); // opcode
         let (account_id, amount) = self.account_data.clone().unwrap_or_default();
         data.extend_from_slice(&account_id.to_be_bytes()[1..]);
+        data.extend_from_slice(&*self.priority_op.packed_pubkey);
         data.extend_from_slice(self.priority_op.eth_address.as_bytes());
         data.extend_from_slice(&self.priority_op.token.to_be_bytes());
+        data.extend_from_slice(&self.priority_op.nonce.to_be_bytes());
         data.extend_from_slice(&*self.priority_op.signature_r);
         data.extend_from_slice(&*self.priority_op.signature_s);
         data.extend_from_slice(&big_decimal_to_u128(&amount).to_be_bytes());

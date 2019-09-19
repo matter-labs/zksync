@@ -34,6 +34,7 @@ use std::env;
 use diesel::sql_types::{BigInt, Nullable, Text, Timestamp};
 sql_function!(coalesce, Coalesce, (x: Nullable<BigInt>, y: BigInt) -> BigInt);
 
+use diesel::result::Error;
 use itertools::Itertools;
 use models::node::AccountAddress;
 
@@ -606,15 +607,17 @@ impl StorageProcessor {
     }
 
     pub fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {
-        let executed_txs: Vec<_> = executed_transactions::table
-            .filter(executed_transactions::block_number.eq(i64::from(block)))
-            .load::<StoredExecutedTransaction>(self.conn())?;
-        Ok(executed_txs
+        let op = self
+            .load_stored_op_with_block_number(block, ActionType::COMMIT)
+            .ok_or_else(|| Error::NotFound)?;
+        let restored_operation = op.into_op(self)?;
+        Ok(restored_operation
+            .block
+            .block_transactions
             .into_iter()
-            .filter_map(|exec_tx| {
-                exec_tx
-                    .operation
-                    .map(|op| serde_json::from_value(op).expect("stored op"))
+            .filter_map(|exec| match exec {
+                ExecutedOperations::PriorityOp(prior_op) => Some(prior_op.op),
+                ExecutedOperations::Tx(tx) => tx.op,
             })
             .collect())
     }

@@ -1,10 +1,8 @@
 /// Sparse Merkle tree with batch updates
-
 use super::hasher::Hasher;
 use crate::primitives::GetBits;
 use fnv::FnvHashMap;
 use std::fmt::Debug;
-
 
 fn select<T>(condition: bool, a: T, b: T) -> (T, T) {
     if condition {

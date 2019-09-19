@@ -159,9 +159,14 @@ impl PlasmaState {
 
         let old_balance = account.get_balance(op.priority_op.token);
         let old_nonce = account.nonce;
+        if old_nonce != op.priority_op.nonce {
+            return updates;
+        }
         account.sub_balance(op.priority_op.token, &amount);
+        account.nonce += 1;
         let new_balance = account.get_balance(op.priority_op.token);
         assert_eq!(new_balance, BigDecimal::from(0));
+        let new_nonce = account.nonce;
 
         self.insert_account(account_id, account);
         updates.push((
@@ -169,7 +174,7 @@ impl PlasmaState {
             AccountUpdate::UpdateBalance {
                 balance_update: (op.priority_op.token, old_balance, new_balance),
                 old_nonce,
-                new_nonce: old_nonce,
+                new_nonce,
             },
         ));
 
