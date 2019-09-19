@@ -801,11 +801,12 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         base_valid_flags.push(is_sig_correct);
 
-        let _is_signer_valid = CircuitElement::equals(
+        let is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correect"),
             &op_data.signer_pubkey.get_hash(),
             &op_data.new_pubkey_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
         )?;
+        base_valid_flags.push(is_signer_valid);
 
         // base_valid_flags.push(_is_signer_valid);
         let is_base_valid = multi_and(cs.namespace(|| "valid base withdraw"), &base_valid_flags)?;
@@ -1046,15 +1047,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             Boolean::constant(false),
         );
 
-        // construct signature message preimage (serialized_tx)
-        let mut serialized_tx_bits = vec![];
-
-        serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
-        serialized_tx_bits.extend(op_data.new_pubkey_hash.get_bits_be());
-        serialized_tx_bits.extend(cur.token.get_bits_be());
-        serialized_tx_bits.extend(op_data.full_amount.get_bits_be());
-        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
-
         //useful below
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
@@ -1111,26 +1103,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         is_valid_flags.push(is_a_correct);
 
-        let is_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_serialized_tx_correct"),
-            serialized_tx_bits,
-            &op_data,
-        )?;
-
-        let is_sig_correct = multi_or(
-            cs.namespace(|| "sig is valid or not first chunk"),
-            &[is_serialized_tx_correct, is_first_chunk.clone().not()],
-        )?;
-        is_valid_flags.push(is_sig_correct);
-
-        let _is_signer_valid = CircuitElement::equals(
-            cs.namespace(|| "signer_key_correect"),
-            &op_data.signer_pubkey.get_hash(),
-            &op_data.new_pubkey_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
-        )?;
-
-        // is_valid_flags.push(_is_signer_valid);
-
         let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
 
         let is_valid_first = Boolean::and(
@@ -1154,17 +1126,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "mutated_pubkey"),
             &op_data.new_pubkey_hash,
             &cur.account.pub_key_hash,
-            &is_valid_first,
-        )?;
-
-        // update nonce
-        let updated_nonce =
-            Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1); //TODO: we can provide Expression++ syntax
-
-        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
-            cs.namespace(|| "update cur nonce"),
-            updated_nonce,
-            &cur.account.nonce,
             &is_valid_first,
         )?;
         Ok(tx_valid)
@@ -1588,14 +1549,15 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             serialized_tx_bits,
             &op_data,
         )?;
-
         lhs_valid_flags.push(is_serialized_tx_correct);
 
-        let _is_signer_valid = CircuitElement::equals(
-            cs.namespace(|| "signer_key_correect"),
+        let is_signer_valid = CircuitElement::equals(
+            cs.namespace(|| "signer_key_correct"),
             &op_data.signer_pubkey.get_hash(),
             &lhs.account.pub_key_hash,
         )?;
+        lhs_valid_flags.push(is_signer_valid);
+
         // lhs_valid_flags.push(_is_signer_valid);
 
         let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;

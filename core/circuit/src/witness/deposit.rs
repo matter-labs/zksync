@@ -97,7 +97,7 @@ pub fn apply_deposit_tx(
 ) -> DepositWitness<Bn256> {
     let alt_new_pubkey_hash = Fr::from_hex(&deposit.priority_op.account.to_hex()).unwrap();
     let deposit_data = DepositData {
-        amount: deposit.priority_op.amount.to_u128().unwrap(),
+        amount: deposit.priority_op.amount.to_string().parse().unwrap(),
         token: u32::from(deposit.priority_op.token),
         account_address: deposit.account_id,
         new_pub_key_hash: alt_new_pubkey_hash,
@@ -119,25 +119,7 @@ pub fn apply_deposit(
     let account_address_fe = Fr::from_str(&deposit.account_address.to_string()).unwrap();
     let token_fe = Fr::from_str(&deposit.token.to_string()).unwrap();
     let amount_as_field_element = Fr::from_str(&deposit.amount.to_string()).unwrap();
-
-    let amount_bits = convert_to_float(
-        deposit.amount,
-        franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap();
-    let reparsed_amount = parse_float_to_u128(
-        amount_bits.clone(),
-        franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap();
-    assert_eq!(reparsed_amount, deposit.amount);
-
-    let amount_encoded: Fr = le_bit_vector_into_field_element(&amount_bits);
-
+    println!("amount_as_field_element is: {}", amount_as_field_element);
     //calculate a and b
     let a = amount_as_field_element;
     let b = Fr::zero();
@@ -154,7 +136,6 @@ pub fn apply_deposit(
                         || (acc.pub_key_hash == Fr::zero())
                 );
                 acc.pub_key_hash = deposit.new_pub_key_hash;
-                acc.nonce.add_assign(&Fr::from_str("1").unwrap());
             },
             |bal| bal.value.add_assign(&amount_as_field_element),
         );
@@ -187,7 +168,7 @@ pub fn apply_deposit(
         },
         args: OperationArguments {
             ethereum_key: Some(Fr::zero()),
-            amount_packed: Some(amount_encoded),
+            amount_packed: Some(Fr::zero()),
             full_amount: Some(amount_as_field_element),
             fee: Some(Fr::zero()),
             a: Some(a),

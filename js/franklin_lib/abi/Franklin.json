@@ -408,10 +408,6 @@
           "type": "address"
         },
         {
-          "name": "_vkAddress",
-          "type": "address"
-        },
-        {
           "name": "_genesisRoot",
           "type": "bytes32"
         },
@@ -959,10 +955,6 @@
       "inputs": [
         {
           "name": "_verifierAddress",
-          "type": "address"
-        },
-        {
-          "name": "_vkAddress",
           "type": "address"
         },
         {

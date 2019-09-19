@@ -299,7 +299,10 @@ impl BabyProver {
                 self.rewind_state(&storage, expected_current_block)?;
             }
             let initial_root = self.accounts_tree.root_hash();
-
+            info!(
+                "initial root when block processing started: {}",
+                initial_root
+            );
             for (index, item) in &self.accounts_tree.items {
                 info!("index: {}, item: {}", index, item.pub_key_hash);
             }
@@ -309,6 +312,7 @@ impl BabyProver {
             let ops = storage.get_block_operations(block.block_number).unwrap();
 
             drop(storage);
+            let (root, acc_witness) = apply_fee(&mut self.accounts_tree, block.fee_account, 0, 0);
             let mut operations = vec![];
             let mut pub_data = vec![];
             let mut fees = vec![];
@@ -555,7 +559,7 @@ impl BabyProver {
                     &mut self.accounts_tree,
                     block.fee_account,
                     u32::from(token),
-                    fee.to_u128().unwrap(),
+                    fee.to_string().parse().unwrap(),
                 );
                 root_after_fee = root;
                 validator_account_witness = acc_witness;
