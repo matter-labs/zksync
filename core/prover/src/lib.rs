@@ -14,11 +14,13 @@ use std::time::Duration;
 use bellman::groth16::{
     create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
 };
+use bellman::Circuit;
 use circuit::account::AccountWitness;
 use circuit::circuit::FranklinCircuit;
 use circuit::operation::SignatureData;
 use circuit::witness::close_account::*;
 use circuit::witness::deposit::*;
+use circuit::witness::full_exit::*;
 use circuit::witness::noop::noop_operation;
 use circuit::witness::transfer::*;
 use circuit::witness::transfer_to_new::*;
@@ -26,6 +28,7 @@ use circuit::witness::utils::*;
 use circuit::witness::withdraw::*;
 use ff::{Field, PrimeField};
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use franklin_crypto::circuit::test::*;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccount;
 use models::circuit::utils::bytes_into_be_bits;
@@ -339,8 +342,7 @@ impl BabyProver {
                             &second_sig_msg,
                             &third_sig_msg,
                             &signature,
-                            &sender_x,
-                            &sender_y,
+                            &vec![Some(false); 256], //doesn't matter for deposit
                         );
                         operations.extend(deposit_operations);
                         pub_data.extend(deposit_witness.get_pubdata());
@@ -370,6 +372,14 @@ impl BabyProver {
 
                         let (first_sig_msg, second_sig_msg, third_sig_msg) =
                             generate_sig_witness(&sig_bits, &phasher, &params);
+
+                        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(
+                            &transfer.tx.signature.pub_key.serialize_packed().unwrap(),
+                        )
+                        .iter()
+                        .map(|x| Some(*x))
+                        .collect();
+
                         let (sender_x, sender_y) = (transfer.tx.signature.pub_key.0).0.into_xy();
                         // generate_sig_data(bits: &[bool], phasher: &PedersenHasher<Bn256>, private_key: &PrivateKey<Bn256>, params: &AltJubjubBn256)
                         // let (
@@ -390,8 +400,7 @@ impl BabyProver {
                             &second_sig_msg,
                             &third_sig_msg,
                             &signature,
-                            &sender_x,
-                            &sender_y,
+                            &signer_packed_key_bits,
                         );
                         operations.extend(transfer_operations);
                         fees.push((transfer.tx.fee, transfer.tx.token));
@@ -400,18 +409,59 @@ impl BabyProver {
                     FranklinOp::TransferToNew(transfer_to_new) => {
                         let transfer_to_new_witness =
                             apply_transfer_to_new_tx(&mut self.accounts_tree, &transfer_to_new);
-                        let (
-                            signature,
-                            first_sig_msg,
-                            second_sig_msg,
-                            third_sig_msg,
-                            sender_x,
-                            sender_y,
-                        ) = generate_dummy_sig_data(
-                            &transfer_to_new_witness.get_sig_bits(),
-                            &phasher,
-                            &params,
-                        );
+                        let sig_bytes = transfer_to_new
+                            .tx
+                            .signature
+                            .sign
+                            .serialize_packed()
+                            .unwrap();
+                        let (r_bytes, s_bytes) = sig_bytes.split_at(32);
+                        let mut r_bytes = r_bytes.to_vec();
+                        let mut s_bytes = s_bytes.to_vec();
+                        r_bytes.reverse();
+                        s_bytes.reverse();
+                        let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
+                            .iter()
+                            .map(|x| Some(*x))
+                            .collect();
+                        let s_bits: Vec<_> = bytes_into_be_bits(&s_bytes)
+                            .iter()
+                            .map(|x| Some(*x))
+                            .collect();
+                        let signature = SignatureData {
+                            r_packed: r_bits,
+                            s: s_bits,
+                        };
+                        let sig_bits: Vec<bool> =
+                            bytes_into_be_bits(&transfer_to_new.tx.get_bytes());
+
+                        let (first_sig_msg, second_sig_msg, third_sig_msg) =
+                            generate_sig_witness(&sig_bits, &phasher, &params);
+
+                        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(
+                            &transfer_to_new
+                                .tx
+                                .signature
+                                .pub_key
+                                .serialize_packed()
+                                .unwrap(),
+                        )
+                        .iter()
+                        .map(|x| Some(*x))
+                        .collect();
+
+                        //                        let (
+                        //                            signature,
+                        //                            first_sig_msg,
+                        //                            second_sig_msg,
+                        //                            third_sig_msg,
+                        //                            sender_x,
+                        //                            sender_y,
+                        //                        ) = generate_dummy_sig_data(
+                        //                            &transfer_to_new_witness.get_sig_bits(),
+                        //                            &phasher,
+                        //                            &params,
+                        //                        );
                         let transfer_to_new_operations =
                             calculate_transfer_to_new_operations_from_witness(
                                 &transfer_to_new_witness,
@@ -419,8 +469,7 @@ impl BabyProver {
                                 &second_sig_msg,
                                 &third_sig_msg,
                                 &signature,
-                                &sender_x,
-                                &sender_y,
+                                &signer_packed_key_bits,
                             );
                         operations.extend(transfer_to_new_operations);
                         fees.push((transfer_to_new.tx.fee, transfer_to_new.tx.token));
@@ -452,7 +501,12 @@ impl BabyProver {
                         let (first_sig_msg, second_sig_msg, third_sig_msg) =
                             generate_sig_witness(&sig_bits, &phasher, &params);
                         let (sender_x, sender_y) = (withdraw.tx.signature.pub_key.0).0.into_xy();
-
+                        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(
+                            &withdraw.tx.signature.pub_key.serialize_packed().unwrap(),
+                        )
+                        .iter()
+                        .map(|x| Some(*x))
+                        .collect();
                         // let (
                         //     signature,
                         //     first_sig_msg,
@@ -471,8 +525,7 @@ impl BabyProver {
                             &second_sig_msg,
                             &third_sig_msg,
                             &signature,
-                            &sender_x,
-                            &sender_y,
+                            &signer_packed_key_bits,
                         );
                         operations.extend(withdraw_operations);
                         fees.push((withdraw.tx.fee, withdraw.tx.token));
@@ -481,18 +534,48 @@ impl BabyProver {
                     FranklinOp::Close(close) => {
                         let close_account_witness =
                             apply_close_account_tx(&mut self.accounts_tree, &close);
-                        let (
-                            signature,
-                            first_sig_msg,
-                            second_sig_msg,
-                            third_sig_msg,
-                            sender_x,
-                            sender_y,
-                        ) = generate_dummy_sig_data(
-                            &close_account_witness.get_sig_bits(),
-                            &phasher,
-                            &params,
-                        );
+                        let sig_bytes = close.tx.signature.sign.serialize_packed().unwrap();
+                        let (r_bytes, s_bytes) = sig_bytes.split_at(32);
+                        let mut r_bytes = r_bytes.to_vec();
+                        let mut s_bytes = s_bytes.to_vec();
+                        r_bytes.reverse();
+                        s_bytes.reverse();
+                        let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
+                            .iter()
+                            .map(|x| Some(*x))
+                            .collect();
+                        let s_bits: Vec<_> = bytes_into_be_bits(&s_bytes)
+                            .iter()
+                            .map(|x| Some(*x))
+                            .collect();
+                        let signature = SignatureData {
+                            r_packed: r_bits,
+                            s: s_bits,
+                        };
+                        let sig_bits: Vec<bool> = bytes_into_be_bits(&close.tx.get_bytes());
+
+                        let (first_sig_msg, second_sig_msg, third_sig_msg) =
+                            generate_sig_witness(&sig_bits, &phasher, &params);
+
+                        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(
+                            &close.tx.signature.pub_key.serialize_packed().unwrap(),
+                        )
+                        .iter()
+                        .map(|x| Some(*x))
+                        .collect();
+
+                        //                        let (
+                        //                            signature,
+                        //                            first_sig_msg,
+                        //                            second_sig_msg,
+                        //                            third_sig_msg,
+                        //                            sender_x,
+                        //                            sender_y,
+                        //                        ) = generate_dummy_sig_data(
+                        //                            &close_account_witness.get_sig_bits(),
+                        //                            &phasher,
+                        //                            &params,
+                        //                        );
                         let close_account_operations =
                             calculate_close_account_operations_from_witness(
                                 &close_account_witness,
@@ -500,13 +583,60 @@ impl BabyProver {
                                 &second_sig_msg,
                                 &third_sig_msg,
                                 &signature,
-                                &sender_x,
-                                &sender_y,
+                                &signer_packed_key_bits,
                             );
                         operations.extend(close_account_operations);
                         pub_data.extend(close_account_witness.get_pubdata());
                     }
-                    FranklinOp::FullExit(_) => unimplemented!("FullExit"),
+                    FranklinOp::FullExit(full_exit) => {
+                        let is_sig_correct = full_exit.priority_op.verify_signature().is_some();
+                        let full_exit_witness =
+                            apply_full_exit_tx(&mut self.accounts_tree, &full_exit, is_sig_correct);
+
+                        let mut r_bytes = full_exit.priority_op.signature_r.to_vec();
+                        let mut s_bytes = full_exit.priority_op.signature_s.to_vec();
+                        r_bytes.reverse();
+                        s_bytes.reverse();
+                        let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
+                            .iter()
+                            .map(|x| Some(*x))
+                            .collect();
+                        let s_bits: Vec<_> = bytes_into_be_bits(&s_bytes)
+                            .iter()
+                            .map(|x| Some(*x))
+                            .collect();
+                        let signature = SignatureData {
+                            r_packed: r_bits,
+                            s: s_bits,
+                        };
+                        let sig_bits: Vec<bool> =
+                            bytes_into_be_bits(&full_exit.priority_op.get_bytes());
+
+                        let (first_sig_msg, second_sig_msg, third_sig_msg) =
+                            generate_sig_witness(&sig_bits, &phasher, &params);
+                        let mut signer_packed_key_bytes =
+                            full_exit.priority_op.packed_pubkey.to_vec();
+                        signer_packed_key_bytes.reverse();
+                        let signer_packed_key_bits: Vec<_> =
+                            bytes_into_be_bits(&signer_packed_key_bytes)
+                                .iter()
+                                .map(|x| Some(*x))
+                                .collect();
+
+                        let full_exit_operations = calculate_full_exit_operations_from_witness(
+                            &full_exit_witness,
+                            &first_sig_msg,
+                            &second_sig_msg,
+                            &third_sig_msg,
+                            &signature,
+                            &signer_packed_key_bits,
+                        );
+                        operations.extend(full_exit_operations);
+                        pub_data.extend(full_exit_witness.get_pubdata(
+                            &signature,
+                            &bytes_into_be_bits(&signer_packed_key_bytes),
+                        ));
+                    }
                 }
             }
             if operations.len() < franklin_constants::BLOCK_SIZE_CHUNKS {
@@ -526,8 +656,7 @@ impl BabyProver {
                         &second_sig_msg,
                         &third_sig_msg,
                         &signature,
-                        &sender_x,
-                        &sender_y,
+                        &vec![Some(false); 256],
                     ));
                     pub_data.extend(vec![false; 64]);
                 }
@@ -549,10 +678,8 @@ impl BabyProver {
                 validator_balances.push(Some(balance_value));
             }
             let mut root_after_fee: Fr = self.accounts_tree.root_hash();
-            let mut validator_account_witness: AccountWitness<Engine> = AccountWitness {
-                nonce: None,
-                pub_key_hash: None,
-            };
+            let (mut root_after_fee, mut validator_account_witness) =
+                apply_fee(&mut self.accounts_tree, block.fee_account, 0, 0);
             for (fee, token) in fees {
                 info!("fee, token: {}, {}", fee, token);
                 let (root, acc_witness) = apply_fee(
@@ -596,29 +723,30 @@ impl BabyProver {
                 validator_account: validator_account_witness.clone(),
             };
 
-            // {
-            //     let inst = FranklinCircuit {
-            //         params: &self.jubjub_params,
-            //         operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
-            //         old_root: Some(initial_root),
-            //         new_root: Some(block.new_root_hash),
-            //         block_number: Fr::from_str(&(block_number + 1).to_string()),
-            //         validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
-            //         pub_data_commitment: Some(public_data_commitment.clone()),
-            //         operations: operations,
-            //         validator_balances: validator_balances,
-            //         validator_audit_path: validator_audit_path,
-            //         validator_account: validator_account_witness,
-            //     };
-            //     let mut cs = TestConstraintSystem::<Engine>::new();
-            //     inst.synthesize(&mut cs).unwrap();
-
-            //     warn!("unconstrained {}\n", cs.find_unconstrained());
-            //     warn!("inputs {}\n", cs.num_inputs());
-            //     warn!("num_constraints: {}\n", cs.num_constraints());
-            //     warn!("is satisfied: {}\n", cs.is_satisfied());
-            //     warn!("which is unsatisfied: {:?}\n", cs.which_is_unsatisfied());
-            // }
+            //            {
+            //                info!("just synthesizing");
+            //                let inst = FranklinCircuit {
+            //                    params: &self.jubjub_params,
+            //                    operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
+            //                    old_root: Some(initial_root),
+            //                    new_root: Some(block.new_root_hash),
+            //                    block_number: Fr::from_str(&(block_number).to_string()),
+            //                    validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
+            //                    pub_data_commitment: Some(public_data_commitment),
+            //                    operations: operations.clone(),
+            //                    validator_balances: validator_balances.clone(),
+            //                    validator_audit_path: validator_audit_path.clone(),
+            //                    validator_account: validator_account_witness.clone(),
+            //                };
+            //                let mut cs = TestConstraintSystem::<Engine>::new();
+            //                inst.synthesize(&mut cs).unwrap();
+            //
+            //                warn!("unconstrained {}\n", cs.find_unconstrained());
+            //                warn!("inputs {}\n", cs.num_inputs());
+            //                warn!("num_constraints: {}\n", cs.num_constraints());
+            //                warn!("is satisfied: {}\n", cs.is_satisfied());
+            //                warn!("which is unsatisfied: {:?}\n", cs.which_is_unsatisfied());
+            //            }
 
             let mut rng = OsRng::new().unwrap();
             info!("Prover has started to work");

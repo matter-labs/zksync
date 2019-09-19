@@ -131,6 +131,7 @@ pub fn apply_close_account(
             ethereum_key: Some(Fr::zero()),
             amount_packed: Some(Fr::zero()),
             full_amount: Some(Fr::zero()),
+            pub_nonce: Some(Fr::zero()),
             fee: Some(Fr::zero()),
             a: Some(a),
             b: Some(b),
@@ -148,8 +149,7 @@ pub fn calculate_close_account_operations_from_witness(
     second_sig_msg: &Fr,
     third_sig_msg: &Fr,
     signature_data: &SignatureData,
-    signer_pub_key_x: &Fr,
-    signer_pub_key_y: &Fr,
+    signer_pub_key_packed: &[Option<bool>],
 ) -> Vec<Operation<Bn256>> {
     let pubdata_chunks: Vec<_> = close_account_witness
         .get_pubdata()
@@ -165,8 +165,7 @@ pub fn calculate_close_account_operations_from_witness(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: close_account_witness.args.clone(),
         lhs: close_account_witness.before.clone(),
         rhs: close_account_witness.before.clone(),

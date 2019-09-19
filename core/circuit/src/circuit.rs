@@ -57,12 +57,13 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             op_data: AllocatedOperationData {
                 ethereum_key: zero_circuit_element.clone(),
                 new_pubkey_hash: zero_circuit_element.clone(),
-                signer_pubkey: CircuitPubkey::from_xy(
-                    cs.namespace(|| "dummy signer_pubkey"),
-                    zero_circuit_element.get_number(),
-                    zero_circuit_element.get_number(),
-                    &self.params,
-                )?,
+                //                signer_pubkey: CircuitPubkey::from_xy(
+                //                    cs.namespace(|| "dummy signer_pubkey"),
+                //                    zero_circuit_element.get_number(),
+                //                    zero_circuit_element.get_number(),
+                //                    &self.params,
+                //                )?,
+                pub_nonce: zero_circuit_element.clone(),
                 amount_packed: zero_circuit_element.clone(),
                 full_amount: zero_circuit_element.clone(),
                 fee_packed: zero_circuit_element.clone(),
@@ -602,9 +603,15 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         }
         prev.op_data = op_data.clone();
 
+        let signer_key = unpack_point_if_possible(
+            cs.namespace(|| "unpack pubkey"),
+            &op.signer_pub_key_packed,
+            self.params,
+        )?;
         let signature_data = verify_circuit_signature(
             cs.namespace(|| "verify circuit signature"),
             &op_data,
+            &signer_key,
             op.signature_data.clone(),
             self.params,
             generator.clone(),
@@ -640,6 +647,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &is_a_geq_b,
             &is_account_empty,
             &op_data,
+            &signer_key,
             &ext_pubdata_chunk,
             &signature_data.is_verified,
         )?);
@@ -652,6 +660,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &is_a_geq_b,
             &is_account_empty,
             &op_data,
+            &signer_key,
             &ext_pubdata_chunk,
             &signature_data.is_verified,
         )?);
@@ -661,6 +670,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &chunk_data,
             &is_a_geq_b,
             &op_data,
+            &signer_key,
             &ext_pubdata_chunk,
             &signature_data.is_verified,
         )?);
@@ -670,6 +680,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &chunk_data,
             &ext_pubdata_chunk,
             &op_data,
+            &signer_key,
             &subtree_root,
             &signature_data.is_verified,
         )?);
@@ -678,6 +689,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &mut cur,
             &chunk_data,
             &op_data,
+            &signer_key,
             &ext_pubdata_chunk,
             &signature_data,
         )?);
@@ -725,6 +737,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         chunk_data: &AllocatedChunkData<E>,
         is_a_geq_b: &Boolean,
         op_data: &AllocatedOperationData<E>,
+        signer_key: &AllocatedSignerPubkey<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
         is_sig_verified: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
@@ -803,7 +816,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correect"),
-            &op_data.signer_pubkey.get_hash(),
+            &signer_key.pubkey.get_hash(),
             &op_data.new_pubkey_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
         )?;
         base_valid_flags.push(is_signer_valid);
@@ -882,6 +895,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         cur: &mut AllocatedOperationBranch<E>,
         chunk_data: &AllocatedChunkData<E>,
         op_data: &AllocatedOperationData<E>,
+        signer_key: &AllocatedSignerPubkey<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
         signature: &AllocatedSignatureData<E>,
     ) -> Result<Boolean, SynthesisError> {
@@ -914,15 +928,19 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &[is_serialized_tx_correct, is_first_chunk.clone().not()],
         )?;
 
-        let _is_signer_valid = CircuitElement::equals(
+        let is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correect"),
-            &op_data.signer_pubkey.get_hash(),
+            &signer_key.pubkey.get_hash(),
             &op_data.new_pubkey_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
         )?;
 
         let is_signed_correctly = multi_and(
             cs.namespace(|| "is_signed_correctly"),
-            &[is_serialized_tx_correct, signature.is_verified.clone()],
+            &[
+                is_serialized_tx_correct,
+                is_signer_valid,
+                signature.is_verified.clone(),
+            ],
         )?;
 
         let amount_to_exit = CircuitElement::conditionally_select_with_number_strict(
@@ -937,15 +955,18 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //1
         pubdata_bits.extend(cur.account_address.get_bits_be()); //3
+        pubdata_bits.extend(vec![signer_key.r_x_bit.clone()]);
+        pubdata_bits.extend(signer_key.r_y_bits.clone());
         pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //20
         pubdata_bits.extend(cur.token.get_bits_be()); // 2
+        pubdata_bits.extend(op_data.pub_nonce.get_bits_be()); // 2
         pubdata_bits.extend(vec![signature.sig_r_x_bit.clone()]);
         pubdata_bits.extend(signature.sig_r_y_bits.clone());
         pubdata_bits.extend(signature.sig_s_bits.clone());
         pubdata_bits.extend(op_data.full_amount.get_bits_be());
 
         pubdata_bits.resize(
-            10 * franklin_constants::CHUNK_BIT_WIDTH,
+            18 * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
 
@@ -953,7 +974,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
             &chunk_data.chunk_number,
-            10,
+            18,
         )?;
 
         let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
@@ -980,7 +1001,12 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         lhs_valid_flags.push(is_first_chunk.clone());
 
         lhs_valid_flags.push(is_base_valid.clone());
-
+        let is_nonce_correct = CircuitElement::equals(
+            cs.namespace(|| "is_nonce_correct"),
+            &cur.account.nonce,
+            &op_data.pub_nonce,
+        )?;
+        lhs_valid_flags.push(is_nonce_correct);
         lhs_valid_flags.push(no_nonce_overflow(
             cs.namespace(|| "no nonce overflow"),
             &cur.account.nonce.get_number(),
@@ -1138,6 +1164,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         chunk_data: &AllocatedChunkData<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
         op_data: &AllocatedOperationData<E>,
+        signer_key: &AllocatedSignerPubkey<E>,
         subtree_root: &CircuitElement<E>,
         is_sig_verified: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
@@ -1200,7 +1227,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         is_valid_flags.push(is_sig_verified.clone());
         let _is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correect"),
-            &op_data.signer_pubkey.get_hash(),
+            &signer_key.pubkey.get_hash(),
             &cur.account.pub_key_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
         )?;
 
@@ -1278,6 +1305,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         is_a_geq_b: &Boolean,
         is_account_empty: &Boolean,
         op_data: &AllocatedOperationData<E>,
+        signer_key: &AllocatedSignerPubkey<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
         is_sig_verified: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
@@ -1376,7 +1404,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let _is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correect"),
-            &op_data.signer_pubkey.get_hash(),
+            &signer_key.pubkey.get_hash(),
             &lhs.account.pub_key_hash,
         )?;
 
@@ -1460,6 +1488,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         is_a_geq_b: &Boolean,
         is_account_empty: &Boolean,
         op_data: &AllocatedOperationData<E>,
+        signer_key: &AllocatedSignerPubkey<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
         is_sig_verified: &Boolean,
     ) -> Result<Boolean, SynthesisError> {
@@ -1553,7 +1582,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correct"),
-            &op_data.signer_pubkey.get_hash(),
+            &signer_key.pubkey.get_hash(),
             &lhs.account.pub_key_hash,
         )?;
         lhs_valid_flags.push(is_signer_valid);

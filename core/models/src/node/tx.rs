@@ -114,7 +114,7 @@ pub struct Close {
 impl Close {
     const TX_TYPE: u8 = 4;
 
-    fn get_bytes(&self) -> Vec<u8> {
+    pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.account.data);

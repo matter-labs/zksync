@@ -90,7 +90,7 @@ pub struct AllocatedChunkData<E: JubjubEngine> {
 #[derive(Clone)]
 pub struct AllocatedOperationData<E: JubjubEngine> {
     // pub new_pubkey: CircuitPubkey<E>,
-    pub signer_pubkey: CircuitPubkey<E>,
+    //    pub signer_pubkey: CircuitPubkey<E>,
     pub amount_packed: CircuitElement<E>,
     pub fee_packed: CircuitElement<E>,
     pub amount_unpacked: CircuitElement<E>,
@@ -101,6 +101,7 @@ pub struct AllocatedOperationData<E: JubjubEngine> {
     pub third_sig_msg: CircuitElement<E>,
     pub new_pubkey_hash: CircuitElement<E>,
     pub ethereum_key: CircuitElement<E>,
+    pub pub_nonce: CircuitElement<E>,
     pub a: CircuitElement<E>,
     pub b: CircuitElement<E>,
 }
@@ -178,13 +179,6 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS - (2 * E::Fr::CAPACITY as usize), //TODO: think of more consistent constant flow
         )?;
 
-        let sig_pubkey = CircuitPubkey::from_xy_fe(
-            cs.namespace(|| "signer_pubkey"),
-            || op.signer_pub_key_x.grab(),
-            || op.signer_pub_key_y.grab(),
-            &params,
-        )?;
-
         let new_pubkey_hash = CircuitElement::from_fe_strict(
             cs.namespace(|| "new_pubkey_hash"),
             || op.args.new_pub_key_hash.grab(),
@@ -192,7 +186,11 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
         )?;
 
         // let new_pubkey_hash = new_pubkey.get_hash().clone();
-
+        let pub_nonce = CircuitElement::from_fe_strict(
+            cs.namespace(|| "pub_nonce"),
+            || op.args.pub_nonce.grab(),
+            franklin_constants::NONCE_BIT_WIDTH,
+        )?;
         let a = CircuitElement::from_fe_strict(
             cs.namespace(|| "a"),
             || op.args.a.grab(),
@@ -206,7 +204,8 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
 
         Ok(AllocatedOperationData {
             ethereum_key,
-            signer_pubkey: sig_pubkey,
+            //            signer_pubkey: sig_pubkey,
+            pub_nonce,
             amount_packed,
             fee_packed,
             fee,

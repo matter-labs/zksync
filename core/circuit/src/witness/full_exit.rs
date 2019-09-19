@@ -24,19 +24,21 @@ pub struct FullExitWitness<E: JubjubEngine> {
     pub tx_type: Option<E::Fr>,
 }
 impl<E: JubjubEngine> FullExitWitness<E> {
-    pub fn get_pubdata(&self, sig_data: &SignatureData) -> Vec<bool> {
+    pub fn get_pubdata(&self, sig_data: &SignatureData, signer_pubkey: &[bool]) -> Vec<bool> {
+        assert_eq!(signer_pubkey.len(), 32);
         let mut pubdata_bits = vec![];
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.tx_type.unwrap(),
             franklin_constants::TX_TYPE_BIT_WIDTH,
         );
-
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.before.address.unwrap(),
             franklin_constants::ACCOUNT_ID_BIT_WIDTH,
         );
+        pubdata_bits.extend(signer_pubkey.to_vec());
+
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.args.ethereum_key.unwrap(),
@@ -47,10 +49,14 @@ impl<E: JubjubEngine> FullExitWitness<E> {
             &self.before.token.unwrap(),
             franklin_constants::TOKEN_BIT_WIDTH,
         );
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.before.witness.account_witness.nonce.unwrap(),
+            franklin_constants::NONCE_BIT_WIDTH,
+        );
 
         pubdata_bits.extend(sig_data.r_packed.iter().map(|x| x.unwrap()));
         pubdata_bits.extend(sig_data.s.iter().map(|x| x.unwrap()));
-        // pubdata_bits.extend(self.args.signature_r_y_be_bits.iter().map(|x| x.unwrap()));
 
         append_be_fixed_width(
             &mut pubdata_bits,
@@ -58,7 +64,7 @@ impl<E: JubjubEngine> FullExitWitness<E> {
             franklin_constants::BALANCE_BIT_WIDTH,
         );
 
-        pubdata_bits.resize(10 * franklin_constants::CHUNK_BIT_WIDTH, false);
+        pubdata_bits.resize(18 * franklin_constants::CHUNK_BIT_WIDTH, false);
         // println!("pub_data outside: ");
         // for (i, bit) in pubdata_bits.iter().enumerate() {
         //     if i % 64 == 0 {
@@ -214,7 +220,7 @@ pub fn apply_full_exit(
             amount_packed: Some(Fr::zero()),
             full_amount: Some(amount_to_exit),
             fee: Some(Fr::zero()),
-            a: Some(a),
+            pub_nonce: a: Some(a),
             b: Some(b),
             new_pub_key_hash: Some(Fr::zero()),
         },
@@ -229,8 +235,7 @@ pub fn calculate_full_exit_operations_from_witness(
     second_sig_msg: &Fr,
     third_sig_msg: &Fr,
     signature_data: &SignatureData,
-    signer_pub_key_x: &Fr,
-    signer_pub_key_y: &Fr,
+    signer_pub_key_packed: &[Option<bool>],
 ) -> Vec<Operation<Bn256>> {
     let pubdata_chunks: Vec<_> = full_exit_witness
         .get_pubdata(signature_data)
@@ -247,8 +252,7 @@ pub fn calculate_full_exit_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: full_exit_witness.args.clone(),
         lhs: full_exit_witness.before.clone(),
         rhs: full_exit_witness.before.clone(),
@@ -264,8 +268,7 @@ pub fn calculate_full_exit_operations_from_witness(
             first_sig_msg: Some(*first_sig_msg),
             second_sig_msg: Some(*second_sig_msg),
             third_sig_msg: Some(*third_sig_msg),
-            signer_pub_key_x: Some(*signer_pub_key_x),
-            signer_pub_key_y: Some(*signer_pub_key_y),
+            signer_pub_key_packed: signer_pub_key_packed.to_vec(),
             args: full_exit_witness.args.clone(),
             lhs: full_exit_witness.after.clone(),
             rhs: full_exit_witness.after.clone(),

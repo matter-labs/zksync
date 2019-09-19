@@ -23,11 +23,11 @@ async function main() {
     console.log(wallet.supportedTokens);
     console.log(wallet.franklinState);
     console.log(wallet.ethState);
-    // let ethWallet2 = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
-    // let wallet2 = await Wallet.fromEthWallet(ethWallet2);
-    //
-    // await wallet.updateState();
-    // await wallet2.updateState();
+    let ethWallet2 = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
+    let wallet2 = await Wallet.fromEthWallet(ethWallet2);
+
+    await wallet.updateState();
+    await wallet2.updateState();
 
 
     // console.log(await wallet.depositOffchain(wallet.supportedTokens['0'], new BN(18), new BN(2)));
@@ -43,12 +43,12 @@ async function main() {
     // await wallet.waitPendingTxsExecuted();
     // console.log(await wallet.depositOffchain(wallet.supportedTokens['1'], 18, 2));
     // await wallet.waitPendingTxsExecuted();
-    //
-    // console.log(await wallet.transfer(wallet2.address, wallet.supportedTokens['0'], 9,1));
-    // await wallet.waitPendingTxsExecuted();
+
+    console.log(await wallet.transfer(wallet2.address, wallet.supportedTokens['0'], 9,1));
+    await wallet.waitPendingTxsExecuted();
     // console.log(await wallet.transfer(wallet2.address, wallet.supportedTokens['1'], 15,3));
     // await wallet.waitPendingTxsExecuted();
-    //
+
     // console.log(await wallet2.widthdrawOffchain(wallet2.supportedTokens['0'], 9, 0));
     // await wallet2.waitPendingTxsExecuted();
     // console.log(await wallet2.widthdrawOffchain(wallet2.supportedTokens['1'], 10, 5));

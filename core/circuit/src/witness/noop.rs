@@ -18,8 +18,7 @@ pub fn noop_operation(
     second_sig_msg: &Fr,
     third_sig_msg: &Fr,
     signature_data: &SignatureData,
-    signer_pub_key_x: &Fr,
-    signer_pub_key_y: &Fr,
+    signer_pub_key_packed: &[Option<bool>],
 ) -> Operation<Bn256> {
     let acc = tree.get(acc_id).unwrap();
     let account_address_fe = Fr::from_str(&acc_id.to_string()).unwrap();
@@ -44,8 +43,7 @@ pub fn noop_operation(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
 
         args: OperationArguments {
             ethereum_key: Some(Fr::zero()),
@@ -54,6 +52,7 @@ pub fn noop_operation(
             fee: Some(Fr::zero()),
             a: Some(Fr::zero()),
             b: Some(Fr::zero()),
+            pub_nonce: Some(Fr::zero()),
             new_pub_key_hash: Some(Fr::zero()),
         },
         lhs: OperationBranch {
