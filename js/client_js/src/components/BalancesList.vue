@@ -52,6 +52,10 @@ export default {
 </script>
 
 <style scoped>
+td:first-child {
+    width: 2em;
+}
+
 .tokenNameButton {
     display: inline-block;
     height: 2;

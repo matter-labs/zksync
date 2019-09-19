@@ -24,6 +24,7 @@ const components = {
     Alert
 };
 
+import { ethers } from 'ethers'
 import { Wallet, FranklinProvider } from 'franklin_lib'
 import { walletDecorator, WalletDecorator } from '../WalletDecorator'
 
@@ -32,13 +33,26 @@ export default {
     computed: {
         ethereumSupported: () => typeof window.web3 !== 'undefined',
     },
+    created() {
+        // TODO: remove this method
+        this.login()
+    },
     methods: {
         async login() {
             try {
-                let franklinProvider = new FranklinProvider(this.config.API_SERVER, this.config.CONTRACT_ADDR);
-                let signer = ethersProvider.getSigner();
+                // TODO: delete next block of code
+                let franklinProvider = new FranklinProvider('http://localhost:3000', this.config.CONTRACT_ADDR);
+                let provider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
+                window.signer = ethers.Wallet.fromMnemonic("fine music test violin matrix prize squirrel panther purchase material script deal").connect(provider);
                 window.wallet = await Wallet.fromEthWallet(signer, franklinProvider);
                 window.walletDecorator = new WalletDecorator(window.wallet);
+
+                // uncomment this one 
+                // let franklinProvider = new FranklinProvider(this.config.API_SERVER, this.config.CONTRACT_ADDR);
+                // let signer = ethersProvider.getSigner();
+                // window.wallet = await Wallet.fromEthWallet(signer, franklinProvider);
+                // window.walletDecorator = new WalletDecorator(window.wallet);
+
                 this.$parent.$router.push('/main')
             } catch (e) {
                 alert('Login failed: ', e.message);

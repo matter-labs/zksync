@@ -2,7 +2,7 @@
     <b-button variant="light" 
         class="copyable tokenNameButton" 
         size="sm"
-        v-b-tooltip.hover 
+        v-b-tooltip.hover.left
         :title="hover_title"
         @click="clicked"
         @mouseenter="mouseEnter"
@@ -21,7 +21,9 @@ export default {
     }),
     methods: {
         clicked() {
-            this.hover_title = 'copied';
+            if (this.data.item.address) {
+                this.hover_title = 'copied';
+            }
         },
         mouseEnter() {
             this.hover_title = this.data.item.address 
@@ -30,3 +32,10 @@ export default {
     },
 }
 </script>
+
+<style scoped>
+.tokenNameButton {
+    display: inline-block;
+    height: 2;
+}
+</style>

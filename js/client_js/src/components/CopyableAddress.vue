@@ -1,6 +1,7 @@
 <template>
     <b-form-input 
         type="text" 
+        style="cursor: pointer"
         class="copyable mr-2"
         v-b-tooltip.hover
         :title="hover_title"

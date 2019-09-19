@@ -80,6 +80,7 @@ export class WalletDecorator {
             if (res[tokenId] === undefined) {
                 res[tokenId] = {
                     tokenName: this.tokenNameFromId(tokenId),
+                    address: this.wallet.supportedTokens[tokenId].address,
                 };
             }
             res[tokenId][key] = balance;
