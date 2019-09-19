@@ -14,10 +14,10 @@ async function main() {
     const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
     let ethWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
     let wallet = await Wallet.fromEthWallet(ethWallet);
-    let full_exit_tx = await wallet.emergencyWithdraw({id: 0, address: ethers.constants.AddressZero});
-    console.log(full_exit_tx);
-    // let dep_tx = await wallet.deposit({id: 0, address: ''}, parseEther("0.2"));
-    // console.log(dep_tx);
+    // let full_exit_tx = await wallet.emergencyWithdraw({id: 0, address: ethers.constants.AddressZero});
+    // console.log(full_exit_tx);
+    let dep_tx = await wallet.deposit({id: 0, address: ''}, parseEther("0.2"));
+    console.log(dep_tx);
 
     await wallet.updateState();
     console.log(wallet.supportedTokens);
