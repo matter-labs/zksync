@@ -4,15 +4,12 @@ import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
 import "./Governance.sol";
 import "./Verifier.sol";
-import "./VerificationKey.sol";
 import "./Bytes.sol";
 
 // GLOBAL TODOS:
 // - check overflows
 
 contract Franklin {
-    // Verification key contract
-    VerificationKey verificationKey;
     // Verifier contract
     Verifier verifier;
     // Governance contract
@@ -230,12 +227,10 @@ contract Franklin {
     // sets genesis root
     constructor(
         address _verifierAddress,
-        address _vkAddress,
         bytes32 _genesisRoot,
         address _governanceAddress
     ) public {
         verifier = Verifier(_verifierAddress);
-        verificationKey = VerificationKey(_vkAddress);
         governance = Governance(_governanceAddress);
 
         blocks[0].stateRoot = _genesisRoot;
@@ -808,10 +803,10 @@ contract Franklin {
         ); // fvk12 - not a validator in verify
 
         // TODO: - doesnt work in integration test - revert with vfyfp3 code. Need to be fixed
-        // require(
-        //     verifyBlockProof(_proof, blocks[_blockNumber].commitment),
-        //     "fvk13"
-        // ); // fvk13 - verification failed
+         require(
+             verifier.verifyBlockProof(_proof, blocks[_blockNumber].commitment),
+             "fvk13"
+         ); // fvk13 - verification failed
 
         consummateOnchainOps(_blockNumber);
 
@@ -823,24 +818,6 @@ contract Franklin {
         totalBlocksVerified += 1;
 
         emit BlockVerified(_blockNumber);
-    }
-
-    // Proof verification
-    // Params:
-    // - _proof - block number
-    // - _commitment - block commitment
-    function verifyBlockProof(uint256[8] memory _proof, bytes32 _commitment)
-        internal
-        view
-        returns (bool valid)
-    {
-        uint256 mask = (~uint256(0)) >> 3;
-        uint256[14] memory vk;
-        uint256[] memory gammaABC;
-        (vk, gammaABC) = verificationKey.getVk();
-        uint256[] memory inputs = new uint256[](1);
-        inputs[0] = uint256(_commitment) & mask;
-        return verifier.Verify(vk, gammaABC, _proof, inputs);
     }
 
     // If block is verified the onchain operations from it must be completed
@@ -900,40 +877,41 @@ contract Franklin {
 
     // Checks that commitment is expired and revert blocks
     function triggerRevertIfBlockCommitmentExpired() internal returns (bool) {
-        if (
-            totalBlocksCommitted > totalBlocksVerified
-            && blocks[totalBlocksVerified + 1].committedAtBlock > 0
-            && block.number > blocks[totalBlocksVerified + 1].committedAtBlock + EXPECT_VERIFICATION_IN
-        ) {
-            revertBlocks();
-            return true;
-        }
+        // TODO: uncomment
+//        if (
+//            totalBlocksCommitted > totalBlocksVerified
+//            && blocks[totalBlocksVerified + 1].committedAtBlock > 0
+//            && block.number > blocks[totalBlocksVerified + 1].committedAtBlock + EXPECT_VERIFICATION_IN
+//        ) {
+//            revertBlocks();
+//            return true;
+//        }
         return false;
     }
-
-    // Reverts unverified blocks
-    function revertBlocks() internal {
-        for (uint32 i = totalBlocksVerified + 1; i <= totalBlocksCommitted; i++) {
-            Block memory reverted = blocks[i];
-            revertBlock(reverted);
-            delete blocks[i];
-        }
-        totalBlocksCommitted -= totalBlocksCommitted - totalBlocksVerified;
-        emit BlocksReverted(totalBlocksVerified, totalBlocksCommitted);
-    }
-
-    // Reverts block onchain operations
-    // Params:
-    // - _reverted - reverted block
-    function revertBlock(Block memory _reverted) internal {
-        require(
-            _reverted.committedAtBlock > 0,
-            "frk11"
-        ); // frk11 - block not found
-        revertOnchainOps(_reverted.operationStartId, _reverted.onchainOperations);
-        totalCommittedPriorityRequests -= _reverted.priorityOperations;
-    }
-
+//    TODO: uncomment
+//    // Reverts unverified blocks
+//    function revertBlocks() internal {
+//        for (uint32 i = totalBlocksVerified + 1; i <= totalBlocksCommitted; i++) {
+//            Block memory reverted = blocks[i];
+//            revertBlock(reverted);
+//            delete blocks[i];
+//        }
+//        totalBlocksCommitted -= totalBlocksCommitted - totalBlocksVerified;
+//        emit BlocksReverted(totalBlocksVerified, totalBlocksCommitted);
+//    }
+//
+//    // Reverts block onchain operations
+//    // Params:
+//    // - _reverted - reverted block
+//    function revertBlock(Block memory _reverted) internal {
+//        require(
+//            _reverted.committedAtBlock > 0,
+//            "frk11"
+//        ); // frk11 - block not found
+//        revertOnchainOps(_reverted.operationStartId, _reverted.onchainOperations);
+//        totalCommittedPriorityRequests -= _reverted.priorityOperations;
+//    }
+//
     // MARK: - EXODUS MODE
 
     // Checks that current state not is exodus mode
