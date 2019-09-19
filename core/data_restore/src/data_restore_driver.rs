@@ -70,37 +70,59 @@ impl DataRestoreDriver {
                 "Verified franklin blocks count: {:?}",
                 &self.events_state.verified_blocks.len()
             );
-            if let Err(error) = self.update_events(),
-                let Err(error) = self.update_accounts() {
-                error!("Something goes wrong: {:?}", error);
-                self.run_updates = false;
-                err = Some(DataRestoreError::StateUpdate(format!(
-                    "Error occured: {:?}",
-                    error
-                )));
+
+            let new_events = match self.events_state.update_events_state(
+                self.blocks_delta.clone(),
+                self.end_eth_blocks_delta.clone()
+            ) {
+                Ok(res) => res,
+                Err(error) => {
+                    self.run_updates = false;
+                    err = Some(DataRestoreError::EventsError(format!(
+                        "Error occured: {:?}",
+                        error
+                    )));
+                }
             }
+            info!(
+                "Got new events"
+            );
+
+            storage_interactor.update_events_state(&new_events)
+            .map_err(|e| DataRestoreError::StorageError(e.to_string()))?;
+            info!(
+                "Updated events storage"
+            );
+            
+            let new_operations = match get_operations_from_events(&new_events) {
+                Ok(res) => res,
+                Err(error) => {
+                    self.run_updates = false;
+                    err = Some(DataRestoreError::OperationsError(format!(
+                        "Error occured: {:?}",
+                        error
+                    )));
+                }
+            }
+            info!(
+                "Parsed events to operations"
+            );
+
+            storage_interactor.update_operations_list(&new_operations)
+            .map_err(|e| DataRestoreError::StorageError(e.to_string()))?;
+            info!(
+                "Updated operations storage"
+            );
+
+            self.account_states.update_accounts_state(&new_operations)
+            .map_err(|e| DataRestoreError::AccountsError(e.to_string()))?;
+            info!(
+                "Updated accounts state"
+            );
         }
         info!("Stopped state updates");
         err
         Ok(())
-    }
-
-    /// Update events state
-    fn update_events(&mut self) -> Result<(), DataRestoreError> {
-        self.events_state.update_events_state(
-            self.blocks_delta.clone(),
-            self.end_eth_blocks_delta.clone()
-        )
-        .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-    }
-
-    /// Update accounts state
-    fn update_events(&mut self) -> Result<(), DataRestoreError> {
-        self.accounts_state.update_accounts_state(
-            self.blocks_delta.clone(),
-            self.end_eth_blocks_delta.clone()
-        )
-        .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
     }
 
     // /// Update past events and accounts states
