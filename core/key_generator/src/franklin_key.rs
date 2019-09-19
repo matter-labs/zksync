@@ -2,7 +2,6 @@ use bellman;
 
 use time::PreciseTime;
 
-use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use pairing::bn256::*;
 use rand::OsRng;
 
@@ -48,7 +47,7 @@ pub fn make_franklin_key() {
     let f_cont = File::create(contract_file_path).expect("Unable to create file");
 
     // let p_g = FixedGenerators::SpendingKeyGenerator;
-    let params = &AltJubjubBn256::new();
+    let params = &franklin_constants::JUBJUB_PARAMS;
     // let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
     let rng = &mut OsRng::new().unwrap();
 

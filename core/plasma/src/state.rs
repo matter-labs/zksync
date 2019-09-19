@@ -127,10 +127,14 @@ impl PlasmaState {
 
     fn apply_full_exit(&mut self, priority_op: FullExit) -> OpSuccess {
         let account_data = {
-            priority_op
-                .verify_signature()
-                .and_then(|addr| self.get_account_by_address(&addr))
-                .map(|(acc_id, account)| (acc_id, account.get_balance(priority_op.token)))
+            if priority_op.token < (params::TOTAL_TOKENS as TokenId) {
+                priority_op
+                    .verify_signature()
+                    .and_then(|addr| self.get_account_by_address(&addr))
+                    .map(|(acc_id, account)| (acc_id, account.get_balance(priority_op.token)))
+            } else {
+                None
+            }
         };
         let op = FullExitOp {
             priority_op,

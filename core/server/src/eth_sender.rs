@@ -371,7 +371,9 @@ impl<T: Transport> ETHSender<T> {
 
                 if let Some(status) = tx_state.confirmed_status() {
                     let success = status == 1;
-                    self.save_completed_tx_to_db(&tx.hash)?;
+                    if success {
+                        self.save_completed_tx_to_db(&tx.hash)?;
+                    }
                     *state = OperationState::Commited {
                         success,
                         hash: tx.hash,
@@ -382,12 +384,13 @@ impl<T: Transport> ETHSender<T> {
                         if let Ok(Some((confirmations, status))) = self.get_tx_status(old_tx) {
                             if confirmations >= WAIT_CONFIRMATIONS {
                                 let success = status == 1;
-                                if self.save_completed_tx_to_db(&old_tx).is_ok() {
-                                    return Some(OperationState::Commited {
-                                        success,
-                                        hash: *old_tx,
-                                    });
+                                if success {
+                                    self.save_completed_tx_to_db(&old_tx).ok()?;
                                 }
+                                return Some(OperationState::Commited {
+                                    success,
+                                    hash: *old_tx,
+                                });
                             }
                         }
                         None

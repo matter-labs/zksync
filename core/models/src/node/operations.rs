@@ -123,7 +123,7 @@ pub struct FullExitOp {
 }
 
 impl FullExitOp {
-    pub const CHUNKS: usize = 15;
+    pub const CHUNKS: usize = 18;
     const OP_CODE: u8 = 0x06;
 
     fn get_public_data(&self) -> Vec<u8> {
