@@ -43,7 +43,7 @@ fn main() {
 fn create_data_restore_driver(
     connection_pool: ConnectionPool,
 ) -> DataRestoreDriver {
-    DataRestoreDriver::new(connection_pool, 250, 25); // TODO: - rethinks how to get deltas
+    DataRestoreDriver::new(connection_pool, 12, 250, 25); // TODO: - rethinks how to get blocks
 }
 
 /// Loads state from the beginning

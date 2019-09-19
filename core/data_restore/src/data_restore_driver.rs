@@ -5,16 +5,16 @@ use crate::franklin_op_block::FranklinOpBlock;
 use crate::helpers::*;
 use crate::storage_interactor;
 use storage::ConnectionPool;
-use web3::types::U256;
+// use web3::types::U256;
 
 /// Description of data restore driver
 pub struct DataRestoreDriver {
     /// Database connection pool
     pub connection_pool: ConnectionPool,
     /// Step of the considered blocks ethereum block
-    pub eth_blocks_delta: U256,
+    pub eth_blocks_delta: u64,
     /// Delta between last ethereum block and last watched ethereum block
-    pub end_eth_blocks_delta: U256,
+    pub end_eth_blocks_delta: u64,
     /// Flag that indicates that state updates are running
     pub run_updates: bool,
     /// Franklin contract events state
@@ -36,8 +36,9 @@ impl DataRestoreDriver {
     ///
     pub fn new(
         connection_pool: ConnectionPool,
-        eth_blocks_delta: U256
-        end_eth_blocks_delta: U256
+        genesis_block_number: u64,
+        eth_blocks_delta: u64
+        end_eth_blocks_delta: u64
     ) -> Self {
         Self {
             connection_pool,
