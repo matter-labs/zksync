@@ -69,6 +69,32 @@
       "type": "function"
     },
     {
+      "constant": false,
+      "inputs": [
+        {
+          "name": "_pubKey",
+          "type": "bytes"
+        },
+        {
+          "name": "_token",
+          "type": "address"
+        },
+        {
+          "name": "_signature",
+          "type": "bytes"
+        },
+        {
+          "name": "_nonce",
+          "type": "uint32"
+        }
+      ],
+      "name": "fullExit",
+      "outputs": [],
+      "payable": true,
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
       "constant": true,
       "inputs": [],
       "name": "totalCommittedPriorityRequests",
@@ -283,28 +309,6 @@
       "constant": false,
       "inputs": [
         {
-          "name": "_pubKey",
-          "type": "bytes"
-        },
-        {
-          "name": "_token",
-          "type": "address"
-        },
-        {
-          "name": "_signature",
-          "type": "bytes"
-        }
-      ],
-      "name": "fullExit",
-      "outputs": [],
-      "payable": true,
-      "stateMutability": "payable",
-      "type": "function"
-    },
-    {
-      "constant": false,
-      "inputs": [
-        {
           "name": "_blockNumber",
           "type": "uint32"
         },
@@ -405,10 +409,6 @@
       "inputs": [
         {
           "name": "_verifierAddress",
-          "type": "address"
-        },
-        {
-          "name": "_vkAddress",
           "type": "address"
         },
         {
@@ -623,6 +623,32 @@
       "type": "function"
     },
     {
+      "constant": false,
+      "inputs": [
+        {
+          "name": "_pubKey",
+          "type": "bytes"
+        },
+        {
+          "name": "_token",
+          "type": "address"
+        },
+        {
+          "name": "_signature",
+          "type": "bytes"
+        },
+        {
+          "name": "_nonce",
+          "type": "uint32"
+        }
+      ],
+      "name": "fullExit",
+      "outputs": [],
+      "payable": true,
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
       "constant": true,
       "inputs": [],
       "name": "totalCommittedPriorityRequests",
@@ -837,28 +863,6 @@
       "constant": false,
       "inputs": [
         {
-          "name": "_pubKey",
-          "type": "bytes"
-        },
-        {
-          "name": "_token",
-          "type": "address"
-        },
-        {
-          "name": "_signature",
-          "type": "bytes"
-        }
-      ],
-      "name": "fullExit",
-      "outputs": [],
-      "payable": true,
-      "stateMutability": "payable",
-      "type": "function"
-    },
-    {
-      "constant": false,
-      "inputs": [
-        {
           "name": "_blockNumber",
           "type": "uint32"
         },
@@ -959,10 +963,6 @@
       "inputs": [
         {
           "name": "_verifierAddress",
-          "type": "address"
-        },
-        {
-          "name": "_vkAddress",
           "type": "address"
         },
         {

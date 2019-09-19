@@ -1,5 +1,6 @@
 use super::operations::{DepositOp, FullExitOp};
 use super::tx::{PackedPublicKey, PackedSignature, TxSignature};
+use super::Nonce;
 use super::{AccountAddress, TokenId};
 use crate::params::FR_ADDRESS_LEN;
 use bigdecimal::BigDecimal;
@@ -24,6 +25,7 @@ pub struct FullExit {
     pub packed_pubkey: Box<[u8; 32]>,
     pub eth_address: Address,
     pub token: TokenId,
+    pub nonce: Nonce,
     pub signature_r: Box<[u8; 32]>,
     pub signature_s: Box<[u8; 32]>,
 }
@@ -36,6 +38,7 @@ impl FullExit {
         out.extend_from_slice(self.packed_pubkey.as_ref());
         out.extend_from_slice(&self.eth_address.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
+        out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }
 
@@ -95,16 +98,21 @@ impl FranklinPriorityOp {
                 }))
             }
             FULLEXIT_OPTYPE_ID => {
-                ensure!(pub_data.len() == 32 + 20 + 2 + 64, "Pub data len mismatch");
+                ensure!(
+                    pub_data.len() == 32 + 20 + 2 + 64 + 4,
+                    "Pub data len mismatch"
+                );
                 let packed_pubkey = Box::new(pub_data[0..32].try_into().unwrap());
                 let eth_address = Address::from_slice(&pub_data[32..(32 + 20)]);
                 let token = u16::from_be_bytes(pub_data[52..(52 + 2)].try_into().unwrap());
-                let signature_r = Box::new(pub_data[54..(54 + 32)].try_into().unwrap());
-                let signature_s = Box::new(pub_data[86..(86 + 32)].try_into().unwrap());
+                let nonce = u32::from_be_bytes(pub_data[54..(54 + 4)].try_into().unwrap());
+                let signature_r = Box::new(pub_data[58..(58 + 32)].try_into().unwrap());
+                let signature_s = Box::new(pub_data[90..(90 + 32)].try_into().unwrap());
                 Ok(Self::FullExit(FullExit {
                     packed_pubkey,
                     eth_address,
                     token,
+                    nonce,
                     signature_r,
                     signature_s,
                 }))

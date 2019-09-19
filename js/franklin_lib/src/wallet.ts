@@ -126,6 +126,7 @@ export interface CloseTx {
 export interface FullExitReq {
     token: number,
     eth_address: String
+    nonce: number,
 }
 
 export class WalletKeys {
@@ -185,8 +186,9 @@ export class WalletKeys {
         let eth_address = Buffer.from(op.eth_address.slice(2),"hex")
         let token = Buffer.alloc(2);
         token.writeUInt16BE(op.token,0);
-
-        let msg = Buffer.concat([type, packed_pubkey, eth_address, token]);
+        let nonce = Buffer.alloc(4);
+        nonce.writeUInt32BE(op.nonce, 0);
+        let msg = Buffer.concat([type, packed_pubkey, eth_address, token, nonce]);
         return Buffer.from(musigPedersen(this.privateKey, msg).sign, "hex");
     }
 }
@@ -250,8 +252,9 @@ export class Wallet {
 
     async emergencyWithdraw(token: Token) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
-        let signature = this.walletKeys.signFullExit({token: token.id, eth_address: await this.ethWallet.getAddress()});
-        let tx = await franklinDeployedContract.fullExit(serializePointPacked(this.walletKeys.publicKey), token.address,  signature,
+        let nonce = await this.getNonce();
+        let signature = this.walletKeys.signFullExit({token: token.id, eth_address: await this.ethWallet.getAddress(), nonce});
+        let tx = await franklinDeployedContract.fullExit(serializePointPacked(this.walletKeys.publicKey), token.address,  signature, nonce,
             {gasLimit: bigNumberify("500000"), value: parseEther("0.02")});
         return tx.hash;
     }
