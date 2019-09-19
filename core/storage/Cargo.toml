@@ -18,6 +18,7 @@ chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 log = "0.4"
 failure = "0.1"
 itertools = "0.8"
+hex = "0.4"
 
 [dev-dependencies]
 env_logger = "0.6"

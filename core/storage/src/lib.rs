@@ -38,6 +38,8 @@ sql_function!(coalesce, Coalesce, (x: Nullable<BigInt>, y: BigInt) -> BigInt);
 use itertools::Itertools;
 use models::node::AccountAddress;
 
+use hex;
+
 #[derive(Clone)]
 pub struct ConnectionPool {
     pool: Pool<ConnectionManager<PgConnection>>,
@@ -571,6 +573,7 @@ pub enum TxAddError {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AccountTransaction {
     tx: Value,
+    tx_hash: String,
     success: bool,
     fail_reason: Option<String>,
     committed: bool,
@@ -681,6 +684,7 @@ impl StorageProcessor {
                 let (mempool_tx, executed_tx, operation) = group_iter.next().unwrap();
                 let mut res = AccountTransaction {
                     tx: mempool_tx.tx,
+                    tx_hash: hex::encode(mempool_tx.hash.as_slice()),
                     success: false,
                     fail_reason: None,
                     committed: false,
