@@ -4,6 +4,7 @@ use ff::{BitIterator, Field, PrimeField};
 use franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
 use franklin_crypto::circuit::num::{AllocatedNum, Num};
 use franklin_crypto::circuit::Assignment;
+use franklin_crypto::eddsa::Signature;
 use franklin_crypto::eddsa::{PrivateKey, PublicKey};
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
 
@@ -47,6 +48,13 @@ where
     // if !is_valid_signature {
     //     return None;
     // }
+    convert_signature_to_representation(signature)
+}
+
+pub fn convert_signature_to_representation<E>(signature: Signature<E>) -> SignatureData
+where
+    E: JubjubEngine,
+{
     let (sig_x, sig_y) = signature.clone().r.into_xy();
     let mut signature_s_be_bits: Vec<bool> = BitIterator::new(signature.s.into_repr()).collect();
     signature_s_be_bits.reverse();
@@ -60,7 +68,6 @@ where
     signature_r_y_be_bits.reverse();
     signature_r_y_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
     signature_r_y_be_bits.reverse();
-
     let mut sig_r_packed_bits = vec![];
     sig_r_packed_bits
         .push(signature_r_x_be_bits[franklin_constants::FR_BIT_WIDTH_PADDED - 1].clone());

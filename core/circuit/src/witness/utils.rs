@@ -55,6 +55,24 @@ pub fn generate_dummy_sig_data(
         sender_y,
     )
 }
+
+pub fn generate_sig_witness(
+    bits: &[bool],
+    phasher: &PedersenHasher<Bn256>,
+    params: &AltJubjubBn256,
+) -> (Fr, Fr, Fr) {
+    let mut sig_bits_to_hash = bits.to_vec();
+    assert!(sig_bits_to_hash.len() < franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
+
+    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS, false);
+    let (first_sig_part_bits, remaining) = sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
+    let remaining = remaining.to_vec();
+    let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
+    let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits);
+    let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits);
+    let third_sig_part: Fr = le_bit_vector_into_field_element(&third_sig_part_bits);
+    (first_sig_part, second_sig_part, third_sig_part)
+}
 pub fn generate_sig_data(
     bits: &[bool],
     phasher: &PedersenHasher<Bn256>,

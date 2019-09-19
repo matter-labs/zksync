@@ -116,10 +116,8 @@ pub fn apply_full_exit_tx(
 ) -> FullExitWitness<Bn256> {
     let full_exit = FullExitData {
         token: u32::from(full_exit.priority_op.token),
-        account_address: full_exit.priority_op.account_id,
+        account_address: full_exit.account_data.clone().unwrap().0,
         ethereum_key: Fr::from_hex(&format!("{:x}", &full_exit.priority_op.eth_address)).unwrap(),
-        // sig_s_bits: be_bytes_into_bits(&full_exit.tx.signature_s.clone()),
-        // sig_r_packed_bits: be_bytes_into_bits(&full_exit.tx.signature_r_packed.clone()),
     };
     // le_bit_vector_into_field_element()
     apply_full_exit(tree, &full_exit, is_sig_valid)

@@ -16,6 +16,7 @@ use bellman::groth16::{
 };
 use circuit::account::AccountWitness;
 use circuit::circuit::FranklinCircuit;
+use circuit::operation::SignatureData;
 use circuit::witness::close_account::*;
 use circuit::witness::deposit::*;
 use circuit::witness::noop::noop_operation;
@@ -27,6 +28,7 @@ use ff::{Field, PrimeField};
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccount;
+use models::circuit::utils::bytes_into_be_bits;
 use models::circuit::CircuitAccountTree;
 use models::merkle_tree::PedersenHasher;
 use models::node::Account;
@@ -34,13 +36,12 @@ use models::node::*;
 use models::params as franklin_constants;
 use models::primitives::pack_bits_into_bytes_in_order;
 use models::EncodedProof;
+use num_traits::cast::ToPrimitive;
 use plasma::state::PlasmaState;
 use tokio::prelude::*;
 use tokio::runtime::current_thread::Handle;
 use tokio::sync::oneshot::Sender;
 use tokio::timer;
-
-use num_traits::cast::ToPrimitive;
 // use models::circuit::encoder;
 // use models::config::{
 //    DEPOSIT_BATCH_SIZE, EXIT_BATCH_SIZE, PROVER_CYCLE_WAIT, PROVER_TIMEOUT, PROVER_TIMER_TICK,
@@ -343,18 +344,42 @@ impl BabyProver {
                     FranklinOp::Transfer(transfer) => {
                         let transfer_witness =
                             apply_transfer_tx(&mut self.accounts_tree, &transfer);
-                        let (
-                            signature,
-                            first_sig_msg,
-                            second_sig_msg,
-                            third_sig_msg,
-                            sender_x,
-                            sender_y,
-                        ) = generate_dummy_sig_data(
-                            &transfer_witness.get_sig_bits(),
-                            &phasher,
-                            &params,
-                        );
+                        let sig_bytes = transfer.tx.signature.sign.serialize_packed().unwrap();
+                        let (r_bytes, s_bytes) = sig_bytes.split_at(32);
+                        let mut r_bytes = r_bytes.to_vec();
+                        let mut s_bytes = s_bytes.to_vec();
+                        r_bytes.reverse();
+                        s_bytes.reverse();
+                        let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
+                            .iter()
+                            .map(|x| Some(*x))
+                            .collect();
+                        let s_bits: Vec<_> = bytes_into_be_bits(&s_bytes)
+                            .iter()
+                            .map(|x| Some(*x))
+                            .collect();
+                        let signature = SignatureData {
+                            r_packed: r_bits,
+                            s: s_bits,
+                        };
+                        let sig_bits: Vec<bool> = bytes_into_be_bits(&transfer.tx.get_bytes());
+
+                        let (first_sig_msg, second_sig_msg, third_sig_msg) =
+                            generate_sig_witness(&sig_bits, &phasher, &params);
+                        let (sender_x, sender_y) = (transfer.tx.signature.pub_key.0).0.into_xy();
+                        // generate_sig_data(bits: &[bool], phasher: &PedersenHasher<Bn256>, private_key: &PrivateKey<Bn256>, params: &AltJubjubBn256)
+                        // let (
+                        //     signature,
+                        //     first_sig_msg,
+                        //     second_sig_msg,
+                        //     third_sig_msg,
+                        //     sender_x,
+                        //     sender_y,
+                        // ) = generate_dummy_sig_data(
+                        //     &transfer_witness.get_sig_bits(),
+                        //     &phasher,
+                        //     &params,
+                        // );
                         let transfer_operations = calculate_transfer_operations_from_witness(
                             &transfer_witness,
                             &first_sig_msg,
@@ -400,18 +425,42 @@ impl BabyProver {
                     FranklinOp::Withdraw(withdraw) => {
                         let withdraw_witness =
                             apply_withdraw_tx(&mut self.accounts_tree, &withdraw);
-                        let (
-                            signature,
-                            first_sig_msg,
-                            second_sig_msg,
-                            third_sig_msg,
-                            sender_x,
-                            sender_y,
-                        ) = generate_dummy_sig_data(
-                            &withdraw_witness.get_sig_bits(),
-                            &phasher,
-                            &params,
-                        );
+                        let sig_bytes = withdraw.tx.signature.sign.serialize_packed().unwrap();
+                        let (r_bytes, s_bytes) = sig_bytes.split_at(32);
+                        let mut r_bytes = r_bytes.to_vec();
+                        let mut s_bytes = s_bytes.to_vec();
+                        r_bytes.reverse();
+                        s_bytes.reverse();
+                        let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
+                            .iter()
+                            .map(|x| Some(*x))
+                            .collect();
+                        let s_bits: Vec<_> = bytes_into_be_bits(&s_bytes)
+                            .iter()
+                            .map(|x| Some(*x))
+                            .collect();
+                        let signature = SignatureData {
+                            r_packed: r_bits,
+                            s: s_bits,
+                        };
+                        let sig_bits: Vec<bool> = bytes_into_be_bits(&withdraw.tx.get_bytes());
+
+                        let (first_sig_msg, second_sig_msg, third_sig_msg) =
+                            generate_sig_witness(&sig_bits, &phasher, &params);
+                        let (sender_x, sender_y) = (withdraw.tx.signature.pub_key.0).0.into_xy();
+
+                        // let (
+                        //     signature,
+                        //     first_sig_msg,
+                        //     second_sig_msg,
+                        //     third_sig_msg,
+                        //     sender_x,
+                        //     sender_y,
+                        // ) = generate_dummy_sig_data(
+                        //     &withdraw_witness.get_sig_bits(),
+                        //     &phasher,
+                        //     &params,
+                        // );
                         let withdraw_operations = calculate_withdraw_operations_from_witness(
                             &withdraw_witness,
                             &first_sig_msg,

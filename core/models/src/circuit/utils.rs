@@ -93,6 +93,18 @@ pub fn be_bit_vector_into_bytes(bits: &[bool]) -> Vec<u8> {
     bytes
 }
 
+pub fn bytes_into_be_bits(bytes: &[u8]) -> Vec<bool> {
+    let mut bits = vec![];
+    for byte in bytes {
+        let mut temp = *byte;
+        for _ in 0..8 {
+            bits.push(temp & 0x80 == 0x80);
+            temp <<= 1;
+        }
+    }
+    bits
+}
+
 pub fn append_le_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, width: usize) {
     let mut token_bits: Vec<bool> = BitIterator::new(x.into_repr()).collect();
     token_bits.reverse();
