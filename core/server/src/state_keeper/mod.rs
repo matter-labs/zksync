@@ -13,6 +13,7 @@ use storage::ConnectionPool;
 use std::sync::mpsc::{Receiver, Sender};
 
 use crate::eth_watch::ETHState;
+use crate::ThreadPanicNotify;
 use itertools::Itertools;
 use models::params::BLOCK_SIZE_CHUNKS;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -380,10 +381,14 @@ pub fn start_state_keeper(
     mut sk: PlasmaStateKeeper,
     rx_for_blocks: Receiver<StateKeeperRequest>,
     tx_for_commitments: Sender<CommitRequest>,
+    panic_notify: Sender<bool>,
 ) {
     std::thread::Builder::new()
         .name("state_keeper".to_string())
-        .spawn(move || sk.run(rx_for_blocks, tx_for_commitments))
+        .spawn(move || {
+            let _panic_sentinel = ThreadPanicNotify(panic_notify);
+            sk.run(rx_for_blocks, tx_for_commitments)
+        })
         .expect("State keeper thread");
 }
 

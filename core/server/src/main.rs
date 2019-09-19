@@ -2,17 +2,15 @@
 #[macro_use]
 extern crate log;
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::channel;
-use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
 use server::api_server::start_api_server;
 use server::committer::start_committer;
-use server::eth_sender;
 use server::eth_watch::start_eth_watch;
 use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
+use server::{eth_sender, ThreadPanicNotify};
 
 use models::{node::config, StateKeeperRequest};
 use storage::ConnectionPool;
@@ -42,13 +40,14 @@ fn main() {
     debug!("starting server");
 
     // handle ctrl+c
-    let stop_signal = Arc::new(AtomicBool::new(false));
-    signal_hook::flag::register(signal_hook::SIGTERM, Arc::clone(&stop_signal))
-        .expect("Error setting SIGTERM handler");
-    signal_hook::flag::register(signal_hook::SIGINT, Arc::clone(&stop_signal))
-        .expect("Error setting SIGINT handler");
-    signal_hook::flag::register(signal_hook::SIGQUIT, Arc::clone(&stop_signal))
-        .expect("Error setting SIGQUIT handler");
+    let (stop_signal_sender, stop_signal_receiver) = channel();
+    {
+        let stop_signal_sender = stop_signal_sender.clone();
+        ctrlc::set_handler(move || {
+            stop_signal_sender.send(true).expect("crtlc signal send");
+        })
+        .expect("Error setting Ctrl-C handler");
+    }
 
     // create main tokio runtime
     //let rt = Runtime::new().unwrap();
@@ -76,32 +75,44 @@ fn main() {
     info!("starting actors");
 
     let (tx_for_state, rx_for_state) = channel();
-    start_api_server(tx_for_state.clone(), connection_pool.clone());
-    let shared_eth_state = start_eth_watch(connection_pool.clone());
+    start_api_server(
+        tx_for_state.clone(),
+        connection_pool.clone(),
+        stop_signal_sender.clone(),
+    );
+    let shared_eth_state = start_eth_watch(connection_pool.clone(), stop_signal_sender.clone());
     let (tx_for_ops, rx_for_ops) = channel();
     let state_keeper = PlasmaStateKeeper::new(connection_pool.clone(), shared_eth_state);
-    start_state_keeper(state_keeper, rx_for_state, tx_for_ops.clone());
-    let tx_for_eth = eth_sender::start_eth_sender(connection_pool.clone());
-    start_committer(rx_for_ops, tx_for_eth, connection_pool.clone());
-
-    // start_prover(connection_pool.clone(), "worker 1");
-    // start_prover(connection_pool.clone(), "worker 2");
-    // start_prover(connection_pool.clone(), "worker 3");
+    start_state_keeper(
+        state_keeper,
+        rx_for_state,
+        tx_for_ops.clone(),
+        stop_signal_sender.clone(),
+    );
+    let tx_for_eth =
+        eth_sender::start_eth_sender(connection_pool.clone(), stop_signal_sender.clone());
+    start_committer(
+        rx_for_ops,
+        tx_for_eth,
+        connection_pool.clone(),
+        stop_signal_sender.clone(),
+    );
 
     // Simple timer, pings every 100 ms
     thread::Builder::new()
         .name("timer".to_string())
-        .spawn(move || loop {
-            tx_for_state
-                .send(StateKeeperRequest::TimerTick)
-                .expect("tx_for_state channel failed");
-            thread::sleep(Duration::from_millis(100));
+        .spawn(move || {
+            let _panic_sentinel = ThreadPanicNotify(stop_signal_sender);
+            loop {
+                tx_for_state
+                    .send(StateKeeperRequest::TimerTick)
+                    .expect("tx_for_state channel failed");
+                thread::sleep(Duration::from_millis(100));
+            }
         })
         .expect("thread creation failed");
 
-    while !stop_signal.load(Ordering::SeqCst) {
-        thread::sleep(Duration::from_secs(1));
-    }
+    stop_signal_receiver.recv().expect("stop signal receive");
 
     info!("terminate signal received");
 }
