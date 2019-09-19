@@ -77,19 +77,6 @@ contract FranklinTest {
         uint32 indexed totalBlocksCommitted
     );
 
-    // Event emitted when user send a transaction to deposit her funds
-    // Structure:
-    // - owner - sender
-    // - tokenId - deposited token
-    // - amount - deposited value
-    // - franlkinAddress - address of Franklin account whtere deposit will be sent
-    event OnchainDeposit(
-        address indexed owner,
-        uint16 tokenId,
-        uint128 amount,
-        bytes franklinAddress
-    );
-
     // Event emitted when user send a transaction to withdraw her funds from onchain balance
     // Structure:
     // - owner - sender
@@ -503,13 +490,6 @@ contract FranklinTest {
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt128(_amount)); // amount
         pubData = Bytes.concat(pubData, _franklinAddr); // franklin address
         addPriorityRequest(OpType.Deposit, _fee, pubData);
-
-        emit OnchainDeposit(
-            msg.sender,
-            _token,
-            _amount,
-            _franklinAddr
-        );
     }
 
     // Register withdrawal
