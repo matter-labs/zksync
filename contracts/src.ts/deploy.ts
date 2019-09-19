@@ -37,13 +37,9 @@ export async function deployFranklin(
     genesisRoot = ethers.constants.HashZero,
     franklinCode = franklinContractCode,
     verifierCode = verifierContractCode,
-    vkCode = vkContractCode
     ) {
     try {
         let verifier = await deployContract(wallet, verifierCode, [], {
-            gasLimit: 1000000,
-        });
-        let vk = await deployContract(wallet, vkCode, [], {
             gasLimit: 1000000,
         });
         let contract = await deployContract(
@@ -51,7 +47,6 @@ export async function deployFranklin(
             franklinCode,
             [
                 verifier.address,
-                vk.address,
                 genesisRoot,
                 governanceAddress
             ],

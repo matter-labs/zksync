@@ -11,8 +11,6 @@ import "./Bytes.sol";
 // - check overflows
 
 contract FranklinTest {
-    // Verification key contract
-    VerificationKey verificationKey;
     // Verifier contract
     Verifier verifier;
     // Governance contract
@@ -227,12 +225,10 @@ contract FranklinTest {
     // sets genesis root
     constructor(
         address _verifierAddress,
-        address _vkAddress,
         bytes32 _genesisRoot,
         address _governanceAddress
     ) public {
         verifier = Verifier(_verifierAddress);
-        verificationKey = VerificationKey(_vkAddress);
         governance = Governance(_governanceAddress);
 
         blocks[0].stateRoot = _genesisRoot;
@@ -813,24 +809,6 @@ contract FranklinTest {
         totalBlocksVerified += 1;
 
         emit BlockVerified(_blockNumber);
-    }
-
-    // Proof verification
-    // Params:
-    // - _proof - block number
-    // - _commitment - block commitment
-    function verifyBlockProof(uint256[8] memory _proof, bytes32 _commitment)
-        internal
-        view
-        returns (bool valid)
-    {
-        uint256 mask = (~uint256(0)) >> 3;
-        uint256[14] memory vk;
-        uint256[] memory gammaABC;
-        (vk, gammaABC) = verificationKey.getVk();
-        uint256[] memory inputs = new uint256[](1);
-        inputs[0] = uint256(_commitment) & mask;
-        return verifier.Verify(vk, gammaABC, _proof, inputs);
     }
 
     // If block is verified the onchain operations from it must be completed
