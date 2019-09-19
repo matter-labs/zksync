@@ -1,5 +1,5 @@
 <template>
-    <b-card :title="balanceListId">
+    <b-card title="Main chain">
         <b-col>
             <b-row v-for="balance in balances" :key=" `${balanceListId}_${balance.tokenName}` ">
                 <b-col class="col-sm-3"> {{ balance.tokenName }} </b-col>

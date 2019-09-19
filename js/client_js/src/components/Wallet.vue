@@ -4,10 +4,9 @@
         <ProgressBar ref="progress_bar"></ProgressBar>
     </b-row>
     <b-row>
-        <b-col xl="6">
-            <BalancesList balanceListId="onchain" :balances="onchainBalances"></BalancesList>
-            <!-- <BalancesList balanceListId="contract" :balances="contractBalances"></BalancesList> -->
-            <DepositButtons 
+        <b-col xl="6" class="pr-3">
+            <BalancesList class="mb-1" balanceListId="onchain" :balances="onchainBalances"></BalancesList>
+            <DepositButtons
                 componentId="offchain"
                 :topBalances="onchainBalances" 
                 :bottomBalances="franklinBalances"
@@ -16,12 +15,12 @@
                 v-on:depositEvent="deposit"
                 v-on:withdrawEvent="withdraw"
                 ></DepositButtons>
-            <FranklinBalancesList 
+            <FranklinBalancesList class="mt-1" 
                 balanceListId="franklin" 
                 :balances="franklinBalancesWithInfo"
                 ></FranklinBalancesList>
         </b-col>
-        <b-col xl="6">
+        <b-col xl="6" class="pl-3">
             <Transfer
                 :balances="franklinBalances"
                 v-on:buttonClicked="transfer"

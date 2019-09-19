@@ -3,7 +3,7 @@
         <header>
             <nav class="navbar navbar-expand-md navbar-dark bg-info mb-4">
                 <b-container>
-                    <a class="navbar-brand" href="#">Franklin</a>
+                    <a class="navbar-brand" href="#">Matter Testnet</a>
                     <button 
                         class="navbar-toggler" type="button" data-toggle="collapse" 
                         data-target="#navbarCollapse" aria-controls="navbarCollapse" 
@@ -16,7 +16,7 @@
                                 <a class="nav-link" @click="componentToBeShown='Wallet'">Wallet</a>
                             </li>
                             <li class="nav-item" :class="{active: componentToBeShown=='History'}">
-                                <a class="nav-link" @click="componentToBeShown='History'">History</a>
+                                <a class="nav-link" @click="componentToBeShown='History'">Transactions</a>
                             </li>
                         </ul>
                     </div>

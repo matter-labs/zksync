@@ -1,15 +1,16 @@
 <template>
     <b-card class="px-0">
-        Address (for testing, use <code style="cursor: pointer" @click="address='0x2d5bf7a3ab29f0ff424d738a83f9b0588bc9241e'">0x2d5bf7a3ab29f0ff424d738a83f9b0588bc9241e</code>)
-        <b-form-input type="text" v-model="address" class="mb-2"></b-form-input>
+        Address:
+        <b-form-input autocomplete="off" type="text" v-model="address" class="mb-2"></b-form-input>
+        <p>(for testing, use <code style="cursor: pointer" @click="address='0x2d5bf7a3ab29f0ff424d738a83f9b0588bc9241e'">0x2d5bf7a3ab29f0ff424d738a83f9b0588bc9241e</code>)</p>
         Token:
         <b-form-select v-model="token" class="mb-2">
             <option v-for="balance in balances" :key="balance.tokenName">{{ balance.tokenName }}</option>
         </b-form-select>
         Amount <span v-if="maxAmountVisible">(no more than {{ token }} {{ balancesDict[token] }}</span>:
-        <b-form-input type="number" v-model="amount" class="mb-2"></b-form-input>
+        <b-form-input autocomplete="off" type="number" v-model="amount" class="mb-2"></b-form-input>
         Fee:
-        <b-form-input type="number" class="mb-2" v-model="fee"></b-form-input>
+        <b-form-input autocomplete="off" type="number" class="mb-2" v-model="fee"></b-form-input>
         <b-button class="mt-2 w-50" variant="primary" @click='buttonClicked'> Transfer </b-button>
     </b-card>
 </template>
@@ -52,13 +53,13 @@ export default {
                 return;
             }
             if (this.address.length != addressLength) {
-                this.localDisplayAlert(`Franklin addresses are hex strings`
-                    + `of length ${addressLength}. Are you sure this is a Franklin address?`);
+                this.localDisplayAlert(`Matter Testnet addresses are hex strings`
+                    + `of length ${addressLength}. Are you sure this is a Matter Testnet address?`);
                 return;
             }
             if (this.address.startsWith('0x') === false) {
-                this.localDisplayAlert(`Franklin addresses are hex strings starting with 0x`
-                    + `Are you sure this is a Franklin address?`);
+                this.localDisplayAlert(`Matter Testnet addresses are hex strings starting with 0x`
+                    + `Are you sure this is a Matter Testnet address?`);
                 return;
             }
 
