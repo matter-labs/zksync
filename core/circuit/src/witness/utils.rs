@@ -20,7 +20,7 @@ use pairing::bn256::*;
 use rand::{Rng, SeedableRng, XorShiftRng};
 
 pub fn _generate_dummy_sig_data() -> (Option<TransactionSignature<Bn256>>, Fr, Fr, Fr) {
-    let params = &AltJubjubBn256::new();
+    let params = &franklin_constants::JUBJUB_PARAMS;
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let sender_sk = PrivateKey::<Bn256>(rng.gen());

@@ -1,3 +1,4 @@
+use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use crate::node::TokenId;
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use lazy_static::lazy_static;
@@ -63,4 +64,5 @@ pub const KEY_FILENAME: &str = "franklin_pk.key";
 
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
+    pub static ref PEDERSEN_HASHER: BabyPedersenHasher = BabyPedersenHasher::default();
 }

@@ -14,7 +14,7 @@ use super::Fr;
 use super::{AccountId, AccountUpdates, Nonce, TokenId};
 use crate::circuit::account::{Balance, CircuitAccount};
 use crate::circuit::utils::pub_key_hash_bytes;
-use crate::merkle_tree::PedersenHasher;
+use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use franklin_crypto::eddsa::PublicKey;
 
 #[derive(Clone, PartialEq, Default, Eq, Hash)]
@@ -50,8 +50,8 @@ impl AccountAddress {
     }
 
     pub fn from_pubkey(public_key: PublicKey<Engine>) -> Self {
-        let phasher = PedersenHasher::<Engine>::default();
-        let pk_hash = pub_key_hash_bytes(&public_key, &phasher);
+        let pk_hash =
+            pub_key_hash_bytes(&public_key, &params::PEDERSEN_HASHER as &BabyPedersenHasher);
 
         Self::from_bytes(&pk_hash).expect("pk convert error")
     }
