@@ -158,6 +158,7 @@ describe("PLANNED FAILS", function() {
             "0x0000000000000000000000000000000000000000000000000000000000000000",
             erc20DeployedToken2.address,
             Buffer.from("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "hex"),
+            0,
             {
                 value: feeValue,
                 gasLimit: bigNumberify("500000")
@@ -180,6 +181,7 @@ describe("PLANNED FAILS", function() {
             "0x0000000000000000000000000000000000000000000000000000000000000000",
             erc20DeployedToken1.address,
             Buffer.from("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "hex"),
+            0,
             {
                 value: wrongFeeValue,
                 gasLimit: bigNumberify("500000")
@@ -201,6 +203,7 @@ describe("PLANNED FAILS", function() {
             "0x0000000000000000000000000000000000000000000000000000000000000000",
             erc20DeployedToken1.address,
             Buffer.from("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "hex"),
+            0,
             {
                 value: feeValue,
                 gasLimit: bigNumberify("500000")
@@ -221,22 +224,16 @@ describe("PLANNED FAILS", function() {
         console.log("\n - test Exodus Mode started");
         // Deposit eth
         const depositValue = parseEther("0.3"); // the value passed to tx
-        const depositAmount = parseEther("0.293753208"); // amount after: tx value - some counted fee
+        const depositAmount = parseEther("0.293856636"); // amount after: tx value - some counted fee
         let tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: depositValue});
         let receipt = await tx.wait();
         let events = receipt.events;
 
         const priorityEvent = events[0].args;
-        const depositEvent = events[1].args;
 
         expect(priorityEvent.opType).equal(1);
-        expect(priorityEvent.pubData).equal("0x52312ad6f01657413b2eae9287f6b9adad93d5fe0000000000000000000004139efc7e78b0000809101112131415161718192021222334252627");
-        expect(priorityEvent.fee).equal(bigNumberify("0x16316c9a255000"));
-
-        expect(depositEvent.owner).equal(wallet.address);
-        expect(depositEvent.tokenId).equal(0);
-        expect(depositEvent.amount).equal(depositAmount);
-        expect(depositEvent.franklinAddress).equal("0x" + franklinAddress);
+        expect(priorityEvent.pubData).equal("0x52312ad6f01657413b2eae9287f6b9adad93d5fe000000000000000000000413fd0db3abd8000809101112131415161718192021222334252627");
+        expect(priorityEvent.fee).equal(bigNumberify("0x15d35b64f22800"));
 
         let totalOpenPriorityRequests = await franklinDeployedContract.totalOpenPriorityRequests();
         let totalCommittedPriorityRequests = await franklinDeployedContract.totalCommittedPriorityRequests();
@@ -269,7 +266,7 @@ describe("PLANNED FAILS", function() {
         
         expect((await franklinDeployedContract.blocks(1)).onchainOperations).equal(1);
         expect((await franklinDeployedContract.blocks(1)).priorityOperations).equal(1);
-        expect((await franklinDeployedContract.blocks(1)).commitment).equal("0x387e39df8d726886ccf16995816306999193abc96f8da43573864b553d876473");
+        expect((await franklinDeployedContract.blocks(1)).commitment).equal("0x7e59b3f061447565f803887ee8460ab3b8865b24ce34eaa991ef2c7b85cb1a40");
         expect((await franklinDeployedContract.blocks(1)).stateRoot).equal("0x0000000000000000000000000000000000000000000000000000000000000000");
         expect((await franklinDeployedContract.blocks(1)).validator).equal("0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE");
 
@@ -496,22 +493,16 @@ describe("PLANNED FAILS", function() {
         // Wrong priority operation - different data
         console.log("\n - Wrong priority operation - different data started");
         const depositValue = parseEther("0.3"); // the value passed to tx
-        depositAmount = parseEther("0.293753208"); // amount after: tx value - some counted fee
+        depositAmount = parseEther("0.293856636"); // amount after: tx value - some counted fee
         let tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: depositValue});
         let receipt = await tx.wait();
         let events = receipt.events;
 
         const priorityEvent = events[0].args;
-        const depositEvent = events[1].args;
 
         expect(priorityEvent.opType).equal(1);
-        expect(priorityEvent.pubData).equal("0x52312ad6f01657413b2eae9287f6b9adad93d5fe0000000000000000000004139efc7e78b0000809101112131415161718192021222334252627");
-        expect(priorityEvent.fee).equal(bigNumberify("0x16316c9a255000"));
-
-        expect(depositEvent.owner).equal(wallet.address);
-        expect(depositEvent.tokenId).equal(0);
-        expect(depositEvent.amount).equal(depositAmount);
-        expect(depositEvent.franklinAddress).equal("0x" + franklinAddress);
+        expect(priorityEvent.pubData).equal("0x52312ad6f01657413b2eae9287f6b9adad93d5fe000000000000000000000413fd0db3abd8000809101112131415161718192021222334252627");
+        expect(priorityEvent.fee).equal(bigNumberify("0x15d35b64f22800"));
 
         let totalOpenPriorityRequests = await franklinDeployedContract.totalOpenPriorityRequests();
         let firstPriorityRequestId = await franklinDeployedContract.firstPriorityRequestId();

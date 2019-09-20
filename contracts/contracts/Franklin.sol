@@ -23,6 +23,7 @@ contract Franklin {
     uint8 ETH_ADDR_BYTES = 20; // ethereum address
     uint8 FEE_BYTES = 2; // fee
     uint8 ACC_NUM_BYTES = 3; // franklin account id
+    uint8 NONCE_BYTES = 4; // franklin nonce
 
     // Franklin chain address length
     uint8 constant PUBKEY_HASH_LEN = 20;
@@ -30,8 +31,6 @@ contract Franklin {
     uint8 constant SIGNATURE_LEN = 64;
     // Public key length
     uint8 constant PUBKEY_LEN = 32;
-    // Franklin nonce length
-    uint8 constant NONCE_LEN = 4;
     // Fee coefficient for priority request transaction
     uint256 constant FEE_COEFF = 4;
     // Base gas cost for transaction
@@ -55,7 +54,7 @@ contract Franklin {
     uint256 constant PARTIAL_EXIT_LENGTH = 6 * 8; // partial exit
     uint256 constant CLOSE_ACCOUNT_LENGTH = 1 * 8; // close account
     uint256 constant TRANSFER_LENGTH = 2 * 8; // transfer
-    uint256 constant FULL_EXIT_LENGTH = 15 * 8; // full exit
+    uint256 constant FULL_EXIT_LENGTH = 18 * 8; // full exit
 
     // MARK: - EVENTS
 
@@ -75,17 +74,6 @@ contract Franklin {
     event BlocksReverted(
         uint32 indexed totalBlocksVerified,
         uint32 indexed totalBlocksCommitted
-    );
-
-    // Event emitted when user send a transaction to withdraw her funds from onchain balance
-    // Structure:
-    // - owner - sender
-    // - tokenId - withdrawed token
-    // - amount - withdrawed value
-    event OnchainWithdrawal(
-        address indexed owner,
-        uint16 tokenId,
-        uint128 amount
     );
 
     // New priority request event
@@ -215,9 +203,9 @@ contract Franklin {
     // Inits verifier, verification key and governance contracts instances,
     // sets genesis root
     constructor(
+        address _governanceAddress,
         address _verifierAddress,
-        bytes32 _genesisRoot,
-        address _governanceAddress
+        bytes32 _genesisRoot
     ) public {
         verifier = Verifier(_verifierAddress);
         governance = Governance(_governanceAddress);
@@ -458,7 +446,7 @@ contract Franklin {
         bytes memory pubData = _pubKey; // franklin id
         pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(msg.sender)); // eth address
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(tokenId)); // token id
-        pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt32(_nonce)); // token id
+        pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt32(_nonce)); // nonce
         pubData = Bytes.concat(pubData, _signature); // signature
         addPriorityRequest(OpType.FullExit, fee, pubData);
         
@@ -503,12 +491,6 @@ contract Franklin {
         ); // frw11 - insufficient balance withdraw
 
         balancesToWithdraw[msg.sender][_token] -= _amount;
-
-        emit OnchainWithdrawal(
-            msg.sender,
-            _token,
-            _amount
-        );
     }
 
     // MARK: - BLOCK COMMITMENT
@@ -628,7 +610,7 @@ contract Franklin {
         bytes memory _publicData,
         uint64 _currentOnchainOp
     ) internal returns (uint256 processedLen, uint64 processedOnchainOps, uint64 priorityCount) {
-        uint256 opDataPointer = _currentPointer + 1;
+        uint256 opDataPointer = _currentPointer + 1; // operation type byte
 
         if (_opType == uint8(OpType.Noop)) return (NOOP_LENGTH, 0, 0);
         if (_opType == uint8(OpType.TransferToNew)) return (TRANSFER_TO_NEW_LENGTH, 0, 0);
@@ -662,9 +644,9 @@ contract Franklin {
         }
 
         if (_opType == uint8(OpType.FullExit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_LEN + SIGNATURE_LEN + AMOUNT_BYTES);
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_LEN + AMOUNT_BYTES);
             require(
-                pubData.length == ACC_NUM_BYTES + PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_LEN + SIGNATURE_LEN + AMOUNT_BYTES,
+                pubData.length == ACC_NUM_BYTES + PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_LEN + AMOUNT_BYTES,
                 "fpp13"
             ); // fpp13 - wrong full exit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
@@ -745,8 +727,8 @@ contract Franklin {
             priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, ETH_ADDR_BYTES, PUBKEY_HASH_LEN + AMOUNT_BYTES + TOKEN_BYTES);
             onchainPubData = _onchainOp.pubData;
         } else if (_onchainOp.opType == OpType.FullExit && priorityRequests[_priorityRequestId].opType == OpType.FullExit) {
-            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 0, PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_LEN + SIGNATURE_LEN);
-            onchainPubData = Bytes.slice(_onchainOp.pubData, ACC_NUM_BYTES, PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_LEN + SIGNATURE_LEN);
+            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 0, PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_LEN);
+            onchainPubData = Bytes.slice(_onchainOp.pubData, ACC_NUM_BYTES, PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_LEN);
         } else {
             revert("fid11"); // fid11 - wrong operation
         }
@@ -837,19 +819,19 @@ contract Franklin {
                 // full exit was successful, accrue balance
                 bytes memory tokenBytes = new bytes(TOKEN_BYTES);
                 for (uint8 i = 0; i < TOKEN_BYTES; ++i) {
-                    tokenBytes[i] = op.pubData[ACC_NUM_BYTES + ETH_ADDR_BYTES + i];
+                    tokenBytes[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_LEN + ETH_ADDR_BYTES + i];
                 }
                 uint16 tokenId = Bytes.bytesToUInt16(tokenBytes);
 
                 bytes memory amountBytes = new bytes(AMOUNT_BYTES);
                 for (uint256 i = 0; i < AMOUNT_BYTES; ++i) {
-                    amountBytes[i] = op.pubData[ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + SIGNATURE_LEN + i];
+                    amountBytes[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_LEN + i];
                 }
                 uint128 amount = Bytes.bytesToUInt128(amountBytes);
 
                 bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
                 for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
-                    ethAddress[i] = op.pubData[ACC_NUM_BYTES + i];
+                    ethAddress[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_LEN + i];
                 }
                 balancesToWithdraw[Bytes.bytesToAddress(ethAddress)][tokenId] += amount;
             }
