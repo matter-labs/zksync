@@ -4,7 +4,7 @@ import {
     musigPedersen,
     privateKeyFromSeed,
     privateKeyToPublicKey,
-    pubkeyToAddress, serializePointPacked,
+    pubkeyToAddress, serializePointPacked, signTransactionBytes,
 } from './crypto';
 import { curve } from 'elliptic';
 import EdwardsPoint = curve.edwards.EdwardsPoint;
@@ -149,7 +149,7 @@ export class WalletKeys {
         let nonce = Buffer.alloc(4);
         nonce.writeUInt32BE(tx.nonce, 0);
         let msg = Buffer.concat([type, from, to, token, amount, fee, nonce]);
-        return musigPedersen(this.privateKey, msg);
+        return signTransactionBytes(this.privateKey, msg);
     }
 
     signWithdraw(tx: WithdrawTx) {
@@ -167,7 +167,7 @@ export class WalletKeys {
         nonce.writeUInt32BE(tx.nonce, 0);
 
         let msg = Buffer.concat([type, account, eth_address, token, amount, fee, nonce]);
-        return musigPedersen(this.privateKey, msg);
+        return signTransactionBytes(this.privateKey, msg);
     }
 
     signClose(tx: CloseTx) {
@@ -177,7 +177,7 @@ export class WalletKeys {
         nonce.writeUInt32BE(tx.nonce, 0);
 
         let msg = Buffer.concat([type, account, nonce]);
-        return musigPedersen(this.privateKey, msg);
+        return signTransactionBytes(this.privateKey, msg);
     }
 
     signFullExit(op: FullExitReq) {
@@ -189,7 +189,7 @@ export class WalletKeys {
         let nonce = Buffer.alloc(4);
         nonce.writeUInt32BE(op.nonce, 0);
         let msg = Buffer.concat([type, packed_pubkey, eth_address, token, nonce]);
-        return Buffer.from(musigPedersen(this.privateKey, msg).sign, "hex");
+        return Buffer.from(signTransactionBytes(this.privateKey, msg).sign, "hex");
     }
 }
 
