@@ -101,12 +101,14 @@ async function txSignatureCheck() {
 async function fullExitSignatureCheck() {
     let keys = new WalletKeys(new BN(crypto.randomBytes(16)));
     let token = 22;
+    let nonce = 78;
     let ethAddress = ethers.constants.AddressZero;
-    let sign = keys.signFullExit({token, eth_address: ethAddress});
+    let sign = keys.signFullExit({token, eth_address: ethAddress, nonce});
     let req = {
         packed_pubkey: serializePointPacked(keys.publicKey).toJSON().data,
         eth_address: ethAddress,
-        token: token,
+        token,
+        nonce,
         signature_r: sign.slice(0, 32).toJSON().data,
         signature_s: sign.slice(32, 64).toJSON().data
     };
