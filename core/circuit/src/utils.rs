@@ -12,7 +12,7 @@ use crate::operation::SignatureData;
 use crate::operation::TransactionSignature;
 use models::circuit::utils::le_bit_vector_into_field_element;
 use models::params as franklin_constants;
-
+use models::primitives::*;
 pub fn sign_pedersen<R, E>(
     msg_data: &[bool],
     private_key: &PrivateKey<E>,
@@ -24,20 +24,7 @@ where
     R: rand::Rng,
     E: JubjubEngine,
 {
-    let raw_data: Vec<bool> = msg_data.to_vec();
-
-    let mut message_bytes: Vec<u8> = vec![];
-
-    let byte_chunks = raw_data.chunks(8);
-    for byte_chunk in byte_chunks {
-        let mut byte = 0u8;
-        for (i, bit) in byte_chunk.iter().enumerate() {
-            if *bit {
-                byte |= 1 << i;
-            }
-        }
-        message_bytes.push(byte);
-    }
+    let message_bytes = pack_bits_into_bytes(msg_data.to_vec());
 
     let signature = private_key.musig_pedersen_sign(&message_bytes, rng, p_g, params);
 
@@ -141,11 +128,11 @@ pub fn multi_and<E: JubjubEngine, CS: ConstraintSystem<E>>(
             &result,
             bool_x,
         )?;
-        // println!(
-        //     "multi and iteration number: {} : result {:?}",
-        //     i,
-        //     result.get_value()
-        // );
+        //        println!(
+        //            "multi and iteration number: {} : result {:?}",
+        //            i,
+        //            result.get_value()
+        //        );
     }
 
     Ok(result)

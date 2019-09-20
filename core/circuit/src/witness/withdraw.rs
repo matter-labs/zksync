@@ -353,6 +353,7 @@ mod test {
     };
     use models::circuit::utils::*;
     use models::merkle_tree::PedersenHasher;
+    use models::node::tx::PackedPublicKey;
     use models::params as franklin_constants;
     use num_traits::cast::ToPrimitive;
     use rand::{Rng, SeedableRng, XorShiftRng};
@@ -440,6 +441,13 @@ mod test {
             &sender_sk,
             params,
         );
+        let packed_public_key = PackedPublicKey(sender_pk);
+        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+        packed_public_key_bytes.reverse();
+        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
 
         let operations = calculate_withdraw_operations_from_witness(
             &withdraw_witness,
@@ -447,8 +455,7 @@ mod test {
             &second_sig_part,
             &third_sig_part,
             &signature_data,
-            &sender_x,
-            &sender_y,
+            &signer_packed_key_bits,
         );
 
         let (root_after_fee, validator_account_witness) =

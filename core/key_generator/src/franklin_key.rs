@@ -70,6 +70,7 @@ pub fn make_franklin_key() {
             amount_packed: None,
             full_amount: None,
             fee: None,
+            pub_nonce: None,
             new_pub_key_hash: None,
             ethereum_key: None,
         },

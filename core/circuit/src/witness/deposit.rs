@@ -321,6 +321,7 @@ mod test {
     use models::circuit::utils::*;
     use models::params as franklin_constants;
 
+    use models::node::tx::PackedPublicKey;
     use rand::{Rng, SeedableRng, XorShiftRng};
 
     #[test]
@@ -401,8 +402,7 @@ mod test {
             &second_sig_part,
             &third_sig_part,
             &signature_data,
-            &sender_x,
-            &sender_y,
+            &[Some(false); 256],
         );
 
         println!("tree before_applying fees: {}", tree.root_hash());
@@ -520,8 +520,7 @@ mod test {
             &second_sig_part,
             &third_sig_part,
             &signature,
-            &sender_x,
-            &sender_y,
+            &[Some(false); 256],
         );
 
         println!("tree before_applying fees: {}", tree.root_hash());

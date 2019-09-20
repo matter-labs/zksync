@@ -373,14 +373,16 @@ impl BabyProver {
                         let (first_sig_msg, second_sig_msg, third_sig_msg) =
                             generate_sig_witness(&sig_bits, &phasher, &params);
 
-                        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(
-                            &transfer.tx.signature.pub_key.serialize_packed().unwrap(),
-                        )
-                        .iter()
-                        .map(|x| Some(*x))
-                        .collect();
+                        let mut signer_packed_key_bytes =
+                            transfer.tx.signature.pub_key.serialize_packed().unwrap();
+                        signer_packed_key_bytes.reverse();
+                        let signer_packed_key_bits: Vec<_> =
+                            bytes_into_be_bits(&signer_packed_key_bytes)
+                                .iter()
+                                .map(|x| Some(*x))
+                                .collect();
 
-                        let (sender_x, sender_y) = (transfer.tx.signature.pub_key.0).0.into_xy();
+                        //                        let (sender_x, sender_y) = (transfer.tx.signature.pub_key.0).0.into_xy();
                         // generate_sig_data(bits: &[bool], phasher: &PedersenHasher<Bn256>, private_key: &PrivateKey<Bn256>, params: &AltJubjubBn256)
                         // let (
                         //     signature,
@@ -409,6 +411,10 @@ impl BabyProver {
                     FranklinOp::TransferToNew(transfer_to_new) => {
                         let transfer_to_new_witness =
                             apply_transfer_to_new_tx(&mut self.accounts_tree, &transfer_to_new);
+                        let (sig_r_x, sig_r_y) = transfer_to_new.tx.signature.sign.0.r.into_xy();
+                        println!("sig_r_x={} \n sig_r_y={}", sig_r_x, sig_r_y);
+                        println!("sig_s={}", transfer_to_new.tx.signature.sign.0.s);
+                        assert_eq!(transfer_to_new.tx.verify_signature(), true);
                         let sig_bytes = transfer_to_new
                             .tx
                             .signature
@@ -416,8 +422,14 @@ impl BabyProver {
                             .serialize_packed()
                             .unwrap();
                         let (r_bytes, s_bytes) = sig_bytes.split_at(32);
+
                         let mut r_bytes = r_bytes.to_vec();
                         let mut s_bytes = s_bytes.to_vec();
+                        //                        println!("s_bytes outside: ");
+                        //                        for (i, byte) in s_bytes.iter().enumerate() {
+                        //                            print!("{:x} ", byte);
+                        //                        }
+                        println!();
                         r_bytes.reverse();
                         s_bytes.reverse();
                         let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
@@ -428,27 +440,83 @@ impl BabyProver {
                             .iter()
                             .map(|x| Some(*x))
                             .collect();
+                        //                        println!("s_bits outside: ");
+                        //                        for (i, bit) in s_bits.iter().enumerate() {
+                        //                            if i % 64 == 0 {
+                        //                                println!("")
+                        //                            } else if i % 8 == 0 {
+                        //                                print!(" ")
+                        //                            };
+                        //                            let numb = {
+                        //                                if bit.unwrap() {
+                        //                                    1
+                        //                                } else {
+                        //                                    0
+                        //                                }
+                        //                            };
+                        //                            print!("{}", numb);
+                        //                        }
+                        //                        println!("");
                         let signature = SignatureData {
                             r_packed: r_bits,
                             s: s_bits,
                         };
                         let sig_bits: Vec<bool> =
                             bytes_into_be_bits(&transfer_to_new.tx.get_bytes());
+                        println!("sig_bits outside: ");
+                        for (i, bit) in sig_bits.iter().enumerate() {
+                            if i % 64 == 0 {
+                                println!("")
+                            } else if i % 8 == 0 {
+                                print!(" ")
+                            };
+                            let numb = {
+                                if *bit {
+                                    1
+                                } else {
+                                    0
+                                }
+                            };
+                            print!("{}", numb);
+                        }
+                        println!("");
+
+                        println!("transfer_to_new_witnessget_sig_bits outside: ");
+                        for (i, bit) in transfer_to_new_witness.get_sig_bits().iter().enumerate() {
+                            if i % 64 == 0 {
+                                println!("")
+                            } else if i % 8 == 0 {
+                                print!(" ")
+                            };
+                            let numb = {
+                                if *bit {
+                                    1
+                                } else {
+                                    0
+                                }
+                            };
+                            print!("{}", numb);
+                        }
+                        println!("");
 
                         let (first_sig_msg, second_sig_msg, third_sig_msg) =
                             generate_sig_witness(&sig_bits, &phasher, &params);
+                        let (pub_key_x, pub_key_y) =
+                            (transfer_to_new.tx.signature.pub_key.0).0.into_xy();
+                        println!("pub_key_x={} \n pub_key_y={}", pub_key_x, pub_key_y);
 
-                        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(
-                            &transfer_to_new
-                                .tx
-                                .signature
-                                .pub_key
-                                .serialize_packed()
-                                .unwrap(),
-                        )
-                        .iter()
-                        .map(|x| Some(*x))
-                        .collect();
+                        let mut signer_packed_key_bytes = transfer_to_new
+                            .tx
+                            .signature
+                            .pub_key
+                            .serialize_packed()
+                            .unwrap();
+                        signer_packed_key_bytes.reverse();
+                        let signer_packed_key_bits: Vec<_> =
+                            bytes_into_be_bits(&signer_packed_key_bytes)
+                                .iter()
+                                .map(|x| Some(*x))
+                                .collect();
 
                         //                        let (
                         //                            signature,
@@ -501,12 +569,14 @@ impl BabyProver {
                         let (first_sig_msg, second_sig_msg, third_sig_msg) =
                             generate_sig_witness(&sig_bits, &phasher, &params);
                         let (sender_x, sender_y) = (withdraw.tx.signature.pub_key.0).0.into_xy();
-                        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(
-                            &withdraw.tx.signature.pub_key.serialize_packed().unwrap(),
-                        )
-                        .iter()
-                        .map(|x| Some(*x))
-                        .collect();
+                        let mut signer_packed_key_bytes =
+                            withdraw.tx.signature.pub_key.serialize_packed().unwrap();
+                        signer_packed_key_bytes.reverse();
+                        let signer_packed_key_bits: Vec<_> =
+                            bytes_into_be_bits(&signer_packed_key_bytes)
+                                .iter()
+                                .map(|x| Some(*x))
+                                .collect();
                         // let (
                         //     signature,
                         //     first_sig_msg,
@@ -557,12 +627,14 @@ impl BabyProver {
                         let (first_sig_msg, second_sig_msg, third_sig_msg) =
                             generate_sig_witness(&sig_bits, &phasher, &params);
 
-                        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(
-                            &close.tx.signature.pub_key.serialize_packed().unwrap(),
-                        )
-                        .iter()
-                        .map(|x| Some(*x))
-                        .collect();
+                        let mut signer_packed_key_bytes =
+                            close.tx.signature.pub_key.serialize_packed().unwrap();
+                        signer_packed_key_bytes.reverse();
+                        let signer_packed_key_bits: Vec<_> =
+                            bytes_into_be_bits(&signer_packed_key_bytes)
+                                .iter()
+                                .map(|x| Some(*x))
+                                .collect();
 
                         //                        let (
                         //                            signature,
@@ -723,30 +795,30 @@ impl BabyProver {
                 validator_account: validator_account_witness.clone(),
             };
 
-            //            {
-            //                info!("just synthesizing");
-            //                let inst = FranklinCircuit {
-            //                    params: &self.jubjub_params,
-            //                    operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
-            //                    old_root: Some(initial_root),
-            //                    new_root: Some(block.new_root_hash),
-            //                    block_number: Fr::from_str(&(block_number).to_string()),
-            //                    validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
-            //                    pub_data_commitment: Some(public_data_commitment),
-            //                    operations: operations.clone(),
-            //                    validator_balances: validator_balances.clone(),
-            //                    validator_audit_path: validator_audit_path.clone(),
-            //                    validator_account: validator_account_witness.clone(),
-            //                };
-            //                let mut cs = TestConstraintSystem::<Engine>::new();
-            //                inst.synthesize(&mut cs).unwrap();
-            //
-            //                warn!("unconstrained {}\n", cs.find_unconstrained());
-            //                warn!("inputs {}\n", cs.num_inputs());
-            //                warn!("num_constraints: {}\n", cs.num_constraints());
-            //                warn!("is satisfied: {}\n", cs.is_satisfied());
-            //                warn!("which is unsatisfied: {:?}\n", cs.which_is_unsatisfied());
-            //            }
+            {
+                info!("just synthesizing");
+                let inst = FranklinCircuit {
+                    params: &self.jubjub_params,
+                    operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
+                    old_root: Some(initial_root),
+                    new_root: Some(block.new_root_hash),
+                    block_number: Fr::from_str(&(block_number).to_string()),
+                    validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
+                    pub_data_commitment: Some(public_data_commitment),
+                    operations: operations.clone(),
+                    validator_balances: validator_balances.clone(),
+                    validator_audit_path: validator_audit_path.clone(),
+                    validator_account: validator_account_witness.clone(),
+                };
+                let mut cs = TestConstraintSystem::<Engine>::new();
+                inst.synthesize(&mut cs).unwrap();
+
+                warn!("unconstrained {}\n", cs.find_unconstrained());
+                warn!("inputs {}\n", cs.num_inputs());
+                warn!("num_constraints: {}\n", cs.num_constraints());
+                warn!("is satisfied: {}\n", cs.is_satisfied());
+                warn!("which is unsatisfied: {:?}\n", cs.which_is_unsatisfied());
+            }
 
             let mut rng = OsRng::new().unwrap();
             info!("Prover has started to work");

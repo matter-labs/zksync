@@ -190,8 +190,8 @@ mod test {
     use franklin_crypto::jubjub::FixedGenerators;
     use models::circuit::account::{CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
     use models::circuit::utils::*;
+    use models::node::tx::PackedPublicKey;
     use models::params as franklin_constants;
-
     use rand::{Rng, SeedableRng, XorShiftRng};
 
     #[test]
@@ -252,6 +252,13 @@ mod test {
             &sender_sk,
             params,
         );
+        let packed_public_key = PackedPublicKey(sender_pk);
+        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+        packed_public_key_bytes.reverse();
+        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
 
         let operations = calculate_close_account_operations_from_witness(
             &close_account_witness,
@@ -259,8 +266,7 @@ mod test {
             &second_sig_part,
             &third_sig_part,
             &signature_data,
-            &sender_x,
-            &sender_y,
+            &signer_packed_key_bits,
         );
 
         println!("tree before_applying fees: {}", tree.root_hash());

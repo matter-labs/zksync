@@ -184,8 +184,7 @@ mod test {
             &second_sig_part,
             &third_sig_part,
             &signature_data,
-            &sender_x,
-            &sender_y,
+            &[Some(false); 256],
         );
         let (_, validator_account_witness) = apply_fee(&mut tree, validator_address_number, 0, 0);
         let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);

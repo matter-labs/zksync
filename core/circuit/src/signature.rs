@@ -51,6 +51,11 @@ pub fn unpack_point_if_possible<E: JubjubEngine, CS: ConstraintSystem<E>>(
         &r_y.get_number(),
         &params,
     )?;
+    println!(
+        "r_recovered.x={:?} \n r_recovered.y={:?}",
+        r_recovered.get_x().get_value(),
+        r_recovered.get_y().get_value()
+    );
 
     //    let mut packed_bits = vec![];
     //    packed_bits.push(Boolean::from(r_x_bit));
@@ -98,7 +103,6 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
     );
     let signature_s =
         CircuitElement::from_witness_be_bits(cs.namespace(|| "signature_s"), &signature_data.s)?;
-
     let (r_recovered, is_sig_r_correct) = ecc::EdwardsPoint::recover_from_y_unchecked(
         cs.namespace(|| "recover_from_y_unchecked"),
         &Boolean::from(r_x_bit.clone()),
@@ -111,18 +115,37 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
         s: signature_s.get_number(),
         pk: signer_key.point.clone(),
     };
+
     println!(
-        "r_x={:?} r_y={:?}",
+        "r_x={:?} \n r_y={:?}",
         signature.r.get_x().get_value(),
         signature.r.get_y().get_value()
     );
-    println!("s ={:?}", signature.s.get_value());
+    println!("s={:?}", signature.s.get_value());
+
     let serialized_tx_bits = {
         let mut temp_bits = op_data.first_sig_msg.get_bits_le();
         temp_bits.extend(op_data.second_sig_msg.get_bits_le());
         temp_bits.extend(op_data.third_sig_msg.get_bits_le());
         temp_bits
     };
+    //    println!("serialized_tx_bits: ");
+    //    for (i, bit) in serialized_tx_bits.iter().enumerate() {
+    //        if i % 64 == 0 {
+    //            println!("")
+    //        } else if i % 8 == 0 {
+    //            print!(" ")
+    //        };
+    //        let numb = {
+    //            if bit.get_value().unwrap() {
+    //                1
+    //            } else {
+    //                0
+    //            }
+    //        };
+    //        print!("{}", numb);
+    //    }
+    //    println!("");
 
     // signature msg is the hash of serialized transaction
     let sig_msg = pedersen_hash::pedersen_hash(
@@ -143,6 +166,8 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
     //     generator,
     // )?;
 
+    //TODO: put bits here
+
     let is_sig_verified = verify_pedersen(
         cs.namespace(|| "musig pedersen"),
         &sig_msg_bits,
@@ -150,6 +175,12 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
         params,
         generator,
     )?;
+    println!("is_sig_verified={:?}", is_sig_verified.get_value());
+    println!("is_sig_r_correct={:?}", is_sig_r_correct.get_value());
+    println!(
+        "signer_key.is_correctly_unpacked={:?}",
+        signer_key.is_correctly_unpacked.get_value()
+    );
     let is_signature_correctly_verified = multi_and(
         cs.namespace(|| "is_signature_correctly_verified"),
         &[

@@ -14,6 +14,7 @@ pub struct FullExitData {
     pub token: u32,
     pub account_address: u32,
     pub ethereum_key: Fr,
+    pub pub_nonce: Fr,
 }
 pub struct FullExitWitness<E: JubjubEngine> {
     pub before: OperationBranch<E>,
@@ -25,7 +26,7 @@ pub struct FullExitWitness<E: JubjubEngine> {
 }
 impl<E: JubjubEngine> FullExitWitness<E> {
     pub fn get_pubdata(&self, sig_data: &SignatureData, signer_pubkey: &[bool]) -> Vec<bool> {
-        assert_eq!(signer_pubkey.len(), 32);
+        assert_eq!(signer_pubkey.len(), 256);
         let mut pubdata_bits = vec![];
         append_be_fixed_width(
             &mut pubdata_bits,
@@ -124,6 +125,7 @@ pub fn apply_full_exit_tx(
         token: u32::from(full_exit.priority_op.token),
         account_address: full_exit.account_data.clone().unwrap().0,
         ethereum_key: Fr::from_hex(&format!("{:x}", &full_exit.priority_op.eth_address)).unwrap(),
+        pub_nonce: Fr::from_str(&full_exit.priority_op.nonce.to_string()).unwrap(),
     };
     // le_bit_vector_into_field_element()
     apply_full_exit(tree, &full_exit, is_sig_valid)
@@ -220,7 +222,8 @@ pub fn apply_full_exit(
             amount_packed: Some(Fr::zero()),
             full_amount: Some(amount_to_exit),
             fee: Some(Fr::zero()),
-            pub_nonce: a: Some(a),
+            pub_nonce: Some(full_exit.pub_nonce),
+            a: Some(a),
             b: Some(b),
             new_pub_key_hash: Some(Fr::zero()),
         },
@@ -237,8 +240,13 @@ pub fn calculate_full_exit_operations_from_witness(
     signature_data: &SignatureData,
     signer_pub_key_packed: &[Option<bool>],
 ) -> Vec<Operation<Bn256>> {
+    let signer_pub_key_bits: Vec<bool> = signer_pub_key_packed
+        .to_vec()
+        .iter()
+        .map(|x| x.unwrap())
+        .collect();
     let pubdata_chunks: Vec<_> = full_exit_witness
-        .get_pubdata(signature_data)
+        .get_pubdata(signature_data, &signer_pub_key_bits)
         .chunks(64)
         .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
         .collect();
@@ -298,6 +306,7 @@ mod test {
     };
     use models::merkle_tree::hasher::Hasher;
     use models::merkle_tree::PedersenHasher;
+    use models::node::tx::PackedPublicKey;
     use models::params as franklin_constants;
     use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
@@ -454,9 +463,17 @@ mod test {
                 token,
                 account_address,
                 ethereum_key,
+                pub_nonce: Fr::zero(),
             },
             is_sig_correct,
         );
+        let packed_public_key = PackedPublicKey(sender_pk);
+        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+        packed_public_key_bytes.reverse();
+        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
 
         let operations = calculate_full_exit_operations_from_witness(
             &full_exit_witness,
@@ -464,17 +481,49 @@ mod test {
             &second_sig_part,
             &third_sig_part,
             &signature_data,
-            &sender_x,
-            &sender_y,
+            &signer_packed_key_bits,
         );
 
         let (root_after_fee, validator_account_witness) =
-            apply_fee(&mut tree, validator_address_number, token, 0);
+            apply_fee(&mut tree, validator_address_number, 0, 0);
 
         let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
-
+        println!("pub_data outside: ");
+        for (i, bit) in full_exit_witness
+            .get_pubdata(
+                &signature_data,
+                &bytes_into_be_bits(&packed_public_key_bytes),
+            )
+            .iter()
+            .enumerate()
+        {
+            if i % 64 == 0 {
+                println!("")
+            } else if i % 8 == 0 {
+                print!(" ")
+            };
+            let numb = {
+                if *bit {
+                    1
+                } else {
+                    0
+                }
+            };
+            print!("{}", numb);
+        }
+        println!("");
+        println!(
+            "full_exit_witness.before_root: {},",
+            full_exit_witness.before_root
+        );
+        println!("root_after_fee: {},", root_after_fee);
+        println!("validator_address: {},", validator_address);
+        println!("block_number: {},", block_number);
         let public_data_commitment = public_data_commitment::<Bn256>(
-            &full_exit_witness.get_pubdata(&signature_data),
+            &full_exit_witness.get_pubdata(
+                &signature_data,
+                &bytes_into_be_bits(&packed_public_key_bytes),
+            ),
             full_exit_witness.before_root,
             Some(root_after_fee),
             Some(validator_address),
@@ -669,9 +718,17 @@ mod test {
                 token,
                 account_address,
                 ethereum_key,
+                pub_nonce: Fr::zero(),
             },
             is_sig_correct,
         );
+        let packed_public_key = PackedPublicKey(sender_pk);
+        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+        packed_public_key_bytes.reverse();
+        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
 
         let operations = calculate_full_exit_operations_from_witness(
             &full_exit_witness,
@@ -679,17 +736,18 @@ mod test {
             &second_sig_part,
             &third_sig_part,
             &signature_data,
-            &sender_x,
-            &sender_y,
+            &signer_packed_key_bits,
         );
 
         let (root_after_fee, validator_account_witness) =
             apply_fee(&mut tree, validator_address_number, token, 0);
 
         let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
-
         let public_data_commitment = public_data_commitment::<Bn256>(
-            &full_exit_witness.get_pubdata(&signature_data),
+            &full_exit_witness.get_pubdata(
+                &signature_data,
+                &bytes_into_be_bits(&packed_public_key_bytes),
+            ),
             full_exit_witness.before_root,
             Some(root_after_fee),
             Some(validator_address),

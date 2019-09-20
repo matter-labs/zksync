@@ -1,14 +1,13 @@
 use super::utils::*;
 use crate::operation::SignatureData;
 use crate::operation::*;
-use ff::{Field, PrimeField};
+use ff::{BitIterator, Field, PrimeField};
 use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
 use models::node::TransferToNewOp;
 use models::params as franklin_constants;
-use num_traits::cast::ToPrimitive;
 use pairing::bn256::*;
 
 pub struct TransferToNewData {
@@ -132,8 +131,8 @@ pub fn apply_transfer_to_new_tx(
     let new_pubkey_hash = Fr::from_hex(&transfer_to_new.tx.to.to_hex()).unwrap();
 
     let transfer_data = TransferToNewData {
-        amount: transfer_to_new.tx.amount.to_u128().unwrap(),
-        fee: transfer_to_new.tx.fee.to_u128().unwrap(),
+        amount: transfer_to_new.tx.amount.to_string().parse().unwrap(),
+        fee: transfer_to_new.tx.fee.to_string().parse().unwrap(),
         token: u32::from(transfer_to_new.tx.token),
         from_account_address: transfer_to_new.from,
         to_account_address: transfer_to_new.to,
@@ -454,6 +453,7 @@ mod test {
     };
     use models::circuit::utils::*;
     use models::merkle_tree::PedersenHasher;
+    use models::node::tx::PackedPublicKey;
     use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
     #[ignore]
@@ -551,6 +551,13 @@ mod test {
 
         let (signature_data, first_sig_part, second_sig_part, third_sig_part) =
             generate_sig_data(&transfer_witness.get_sig_bits(), &phasher, &from_sk, params);
+        let packed_public_key = PackedPublicKey(from_pk);
+        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+        packed_public_key_bytes.reverse();
+        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
 
         let operations = calculate_transfer_to_new_operations_from_witness(
             &transfer_witness,
@@ -558,8 +565,7 @@ mod test {
             &second_sig_part,
             &third_sig_part,
             &signature_data,
-            &from_x,
-            &from_y,
+            &signer_packed_key_bits,
         );
         let (root_after_fee, validator_account_witness) =
             apply_fee(&mut tree, validator_address_number, token, fee);

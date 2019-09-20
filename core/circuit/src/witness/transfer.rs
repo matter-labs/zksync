@@ -293,6 +293,7 @@ pub fn apply_transfer(
             amount_packed: Some(amount_encoded),
             full_amount: Some(amount_as_field_element),
             fee: Some(fee_encoded),
+            pub_nonce: Some(Fr::zero()),
             a: Some(a),
             b: Some(b),
             new_pub_key_hash: Some(Fr::zero()),
@@ -368,6 +369,7 @@ mod test {
     };
     use models::circuit::utils::*;
     use models::merkle_tree::PedersenHasher;
+    use models::node::tx::PackedPublicKey;
     use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
     #[ignore]
@@ -555,14 +557,20 @@ mod test {
         let (signature_data, first_sig_part, second_sig_part, third_sig_part) =
             generate_sig_data(&transfer_witness.get_sig_bits(), &phasher, &from_sk, params);
 
+        let packed_public_key = PackedPublicKey(from_pk);
+        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+        packed_public_key_bytes.reverse();
+        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
         let operations = calculate_transfer_operations_from_witness(
             &transfer_witness,
             &first_sig_part,
             &second_sig_part,
             &third_sig_part,
             &signature_data,
-            &from_x,
-            &from_y,
+            &signer_packed_key_bits,
         );
 
         let (root_after_fee, validator_account_witness) =
