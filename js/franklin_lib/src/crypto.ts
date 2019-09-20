@@ -277,6 +277,8 @@ function pedersenHStar(input: Buffer) : BN {
 }
 
 export function musigSHA256(priv_key: BN, msg: Buffer) {
+    msg = pedersenHash(msg, "be").getX().toBuffer("le", 32);
+
     const t = crypto.randomBytes(80);
 
     const pub_key = privateKeyToPublicKey(priv_key);
@@ -299,6 +301,7 @@ export function musigSHA256(priv_key: BN, msg: Buffer) {
 }
 
 export function musigPedersen(priv_key: BN, msg: Buffer) {
+    msg = pedersenHash(msg, "be").getX().toBuffer("le", 32);
 
     const t = crypto.randomBytes(80);
 
@@ -344,8 +347,7 @@ export function serializePointPacked(point: edwards.EdwardsPoint): Buffer {
 }
 
 export function signTransactionBytes(privKey: BN, bytes: Buffer) {
-    let hash = pedersenHash(bytes, "be").getX().toBuffer("le", 32);
-    return musigPedersen(privKey, hash);
+    return musigPedersen(privKey, bytes);
 }
 
 export function privateKeyFromSeed(seed: Buffer) {

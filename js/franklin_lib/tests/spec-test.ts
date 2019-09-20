@@ -10,6 +10,7 @@ import BN = require("bn.js");
 import Axios from 'axios';
 import {Address, FranklinProvider, WalletKeys} from "../src/wallet";
 import {ethers} from 'ethers';
+import {packAmount, packFee} from "../src/utils";
 const crypto = require("crypto");
 
 const specTestServer = "http://127.0.0.1:8734";
