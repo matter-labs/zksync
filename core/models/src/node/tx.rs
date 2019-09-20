@@ -7,6 +7,7 @@ use crypto::{digest::Digest, sha2::Sha256};
 use super::account::AccountAddress;
 use super::Engine;
 use crate::params::JUBJUB_PARAMS;
+use crate::primitives::pedersen_hash_tx_msg;
 use failure::{ensure, format_err};
 use ff::{PrimeField, PrimeFieldRepr};
 use franklin_crypto::alt_babyjubjub::fs::FsRepr;
@@ -199,8 +200,9 @@ pub struct TxSignature {
 
 impl TxSignature {
     pub fn verify_musig_pedersen(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
+        let hashed_msg = pedersen_hash_tx_msg(msg);
         let valid = self.pub_key.0.verify_musig_pedersen(
-            msg,
+            &hashed_msg,
             &self.sign.0,
             FixedGenerators::SpendingKeyGenerator,
             &JUBJUB_PARAMS,
@@ -213,8 +215,9 @@ impl TxSignature {
     }
 
     pub fn verify_musig_sha256(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
+        let hashed_msg = pedersen_hash_tx_msg(msg);
         let valid = self.pub_key.0.verify_musig_sha256(
-            msg,
+            &hashed_msg,
             &self.sign.0,
             FixedGenerators::SpendingKeyGenerator,
             &JUBJUB_PARAMS,

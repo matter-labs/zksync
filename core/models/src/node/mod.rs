@@ -70,7 +70,7 @@ mod test {
     use bigdecimal::BigDecimal;
     #[test]
     fn test_pack() {
-        //        println!("{:x?}", pack_token_amount(&BigDecimal::from(2)));
+        println!("{:x?}", pack_token_amount(&BigDecimal::from(2)));
         println!("{:x?}", pack_fee_amount(&BigDecimal::from(1)));
     }
 }
