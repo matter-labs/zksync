@@ -4,13 +4,13 @@ import "./Bytes.sol";
 
 contract PriorityQueue {
 
-    // MARK: - CONSTANTS
+    address franklinAddress;
+    address ownerAddress;
 
     // Operation fields bytes lengths
     uint8 TOKEN_BYTES = 2; // token id
     uint8 AMOUNT_BYTES = 16; // token amount
     uint8 ETH_ADDR_BYTES = 20; // ethereum address
-    uint8 FEE_BYTES = 2; // fee
     uint8 ACC_NUM_BYTES = 3; // franklin account id
     uint8 NONCE_BYTES = 4; // franklin nonce
 
@@ -20,30 +20,8 @@ contract PriorityQueue {
     uint8 constant SIGNATURE_LEN = 64;
     // Public key length
     uint8 constant PUBKEY_LEN = 32;
-    // Fee coefficient for priority request transaction
-    uint256 constant FEE_COEFF = 4;
-    // Base gas cost for transaction
-    uint256 constant BASE_GAS = 21000;
-    // Chunks per block; each chunk has 8 bytes of public data
-    uint256 constant BLOCK_SIZE = 14;
-    // Max amount of any token must fit into uint128
-    uint256 constant MAX_VALUE = 2 ** 112 - 1;
     // Expiration delta for priority request to be satisfied (in ETH blocks)
     uint256 constant PRIORITY_EXPIRATION = 250; // About 1 hour
-    // ETH blocks verification expectation
-    uint256 constant EXPECT_VERIFICATION_IN = 8 * 60 * 100;
-    // Max number of unverified blocks. To make sure that all reverted blocks can be copied under block gas limit!
-    uint256 constant MAX_UNVERIFIED_BLOCKS = 4 * 60 * 100;
-
-    // Operations lengths
-
-    uint256 constant NOOP_LENGTH = 1 * 8; // noop
-    uint256 constant DEPOSIT_LENGTH = 6 * 8; // deposit
-    uint256 constant TRANSFER_TO_NEW_LENGTH = 5 * 8; // transfer
-    uint256 constant PARTIAL_EXIT_LENGTH = 6 * 8; // partial exit
-    uint256 constant CLOSE_ACCOUNT_LENGTH = 1 * 8; // close account
-    uint256 constant TRANSFER_LENGTH = 2 * 8; // transfer
-    uint256 constant FULL_EXIT_LENGTH = 18 * 8; // full exit
 
     // New priority request event
     // Emitted when a request is placed into mapping
@@ -59,8 +37,6 @@ contract PriorityQueue {
         uint256 expirationBlock,
         uint256 fee
     );
-
-    // Priority Queue
 
     // Types of franklin operations in blocks
     enum OpType {
@@ -92,6 +68,25 @@ contract PriorityQueue {
     // Total number of committed requests
     uint64 public totalCommittedPriorityRequests;
 
+    // Sets owner address
+    constructor(address _ownerAddress) public {
+        ownerAddress = _ownerAddress;
+    }
+
+    // Change current owner
+    // _newOwner - address of the new governor
+    function changeOwner(address _newOwner) external {
+        requireOwner();
+        ownerAddress = _newOwner;
+    }
+
+    // Change franklin address
+    // _franklinAddress - address of the Franklin contract
+    function changeFranklinAddress(address _franklinAddress) external {
+        requireOwner();
+        franklinAddress = _franklinAddress;
+    }
+
     // Calculate expiration block for request, store this request and emit NewPriorityRequest event
     // Params:
     // - _opType - priority request type
@@ -102,6 +97,7 @@ contract PriorityQueue {
         uint256 _fee,
         bytes calldata _pubData
     ) external {
+        requireFranklin();
         // Expiration block is: current block number + priority expiration delta
         uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
 
@@ -128,6 +124,7 @@ contract PriorityQueue {
     // Params:
     // - _number - the number of requests
     function collectValidatorsFeeAndDeleteRequests(uint64 _number) external returns (uint256) {
+        requireFranklin();
         require(
             _number <= totalOpenPriorityRequests,
             "fcs11"
@@ -182,7 +179,7 @@ contract PriorityQueue {
     // - _opType - operation type
     // - _pubData - operation pub data
     // - _id - operation number
-    function isPriorityOpValid(OpType _opType, bytes memory _pubData, uint64 _id) internal view returns (bool) {
+    function isPriorityOpValid(OpType _opType, bytes calldata _pubData, uint64 _id) external view returns (bool) {
         uint64 _priorityRequestId = _id + firstPriorityRequestId + totalCommittedPriorityRequests;
         bytes memory priorityPubData;
         bytes memory onchainPubData;
@@ -199,6 +196,9 @@ contract PriorityQueue {
             (keccak256(onchainPubData) == keccak256(priorityPubData));
     }
 
+    // Checks if provided number is less than uncommitted requests count
+    // Params:
+    // - _number - number of requests
     function validateNumberOfRequests(uint64 _number) external view {
         require(
             _number <= totalOpenPriorityRequests-totalCommittedPriorityRequests,
@@ -206,11 +206,15 @@ contract PriorityQueue {
         ); // fvs11 - too much priority requests
     }
 
+    // Increases committed requests count by provided number
     function increaseCommittedRequestsNumber(uint64 _number) external {
+        requireFranklin();
         totalCommittedPriorityRequests += _number;
     }
 
+    // Decreases committed requests count by provided number
     function decreaseCommittedRequestsNumber(uint64 _number) external {
+        requireFranklin();
         totalCommittedPriorityRequests -= _number;
     }
 
@@ -227,5 +231,21 @@ contract PriorityQueue {
         } else {
             return false;
         }
+    }
+
+    // Check if the sender is franklin contract
+    function requireFranklin() internal view {
+        require(
+            msg.sender == franklinAddress,
+            "grr11"
+        ); // grr11 - only by governor
+    }
+
+    // Check if the sender is owner
+    function requireOwner() internal view {
+        require(
+            msg.sender == ownerAddress,
+            "grr11"
+        ); // grr11 - only by governor
     }
 }

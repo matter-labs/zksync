@@ -18,8 +18,6 @@ contract Franklin {
     // Priority Queue contract
     PriorityQueue priorityQueue;
 
-    // MARK: - CONSTANTS
-
     // Operation fields bytes lengths
     uint8 TOKEN_BYTES = 2; // token id
     uint8 AMOUNT_BYTES = 16; // token amount
@@ -38,19 +36,14 @@ contract Franklin {
     uint256 constant FEE_COEFF = 4;
     // Base gas cost for transaction
     uint256 constant BASE_GAS = 21000;
-    // Chunks per block; each chunk has 8 bytes of public data
-    uint256 constant BLOCK_SIZE = 14;
     // Max amount of any token must fit into uint128
     uint256 constant MAX_VALUE = 2 ** 112 - 1;
-    // Expiration delta for priority request to be satisfied (in ETH blocks)
-    uint256 constant PRIORITY_EXPIRATION = 250; // About 1 hour
     // ETH blocks verification expectation
     uint256 constant EXPECT_VERIFICATION_IN = 8 * 60 * 100;
     // Max number of unverified blocks. To make sure that all reverted blocks can be copied under block gas limit!
     uint256 constant MAX_UNVERIFIED_BLOCKS = 4 * 60 * 100;
 
     // Operations lengths
-
     uint256 constant NOOP_LENGTH = 1 * 8; // noop
     uint256 constant DEPOSIT_LENGTH = 6 * 8; // deposit
     uint256 constant TRANSFER_TO_NEW_LENGTH = 5 * 8; // transfer
@@ -59,7 +52,6 @@ contract Franklin {
     uint256 constant TRANSFER_LENGTH = 2 * 8; // transfer
     uint256 constant FULL_EXIT_LENGTH = 18 * 8; // full exit
 
-    // MARK: - EVENTS
 
     // Event emitted when a block is committed
     // Structure:
@@ -82,12 +74,8 @@ contract Franklin {
     // Exodus mode entered event
     event ExodusMode();
 
-    // MARK: - STORAGE
-
     // Root-chain balances (per owner and token id) to withdraw
     mapping(address => mapping(uint16 => uint128)) public balancesToWithdraw;
-
-    // Blocks
 
     // Total number of verified blocks
     // i.e. blocks[totalBlocksVerified] points at the latest verified block (block 0 is genesis)
@@ -182,8 +170,6 @@ contract Franklin {
         blocks[0].stateRoot = _genesisRoot;
     }
 
-    // MARK: - PRIORITY QUEUE
-
     // Collects a fee from provided requests number for the validator, store it on her
     // balance to withdraw in Ether and delete this requests
     // Params:
@@ -229,8 +215,6 @@ contract Franklin {
 
     //     require(false, "unimplemented");
     // }
-
-    // MARK: - ROOT-CHAIN OPERATIONS
 
     // Deposit ETH
     // Params:
@@ -405,8 +389,6 @@ contract Franklin {
 
         balancesToWithdraw[msg.sender][_token] -= _amount;
     }
-
-    // MARK: - BLOCK COMMITMENT
 
     // Commit block
     // Params:
@@ -639,8 +621,6 @@ contract Franklin {
         }
     }
 
-    // MARK: - BLOCK VERIFICATION
-
     // Block verification.
     // Verify proof -> consummate onchain ops (accrue balances from withdrawls) -> remove priority requests
     // Params:
@@ -729,8 +709,6 @@ contract Franklin {
         }
     }
 
-    // MARK: - REVERTING COMMITTED BLOCKS
-
     // Checks that commitment is expired and revert blocks
     function triggerRevertIfBlockCommitmentExpired() internal returns (bool) {
         if (
@@ -766,8 +744,6 @@ contract Franklin {
         revertOnchainOps(_reverted.operationStartId, _reverted.onchainOperations);
         priorityQueue.decreaseCommittedRequestsNumber(_reverted.priorityOperations);
     }
-
-    // MARK: - EXODUS MODE
 
     // Checks that current state not is exodus mode
     function requireActive() internal view {
