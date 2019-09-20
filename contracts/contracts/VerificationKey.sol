@@ -1,13 +1,13 @@
 
 // This contract is generated programmatically
 
-pragma solidity ^0.5.1;
+pragma solidity ^0.5.8;
 
 
 // Hardcoded constants to avoid accessing store
 contract VerificationKey {
 
-    function getVk() external pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {
+    function getVk() internal pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {
 
         
         vk[0] = 0x0b6721dac5dadebb910d601b830a4f281c5d3da54eb16ab8150863a0a916c6e7;
