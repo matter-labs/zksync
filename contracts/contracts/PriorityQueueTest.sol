@@ -138,31 +138,10 @@ contract PriorityQueueTest {
     // Accrues users balances from priority requests,
     // if this request contains a Deposit operation
     // WARNING: Only for Exodus mode
-    function cancelOutstandingDepositsForExodusMode() external view returns (
-        address[] memory owners,
-        uint16[] memory tokens,
-        uint128[] memory amounts
-    ) {
-        uint64 counter = 0;
+    function getOutstandingDeposits() external view returns (bytes memory depositsPubData) {
         for (uint64 i = firstPriorityRequestId; i < firstPriorityRequestId + totalOpenPriorityRequests; i++) {
             if (priorityRequests[i].opType == DEPOSIT_OP) {
-                bytes memory pubData = priorityRequests[i].pubData;
-                bytes memory owner = new bytes(ETH_ADDR_BYTES);
-                for (uint8 j = 0; j < ETH_ADDR_BYTES; ++j) {
-                    owner[j] = pubData[j];
-                }
-                bytes memory token = new bytes(TOKEN_BYTES);
-                for (uint8 j = 0; j < TOKEN_BYTES; j++) {
-                    token[j] = pubData[ETH_ADDR_BYTES + j];
-                }
-                bytes memory amount = new bytes(AMOUNT_BYTES);
-                for (uint8 j = 0; j < AMOUNT_BYTES; ++j) {
-                    amount[j] = pubData[ETH_ADDR_BYTES + TOKEN_BYTES + j];
-                }
-                owners[counter] = Bytes.bytesToAddress(owner);
-                tokens[counter] = Bytes.bytesToUInt16(token);
-                amounts[counter] = Bytes.bytesToUInt128(amount);
-                counter++;
+                depositsPubData = Bytes.concat(depositsPubData, priorityRequests[i].pubData);
             }
         }
     }
