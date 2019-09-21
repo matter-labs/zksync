@@ -10,8 +10,9 @@ export const ERC20MintableContract = function () {
     return contract
 }();
 export const franklinContractCode = require('../build/FranklinTest');
-export const verifierContractCode = require('../build/Verifier');
+export const verifierContractCode = require('../build/VerifierTest');
 export const governanceContractCode = require('../build/Governance');
+export const priorityQueueContractCode = require('../build/PriorityQueueTest');
 
 export async function deployGovernance(
     wallet,
@@ -30,23 +31,55 @@ export async function deployGovernance(
     }
 }
 
+export async function deployPriorityQueue(
+    wallet,
+    ownerAddress = wallet.address,
+    priorityQueueCode = priorityQueueContractCode
+    ) {
+    try {
+        let priorityQueue = await deployContract(wallet, priorityQueueCode, [ownerAddress], {
+            gasLimit: 5000000,
+        });
+        console.log(`PRIORITY_QUEUE_ADDR=${priorityQueue.address}`);
+
+        return priorityQueue
+    } catch (err) {
+        console.log("Priority queu deploy error:" + err);
+    }
+}
+
+export async function deployVerifier(
+    wallet,
+    verifierCode = verifierContractCode
+    ) {
+    try {
+        let verifier = await deployContract(wallet, verifierCode, [], {
+            gasLimit: 2000000,
+        });
+        console.log(`VERIFIER_ADDR=${verifier.address}`);
+
+        return verifier
+    } catch (err) {
+        console.log("Verifier deploy error:" + err);
+    }
+}
+
 export async function deployFranklin(
     wallet,
     governanceAddress,
-    verifierCode = verifierContractCode,
+    priorityQueueAddress,
+    verifierAddress,
     genesisRoot = ethers.constants.HashZero,
     franklinCode = franklinContractCode
     ) {
     try {
-        let verifier = await deployContract(wallet, verifierCode, [], {
-            gasLimit: 1100000,
-        });
         let contract = await deployContract(
             wallet,
             franklinCode,
             [
                 governanceAddress,
-                verifier.address,
+                verifierAddress,
+                priorityQueueAddress,
                 genesisRoot,
             ],
         {

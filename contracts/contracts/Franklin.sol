@@ -62,6 +62,32 @@ contract Franklin {
     // - blockNumber - the number of verified block
     event BlockVerified(uint32 indexed blockNumber);
 
+    // Event emitted when user send a transaction to withdraw her funds from onchain balance
+    // Structure:
+    // - owner - sender
+    // - tokenId - withdrawed token
+    // - amount - withdrawed value
+    event OnchainWithdrawal(
+        address indexed owner,
+        uint16 tokenId,
+        uint128 amount
+    );
+
+    // Event emitted when user send a transaction to deposit her funds
+    // Structure:
+    // - owner - sender
+    // - tokenId - deposited token
+    // - amount - deposited value
+    // - fee - fee
+    // - franlkinAddress - address of Franklin account whtere deposit will be sent
+    event OnchainDeposit(
+        address indexed owner,
+        uint16 tokenId,
+        uint128 amount,
+        uint256 fee,
+        bytes franklinAddress
+    );
+
     // Event emitted when blocks are reverted
     // Structure:
     // - totalBlocksVerified - number of verified blocks
@@ -185,7 +211,7 @@ contract Franklin {
     // WARNING: Only for Exodus mode
     function cancelOutstandingDepositsForExodusMode() internal {
         (address[] memory owners, uint16[] memory tokens, uint128[] memory amounts) = priorityQueue.cancelOutstandingDepositsForExodusMode();
-        for (uint64 i = 0; i < owners.count; i++) {
+        for (uint64 i = 0; i < owners.length; i++) {
             balancesToWithdraw[owners[i]][tokens[i]] += amounts[i];
         }
     }
@@ -344,7 +370,7 @@ contract Franklin {
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt32(_nonce)); // nonce
         pubData = Bytes.concat(pubData, _signature); // signature
 
-        priorityQueue.addPriorityRequest(OpType.FullExit, fee, pubData);
+        priorityQueue.addPriorityRequest(uint8(OpType.FullExit), fee, pubData);
         
         if (msg.value != fee) {
             msg.sender.transfer(msg.value-fee);
@@ -374,7 +400,15 @@ contract Franklin {
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt128(_amount)); // amount
         pubData = Bytes.concat(pubData, _franklinAddr); // franklin address
 
-        priorityQueue.addPriorityRequest(OpType.Deposit, _fee, pubData);
+        priorityQueue.addPriorityRequest(uint8(OpType.Deposit), _fee, pubData);
+
+        emit OnchainDeposit(
+            msg.sender,
+            _token,
+            _amount,
+            _fee,
+            _franklinAddr
+        );
     }
 
     // Register withdrawal
@@ -388,6 +422,12 @@ contract Franklin {
         ); // frw11 - insufficient balance withdraw
 
         balancesToWithdraw[msg.sender][_token] -= _amount;
+
+        emit OnchainWithdrawal(
+            msg.sender,
+            _token,
+            _amount
+        );
     }
 
     // Commit block
@@ -600,7 +640,7 @@ contract Franklin {
             if (onchainOps[current].opType == OpType.FullExit || onchainOps[current].opType == OpType.Deposit) {
                 OnchainOperation memory op = onchainOps[current];
                 require(
-                    priorityQueue.isPriorityOpValid(op.opType, op.pubData, counter),
+                    priorityQueue.isPriorityOpValid(uint8(op.opType), op.pubData, counter),
                     "fvs12"
                 ); // fvs12 - priority operation is not valid
                 counter++;
