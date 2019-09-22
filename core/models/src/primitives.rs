@@ -353,7 +353,8 @@ pub fn bytes_into_be_bits(bytes: &[u8]) -> Vec<bool> {
 }
 
 pub fn pedersen_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
-    let msg_bits = bytes_into_be_bits(msg);
+    let mut msg_bits = bytes_into_be_bits(msg);
+    msg_bits.resize(params::PAD_MSG_BEFORE_HASH_BITS_LEN, false);
     let hasher = &params::PEDERSEN_HASHER as &BabyPedersenHasher;
     let hash_fr = hasher.hash_bits(msg_bits.into_iter());
     let mut hash_bits = Vec::new();

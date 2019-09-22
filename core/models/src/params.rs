@@ -62,6 +62,8 @@ pub const FR_ADDRESS_LEN: usize = 20;
 
 pub const KEY_FILENAME: &str = "franklin_pk.key";
 
+pub const PAD_MSG_BEFORE_HASH_BITS_LEN: usize = 736;
+
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
     pub static ref PEDERSEN_HASHER: BabyPedersenHasher = BabyPedersenHasher::default();

@@ -39,6 +39,7 @@ export const altjubjubCurve = new elliptic.curve.edwards(babyJubjubParams);
 const curveZero = altjubjubCurve.point('0', '1');
 const chunksPerGenerator = 62;
 export const addressLen=20;
+const PAD_MSG_BEFORE_HASH_BYTES_LEN = 92;
 
 let gen1 = altjubjubCurve.point(
     '184570ed4909a81b2793320a26e8f956be129e4eed381acf901718dff8802135',
@@ -277,7 +278,9 @@ function pedersenHStar(input: Buffer) : BN {
 }
 
 export function musigSHA256(priv_key: BN, msg: Buffer) {
-    msg = pedersenHash(msg, "be").getX().toBuffer("le", 32);
+    let msgToHash = Buffer.alloc(PAD_MSG_BEFORE_HASH_BYTES_LEN, 0);
+    msg.copy(msgToHash);
+    msg = pedersenHash(msgToHash, "be").getX().toBuffer("le", 32);
 
     const t = crypto.randomBytes(80);
 
@@ -301,7 +304,9 @@ export function musigSHA256(priv_key: BN, msg: Buffer) {
 }
 
 export function musigPedersen(priv_key: BN, msg: Buffer) {
-    msg = pedersenHash(msg, "be").getX().toBuffer("le", 32);
+    let msgToHash = Buffer.alloc(PAD_MSG_BEFORE_HASH_BYTES_LEN, 0);
+    msg.copy(msgToHash);
+    msg = pedersenHash(msgToHash, "be").getX().toBuffer("le", 32);
 
     const t = crypto.randomBytes(80);
 
