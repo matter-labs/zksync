@@ -457,6 +457,40 @@ mod test {
     use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
     #[ignore]
+    fn test_transfer_to_new_signature() {
+        let params = &AltJubjubBn256::new();
+        let p_g = FixedGenerators::SpendingKeyGenerator;
+
+        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+
+        let validator_address_number = 7;
+        let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
+        let phasher = PedersenHasher::<Bn256>::default();
+
+        let mut tree = CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
+
+        let capacity = tree.capacity();
+        assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
+
+        let from_sk = PrivateKey::<Bn256>(rng.gen());
+        let from_pk = PublicKey::from_private(&from_sk, p_g, params);
+        let from_pub_key_hash = pub_key_hash_fe(&from_pk, &phasher);
+        let (from_x, from_y) = from_pk.0.into_xy();
+        println!("x = {}, y = {}", from_x, from_y);
+
+        let (signature_data, first_sig_part, second_sig_part, third_sig_part) =
+            generate_sig_data(&[true; 1], &phasher, &from_sk, params);
+
+        let packed_public_key = PackedPublicKey(from_pk);
+        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+        packed_public_key_bytes.reverse();
+        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
+    }
+    #[test]
+    #[ignore]
     fn test_transfer_to_new() {
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;

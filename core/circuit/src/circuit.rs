@@ -630,60 +630,60 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?);
 
         let mut op_flags = vec![];
-        //        op_flags.push(self.deposit(
-        //            cs.namespace(|| "deposit"),
-        //            &mut cur,
-        //            &chunk_data,
-        //            &is_account_empty,
-        //            &op_data,
-        //            &ext_pubdata_chunk,
-        //        )?);
-        //        op_flags.push(self.transfer(
-        //            cs.namespace(|| "transfer"),
-        //            &mut cur,
-        //            &lhs,
-        //            &rhs,
-        //            &chunk_data,
-        //            &is_a_geq_b,
-        //            &is_account_empty,
-        //            &op_data,
-        //            &signer_key,
-        //            &ext_pubdata_chunk,
-        //            &signature_data.is_verified,
-        //        )?);
-        //        op_flags.push(self.transfer_to_new(
-        //            cs.namespace(|| "transfer_to_new"),
-        //            &mut cur,
-        //            &lhs,
-        //            &rhs,
-        //            &chunk_data,
-        //            &is_a_geq_b,
-        //            &is_account_empty,
-        //            &op_data,
-        //            &signer_key,
-        //            &ext_pubdata_chunk,
-        //            &signature_data.is_verified,
-        //        )?);
-        //        op_flags.push(self.withdraw(
-        //            cs.namespace(|| "withdraw"),
-        //            &mut cur,
-        //            &chunk_data,
-        //            &is_a_geq_b,
-        //            &op_data,
-        //            &signer_key,
-        //            &ext_pubdata_chunk,
-        //            &signature_data.is_verified,
-        //        )?);
-        //        op_flags.push(self.close_account(
-        //            cs.namespace(|| "close_account"),
-        //            &mut cur,
-        //            &chunk_data,
-        //            &ext_pubdata_chunk,
-        //            &op_data,
-        //            &signer_key,
-        //            &subtree_root,
-        //            &signature_data.is_verified,
-        //        )?);
+        op_flags.push(self.deposit(
+            cs.namespace(|| "deposit"),
+            &mut cur,
+            &chunk_data,
+            &is_account_empty,
+            &op_data,
+            &ext_pubdata_chunk,
+        )?);
+        op_flags.push(self.transfer(
+            cs.namespace(|| "transfer"),
+            &mut cur,
+            &lhs,
+            &rhs,
+            &chunk_data,
+            &is_a_geq_b,
+            &is_account_empty,
+            &op_data,
+            &signer_key,
+            &ext_pubdata_chunk,
+            &signature_data.is_verified,
+        )?);
+        op_flags.push(self.transfer_to_new(
+            cs.namespace(|| "transfer_to_new"),
+            &mut cur,
+            &lhs,
+            &rhs,
+            &chunk_data,
+            &is_a_geq_b,
+            &is_account_empty,
+            &op_data,
+            &signer_key,
+            &ext_pubdata_chunk,
+            &signature_data.is_verified,
+        )?);
+        op_flags.push(self.withdraw(
+            cs.namespace(|| "withdraw"),
+            &mut cur,
+            &chunk_data,
+            &is_a_geq_b,
+            &op_data,
+            &signer_key,
+            &ext_pubdata_chunk,
+            &signature_data.is_verified,
+        )?);
+        op_flags.push(self.close_account(
+            cs.namespace(|| "close_account"),
+            &mut cur,
+            &chunk_data,
+            &ext_pubdata_chunk,
+            &op_data,
+            &signer_key,
+            &subtree_root,
+            &signature_data.is_verified,
+        )?);
         op_flags.push(self.full_exit(
             cs.namespace(|| "full_exit"),
             &mut cur,
@@ -693,7 +693,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &ext_pubdata_chunk,
             &signature_data,
         )?);
-        //        op_flags.push(self.noop(cs.namespace(|| "noop"), &chunk_data, &ext_pubdata_chunk)?);
+        op_flags.push(self.noop(cs.namespace(|| "noop"), &chunk_data, &ext_pubdata_chunk)?);
 
         let op_valid = multi_or(cs.namespace(|| "op_valid"), &op_flags)?;
 
@@ -1438,14 +1438,14 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         lhs_valid_flags.push(is_sig_correct);
 
-        let _is_signer_valid = CircuitElement::equals(
+        let is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correect"),
             &signer_key.pubkey.get_hash(),
             &lhs.account.pub_key_hash,
         )?;
-        println!("is_signer_valid: {:?}", _is_signer_valid.get_value());
+        println!("is_signer_valid: {:?}", is_signer_valid.get_value());
 
-        //        lhs_valid_flags.push(_is_signer_valid);
+        lhs_valid_flags.push(is_signer_valid);
         println!("lhs_valid_transfer_to_new_begin");
         let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
         println!("lhs_valid_transfer_to_new_end");

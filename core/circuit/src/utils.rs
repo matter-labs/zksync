@@ -35,6 +35,11 @@ where
     // if !is_valid_signature {
     //     return None;
     // }
+    let (sig_r_x, sig_r_y) = signature.r.into_xy();
+    println!("signature.s: {}", signature.s);
+    println!("signature.r.x: {}", sig_r_x);
+    println!("signature.r.y: {}", sig_r_y);
+
     convert_signature_to_representation(signature)
 }
 
