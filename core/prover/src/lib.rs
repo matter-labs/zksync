@@ -595,18 +595,7 @@ impl BabyProver {
                                 .iter()
                                 .map(|x| Some(*x))
                                 .collect();
-                        // let (
-                        //     signature,
-                        //     first_sig_msg,
-                        //     second_sig_msg,
-                        //     third_sig_msg,
-                        //     sender_x,
-                        //     sender_y,
-                        // ) = generate_dummy_sig_data(
-                        //     &withdraw_witness.get_sig_bits(),
-                        //     &phasher,
-                        //     &params,
-                        // );
+
                         let withdraw_operations = calculate_withdraw_operations_from_witness(
                             &withdraw_witness,
                             &first_sig_msg,
@@ -651,18 +640,6 @@ impl BabyProver {
                                 .map(|x| Some(*x))
                                 .collect();
 
-                        //                        let (
-                        //                            signature,
-                        //                            first_sig_msg,
-                        //                            second_sig_msg,
-                        //                            third_sig_msg,
-                        //                            sender_x,
-                        //                            sender_y,
-                        //                        ) = generate_dummy_sig_data(
-                        //                            &close_account_witness.get_sig_bits(),
-                        //                            &phasher,
-                        //                            &params,
-                        //                        );
                         let close_account_operations =
                             calculate_close_account_operations_from_witness(
                                 &close_account_witness,
@@ -682,7 +659,6 @@ impl BabyProver {
 
                         let mut r_bytes = full_exit.priority_op.signature_r.to_vec();
                         let mut s_bytes = full_exit.priority_op.signature_s.to_vec();
-                        println!("s_bytes: {}", hex::encode(s_bytes.clone()));
 
                         let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
                             .iter()
@@ -717,27 +693,6 @@ impl BabyProver {
                             &signature,
                             &signer_packed_key_bits,
                         );
-                        println!("pubdata_bits outside: ");
-                        for (i, bit) in full_exit_witness
-                            .get_pubdata(&signature, &bytes_into_be_bits(&signer_packed_key_bytes))
-                            .iter()
-                            .enumerate()
-                        {
-                            if i % 64 == 0 {
-                                println!("")
-                            } else if i % 8 == 0 {
-                                print!(" ")
-                            };
-                            let numb = {
-                                if *bit {
-                                    1
-                                } else {
-                                    0
-                                }
-                            };
-                            print!("{}", numb);
-                        }
-                        println!("");
                         operations.extend(full_exit_operations);
                         pub_data.extend(full_exit_witness.get_pubdata(
                             &signature,
@@ -830,30 +785,30 @@ impl BabyProver {
                 validator_account: validator_account_witness.clone(),
             };
 
-            {
-                info!("just synthesizing");
-                let inst = FranklinCircuit {
-                    params: &self.jubjub_params,
-                    operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
-                    old_root: Some(initial_root),
-                    new_root: Some(block.new_root_hash),
-                    block_number: Fr::from_str(&(block_number).to_string()),
-                    validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
-                    pub_data_commitment: Some(public_data_commitment),
-                    operations: operations.clone(),
-                    validator_balances: validator_balances.clone(),
-                    validator_audit_path: validator_audit_path.clone(),
-                    validator_account: validator_account_witness.clone(),
-                };
-                let mut cs = TestConstraintSystem::<Engine>::new();
-                inst.synthesize(&mut cs).unwrap();
-
-                warn!("unconstrained {}\n", cs.find_unconstrained());
-                warn!("inputs {}\n", cs.num_inputs());
-                warn!("num_constraints: {}\n", cs.num_constraints());
-                warn!("is satisfied: {}\n", cs.is_satisfied());
-                warn!("which is unsatisfied: {:?}\n", cs.which_is_unsatisfied());
-            }
+            //            {
+            //                info!("just synthesizing");
+            //                let inst = FranklinCircuit {
+            //                    params: &self.jubjub_params,
+            //                    operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
+            //                    old_root: Some(initial_root),
+            //                    new_root: Some(block.new_root_hash),
+            //                    block_number: Fr::from_str(&(block_number).to_string()),
+            //                    validator_address: Some(Fr::from_str(&block.fee_account.to_string()).unwrap()),
+            //                    pub_data_commitment: Some(public_data_commitment),
+            //                    operations: operations.clone(),
+            //                    validator_balances: validator_balances.clone(),
+            //                    validator_audit_path: validator_audit_path.clone(),
+            //                    validator_account: validator_account_witness.clone(),
+            //                };
+            //                let mut cs = TestConstraintSystem::<Engine>::new();
+            //                inst.synthesize(&mut cs).unwrap();
+            //
+            //                warn!("unconstrained {}\n", cs.find_unconstrained());
+            //                warn!("inputs {}\n", cs.num_inputs());
+            //                warn!("num_constraints: {}\n", cs.num_constraints());
+            //                warn!("is satisfied: {}\n", cs.is_satisfied());
+            //                warn!("which is unsatisfied: {:?}\n", cs.which_is_unsatisfied());
+            //            }
 
             let mut rng = OsRng::new().unwrap();
             info!("Prover has started to work");
