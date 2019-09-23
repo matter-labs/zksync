@@ -48,6 +48,14 @@ table! {
 }
 
 table! {
+    blocks (number) {
+        number -> Int8,
+        root_hash -> Text,
+        fee_account_id -> Int8,
+    }
+}
+
+table! {
     data_restore_last_watched_eth_block (id) {
         id -> Int4,
         block_number -> Text,
@@ -89,6 +97,7 @@ table! {
         block_index -> Int4,
         operation -> Jsonb,
         priority_op_serialid -> Int8,
+        deadline_block -> Int8,
         eth_fee -> Numeric,
     }
 }
@@ -145,7 +154,6 @@ table! {
 table! {
     operations (id) {
         id -> Int8,
-        data -> Jsonb,
         block_number -> Int8,
         action_type -> Text,
         created_at -> Timestamp,
@@ -198,6 +206,7 @@ allow_tables_to_appear_in_same_query!(
     accounts,
     active_provers,
     balances,
+    blocks,
     data_restore_last_watched_eth_block,
     data_restore_network,
     eth_operations,

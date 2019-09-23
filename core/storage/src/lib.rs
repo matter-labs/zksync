@@ -6,14 +6,9 @@ extern crate log;
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
-use failure::Fail;
+use failure::{Fail, bail};
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
-use models::node::{
-    apply_updates, reverse_updates,
-    tx::{FranklinTx, TxType},
-    Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, FranklinOp, Nonce,
-    TokenId,
-};
+use models::node::{apply_updates, reverse_updates, tx::{FranklinTx, TxType}, Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, FranklinOp, Nonce, TokenId, PriorityOp};
 use models::{Action, ActionType, EncodedProof, Operation, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
@@ -167,6 +162,24 @@ struct StoredExecutedTransaction {
     block_index: Option<i32>,
 }
 
+impl StoredExecutedTransaction {
+    fn try_into_successful_tx(self) -> Result<ExecutedTx, failure::Error> {
+        let franklin_op: FranklinOp = if let Some(op) = self.operation {
+            serde_json::from_value(op).expect("Unparsable FranklinOp in db")
+        } else {
+            bail!("Transaction was not successful");
+        };
+
+        Ok(ExecutedTx {
+            tx: franklin_op.try_get_tx().expect("FranklinOp should not have tx"),
+            success: true,
+            op: Some(franklin_op),
+            fail_reason: None,
+            block_index: Some(self.block_index.expect("Block idx should be set") as u32),
+        })
+    }
+}
+
 #[derive(Debug, Insertable)]
 #[table_name = "executed_priority_operations"]
 struct NewExecutedPriorityOperation {
@@ -174,6 +187,7 @@ struct NewExecutedPriorityOperation {
     block_index: i32,
     operation: Value,
     priority_op_serialid: i64,
+    deadline_block: i64,
     eth_fee: BigDecimal,
 }
 
@@ -184,6 +198,7 @@ impl NewExecutedPriorityOperation {
             block_index: exec_prior_op.block_index as i32,
             operation: serde_json::to_value(&exec_prior_op.op).unwrap(),
             priority_op_serialid: exec_prior_op.priority_op.serial_id as i64,
+            deadline_block: exec_prior_op.priority_op.deadline_block as i64,
             eth_fee: exec_prior_op.priority_op.eth_fee.clone(),
         }
     }
@@ -197,7 +212,24 @@ struct StoredExecutedPriorityOperation {
     block_index: i32,
     operation: Value,
     priority_op_serialid: i64,
+    deadline_block: i64,
     eth_fee: BigDecimal,
+}
+
+impl Into<ExecutedPriorityOp> for StoredExecutedPriorityOperation {
+    fn into(self) -> ExecutedPriorityOp {
+        let franklin_op: FranklinOp = serde_json::from_value(self.operation).expect("Unparsable priority op in db");
+        ExecutedPriorityOp {
+            priority_op: PriorityOp {
+                serial_id: self.priority_op_serialid as u64,
+                data: franklin_op.try_get_priority_op().expect("FranklinOp should have priority op"),
+                deadline_block: self.deadline_block as u64,
+                eth_fee: self.eth_fee
+            },
+            op: franklin_op,
+            block_index: self.block_index as u32,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -299,10 +331,9 @@ impl StorageAccountDiff {
     }
 }
 
-#[derive(Insertable)]
+#[derive(Debug, Insertable)]
 #[table_name = "operations"]
 struct NewOperation {
-    pub data: Value,
     pub block_number: i64,
     pub action_type: String,
 }
@@ -311,7 +342,6 @@ struct NewOperation {
 #[table_name = "operations"]
 pub struct StoredOperation {
     pub id: i64,
-    pub data: serde_json::Value,
     pub block_number: i64,
     pub action_type: String,
     pub created_at: NaiveDateTime,
@@ -338,6 +368,14 @@ struct NewETHOperation {
     deadline_block: i64,
     gas_price: BigDecimal,
     tx_hash: String,
+}
+
+#[derive(Debug, Insertable, Queryable)]
+#[table_name = "blocks"]
+struct StorageBlock {
+    number: i64,
+    root_hash: String,
+    fee_account_id: i64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Queryable)]
@@ -612,25 +650,40 @@ impl StorageProcessor {
             match &op.action {
                 Action::Commit => {
                     self.commit_state_update(op.block.block_number, &op.accounts_updated)?;
-                    self.save_block_transactions(&op.block)?;
+                    self.save_block(&op.block)?;
                 }
                 Action::Verify { .. } => self.apply_state_update(op.block.block_number)?,
             };
 
-            // NOTE: tx meta is inserted automatically with sender addr and next expected nonce
-            // see SQL migration code for `operations` table
             let stored: StoredOperation = diesel::insert_into(operations::table)
                 .values(&NewOperation {
                     block_number: i64::from(op.block.block_number),
                     action_type: op.action.to_string(),
-                    data: serde_json::to_value(&op).unwrap(),
                 })
                 .get_result(self.conn())?;
             stored.into_op(self)
         })
     }
 
-    pub fn save_block_transactions(&self, block: &Block) -> QueryResult<()> {
+    fn save_block(&self, block: &Block) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            self.save_block_transactions(block)?;
+
+            let new_block = StorageBlock {
+                number: block.block_number as i64,
+                root_hash: block.new_root_hash.to_string(),
+                fee_account_id: block.fee_account as i64,
+            };
+
+            diesel::insert_into(blocks::table)
+                .values(&new_block)
+                .execute(self.conn())?;
+
+            Ok(())
+        })
+    }
+
+    fn save_block_transactions(&self, block: &Block) -> QueryResult<()> {
         for block_tx in block.block_transactions.iter() {
             match block_tx {
                 ExecutedOperations::Tx(tx) => {
@@ -656,19 +709,35 @@ impl StorageProcessor {
     }
 
     pub fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {
-        let op = self
-            .load_stored_op_with_block_number(block, ActionType::COMMIT)
-            .ok_or_else(|| Error::NotFound)?;
-        let restored_operation = op.into_op(self)?;
-        Ok(restored_operation
-            .block
-            .block_transactions
-            .into_iter()
-            .filter_map(|exec| match exec {
-                ExecutedOperations::PriorityOp(prior_op) => Some(prior_op.op),
-                ExecutedOperations::Tx(tx) => tx.op,
-            })
-            .collect())
+        let executed_txs: Vec<_> =  executed_transactions::table
+            .filter(executed_transactions::block_number.eq(block as i64))
+            .filter(executed_transactions::success.eq(true))
+            .load::<StoredExecutedTransaction>(self.conn());
+        let executed_prior_ops: Vec<_> = executed_priority_operations::table
+            .filter(executed_priority_operations::block_number.eq(block as i64))
+            .load::<StoredExecutedPriorityOperation>(self.conn());
+
+        let executed_ops = {
+            let mut executed_ops = Vec::new();
+            let txs = executed_txs.into_iter().map(|stored_tx| ExecutedOperations::Tx(stored_tx.try_into_successful_tx.expect("Expected successful txs")));
+            executed_ops.extend(txs);
+            let ops = executed_prior_ops.into_iter().map(|stored_op| ExecutedOperations::PriorityOp(stored_op.into()));
+            executed_ops.extend(ops);
+            executed_ops.sorted_by_key(|exec_op| {
+                match exec_op {
+                    ExecutedOperations::Tx(tx) => tx.block_index.expect("expected successful tx"),
+                    ExecutedOperations::PriorityOp(op) => op.block_index,
+                }
+            });
+            executed_ops
+        };
+
+        Ok(executed_ops.into_iter().map(|executed_op| {
+            match executed_op {
+                ExecutedOperations::Tx(tx) => tx.op.expect("expected successful tx"),
+                ExecutedOperations::PriorityOp(prior_op) => prior_op.op,
+            }
+        }).collect())
     }
 
     pub fn commit_state_update(

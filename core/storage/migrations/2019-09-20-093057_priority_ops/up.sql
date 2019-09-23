@@ -5,12 +5,23 @@ create table executed_priority_operations
     block_number         bigint  not null,
     block_index          int     not null,
     -- operation data
-    operation            jsonb not null,
+    operation            jsonb   not null,
     -- operation metadata
     priority_op_serialid bigint  not null,
+    deadline_block       bigint  not null,
     eth_fee              numeric not null
 );
 
 
 ALTER TABLE executed_transactions
     ADD COLUMN block_index int;
+
+ALTER TABLE operations
+    DROP COLUMN data;
+
+create table blocks
+(
+    number         bigint primary key,
+    root_hash      text   not null,
+    fee_account_id bigint not null
+);

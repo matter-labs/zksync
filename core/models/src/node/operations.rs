@@ -2,6 +2,8 @@ use super::AccountId;
 use super::{pack_fee_amount, pack_token_amount, Deposit, FullExit};
 use super::{Close, Transfer, Withdraw};
 use bigdecimal::BigDecimal;
+use super::FranklinTx;
+use crate::node::FranklinPriorityOp;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositOp {
@@ -174,6 +176,24 @@ impl FranklinOp {
             FranklinOp::Close(op) => op.get_public_data(),
             FranklinOp::Transfer(op) => op.get_public_data(),
             FranklinOp::FullExit(op) => op.get_public_data(),
+        }
+    }
+
+    pub fn try_get_tx(&self) -> Option<FranklinTx> {
+        match self {
+            FranklinOp::Transfer(op) => Some(FranklinTx::Transfer(op.tx.clone())),
+            FranklinOp::TransferToNew(op) => Some(FranklinTx::Transfer(op.tx.clone())),
+            FranklinOp::Withdraw(op) => Some(FranklinTx::Withdraw(op.tx.clone())),
+            FranklinOp::Close(op) => Some(FranklinTx::Close(op.tx.clone())),
+            _ => None,
+        }
+    }
+
+    pub fn try_get_priority_op(&self) -> Option<FranklinPriorityOp> {
+        match self {
+            FranklinOp::Deposit(op) => Some(FranklinPriorityOp::Deposit(op.priority_op.clone())),
+            FranklinOp::FullExit(op) => Some(FranklinPriorityOp::FullExit(op.priority_op.clone())),
+            _ => None,
         }
     }
 }
