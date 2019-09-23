@@ -70,12 +70,14 @@ export function createFullExitPublicData(ethAddress: string, tokenId, hexAmount:
     const txId = Buffer.from("06", "hex");
     const accountId = Buffer.alloc(3, 0);
     accountId.writeUIntBE(2, 0, 3);
+    const pubkeyBytes = Buffer.alloc(32, 0);
     if (ethAddress.charAt(0) === '0' && ethAddress.charAt(1) === 'x') {
         ethAddress = ethAddress.substr(2);
     }
     const addressBytes = Buffer.from(ethAddress, "hex");
     const tokenBytes = Buffer.alloc(2);
     tokenBytes.writeUInt16BE(tokenId, 0);
+    const nonceBytes = Buffer.alloc(4, 0);
     const signatureBytes = Buffer.alloc(64, 0);
     if (hexAmount.charAt(0) === '0' && hexAmount.charAt(1) === 'x') {
         hexAmount = hexAmount.substr(2);
@@ -83,9 +85,9 @@ export function createFullExitPublicData(ethAddress: string, tokenId, hexAmount:
     const amountBytes = Buffer.from(hexAmount, "hex");
     const pad1BytesLength = 16 - amountBytes.length;
     const pad1Bytes = Buffer.alloc(pad1BytesLength, 0);
-    const pad2Bytes = Buffer.alloc(6, 0);
+    const pad2Bytes = Buffer.alloc(2, 0);
 
-    return Buffer.concat([txId, accountId, addressBytes, tokenBytes, signatureBytes, pad1Bytes, amountBytes, pad2Bytes]);
+    return Buffer.concat([txId, accountId, pubkeyBytes, addressBytes, tokenBytes, nonceBytes, signatureBytes, pad1Bytes, amountBytes, pad2Bytes]);
 }
 
 export function createNoopPublicData(): Buffer {
