@@ -19,8 +19,8 @@ use std::sync::mpsc::{self, sync_channel};
 use storage::ConnectionPool;
 
 pub struct EthWatch<T: Transport> {
-    main_contract: (ethabi::Contract, Contract<T>),
     gov_contract: (ethabi::Contract, Contract<T>),
+    priority_queue_contract: (ethabi::Contract, Contract<T>),
     processed_block: u64,
     eth_state: Arc<RwLock<ETHState>>,
     web3: Web3<T>,
@@ -121,23 +121,6 @@ impl TryFrom<Log> for TokenAddedEvent {
 
 impl<T: Transport> EthWatch<T> {
     pub fn new(web3: Web3<T>, db_pool: ConnectionPool) -> Self {
-        let main_contract = {
-            let abi_string = serde_json::Value::from_str(models::abi::FRANKLIN_CONTRACT)
-                .unwrap()
-                .get("abi")
-                .unwrap()
-                .to_string();
-            let abi = ethabi::Contract::load(abi_string.as_bytes()).unwrap();
-            let address = H160::from_str(
-                &env::var("CONTRACT_ADDR")
-                    .map(|s| s[2..].to_string())
-                    .expect("CONTRACT_ADDR env var not found"),
-            )
-            .unwrap();
-
-            (abi.clone(), Contract::new(web3.eth(), address, abi.clone()))
-        };
-
         let gov_contract = {
             let abi_string = serde_json::Value::from_str(models::abi::GOVERNANCE_CONTRACT)
                 .unwrap()
@@ -155,9 +138,26 @@ impl<T: Transport> EthWatch<T> {
             (abi.clone(), Contract::new(web3.eth(), address, abi.clone()))
         };
 
+        let priority_queue_contract = {
+            let abi_string = serde_json::Value::from_str(models::abi::PRIORITY_QUEUE_CONTRACT)
+                .unwrap()
+                .get("abi")
+                .unwrap()
+                .to_string();
+            let abi = ethabi::Contract::load(abi_string.as_bytes()).unwrap();
+            let address = H160::from_str(
+                &env::var("PRIORITY_QUEUE_ADDR")
+                    .map(|s| s[2..].to_string())
+                    .expect("PRIORITY_QUEUE_ADDR env var not found"),
+            )
+            .unwrap();
+
+            (abi.clone(), Contract::new(web3.eth(), address, abi.clone()))
+        };
+
         Self {
-            main_contract,
             gov_contract,
+            priority_queue_contract,
             processed_block: 0,
             eth_state: Arc::new(RwLock::new(ETHState {
                 tokens: HashMap::new(),
@@ -205,13 +205,13 @@ impl<T: Transport> EthWatch<T> {
 
     fn get_priority_op_event_filter(&self, from: BlockNumber, to: BlockNumber) -> Filter {
         let priority_op_event_topic = self
-            .main_contract
+            .priority_queue_contract
             .0
             .event("NewPriorityRequest")
             .expect("main contract abi error")
             .signature();
         FilterBuilder::default()
-            .address(vec![self.main_contract.1.address()])
+            .address(vec![self.priority_queue_contract.1.address()])
             .from_block(from)
             .to_block(to)
             .topics(Some(vec![priority_op_event_topic]), None, None, None)

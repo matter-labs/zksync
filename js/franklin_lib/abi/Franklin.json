@@ -22,15 +22,15 @@
           "type": "uint16"
         },
         {
-          "name": "_owners",
-          "type": "address[]"
+          "name": "_owner",
+          "type": "address"
         },
         {
-          "name": "_amounts",
-          "type": "uint128[]"
+          "name": "_amount",
+          "type": "uint128"
         },
         {
-          "name": "",
+          "name": "_proof",
           "type": "uint256[8]"
         }
       ],
@@ -92,20 +92,6 @@
       "outputs": [],
       "payable": true,
       "stateMutability": "payable",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [],
-      "name": "totalCommittedPriorityRequests",
-      "outputs": [
-        {
-          "name": "",
-          "type": "uint64"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -261,51 +247,6 @@
       "type": "function"
     },
     {
-      "constant": true,
-      "inputs": [],
-      "name": "firstPriorityRequestId",
-      "outputs": [
-        {
-          "name": "",
-          "type": "uint64"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [
-        {
-          "name": "",
-          "type": "uint64"
-        }
-      ],
-      "name": "priorityRequests",
-      "outputs": [
-        {
-          "name": "opType",
-          "type": "uint8"
-        },
-        {
-          "name": "pubData",
-          "type": "bytes"
-        },
-        {
-          "name": "expirationBlock",
-          "type": "uint256"
-        },
-        {
-          "name": "fee",
-          "type": "uint256"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
       "constant": false,
       "inputs": [
         {
@@ -343,20 +284,6 @@
       "outputs": [],
       "payable": false,
       "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [],
-      "name": "totalOpenPriorityRequests",
-      "outputs": [
-        {
-          "name": "",
-          "type": "uint64"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -408,16 +335,20 @@
     {
       "inputs": [
         {
+          "name": "_governanceAddress",
+          "type": "address"
+        },
+        {
           "name": "_verifierAddress",
+          "type": "address"
+        },
+        {
+          "name": "_priorityQueueAddress",
           "type": "address"
         },
         {
           "name": "_genesisRoot",
           "type": "bytes32"
-        },
-        {
-          "name": "_governanceAddress",
-          "type": "address"
         }
       ],
       "payable": false,
@@ -453,50 +384,6 @@
       "inputs": [
         {
           "indexed": true,
-          "name": "totalBlocksVerified",
-          "type": "uint32"
-        },
-        {
-          "indexed": true,
-          "name": "totalBlocksCommitted",
-          "type": "uint32"
-        }
-      ],
-      "name": "BlocksReverted",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "name": "owner",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "name": "tokenId",
-          "type": "uint16"
-        },
-        {
-          "indexed": false,
-          "name": "amount",
-          "type": "uint128"
-        },
-        {
-          "indexed": false,
-          "name": "franklinAddress",
-          "type": "bytes"
-        }
-      ],
-      "name": "OnchainDeposit",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
           "name": "owner",
           "type": "address"
         },
@@ -518,32 +405,49 @@
       "anonymous": false,
       "inputs": [
         {
-          "indexed": false,
-          "name": "serialId",
-          "type": "uint64"
+          "indexed": true,
+          "name": "owner",
+          "type": "address"
         },
         {
           "indexed": false,
-          "name": "opType",
-          "type": "uint8"
+          "name": "tokenId",
+          "type": "uint16"
         },
         {
           "indexed": false,
-          "name": "pubData",
-          "type": "bytes"
-        },
-        {
-          "indexed": false,
-          "name": "expirationBlock",
-          "type": "uint256"
+          "name": "amount",
+          "type": "uint128"
         },
         {
           "indexed": false,
           "name": "fee",
           "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "name": "franklinAddress",
+          "type": "bytes"
         }
       ],
-      "name": "NewPriorityRequest",
+      "name": "OnchainDeposit",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "name": "totalBlocksVerified",
+          "type": "uint32"
+        },
+        {
+          "indexed": true,
+          "name": "totalBlocksCommitted",
+          "type": "uint32"
+        }
+      ],
+      "name": "BlocksReverted",
       "type": "event"
     },
     {
@@ -576,15 +480,15 @@
           "type": "uint16"
         },
         {
-          "name": "_owners",
-          "type": "address[]"
+          "name": "_owner",
+          "type": "address"
         },
         {
-          "name": "_amounts",
-          "type": "uint128[]"
+          "name": "_amount",
+          "type": "uint128"
         },
         {
-          "name": "",
+          "name": "_proof",
           "type": "uint256[8]"
         }
       ],
@@ -646,20 +550,6 @@
       "outputs": [],
       "payable": true,
       "stateMutability": "payable",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [],
-      "name": "totalCommittedPriorityRequests",
-      "outputs": [
-        {
-          "name": "",
-          "type": "uint64"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -815,51 +705,6 @@
       "type": "function"
     },
     {
-      "constant": true,
-      "inputs": [],
-      "name": "firstPriorityRequestId",
-      "outputs": [
-        {
-          "name": "",
-          "type": "uint64"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [
-        {
-          "name": "",
-          "type": "uint64"
-        }
-      ],
-      "name": "priorityRequests",
-      "outputs": [
-        {
-          "name": "opType",
-          "type": "uint8"
-        },
-        {
-          "name": "pubData",
-          "type": "bytes"
-        },
-        {
-          "name": "expirationBlock",
-          "type": "uint256"
-        },
-        {
-          "name": "fee",
-          "type": "uint256"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
       "constant": false,
       "inputs": [
         {
@@ -897,20 +742,6 @@
       "outputs": [],
       "payable": false,
       "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [],
-      "name": "totalOpenPriorityRequests",
-      "outputs": [
-        {
-          "name": "",
-          "type": "uint64"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -962,16 +793,20 @@
     {
       "inputs": [
         {
+          "name": "_governanceAddress",
+          "type": "address"
+        },
+        {
           "name": "_verifierAddress",
+          "type": "address"
+        },
+        {
+          "name": "_priorityQueueAddress",
           "type": "address"
         },
         {
           "name": "_genesisRoot",
           "type": "bytes32"
-        },
-        {
-          "name": "_governanceAddress",
-          "type": "address"
         }
       ],
       "payable": false,
@@ -1007,50 +842,6 @@
       "inputs": [
         {
           "indexed": true,
-          "name": "totalBlocksVerified",
-          "type": "uint32"
-        },
-        {
-          "indexed": true,
-          "name": "totalBlocksCommitted",
-          "type": "uint32"
-        }
-      ],
-      "name": "BlocksReverted",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "name": "owner",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "name": "tokenId",
-          "type": "uint16"
-        },
-        {
-          "indexed": false,
-          "name": "amount",
-          "type": "uint128"
-        },
-        {
-          "indexed": false,
-          "name": "franklinAddress",
-          "type": "bytes"
-        }
-      ],
-      "name": "OnchainDeposit",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
           "name": "owner",
           "type": "address"
         },
@@ -1072,32 +863,49 @@
       "anonymous": false,
       "inputs": [
         {
-          "indexed": false,
-          "name": "serialId",
-          "type": "uint64"
+          "indexed": true,
+          "name": "owner",
+          "type": "address"
         },
         {
           "indexed": false,
-          "name": "opType",
-          "type": "uint8"
+          "name": "tokenId",
+          "type": "uint16"
         },
         {
           "indexed": false,
-          "name": "pubData",
-          "type": "bytes"
-        },
-        {
-          "indexed": false,
-          "name": "expirationBlock",
-          "type": "uint256"
+          "name": "amount",
+          "type": "uint128"
         },
         {
           "indexed": false,
           "name": "fee",
           "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "name": "franklinAddress",
+          "type": "bytes"
         }
       ],
-      "name": "NewPriorityRequest",
+      "name": "OnchainDeposit",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "name": "totalBlocksVerified",
+          "type": "uint32"
+        },
+        {
+          "indexed": true,
+          "name": "totalBlocksCommitted",
+          "type": "uint32"
+        }
+      ],
+      "name": "BlocksReverted",
       "type": "event"
     },
     {

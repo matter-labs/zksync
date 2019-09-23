@@ -12,6 +12,7 @@ export const ERC20MintableContract = function () {
 export const franklinContractCode = require('../build/Franklin');
 export const verifierContractCode = require('../build/Verifier');
 export const governanceContractCode = require('../build/Governance');
+export const priorityQueueContractCode = require('../build/PriorityQueue')
 
 export async function deployGovernance(
     wallet,
@@ -30,30 +31,64 @@ export async function deployGovernance(
     }
 }
 
+export async function deployPriorityQueue(
+    wallet,
+    ownerAddress = wallet.address,
+    priorityQueueCode = priorityQueueContractCode
+) {
+    try {
+        let priorityQueue = await deployContract(wallet, priorityQueueCode, [ownerAddress], {
+            gasLimit: 5000000,
+        });
+        console.log(`PRIORITY_QUEUE_ADDR=${priorityQueue.address}`);
+
+        return priorityQueue
+    } catch (err) {
+        console.log("Priority queue deploy error:" + err);
+    }
+}
+
+export async function deployVerifier(
+    wallet,
+    verifierCode = verifierContractCode
+) {
+    try {
+        let verifier = await deployContract(wallet, verifierCode, [], {
+            gasLimit: 2000000,
+        });
+        console.log(`VERIFIER_ADDR=${verifier.address}`);
+
+        return verifier
+    } catch (err) {
+        console.log("Verifier deploy error:" + err);
+    }
+}
+
 export async function deployFranklin(
     wallet,
     governanceAddress,
+    priorityQueueAddress,
+    verifierAddress,
     genesisRoot = ethers.constants.HashZero,
-    verifierCode = verifierContractCode,
     franklinCode = franklinContractCode
-    ) {
+) {
     try {
-        let verifier = await deployContract(wallet, verifierCode, [], {
-            gasLimit: 1100000,
-        });
         let contract = await deployContract(
             wallet,
             franklinCode,
             [
                 governanceAddress,
-                verifier.address,
+                verifierAddress,
+                priorityQueueAddress,
                 genesisRoot,
             ],
-        {
-            gasLimit: 6600000,
-        });
+            {
+                gasLimit: 6600000,
+            });
         console.log(`CONTRACT_ADDR=${contract.address}`);
 
+        const priorityQueueContract = new ethers.Contract(priorityQueueAddress, priorityQueueContractCode.interface, wallet);
+        await (await priorityQueueContract.changeFranklinAddress(contract.address)).wait();
         return contract
     } catch (err) {
         console.log("Franklin deploy error:" + err);
@@ -82,6 +117,17 @@ export async function addTestERC20Token(wallet, governance) {
         await erc20.mint(wallet.address, bigNumberify("1000000000"));
         console.log("TEST_ERC20=" + erc20.address);
         await (await governance.addToken(erc20.address)).wait();
+        return erc20
+    } catch (err) {
+        console.log("Add token error:" + err);
+    }
+}
+
+export async function addTestNotApprovedERC20Token(wallet) {
+    try {
+        let erc20 = await deployContract(wallet, ERC20MintableContract, []);
+        await erc20.mint(wallet.address, bigNumberify("1000000000"));
+        console.log("TEST_ERC20=" + erc20.address);
         return erc20
     } catch (err) {
         console.log("Add token error:" + err);
