@@ -1,5 +1,6 @@
 use super::FranklinOp;
 use super::FranklinTx;
+use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
 use crate::params::BLOCK_SIZE_CHUNKS;
 
@@ -9,11 +10,14 @@ pub struct ExecutedTx {
     pub success: bool,
     pub op: Option<FranklinOp>,
     pub fail_reason: Option<String>,
+    pub block_index: Option<u32>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecutedPriorityOp {
+    pub priority_op: PriorityOp,
     pub op: FranklinOp,
+    pub block_index: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

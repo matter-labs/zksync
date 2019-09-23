@@ -4,9 +4,11 @@ use super::Nonce;
 use super::{AccountAddress, TokenId};
 use crate::params::FR_ADDRESS_LEN;
 use bigdecimal::BigDecimal;
-use failure::{bail, ensure};
-use std::convert::TryInto;
-use web3::types::Address;
+use ethabi::{decode, ParamType};
+use failure::{bail, ensure, format_err};
+use std::convert::{TryFrom, TryInto};
+use std::str::FromStr;
+use web3::types::{Address, Log, U256};
 
 // From enum OpType in Franklin.sol
 const DEPOSIT_OPTYPE_ID: u8 = 1u8;
@@ -128,5 +130,61 @@ impl FranklinPriorityOp {
             Self::Deposit(_) => DepositOp::CHUNKS,
             Self::FullExit(_) => FullExitOp::CHUNKS,
         }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PriorityOp {
+    pub serial_id: u64,
+    pub data: FranklinPriorityOp,
+    pub deadline_block: u64,
+    pub eth_fee: BigDecimal,
+}
+
+impl TryFrom<Log> for PriorityOp {
+    type Error = failure::Error;
+
+    fn try_from(event: Log) -> Result<PriorityOp, failure::Error> {
+        let mut dec_ev = decode(
+            &[
+                ParamType::Uint(64),  // Serial id
+                ParamType::Uint(8),   // OpType
+                ParamType::Bytes,     // Pubdata
+                ParamType::Uint(256), // expir. block
+                ParamType::Uint(256), // fee
+            ],
+            &event.data.0,
+        )
+        .map_err(|e| format_err!("Event data decode: {:?}", e))?;
+
+        Ok(PriorityOp {
+            serial_id: dec_ev
+                .remove(0)
+                .to_uint()
+                .as_ref()
+                .map(U256::as_u64)
+                .unwrap(),
+            data: {
+                let op_type = dec_ev
+                    .remove(0)
+                    .to_uint()
+                    .as_ref()
+                    .map(|ui| U256::as_u32(ui) as u8)
+                    .unwrap();
+                let op_pubdata = dec_ev.remove(0).to_bytes().unwrap();
+                FranklinPriorityOp::parse_pubdata(&op_pubdata, op_type)
+                    .expect("Failed to parse priority op data")
+            },
+            deadline_block: dec_ev
+                .remove(0)
+                .to_uint()
+                .as_ref()
+                .map(U256::as_u64)
+                .unwrap(),
+            eth_fee: {
+                let amount_uint = dec_ev.remove(0).to_uint().unwrap();
+                BigDecimal::from_str(&format!("{}", amount_uint)).unwrap()
+            },
+        })
     }
 }

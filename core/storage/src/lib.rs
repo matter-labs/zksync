@@ -7,7 +7,7 @@ use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
 use failure::Fail;
-use models::node::block::{Block, ExecutedOperations, ExecutedTx};
+use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::{
     apply_updates, reverse_updates,
     tx::{FranklinTx, TxType},
@@ -139,6 +139,20 @@ struct NewExecutedTransaction {
     operation: Option<Value>,
     success: bool,
     fail_reason: Option<String>,
+    block_index: Option<i32>,
+}
+
+impl NewExecutedTransaction {
+    fn prepare_stored_tx(exec_tx: &ExecutedTx, block: BlockNumber) -> Self {
+        Self {
+            block_number: i64::from(block),
+            tx_hash: exec_tx.tx.hash(),
+            operation: exec_tx.op.clone().map(|o| serde_json::to_value(o).unwrap()),
+            success: exec_tx.success,
+            fail_reason: exec_tx.fail_reason.clone(),
+            block_index: exec_tx.block_index.map(|idx| idx as i32),
+        }
+    }
 }
 
 #[derive(Debug, Queryable, QueryableByName)]
@@ -150,6 +164,40 @@ struct StoredExecutedTransaction {
     operation: Option<Value>,
     success: bool,
     fail_reason: Option<String>,
+    block_index: Option<i32>,
+}
+
+#[derive(Debug, Insertable)]
+#[table_name = "executed_priority_operations"]
+struct NewExecutedPriorityOperation {
+    block_number: i64,
+    block_index: i32,
+    operation: Value,
+    priority_op_serialid: i64,
+    eth_fee: BigDecimal,
+}
+
+impl NewExecutedPriorityOperation {
+    fn prepare_stored_priority_op(exec_prior_op: &ExecutedPriorityOp, block: BlockNumber) -> Self {
+        Self {
+            block_number: i64::from(block),
+            block_index: exec_prior_op.block_index as i32,
+            operation: serde_json::to_value(&exec_prior_op.op).unwrap(),
+            priority_op_serialid: exec_prior_op.priority_op.serial_id as i64,
+            eth_fee: exec_prior_op.priority_op.eth_fee.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Queryable, QueryableByName)]
+#[table_name = "executed_priority_operations"]
+struct StoredExecutedPriorityOperation {
+    id: i32,
+    block_number: i64,
+    block_index: i32,
+    operation: Value,
+    priority_op_serialid: i64,
+    eth_fee: BigDecimal,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -159,18 +207,6 @@ pub struct TxReceiptResponse {
     success: bool,
     verified: bool,
     fail_reason: Option<String>,
-}
-
-impl NewExecutedTransaction {
-    fn prepare_stored_tx(exec_tx: &ExecutedTx, block: BlockNumber) -> Self {
-        Self {
-            block_number: i64::from(block),
-            tx_hash: exec_tx.tx.hash(),
-            operation: exec_tx.op.clone().map(|o| serde_json::to_value(o).unwrap()),
-            success: exec_tx.success,
-            fail_reason: exec_tx.fail_reason.clone(),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -596,11 +632,24 @@ impl StorageProcessor {
 
     pub fn save_block_transactions(&self, block: &Block) -> QueryResult<()> {
         for block_tx in block.block_transactions.iter() {
-            if let ExecutedOperations::Tx(tx) = block_tx {
-                let stored_tx = NewExecutedTransaction::prepare_stored_tx(tx, block.block_number);
-                diesel::insert_into(executed_transactions::table)
-                    .values(&stored_tx)
-                    .execute(self.conn())?;
+            match block_tx {
+                ExecutedOperations::Tx(tx) => {
+                    let stored_tx =
+                        NewExecutedTransaction::prepare_stored_tx(tx, block.block_number);
+                    diesel::insert_into(executed_transactions::table)
+                        .values(&stored_tx)
+                        .execute(self.conn())?;
+                }
+                ExecutedOperations::PriorityOp(prior_op) => {
+                    let stored_priority_op =
+                        NewExecutedPriorityOperation::prepare_stored_priority_op(
+                            prior_op,
+                            block.block_number,
+                        );
+                    diesel::insert_into(executed_priority_operations::table)
+                        .values(&stored_priority_op)
+                        .execute(self.conn())?;
+                }
             }
         }
         Ok(())

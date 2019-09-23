@@ -12,8 +12,7 @@ use web3::types::{Address, BlockNumber, Filter, FilterBuilder, Log, H160, U256};
 use web3::{Transport, Web3};
 
 use crate::ThreadPanicNotify;
-use bigdecimal::BigDecimal;
-use models::node::{FranklinPriorityOp, TokenId};
+use models::node::{PriorityOp, TokenId};
 use models::params::PRIORITY_EXPIRATION;
 use std::sync::mpsc::{self, sync_channel};
 use storage::ConnectionPool;
@@ -31,62 +30,6 @@ pub struct EthWatch<T: Transport> {
 pub struct ETHState {
     pub tokens: HashMap<TokenId, Address>,
     pub priority_queue: HashMap<u64, PriorityOp>,
-}
-
-#[derive(Debug)]
-pub struct PriorityOp {
-    pub serial_id: u64,
-    pub data: FranklinPriorityOp,
-    pub deadline_block: u64,
-    pub eth_fee: BigDecimal,
-}
-
-impl TryFrom<Log> for PriorityOp {
-    type Error = failure::Error;
-
-    fn try_from(event: Log) -> Result<PriorityOp, failure::Error> {
-        let mut dec_ev = decode(
-            &[
-                ParamType::Uint(64),  // Serial id
-                ParamType::Uint(8),   // OpType
-                ParamType::Bytes,     // Pubdata
-                ParamType::Uint(256), // expir. block
-                ParamType::Uint(256), // fee
-            ],
-            &event.data.0,
-        )
-        .map_err(|e| format_err!("Event data decode: {:?}", e))?;
-
-        Ok(PriorityOp {
-            serial_id: dec_ev
-                .remove(0)
-                .to_uint()
-                .as_ref()
-                .map(U256::as_u64)
-                .unwrap(),
-            data: {
-                let op_type = dec_ev
-                    .remove(0)
-                    .to_uint()
-                    .as_ref()
-                    .map(|ui| U256::as_u32(ui) as u8)
-                    .unwrap();
-                let op_pubdata = dec_ev.remove(0).to_bytes().unwrap();
-                FranklinPriorityOp::parse_pubdata(&op_pubdata, op_type)
-                    .expect("Failed to parse priority op data")
-            },
-            deadline_block: dec_ev
-                .remove(0)
-                .to_uint()
-                .as_ref()
-                .map(U256::as_u64)
-                .unwrap(),
-            eth_fee: {
-                let amount_uint = dec_ev.remove(0).to_uint().unwrap();
-                BigDecimal::from_str(&format!("{}", amount_uint)).unwrap()
-            },
-        })
-    }
 }
 
 impl ETHState {
