@@ -53,6 +53,7 @@ use tokio::timer;
 // };
 use storage::StorageProcessor;
 
+use models::node::tx::PackedPublicKey;
 use models::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum};
 
 pub struct Prover<E: JubjubEngine> {
@@ -325,24 +326,15 @@ impl BabyProver {
                     FranklinOp::Deposit(deposit) => {
                         let deposit_witness = apply_deposit_tx(&mut self.accounts_tree, &deposit);
 
-                        let (
-                            signature,
-                            first_sig_msg,
-                            second_sig_msg,
-                            third_sig_msg,
-                            sender_x,
-                            sender_y,
-                        ) = generate_dummy_sig_data(
-                            &deposit_witness.get_sig_bits(),
-                            &phasher,
-                            &params,
-                        );
                         let deposit_operations = calculate_deposit_operations_from_witness(
                             &deposit_witness,
-                            &first_sig_msg,
-                            &second_sig_msg,
-                            &third_sig_msg,
-                            &signature,
+                            &Fr::zero(),
+                            &Fr::zero(),
+                            &Fr::zero(),
+                            &SignatureData {
+                                r_packed: vec![Some(false); 256],
+                                s: vec![Some(false); 256],
+                            },
                             &vec![Some(false); 256], //doesn't matter for deposit
                         );
                         operations.extend(deposit_operations);
@@ -351,55 +343,51 @@ impl BabyProver {
                     FranklinOp::Transfer(transfer) => {
                         let transfer_witness =
                             apply_transfer_tx(&mut self.accounts_tree, &transfer);
-                        let sig_bytes = transfer.tx.signature.sign.serialize_packed().unwrap();
-                        let (r_bytes, s_bytes) = sig_bytes.split_at(32);
-                        let mut r_bytes = r_bytes.to_vec();
-                        let mut s_bytes = s_bytes.to_vec();
-                        let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
-                            .iter()
-                            .map(|x| Some(*x))
-                            .collect();
-                        let s_bits: Vec<_> = bytes_into_be_bits(&s_bytes)
-                            .iter()
-                            .map(|x| Some(*x))
-                            .collect();
-                        let signature = SignatureData {
-                            r_packed: r_bits,
-                            s: s_bits,
-                        };
-                        let sig_bits: Vec<bool> = bytes_into_be_bits(&transfer.tx.get_bytes());
-
-                        let (first_sig_msg, second_sig_msg, third_sig_msg) =
-                            generate_sig_witness(&sig_bits, &phasher, &params);
-
-                        let mut signer_packed_key_bytes =
-                            transfer.tx.signature.pub_key.serialize_packed().unwrap();
-                        let signer_packed_key_bits: Vec<_> =
-                            bytes_into_be_bits(&signer_packed_key_bytes)
-                                .iter()
-                                .map(|x| Some(*x))
-                                .collect();
-
-                        //                        let (sender_x, sender_y) = (transfer.tx.signature.pub_key.0).0.into_xy();
-                        // generate_sig_data(bits: &[bool], phasher: &PedersenHasher<Bn256>, private_key: &PrivateKey<Bn256>, params: &AltJubjubBn256)
-                        // let (
-                        //     signature,
-                        //     first_sig_msg,
-                        //     second_sig_msg,
-                        //     third_sig_msg,
-                        //     sender_x,
-                        //     sender_y,
-                        // ) = generate_dummy_sig_data(
-                        //     &transfer_witness.get_sig_bits(),
-                        //     &phasher,
-                        //     &params,
-                        // );
+                        //                        let sig_bytes = transfer.tx.signature.sign.serialize_packed().unwrap();
+                        //                        let (r_bytes, s_bytes) = sig_bytes.split_at(32);
+                        //                        let mut r_bytes = r_bytes.to_vec();
+                        //                        let mut s_bytes = s_bytes.to_vec();
+                        //                        let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
+                        //                            .iter()
+                        //                            .map(|x| Some(*x))
+                        //                            .collect();
+                        //                        let s_bits: Vec<_> = bytes_into_be_bits(&s_bytes)
+                        //                            .iter()
+                        //                            .map(|x| Some(*x))
+                        //                            .collect();
+                        //                        let signature = SignatureData {
+                        //                            r_packed: r_bits,
+                        //                            s: s_bits,
+                        //                        };
+                        //                        let sig_bits: Vec<bool> = bytes_into_be_bits(&transfer.tx.get_bytes());
+                        //
+                        //                        let (first_sig_msg, second_sig_msg, third_sig_msg) =
+                        //                            generate_sig_witness(&sig_bits, &phasher, &params);
+                        //
+                        //                        let mut signer_packed_key_bytes =
+                        //                            transfer.tx.signature.pub_key.serialize_packed().unwrap();
+                        //                        let signer_packed_key_bits: Vec<_> =
+                        //                            bytes_into_be_bits(&signer_packed_key_bytes)
+                        //                                .iter()
+                        //                                .map(|x| Some(*x))
+                        //                                .collect();
+                        let (
+                            first_sig_msg,
+                            second_sig_msg,
+                            third_sig_msg,
+                            signature_data,
+                            signer_packed_key_bits,
+                        ) = prepare_sig_data(
+                            &transfer.tx.signature.sign.serialize_packed().unwrap(),
+                            &transfer.tx.get_bytes(),
+                            &transfer.tx.signature.pub_key,
+                        );
                         let transfer_operations = calculate_transfer_operations_from_witness(
                             &transfer_witness,
                             &first_sig_msg,
                             &second_sig_msg,
                             &third_sig_msg,
-                            &signature,
+                            &signature_data,
                             &signer_packed_key_bits,
                         );
                         operations.extend(transfer_operations);
@@ -409,153 +397,93 @@ impl BabyProver {
                     FranklinOp::TransferToNew(transfer_to_new) => {
                         let transfer_to_new_witness =
                             apply_transfer_to_new_tx(&mut self.accounts_tree, &transfer_to_new);
-                        let (sig_r_x, sig_r_y) = transfer_to_new.tx.signature.sign.0.r.into_xy();
-                        println!("sig_r_x={} \n sig_r_y={}", sig_r_x, sig_r_y);
-                        println!("sig_s={}", transfer_to_new.tx.signature.sign.0.s);
-
-                        assert_eq!(transfer_to_new.tx.verify_signature(), true);
-                        let sig_bytes = transfer_to_new
-                            .tx
-                            .signature
-                            .sign
-                            .serialize_packed()
-                            .unwrap();
-                        let (r_bytes, s_bytes) = sig_bytes.split_at(32);
-
-                        let mut r_bytes = r_bytes.to_vec();
-                        let mut s_bytes = s_bytes.to_vec();
-                        //                        println!("s_bytes outside: ");
-                        //                        for (i, byte) in s_bytes.iter().enumerate() {
-                        //                            print!("{:x} ", byte);
-                        //                        }
-                        println!();
-                        let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
-                            .iter()
-                            .map(|x| Some(*x))
-                            .collect();
-                        let s_bits: Vec<_> = bytes_into_be_bits(&s_bytes)
-                            .iter()
-                            .map(|x| Some(*x))
-                            .collect();
-                        //                        println!("s_bits outside: ");
-                        //                        for (i, bit) in s_bits.iter().enumerate() {
-                        //                            if i % 64 == 0 {
-                        //                                println!("")
-                        //                            } else if i % 8 == 0 {
-                        //                                print!(" ")
-                        //                            };
-                        //                            let numb = {
-                        //                                if bit.unwrap() {
-                        //                                    1
-                        //                                } else {
-                        //                                    0
-                        //                                }
-                        //                            };
-                        //                            print!("{}", numb);
-                        //                        }
-                        //                        println!("");
-                        let signature = SignatureData {
-                            r_packed: r_bits,
-                            s: s_bits,
-                        };
-                        let sig_bits: Vec<bool> =
-                            bytes_into_be_bits(&transfer_to_new.tx.get_bytes());
-                        println!("sig_bits outside: ");
-                        for (i, bit) in sig_bits.iter().enumerate() {
-                            if i % 64 == 0 {
-                                println!("")
-                            } else if i % 8 == 0 {
-                                print!(" ")
-                            };
-                            let numb = {
-                                if *bit {
-                                    1
-                                } else {
-                                    0
-                                }
-                            };
-                            print!("{}", numb);
-                        }
-                        println!("");
-
-                        println!("transfer_to_new_witnessget_sig_bits outside: ");
-                        for (i, bit) in transfer_to_new_witness.get_sig_bits().iter().enumerate() {
-                            if i % 64 == 0 {
-                                println!("")
-                            } else if i % 8 == 0 {
-                                print!(" ")
-                            };
-                            let numb = {
-                                if *bit {
-                                    1
-                                } else {
-                                    0
-                                }
-                            };
-                            print!("{}", numb);
-                        }
-                        println!("");
-
-                        let (first_sig_msg, second_sig_msg, third_sig_msg) =
-                            generate_sig_witness(&sig_bits, &phasher, &params);
-                        let (pub_key_x, pub_key_y) =
-                            (transfer_to_new.tx.signature.pub_key.0).0.into_xy();
-                        println!("pub_key_x={} \n pub_key_y={}", pub_key_x, pub_key_y);
-
-                        let mut signer_packed_key_bytes = transfer_to_new
-                            .tx
-                            .signature
-                            .pub_key
-                            .serialize_packed()
-                            .unwrap();
-                        //                        pub_key_hash_bytes(
-                        //                            transfer_to_new.tx.signature.pub_key.0,
+                        //                        let (sig_r_x, sig_r_y) = transfer_to_new.tx.signature.sign.0.r.into_xy();
+                        //                        println!("sig_r_x={} \n sig_r_y={}", sig_r_x, sig_r_y);
+                        //                        println!("sig_s={}", transfer_to_new.tx.signature.sign.0.s);
+                        //
+                        //                        assert_eq!(transfer_to_new.tx.verify_signature(), true);
+                        //                        let sig_bytes = transfer_to_new
+                        //                            .tx
+                        //                            .signature
+                        //                            .sign
+                        //                            .serialize_packed()
+                        //                            .unwrap();
+                        //                        let (r_bytes, s_bytes) = sig_bytes.split_at(32);
+                        //
+                        //                        let mut r_bytes = r_bytes.to_vec();
+                        //                        let mut s_bytes = s_bytes.to_vec();
+                        //
+                        //                        println!();
+                        //                        let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
+                        //                            .iter()
+                        //                            .map(|x| Some(*x))
+                        //                            .collect();
+                        //                        let s_bits: Vec<_> = bytes_into_be_bits(&s_bytes)
+                        //                            .iter()
+                        //                            .map(|x| Some(*x))
+                        //                            .collect();
+                        //                        let signature = SignatureData {
+                        //                            r_packed: r_bits,
+                        //                            s: s_bits,
+                        //                        };
+                        //                        let sig_bits: Vec<bool> =
+                        //                            bytes_into_be_bits(&transfer_to_new.tx.get_bytes());
+                        //
+                        //                        let (first_sig_msg, second_sig_msg, third_sig_msg) =
+                        //                            generate_sig_witness(&sig_bits, &phasher, &params);
+                        //                        let (pub_key_x, pub_key_y) =
+                        //                            (transfer_to_new.tx.signature.pub_key.0).0.into_xy();
+                        //                        println!("pub_key_x={} \n pub_key_y={}", pub_key_x, pub_key_y);
+                        //
+                        //                        let mut signer_packed_key_bytes = transfer_to_new
+                        //                            .tx
+                        //                            .signature
+                        //                            .pub_key
+                        //                            .serialize_packed()
+                        //                            .unwrap();
+                        //
+                        //                        let phasher = PedersenHasher::<Engine>::default();
+                        //                        let from_pub_key_hash =
+                        //                            pub_key_hash_fe(&transfer_to_new.tx.signature.pub_key.0, &phasher);
+                        //                        //                        &params::PEDERSEN_HASHER as &BabyPedersenHasher
+                        //                        println!("from_pub_key_hash: {:?}", from_pub_key_hash);
+                        //
+                        //                        let from_pub_key_hash = pub_key_hash_fe(
+                        //                            &transfer_to_new.tx.signature.pub_key.0,
                         //                            &franklin_constants::PEDERSEN_HASHER as &BabyPedersenHasher,
                         //                        );
-                        println!(
-                            "account_address_prover_key: {}",
-                            AccountAddress::from_pubkey(
-                                transfer_to_new.tx.signature.pub_key.0.clone()
-                            )
-                            .to_hex()
+                        //                        println!("from_pub_key_hash: {:?}", from_pub_key_hash);
+                        //
+                        //                        let signer_packed_key_bits: Vec<_> =
+                        //                            bytes_into_be_bits(&signer_packed_key_bytes)
+                        //                                .iter()
+                        //                                .map(|x| Some(*x))
+                        //                                .collect();
+
+                        let (
+                            first_sig_msg,
+                            second_sig_msg,
+                            third_sig_msg,
+                            signature_data,
+                            signer_packed_key_bits,
+                        ) = prepare_sig_data(
+                            &transfer_to_new
+                                .tx
+                                .signature
+                                .sign
+                                .serialize_packed()
+                                .unwrap(),
+                            &transfer_to_new.tx.get_bytes(),
+                            &transfer_to_new.tx.signature.pub_key,
                         );
-                        let phasher = PedersenHasher::<Engine>::default();
-                        let from_pub_key_hash =
-                            pub_key_hash_fe(&transfer_to_new.tx.signature.pub_key.0, &phasher);
-                        //                        &params::PEDERSEN_HASHER as &BabyPedersenHasher
-                        println!("from_pub_key_hash: {:?}", from_pub_key_hash);
 
-                        let from_pub_key_hash = pub_key_hash_fe(
-                            &transfer_to_new.tx.signature.pub_key.0,
-                            &franklin_constants::PEDERSEN_HASHER as &BabyPedersenHasher,
-                        );
-                        println!("from_pub_key_hash: {:?}", from_pub_key_hash);
-
-                        let signer_packed_key_bits: Vec<_> =
-                            bytes_into_be_bits(&signer_packed_key_bytes)
-                                .iter()
-                                .map(|x| Some(*x))
-                                .collect();
-
-                        //                        let (
-                        //                            signature,
-                        //                            first_sig_msg,
-                        //                            second_sig_msg,
-                        //                            third_sig_msg,
-                        //                            sender_x,
-                        //                            sender_y,
-                        //                        ) = generate_dummy_sig_data(
-                        //                            &transfer_to_new_witness.get_sig_bits(),
-                        //                            &phasher,
-                        //                            &params,
-                        //                        );
                         let transfer_to_new_operations =
                             calculate_transfer_to_new_operations_from_witness(
                                 &transfer_to_new_witness,
                                 &first_sig_msg,
                                 &second_sig_msg,
                                 &third_sig_msg,
-                                &signature,
+                                &signature_data,
                                 &signer_packed_key_bits,
                             );
                         operations.extend(transfer_to_new_operations);
@@ -565,43 +493,55 @@ impl BabyProver {
                     FranklinOp::Withdraw(withdraw) => {
                         let withdraw_witness =
                             apply_withdraw_tx(&mut self.accounts_tree, &withdraw);
-                        let sig_bytes = withdraw.tx.signature.sign.serialize_packed().unwrap();
-                        let (r_bytes, s_bytes) = sig_bytes.split_at(32);
-                        let mut r_bytes = r_bytes.to_vec();
-                        let mut s_bytes = s_bytes.to_vec();
-                        r_bytes.reverse();
-                        s_bytes.reverse();
-                        let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
-                            .iter()
-                            .map(|x| Some(*x))
-                            .collect();
-                        let s_bits: Vec<_> = bytes_into_be_bits(&s_bytes)
-                            .iter()
-                            .map(|x| Some(*x))
-                            .collect();
-                        let signature = SignatureData {
-                            r_packed: r_bits,
-                            s: s_bits,
-                        };
-                        let sig_bits: Vec<bool> = bytes_into_be_bits(&withdraw.tx.get_bytes());
+                        //                        let sig_bytes = withdraw.tx.signature.sign.serialize_packed().unwrap();
+                        //                        let (r_bytes, s_bytes) = sig_bytes.split_at(32);
+                        //                        let mut r_bytes = r_bytes.to_vec();
+                        //                        let mut s_bytes = s_bytes.to_vec();
+                        //                        r_bytes.reverse();
+                        //                        s_bytes.reverse();
+                        //                        let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
+                        //                            .iter()
+                        //                            .map(|x| Some(*x))
+                        //                            .collect();
+                        //                        let s_bits: Vec<_> = bytes_into_be_bits(&s_bytes)
+                        //                            .iter()
+                        //                            .map(|x| Some(*x))
+                        //                            .collect();
+                        //                        let signature = SignatureData {
+                        //                            r_packed: r_bits,
+                        //                            s: s_bits,
+                        //                        };
+                        //                        let sig_bits: Vec<bool> = bytes_into_be_bits(&withdraw.tx.get_bytes());
+                        //
+                        //                        let (first_sig_msg, second_sig_msg, third_sig_msg) =
+                        //                            generate_sig_witness(&sig_bits, &phasher, &params);
+                        //                        let (sender_x, sender_y) = (withdraw.tx.signature.pub_key.0).0.into_xy();
+                        //                        let mut signer_packed_key_bytes =
+                        //                            withdraw.tx.signature.pub_key.serialize_packed().unwrap();
+                        //                        let signer_packed_key_bits: Vec<_> =
+                        //                            bytes_into_be_bits(&signer_packed_key_bytes)
+                        //                                .iter()
+                        //                                .map(|x| Some(*x))
+                        //                                .collect();
 
-                        let (first_sig_msg, second_sig_msg, third_sig_msg) =
-                            generate_sig_witness(&sig_bits, &phasher, &params);
-                        let (sender_x, sender_y) = (withdraw.tx.signature.pub_key.0).0.into_xy();
-                        let mut signer_packed_key_bytes =
-                            withdraw.tx.signature.pub_key.serialize_packed().unwrap();
-                        let signer_packed_key_bits: Vec<_> =
-                            bytes_into_be_bits(&signer_packed_key_bytes)
-                                .iter()
-                                .map(|x| Some(*x))
-                                .collect();
+                        let (
+                            first_sig_msg,
+                            second_sig_msg,
+                            third_sig_msg,
+                            signature_data,
+                            signer_packed_key_bits,
+                        ) = prepare_sig_data(
+                            &withdraw.tx.signature.sign.serialize_packed().unwrap(),
+                            &withdraw.tx.get_bytes(),
+                            &withdraw.tx.signature.pub_key,
+                        );
 
                         let withdraw_operations = calculate_withdraw_operations_from_witness(
                             &withdraw_witness,
                             &first_sig_msg,
                             &second_sig_msg,
                             &third_sig_msg,
-                            &signature,
+                            &signature_data,
                             &signer_packed_key_bits,
                         );
                         operations.extend(withdraw_operations);
@@ -611,34 +551,46 @@ impl BabyProver {
                     FranklinOp::Close(close) => {
                         let close_account_witness =
                             apply_close_account_tx(&mut self.accounts_tree, &close);
-                        let sig_bytes = close.tx.signature.sign.serialize_packed().unwrap();
-                        let (r_bytes, s_bytes) = sig_bytes.split_at(32);
-                        let mut r_bytes = r_bytes.to_vec();
-                        let mut s_bytes = s_bytes.to_vec();
-                        let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
-                            .iter()
-                            .map(|x| Some(*x))
-                            .collect();
-                        let s_bits: Vec<_> = bytes_into_be_bits(&s_bytes)
-                            .iter()
-                            .map(|x| Some(*x))
-                            .collect();
-                        let signature = SignatureData {
-                            r_packed: r_bits,
-                            s: s_bits,
-                        };
-                        let sig_bits: Vec<bool> = bytes_into_be_bits(&close.tx.get_bytes());
+                        //                        let sig_bytes = close.tx.signature.sign.serialize_packed().unwrap();
+                        //                        let (r_bytes, s_bytes) = sig_bytes.split_at(32);
+                        //                        let mut r_bytes = r_bytes.to_vec();
+                        //                        let mut s_bytes = s_bytes.to_vec();
+                        //                        let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
+                        //                            .iter()
+                        //                            .map(|x| Some(*x))
+                        //                            .collect();
+                        //                        let s_bits: Vec<_> = bytes_into_be_bits(&s_bytes)
+                        //                            .iter()
+                        //                            .map(|x| Some(*x))
+                        //                            .collect();
+                        //                        let signature = SignatureData {
+                        //                            r_packed: r_bits,
+                        //                            s: s_bits,
+                        //                        };
+                        //                        let sig_bits: Vec<bool> = bytes_into_be_bits(&close.tx.get_bytes());
+                        //
+                        //                        let (first_sig_msg, second_sig_msg, third_sig_msg) =
+                        //                            generate_sig_witness(&sig_bits, &phasher, &params);
+                        //
+                        //                        let mut signer_packed_key_bytes =
+                        //                            close.tx.signature.pub_key.serialize_packed().unwrap();
+                        //                        let signer_packed_key_bits: Vec<_> =
+                        //                            bytes_into_be_bits(&signer_packed_key_bytes)
+                        //                                .iter()
+                        //                                .map(|x| Some(*x))
+                        //                                .collect();
 
-                        let (first_sig_msg, second_sig_msg, third_sig_msg) =
-                            generate_sig_witness(&sig_bits, &phasher, &params);
-
-                        let mut signer_packed_key_bytes =
-                            close.tx.signature.pub_key.serialize_packed().unwrap();
-                        let signer_packed_key_bits: Vec<_> =
-                            bytes_into_be_bits(&signer_packed_key_bytes)
-                                .iter()
-                                .map(|x| Some(*x))
-                                .collect();
+                        let (
+                            first_sig_msg,
+                            second_sig_msg,
+                            third_sig_msg,
+                            signature_data,
+                            signer_packed_key_bits,
+                        ) = prepare_sig_data(
+                            &close.tx.signature.sign.serialize_packed().unwrap(),
+                            &close.tx.get_bytes(),
+                            &close.tx.signature.pub_key,
+                        );
 
                         let close_account_operations =
                             calculate_close_account_operations_from_witness(
@@ -646,7 +598,7 @@ impl BabyProver {
                                 &first_sig_msg,
                                 &second_sig_msg,
                                 &third_sig_msg,
-                                &signature,
+                                &signature_data,
                                 &signer_packed_key_bits,
                             );
                         operations.extend(close_account_operations);
@@ -657,17 +609,16 @@ impl BabyProver {
                         let full_exit_witness =
                             apply_full_exit_tx(&mut self.accounts_tree, &full_exit, is_sig_correct);
 
-                        let mut r_bytes = full_exit.priority_op.signature_r.to_vec();
-                        let mut s_bytes = full_exit.priority_op.signature_s.to_vec();
-
-                        let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
-                            .iter()
-                            .map(|x| Some(*x))
-                            .collect();
-                        let s_bits: Vec<_> = bytes_into_be_bits(&s_bytes)
-                            .iter()
-                            .map(|x| Some(*x))
-                            .collect();
+                        let r_bits: Vec<_> =
+                            bytes_into_be_bits(full_exit.priority_op.signature_r.as_ref())
+                                .iter()
+                                .map(|x| Some(*x))
+                                .collect();
+                        let s_bits: Vec<_> =
+                            bytes_into_be_bits(full_exit.priority_op.signature_s.as_ref())
+                                .iter()
+                                .map(|x| Some(*x))
+                                .collect();
                         let signature = SignatureData {
                             r_packed: r_bits,
                             s: s_bits,
@@ -868,7 +819,6 @@ impl BabyProver {
         }
         Ok(())
     }
-
     pub fn start_timer_interval(&self, rt: &Handle) {
         let job_ref = self.current_job.clone();
         rt.spawn(
@@ -900,4 +850,44 @@ impl BabyProver {
         info!("prover stopped");
         shutdown_tx.send(()).unwrap();
     }
+}
+
+pub fn prepare_sig_data(
+    sig_bytes: &[u8],
+    tx_bytes: &[u8],
+    pub_key: &PackedPublicKey,
+) -> (Fr, Fr, Fr, SignatureData, Vec<Option<bool>>) {
+    let (r_bytes, s_bytes) = sig_bytes.split_at(32);
+    let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
+        .iter()
+        .map(|x| Some(*x))
+        .collect();
+    let s_bits: Vec<_> = bytes_into_be_bits(&s_bytes)
+        .iter()
+        .map(|x| Some(*x))
+        .collect();
+    let signature = SignatureData {
+        r_packed: r_bits,
+        s: s_bits,
+    };
+    let sig_bits: Vec<bool> = bytes_into_be_bits(&tx_bytes);
+
+    let (first_sig_msg, second_sig_msg, third_sig_msg) = generate_sig_witness(
+        &sig_bits,
+        &franklin_constants::PEDERSEN_HASHER,
+        &franklin_constants::JUBJUB_PARAMS,
+    );
+
+    let signer_packed_key_bytes = pub_key.serialize_packed().unwrap();
+    let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&signer_packed_key_bytes)
+        .iter()
+        .map(|x| Some(*x))
+        .collect();
+    (
+        first_sig_msg,
+        second_sig_msg,
+        third_sig_msg,
+        signature,
+        signer_packed_key_bits,
+    )
 }

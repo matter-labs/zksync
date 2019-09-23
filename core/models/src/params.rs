@@ -69,5 +69,4 @@ pub const PAD_MSG_BEFORE_HASH_BITS_LEN: usize = 736;
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
     pub static ref PEDERSEN_HASHER: BabyPedersenHasher = BabyPedersenHasher::default();
-    pub static ref PEDERSEN_HASHER2: PedersenHasher<Bn256> = PedersenHasher::<Bn256>::default();
 }
