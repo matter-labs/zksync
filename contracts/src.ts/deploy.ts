@@ -10,7 +10,6 @@ export const ERC20MintableContract = function () {
     return contract
 }();
 export const franklinContractCode = require('../build/Franklin');
-export const vkContractCode = require('../build/VerificationKey');
 export const verifierContractCode = require('../build/Verifier');
 export const governanceContractCode = require('../build/Governance');
 
@@ -34,26 +33,21 @@ export async function deployGovernance(
 export async function deployFranklin(
     wallet,
     governanceAddress,
-    genesisRoot = ethers.constants.HashZero,
-    franklinCode = franklinContractCode,
     verifierCode = verifierContractCode,
-    vkCode = vkContractCode
+    genesisRoot = ethers.constants.HashZero,
+    franklinCode = franklinContractCode
     ) {
     try {
         let verifier = await deployContract(wallet, verifierCode, [], {
-            gasLimit: 1000000,
-        });
-        let vk = await deployContract(wallet, vkCode, [], {
-            gasLimit: 1000000,
+            gasLimit: 1100000,
         });
         let contract = await deployContract(
             wallet,
             franklinCode,
             [
+                governanceAddress,
                 verifier.address,
-                vk.address,
                 genesisRoot,
-                governanceAddress
             ],
         {
             gasLimit: 6600000,
