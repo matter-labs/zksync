@@ -1,5 +1,15 @@
 import {ethers} from "ethers";
-import {addTestERC20Token, deployFranklin, deployGovernance, deployPriorityQueue, deployVerifier} from "./deploy";
+import {addTestERC20Token,
+    addTestNotApprovedERC20Token,
+    deployFranklin,
+    deployGovernance,
+    deployPriorityQueue,
+    deployVerifier,
+    franklinTestContractCode,
+    verifierTestContractCode,
+    governanceTestContractCode,
+    priorityQueueTestContractCode
+} from "../src.ts/deploy";
 
 import {expect, use} from "chai";
 import {solidity} from "ethereum-waffle";
@@ -26,14 +36,15 @@ describe("INTEGRATION", function() {
 
     beforeEach(async () => {
         console.log("---\n");
-        verifierDeployedContract = await deployVerifier(wallet);
-        governanceDeployedContract = await deployGovernance(wallet, wallet.address);
-        priorityQueueDeployedContract = await deployPriorityQueue(wallet, wallet.address);
+        verifierDeployedContract = await deployVerifier(wallet, verifierTestContractCode);
+        governanceDeployedContract = await deployGovernance(wallet, wallet.address, governanceTestContractCode);
+        priorityQueueDeployedContract = await deployPriorityQueue(wallet, wallet.address, priorityQueueTestContractCode);
         franklinDeployedContract = await deployFranklin(
             wallet,
             governanceDeployedContract.address,
             priorityQueueDeployedContract.address,
-            verifierDeployedContract.address
+            verifierDeployedContract.address,
+            franklinTestContractCode
         );
         erc20DeployedToken = await addTestERC20Token(wallet, governanceDeployedContract);
         // Make sure that exit wallet can execute transactions.
@@ -42,10 +53,6 @@ describe("INTEGRATION", function() {
 
     it("ETH deposit, part exit, full exit, commit, verify, withdraw", async () => {
         console.log("\n - ETH Integration started");
-
-        // Set franklin address to priority queue contract
-        const prTx = await priorityQueueDeployedContract.changeFranklinAddress(franklinDeployedContract.address);
-        await prTx.wait();
 
         // Deposit eth
         const depositValue = parseEther("0.3"); // the value passed to tx
@@ -242,10 +249,6 @@ describe("INTEGRATION", function() {
 
     it("ERC20 deposit, part exit, full exit, commit, verify, withdraw", async () => {
         console.log("\n - ERC20 Integration started");
-
-        // Set franklin address to priority queue contract
-        const prTx = await priorityQueueDeployedContract.changeFranklinAddress(franklinDeployedContract.address);
-        await prTx.wait();
 
         // Deposit eth
         const depositValue = 78; // the value passed to tx

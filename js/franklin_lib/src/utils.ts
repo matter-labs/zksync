@@ -123,11 +123,19 @@ export function integerToFloat(integer: BN, exp_bits: number, mantissa_bits: num
         }
     }
 
-    return bitsIntoBytesInOrder(encoding.reverse()).reverse();
+    return uint8ArrayToBuffer(bitsIntoBytesInOrder(encoding.reverse()).reverse());
+}
+
+function uint8ArrayToBuffer(uint8array) {
+    var buf = Buffer.alloc(uint8array.byteLength);
+    for (var i = 0; i < buf.length; ++i) {
+        buf[i] = uint8array[i];
+    }
+    return buf;
 }
 
 export function reverseBits(buffer: Buffer): Buffer {
-    let reversed = buffer.reverse();
+    let reversed = uint8ArrayToBuffer(buffer.reverse());
     reversed.map( (b, i, a) => {
         // reverse bits in byte
         b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;

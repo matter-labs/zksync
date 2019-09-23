@@ -1,5 +1,16 @@
 import {ethers} from "ethers";
-import {addTestERC20Token, addTestNotApprovedERC20Token, deployFranklin, deployGovernance, deployPriorityQueue, deployVerifier} from "../src.ts/deploy";
+import {
+    addTestERC20Token,
+    addTestNotApprovedERC20Token,
+    deployFranklin,
+    deployGovernance,
+    deployPriorityQueue,
+    deployVerifier,
+    franklinTestContractCode,
+    verifierTestContractCode,
+    governanceTestContractCode,
+    priorityQueueTestContractCode
+} from "../src.ts/deploy";
 
 import {expect, use, assert} from "chai";
 import {solidity} from "ethereum-waffle";
@@ -36,14 +47,15 @@ describe("PLANNED FAILS", function() {
 
     beforeEach(async () => {
         console.log("---\n");
-        verifierDeployedContract = await deployVerifier(wallet);
-        governanceDeployedContract = await deployGovernance(wallet, wallet.address);
-        priorityQueueDeployedContract = await deployPriorityQueue(wallet, wallet.address);
+        verifierDeployedContract = await deployVerifier(wallet, verifierTestContractCode);
+        governanceDeployedContract = await deployGovernance(wallet, wallet.address, governanceTestContractCode);
+        priorityQueueDeployedContract = await deployPriorityQueue(wallet, wallet.address, priorityQueueTestContractCode);
         franklinDeployedContract = await deployFranklin(
             wallet,
             governanceDeployedContract.address,
             priorityQueueDeployedContract.address,
-            verifierDeployedContract.address
+            verifierDeployedContract.address,
+            franklinTestContractCode
         );
         erc20DeployedToken1 = await addTestERC20Token(wallet, governanceDeployedContract);
         erc20DeployedToken2 = await addTestNotApprovedERC20Token(wallet);
@@ -52,11 +64,6 @@ describe("PLANNED FAILS", function() {
     });
 
     it("Onchain errors", async () => {
-
-        // Set franklin address to priority queue contract
-        const prTx = await priorityQueueDeployedContract.changeFranklinAddress(franklinDeployedContract.address);
-        await prTx.wait();
-
         // ETH deposit: Wrong tx value (msg.value >= fee)
         console.log("\n - ETH deposit: Wrong tx value (msg.value >= fee) started");
         const depositETH1Value = parseEther("0.005"); // the value passed to tx
@@ -235,10 +242,6 @@ describe("PLANNED FAILS", function() {
     });
 
     it("Enter Exodus Mode", async () => {
-        // Set franklin address to priority queue contract
-        const prTx = await priorityQueueDeployedContract.changeFranklinAddress(franklinDeployedContract.address);
-        await prTx.wait(); 
-
         console.log("\n - test Exodus Mode started");
         // Deposit eth
         const depositValue = parseEther("0.3"); // the value passed to tx
@@ -397,10 +400,6 @@ describe("PLANNED FAILS", function() {
     });
 
     it("Block commit errors", async () => {
-        // Set franklin address to priority queue contract
-        const prTx = await priorityQueueDeployedContract.changeFranklinAddress(franklinDeployedContract.address);
-        await prTx.wait();
-
         const noopBlockPublicData = createNoopPublicData();
 
         // Wrong commit number
@@ -558,10 +557,6 @@ describe("PLANNED FAILS", function() {
     });
 
     it("Block verify errors", async () => {
-        // Set franklin address to priority queue contract
-        const prTx = await priorityQueueDeployedContract.changeFranklinAddress(franklinDeployedContract.address);
-        await prTx.wait();
-
         const noopBlockPublicData = createNoopPublicData();
 
         let tx = await franklinDeployedContract.commitBlock(1, 22,
@@ -601,10 +596,6 @@ describe("PLANNED FAILS", function() {
     });
 
     it("Enter blocks revert", async () => {
-        // Set franklin address to priority queue contract
-        const prTx = await priorityQueueDeployedContract.changeFranklinAddress(franklinDeployedContract.address);
-        await prTx.wait();
-
         console.log("\n - Blocks revert started");
         const noopBlockPublicData = createNoopPublicData();
 
@@ -635,11 +626,6 @@ describe("PLANNED FAILS", function() {
 
     it("Priority Queue errors", async () => {
         console.log("\n - Set franklin address twice will not work started");
-        // Set franklin address to priority queue contract
-        const prTx1 = await priorityQueueDeployedContract.changeFranklinAddress(franklinDeployedContract.address);
-        await prTx1.wait();
-        console.log("First time setted");
-
         // Set franklin address again
 
         const prTx2 = await priorityQueueDeployedContract.changeFranklinAddress(wallet.address,

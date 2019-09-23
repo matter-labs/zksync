@@ -12,10 +12,10 @@ import {
 async function main() {
     const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
     const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
-    const governance = await deployGovernance(wallet);
-    const priorityQueue = await deployPriorityQueue(wallet)
-    const verifier = await deployVerifier(wallet);
-    const franklin = await deployFranklin(wallet, governance.address, priorityQueue.address, verifier.address, process.env.GENESIS_ROOT);
+    const governance = await deployGovernance(wallet, wallet.address, governanceContractCode);
+    const priorityQueue = await deployPriorityQueue(wallet, wallet.address, priorityQueueContractCode)
+    const verifier = await deployVerifier(wallet, verifierContractCode);
+    const franklin = await deployFranklin(wallet, governance.address, priorityQueue.address, verifier.address, franklinContractCode, process.env.GENESIS_ROOT);
     await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true);
     await addTestERC20Token(wallet, governance);
 
