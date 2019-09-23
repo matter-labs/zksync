@@ -32,7 +32,7 @@ pub struct FullExit {
 
 impl FullExit {
     const TX_TYPE: u8 = 6;
-    fn get_bytes(&self) -> Vec<u8> {
+    pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(self.packed_pubkey.as_ref());

@@ -337,7 +337,7 @@ export function privateKeyToPublicKey(pk: BN): edwards.EdwardsPoint  {
 export function pubkeyToAddress(pubKey: edwards.EdwardsPoint): Buffer {
     let x = pubKey.getX().toBuffer("le", 32);
     let y = pubKey.getY().toBuffer("le", 32);
-    return pedersenHash(Buffer.concat([x,y])).getX().toBuffer("le", 32).slice(0, addressLen);
+    return pedersenHash(Buffer.concat([x,y])).getX().toBuffer("le", 32).slice(0, addressLen).reverse();
 }
 
 export function serializePointPacked(point: edwards.EdwardsPoint): Buffer {

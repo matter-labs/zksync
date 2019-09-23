@@ -40,7 +40,7 @@ pub struct Transfer {
 
 impl Transfer {
     const TX_TYPE: u8 = 5;
-    fn get_bytes(&self) -> Vec<u8> {
+    pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.from.data);
@@ -80,7 +80,7 @@ pub struct Withdraw {
 
 impl Withdraw {
     const TX_TYPE: u8 = 3;
-    fn get_bytes(&self) -> Vec<u8> {
+    pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.account.data);
@@ -115,7 +115,7 @@ pub struct Close {
 impl Close {
     const TX_TYPE: u8 = 4;
 
-    fn get_bytes(&self) -> Vec<u8> {
+    pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.account.data);
