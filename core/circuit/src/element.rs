@@ -316,7 +316,7 @@ impl<E: JubjubEngine> CircuitPubkey<E> {
             &to_hash,
             params,
         )?;
-        println!("hash when fromxy: {:?}", hash.get_x().get_value());
+        debug!("hash when fromxy: {:?}", hash.get_x().get_value());
         let mut hash_bits = hash
             .get_x()
             .into_bits_le(cs.namespace(|| "hash into_bits"))?;

@@ -89,8 +89,6 @@ pub struct AllocatedChunkData<E: JubjubEngine> {
 
 #[derive(Clone)]
 pub struct AllocatedOperationData<E: JubjubEngine> {
-    // pub new_pubkey: CircuitPubkey<E>,
-    //    pub signer_pubkey: CircuitPubkey<E>,
     pub amount_packed: CircuitElement<E>,
     pub fee_packed: CircuitElement<E>,
     pub amount_unpacked: CircuitElement<E>,
@@ -185,7 +183,6 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         )?;
 
-        // let new_pubkey_hash = new_pubkey.get_hash().clone();
         let pub_nonce = CircuitElement::from_fe_strict(
             cs.namespace(|| "pub_nonce"),
             || op.args.pub_nonce.grab(),
@@ -204,7 +201,6 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
 
         Ok(AllocatedOperationData {
             ethereum_key,
-            //            signer_pubkey: sig_pubkey,
             pub_nonce,
             amount_packed,
             fee_packed,

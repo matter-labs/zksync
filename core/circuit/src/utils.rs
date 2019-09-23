@@ -42,13 +42,14 @@ where
     let is_valid_signature =
         pk.verify_musig_pedersen(&message_bytes, &signature.clone(), p_g, params);
 
+    // TODO: handle the case where it is not valid
     // if !is_valid_signature {
     //     return None;
     // }
     let (sig_r_x, sig_r_y) = signature.r.into_xy();
-    println!("signature.s: {}", signature.s);
-    println!("signature.r.x: {}", sig_r_x);
-    println!("signature.r.y: {}", sig_r_y);
+    debug!("signature.s: {}", signature.s);
+    debug!("signature.r.x: {}", sig_r_x);
+    debug!("signature.r.y: {}", sig_r_y);
 
     convert_signature_to_representation(signature)
 }
@@ -147,11 +148,6 @@ pub fn multi_and<E: JubjubEngine, CS: ConstraintSystem<E>>(
             &result,
             bool_x,
         )?;
-        //        println!(
-        //            "multi and iteration number: {} : result {:?}",
-        //            i,
-        //            result.get_value()
-        //        );
     }
 
     Ok(result)
