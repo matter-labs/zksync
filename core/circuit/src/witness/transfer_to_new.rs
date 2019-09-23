@@ -1,10 +1,10 @@
 use super::utils::*;
 use crate::operation::*;
-use crate::utils::*;
 use ff::{Field, PrimeField};
 use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
+use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
 use models::node::TransferToNewOp;
 use models::params as franklin_constants;
 use num_traits::cast::ToPrimitive;
@@ -456,6 +456,7 @@ mod test {
     use models::circuit::account::{
         Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
+    use models::circuit::utils::*;
     use models::merkle_tree::PedersenHasher;
     use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
@@ -477,20 +478,20 @@ mod test {
 
         let from_sk = PrivateKey::<Bn256>(rng.gen());
         let from_pk = PublicKey::from_private(&from_sk, p_g, params);
-        let from_pub_key_hash = pub_key_hash(&from_pk, &phasher);
+        let from_pub_key_hash = pub_key_hash_fe(&from_pk, &phasher);
         let (from_x, from_y) = from_pk.0.into_xy();
         println!("x = {}, y = {}", from_x, from_y);
 
         let new_sk = PrivateKey::<Bn256>(rng.gen());
         let to_pk = PublicKey::from_private(&new_sk, p_g, params);
-        let to_pub_key_hash = pub_key_hash(&to_pk, &phasher);
+        let to_pub_key_hash = pub_key_hash_fe(&to_pk, &phasher);
         let (to_x, to_y) = to_pk.0.into_xy();
         println!("x = {}, y = {}", to_x, to_y);
 
         // give some funds to sender and make zero balance for recipient
         let validator_sk = PrivateKey::<Bn256>(rng.gen());
         let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
-        let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
+        let validator_pub_key_hash = pub_key_hash_fe(&validator_pk, &phasher);
         let (validator_x, validator_y) = validator_pk.0.into_xy();
         println!("x = {}, y = {}", validator_x, validator_y);
         let validator_leaf = CircuitAccount::<Bn256> {

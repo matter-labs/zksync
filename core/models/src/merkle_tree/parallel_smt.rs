@@ -1,12 +1,8 @@
-// Sparse Merkle tree with batch updates
-
+/// Sparse Merkle tree with batch updates
 use super::hasher::Hasher;
 use crate::primitives::GetBits;
 use fnv::FnvHashMap;
 use std::fmt::Debug;
-
-// use std::time::Duration;
-// use rayon::prelude::*;
 
 fn select<T>(condition: bool, a: T, b: T) -> (T, T) {
     if condition {
@@ -16,19 +12,19 @@ fn select<T>(condition: bool, a: T, b: T) -> (T, T) {
     }
 }
 
-// Nodes enumarated starting with index(root) = 1
-// We need 2 * TREE_HEIGHT bits
+/// Nodes enumarated starting with index(root) = 1
+/// We need 2 * TREE_HEIGHT bits
 type NodeIndex = u64;
 
-// Lead index: 0 <= i < N (u64 to avoid conversions; 64 bit HW should be used anyway)
+/// Lead index: 0 <= i < N (u64 to avoid conversions; 64 bit HW should be used anyway)
 type ItemIndex = usize;
 
-// Tree of depth 0: 1 item (which is root), level 0 only
-// Tree of depth 1: 2 items, levels 0 and 1
-// Tree of depth N: 2 ^ N items, 0 <= level < depth
+/// Tree of depth 0: 1 item (which is root), level 0 only
+/// Tree of depth 1: 2 items, levels 0 and 1
+/// Tree of depth N: 2 ^ N items, 0 <= level < depth
 type Depth = usize;
 
-// Index of the node in the vector; slightly inefficient, won't be needed when rust gets non-lexical timelines
+/// Index of the node in the vector; slightly inefficient, won't be needed when rust gets non-lexical timelines
 type NodeRef = usize;
 
 #[derive(Debug, Clone)]

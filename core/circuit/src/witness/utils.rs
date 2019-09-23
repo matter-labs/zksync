@@ -12,6 +12,7 @@ use franklin_crypto::eddsa::PublicKey;
 use franklin_crypto::jubjub::FixedGenerators;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::{Balance, CircuitAccount, CircuitAccountTree};
+use models::circuit::utils::{be_bit_vector_into_bytes, le_bit_vector_into_field_element};
 use models::merkle_tree::hasher::Hasher;
 use models::merkle_tree::PedersenHasher;
 use models::params as franklin_constants;
@@ -19,7 +20,7 @@ use pairing::bn256::*;
 use rand::{Rng, SeedableRng, XorShiftRng};
 
 pub fn _generate_dummy_sig_data() -> (Option<TransactionSignature<Bn256>>, Fr, Fr, Fr) {
-    let params = &AltJubjubBn256::new();
+    let params = &franklin_constants::JUBJUB_PARAMS;
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let sender_sk = PrivateKey::<Bn256>(rng.gen());
@@ -96,32 +97,6 @@ pub fn generate_sig_data(
     let signature = sign_pedersen(&sig_bits, &private_key, p_g, params, rng);
     // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
     (signature, first_sig_part, second_sig_part, third_sig_part)
-}
-pub fn pub_key_hash<E: JubjubEngine, H: Hasher<E::Fr>>(
-    pub_key: &PublicKey<E>,
-    hasher: &H,
-) -> E::Fr {
-    let (pub_x, pub_y) = pub_key.0.into_xy();
-    println!("x = {}, y = {}", pub_x, pub_y);
-    let mut pub_key_bits = vec![];
-    append_le_fixed_width(
-        &mut pub_key_bits,
-        &pub_x,
-        franklin_constants::FR_BIT_WIDTH_PADDED,
-    );
-    append_le_fixed_width(
-        &mut pub_key_bits,
-        &pub_y,
-        franklin_constants::FR_BIT_WIDTH_PADDED,
-    );
-    let pub_key_hash = hasher.hash_bits(pub_key_bits);
-    let mut pub_key_hash_bits = vec![];
-    append_le_fixed_width(
-        &mut pub_key_hash_bits,
-        &pub_key_hash,
-        franklin_constants::NEW_PUBKEY_HASH_WIDTH,
-    );
-    le_bit_vector_into_field_element(&pub_key_hash_bits)
 }
 
 pub fn public_data_commitment<E: JubjubEngine>(

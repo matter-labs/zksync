@@ -1,4 +1,4 @@
-use ethabi::{decode, ParamType, Token};
+use ethabi::{decode, ParamType};
 use failure::format_err;
 use futures::Future;
 use std::collections::HashMap;
@@ -9,46 +9,84 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use web3::contract::Contract;
 use web3::types::{Address, BlockNumber, Filter, FilterBuilder, Log, H160, U256};
-use web3::Web3;
+use web3::{Transport, Web3};
 
+use crate::ThreadPanicNotify;
 use bigdecimal::BigDecimal;
-use models::node::{AccountAddress, TokenId};
-use models::params::LOCK_DEPOSITS_FOR;
+use models::node::{FranklinPriorityOp, TokenId};
+use models::params::PRIORITY_EXPIRATION;
+use std::sync::mpsc::{self, sync_channel};
 use storage::ConnectionPool;
 
-pub struct EthWatch {
-    contract_addr: H160,
-    web3_url: String,
-    contract: ethabi::Contract,
+pub struct EthWatch<T: Transport> {
+    gov_contract: (ethabi::Contract, Contract<T>),
+    priority_queue_contract: (ethabi::Contract, Contract<T>),
     processed_block: u64,
     eth_state: Arc<RwLock<ETHState>>,
+    web3: Web3<T>,
     db_pool: ConnectionPool,
-}
-
-#[derive(Debug)]
-pub struct LockedBalance {
-    pub amount: BigDecimal,
-    pub blocks_left_until_unlock: u64,
-    locked_until_block: u64,
-    eth_address: Address,
-}
-
-impl LockedBalance {
-    fn from_event(event: OnchainDepositEvent, current_block: u64) -> Self {
-        Self {
-            amount: event.amount,
-            locked_until_block: u64::from(event.locked_until_block),
-            blocks_left_until_unlock: u64::from(event.locked_until_block)
-                .saturating_sub(current_block),
-            eth_address: event.address,
-        }
-    }
 }
 
 #[derive(Debug)]
 pub struct ETHState {
     pub tokens: HashMap<TokenId, Address>,
-    pub locked_balances: HashMap<(AccountAddress, TokenId), LockedBalance>,
+    pub priority_queue: HashMap<u64, PriorityOp>,
+}
+
+#[derive(Debug)]
+pub struct PriorityOp {
+    pub serial_id: u64,
+    pub data: FranklinPriorityOp,
+    pub deadline_block: u64,
+    pub eth_fee: BigDecimal,
+}
+
+impl TryFrom<Log> for PriorityOp {
+    type Error = failure::Error;
+
+    fn try_from(event: Log) -> Result<PriorityOp, failure::Error> {
+        let mut dec_ev = decode(
+            &[
+                ParamType::Uint(64),  // Serial id
+                ParamType::Uint(8),   // OpType
+                ParamType::Bytes,     // Pubdata
+                ParamType::Uint(256), // expir. block
+                ParamType::Uint(256), // fee
+            ],
+            &event.data.0,
+        )
+        .map_err(|e| format_err!("Event data decode: {:?}", e))?;
+
+        Ok(PriorityOp {
+            serial_id: dec_ev
+                .remove(0)
+                .to_uint()
+                .as_ref()
+                .map(U256::as_u64)
+                .unwrap(),
+            data: {
+                let op_type = dec_ev
+                    .remove(0)
+                    .to_uint()
+                    .as_ref()
+                    .map(|ui| U256::as_u32(ui) as u8)
+                    .unwrap();
+                let op_pubdata = dec_ev.remove(0).to_bytes().unwrap();
+                FranklinPriorityOp::parse_pubdata(&op_pubdata, op_type)
+                    .expect("Failed to parse priority op data")
+            },
+            deadline_block: dec_ev
+                .remove(0)
+                .to_uint()
+                .as_ref()
+                .map(U256::as_u64)
+                .unwrap(),
+            eth_fee: {
+                let amount_uint = dec_ev.remove(0).to_uint().unwrap();
+                BigDecimal::from_str(&format!("{}", amount_uint)).unwrap()
+            },
+        })
+    }
 }
 
 impl ETHState {
@@ -81,112 +119,144 @@ impl TryFrom<Log> for TokenAddedEvent {
     }
 }
 
-#[derive(Debug)]
-struct OnchainDepositEvent {
-    address: Address,
-    token_id: u32,
-    amount: BigDecimal,
-    locked_until_block: u32,
-    franklin_addr: AccountAddress,
-}
+impl<T: Transport> EthWatch<T> {
+    pub fn new(web3: Web3<T>, db_pool: ConnectionPool) -> Self {
+        let gov_contract = {
+            let abi_string = serde_json::Value::from_str(models::abi::GOVERNANCE_CONTRACT)
+                .unwrap()
+                .get("abi")
+                .unwrap()
+                .to_string();
+            let abi = ethabi::Contract::load(abi_string.as_bytes()).unwrap();
+            let address = H160::from_str(
+                &env::var("GOVERNANCE_ADDR")
+                    .map(|s| s[2..].to_string())
+                    .expect("GOVERNANCE_ADDR env var not found"),
+            )
+            .unwrap();
 
-impl TryFrom<Log> for OnchainDepositEvent {
-    type Error = failure::Error;
+            (abi.clone(), Contract::new(web3.eth(), address, abi.clone()))
+        };
 
-    fn try_from(event: Log) -> Result<OnchainDepositEvent, failure::Error> {
-        let mut dec_addr = decode(
-            &[ParamType::Address],
-            event
-                .topics
-                .get(1)
-                .ok_or_else(|| format_err!("Failed to get address topic"))?
-                .as_ref(),
-        )
-        .map_err(|e| format_err!("Address topic data decode: {:?}", e))?;
+        let priority_queue_contract = {
+            let abi_string = serde_json::Value::from_str(models::abi::PRIORITY_QUEUE_CONTRACT)
+                .unwrap()
+                .get("abi")
+                .unwrap()
+                .to_string();
+            let abi = ethabi::Contract::load(abi_string.as_bytes()).unwrap();
+            let address = H160::from_str(
+                &env::var("PRIORITY_QUEUE_ADDR")
+                    .map(|s| s[2..].to_string())
+                    .expect("PRIORITY_QUEUE_ADDR env var not found"),
+            )
+            .unwrap();
 
-        let mut dec_ev = decode(
-            &[
-                ParamType::Uint(32),
-                ParamType::Uint(112),
-                ParamType::Uint(32),
-                ParamType::Bytes,
-            ],
-            &event.data.0,
-        )
-        .map_err(|e| format_err!("Event data decode: {:?}", e))?;
-
-        Ok(OnchainDepositEvent {
-            address: dec_addr.remove(0).to_address().unwrap(),
-            token_id: dec_ev
-                .remove(0)
-                .to_uint()
-                .as_ref()
-                .map(U256::as_u32)
-                .unwrap(),
-            amount: {
-                let amount_uint = dec_ev.remove(0).to_uint().unwrap();
-                BigDecimal::from_str(&format!("{}", amount_uint)).unwrap()
-            },
-            locked_until_block: dec_ev
-                .remove(0)
-                .to_uint()
-                .as_ref()
-                .map(U256::as_u32)
-                .unwrap(),
-            franklin_addr: {
-                let addr_bytes = dec_ev.remove(0).to_bytes().unwrap();
-                AccountAddress::from_bytes(&addr_bytes)?
-            },
-        })
-    }
-}
-impl Default for EthWatch {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl EthWatch {
-    pub fn new() -> Self {
-        let abi_string = serde_json::Value::from_str(models::abi::TEST_PLASMA2_ALWAYS_VERIFY)
-            .unwrap()
-            .get("abi")
-            .unwrap()
-            .to_string();
+            (abi.clone(), Contract::new(web3.eth(), address, abi.clone()))
+        };
 
         Self {
-            contract_addr: H160::from_str(
-                &env::var("CONTRACT_ADDR")
-                    .map(|s| s[2..].to_string())
-                    .expect("CONTRACT_ADDR env var not found"),
-            )
-            .unwrap(),
-            web3_url: env::var("WEB3_URL").expect("WEB3_URL env var not found"),
-            contract: ethabi::Contract::load(abi_string.as_bytes()).unwrap(),
+            gov_contract,
+            priority_queue_contract,
             processed_block: 0,
             eth_state: Arc::new(RwLock::new(ETHState {
                 tokens: HashMap::new(),
-                locked_balances: HashMap::new(),
+                priority_queue: HashMap::new(),
             })),
-            db_pool: ConnectionPool::new(),
+            web3,
+            db_pool,
         }
     }
 
-    fn restore_state_from_eth<T: web3::Transport>(&mut self, web3: &Web3<T>, block: u64) {
+    fn get_new_token_event_filter(&self, from: BlockNumber, to: BlockNumber) -> Filter {
+        let new_token_event_topic = self
+            .gov_contract
+            .0
+            .event("TokenAdded")
+            .expect("gov contract abi error")
+            .signature();
+        FilterBuilder::default()
+            .address(vec![self.gov_contract.1.address()])
+            .from_block(from)
+            .to_block(to)
+            .topics(Some(vec![new_token_event_topic]), None, None, None)
+            .build()
+    }
+
+    fn get_new_token_events(
+        &self,
+        from: BlockNumber,
+        to: BlockNumber,
+    ) -> Result<Vec<TokenAddedEvent>, failure::Error> {
+        let filter = self.get_new_token_event_filter(from, to);
+
+        self.web3
+            .eth()
+            .logs(filter)
+            .wait()?
+            .into_iter()
+            .map(|event| {
+                TokenAddedEvent::try_from(event).map_err(|e| {
+                    format_err!("Failed to parse TokenAdded event log from ETH: {}", e)
+                })
+            })
+            .collect()
+    }
+
+    fn get_priority_op_event_filter(&self, from: BlockNumber, to: BlockNumber) -> Filter {
+        let priority_op_event_topic = self
+            .priority_queue_contract
+            .0
+            .event("NewPriorityRequest")
+            .expect("main contract abi error")
+            .signature();
+        FilterBuilder::default()
+            .address(vec![self.priority_queue_contract.1.address()])
+            .from_block(from)
+            .to_block(to)
+            .topics(Some(vec![priority_op_event_topic]), None, None, None)
+            .build()
+    }
+
+    fn get_priority_op_events(
+        &self,
+        from: BlockNumber,
+        to: BlockNumber,
+    ) -> Result<Vec<PriorityOp>, failure::Error> {
+        let filter = self.get_priority_op_event_filter(from, to);
+        self.web3
+            .eth()
+            .logs(filter)
+            .wait()?
+            .into_iter()
+            .map(|event| {
+                PriorityOp::try_from(event).map_err(|e| {
+                    format_err!("Failed to parse priority queue event log from ETH: {:?}", e)
+                })
+            })
+            .collect()
+    }
+
+    fn restore_state_from_eth(&mut self, block: u64) {
         let mut eth_state = self.eth_state.write().expect("ETH state lock");
-        let deposit_events = self.get_onchain_deposit_events(
-            web3,
-            BlockNumber::Number(block.saturating_sub(LOCK_DEPOSITS_FOR)),
-            BlockNumber::Number(block),
-        );
-        for deposit in deposit_events {
-            eth_state.locked_balances.insert(
-                (deposit.franklin_addr.clone(), deposit.token_id as TokenId),
-                LockedBalance::from_event(deposit, block),
-            );
+
+        // restore priority queue
+        let prior_queue_events = self
+            .get_priority_op_events(
+                BlockNumber::Number(block.saturating_sub(PRIORITY_EXPIRATION)),
+                BlockNumber::Number(block),
+            )
+            .expect("Failed to restore priority queue events from ETH");
+        for priority_op in prior_queue_events.into_iter() {
+            eth_state
+                .priority_queue
+                .insert(priority_op.serial_id, priority_op);
         }
-        let new_tokens =
-            self.get_new_token_events(web3, BlockNumber::Earliest, BlockNumber::Number(block));
+
+        // restore token list from governance contract
+        let new_tokens = self
+            .get_new_token_events(BlockNumber::Earliest, BlockNumber::Number(block))
+            .expect("Failed to restore token list from ETH");
         for token in new_tokens.into_iter() {
             eth_state.add_new_token(token.id as TokenId, token.address)
         }
@@ -194,139 +264,33 @@ impl EthWatch {
         debug!("ETH state: {:#?}", *eth_state);
     }
 
-    fn get_new_token_event_filter(&self, from: BlockNumber, to: BlockNumber) -> Filter {
-        let new_token_event_topic = self.contract.event("TokenAdded").unwrap().signature();
-        FilterBuilder::default()
-            .address(vec![self.contract_addr])
-            .from_block(from)
-            .to_block(to)
-            .topics(Some(vec![new_token_event_topic]), None, None, None)
-            .build()
-    }
-
-    fn get_new_token_events<T: web3::Transport>(
-        &self,
-        web3: &Web3<T>,
-        from: BlockNumber,
-        to: BlockNumber,
-    ) -> Vec<TokenAddedEvent> {
-        let filter = self.get_new_token_event_filter(from, to);
-
-        web3.eth()
-            .logs(filter)
-            .wait()
-            .expect("Failed to get TokenAdded events")
-            .into_iter()
-            .filter_map(|event| {
-                TokenAddedEvent::try_from(event)
-                    .map_err(|e| error!("Failed to parse TokanAdded event log from ETH: {}", e))
-                    .ok()
-            })
-            .collect()
-    }
-
-    fn get_deposit_event_filter(&self, from: BlockNumber, to: BlockNumber) -> Filter {
-        let onchain_deposit_event_topic =
-            self.contract.event("OnchainDeposit").unwrap().signature();
-        FilterBuilder::default()
-            .address(vec![self.contract_addr])
-            .from_block(from)
-            .to_block(to)
-            .topics(Some(vec![onchain_deposit_event_topic]), None, None, None)
-            .build()
-    }
-
-    fn get_onchain_deposit_events<T: web3::Transport>(
-        &self,
-        web3: &Web3<T>,
-        from: BlockNumber,
-        to: BlockNumber,
-    ) -> Vec<OnchainDepositEvent> {
-        let filter = self.get_deposit_event_filter(from, to);
-        web3.eth()
-            .logs(filter)
-            .wait()
-            .expect("Failed to get OnchainBalanceChanged events")
-            .into_iter()
-            .filter_map(|event| {
-                OnchainDepositEvent::try_from(event)
-                    .map_err(|e| warn!("Failed to parse deposit event log from ETH: {:?}", e))
-                    .ok()
-            })
-            .collect()
-    }
-
-    fn process_new_blocks<T: web3::Transport>(
-        &mut self,
-        web3: &Web3<T>,
-        contract: &Contract<T>,
-        last_block: u64,
-    ) {
+    fn process_new_blocks(&mut self, last_block: u64) -> Result<(), failure::Error> {
         debug_assert!(self.processed_block < last_block);
 
-        let mut eth_state = self.eth_state.write().expect("ETH state lock");
-
         let new_tokens = self.get_new_token_events(
-            web3,
             BlockNumber::Number(self.processed_block + 1),
             BlockNumber::Number(last_block),
-        );
+        )?;
+        let priority_op_events = self.get_priority_op_events(
+            BlockNumber::Number(self.processed_block + 1),
+            BlockNumber::Number(last_block),
+        )?;
+
+        let mut eth_state = self.eth_state.write().expect("ETH state lock");
+        for priority_op in priority_op_events.into_iter() {
+            debug!("New priority op: {:?}", priority_op);
+            eth_state
+                .priority_queue
+                .insert(priority_op.serial_id, priority_op);
+        }
         for token in new_tokens.into_iter() {
             debug!("New token added: {:?}", token);
-            eth_state.add_new_token(token.id as TokenId, token.address)
+            eth_state.add_new_token(token.id as TokenId, token.address);
         }
-
-        let deposit_events = self.get_onchain_deposit_events(
-            web3,
-            BlockNumber::Number(self.processed_block + 1),
-            BlockNumber::Number(last_block),
-        );
-        for deposit in deposit_events.into_iter() {
-            debug!("New locked deposit: {:?}", deposit);
-
-            eth_state.locked_balances.insert(
-                (deposit.franklin_addr.clone(), deposit.token_id as TokenId),
-                LockedBalance::from_event(deposit, last_block),
-            );
-        }
-
-        eth_state.locked_balances = eth_state
-            .locked_balances
-            .drain()
-            .filter_map(|((addr, token), mut v)| {
-                let res: Result<(U256, U256), _> = contract
-                    .query(
-                        "balances",
-                        (Token::Address(v.eth_address), u64::from(token)),
-                        None,
-                        Default::default(),
-                        Some(BlockNumber::Number(last_block)),
-                    )
-                    .wait();
-                match res {
-                    Ok((value, _)) => {
-                        let new_amount = BigDecimal::from_str(&format!("{}", value)).unwrap();
-                        if new_amount != v.amount {
-                            v.amount = new_amount;
-                            debug!("Deposit updated: {:?}", v);
-                        }
-                    }
-                    Err(e) => {
-                        error!("Failed to query balances: {:?}", e);
-                    }
-                };
-
-                v.blocks_left_until_unlock = v.locked_until_block.saturating_sub(last_block);
-
-                if v.blocks_left_until_unlock == 0 {
-                    debug!("Deposit expired: {:?}", v);
-                    None
-                } else {
-                    Some(((addr, token), v))
-                }
-            })
-            .collect();
         self.processed_block = last_block;
+
+        // TODO: check if op was executed. decide best way.
+        Ok(())
     }
 
     fn commit_state(&self) {
@@ -348,40 +312,54 @@ impl EthWatch {
     }
 
     pub fn run(mut self) {
-        let (_eloop, transport) = web3::transports::Http::new(&self.web3_url).unwrap();
-        let web3 = web3::Web3::new(transport);
-        let contract = Contract::new(web3.eth(), self.contract_addr, self.contract.clone());
-
-        let mut block = web3
+        let block = self
+            .web3
             .eth()
             .block_number()
             .wait()
             .expect("Block number")
             .as_u64();
         self.processed_block = block;
-        self.restore_state_from_eth(&web3, block);
+        self.restore_state_from_eth(block);
 
         loop {
             std::thread::sleep(Duration::from_secs(1));
-            let last_block_number = web3.eth().block_number().wait();
-            if last_block_number.is_err() {
+            let last_block_number = self.web3.eth().block_number().wait();
+            let block = if let Ok(block) = last_block_number {
+                block.as_u64()
+            } else {
                 continue;
-            }
-            block = last_block_number.unwrap().as_u64();
+            };
 
             if block > self.processed_block {
-                self.process_new_blocks(&web3, &contract, block);
+                self.process_new_blocks(block)
+                    .map_err(|e| warn!("Failed to process new blocks {}", e))
+                    .unwrap_or_default();
                 self.commit_state();
             }
         }
     }
 }
 
-pub fn start_eth_watch(eth_watch: EthWatch) {
+pub fn start_eth_watch(
+    pool: ConnectionPool,
+    panic_notify: mpsc::Sender<bool>,
+) -> Arc<RwLock<ETHState>> {
+    let (sender, receiver) = sync_channel(1);
+
     std::thread::Builder::new()
         .name("eth_watch".to_string())
         .spawn(move || {
+            let _panic_sentinel = ThreadPanicNotify(panic_notify);
+
+            let web3_url = env::var("WEB3_URL").expect("WEB3_URL env var not found");
+            let (_eloop, transport) = web3::transports::Http::new(&web3_url).unwrap();
+            let web3 = web3::Web3::new(transport);
+            let eth_watch = EthWatch::new(web3, pool);
+            sender.send(eth_watch.get_shared_eth_state()).unwrap();
             eth_watch.run();
         })
         .expect("Eth watcher thread");
+
+    receiver.recv().unwrap()
 }
