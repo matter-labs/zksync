@@ -47,14 +47,10 @@ pub fn unpack_point_if_possible<E: JubjubEngine, CS: ConstraintSystem<E>>(
     let r_x_bit =
         AllocatedBit::alloc(cs.namespace(|| "r_x_bit"), packed_key_bits_correct_order[0])?;
 
-    // let mut r_y_value = signature_data.r_packed.clone();
-    // r_y_value.truncate(franklin_constants::FR_BIT_WIDTH_PADDED - 2);
-
     let r_y = CircuitElement::from_witness_be_bits(
         cs.namespace(|| "signature_r_y from bits"),
         &packed_key_bits_correct_order[1..],
     )?;
-    // let r_y = r_y.pad(franklin_constants::FR_BIT_WIDTH_PADDED - 1);
 
     let (r_recovered, is_r_correct) = ecc::EdwardsPoint::recover_from_y_unchecked(
         cs.namespace(|| "recover_from_y_unchecked"),
@@ -68,9 +64,6 @@ pub fn unpack_point_if_possible<E: JubjubEngine, CS: ConstraintSystem<E>>(
         r_recovered.get_y().get_value()
     );
 
-    //    let mut packed_bits = vec![];
-    //    packed_bits.push(Boolean::from(r_x_bit));
-    //    packed_bits.extend(r_y.get_bits_be());
     let pubkey = CircuitPubkey::from_xy(
         cs.namespace(|| "pubkey from xy"),
         r_recovered.get_x().clone(),

@@ -59,12 +59,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             op_data: AllocatedOperationData {
                 ethereum_key: zero_circuit_element.clone(),
                 new_pubkey_hash: zero_circuit_element.clone(),
-                //                signer_pubkey: CircuitPubkey::from_xy(
-                //                    cs.namespace(|| "dummy signer_pubkey"),
-                //                    zero_circuit_element.get_number(),
-                //                    zero_circuit_element.get_number(),
-                //                    &self.params,
-                //                )?,
                 pub_nonce: zero_circuit_element.clone(),
                 amount_packed: zero_circuit_element.clone(),
                 full_amount: zero_circuit_element.clone(),
