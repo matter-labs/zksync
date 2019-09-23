@@ -211,7 +211,7 @@ export class Wallet {
     async deposit(token: Token, amount: BigNumberish) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
         if (token.id == 0) {
-            const tx = await franklinDeployedContract.depositETH(this.address, {value: amount});
+            const tx = await franklinDeployedContract.depositETH(this.address, {value: amount, gasLimit: bigNumberify("200000")});
             return tx.hash;
         } else {
             const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
