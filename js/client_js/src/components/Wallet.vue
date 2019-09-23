@@ -10,7 +10,7 @@
                 componentId="offchain"
                 :topBalances="onchainBalances" 
                 :bottomBalances="franklinBalances"
-                :depositFeeNeeded="true"
+                :depositFeeNeeded="false"
                 :withdrawFeeNeeded="true"
                 v-on:depositEvent="deposit"
                 v-on:withdrawEvent="withdraw"
@@ -82,9 +82,7 @@ export default {
         },
         async verboseFunctionShower(generator) {
             for await (const progress of generator) {
-                console.log(progress);
                 if (progress.message.includes(`started proving block`)) {
-                    console.log('includes, e');
                     this.$refs.progress_bar.startProgressBarTimer(20000);
                 }
                 if (progress.message.includes(`got proved!`)) {

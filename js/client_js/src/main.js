@@ -26,7 +26,7 @@ Vue.mixin({
             return window.walletDecorator.wallet.ethWallet.address;
         },
         franklinAddress() {
-            return window.walletDecorator.wallet.address;
+            return window.walletDecorator.address;
         },
         currentLocationNetworkName() {
             return window.location.host.split(/[^\w]/)[0];

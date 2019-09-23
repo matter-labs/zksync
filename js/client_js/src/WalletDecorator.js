@@ -6,6 +6,7 @@ const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
 export class WalletDecorator {
     constructor (wallet) {
         this.wallet = wallet;
+        this.address = '0x' + this.wallet.address.toString('hex');
     }
 
     async updateState() {
@@ -69,7 +70,7 @@ export class WalletDecorator {
             .map((balance, tokenId) => ({
                 tokenName: this.tokenNameFromId(tokenId),
                 address: this.wallet.supportedTokens[tokenId].address,
-                amount: `${balance.toString()}, blocks left ${this.wallet.ethState.lockedBlocksLeft[tokenId]}`
+                amount: `${balance.toString()}`
             }))
             .filter(tokenInfo => true || tokenInfo.amount);
     }
@@ -104,7 +105,8 @@ export class WalletDecorator {
             });
     }
     // #endregion
-    
+
+    // #region actions
     async transfer(kwargs) {
         let token = this.tokenFromName(kwargs.token);
         let amount = bigNumberify(kwargs.amount);
@@ -188,11 +190,29 @@ export class WalletDecorator {
     }
 
     async * verboseWithdraw(kwargs) {
+        yield {
+            error: null,
+            message: `Started withdraw ${JSON.stringify(kwargs)}`
+        };
+
+        console.log(kwargs);
+
         let token = this.tokenFromName(kwargs.token);
         let amount = bigNumberify(kwargs.amount);
         let fee = bigNumberify(kwargs.fee);
 
-        let res = await this.wallet.widthdrawOffchain(token, amount, fee);
+        yield {
+            error: null,
+            message: `managed to parse arguments`
+        };
+
+        try {
+            var res = await this.wallet.widthdrawOffchain(token, amount, fee);
+        } catch (e) {
+            console.log(e);
+        }
+
+        console.log('withdrawOffchain res: ', res);
 
         if (res.err) {
             yield {
@@ -207,7 +227,20 @@ export class WalletDecorator {
             };
         }
     
-        let receipt = await this.wallet.txReceipt(res.hash);
+        yield {
+            error: null,
+            message: `Getting receipt...`,
+        };
+
+        try {
+            var receipt = await this.wallet.txReceipt(res.hash);
+        } catch (e) {
+            yield {
+                error: e.message,
+                message: `getting receipt failed with ${e.message}`,
+            };
+            return;  
+        }
 
         if (receipt.fail_reason) {
             yield {
@@ -247,7 +280,7 @@ export class WalletDecorator {
         await sleep(5000);
 
         try {
-            var hash = await this.wallet.widthdrawOnchain(token, amount);
+            var tx_hash = await this.wallet.widthdrawOnchain(token, amount);
         } catch (e) {
             yield {
                 error: e.message,
@@ -255,6 +288,64 @@ export class WalletDecorator {
             };
             return;
         }
+
+        try {
+            
+            for (let i = 1; i <= 5 && !receipt; i++) {
+                yield {
+                    error: null,
+                    message: `Awaiting for tx ${tx_hash} receipt, attempt ${i} out of 5`
+                };
+                
+                receipt = await this.wallet.ethWallet.provider.getTransactionReceipt(tx_hash);
+                
+                if (receipt) break;
+                await sleep(4000);
+            }
+
+            console.log(`and hash is ${tx_hash}`);
+
+            console.log(receipt.status);
+
+            if (receipt.status) {
+                yield {
+                    error: null,
+                    message: `Onchain transaction mined`
+                };
+            } else {
+                const tx = await this.wallet.ethWallet.provider.getTransaction(tx_hash);
+                const code = await this.wallet.ethWallet.provider.call(tx, tx.blockNumber);
+                console.log('code: ', code);
+                if (code == '0x') {
+                    yield {
+                        err: `Empty revert reason code`,
+                        message: `empty revert reason code`
+                    };
+                } else {
+                    const reason = code
+                        .substr(138)
+                        .match(/../g)
+                        .map(h => parseInt(h, 16))
+                        .map(String.fromCharCode)
+                        .join('');
+                    yield {
+                        error: " ",
+                        message: `Revert reason is: [${reason}]`
+                    };
+                    console.log("revert reason:", reason);
+                    console.log("revert code", code);
+                }
+            }
+        } catch (e) {
+            console.log(e);
+            yield {
+                error: e.message,
+                message: `Onchain withdraw failed with "${e.message}"`,
+            };
+            return;
+        }
+
+        console.log('hash of withdrawOnchain:', tx_hash);
 
         yield {
             err: null,
@@ -355,13 +446,73 @@ export class WalletDecorator {
         }
 
         try {
-            let tx_hash = await this.depositOnchain(kwargs);
+            var token = this.tokenFromName(kwargs.token);
+            var amount = bigNumberify(kwargs.amount);
+            var tx_hash = await this.wallet.deposit(token, amount);
             yield {
                 error: null,
                 tx_hash,
-                message: `Onchain deposit succeeded, waiting for offchain...`,
+                message: `Deposit ${tx_hash} sent to Mainchain, `,
             };
         } catch (e) {
+            console.log(e);
+            yield {
+                error: e.message,
+                message: `Onchain deposit failed with "${e.message}"`,
+            };
+            return;
+        }
+        var receipt;
+
+        try {
+            
+            for (let i = 1; i <= 5 && !receipt; i++) {
+                yield {
+                    error: null,
+                    message: `Awaiting for tx ${tx_hash} receipt, attempt ${i} out of 5`
+                };
+                
+                receipt = await this.wallet.ethWallet.provider.getTransactionReceipt(tx_hash);
+                
+                if (receipt) break;
+                await sleep(4000);
+            }
+
+            console.log(`and hash is ${tx_hash}`);
+
+            console.log(receipt.status);
+
+            if (receipt.status) {
+                yield {
+                    error: null,
+                    message: `Onchain transaction mined`
+                };
+            } else {
+                const tx = await this.wallet.ethWallet.provider.getTransaction(tx_hash);
+                const code = await this.wallet.ethWallet.provider.call(tx, tx.blockNumber);
+                console.log('code: ', code);
+                if (code == '0x') {
+                    yield {
+                        err: `Empty revert reason code`,
+                        message: `empty revert reason code`
+                    };
+                } else {
+                    const reason = code
+                        .substr(138)
+                        .match(/../g)
+                        .map(h => parseInt(h, 16))
+                        .map(String.fromCharCode)
+                        .join('');
+                    yield {
+                        error: " ",
+                        message: `Revert reason is: [${reason}]`
+                    };
+                    console.log("revert reason:", reason);
+                    console.log("revert code", code);
+                }
+            }
+        } catch (e) {
+            console.log(e);
             yield {
                 error: e.message,
                 message: `Onchain deposit failed with "${e.message}"`,
@@ -369,6 +520,42 @@ export class WalletDecorator {
             return;
         }
 
-        yield * this.verboseDepositOffchain(kwargs);
+        // receipt = await this.wallet.txReceipt(res.hash);
+
+        // if (receipt.fail_reason) {
+        //     yield {
+        //         error: receipt.fail_reason,
+        //         message: `Transaction failed with ${receipt.fail_reason}`
+        //     };
+        //     return;
+        // } else {
+        //     yield {
+        //         error: null,
+        //         message: `Tx ${res.hash} got included in block ${receipt.block_number}, waiting for prover`,
+        //     };
+        // }
+
+        // while ( ! receipt.prover_run) {
+        //     receipt = await this.wallet.txReceipt(res.hash)
+        //     await sleep(1000);
+        // }
+
+        // yield {
+        //     error: null,
+        //     message: `Prover ${receipt.prover_run.worker} started `
+        //         + `proving block ${receipt.prover_run.block_number} `
+        //         + `at ${receipt.prover_run.created_at}`
+        // };
+
+        // while ( ! receipt.verified) {
+        //     receipt = await this.wallet.txReceipt(res.hash)
+        //     await sleep(1000);
+        // }
+
+        // yield {
+        //     error: null,
+        //     message: `Tx ${res.hash} got proved!`
+        // }
     }
+    // #endregion
 }

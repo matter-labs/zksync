@@ -67,23 +67,33 @@ export class FranklinProvider {
     }
 
     async submitTx(tx) {
-        return await Axios.post(this.providerAddress + '/api/v0.1/submit_tx', tx).then(reps => reps.data);
+        return await Axios.post(this.providerAddress + '/api/v0.1/submit_tx', tx)
+            .then(reps => reps.data)
+            .catch(error => console.log(error.response));
     }
 
     async getTokens() {
-        return await Axios.get(this.providerAddress + '/api/v0.1/tokens').then(reps => reps.data);
+        return await Axios.get(this.providerAddress + '/api/v0.1/tokens')
+            .then(reps => reps.data)
+            .catch(error => console.log(error.response));
     }
 
     async getTransactionsHistory(address: Address) {
-        return await Axios.get(this.providerAddress + '/api/v0.1/account/' + address + '/transactions').then(reps => reps.data);
+        return await Axios.get(this.providerAddress + '/api/v0.1/account/' + `0x${address.toString("hex")}` + '/transactions')
+            .then(reps => reps.data)
+            .catch(error => console.log(error.response));
     }
 
     async getState(address: Address): Promise<FranklinAccountState> {
-        return await Axios.get(this.providerAddress + '/api/v0.1/account/' + `0x${address.toString("hex")}`).then(reps => reps.data);
+        return await Axios.get(this.providerAddress + '/api/v0.1/account/' + `0x${address.toString("hex")}`)
+            .then(reps => reps.data)
+            .catch(error => console.log(error.response));
     }
 
     async txReceipt(tx_hash) {
-        return await Axios.get(this.providerAddress + '/api/v0.1/transactions/' + tx_hash).then(reps => reps.data);
+        return await Axios.get(this.providerAddress + '/api/v0.1/transactions/' + tx_hash)
+            .then(reps => reps.data)
+            .catch(error => console.log(error.response));
     }
 }
 
@@ -170,7 +180,7 @@ export class WalletKeys {
         let token = Buffer.alloc(2);
         token.writeUInt16BE(tx.token,0);
         let bnAmount = new BN(bigNumberify(tx.amount).toString());
-        let amount = bnAmount.toBuffer("be", 16);
+        let amount = bnAmount.toArrayLike(Buffer, "be", 16);
         let bnFee = new BN(bigNumberify(tx.fee).toString());
         let fee = packFee(bnFee);
 
@@ -223,14 +233,13 @@ export class Wallet {
     async deposit(token: Token, amount: BigNumberish) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
         if (token.id == 0) {
-            const tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: amount});
-            await tx.wait(2);
+            const tx = await franklinDeployedContract.depositETH(this.address, {value: amount, gasLimit: bigNumberify(1500000)});
             return tx.hash;
         } else {
             const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
             await erc20DeployedToken.approve(franklinDeployedContract.address, amount);
             const tx = await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address,
-                {gasLimit: bigNumberify("150000"), value: parseEther("0.001")});
+                {gasLimit: bigNumberify("150000"), value: parseEther("0.01")});
             return tx.hash;
         }
     }
@@ -311,7 +320,7 @@ export class Wallet {
     }
 
     async getNonce(): Promise<number> {
-        if (this.nonce === null) {
+        if (this.nonce == null) {
             await this.fetchFranklinState();
             this.nonce = this.franklinState.commited.nonce + this.franklinState.pending_txs.length;
         }
@@ -330,7 +339,7 @@ export class Wallet {
         let contractBalances = new Array<BigNumber>(this.supportedTokens.length);
 
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
-        for(let token  of this.supportedTokens) {
+        for (let token of this.supportedTokens) {
             if (token.id == 0) {
                 onchainBalances[token.id] = await this.ethWallet.provider.getBalance(this.ethAddress);
             } else {

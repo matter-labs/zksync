@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build",
+    "serve": "f ../../bin/.gen_js_config > src/env-config.js && vue-cli-service serve",
+    "build": "f ../../bin/.gen_js_config > src/env-config.js && vue-cli-service build",
+    "softserve": "cd ../franklin_lib && yarn tsc && cd ../client_js && rm -r node_modules && yarn && yarn serve",
     "lint": "vue-cli-service lint"
   },
   "dependencies": {

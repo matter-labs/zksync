@@ -59,7 +59,6 @@ export default {
         clickedWhatever: function(evt) {
             let tgt = evt.target;
             tgt.setAttribute('data-original-title', 'copied');
-            console.log(tgt);
         }
     },
     components,
