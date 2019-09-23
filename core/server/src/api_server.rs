@@ -9,6 +9,7 @@ use models::{ActionType, NetworkStatus, StateKeeperRequest};
 use std::sync::mpsc;
 use storage::{BlockDetails, ConnectionPool};
 
+use crate::ThreadPanicNotify;
 use actix_web::Result as ActixResult;
 use failure::format_err;
 use futures::Future;
@@ -608,11 +609,13 @@ pub fn start_status_interval(state: AppState) {
 pub fn start_api_server(
     tx_for_state: mpsc::Sender<StateKeeperRequest>,
     connection_pool: ConnectionPool,
+    panic_notify: mpsc::Sender<bool>,
 ) {
     std::thread::Builder::new()
         .name("actix".to_string())
         .spawn(move || {
             env::set_var("RUST_LOG", "actix_web=info");
+            let _panic_sentinel = ThreadPanicNotify(panic_notify);
 
             let address = env::var("BIND_TO").unwrap_or_else(|_| "127.0.0.1".to_string());
             let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());

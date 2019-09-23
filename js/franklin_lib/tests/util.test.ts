@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import BN = require('bn.js');
 import { floatToInteger, integerToFloat } from '../src/utils';
-import { pedersenHash } from '../src/sign';
+import { pedersenHash } from '../src/crypto';
 
 describe('Packing and unpacking', function() {
     it('Test round-trip', function() {

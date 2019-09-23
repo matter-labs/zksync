@@ -46,7 +46,7 @@ A user can withdraw funds from the **root-chain balance** at any time by calling
 
 User can request this expensive operation to withdraw funds if he thinks that his transactions are censored by validators.
 
-The user must send a transaction to **Franklin** contract function `registerFullExit()`. This function creates **full exit priority request** that is placed in corresponding priority requests mapping and also emits **NewPriorityRequest(opType, pubData, expirationBlock)** event to notify validators that they must include this request to upcoming blocks. Complete **PriorityQueue** logic that handles **priority requests** is described in **Priority Requests** section.
+The user must send a transaction to **Franklin** contract function `registerFullExit()`. This function creates **full exit priority request** that is placed in corresponding priority requests mapping and also emits **NewPriorityRequest(serialId, opType, pubData, expirationBlock)** event to notify validators that they must include this request to upcoming blocks. Complete **PriorityQueue** logic that handles **priority requests** is described in **Priority Requests** section.
 
 When a validator commits a block which contains a **circuit operation** `full_exit`, the corresponding **withdraw onchain operation** for this withdrawal is created to verify compliance with priority queue requests. If it succeeds than their count will be added to **priority requests** count for this block. If the block is verified, funds from the **withdrawal onchain operation** are accrued to the users' **root-chain balances** and **withdraw onchain operations** and **full exit priority requests** are simply discarded.
 
@@ -74,6 +74,7 @@ This queue will be implemented in separate contract to ensure that priority oper
 
 **NewPriorityRequest** event is emitted when a user send according transaction to Franklin contract. Also some info about it will be stored in the mapping (operation type and expiration block) strictly in the order of arrival.
 **NewPriorityRequest** event structure:
+- `serialId` - serial id of this priority request
 - `opType` - operation type
 - `pubData` - request data
 - `expirationBlock` - the number of Ethereum block when request becomes expired

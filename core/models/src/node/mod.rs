@@ -8,12 +8,17 @@ pub mod account;
 pub mod block;
 pub mod config;
 pub mod operations;
+pub mod priority_ops;
 pub mod tx;
 
 pub use web3::types::{H256, U128, U256};
 
 pub use self::account::{Account, AccountAddress, AccountUpdate};
-pub use self::operations::{DepositOp, FranklinOp, TransferOp, TransferToNewOp, WithdrawOp};
+pub use self::operations::{
+    DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+};
+pub use self::priority_ops::{Deposit, FranklinPriorityOp, FullExit};
+pub use self::tx::{Close, FranklinTx, Transfer, Withdraw};
 
 pub type Engine = bn256::Bn256;
 pub type Fr = bn256::Fr;
@@ -63,10 +68,11 @@ pub fn pack_fee_amount(amount: &BigDecimal) -> Vec<u8> {
 
 #[cfg(test)]
 mod test {
-    use crate::node::pack_token_amount;
+    use super::*;
     use bigdecimal::BigDecimal;
     #[test]
     fn test_pack() {
-        println!("{:x?}", pack_token_amount(&BigDecimal::from(4)));
+        println!("{:x?}", pack_token_amount(&BigDecimal::from(2)));
+        println!("{:x?}", pack_fee_amount(&BigDecimal::from(1)));
     }
 }

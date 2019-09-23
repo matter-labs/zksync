@@ -68,13 +68,13 @@ pub fn generate_vk_contract<E: Engine>(
         r#"
 // This contract is generated programmatically
 
-pragma solidity ^0.5.1;
+pragma solidity ^0.5.8;
 
 
 // Hardcoded constants to avoid accessing store
 contract {contract_name} {{
 
-    function {function_name}() external pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {{
+    function {function_name}() internal pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {{
 
         {vk}
 
