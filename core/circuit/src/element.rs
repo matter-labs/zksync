@@ -1,4 +1,4 @@
-use crate::utils::{allocate_bits_vector, pack_bits_to_element};
+use crate::utils::{allocate_bits_vector, pack_bits_to_element, reverse_bytes};
 use bellman::{ConstraintSystem, SynthesisError};
 use franklin_crypto::circuit::boolean::Boolean;
 
@@ -316,6 +316,7 @@ impl<E: JubjubEngine> CircuitPubkey<E> {
             &to_hash,
             params,
         )?;
+        println!("hash when fromxy: {:?}", hash.get_x().get_value());
         let mut hash_bits = hash
             .get_x()
             .into_bits_le(cs.namespace(|| "hash into_bits"))?;
@@ -342,7 +343,12 @@ impl<E: JubjubEngine> CircuitPubkey<E> {
     pub fn get_hash(&self) -> CircuitElement<E> {
         self.hash.clone()
     }
-
+    pub fn get_external_packing(&self) -> Vec<Boolean> {
+        let mut ext_bits = vec![];
+        ext_bits.push(self.get_x().get_bits_le()[0].clone());
+        ext_bits.extend(self.get_y().get_bits_be()[1..].to_vec());
+        reverse_bytes(&ext_bits)
+    }
     pub fn conditionally_select<CS: ConstraintSystem<E>>(
         mut cs: CS,
         a: &Self,

@@ -267,7 +267,7 @@ pub fn calculate_full_exit_operations_from_witness(
         signature_data: signature_data.clone(),
     });
 
-    for i in 1..10 {
+    for i in 1..18 {
         operations.push(Operation {
             new_root: full_exit_witness.after_root,
             tx_type: full_exit_witness.tx_type,
@@ -373,17 +373,21 @@ mod test {
             pub_key_hash: sender_pub_key_hash,
         };
 
+        let packed_public_key = PackedPublicKey(sender_pk.clone());
+        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+        packed_public_key_bytes.reverse();
+        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
+
         let mut sig_bits = vec![];
         append_be_fixed_width(
             &mut sig_bits,
             &Fr::from_str("6").unwrap(), //Corresponding tx_type
             franklin_constants::TX_TYPE_BIT_WIDTH,
         );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &sender_leaf_initial.pub_key_hash,
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
-        );
+        sig_bits.extend(&bytes_into_be_bits(&packed_public_key_bytes));
         append_be_fixed_width(
             &mut sig_bits,
             &ethereum_key,
@@ -399,6 +403,24 @@ mod test {
             &sender_leaf_initial.nonce,
             franklin_constants::NONCE_BIT_WIDTH,
         );
+
+        println!("sig_bits outside: ");
+        for (i, bit) in sig_bits.iter().enumerate() {
+            if i % 64 == 0 {
+                println!("")
+            } else if i % 8 == 0 {
+                print!(" ")
+            };
+            let numb = {
+                if *bit {
+                    1
+                } else {
+                    0
+                }
+            };
+            print!("{}", numb);
+        }
+        println!("");
         tree.insert(account_address, sender_leaf_initial);
 
         sig_bits.resize(franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS, false);
@@ -513,7 +535,7 @@ mod test {
         }
         println!("");
         println!(
-            "full_exit_witness.before_root: {},",
+            "full_exit_witness.before_root: {:?},",
             full_exit_witness.before_root
         );
         println!("root_after_fee: {},", root_after_fee);
@@ -623,17 +645,20 @@ mod test {
             pub_key_hash: sender_pub_key_hash,
         };
 
+        let packed_public_key = PackedPublicKey(sender_pk.clone());
+        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
+
         let mut sig_bits = vec![];
         append_be_fixed_width(
             &mut sig_bits,
             &Fr::from_str("6").unwrap(), //Corresponding tx_type
             franklin_constants::TX_TYPE_BIT_WIDTH,
         );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &sender_leaf_initial.pub_key_hash,
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
-        );
+        sig_bits.extend(&bytes_into_be_bits(&packed_public_key_bytes));
         append_be_fixed_width(
             &mut sig_bits,
             &ethereum_key,
@@ -722,13 +747,6 @@ mod test {
             },
             is_sig_correct,
         );
-        let packed_public_key = PackedPublicKey(sender_pk);
-        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
-        packed_public_key_bytes.reverse();
-        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
-            .iter()
-            .map(|x| Some(*x))
-            .collect();
 
         let operations = calculate_full_exit_operations_from_witness(
             &full_exit_witness,

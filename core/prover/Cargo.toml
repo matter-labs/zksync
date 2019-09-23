@@ -18,7 +18,7 @@ franklin_crypto = { package = "franklin-crypto", git = "ssh://git@github.com/mat
 # pairing = { path = "../pairing" }
 # bellman = { path = "../bellman" }
 # sapling-crypto = { path = "../sapling-crypto" }
-
+hex = "0.3"
 rand = "0.4"
 rust-crypto = "0.2"
 rustc-hex = "2.0.1"

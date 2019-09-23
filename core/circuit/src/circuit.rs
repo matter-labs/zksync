@@ -4,7 +4,9 @@ use crate::allocated_structures::*;
 use crate::element::{CircuitElement, CircuitPubkey};
 use crate::operation::Operation;
 use crate::signature::*;
-use crate::utils::{allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element};
+use crate::utils::{
+    allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element, reverse_bytes,
+};
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use ff::{Field, PrimeField, PrimeFieldRepr};
 use franklin_crypto::circuit::boolean::Boolean;
@@ -913,10 +915,32 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let mut serialized_tx_bits = vec![];
 
         serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
-        serialized_tx_bits.extend(cur.account.pub_key_hash.get_bits_be());
+        //        serialized_tx_bits.extend(cur.account.pub_key_hash.get_bits_be());
+
+        //        serialized_tx_bits.push(signer_key.pubkey.get_x().get_bits_le()[0].clone());
+        //        serialized_tx_bits.extend(signer_key.pubkey.get_y().get_bits_be()[1..].to_vec());
+        serialized_tx_bits.extend(signer_key.pubkey.get_external_packing());
         serialized_tx_bits.extend(op_data.ethereum_key.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
         serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+
+        //        println!("serialized_tx_bits: ");
+        //        for (i, bit) in serialized_tx_bits.iter().enumerate() {
+        //            if i % 64 == 0 {
+        //                println!("")
+        //            } else if i % 8 == 0 {
+        //                print!(" ")
+        //            };
+        //            let numb = {
+        //                if bit.get_value().unwrap() {
+        //                    1
+        //                } else {
+        //                    0
+        //                }
+        //            };
+        //            print!("{}", numb);
+        //        }
+        //        println!("");
 
         let is_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_serialized_tx_correct"),
@@ -965,16 +989,33 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //1
         pubdata_bits.extend(cur.account_address.get_bits_be()); //3
-        pubdata_bits.extend(vec![signer_key.r_x_bit.clone()]);
-        pubdata_bits.extend(signer_key.r_y_bits.clone());
+        pubdata_bits.extend(signer_key.pubkey.get_external_packing());
         pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //20
         pubdata_bits.extend(cur.token.get_bits_be()); // 2
         pubdata_bits.extend(op_data.pub_nonce.get_bits_be()); // 2
-        pubdata_bits.extend(vec![signature.sig_r_x_bit.clone()]);
-        pubdata_bits.extend(signature.sig_r_y_bits.clone());
-        pubdata_bits.extend(signature.sig_s_bits.clone());
+        pubdata_bits.extend(signature.get_packed_r().clone());
+        pubdata_bits.extend(reverse_bytes(&signature.sig_s_bits.clone()));
         pubdata_bits.extend(op_data.full_amount.get_bits_be());
-
+        //        println!("signatue_s: ");
+        //        for (i, bit) in reverse_bytes(&signature.sig_s_bits.clone())
+        //            .iter()
+        //            .enumerate()
+        //        {
+        //            if i % 64 == 0 {
+        //                println!("")
+        //            } else if i % 8 == 0 {
+        //                print!(" ")
+        //            };
+        //            let numb = {
+        //                if bit.get_value().unwrap() {
+        //                    1
+        //                } else {
+        //                    0
+        //                }
+        //            };
+        //            print!("{}", numb);
+        //        }
+        //        println!("");
         pubdata_bits.resize(
             18 * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
@@ -1009,9 +1050,13 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &pubdata_chunk,
             ext_pubdata_chunk,
         )?);
+        println!(
+            "is_pubdata_chunk_correct {:?}",
+            is_pubdata_chunk_correct.get_value()
+        );
         base_valid_flags.push(is_pubdata_chunk_correct);
 
-        // verify correct tx_code
+        // verify correct tx_co     de
         let is_full_exit = Boolean::from(Expression::equals(
             cs.namespace(|| "is_full_exit"),
             &chunk_data.tx_type.get_number(),
@@ -1443,12 +1488,28 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &signer_key.pubkey.get_hash(),
             &lhs.account.pub_key_hash,
         )?;
+        println!(
+            "signer_key.pubkey.get_hash(): {:?}",
+            signer_key.pubkey.get_hash().get_number().get_value()
+        );
+        println!(
+            "signer_key.pubkey.get_x(): {:?}",
+            signer_key.pubkey.get_x().get_number().get_value()
+        );
+
+        println!(
+            "signer_key.pubkey.get_y(): {:?}",
+            signer_key.pubkey.get_y().get_number().get_value()
+        );
+
+        println!(
+            "lhs.account.pub_key_hash: {:?}",
+            lhs.account.pub_key_hash.get_number().get_value()
+        );
         println!("is_signer_valid: {:?}", is_signer_valid.get_value());
 
         lhs_valid_flags.push(is_signer_valid);
-        println!("lhs_valid_transfer_to_new_begin");
         let lhs_valid = multi_and(cs.namespace(|| "lhs_valid"), &lhs_valid_flags)?;
-        println!("lhs_valid_transfer_to_new_end");
         let updated_balance_value = Expression::from(&cur.balance.get_number()) - sum_amount_fee;
 
         let updated_nonce =
@@ -1945,7 +2006,7 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
     for i in &[6] {
         //full_exit
         let x = E::Fr::from_str(&i.to_string()).unwrap();
-        let y = E::Fr::from_str("9").unwrap();
+        let y = E::Fr::from_str("17").unwrap();
         points.push((x, y));
     }
 

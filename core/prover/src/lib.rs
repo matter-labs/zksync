@@ -1,16 +1,6 @@
 #[macro_use]
 extern crate log;
 
-use rand::OsRng;
-use std::fmt;
-use std::iter::Iterator;
-use std::sync::{
-    atomic::{AtomicBool, AtomicUsize, Ordering},
-    Arc,
-};
-use std::thread;
-use std::time::Duration;
-
 use bellman::groth16::{
     create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
 };
@@ -32,7 +22,9 @@ use franklin_crypto::circuit::test::*;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccount;
 use models::circuit::utils::bytes_into_be_bits;
+use models::circuit::utils::{pub_key_hash_bytes, pub_key_hash_fe};
 use models::circuit::CircuitAccountTree;
+use models::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use models::merkle_tree::PedersenHasher;
 use models::node::Account;
 use models::node::*;
@@ -41,6 +33,15 @@ use models::primitives::pack_bits_into_bytes_in_order;
 use models::EncodedProof;
 use num_traits::cast::ToPrimitive;
 use plasma::state::PlasmaState;
+use rand::OsRng;
+use std::fmt;
+use std::iter::Iterator;
+use std::sync::{
+    atomic::{AtomicBool, AtomicUsize, Ordering},
+    Arc,
+};
+use std::thread;
+use std::time::Duration;
 use tokio::prelude::*;
 use tokio::runtime::current_thread::Handle;
 use tokio::sync::oneshot::Sender;
@@ -354,8 +355,6 @@ impl BabyProver {
                         let (r_bytes, s_bytes) = sig_bytes.split_at(32);
                         let mut r_bytes = r_bytes.to_vec();
                         let mut s_bytes = s_bytes.to_vec();
-                        r_bytes.reverse();
-                        s_bytes.reverse();
                         let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
                             .iter()
                             .map(|x| Some(*x))
@@ -375,7 +374,6 @@ impl BabyProver {
 
                         let mut signer_packed_key_bytes =
                             transfer.tx.signature.pub_key.serialize_packed().unwrap();
-                        signer_packed_key_bytes.reverse();
                         let signer_packed_key_bits: Vec<_> =
                             bytes_into_be_bits(&signer_packed_key_bytes)
                                 .iter()
@@ -414,6 +412,7 @@ impl BabyProver {
                         let (sig_r_x, sig_r_y) = transfer_to_new.tx.signature.sign.0.r.into_xy();
                         println!("sig_r_x={} \n sig_r_y={}", sig_r_x, sig_r_y);
                         println!("sig_s={}", transfer_to_new.tx.signature.sign.0.s);
+
                         assert_eq!(transfer_to_new.tx.verify_signature(), true);
                         let sig_bytes = transfer_to_new
                             .tx
@@ -430,8 +429,6 @@ impl BabyProver {
                         //                            print!("{:x} ", byte);
                         //                        }
                         println!();
-                        r_bytes.reverse();
-                        s_bytes.reverse();
                         let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
                             .iter()
                             .map(|x| Some(*x))
@@ -511,7 +508,29 @@ impl BabyProver {
                             .pub_key
                             .serialize_packed()
                             .unwrap();
-                        signer_packed_key_bytes.reverse();
+                        //                        pub_key_hash_bytes(
+                        //                            transfer_to_new.tx.signature.pub_key.0,
+                        //                            &franklin_constants::PEDERSEN_HASHER as &BabyPedersenHasher,
+                        //                        );
+                        println!(
+                            "account_address_prover_key: {}",
+                            AccountAddress::from_pubkey(
+                                transfer_to_new.tx.signature.pub_key.0.clone()
+                            )
+                            .to_hex()
+                        );
+                        let phasher = PedersenHasher::<Engine>::default();
+                        let from_pub_key_hash =
+                            pub_key_hash_fe(&transfer_to_new.tx.signature.pub_key.0, &phasher);
+                        //                        &params::PEDERSEN_HASHER as &BabyPedersenHasher
+                        println!("from_pub_key_hash: {:?}", from_pub_key_hash);
+
+                        let from_pub_key_hash = pub_key_hash_fe(
+                            &transfer_to_new.tx.signature.pub_key.0,
+                            &franklin_constants::PEDERSEN_HASHER as &BabyPedersenHasher,
+                        );
+                        println!("from_pub_key_hash: {:?}", from_pub_key_hash);
+
                         let signer_packed_key_bits: Vec<_> =
                             bytes_into_be_bits(&signer_packed_key_bytes)
                                 .iter()
@@ -571,7 +590,6 @@ impl BabyProver {
                         let (sender_x, sender_y) = (withdraw.tx.signature.pub_key.0).0.into_xy();
                         let mut signer_packed_key_bytes =
                             withdraw.tx.signature.pub_key.serialize_packed().unwrap();
-                        signer_packed_key_bytes.reverse();
                         let signer_packed_key_bits: Vec<_> =
                             bytes_into_be_bits(&signer_packed_key_bytes)
                                 .iter()
@@ -608,8 +626,6 @@ impl BabyProver {
                         let (r_bytes, s_bytes) = sig_bytes.split_at(32);
                         let mut r_bytes = r_bytes.to_vec();
                         let mut s_bytes = s_bytes.to_vec();
-                        r_bytes.reverse();
-                        s_bytes.reverse();
                         let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
                             .iter()
                             .map(|x| Some(*x))
@@ -629,7 +645,6 @@ impl BabyProver {
 
                         let mut signer_packed_key_bytes =
                             close.tx.signature.pub_key.serialize_packed().unwrap();
-                        signer_packed_key_bytes.reverse();
                         let signer_packed_key_bits: Vec<_> =
                             bytes_into_be_bits(&signer_packed_key_bytes)
                                 .iter()
@@ -667,8 +682,8 @@ impl BabyProver {
 
                         let mut r_bytes = full_exit.priority_op.signature_r.to_vec();
                         let mut s_bytes = full_exit.priority_op.signature_s.to_vec();
-                        r_bytes.reverse();
-                        s_bytes.reverse();
+                        println!("s_bytes: {}", hex::encode(s_bytes.clone()));
+
                         let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
                             .iter()
                             .map(|x| Some(*x))
@@ -688,7 +703,6 @@ impl BabyProver {
                             generate_sig_witness(&sig_bits, &phasher, &params);
                         let mut signer_packed_key_bytes =
                             full_exit.priority_op.packed_pubkey.to_vec();
-                        signer_packed_key_bytes.reverse();
                         let signer_packed_key_bits: Vec<_> =
                             bytes_into_be_bits(&signer_packed_key_bytes)
                                 .iter()
@@ -703,6 +717,27 @@ impl BabyProver {
                             &signature,
                             &signer_packed_key_bits,
                         );
+                        println!("pubdata_bits outside: ");
+                        for (i, bit) in full_exit_witness
+                            .get_pubdata(&signature, &bytes_into_be_bits(&signer_packed_key_bytes))
+                            .iter()
+                            .enumerate()
+                        {
+                            if i % 64 == 0 {
+                                println!("")
+                            } else if i % 8 == 0 {
+                                print!(" ")
+                            };
+                            let numb = {
+                                if *bit {
+                                    1
+                                } else {
+                                    0
+                                }
+                            };
+                            print!("{}", numb);
+                        }
+                        println!("");
                         operations.extend(full_exit_operations);
                         pub_data.extend(full_exit_witness.get_pubdata(
                             &signature,

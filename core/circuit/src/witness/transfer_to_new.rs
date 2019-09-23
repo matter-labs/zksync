@@ -587,7 +587,6 @@ mod test {
             generate_sig_data(&transfer_witness.get_sig_bits(), &phasher, &from_sk, params);
         let packed_public_key = PackedPublicKey(from_pk);
         let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
-        packed_public_key_bytes.reverse();
         let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
             .iter()
             .map(|x| Some(*x))

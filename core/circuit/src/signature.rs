@@ -1,7 +1,7 @@
 use crate::allocated_structures::*;
 use crate::element::{CircuitElement, CircuitPubkey};
 use crate::operation::SignatureData;
-use crate::utils::{multi_and, pack_bits_to_element};
+use crate::utils::{multi_and, pack_bits_to_element, reverse_bytes};
 use bellman::{ConstraintSystem, SynthesisError};
 use ff::PrimeField;
 use franklin_crypto::circuit::baby_eddsa::EddsaSignature;
@@ -21,6 +21,15 @@ pub struct AllocatedSignatureData<E: JubjubEngine> {
     pub sig_s_bits: Vec<Boolean>,
 }
 
+impl<E: JubjubEngine> AllocatedSignatureData<E> {
+    pub fn get_packed_r(&self) -> Vec<Boolean> {
+        let mut r_packed_bits = vec![];
+        r_packed_bits.push(self.sig_r_x_bit.clone());
+        r_packed_bits.extend(self.sig_r_y_bits.clone());
+        reverse_bytes(&r_packed_bits)
+    }
+}
+
 pub struct AllocatedSignerPubkey<E: JubjubEngine> {
     pub pubkey: CircuitPubkey<E>,
     pub point: ecc::EdwardsPoint<E>,
@@ -34,14 +43,16 @@ pub fn unpack_point_if_possible<E: JubjubEngine, CS: ConstraintSystem<E>>(
     params: &E::Params,
 ) -> Result<AllocatedSignerPubkey<E>, SynthesisError> {
     assert_eq!(packed_key.len(), franklin_constants::FR_BIT_WIDTH_PADDED);
-    let r_x_bit = AllocatedBit::alloc(cs.namespace(|| "r_x_bit"), packed_key[0])?;
+    let packed_key_bits_correct_order = reverse_bytes(packed_key);
+    let r_x_bit =
+        AllocatedBit::alloc(cs.namespace(|| "r_x_bit"), packed_key_bits_correct_order[0])?;
 
     // let mut r_y_value = signature_data.r_packed.clone();
     // r_y_value.truncate(franklin_constants::FR_BIT_WIDTH_PADDED - 2);
 
     let r_y = CircuitElement::from_witness_be_bits(
         cs.namespace(|| "signature_r_y from bits"),
-        &packed_key[1..],
+        &packed_key_bits_correct_order[1..],
     )?;
     // let r_y = r_y.pad(franklin_constants::FR_BIT_WIDTH_PADDED - 1);
 
@@ -82,18 +93,20 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
     params: &E::Params,
     generator: ecc::EdwardsPoint<E>,
 ) -> Result<AllocatedSignatureData<E>, SynthesisError> {
+    let signature_data_r_packed = reverse_bytes(&signature_data.r_packed);
+    let signature_data_s = reverse_bytes(&signature_data.s);
     assert_eq!(
         signature_data.r_packed.len(),
         franklin_constants::FR_BIT_WIDTH_PADDED
     );
-    let r_x_bit = AllocatedBit::alloc(cs.namespace(|| "r_x_bit"), signature_data.r_packed[0])?;
+    let r_x_bit = AllocatedBit::alloc(cs.namespace(|| "r_x_bit"), signature_data_r_packed[0])?;
 
     // let mut r_y_value = signature_data.r_packed.clone();
     // r_y_value.truncate(franklin_constants::FR_BIT_WIDTH_PADDED - 2);
 
     let r_y = CircuitElement::from_witness_be_bits(
         cs.namespace(|| "signature_r_y from bits"),
-        &signature_data.r_packed[1..],
+        &signature_data_r_packed[1..],
     )?;
     // let r_y = r_y.pad(franklin_constants::FR_BIT_WIDTH_PADDED - 1);
 
@@ -102,7 +115,7 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
         franklin_constants::FR_BIT_WIDTH_PADDED
     );
     let signature_s =
-        CircuitElement::from_witness_be_bits(cs.namespace(|| "signature_s"), &signature_data.s)?;
+        CircuitElement::from_witness_be_bits(cs.namespace(|| "signature_s"), &signature_data_s)?;
     let (r_recovered, is_sig_r_correct) = ecc::EdwardsPoint::recover_from_y_unchecked(
         cs.namespace(|| "recover_from_y_unchecked"),
         &Boolean::from(r_x_bit.clone()),
@@ -117,7 +130,7 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
     };
 
     println!(
-        "r_x={:?} \n r_y={:?}",
+        "signature_r_x={:?} \n signature_r_y={:?}",
         signature.r.get_x().get_value(),
         signature.r.get_y().get_value()
     );

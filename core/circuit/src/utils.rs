@@ -13,6 +13,16 @@ use crate::operation::TransactionSignature;
 use models::circuit::utils::le_bit_vector_into_field_element;
 use models::params as franklin_constants;
 use models::primitives::*;
+
+pub fn reverse_bytes<T: Clone>(bits: &[T]) -> Vec<T> {
+    bits.chunks(8)
+        .rev()
+        .map(|x| x.to_vec())
+        .fold(Vec::new(), |mut acc, mut byte| {
+            acc.append(&mut byte);
+            acc
+        })
+}
 pub fn sign_pedersen<R, E>(
     msg_data: &[bool],
     private_key: &PrivateKey<E>,
@@ -64,12 +74,16 @@ where
     sig_r_packed_bits
         .push(signature_r_x_be_bits[franklin_constants::FR_BIT_WIDTH_PADDED - 1].clone());
     sig_r_packed_bits.extend(signature_r_y_be_bits[1..].iter());
+    let sig_r_packed_bits = reverse_bytes(&sig_r_packed_bits);
+
     assert_eq!(
         sig_r_packed_bits.len(),
         franklin_constants::FR_BIT_WIDTH_PADDED
     );
 
     let sig_s_bits = signature_s_be_bits.clone();
+    let sig_s_bits = reverse_bytes(&sig_s_bits);
+
     SignatureData {
         r_packed: sig_r_packed_bits.iter().map(|x| Some(*x)).collect(),
         s: sig_s_bits.iter().map(|x| Some(*x)).collect(),

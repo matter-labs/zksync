@@ -511,55 +511,11 @@ mod test {
             "transfer_witness calculated a is: {}",
             transfer_witness.args.a.unwrap()
         );
-        // construct signature
-        let mut sig_bits = vec![];
-
-        let transfer_tx_type = Fr::from_str("5").unwrap();
-        append_le_fixed_width(
-            &mut sig_bits,
-            &transfer_tx_type,
-            franklin_constants::TX_TYPE_BIT_WIDTH,
-        );
-        append_le_fixed_width(
-            &mut sig_bits,
-            &from_leaf_number_fe,
-            franklin_constants::ACCOUNT_TREE_DEPTH,
-        );
-        // append_le_fixed_width(&mut sig_bits, , franklin_constants::NEW_PUBKEY_HASH_WIDTH);
-        append_le_fixed_width(
-            &mut sig_bits,
-            &token_fe,
-            franklin_constants::BALANCE_TREE_DEPTH,
-        );
-        append_le_fixed_width(
-            &mut sig_bits,
-            &transfer_witness
-                .from_after
-                .witness
-                .account_witness
-                .nonce
-                .unwrap(),
-            // &transfer_witness.nonce,
-            franklin_constants::NONCE_BIT_WIDTH,
-        );
-        append_le_fixed_width(
-            &mut sig_bits,
-            &transfer_amount_encoded,
-            franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH
-                + franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        );
-        append_le_fixed_width(
-            &mut sig_bits,
-            &fee_encoded,
-            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-        );
-
         let (signature_data, first_sig_part, second_sig_part, third_sig_part) =
             generate_sig_data(&transfer_witness.get_sig_bits(), &phasher, &from_sk, params);
 
         let packed_public_key = PackedPublicKey(from_pk);
         let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
-        packed_public_key_bytes.reverse();
         let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
             .iter()
             .map(|x| Some(*x))
