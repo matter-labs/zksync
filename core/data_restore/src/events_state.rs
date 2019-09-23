@@ -62,6 +62,8 @@ impl EventsState {
         eth_blocks_delta: u64,
         end_eth_blocks_delta: u64
     ) -> Result<ComAndVerBlocksVecs, DataRestoreError> {
+        self.remove_verified_events();
+
         let (blocks, to_block_number): (ComAndVerBlocksVecs, u64) = update_logs_and_last_watched_block(
             self.last_watched_eth_block_number
             eth_blocks_delta,
@@ -206,7 +208,11 @@ impl EventsState {
         Ok((committed_blocks, verified_blocks))
     }
 
-
+    fn remove_verified_events(&mut self) {
+        let count_to_remove = self.verified_blocks.count();
+        self.verified_blocks.clear();
+        self.committed_blocks.drain(0..count_to_remove);
+    }
 
 
 
