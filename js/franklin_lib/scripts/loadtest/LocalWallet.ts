@@ -146,7 +146,7 @@ export class LocalWallet {
     async withdraw(token: Token, amount: BigNumberish, fee: BigNumberish) {
         let offRes = await this.franklinWallet.widthdrawOffchain(token, amount, fee);
         if (offRes.err) throw new Error(offRes.err);
-        let receipt = await this.franklinWallet.txReceipt(offRes.hash);
+        let receipt = await this.franklinWallet.waitTxReceipt(offRes.hash);
         if (receipt.fail_reason) {
             throw new Error(receipt.fail_reason);
         }
@@ -217,7 +217,7 @@ export class LocalWallet {
         if (res.err) {
             throw new Error(res.err);
         }
-        let receipt = await this.franklinWallet.txReceipt(res.hash);
+        let receipt = await this.franklinWallet.waitTxReceipt(res.hash);
         if (receipt.fail_reason) {
             throw new Error(receipt.fail_reason);
         }
@@ -253,7 +253,7 @@ export class LocalWallet {
 
         let res = await this.franklinWallet.transfer(wallet2.franklinWallet.address, token, amount, fee);
         if (res.err) throw new Error(res.err);
-        let receipt = await this.franklinWallet.txReceipt(res.hash);
+        let receipt = await this.franklinWallet.waitTxReceipt(res.hash);
         if (receipt.fail_reason) throw new Error(receipt.fail_reason);
     }
 

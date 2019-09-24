@@ -25,6 +25,7 @@ export class WalletDecorator {
 
     async updateState() {
         await this.wallet.updateState();
+        this.tx_history = await this.wallet.provider.getTransactionsHistory(this.address.substr(2));
     }
 
     tokenNameFromId(tokenId) {
@@ -46,7 +47,7 @@ export class WalletDecorator {
 
     // #region renderable
     transactionsAsNeeded() {
-        return (this.wallet.franklinState.tx_history).map((tx, index) => {
+        return (this.tx_history).map((tx, index) => {
             let elem_id      = `history_${index}`;
             let hash         = tx.tx_hash;
             let success      = tx.success     || '';
@@ -134,7 +135,7 @@ export class WalletDecorator {
         let res = await this.wallet.transfer(kwargs.address, token, amount, fee);
 
         if (res.err) throw new Error(res.err);
-        let receipt = await this.wallet.txReceipt(res.hash);
+        let receipt = await this.wallet.waitTxReceipt(res.hash);
         if (receipt.fail_reason) throw new Error(receipt.fail_reason);
     }
 
@@ -157,7 +158,7 @@ export class WalletDecorator {
             return;
         }
 
-        let receipt = await this.wallet.txReceipt(res.hash);
+        let receipt = await this.wallet.waitTxReceipt(res.hash);
 
         if (receipt.fail_reason) {
             yield error(`Transaction failed with ${receipt.fail_reason}`);
@@ -166,7 +167,7 @@ export class WalletDecorator {
         }
 
         while ( ! receipt.prover_run) {
-            receipt = await this.wallet.txReceipt(res.hash)
+            receipt = await this.wallet.waitTxReceipt(res.hash)
             await sleep(1000);
         }
 
@@ -177,7 +178,7 @@ export class WalletDecorator {
         await sleep(3000);
 
         while ( ! receipt.verified) {
-            receipt = await this.wallet.txReceipt(res.hash)
+            receipt = await this.wallet.waitTxReceipt(res.hash)
             await sleep(1000);
         }
 
@@ -205,7 +206,7 @@ export class WalletDecorator {
             yield info(`Getting receipt...`);
     
             try {
-                var receipt = await this.wallet.txReceipt(res.hash);
+                var receipt = await this.wallet.waitTxReceipt(res.hash);
             } catch (e) {
                 yield error(`Failed to get the receipt with ${e.message}`);
                 return;  
@@ -219,7 +220,7 @@ export class WalletDecorator {
             }
     
             while ( ! receipt.prover_run) {
-                receipt = await this.wallet.txReceipt(res.hash)
+                receipt = await this.wallet.waitTxReceipt(res.hash)
                 await sleep(1000);
             }
     
@@ -230,7 +231,7 @@ export class WalletDecorator {
             await sleep(3000);
     
             while ( ! receipt.verified) {
-                receipt = await this.wallet.txReceipt(res.hash)
+                receipt = await this.wallet.waitTxReceipt(res.hash)
                 await sleep(1000);
             }
     
@@ -268,7 +269,7 @@ export class WalletDecorator {
             throw new Error(res.err);
         }
 
-        let receipt = await this.wallet.txReceipt(res.hash);
+        let receipt = await this.wallet.waitTxReceipt(res.hash);
 
         if (receipt.fail_reason) {
             throw new Error(receipt.fail_reason);
@@ -290,7 +291,7 @@ export class WalletDecorator {
             yield info(`Sent tx to Franklin server`);
         }
 
-        let receipt = await this.wallet.txReceipt(res.hash);
+        let receipt = await this.wallet.waitTxReceipt(res.hash);
 
         if (receipt.fail_reason) {
             yield error(`Transaction failed with ${receipt.fail_reason}`);
@@ -300,7 +301,7 @@ export class WalletDecorator {
         }
 
         while ( ! receipt.prover_run) {
-            receipt = await this.wallet.txReceipt(res.hash)
+            receipt = await this.wallet.waitTxReceipt(res.hash)
             await sleep(1000);
         }
 
@@ -309,7 +310,7 @@ export class WalletDecorator {
                 + `at ${receipt.prover_run.created_at}`);
 
         while ( ! receipt.verified) {
-            receipt = await this.wallet.txReceipt(res.hash)
+            receipt = await this.wallet.waitTxReceipt(res.hash)
             await sleep(1000);
         }
 

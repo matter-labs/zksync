@@ -18,7 +18,7 @@ type BigNumberish = ethers.utils.BigNumberish;
 const parseEther = ethers.utils.parseEther;
 const bigNumberify = ethers.utils.bigNumberify;
 const PUBKEY_HASH_LEN=20;
-const IERC20Conract = require("openzeppelin-solidity/build/contracts/ERC20Mintable.json");
+const IERC20Conract = require("../abi/IERC20.json");
 const franklinContractCode = require("../abi/Franklin.json");
 
 export type Address = Buffer;
@@ -90,7 +90,7 @@ export class FranklinProvider {
             .catch(error => console.log(error.response));
     }
 
-    async txReceipt(tx_hash) {
+    async waitTxReceipt(tx_hash) {
         return await Axios.get(this.providerAddress + '/api/v0.1/transactions/' + tx_hash)
             .then(reps => reps.data)
             .catch(error => console.log(error.response));
@@ -114,7 +114,6 @@ export interface FranklinAccountState {
     commited: FranklinAccountBalanceState,
     verified: FranklinAccountBalanceState,
     pending_txs: any[],
-    tx_history: any[],
 }
 interface ETHAccountState {
     onchainBalances: BigNumber[],
@@ -222,7 +221,7 @@ export class Wallet {
     supportedTokens: Token[];
     franklinState: FranklinAccountState;
     ethState: ETHAccountState;
-    nonce: number;
+    pendingNonce: number;
 
     constructor(seed: Buffer, public provider: FranklinProvider, public ethWallet: ethers.Signer, public ethAddress: string) {
         let {privateKey} = privateKeyFromSeed(seed);
@@ -244,9 +243,9 @@ export class Wallet {
         }
     }
 
-    async txReceipt(tx_hash) {
+    async waitTxReceipt(tx_hash) {
         while (true) {
-            let receipt = await this.provider.txReceipt(tx_hash);
+            let receipt = await this.provider.waitTxReceipt(tx_hash);
             if (receipt != null) {
                 return receipt
             }
@@ -320,11 +319,12 @@ export class Wallet {
     }
 
     async getNonce(): Promise<number> {
-        if (this.nonce == null) {
+        // TODO: reconsider nonce logic 
+        if (this.pendingNonce == null) {
             await this.fetchFranklinState();
-            this.nonce = this.franklinState.commited.nonce + this.franklinState.pending_txs.length;
+            this.pendingNonce = this.franklinState.commited.nonce + this.franklinState.pending_txs.length;
         }
-        return this.nonce++;
+        return this.pendingNonce++;
     }
 
     static async fromEthWallet(wallet: ethers.Signer, franklinProvider: FranklinProvider = new FranklinProvider()) {
@@ -355,7 +355,6 @@ export class Wallet {
     async fetchFranklinState() {
         this.supportedTokens = await this.provider.getTokens();
         this.franklinState = await this.provider.getState(this.address);
-        this.franklinState.tx_history = await this.provider.getTransactionsHistory(this.address);
     }
 
     async updateState() {

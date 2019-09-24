@@ -39,8 +39,6 @@ use diesel::result::Error;
 use itertools::Itertools;
 use models::node::AccountAddress;
 
-use hex;
-
 #[derive(Clone)]
 pub struct ConnectionPool {
     pool: Pool<ConnectionManager<PgConnection>>,
