@@ -82,11 +82,14 @@ export default {
         },
         async verboseFunctionShower(generator) {
             for await (const progress of generator) {
+                if (progress.message.includes(`waiting for creating new block`)) {
+                    this.$refs.progress_bar.startProgressBarHalfLife(10000);
+                }
                 if (progress.message.includes(`started proving block`)) {
-                    this.$refs.progress_bar.startProgressBarTimer(20000);
+                    this.$refs.progress_bar.startProgressBarHalfLife(10000);
                 }
                 if (progress.message.includes(`got proved!`)) {
-                    this.$refs.progress_bar.updateProgressPercent(100);
+                    this.$refs.progress_bar.cancelAnimation();
                 }
                 this.$emit('alert', {
                     message: progress.message,

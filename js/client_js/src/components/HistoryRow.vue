@@ -2,7 +2,7 @@
     <b-card no-body class="mb-1">
         <b-card-header header-tag="header" class="p-1" role="tab">
             <b-row>
-                <b-col>
+                <b-col class="xl-1">
                     <b-button 
                         :class="bButtonClasses"
                         @click="bButtonClasses.rotated = !bButtonClasses.rotated"
@@ -10,34 +10,37 @@
                         variant="outline-light">
                         <img src="../assets/expand-button.png" width="12em" height="12em" />
                     </b-button>
+                </b-col>    
+                <b-col class="xl-1">
+                    <span v-html="tx.status"></span><span>{{ tx.type }}</span>
                 </b-col>
-                <b-col>
-                    <b-input 
-                        :id="`${tx.elem_id}_input`" 
-                        @click="copyTestingCode(`${tx.elem_id}_input`)"
-                        :value="tx.hash"
-                        style="outline: none; box-shadow: none"
-                        class="noselect"
-                        readonly
-                        ></b-input>
+                <b-col class="xl-10">
+                    <CopyableAddress class="w-25" :address="tx.hash"></CopyableAddress>
                 </b-col>
             </b-row>
         </b-card-header>
         <b-collapse :id="`${tx.elem_id}_body`">
             <b-card-body>
-                <b-card-text> type: {{ tx.type }} </b-card-text>
-                <b-card-text> success: {{ tx.success }} </b-card-text>
-                <b-card-text> fail_reason: {{ tx.fail_reason }} </b-card-text>
-                <b-card-text> to: {{ tx.to }} </b-card-text>
-                <b-card-text> amount: {{ tx.amount }} </b-card-text>
-                <b-card-text> is_committed: {{ tx.is_committed }} </b-card-text>
-                <b-card-text> is_verified: {{ tx.is_verified }} </b-card-text>
+                <b-table borderless small responsive :items="[tx]">
+                    <!-- <template v-slot:cell(tokenName)="data">
+                        <TokenNameButton :data="data"></TokenNameButton>
+                    </template>
+                    <template v-slot:cell(amount)="data">
+                        <span style="vertical-align: middle;"> {{ data.item.amount }} </span>
+                    </template> -->
+                </b-table>
             </b-card-body>
         </b-collapse>
     </b-card>
 </template>
 
 <script>
+import CopyableAddress from './CopyableAddress.vue'
+
+const components = {
+    CopyableAddress,
+};
+
 export default {
     name: 'HistoryRow',
     props: ['tx'],
@@ -67,7 +70,8 @@ export default {
             // testingCodeToCopy.setAttribute('type', 'hidden');
             window.getSelection().removeAllRanges();
         },
-    }
+    },
+    components,
 }
 </script>
 

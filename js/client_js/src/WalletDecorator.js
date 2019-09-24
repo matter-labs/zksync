@@ -3,6 +3,20 @@ import { FranklinProvider, Wallet, Address } from 'franklin_lib'
 
 const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
 
+function info(msg) {
+    return {
+        message: msg, 
+        error: false,
+    };
+}
+
+function error(msg) {
+    return {
+        message: msg,
+        error: true,
+    }
+};
+
 export class WalletDecorator {
     constructor (wallet) {
         this.wallet = wallet;
@@ -25,8 +39,6 @@ export class WalletDecorator {
         if (first.length) return first[0];
         let tokenId = tokenName.slice('erc20_'.length);
         let second = this.wallet.supportedTokens.filter(token => {
-            console.log(tokenId);
-            console.log(token);
             return token.id == tokenId;
         });
         return second[0];
@@ -48,10 +60,17 @@ export class WalletDecorator {
             let fail_reason  = tx.fail_reason || '';
             let is_committed = tx.committed   || '';
             let is_verified  = tx.verified    || '';
+
+            let status = (() => {
+                if (is_verified) return `<span style="color: green">(verified)</span>`;
+                if (is_committed) return `<span style="color: grey">(committed)</span>`;
+                if (fail_reason) return `<span style="color: red">(failed)</span>`;
+            })();
+
             return {
                 type, to, amount, success, fail_reason, 
                 is_committed, is_verified, elem_id,
-                hash
+                hash, status,
             };
         });
     }
@@ -112,11 +131,7 @@ export class WalletDecorator {
         let amount = bigNumberify(kwargs.amount);
         let fee = bigNumberify(kwargs.fee);
         
-        console.log('walletDecorator.transfer', kwargs)
-
         let res = await this.wallet.transfer(kwargs.address, token, amount, fee);
-
-        console.log(res);
 
         if (res.err) throw new Error(res.err);
         let receipt = await this.wallet.txReceipt(res.hash);
@@ -131,39 +146,23 @@ export class WalletDecorator {
         try {
             var res = await this.wallet.transfer(kwargs.address, token, amount, fee);
         } catch (e) {
-            yield {
-                error: e.message,
-                message: `Transfer failed with ${e.message}`
-            };
+            yield error(`Transfer failed with ${e.message}`);
             return;
         }
 
-        if (res.err === null) {
-            yield {
-                error: null,
-                message: `Sent transfer to Matters server`
-            };
+        if (res.err == null) {
+            yield info(`Sent transfer to Matters server`);
         } else {
-            yield {
-                error: res.err,
-                message: `Transfer failed with ${res.err}`
-            };
+            yield error(`Transfer failed with ${res.err}`);
             return;
         }
 
         let receipt = await this.wallet.txReceipt(res.hash);
 
         if (receipt.fail_reason) {
-            yield {
-                error: receipt.fail_reason,
-                message: `Transaction failed with ${receipt.fail_reason}`
-            };
-            return;
+            yield error(`Transaction failed with ${receipt.fail_reason}`);
         } else {
-            yield {
-                error: null,
-                message: `Tx ${res.hash} got included in block ${receipt.block_number}, waiting for prover`,
-            };
+            yield info(`Tx <code>${res.hash}</code> got included in block ${receipt.block_number}, waiting for prover`);
         }
 
         while ( ! receipt.prover_run) {
@@ -171,186 +170,82 @@ export class WalletDecorator {
             await sleep(1000);
         }
 
-        yield {
-            error: null,
-            message: `Prover ${receipt.prover_run.worker} started `
-                + `proving block ${receipt.prover_run.block_number} `
-                + `at ${receipt.prover_run.created_at}`
-        };
+        yield info(`Prover ${receipt.prover_run.worker} started `
+            + `proving block ${receipt.prover_run.block_number} `
+            + `at ${receipt.prover_run.created_at}`);
+
+        await sleep(3000);
 
         while ( ! receipt.verified) {
             receipt = await this.wallet.txReceipt(res.hash)
             await sleep(1000);
         }
 
-        yield {
-            error: null,
-            message: `Transfer ${res.hash} got proved!`
-        };   
+        yield info (`Transfer <code>${res.hash}</code> got proved!`);
     }
 
     async * verboseWithdraw(kwargs) {
-        yield {
-            error: null,
-            message: `Started withdraw ${JSON.stringify(kwargs)}`
-        };
-
-        console.log(kwargs);
-
-        let token = this.tokenFromName(kwargs.token);
-        let amount = bigNumberify(kwargs.amount);
-        let fee = bigNumberify(kwargs.fee);
-
-        yield {
-            error: null,
-            message: `managed to parse arguments`
-        };
-
         try {
-            var res = await this.wallet.widthdrawOffchain(token, amount, fee);
-        } catch (e) {
-            console.log(e);
-        }
 
-        console.log('withdrawOffchain res: ', res);
-
-        if (res.err) {
-            yield {
-                error: res.err,
-                message: `Offchain withdraw failed with ${res.err}`,
-            }; 
-            return;
-        } else {
-            yield {
-                error: null,
-                message: `Sent withdraw tx to Franklin server`,
-            };
-        }
+            yield info(`Sending withdraw...`);
     
-        yield {
-            error: null,
-            message: `Getting receipt...`,
-        };
-
-        try {
-            var receipt = await this.wallet.txReceipt(res.hash);
-        } catch (e) {
-            yield {
-                error: e.message,
-                message: `getting receipt failed with ${e.message}`,
-            };
-            return;  
-        }
-
-        if (receipt.fail_reason) {
-            yield {
-                error: receipt.fail_reason,
-                message: `Transaction failed with ${receipt.fail_reason}`
-            };
-            return;
-        } else {
-            yield {
-                error: null,
-                message: `Tx ${res.hash} got included in block ${receipt.block_number}, waiting for prover`,
-            };
-        }
-
-        while ( ! receipt.prover_run) {
-            receipt = await this.wallet.txReceipt(res.hash)
-            await sleep(1000);
-        }
-
-        yield {
-            error: null,
-            message: `Prover ${receipt.prover_run.worker} started `
-                + `proving block ${receipt.prover_run.block_number} `
-                + `at ${receipt.prover_run.created_at}`
-        };
-
-        while ( ! receipt.verified) {
-            receipt = await this.wallet.txReceipt(res.hash)
-            await sleep(1000);
-        }
-
-        yield {
-            error: null,
-            message: `Tx ${res.hash} got proved! Starting onchain deposit after sleeping lol`
-        };
-
-        await sleep(5000);
-
-        try {
-            var tx_hash = await this.wallet.widthdrawOnchain(token, amount);
-        } catch (e) {
-            yield {
-                error: e.message,
-                message: `Withdraw onchain failed with ${e.message}`
-            };
-            return;
-        }
-
-        try {
-            
-            for (let i = 1; i <= 5 && !receipt; i++) {
-                yield {
-                    error: null,
-                    message: `Awaiting for tx ${tx_hash} receipt, attempt ${i} out of 5`
-                };
-                
-                receipt = await this.wallet.ethWallet.provider.getTransactionReceipt(tx_hash);
-                
-                if (receipt) break;
-                await sleep(4000);
-            }
-
-            console.log(`and hash is ${tx_hash}`);
-
-            console.log(receipt.status);
-
-            if (receipt.status) {
-                yield {
-                    error: null,
-                    message: `Onchain transaction mined`
-                };
+            let token = this.tokenFromName(kwargs.token);
+            let amount = bigNumberify(kwargs.amount);
+            let fee = bigNumberify(kwargs.fee);
+    
+            let res = await this.wallet.widthdrawOffchain(token, amount, fee);
+    
+            if (res.err) {
+                yield error(`Offchain withdraw failed with ${res.err}`);
+                return;
             } else {
-                const tx = await this.wallet.ethWallet.provider.getTransaction(tx_hash);
-                const code = await this.wallet.ethWallet.provider.call(tx, tx.blockNumber);
-                console.log('code: ', code);
-                if (code == '0x') {
-                    yield {
-                        err: `Empty revert reason code`,
-                        message: `empty revert reason code`
-                    };
-                } else {
-                    const reason = code
-                        .substr(138)
-                        .match(/../g)
-                        .map(h => parseInt(h, 16))
-                        .map(String.fromCharCode)
-                        .join('');
-                    yield {
-                        error: " ",
-                        message: `Revert reason is: [${reason}]`
-                    };
-                    console.log("revert reason:", reason);
-                    console.log("revert code", code);
-                }
+                yield info(`Sent withdraw tx to Franklin server`);
             }
+        
+            yield info(`Getting receipt...`);
+    
+            try {
+                var receipt = await this.wallet.txReceipt(res.hash);
+            } catch (e) {
+                yield error(`Failed to get the receipt with ${e.message}`);
+                return;  
+            }
+    
+            if (receipt.fail_reason) {
+                yield error(`Transaction failed with ${receipt.fail_reason}`);
+                return;
+            } else {
+                yield info(`Tx <code>${res.hash}</code> got included in block ${receipt.block_number}, waiting for prover`);
+            }
+    
+            while ( ! receipt.prover_run) {
+                receipt = await this.wallet.txReceipt(res.hash)
+                await sleep(1000);
+            }
+    
+            yield info(`Prover ${receipt.prover_run.worker} started `
+                + `proving block ${receipt.prover_run.block_number} `
+                + `at ${receipt.prover_run.created_at}`);
+    
+            await sleep(3000);
+    
+            while ( ! receipt.verified) {
+                receipt = await this.wallet.txReceipt(res.hash)
+                await sleep(1000);
+            }
+    
+            yield info(`Tx <code>${res.hash}</code> got proved! Starting onchain withdraw...`);
+    
+            await sleep(5000);
+    
+            var tx_hash = await this.wallet.widthdrawOnchain(token, amount);
+
+            yield * this.verboseGetRevertReason(tx_hash);
+    
+            yield info(`Withdraw succeeded!`);
         } catch (e) {
-            console.log(e);
-            yield {
-                error: e.message,
-                message: `Onchain withdraw failed with "${e.message}"`,
-            };
-            return;
+            yield error('Withdraw failed with ', e.message);
         }
-
-        console.log('hash of withdrawOnchain:', tx_hash);
-
-        yield {
-            err: null,
-            message: `Withdraw succeeded!`
-        };
     }
 
     async depositOnchain(kwargs) {
@@ -389,31 +284,19 @@ export class WalletDecorator {
         let res = await this.wallet.depositOffchain(token, amount, fee);
 
         if (res.err) {
-            yield {
-                error: res.err,
-                message: `Onchain Deposit Failed with ${res.err}`,
-            }; 
+            yield error(`Onchain Deposit Failed with ${res.err}`);
             return;
         } else {
-            yield {
-                error: null,
-                message: `Sent tx to Franklin server`,
-            };
+            yield info(`Sent tx to Franklin server`);
         }
 
         let receipt = await this.wallet.txReceipt(res.hash);
 
         if (receipt.fail_reason) {
-            yield {
-                error: receipt.fail_reason,
-                message: `Transaction failed with ${receipt.fail_reason}`
-            };
+            yield error(`Transaction failed with ${receipt.fail_reason}`);
             return;
         } else {
-            yield {
-                error: null,
-                message: `Tx ${res.hash} got included in block ${receipt.block_number}, waiting for prover`,
-            };
+            yield info(`Tx <code>${res.hash}</code> got included in block ${receipt.block_number}, waiting for prover`);
         }
 
         while ( ! receipt.prover_run) {
@@ -421,141 +304,69 @@ export class WalletDecorator {
             await sleep(1000);
         }
 
-        yield {
-            error: null,
-            message: `Prover ${receipt.prover_run.worker} started `
+        yield info(`Prover ${receipt.prover_run.worker} started `
                 + `proving block ${receipt.prover_run.block_number} `
-                + `at ${receipt.prover_run.created_at}`
-        };
+                + `at ${receipt.prover_run.created_at}`);
 
         while ( ! receipt.verified) {
             receipt = await this.wallet.txReceipt(res.hash)
             await sleep(1000);
         }
 
-        yield {
-            error: null,
-            message: `Tx ${res.hash} got proved!`
-        }
+        yield info(`Tx <code>${res.hash}</code> got proved!`);
     }
 
     async * verboseDeposit(kwargs) {
-        yield {
-            error: null,
-            message: `Sending deposit...`
-        }
+        yield info(`Sending deposit...`);
 
         try {
             var token = this.tokenFromName(kwargs.token);
             var amount = bigNumberify(kwargs.amount);
             var tx_hash = await this.wallet.deposit(token, amount);
-            yield {
-                error: null,
-                tx_hash,
-                message: `Deposit ${tx_hash} sent to Mainchain, `,
-            };
+            yield info(`Deposit <code>${tx_hash}</code> sent to Mainchain...`);
         } catch (e) {
-            console.log(e);
-            yield {
-                error: e.message,
-                message: `Onchain deposit failed with "${e.message}"`,
-            };
+            yield error(`Onchain deposit failed with "${e.message}"`);
             return;
         }
-        var receipt;
 
         try {
-            
-            for (let i = 1; i <= 5 && !receipt; i++) {
-                yield {
-                    error: null,
-                    message: `Awaiting for tx ${tx_hash} receipt, attempt ${i} out of 5`
-                };
-                
-                receipt = await this.wallet.ethWallet.provider.getTransactionReceipt(tx_hash);
-                
-                if (receipt) break;
-                await sleep(4000);
-            }
-
-            console.log(`and hash is ${tx_hash}`);
-
-            console.log(receipt.status);
-
-            if (receipt.status) {
-                yield {
-                    error: null,
-                    message: `Onchain transaction mined`
-                };
-            } else {
-                const tx = await this.wallet.ethWallet.provider.getTransaction(tx_hash);
-                const code = await this.wallet.ethWallet.provider.call(tx, tx.blockNumber);
-                console.log('code: ', code);
-                if (code == '0x') {
-                    yield {
-                        err: `Empty revert reason code`,
-                        message: `empty revert reason code`
-                    };
-                } else {
-                    const reason = code
-                        .substr(138)
-                        .match(/../g)
-                        .map(h => parseInt(h, 16))
-                        .map(String.fromCharCode)
-                        .join('');
-                    yield {
-                        error: " ",
-                        message: `Revert reason is: [${reason}]`
-                    };
-                    console.log("revert reason:", reason);
-                    console.log("revert code", code);
-                }
-            }
+            yield * await this.verboseGetRevertReason(tx_hash);
         } catch (e) {
-            console.log(e);
-            yield {
-                error: e.message,
-                message: `Onchain deposit failed with "${e.message}"`,
-            };
+            yield error(`Onchain deposit failed with "${e.message}"`);
             return;
         }
-
-        // receipt = await this.wallet.txReceipt(res.hash);
-
-        // if (receipt.fail_reason) {
-        //     yield {
-        //         error: receipt.fail_reason,
-        //         message: `Transaction failed with ${receipt.fail_reason}`
-        //     };
-        //     return;
-        // } else {
-        //     yield {
-        //         error: null,
-        //         message: `Tx ${res.hash} got included in block ${receipt.block_number}, waiting for prover`,
-        //     };
-        // }
-
-        // while ( ! receipt.prover_run) {
-        //     receipt = await this.wallet.txReceipt(res.hash)
-        //     await sleep(1000);
-        // }
-
-        // yield {
-        //     error: null,
-        //     message: `Prover ${receipt.prover_run.worker} started `
-        //         + `proving block ${receipt.prover_run.block_number} `
-        //         + `at ${receipt.prover_run.created_at}`
-        // };
-
-        // while ( ! receipt.verified) {
-        //     receipt = await this.wallet.txReceipt(res.hash)
-        //     await sleep(1000);
-        // }
-
-        // yield {
-        //     error: null,
-        //     message: `Tx ${res.hash} got proved!`
-        // }
     }
+
+    async * verboseGetRevertReason(tx_hash) {
+        let receipt;
+        for (let i = 1; i <= 5 && !receipt; i++) {
+            yield info(`Getting tx receipt...`);
+            
+            receipt = await this.wallet.ethWallet.provider.getTransactionReceipt(tx_hash);
+            
+            if (receipt) break;
+            await sleep(4000);
+        }
+
+        if (receipt.status) {
+            yield info(`Transaction succeeded.`);
+        } else {
+            const tx = await this.wallet.ethWallet.provider.getTransaction(tx_hash);
+            const code = await this.wallet.ethWallet.provider.call(tx, tx.blockNumber);
+
+            if (code == '0x') {
+                yield error('Empty revert reason code');
+            } else {
+                const reason = code
+                    .substr(138)
+                    .match(/../g)
+                    .map(h => parseInt(h, 16))
+                    .map(String.fromCharCode)
+                    .join('');
+                yield error(`Revert reason is: ${reason}`);
+            }
+        }
+    }
+
     // #endregion
 }

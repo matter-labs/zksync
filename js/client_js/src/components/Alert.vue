@@ -1,6 +1,5 @@
 <template>
-    <b-alert :variant="variant" fade :show="alertVisible" @dismissed="dismiss" class="mt-2">
-        {{ message }}
+    <b-alert :variant="variant" fade :show="alertVisible" @dismissed="dismiss" class="mt-2" v-html="message">
     </b-alert>
 </template>
 

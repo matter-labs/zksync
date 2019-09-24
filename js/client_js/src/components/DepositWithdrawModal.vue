@@ -1,14 +1,24 @@
 <template>
     <div>
         Token:
-        <b-form-select autocomplete="off" v-model="token" class="mb-2">
+        <!-- <b-form-select autocomplete="off" v-model="token" class="mb-2">
             <option v-for="balance in balances" :key="balance.tokenName">{{ balance.tokenName }}</option>
-        </b-form-select>
+        </b-form-select> -->
+        <TokenSelector 
+            class="mb-2"
+            :tokens="balances.map(b => b.tokenName)"
+            :selected.sync="token">
+        </TokenSelector>
         Amount <span v-if="maxAmountVisible">(max: {{ balancesDict[token] }} {{ token }})</span>:
         <b-form-input autocomplete="off" type="number" v-model="amount" class="mb-2"></b-form-input>
         <div v-if="feeNeeded">
             Fee:
-            <b-form-input autocomplete="off" type="number" v-model="fee"></b-form-input>
+            <!-- <b-form-input autocomplete="off" type="number" v-model="fee"></b-form-input> -->
+            <FeeSelector 
+                class="mb-2"
+                :fees="fees"
+                :selected.sync="fee">
+            </FeeSelector>
         </div>
         <p v-if="alertVisible"> {{ alertText }} </p>
         <b-button class="w-50 mt-3" variant="primary" @click='buttonClicked'> {{ buttonText }} </b-button>
@@ -17,6 +27,14 @@
 
 <script>
 import { bigNumberify } from 'ethers/utils'
+
+import TokenSelector from './TokenSelector.vue'
+import FeeSelector from './FeeSelector.vue'
+
+const components = {
+    TokenSelector,
+    FeeSelector,
+};
 
 export default {
     name: 'DepositWithdrawModal',
@@ -29,6 +47,8 @@ export default {
         token: null,
         amount: null,
         fee: null,
+
+        fees: [1, 10, 100], // TODO
 
         maxAmountVisible: false,
         balancesDict: {},
@@ -83,6 +103,7 @@ export default {
                 fee: this.fee,
             });
         }
-    }
+    },
+    components,
 }
 </script>
