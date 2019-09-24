@@ -4,19 +4,19 @@ import "./Bytes.sol";
 
 contract PriorityQueueTest {
 
-    address franklinAddress; // Franklin contract address
-    address ownerAddress; // Owner address
+    address internal franklinAddress; // Franklin contract address
+    address internal ownerAddress; // Owner address
     
     // Priority operation numbers
-    uint8 DEPOSIT_OP = 1; // Deposit operation number
-    uint8 FULL_EXIT_OP = 6; // Full exit operation number
+    uint8 constant DEPOSIT_OP = 1; // Deposit operation number
+    uint8 constant FULL_EXIT_OP = 6; // Full exit operation number
 
     // Operation fields bytes lengths
-    uint8 TOKEN_BYTES = 2; // token id
-    uint8 AMOUNT_BYTES = 16; // token amount
-    uint8 ETH_ADDR_BYTES = 20; // ethereum address
-    uint8 ACC_NUM_BYTES = 3; // franklin account id
-    uint8 NONCE_BYTES = 4; // franklin nonce
+    uint8 constant TOKEN_BYTES = 2; // token id
+    uint8 constant AMOUNT_BYTES = 16; // token amount
+    uint8 constant ETH_ADDR_BYTES = 20; // ethereum address
+    uint8 constant ACC_NUM_BYTES = 3; // franklin account id
+    uint8 constant NONCE_BYTES = 4; // franklin nonce
 
     // Franklin chain address length
     uint8 constant PUBKEY_HASH_LEN = 20;
@@ -61,21 +61,19 @@ contract PriorityQueueTest {
     // Total number of committed requests
     uint64 public totalCommittedPriorityRequests;
 
-    // Sets owner address
+    // Constructor sets owner address
     constructor(address _ownerAddress) public {
         ownerAddress = _ownerAddress;
-    }
-
-    // Change current owner
-    // _newOwner - address of the new governor
-    function changeOwner(address _newOwner) external {
-        requireOwner();
-        ownerAddress = _newOwner;
     }
 
     // Change franklin address
     // _franklinAddress - address of the Franklin contract
     function changeFranklinAddress(address _franklinAddress) external {
+        // Its possible to set franklin contract address only if it has not been setted before
+        require(
+            franklinAddress == address(0),
+            "pcs11"
+        ); // pcs11 - frankin address is already setted
         requireOwner();
         franklinAddress = _franklinAddress;
     }
@@ -112,16 +110,15 @@ contract PriorityQueueTest {
         totalOpenPriorityRequests++;
     }
 
-    // Collects a fee from provided requests number for the validator, store it on her
-    // balance to withdraw in Ether and delete this requests
+    // Collects a fee from provided requests number for the validator, return it and delete these requests
     // Params:
     // - _number - the number of requests
     function collectValidatorsFeeAndDeleteRequests(uint64 _number) external returns (uint256) {
         requireFranklin();
         require(
             _number <= totalOpenPriorityRequests,
-            "fcs11"
-        ); // fcs11 - number is heigher than total priority requests number
+            "pcs21"
+        ); // pcs21 - number is heigher than total priority requests number
 
         uint256 totalFee = 0;
         for (uint64 i = firstPriorityRequestId; i < firstPriorityRequestId + _number; i++) {
@@ -135,9 +132,7 @@ contract PriorityQueueTest {
         return totalFee;
     }
 
-    // Accrues users balances from priority requests,
-    // if this request contains a Deposit operation
-    // WARNING: Only for Exodus mode
+    // Returns deposits pub data in bytes
     function getOutstandingDeposits() external view returns (bytes memory depositsPubData) {
         for (uint64 i = firstPriorityRequestId; i < firstPriorityRequestId + totalOpenPriorityRequests; i++) {
             if (priorityRequests[i].opType == DEPOSIT_OP) {
@@ -146,7 +141,7 @@ contract PriorityQueueTest {
         }
     }
 
-    // Compares operation from the block with corresponding priority requests' operation
+    // Compares operation with corresponding priority requests' operation
     // Params:
     // - _opType - operation type
     // - _pubData - operation pub data
@@ -162,7 +157,7 @@ contract PriorityQueueTest {
             priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 0, PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_LEN);
             onchainPubData = Bytes.slice(_pubData, ACC_NUM_BYTES, PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_LEN);
         } else {
-            revert("fid11"); // fid11 - wrong operation
+            revert("pid11"); // pid11 - wrong operation
         }
         return (priorityPubData.length > 0) &&
             (keccak256(onchainPubData) == keccak256(priorityPubData));
@@ -174,8 +169,8 @@ contract PriorityQueueTest {
     function validateNumberOfRequests(uint64 _number) external view {
         require(
             _number <= totalOpenPriorityRequests-totalCommittedPriorityRequests,
-            "fvs11"
-        ); // fvs11 - too much priority requests
+            "pvs11"
+        ); // pvs11 - too much priority requests
     }
 
     // Increases committed requests count by provided number
@@ -190,34 +185,28 @@ contract PriorityQueueTest {
         totalCommittedPriorityRequests -= _number;
     }
 
-    // Checks if Exodus mode must be entered. If true - cancels outstanding deposits and emits ExodusMode event.
+    // Checks if Exodus mode must be entered and returns bool.
     // Returns bool flag that is true if the Exodus mode must be entered.
     // Exodus mode must be entered in case of current ethereum block number is higher than the oldest
     // of existed priority requests expiration block number.
     function triggerExodusIfNeeded() external view returns (bool) {
-        if (
-            block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
-            priorityRequests[firstPriorityRequestId].expirationBlock != 0
-        ) {
-            return true;
-        } else {
-            return false;
-        }
+        return block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
+            priorityRequests[firstPriorityRequestId].expirationBlock != 0;
     }
 
     // Check if the sender is franklin contract
     function requireFranklin() internal view {
         require(
             msg.sender == franklinAddress,
-            "grr11"
-        ); // grr11 - only by governor
+            "prn11"
+        ); // prn11 - only by franklin
     }
 
     // Check if the sender is owner
     function requireOwner() internal view {
         require(
             msg.sender == ownerAddress,
-            "grr11"
-        ); // grr11 - only by governor
+            "prr11"
+        ); // prr11 - only by owner
     }
 }
