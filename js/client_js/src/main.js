@@ -23,7 +23,7 @@ Vue.mixin({
 	},
 	computed: {
         ethereumAddress() {
-            return window.walletDecorator.wallet.ethWallet.address;
+            return window.walletDecorator.ethAddress;
         },
         franklinAddress() {
             return window.walletDecorator.address;

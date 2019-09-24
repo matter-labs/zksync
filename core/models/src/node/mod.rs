@@ -14,7 +14,9 @@ pub mod tx;
 pub use web3::types::{H256, U128, U256};
 
 pub use self::account::{Account, AccountAddress, AccountUpdate};
-pub use self::operations::{DepositOp, FranklinOp, TransferOp, TransferToNewOp, WithdrawOp};
+pub use self::operations::{
+    DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+};
 pub use self::priority_ops::{Deposit, FranklinPriorityOp, FullExit};
 pub use self::tx::{Close, FranklinTx, Transfer, Withdraw};
 
@@ -70,7 +72,7 @@ mod test {
     use bigdecimal::BigDecimal;
     #[test]
     fn test_pack() {
-        //        println!("{:x?}", pack_token_amount(&BigDecimal::from(2)));
+        println!("{:x?}", pack_token_amount(&BigDecimal::from(2)));
         println!("{:x?}", pack_fee_amount(&BigDecimal::from(1)));
     }
 }

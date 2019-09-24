@@ -34,7 +34,7 @@ impl<E: JubjubEngine> AllocatedOperationBranch<E> {
         )?;
         let account_address = account_address.pad(franklin_constants::ACCOUNT_ID_BIT_WIDTH);
 
-        let account_audit_path = utils::allocate_audit_path(
+        let account_audit_path = utils::allocate_numbers_vec(
             cs.namespace(|| "account_audit_path"),
             &operation_branch.witness.account_path,
         )?;
@@ -60,7 +60,7 @@ impl<E: JubjubEngine> AllocatedOperationBranch<E> {
             franklin_constants::BALANCE_TREE_DEPTH,
         )?;
         let token = token.pad(franklin_constants::TOKEN_BIT_WIDTH);
-        let balance_audit_path = utils::allocate_audit_path(
+        let balance_audit_path = utils::allocate_numbers_vec(
             cs.namespace(|| "balance_audit_path"),
             &operation_branch.witness.balance_subtree_path,
         )?;
@@ -82,14 +82,13 @@ impl<E: JubjubEngine> AllocatedOperationBranch<E> {
 
 pub struct AllocatedChunkData<E: JubjubEngine> {
     pub is_chunk_last: Boolean,
+    pub is_chunk_first: Boolean,
     pub chunk_number: AllocatedNum<E>, //TODO: don't need bit representation here, though make sense to unify probably
     pub tx_type: CircuitElement<E>,
 }
 
 #[derive(Clone)]
 pub struct AllocatedOperationData<E: JubjubEngine> {
-    // pub new_pubkey: CircuitPubkey<E>,
-    pub signer_pubkey: CircuitPubkey<E>,
     pub amount_packed: CircuitElement<E>,
     pub fee_packed: CircuitElement<E>,
     pub amount_unpacked: CircuitElement<E>,
@@ -100,6 +99,7 @@ pub struct AllocatedOperationData<E: JubjubEngine> {
     pub third_sig_msg: CircuitElement<E>,
     pub new_pubkey_hash: CircuitElement<E>,
     pub ethereum_key: CircuitElement<E>,
+    pub pub_nonce: CircuitElement<E>,
     pub a: CircuitElement<E>,
     pub b: CircuitElement<E>,
 }
@@ -177,20 +177,17 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS - (2 * E::Fr::CAPACITY as usize), //TODO: think of more consistent constant flow
         )?;
 
-        let sig_pubkey = CircuitPubkey::from_xy_fe(
-            cs.namespace(|| "signer_pubkey"),
-            || op.signer_pub_key_x.grab(),
-            || op.signer_pub_key_y.grab(),
-            &params,
-        )?;
-
         let new_pubkey_hash = CircuitElement::from_fe_strict(
             cs.namespace(|| "new_pubkey_hash"),
             || op.args.new_pub_key_hash.grab(),
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         )?;
-        // let new_pubkey_hash = new_pubkey.get_hash().clone();
 
+        let pub_nonce = CircuitElement::from_fe_strict(
+            cs.namespace(|| "pub_nonce"),
+            || op.args.pub_nonce.grab(),
+            franklin_constants::NONCE_BIT_WIDTH,
+        )?;
         let a = CircuitElement::from_fe_strict(
             cs.namespace(|| "a"),
             || op.args.a.grab(),
@@ -204,7 +201,7 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
 
         Ok(AllocatedOperationData {
             ethereum_key,
-            signer_pubkey: sig_pubkey,
+            pub_nonce,
             amount_packed,
             fee_packed,
             fee,

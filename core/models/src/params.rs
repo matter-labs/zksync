@@ -1,7 +1,9 @@
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
+use crate::merkle_tree::PedersenHasher;
 use crate::node::TokenId;
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use lazy_static::lazy_static;
+use pairing::bn256::*;
 
 /// Account tree depth
 pub const ACCOUNT_TREE_DEPTH: usize = 5;
@@ -27,7 +29,7 @@ pub const NONCE_BIT_WIDTH: usize = 32;
 //
 pub const CHUNK_BIT_WIDTH: usize = 64;
 
-pub const MAX_CIRCUIT_PEDERSEN_HASH_BITS: usize = 738;
+pub const MAX_CIRCUIT_PEDERSEN_HASH_BITS: usize = 736;
 
 pub const ETHEREUM_KEY_BIT_WIDTH: usize = 160;
 /// Block number bit width
@@ -61,6 +63,8 @@ pub const PRIORITY_EXPIRATION: u64 = 250;
 pub const FR_ADDRESS_LEN: usize = 20;
 
 pub const KEY_FILENAME: &str = "franklin_pk.key";
+
+pub const PAD_MSG_BEFORE_HASH_BITS_LEN: usize = 736;
 
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();

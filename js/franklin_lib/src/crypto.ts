@@ -39,6 +39,7 @@ export const altjubjubCurve = new elliptic.curve.edwards(babyJubjubParams);
 const curveZero = altjubjubCurve.point('0', '1');
 const chunksPerGenerator = 62;
 export const addressLen=20;
+const PAD_MSG_BEFORE_HASH_BYTES_LEN = 92;
 
 let gen1 = altjubjubCurve.point(
     '184570ed4909a81b2793320a26e8f956be129e4eed381acf901718dff8802135',
@@ -110,7 +111,7 @@ function genPedersonHashLookupTable() {
     return table;
 }
 
-function buffer2bits(buff) {
+function buffer2bits_le(buff) {
     const res = new Array(buff.length * 8);
     for (let i = 0; i < buff.length; i++) {
         const b = buff[i];
@@ -126,10 +127,30 @@ function buffer2bits(buff) {
     return res;
 }
 
-export function pedersenHash(input: Buffer): EdwardsPoint {
-    let personaizationBits = new Array(6).fill(true);
+function buffer2bits_be(buff) {
+    const res = new Array(buff.length * 8);
+    for (let i = 0; i < buff.length; i++) {
+        const b = buff[i];
+        res[i * 8] = (b & 0x80) != 0;
+        res[i * 8 + 1] = (b & 0x40) != 0;
+        res[i * 8 + 2] = (b & 0x20) != 0;
+        res[i * 8 + 3] = (b & 0x10) != 0;
+        res[i * 8 + 4] = (b & 0x08) != 0;
+        res[i * 8 + 5] = (b & 0x04) != 0;
+        res[i * 8 + 6] = (b & 0x02) != 0;
+        res[i * 8 + 7] = (b & 0x01) != 0;
+    }
+    return res;
+}
 
-    let bits = personaizationBits.concat(buffer2bits(input));
+export function pedersenHash(input: Buffer, bit_endianness: "le" | "be" = "le"): EdwardsPoint {
+    let personaizationBits = new Array(6).fill(true);
+    let bits;
+    if (bit_endianness == "le") {
+         bits = personaizationBits.concat(buffer2bits_le(input));
+    } else {
+        bits = personaizationBits.concat(buffer2bits_be(input));
+    }
 
     function fsToPoint(fs, generator) {
         fs = wrapScalar(fs);
@@ -257,6 +278,10 @@ function pedersenHStar(input: Buffer) : BN {
 }
 
 export function musigSHA256(priv_key: BN, msg: Buffer) {
+    let msgToHash = Buffer.alloc(PAD_MSG_BEFORE_HASH_BYTES_LEN, 0);
+    msg.copy(msgToHash);
+    msg = pedersenHash(msgToHash, "be").getX().toBuffer("le", 32);
+
     const t = crypto.randomBytes(80);
 
     const pub_key = privateKeyToPublicKey(priv_key);
@@ -279,6 +304,9 @@ export function musigSHA256(priv_key: BN, msg: Buffer) {
 }
 
 export function musigPedersen(priv_key: BN, msg: Buffer) {
+    let msgToHash = Buffer.alloc(PAD_MSG_BEFORE_HASH_BYTES_LEN, 0);
+    msg.copy(msgToHash);
+    msg = pedersenHash(msgToHash, "be").getX().toBuffer("le", 32);
 
     const t = crypto.randomBytes(80);
 
@@ -322,6 +350,10 @@ export function serializePointPacked(point: edwards.EdwardsPoint): Buffer {
         y_buff[y_buff.length - 1] |= (1 << 7);
     }
     return y_buff;
+}
+
+export function signTransactionBytes(privKey: BN, bytes: Buffer) {
+    return musigPedersen(privKey, bytes);
 }
 
 export function privateKeyFromSeed(seed: Buffer) {

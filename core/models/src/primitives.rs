@@ -1,3 +1,6 @@
+use crate::circuit::utils::append_le_fixed_width;
+use crate::merkle_tree::{hasher::Hasher, pedersen_hasher::BabyPedersenHasher};
+use crate::params;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use failure::bail;
 use ff::ScalarEngine;
@@ -332,9 +335,32 @@ pub fn convert_to_float(
         }
     }
 
-    debug_assert!(encoding.len() == exponent_length + mantissa_length);
+    debug_assert_eq!(encoding.len(), exponent_length + mantissa_length);
 
     Ok(encoding)
+}
+
+pub fn bytes_into_be_bits(bytes: &[u8]) -> Vec<bool> {
+    let mut bits = vec![];
+    for byte in bytes {
+        let mut temp = *byte;
+        for _ in 0..8 {
+            bits.push(temp & 0x80 == 0x80);
+            temp <<= 1;
+        }
+    }
+    bits
+}
+
+pub fn pedersen_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
+    let mut msg_bits = bytes_into_be_bits(msg);
+    msg_bits.resize(params::PAD_MSG_BEFORE_HASH_BITS_LEN, false);
+    let hasher = &params::PEDERSEN_HASHER as &BabyPedersenHasher;
+    let hash_fr = hasher.hash_bits(msg_bits.into_iter());
+    let mut hash_bits = Vec::new();
+    append_le_fixed_width(&mut hash_bits, &hash_fr, 256);
+    let result = pack_bits_into_bytes(hash_bits);
+    result
 }
 
 #[test]

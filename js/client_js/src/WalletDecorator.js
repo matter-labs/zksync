@@ -23,6 +23,12 @@ export class WalletDecorator {
         this.address = '0x' + this.wallet.address.toString('hex');
     }
 
+    static async new(wallet) {
+        let res = new WalletDecorator(wallet);
+        res.ethAddress = await wallet.ethWallet.getAddress();
+        return res;
+    }
+
     async updateState() {
         await this.wallet.updateState();
         this.tx_history = await this.wallet.provider.getTransactionsHistory(this.address.substr(2));

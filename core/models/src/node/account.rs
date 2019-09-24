@@ -50,9 +50,9 @@ impl AccountAddress {
     }
 
     pub fn from_pubkey(public_key: PublicKey<Engine>) -> Self {
-        let pk_hash =
+        let mut pk_hash =
             pub_key_hash_bytes(&public_key, &params::PEDERSEN_HASHER as &BabyPedersenHasher);
-
+        pk_hash.reverse();
         Self::from_bytes(&pk_hash).expect("pk convert error")
     }
 }
