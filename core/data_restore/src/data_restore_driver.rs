@@ -128,12 +128,12 @@ impl DataRestoreDriver {
     /// Return verified comitted operations blocks from verified op blocks events
     fn get_new_operations_from_events(&mut self) -> Vec<FranklinOpBlock> {
         info!("Loading new verified op_blocks");
-        let committed_blocks = self
+        let committed_events = self
             .events_state
-            .get_only_verified_committed_blocks();
+            .get_only_verified_committed_blocks_events();
         let mut op_blocks = vec![];
-        for block in committed_blocks {
-            let tx = FranklinOpBlock::get_franklin_op_block(&block);
+        for event in committed_events {
+            let tx = FranklinOpBlock::get_franklin_op_block(&event);
             if tx.is_none() {
                 continue;
             }

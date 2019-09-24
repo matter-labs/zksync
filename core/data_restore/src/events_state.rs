@@ -15,16 +15,16 @@ use crate::helpers::{
     get_topic_keccak_hash
 };
 
-type ComAndVerBlocksVecs = (Vec<EventData>, Vec<EventData>);
+type CommittedAndVerifiedEvents = (Vec<EventData>, Vec<EventData>);
 // type BlockNumber256 = U256;
 
 /// Franklin contract events states description
 #[derive(Debug, Clone)]
 pub struct EventsState {
     /// Committed operations blocks events
-    pub committed_blocks: Vec<EventData>,
+    pub committed_events: Vec<EventData>,
     /// Verified operations blocks events
-    pub verified_blocks: Vec<EventData>,
+    pub verified_events: Vec<EventData>,
     /// Last watched ethereum block number
     pub last_watched_eth_block_number: u64,
 }
@@ -40,12 +40,11 @@ impl EventsState {
     /// # Arguments
     ///
     /// * `genesis_block_number` - contract creation block number
-    /// * `end_eth_blocks_delta` - Delta between last eth block and last watched block
     ///
     pub fn new(genesis_block_number: u64) -> Self {
         Self {
-            committed_blocks: vec![],
-            verified_blocks: vec![],
+            committed_events: vec![],
+            verified_events: vec![],
             last_watched_block_number: genesis_block_number,
         }
     }
@@ -66,14 +65,14 @@ impl EventsState {
     ) -> Result<(), DataRestoreError> {
         self.remove_verified_events();
 
-        let (blocks, to_block_number): (ComAndVerBlocksVecs, u64) = update_logs_and_last_watched_block(
+        let (events, to_block_number): (CommittedAndVerifiedEvents, u64) = update_events_and_last_watched_block(
             self.last_watched_eth_block_number
             eth_blocks_delta,
             end_eth_blocks_delta
         )?;
 
-        self.committed_blocks.extend(blocks.0);
-        self.verified_blocks.extend(blocks.1);
+        self.committed_events.extend(events.0);
+        self.verified_events.extend(events.1);
         self.last_watched_eth_block_number = to_block_number;
 
         Ok(())
@@ -100,11 +99,11 @@ impl EventsState {
     /// * `eth_blocks_delta` - Ethereum blocks delta step
     /// * `end_eth_blocks_delta` - last block delta
     ///
-    fn update_logs_and_last_watched_block(
+    fn update_events_and_last_watched_block(
         last_watched_block_number: u64,
         eth_blocks_delta: u64,
         end_eth_blocks_delta: u64,
-    ) -> Result<(ComAndVerBlocksVecs, u64), DataRestoreError> {
+    ) -> Result<(CommittedAndVerifiedEvents, u64), DataRestoreError> {
         let latest_eth_block_minus_delta = get_last_block_number()? - end_eth_blocks_delta;
         if latest_eth_block_minus_delta == last_watched_block_number {
             Ok( ( (vec![], vec![]), last_watched_block_number ) ) // No new eth blocks
@@ -168,12 +167,12 @@ impl EventsState {
     ///
     /// * `logs` - Logs slice
     ///
-    fn sort_logs(&mut self, logs: &[Log]) -> Result<ComAndVerBlocksVecs, DataRestoreError> {
+    fn sort_logs(&mut self, logs: &[Log]) -> Result<CommittedAndVerifiedEvents, DataRestoreError> {
         if logs.is_empty() {
             Ok((vec![], vec![]));
         }
-        let mut committed_blocks: Vec<EventData> = vec![];
-        let mut verified_blocks: Vec<EventData> = vec![];
+        let mut committed_events: Vec<EventData> = vec![];
+        let mut verified_events: Vec<EventData> = vec![];
         let block_verified_topic = "BlockVerified(uint32)";
         let block_committed_topic = "BlockCommitted(uint32)";
         let block_verified_topic_h256: H256 = get_topic_keccak_hash(block_verified_topic);
@@ -195,10 +194,10 @@ impl EventsState {
 
                     if topic == block_verified_topic_h256 {
                         block.block_type = EventType::Verified;
-                        verified_blocks.push(block);
+                        verified_events.push(block);
                     } else if topic == block_committed_topic_h256 {
                         block.block_type = EventType::Committed;
-                        committed_blocks.push(block);
+                        committed_events.push(block);
                     }
                 }
                 None => {
@@ -206,21 +205,21 @@ impl EventsState {
                 },
             };
         }
-        committed_blocks.sort_by_key(|x| x.block_num);
-        verified_blocks.sort_by_key(|x| x.block_num);
-        Ok((committed_blocks, verified_blocks))
+        committed_events.sort_by_key(|x| x.block_num);
+        verified_events.sort_by_key(|x| x.block_num);
+        Ok((committed_events, verified_events))
     }
 
     /// Removes verified committed blocks events and all verified
     fn remove_verified_events(&mut self) {
-        let count_to_remove = self.verified_blocks.count();
-        self.verified_blocks.clear();
-        self.committed_blocks.drain(0..count_to_remove);
+        let count_to_remove = self.verified_events.count();
+        self.verified_events.clear();
+        self.committed_events.drain(0..count_to_remove);
     }
 
     /// Return only verified committed blocks from verified
-    pub fn get_only_verified_committed_blocks(&self) -> Vec<EventData> {
-        let count_to_get = self.verified_blocks.count();
-        self.committed_blocks[0..count_to_get].to_vec();
+    pub fn get_only_verified_committed_events_events(&self) -> Vec<EventData> {
+        let count_to_get = self.verified_events.count();
+        self.committed_events[0..count_to_get].to_vec();
     }
 }

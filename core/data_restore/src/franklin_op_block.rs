@@ -38,10 +38,7 @@ impl FranklinOpBlock {
     /// * `config` - Configuration of DataRestore driver
     /// * `event_data` - Franklin Contract event description
     ///
-    pub fn get_franklin_op_block(
-        config: &DataRestoreConfig,
-        event_data: &EventData,
-    ) -> Option<Self> {
+    pub fn get_franklin_op_block(event_data: &EventData) -> Option<Self> {
         let transaction =
             FranklinOpBlock::get_ethereum_transaction(config, &event_data.transaction_hash)?;
         let input_data = FranklinOpBlock::get_input_data_from_ethereum_transaction(&transaction);
