@@ -30,6 +30,10 @@ impl DepositOp {
         data.resize(Self::CHUNKS * 8, 0x00);
         data
     }
+
+    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,6 +59,10 @@ impl TransferToNewOp {
         data.resize(Self::CHUNKS * 8, 0x00);
         data
     }
+
+    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,6 +87,10 @@ impl TransferOp {
         data.resize(Self::CHUNKS * 8, 0x00);
         data
     }
+
+    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -102,6 +114,10 @@ impl WithdrawOp {
         data.resize(Self::CHUNKS * 8, 0x00);
         data
     }
+
+    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,6 +136,10 @@ impl CloseOp {
         data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
         data.resize(Self::CHUNKS * 8, 0x00);
         data
+    }
+
+    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        
     }
 }
 
@@ -147,6 +167,10 @@ impl FullExitOp {
         data.extend_from_slice(&big_decimal_to_u128(&amount).to_be_bytes());
         data.resize(Self::CHUNKS * 8, 0x00);
         data
+    }
+
+    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        
     }
 }
 
