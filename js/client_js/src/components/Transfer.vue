@@ -12,7 +12,7 @@
             :tokens="tokensList"
             :selected.sync="token">
         </TokenSelector>
-        Amount <span v-if="maxAmountVisible">(max {{ token }} {{ balancesDict[token] }})</span>:
+        Amount <span v-if="maxAmountVisible">(<span v-if="token == 'ETH'">in ETH tokens, </span> max {{ token }} {{ displayableBalancesDict[token] }})</span>:
         <b-form-input autocomplete="off" type="number" v-model="amount" class="mb-3"></b-form-input>
         Choose fee:
         <FeeSelector 
@@ -26,9 +26,10 @@
 </template>
 
 <script>
-import { bigNumberify } from 'ethers/utils'
+import { bigNumberify, parseEther } from 'ethers/utils'
 import TokenSelector from './TokenSelector.vue'
 import FeeSelector from './FeeSelector.vue'
+import { getDisplayableBalanceDict } from '../utils';
 
 const components = {
     TokenSelector,
@@ -47,7 +48,7 @@ export default {
         maxAmountVisible: false,
         balancesDict: {},
         tokensList: [],
-        fees: [1, 10, 100], // TODO: these should be computed somehow idk
+        fees: ['0.000001', '1', '100'], // TODO: these should be computed somehow idk
     }),
     watch: {
         balances: function() {
@@ -56,6 +57,7 @@ export default {
                     acc[bal.tokenName] = bal.amount;
                     return acc;
                 }, {});
+            this.displayableBalancesDict = getDisplayableBalanceDict(this.balancesDict);
             this.tokensList = this.balances.map(bal => bal.tokenName);
         },
         token: function() {
@@ -93,12 +95,31 @@ export default {
                 return;
             }
 
+            try {
+                var amount = this.token == 'ETH'
+                    ? parseEther(this.amount)
+                    : bigNumberify(this.amount);
+            } catch (e) {
+                this.localDisplayAlert(`Please input valid amount value`);
+                return;
+            }
+
             if (!this.fee) {
                 this.localDisplayAlert(`Please select fee.`);
                 return;
             }
 
-            if (bigNumberify(this.amount).add(this.fee).gt(bigNumberify(this.balancesDict[this.token]))) {
+            try {
+                var fee = this.token == 'ETH'
+                    ? parseEther(this.fee)
+                    : bigNumberify(this.fee);
+            } catch (e) {
+                console.log(e);
+                this.localDisplayAlert(`Please input valid fee value`);
+                return;
+            }
+
+            if (amount.add(fee).gt(bigNumberify(this.balancesDict[this.token]))) {
                 this.localDisplayAlert(`It's too much, man!`);
                 return;
             }
@@ -106,8 +127,8 @@ export default {
             this.$emit('buttonClicked', {
                 address: this.address,
                 token: this.token,
-                amount: this.amount,
-                fee: this.fee
+                amount: amount.toString(10),
+                fee: fee.toString(10),
             });
         }
     },

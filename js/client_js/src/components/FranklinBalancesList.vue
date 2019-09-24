@@ -5,7 +5,7 @@
                 (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+franklinAddress"
                     target="blanc">block explorer</a>):
             <CopyableAddress id="franklinAddressFormInput" :address="franklinAddress"></CopyableAddress>
-            <b-table borderless small responsive :fields="fields" :items="balances">
+            <b-table borderless small responsive :fields="fields" :items="displayableBalances">
                 <template v-slot:cell(tokenName)="data" style="width: 100px !important">
                     <TokenNameButton :data="data"></TokenNameButton>
                 </template>
@@ -34,6 +34,9 @@
 </template>
 
 <script>
+import { formatUnits } from 'ethers/utils';
+import { readableEther } from '../utils';
+
 import TokenNameButton from './TokenNameButton.vue';
 import CopyableAddress from './CopyableAddress.vue';
 
@@ -49,12 +52,24 @@ export default {
             { key: 'tokenName', label: 'Token' }, 
             'amount',
         ],
+        displayableBalances: [],
     }),
     props: [
         // balances are like [{ tokenName: 'eth', amount: '120' }]
         'balances',
         'balanceListId'
     ],
+    watch: {
+        balances() {
+            this.displayableBalances = this.balances.map(bal => {
+                if (bal.tokenName != 'ETH') return bal;
+                let res = Object.assign({}, bal);
+                res.verifiedAmount = readableEther(res.verifiedAmount);
+                res.committedAmount = readableEther(res.committedAmount);
+                return res;
+            });
+        },
+    },
     methods: {
         clickedWhatever: function(evt) {
             let tgt = evt.target;

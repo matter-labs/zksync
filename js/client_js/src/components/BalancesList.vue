@@ -5,7 +5,7 @@
                 (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+ethereumAddress"
                     target="blanc">block explorer</a>):
             <CopyableAddress id="ethereumAddressFormInput" :address="ethereumAddress"></CopyableAddress>
-            <b-table borderless small responsive :fields="fields" :items="balances">
+            <b-table borderless small responsive :fields="fields" :items="displayableBalances">
                 <template v-slot:cell(tokenName)="data">
                     <TokenNameButton :data="data"></TokenNameButton>
                 </template>
@@ -18,6 +18,8 @@
 </template>
 
 <script>
+import { ethers } from 'ethers';
+import { readableEther, getDisplayableBalanceList } from '../utils';
 import TokenNameButton from './TokenNameButton.vue';
 import CopyableAddress from './CopyableAddress.vue';
 
@@ -34,18 +36,24 @@ export default {
             { key: 'tokenName', label: 'Token' }, 
             'amount'
         ],
+        displayableBalances: [],
     }),
     props: [
         // balances are like [{ tokenName: 'eth', amount: '120' }]
         'balances',
         'balanceListId'
     ],
+    watch: {
+        balances() {
+            this.displayableBalances = getDisplayableBalanceList(this.balances);
+        },
+    },
     methods: {
         clickedWhatever: function(evt) {
             let tgt = evt.target;
             tgt.setAttribute('data-original-title', 'copied');
             console.log(tgt);
-        }
+        },
     },
     components,
 }
@@ -60,16 +68,4 @@ td:first-child {
     display: inline-block;
     height: 2;
 }
-/* .copyable::before {
-    display:block;
-    transition: all 0.5s ease;
-    position: absolute;
-    transform: translate(-2em, -1em);
-    content: "click to copy";
-    opacity: 0;
-}
-.copyable:hover::before {
-    background: yellow;
-    opacity: 1;
-} */
 </style>
