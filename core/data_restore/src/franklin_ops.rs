@@ -4,6 +4,15 @@ use web3::types::{Transaction, TransactionId, H256};
 use crate::events::EventData;
 use crate::helpers::{DATA_RESTORE_CONFIG, DataRestoreError};
 
+use models::operations::{
+    DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+};
+use models::priority_ops::{Deposit, FranklinPriorityOp, FullExit};
+use models::tx::{Close, FranklinTx, Transfer, Withdraw};
+use models::account::{Account, AccountAddress, AccountUpdate};
+
+const FUNC_NAME_HASH_LENGTH = 4;
+
 /// Description of a Franklin operations block
 #[derive(Debug, Clone)]
 pub struct FranklinOpsBlock {
@@ -18,7 +27,17 @@ pub fn get_franklin_ops(event_data: &EventData) -> Result<Vec<FranklinOp>, DataR
 }
 
 fn get_franklin_ops_from_block(ops_block: FranklinOpsBlock) -> Result<Vec<FranklinOp>, DataRestoreError> {
-    // TODO: - parse commitment
+    let mut current_pointer = 0;
+    let mut ops = vec![];
+    while (current_pointer < ops_block.commitment_data.length) {
+        let op_type: &u8 = &ops_block.commitment_data[current_pointer];
+        let chunks: usize = FranklinOp::chunks_by_op_number(op_type);
+        let size: usize = 8 * chunks;
+        let op = FranklinOp::from_bytes(&ops_block.commitment_data[current_pointer..current_pointer+size].to_vec())
+            .ok_or(|e| DataRestoreError::WrongType)?;
+        ops.push(op);
+        current_pointer += size;
+    }
 }
 
 /// Return Franklin operations block description
@@ -62,8 +81,8 @@ fn get_ethereum_transaction(&transaction_hash: &H256) -> Result<Transaction, Dat
 ///
 fn get_commitment_data_from_ethereum_transaction(transaction: &Transaction) -> Result<Vec<u8>, DataRestoreError> {
     let input_data = transaction.clone().input.0;
-    if input_data.len() > 4 {
-        Ok(input_data[4..input_data.len()].to_vec())
+    if input_data.len() > FUNC_NAME_HASH_LENGTH {
+        Ok(input_data[FUNC_NAME_HASH_LENGTH..input_data.len()].to_vec())
     } else {
         Err(DataRestoreError::NoData("No commitment data in tx".to_string())
     }

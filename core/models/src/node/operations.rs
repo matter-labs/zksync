@@ -3,6 +3,13 @@ use super::{pack_fee_amount, pack_token_amount, Deposit, FullExit};
 use super::{Close, Transfer, Withdraw};
 use bigdecimal::BigDecimal;
 
+pub const DEPOSIT_NUMBER: u8 = 1;
+pub const TRANSFER_TO_NEW_NUMBER: u8 = 2;
+pub const WITHDRAW_NUMBER_NUMBER: u8 = 3;
+pub const CLOSE_NUMBER: u8 = 4;
+pub const TRANSFER_NUMBER: u8 = 5;
+pub const FULL_EXIT_NUMBER: u8 = 6;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositOp {
     pub priority_op: Deposit,
@@ -174,6 +181,31 @@ impl FranklinOp {
             FranklinOp::Close(op) => op.get_public_data(),
             FranklinOp::Transfer(op) => op.get_public_data(),
             FranklinOp::FullExit(op) => op.get_public_data(),
+        }
+    }
+
+    pub fn chunks_by_op_number(op_type: &u8) -> Option<usize> {
+        match *op_type {
+            DEPOSIT_NUMBER => Some(DepositOp::CHUNKS),
+            WITHDRAW_NUMBER_NUMBER => Some(TransferToNewOp::CHUNKS),
+            WITHDRAW_NUMBER_NUMBER => Some(WithdrawOp::CHUNKS),
+            CLOSE_NUMBER => Some(CloseOp::CHUNKS),
+            TRANSFER_NUMBER => Some(TransferOp::CHUNKS),
+            FULL_EXIT_NUMBER => Some(FullExitOp::CHUNKS),
+            _ => None
+        }
+    }
+
+    pub fn from_bytes(bytes: &Vec<u8>) -> Option<Self> {
+        let op_type: &u8 = bytes[0];
+        match *op_type {
+            DEPOSIT_NUMBER => Some(Deposit(DepositOp::from_bytes(&bytes)))),
+            TRANSFER_TO_NEW_NUMBER => Some(TransferToNew(TransferToNewOp::from_bytes(&bytes))),
+            WITHDRAW_NUMBER_NUMBER => Some(Withdraw(WithdrawOp::from_bytes(&bytes))),
+            CLOSE_NUMBER => Some(Close(CloseOp::from_bytes(&bytes))),
+            TRANSFER_NUMBER => Some(ransfer(TransferOp::from_bytes(&bytes))),
+            FULL_EXIT_NUMBER => Some(FullExit(FullExitOp::from_bytes(&bytes))),
+            _ => None
         }
     }
 }
