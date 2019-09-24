@@ -3,12 +3,25 @@ use super::{pack_fee_amount, pack_token_amount, Deposit, FullExit};
 use super::{Close, Transfer, Withdraw};
 use bigdecimal::BigDecimal;
 
-pub const DEPOSIT_NUMBER: u8 = 1;
-pub const TRANSFER_TO_NEW_NUMBER: u8 = 2;
-pub const WITHDRAW_NUMBER_NUMBER: u8 = 3;
-pub const CLOSE_NUMBER: u8 = 4;
-pub const TRANSFER_NUMBER: u8 = 5;
-pub const FULL_EXIT_NUMBER: u8 = 6;
+pub const DEPOSIT_OP_CODE: u8 = 1;
+pub const TRANSFER_TO_NEW_OP_CODE: u8 = 2;
+pub const WITHDRAW_OP_CODE_OP_CODE: u8 = 3;
+pub const CLOSE_OP_CODE: u8 = 4;
+pub const TRANSFER_OP_CODE: u8 = 5;
+pub const FULL_EXIT_OP_CODE: u8 = 6;
+
+pub const TX_TYPE_BYTES_LEGTH: u8 = 1;
+pub const ACCOUNT_ID_BYTES_LEGTH: u8 = 3;
+pub const TOKEN_BYTES_LENGTH: u8 = 2;
+pub const FULL_AMOUNT_BYTES_LEGTH: u8 = 16;
+pub const PUBKEY_HASH_BYTES_LEGTH: u8 = 20;
+pub const FEE_BYTES_LEGTH: u8 = 2;
+pub const ETH_ADDR_BYTES_LEGTH: u8 = 20;
+pub const AMOUNT_BYTES_LEGTH: u8 = 3;
+pub const NONCE_BYTES_LEGTH: u8 = 4;
+pub const SIGNATURE_BYTES_LEGTH: u8 = 64;
+pub const PUBKEY_PACKED_BYTES_LEGTH: u8 = 32;
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositOp {
@@ -32,7 +45,10 @@ impl DepositOp {
     }
 
     pub fn from_bytes(bytes: &Vec<u8>) -> Self {
-        
+        Self {
+            priority_op: Deposit::from_bytes(bytes),
+            account_id: AccountId::from_be_bytes(bytes[TX_TYPE_BYTES_LEGTH .. TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH])
+        }
     }
 }
 
@@ -61,7 +77,11 @@ impl TransferToNewOp {
     }
 
     pub fn from_bytes(bytes: &Vec<u8>) -> Self {
-        
+        Self {
+            tx: Transfer::from_bytes(bytes),
+            from: AccountId::from_be_bytes(bytes[TX_TYPE_BYTES_LEGTH .. TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH]),
+            to: AccountId::from_be_bytes(bytes[TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH+TOKEN_BYTES_LENGTH+FULL_AMOUNT_BYTES_LEGTH+PUBKEY_HASH_BYTES_LEGTH .. TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH+TOKEN_BYTES_LENGTH+FULL_AMOUNT_BYTES_LEGTH+PUBKEY_HASH_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH])
+        }
     }
 }
 
@@ -89,7 +109,11 @@ impl TransferOp {
     }
 
     pub fn from_bytes(bytes: &Vec<u8>) -> Self {
-        
+        Self {
+            tx: Transfer::from_bytes(bytes),
+            from: AccountId::from_be_bytes(bytes[TX_TYPE_BYTES_LEGTH .. TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH]),
+            to: AccountId::from_be_bytes(bytes[TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH+TOKEN_BYTES_LENGTH .. TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH+TOKEN_BYTES_LENGTH+ACCOUNT_ID_BYTES_LEGTH])
+        }
     }
 }
 
@@ -116,7 +140,10 @@ impl WithdrawOp {
     }
 
     pub fn from_bytes(bytes: &Vec<u8>) -> Self {
-        
+        Self {
+            tx: Withdraw::from_bytes(bytes),
+            account_id: AccountId::from_be_bytes(bytes[TX_TYPE_BYTES_LEGTH..TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH])
+        }
     }
 }
 
@@ -139,7 +166,10 @@ impl CloseOp {
     }
 
     pub fn from_bytes(bytes: &Vec<u8>) -> Self {
-        
+        Self {
+            tx: Withdraw::from_bytes(bytes),
+            account_id: AccountId::from_be_bytes(bytes[TX_TYPE_BYTES_LEGTH .. TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH])
+        }
     }
 }
 
@@ -170,7 +200,13 @@ impl FullExitOp {
     }
 
     pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        let acc_id = AccountId::from_be_bytes(bytes[TX_TYPE_BYTES_LEGTH..TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH]);
+        let amount = BigDecimal::parse_bytes(bytes[TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH+PUBKEY_PACKED_BYTES_LEGTH+ETH_ADDR_BYTES_LEGTH+TOKEN_BYTES_LENGTH+NONCE_BYTES_LEGTH+SIGNATURE_BYTES_LEGTH .. TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH+PUBKEY_PACKED_BYTES_LEGTH+ETH_ADDR_BYTES_LEGTH+TOKEN_BYTES_LENGTH+NONCE_BYTES_LEGTH+SIGNATURE_BYTES_LEGTH+FULL_AMOUNT_BYTES_LEGTH].to_vec(), 18);
         
+        Self {
+            priority_op: FullExit::from_bytes(bytes),
+            account_data: Some((acc_id, amount))
+        }
     }
 }
 
@@ -210,12 +246,12 @@ impl FranklinOp {
 
     pub fn chunks_by_op_number(op_type: &u8) -> Option<usize> {
         match *op_type {
-            DEPOSIT_NUMBER => Some(DepositOp::CHUNKS),
-            WITHDRAW_NUMBER_NUMBER => Some(TransferToNewOp::CHUNKS),
-            WITHDRAW_NUMBER_NUMBER => Some(WithdrawOp::CHUNKS),
-            CLOSE_NUMBER => Some(CloseOp::CHUNKS),
-            TRANSFER_NUMBER => Some(TransferOp::CHUNKS),
-            FULL_EXIT_NUMBER => Some(FullExitOp::CHUNKS),
+            DEPOSIT_OP_CODE => Some(DepositOp::CHUNKS),
+            TRANSFER_TO_NEW_OP_CODE => Some(TransferToNewOp::CHUNKS),
+            WITHDRAW_NUMBER_OP_CODE => Some(WithdrawOp::CHUNKS),
+            CLOSE_OP_CODE => Some(CloseOp::CHUNKS),
+            TRANSFER_OP_CODE => Some(TransferOp::CHUNKS),
+            FULL_EXIT_OP_CODE => Some(FullExitOp::CHUNKS),
             _ => None
         }
     }
@@ -223,12 +259,12 @@ impl FranklinOp {
     pub fn from_bytes(bytes: &Vec<u8>) -> Option<Self> {
         let op_type: &u8 = bytes[0];
         match *op_type {
-            DEPOSIT_NUMBER => Some(Deposit(DepositOp::from_bytes(&bytes)))),
-            TRANSFER_TO_NEW_NUMBER => Some(TransferToNew(TransferToNewOp::from_bytes(&bytes))),
-            WITHDRAW_NUMBER_NUMBER => Some(Withdraw(WithdrawOp::from_bytes(&bytes))),
-            CLOSE_NUMBER => Some(Close(CloseOp::from_bytes(&bytes))),
-            TRANSFER_NUMBER => Some(ransfer(TransferOp::from_bytes(&bytes))),
-            FULL_EXIT_NUMBER => Some(FullExit(FullExitOp::from_bytes(&bytes))),
+            DEPOSIT_OP_CODE => Some(Deposit(DepositOp::from_bytes(&bytes)))),
+            TRANSFER_TO_NEW_OP_CODE => Some(TransferToNew(TransferToNewOp::from_bytes(&bytes))),
+            WITHDRAW_NUMBER_OP_CODE => Some(Withdraw(WithdrawOp::from_bytes(&bytes))),
+            CLOSE_OP_CODE => Some(Close(CloseOp::from_bytes(&bytes))),
+            TRANSFER_OP_CODE => Some(ransfer(TransferOp::from_bytes(&bytes))),
+            FULL_EXIT_OP_CODE => Some(FullExit(FullExitOp::from_bytes(&bytes))),
             _ => None
         }
     }
