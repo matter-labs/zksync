@@ -25,61 +25,123 @@ export function floatToInteger(floatBytes: Buffer, exp_bits: number, mantissa_bi
     return exponent.mul(mantissa);
 }
 
-export function integerToFloat(integer: BN, exp_bits: number, mantissa_bits: number, exp_base: number): Buffer {
-    function integerToFloatInner(integer, exp_bits, mantissa_bits, exp_base, second_pass) {
-        // change strategy. First try to guess the precision, and then reparse;
-        const maxMantissa = new BN(1).ushln(mantissa_bits).subn(1);
-        const maxExponent = new BN(exp_base).pow(new BN(1).ushln(exp_bits).subn(1));
-        // try to get the best precision
-        const exponentBase = new BN(exp_base);
-        let exponent = new BN(0);
-        let one = new BN(1);
-        if (integer.gt(maxMantissa)) {
-            let exponentGuess = integer.div(maxMantissa);
-            let exponentTmp = exponentGuess;
-
-            while (exponentTmp.gte(exponentBase)) {
-                exponentTmp = exponentTmp.div(exponentBase);
-                exponent = exponent.addn(1);
-            }
-        }
-
-        let exponentTmp = exponentBase.pow(exponent);
-        if (maxMantissa.mul(exponentTmp).lt(integer)) {
-            exponent = exponent.addn(1);
-        }
-
-        let power = exponentBase.pow(exponent);
-        let mantissa = integer.div(power);
-        if (!second_pass) {
-            let down_to_precision = mantissa.mul(power);
-            return integerToFloatInner(down_to_precision, exp_bits, mantissa_bits, exp_base, true);
-        }
-        // pack
-        const totalBits = mantissa_bits + exp_bits - 1;
-        const encoding = new BN(0);
-        //todo: it is probably enough to use 'le' here
-        for (let i = mantissa_bits; i > 0; i--) {
-            if (mantissa.testn(i)) {
-                encoding.bincn(totalBits - exp_bits - i);
-            }
-        }
-
-        for (let i = exp_bits; i > 0; i--) {
-            if (exponent.testn(i)) {
-                encoding.bincn(totalBits - i);
-            }
-        }
-
-        return encoding.toArrayLike(Buffer, 'be', (exp_bits + mantissa_bits) / 8);
+export function bitsIntoBytesInOrder(bits: Array<boolean>) : Buffer {
+    if (bits.length % 8 != 0) {
+        throw "wrong number of bits to pack";
     }
-    return integerToFloatInner(integer, exp_bits, mantissa_bits, exp_base, false);
+    let nBytes = bits.length / 8;
+    let resultBytes = Buffer.alloc(nBytes, 0);
+
+    for (let byte = 0; byte < nBytes; ++byte) {
+        let value = 0;
+        if (bits[byte * 8]) {
+            value |= 0x80;
+        }
+        if (bits[byte * 8 + 1]) {
+            value |= 0x40;
+        }
+        if (bits[byte * 8 + 2]) {
+            value |= 0x20;
+        }
+        if (bits[byte * 8 + 3]) {
+            value |= 0x10;
+        }
+        if (bits[byte * 8 + 4]) {
+            value |= 0x08;
+        }
+        if (bits[byte * 8 + 5]) {
+            value |= 0x04;
+        }
+        if (bits[byte * 8 + 6]) {
+            value |= 0x02;
+        }
+        if (bits[byte * 8 + 7]) {
+            value |= 0x01;
+        }
+
+        resultBytes[byte] = value;
+    }
+
+    return resultBytes;
+}
+
+export function integerToFloat(integer: BN, exp_bits: number, mantissa_bits: number, exp_base: number): Buffer {
+
+    let max_exponent = (new BN(10)).pow(new BN((1 << exp_bits) - 1));
+    let max_mantissa = (new BN(2)).pow(new BN(mantissa_bits)).subn(1);
+
+    if (integer.gt(max_mantissa.mul(max_exponent))) {
+        throw "Integer is too big";
+    }
+
+    let exponent = 0;
+    let mantissa = integer;
+
+    if (integer.gt(max_mantissa)) {
+        // always try best precision
+        let exponent_guess = integer.div(max_mantissa);
+        let exponent_temp = exponent_guess;
+
+        while(true) {
+            if (exponent_temp.ltn(exp_base)) {
+                break;
+            }
+            exponent_temp = exponent_temp.divn(exp_base);
+            exponent += 1;
+        }
+
+        exponent_temp = new BN(1);
+        for (let i = 0; i < exponent; ++i) {
+            exponent_temp = exponent_temp.muln(exp_base);
+        }
+
+        if (exponent_temp.mul(max_mantissa) < integer) {
+            exponent += 1;
+            exponent_temp = exponent_temp.muln(exp_base);
+        }
+
+        mantissa = integer.div(exponent_temp);
+    }
+
+    // encode into bits. First bits of mantissa in LE order
+
+    let encoding = [];
+
+    for (let i = 0; i < exp_bits; ++i) {
+        if ((exponent & (1 << i)) == 0) {
+            encoding.push(false);
+        } else {
+            encoding.push(true);
+        }
+    }
+
+    for (let i =0; i < mantissa_bits; ++i) {
+        if (mantissa.and(new BN(1 << i)).eqn(0)) {
+            encoding.push(false);
+        } else {
+            encoding.push(true);
+        }
+    }
+
+    return bitsIntoBytesInOrder(encoding.reverse()).reverse();
+}
+
+export function reverseBits(buffer: Buffer): Buffer {
+    let reversed = buffer.reverse();
+    reversed.map( (b, i, a) => {
+        // reverse bits in byte
+        b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+        b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+        b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+        return b
+    });
+    return reversed;
 }
 
 export function packAmount(amount: BN): Buffer {
-    return integerToFloat(amount, 5, 19, 10);
+    return reverseBits(integerToFloat(amount, 5, 19, 10));
 }
 
 export function packFee(amount: BN): Buffer {
-    return integerToFloat(amount, 6, 10, 10);
+    return reverseBits(integerToFloat(amount, 6, 10, 10));
 }

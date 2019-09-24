@@ -14,6 +14,12 @@ library Bytes {
         bts = toBytesFromBytes32(bytes32(uint(self) << 232), 3);
     }
 
+    // Compies uint32 'self' into a new 'bytes memory'.
+    // Returns the newly created 'bytes memory'.
+    function toBytesFromUInt32(uint32 self) internal pure returns (bytes memory bts) {
+        bts = toBytesFromBytes32(bytes32(uint(self) << 224), 4);
+    }
+
     // Compies uint128 'self' into a new 'bytes memory'.
     // Returns the newly created 'bytes memory'.
     function toBytesFromUInt128(uint128 self) internal pure returns (bytes memory bts) {
@@ -24,7 +30,10 @@ library Bytes {
     // Returns the newly created 'bytes memory'
     // The returned bytes will be of length 'len'.
     function toBytesFromBytes32(bytes32 self, uint8 len) internal pure returns (bytes memory bts) {
-        require(len <= 32, "wrong bytes length from 32");
+        require(
+            len <= 32,
+            "bt211"
+        ); // bt211 - wrong bytes length from 32
         bts = new bytes(len);
         // Even though the bytes will allocate a full word, we don't want
         // any potential garbage bytes in there.
@@ -48,7 +57,10 @@ library Bytes {
         pure
         returns (address addr)
     {
-        require(self.length >= 20, "wrong bytes length to address");
+        require(
+            self.length >= 20,
+            "bbs11"
+        ); // bbs11 - wrong bytes length to address
 
         assembly {
             addr := div(mload(add(add(self, 0x20), 0)), 0x1000000000000000000000000)
@@ -62,7 +74,10 @@ library Bytes {
         pure
         returns (uint16)
     {
-        require(self.length >= 2, "wrong bytes length to 16");
+        require(
+            self.length >= 2,
+            "bb611"
+        ); // bb611 - wrong bytes length to 16
         uint16 tempUint;
 
         assembly {
@@ -79,7 +94,10 @@ library Bytes {
         pure
         returns (uint128)
     {
-        require(self.length >= 16, "wrong bytes length to 128");
+        require(
+            self.length >= 16,
+            "bb811"
+        ); // bb811 - wrong bytes length to 128
         uint128 tempUint;
 
         assembly {
@@ -101,7 +119,10 @@ library Bytes {
         pure
         returns (bytes memory)
     {
-        require(_bytes.length >= (_start + _length));
+        require(
+            _bytes.length >= (_start + _length),
+            "bse11"
+        ); // bse11 - bytes length is less then start byte + length bytes
 
         bytes memory tempBytes;
 

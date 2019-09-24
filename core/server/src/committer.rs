@@ -1,3 +1,4 @@
+use crate::ThreadPanicNotify;
 use models::{Action, CommitRequest, Operation};
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
@@ -8,10 +9,12 @@ pub fn start_committer(
     rx_for_ops: Receiver<CommitRequest>,
     tx_for_eth: Sender<Operation>,
     pool: ConnectionPool,
+    panic_notify: Sender<bool>,
 ) {
     thread::Builder::new()
         .name("committer".to_string())
         .spawn(move || {
+            let _panic_sentinel = ThreadPanicNotify(panic_notify);
             run_committer(rx_for_ops, tx_for_eth, pool);
         })
         .expect("thread creation failed");
@@ -39,7 +42,7 @@ fn run_committer(
             accounts_updated,
         }) = req
         {
-            if accounts_updated.is_empty() {
+            if accounts_updated.is_empty() && block.number_of_processed_prior_ops() == 0 {
                 info!(
                     "Failed transactions commited block: #{}",
                     block.block_number

@@ -2,7 +2,6 @@ use bellman;
 
 use time::PreciseTime;
 
-use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use pairing::bn256::*;
 use rand::OsRng;
 
@@ -48,7 +47,7 @@ pub fn make_franklin_key() {
     let f_cont = File::create(contract_file_path).expect("Unable to create file");
 
     // let p_g = FixedGenerators::SpendingKeyGenerator;
-    let params = &AltJubjubBn256::new();
+    let params = &franklin_constants::JUBJUB_PARAMS;
     // let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
     let rng = &mut OsRng::new().unwrap();
 
@@ -57,18 +56,21 @@ pub fn make_franklin_key() {
         tx_type: None,
         chunk: None,
         pubdata_chunk: None,
-        signer_pub_key_x: None,
-        signer_pub_key_y: None,
+        signer_pub_key_packed: vec![None; franklin_constants::FR_BIT_WIDTH_PADDED],
         first_sig_msg: None,
         second_sig_msg: None,
         third_sig_msg: None,
-        signature: None,
+        signature_data: SignatureData {
+            r_packed: vec![None; franklin_constants::FR_BIT_WIDTH_PADDED],
+            s: vec![None; franklin_constants::FR_BIT_WIDTH_PADDED],
+        },
         args: OperationArguments {
             a: None,
             b: None,
             amount_packed: None,
             full_amount: None,
             fee: None,
+            pub_nonce: None,
             new_pub_key_hash: None,
             ethereum_key: None,
         },
