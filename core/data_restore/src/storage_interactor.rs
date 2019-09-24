@@ -1,6 +1,6 @@
 use crate::events::{EventData, EventType};
 use crate::events_state::EventsState;
-use crate::franklin_op_block::{FranklinOpBlock, FranklinOpBlockType};
+use crate::franklin_ops::{FranklinOpBlock, FranklinOpBlockType};
 use crate::helpers;
 use std::convert::TryFrom;
 use storage::{

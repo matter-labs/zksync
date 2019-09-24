@@ -1,7 +1,7 @@
 use crate::accounts_state::FranklinAccountsStates;
 use crate::events::EventData;
 use crate::events_state::EventsState;
-use crate::franklin_op_block::FranklinOpBlock;
+use crate::franklin_ops::FranklinOp;
 use crate::helpers::*;
 use crate::storage_interactor;
 use storage::ConnectionPool;
@@ -28,7 +28,7 @@ pub struct DataRestoreDriver {
     /// Franklin accounts state
     pub account_states: FranklinAccountsStates,
     /// Franklin operations blocks
-    pub op_blocks: Vec<FranklinOpBlock>,
+    pub op_blocks: Vec<FranklinOps>,
     /// Storage update state
     pub storage_update_state: StorageUpdateState
 }
@@ -126,15 +126,15 @@ impl DataRestoreDriver {
     }
 
     /// Return verified comitted operations blocks from verified op blocks events
-    pub fn get_new_operations_from_events(&mut self) -> Result<Vec<FranklinOpBlock>, DataRestoreError> {
+    pub fn get_new_operations_from_events(&mut self) -> Result<Vec<FranklinOp>, DataRestoreError> {
         info!("Loading new verified op_blocks");
         let committed_events = self
             .events_state
             .get_only_verified_committed_blocks_events();
         let mut ops = vec![];
         for event in committed_events {
-            let _ops = FranklinOpBlock::get_franklin_ops(&event)?;
-            ops.push(_ops);
+            let _ops = franklin_ops::get_franklin_ops(&event)?;
+            ops.append(&_ops);
         }
         Ok(ops)
     }

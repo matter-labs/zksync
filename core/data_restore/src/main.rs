@@ -5,7 +5,7 @@ pub mod accounts_state;
 pub mod data_restore_driver;
 pub mod events;
 pub mod events_state;
-pub mod franklin_op_block;
+pub mod franklin_ops;
 pub mod helpers;
 pub mod storage_interactor;
 
