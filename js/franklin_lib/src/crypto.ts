@@ -280,7 +280,7 @@ function pedersenHStar(input: Buffer) : BN {
 export function musigSHA256(priv_key: BN, msg: Buffer) {
     let msgToHash = Buffer.alloc(PAD_MSG_BEFORE_HASH_BYTES_LEN, 0);
     msg.copy(msgToHash);
-    msg = pedersenHash(msgToHash, "be").getX().toBuffer("le", 32);
+    msg = pedersenHash(msgToHash, "be").getX().toArrayLike(Buffer, "le", 32);
 
     const t = crypto.randomBytes(80);
 
@@ -306,7 +306,7 @@ export function musigSHA256(priv_key: BN, msg: Buffer) {
 export function musigPedersen(priv_key: BN, msg: Buffer) {
     let msgToHash = Buffer.alloc(PAD_MSG_BEFORE_HASH_BYTES_LEN, 0);
     msg.copy(msgToHash);
-    msg = pedersenHash(msgToHash, "be").getX().toBuffer("le", 32);
+    msg = pedersenHash(msgToHash, "be").getX().toArrayLike(Buffer, "le", 32);
 
     const t = crypto.randomBytes(80);
 
@@ -337,7 +337,7 @@ export function privateKeyToPublicKey(pk: BN): edwards.EdwardsPoint  {
 export function pubkeyToAddress(pubKey: edwards.EdwardsPoint): Buffer {
     let x = pubKey.getX().toArrayLike(Buffer, "le", 32);
     let y = pubKey.getY().toArrayLike(Buffer, "le", 32);
-    let res = pedersenHash(Buffer.concat([x,y])).getX().toArrayLike(Buffer, "le", 32).slice(0, addressLen);
+    let res = pedersenHash(Buffer.concat([x,y])).getX().toArrayLike(Buffer, "le", 32).slice(0, addressLen).reverse();
     return res;
 }
 

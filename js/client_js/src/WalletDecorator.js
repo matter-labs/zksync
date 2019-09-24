@@ -153,7 +153,7 @@ export class WalletDecorator {
         try {
             var res = await this.wallet.transfer(kwargs.address, token, amount, fee);
         } catch (e) {
-            yield error(`Transfer failed with ${e.message}`);
+            yield error(`Sending transfer failed with ${e.message}`);
             return;
         }
 
@@ -281,46 +281,6 @@ export class WalletDecorator {
             throw new Error(receipt.fail_reason);
         }
         return 0;
-    }
-
-    async * verboseDepositOffchain(kwargs) {
-        let token = this.tokenFromName(kwargs.token);
-        let amount = bigNumberify(kwargs.amount);
-        let fee = bigNumberify(kwargs.fee);
-
-        let res = await this.wallet.depositOffchain(token, amount, fee);
-
-        if (res.err) {
-            yield error(`Onchain Deposit Failed with ${res.err}`);
-            return;
-        } else {
-            yield info(`Sent tx to Franklin server`);
-        }
-
-        let receipt = await this.wallet.waitTxReceipt(res.hash);
-
-        if (receipt.fail_reason) {
-            yield error(`Transaction failed with ${receipt.fail_reason}`);
-            return;
-        } else {
-            yield info(`Tx <code>${res.hash}</code> got included in block ${receipt.block_number}, waiting for prover`);
-        }
-
-        while ( ! receipt.prover_run) {
-            receipt = await this.wallet.waitTxReceipt(res.hash)
-            await sleep(1000);
-        }
-
-        yield info(`Prover ${receipt.prover_run.worker} started `
-                + `proving block ${receipt.prover_run.block_number} `
-                + `at ${receipt.prover_run.created_at}`);
-
-        while ( ! receipt.verified) {
-            receipt = await this.wallet.waitTxReceipt(res.hash)
-            await sleep(1000);
-        }
-
-        yield info(`Tx <code>${res.hash}</code> got proved!`);
     }
 
     async * verboseDeposit(kwargs) {

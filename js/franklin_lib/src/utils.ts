@@ -147,6 +147,13 @@ export function packFee(amount: BN): Buffer {
     return reverseBits(integerToFloat(amount, 6, 10, 10));
 }
 
+/**
+ * packs and unpacks the amount, returning the closest packed value.
+ * e.g 1000000003 => 1000000000
+ * @param amount 
+ * @param AMOUNT_EXPONENT_BIT_WIDTH 
+ * @param AMOUNT_MANTISSA_BIT_WIDTH 
+ */
 function packedHelper(amount: ethers.utils.BigNumberish, AMOUNT_EXPONENT_BIT_WIDTH: number, AMOUNT_MANTISSA_BIT_WIDTH: number) {
     let amountStr10 = ethers.utils.bigNumberify(amount).toString();
     let bn = new BN(amountStr10, 10);
@@ -156,12 +163,22 @@ function packedHelper(amount: ethers.utils.BigNumberish, AMOUNT_EXPONENT_BIT_WID
     return unpacked.toString(10);
 }
 
+/**
+ * packs and unpacks the amount, returning the closest packed value.
+ * e.g 1000000003 => 1000000000
+ * @param amount
+ */
 export function packedAmount(amount: ethers.utils.BigNumberish) {
     const AMOUNT_EXPONENT_BIT_WIDTH = 5;
     const AMOUNT_MANTISSA_BIT_WIDTH = 19;
     return packedHelper(amount, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH);
 }
 
+/**
+ * packs and unpacks the amount, returning the closest packed value.
+ * e.g 1000000003 => 1000000000
+ * @param fee 
+ */
 export function packedFee(fee: ethers.utils.BigNumberish) {
     const FEE_EXPONENT_BIT_WIDTH = 4;
     const FEE_MANTISSA_BIT_WIDTH = 4;

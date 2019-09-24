@@ -206,21 +206,10 @@ export class LocalWallet {
 
     private async depositOnchain(token: Token, amount: BigNumber) {
         await this.franklinWallet.updateState();
-        let res = await this.franklinWallet.depositOnchain(token, amount);
+        let res = await this.franklinWallet.deposit(token, amount);
         console.log('deposit onchain res');
         console.log(res);
         await this.franklinWallet.updateState();
-    }
-
-    private async depositOffchain(token: Token, amount: BigNumber, fee: BigNumber) {
-        let res = await this.franklinWallet.depositOffchain(token, amount, fee);
-        if (res.err) {
-            throw new Error(res.err);
-        }
-        let receipt = await this.franklinWallet.waitTxReceipt(res.hash);
-        if (receipt.fail_reason) {
-            throw new Error(receipt.fail_reason);
-        }
     }
 
     async deposit(token: Token, amount: BigNumber, fee: BigNumber) {
@@ -236,7 +225,6 @@ export class LocalWallet {
         }
 
         await this.depositOnchain(token, total_amount);
-        await this.depositOffchain(token, amount, fee);
         await sleep(1000);
     }
 
