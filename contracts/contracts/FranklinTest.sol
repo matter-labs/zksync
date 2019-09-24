@@ -12,19 +12,19 @@ import "./Bytes.sol";
 
 contract FranklinTest {
     // Verifier contract
-    VerifierTest verifier;
+    VerifierTest internal verifier;
     // Governance contract
-    Governance governance;
+    Governance internal governance;
     // Priority Queue contract
-    PriorityQueueTest priorityQueue;
+    PriorityQueueTest internal priorityQueue;
 
     // Operation fields bytes lengths
-    uint8 TOKEN_BYTES = 2; // token id
-    uint8 AMOUNT_BYTES = 16; // token amount
-    uint8 ETH_ADDR_BYTES = 20; // ethereum address
-    uint8 FEE_BYTES = 2; // fee
-    uint8 ACC_NUM_BYTES = 3; // franklin account id
-    uint8 NONCE_BYTES = 4; // franklin nonce
+    uint8 constant TOKEN_BYTES = 2; // token id
+    uint8 constant AMOUNT_BYTES = 16; // token amount
+    uint8 constant ETH_ADDR_BYTES = 20; // ethereum address
+    uint8 constant FEE_BYTES = 2; // fee
+    uint8 constant ACC_NUM_BYTES = 3; // franklin account id
+    uint8 constant NONCE_BYTES = 4; // franklin nonce
 
     // Franklin chain address length
     uint8 constant PUBKEY_HASH_LEN = 20;
@@ -88,7 +88,11 @@ contract FranklinTest {
         bytes franklinAddress
     );
 
-    // Full Exit event for tests
+    // Full Exit event
+    // Structure:
+    // - pubData - full exit pubdata
+    // - fee - fee
+    // - nonce - nonce
     event FullExit(
         bytes pubData,
         uint256 fee,
@@ -203,7 +207,7 @@ contract FranklinTest {
         blocks[0].stateRoot = _genesisRoot;
     }
 
-    // Collects a fee from provided requests number for the validator, store it on her
+    // Collects fees from provided requests number for the block validator, store it on her
     // balance to withdraw in Ether and delete this requests
     // Params:
     // - _number - the number of requests
@@ -213,8 +217,7 @@ contract FranklinTest {
         balancesToWithdraw[_validator][0] += uint128(totalFee);
     }
 
-    // Accrues users balances from priority requests,
-    // if this request contains a Deposit operation
+    // Accrues users balances from deposit priority requests
     // WARNING: Only for Exodus mode
     function cancelOutstandingDepositsForExodusMode() internal {
         bytes memory depositsPubData = priorityQueue.getOutstandingDeposits();
@@ -477,13 +480,13 @@ contract FranklinTest {
         ); // fck11 - only commit next block
         require(
             governance.isValidator(msg.sender),
-            "fck13"
-        ); // fck13 - not a validator in commit
+            "fck12"
+        ); // fck12 - not a validator in commit
         if(!triggerRevertIfBlockCommitmentExpired() && !triggerExodusIfNeeded()) {
             require(
                 totalBlocksCommitted - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS,
-                "fck12"
-            ); // fck12 - too many committed
+                "fck13"
+            ); // fck13 - too many committed
             
             // Unpack onchain operations and store them.
             // Get onchain operations start id for global onchain operations counter,
@@ -534,8 +537,8 @@ contract FranklinTest {
     {
         require(
             _publicData.length % 8 == 0,
-            "fcs21"
-        ); // fcs21 - pubdata.len % 8 != 0
+            "fcs11"
+        ); // fcs11 - pubdata.len % 8 != 0
 
         onchainOpsStartId = totalOnchainOps;
         uint64 currentOnchainOp = totalOnchainOps;
@@ -556,12 +559,12 @@ contract FranklinTest {
         }
         require(
             currentPointer == _publicData.length,
-            "fcs22"
-        ); // fcs22 - last chunk exceeds pubdata
+            "fcs12"
+        ); // fcs12 - last chunk exceeds pubdata
     }
 
-    // Returns operation processed length, and indicators if it is
-    // an onchain operation and if it is a priority operation (1 if true)
+    // Returns operation processed length, and indicators if this operation is
+    // an onchain operation and it is a priority operation (1 if true)
     // Params:
     // - _opType - operation type
     // - _currentPointer - current pointer
@@ -669,8 +672,8 @@ contract FranklinTest {
                 OnchainOperation memory op = onchainOps[current];
                 require(
                     priorityQueue.isPriorityOpValid(uint8(op.opType), op.pubData, counter),
-                    "fvs12"
-                ); // fvs12 - priority operation is not valid
+                    "fvs11"
+                ); // fvs11 - priority operation is not valid
                 counter++;
             }
         }
@@ -860,7 +863,7 @@ contract FranklinTest {
 
         require(
             verifier.verifyExitProof(_tokenId, _owner, _amount, _proof),
-            "fvk13"
+            "fet13"
         ); // fet13 - verification failed
 
         balancesToWithdraw[_owner][_tokenId] += _amount;

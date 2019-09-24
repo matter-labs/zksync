@@ -123,11 +123,11 @@ export function integerToFloat(integer: BN, exp_bits: number, mantissa_bits: num
         }
     }
 
-    return bitsIntoBytesInOrder(encoding.reverse()).reverse();
+    return Buffer.from(bitsIntoBytesInOrder(encoding.reverse()).reverse());
 }
 
 export function reverseBits(buffer: Buffer): Buffer {
-    let reversed = buffer.reverse();
+    let reversed = Buffer.from(buffer.reverse());
     reversed.map( (b, i, a) => {
         // reverse bits in byte
         b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
