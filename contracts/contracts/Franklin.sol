@@ -88,17 +88,6 @@ contract Franklin {
         bytes franklinAddress
     );
 
-    // Full Exit event
-    // Structure:
-    // - pubData - full exit pubdata
-    // - fee - fee
-    // - nonce - nonce
-    event FullExit(
-        bytes pubData,
-        uint256 fee,
-        uint32 nonce
-    );
-
     // Event emitted when blocks are reverted
     // Structure:
     // - totalBlocksVerified - number of verified blocks
@@ -400,12 +389,6 @@ contract Franklin {
         if (msg.value != fee) {
             msg.sender.transfer(msg.value-fee);
         }
-
-        emit FullExit(
-            pubData,
-            fee,
-            _nonce
-        );
     }
 
     // Register deposit request
