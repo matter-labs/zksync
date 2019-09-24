@@ -133,16 +133,10 @@ impl DataRestoreDriver {
             .get_only_verified_committed_blocks_events();
         let mut ops = vec![];
         for event in committed_events {
-            let tx = FranklinOpBlock::get_franklin_op_block(&event);
-            if tx.is_none() {
-                continue;
-            }
-            op_blocks.push(tx.expect(
-                "No franklin op_blocks in get_verified_committed_op_blocks_from_blocks_state",
-            ));
+            let _ops = FranklinOpBlock::get_franklin_ops(&event)?;
+            ops.push(_ops);
         }
-        info!("Operation blocks loaded and sorted");
-        op_blocks
+        Ok(ops)
     }
 
     // /// Update past events and accounts states
