@@ -1,7 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var BN = require("bn.js");
+var js_sha256_1 = require("js-sha256");
+var crypto_js_1 = require("crypto-js");
+var blake2b = require('blake2b');
 var elliptic = require('elliptic');
+var crypto = require('crypto');
 //! `Fr modulus = 21888242871839275222246405745257275088548364400416034343698204186575808495617`
 //!
 //! It takes the form `-x^2 + y^2 = 1 + dx^2y^2` with
@@ -29,13 +33,15 @@ var fsZero = new BN(0);
 exports.altjubjubCurve = new elliptic.curve.edwards(babyJubjubParams);
 var curveZero = exports.altjubjubCurve.point('0', '1');
 var chunksPerGenerator = 62;
+exports.addressLen = 20;
+var PAD_MSG_BEFORE_HASH_BYTES_LEN = 92;
 var gen1 = exports.altjubjubCurve.point('184570ed4909a81b2793320a26e8f956be129e4eed381acf901718dff8802135', '1c3a9a830f61587101ef8cbbebf55063c1c6480e7e5a7441eac7f626d8f69a45');
 var gen2 = exports.altjubjubCurve.point('0afc00ffa0065f5479f53575e86f6dcd0d88d7331eefd39df037eea2d6f031e4', '237a6734dd50e044b4f44027ee9e70fcd2e5724ded1d1c12b820a11afdc15c7a');
 var gen3 = exports.altjubjubCurve.point('00fb62ad05ee0e615f935c5a83a870f389a5ea2baccf22ad731a4929e7a75b37', '00bc8b1c9d376ceeea2cf66a91b7e2ad20ab8cce38575ac13dbefe2be548f702');
 var gen4 = exports.altjubjubCurve.point('0675544aa0a708b0c584833fdedda8d89be14c516e0a7ef3042f378cb01f6e48', '169025a530508ee4f1d34b73b4d32e008b97da2147f15af3c53f405cf44f89d4');
 var gen5 = exports.altjubjubCurve.point('07350a0660a05014168047155c0a0647ea2720ecb182a6cb137b29f8a5cfd37f', '3004ad73b7abe27f17ec04b04b450955a4189dd012b4cf4b174af15bd412696a');
 var basicGenerators = [gen1, gen2, gen3, gen4, gen5];
-function wrapFs(fs) {
+function wrapScalar(fs) {
     while (fs.ltn(0)) {
         fs = fs.add(fsModulus);
     }
@@ -78,7 +84,7 @@ function genPedersonHashLookupTable() {
     }
     return table;
 }
-function buffer2bits(buff) {
+function buffer2bits_le(buff) {
     var res = new Array(buff.length * 8);
     for (var i = 0; i < buff.length; i++) {
         var b = buff[i];
@@ -93,11 +99,33 @@ function buffer2bits(buff) {
     }
     return res;
 }
-function pedersenHash(input) {
+function buffer2bits_be(buff) {
+    var res = new Array(buff.length * 8);
+    for (var i = 0; i < buff.length; i++) {
+        var b = buff[i];
+        res[i * 8] = (b & 0x80) != 0;
+        res[i * 8 + 1] = (b & 0x40) != 0;
+        res[i * 8 + 2] = (b & 0x20) != 0;
+        res[i * 8 + 3] = (b & 0x10) != 0;
+        res[i * 8 + 4] = (b & 0x08) != 0;
+        res[i * 8 + 5] = (b & 0x04) != 0;
+        res[i * 8 + 6] = (b & 0x02) != 0;
+        res[i * 8 + 7] = (b & 0x01) != 0;
+    }
+    return res;
+}
+function pedersenHash(input, bit_endianness) {
+    if (bit_endianness === void 0) { bit_endianness = "le"; }
     var personaizationBits = new Array(6).fill(true);
-    var bits = personaizationBits.concat(buffer2bits(input));
+    var bits;
+    if (bit_endianness == "le") {
+        bits = personaizationBits.concat(buffer2bits_le(input));
+    }
+    else {
+        bits = personaizationBits.concat(buffer2bits_be(input));
+    }
     function fsToPoint(fs, generator) {
-        fs = wrapFs(fs);
+        fs = wrapScalar(fs);
         var tmpPoint = curveZero;
         var accStr = fs.toString('hex').padStart(64, '0');
         var accBuff = Buffer.from(accStr, 'hex').reverse();
@@ -151,12 +179,123 @@ function pedersenHash(input) {
     return result.normalize();
 }
 exports.pedersenHash = pedersenHash;
-function testCalculate() {
-    for (var w = 0; w < 3; ++w) {
-        var p1 = lookupGeneratorFromTable(0, w, w * 7 + 2);
-        // let p1 = basicGenerators[0].mul(new BN(256)).normalize();
-        var p2 = calulateGenerator(0, w, w * 7 + 2);
-        // console.log(p2);
-        console.log(p1, p2);
+function to_uniform(bytes) {
+    var bits = new Array(bytes.length * 8);
+    var bit_n = 0;
+    for (var i = bytes.length - 1; i >= 0; --i) {
+        var b = bytes[i];
+        bits[bit_n] = (b & 0x80) != 0;
+        bits[bit_n + 1] = (b & 0x40) != 0;
+        bits[bit_n + 2] = (b & 0x20) != 0;
+        bits[bit_n + 3] = (b & 0x10) != 0;
+        bits[bit_n + 4] = (b & 0x08) != 0;
+        bits[bit_n + 5] = (b & 0x04) != 0;
+        bits[bit_n + 6] = (b & 0x02) != 0;
+        bits[bit_n + 7] = (b & 0x01) != 0;
+        bit_n += 8;
     }
+    var res = new BN(0);
+    for (var n = 0; n < bits.length; n++) {
+        res = res.muln(2);
+        if (bits[n]) {
+            res = res.addn(1);
+        }
+    }
+    return wrapScalar(res);
 }
+function balke2bHStar(a, b) {
+    var output = new Uint8Array(64);
+    var hash = blake2b(64, null, null, Buffer.from("Zcash_RedJubjubH"));
+    hash.update(a);
+    hash.update(b);
+    output = hash.digest();
+    var buff = Buffer.from(output);
+    return to_uniform(buff);
+}
+function sha256HStart(a, b) {
+    var hasher = js_sha256_1.sha256.create();
+    var personaization = "";
+    hasher.update(personaization);
+    hasher.update(a);
+    hasher.update(b);
+    var hash = Buffer.from(hasher.array());
+    var point = to_uniform(hash);
+    // console.log("sha256: ", hash.toString("hex"));
+    // console.log("sha256 point: ", point);
+    return point;
+}
+function pedersenHStar(input) {
+    var p_hash_start_res = pedersenHash(input);
+    var p_hash_star_fe = to_uniform(p_hash_start_res.getX().toArrayLike(Buffer, "le", 32));
+    return p_hash_star_fe;
+}
+function musigSHA256(priv_key, msg) {
+    var msgToHash = Buffer.alloc(PAD_MSG_BEFORE_HASH_BYTES_LEN, 0);
+    msg.copy(msgToHash);
+    msg = pedersenHash(msgToHash, "be").getX().toArrayLike(Buffer, "le", 32);
+    var t = crypto.randomBytes(80);
+    var pub_key = privateKeyToPublicKey(priv_key);
+    var pk_bytes = pub_key.getX().toArrayLike(Buffer, "le", 32);
+    var r = balke2bHStar(t, msg);
+    var r_g = exports.altjubjubCurve.g.mul(r);
+    var r_g_bytes = r_g.getX().toArrayLike(Buffer, "le", 32);
+    var concat = Buffer.concat([pk_bytes, r_g_bytes]);
+    var msg_padded = Buffer.alloc(32, 0);
+    msg.copy(msg_padded, 0, 0, 32);
+    var s = wrapScalar(sha256HStart(concat, msg_padded).mul(priv_key).add(r));
+    var signature = Buffer.concat([serializePointPacked(r_g), s.toArrayLike(Buffer, "le", 32)]).toString("hex");
+    var pubkey = serializePointPacked(pub_key).toString("hex");
+    return { pub_key: pubkey, sign: signature };
+}
+exports.musigSHA256 = musigSHA256;
+function musigPedersen(priv_key, msg) {
+    var msgToHash = Buffer.alloc(PAD_MSG_BEFORE_HASH_BYTES_LEN, 0);
+    msg.copy(msgToHash);
+    msg = pedersenHash(msgToHash, "be").getX().toArrayLike(Buffer, "le", 32);
+    var t = crypto.randomBytes(80);
+    var pub_key = privateKeyToPublicKey(priv_key);
+    var pk_bytes = pub_key.getX().toArrayLike(Buffer, "le", 32);
+    var r = balke2bHStar(t, msg);
+    var r_g = exports.altjubjubCurve.g.mul(r);
+    var r_g_bytes = r_g.getX().toArrayLike(Buffer, "le", 32);
+    var concat = Buffer.concat([pk_bytes, r_g_bytes]);
+    var concat_hash_bytes = pedersenHash(concat).getX().toArrayLike(Buffer, "le", 32);
+    var msg_padded = Buffer.alloc(32, 0);
+    msg.copy(msg_padded, 0, 0, 32);
+    var s = wrapScalar(pedersenHStar(Buffer.concat([concat_hash_bytes, msg_padded])).mul(priv_key).add(r));
+    var signature = Buffer.concat([serializePointPacked(r_g), s.toArrayLike(Buffer, "le", 32)]).toString("hex");
+    var pubkey = serializePointPacked(pub_key).toString("hex");
+    return { pub_key: pubkey, sign: signature };
+}
+exports.musigPedersen = musigPedersen;
+function privateKeyToPublicKey(pk) {
+    return exports.altjubjubCurve.g.mul(pk);
+}
+exports.privateKeyToPublicKey = privateKeyToPublicKey;
+function pubkeyToAddress(pubKey) {
+    var x = pubKey.getX().toArrayLike(Buffer, "le", 32);
+    var y = pubKey.getY().toArrayLike(Buffer, "le", 32);
+    var res = pedersenHash(Buffer.concat([x, y])).getX().toArrayLike(Buffer, "le", 32).slice(0, exports.addressLen).reverse();
+    return res;
+}
+exports.pubkeyToAddress = pubkeyToAddress;
+function serializePointPacked(point) {
+    var y = point.getY();
+    var y_buff = y.toArrayLike(Buffer, "le", 32);
+    if (exports.altjubjubCurve.pointFromY(y, true).getX().eq(point.getX())) {
+        //x is odd
+        y_buff[y_buff.length - 1] |= (1 << 7);
+    }
+    return y_buff;
+}
+exports.serializePointPacked = serializePointPacked;
+function signTransactionBytes(privKey, bytes) {
+    return musigPedersen(privKey, bytes);
+}
+exports.signTransactionBytes = signTransactionBytes;
+function privateKeyFromSeed(seed) {
+    var privateKey = wrapScalar(new BN(crypto_js_1.HmacSHA512(seed.toString('hex'), 'Matter seed').toString(), 'hex'));
+    var publicKey = privateKeyToPublicKey(privateKey);
+    return { privateKey: privateKey, publicKey: publicKey };
+}
+exports.privateKeyFromSeed = privateKeyFromSeed;

@@ -9,15 +9,22 @@ export const ERC20MintableContract = function () {
     contract.evm = {bytecode: contract.bytecode};
     return contract
 }();
+
 export const franklinContractCode = require('../build/Franklin');
 export const verifierContractCode = require('../build/Verifier');
 export const governanceContractCode = require('../build/Governance');
 export const priorityQueueContractCode = require('../build/PriorityQueue')
 
+
+export const franklinTestContractCode = require('../build/FranklinTest');
+export const verifierTestContractCode = require('../build/VerifierTest');
+export const governanceTestContractCode = require('../build/GovernanceTest');
+export const priorityQueueTestContractCode = require('../build/PriorityQueueTest')
+
 export async function deployGovernance(
     wallet,
-    governorAddress = wallet.address,
-    governanceCode = governanceContractCode
+    governorAddress,
+    governanceCode
     ) {
     try {
         let governance = await deployContract(wallet, governanceCode, [governorAddress], {
@@ -33,8 +40,8 @@ export async function deployGovernance(
 
 export async function deployPriorityQueue(
     wallet,
-    ownerAddress = wallet.address,
-    priorityQueueCode = priorityQueueContractCode
+    ownerAddress,
+    priorityQueueCode
 ) {
     try {
         let priorityQueue = await deployContract(wallet, priorityQueueCode, [ownerAddress], {
@@ -50,7 +57,7 @@ export async function deployPriorityQueue(
 
 export async function deployVerifier(
     wallet,
-    verifierCode = verifierContractCode
+    verifierCode
 ) {
     try {
         let verifier = await deployContract(wallet, verifierCode, [], {
@@ -69,8 +76,8 @@ export async function deployFranklin(
     governanceAddress,
     priorityQueueAddress,
     verifierAddress,
-    genesisRoot = ethers.constants.HashZero,
-    franklinCode = franklinContractCode
+    franklinCode,
+    genesisRoot = ethers.constants.HashZero
 ) {
     try {
         let contract = await deployContract(

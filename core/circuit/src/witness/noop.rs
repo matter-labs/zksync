@@ -5,7 +5,7 @@ use crate::operation::*;
 use ff::{Field, PrimeField};
 
 use crate::account::AccountWitness;
-
+use crate::operation::SignatureData;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::le_bit_vector_into_field_element;
 
@@ -17,9 +17,8 @@ pub fn noop_operation(
     first_sig_msg: &Fr,
     second_sig_msg: &Fr,
     third_sig_msg: &Fr,
-    signature: Option<TransactionSignature<Bn256>>,
-    signer_pub_key_x: &Fr,
-    signer_pub_key_y: &Fr,
+    signature_data: &SignatureData,
+    signer_pub_key_packed: &[Option<bool>],
 ) -> Operation<Bn256> {
     let acc = tree.get(acc_id).unwrap();
     let account_address_fe = Fr::from_str(&acc_id.to_string()).unwrap();
@@ -43,9 +42,8 @@ pub fn noop_operation(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signature_data: signature_data.clone(),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
 
         args: OperationArguments {
             ethereum_key: Some(Fr::zero()),
@@ -54,6 +52,7 @@ pub fn noop_operation(
             fee: Some(Fr::zero()),
             a: Some(Fr::zero()),
             b: Some(Fr::zero()),
+            pub_nonce: Some(Fr::zero()),
             new_pub_key_hash: Some(Fr::zero()),
         },
         lhs: OperationBranch {
@@ -173,7 +172,7 @@ mod test {
         tree.insert(account_address, sender_leaf_initial);
 
         let sig_bits_to_hash = vec![false; 1]; //just a trash for consistency
-        let (signature, first_sig_part, second_sig_part, third_sig_part) =
+        let (signature_data, first_sig_part, second_sig_part, third_sig_part) =
             generate_sig_data(&sig_bits_to_hash, &phasher, &sender_sk, params);
 
         // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
@@ -184,9 +183,8 @@ mod test {
             &first_sig_part,
             &second_sig_part,
             &third_sig_part,
-            signature,
-            &sender_x,
-            &sender_y,
+            &signature_data,
+            &[Some(false); 256],
         );
         let (_, validator_account_witness) = apply_fee(&mut tree, validator_address_number, 0, 0);
         let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);

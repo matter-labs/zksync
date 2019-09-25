@@ -1,13 +1,12 @@
 use super::{Nonce, TokenId};
 use crate::node::{pack_fee_amount, pack_token_amount};
 use bigdecimal::BigDecimal;
-use bigdecimal::ToPrimitive;
 use crypto::{digest::Digest, sha2::Sha256};
 
 use super::account::AccountAddress;
 use super::Engine;
 use crate::params::JUBJUB_PARAMS;
-use crate::primitives::pedersen_hash_tx_msg;
+use crate::primitives::{pedersen_hash_tx_msg, big_decimal_to_u128};
 use failure::{ensure, format_err};
 use ff::{PrimeField, PrimeFieldRepr};
 use franklin_crypto::alt_babyjubjub::fs::FsRepr;
@@ -40,7 +39,7 @@ pub struct Transfer {
 
 impl Transfer {
     const TX_TYPE: u8 = 5;
-    fn get_bytes(&self) -> Vec<u8> {
+    pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.from.data);
@@ -80,13 +79,13 @@ pub struct Withdraw {
 
 impl Withdraw {
     const TX_TYPE: u8 = 3;
-    fn get_bytes(&self) -> Vec<u8> {
+    pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.account.data);
         out.extend_from_slice(self.eth_address.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
-        out.extend_from_slice(&self.amount.to_u128().unwrap().to_be_bytes());
+        out.extend_from_slice(&big_decimal_to_u128(&self.amount).to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
@@ -115,7 +114,7 @@ pub struct Close {
 impl Close {
     const TX_TYPE: u8 = 4;
 
-    fn get_bytes(&self) -> Vec<u8> {
+    pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.account.data);

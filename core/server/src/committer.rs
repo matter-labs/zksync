@@ -87,7 +87,7 @@ fn run_committer(
                         .expect("committer must commit the op into db");
                     tx_for_eth
                         .send(op)
-                        .expect("must send an operation for commitment to ethereum");
+                        .expect("must send an operation for verification to ethereum");
                     last_verified_block += 1;
                 } else {
                     break;

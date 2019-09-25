@@ -4,15 +4,18 @@ use crate::operation::*;
 
 use ff::{Field, PrimeField};
 
+use crate::operation::SignatureData;
 use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
+
 use num_traits::cast::ToPrimitive;
 
 use models::node::WithdrawOp;
 use models::params as franklin_constants;
 use pairing::bn256::*;
+use models::primitives::big_decimal_to_u128;
 
 pub struct WithdrawData {
     pub amount: u128,
@@ -112,15 +115,15 @@ pub fn apply_withdraw_tx(
     tree: &mut CircuitAccountTree,
     withdraw: &WithdrawOp,
 ) -> WithdrawWitness<Bn256> {
-    let transfer_data = WithdrawData {
-        amount: withdraw.tx.amount.to_u128().unwrap(),
-        fee: withdraw.tx.fee.to_u128().unwrap(),
+    let withdraw_data = WithdrawData {
+        amount: big_decimal_to_u128(&withdraw.tx.amount),
+        fee: big_decimal_to_u128(&withdraw.tx.fee),
         token: u32::from(withdraw.tx.token),
         account_address: withdraw.account_id,
         ethereum_key: Fr::from_hex(&format!("{:x}", &withdraw.tx.eth_address)).unwrap(),
     };
     // le_bit_vector_into_field_element()
-    apply_withdraw(tree, &transfer_data)
+    apply_withdraw(tree, &withdraw_data)
 }
 pub fn apply_withdraw(
     tree: &mut CircuitAccountTree,
@@ -173,12 +176,8 @@ pub fn apply_withdraw(
                 acc.nonce.add_assign(&Fr::from_str("1").unwrap());
             },
             |bal| {
-                if withdraw.amount == 0 {
-                    bal.value = Fr::zero();
-                } else {
-                    bal.value.sub_assign(&amount_as_field_element);
-                    bal.value.sub_assign(&fee_as_field_element);
-                }
+                bal.value.sub_assign(&amount_as_field_element);
+                bal.value.sub_assign(&fee_as_field_element);
             },
         );
 
@@ -217,6 +216,7 @@ pub fn apply_withdraw(
             amount_packed: Some(amount_encoded),
             full_amount: Some(amount_as_field_element),
             fee: Some(fee_encoded),
+            pub_nonce: Some(Fr::zero()),
             a: Some(a),
             b: Some(b),
             new_pub_key_hash: Some(Fr::zero()),
@@ -231,9 +231,8 @@ pub fn calculate_withdraw_operations_from_witness(
     first_sig_msg: &Fr,
     second_sig_msg: &Fr,
     third_sig_msg: &Fr,
-    signature: Option<TransactionSignature<Bn256>>,
-    signer_pub_key_x: &Fr,
-    signer_pub_key_y: &Fr,
+    signature_data: &SignatureData,
+    signer_pub_key_packed: &[Option<bool>],
 ) -> Vec<Operation<Bn256>> {
     let pubdata_chunks: Vec<_> = withdraw_witness
         .get_pubdata()
@@ -249,9 +248,8 @@ pub fn calculate_withdraw_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signature_data: signature_data.clone(),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: withdraw_witness.args.clone(),
         lhs: withdraw_witness.before.clone(),
         rhs: withdraw_witness.before.clone(),
@@ -265,9 +263,8 @@ pub fn calculate_withdraw_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signature_data: signature_data.clone(),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: withdraw_witness.args.clone(),
         lhs: withdraw_witness.after.clone(),
         rhs: withdraw_witness.after.clone(),
@@ -281,9 +278,8 @@ pub fn calculate_withdraw_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signature_data: signature_data.clone(),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: withdraw_witness.args.clone(),
         lhs: withdraw_witness.after.clone(),
         rhs: withdraw_witness.after.clone(),
@@ -297,9 +293,8 @@ pub fn calculate_withdraw_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signature_data: signature_data.clone(),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: withdraw_witness.args.clone(),
         lhs: withdraw_witness.after.clone(),
         rhs: withdraw_witness.after.clone(),
@@ -312,9 +307,8 @@ pub fn calculate_withdraw_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signature_data: signature_data.clone(),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: withdraw_witness.args.clone(),
         lhs: withdraw_witness.after.clone(),
         rhs: withdraw_witness.after.clone(),
@@ -327,9 +321,8 @@ pub fn calculate_withdraw_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signature_data: signature_data.clone(),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: withdraw_witness.args.clone(),
         lhs: withdraw_witness.after.clone(),
         rhs: withdraw_witness.after.clone(),
@@ -351,7 +344,6 @@ mod test {
 
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
-
     use ff::{Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
     use franklin_crypto::circuit::test::*;
@@ -362,7 +354,9 @@ mod test {
     };
     use models::circuit::utils::*;
     use models::merkle_tree::PedersenHasher;
+    use models::node::tx::PackedPublicKey;
     use models::params as franklin_constants;
+    use num_traits::cast::ToPrimitive;
     use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
     #[ignore]
@@ -442,21 +436,26 @@ mod test {
             },
         );
 
-        let (signature, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
+        let (signature_data, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
             &withdraw_witness.get_sig_bits(),
             &phasher,
             &sender_sk,
             params,
         );
+        let packed_public_key = PackedPublicKey(sender_pk);
+        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
 
         let operations = calculate_withdraw_operations_from_witness(
             &withdraw_witness,
             &first_sig_part,
             &second_sig_part,
             &third_sig_part,
-            signature,
-            &sender_x,
-            &sender_y,
+            &signature_data,
+            &signer_packed_key_bits,
         );
 
         let (root_after_fee, validator_account_witness) =

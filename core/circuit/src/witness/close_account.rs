@@ -2,6 +2,7 @@ use super::utils::*;
 
 use crate::operation::*;
 
+use crate::operation::SignatureData;
 use ff::{Field, PrimeField};
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
@@ -130,6 +131,7 @@ pub fn apply_close_account(
             ethereum_key: Some(Fr::zero()),
             amount_packed: Some(Fr::zero()),
             full_amount: Some(Fr::zero()),
+            pub_nonce: Some(Fr::zero()),
             fee: Some(Fr::zero()),
             a: Some(a),
             b: Some(b),
@@ -146,9 +148,8 @@ pub fn calculate_close_account_operations_from_witness(
     first_sig_msg: &Fr,
     second_sig_msg: &Fr,
     third_sig_msg: &Fr,
-    signature: Option<TransactionSignature<Bn256>>,
-    signer_pub_key_x: &Fr,
-    signer_pub_key_y: &Fr,
+    signature_data: &SignatureData,
+    signer_pub_key_packed: &[Option<bool>],
 ) -> Vec<Operation<Bn256>> {
     let pubdata_chunks: Vec<_> = close_account_witness
         .get_pubdata()
@@ -163,9 +164,8 @@ pub fn calculate_close_account_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signature_data: signature_data.clone(),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: close_account_witness.args.clone(),
         lhs: close_account_witness.before.clone(),
         rhs: close_account_witness.before.clone(),
@@ -190,8 +190,8 @@ mod test {
     use franklin_crypto::jubjub::FixedGenerators;
     use models::circuit::account::{CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
     use models::circuit::utils::*;
+    use models::node::tx::PackedPublicKey;
     use models::params as franklin_constants;
-
     use rand::{Rng, SeedableRng, XorShiftRng};
 
     #[test]
@@ -246,21 +246,26 @@ mod test {
         //-------------- Start applying changes to state
         let close_account_witness =
             apply_close_account(&mut tree, &CloseAccountData { account_address });
-        let (signature, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
+        let (signature_data, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
             &close_account_witness.get_sig_bits(),
             &phasher,
             &sender_sk,
             params,
         );
+        let packed_public_key = PackedPublicKey(sender_pk);
+        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
 
         let operations = calculate_close_account_operations_from_witness(
             &close_account_witness,
             &first_sig_part,
             &second_sig_part,
             &third_sig_part,
-            signature,
-            &sender_x,
-            &sender_y,
+            &signature_data,
+            &signer_packed_key_bits,
         );
 
         println!("tree before_applying fees: {}", tree.root_hash());
