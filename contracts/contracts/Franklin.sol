@@ -694,10 +694,10 @@ contract Franklin {
             "fvk12"
         ); // fvk12 - not a validator in verify
 
-        require(
-            verifier.verifyBlockProof(_proof, blocks[_blockNumber].commitment),
-            "fvk13"
-        ); // fvk13 - verification failed
+//        require(
+//            verifier.verifyBlockProof(_proof, blocks[_blockNumber].commitment),
+//            "fvk13"
+//        ); // fvk13 - verification failed
 
         consummateOnchainOps(_blockNumber);
 
