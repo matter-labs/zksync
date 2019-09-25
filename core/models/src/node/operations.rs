@@ -89,10 +89,10 @@ impl TransferToNewOp {
         let from_pre_length = 0;
         let to_pre_length = ACCOUNT_ID_BYTES_LEGTH +
             TOKEN_BYTES_LENGTH +
-            FULL_AMOUNT_BYTES_LEGTH +
+            PACKED_AMOUNT_BYTES_LEGTH +
             FR_ADDRESS_LEN;
         Self {
-            tx: Transfer::from_bytes(bytes),
+            tx: Transfer::from_transfer_to_new_bytes(bytes),
             from: AccountId::from_be_bytes(bytes[from_pre_length .. from_pre_length + ACCOUNT_ID_BYTES_LEGTH]),
             to: AccountId::from_be_bytes(bytes[to_pre_length .. to_pre_length + ACCOUNT_ID_BYTES_LEGTH])
         }
@@ -127,7 +127,7 @@ impl TransferOp {
         let to_pre_length = ACCOUNT_ID_BYTES_LEGTH +
             TOKEN_BYTES_LENGTH;
         Self {
-            tx: Transfer::from_bytes(bytes),
+            tx: Transfer::from_transfer_bytes(bytes),
             from: AccountId::from_be_bytes(bytes[from_pre_length .. from_pre_length + ACCOUNT_ID_BYTES_LEGTH]),
             to: AccountId::from_be_bytes(bytes[to_pre_length .. to_pre_length + ACCOUNT_ID_BYTES_LEGTH])
         }
@@ -186,7 +186,7 @@ impl CloseOp {
     pub fn from_bytes(bytes: &Vec<u8>) -> Self {
         let pre_length = 0;
         Self {
-            tx: Withdraw::from_bytes(bytes),
+            tx: Close::from_bytes(bytes),
             account_id: AccountId::from_be_bytes(bytes[pre_length .. pre_length + ACCOUNT_ID_BYTES_LEGTH])
         }
     }

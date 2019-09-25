@@ -29,6 +29,12 @@ impl std::fmt::Debug for AccountAddress {
 }
 
 impl AccountAddress {
+    pub fn zero() -> Self {
+        AccountAddress {
+            data: [0; params::FR_ADDRESS_LEN]
+        }
+    }
+
     pub fn to_hex(&self) -> String {
         format!("0x{}", hex::encode(&self.data))
     }

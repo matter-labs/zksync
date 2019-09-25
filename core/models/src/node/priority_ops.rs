@@ -79,7 +79,7 @@ impl FullExit {
         let signature_s_pre_length = signature_r_pre_length +
             SIGNATURE_R_BYTES_LEGTH;
         Self {
-            packed_pubkey: Box::from(bytes[packed_pubkey_pre_length .. packed_pubkey_pre_length + PUBKEY_PACKED_BYTES_LEGTH]), // In current circuit there is no sender in deposit pubdata
+            packed_pubkey: Box::from(bytes[packed_pubkey_pre_length .. packed_pubkey_pre_length + PUBKEY_PACKED_BYTES_LEGTH]),
             eth_address: Address::from_slice(bytes[eth_address_pre_length .. eth_address_pre_length + ETH_ADDR_BYTES_LEGTH]),
             token: TokenId::from_be_bytes(bytes[token_pre_length .. token_pre_length + TOKEN_BYTES_LENGTH]),
             nonce: Nonce::from_be_bytes(bytes[nonce_pre_length .. nonce_pre_length + NONCE_BYTES_LEGTH]),

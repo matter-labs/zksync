@@ -1,5 +1,24 @@
 use super::{Nonce, TokenId};
 use crate::node::{pack_fee_amount, pack_token_amount};
+use super::operations::{
+    DEPOSIT_OP_CODE,
+    TRANSFER_TO_NEW_OP_CODE,
+    WITHDRAW_OP_CODE_OP_CODE,
+    CLOSE_OP_CODE,
+    TRANSFER_OP_CODE,
+    FULL_EXIT_OP_CODE,
+    TX_TYPE_BYTES_LEGTH,
+    ACCOUNT_ID_BYTES_LEGTH,
+    TOKEN_BYTES_LENGTH,
+    FULL_AMOUNT_BYTES_LEGTH,
+    FEE_BYTES_LEGTH,
+    ETH_ADDR_BYTES_LEGTH,
+    PACKED_AMOUNT_BYTES_LEGTH,
+    NONCE_BYTES_LEGTH,
+    SIGNATURE_R_BYTES_LEGTH,
+    SIGNATURE_S_BYTES_LEGTH,
+    PUBKEY_PACKED_BYTES_LEGTH,
+}
 use bigdecimal::BigDecimal;
 use bigdecimal::ToPrimitive;
 use crypto::{digest::Digest, sha2::Sha256};
@@ -40,6 +59,44 @@ pub struct Transfer {
 
 impl Transfer {
     const TX_TYPE: u8 = 5;
+
+    pub fn from_transfer_to_new_bytes(bytes: &Vec<u8>) -> Self {
+        let token_id_pre_length = ACCOUNT_ID_BYTES_LEGTH;
+        let amount_pre_length = token_id_pre_length +
+            TOKEN_BYTES_LENGTH;
+        let to_pre_length = amount_pre_length +
+            PACKED_AMOUNT_BYTES_LEGTH;
+        let fee_pre_length = to_pre_length +
+            ACCOUNT_ID_BYTES_LEGTH;
+        Self {
+            from: AccountAddress::zero(), // From pubdata its unknown
+            to: AccountAddress::from_bytes(bytes[to_pre_length .. to_pre_length + FR_ADDRESS_LEN]),
+            token: TokenId::from_be_bytes(bytes[token_id_pre_length .. token_id_pre_length + TOKEN_BYTES_LENGTH]),
+            amount: unpack_token_amount(bytes[amount_pre_length .. amount_pre_length + PACKED_AMOUNT_BYTES_LEGTH]),
+            fee: unpack_fee_amount(bytes[fee_pre_length .. fee_pre_length + FEE_BYTES_LEGTH]),
+            nonce: 0, // From pubdata its unknown
+            signature: TxSignature::default() // From pubdata its unknown
+        }
+    }
+
+    pub fn from_transfer_bytes(bytes: &Vec<u8>) -> Self {
+        let token_id_pre_length = ACCOUNT_ID_BYTES_LEGTH;
+        let amount_pre_length = token_id_pre_length +
+            TOKEN_BYTES_LENGTH +
+            ACCOUNT_ID_BYTES_LEGTH;
+        let fee_pre_length = amount_pre_length +
+            PACKED_AMOUNT_BYTES_LEGTH;
+        Self {
+            from: AccountAddress::zero(), // From pubdata its unknown
+            to: AccountAddress::zero(), // From pubdata its unknown
+            token: TokenId::from_be_bytes(bytes[token_id_pre_length .. token_id_pre_length + TOKEN_BYTES_LENGTH]),
+            amount: unpack_token_amount(bytes[amount_pre_length .. amount_pre_length + PACKED_AMOUNT_BYTES_LEGTH]),
+            fee: unpack_fee_amount(bytes[fee_pre_length .. fee_pre_length + FEE_BYTES_LEGTH]),
+            nonce: 0, // From pubdata its unknown
+            signature: TxSignature::default() // From pubdata its unknown
+        }
+    }
+
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
@@ -80,6 +137,27 @@ pub struct Withdraw {
 
 impl Withdraw {
     const TX_TYPE: u8 = 3;
+
+    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        let token_id_pre_length = ACCOUNT_ID_BYTES_LEGTH;
+        let amount_pre_length = token_id_pre_length +
+            TOKEN_BYTES_LENGTH;
+        let fee_pre_length = amount_pre_length +
+            FULL_AMOUNT_BYTES_LEGTH;
+        let eth_address_pre_length = fee_pre_length +
+            FEE_BYTES_LEGTH;
+
+        Self {
+            from: AccountAddress::zero(), // From pubdata its unknown
+            eth_address: Address::from_slice(bytes[eth_address_pre_length .. eth_address_pre_length + ETH_ADDR_BYTES_LEGTH]),
+            token: TokenId::from_be_bytes(bytes[token_id_pre_length .. token_id_pre_length + TOKEN_BYTES_LENGTH]),
+            amount: BigDecimal::parse_bytes(bytes[amount_pre_length .. amount_pre_length + FULL_AMOUNT_BYTES_LEGTH].to_vec(), 18),
+            fee: unpack_fee_amount(bytes[fee_pre_length .. fee_pre_length + FEE_BYTES_LEGTH]),
+            nonce: 0, // From pubdata its unknown
+            signature: TxSignature::default() // From pubdata its unknown
+        }
+    }
+
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
@@ -121,6 +199,14 @@ impl Close {
         out.extend_from_slice(&self.account.data);
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
+    }
+
+    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        Self {
+            account: AccountAddress::zero(), // From pubdata its unknown
+            nonce: 0, // From pubdata its unknown
+            signature: TxSignature::default() // From pubdata its unknown
+        }
     }
 
     pub fn verify_signature(&self) -> bool {
