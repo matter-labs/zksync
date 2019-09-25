@@ -33,11 +33,11 @@ fn get_franklin_ops_from_block(ops_block: FranklinOpsBlock) -> Result<Vec<Frankl
         let op_type: &u8 = &ops_block.commitment_data[current_pointer];
 
         let chunks: usize = FranklinOp::chunks_by_op_number(op_type)
-            .ok_or(|e| DataRestoreError::WrongType)?;;
+            .ok_or(|e| DataRestoreError::WrongType)?;
         let full_size: usize = 8 * chunks;
 
         let pub_data_size: usize = FranklinOp::public_data_length(op_type)
-            .ok_or(|e| DataRestoreError::WrongType)?;;
+            .ok_or(|e| DataRestoreError::WrongType)?;
 
         let pre = current_pointer + TX_TYPE_BYTES_LEGTH;
         let post = pre + pub_data_size;
