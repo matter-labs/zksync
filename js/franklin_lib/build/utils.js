@@ -72,26 +72,9 @@ function integerToFloat(integer, exp_bits, mantissa_bits, exp_base) {
     }
     var exponent = 0;
     var mantissa = integer;
-    if (integer.gt(max_mantissa)) {
-        // always try best precision
-        var exponent_guess = integer.div(max_mantissa);
-        var exponent_temp = exponent_guess;
-        while (true) {
-            if (exponent_temp.ltn(exp_base)) {
-                break;
-            }
-            exponent_temp = exponent_temp.divn(exp_base);
-            exponent += 1;
-        }
-        exponent_temp = new BN(1);
-        for (var i = 0; i < exponent; ++i) {
-            exponent_temp = exponent_temp.muln(exp_base);
-        }
-        if (exponent_temp.mul(max_mantissa) < integer) {
-            exponent += 1;
-            exponent_temp = exponent_temp.muln(exp_base);
-        }
-        mantissa = integer.div(exponent_temp);
+    while (mantissa.gt(max_mantissa)) {
+        mantissa = mantissa.divn(exp_base);
+        exponent += 1;
     }
     // encode into bits. First bits of mantissa in LE order
     var encoding = [];

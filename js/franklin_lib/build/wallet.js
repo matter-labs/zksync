@@ -243,7 +243,7 @@ var Wallet = /** @class */ (function () {
                         return [4 /*yield*/, erc20DeployedToken.approve(franklinDeployedContract.address, amount)];
                     case 3:
                         _a.sent();
-                        return [4 /*yield*/, franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address, { gasLimit: bigNumberify("150000"), value: parseEther("0.01") })];
+                        return [4 /*yield*/, franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address, { gasLimit: bigNumberify("300000"), value: parseEther("0.05") })];
                     case 4:
                         tx = _a.sent();
                         return [2 /*return*/, tx.hash];
