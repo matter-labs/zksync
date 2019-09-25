@@ -21,7 +21,9 @@ ALTER TABLE operations
 
 create table blocks
 (
-    number         bigint primary key,
-    root_hash      text   not null,
-    fee_account_id bigint not null
+    number                      bigint primary key,
+    root_hash                   text   not null,
+    fee_account_id              bigint not null,
+    unprocessed_prior_op_before bigint not null,
+    unprocessed_prior_op_after  bigint not null
 );

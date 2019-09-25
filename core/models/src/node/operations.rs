@@ -2,8 +2,8 @@ use super::AccountId;
 use super::FranklinTx;
 use super::{pack_fee_amount, pack_token_amount, Deposit, FullExit};
 use super::{Close, Transfer, Withdraw};
-use crate::primitives::big_decimal_to_u128;
 use crate::node::FranklinPriorityOp;
+use crate::primitives::big_decimal_to_u128;
 use bigdecimal::BigDecimal;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

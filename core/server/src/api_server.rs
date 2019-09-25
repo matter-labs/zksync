@@ -5,7 +5,7 @@ use actix_web::{
     HttpMessage, HttpRequest, HttpResponse,
 };
 use models::node::{tx::FranklinTx, Account, AccountId};
-use models::{ActionType, NetworkStatus, StateKeeperRequest};
+use models::{NetworkStatus, StateKeeperRequest};
 use std::sync::mpsc;
 use storage::{BlockDetails, ConnectionPool};
 
@@ -277,7 +277,7 @@ fn handle_get_account_transactions(req: &HttpRequest<AppState>) -> ActixResult<H
             .get_account_transactions(&address)
             .map_err(|_| HttpResponse::InternalServerError().body(Body::Empty))
     });
-    
+
     let res = match storage_query_result {
         Ok(txs) => txs,
         Err(e) => {
@@ -477,49 +477,50 @@ fn handle_get_blocks(
         .responder()
 }
 
-fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-    let pool = req.state().connection_pool.clone();
-
-    let storage = pool.access_storage();
-    if storage.is_err() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "rate limit".to_string(),
-        }));
-    }
-    let storage = storage.unwrap();
-
-    let block_id_string = req.match_info().get("block_id");
-    if block_id_string.is_none() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "invalid parameters".to_string(),
-        }));
-    }
-    let block_id = block_id_string.unwrap().parse::<u32>();
-    if block_id.is_err() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "invalid block_id".to_string(),
-        }));
-    }
-
-    let block_id_u32 = block_id.unwrap();
-
-    let stored_commit_operation =
-        storage.load_stored_op_with_block_number(block_id_u32, ActionType::COMMIT);
-    if stored_commit_operation.is_none() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "not found".to_string(),
-        }));
-    }
-
-    let commit = stored_commit_operation.unwrap();
-
-    let txs = commit.get_txs();
-    match txs {
-        Ok(res) => Ok(HttpResponse::Ok().json(res)),
-        Err(err) => Ok(HttpResponse::Ok().json(ApiError {
-            error: format!("error: {}", err),
-        })),
-    }
+fn handle_get_block_transactions(_req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    unimplemented!("Fix prover");
+    //    let pool = req.state().connection_pool.clone();
+    //
+    //    let storage = pool.access_storage();
+    //    if storage.is_err() {
+    //        return Ok(HttpResponse::Ok().json(ApiError {
+    //            error: "rate limit".to_string(),
+    //        }));
+    //    }
+    //    let storage = storage.unwrap();
+    //
+    //    let block_id_string = req.match_info().get("block_id");
+    //    if block_id_string.is_none() {
+    //        return Ok(HttpResponse::Ok().json(ApiError {
+    //            error: "invalid parameters".to_string(),
+    //        }));
+    //    }
+    //    let block_id = block_id_string.unwrap().parse::<u32>();
+    //    if block_id.is_err() {
+    //        return Ok(HttpResponse::Ok().json(ApiError {
+    //            error: "invalid block_id".to_string(),
+    //        }));
+    //    }
+    //
+    //    let block_id_u32 = block_id.unwrap();
+    //
+    //    let stored_commit_operation =
+    //        storage.load_stored_op_with_block_number(block_id_u32, ActionType::COMMIT);
+    //    if stored_commit_operation.is_none() {
+    //        return Ok(HttpResponse::Ok().json(ApiError {
+    //            error: "not found".to_string(),
+    //        }));
+    //    }
+    //
+    //    let commit = stored_commit_operation.unwrap();
+    //
+    //    let txs = commit.get_txs();
+    //    match txs {
+    //        Ok(res) => Ok(HttpResponse::Ok().json(res)),
+    //        Err(err) => Ok(HttpResponse::Ok().json(ApiError {
+    //            error: format!("error: {}", err),
+    //        })),
+    //    }
 }
 
 //#[allow(dead_code)]

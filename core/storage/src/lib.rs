@@ -9,10 +9,8 @@ use diesel::dsl::*;
 use failure::{bail, Fail};
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::{
-    apply_updates, reverse_updates,
-    tx::{FranklinTx, TxType},
-    Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, FranklinOp, Nonce,
-    PriorityOp, TokenId,
+    apply_updates, reverse_updates, tx::FranklinTx, Account, AccountId, AccountMap, AccountUpdate,
+    AccountUpdates, BlockNumber, Fr, FranklinOp, PriorityOp, TokenId,
 };
 use models::{Action, ActionType, EncodedProof, Operation, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
@@ -31,11 +29,9 @@ use diesel::r2d2::{ConnectionManager, Pool, PoolError, PooledConnection};
 use serde_json::value::Value;
 use std::env;
 
-
 use diesel::sql_types::{BigInt, Nullable, Text, Timestamp};
 sql_function!(coalesce, Coalesce, (x: Nullable<BigInt>, y: BigInt) -> BigInt);
 
-use diesel::result::Error;
 use itertools::Itertools;
 use models::node::AccountAddress;
 
@@ -169,22 +165,34 @@ struct StoredExecutedTransaction {
 }
 
 impl StoredExecutedTransaction {
-    fn try_into_successful_tx(self) -> Result<ExecutedTx, failure::Error> {
-        let franklin_op: FranklinOp = if let Some(op) = self.operation {
-            serde_json::from_value(op).expect("Unparsable FranklinOp in db")
+    fn into_executed_tx(self, stored_tx: Option<ReadTx>) -> Result<ExecutedTx, failure::Error> {
+        if let Some(op) = self.operation {
+            let franklin_op: FranklinOp =
+                serde_json::from_value(op).expect("Unparsable FranklinOp in db");
+            Ok(ExecutedTx {
+                tx: franklin_op
+                    .try_get_tx()
+                    .expect("FranklinOp should not have tx"),
+                success: true,
+                op: Some(franklin_op),
+                fail_reason: None,
+                block_index: Some(self.block_index.expect("Block idx should be set") as u32),
+            })
         } else {
-            bail!("Transaction was not successful");
-        };
-
-        Ok(ExecutedTx {
-            tx: franklin_op
-                .try_get_tx()
-                .expect("FranklinOp should not have tx"),
-            success: true,
-            op: Some(franklin_op),
-            fail_reason: None,
-            block_index: Some(self.block_index.expect("Block idx should be set") as u32),
-        })
+            if let Some(stored_tx) = stored_tx {
+                let tx: FranklinTx =
+                    serde_json::from_value(stored_tx.tx).expect("Unparsable tx in db");
+                Ok(ExecutedTx {
+                    tx,
+                    success: false,
+                    op: None,
+                    fail_reason: self.fail_reason,
+                    block_index: None,
+                })
+            } else {
+                bail!("Unsuccessful tx was lost from db.");
+            }
+        }
     }
 }
 
@@ -388,6 +396,8 @@ struct StorageBlock {
     number: i64,
     root_hash: String,
     fee_account_id: i64,
+    unprocessed_prior_op_before: i64,
+    unprocessed_prior_op_after: i64,
 }
 
 impl StoredOperation {
@@ -599,7 +609,7 @@ pub struct AccountTransaction {
     success: bool,
     fail_reason: Option<String>,
     committed: bool,
-    verified: bool
+    verified: bool,
 }
 
 enum ConnectionHolder {
@@ -683,8 +693,10 @@ impl StorageProcessor {
 
             let new_block = StorageBlock {
                 number: block.block_number as i64,
-                root_hash: block.new_root_hash.to_string(),
+                root_hash: block.new_root_hash.to_hex(),
                 fee_account_id: block.fee_account as i64,
+                unprocessed_prior_op_before: block.processed_priority_ops.0 as i64,
+                unprocessed_prior_op_after: block.processed_priority_ops.1 as i64,
             };
 
             diesel::insert_into(blocks::table)
@@ -695,7 +707,7 @@ impl StorageProcessor {
         })
     }
 
-    fn save_block_transactions(&self, block: &Block) -> QueryResult<()> {
+    pub fn save_block_transactions(&self, block: &Block) -> QueryResult<()> {
         for block_tx in block.block_transactions.iter() {
             match block_tx {
                 ExecutedOperations::Tx(tx) => {
@@ -720,16 +732,24 @@ impl StorageProcessor {
         Ok(())
     }
 
-    pub fn get_block(&self, block: BlockNumber) -> QueryResult<Option<Block>> {
-        unimplemented!();
-    }
-
-    pub fn get_account_transactions(&self, address: &AccountAddress) -> QueryResult<Vec<AccountTransaction>> {
+    pub fn get_account_transactions(
+        &self,
+        address: &AccountAddress,
+    ) -> QueryResult<Vec<AccountTransaction>> {
         let all_txs: Vec<_> = mempool::table
             .filter(mempool::primary_account_address.eq(address.data.to_vec()))
-            .left_join(executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),)
-            .left_join(operations::table.on(operations::block_number.eq(executed_transactions::block_number)))
-            .load::<(ReadTx, Option<StoredExecutedTransaction>, Option<StoredOperation>)>(self.conn())?;
+            .left_join(
+                executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),
+            )
+            .left_join(
+                operations::table
+                    .on(operations::block_number.eq(executed_transactions::block_number)),
+            )
+            .load::<(
+                ReadTx,
+                Option<StoredExecutedTransaction>,
+                Option<StoredOperation>,
+            )>(self.conn())?;
 
         let res = all_txs
             .into_iter()
@@ -744,7 +764,7 @@ impl StorageProcessor {
                     success: false,
                     fail_reason: None,
                     committed: false,
-                    verified: false
+                    verified: false,
                 };
                 if let Some(executed_tx) = executed_tx {
                     res.success = executed_tx.success;
@@ -773,41 +793,78 @@ impl StorageProcessor {
         Ok(res)
     }
 
-    pub fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {
-        let executed_txs: Vec<_> = executed_transactions::table
-            .filter(executed_transactions::block_number.eq(block as i64))
-            .filter(executed_transactions::success.eq(true))
-            .load::<StoredExecutedTransaction>(self.conn())?;
-        let executed_prior_ops: Vec<_> = executed_priority_operations::table
-            .filter(executed_priority_operations::block_number.eq(block as i64))
-            .load::<StoredExecutedPriorityOperation>(self.conn())?;
-
-        let executed_ops = {
-            let mut executed_ops = Vec::new();
-            let txs = executed_txs.into_iter().map(|stored_tx| {
-                ExecutedOperations::Tx(
-                    stored_tx
-                        .try_into_successful_tx()
-                        .expect("Expected successful txs"),
-                )
-            });
-            executed_ops.extend(txs);
-            let ops = executed_prior_ops
-                .into_iter()
-                .map(|stored_op| ExecutedOperations::PriorityOp(stored_op.into()));
-            executed_ops.extend(ops);
-            executed_ops.sort_by_key(|exec_op| match exec_op {
-                ExecutedOperations::Tx(tx) => tx.block_index.expect("expected successful tx"),
-                ExecutedOperations::PriorityOp(op) => op.block_index,
-            });
-            executed_ops
+    pub fn get_block(&self, block: BlockNumber) -> QueryResult<Option<Block>> {
+        let stored_block = if let Some(block) = blocks::table
+            .find(block as i64)
+            .first::<StorageBlock>(self.conn())
+            .optional()?
+        {
+            block
+        } else {
+            return Ok(None);
         };
 
+        let block_transactions = self.get_block_executed_ops(block)?;
+
+        Ok(Some(Block {
+            block_number: block,
+            new_root_hash: Fr::from_hex(&stored_block.root_hash).expect("Unparsable root hash"),
+            fee_account: stored_block.fee_account_id as AccountId,
+            block_transactions,
+            processed_priority_ops: (
+                stored_block.unprocessed_prior_op_before as u64,
+                stored_block.unprocessed_prior_op_after as u64,
+            ),
+        }))
+    }
+
+    fn get_block_executed_ops(&self, block: BlockNumber) -> QueryResult<Vec<ExecutedOperations>> {
+        self.conn().transaction(|| {
+            let mut executed_operations = Vec::new();
+
+            let stored_executed_txs: Vec<_> = executed_transactions::table
+                .left_join(mempool::table.on(executed_transactions::tx_hash.eq(mempool::hash)))
+                .filter(executed_transactions::block_number.eq(block as i64))
+                .load::<(StoredExecutedTransaction, Option<ReadTx>)>(self.conn())?;
+            let executed_txs = stored_executed_txs
+                .into_iter()
+                .filter_map(|(stored_exec, stored_tx)| stored_exec.into_executed_tx(stored_tx).ok())
+                .map(ExecutedOperations::Tx);
+            executed_operations.extend(executed_txs);
+
+            let stored_executed_prior_ops: Vec<_> = executed_priority_operations::table
+                .filter(executed_priority_operations::block_number.eq(block as i64))
+                .load::<StoredExecutedPriorityOperation>(self.conn())?;
+            let executed_prior_ops = stored_executed_prior_ops
+                .into_iter()
+                .map(|op| ExecutedOperations::PriorityOp(op.into()));
+            executed_operations.extend(executed_prior_ops);
+
+            executed_operations.sort_by_key(|exec_op| {
+                match exec_op {
+                    ExecutedOperations::Tx(tx) => {
+                        if let Some(idx) = tx.block_index {
+                            idx
+                        } else {
+                            // failed operations are at the end.
+                            u32::max_value()
+                        }
+                    }
+                    ExecutedOperations::PriorityOp(op) => op.block_index,
+                }
+            });
+
+            Ok(executed_operations)
+        })
+    }
+
+    pub fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {
+        let executed_ops = self.get_block_executed_ops(block)?;
         Ok(executed_ops
             .into_iter()
-            .map(|executed_op| match executed_op {
-                ExecutedOperations::Tx(tx) => tx.op.expect("expected successful tx"),
-                ExecutedOperations::PriorityOp(prior_op) => prior_op.op,
+            .filter_map(|exec_op| match exec_op {
+                ExecutedOperations::Tx(tx) => tx.op,
+                ExecutedOperations::PriorityOp(priorop) => Some(priorop.op),
             })
             .collect())
     }
