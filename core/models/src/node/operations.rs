@@ -1,26 +1,34 @@
+use crate::params::FR_ADDRESS_LEN;
 use super::AccountId;
 use super::{pack_fee_amount, pack_token_amount, Deposit, FullExit};
 use super::{Close, Transfer, Withdraw};
 use bigdecimal::BigDecimal;
 
-pub const DEPOSIT_OP_CODE: u8 = 1;
-pub const TRANSFER_TO_NEW_OP_CODE: u8 = 2;
-pub const WITHDRAW_OP_CODE_OP_CODE: u8 = 3;
-pub const CLOSE_OP_CODE: u8 = 4;
-pub const TRANSFER_OP_CODE: u8 = 5;
-pub const FULL_EXIT_OP_CODE: u8 = 6;
+pub const DEPOSIT_OP_LENGTH: u8 = 43u8;
+pub const TRANSFER_TO_NEW_OP_LENGTH: u8 = 33u8;
+pub const WITHDRAW_OP_LENGTH: u8 = 43u8;
+pub const CLOSE_OP_LENGTH: u8 = 3u8;
+pub const TRANSFER_OP_LENGTH: u8 = 13u8;
+pub const FULL_EXIT_OP_LENGTH: u8 = 141u8;
 
-pub const TX_TYPE_BYTES_LEGTH: u8 = 1;
-pub const ACCOUNT_ID_BYTES_LEGTH: u8 = 3;
-pub const TOKEN_BYTES_LENGTH: u8 = 2;
-pub const FULL_AMOUNT_BYTES_LEGTH: u8 = 16;
-pub const PUBKEY_HASH_BYTES_LEGTH: u8 = 20;
-pub const FEE_BYTES_LEGTH: u8 = 2;
-pub const ETH_ADDR_BYTES_LEGTH: u8 = 20;
-pub const AMOUNT_BYTES_LEGTH: u8 = 3;
-pub const NONCE_BYTES_LEGTH: u8 = 4;
-pub const SIGNATURE_BYTES_LEGTH: u8 = 64;
-pub const PUBKEY_PACKED_BYTES_LEGTH: u8 = 32;
+pub const DEPOSIT_OP_CODE: u8 = 1u8;
+pub const TRANSFER_TO_NEW_OP_CODE: u8 = 2u8;
+pub const WITHDRAW_OP_CODE: u8 = 3u8;
+pub const CLOSE_OP_CODE: u8 = 4u8;
+pub const TRANSFER_OP_CODE: u8 = 5u8;
+pub const FULL_EXIT_OP_CODE: u8 = 6u8;
+
+pub const TX_TYPE_BYTES_LEGTH: u8 = 1u8;
+pub const ACCOUNT_ID_BYTES_LEGTH: u8 = 3u8;
+pub const TOKEN_BYTES_LENGTH: u8 = 2u8;
+pub const FULL_AMOUNT_BYTES_LEGTH: u8 = 16u8;
+pub const FEE_BYTES_LEGTH: u8 = 2u8;
+pub const ETH_ADDR_BYTES_LEGTH: u8 = 20u8;
+pub const PACKED_AMOUNT_BYTES_LEGTH: u8 = 3u8;
+pub const NONCE_BYTES_LEGTH: u8 = 4u8;
+pub const SIGNATURE_R_BYTES_LEGTH: u8 = 32u8;
+pub const SIGNATURE_S_BYTES_LEGTH: u8 = 32u8;
+pub const PUBKEY_PACKED_BYTES_LEGTH: u8 = 32u8;
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,9 +53,10 @@ impl DepositOp {
     }
 
     pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        let pre_length = 0;
         Self {
             priority_op: Deposit::from_bytes(bytes),
-            account_id: AccountId::from_be_bytes(bytes[TX_TYPE_BYTES_LEGTH .. TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH])
+            account_id: AccountId::from_be_bytes(bytes[pre_length .. pre_length + ACCOUNT_ID_BYTES_LEGTH])
         }
     }
 }
@@ -77,10 +86,15 @@ impl TransferToNewOp {
     }
 
     pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        let from_pre_length = 0;
+        let to_pre_length = ACCOUNT_ID_BYTES_LEGTH +
+            TOKEN_BYTES_LENGTH +
+            FULL_AMOUNT_BYTES_LEGTH +
+            FR_ADDRESS_LEN;
         Self {
             tx: Transfer::from_bytes(bytes),
-            from: AccountId::from_be_bytes(bytes[TX_TYPE_BYTES_LEGTH .. TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH]),
-            to: AccountId::from_be_bytes(bytes[TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH+TOKEN_BYTES_LENGTH+FULL_AMOUNT_BYTES_LEGTH+PUBKEY_HASH_BYTES_LEGTH .. TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH+TOKEN_BYTES_LENGTH+FULL_AMOUNT_BYTES_LEGTH+PUBKEY_HASH_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH])
+            from: AccountId::from_be_bytes(bytes[from_pre_length .. from_pre_length + ACCOUNT_ID_BYTES_LEGTH]),
+            to: AccountId::from_be_bytes(bytes[to_pre_length .. to_pre_length + ACCOUNT_ID_BYTES_LEGTH])
         }
     }
 }
@@ -109,10 +123,13 @@ impl TransferOp {
     }
 
     pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        let from_pre_length = 0;
+        let to_pre_length = ACCOUNT_ID_BYTES_LEGTH +
+            TOKEN_BYTES_LENGTH;
         Self {
             tx: Transfer::from_bytes(bytes),
-            from: AccountId::from_be_bytes(bytes[TX_TYPE_BYTES_LEGTH .. TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH]),
-            to: AccountId::from_be_bytes(bytes[TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH+TOKEN_BYTES_LENGTH .. TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH+TOKEN_BYTES_LENGTH+ACCOUNT_ID_BYTES_LEGTH])
+            from: AccountId::from_be_bytes(bytes[from_pre_length .. from_pre_length + ACCOUNT_ID_BYTES_LEGTH]),
+            to: AccountId::from_be_bytes(bytes[to_pre_length .. to_pre_length + ACCOUNT_ID_BYTES_LEGTH])
         }
     }
 }
@@ -140,9 +157,10 @@ impl WithdrawOp {
     }
 
     pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        let pre_length = 0;
         Self {
             tx: Withdraw::from_bytes(bytes),
-            account_id: AccountId::from_be_bytes(bytes[TX_TYPE_BYTES_LEGTH..TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH])
+            account_id: AccountId::from_be_bytes(bytes[pre_length..pre_length + ACCOUNT_ID_BYTES_LEGTH])
         }
     }
 }
@@ -166,9 +184,10 @@ impl CloseOp {
     }
 
     pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        let pre_length = 0;
         Self {
             tx: Withdraw::from_bytes(bytes),
-            account_id: AccountId::from_be_bytes(bytes[TX_TYPE_BYTES_LEGTH .. TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH])
+            account_id: AccountId::from_be_bytes(bytes[pre_length .. pre_length + ACCOUNT_ID_BYTES_LEGTH])
         }
     }
 }
@@ -200,8 +219,17 @@ impl FullExitOp {
     }
 
     pub fn from_bytes(bytes: &Vec<u8>) -> Self {
-        let acc_id = AccountId::from_be_bytes(bytes[TX_TYPE_BYTES_LEGTH..TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH]);
-        let amount = BigDecimal::parse_bytes(bytes[TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH+PUBKEY_PACKED_BYTES_LEGTH+ETH_ADDR_BYTES_LEGTH+TOKEN_BYTES_LENGTH+NONCE_BYTES_LEGTH+SIGNATURE_BYTES_LEGTH .. TX_TYPE_BYTES_LEGTH+ACCOUNT_ID_BYTES_LEGTH+PUBKEY_PACKED_BYTES_LEGTH+ETH_ADDR_BYTES_LEGTH+TOKEN_BYTES_LENGTH+NONCE_BYTES_LEGTH+SIGNATURE_BYTES_LEGTH+FULL_AMOUNT_BYTES_LEGTH].to_vec(), 18);
+        let acc_id_pre_length = 0;
+        let to_pre_length = ACCOUNT_ID_BYTES_LEGTH +
+            PUBKEY_PACKED_BYTES_LEGTH +
+            ETH_ADDR_BYTES_LEGTH +
+            TOKEN_BYTES_LENGTH +
+            NONCE_BYTES_LEGTH +
+            SIGNATURE_R_BYTES_LEGTH +
+            SIGNATURE_S_BYTES_LEGTH;
+
+        let acc_id = AccountId::from_be_bytes(bytes[acc_id_pre_length..acc_id_pre_length + ACCOUNT_ID_BYTES_LEGTH]);
+        let amount = BigDecimal::parse_bytes(bytes[to_pre_length .. to_pre_length + FULL_AMOUNT_BYTES_LEGTH].to_vec(), 18);
         
         Self {
             priority_op: FullExit::from_bytes(bytes),
@@ -248,7 +276,7 @@ impl FranklinOp {
         match *op_type {
             DEPOSIT_OP_CODE => Some(DepositOp::CHUNKS),
             TRANSFER_TO_NEW_OP_CODE => Some(TransferToNewOp::CHUNKS),
-            WITHDRAW_NUMBER_OP_CODE => Some(WithdrawOp::CHUNKS),
+            WITHDRAW_OP_CODE => Some(WithdrawOp::CHUNKS),
             CLOSE_OP_CODE => Some(CloseOp::CHUNKS),
             TRANSFER_OP_CODE => Some(TransferOp::CHUNKS),
             FULL_EXIT_OP_CODE => Some(FullExitOp::CHUNKS),
@@ -261,10 +289,23 @@ impl FranklinOp {
         match *op_type {
             DEPOSIT_OP_CODE => Some(Deposit(DepositOp::from_bytes(&bytes)))),
             TRANSFER_TO_NEW_OP_CODE => Some(TransferToNew(TransferToNewOp::from_bytes(&bytes))),
-            WITHDRAW_NUMBER_OP_CODE => Some(Withdraw(WithdrawOp::from_bytes(&bytes))),
+            WITHDRAW_OP_CODE => Some(Withdraw(WithdrawOp::from_bytes(&bytes))),
             CLOSE_OP_CODE => Some(Close(CloseOp::from_bytes(&bytes))),
-            TRANSFER_OP_CODE => Some(ransfer(TransferOp::from_bytes(&bytes))),
+            TRANSFER_OP_CODE => Some(Transfer(TransferOp::from_bytes(&bytes))),
             FULL_EXIT_OP_CODE => Some(FullExit(FullExitOp::from_bytes(&bytes))),
+            _ => None
+        }
+    }
+
+    pub fn public_data_length(bytes: &Vec<u8>) -> Option<u8> {
+        let op_type: &u8 = bytes[0];
+        match *op_type {
+            DEPOSIT_OP_CODE => Some(DEPOSIT_OP_LENGTH),
+            TRANSFER_TO_NEW_OP_CODE => Some(TRANSFER_TO_NEW_OP_LENGTH),
+            WITHDRAW_OP_CODE => Some(WITHDRAW_OP_LENGTH),
+            CLOSE_OP_CODE => Some(CLOSE_OP_LENGTH),
+            TRANSFER_OP_CODE => Some(TRANSFER_OP_LENGTH),
+            FULL_EXIT_OP_CODE => Some(FULL_EXIT_OP_LENGTH),
             _ => None
         }
     }

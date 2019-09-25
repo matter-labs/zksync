@@ -5,7 +5,7 @@ use crate::events::EventData;
 use crate::helpers::{DATA_RESTORE_CONFIG, DataRestoreError};
 
 use models::operations::{
-    DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+    TX_TYPE_BYTES_LEGTH, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
 };
 use models::priority_ops::{Deposit, FranklinPriorityOp, FullExit};
 use models::tx::{Close, FranklinTx, Transfer, Withdraw};
@@ -31,12 +31,21 @@ fn get_franklin_ops_from_block(ops_block: FranklinOpsBlock) -> Result<Vec<Frankl
     let mut ops = vec![];
     while (current_pointer < ops_block.commitment_data.length) {
         let op_type: &u8 = &ops_block.commitment_data[current_pointer];
-        let chunks: usize = FranklinOp::chunks_by_op_number(op_type);
-        let size: usize = 8 * chunks;
-        let op = FranklinOp::from_bytes(&ops_block.commitment_data[current_pointer..current_pointer+size].to_vec())
+
+        let chunks: usize = FranklinOp::chunks_by_op_number(op_type)
+            .ok_or(|e| DataRestoreError::WrongType)?;;
+        let full_size: usize = 8 * chunks;
+
+        let pub_data_size: usize = FranklinOp::public_data_length(op_type)
+            .ok_or(|e| DataRestoreError::WrongType)?;;
+
+        let pre = current_pointer + TX_TYPE_BYTES_LEGTH;
+        let post = pre + pub_data_size;
+
+        let op = FranklinOp::from_bytes(&ops_block.commitment_data[pre .. post].to_vec())
             .ok_or(|e| DataRestoreError::WrongType)?;
         ops.push(op);
-        current_pointer += size;
+        current_pointer += full_size;
     }
 }
 
