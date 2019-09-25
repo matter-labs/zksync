@@ -1,9 +1,9 @@
 use super::AccountId;
+use super::FranklinTx;
 use super::{pack_fee_amount, pack_token_amount, Deposit, FullExit};
 use super::{Close, Transfer, Withdraw};
-use bigdecimal::BigDecimal;
-use super::FranklinTx;
 use crate::node::FranklinPriorityOp;
+use bigdecimal::BigDecimal;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositOp {

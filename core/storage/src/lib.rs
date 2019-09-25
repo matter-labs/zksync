@@ -6,9 +6,14 @@ extern crate log;
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
-use failure::{Fail, bail};
+use failure::{bail, Fail};
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
-use models::node::{apply_updates, reverse_updates, tx::{FranklinTx, TxType}, Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, FranklinOp, Nonce, TokenId, PriorityOp};
+use models::node::{
+    apply_updates, reverse_updates,
+    tx::{FranklinTx, TxType},
+    Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, FranklinOp, Nonce,
+    PriorityOp, TokenId,
+};
 use models::{Action, ActionType, EncodedProof, Operation, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
@@ -171,7 +176,9 @@ impl StoredExecutedTransaction {
         };
 
         Ok(ExecutedTx {
-            tx: franklin_op.try_get_tx().expect("FranklinOp should not have tx"),
+            tx: franklin_op
+                .try_get_tx()
+                .expect("FranklinOp should not have tx"),
             success: true,
             op: Some(franklin_op),
             fail_reason: None,
@@ -218,13 +225,16 @@ struct StoredExecutedPriorityOperation {
 
 impl Into<ExecutedPriorityOp> for StoredExecutedPriorityOperation {
     fn into(self) -> ExecutedPriorityOp {
-        let franklin_op: FranklinOp = serde_json::from_value(self.operation).expect("Unparsable priority op in db");
+        let franklin_op: FranklinOp =
+            serde_json::from_value(self.operation).expect("Unparsable priority op in db");
         ExecutedPriorityOp {
             priority_op: PriorityOp {
                 serial_id: self.priority_op_serialid as u64,
-                data: franklin_op.try_get_priority_op().expect("FranklinOp should have priority op"),
+                data: franklin_op
+                    .try_get_priority_op()
+                    .expect("FranklinOp should have priority op"),
                 deadline_block: self.deadline_block as u64,
-                eth_fee: self.eth_fee
+                eth_fee: self.eth_fee,
             },
             op: franklin_op,
             block_index: self.block_index as u32,
@@ -378,41 +388,31 @@ struct StorageBlock {
     fee_account_id: i64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Queryable)]
-pub struct StoredTx {
-    pub tx_type: TxType, // 'Transfer', 'Deposit', 'Withdraw', 'CLose'
-    pub from: Option<AccountAddress>,
-    pub to: Option<AccountAddress>,
-    pub nonce: Option<Nonce>,
-    pub token: Option<TokenId>,
-    pub amount: Option<BigDecimal>,
-    pub fee: Option<BigDecimal>,
-}
-
 impl StoredOperation {
     pub fn into_op(self, conn: &StorageProcessor) -> QueryResult<Operation> {
-        let debug_data = format!("data: {}", &self.data);
+        let block_number = self.block_number as BlockNumber;
+        let id = Some(self.id);
 
-        // let op: Result<Operation, serde_json::Error> = serde_json::from_value(self.data);
-        let op: Result<Operation, serde_json::Error> = serde_json::from_str(&self.data.to_string());
-
-        if let Err(err) = &op {
-            debug!("Error: {} on {}", err, debug_data)
-        }
-
-        let mut op = op.expect("Operation deserialization");
-        op.id = Some(self.id);
-
-        if op.accounts_updated.is_empty() {
-            let updates = conn.load_state_diff_for_block(op.block.block_number)?;
-            op.accounts_updated = updates;
+        let action = if self.action_type == ActionType::COMMIT.to_string() {
+            Action::Commit
+        } else if self.action_type == ActionType::VERIFY.to_string() {
+            // verify
+            let proof = Box::new(conn.load_proof(block_number)?);
+            Action::Verify { proof }
+        } else {
+            unreachable!("Incorrect action type in db");
         };
 
-        Ok(op)
-    }
-
-    pub fn get_txs(&self) -> QueryResult<Vec<StoredTx>> {
-        unimplemented!("update with block explorer")
+        let block = conn
+            .get_block(block_number)?
+            .expect("Block for action does not exist");
+        let accounts_updated = conn.load_state_diff_for_block(block_number)?;
+        Ok(Operation {
+            id,
+            action,
+            block,
+            accounts_updated,
+        })
     }
 }
 
@@ -708,36 +708,47 @@ impl StorageProcessor {
         Ok(())
     }
 
+    pub fn get_block(&self, block: BlockNumber) -> QueryResult<Option<Block>> {
+        unimplemented!();
+    }
+
     pub fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {
-        let executed_txs: Vec<_> =  executed_transactions::table
+        let executed_txs: Vec<_> = executed_transactions::table
             .filter(executed_transactions::block_number.eq(block as i64))
             .filter(executed_transactions::success.eq(true))
-            .load::<StoredExecutedTransaction>(self.conn());
+            .load::<StoredExecutedTransaction>(self.conn())?;
         let executed_prior_ops: Vec<_> = executed_priority_operations::table
             .filter(executed_priority_operations::block_number.eq(block as i64))
-            .load::<StoredExecutedPriorityOperation>(self.conn());
+            .load::<StoredExecutedPriorityOperation>(self.conn())?;
 
         let executed_ops = {
             let mut executed_ops = Vec::new();
-            let txs = executed_txs.into_iter().map(|stored_tx| ExecutedOperations::Tx(stored_tx.try_into_successful_tx.expect("Expected successful txs")));
+            let txs = executed_txs.into_iter().map(|stored_tx| {
+                ExecutedOperations::Tx(
+                    stored_tx
+                        .try_into_successful_tx()
+                        .expect("Expected successful txs"),
+                )
+            });
             executed_ops.extend(txs);
-            let ops = executed_prior_ops.into_iter().map(|stored_op| ExecutedOperations::PriorityOp(stored_op.into()));
+            let ops = executed_prior_ops
+                .into_iter()
+                .map(|stored_op| ExecutedOperations::PriorityOp(stored_op.into()));
             executed_ops.extend(ops);
-            executed_ops.sorted_by_key(|exec_op| {
-                match exec_op {
-                    ExecutedOperations::Tx(tx) => tx.block_index.expect("expected successful tx"),
-                    ExecutedOperations::PriorityOp(op) => op.block_index,
-                }
+            executed_ops.sort_by_key(|exec_op| match exec_op {
+                ExecutedOperations::Tx(tx) => tx.block_index.expect("expected successful tx"),
+                ExecutedOperations::PriorityOp(op) => op.block_index,
             });
             executed_ops
         };
 
-        Ok(executed_ops.into_iter().map(|executed_op| {
-            match executed_op {
+        Ok(executed_ops
+            .into_iter()
+            .map(|executed_op| match executed_op {
                 ExecutedOperations::Tx(tx) => tx.op.expect("expected successful tx"),
                 ExecutedOperations::PriorityOp(prior_op) => prior_op.op,
-            }
-        }).collect())
+            })
+            .collect())
     }
 
     pub fn commit_state_update(
