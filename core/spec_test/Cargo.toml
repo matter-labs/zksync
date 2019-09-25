@@ -6,7 +6,8 @@ edition = "2018"
 
 [dependencies]
 models = { path = "../models", version = "0.0.1" }
-franklin_crypto = { package = "franklin-crypto", git = "ssh://git@github.com/matter-labs/franklin-crypto.git" }
+franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="master"}
+
 log = "0.4"
 env_logger = "0.6"
 actix-web = "1.0"

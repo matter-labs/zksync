@@ -437,28 +437,6 @@
       "anonymous": false,
       "inputs": [
         {
-          "indexed": false,
-          "name": "pubData",
-          "type": "bytes"
-        },
-        {
-          "indexed": false,
-          "name": "fee",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "name": "nonce",
-          "type": "uint32"
-        }
-      ],
-      "name": "FullExit",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
           "indexed": true,
           "name": "totalBlocksVerified",
           "type": "uint32"
@@ -911,28 +889,6 @@
         }
       ],
       "name": "OnchainDeposit",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": false,
-          "name": "pubData",
-          "type": "bytes"
-        },
-        {
-          "indexed": false,
-          "name": "fee",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "name": "nonce",
-          "type": "uint32"
-        }
-      ],
-      "name": "FullExit",
       "type": "event"
     },
     {
