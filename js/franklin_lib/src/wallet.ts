@@ -238,7 +238,7 @@ export class Wallet {
             const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
             await erc20DeployedToken.approve(franklinDeployedContract.address, amount);
             const tx = await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address,
-                {gasLimit: bigNumberify("150000"), value: parseEther("0.01")});
+                {gasLimit: bigNumberify("300000"), value: parseEther("0.05")});
             return tx.hash;
         }
     }
