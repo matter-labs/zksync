@@ -1,19 +1,19 @@
 use bigdecimal::BigDecimal;
 use failure::{bail, ensure, format_err, Error};
 use models::node::operations::{
-    CloseOp, DepositOp, FranklinOp, TransferOp, TransferToNewOp, WithdrawOp,
+    CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
 };
-use models::node::tx::{Close, Deposit, FranklinTx, Transfer, Withdraw};
-use models::node::{Account, AccountAddress, AccountTree};
+use models::node::{Account, AccountAddress, AccountTree, FranklinPriorityOp};
 use models::node::{
     AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr, TokenId,
 };
+use models::node::{Close, Deposit, FranklinTx, FullExit, Transfer, Withdraw};
 use models::params;
 use std::collections::HashMap;
 
 #[derive(Debug)]
-pub struct TxSuccess {
-    pub fee: CollectedFee,
+pub struct OpSuccess {
+    pub fee: Option<CollectedFee>,
     pub updates: AccountUpdates,
     pub executed_op: FranklinOp,
 }
@@ -79,16 +79,22 @@ impl PlasmaState {
                     TransferToNewOp::CHUNKS
                 }
             }
-            FranklinTx::Deposit(_) => DepositOp::CHUNKS,
             FranklinTx::Withdraw(_) => WithdrawOp::CHUNKS,
             FranklinTx::Close(_) => CloseOp::CHUNKS,
         }
     }
 
-    pub fn apply_tx(&mut self, tx: FranklinTx) -> Result<TxSuccess, Error> {
+    /// Priority op execution should not fail.
+    pub fn execute_priority_op(&mut self, op: FranklinPriorityOp) -> OpSuccess {
+        match op {
+            FranklinPriorityOp::Deposit(op) => self.apply_deposit(op),
+            FranklinPriorityOp::FullExit(op) => self.apply_full_exit(op),
+        }
+    }
+
+    pub fn execute_tx(&mut self, tx: FranklinTx) -> Result<OpSuccess, Error> {
         match tx {
             FranklinTx::Transfer(tx) => self.apply_transfer(tx),
-            FranklinTx::Deposit(tx) => self.apply_deposit(tx),
             FranklinTx::Withdraw(tx) => self.apply_withdraw(tx),
             FranklinTx::Close(tx) => self.apply_close(tx),
         }
@@ -99,27 +105,87 @@ impl PlasmaState {
         self.balance_tree.items.len() as u32
     }
 
-    fn apply_deposit(&mut self, tx: Deposit) -> Result<TxSuccess, Error> {
-        ensure!(
-            tx.token < (params::TOTAL_TOKENS as TokenId),
-            "Token id is not supported"
-        );
-        let account_id = if let Some((account_id, _)) = self.get_account_by_address(&tx.to) {
-            account_id
-        } else {
-            self.get_free_account_id()
+    fn apply_deposit(&mut self, priority_op: Deposit) -> OpSuccess {
+        let account_id =
+            if let Some((account_id, _)) = self.get_account_by_address(&priority_op.account) {
+                account_id
+            } else {
+                self.get_free_account_id()
+            };
+        let deposit_op = DepositOp {
+            priority_op,
+            account_id,
         };
-        let deposit_op = DepositOp { tx, account_id };
 
-        let (fee, updates) = self.apply_deposit_op(&deposit_op)?;
-        Ok(TxSuccess {
-            fee,
+        let updates = self.apply_deposit_op(&deposit_op);
+        OpSuccess {
+            fee: None,
             updates,
             executed_op: FranklinOp::Deposit(deposit_op),
-        })
+        }
     }
 
-    fn apply_transfer(&mut self, tx: Transfer) -> Result<TxSuccess, Error> {
+    fn apply_full_exit(&mut self, priority_op: FullExit) -> OpSuccess {
+        let account_data = {
+            if priority_op.token < (params::TOTAL_TOKENS as TokenId) {
+                priority_op
+                    .verify_signature()
+                    .and_then(|addr| self.get_account_by_address(&addr))
+                    .map(|(acc_id, account)| (acc_id, account.get_balance(priority_op.token)))
+            } else {
+                None
+            }
+        };
+        let op = FullExitOp {
+            priority_op,
+            account_data,
+        };
+
+        OpSuccess {
+            fee: None,
+            updates: self.apply_full_exit_op(&op),
+            executed_op: FranklinOp::FullExit(op),
+        }
+    }
+
+    fn apply_full_exit_op(&mut self, op: &FullExitOp) -> AccountUpdates {
+        let mut updates = Vec::new();
+        let (account_id, amount) = if let Some((account_id, amount)) = &op.account_data {
+            (*account_id, amount.clone())
+        } else {
+            return updates;
+        };
+        let mut account = if let Some(account) = self.get_account(account_id) {
+            account
+        } else {
+            return updates;
+        };
+
+        let old_balance = account.get_balance(op.priority_op.token);
+        let old_nonce = account.nonce;
+        if old_nonce != op.priority_op.nonce {
+            return updates;
+        }
+        account.sub_balance(op.priority_op.token, &amount);
+        account.nonce += 1;
+        let new_balance = account.get_balance(op.priority_op.token);
+        assert_eq!(new_balance, BigDecimal::from(0));
+        let new_nonce = account.nonce;
+
+        self.insert_account(account_id, account);
+        updates.push((
+            account_id,
+            AccountUpdate::UpdateBalance {
+                balance_update: (op.priority_op.token, old_balance, new_balance),
+                old_nonce,
+                new_nonce,
+            },
+        ));
+
+        updates
+    }
+
+    fn apply_transfer(&mut self, tx: Transfer) -> Result<OpSuccess, Error> {
         ensure!(
             tx.token < (params::TOTAL_TOKENS as TokenId),
             "Token id is not supported"
@@ -132,8 +198,8 @@ impl PlasmaState {
             let transfer_op = TransferOp { tx, from, to };
 
             let (fee, updates) = self.apply_transfer_op(&transfer_op)?;
-            Ok(TxSuccess {
-                fee,
+            Ok(OpSuccess {
+                fee: Some(fee),
                 updates,
                 executed_op: FranklinOp::Transfer(transfer_op),
             })
@@ -142,15 +208,15 @@ impl PlasmaState {
             let transfer_to_new_op = TransferToNewOp { tx, from, to };
 
             let (fee, updates) = self.apply_transfer_to_new_op(&transfer_to_new_op)?;
-            Ok(TxSuccess {
-                fee,
+            Ok(OpSuccess {
+                fee: Some(fee),
                 updates,
                 executed_op: FranklinOp::TransferToNew(transfer_to_new_op),
             })
         }
     }
 
-    fn apply_withdraw(&mut self, tx: Withdraw) -> Result<TxSuccess, Error> {
+    fn apply_withdraw(&mut self, tx: Withdraw) -> Result<OpSuccess, Error> {
         ensure!(
             tx.token < (params::TOTAL_TOKENS as TokenId),
             "Token id is not supported"
@@ -161,22 +227,22 @@ impl PlasmaState {
         let withdraw_op = WithdrawOp { tx, account_id };
 
         let (fee, updates) = self.apply_withdraw_op(&withdraw_op)?;
-        Ok(TxSuccess {
-            fee,
+        Ok(OpSuccess {
+            fee: Some(fee),
             updates,
             executed_op: FranklinOp::Withdraw(withdraw_op),
         })
     }
 
-    fn apply_close(&mut self, tx: Close) -> Result<TxSuccess, Error> {
+    fn apply_close(&mut self, tx: Close) -> Result<OpSuccess, Error> {
         let (account_id, _) = self
             .get_account_by_address(&tx.account)
             .ok_or_else(|| format_err!("Account does not exist"))?;
         let close_op = CloseOp { tx, account_id };
 
         let (fee, updates) = self.apply_close_op(&close_op)?;
-        Ok(TxSuccess {
-            fee,
+        Ok(OpSuccess {
+            fee: Some(fee),
             updates,
             executed_op: FranklinOp::Close(close_op),
         })
@@ -246,49 +312,33 @@ impl PlasmaState {
         }
     }
 
-    fn apply_deposit_op(
-        &mut self,
-        op: &DepositOp,
-    ) -> Result<(CollectedFee, AccountUpdates), Error> {
+    fn apply_deposit_op(&mut self, op: &DepositOp) -> AccountUpdates {
         let mut updates = Vec::new();
 
         let mut account = self.get_account(op.account_id).unwrap_or_else(|| {
-            let (account, upd) = Account::create_account(op.account_id, op.tx.to.clone());
+            let (account, upd) =
+                Account::create_account(op.account_id, op.priority_op.account.clone());
             updates.extend(upd.into_iter());
             account
         });
 
-        let old_amount = account.get_balance(op.tx.token).clone();
+        let old_amount = account.get_balance(op.priority_op.token).clone();
         let old_nonce = account.nonce;
-        ensure!(
-            op.tx.nonce == old_nonce,
-            "Nonce mismatch tx: {}, account: {}",
-            op.tx.nonce,
-            old_nonce
-        );
-        // TODO: (Drogan) check eth state balance.
-        account.add_balance(op.tx.token, &op.tx.amount);
-        account.nonce += 1;
-        let new_amount = account.get_balance(op.tx.token).clone();
-        let new_nonce = account.nonce;
+        account.add_balance(op.priority_op.token, &op.priority_op.amount);
+        let new_amount = account.get_balance(op.priority_op.token).clone();
 
         self.insert_account(op.account_id, account);
 
         updates.push((
             op.account_id,
             AccountUpdate::UpdateBalance {
-                balance_update: (op.tx.token, old_amount, new_amount),
+                balance_update: (op.priority_op.token, old_amount, new_amount),
                 old_nonce,
-                new_nonce,
+                new_nonce: old_nonce,
             },
         ));
 
-        let fee = CollectedFee {
-            token: op.tx.token,
-            amount: op.tx.fee.clone(),
-        };
-
-        Ok((fee, updates))
+        updates
     }
 
     fn apply_transfer_to_new_op(

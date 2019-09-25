@@ -1,6 +1,5 @@
 import {ethers} from "ethers";
 import {deployContract} from "ethereum-waffle";
-import {bigNumberify} from "ethers/utils";
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);

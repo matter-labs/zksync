@@ -184,6 +184,9 @@ prepare-loadtest: confirm_action
 rescue: confirm_action
 	@node js/loadtest/rescue.js
 
+contracts-test: confirm_action 
+	@bin/contracts-test.sh
+
 deposit: confirm_action
 	@node contracts/scripts/deposit.js
 

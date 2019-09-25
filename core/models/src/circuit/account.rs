@@ -55,8 +55,6 @@ impl std::default::Default for CircuitAccount<Bn256> {
         Self {
             nonce: Fr::zero(),
             pub_key_hash: Fr::zero(),
-            // pub_x: Fr::zero(),
-            // pub_y: Fr::zero(),
             subtree: SparseMerkleTree::new(params::BALANCE_TREE_DEPTH as u32),
         }
     }

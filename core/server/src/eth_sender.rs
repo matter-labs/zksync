@@ -11,11 +11,12 @@
 //! Note: make sure to save signed tx to db before sending it to ETH, this way we can be sure
 //! that state is always recoverable.
 
+use crate::ThreadPanicNotify;
 use bigdecimal::BigDecimal;
 use eth_client::{ETHClient, SignedCallResult};
 use ff::{PrimeField, PrimeFieldRepr};
 use futures::Future;
-use models::abi::TEST_PLASMA2_ALWAYS_VERIFY;
+use models::abi::FRANKLIN_CONTRACT;
 use models::{Action, Operation};
 use std::collections::VecDeque;
 use std::str::FromStr;
@@ -88,7 +89,7 @@ struct ETHSender<T: Transport> {
 impl<T: Transport> ETHSender<T> {
     fn new(transport: T, db_pool: ConnectionPool) -> Self {
         let eth_client = {
-            let abi_string = serde_json::Value::from_str(TEST_PLASMA2_ALWAYS_VERIFY)
+            let abi_string = serde_json::Value::from_str(FRANKLIN_CONTRACT)
                 .unwrap()
                 .get("abi")
                 .unwrap()
@@ -370,7 +371,9 @@ impl<T: Transport> ETHSender<T> {
 
                 if let Some(status) = tx_state.confirmed_status() {
                     let success = status == 1;
-                    self.save_completed_tx_to_db(&tx.hash)?;
+                    if success {
+                        self.save_completed_tx_to_db(&tx.hash)?;
+                    }
                     *state = OperationState::Commited {
                         success,
                         hash: tx.hash,
@@ -381,12 +384,13 @@ impl<T: Transport> ETHSender<T> {
                         if let Ok(Some((confirmations, status))) = self.get_tx_status(old_tx) {
                             if confirmations >= WAIT_CONFIRMATIONS {
                                 let success = status == 1;
-                                if self.save_completed_tx_to_db(&old_tx).is_ok() {
-                                    return Some(OperationState::Commited {
-                                        success,
-                                        hash: *old_tx,
-                                    });
+                                if success {
+                                    self.save_completed_tx_to_db(&old_tx).ok()?;
                                 }
+                                return Some(OperationState::Commited {
+                                    success,
+                                    hash: *old_tx,
+                                });
                             }
                         }
                         None
@@ -468,16 +472,17 @@ impl<T: Transport> ETHSender<T> {
     }
 }
 
-pub fn start_eth_sender(pool: ConnectionPool) -> Sender<Operation> {
+pub fn start_eth_sender(pool: ConnectionPool, panic_notify: Sender<bool>) -> Sender<Operation> {
     let (tx_for_eth, rx_for_eth) = channel::<Operation>();
 
     std::thread::Builder::new()
         .name("eth_sender".to_string())
         .spawn(move || {
+            let _panic_sentinel = ThreadPanicNotify(panic_notify);
+
             let web3_url = std::env::var("WEB3_URL").expect("WEB3_URL env var not found");
             let (_event_loop, transport) =
                 Http::new(&web3_url).expect("failed to start web3 transport");
-
             let mut eth_sender = ETHSender::new(transport, pool);
             eth_sender.run(rx_for_eth);
         })

@@ -1,13 +1,13 @@
 use super::utils::*;
+use crate::operation::SignatureData;
 use crate::operation::*;
-use crate::utils::*;
-use ff::{Field, PrimeField};
+use ff::{BitIterator, Field, PrimeField};
 use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
+use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
 use models::node::TransferToNewOp;
 use models::params as franklin_constants;
-use num_traits::cast::ToPrimitive;
 use pairing::bn256::*;
 
 pub struct TransferToNewData {
@@ -131,8 +131,8 @@ pub fn apply_transfer_to_new_tx(
     let new_pubkey_hash = Fr::from_hex(&transfer_to_new.tx.to.to_hex()).unwrap();
 
     let transfer_data = TransferToNewData {
-        amount: transfer_to_new.tx.amount.to_u128().unwrap(),
-        fee: transfer_to_new.tx.fee.to_u128().unwrap(),
+        amount: transfer_to_new.tx.amount.to_string().parse().unwrap(),
+        fee: transfer_to_new.tx.fee.to_string().parse().unwrap(),
         token: u32::from(transfer_to_new.tx.token),
         from_account_address: transfer_to_new.from,
         to_account_address: transfer_to_new.to,
@@ -329,6 +329,7 @@ pub fn apply_transfer_to_new(
             fee: Some(fee_encoded),
             a: Some(a),
             b: Some(b),
+            pub_nonce: Some(Fr::zero()),
             new_pub_key_hash: Some(transfer_to_new.new_pub_key_hash),
         },
         before_root: Some(before_root),
@@ -343,9 +344,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
     first_sig_msg: &Fr,
     second_sig_msg: &Fr,
     third_sig_msg: &Fr,
-    signature: Option<TransactionSignature<Bn256>>,
-    signer_pub_key_x: &Fr,
-    signer_pub_key_y: &Fr,
+    signature_data: &SignatureData,
+    signer_pub_key_packed: &[Option<bool>],
 ) -> Vec<Operation<Bn256>> {
     let pubdata_chunks: Vec<_> = transfer_witness
         .get_pubdata()
@@ -361,9 +361,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signature_data: signature_data.clone(),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_before.clone(),
         rhs: transfer_witness.to_before.clone(),
@@ -377,9 +376,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signature_data: signature_data.clone(),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_intermediate.clone(),
         rhs: transfer_witness.to_intermediate.clone(),
@@ -393,9 +391,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signature_data: signature_data.clone(),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_after.clone(),
         rhs: transfer_witness.to_after.clone(),
@@ -409,9 +406,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signature_data: signature_data.clone(),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_after.clone(),
         rhs: transfer_witness.to_after.clone(),
@@ -425,9 +421,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signature_data: signature_data.clone(),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_after.clone(),
         rhs: transfer_witness.to_after.clone(),
@@ -456,8 +451,44 @@ mod test {
     use models::circuit::account::{
         Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
+    use models::circuit::utils::*;
     use models::merkle_tree::PedersenHasher;
+    use models::node::tx::PackedPublicKey;
     use rand::{Rng, SeedableRng, XorShiftRng};
+    #[test]
+    #[ignore]
+    fn test_transfer_to_new_signature() {
+        let params = &AltJubjubBn256::new();
+        let p_g = FixedGenerators::SpendingKeyGenerator;
+
+        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+
+        let validator_address_number = 7;
+        let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
+        let phasher = PedersenHasher::<Bn256>::default();
+
+        let mut tree = CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
+
+        let capacity = tree.capacity();
+        assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
+
+        let from_sk = PrivateKey::<Bn256>(rng.gen());
+        let from_pk = PublicKey::from_private(&from_sk, p_g, params);
+        let from_pub_key_hash = pub_key_hash_fe(&from_pk, &phasher);
+        let (from_x, from_y) = from_pk.0.into_xy();
+        println!("x = {}, y = {}", from_x, from_y);
+
+        let (signature_data, first_sig_part, second_sig_part, third_sig_part) =
+            generate_sig_data(&[true; 1], &phasher, &from_sk, params);
+
+        let packed_public_key = PackedPublicKey(from_pk);
+        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+        packed_public_key_bytes.reverse();
+        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
+    }
     #[test]
     #[ignore]
     fn test_transfer_to_new() {
@@ -477,20 +508,20 @@ mod test {
 
         let from_sk = PrivateKey::<Bn256>(rng.gen());
         let from_pk = PublicKey::from_private(&from_sk, p_g, params);
-        let from_pub_key_hash = pub_key_hash(&from_pk, &phasher);
+        let from_pub_key_hash = pub_key_hash_fe(&from_pk, &phasher);
         let (from_x, from_y) = from_pk.0.into_xy();
         println!("x = {}, y = {}", from_x, from_y);
 
         let new_sk = PrivateKey::<Bn256>(rng.gen());
         let to_pk = PublicKey::from_private(&new_sk, p_g, params);
-        let to_pub_key_hash = pub_key_hash(&to_pk, &phasher);
+        let to_pub_key_hash = pub_key_hash_fe(&to_pk, &phasher);
         let (to_x, to_y) = to_pk.0.into_xy();
         println!("x = {}, y = {}", to_x, to_y);
 
         // give some funds to sender and make zero balance for recipient
         let validator_sk = PrivateKey::<Bn256>(rng.gen());
         let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
-        let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
+        let validator_pub_key_hash = pub_key_hash_fe(&validator_pk, &phasher);
         let (validator_x, validator_y) = validator_pk.0.into_xy();
         println!("x = {}, y = {}", validator_x, validator_y);
         let validator_leaf = CircuitAccount::<Bn256> {
@@ -552,17 +583,22 @@ mod test {
             },
         );
 
-        let (signature, first_sig_part, second_sig_part, third_sig_part) =
+        let (signature_data, first_sig_part, second_sig_part, third_sig_part) =
             generate_sig_data(&transfer_witness.get_sig_bits(), &phasher, &from_sk, params);
+        let packed_public_key = PackedPublicKey(from_pk);
+        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
 
         let operations = calculate_transfer_to_new_operations_from_witness(
             &transfer_witness,
             &first_sig_part,
             &second_sig_part,
             &third_sig_part,
-            signature,
-            &from_x,
-            &from_y,
+            &signature_data,
+            &signer_packed_key_bits,
         );
         let (root_after_fee, validator_account_witness) =
             apply_fee(&mut tree, validator_address_number, token, fee);
