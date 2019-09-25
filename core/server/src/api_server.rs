@@ -259,9 +259,34 @@ fn handle_get_testnet_config(req: &HttpRequest<AppState>) -> ActixResult<HttpRes
 //     Ok(HttpResponse::Ok().json(status))
 // }
 
-//fn handle_get_account_transactions(_req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-//    Ok(HttpResponse::Ok().json("{}"))
-//}
+fn handle_get_account_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    let account_address = req.match_info().get("id");
+    let address = if let Some(account_address) = account_address {
+        AccountAddress::from_hex(account_address)?
+    } else {
+        return Err(format_err!("Invalid parameters").into());
+    };
+
+    let pool = req.state().connection_pool.clone();
+
+    let storage = pool
+        .access_storage()
+        .map_err(|_| HttpResponse::InternalServerError().body(Body::Empty));
+    let storage_query_result = storage.and_then(|storage| {
+        storage
+            .get_account_transactions(&address)
+            .map_err(|_| HttpResponse::InternalServerError().body(Body::Empty))
+    });
+    
+    let res = match storage_query_result {
+        Ok(txs) => txs,
+        Err(e) => {
+            return Ok(e);
+        }
+    };
+
+    Ok(HttpResponse::Ok().json(res))
+}
 
 //fn handle_get_transaction_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
 //    let pool = req.state().connection_pool.clone();
@@ -545,9 +570,9 @@ fn start_server(state: AppState, bind_to: String) {
                     .resource("/tokens", |r| {
                         r.method(Method::GET).f(handle_get_tokens);
                     })
-                    // .resource("/account/{id}/transactions", |r| {
-                    //     r.method(Method::GET).f(handle_get_account_transactions);
-                    // })
+                    .resource("/account/{id}/transactions", |r| {
+                        r.method(Method::GET).f(handle_get_account_transactions);
+                    })
                     // .resource("/blocks/transactions/{tx_id}", |r| {
                     //     r.method(Method::GET).f(handle_get_transaction_by_id);
                     // })

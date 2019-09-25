@@ -31,6 +31,7 @@ use diesel::r2d2::{ConnectionManager, Pool, PoolError, PooledConnection};
 use serde_json::value::Value;
 use std::env;
 
+
 use diesel::sql_types::{BigInt, Nullable, Text, Timestamp};
 sql_function!(coalesce, Coalesce, (x: Nullable<BigInt>, y: BigInt) -> BigInt);
 
@@ -159,6 +160,7 @@ pub struct TxReceiptResponse {
     success: bool,
     verified: bool,
     fail_reason: Option<String>,
+    prover_run: Option<ProverRun>,
 }
 
 impl NewExecutedTransaction {
@@ -358,7 +360,7 @@ pub struct StoredProof {
 }
 
 // Every time before a prover worker starts generating the proof, a prover run is recorded for monitoring purposes
-#[derive(Debug, Insertable, Queryable, QueryableByName)]
+#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize, Deserialize)]
 #[table_name = "prover_runs"]
 pub struct ProverRun {
     pub id: i32,
@@ -516,6 +518,16 @@ pub enum TxAddError {
     InvalidSignature,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AccountTransaction {
+    tx: Value,
+    tx_hash: String,
+    success: bool,
+    fail_reason: Option<String>,
+    committed: bool,
+    verified: bool
+}
+
 enum ConnectionHolder {
     Pooled(PooledConnection<ConnectionManager<PgConnection>>),
     Direct(PgConnection),
@@ -604,6 +616,55 @@ impl StorageProcessor {
             }
         }
         Ok(())
+    }
+
+    pub fn get_account_transactions(&self, address: &AccountAddress) -> QueryResult<Vec<AccountTransaction>> {
+        let all_txs: Vec<_> = mempool::table
+            .filter(mempool::primary_account_address.eq(address.data.to_vec()))
+            .left_join(executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),)
+            .left_join(operations::table.on(operations::block_number.eq(executed_transactions::block_number)))
+            .load::<(ReadTx, Option<StoredExecutedTransaction>, Option<StoredOperation>)>(self.conn())?;
+
+        let res = all_txs
+            .into_iter()
+            .group_by(|(mempool_tx, _, _)| mempool_tx.hash.clone())
+            .into_iter()
+            .map(|(_op_id, mut group_iter)| {
+                // TODO: replace the query with pivot
+                let (mempool_tx, executed_tx, operation) = group_iter.next().unwrap();
+                let mut res = AccountTransaction {
+                    tx: mempool_tx.tx,
+                    tx_hash: hex::encode(mempool_tx.hash.as_slice()),
+                    success: false,
+                    fail_reason: None,
+                    committed: false,
+                    verified: false
+                };
+                if let Some(executed_tx) = executed_tx {
+                    res.success = executed_tx.success;
+                    res.fail_reason = executed_tx.fail_reason;
+                }
+                if let Some(operation) = operation {
+                    if operation.action_type == "Commit" {
+                        res.committed = operation.confirmed;
+                    } else {
+                        res.verified = operation.confirmed;
+                    }
+                }
+                if let Some((_mempool_tx, _executed_tx, operation)) = group_iter.next() {
+                    if let Some(operation) = operation {
+                        if operation.action_type == "Commit" {
+                            res.committed = operation.confirmed;
+                        } else {
+                            res.verified = operation.confirmed;
+                        }
+                    };
+                }
+                res
+            })
+            .collect::<Vec<AccountTransaction>>();
+        
+        Ok(res)
     }
 
     pub fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {
@@ -1172,12 +1233,18 @@ impl StorageProcessor {
                     .first::<StoredOperation>(self.conn())
                     .optional()?;
 
+                let prover_run: Option<ProverRun> = prover_runs::table
+                    .filter(prover_runs::block_number.eq(tx.block_number)) 
+                    .first::<ProverRun>(self.conn())
+                    .optional()?;
+                
                 Ok(Some(TxReceiptResponse {
                     tx_hash: hash.to_vec(),
                     block_number: tx.block_number,
                     success: tx.success,
                     verified: confirm.is_some(),
                     fail_reason: tx.fail_reason,
+                    prover_run: prover_run,
                 }))
             } else {
                 Ok(None)

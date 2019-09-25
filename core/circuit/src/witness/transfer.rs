@@ -11,6 +11,7 @@ use num_traits::cast::ToPrimitive;
 use pairing::bn256::*;
 
 use models::node::TransferOp;
+use models::primitives::big_decimal_to_u128;
 
 pub struct TransferData {
     pub amount: u128,
@@ -124,8 +125,8 @@ pub fn apply_transfer_tx(
     transfer: &TransferOp,
 ) -> TransferWitness<Bn256> {
     let transfer_data = TransferData {
-        amount: transfer.tx.amount.to_u128().unwrap(),
-        fee: transfer.tx.fee.to_u128().unwrap(),
+        amount: big_decimal_to_u128(&transfer.tx.amount),
+        fee: big_decimal_to_u128(&transfer.tx.fee),
         token: u32::from(transfer.tx.token),
         from_account_address: transfer.from,
         to_account_address: transfer.to,

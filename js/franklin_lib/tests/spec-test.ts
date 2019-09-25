@@ -57,8 +57,8 @@ async function txSignatureCheck() {
             from: pubkeyToAddress(keys.publicKey),
             to: crypto.randomBytes(addressLen),
             token: 2,
-            amount: 11,
-            fee: 12,
+            amount: ethers.utils.parseEther("1000"),
+            fee: ethers.utils.parseEther("100"),
             nonce: 17,
     };
 

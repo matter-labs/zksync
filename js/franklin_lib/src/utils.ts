@@ -1,4 +1,5 @@
 import BN = require('bn.js');
+import { ethers } from 'ethers';
 
 export function floatToInteger(floatBytes: Buffer, exp_bits: number, mantissa_bits: number, exp_base: number): BN {
     const floatHolder = new BN(floatBytes, 16, 'be'); // keep bit order
@@ -66,7 +67,6 @@ export function bitsIntoBytesInOrder(bits: Array<boolean>) : Buffer {
 }
 
 export function integerToFloat(integer: BN, exp_bits: number, mantissa_bits: number, exp_base: number): Buffer {
-
     let max_exponent = (new BN(10)).pow(new BN((1 << exp_bits) - 1));
     let max_mantissa = (new BN(2)).pow(new BN(mantissa_bits)).subn(1);
 
@@ -76,35 +76,12 @@ export function integerToFloat(integer: BN, exp_bits: number, mantissa_bits: num
 
     let exponent = 0;
     let mantissa = integer;
-
-    if (integer.gt(max_mantissa)) {
-        // always try best precision
-        let exponent_guess = integer.div(max_mantissa);
-        let exponent_temp = exponent_guess;
-
-        while(true) {
-            if (exponent_temp.ltn(exp_base)) {
-                break;
-            }
-            exponent_temp = exponent_temp.divn(exp_base);
-            exponent += 1;
-        }
-
-        exponent_temp = new BN(1);
-        for (let i = 0; i < exponent; ++i) {
-            exponent_temp = exponent_temp.muln(exp_base);
-        }
-
-        if (exponent_temp.mul(max_mantissa) < integer) {
-            exponent += 1;
-            exponent_temp = exponent_temp.muln(exp_base);
-        }
-
-        mantissa = integer.div(exponent_temp);
+    while (mantissa.gt(max_mantissa)) {
+        mantissa = mantissa.divn(exp_base);
+        exponent += 1;
     }
 
     // encode into bits. First bits of mantissa in LE order
-
     let encoding = [];
 
     for (let i = 0; i < exp_bits; ++i) {
@@ -144,4 +121,42 @@ export function packAmount(amount: BN): Buffer {
 
 export function packFee(amount: BN): Buffer {
     return reverseBits(integerToFloat(amount, 6, 10, 10));
+}
+
+/**
+ * packs and unpacks the amount, returning the closest packed value.
+ * e.g 1000000003 => 1000000000
+ * @param amount 
+ * @param AMOUNT_EXPONENT_BIT_WIDTH 
+ * @param AMOUNT_MANTISSA_BIT_WIDTH 
+ */
+function packedHelper(amount: ethers.utils.BigNumberish, AMOUNT_EXPONENT_BIT_WIDTH: number, AMOUNT_MANTISSA_BIT_WIDTH: number) {
+    let amountStr10 = ethers.utils.bigNumberify(amount).toString();
+    let bn = new BN(amountStr10, 10);
+    
+    let packed = integerToFloat(bn, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, 10);
+    let unpacked = floatToInteger(packed, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, 10);    
+    return unpacked.toString(10);
+}
+
+/**
+ * packs and unpacks the amount, returning the closest packed value.
+ * e.g 1000000003 => 1000000000
+ * @param amount
+ */
+export function packedAmount(amount: ethers.utils.BigNumberish) {
+    const AMOUNT_EXPONENT_BIT_WIDTH = 5;
+    const AMOUNT_MANTISSA_BIT_WIDTH = 19;
+    return packedHelper(amount, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH);
+}
+
+/**
+ * packs and unpacks the amount, returning the closest packed value.
+ * e.g 1000000003 => 1000000000
+ * @param fee 
+ */
+export function packedFee(fee: ethers.utils.BigNumberish) {
+    const FEE_EXPONENT_BIT_WIDTH = 4;
+    const FEE_MANTISSA_BIT_WIDTH = 4;
+    return packedHelper(fee, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH);
 }

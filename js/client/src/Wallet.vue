@@ -22,7 +22,7 @@
         <h3 style="color: red">Please switch to <b>{{currentNetwork}}</b> network in Metamask to try this demo.</h3>
     </b-container>
     <b-container v-if="network && correctNetwork">
-        <b-alert show dismissible :variant="alertType" fade :show="countdown" @dismissed="countdown=0" class="mt-2">
+        <b-alert dismissible :variant="alertType" fade :show="countdown" @dismissed="countdown=0" class="mt-2">
             {{result}}
         </b-alert>
 
@@ -30,7 +30,7 @@
             <b style="color: red">Warning</b>: this app is for demo only. Database and smart contracts will be reset from time to time, 
             with all coins lost!
         </p>
-        
+ 
         <b-row>
             <b-col sm="6" order="2" class="col-xl-8 col-lg-7 col-md-6 col-sm-12">
                 <b-card title="Transfer in Matter Network" class="mb-4 d-flex">
