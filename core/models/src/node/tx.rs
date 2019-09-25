@@ -1,5 +1,5 @@
 use super::{Nonce, TokenId};
-use crate::node::{pack_fee_amount, pack_token_amount};
+use crate::node::{pack_fee_amount, pack_token_amount, unpack_token_amount, unpack_fee_amount};
 use super::operations::{
     DEPOSIT_OP_CODE,
     TRANSFER_TO_NEW_OP_CODE,
@@ -72,8 +72,8 @@ impl Transfer {
             from: AccountAddress::zero(), // From pubdata its unknown
             to: AccountAddress::from_bytes(bytes[to_pre_length .. to_pre_length + FR_ADDRESS_LEN]),
             token: TokenId::from_be_bytes(bytes[token_id_pre_length .. token_id_pre_length + TOKEN_BYTES_LENGTH]),
-            amount: unpack_token_amount(bytes[amount_pre_length .. amount_pre_length + PACKED_AMOUNT_BYTES_LEGTH]),
-            fee: unpack_fee_amount(bytes[fee_pre_length .. fee_pre_length + FEE_BYTES_LEGTH]),
+            amount: unpack_token_amount(bytes[amount_pre_length .. amount_pre_length + PACKED_AMOUNT_BYTES_LEGTH])?,
+            fee: unpack_fee_amount(bytes[fee_pre_length .. fee_pre_length + FEE_BYTES_LEGTH])?,
             nonce: 0, // From pubdata its unknown
             signature: TxSignature::default() // From pubdata its unknown
         }
@@ -90,8 +90,8 @@ impl Transfer {
             from: AccountAddress::zero(), // From pubdata its unknown
             to: AccountAddress::zero(), // From pubdata its unknown
             token: TokenId::from_be_bytes(bytes[token_id_pre_length .. token_id_pre_length + TOKEN_BYTES_LENGTH]),
-            amount: unpack_token_amount(bytes[amount_pre_length .. amount_pre_length + PACKED_AMOUNT_BYTES_LEGTH]),
-            fee: unpack_fee_amount(bytes[fee_pre_length .. fee_pre_length + FEE_BYTES_LEGTH]),
+            amount: unpack_token_amount(bytes[amount_pre_length .. amount_pre_length + PACKED_AMOUNT_BYTES_LEGTH])?,
+            fee: unpack_fee_amount(bytes[fee_pre_length .. fee_pre_length + FEE_BYTES_LEGTH])?,
             nonce: 0, // From pubdata its unknown
             signature: TxSignature::default() // From pubdata its unknown
         }
@@ -152,7 +152,7 @@ impl Withdraw {
             eth_address: Address::from_slice(bytes[eth_address_pre_length .. eth_address_pre_length + ETH_ADDR_BYTES_LEGTH]),
             token: TokenId::from_be_bytes(bytes[token_id_pre_length .. token_id_pre_length + TOKEN_BYTES_LENGTH]),
             amount: BigDecimal::parse_bytes(bytes[amount_pre_length .. amount_pre_length + FULL_AMOUNT_BYTES_LEGTH].to_vec(), 18),
-            fee: unpack_fee_amount(bytes[fee_pre_length .. fee_pre_length + FEE_BYTES_LEGTH]),
+            fee: unpack_fee_amount(bytes[fee_pre_length .. fee_pre_length + FEE_BYTES_LEGTH])?,
             nonce: 0, // From pubdata its unknown
             signature: TxSignature::default() // From pubdata its unknown
         }

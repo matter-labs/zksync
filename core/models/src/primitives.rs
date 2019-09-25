@@ -1,6 +1,7 @@
 use crate::circuit::utils::append_le_fixed_width;
 use crate::merkle_tree::{hasher::Hasher, pedersen_hasher::BabyPedersenHasher};
 use crate::params;
+use num_bigint::BigInt;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use failure::bail;
 use ff::ScalarEngine;
@@ -263,6 +264,62 @@ pub fn pack_as_float(number: &BigDecimal, exponent_len: usize, mantissa_len: usi
     let mut vec = convert_to_float(uint, exponent_len, mantissa_len, 10).expect("packing error");
     vec.reverse();
     pack_bits_into_bytes_in_order(vec)
+}
+
+pub fn unpack_as_big_decimal(bytes: &Vec<u8>, exponent_len: usize, mantissa_len: usize) -> Option<BigDecimal> {
+    let bool_vec: Vec<bool> = bytes_into_be_bits(bytes.as_slice());
+    let amount_u128: u128 = parse_float_to_u128(
+        bool_vec,
+        exponent_len,
+        mantissa_len,
+        10,
+    )?;
+    Some(BigDecimal::from(
+        BigInt::from(amount_u128)
+    ))
+}
+
+pub fn parse_float_to_u128(
+    bool_vec: Vec<bool>,
+    exponent_length: usize,
+    mantissa_length: usize,
+    exponent_base: u32
+) -> Option<u128>
+{
+    if exponent_length + mantissa_length != bool_vec.len() { None }
+
+    let exponent_base: u128 = u128::from(exponent_base);
+    let mut exponent_power_of_two = exponent_base;
+    let mut exponent: u128 = 1;
+    for i in 0 .. exponent_length {
+        if bool_vec[i] {
+            let max_exponent: u128 = 1 + (u128::max_value() / exponent_power_of_two);
+            if exponent >= max_exponent { None }
+            exponent = exponent.checked_mul(exponent_power_of_two)?;
+        }
+        exponent_power_of_two = exponent_power_of_two.checked_mul(exponent_power_of_two)?;
+    }
+
+    let mut max_mantissa: u128 = u128::max_value();
+    if exponent != 1 {
+        max_mantissa = 1 + (u128::max_value() / exponent);
+    }
+
+    let mut mantissa_power_of_two: u128 = 1;
+    let mut mantissa: u128 = 0;
+    for i in exponent_length .. (exponent_length + mantissa_length)
+    {
+        if bool_vec[i] {
+            let _max_mantissa: u128 = 1 + (max_mantissa / 2);
+            if mantissa >= _max_mantissa { None }
+            mantissa = mantissa.checked_add(mantissa_power_of_two)?;
+        }
+        mantissa_power_of_two = mantissa_power_of_two.checked_mul(2)?;
+    }
+
+    let result = mantissa.checked_mul(exponent)?;
+
+    Some(result)
 }
 
 pub fn convert_to_float(

@@ -1,6 +1,6 @@
 use super::merkle_tree::{PedersenHasher, SparseMerkleTree};
 use super::params;
-use super::primitives::pack_as_float;
+use super::primitives::{pack_as_float, pack_as_float};
 use bigdecimal::BigDecimal;
 use pairing::bn256;
 
@@ -58,9 +58,25 @@ pub fn pack_token_amount(amount: &BigDecimal) -> Vec<u8> {
     )
 }
 
+pub fn unpack_token_amount(bytes: &Vec<u8>) -> Option<BigDecimal> {
+    unpack_as_big_decimal(
+        bytes,
+        params::AMOUNT_EXPONENT_BIT_WIDTH,
+        params::AMOUNT_MANTISSA_BIT_WIDTH,
+    )
+}
+
 pub fn pack_fee_amount(amount: &BigDecimal) -> Vec<u8> {
     pack_as_float(
         amount,
+        params::FEE_EXPONENT_BIT_WIDTH,
+        params::FEE_MANTISSA_BIT_WIDTH,
+    )
+}
+
+pub fn unpack_fee_amount(bytes: &Vec<u8>) -> Option<BigDecimal> {
+    unpack_as_big_decimal(
+        bytes,
         params::FEE_EXPONENT_BIT_WIDTH,
         params::FEE_MANTISSA_BIT_WIDTH,
     )
