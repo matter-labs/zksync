@@ -93,21 +93,21 @@ export default {
                     from = formatAddress(tx.priority_op.data.sender);
                     to = formatAddress(tx.priority_op.data.account);
                     token = tx.priority_op.data.token;
-                    token = tokens[token].symbol ? token[token.symbol] : defaultTokenSymbol(token);
+                    token = tokens[token].symbol ? tokens[token].symbol : defaultTokenSymbol(token);
                     amount =  `${formatToken(tx.priority_op.data.amount, token)} ${token}`;
                     fee = `${formatToken(tx.priority_op.eth_fee, "ETH")} ETH`;
                 } else if (type == "Transfer") {
                     from = formatAddress(tx.tx.from);
                     to = formatAddress(tx.tx.to);
                     token = tx.tx.token;
-                    token = tokens[token].symbol ? token[token.symbol] : defaultTokenSymbol(token);
+                    token = tokens[token].symbol ? tokens[token].symbol : defaultTokenSymbol(token);
                     amount =  `${formatToken(tx.tx.amount, token)} ${token}`;
                     fee = `${formatToken(tx.tx.fee, token)} ${token}`;
                 } else if (type == "Withdraw") {
                     from = formatAddress(tx.tx.account);
                     to = formatAddress(tx.tx.eth_address);
                     token = tx.tx.token;
-                    token = tokens[token].symbol ? token[token.symbol] : defaultTokenSymbol(token);
+                    token = tokens[token].symbol ? tokens[token].symbol : defaultTokenSymbol(token);
                     amount =  `${formatToken(tx.tx.amount, token)} ${token}`;
                     fee = `${formatToken(tx.tx.fee, token)} ${token}`;
                 }
