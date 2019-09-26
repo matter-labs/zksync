@@ -1,6 +1,7 @@
 use crate::circuit::utils::append_le_fixed_width;
 use crate::merkle_tree::{hasher::Hasher, pedersen_hasher::BabyPedersenHasher};
 use crate::params;
+use std::mem::size_of;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use failure::bail;
 use ff::ScalarEngine;
@@ -283,7 +284,7 @@ pub fn parse_float_to_u128(
     exponent_base: u32
 ) -> Option<u128>
 {
-    if exponent_length + mantissa_length != bool_vec.len() { None }
+    if exponent_length + mantissa_length != bool_vec.len() { return None }
 
     let exponent_base: u128 = u128::from(exponent_base);
     let mut exponent_power_of_two = exponent_base;
@@ -291,7 +292,7 @@ pub fn parse_float_to_u128(
     for i in 0 .. exponent_length {
         if bool_vec[i] {
             let max_exponent: u128 = 1 + (u128::max_value() / exponent_power_of_two);
-            if exponent >= max_exponent { None }
+            if exponent >= max_exponent { return None }
             exponent = exponent.checked_mul(exponent_power_of_two)?;
         }
         exponent_power_of_two = exponent_power_of_two.checked_mul(exponent_power_of_two)?;
@@ -308,7 +309,7 @@ pub fn parse_float_to_u128(
     {
         if bool_vec[i] {
             let _max_mantissa: u128 = 1 + (max_mantissa / 2);
-            if mantissa >= _max_mantissa { None }
+            if mantissa >= _max_mantissa { return None }
             mantissa = mantissa.checked_add(mantissa_power_of_two)?;
         }
         mantissa_power_of_two = mantissa_power_of_two.checked_mul(2)?;
@@ -420,6 +421,19 @@ pub fn pedersen_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
 /// Its important to use this, instead of bit_decimal.to_u128()
 pub fn big_decimal_to_u128(big_decimal: &BigDecimal) -> u128 {
     format!("{}", big_decimal).parse().unwrap()
+}
+
+pub fn bytes_slice_to_uint32(bytes: &[u8]) -> Option<u32> {
+    let mut size = bytes.len();
+    if size >= 4 || size == 0 { return None }
+    let mut fbytes = bytes;
+    while size < 4 {
+        [[0], fbytes].concat();
+        size += 1;
+    }
+    let mut array: [u8; 4] = Default::default();
+    array.copy_from_slice(&fbytes);
+    Some(u32::from_be_bytes(array))
 }
 
 #[test]

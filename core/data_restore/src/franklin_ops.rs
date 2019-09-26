@@ -42,7 +42,7 @@ fn get_franklin_ops_from_block(ops_block: FranklinOpsBlock) -> Result<Vec<Frankl
         let pre = current_pointer + TX_TYPE_BYTES_LEGTH;
         let post = pre + pub_data_size;
 
-        let op = FranklinOp::from_bytes(&ops_block.commitment_data[pre .. post].to_vec())
+        let op = FranklinOp::from_bytes(&ops_block.commitment_data[pre .. post])
             .ok_or(|e| DataRestoreError::WrongType)?;
         ops.push(op);
         current_pointer += full_size;
