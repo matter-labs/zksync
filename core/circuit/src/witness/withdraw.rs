@@ -14,8 +14,8 @@ use num_traits::cast::ToPrimitive;
 
 use models::node::WithdrawOp;
 use models::params as franklin_constants;
-use pairing::bn256::*;
 use models::primitives::big_decimal_to_u128;
+use pairing::bn256::*;
 
 pub struct WithdrawData {
     pub amount: u128,
