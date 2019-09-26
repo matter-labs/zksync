@@ -95,16 +95,16 @@ fn load_state_from_storage(
     driver: &mut DataRestoreDriver,
     connection_pool: ConnectionPool,
 ) {
-    info!("Loading stored state");
-    // Get events
-    driver.events_state = get_events_state_from_storage(connection_pool.clone());
-    // Get operations blocks
-    let mut blocks = get_op_blocks_from_storage(connection_pool.clone());
-    // Build accounts state from operations blocks
-    driver
-        .update_accounts_state_from_op_blocks(blocks.as_slice())
-        .expect("Cant update accounts state from op blocks in load_state_from_storage");
-    info!("Stored state loaded");
+    // info!("Loading stored state");
+    // // Get events
+    // driver.events_state = get_events_state_from_storage(connection_pool.clone());
+    // // Get operations blocks
+    // let mut blocks = get_op_blocks_from_storage(connection_pool.clone());
+    // // Build accounts state from operations blocks
+    // driver
+    //     .update_accounts_state_from_op_blocks(blocks.as_slice())
+    //     .expect("Cant update accounts state from op blocks in load_state_from_storage");
+    // info!("Stored state loaded");
 }
 
 /// Runs states updates

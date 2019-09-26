@@ -59,7 +59,7 @@ pub fn pack_token_amount(amount: &BigDecimal) -> Vec<u8> {
     )
 }
 
-pub fn unpack_token_amount(bytes: &Vec<u8>) -> Option<BigDecimal> {
+pub fn unpack_token_amount(bytes: &[u8]) -> Option<BigDecimal> {
     unpack_as_big_decimal(
         bytes,
         params::AMOUNT_EXPONENT_BIT_WIDTH,
@@ -75,7 +75,7 @@ pub fn pack_fee_amount(amount: &BigDecimal) -> Vec<u8> {
     )
 }
 
-pub fn unpack_fee_amount(bytes: &Vec<u8>) -> Option<BigDecimal> {
+pub fn unpack_fee_amount(bytes: &[u8]) -> Option<BigDecimal> {
     unpack_as_big_decimal(
         bytes,
         params::FEE_EXPONENT_BIT_WIDTH,

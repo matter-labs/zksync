@@ -3,6 +3,7 @@ use crate::merkle_tree::{hasher::Hasher, pedersen_hasher::BabyPedersenHasher};
 use crate::params;
 use std::mem::size_of;
 use bigdecimal::{BigDecimal, ToPrimitive};
+use std::str::FromStr;
 use failure::bail;
 use ff::ScalarEngine;
 use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
@@ -266,15 +267,15 @@ pub fn pack_as_float(number: &BigDecimal, exponent_len: usize, mantissa_len: usi
     pack_bits_into_bytes_in_order(vec)
 }
 
-pub fn unpack_as_big_decimal(bytes: &Vec<u8>, exponent_len: usize, mantissa_len: usize) -> Option<BigDecimal> {
-    let bool_vec: Vec<bool> = bytes_into_be_bits(bytes.as_slice());
+pub fn unpack_as_big_decimal(bytes: &[u8], exponent_len: usize, mantissa_len: usize) -> Option<BigDecimal> {
+    let bool_vec: Vec<bool> = bytes_into_be_bits(bytes);
     let amount_u128: u128 = parse_float_to_u128(
         bool_vec,
         exponent_len,
         mantissa_len,
         10,
     )?;
-    BigDecimal::try_from(amount_u128).ok()
+    BigDecimal::from_str(&amount_u128.to_string()).ok()
 }
 
 pub fn parse_float_to_u128(
@@ -426,14 +427,35 @@ pub fn big_decimal_to_u128(big_decimal: &BigDecimal) -> u128 {
 pub fn bytes_slice_to_uint32(bytes: &[u8]) -> Option<u32> {
     let mut size = bytes.len();
     if size >= 4 || size == 0 { return None }
-    let mut fbytes = bytes;
-    while size < 4 {
-        [[0], fbytes].concat();
-        size += 1;
-    }
     let mut array: [u8; 4] = Default::default();
-    array.copy_from_slice(&fbytes);
+    for i in 0..4-size {
+        array[i] = 0;
+    }
+    for i in 4-size..4 {
+        array[i]=bytes[i-(4-size)]
+    }
     Some(u32::from_be_bytes(array))
+}
+
+pub fn bytes_slice_to_uint16(bytes: &[u8]) -> Option<u16> {
+    let mut size = bytes.len();
+    if size >= 2 || size == 0 { return None }
+    let mut array: [u8; 2] = Default::default();
+    for i in 0..2-size {
+        array[i] = 0;
+    }
+    for i in 2-size..2 {
+        array[i]=bytes[i-(2-size)]
+    }
+    Some(u16::from_be_bytes(array))
+}
+
+pub fn bytes32_from_slice(bytes: &[u8]) -> Option<[u8; 32]> {
+    if bytes.len() != 32 { return None }
+    let mut array = [0; 32];
+    let bytes = &bytes[..array.len()];
+    array.copy_from_slice(bytes); 
+    Some(array)
 }
 
 #[test]

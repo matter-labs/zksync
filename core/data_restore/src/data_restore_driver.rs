@@ -94,10 +94,10 @@ impl DataRestoreDriver {
             );
 
             // Store events
-            storage_interactor.update_events_state(&self.events_state)?;
-            info!(
-                "Updated events storage"
-            );
+            // storage_interactor.update_events_state(&self.events_state)?;
+            // info!(
+            //     "Updated events storage"
+            // );
             
             self.storage_update_state = StorageUpdateState::Events;
             
@@ -108,10 +108,10 @@ impl DataRestoreDriver {
             );
 
             // Store Operations
-            storage_interactor.update_operations_list(&new_operations)?;
-            info!(
-                "Updated operations storage"
-            );
+            // storage_interactor.update_operations_list(&new_operations)?;
+            // info!(
+            //     "Updated operations storage"
+            // );
 
             self.storage_update_state = StorageUpdateState::Operations;
 

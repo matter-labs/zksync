@@ -72,54 +72,6 @@ pub fn get_topic_keccak_hash(topic: &str) -> web3::types::H256 {
     H256::from_slice(topic_keccak_data_vec)
 }
 
-/// Returns BigDecimal repr of amount bytes slice
-///
-/// # Arguments
-///
-/// * `bytes` - amount bytes slice
-///
-pub fn amount_bytes_slice_to_big_decimal(bytes: &[u8]) -> BigDecimal {
-    let vec = bytes.to_vec();
-    let bit_vec: BitVec = vec.into();
-    let mut bool_vec: Vec<bool> = vec![];
-    for i in bit_vec {
-        bool_vec.push(i);
-    }
-    let amount_u128: u128 = parse_float_to_u128(
-        bool_vec,
-        plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap_or(0);
-    let amount_u64 = amount_u128 as u64;
-    // amount_f64 = amount_f64 / f64::from(1000000);
-    BigDecimal::from(amount_u64)
-}
-
-/// Returns BigDecimal repr of fee bytes slice
-///
-/// # Arguments
-///
-/// * `bytes` - fee bytes slice
-///
-pub fn fee_bytes_slice_to_big_decimal(byte: u8) -> BigDecimal {
-    let bit_vec: BitVec = BitVec::from_element(byte);
-    let mut bool_vec: Vec<bool> = vec![];
-    for i in bit_vec {
-        bool_vec.push(i);
-    }
-    let fee_u128: u128 = parse_float_to_u128(
-        bool_vec,
-        plasma_constants::FEE_EXPONENT_BIT_WIDTH,
-        plasma_constants::FEE_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap_or(0);
-    let fee_u64 = fee_u128 as u64;
-    BigDecimal::from(fee_u64)
-}
-
 /// Specific errors that may occure during data restoring
 #[derive(Debug, Clone)]
 pub enum DataRestoreError {
