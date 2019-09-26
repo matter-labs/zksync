@@ -33,7 +33,13 @@ contract Franklin {
     // Public key length
     uint8 constant PUBKEY_LEN = 32;
     // Fee coefficient for priority request transaction
-    uint256 constant FEE_COEFF = 4;
+    uint256 constant FEE_COEFF = 2;
+    // Base gas cost for deposit eth transaction
+    uint256 constant BASE_DEPOSIT_ETH_GAS = 179179;
+    // Base gas cost for deposit erc transaction
+    uint256 constant BASE_DEPOSIT_ERC_GAS = 213948;
+    // Base gas cost for full exit transaction
+    uint256 constant BASE_FULL_EXIT_GAS = 170000;
     // Base gas cost for transaction
     uint256 constant BASE_GAS = 21000;
     // Max amount of any token must fit into uint128
@@ -261,8 +267,8 @@ contract Franklin {
     // - _franklinAddr - the receiver Franklin address
     function depositETH(bytes calldata _franklinAddr) external payable {
         // Fee is:
-        //   fee coeff * (base tx gas cost + remained gas) * gas price
-        uint256 fee = FEE_COEFF * (BASE_GAS + gasleft()) * tx.gasprice;
+        //   fee coeff * base tx gas cost * gas price
+        uint256 fee = FEE_COEFF * BASE_DEPOSIT_ETH_GAS * tx.gasprice;
 
         requireActive();
 
@@ -299,8 +305,8 @@ contract Franklin {
         bytes calldata _franklinAddr
     ) external payable {
         // Fee is:
-        //   fee coeff * (base tx gas cost + remained gas) * gas price
-        uint256 fee = FEE_COEFF * (BASE_GAS + gasleft()) * tx.gasprice;
+        //   fee coeff * base tx gas cost * gas price
+        uint256 fee = FEE_COEFF * BASE_DEPOSIT_ERC_GAS * tx.gasprice;
 
         requireActive();
 
@@ -350,8 +356,8 @@ contract Franklin {
         uint32 _nonce
     ) external payable {
         // Fee is:
-        //   fee coeff * (base tx gas cost + remained gas) * gas price
-        uint256 fee = FEE_COEFF * (BASE_GAS + gasleft()) * tx.gasprice;
+        //   fee coeff * base tx gas cost * gas price
+        uint256 fee = FEE_COEFF * BASE_FULL_EXIT_GAS * tx.gasprice;
         
         uint16 tokenId;
         if (_token == address(0)) {
