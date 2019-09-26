@@ -1,9 +1,10 @@
 use super::{Nonce, TokenId};
 use crate::node::{pack_fee_amount, pack_token_amount, unpack_token_amount, unpack_fee_amount};
+use crate::params::FR_ADDRESS_LEN;
 use super::operations::{
     DEPOSIT_OP_CODE,
     TRANSFER_TO_NEW_OP_CODE,
-    WITHDRAW_OP_CODE_OP_CODE,
+    WITHDRAW_OP_CODE,
     CLOSE_OP_CODE,
     TRANSFER_OP_CODE,
     FULL_EXIT_OP_CODE,
@@ -18,7 +19,7 @@ use super::operations::{
     SIGNATURE_R_BYTES_LEGTH,
     SIGNATURE_S_BYTES_LEGTH,
     PUBKEY_PACKED_BYTES_LEGTH,
-}
+};
 use bigdecimal::BigDecimal;
 use bigdecimal::ToPrimitive;
 use crypto::{digest::Digest, sha2::Sha256};

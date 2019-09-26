@@ -11,7 +11,7 @@ use web3::types::Address;
 use super::operations::{
     DEPOSIT_OP_CODE,
     TRANSFER_TO_NEW_OP_CODE,
-    WITHDRAW_OP_CODE_OP_CODE,
+    WITHDRAW_OP_CODE,
     CLOSE_OP_CODE,
     TRANSFER_OP_CODE,
     FULL_EXIT_OP_CODE,
@@ -26,7 +26,7 @@ use super::operations::{
     SIGNATURE_R_BYTES_LEGTH,
     SIGNATURE_S_BYTES_LEGTH,
     PUBKEY_PACKED_BYTES_LEGTH,
-}
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Deposit {
@@ -41,7 +41,7 @@ impl Deposit {
         let token_id_pre_length = ACCOUNT_ID_BYTES_LEGTH;
         let amount_pre_length = token_id_pre_length +
             TOKEN_BYTES_LENGTH;
-        let account_pre_length = account_pre_length +
+        let account_pre_length = amount_pre_length +
             FULL_AMOUNT_BYTES_LEGTH +
             FEE_BYTES_LEGTH;
         Self {
@@ -68,7 +68,7 @@ impl FullExit {
 
     pub fn from_bytes(bytes: &Vec<u8>) -> Self {
         let packed_pubkey_pre_length = ACCOUNT_ID_BYTES_LEGTH;
-        let eth_address_pre_length = eth_address_pre_length +
+        let eth_address_pre_length = packed_pubkey_pre_length +
             PUBKEY_PACKED_BYTES_LEGTH;
         let token_pre_length = eth_address_pre_length +
             ETH_ADDR_BYTES_LEGTH;

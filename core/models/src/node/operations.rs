@@ -4,31 +4,31 @@ use super::{pack_fee_amount, pack_token_amount, Deposit, FullExit};
 use super::{Close, Transfer, Withdraw};
 use bigdecimal::BigDecimal;
 
-pub const DEPOSIT_OP_LENGTH: u8 = 43u8;
-pub const TRANSFER_TO_NEW_OP_LENGTH: u8 = 33u8;
-pub const WITHDRAW_OP_LENGTH: u8 = 43u8;
-pub const CLOSE_OP_LENGTH: u8 = 3u8;
-pub const TRANSFER_OP_LENGTH: u8 = 13u8;
-pub const FULL_EXIT_OP_LENGTH: u8 = 141u8;
+pub const DEPOSIT_OP_LENGTH: usize = 43;
+pub const TRANSFER_TO_NEW_OP_LENGTH: usize = 33;
+pub const WITHDRAW_OP_LENGTH: usize = 43;
+pub const CLOSE_OP_LENGTH: usize = 3;
+pub const TRANSFER_OP_LENGTH: usize = 13;
+pub const FULL_EXIT_OP_LENGTH: usize = 141;
 
-pub const DEPOSIT_OP_CODE: u8 = 1u8;
-pub const TRANSFER_TO_NEW_OP_CODE: u8 = 2u8;
-pub const WITHDRAW_OP_CODE: u8 = 3u8;
-pub const CLOSE_OP_CODE: u8 = 4u8;
-pub const TRANSFER_OP_CODE: u8 = 5u8;
-pub const FULL_EXIT_OP_CODE: u8 = 6u8;
+pub const DEPOSIT_OP_CODE: usize = 1;
+pub const TRANSFER_TO_NEW_OP_CODE: usize = 2;
+pub const WITHDRAW_OP_CODE: usize = 3;
+pub const CLOSE_OP_CODE: usize = 4;
+pub const TRANSFER_OP_CODE: usize = 5;
+pub const FULL_EXIT_OP_CODE: usize = 6;
 
-pub const TX_TYPE_BYTES_LEGTH: u8 = 1u8;
-pub const ACCOUNT_ID_BYTES_LEGTH: u8 = 3u8;
-pub const TOKEN_BYTES_LENGTH: u8 = 2u8;
-pub const FULL_AMOUNT_BYTES_LEGTH: u8 = 16u8;
-pub const FEE_BYTES_LEGTH: u8 = 2u8;
-pub const ETH_ADDR_BYTES_LEGTH: u8 = 20u8;
-pub const PACKED_AMOUNT_BYTES_LEGTH: u8 = 3u8;
-pub const NONCE_BYTES_LEGTH: u8 = 4u8;
-pub const SIGNATURE_R_BYTES_LEGTH: u8 = 32u8;
-pub const SIGNATURE_S_BYTES_LEGTH: u8 = 32u8;
-pub const PUBKEY_PACKED_BYTES_LEGTH: u8 = 32u8;
+pub const TX_TYPE_BYTES_LEGTH: usize = 1;
+pub const ACCOUNT_ID_BYTES_LEGTH: usize = 3;
+pub const TOKEN_BYTES_LENGTH: usize = 2;
+pub const FULL_AMOUNT_BYTES_LEGTH: usize = 16;
+pub const FEE_BYTES_LEGTH: usize = 2;
+pub const ETH_ADDR_BYTES_LEGTH: usize = 20;
+pub const PACKED_AMOUNT_BYTES_LEGTH: usize = 3;
+pub const NONCE_BYTES_LEGTH: usize = 4;
+pub const SIGNATURE_R_BYTES_LEGTH: usize = 32;
+pub const SIGNATURE_S_BYTES_LEGTH: usize = 32;
+pub const PUBKEY_PACKED_BYTES_LEGTH: usize = 32;
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -287,12 +287,12 @@ impl FranklinOp {
     pub fn from_bytes(bytes: &Vec<u8>) -> Option<Self> {
         let op_type: &u8 = bytes[0];
         match *op_type {
-            DEPOSIT_OP_CODE => Some(Deposit(DepositOp::from_bytes(&bytes)))),
-            TRANSFER_TO_NEW_OP_CODE => Some(TransferToNew(TransferToNewOp::from_bytes(&bytes))),
-            WITHDRAW_OP_CODE => Some(Withdraw(WithdrawOp::from_bytes(&bytes))),
-            CLOSE_OP_CODE => Some(Close(CloseOp::from_bytes(&bytes))),
-            TRANSFER_OP_CODE => Some(Transfer(TransferOp::from_bytes(&bytes))),
-            FULL_EXIT_OP_CODE => Some(FullExit(FullExitOp::from_bytes(&bytes))),
+            DEPOSIT_OP_CODE => Some(FranklinOp::Deposit(DepositOp::from_bytes(&bytes))),
+            TRANSFER_TO_NEW_OP_CODE => Some(FranklinOp::TransferToNew(TransferToNewOp::from_bytes(&bytes))),
+            WITHDRAW_OP_CODE => Some(FranklinOp::Withdraw(WithdrawOp::from_bytes(&bytes))),
+            CLOSE_OP_CODE => Some(FranklinOp::Close(CloseOp::from_bytes(&bytes))),
+            TRANSFER_OP_CODE => Some(FranklinOp::Transfer(TransferOp::from_bytes(&bytes))),
+            FULL_EXIT_OP_CODE => Some(FranklinOp::FullExit(FullExitOp::from_bytes(&bytes))),
             _ => None
         }
     }

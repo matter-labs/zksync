@@ -1,7 +1,7 @@
 use crate::circuit::utils::append_le_fixed_width;
 use crate::merkle_tree::{hasher::Hasher, pedersen_hasher::BabyPedersenHasher};
 use crate::params;
-use num_bigint::BigInt;
+use bigdecimal::BigInt;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use failure::bail;
 use ff::ScalarEngine;
@@ -274,9 +274,7 @@ pub fn unpack_as_big_decimal(bytes: &Vec<u8>, exponent_len: usize, mantissa_len:
         mantissa_len,
         10,
     )?;
-    Some(BigDecimal::from(
-        BigInt::from(amount_u128)
-    ))
+    BigDecimal::try_from(amount_u128).ok()
 }
 
 pub fn parse_float_to_u128(
