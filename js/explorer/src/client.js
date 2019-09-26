@@ -50,6 +50,13 @@ let self = {
         })
     },
 
+    async getTokens() {
+        return fetch({
+            method:     'get',
+            url:        `${baseUrl()}/tokens`,
+        })
+    },
+
     async searchBlock(query) {
         return fetch({
             method:     'get',

@@ -32,6 +32,23 @@
 import store from './store'
 import TransactionList from './TransactionList.vue'
 import client from './client'
+import {ethers} from 'ethers';
+
+function formatToken(amount, token) {
+    if (token == "ETH") {
+        return ethers.utils.formatEther(amount);
+    }
+    return amount;
+}
+
+function formatAddress(address) {
+    // return `${address.slice(0,8)}..${address.slice(36, 42)}`;
+    return address;
+}
+
+function defaultTokenSymbol(tokenId) {
+    return `erc20_${tokenId}`;
+}
 
 export default {
     name: 'block',
@@ -56,16 +73,52 @@ export default {
             this.status          = block.verified_at ? 'Verified' : 'Committed'
 
             let txs = await client.getBlockTransactions(this.blockNumber)
-            this.transactions = txs.map( (tx, index) => ({
-                number:      index+1,
-                type:        tx.tx_type,
-                from:        tx.from ? (tx.from.slice(0, 8) + '...' + tx.from.slice(36, 42)) : "Ext",
-                to:          tx.to ? (tx.to.slice(0, 8) + '...' + tx.to.slice(36, 42)) : "Ext",
-                token:       tx.token,
-                amount:      tx.amount ? (this.formatFranklin(tx.amount) + ' ETH') : "None",
-                fee:         tx.fee ? (this.formatFranklin(tx.fee) + ' ETH') : "None",
-                nonce:       tx.nonce,
-            }))
+            let tokens = await client.getTokens();
+            this.transactions = txs.map( (tx, index) => {
+
+                let type = "";
+                if (tx.type == "PriorityOp") {
+                    type = tx.priority_op.data.type;
+                } else if (tx.type == "Tx") {
+                    type = tx.tx.type;
+                }
+
+                let from = "";
+                let to = "";
+                let token = "";
+                let amount = "";
+                let fee = "";
+
+                if (type == "Deposit") {
+                    from = formatAddress(tx.priority_op.data.sender);
+                    to = formatAddress(tx.priority_op.data.account);
+                    token = tx.priority_op.data.token;
+                    token = tokens[token].symbol ? token[token.symbol] : defaultTokenSymbol(token);
+                    amount =  `${formatToken(tx.priority_op.data.amount, token)} ${token}`;
+                    fee = `${formatToken(tx.priority_op.eth_fee, "ETH")} ETH`;
+                } else if (type == "Transfer") {
+                    from = formatAddress(tx.tx.from);
+                    to = formatAddress(tx.tx.to);
+                    token = tx.tx.token;
+                    token = tokens[token].symbol ? token[token.symbol] : defaultTokenSymbol(token);
+                    amount =  `${formatToken(tx.tx.amount, token)} ${token}`;
+                    fee = `${formatToken(tx.tx.fee, token)} ${token}`;
+                } else if (type == "Withdraw") {
+                    from = formatAddress(tx.tx.account);
+                    to = formatAddress(tx.tx.eth_address);
+                    token = tx.tx.token;
+                    token = tokens[token].symbol ? token[token.symbol] : defaultTokenSymbol(token);
+                    amount =  `${formatToken(tx.tx.amount, token)} ${token}`;
+                    fee = `${formatToken(tx.tx.fee, token)} ${token}`;
+                }
+
+                return {
+                type,
+                from,
+                to,
+                amount,
+                fee
+            }})
         },
     },
     computed: {

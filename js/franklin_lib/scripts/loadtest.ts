@@ -17,26 +17,26 @@ async function main() {
     await wallet.updateState();
     // let full_exit_tx = await wallet.emergencyWithdraw({id: 0, address: ethers.constants.AddressZero});
     // console.log(full_exit_tx);
-    let dep_tx = await wallet.deposit(wallet.supportedTokens['1'], 10);
-    console.log(dep_tx);
+    // let dep_tx = await wallet.deposit(wallet.supportedTokens['1'], 10);
+    // console.log(dep_tx);
 
     // await wallet.updateState();
     // console.log(wallet.supportedTokens);
     // console.log(wallet.franklinState);
     // console.log(wallet.ethState);
-    // let ethWallet2 = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
-    // let wallet2 = await Wallet.fromEthWallet(ethWallet2);
-    //
-    // await wallet.updateState();
-    // await wallet2.updateState();
+    let ethWallet2 = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
+    let wallet2 = await Wallet.fromEthWallet(ethWallet2);
+    
+    await wallet.updateState();
+    await wallet2.updateState();
 
 
-    // console.log(await wallet.transfer(wallet2.address, wallet.supportedTokens['0'], parseEther("1"),parseEther("0.1")));
+    //console.log(await wallet.transfer(wallet2.address, wallet.supportedTokens['1'], 5, 1));
     // await wallet.waitPendingTxsExecuted();
     // console.log(await wallet.transfer(wallet2.address, wallet.supportedTokens['1'], 15,3));
     // await wallet.waitPendingTxsExecuted();
 
-    // console.log(await wallet2.widthdrawOffchain(wallet2.supportedTokens['0'], 9, 0));
+     console.log(await wallet2.widthdrawOffchain(wallet2.supportedTokens['1'], 2, 1));
     // await wallet2.waitPendingTxsExecuted();
     // console.log(await wallet2.widthdrawOffchain(wallet2.supportedTokens['1'], 10, 5));
     // await wallet2.waitPendingTxsExecuted();

@@ -818,7 +818,10 @@ impl StorageProcessor {
         }))
     }
 
-    fn get_block_executed_ops(&self, block: BlockNumber) -> QueryResult<Vec<ExecutedOperations>> {
+    pub fn get_block_executed_ops(
+        &self,
+        block: BlockNumber,
+    ) -> QueryResult<Vec<ExecutedOperations>> {
         self.conn().transaction(|| {
             let mut executed_operations = Vec::new();
 
@@ -1166,29 +1169,31 @@ impl StorageProcessor {
     ) -> QueryResult<Vec<BlockDetails>> {
         let query = format!(
             "
-            with committed as (
-                select 
-                    data -> 'block' ->> 'new_root_hash' as new_state_root,    
-                    block_number,
-                    tx_hash as commit_tx_hash,
-                    created_at as committed_at
-                from operations
-                where 
-                    block_number <= {max_block}
-                    and action_type = 'Commit'
-                order by block_number desc
-                limit {limit}
+            with eth_ops as (
+            	select
+            		operations.block_number,
+            		eth_operations.tx_hash,
+            		operations.action_type,
+            		operations.created_at
+            	from operations
+            		left join eth_operations on eth_operations.op_id = operations.id
             )
-            select 
-                committed.*, 
-                verified.tx_hash as verify_tx_hash,
-                verified.created_at as verified_at
-            from committed
-            left join operations verified
-            on
-                committed.block_number = verified.block_number
-                and action_type = 'Verify'
-            order by committed.block_number desc
+            select
+            	blocks.number as block_number,
+            	blocks.root_hash as new_state_root,
+            	commited.tx_hash as commit_tx_hash,
+            	verified.tx_hash as verify_tx_hash,
+            	commited.created_at as committed_at,
+            	verified.created_at as verified_at
+            from blocks
+            inner join eth_ops commited on
+            	commited.block_number = blocks.number and commited.action_type = 'Commit'
+            left join eth_ops verified on
+            	verified.block_number = blocks.number and verified.action_type = 'Verify'
+            where
+            	blocks.number <= {max_block}
+            order by blocks.number desc
+            limit {limit};
         ",
             max_block = i64::from(max_block),
             limit = i64::from(limit)
@@ -1199,46 +1204,41 @@ impl StorageProcessor {
     pub fn handle_search(&self, query: String) -> Option<BlockDetails> {
         let block_number = query.parse::<i64>().unwrap_or(i64::max_value());
         let l_query = query.to_lowercase();
-        let has_prefix = l_query.starts_with("0x");
-        let prefix = "0x".to_owned();
-        let query_with_prefix = if has_prefix {
-            l_query
-        } else {
-            format!("{}{}", prefix, l_query)
-        };
         let sql_query = format!(
             "
-            with committed as (
-                select 
-                    data -> 'block' ->> 'new_root_hash' as new_state_root,    
-                    block_number,
-                    tx_hash as commit_tx_hash,
-                    created_at as committed_at
-                from operations
-                where action_type = 'Commit'
-                order by block_number desc
+                        with eth_ops as (
+            	select
+            		operations.block_number,
+            		eth_operations.tx_hash,
+            		operations.action_type,
+            		operations.created_at
+            	from operations
+            		left join eth_operations on eth_operations.op_id = operations.id
             )
-            select 
-                committed.*, 
-                verified.tx_hash as verify_tx_hash,
-                verified.created_at as verified_at
-            from committed
-            left join operations verified
-            on
-                committed.block_number = verified.block_number
-                and action_type = 'Verify'
+            select
+            	blocks.number as block_number,
+            	blocks.root_hash as new_state_root,
+            	commited.tx_hash as commit_tx_hash,
+            	verified.tx_hash as verify_tx_hash,
+            	commited.created_at as committed_at,
+            	verified.created_at as verified_at
+            from blocks
+            inner join eth_ops commited on
+            	commited.block_number = blocks.number and commited.action_type = 'Commit'
+            left join eth_ops verified on
+            	verified.block_number = blocks.number and verified.action_type = 'Verify'
             where false
-                or lower(commit_tx_hash) = $1
+                or lower(commited.tx_hash) = $1
                 or lower(verified.tx_hash) = $1
-                or lower(new_state_root) = $1
-                or committed.block_number = {block_number}
-            order by committed.block_number desc
-            limit 1
+                or lower(blocks.root_hash) = $1
+                or blocks.number = {block_number}
+            order by blocks.number desc
+            limit 1;
         ",
             block_number = block_number
         );
         diesel::sql_query(sql_query)
-            .bind::<Text, _>(query_with_prefix)
+            .bind::<Text, _>(l_query)
             .get_result(self.conn())
             .ok()
     }
@@ -1503,12 +1503,14 @@ impl StorageProcessor {
     }
 
     pub fn count_total_transactions(&self) -> QueryResult<u32> {
-        use crate::schema::executed_transactions::dsl::*;
-        let count: i64 = executed_transactions
-            .filter(success.eq(true))
+        let count_tx: i64 = executed_transactions::table
+            .filter(executed_transactions::success.eq(true))
             .select(count_star())
             .first(self.conn())?;
-        Ok(count as u32)
+        let prior_ops: i64 = executed_priority_operations::table
+            .select(count_star())
+            .first(self.conn())?;
+        Ok((count_tx + prior_ops) as u32)
     }
 
     pub fn get_last_committed_block(&self) -> QueryResult<BlockNumber> {

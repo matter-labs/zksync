@@ -14,6 +14,7 @@ pub mod tx;
 pub use web3::types::{H256, U128, U256};
 
 pub use self::account::{Account, AccountAddress, AccountUpdate};
+pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 pub use self::operations::{
     DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
 };

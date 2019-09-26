@@ -71,6 +71,7 @@ impl FullExit {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub enum FranklinPriorityOp {
     Deposit(Deposit),
     FullExit(FullExit),
