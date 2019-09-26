@@ -1,9 +1,7 @@
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
-use crate::merkle_tree::PedersenHasher;
 use crate::node::TokenId;
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use lazy_static::lazy_static;
-use pairing::bn256::*;
 
 /// Account tree depth
 pub const ACCOUNT_TREE_DEPTH: usize = 5;

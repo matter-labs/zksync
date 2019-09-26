@@ -21,13 +21,12 @@ use super::operations::{
     PUBKEY_PACKED_BYTES_LEGTH,
 };
 use bigdecimal::BigDecimal;
-use bigdecimal::ToPrimitive;
 use crypto::{digest::Digest, sha2::Sha256};
 
 use super::account::AccountAddress;
 use super::Engine;
 use crate::params::JUBJUB_PARAMS;
-use crate::primitives::pedersen_hash_tx_msg;
+use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg};
 use failure::{ensure, format_err};
 use ff::{PrimeField, PrimeFieldRepr};
 use franklin_crypto::alt_babyjubjub::fs::FsRepr;
@@ -165,7 +164,7 @@ impl Withdraw {
         out.extend_from_slice(&self.account.data);
         out.extend_from_slice(self.eth_address.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
-        out.extend_from_slice(&self.amount.to_u128().unwrap().to_be_bytes());
+        out.extend_from_slice(&big_decimal_to_u128(&self.amount).to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out

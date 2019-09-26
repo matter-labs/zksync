@@ -14,6 +14,7 @@ use num_traits::cast::ToPrimitive;
 
 use models::node::WithdrawOp;
 use models::params as franklin_constants;
+use models::primitives::big_decimal_to_u128;
 use pairing::bn256::*;
 
 pub struct WithdrawData {
@@ -115,8 +116,8 @@ pub fn apply_withdraw_tx(
     withdraw: &WithdrawOp,
 ) -> WithdrawWitness<Bn256> {
     let withdraw_data = WithdrawData {
-        amount: withdraw.tx.amount.to_u128().unwrap(),
-        fee: withdraw.tx.fee.to_u128().unwrap(),
+        amount: big_decimal_to_u128(&withdraw.tx.amount),
+        fee: big_decimal_to_u128(&withdraw.tx.fee),
         token: u32::from(withdraw.tx.token),
         account_address: withdraw.account_id,
         ethereum_key: Fr::from_hex(&format!("{:x}", &withdraw.tx.eth_address)).unwrap(),

@@ -1,7 +1,6 @@
 use crate::circuit::utils::append_le_fixed_width;
 use crate::merkle_tree::{hasher::Hasher, pedersen_hasher::BabyPedersenHasher};
 use crate::params;
-use bigdecimal::BigInt;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use failure::bail;
 use ff::ScalarEngine;
@@ -52,7 +51,7 @@ pub fn get_bits_le_fixed_u128(num: u128, n: usize) -> Vec<bool> {
 }
 
 pub fn get_bits_le_fixed_big_decimal(num: BigDecimal, n: usize) -> Vec<bool> {
-    let as_u128 = num.to_u128().unwrap();
+    let as_u128 = big_decimal_to_u128(&num);
 
     get_bits_le_fixed_u128(as_u128, n)
 }
@@ -259,7 +258,7 @@ pub fn pack_bits_into_bytes_in_order(bits: Vec<bool>) -> Vec<u8> {
 }
 
 pub fn pack_as_float(number: &BigDecimal, exponent_len: usize, mantissa_len: usize) -> Vec<u8> {
-    let uint = number.to_u128().expect("should be in u128");
+    let uint = big_decimal_to_u128(number);
 
     let mut vec = convert_to_float(uint, exponent_len, mantissa_len, 10).expect("packing error");
     vec.reverse();
@@ -416,6 +415,11 @@ pub fn pedersen_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
     append_le_fixed_width(&mut hash_bits, &hash_fr, 256);
     let result = pack_bits_into_bytes(hash_bits);
     result
+}
+
+/// Its important to use this, instead of bit_decimal.to_u128()
+pub fn big_decimal_to_u128(big_decimal: &BigDecimal) -> u128 {
+    format!("{}", big_decimal).parse().unwrap()
 }
 
 #[test]

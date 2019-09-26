@@ -30,10 +30,6 @@ fn run_committer(
         .access_storage()
         .expect("db connection failed for committer");;
 
-    //    let eth_client = ETHClient::new(TEST_PLASMA_ALWAYS_VERIFY);
-    //    let current_nonce = eth_client.current_nonce().expect("can not get nonce");
-    //    let _ = storage.prepare_nonce_scheduling(&eth_client.current_sender(), current_nonce);
-
     let mut last_verified_block = storage.get_last_verified_block().expect("db failed");
     loop {
         let req = rx_for_ops.recv_timeout(Duration::from_millis(100));
@@ -91,7 +87,7 @@ fn run_committer(
                         .expect("committer must commit the op into db");
                     tx_for_eth
                         .send(op)
-                        .expect("must send an operation for commitment to ethereum");
+                        .expect("must send an operation for verification to ethereum");
                     last_verified_block += 1;
                 } else {
                     break;

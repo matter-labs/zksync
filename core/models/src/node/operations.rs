@@ -1,7 +1,10 @@
 use crate::params::FR_ADDRESS_LEN;
 use super::AccountId;
+use super::FranklinTx;
 use super::{pack_fee_amount, pack_token_amount, Deposit, FullExit};
 use super::{Close, Transfer, Withdraw};
+use crate::node::FranklinPriorityOp;
+use crate::primitives::big_decimal_to_u128;
 use bigdecimal::BigDecimal;
 
 pub const DEPOSIT_OP_LENGTH: usize = 43;
@@ -309,8 +312,22 @@ impl FranklinOp {
             _ => None
         }
     }
-}
 
-fn big_decimal_to_u128(big_decimal: &BigDecimal) -> u128 {
-    format!("{}", big_decimal).parse().unwrap()
+    pub fn try_get_tx(&self) -> Option<FranklinTx> {
+        match self {
+            FranklinOp::Transfer(op) => Some(FranklinTx::Transfer(op.tx.clone())),
+            FranklinOp::TransferToNew(op) => Some(FranklinTx::Transfer(op.tx.clone())),
+            FranklinOp::Withdraw(op) => Some(FranklinTx::Withdraw(op.tx.clone())),
+            FranklinOp::Close(op) => Some(FranklinTx::Close(op.tx.clone())),
+            _ => None,
+        }
+    }
+
+    pub fn try_get_priority_op(&self) -> Option<FranklinPriorityOp> {
+        match self {
+            FranklinOp::Deposit(op) => Some(FranklinPriorityOp::Deposit(op.priority_op.clone())),
+            FranklinOp::FullExit(op) => Some(FranklinPriorityOp::FullExit(op.priority_op.clone())),
+            _ => None,
+        }
+    }
 }
