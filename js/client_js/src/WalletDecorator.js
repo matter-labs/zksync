@@ -1,4 +1,4 @@
-import { BigNumberish, BigNumber, bigNumberify } from 'ethers/utils';
+\import { BigNumberish, BigNumber, bigNumberify } from 'ethers/utils';
 import { FranklinProvider, Wallet, Address } from 'franklin_lib'
 
 const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
@@ -361,6 +361,11 @@ export class WalletDecorator {
             
             if (receipt) break;
             await sleep(4000);
+        }
+
+        if (receipt == null) {
+            yield error(`Can't get tx receipt after 5 retries`);
+            return;
         }
 
         if (receipt.status) {

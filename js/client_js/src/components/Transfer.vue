@@ -13,12 +13,12 @@
             :selected.sync="token">
         </TokenSelector>
         Amount <span v-if="maxAmountVisible">(<span v-if="token == 'ETH'">in ETH tokens, </span> max {{ token }} {{ displayableBalancesDict[token] }})</span>:
-        <b-form-input autocomplete="off" type="number" v-model="amount" class="mb-3"></b-form-input>
+        <b-form-input autocomplete="off" type="number" v-model="amountSelected" class="mb-3"></b-form-input>
         Choose fee:
         <FeeSelector 
             class="mb-3"
             :fees="fees"
-            :selected.sync="fee">
+            :selected.sync="feeButtonSelectedIndex">
         </FeeSelector>
         <!-- <b-form-input autocomplete="off" type="number" class="mb-3" v-model="fee"></b-form-input> -->
         <b-button class="mt-2 w-50" variant="primary" @click='buttonClicked'> Transfer </b-button>
@@ -29,7 +29,7 @@
 import { bigNumberify, parseEther } from 'ethers/utils'
 import TokenSelector from './TokenSelector.vue'
 import FeeSelector from './FeeSelector.vue'
-import { getDisplayableBalanceDict } from '../utils';
+import { getDisplayableBalanceDict, feesFromAmount } from '../utils';
 
 const components = {
     TokenSelector,
@@ -42,13 +42,13 @@ export default {
     data: () => ({
         address: null,
         token: null,
-        amount: null,
-        fee: null,
 
         maxAmountVisible: false,
         balancesDict: {},
         tokensList: [],
-        fees: ['0.000001', '1', '100'], // TODO: these should be computed somehow idk
+        amountSelected: null,
+        feeButtonSelectedIndex: null,
+        fees: ['Normal', 'Faster(1%)', 'Fastest(5%)'],
     }),
     watch: {
         balances: function() {
@@ -62,11 +62,29 @@ export default {
         },
         token: function() {
             this.maxAmountVisible = true;
-        }
+        },
     },
     methods: {
         localDisplayAlert(message) {
             this.$emit('alert', { message, variant: 'warning' });
+        },
+        getAmount() {
+            try {
+                return this.token == 'ETH'
+                    ? parseEther(this.amountSelected)
+                    : bigNumberify(this.amountSelected);
+            } catch (e) {
+                console.log('amount compute error: ', e);
+                return null;
+            }
+        },
+        getFee() {
+            try {
+                let amount = this.getAmount();
+                return feesFromAmount(amount)[this.feeButtonSelectedIndex];
+            } catch (e) {
+                return null;
+            }
         },
         buttonClicked() {
             const addressLength = '0x2d5bf7a3ab29f0ff424d738a83f9b0588bc9241e'.length;
@@ -90,32 +108,25 @@ export default {
                 return;
             }
 
-            if (!this.amount) {
-                this.localDisplayAlert(`Please select amount.`);
+            if (this.amountSelected == null) {
+                this.localDisplayAlert(`Please select amount`);
                 return;
             }
 
-            try {
-                var amount = this.token == 'ETH'
-                    ? parseEther(this.amount)
-                    : bigNumberify(this.amount);
-            } catch (e) {
+            let amount = this.getAmount();
+            if (amount == null) {
                 this.localDisplayAlert(`Please input valid amount value`);
                 return;
             }
 
-            if (!this.fee) {
-                this.localDisplayAlert(`Please select fee.`);
+            if (this.feeButtonSelectedIndex == null) {
+                this.localDisplayAlert(`Please select fee`);
                 return;
             }
 
-            try {
-                var fee = this.token == 'ETH'
-                    ? parseEther(this.fee)
-                    : bigNumberify(this.fee);
-            } catch (e) {
-                console.log(e);
-                this.localDisplayAlert(`Please input valid fee value`);
+            let fee = this.getFee();
+            if (fee == null) {
+                this.localDisplayAlert(`Problem with fee.`); // TODO:
                 return;
             }
 

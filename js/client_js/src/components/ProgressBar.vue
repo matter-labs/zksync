@@ -48,7 +48,6 @@ export default {
                 }
 
                 let progress = (Date.now() - start) / duration;
-                console.log('progress', progress);
                 progress = animation(progress);
                 progress = Math.min(1.0, progress);
                 self.value = Math.round(self.max * progress);
