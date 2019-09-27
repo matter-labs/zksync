@@ -76,19 +76,11 @@ export default {
     },
     async created() {
         this.updateAccountInfo();
-        var clipboard = new ClipboardJS('.copyable');
-
-        clipboard.on('success', function(e) {
-            console.log(e);
-        });
-
-        clipboard.on('error', function(e) {
-            console.log(e);
-        });
+        new ClipboardJS('.copyable');
     },
     methods: {
         displayAlert(kwargs) {
-            this.$refs.alert.display(kwargs)
+            this.$refs.alert.display(kwargs);
         },
         async updateAccountInfo() {
             await window.walletDecorator.updateState();
