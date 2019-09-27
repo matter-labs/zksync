@@ -1,12 +1,14 @@
 use super::{Nonce, TokenId};
-use crate::node::{pack_fee_amount, pack_token_amount};
+use crate::node::{
+    is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount,
+};
 use bigdecimal::BigDecimal;
 use crypto::{digest::Digest, sha2::Sha256};
 
 use super::account::AccountAddress;
 use super::Engine;
 use crate::params::JUBJUB_PARAMS;
-use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg};
+use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
 use failure::{ensure, format_err};
 use ff::{PrimeField, PrimeFieldRepr};
 use franklin_crypto::alt_babyjubjub::fs::FsRepr;
@@ -51,6 +53,12 @@ impl Transfer {
         out
     }
 
+    pub fn check_correctness(&self) -> bool {
+        self.from != self.to
+            && is_token_amount_packable(&self.amount)
+            && is_fee_amount_packable(&self.fee)
+    }
+
     pub fn verify_signature(&self) -> bool {
         if let Some(pub_key) = self.signature.verify_musig_pedersen(&self.get_bytes()) {
             if AccountAddress::from_pubkey(pub_key) == self.from {
@@ -89,6 +97,10 @@ impl Withdraw {
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
+    }
+
+    pub fn check_correctness(&self) -> bool {
+        is_fee_amount_packable(&self.fee) && self.amount <= u128_to_bigdecimal(u128::max_value())
     }
 
     pub fn verify_signature(&self) -> bool {
@@ -171,6 +183,14 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.nonce,
             FranklinTx::Withdraw(tx) => tx.nonce,
             FranklinTx::Close(tx) => tx.nonce,
+        }
+    }
+
+    pub fn check_correctness(&self) -> bool {
+        match self {
+            FranklinTx::Transfer(tx) => tx.check_correctness(),
+            FranklinTx::Withdraw(tx) => tx.check_correctness(),
+            FranklinTx::Close(_) => true,
         }
     }
 
