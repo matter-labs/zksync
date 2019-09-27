@@ -6,7 +6,7 @@ use crypto::{digest::Digest, sha2::Sha256};
 use super::account::AccountAddress;
 use super::Engine;
 use crate::params::JUBJUB_PARAMS;
-use crate::primitives::{pedersen_hash_tx_msg, big_decimal_to_u128};
+use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg};
 use failure::{ensure, format_err};
 use ff::{PrimeField, PrimeFieldRepr};
 use franklin_crypto::alt_babyjubjub::fs::FsRepr;

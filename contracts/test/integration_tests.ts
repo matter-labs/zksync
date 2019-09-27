@@ -1,5 +1,15 @@
 import {ethers} from "ethers";
-import {addTestERC20Token, deployFranklin, deployGovernance, deployPriorityQueue, deployVerifier} from "./deploy";
+import {addTestERC20Token,
+    addTestNotApprovedERC20Token,
+    deployFranklin,
+    deployGovernance,
+    deployPriorityQueue,
+    deployVerifier,
+    franklinTestContractCode,
+    verifierTestContractCode,
+    governanceTestContractCode,
+    priorityQueueTestContractCode
+} from "../src.ts/deploy";
 
 import {expect, use} from "chai";
 import {solidity} from "ethereum-waffle";
@@ -26,14 +36,15 @@ describe("INTEGRATION", function() {
 
     beforeEach(async () => {
         console.log("---\n");
-        verifierDeployedContract = await deployVerifier(wallet);
-        governanceDeployedContract = await deployGovernance(wallet, wallet.address);
-        priorityQueueDeployedContract = await deployPriorityQueue(wallet, wallet.address);
+        verifierDeployedContract = await deployVerifier(wallet, verifierTestContractCode);
+        governanceDeployedContract = await deployGovernance(wallet, wallet.address, governanceTestContractCode);
+        priorityQueueDeployedContract = await deployPriorityQueue(wallet, wallet.address, priorityQueueTestContractCode);
         franklinDeployedContract = await deployFranklin(
             wallet,
             governanceDeployedContract.address,
             priorityQueueDeployedContract.address,
-            verifierDeployedContract.address
+            verifierDeployedContract.address,
+            franklinTestContractCode
         );
         erc20DeployedToken = await addTestERC20Token(wallet, governanceDeployedContract);
         // Make sure that exit wallet can execute transactions.
@@ -43,14 +54,10 @@ describe("INTEGRATION", function() {
     it("ETH deposit, part exit, full exit, commit, verify, withdraw", async () => {
         console.log("\n - ETH Integration started");
 
-        // Set franklin address to priority queue contract
-        const prTx = await priorityQueueDeployedContract.changeFranklinAddress(franklinDeployedContract.address);
-        await prTx.wait();
-
         // Deposit eth
         const depositValue = parseEther("0.3"); // the value passed to tx
-        const depositAmount = parseEther("0.293640204"); // amount after: tx value - some counted fee
-        const depositFee = parseEther("0.006359796"); // tx fee
+        const depositAmount = parseEther("0.293638620"); // amount after: tx value - some counted fee
+        const depositFee = parseEther("0.00636138"); // tx fee
         const depositTx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: depositValue});
         const depositReceipt = await depositTx.wait();
         const depositEvent = depositReceipt.events[1].args;
@@ -87,7 +94,7 @@ describe("INTEGRATION", function() {
         
         expect((await franklinDeployedContract.blocks(1)).onchainOperations).equal(1);
         expect((await franklinDeployedContract.blocks(1)).priorityOperations).equal(1);
-        expect((await franklinDeployedContract.blocks(1)).commitment).equal("0xb91db3bdbaf72c48f7280d208c0e0a4dcc5e5ab23a020d70d91255c412b77a8c");
+        expect((await franklinDeployedContract.blocks(1)).commitment).equal("0xf41d0db7c7855d68c03c711ba3b2b6f0e14db1af4b30cb2cec003670a1bc4bb5");
         expect((await franklinDeployedContract.blocks(1)).stateRoot).equal("0x0000000000000000000000000000000000000000000000000000000000000000");
         expect((await franklinDeployedContract.blocks(1)).validator).equal("0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE");
         
@@ -148,7 +155,7 @@ describe("INTEGRATION", function() {
         console.log("Verified partial exit");
 
         // Full exit eth
-        const fullExitAmount = parseEther("0.093640204"); // amount after: tx value - some counted fee - exit amount
+        const fullExitAmount = parseEther("0.093638620"); // amount after: tx value - some counted fee - exit amount
         const fullExTx = await franklinDeployedContract.fullExit(
             "0x0000000000000000000000000000000000000000000000000000000000000000",
             "0x0000000000000000000000000000000000000000",
@@ -190,7 +197,7 @@ describe("INTEGRATION", function() {
         
         expect((await franklinDeployedContract.blocks(3)).onchainOperations).equal(1);
         expect((await franklinDeployedContract.blocks(3)).priorityOperations).equal(1);
-        expect((await franklinDeployedContract.blocks(3)).commitment).equal("0x105c5a046e37b92184a8f317d650803a82d952bfd03391970efc00034d322453");
+        expect((await franklinDeployedContract.blocks(3)).commitment).equal("0x9aa0137f02827e50880320bec6b318af0d48f7951aae70afa2cb69fc1c866b94");
         expect((await franklinDeployedContract.blocks(3)).stateRoot).equal("0x0000000000000000000000000000000000000000000000000000000000000000");
         expect((await franklinDeployedContract.blocks(3)).validator).equal("0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE");
         
@@ -242,10 +249,6 @@ describe("INTEGRATION", function() {
 
     it("ERC20 deposit, part exit, full exit, commit, verify, withdraw", async () => {
         console.log("\n - ERC20 Integration started");
-
-        // Set franklin address to priority queue contract
-        const prTx = await priorityQueueDeployedContract.changeFranklinAddress(franklinDeployedContract.address);
-        await prTx.wait();
 
         // Deposit eth
         const depositValue = 78; // the value passed to tx
