@@ -9,6 +9,7 @@ use models::node::tx::{Close, FranklinTx, Transfer, Withdraw};
 use models::node::account::{Account, AccountAddress, AccountUpdate};
 use crate::helpers::*;
 use crate::storage_interactor;
+use crate::franklin_ops;
 use storage::ConnectionPool;
 // use web3::types::U256;
 
@@ -136,11 +137,11 @@ impl DataRestoreDriver {
         let committed_events = self
             .events_state
             .get_only_verified_committed_events();
-        let mut ops = vec![];
-        // for event in committed_events {
-        //     let _ops = franklin_ops::get_franklin_ops(&event)?;
-        //     ops.append(&_ops);
-        // }
+        let mut ops: Vec<FranklinOp> = vec![];
+        for event in committed_events {
+            let mut _ops = franklin_ops::get_franklin_ops(&event)?;
+            ops.append(&mut _ops);
+        }
         Ok(ops)
     }
 
