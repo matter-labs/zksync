@@ -1,13 +1,13 @@
-use crate::events::{EventData, EventType};
-use crate::events_state::EventsState;
-use crate::franklin_ops::{FranklinOpBlock, FranklinOpBlockType};
-use crate::helpers;
-use std::convert::TryFrom;
-use storage::{
-    ConnectionPool, NewBlockLog, NewFranklinOpBlock,
-    NewLastWatchedEthBlockNumber, StoredBlockLog, StoredFranklinOpBlock,
-};
-use web3::types::{Bytes, Transaction, H160, H256, U128, U256};
+// use crate::events::{EventData, EventType};
+// use crate::events_state::EventsState;
+// use crate::franklin_ops::{FranklinOpBlock, FranklinOpBlockType};
+// use crate::helpers;
+// use std::convert::TryFrom;
+// use storage::{
+//     ConnectionPool, NewBlockLog, NewFranklinOpBlock,
+//     NewLastWatchedEthBlockNumber, StoredBlockLog, StoredFranklinOpBlock,
+// };
+// use web3::types::{Bytes, Transaction, H160, H256, U128, U256};
 
 // /// Removes stored data
 // ///

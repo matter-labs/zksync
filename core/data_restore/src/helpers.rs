@@ -1,10 +1,10 @@
 use bigdecimal::BigDecimal;
 use bitvec::prelude::*;
 use ethabi::Contract;
+use serde_json;
+use std::str::FromStr;
 use franklin_crypto::circuit::float_point::parse_float_to_u128;
-use models::abi::{PROD_PLASMA, TEST_PLASMA_ALWAYS_VERIFY};
-use models::config::RuntimeConfig;
-use models::plasma::params as plasma_constants;
+use models::abi::FRANKLIN_CONTRACT;
 use tiny_keccak::keccak256;
 use web3::types::{Address, H256};
 
@@ -29,10 +29,14 @@ pub struct DataRestoreConfig {
 impl DataRestoreConfig {
     /// Return the configuration for setted Infura web3 endpoint
     pub fn new() -> Self {
-        let config = RuntimeConfig::new();
+        let abi_string = serde_json::Value::from_str(FRANKLIN_CONTRACT)
+            .expect("Cant get plasma contract")
+            .get("abi")
+            .expect("Cant get plasma contract abi")
+            .to_string();
         Self {
             web3_endpoint: env::var("WEB3_URL").expect("WEB3_URL env missing"), //"https://rinkeby.infura.io/".to_string(),
-            franklin_contract: ethabi::Contract::load(PROD_PLASMA.0)
+            franklin_contract: ethabi::Contract::load(abi_string.as_bytes())
                 .expect("Cant get plasma contract in data restore config"),
             franklin_contract_address: env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR env missing")
                 .as_str()

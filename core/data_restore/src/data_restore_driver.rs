@@ -1,13 +1,18 @@
-use crate::accounts_state::FranklinAccountsStates;
+// use crate::accounts_state::FranklinAccountsStates;
 use crate::events::EventData;
 use crate::events_state::EventsState;
-use crate::franklin_ops::FranklinOp;
+use models::node::operations::{
+    TX_TYPE_BYTES_LEGTH, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+};
+use models::node::priority_ops::{Deposit, FranklinPriorityOp, FullExit};
+use models::node::tx::{Close, FranklinTx, Transfer, Withdraw};
+use models::node::account::{Account, AccountAddress, AccountUpdate};
 use crate::helpers::*;
 use crate::storage_interactor;
 use storage::ConnectionPool;
 // use web3::types::U256;
 
-enum StorageUpdateState {
+pub enum StorageUpdateState {
     None,
     Events,
     Operations
@@ -26,9 +31,9 @@ pub struct DataRestoreDriver {
     /// Franklin contract events state
     pub events_state: EventsState,
     /// Franklin accounts state
-    pub account_states: FranklinAccountsStates,
+    // pub account_states: FranklinAccountsStates,
     /// Franklin operations blocks
-    pub op_blocks: Vec<FranklinOps>,
+    pub op_blocks: Vec<FranklinOp>,
     /// Storage update state
     pub storage_update_state: StorageUpdateState
 }
@@ -45,7 +50,7 @@ impl DataRestoreDriver {
     pub fn new(
         connection_pool: ConnectionPool,
         genesis_block_number: u64,
-        eth_blocks_delta: u64
+        eth_blocks_delta: u64,
         end_eth_blocks_delta: u64
     ) -> Self {
         Self {
@@ -53,10 +58,10 @@ impl DataRestoreDriver {
             eth_blocks_delta,
             end_eth_blocks_delta,
             run_updates: false,
-            events_state: EventsState::new(),
-            processed_events: vec![],
-            account_states: FranklinAccountsStates::new(),
+            events_state: EventsState::new(genesis_block_number),
+            // account_states: FranklinAccountsStates::new(),
             op_blocks: vec![],
+            storage_update_state: StorageUpdateState::None
         }
     }
 
@@ -65,79 +70,79 @@ impl DataRestoreDriver {
         self.run_updates = false
     }
 
-    pub fn run_state_updates(&mut self) -> Result<(), DataRestoreError> {
-        self.run_updates = true
-        while self.run_updates {
-            info!(
-                "Last watched ethereum block: {:?}",
-                &self.events_state.last_watched_eth_block_number
-            );
-            info!(
-                "Committed franklin blocks count: {:?}",
-                &self.events_state.committed_blocks.len()
-            );
-            info!(
-                "Verified franklin blocks count: {:?}",
-                &self.events_state.verified_blocks.len()
-            );
+    // pub fn run_state_updates(&mut self) -> Result<(), DataRestoreError> {
+    //     self.run_updates = true;
+    //     while self.run_updates {
+    //         info!(
+    //             "Last watched ethereum block: {:?}",
+    //             &self.events_state.last_watched_eth_block_number
+    //         );
+    //         info!(
+    //             "Committed franklin blocks count: {:?}",
+    //             &self.events_state.committed_blocks.len()
+    //         );
+    //         info!(
+    //             "Verified franklin blocks count: {:?}",
+    //             &self.events_state.verified_blocks.len()
+    //         );
 
-            // Start updating
-            self.storage_update_state = StorageUpdateState::None;
+    //         // Start updating
+    //         self.storage_update_state = StorageUpdateState::None;
 
-            // Update events
-            self.events_state.update_events_state(
-                self.eth_blocks_delta.clone(),
-                self.end_eth_blocks_delta.clone()
-            )?;
-            info!(
-                "Got new events"
-            );
+    //         // Update events
+    //         self.events_state.update_events_state(
+    //             self.eth_blocks_delta.clone(),
+    //             self.end_eth_blocks_delta.clone()
+    //         )?;
+    //         info!(
+    //             "Got new events"
+    //         );
 
-            // Store events
-            // storage_interactor.update_events_state(&self.events_state)?;
-            // info!(
-            //     "Updated events storage"
-            // );
+    //         // Store events
+    //         // storage_interactor.update_events_state(&self.events_state)?;
+    //         // info!(
+    //         //     "Updated events storage"
+    //         // );
             
-            self.storage_update_state = StorageUpdateState::Events;
+    //         self.storage_update_state = StorageUpdateState::Events;
             
-            // Update operations
-            let new_operations = get_new_operations_from_events()?;
-            info!(
-                "Parsed events to operations"
-            );
+    //         // Update operations
+    //         let new_operations = get_new_operations_from_events()?;
+    //         info!(
+    //             "Parsed events to operations"
+    //         );
 
-            // Store Operations
-            // storage_interactor.update_operations_list(&new_operations)?;
-            // info!(
-            //     "Updated operations storage"
-            // );
+    //         // Store Operations
+    //         // storage_interactor.update_operations_list(&new_operations)?;
+    //         // info!(
+    //         //     "Updated operations storage"
+    //         // );
 
-            self.storage_update_state = StorageUpdateState::Operations;
+    //         self.storage_update_state = StorageUpdateState::Operations;
 
-            // Update tree
-            self.account_states.update_accounts_state(&new_operations)?;
-            info!(
-                "Updated accounts state"
-            );
-        }
-        info!("Stopped state updates");
-        Ok(())
-    }
+    //         // Update tree
+    //         // self.account_states.update_accounts_state(&new_operations)?;
+    //         // info!(
+    //         //     "Updated accounts state"
+    //         // );
+    //     }
+    //     info!("Stopped state updates");
+    //     Ok(())
+    // }
 
-    /// Return verified comitted operations blocks from verified op blocks events
-    pub fn get_new_operations_from_events(&mut self) -> Result<Vec<FranklinOp>, DataRestoreError> {
-        info!("Loading new verified op_blocks");
-        let committed_events = self
-            .events_state
-            .get_only_verified_committed_blocks_events();
-        let mut ops = vec![];
-        for event in committed_events {
-            let _ops = franklin_ops::get_franklin_ops(&event)?;
-            ops.append(&_ops);
-        }
-        Ok(ops)
-    }
+    // /// Return verified comitted operations blocks from verified op blocks events
+    // pub fn get_new_operations_from_events(&mut self) -> Result<Vec<FranklinOp>, DataRestoreError> {
+    //     info!("Loading new verified op_blocks");
+    //     let committed_events = self
+    //         .events_state
+    //         .get_only_verified_committed_blocks_events();
+    //     let mut ops = vec![];
+    //     for event in committed_events {
+    //         let _ops = franklin_ops::get_franklin_ops(&event)?;
+    //         ops.append(&_ops);
+    //     }
+    //     Ok(ops)
+    // }
 
     // /// Update past events and accounts states
     // ///
