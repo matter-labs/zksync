@@ -76,7 +76,15 @@ export default {
     },
     async created() {
         this.updateAccountInfo();
-        new ClipboardJS('.copyable');
+        var clipboard = new ClipboardJS('.copyable');
+
+        clipboard.on('success', function(e) {
+            console.log(e);
+        });
+
+        clipboard.on('error', function(e) {
+            console.log(e);
+        });
     },
     methods: {
         displayAlert(kwargs) {
@@ -96,7 +104,7 @@ export default {
             };
 
             this.historyInfo = {
-                transactions: window.walletDecorator.transactionsAsNeeded()
+                transactions: await window.walletDecorator.transactionsAsNeeded(),
             };
 
             await sleep(3000);

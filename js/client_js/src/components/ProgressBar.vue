@@ -12,8 +12,8 @@ const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
 export default {
     name: 'ProgressBar',
     data: () => ({
-        value: 1.0,
-        max: 1.0,
+        value: 100,
+        max: 100,
         animationInProgress: false,
     }),
     methods: {
@@ -21,7 +21,7 @@ export default {
             this.value = percent;
         },
         cancelAnimation() {
-            this.value = 1.0;
+            this.value = this.max;
         },
         startProgressBarHalfLife(millis) {
             const animation = progress => 1 - Math.pow(2, -progress);
@@ -42,15 +42,16 @@ export default {
             const self = this;
             const start = Date.now();
             const draw = () => {
-                if (self.value >= 1.0) {
+                if (self.value >= self.max) {
                     self.animationInProgress = false;
                     return;
                 }
 
                 let progress = (Date.now() - start) / duration;
+                console.log('progress', progress);
                 progress = animation(progress);
                 progress = Math.min(1.0, progress);
-                self.value = progress;
+                self.value = Math.round(self.max * progress);
                 window.requestAnimationFrame(draw);
             };
             window.requestAnimationFrame(draw);

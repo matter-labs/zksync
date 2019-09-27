@@ -5,7 +5,7 @@
                 (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+ethereumAddress"
                     target="blanc">block explorer</a>):
             <CopyableAddress id="ethereumAddressFormInput" :address="ethereumAddress"></CopyableAddress>
-            <b-table borderless small responsive :fields="fields" :items="displayableBalances">
+            <b-table class="b-table-balances-width-hack" borderless small responsive :fields="fields" :items="displayableBalances">
                 <template v-slot:cell(tokenName)="data">
                     <TokenNameButton :data="data"></TokenNameButton>
                 </template>
@@ -60,10 +60,6 @@ export default {
 </script>
 
 <style scoped>
-td:first-child {
-    width: 2em;
-}
-
 .tokenNameButton {
     display: inline-block;
     height: 2;

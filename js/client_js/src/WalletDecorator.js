@@ -52,8 +52,8 @@ export class WalletDecorator {
     }
 
     // #region renderable
-    transactionsAsNeeded() {
-        return (this.tx_history).map((tx, index) => {
+    async transactionsAsNeeded() {
+        let res = (this.tx_history).map(async (tx, index) => {
             let elem_id      = `history_${index}`;
             let hash         = tx.tx_hash;
             let success      = tx.success     || '';
@@ -71,15 +71,63 @@ export class WalletDecorator {
             let status = (() => {
                 if (is_verified) return `<span style="color: green">(verified)</span>`;
                 if (is_committed) return `<span style="color: grey">(committed)</span>`;
+                if (success) return `<span style="color: grey">(succeeded)</span>`;
                 if (fail_reason) return `<span style="color: red">(failed)</span>`;
+                return `<span style="color: red">(WTF)</span>`;
             })();
+
+            let status_tooltip = await (async () => {
+                if ( ! is_committed) {
+                    return 'Nothing';
+                }
+                
+                let receipt = await this.wallet.provider.getTxReceipt(hash);
+                /**
+                pub struct ProverRun {
+                    pub id: i32,
+                    pub block_number: i64,
+                    pub worker: Option<String>,
+                    pub created_at: NaiveDateTime,
+                    pub updated_at: NaiveDateTime,
+                }
+                */
+                // on hover, show tooltip with 
+                //      "waiting for prover..."
+                //      "prover <code>default</code> started proving at <code>created_at</code>"
+                
+                if (receipt == null || receipt.prover_run == null) {
+                    return 'Waiting for prover..';
+                }
+
+                let prover_name = receipt.prover_run.worker;
+                let started_time = receipt.prover_run.created;
+                return `Is being proved since ${started_time}`;
+            })();
+
+            let row_status = await (async () => {
+                if (is_verified) return `<span style="color: green">Verified</span>`;
+                if (is_committed) return `<span style="color: grey">Committed</span>`;
+                if (success) return `<span style="color: grey">Succeeded</span>`;
+                if (fail_reason) return `<span style="color: red">Failed with ${fail_reason}</span>`;
+            })();
+
+            const directions = {
+                in: `<span style="color: green">(in)</span>`,
+                out: `<span style="color: red">(out)</span>`,
+            };
+
+            // TODO: add incoming transactions
+            let direction = type == 'Deposit' ? 'incoming' : 'outcoming';
 
             return {
                 type, to, amount, success, fail_reason, 
                 is_committed, is_verified, elem_id,
-                hash, status,
+                hash, status, status_tooltip, 
+                row_status, direction,
             };
         });
+
+        return Promise.all(res);
     }
 
     onchainBalancesAsRenderableList() {
