@@ -24,11 +24,14 @@ export function getDisplayableBalanceList(list) {
 export function bigNumberMax(a, b) {
     return a.gt(b) ? a : b;
 }
+export function bigNumberMin(a, b) {
+    return a.gt(b) ? a : b;
+}
 
 export function feesFromAmount(amount) {
     return [
-        0,
-        bigNumberMax(amount.div(100), 1),
-        bigNumberMax(amount.div(20), 1),
+        ethers.utils.bigNumberify(0),
+        amount.div(100),
+        amount.div(20),
     ].map(String);
 }

@@ -48,7 +48,7 @@ export default {
         tokensList: [],
         amountSelected: null,
         feeButtonSelectedIndex: null,
-        fees: ['Normal', 'Faster(1%)', 'Fastest(5%)'],
+        fees: ['0%', '1%', '5%'],
     }),
     watch: {
         balances: function() {

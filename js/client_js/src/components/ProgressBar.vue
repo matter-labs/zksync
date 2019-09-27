@@ -1,7 +1,7 @@
 <template>
     <b-container class="p-0">
         <p>
-            <b-progress class="w-100" v-if="value != max" :value="value" :max="max" show show-progress animated></b-progress>
+            <b-progress class="w-100" v-if="value != max" :value="value" :max="max" show animated></b-progress>
         </p>
     </b-container>
 </template>

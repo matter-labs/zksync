@@ -21,7 +21,7 @@
                 <b-col class="col-auto">
                     <span v-html="tx.status" class="heightened"></span>
                 </b-col>
-                <b-col class="col-auto">
+                <b-col class="col-auto heightened">
                     <span v-if="tx.direction == 'incoming' " style="color: green; font-weight: bold" v-html="'<-'">
                     </span>
                     <span v-else style="color: red; font-weight: bold" v-html="'->'">

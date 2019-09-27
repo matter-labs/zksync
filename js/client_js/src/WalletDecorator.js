@@ -1,5 +1,6 @@
 import { BigNumberish, BigNumber, bigNumberify } from 'ethers/utils';
-import { FranklinProvider, Wallet, Address } from 'franklin_lib'
+import { FranklinProvider, Wallet, Address } from 'franklin_lib';
+import { readableEther } from './utils';
 
 const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
 
@@ -27,6 +28,13 @@ export class WalletDecorator {
         let res = new WalletDecorator(wallet);
         res.ethAddress = await wallet.ethWallet.getAddress();
         return res;
+    }
+
+    async getDepositFee() {
+        let gasPrice = await this.wallet.ethWallet.provider.getGasPrice();
+        let gasLimit = bigNumberify(200000); // from wallet.ts
+        let fee = gasPrice.mul(gasLimit);
+        return readableEther(fee);
     }
 
     async updateState() {
@@ -137,7 +145,7 @@ export class WalletDecorator {
                 address: this.wallet.supportedTokens[tokenId].address,
                 amount: balance.toString()
             }))
-            .filter(tokenInfo => tokenInfo.amount);
+            .filter(tokenInfo => Number(tokenInfo.amount));
     }
     contractBalancesAsRenderableList() {
         return this.wallet.ethState.contractBalances
@@ -146,7 +154,7 @@ export class WalletDecorator {
                 address: this.wallet.supportedTokens[tokenId].address,
                 amount: `${balance.toString()}`
             }))
-            .filter(tokenInfo => true || tokenInfo.amount);
+            .filter(tokenInfo => Number(tokenInfo.amount));
     }
     franklinBalancesAsRenderableListWithInfo() {
         let res = {};
@@ -166,7 +174,7 @@ export class WalletDecorator {
             val['committedAmount'] = val['committedAmount'] || bigNumberify(0);
             val['verifiedAmount']  = val['verifiedAmount']  || bigNumberify(0);
             return val;
-        });
+        }).filter(entry => Number(entry.committedAmount) || Number(entry.verifiedAmount));
     }
     franklinBalancesAsRenderableList() {
         return Object.entries(this.wallet.franklinState.commited.balances)
@@ -176,7 +184,7 @@ export class WalletDecorator {
                     tokenName: this.tokenNameFromId(tokenId),
                     amount: balance
                 };
-            });
+            }).filter(bal => Number(bal.amount));
     }
     // #endregion
 

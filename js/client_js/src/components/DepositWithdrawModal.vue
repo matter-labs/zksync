@@ -16,6 +16,9 @@
                 :selected.sync="feeButtonSelectedIndex">
             </FeeSelector>
         </div>
+        <div v-else>
+            The fee is <b>ETH</b> {{ depositFee }}. The change will be put on your Matter account.
+        </div>
         <p v-if="alertVisible"> {{ alertText }} </p>
         <b-button class="w-50 mt-3" variant="primary" @click='buttonClicked'> {{ buttonText }} </b-button>
     </div>
@@ -46,14 +49,18 @@ export default {
 
         amountSelected: null,
         feeButtonSelectedIndex: null,
-        fees: ['Normal', 'Faster(1%)', 'Fastest(5%)'],
+        fees: ['0%', '1%', '5%'],
 
         maxAmountVisible: false,
         balancesDict: {},
         displayableBalancesDict: {},
         alertVisible: false,
         alertText: '',
+        depositFee: '',
     }),
+    async created() {
+        this.depositFee = await window.walletDecorator.getDepositFee();
+    },
     watch: {
         balances: function() {
             this.balancesDict = this.balances
@@ -127,54 +134,13 @@ export default {
                     return;
                 }
             } else {
-                if (amount.gt(bigNumberify(this.balancesDict[this.token]))) {
+                let fee = parseEther(this.depositFee);
+                amount = amount.add(fee);
+                if (amount.add(fee).gt(bigNumberify(this.balancesDict[this.token]))) {
                     this.localDisplayAlert(`It's too much, man!`);
                     return;
                 }
             }
-
-            // if (!this.token) {
-            //     this.localDisplayAlert(`Select token, please`);
-            //     return;
-            // }
-            // if (!this.amount) {
-            //     this.localDisplayAlert(`Select amount, please`);
-            //     return;
-            // }
-
-            // try {
-            //     var amount = this.token == 'ETH'
-            //     ? ethers.utils.parseEther(this.amount)
-            //     : bigNumberify(this.amount);
-            // } catch (e) {
-            //     this.localDisplayAlert(`Please input valid amount value`);
-            // }
-
-            // if (amount.gt(bigNumberify(this.balancesDict[this.token]))) {
-            //     this.localDisplayAlert(`It's too much, man!`);
-            //     return;
-            // }
-
-            // if (this.feeNeeded) {
-            //     if (!this.fee) {
-            //         this.localDisplayAlert(`Select fee, please`);
-            //         return;
-            //     }
-
-            //     try {
-            //         var fee = this.token == 'ETH'
-            //         ? parseEther(this.fee)
-            //         : bigNumberify(this.fee);
-            //     } catch (e) {
-            //         this.localDisplayAlert(`Please input valid fee value`);
-            //         return;
-            //     }
-                
-            //     if (amount.add(fee).gt(bigNumberify(this.balancesDict[this.token]))) {
-            //         this.localDisplayAlert(`It's too much, man!`);
-            //         return;
-            //     }
-            // }
 
             this.$emit('buttonClicked', {
                 token: this.token,
