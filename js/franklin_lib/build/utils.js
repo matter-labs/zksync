@@ -94,11 +94,11 @@ function integerToFloat(integer, exp_bits, mantissa_bits, exp_base) {
             encoding.push(true);
         }
     }
-    return bitsIntoBytesInOrder(encoding.reverse()).reverse();
+    return Buffer.from(bitsIntoBytesInOrder(encoding.reverse()).reverse());
 }
 exports.integerToFloat = integerToFloat;
 function reverseBits(buffer) {
-    var reversed = buffer.reverse();
+    var reversed = Buffer.from(buffer.reverse());
     reversed.map(function (b, i, a) {
         // reverse bits in byte
         b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
