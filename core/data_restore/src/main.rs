@@ -114,5 +114,5 @@ fn restart_state_load(args: Vec<String>) {
 /// * `driver` - DataRestore Driver config
 ///
 fn run_state_update(driver: &mut DataRestoreDriver) {
-    // driver.run_state_updates().expect("Cant update state");
+    driver.run_state_updates().expect("Cant update state");
 }

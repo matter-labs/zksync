@@ -70,65 +70,65 @@ impl DataRestoreDriver {
         self.run_updates = false
     }
 
-    // pub fn run_state_updates(&mut self) -> Result<(), DataRestoreError> {
-    //     self.run_updates = true;
-    //     while self.run_updates {
-    //         info!(
-    //             "Last watched ethereum block: {:?}",
-    //             &self.events_state.last_watched_eth_block_number
-    //         );
-    //         info!(
-    //             "Committed franklin blocks count: {:?}",
-    //             &self.events_state.committed_blocks.len()
-    //         );
-    //         info!(
-    //             "Verified franklin blocks count: {:?}",
-    //             &self.events_state.verified_blocks.len()
-    //         );
+    pub fn run_state_updates(&mut self) -> Result<(), DataRestoreError> {
+        self.run_updates = true;
+        while self.run_updates {
+            info!(
+                "Last watched ethereum block: {:?}",
+                &self.events_state.last_watched_eth_block_number
+            );
+            info!(
+                "Committed franklin events count: {:?}",
+                &self.events_state.committed_events.len()
+            );
+            info!(
+                "Verified franklin events count: {:?}",
+                &self.events_state.verified_events.len()
+            );
 
-    //         // Start updating
-    //         self.storage_update_state = StorageUpdateState::None;
+            // Start updating
+            self.storage_update_state = StorageUpdateState::None;
 
-    //         // Update events
-    //         self.events_state.update_events_state(
-    //             self.eth_blocks_delta.clone(),
-    //             self.end_eth_blocks_delta.clone()
-    //         )?;
-    //         info!(
-    //             "Got new events"
-    //         );
+            // Update events
+            self.events_state.update_events_state(
+                self.eth_blocks_delta.clone(),
+                self.end_eth_blocks_delta.clone()
+            )?;
+            info!(
+                "Got new events"
+            );
 
-    //         // Store events
-    //         // storage_interactor.update_events_state(&self.events_state)?;
-    //         // info!(
-    //         //     "Updated events storage"
-    //         // );
+            // Store events
+            // storage_interactor.update_events_state(&self.events_state)?;
+            // info!(
+            //     "Updated events storage"
+            // );
             
-    //         self.storage_update_state = StorageUpdateState::Events;
+            self.storage_update_state = StorageUpdateState::Events;
             
-    //         // Update operations
-    //         let new_operations = get_new_operations_from_events()?;
-    //         info!(
-    //             "Parsed events to operations"
-    //         );
+            // Update operations
+            // let new_operations = get_new_operations_from_events()?;
+            // info!(
+            //     "Parsed events to operations"
+            // );
 
-    //         // Store Operations
-    //         // storage_interactor.update_operations_list(&new_operations)?;
-    //         // info!(
-    //         //     "Updated operations storage"
-    //         // );
+            // Store Operations
+            // storage_interactor.update_operations_list(&new_operations)?;
+            // info!(
+            //     "Updated operations storage"
+            // );
 
-    //         self.storage_update_state = StorageUpdateState::Operations;
+            self.storage_update_state = StorageUpdateState::Operations;
 
-    //         // Update tree
-    //         // self.account_states.update_accounts_state(&new_operations)?;
-    //         // info!(
-    //         //     "Updated accounts state"
-    //         // );
-    //     }
-    //     info!("Stopped state updates");
-    //     Ok(())
-    // }
+            // Update tree
+            // self.account_states.update_accounts_state(&new_operations)?;
+            // info!(
+            //     "Updated accounts state"
+            // );
+        }
+        info!("Stopped state updates");
+        Ok(())
+    }
 
     // /// Return verified comitted operations blocks from verified op blocks events
     // pub fn get_new_operations_from_events(&mut self) -> Result<Vec<FranklinOp>, DataRestoreError> {
