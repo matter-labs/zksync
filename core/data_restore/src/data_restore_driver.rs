@@ -107,10 +107,10 @@ impl DataRestoreDriver {
             self.storage_update_state = StorageUpdateState::Events;
             
             // Update operations
-            // let new_operations = get_new_operations_from_events()?;
-            // info!(
-            //     "Parsed events to operations"
-            // );
+            let new_operations = self.get_new_operations_from_events()?;
+            info!(
+                "Parsed events to operations"
+            );
 
             // Store Operations
             // storage_interactor.update_operations_list(&new_operations)?;
@@ -130,19 +130,19 @@ impl DataRestoreDriver {
         Ok(())
     }
 
-    // /// Return verified comitted operations blocks from verified op blocks events
-    // pub fn get_new_operations_from_events(&mut self) -> Result<Vec<FranklinOp>, DataRestoreError> {
-    //     info!("Loading new verified op_blocks");
-    //     let committed_events = self
-    //         .events_state
-    //         .get_only_verified_committed_blocks_events();
-    //     let mut ops = vec![];
-    //     for event in committed_events {
-    //         let _ops = franklin_ops::get_franklin_ops(&event)?;
-    //         ops.append(&_ops);
-    //     }
-    //     Ok(ops)
-    // }
+    /// Return verified comitted operations blocks from verified op blocks events
+    pub fn get_new_operations_from_events(&mut self) -> Result<Vec<FranklinOp>, DataRestoreError> {
+        info!("Loading new verified op_blocks");
+        let committed_events = self
+            .events_state
+            .get_only_verified_committed_events();
+        let mut ops = vec![];
+        // for event in committed_events {
+        //     let _ops = franklin_ops::get_franklin_ops(&event)?;
+        //     ops.append(&_ops);
+        // }
+        Ok(ops)
+    }
 
     // /// Update past events and accounts states
     // ///

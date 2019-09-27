@@ -222,7 +222,7 @@ impl EventsState {
     }
 
     /// Return only verified committed blocks from verified
-    pub fn get_only_verified_committed_events_events(&self) -> Vec<EventData> {
+    pub fn get_only_verified_committed_events(&self) -> Vec<EventData> {
         let count_to_get = self.verified_events.len();
         self.committed_events[0..count_to_get].to_vec()
     }
