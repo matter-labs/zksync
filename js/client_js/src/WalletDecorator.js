@@ -1,4 +1,4 @@
-\import { BigNumberish, BigNumber, bigNumberify } from 'ethers/utils';
+import { BigNumberish, BigNumber, bigNumberify } from 'ethers/utils';
 import { FranklinProvider, Wallet, Address } from 'franklin_lib'
 
 const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
