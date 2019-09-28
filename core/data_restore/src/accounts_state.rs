@@ -44,29 +44,51 @@ impl FranklinAccountsState {
     pub fn update_accounts_states_from_op(
         &mut self,
         op: &FranklinOp,
-    ) {
-        match op.clone() {
+    ) -> Result<(), DataRestoreError> {
+        let mut operation = op.clone();
+        match operation {
             FranklinOp::Deposit(_op) => {
                 self.state.execute_priority_op(
                     FranklinPriorityOp::Deposit(_op.priority_op)
                 );
             },
-            FranklinOp::TransferToNew(_op) => {
+            FranklinOp::TransferToNew(mut _op) => {
+                let from = self.state.get_account(_op.from)
+                    .ok_or(DataRestoreError::NonexistentAccount)?;
+                _op.tx.from = from.address;
+                _op.tx.nonce = from.nonce + 1;
                 self.state.execute_tx(
                     FranklinTx::Transfer(_op.tx)
                 );
             },
-            FranklinOp::Withdraw(_op) => {
+            FranklinOp::Withdraw(mut _op) => {
+                // Withdraw op comes with empty Account Address and Nonce fields
+                let account = self.state.get_account(_op.account_id)
+                    .ok_or(DataRestoreError::NonexistentAccount)?;
+                _op.tx.account = account.address;
+                _op.tx.nonce = account.nonce + 1;
                 self.state.execute_tx(
                     FranklinTx::Withdraw(_op.tx)
                 );
             },
-            FranklinOp::Close(_op) => {
+            FranklinOp::Close(mut _op) => {
+                // Close op comes with empty Account Address and Nonce fields
+                let account = self.state.get_account(_op.account_id)
+                    .ok_or(DataRestoreError::NonexistentAccount)?;
+                _op.tx.account = account.address;
+                _op.tx.nonce = account.nonce + 1;
                 self.state.execute_tx(
                     FranklinTx::Close(_op.tx)
                 );
             },
-            FranklinOp::Transfer(_op) => {
+            FranklinOp::Transfer(mut _op) => {
+                let from = self.state.get_account(_op.from)
+                    .ok_or(DataRestoreError::NonexistentAccount)?;
+                let to = self.state.get_account(_op.to)
+                    .ok_or(DataRestoreError::NonexistentAccount)?;
+                _op.tx.from = from.address;
+                _op.tx.to = to.address;
+                _op.tx.nonce = from.nonce + 1;
                 self.state.execute_tx(
                     FranklinTx::Transfer(_op.tx)
                 );
@@ -77,6 +99,7 @@ impl FranklinAccountsState {
                 );
             },
         }
+        Ok(())
     }
 
     /// Returns map of Franklin accounts ids and their descriptions
