@@ -20,20 +20,23 @@ use crate::helpers::DataRestoreError;
 pub struct FranklinAccountsState {
     /// Accounts stored in a spase Merkle tree and current block number
     pub state: PlasmaState,
+    pub fee_account_address: AccountAddress
 }
 
 impl FranklinAccountsState {
     /// Creates empty Franklin Accounts states
-    pub fn new() -> Self {
+    pub fn new(fee_account_address: AccountAddress) -> Self {
         Self {
             state: PlasmaState::empty(),
+            fee_account_address
         }
     }
 
     /// Creates empty Franklin Accounts states
-    pub fn load(accounts: AccountMap, current_block: u32) -> Self {
+    pub fn load(accounts: AccountMap, current_block: u32, fee_account_address: AccountAddress) -> Self {
         Self {
             state: PlasmaState::new(accounts, current_block + 1),
+            fee_account_address
         }
     }
 
@@ -51,21 +54,39 @@ impl FranklinAccountsState {
         block: &FranklinOpsBlock,
     ) -> Result<(), DataRestoreError> {
         let mut operations = block.ops.clone();
+
+        let mut fees = Vec::new();
+
         for operation in operations {
             match operation {
                 FranklinOp::Deposit(_op) => {
-                    self.state.execute_priority_op(
+                    let OpSuccess {
+                        fee,
+                        mut updates,
+                        executed_op,
+                    } = self.state.execute_priority_op(
                         FranklinPriorityOp::Deposit(_op.priority_op)
                     );
+                    if let Some(fee) = fee {
+                        fees.push(fee);
+                    }
                 },
                 FranklinOp::TransferToNew(mut _op) => {
                     let from = self.state.get_account(_op.from)
                         .ok_or(DataRestoreError::NonexistentAccount)?;
                     _op.tx.from = from.address;
                     _op.tx.nonce = from.nonce + 1;
-                    self.state.execute_tx(
+                    if let Ok(OpSuccess {
+                        fee,
+                        mut updates,
+                        executed_op,
+                    }) = self.state.execute_tx(
                         FranklinTx::Transfer(_op.tx)
-                    );
+                    ) {
+                        if let Some(fee) = fee {
+                            fees.push(fee);
+                        }
+                    }
                 },
                 FranklinOp::Withdraw(mut _op) => {
                     // Withdraw op comes with empty Account Address and Nonce fields
@@ -73,9 +94,17 @@ impl FranklinAccountsState {
                         .ok_or(DataRestoreError::NonexistentAccount)?;
                     _op.tx.account = account.address;
                     _op.tx.nonce = account.nonce + 1;
-                    self.state.execute_tx(
+                    if let Ok(OpSuccess {
+                        fee,
+                        mut updates,
+                        executed_op,
+                    }) = self.state.execute_tx(
                         FranklinTx::Withdraw(_op.tx)
-                    );
+                    ) {
+                        if let Some(fee) = fee {
+                            fees.push(fee);
+                        }
+                    }
                 },
                 FranklinOp::Close(mut _op) => {
                     // Close op comes with empty Account Address and Nonce fields
@@ -83,9 +112,17 @@ impl FranklinAccountsState {
                         .ok_or(DataRestoreError::NonexistentAccount)?;
                     _op.tx.account = account.address;
                     _op.tx.nonce = account.nonce + 1;
-                    self.state.execute_tx(
+                    if let Ok(OpSuccess {
+                        fee,
+                        mut updates,
+                        executed_op,
+                    }) = self.state.execute_tx(
                         FranklinTx::Close(_op.tx)
-                    );
+                    ) {
+                        if let Some(fee) = fee {
+                            fees.push(fee);
+                        }
+                    }
                 },
                 FranklinOp::Transfer(mut _op) => {
                     let from = self.state.get_account(_op.from)
@@ -95,17 +132,35 @@ impl FranklinAccountsState {
                     _op.tx.from = from.address;
                     _op.tx.to = to.address;
                     _op.tx.nonce = from.nonce + 1;
-                    self.state.execute_tx(
+                    if let Ok(OpSuccess {
+                        fee,
+                        mut updates,
+                        executed_op,
+                    }) = self.state.execute_tx(
                         FranklinTx::Transfer(_op.tx)
-                    );
+                    ) {
+                        if let Some(fee) = fee {
+                            fees.push(fee);
+                        }
+                    }
                 },
                 FranklinOp::FullExit(_op) => {
-                    self.state.execute_priority_op(
+                    let OpSuccess {
+                        fee,
+                        mut updates,
+                        executed_op,
+                    } = self.state.execute_priority_op(
                         FranklinPriorityOp::FullExit(_op.priority_op)
                     );
+                    if let Some(fee) = fee {
+                        fees.push(fee);
+                    }
                 },
             }
         }
+
+        self.state.collect_fee(&fees, &self.fee_account_address);
+
         Ok(())
     }
 
