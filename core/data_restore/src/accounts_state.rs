@@ -5,6 +5,8 @@ use std::convert::TryInto;
 use ff::{Field, PrimeField, PrimeFieldRepr};
 use plasma::state::{OpSuccess, PlasmaState};
 
+use crate::franklin_ops::FranklinOpsBlock;
+
 use models::node::operations::{
     TX_TYPE_BYTES_LEGTH, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
 };
@@ -41,63 +43,68 @@ impl FranklinAccountsState {
     ///
     /// * `op` - Franklin operation
     ///
-    pub fn update_accounts_states_from_op(
+    /// 
+    /// 
+    /// TODO: - collect fees
+    pub fn update_accounts_states_from_ops_block(
         &mut self,
-        op: &FranklinOp,
+        block: &FranklinOpsBlock,
     ) -> Result<(), DataRestoreError> {
-        let mut operation = op.clone();
-        match operation {
-            FranklinOp::Deposit(_op) => {
-                self.state.execute_priority_op(
-                    FranklinPriorityOp::Deposit(_op.priority_op)
-                );
-            },
-            FranklinOp::TransferToNew(mut _op) => {
-                let from = self.state.get_account(_op.from)
-                    .ok_or(DataRestoreError::NonexistentAccount)?;
-                _op.tx.from = from.address;
-                _op.tx.nonce = from.nonce + 1;
-                self.state.execute_tx(
-                    FranklinTx::Transfer(_op.tx)
-                );
-            },
-            FranklinOp::Withdraw(mut _op) => {
-                // Withdraw op comes with empty Account Address and Nonce fields
-                let account = self.state.get_account(_op.account_id)
-                    .ok_or(DataRestoreError::NonexistentAccount)?;
-                _op.tx.account = account.address;
-                _op.tx.nonce = account.nonce + 1;
-                self.state.execute_tx(
-                    FranklinTx::Withdraw(_op.tx)
-                );
-            },
-            FranklinOp::Close(mut _op) => {
-                // Close op comes with empty Account Address and Nonce fields
-                let account = self.state.get_account(_op.account_id)
-                    .ok_or(DataRestoreError::NonexistentAccount)?;
-                _op.tx.account = account.address;
-                _op.tx.nonce = account.nonce + 1;
-                self.state.execute_tx(
-                    FranklinTx::Close(_op.tx)
-                );
-            },
-            FranklinOp::Transfer(mut _op) => {
-                let from = self.state.get_account(_op.from)
-                    .ok_or(DataRestoreError::NonexistentAccount)?;
-                let to = self.state.get_account(_op.to)
-                    .ok_or(DataRestoreError::NonexistentAccount)?;
-                _op.tx.from = from.address;
-                _op.tx.to = to.address;
-                _op.tx.nonce = from.nonce + 1;
-                self.state.execute_tx(
-                    FranklinTx::Transfer(_op.tx)
-                );
-            },
-            FranklinOp::FullExit(_op) => {
-                self.state.execute_priority_op(
-                    FranklinPriorityOp::FullExit(_op.priority_op)
-                );
-            },
+        let mut operations = block.ops.clone();
+        for operation in operations {
+            match operation {
+                FranklinOp::Deposit(_op) => {
+                    self.state.execute_priority_op(
+                        FranklinPriorityOp::Deposit(_op.priority_op)
+                    );
+                },
+                FranklinOp::TransferToNew(mut _op) => {
+                    let from = self.state.get_account(_op.from)
+                        .ok_or(DataRestoreError::NonexistentAccount)?;
+                    _op.tx.from = from.address;
+                    _op.tx.nonce = from.nonce + 1;
+                    self.state.execute_tx(
+                        FranklinTx::Transfer(_op.tx)
+                    );
+                },
+                FranklinOp::Withdraw(mut _op) => {
+                    // Withdraw op comes with empty Account Address and Nonce fields
+                    let account = self.state.get_account(_op.account_id)
+                        .ok_or(DataRestoreError::NonexistentAccount)?;
+                    _op.tx.account = account.address;
+                    _op.tx.nonce = account.nonce + 1;
+                    self.state.execute_tx(
+                        FranklinTx::Withdraw(_op.tx)
+                    );
+                },
+                FranklinOp::Close(mut _op) => {
+                    // Close op comes with empty Account Address and Nonce fields
+                    let account = self.state.get_account(_op.account_id)
+                        .ok_or(DataRestoreError::NonexistentAccount)?;
+                    _op.tx.account = account.address;
+                    _op.tx.nonce = account.nonce + 1;
+                    self.state.execute_tx(
+                        FranklinTx::Close(_op.tx)
+                    );
+                },
+                FranklinOp::Transfer(mut _op) => {
+                    let from = self.state.get_account(_op.from)
+                        .ok_or(DataRestoreError::NonexistentAccount)?;
+                    let to = self.state.get_account(_op.to)
+                        .ok_or(DataRestoreError::NonexistentAccount)?;
+                    _op.tx.from = from.address;
+                    _op.tx.to = to.address;
+                    _op.tx.nonce = from.nonce + 1;
+                    self.state.execute_tx(
+                        FranklinTx::Transfer(_op.tx)
+                    );
+                },
+                FranklinOp::FullExit(_op) => {
+                    self.state.execute_priority_op(
+                        FranklinPriorityOp::FullExit(_op.priority_op)
+                    );
+                },
+            }
         }
         Ok(())
     }

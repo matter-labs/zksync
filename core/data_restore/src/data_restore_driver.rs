@@ -4,6 +4,7 @@ use crate::events_state::EventsState;
 use models::node::operations::{
     TX_TYPE_BYTES_LEGTH, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
 };
+use crate::franklin_ops::FranklinOpsBlock;
 use models::node::priority_ops::{Deposit, FranklinPriorityOp, FullExit};
 use models::node::tx::{Close, FranklinTx, Transfer, Withdraw};
 use models::node::account::{Account, AccountAddress, AccountUpdate};
@@ -34,7 +35,7 @@ pub struct DataRestoreDriver {
     /// Franklin accounts state
     // pub account_states: FranklinAccountsStates,
     /// Franklin operations blocks
-    pub op_blocks: Vec<FranklinOp>,
+    pub op_blocks: Vec<FranklinOpsBlock>,
     /// Storage update state
     pub storage_update_state: StorageUpdateState
 }
@@ -108,9 +109,9 @@ impl DataRestoreDriver {
             self.storage_update_state = StorageUpdateState::Events;
             
             // Update operations
-            let new_operations = self.get_new_operations_from_events()?;
+            let new_blocks = self.get_new_operation_blocks_from_events()?;
             info!(
-                "Parsed events to operations"
+                "Parsed events to operation blocks"
             );
 
             // Store Operations
@@ -132,17 +133,17 @@ impl DataRestoreDriver {
     }
 
     /// Return verified comitted operations blocks from verified op blocks events
-    pub fn get_new_operations_from_events(&mut self) -> Result<Vec<FranklinOp>, DataRestoreError> {
+    pub fn get_new_operation_blocks_from_events(&mut self) -> Result<Vec<FranklinOpsBlock>, DataRestoreError> {
         info!("Loading new verified op_blocks");
         let committed_events = self
             .events_state
             .get_only_verified_committed_events();
-        let mut ops: Vec<FranklinOp> = vec![];
+        let mut blocks: Vec<FranklinOpsBlock> = vec![];
         for event in committed_events {
-            let mut _ops = franklin_ops::get_franklin_ops(&event)?;
-            ops.append(&mut _ops);
+            let mut _block = FranklinOpsBlock::get_from_event(&event)?;
+            blocks.push(_block);
         }
-        Ok(ops)
+        Ok(blocks)
     }
 
     // /// Update past events and accounts states
