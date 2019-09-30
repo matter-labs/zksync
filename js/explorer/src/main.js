@@ -66,8 +66,7 @@ window.app = new Vue({
     async created() {
         this.store.config = config
         let regex = /(?:api-)*(\w*)(?:\..*)*/
-        this.store.network = 
-            regex.exec(url.parse(this.store.config.API_SERVER).host)[1]
+        this.store.network = this.store.config.ETH_NETWORK
     },
     render: h => h(App)
 })

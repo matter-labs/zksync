@@ -4,7 +4,7 @@ use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use lazy_static::lazy_static;
 
 /// Account tree depth
-pub const ACCOUNT_TREE_DEPTH: usize = 5;
+pub const ACCOUNT_TREE_DEPTH: usize = 16;
 pub const ACCOUNT_ID_BIT_WIDTH: usize = 24;
 
 /// Balance tree depth
@@ -54,7 +54,7 @@ pub const FR_BIT_WIDTH_PADDED: usize = 256;
 pub const TOTAL_TOKENS: usize = 1 << BALANCE_TREE_DEPTH;
 pub const ETH_TOKEN_ID: TokenId = 0;
 
-pub const BLOCK_SIZE_CHUNKS: usize = 18;
+pub const BLOCK_SIZE_CHUNKS: usize = 100;
 
 /// Priority op should be executed for this number of eth blocks.
 pub const PRIORITY_EXPIRATION: u64 = 250;

@@ -1,6 +1,8 @@
 #!/bin/sh
 
 # remove quotes for docker-compose
+echo KEY_FILES=$KEY_FILES
+
 export KEY_FILES=`echo $KEY_FILES | sed -e 's/"\(.*\)/\1/g' -e 's/"$//g'`
 echo KEY_FILES=$KEY_FILES
 
