@@ -1705,6 +1705,7 @@ impl StorageProcessor {
     pub fn update_state(&self, block_number: BlockNumber, updates: &AccountUpdates) -> QueryResult<()> {
         self.commit_state_update(block_number, &updates)?;
         self.apply_state_update(block_number)?;
+        Ok(())
     }
 
     pub fn store_token(&self, id: TokenId, address: &str, symbol: Option<&str>) -> QueryResult<()> {
