@@ -16,6 +16,7 @@ const FUNC_NAME_HASH_LENGTH: usize = 4;
 /// Description of a Franklin operations block
 #[derive(Debug, Clone)]
 pub struct FranklinOpsBlock {
+    pub block_num: u32,
     /// Franklin operations in block
     pub ops: Vec<FranklinOp>
 }
@@ -24,6 +25,24 @@ impl FranklinOpsBlock {
     pub fn get_from_event(event_data: &EventData) -> Result<Self, DataRestoreError> {
         let ops_block = FranklinOpsBlock::get_franklin_ops_block(event_data)?;
         Ok(ops_block)
+    }
+
+    /// Return Franklin operations block description
+    ///
+    /// # Arguments
+    ///
+    /// * `event_data` - Franklin Contract event description
+    ///
+    fn get_franklin_ops_block(event_data: &EventData) -> Result<FranklinOpsBlock, DataRestoreError> {
+        let transaction =
+            FranklinOpsBlock::get_ethereum_transaction(&event_data.transaction_hash)?;
+        let commitment_data = FranklinOpsBlock::get_commitment_data_from_ethereum_transaction(&transaction)?;
+        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&commitment_data)?;
+        let block = FranklinOpsBlock {
+            block_num: event_data.block_num,
+            ops,
+        };
+        Ok(block)
     }
 
     fn get_franklin_ops_from_data(data: &Vec<u8>) -> Result<Vec<FranklinOp>, DataRestoreError> {
@@ -48,23 +67,6 @@ impl FranklinOpsBlock {
             current_pointer += full_size;
         }
         Ok(ops)
-    }
-
-    /// Return Franklin operations block description
-    ///
-    /// # Arguments
-    ///
-    /// * `event_data` - Franklin Contract event description
-    ///
-    fn get_franklin_ops_block(event_data: &EventData) -> Result<FranklinOpsBlock, DataRestoreError> {
-        let transaction =
-            FranklinOpsBlock::get_ethereum_transaction(&event_data.transaction_hash)?;
-        let commitment_data = FranklinOpsBlock::get_commitment_data_from_ethereum_transaction(&transaction)?;
-        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&commitment_data)?;
-        let block = FranklinOpsBlock {
-            ops,
-        };
-        Ok(block)
     }
 
     /// Return Ethereum transaction description
