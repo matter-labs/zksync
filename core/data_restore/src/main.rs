@@ -13,11 +13,11 @@ use crate::data_restore_driver::DataRestoreDriver;
 use std::env;
 // use std::str::FromStr;
 use storage::ConnectionPool;
-// use storage_interactor::{
-//     remove_storage_data,
-//     get_events_state_from_storage,
-//     get_op_blocks_from_storage
-// };
+use storage_interactor::{
+    remove_storage_data,
+    // get_events_state_from_storage,
+    // get_op_blocks_from_storage
+};
 // use web3::types::U256;
 
 fn main() {
@@ -55,16 +55,16 @@ fn create_data_restore_driver(
 fn restart_state_load(args: Vec<String>) {
     let connection_pool = ConnectionPool::new();
 
-    // let remove_storage_data_res = remove_storage_data(connection_pool.clone());
-    // if !remove_storage_data_res.is_err() {
-    //     info!("Storage data removed");
-    // }
+    let remove_storage_data_res = remove_storage_data(connection_pool.clone());
+    if !remove_storage_data_res.is_err() {
+        info!("Storage data removed");
+    }
 
     let mut data_restore_driver =
         create_data_restore_driver(connection_pool.clone());
     info!("Driver created");
 
-    // run_state_update(&mut data_restore_driver);
+    run_state_update(&mut data_restore_driver);
 }
 
 // /// Loads states from storage and start update

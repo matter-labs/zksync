@@ -529,7 +529,7 @@ pub struct StoredBlockEvent {
 
 #[derive(Debug, Insertable)]
 #[table_name = "franklin_ops"]
-struct NewFranklinOp {
+pub struct NewFranklinOp {
     pub block_num: i64,
     pub operation: Value,
 }
@@ -545,7 +545,7 @@ impl NewFranklinOp {
 
 #[derive(Debug, Clone, Queryable, QueryableByName)]
 #[table_name = "franklin_ops"]
-struct StoredFranklinOp {
+pub struct StoredFranklinOp {
     pub id: i32,
     pub block_num: i64,
     pub operation: Value,
@@ -1675,7 +1675,7 @@ impl StorageProcessor {
         Ok(())
     }
 
-    pub fn load_franklin_ops(&self) -> QueryResult<Vec<StoredFranklinOpsBlock>> {
+    pub fn load_franklin_ops_blocks(&self) -> QueryResult<Vec<StoredFranklinOpsBlock>> {
         let stored_operations = franklin_ops::table
             .order(franklin_ops::id.asc())
             .load::<StoredFranklinOp>(self.conn())?;

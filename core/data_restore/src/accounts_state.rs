@@ -12,7 +12,7 @@ use models::node::operations::{
 };
 use models::node::priority_ops::{Deposit, FranklinPriorityOp, FullExit};
 use models::node::tx::{Close, FranklinTx, Transfer, Withdraw};
-use models::node::{AccountMap, Fr, AccountId};
+use models::node::{AccountMap, Fr, AccountId, AccountUpdates};
 use models::node::account::{Account, AccountAddress, AccountUpdate};
 use crate::helpers::DataRestoreError;
 
@@ -52,9 +52,10 @@ impl FranklinAccountsState {
     pub fn update_accounts_states_from_ops_block(
         &mut self,
         block: &FranklinOpsBlock,
-    ) -> Result<(), DataRestoreError> {
+    ) -> Result<AccountUpdates, DataRestoreError> {
         let mut operations = block.ops.clone();
 
+        let mut accounts_updated = Vec::new();
         let mut fees = Vec::new();
 
         for operation in operations {
@@ -70,6 +71,7 @@ impl FranklinAccountsState {
                     if let Some(fee) = fee {
                         fees.push(fee);
                     }
+                    accounts_updated.append(&mut updates);
                 },
                 FranklinOp::TransferToNew(mut _op) => {
                     let from = self.state.get_account(_op.from)
@@ -86,6 +88,7 @@ impl FranklinAccountsState {
                         if let Some(fee) = fee {
                             fees.push(fee);
                         }
+                        accounts_updated.append(&mut updates);
                     }
                 },
                 FranklinOp::Withdraw(mut _op) => {
@@ -104,6 +107,7 @@ impl FranklinAccountsState {
                         if let Some(fee) = fee {
                             fees.push(fee);
                         }
+                        accounts_updated.append(&mut updates);
                     }
                 },
                 FranklinOp::Close(mut _op) => {
@@ -122,6 +126,7 @@ impl FranklinAccountsState {
                         if let Some(fee) = fee {
                             fees.push(fee);
                         }
+                        accounts_updated.append(&mut updates);
                     }
                 },
                 FranklinOp::Transfer(mut _op) => {
@@ -142,6 +147,7 @@ impl FranklinAccountsState {
                         if let Some(fee) = fee {
                             fees.push(fee);
                         }
+                        accounts_updated.append(&mut updates);
                     }
                 },
                 FranklinOp::FullExit(_op) => {
@@ -155,13 +161,15 @@ impl FranklinAccountsState {
                     if let Some(fee) = fee {
                         fees.push(fee);
                     }
+                    accounts_updated.append(&mut updates);
                 },
             }
         }
 
-        self.state.collect_fee(&fees, &self.fee_account_address);
+        let (_, fee_updates) = self.state.collect_fee(&fees, &self.fee_account_address);
+        accounts_updated.extend(fee_updates.into_iter());
 
-        Ok(())
+        Ok(accounts_updated)
     }
 
     /// Returns map of Franklin accounts ids and their descriptions

@@ -81,6 +81,8 @@ pub fn get_topic_keccak_hash(topic: &str) -> web3::types::H256 {
 pub enum DataRestoreError {
     /// Unknown error with description
     Unknown(String),
+    /// Storage error with description
+    Storage(String),
     /// Wrong type
     WrongType,
     /// Got no data with description
@@ -103,6 +105,7 @@ impl std::string::ToString for DataRestoreError {
     fn to_string(&self) -> String {
         match self {
             DataRestoreError::Unknown(text) => format!("Unknown {}", text),
+            DataRestoreError::Storage(text) => format!("Storage {}", text),
             DataRestoreError::WrongType => "Wrong type".to_owned(),
             DataRestoreError::NoData(text) => format!("No data {}", text),
             DataRestoreError::NonexistentAccount => "Nonexistent account".to_owned(),
