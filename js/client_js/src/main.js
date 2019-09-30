@@ -33,18 +33,16 @@ Vue.mixin({
         },
         currentMetamaskNetworkName () {
             return ({
-                '1': 'Mainnet',
-                '4': 'Rinkeby',
+                '1': 'mainnet',
+                '4': 'rinkeby',
                 '9': 'localhost',
             })[this.network];
         },
         currentMetamaskNetwork() {
-            return window.location.hostname.split('.')[0];
+            return this.config.ETH_NETWORK;
         },
         correctNetwork() {
-            return (this.network === '9' && window.location.hostname.includes('localhost')) ||
-                (this.network === '1' && window.location.hostname.includes('mainnet')) ||
-                (this.network === '4' && window.location.hostname.includes('rinkeby'));
+            return this.currentMetamaskNetworkName == this.currentMetamaskNetwork;
         },
         baseUrl() {
             return this.apiServer + '/api/v0.1'
