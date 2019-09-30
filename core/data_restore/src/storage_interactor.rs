@@ -2,10 +2,12 @@ use crate::events::{EventData, EventType};
 use crate::events_state::EventsState;
 use crate::franklin_ops::FranklinOpsBlock;
 use crate::helpers::DataRestoreError;
+use crate::data_restore_driver::StorageUpdateState;
 use std::convert::TryFrom;
 use storage::{
     ConnectionPool, NewBlockEvent, StoredBlockEvent, NewFranklinOp, StoredFranklinOp,
     NewLastWatchedEthBlockNumber, StoredLastWatchedEthBlockNumber, StoredFranklinOpsBlock,
+    NewStorageState, StoredStorageState
 };
 use models::node::operations::FranklinOp;
 use models::node::{AccountUpdates, AccountMap};
@@ -22,6 +24,7 @@ pub fn remove_storage_data(connection_pool: ConnectionPool) -> Result<(), DataRe
     remove_events_state(connection_pool.clone())?;
     remove_franklin_ops(connection_pool.clone())?;
     remove_tree_state(connection_pool.clone())?;
+    remove_storage_state(connection_pool.clone())?;
     Ok(())
 }
 
@@ -99,6 +102,24 @@ pub fn save_last_watched_block_number(number: &u64, connection_pool: ConnectionP
     Ok(())
 }
 
+pub fn save_storage_state(state: StorageUpdateState, connection_pool: ConnectionPool) -> Result<(), DataRestoreError> {
+    let string = match state {
+        StorageUpdateState::None => "None".to_string(),
+        StorageUpdateState::Events => "Events".to_string(),
+        StorageUpdateState::Operations => "Operations".to_string(),
+    };
+    let storage_state = NewStorageState {
+        storage_state: string
+    };
+    let storage = connection_pool
+        .access_storage()
+        .map_err(|_| DataRestoreError::Storage("db connection failed for data restore save storage state".to_string()))?;
+    storage
+        .save_storage_state(&storage_state)
+        .map_err(|_| DataRestoreError::Storage("cant save storage state".to_string()))?;
+    Ok(())
+}
+
 /// Saves franklin operation blocks in storage
 ///
 /// # Arguments
@@ -124,7 +145,7 @@ pub fn remove_events_state(connection_pool: ConnectionPool) -> Result<(), DataRe
     let storage = connection_pool
         .access_storage()
         .map_err(|_| DataRestoreError::Storage("db connection failed for data restore remove data".to_string()))?;
-    let delete_events_state_res = storage.delete_events_state()
+    storage.delete_events_state()
         .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
     Ok(())
 }
@@ -133,7 +154,7 @@ pub fn remove_franklin_ops(connection_pool: ConnectionPool) -> Result<(), DataRe
     let storage = connection_pool
         .access_storage()
         .map_err(|_| DataRestoreError::Storage("db connection failed for data restore remove data".to_string()))?;
-    let delete_franklin_ops_res = storage.delete_franklin_ops()
+    storage.delete_franklin_ops()
         .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
     Ok(())
 }
@@ -142,7 +163,7 @@ pub fn remove_tree_state(connection_pool: ConnectionPool) -> Result<(), DataRest
     let storage = connection_pool
         .access_storage()
         .map_err(|_| DataRestoreError::Storage("db connection failed for data restore remove data".to_string()))?;
-    let delete_tree_state_res = storage.delete_tree_state()
+    storage.delete_tree_state()
         .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
     Ok(())
 }
@@ -151,7 +172,16 @@ pub fn remove_last_watched_block_number(connection_pool: ConnectionPool) -> Resu
     let storage = connection_pool
         .access_storage()
         .map_err(|_| DataRestoreError::Storage("db connection failed for data restore remove data".to_string()))?;
-    let delete_last_watched_block_number_res = storage.delete_last_watched_block_number()
+    storage.delete_last_watched_block_number()
+        .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+    Ok(())
+}
+
+pub fn remove_storage_state(connection_pool: ConnectionPool) -> Result<(), DataRestoreError> {
+    let storage = connection_pool
+        .access_storage()
+        .map_err(|_| DataRestoreError::Storage("db connection failed for data restore remove data".to_string()))?;
+    storage.delete_storage_state()
         .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
     Ok(())
 }
@@ -187,6 +217,26 @@ pub fn stored_ops_block_into_ops_block(op_block: &StoredFranklinOpsBlock) -> Fra
         ops: op_block.ops.clone()
     }
 } 
+
+pub fn get_storage_state(connection_pool: ConnectionPool) -> Result<StorageUpdateState, DataRestoreError> {
+    let storage = connection_pool
+        .access_storage()
+        .map_err(|_| DataRestoreError::Storage("db connection failed storage state".to_string()))?;
+
+    let storage_state_string = storage
+        .load_storage_state()
+        .map_err(|_| DataRestoreError::Storage("load_storage_state: db must work".to_string()))?
+        .storage_state;
+
+    let state = match storage_state_string.as_ref() {
+        "Events" => StorageUpdateState::Events,
+        "Operations" => StorageUpdateState::Operations,
+        "None" => StorageUpdateState::None,
+        _ => {return Err(DataRestoreError::Storage("unknown state".to_string()))},
+    };
+
+    Ok(state)
+}
 
 /// Get last watched ethereum block number from storage
 ///

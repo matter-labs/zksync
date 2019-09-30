@@ -16,3 +16,8 @@ CREATE TABLE franklin_ops (
     block_num BIGINT NOT NULL,
     operation JSONB NOT NULL
 );
+
+CREATE TABLE storage_state_update (
+    id SERIAL PRIMARY KEY,
+    storage_state TEXT NOT NULL
+);

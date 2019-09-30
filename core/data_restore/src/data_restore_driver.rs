@@ -34,8 +34,6 @@ pub struct DataRestoreDriver {
     pub events_state: EventsState,
     /// Franklin accounts state
     pub accounts_state: FranklinAccountsState,
-    /// Storage update state
-    pub storage_update_state: StorageUpdateState,
 }
 
 impl DataRestoreDriver {
@@ -60,7 +58,6 @@ impl DataRestoreDriver {
             run_updates: false,
             events_state: EventsState::new(genesis_block_number),
             accounts_state: FranklinAccountsState::new(),
-            storage_update_state: StorageUpdateState::None
         }
     }
 
@@ -69,7 +66,8 @@ impl DataRestoreDriver {
         self.run_updates = false
     }
 
-    pub fn load_state_from_storage(&mut self, state: StorageUpdateState) -> Result<(), DataRestoreError> {
+    pub fn load_state_from_storage(&mut self) -> Result<(), DataRestoreError> {
+        let state = storage_interactor::get_storage_state(self.connection_pool.clone())?;
         match state {
             StorageUpdateState::Events => {
                 self.events_state = storage_interactor::get_events_state_from_storage(self.connection_pool.clone())?;
@@ -132,11 +130,13 @@ impl DataRestoreDriver {
         // Store events
         storage_interactor::remove_events_state(self.connection_pool.clone())?;
         storage_interactor::save_events_state(&events, self.connection_pool.clone())?;
+        
+        storage_interactor::remove_storage_state(self.connection_pool.clone())?;
+        storage_interactor::save_storage_state(StorageUpdateState::Events, self.connection_pool.clone())?;
+
         info!(
             "Updated events storage"
         );
-        
-        self.storage_update_state = StorageUpdateState::Events;
 
         Ok(())
     }
@@ -146,11 +146,13 @@ impl DataRestoreDriver {
             let state = self.accounts_state.update_accounts_states_from_ops_block(&block)?;
             storage_interactor::update_tree_state(block.block_num, &state, self.connection_pool.clone())?;
         }
+
+        storage_interactor::remove_storage_state(self.connection_pool.clone())?;
+        storage_interactor::save_storage_state(StorageUpdateState::None, self.connection_pool.clone())?;
+
         info!(
             "Updated accounts state"
         );
-
-        self.storage_update_state = StorageUpdateState::None;
 
         Ok(())
     }
@@ -163,11 +165,13 @@ impl DataRestoreDriver {
 
         storage_interactor::remove_franklin_ops(self.connection_pool.clone())?;
         storage_interactor::save_franklin_ops_blocks(&new_blocks, self.connection_pool.clone())?;
+        
+        storage_interactor::remove_storage_state(self.connection_pool.clone())?;
+        storage_interactor::save_storage_state(StorageUpdateState::Operations, self.connection_pool.clone())?;
+        
         info!(
             "Updated events storage"
         );
-
-        self.storage_update_state = StorageUpdateState::Operations;
 
         Ok(new_blocks)
     }

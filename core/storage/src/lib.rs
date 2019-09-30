@@ -498,6 +498,19 @@ pub struct BlockDetails {
 }
 
 #[derive(Insertable)]
+#[table_name = "storage_state_update"]
+pub struct NewStorageState {
+    pub storage_state: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
+#[table_name = "storage_state_update"]
+pub struct StoredStorageState {
+    pub id: i32,
+    pub storage_state: String,
+}
+
+#[derive(Insertable)]
 #[table_name = "data_restore_last_watched_eth_block"]
 pub struct NewLastWatchedEthBlockNumber {
     pub block_number: String,
@@ -1635,6 +1648,25 @@ impl StorageProcessor {
             .order(events_state::block_num.asc())
             .load::<StoredBlockEvent>(self.conn())?;
         Ok(events)
+    }
+
+    pub fn save_storage_state(
+        &self,
+        state: &NewStorageState,
+    ) -> QueryResult<()> {
+        diesel::insert_into(storage_state_update::table)
+            .values(state)
+            .execute(self.conn())?;
+        Ok(())
+    }
+
+    pub fn delete_storage_state(&self) -> QueryResult<()> {
+        diesel::delete(storage_state_update::table).execute(self.conn())?;
+        Ok(())
+    }
+
+    pub fn load_storage_state(&self) -> QueryResult<StoredStorageState> {
+        storage_state_update::table.first(self.conn())
     }
 
     pub fn save_last_watched_block_number(

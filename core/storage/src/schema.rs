@@ -170,6 +170,13 @@ table! {
 }
 
 table! {
+    storage_state_update (id) {
+        id -> Int4,
+        storage_state -> Text,
+    }
+}
+
+table! {
     tokens (id) {
         id -> Int4,
         address -> Text,
@@ -202,5 +209,6 @@ allow_tables_to_appear_in_same_query!(
     proofs,
     prover_runs,
     server_config,
+    storage_state_update,
     tokens,
 );
