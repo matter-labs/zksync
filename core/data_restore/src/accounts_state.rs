@@ -48,10 +48,7 @@ impl FranklinAccountsState {
     /// # Arguments
     ///
     /// * `op` - Franklin operation
-    ///
     /// 
-    /// 
-    /// TODO: - collect fees
     pub fn update_accounts_states_from_ops_block(
         &mut self,
         block: &FranklinOpsBlock,

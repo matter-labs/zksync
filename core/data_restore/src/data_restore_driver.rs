@@ -34,8 +34,6 @@ pub struct DataRestoreDriver {
     pub events_state: EventsState,
     /// Franklin accounts state
     pub accounts_state: FranklinAccountsState,
-    /// Franklin operations blocks
-    pub op_blocks: Vec<FranklinOpsBlock>,
     /// Storage update state
     pub storage_update_state: StorageUpdateState,
 }
@@ -62,7 +60,6 @@ impl DataRestoreDriver {
             run_updates: false,
             events_state: EventsState::new(genesis_block_number),
             accounts_state: FranklinAccountsState::new(),
-            op_blocks: vec![],
             storage_update_state: StorageUpdateState::None
         }
     }
@@ -72,10 +69,24 @@ impl DataRestoreDriver {
         self.run_updates = false
     }
 
-    pub fn load_state_from_storage(&mut self) -> Result<(), DataRestoreError> {
-        // match self.storage_update_state {
-
-        // }
+    pub fn load_state_from_storage(&mut self, state: StorageUpdateState) -> Result<(), DataRestoreError> {
+        match state {
+            StorageUpdateState::Events => {
+                self.events_state = storage_interactor::get_events_state_from_storage(self.connection_pool.clone())?;
+                // Update operations
+                let new_ops_blocks = self.update_operations_state()?;
+                // Update tree
+                self.update_tree_state(new_ops_blocks)?;
+            },
+            StorageUpdateState::Operations => {
+                self.events_state = storage_interactor::get_events_state_from_storage(self.connection_pool.clone())?;
+                // Update operations
+                let new_ops_blocks = storage_interactor::get_ops_blocks_from_storage(self.connection_pool.clone())?;
+                // Update tree
+                self.update_tree_state(new_ops_blocks)?;
+            },
+            StorageUpdateState::None => {},
+        }
         Ok(())
     }
 
@@ -96,50 +107,69 @@ impl DataRestoreDriver {
             );
 
             // Update events
-            let events = self.events_state.update_events_state(
-                self.eth_blocks_delta.clone(),
-                self.end_eth_blocks_delta.clone()
-            )?;
-            info!(
-                "Got new events"
-            );
-
-            // Store events
-            storage_interactor::remove_events_state(self.connection_pool.clone())?;
-            storage_interactor::save_events_state(&events, self.connection_pool.clone())?;
-            info!(
-                "Updated events storage"
-            );
-            
-            self.storage_update_state = StorageUpdateState::Events;
+            self.update_events_state()?;
             
             // Update operations
-            let new_blocks = self.get_new_operation_blocks_from_events()?;
-            info!(
-                "Parsed events to operation blocks"
-            );
-
-            storage_interactor::remove_franklin_ops(self.connection_pool.clone())?;
-            storage_interactor::save_franklin_ops_blocks(&new_blocks, self.connection_pool.clone())?;
-            info!(
-                "Updated events storage"
-            );
-
-            self.storage_update_state = StorageUpdateState::Operations;
+            let new_ops_blocks = self.update_operations_state()?;
 
             // Update tree
-            for block in new_blocks {
-                let state = self.accounts_state.update_accounts_states_from_ops_block(&block)?;
-                storage_interactor::update_tree_state(block.block_num, &state, self.connection_pool.clone())?;
-            }
-            info!(
-                "Updated accounts state"
-            );
-
-            self.storage_update_state = StorageUpdateState::None;
+            self.update_tree_state(new_ops_blocks)?;
+            
         }
         info!("Stopped state updates");
         Ok(())
+    }
+
+    fn update_events_state(&mut self) -> Result<(), DataRestoreError> {
+        let events = self.events_state.update_events_state(
+            self.eth_blocks_delta.clone(),
+            self.end_eth_blocks_delta.clone()
+        )?;
+        info!(
+            "Got new events"
+        );
+
+        // Store events
+        storage_interactor::remove_events_state(self.connection_pool.clone())?;
+        storage_interactor::save_events_state(&events, self.connection_pool.clone())?;
+        info!(
+            "Updated events storage"
+        );
+        
+        self.storage_update_state = StorageUpdateState::Events;
+
+        Ok(())
+    }
+
+    fn update_tree_state(&mut self, new_ops_blocks: Vec<FranklinOpsBlock>) -> Result<(), DataRestoreError> {
+        for block in new_ops_blocks {
+            let state = self.accounts_state.update_accounts_states_from_ops_block(&block)?;
+            storage_interactor::update_tree_state(block.block_num, &state, self.connection_pool.clone())?;
+        }
+        info!(
+            "Updated accounts state"
+        );
+
+        self.storage_update_state = StorageUpdateState::None;
+
+        Ok(())
+    }
+
+    fn update_operations_state(&mut self) -> Result<Vec<FranklinOpsBlock>, DataRestoreError> {
+        let new_blocks = self.get_new_operation_blocks_from_events()?;
+        info!(
+            "Parsed events to operation blocks"
+        );
+
+        storage_interactor::remove_franklin_ops(self.connection_pool.clone())?;
+        storage_interactor::save_franklin_ops_blocks(&new_blocks, self.connection_pool.clone())?;
+        info!(
+            "Updated events storage"
+        );
+
+        self.storage_update_state = StorageUpdateState::Operations;
+
+        Ok(new_blocks)
     }
 
     /// Return verified comitted operations blocks from verified op blocks events

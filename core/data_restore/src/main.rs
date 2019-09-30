@@ -80,7 +80,7 @@ fn continue_state_load(args: Vec<String>) {
         create_data_restore_driver(connection_pool.clone());
     info!("Driver created");
 
-    data_restore_driver.load_state_from_storage();
+    // data_restore_driver.load_state_from_storage();
     run_state_update(&mut data_restore_driver);
 }
 
