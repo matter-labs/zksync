@@ -2,10 +2,10 @@
     <b-card title="Matter Testnet">
         <b-col>
             <label for="franklinAddressFormInput">Address</label> 
-                (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+franklinAddress"
-                    target="blanc">block explorer</a>):
+                <!-- (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+franklinAddress"
+                    target="blanc">block explorer</a>): -->
             <CopyableAddress id="franklinAddressFormInput" :address="franklinAddress"></CopyableAddress>
-            <b-table borderless small responsive :fields="fields" :items="displayableBalances">
+            <b-table class="b-table-balances-width-hack" borderless small responsive :fields="fields" :items="displayableBalances">
                 <template v-slot:cell(tokenName)="data" style="width: 100px !important">
                     <TokenNameButton :data="data"></TokenNameButton>
                 </template>
@@ -67,7 +67,7 @@ export default {
                 res.verifiedAmount = readableEther(res.verifiedAmount);
                 res.committedAmount = readableEther(res.committedAmount);
                 return res;
-            });
+            }).filter(entry => Number(entry.committedAmount) || Number(entry.verifiedAmount));
         },
     },
     methods: {
@@ -81,7 +81,7 @@ export default {
 </script>
 
 <style>
-td:first-child {
+.b-table-balances-width-hack td:first-child {
     width: 2em;
 }
 </style>

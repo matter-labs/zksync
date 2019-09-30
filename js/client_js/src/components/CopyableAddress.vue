@@ -21,12 +21,12 @@ export default {
         hover_title: ''
     }),
     methods: {
-        clicked() {
-            this.hover_title = "Copied"
+        clicked(event) {
+            this.hover_title = "Copied";
         },
         mouseEntered() {
             this.hover_title = "Click to copy"
         },
     },
-}
+};
 </script>

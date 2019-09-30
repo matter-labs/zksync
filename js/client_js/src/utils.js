@@ -1,12 +1,14 @@
-import { formatUnits } from 'ethers/utils';
+// import { formatUnits } from 'ethers/utils';
+import { ethers } from 'ethers'
 
 export function readableEther(wei) {
-    return formatUnits(wei, 18).match(/\d+\.\d{1,3}/)[0];
+    return ethers.utils.formatUnits(wei, 18).match(/\d+\.\d{1,3}/)[0];
 }
 
 export function getDisplayableBalanceDict(dict) {
     let res = Object.assign({}, dict);
-    res['ETH'] = readableEther(dict['ETH']);
+    if (res['ETH'] != undefined)
+        res['ETH'] = readableEther(dict['ETH']);
     return res;
 }
 
@@ -17,4 +19,19 @@ export function getDisplayableBalanceList(list) {
         res.amount = readableEther(res.amount);
         return res;
     });
+}
+
+export function bigNumberMax(a, b) {
+    return a.gt(b) ? a : b;
+}
+export function bigNumberMin(a, b) {
+    return a.gt(b) ? a : b;
+}
+
+export function feesFromAmount(amount) {
+    return [
+        ethers.utils.bigNumberify(0),
+        amount.div(100),
+        amount.div(20),
+    ].map(String);
 }

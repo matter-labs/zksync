@@ -259,6 +259,36 @@ pub fn pack_bits_into_bytes_in_order(bits: Vec<bool>) -> Vec<u8> {
     message_bytes
 }
 
+pub fn unpack_float(data: &[u8], exponent_len: usize, mantissa_len: usize) -> Option<u128> {
+    if exponent_len + mantissa_len != data.len() * 8 {
+        return None;
+    }
+
+    let bits = bytes_into_be_bits(data);
+
+    let mut mantissa = 0u128;
+    for (i, bit) in bits[0..mantissa_len].iter().rev().enumerate() {
+        if *bit {
+            mantissa = mantissa.checked_add(1u128 << i)?;
+        }
+    }
+
+    let mut exponent_pow = 0u32;
+    for (i, bit) in bits[mantissa_len..(mantissa_len + exponent_len)]
+        .iter()
+        .rev()
+        .enumerate()
+    {
+        if *bit {
+            exponent_pow = exponent_pow.checked_add(1u32 << i)?;
+        }
+    }
+
+    let exponent = 10u128.checked_pow(exponent_pow)?;
+
+    mantissa.checked_mul(exponent)
+}
+
 pub fn pack_as_float(number: &BigDecimal, exponent_len: usize, mantissa_len: usize) -> Vec<u8> {
     let uint = big_decimal_to_u128(number);
 
@@ -421,7 +451,12 @@ pub fn pedersen_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
 
 /// Its important to use this, instead of bit_decimal.to_u128()
 pub fn big_decimal_to_u128(big_decimal: &BigDecimal) -> u128 {
-    format!("{}", big_decimal).parse().unwrap()
+    big_decimal.to_string().parse().unwrap()
+}
+
+/// Its important to use this, instead of BigDecimal::from_u128()
+pub fn u128_to_bigdecimal(n: u128) -> BigDecimal {
+    n.to_string().parse().unwrap()
 }
 
 pub fn bytes_slice_to_uint32(bytes: &[u8]) -> Option<u32> {

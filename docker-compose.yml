@@ -3,11 +3,15 @@ services:
   nginx:
     image: "gluk64/franklin-nginx:latest"
     ports:
-      - "80:80"
+      - "4001:80"
     #volumes:
     #  - type: bind
     #    source: ./volumes/html
     #    target: /usr/share/nginx/html
+  newnginx:
+    image: "matterlabs/nginx:rinkeby-multitoken"
+    ports:
+      - "4000:80"
   server:
     image: "gluk64/franklin:server"
     env_file: $ENV_FILE

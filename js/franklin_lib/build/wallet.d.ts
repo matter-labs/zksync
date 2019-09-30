@@ -19,7 +19,7 @@ export declare class FranklinProvider {
     getTokens(): Promise<any>;
     getTransactionsHistory(address: Address): Promise<any>;
     getState(address: Address): Promise<FranklinAccountState>;
-    waitTxReceipt(tx_hash: any): Promise<any>;
+    getTxReceipt(tx_hash: any): Promise<any>;
 }
 export interface Token {
     id: number;

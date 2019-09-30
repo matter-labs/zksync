@@ -145,7 +145,7 @@ var FranklinProvider = /** @class */ (function () {
             });
         });
     };
-    FranklinProvider.prototype.waitTxReceipt = function (tx_hash) {
+    FranklinProvider.prototype.getTxReceipt = function (tx_hash) {
         return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -258,7 +258,7 @@ var Wallet = /** @class */ (function () {
                 switch (_a.label) {
                     case 0:
                         if (!true) return [3 /*break*/, 3];
-                        return [4 /*yield*/, this.provider.waitTxReceipt(tx_hash)];
+                        return [4 /*yield*/, this.provider.getTxReceipt(tx_hash)];
                     case 1:
                         receipt = _a.sent();
                         if (receipt != null) {

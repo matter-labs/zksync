@@ -1,33 +1,54 @@
 <template>
     <b-card no-body class="mb-1">
-        <b-card-header header-tag="header" class="p-1" role="tab">
+        <b-card-header 
+            header-tag="header" 
+            class="p-1 noselect clickable" 
+            role="tab"
+            @click="cardHeaderClicked"  
+            v-b-toggle='`${tx.elem_id}_body`'
+        >
             <b-row>
-                <b-col class="xl-1">
+                <b-col class="col-auto">
                     <b-button 
                         :class="bButtonClasses"
-                        @click="bButtonClasses.rotated = !bButtonClasses.rotated"
-                        v-b-toggle='`${tx.elem_id}_body`' 
                         variant="outline-light">
                         <img src="../assets/expand-button.png" width="12em" height="12em" />
                     </b-button>
-                </b-col>    
-                <b-col class="xl-1">
-                    <span v-html="tx.status"></span><span>{{ tx.type }}</span>
                 </b-col>
-                <b-col class="xl-10">
-                    <CopyableAddress class="w-25" :address="tx.hash"></CopyableAddress>
+                <b-col class="col-auto">
+                    <span style="width: 5em" class="heightened"><b>{{ tx.type }}</b></span>
+                </b-col>
+                <b-col class="col-auto">
+                    <span v-html="tx.status" class="heightened"></span>
+                </b-col>
+                <b-col class="col-auto heightened">
+                    <span v-if="tx.direction == 'incoming' " style="color: green; font-weight: bold" v-html="'<-'">
+                    </span>
+                    <span v-else style="color: red; font-weight: bold" v-html="'->'">
+                    </span>
                 </b-col>
             </b-row>
         </b-card-header>
         <b-collapse :id="`${tx.elem_id}_body`">
             <b-card-body>
-                <b-table borderless small responsive :items="[tx]">
-                    <!-- <template v-slot:cell(tokenName)="data">
-                        <TokenNameButton :data="data"></TokenNameButton>
+                <b-table 
+                    stacked 
+                    borderless 
+                    small 
+                    responsive 
+                    :items="[tx]" 
+                    :fields="fields[tx.type]" 
+                    class="ml-auto b-table-stacked-position-hack"
+                >
+                    <template v-slot:cell(to)="data">
+                        <code class="clickable copyable" :data-clipboard-text="data.item.to">{{ data.item.to }}</code>
                     </template>
-                    <template v-slot:cell(amount)="data">
-                        <span style="vertical-align: middle;"> {{ data.item.amount }} </span>
-                    </template> -->
+                    <template v-slot:cell(row_status)="data">
+                        <span v-html="data.item.row_status"></span>
+                    </template>
+                    <template v-slot:cell(hash)="data">
+                        <code class="clickable copyable" :data-clipboard-text="data.item.hash">{{ data.item.hash }}</code>
+                    </template>
                 </b-table>
             </b-card-body>
         </b-collapse>
@@ -49,27 +70,25 @@ export default {
             expandButton: true,
             rotated: true,
         },
+        fields: {
+            Transfer: [
+                { key: 'amount',      label: 'Amount' },
+                { key: 'to',          label: 'To' },
+                { key: 'row_status',  label: 'Status' },
+                { key: 'hash',        label: 'Tx hash' },
+            ],
+            Withdraw: [
+                { key: 'amount',      label: 'Amount' },
+                { key: 'row_status',  label: 'Status' },
+                { key: 'hash',        label: 'Tx hash' },
+            ],
+        },
     }),
     methods: {
-        copyTestingCode (id) {
-            let testingCodeToCopy = document.getElementById(id);
-            // let string = `copied`;
-            // let testingCodeToCopy = document.createElement('input');
-            testingCodeToCopy.setAttribute('type', 'text');
-            testingCodeToCopy.select();
-
-            try {
-                var successful = document.execCommand('copy');
-                var msg = successful ? 'successful' : 'unsuccessful';
-                console.log('Testing code was copied ' + msg);
-            } catch (err) {
-                alert('Oops, unable to copy');
-            }
-
-            /* unselect the range */
-            // testingCodeToCopy.setAttribute('type', 'hidden');
-            window.getSelection().removeAllRanges();
-        },
+        cardHeaderClicked(event) {
+            this.bButtonClasses.rotated = !this.bButtonClasses.rotated;
+            event.preventDefault();
+        }
     },
     components,
 }
@@ -86,6 +105,10 @@ export default {
                                   supported by Chrome and Opera */
 }
 
+.clickable {
+    cursor: pointer;
+}
+
 .rotated {
     transform: rotate(-90deg);
 }
@@ -93,4 +116,23 @@ export default {
 .expandButton {
     transition: all .25s ease;
 }
+
+.heightened {
+    display: inline-block; 
+    line-height: 2.3em;
+}
+
+
+.b-table-stacked-position-hack {
+    position: relative; 
+    left: -30%;
+}
+
+@media only screen and (max-width: 800px) {
+    .b-table-stacked-position-hack {
+        position: relative; 
+        left: -20%;
+    }
+}
+
 </style>

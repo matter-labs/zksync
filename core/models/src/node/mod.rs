@@ -1,6 +1,6 @@
 use super::merkle_tree::{PedersenHasher, SparseMerkleTree};
 use super::params;
-use super::primitives::{pack_as_float, unpack_as_big_decimal};
+use super::primitives::{pack_as_float, unpack_as_big_decimal, u128_to_bigdecimal, unpack_float};
 use bigdecimal::BigDecimal;
 use pairing::bn256;
 
@@ -59,14 +59,6 @@ pub fn pack_token_amount(amount: &BigDecimal) -> Vec<u8> {
     )
 }
 
-pub fn unpack_token_amount(bytes: &[u8]) -> Option<BigDecimal> {
-    unpack_as_big_decimal(
-        bytes,
-        params::AMOUNT_EXPONENT_BIT_WIDTH,
-        params::AMOUNT_MANTISSA_BIT_WIDTH,
-    )
-}
-
 pub fn pack_fee_amount(amount: &BigDecimal) -> Vec<u8> {
     pack_as_float(
         amount,
@@ -75,12 +67,30 @@ pub fn pack_fee_amount(amount: &BigDecimal) -> Vec<u8> {
     )
 }
 
-pub fn unpack_fee_amount(bytes: &[u8]) -> Option<BigDecimal> {
-    unpack_as_big_decimal(
-        bytes,
+pub fn is_token_amount_packable(amount: &BigDecimal) -> bool {
+    Some(amount.clone()) == unpack_token_amount(&pack_token_amount(amount))
+}
+
+pub fn is_fee_amount_packable(amount: &BigDecimal) -> bool {
+    Some(amount.clone()) == unpack_fee_amount(&pack_fee_amount(amount))
+}
+
+pub fn unpack_token_amount(data: &[u8]) -> Option<BigDecimal> {
+    unpack_float(
+        data,
+        params::AMOUNT_EXPONENT_BIT_WIDTH,
+        params::AMOUNT_MANTISSA_BIT_WIDTH,
+    )
+    .map(u128_to_bigdecimal)
+}
+
+pub fn unpack_fee_amount(data: &[u8]) -> Option<BigDecimal> {
+    unpack_float(
+        data,
         params::FEE_EXPONENT_BIT_WIDTH,
         params::FEE_MANTISSA_BIT_WIDTH,
     )
+    .map(u128_to_bigdecimal)
 }
 
 #[cfg(test)]
@@ -88,8 +98,35 @@ mod test {
     use super::*;
     use bigdecimal::BigDecimal;
     #[test]
-    fn test_pack() {
-        println!("{:x?}", pack_token_amount(&BigDecimal::from(2)));
-        println!("{:x?}", pack_fee_amount(&BigDecimal::from(1)));
+    fn test_roundtrip() {
+        let zero = BigDecimal::from(1);
+        let one = BigDecimal::from(1);
+        {
+            let round_trip_zero = unpack_token_amount(&pack_token_amount(&zero));
+            let round_trip_one = unpack_token_amount(&pack_token_amount(&one));
+            assert_eq!(Some(zero.clone()), round_trip_zero);
+            assert_eq!(Some(one.clone()), round_trip_one);
+        }
+        {
+            let round_trip_zero = unpack_fee_amount(&pack_fee_amount(&zero));
+            let round_trip_one = unpack_fee_amount(&pack_fee_amount(&one));
+            assert_eq!(Some(zero.clone()), round_trip_zero);
+            assert_eq!(Some(one.clone()), round_trip_one);
+        }
+    }
+
+    #[test]
+    fn detect_unpackable() {
+        let max_mantissa_token =
+            u128_to_bigdecimal((1u128 << params::AMOUNT_MANTISSA_BIT_WIDTH) - 1);
+        let max_mantissa_fee = u128_to_bigdecimal((1u128 << params::FEE_MANTISSA_BIT_WIDTH) - 1);
+        assert!(is_token_amount_packable(&max_mantissa_token));
+        assert!(is_fee_amount_packable(&max_mantissa_fee));
+        assert!(!is_token_amount_packable(
+            &(max_mantissa_token + BigDecimal::from(1))
+        ));
+        assert!(!is_fee_amount_packable(
+            &(max_mantissa_fee + BigDecimal::from(1))
+        ));
     }
 }

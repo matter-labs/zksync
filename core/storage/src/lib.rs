@@ -600,6 +600,8 @@ pub enum TxAddError {
     NonceTooLow,
     #[fail(display = "Tx signature is incorrect.")]
     InvalidSignature,
+    #[fail(display = "Tx is incorrect")]
+    IncorrectTx,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1781,6 +1783,10 @@ impl StorageProcessor {
     pub fn mempool_add_tx(&self, tx: &FranklinTx) -> QueryResult<Result<(), TxAddError>> {
         if !tx.check_signature() {
             return Ok(Err(TxAddError::InvalidSignature));
+        }
+
+        if !tx.check_correctness() {
+            return Ok(Err(TxAddError::IncorrectTx));
         }
 
         let (_, _, commited_state) = self.account_state_by_address(&tx.account())?;
