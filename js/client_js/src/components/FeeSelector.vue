@@ -4,7 +4,7 @@
             class="w-100"
             button-variant="outline-info"
             v-model="selected"
-            :options="fees"
+            :options="feesOptions"
             buttons
         ></b-form-radio-group>
     </div>
@@ -15,11 +15,24 @@ export default {
     name: 'TokenSelector',
     props: ['fees'],
     data: () => ({
-        selected: null,
+        feesOptions: [],
+        selected: 0,
     }),
+    created() {
+        this.renderableFees();
+        this.$emit('update:selected', this.selected);
+    },
     watch: {
+        fees: function() {
+            this.renderableFees();
+        },
         selected: function () {
             this.$emit('update:selected', this.selected);
+        },
+    },
+    methods: {
+        renderableFees() {
+            this.feesOptions = this.fees.map((text, value) => ({text, value}));
         },
     },
 }

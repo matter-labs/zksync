@@ -8,7 +8,7 @@ const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 
 export class LocalWallet {
     public resetNonce(): void {
-        this.franklinWallet.nonce = null;
+        this.franklinWallet.pendingNonce = null;
     }
 
     public franklinWallet: Wallet;
@@ -138,77 +138,81 @@ export class LocalWallet {
 
     public async getWalletDescriptionString(): Promise<string> {
         let balances = await this.getAllBalancesString();
-        return `${this.franklinWallet.address}\n${balances.join('\n')}`;
+        return `${this.franklinWallet.address.toString('hex')}\n${balances.join('\n')}`;
     }
     // #endregion
 
     // #region actions
     async withdraw(token: Token, amount: BigNumberish, fee: BigNumberish) {
-        let offRes = await this.franklinWallet.widthdrawOffchain(token, amount, fee);
-        if (offRes.err) throw new Error(offRes.err);
-        let receipt = await this.franklinWallet.waitTxReceipt(offRes.hash);
-        if (receipt.fail_reason) {
-            throw new Error(receipt.fail_reason);
-        }
-        // await this.franklinWallet.widthdrawOnchain(token, amount);
+        let res = await this.franklinWallet.widthdrawOffchain(token, amount, fee);
         
-        // async widthdrawOnchain(token: Token, amount: BigNumberish) {
-        //     const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
-        //     if (token.id == 0) {
-        //         const tx = await franklinDeployedContract.withdrawETH(amount, {gasLimit: 200000});
-        //         await tx.wait(2);
-        //         return tx.hash;
-        //     } else {
-        //         const tx = await franklinDeployedContract.withdrawERC20(token.address, amount, {gasLimit: bigNumberify("150000")});
-        //         await tx.wait(2);
-        //         return tx.hash;
-        //     }
-        // }
+        if (res.err) throw new Error(res.err);
+    
+        var receipt = await this.franklinWallet.waitTxReceipt(res.hash);
 
-        // async widthdrawOffchain(token: Token, amount: BigNumberish, fee: BigNumberish) {
-        //     let nonce = await this.getNonce();
-        //     let tx = {
-        //         type: 'Withdraw',
-        //         account: this.address,
-        //         eth_address: await this.ethWallet.getAddress(),
-        //         token: token.id,
-        //         amount: bigNumberify(amount).toString(),
-        //         fee: bigNumberify(fee).toString(),
-        //         nonce: nonce,
-        //     };
+        if (receipt.fail_reason) throw new Error(receipt.fail_reason);
 
-        //     let res = await this.provider.submitTx(tx);
-        //     return res;
-        // }
+        while ( ! receipt.verified) {
+            receipt = await this.franklinWallet.waitTxReceipt(res.hash)
+            await sleep(1000);
+        }
+
+        var tx_hash = await this.franklinWallet.widthdrawOnchain(token, amount);
+
+        let status = await this.getOnchainTxStatus(tx_hash);
+
+        if (status.success == false) throw new Error(status.message);
     }
 
-    public static async reason(hash: string): Promise<string> {
-        const tx = await provider.getTransaction(hash);
-        if (!tx) return "tx not found";
+    private async getOnchainTxStatus(tx_hash: string) {
+        let receipt = null;
+        for (let i = 1; i <= 5 && !receipt; i++) {            
+            receipt = await this.franklinWallet.ethWallet.provider.getTransactionReceipt(tx_hash);
+            
+            if (receipt) break;
+            await sleep(4000);
+        }
 
-        const receipt = await provider.getTransactionReceipt(hash);
+        if (receipt.status) {
+            return {
+                success: true,
+                message: "Tx Success",
+            };
+        }
+
+        const tx = await this.franklinWallet.ethWallet.provider.getTransaction(tx_hash);
+        const code = await this.franklinWallet.ethWallet.provider.call(tx, tx.blockNumber);
+
+        if (code == '0x') {
+            return {
+                success: false,
+                message: "Empty revert reason",
+            };
+        }
         
-        if (receipt.status) return receipt.status.toString();
-
-        const code = await provider.call(tx, tx.blockNumber);
-        const reason = hex_to_ascii(code.substr(138));
-        return reason;
-
-        function hex_to_ascii(str1) {
-            const hex  = str1.toString();
-            let str = "";
-            for (let n = 0; n < hex.length; n += 2) {
-                str += String.fromCharCode(parseInt(hex.substr(n, 2), 16));
-            }
-            return str;
-        }        
+        const reason = code
+            .substr(138)
+            .match(/../g)
+            .map(h => parseInt(h, 16))
+            .map(x => String.fromCharCode(x))
+            .join('');
+        
+        return {
+            success: false,
+            message: `Revert reason is: ${reason}`,
+        };
     }
 
     private async depositOnchain(token: Token, amount: BigNumber) {
         await this.franklinWallet.updateState();
-        let res = await this.franklinWallet.deposit(token, amount);
-        console.log('deposit onchain res');
-        console.log(res);
+        let hash = await this.franklinWallet.deposit(token, amount);
+        console.log('hash', hash);
+
+        let status = await this.getOnchainTxStatus(hash);
+        if (status.success == false) {
+            throw new Error(status.message);
+        }
+
         await this.franklinWallet.updateState();
     }
 

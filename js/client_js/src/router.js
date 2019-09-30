@@ -9,8 +9,8 @@ Vue.use(Router);
 
 const router = new Router({
   routes: [
-    { path: '/login', component: Login },
-    { path: '/main', component: Main },
+    { path: '/login', component: Login, meta: {title: 'Matter Wallet'} },
+    { path: '/main',  component: Main,  meta: {title: 'Matter Wallet'} },
     { path: '*', redirect: '/login' },
   ],
   mode:   'history',
@@ -27,6 +27,7 @@ router.beforeEach((to, from, next) => {
             next('/main');
         }
     }
+    document.title = to.meta.title;
     next();
 });
 

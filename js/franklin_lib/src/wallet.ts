@@ -90,7 +90,7 @@ export class FranklinProvider {
             .catch(error => console.log(error.response));
     }
 
-    async waitTxReceipt(tx_hash) {
+    async getTxReceipt(tx_hash) {
         return await Axios.get(this.providerAddress + '/api/v0.1/transactions/' + tx_hash)
             .then(reps => reps.data)
             .catch(error => console.log(error.response));
@@ -245,7 +245,7 @@ export class Wallet {
 
     async waitTxReceipt(tx_hash) {
         while (true) {
-            let receipt = await this.provider.waitTxReceipt(tx_hash);
+            let receipt = await this.provider.getTxReceipt(tx_hash);
             if (receipt != null) {
                 return receipt
             }

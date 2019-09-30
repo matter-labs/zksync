@@ -5,9 +5,6 @@ import BootstrapVue from 'bootstrap-vue';
 import "bootstrap/dist/css/bootstrap.min.css"
 import "bootstrap-vue/dist/bootstrap-vue.css"
 
-import {ethers} from 'ethers';
-import Eth from 'ethjs'
-
 import config from "./env-config.js"
 
 Vue.config.productionTip = false;
@@ -45,9 +42,9 @@ Vue.mixin({
             return window.location.hostname.split('.')[0];
         },
         correctNetwork() {
-            return (this.network === '9' && window.location.hostname.startsWith('localhost')) ||
-                (this.network === '1' && window.location.hostname.startsWith('mainnet')) ||
-                (this.network === '4' && window.location.hostname.startsWith('rinkeby'));
+            return (this.network === '9' && window.location.hostname.includes('localhost')) ||
+                (this.network === '1' && window.location.hostname.includes('mainnet')) ||
+                (this.network === '4' && window.location.hostname.includes('rinkeby'));
         },
         baseUrl() {
             return this.apiServer + '/api/v0.1'
@@ -59,8 +56,6 @@ new Vue({
 	router,
 	render: h => h(App),
 	async created() {
-		window.ethereum.enable();
-		window.eth = new Eth(window.web3.currentProvider);
-		window.ethersProvider = new ethers.providers.Web3Provider(window.web3.currentProvider);
+        ethereum.autoRefreshOnNetworkChange = false;
 	}
 }).$mount("#app");

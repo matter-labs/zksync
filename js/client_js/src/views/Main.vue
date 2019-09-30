@@ -80,7 +80,7 @@ export default {
     },
     methods: {
         displayAlert(kwargs) {
-            this.$refs.alert.display(kwargs)
+            this.$refs.alert.display(kwargs);
         },
         async updateAccountInfo() {
             await window.walletDecorator.updateState();
@@ -96,7 +96,7 @@ export default {
             };
 
             this.historyInfo = {
-                transactions: window.walletDecorator.transactionsAsNeeded()
+                transactions: await window.walletDecorator.transactionsAsNeeded(),
             };
 
             await sleep(3000);
