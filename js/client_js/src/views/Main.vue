@@ -31,7 +31,12 @@
                 </b-col>
                 <Alert class="w-100 m-0" style="position: absolute; top: -1.3em;" ref="alert"></Alert>
             </b-row>
-            <b-row class="px-0 mt-4">
+            <div style="min-height: 1.5em;">
+                <b-row class="px-3 py-0 my-0" v-for="shower in store.pendingTransactionGenerators" :key="shower.id" :id="shower.id">
+                    <AlertWithProgressBar :shower="shower"></AlertWithProgressBar>
+                </b-row>
+            </div>
+            <b-row class="px-0 mt-0">
                 <Wallet 
                     v-if="componentToBeShown=='Wallet'" 
                     v-on:alert="displayAlert"
@@ -52,13 +57,15 @@ import ClipboardJS from 'clipboard'
 import Wallet from '../components/Wallet.vue'
 import History from '../components/History.vue'
 import Alert from '../components/Alert.vue'
+import AlertWithProgressBar from '../components/AlertWithProgressBar.vue'
 
-const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
+import { sleep } from '../utils.js'
 
 const components = {
     History,
     Alert,
-    Wallet
+    Wallet,
+    AlertWithProgressBar,
 }
 
 export default {

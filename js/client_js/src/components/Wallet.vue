@@ -1,8 +1,5 @@
 <template>
 <b-container>
-    <b-row class="w-100 px-0 mx-0">
-        <ProgressBar ref="progress_bar"></ProgressBar>
-    </b-row>
     <b-row>
         <b-col xl="6" class="pr-3">
             <BalancesList class="mb-1" balanceListId="onchain" :balances="onchainBalances"></BalancesList>
@@ -32,6 +29,8 @@
 </template>
 
 <script>
+import { GeneratorMultiplier } from '../GeneratorMultiplier.js';
+
 import Alert from './Alert.vue'
 import BalancesList from './BalancesList.vue'
 import FranklinBalancesList from './FranklinBalancesList.vue'
@@ -48,7 +47,7 @@ const components = {
     ProgressBar,
 };
 
-const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
+import { sleep } from '../utils.js'
 
 export default {
     name: 'wallet',
@@ -59,6 +58,7 @@ export default {
         contractBalances: [],
         franklinBalances: [],
         franklinBalancesWithInfo: [],
+        verboseShowerId: 0,
     }),
     watch: {
         info: function() {
@@ -72,24 +72,30 @@ export default {
             this.$emit('alert', kwargs);
         },
         async deposit(kwargs) {
-            await this.verboseFunctionShower(window.walletDecorator.verboseDeposit(kwargs));
+            await this.verboseShower(window.walletDecorator.verboseDeposit(kwargs));
         },
         async withdraw(kwargs) {
-            await this.verboseFunctionShower(window.walletDecorator.verboseWithdraw(kwargs));
+            await this.verboseShower(window.walletDecorator.verboseWithdraw(kwargs));
         },
         async transfer(kwargs) {
-            await this.verboseFunctionShower(window.walletDecorator.verboseTransfer(kwargs));
+            await this.verboseShower(window.walletDecorator.verboseTransfer(kwargs));
+        },
+        async verboseShower(generator) {
+            this.store.pendingTransactionGenerators.push({
+                id: `verbose_shower_${this.verboseShowerId++}`,
+                generator: new GeneratorMultiplier(generator),
+            });
         },
         async verboseFunctionShower(generator) {
             for await (const progress of generator) {
                 if (progress.message.includes(`waiting for creating new block`)) {
-                    this.$refs.progress_bar.startProgressBarHalfLife(10000);
+                    this.$refs.progress_bar && this.$refs.progress_bar.startProgressBarHalfLife(10000);
                 }
                 if (progress.message.includes(`started proving block`)) {
-                    this.$refs.progress_bar.startProgressBarHalfLife(10000);
+                    this.$refs.progress_bar && this.$refs.progress_bar.startProgressBarHalfLife(10000);
                 }
                 if (progress.message.includes(`got proved!`)) {
-                    this.$refs.progress_bar.cancelAnimation();
+                    this.$refs.progress_bar && this.$refs.progress_bar.cancelAnimation();
                 }
                 this.$emit('alert', {
                     message: progress.message,

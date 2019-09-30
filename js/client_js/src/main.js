@@ -11,6 +11,10 @@ Vue.config.productionTip = false;
 
 Vue.use(BootstrapVue);
 
+const store = {
+    pendingTransactionGenerators: [],
+};
+
 Vue.mixin({
 	data: () => {
 		return {
@@ -19,6 +23,9 @@ Vue.mixin({
 		}
 	},
 	computed: {
+        store() {
+            return store;
+        },
         ethereumAddress() {
             return window.walletDecorator.ethAddress;
         },
@@ -45,6 +52,8 @@ Vue.mixin({
             return (this.network === '9' && window.location.hostname.includes('localhost')) ||
                 (this.network === '1' && window.location.hostname.includes('mainnet')) ||
                 (this.network === '4' && window.location.hostname.includes('rinkeby'));
+            if (correct == false)
+            return correct;
         },
         baseUrl() {
             return this.apiServer + '/api/v0.1'

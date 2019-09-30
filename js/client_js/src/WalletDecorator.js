@@ -1,8 +1,6 @@
 import { BigNumberish, BigNumber, bigNumberify } from 'ethers/utils';
 import { FranklinProvider, Wallet, Address } from 'franklin_lib';
-import { readableEther } from './utils';
-
-const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
+import { readableEther, sleep } from './utils';
 
 function info(msg) {
     return {
@@ -245,6 +243,8 @@ export class WalletDecorator {
         }
 
         yield info (`Transfer <code>${res.hash}</code> got proved!`);
+        await sleep(5000);
+        return;
     }
 
     async * verboseWithdraw(kwargs) {

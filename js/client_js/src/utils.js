@@ -1,6 +1,8 @@
 // import { formatUnits } from 'ethers/utils';
 import { ethers } from 'ethers'
 
+export const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
+
 export function readableEther(wei) {
     return ethers.utils.formatUnits(wei, 18).match(/\d+\.\d{1,3}/)[0];
 }
