@@ -30,7 +30,7 @@ fn main() {
         restart_state_load(args);
     } else {
         info!("Continue loading state");
-        // continue_state_load(args);
+        continue_state_load(args);
     }
 }
 
@@ -67,45 +67,22 @@ fn restart_state_load(args: Vec<String>) {
     run_state_update(&mut data_restore_driver);
 }
 
-// /// Loads states from storage and start update
-// ///
-// /// # Arguments
-// ///
-// /// * `args` - Func Arguments
-// ///
-// fn continue_state_load(args: Vec<String>) {
-//     let connection_pool = ConnectionPool::new();
+/// Loads states from storage and start update
+///
+/// # Arguments
+///
+/// * `args` - Func Arguments
+///
+fn continue_state_load(args: Vec<String>) {
+    let connection_pool = ConnectionPool::new();
 
-//     let mut data_restore_driver =
-//         create_data_restore_driver(connection_pool.clone());
-//     info!("Driver created");
+    let mut data_restore_driver =
+        create_data_restore_driver(connection_pool.clone());
+    info!("Driver created");
 
-//     load_state_from_storage(&mut data_restore_driver, connection_pool.clone());
-//     run_state_update(&mut data_restore_driver);
-// }
-
-// /// Loads past states from storage
-// ///
-// /// # Arguments
-// ///
-// /// * `driver` - DataRestore Driver config
-// /// * `connection_pool` - Database connection pool
-// ///
-// fn load_state_from_storage(
-//     driver: &mut DataRestoreDriver,
-//     connection_pool: ConnectionPool,
-// ) {
-//     // info!("Loading stored state");
-//     // // Get events
-//     // driver.events_state = get_events_state_from_storage(connection_pool.clone());
-//     // // Get operations blocks
-//     // let mut blocks = get_op_blocks_from_storage(connection_pool.clone());
-//     // // Build accounts state from operations blocks
-//     // driver
-//     //     .update_accounts_state_from_op_blocks(blocks.as_slice())
-//     //     .expect("Cant update accounts state from op blocks in load_state_from_storage");
-//     // info!("Stored state loaded");
-// }
+    data_restore_driver.load_state_from_storage();
+    run_state_update(&mut data_restore_driver);
+}
 
 /// Runs states updates
 ///

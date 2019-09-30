@@ -106,7 +106,7 @@ pub fn save_last_watched_block_number(number: &u64, connection_pool: ConnectionP
 /// * `blocks` - Franklin operation blocks
 /// * `connection_pool` - Database Connection Pool
 ///
-pub fn save_franklin_ops_block(blocks: &Vec<FranklinOpsBlock>, connection_pool: ConnectionPool) -> Result<(), DataRestoreError> {
+pub fn save_franklin_ops_blocks(blocks: &Vec<FranklinOpsBlock>, connection_pool: ConnectionPool) -> Result<(), DataRestoreError> {
     let storage = connection_pool
         .access_storage()
         .map_err(|_| DataRestoreError::Storage("db connection failed for data restore save transactions".to_string()))?;

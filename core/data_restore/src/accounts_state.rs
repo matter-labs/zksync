@@ -6,6 +6,11 @@ use ff::{Field, PrimeField, PrimeFieldRepr};
 use plasma::state::{OpSuccess, PlasmaState};
 
 use crate::franklin_ops::FranklinOpsBlock;
+use crate::helpers::{
+    DATA_RESTORE_CONFIG,
+    DataRestoreError,
+    get_topic_keccak_hash
+};
 
 use models::node::operations::{
     TX_TYPE_BYTES_LEGTH, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
@@ -14,7 +19,6 @@ use models::node::priority_ops::{Deposit, FranklinPriorityOp, FullExit};
 use models::node::tx::{Close, FranklinTx, Transfer, Withdraw};
 use models::node::{AccountMap, Fr, AccountId, AccountUpdates};
 use models::node::account::{Account, AccountAddress, AccountUpdate};
-use crate::helpers::DataRestoreError;
 
 /// Franklin Accounts states with data restore configuration
 pub struct FranklinAccountsState {
@@ -24,19 +28,18 @@ pub struct FranklinAccountsState {
 }
 
 impl FranklinAccountsState {
-    /// Creates empty Franklin Accounts states
-    pub fn new(fee_account_address: AccountAddress) -> Self {
+    pub fn new() -> Self {
         Self {
             state: PlasmaState::empty(),
-            fee_account_address
+            fee_account_address: DATA_RESTORE_CONFIG.fee_account_address.clone(),
         }
     }
 
     /// Creates empty Franklin Accounts states
-    pub fn load(accounts: AccountMap, current_block: u32, fee_account_address: AccountAddress) -> Self {
+    pub fn load(accounts: AccountMap, current_block: u32) -> Self {
         Self {
             state: PlasmaState::new(accounts, current_block + 1),
-            fee_account_address
+            fee_account_address: DATA_RESTORE_CONFIG.fee_account_address.clone(),
         }
     }
 

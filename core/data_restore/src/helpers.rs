@@ -7,6 +7,7 @@ use franklin_crypto::circuit::float_point::parse_float_to_u128;
 use models::abi::FRANKLIN_CONTRACT;
 use tiny_keccak::keccak256;
 use web3::types::{Address, H256};
+use models::node::AccountAddress;
 
 use lazy_static::lazy_static;
 use std::env;
@@ -24,6 +25,8 @@ pub struct DataRestoreConfig {
     pub franklin_contract: Contract,
     /// Ethereum Franklin contract address is type of H160
     pub franklin_contract_address: Address,
+    /// Operator address (fee)
+    pub fee_account_address: AccountAddress
 }
 
 impl DataRestoreConfig {
@@ -42,6 +45,11 @@ impl DataRestoreConfig {
                 .as_str()
                 .parse()
                 .expect("Cant create data restore config"), //"4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()
+            fee_account_address: std::env::var("OPERATOR_FRANKLIN_ADDRESS")
+                .map(|addr| {
+                    AccountAddress::from_hex(&addr).expect("Incorrect franklin account address")
+                })
+                .expect("OPERATOR_FRANKLIN_ADDRESS must be set"), // AccountAddress::from_hex("4fbf331db438c88a83b1316d072b7d73d8366367".to_string()).expect("Incorrect franklin account address")
         }
     }
 }

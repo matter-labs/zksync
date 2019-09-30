@@ -64,7 +64,7 @@ impl EventsState {
         &mut self,
         eth_blocks_delta: u64,
         end_eth_blocks_delta: u64
-    ) -> Result<(), DataRestoreError> {
+    ) -> Result<Vec<EventData>, DataRestoreError> {
         self.remove_verified_events();
 
         let (events, to_block_number): (CommittedAndVerifiedEvents, u64) = EventsState::update_events_and_last_watched_block(
@@ -77,7 +77,10 @@ impl EventsState {
         self.verified_events.extend(events.1);
         self.last_watched_eth_block_number = to_block_number;
 
-        Ok(())
+        let mut events_to_return: Vec<EventData> = self.committed_events.clone();
+        events_to_return.extend(self.verified_events.clone());
+
+        Ok(events_to_return)
     }
 
     /// Return last watched ethereum block number
