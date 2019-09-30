@@ -8,7 +8,7 @@ use storage::{
     NewLastWatchedEthBlockNumber, StoredLastWatchedEthBlockNumber, StoredFranklinOpsBlock,
 };
 use models::node::operations::FranklinOp;
-use models::node::AccountUpdates;
+use models::node::{AccountUpdates, AccountMap};
 use web3::types::{Bytes, Transaction, H160, H256, U128, U256};
 
 /// Removes stored data
@@ -266,6 +266,14 @@ pub fn stored_block_event_into_block_event(block: StoredBlockEvent) -> Option<Ev
     })
 }
 
+pub fn get_tree_state(connection_pool: ConnectionPool) -> Result<(u32, AccountMap), DataRestoreError> {
+    let storage = connection_pool
+        .access_storage()
+        .map_err(|_| DataRestoreError::Storage("db connection failed for tree state".to_string()))?;
 
+    let tree_state = storage
+        .load_tree_state()
+        .map_err(|_| DataRestoreError::Storage("load_tree_state: db must work".to_string()))?;
 
-
+    Ok(tree_state)
+}
