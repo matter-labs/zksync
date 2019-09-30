@@ -35,9 +35,9 @@ contract Franklin {
     // Fee coefficient for priority request transaction
     uint256 constant FEE_COEFF = 2;
     // Base gas cost for deposit eth transaction
-    uint256 constant BASE_DEPOSIT_ETH_GAS = 179179;
+    uint256 constant BASE_DEPOSIT_ETH_GAS = 179000;
     // Base gas cost for deposit erc transaction
-    uint256 constant BASE_DEPOSIT_ERC_GAS = 213948;
+    uint256 constant BASE_DEPOSIT_ERC_GAS = 214000;
     // Base gas cost for full exit transaction
     uint256 constant BASE_FULL_EXIT_GAS = 170000;
     // Base gas cost for transaction
