@@ -497,8 +497,6 @@ pub struct BlockDetails {
     pub verified_at: Option<NaiveDateTime>,
 }
 
-/// MARK: - Data restore part
-
 #[derive(Insertable)]
 #[table_name = "data_restore_last_watched_eth_block"]
 pub struct NewLastWatchedEthBlockNumber {
@@ -564,8 +562,6 @@ pub struct StoredFranklinOpsBlock {
     pub block_num: BlockNumber,
     pub ops: Vec<FranklinOp>,
 }
-
-/// END Data restore part
 
 #[derive(Debug, Insertable)]
 #[table_name = "mempool"]
@@ -1611,8 +1607,6 @@ impl StorageProcessor {
         Ok(serde_json::from_value(stored.proof).unwrap())
     }
 
-    /// MARK: - Data restore part
-
     pub fn save_events_state(&self, events: &[NewBlockEvent]) -> QueryResult<()> {
         for event in events.iter() {
             diesel::insert_into(events_state::table)
@@ -1708,7 +1702,10 @@ impl StorageProcessor {
         Ok(ops_blocks)
     }
 
-    /// END Data restore part
+    pub fn update_state(&self, block_number: BlockNumber, updates: &AccountUpdates) -> QueryResult<()> {
+        self.commit_state_update(block_number, &updates)?;
+        self.apply_state_update(block_number)?;
+    }
 
     pub fn store_token(&self, id: TokenId, address: &str, symbol: Option<&str>) -> QueryResult<()> {
         let new_token = Token {
