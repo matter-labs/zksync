@@ -106,7 +106,7 @@ export default {
                 transactions: await window.walletDecorator.transactionsAsNeeded(),
             };
 
-            await sleep(3000);
+            await sleep(5000);
             this.updateAccountInfo();
         }
     },

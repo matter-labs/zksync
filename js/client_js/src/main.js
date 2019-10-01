@@ -19,7 +19,7 @@ const store = {
 Vue.mixin({
 	data: () => {
 		return {
-			isDev: true, // TODO
+			isDev: process.env.NODE_ENV !== 'production',
 			config,
 		}
 	},
