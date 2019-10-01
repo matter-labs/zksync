@@ -539,6 +539,7 @@ contract Franklin {
             currentPointer += len;
             processedOnchainOps += ops;
             priorityCount += priority;
+            currentOnchainOp++;
         }
         require(
             currentPointer == _publicData.length,
