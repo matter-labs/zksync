@@ -245,8 +245,8 @@ describe("PLANNED FAILS", function() {
         console.log("\n - test Exodus Mode started");
         // Deposit eth
         const depositValue = parseEther("0.3"); // the value passed to tx
-        const depositAmount = parseEther("0.296774778"); // amount after: tx value - some counted fee
-        const depositFee = parseEther("0.003225222"); // tx fee
+        const depositAmount = parseEther("0.296778"); // amount after: tx value - some counted fee
+        const depositFee = parseEther("0.003222"); // tx fee
         const depositTx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: depositValue});
         const depositReceipt = await depositTx.wait();
         const depositEvent = depositReceipt.events[1].args;
@@ -284,7 +284,7 @@ describe("PLANNED FAILS", function() {
         
         expect((await franklinDeployedContract.blocks(1)).onchainOperations).equal(1);
         expect((await franklinDeployedContract.blocks(1)).priorityOperations).equal(1);
-        expect((await franklinDeployedContract.blocks(1)).commitment).equal("0xde6e2f8c28c5fe9c7e5fd0fcd73ce869338c114f50a91df5238ed9da15b56645");
+        expect((await franklinDeployedContract.blocks(1)).commitment).equal("0xc456a531f6b89e6c0bf3a381b03961725895447203ec77cb0a2afd95e78217dd");
         expect((await franklinDeployedContract.blocks(1)).stateRoot).equal("0x0000000000000000000000000000000000000000000000000000000000000000");
         expect((await franklinDeployedContract.blocks(1)).validator).equal("0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE");
             
@@ -313,8 +313,8 @@ describe("PLANNED FAILS", function() {
 
         // Deposit eth for exodus
         const depositExodusValue = parseEther("10");
-        const depositExodusAmount = parseEther("9.996774778"); // amount after: tx value - some counted fee
-        const depositExodusFee = parseEther("0.003225222"); // tx fee
+        const depositExodusAmount = parseEther("9.996778"); // amount after: tx value - some counted fee
+        const depositExodusFee = parseEther("0.003222"); // tx fee
         const depositExodusTx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: depositExodusValue});
         const depositExodusReceipt = await depositExodusTx.wait();
         const depositExodusEvent = depositExodusReceipt.events[1].args;
@@ -516,8 +516,8 @@ describe("PLANNED FAILS", function() {
         // Wrong priority operation - different data
         console.log("\n - Wrong priority operation - different data started");
         const depositValue = parseEther("0.3"); // the value passed to tx
-        const depositCorrectAmount = parseEther("0.296774778"); // amount after: tx value - some counted fee
-        const depositFee = parseEther("0.003225222"); // tx fee
+        const depositCorrectAmount = parseEther("0.296778"); // amount after: tx value - some counted fee
+        const depositFee = parseEther("0.003222"); // tx fee
         const depositTx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: depositValue});
         const depositReceipt = await depositTx.wait();
         const depositEvent = depositReceipt.events[1].args;

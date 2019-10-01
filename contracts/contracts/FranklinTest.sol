@@ -2,7 +2,7 @@ pragma solidity ^0.5.8;
 
 import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
-import "./Governance.sol";
+import "./GovernanceTest.sol";
 import "./VerifierTest.sol";
 import "./PriorityQueueTest.sol";
 import "./Bytes.sol";
@@ -11,10 +11,10 @@ import "./Bytes.sol";
 // - check overflows
 
 contract FranklinTest {
-    // Verifier contract
+    // VerifierTest contract
     VerifierTest internal verifier;
-    // Governance contract
-    Governance internal governance;
+    // GovernanceTest contract
+    GovernanceTest internal governance;
     // Priority Queue contract
     PriorityQueueTest internal priorityQueue;
 
@@ -26,7 +26,7 @@ contract FranklinTest {
     uint8 constant ACC_NUM_BYTES = 3; // franklin account id
     uint8 constant NONCE_BYTES = 4; // franklin nonce
 
-    // Franklin chain address length
+    // FranklinTest chain address length
     uint8 constant PUBKEY_HASH_LEN = 20;
     // Signature (for example full exit signature) length
     uint8 constant SIGNATURE_LEN = 64;
@@ -35,17 +35,19 @@ contract FranklinTest {
     // Fee coefficient for priority request transaction
     uint256 constant FEE_COEFF = 2;
     // Base gas cost for deposit eth transaction
-    uint256 constant BASE_DEPOSIT_ETH_GAS = 179179;
+    uint256 constant BASE_DEPOSIT_ETH_GAS = 179000;
     // Base gas cost for deposit erc transaction
-    uint256 constant BASE_DEPOSIT_ERC_GAS = 213948;
+    uint256 constant BASE_DEPOSIT_ERC_GAS = 214000;
     // Base gas cost for full exit transaction
     uint256 constant BASE_FULL_EXIT_GAS = 170000;
+    // Base gas cost for transaction
+    uint256 constant BASE_GAS = 210;
     // Max amount of any token must fit into uint128
     uint256 constant MAX_VALUE = 2 ** 112 - 1;
     // ETH blocks verification expectation
-    uint256 constant EXPECT_VERIFICATION_IN = 8;
+    uint256 constant EXPECT_VERIFICATION_IN = 8 * 1 * 1;
     // Max number of unverified blocks. To make sure that all reverted blocks can be copied under block gas limit!
-    uint256 constant MAX_UNVERIFIED_BLOCKS = 4;
+    uint256 constant MAX_UNVERIFIED_BLOCKS = 4 * 1 * 1;
 
     // Operations lengths
     uint256 constant NOOP_LENGTH = 1 * 8; // noop
@@ -76,31 +78,20 @@ contract FranklinTest {
         uint16 tokenId,
         uint128 amount
     );
-    
+
     // Event emitted when user send a transaction to deposit her funds
     // Structure:
     // - owner - sender
     // - tokenId - deposited token
     // - amount - deposited value
     // - fee - fee
-    // - franlkinAddress - address of Franklin account whtere deposit will be sent
+    // - franlkinAddress - address of FranklinTest account whtere deposit will be sent
     event OnchainDeposit(
         address indexed owner,
         uint16 tokenId,
         uint128 amount,
         uint256 fee,
         bytes franklinAddress
-    );
-
-    // Full Exit event
-    // Structure:
-    // - pubData - full exit pubdata
-    // - fee - fee
-    // - nonce - nonce
-    event FullExit(
-        bytes pubData,
-        uint256 fee,
-        uint32 nonce
     );
 
     // Event emitted when blocks are reverted
@@ -144,7 +135,7 @@ contract FranklinTest {
         bytes32 stateRoot;
     }
 
-    // Blocks by Franklin block id
+    // Blocks by FranklinTest block id
     mapping(uint32 => Block) public blocks;
 
     // Types of franklin operations in blocks
@@ -205,7 +196,7 @@ contract FranklinTest {
         bytes32 _genesisRoot
     ) public {
         verifier = VerifierTest(_verifierAddress);
-        governance = Governance(_governanceAddress);
+        governance = GovernanceTest(_governanceAddress);
         priorityQueue = PriorityQueueTest(_priorityQueueAddress);
 
         blocks[0].stateRoot = _genesisRoot;
@@ -273,7 +264,7 @@ contract FranklinTest {
 
     // Deposit ETH
     // Params:
-    // - _franklinAddr - the receiver Franklin address
+    // - _franklinAddr - the receiver FranklinTest address
     function depositETH(bytes calldata _franklinAddr) external payable {
         // Fee is:
         //   fee coeff * base tx gas cost * gas price
@@ -290,7 +281,7 @@ contract FranklinTest {
         require(
             amount <= MAX_VALUE,
             "fdh12"
-        ); // fdh12 - deposit amount value is heigher than Franklin is able to process
+        ); // fdh12 - deposit amount value is heigher than FranklinTest is able to process
 
         registerDeposit(0, uint128(amount), fee, _franklinAddr);
     }
@@ -404,12 +395,6 @@ contract FranklinTest {
         if (msg.value != fee) {
             msg.sender.transfer(msg.value-fee);
         }
-
-        emit FullExit(
-            pubData,
-            fee,
-            _nonce
-        );
     }
 
     // Register deposit request
@@ -843,7 +828,7 @@ contract FranklinTest {
         }
     }
 
-    // Withdraws token from Franklin to root chain
+    // Withdraws token from FranklinTest to root chain
     // Params:
     // - _tokenId - verified token id
     // - _owners - all owners
