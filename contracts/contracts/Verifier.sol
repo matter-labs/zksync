@@ -53,6 +53,7 @@ contract Verifier is VerificationKey {
         uint256[8] memory in_proof,
         uint256[] memory proof_inputs
     ) internal view returns (bool) {
+        // Start
         require(
             ((vk_gammaABC.length / 2) - 1) == proof_inputs.length,
             "vvy11"
