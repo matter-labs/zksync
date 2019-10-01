@@ -23,7 +23,7 @@ fn main() {
     if args[1].clone() == format!("restart") {
         info!("Restart loading state");
         restart_state_load();
-    } else {
+    } else if args[1].clone() == format!("continue") {
         info!("Continue loading state");
         continue_state_load();
     }
