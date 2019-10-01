@@ -1,33 +1,16 @@
 use super::{Nonce, TokenId};
 
-use crate::node::{is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount, unpack_token_amount, unpack_fee_amount};
+use super::operations::{
+    ACCOUNT_ID_BYTES_LEGTH, CLOSE_OP_LENGTH, ETH_ADDR_BYTES_LEGTH, FEE_BYTES_LEGTH,
+    FULL_AMOUNT_BYTES_LEGTH, PACKED_AMOUNT_BYTES_LEGTH, TOKEN_BYTES_LENGTH, TRANSFER_OP_LENGTH,
+    TRANSFER_TO_NEW_OP_LENGTH, WITHDRAW_OP_LENGTH,
+};
+use crate::node::{
+    is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount,
+    unpack_fee_amount, unpack_token_amount,
+};
 use crate::params::FR_ADDRESS_LEN;
 use crate::primitives::bytes_slice_to_uint16;
-use super::operations::{
-    DEPOSIT_OP_LENGTH,
-    TRANSFER_TO_NEW_OP_LENGTH,
-    WITHDRAW_OP_LENGTH,
-    CLOSE_OP_LENGTH,
-    TRANSFER_OP_LENGTH,
-    FULL_EXIT_OP_LENGTH,
-    DEPOSIT_OP_CODE,
-    TRANSFER_TO_NEW_OP_CODE,
-    WITHDRAW_OP_CODE,
-    CLOSE_OP_CODE,
-    TRANSFER_OP_CODE,
-    FULL_EXIT_OP_CODE,
-    TX_TYPE_BYTES_LEGTH,
-    ACCOUNT_ID_BYTES_LEGTH,
-    TOKEN_BYTES_LENGTH,
-    FULL_AMOUNT_BYTES_LEGTH,
-    FEE_BYTES_LEGTH,
-    ETH_ADDR_BYTES_LEGTH,
-    PACKED_AMOUNT_BYTES_LEGTH,
-    NONCE_BYTES_LEGTH,
-    SIGNATURE_R_BYTES_LEGTH,
-    SIGNATURE_S_BYTES_LEGTH,
-    PUBKEY_PACKED_BYTES_LEGTH,
-};
 use bigdecimal::BigDecimal;
 use crypto::{digest::Digest, sha2::Sha256};
 
@@ -69,41 +52,48 @@ impl Transfer {
     const TX_TYPE: u8 = 5;
 
     pub fn from_transfer_to_new_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != TRANSFER_TO_NEW_OP_LENGTH { return None }
+        if bytes.len() != TRANSFER_TO_NEW_OP_LENGTH {
+            return None;
+        }
         let token_id_pre_length = ACCOUNT_ID_BYTES_LEGTH;
-        let amount_pre_length = token_id_pre_length +
-            TOKEN_BYTES_LENGTH;
-        let to_pre_length = amount_pre_length +
-            PACKED_AMOUNT_BYTES_LEGTH;
-        let fee_pre_length = to_pre_length +
-            ACCOUNT_ID_BYTES_LEGTH;
+        let amount_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH;
+        let to_pre_length = amount_pre_length + PACKED_AMOUNT_BYTES_LEGTH;
+        let fee_pre_length = to_pre_length + ACCOUNT_ID_BYTES_LEGTH;
         Some(Self {
             from: AccountAddress::zero(), // From pubdata its unknown
-            to: AccountAddress::from_bytes(&bytes[to_pre_length .. to_pre_length + FR_ADDRESS_LEN]).ok()?,
-            token: bytes_slice_to_uint16(&bytes[token_id_pre_length .. token_id_pre_length + TOKEN_BYTES_LENGTH])?,
-            amount: unpack_token_amount(&bytes[amount_pre_length .. amount_pre_length + PACKED_AMOUNT_BYTES_LEGTH])?,
-            fee: unpack_fee_amount(&bytes[fee_pre_length .. fee_pre_length + FEE_BYTES_LEGTH])?,
-            nonce: 0, // From pubdata its unknown
-            signature: TxSignature::default()// From pubdata its unknown
+            to: AccountAddress::from_bytes(&bytes[to_pre_length..to_pre_length + FR_ADDRESS_LEN])
+                .ok()?,
+            token: bytes_slice_to_uint16(
+                &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BYTES_LENGTH],
+            )?,
+            amount: unpack_token_amount(
+                &bytes[amount_pre_length..amount_pre_length + PACKED_AMOUNT_BYTES_LEGTH],
+            )?,
+            fee: unpack_fee_amount(&bytes[fee_pre_length..fee_pre_length + FEE_BYTES_LEGTH])?,
+            nonce: 0,                          // From pubdata its unknown
+            signature: TxSignature::default(), // From pubdata its unknown
         })
     }
 
     pub fn from_transfer_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != TRANSFER_OP_LENGTH { return None }
+        if bytes.len() != TRANSFER_OP_LENGTH {
+            return None;
+        }
         let token_id_pre_length = ACCOUNT_ID_BYTES_LEGTH;
-        let amount_pre_length = token_id_pre_length +
-            TOKEN_BYTES_LENGTH +
-            ACCOUNT_ID_BYTES_LEGTH;
-        let fee_pre_length = amount_pre_length +
-            PACKED_AMOUNT_BYTES_LEGTH;
+        let amount_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH + ACCOUNT_ID_BYTES_LEGTH;
+        let fee_pre_length = amount_pre_length + PACKED_AMOUNT_BYTES_LEGTH;
         Some(Self {
             from: AccountAddress::zero(), // From pubdata its unknown
-            to: AccountAddress::zero(), // From pubdata its unknown
-            token: bytes_slice_to_uint16(&bytes[token_id_pre_length .. token_id_pre_length + TOKEN_BYTES_LENGTH])?,
-            amount: unpack_token_amount(&bytes[amount_pre_length .. amount_pre_length + PACKED_AMOUNT_BYTES_LEGTH])?,
-            fee: unpack_fee_amount(&bytes[fee_pre_length .. fee_pre_length + FEE_BYTES_LEGTH])?,
-            nonce: 0, // From pubdata its unknown
-            signature: TxSignature::default() // From pubdata its unknown
+            to: AccountAddress::zero(),   // From pubdata its unknown
+            token: bytes_slice_to_uint16(
+                &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BYTES_LENGTH],
+            )?,
+            amount: unpack_token_amount(
+                &bytes[amount_pre_length..amount_pre_length + PACKED_AMOUNT_BYTES_LEGTH],
+            )?,
+            fee: unpack_fee_amount(&bytes[fee_pre_length..fee_pre_length + FEE_BYTES_LEGTH])?,
+            nonce: 0,                          // From pubdata its unknown
+            signature: TxSignature::default(), // From pubdata its unknown
         })
     }
 
@@ -155,23 +145,29 @@ impl Withdraw {
     const TX_TYPE: u8 = 3;
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != WITHDRAW_OP_LENGTH { return None }
+        if bytes.len() != WITHDRAW_OP_LENGTH {
+            return None;
+        }
         let token_id_pre_length = ACCOUNT_ID_BYTES_LEGTH;
-        let amount_pre_length = token_id_pre_length +
-            TOKEN_BYTES_LENGTH;
-        let fee_pre_length = amount_pre_length +
-            FULL_AMOUNT_BYTES_LEGTH;
-        let eth_address_pre_length = fee_pre_length +
-            FEE_BYTES_LEGTH;
+        let amount_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH;
+        let fee_pre_length = amount_pre_length + FULL_AMOUNT_BYTES_LEGTH;
+        let eth_address_pre_length = fee_pre_length + FEE_BYTES_LEGTH;
 
         Some(Self {
             account: AccountAddress::zero(), // From pubdata its unknown
-            eth_address: Address::from_slice(&bytes[eth_address_pre_length .. eth_address_pre_length + ETH_ADDR_BYTES_LEGTH]),
-            token: bytes_slice_to_uint16(&bytes[token_id_pre_length .. token_id_pre_length + TOKEN_BYTES_LENGTH])?,
-            amount: BigDecimal::parse_bytes(&bytes[amount_pre_length .. amount_pre_length + FULL_AMOUNT_BYTES_LEGTH], 18)?,
-            fee: unpack_fee_amount(&bytes[fee_pre_length .. fee_pre_length + FEE_BYTES_LEGTH])?,
-            nonce: 0, // From pubdata its unknown
-            signature: TxSignature::default() // From pubdata its unknown
+            eth_address: Address::from_slice(
+                &bytes[eth_address_pre_length..eth_address_pre_length + ETH_ADDR_BYTES_LEGTH],
+            ),
+            token: bytes_slice_to_uint16(
+                &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BYTES_LENGTH],
+            )?,
+            amount: BigDecimal::parse_bytes(
+                &bytes[amount_pre_length..amount_pre_length + FULL_AMOUNT_BYTES_LEGTH],
+                18,
+            )?,
+            fee: unpack_fee_amount(&bytes[fee_pre_length..fee_pre_length + FEE_BYTES_LEGTH])?,
+            nonce: 0,                          // From pubdata its unknown
+            signature: TxSignature::default(), // From pubdata its unknown
         })
     }
 
@@ -223,11 +219,13 @@ impl Close {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != CLOSE_OP_LENGTH { return None }
+        if bytes.len() != CLOSE_OP_LENGTH {
+            return None;
+        }
         Some(Self {
-            account: AccountAddress::zero(), // From pubdata its unknown
-            nonce: 0, // From pubdata its unknown
-            signature: TxSignature::default() // From pubdata its unknown
+            account: AccountAddress::zero(),   // From pubdata its unknown
+            nonce: 0,                          // From pubdata its unknown
+            signature: TxSignature::default(), // From pubdata its unknown
         })
     }
 
@@ -318,7 +316,7 @@ impl TxSignature {
     pub fn default() -> Self {
         Self {
             pub_key: PackedPublicKey::deserialize_packed(&[0; 32]).unwrap(),
-            sign: PackedSignature::deserialize_packed(&[0; 64]).unwrap()
+            sign: PackedSignature::deserialize_packed(&[0; 64]).unwrap(),
         }
     }
 

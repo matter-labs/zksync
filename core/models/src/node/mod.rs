@@ -1,6 +1,6 @@
 use super::merkle_tree::{PedersenHasher, SparseMerkleTree};
 use super::params;
-use super::primitives::{pack_as_float, unpack_as_big_decimal, u128_to_bigdecimal, unpack_float};
+use super::primitives::{pack_as_float, u128_to_bigdecimal, unpack_float};
 use bigdecimal::BigDecimal;
 use pairing::bn256;
 

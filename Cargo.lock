@@ -490,11 +490,6 @@ version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "bitvec"
-version = "0.11.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
 name = "blake2-rfc_bellman_edition"
 version = "0.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -734,7 +729,6 @@ name = "data_restore"
 version = "0.1.0"
 dependencies = [
  "bigdecimal 0.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
- "bitvec 0.11.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "ethabi 8.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "ff_ce 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3523,7 +3517,6 @@ dependencies = [
 "checksum bit-vec 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a4523a10839ffae575fb08aa3423026c8cb4687eef43952afb956229d4f246f7"
 "checksum bitflags 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4efd02e230a02e18f92fc2735f44597385ed02ad8f831e7c1c1156ee5e1ab3a5"
 "checksum bitflags 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8a606a02debe2813760609f57a64a2ffd27d9fdf5b2f133eaca0b248dd92cdd2"
-"checksum bitvec 0.11.3 (registry+https://github.com/rust-lang/crates.io-index)" = "b67491e1cc6f37da6c4415cd743cb8d2e2c65388acc91ca3094a054cbf3cbd0c"
 "checksum blake2-rfc_bellman_edition 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "fdc60350286c7c3db13b98e91dbe5c8b6830a6821bc20af5b0c310ce94d74915"
 "checksum brotli-sys 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "4445dea95f4c2b41cde57cc9fee236ae4dbae88d8fcbdb4750fc1bb5d86aaecd"
 "checksum brotli2 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "0cb036c3eade309815c15ddbacec5b22c4d1f3983a774ab2eac2e3e9ea85568e"

@@ -31,7 +31,7 @@ impl std::fmt::Debug for AccountAddress {
 impl AccountAddress {
     pub fn zero() -> Self {
         AccountAddress {
-            data: [0; params::FR_ADDRESS_LEN]
+            data: [0; params::FR_ADDRESS_LEN],
         }
     }
 

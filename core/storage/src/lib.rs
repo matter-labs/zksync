@@ -1652,10 +1652,7 @@ impl StorageProcessor {
         Ok(events)
     }
 
-    pub fn save_storage_state(
-        &self,
-        state: &NewStorageState,
-    ) -> QueryResult<()> {
+    pub fn save_storage_state(&self, state: &NewStorageState) -> QueryResult<()> {
         diesel::insert_into(storage_state_update::table)
             .values(state)
             .execute(self.conn())?;
@@ -1693,7 +1690,7 @@ impl StorageProcessor {
     pub fn save_franklin_ops_block(
         &self,
         ops: &[FranklinOp],
-        block_num: BlockNumber
+        block_num: BlockNumber,
     ) -> QueryResult<()> {
         for op in ops.iter() {
             let stored_op = NewFranklinOp::prepare_stored_op(&op, block_num);
@@ -1729,14 +1726,18 @@ impl StorageProcessor {
                     .collect();
                 StoredFranklinOpsBlock {
                     block_num: block_num as u32,
-                    ops: ops
+                    ops: ops,
                 }
             })
             .collect();
         Ok(ops_blocks)
     }
 
-    pub fn update_tree_state(&self, block_number: BlockNumber, updates: &AccountUpdates) -> QueryResult<()> {
+    pub fn update_tree_state(
+        &self,
+        block_number: BlockNumber,
+        updates: &AccountUpdates,
+    ) -> QueryResult<()> {
         self.commit_state_update(block_number, &updates)?;
         self.apply_state_update(block_number)?;
         Ok(())

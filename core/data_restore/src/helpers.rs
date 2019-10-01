@@ -1,13 +1,10 @@
-use bigdecimal::BigDecimal;
-use bitvec::prelude::*;
 use ethabi::Contract;
+use models::abi::FRANKLIN_CONTRACT;
+use models::node::AccountAddress;
 use serde_json;
 use std::str::FromStr;
-use franklin_crypto::circuit::float_point::parse_float_to_u128;
-use models::abi::FRANKLIN_CONTRACT;
 use tiny_keccak::keccak256;
 use web3::types::{Address, H256};
-use models::node::AccountAddress;
 
 use lazy_static::lazy_static;
 use std::env;
@@ -26,7 +23,7 @@ pub struct DataRestoreConfig {
     /// Ethereum Franklin contract address is type of H160
     pub franklin_contract_address: Address,
     /// Operator address (fee)
-    pub fee_account_address: AccountAddress
+    pub fee_account_address: AccountAddress,
 }
 
 impl DataRestoreConfig {
@@ -41,7 +38,8 @@ impl DataRestoreConfig {
             web3_endpoint: env::var("WEB3_URL").expect("WEB3_URL env missing"), //"https://rinkeby.infura.io/".to_string(),
             franklin_contract: ethabi::Contract::load(abi_string.as_bytes())
                 .expect("Cant get plasma contract in data restore config"),
-            franklin_contract_address: env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR env missing")
+            franklin_contract_address: env::var("CONTRACT_ADDR")
+                .expect("CONTRACT_ADDR env missing")
                 .as_str()
                 .parse()
                 .expect("Cant create data restore config"), //"4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()

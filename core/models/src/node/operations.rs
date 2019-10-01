@@ -1,9 +1,9 @@
-use crate::params::FR_ADDRESS_LEN;
 use super::AccountId;
 use super::FranklinTx;
 use super::{pack_fee_amount, pack_token_amount, Deposit, FullExit};
 use super::{Close, Transfer, Withdraw};
 use crate::node::FranklinPriorityOp;
+use crate::params::FR_ADDRESS_LEN;
 use crate::primitives::{big_decimal_to_u128, bytes_slice_to_uint32};
 use bigdecimal::BigDecimal;
 
@@ -33,7 +33,6 @@ pub const SIGNATURE_R_BYTES_LEGTH: usize = 32;
 pub const SIGNATURE_S_BYTES_LEGTH: usize = 32;
 pub const PUBKEY_PACKED_BYTES_LEGTH: usize = 32;
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositOp {
     pub priority_op: Deposit,
@@ -56,11 +55,15 @@ impl DepositOp {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != DEPOSIT_OP_LENGTH { return None }
+        if bytes.len() != DEPOSIT_OP_LENGTH {
+            return None;
+        }
         let pre_length = 0;
         Some(Self {
             priority_op: Deposit::from_bytes(bytes)?,
-            account_id: bytes_slice_to_uint32(&bytes[pre_length .. pre_length + ACCOUNT_ID_BYTES_LEGTH])?
+            account_id: bytes_slice_to_uint32(
+                &bytes[pre_length..pre_length + ACCOUNT_ID_BYTES_LEGTH],
+            )?,
         })
     }
 }
@@ -90,16 +93,22 @@ impl TransferToNewOp {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != TRANSFER_TO_NEW_OP_LENGTH { return None }
+        if bytes.len() != TRANSFER_TO_NEW_OP_LENGTH {
+            return None;
+        }
         let from_pre_length = 0;
-        let to_pre_length = ACCOUNT_ID_BYTES_LEGTH +
-            TOKEN_BYTES_LENGTH +
-            PACKED_AMOUNT_BYTES_LEGTH +
-            FR_ADDRESS_LEN;
+        let to_pre_length = ACCOUNT_ID_BYTES_LEGTH
+            + TOKEN_BYTES_LENGTH
+            + PACKED_AMOUNT_BYTES_LEGTH
+            + FR_ADDRESS_LEN;
         Some(Self {
             tx: Transfer::from_transfer_to_new_bytes(bytes)?,
-            from: bytes_slice_to_uint32(&bytes[from_pre_length .. from_pre_length + ACCOUNT_ID_BYTES_LEGTH])?,
-            to: bytes_slice_to_uint32(&bytes[to_pre_length .. to_pre_length + ACCOUNT_ID_BYTES_LEGTH])?
+            from: bytes_slice_to_uint32(
+                &bytes[from_pre_length..from_pre_length + ACCOUNT_ID_BYTES_LEGTH],
+            )?,
+            to: bytes_slice_to_uint32(
+                &bytes[to_pre_length..to_pre_length + ACCOUNT_ID_BYTES_LEGTH],
+            )?,
         })
     }
 }
@@ -128,14 +137,19 @@ impl TransferOp {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != TRANSFER_OP_LENGTH { return None }
+        if bytes.len() != TRANSFER_OP_LENGTH {
+            return None;
+        }
         let from_pre_length = 0;
-        let to_pre_length = ACCOUNT_ID_BYTES_LEGTH +
-            TOKEN_BYTES_LENGTH;
+        let to_pre_length = ACCOUNT_ID_BYTES_LEGTH + TOKEN_BYTES_LENGTH;
         Some(Self {
             tx: Transfer::from_transfer_bytes(bytes)?,
-            from: bytes_slice_to_uint32(&bytes[from_pre_length .. from_pre_length + ACCOUNT_ID_BYTES_LEGTH])?,
-            to: bytes_slice_to_uint32(&bytes[to_pre_length .. to_pre_length + ACCOUNT_ID_BYTES_LEGTH])?
+            from: bytes_slice_to_uint32(
+                &bytes[from_pre_length..from_pre_length + ACCOUNT_ID_BYTES_LEGTH],
+            )?,
+            to: bytes_slice_to_uint32(
+                &bytes[to_pre_length..to_pre_length + ACCOUNT_ID_BYTES_LEGTH],
+            )?,
         })
     }
 }
@@ -163,11 +177,15 @@ impl WithdrawOp {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != WITHDRAW_OP_LENGTH { return None }
+        if bytes.len() != WITHDRAW_OP_LENGTH {
+            return None;
+        }
         let pre_length = 0;
         Some(Self {
             tx: Withdraw::from_bytes(bytes)?,
-            account_id: bytes_slice_to_uint32(&bytes[pre_length..pre_length + ACCOUNT_ID_BYTES_LEGTH])?
+            account_id: bytes_slice_to_uint32(
+                &bytes[pre_length..pre_length + ACCOUNT_ID_BYTES_LEGTH],
+            )?,
         })
     }
 }
@@ -191,11 +209,15 @@ impl CloseOp {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != CLOSE_OP_LENGTH { return None }
+        if bytes.len() != CLOSE_OP_LENGTH {
+            return None;
+        }
         let pre_length = 0;
         Some(Self {
             tx: Close::from_bytes(bytes)?,
-            account_id: bytes_slice_to_uint32(&bytes[pre_length .. pre_length + ACCOUNT_ID_BYTES_LEGTH])?
+            account_id: bytes_slice_to_uint32(
+                &bytes[pre_length..pre_length + ACCOUNT_ID_BYTES_LEGTH],
+            )?,
         })
     }
 }
@@ -227,22 +249,29 @@ impl FullExitOp {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != FULL_EXIT_OP_LENGTH { return None }
+        if bytes.len() != FULL_EXIT_OP_LENGTH {
+            return None;
+        }
         let acc_id_pre_length = 0;
-        let to_pre_length = ACCOUNT_ID_BYTES_LEGTH +
-            PUBKEY_PACKED_BYTES_LEGTH +
-            ETH_ADDR_BYTES_LEGTH +
-            TOKEN_BYTES_LENGTH +
-            NONCE_BYTES_LEGTH +
-            SIGNATURE_R_BYTES_LEGTH +
-            SIGNATURE_S_BYTES_LEGTH;
+        let to_pre_length = ACCOUNT_ID_BYTES_LEGTH
+            + PUBKEY_PACKED_BYTES_LEGTH
+            + ETH_ADDR_BYTES_LEGTH
+            + TOKEN_BYTES_LENGTH
+            + NONCE_BYTES_LEGTH
+            + SIGNATURE_R_BYTES_LEGTH
+            + SIGNATURE_S_BYTES_LEGTH;
 
-        let acc_id = bytes_slice_to_uint32(&bytes[acc_id_pre_length..acc_id_pre_length + ACCOUNT_ID_BYTES_LEGTH])?;
-        let amount = BigDecimal::parse_bytes(&bytes[to_pre_length .. to_pre_length + FULL_AMOUNT_BYTES_LEGTH], 18)?;
-        
+        let acc_id = bytes_slice_to_uint32(
+            &bytes[acc_id_pre_length..acc_id_pre_length + ACCOUNT_ID_BYTES_LEGTH],
+        )?;
+        let amount = BigDecimal::parse_bytes(
+            &bytes[to_pre_length..to_pre_length + FULL_AMOUNT_BYTES_LEGTH],
+            18,
+        )?;
+
         Some(Self {
             priority_op: FullExit::from_bytes(bytes)?,
-            account_data: Some((acc_id, amount))
+            account_data: Some((acc_id, amount)),
         })
     }
 }
@@ -289,32 +318,22 @@ impl FranklinOp {
             CLOSE_OP_CODE => Some(CloseOp::CHUNKS),
             TRANSFER_OP_CODE => Some(TransferOp::CHUNKS),
             FULL_EXIT_OP_CODE => Some(FullExitOp::CHUNKS),
-            _ => None
+            _ => None,
         }
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
         let op_type: &u8 = &bytes[0];
         match *op_type as usize {
-            DEPOSIT_OP_CODE => Some(FranklinOp::Deposit(
-                DepositOp::from_bytes(&bytes)?
-            )),
+            DEPOSIT_OP_CODE => Some(FranklinOp::Deposit(DepositOp::from_bytes(&bytes)?)),
             TRANSFER_TO_NEW_OP_CODE => Some(FranklinOp::TransferToNew(
-                TransferToNewOp::from_bytes(&bytes)?
+                TransferToNewOp::from_bytes(&bytes)?,
             )),
-            WITHDRAW_OP_CODE => Some(FranklinOp::Withdraw(
-                WithdrawOp::from_bytes(&bytes)?
-            )),
-            CLOSE_OP_CODE => Some(FranklinOp::Close(
-                CloseOp::from_bytes(&bytes)?
-            )),
-            TRANSFER_OP_CODE => Some(FranklinOp::Transfer(
-                TransferOp::from_bytes(&bytes)?
-            )),
-            FULL_EXIT_OP_CODE => Some(FranklinOp::FullExit(
-                FullExitOp::from_bytes(&bytes)?
-            )),
-            _ => None
+            WITHDRAW_OP_CODE => Some(FranklinOp::Withdraw(WithdrawOp::from_bytes(&bytes)?)),
+            CLOSE_OP_CODE => Some(FranklinOp::Close(CloseOp::from_bytes(&bytes)?)),
+            TRANSFER_OP_CODE => Some(FranklinOp::Transfer(TransferOp::from_bytes(&bytes)?)),
+            FULL_EXIT_OP_CODE => Some(FranklinOp::FullExit(FullExitOp::from_bytes(&bytes)?)),
+            _ => None,
         }
     }
 
@@ -326,7 +345,7 @@ impl FranklinOp {
             CLOSE_OP_CODE => Some(CLOSE_OP_LENGTH),
             TRANSFER_OP_CODE => Some(TRANSFER_OP_LENGTH),
             FULL_EXIT_OP_CODE => Some(FULL_EXIT_OP_LENGTH),
-            _ => None
+            _ => None,
         }
     }
 

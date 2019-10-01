@@ -1,21 +1,8 @@
 use web3::futures::Future;
-use web3::types::{
-    BlockNumber,
-    FilterBuilder,
-    Log,
-    H256,
-    U256,
-    U64
-};
-use web3::api::Eth;
-
+use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256, U64};
 
 use crate::events::{EventData, EventType};
-use crate::helpers::{
-    DATA_RESTORE_CONFIG,
-    DataRestoreError,
-    get_topic_keccak_hash
-};
+use crate::helpers::{get_topic_keccak_hash, DataRestoreError, DATA_RESTORE_CONFIG};
 
 type CommittedAndVerifiedEvents = (Vec<EventData>, Vec<EventData>);
 // type BlockNumber256 = U256;
@@ -63,15 +50,16 @@ impl EventsState {
     pub fn update_events_state(
         &mut self,
         eth_blocks_delta: u64,
-        end_eth_blocks_delta: u64
+        end_eth_blocks_delta: u64,
     ) -> Result<Vec<EventData>, DataRestoreError> {
         self.remove_verified_events();
 
-        let (events, to_block_number): (CommittedAndVerifiedEvents, u64) = EventsState::update_events_and_last_watched_block(
-            self.last_watched_eth_block_number,
-            eth_blocks_delta,
-            end_eth_blocks_delta
-        )?;
+        let (events, to_block_number): (CommittedAndVerifiedEvents, u64) =
+            EventsState::update_events_and_last_watched_block(
+                self.last_watched_eth_block_number,
+                eth_blocks_delta,
+                end_eth_blocks_delta,
+            )?;
 
         self.committed_events.extend(events.0);
         self.verified_events.extend(events.1);
@@ -85,8 +73,9 @@ impl EventsState {
 
     /// Return last watched ethereum block number
     pub fn get_last_block_number() -> Result<u64, DataRestoreError> {
-        let (_eloop, transport) = web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
-            .map_err(|_| DataRestoreError::WrongEndpoint)?;
+        let (_eloop, transport) =
+            web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
+                .map_err(|_| DataRestoreError::WrongEndpoint)?;
         let web3 = web3::Web3::new(transport);
         let last_block_number = web3
             .eth()
@@ -109,11 +98,12 @@ impl EventsState {
         eth_blocks_delta: u64,
         end_eth_blocks_delta: u64,
     ) -> Result<(CommittedAndVerifiedEvents, u64), DataRestoreError> {
-        let latest_eth_block_minus_delta = EventsState::get_last_block_number()? - end_eth_blocks_delta;
+        let latest_eth_block_minus_delta =
+            EventsState::get_last_block_number()? - end_eth_blocks_delta;
         if latest_eth_block_minus_delta == last_watched_block_number {
-            return Ok( ( (vec![], vec![]), last_watched_block_number ) ) // No new eth blocks
+            return Ok(((vec![], vec![]), last_watched_block_number)); // No new eth blocks
         }
-        
+
         let from_block_number_u64 = last_watched_block_number + 1;
 
         let mut to_block_number_u64 = from_block_number_u64 + eth_blocks_delta;
@@ -157,8 +147,9 @@ impl EventsState {
             .topics(Some(topics_vec_h256), None, None, None)
             .build();
 
-        let (_eloop, transport) = web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
-            .map_err(|_| DataRestoreError::WrongEndpoint)?;
+        let (_eloop, transport) =
+            web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
+                .map_err(|_| DataRestoreError::WrongEndpoint)?;
         let web3 = web3::Web3::new(transport);
         let result = web3
             .eth()
@@ -208,8 +199,10 @@ impl EventsState {
                     }
                 }
                 None => {
-                    return Err(DataRestoreError::NoData("No tx hash in block event".to_string()))
-                },
+                    return Err(DataRestoreError::NoData(
+                        "No tx hash in block event".to_string(),
+                    ))
+                }
             };
         }
         committed_events.sort_by_key(|x| x.block_num);
