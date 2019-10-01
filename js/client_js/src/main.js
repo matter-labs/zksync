@@ -5,6 +5,7 @@ import BootstrapVue from 'bootstrap-vue';
 import "bootstrap/dist/css/bootstrap.min.css"
 import "bootstrap-vue/dist/bootstrap-vue.css"
 
+import { strCompareIgnoreCase } from './utils'
 import config from "./env-config.js"
 
 Vue.config.productionTip = false;
@@ -33,23 +34,22 @@ Vue.mixin({
             return window.walletDecorator.address;
         },
         currentLocationNetworkName() {
-            return window.location.host.split(/[^\w]/)[0];
+            return this.config.ETH_NETWORK;
         },
         network() {
             return window.web3.version.network;
         },
         currentMetamaskNetworkName () {
-            return ({
+            let net = ({
                 '1': 'mainnet',
                 '4': 'rinkeby',
                 '9': 'localhost',
             })[this.network];
-        },
-        currentMetamaskNetwork() {
-            return this.config.ETH_NETWORK;
+            if (net == undefined) return 'unknown';
+            return net;
         },
         correctNetwork() {
-            return this.currentMetamaskNetworkName == this.currentMetamaskNetwork;
+            return strCompareIgnoreCase(this.currentMetamaskNetworkName, this.currentLocationNetworkName);
         },
         baseUrl() {
             return this.apiServer + '/api/v0.1'
@@ -61,6 +61,6 @@ new Vue({
 	router,
 	render: h => h(App),
 	async created() {
-        ethereum.autoRefreshOnNetworkChange = false;
+        ethereum.autoRefreshOnNetworkChange = true;
 	}
 }).$mount("#app");

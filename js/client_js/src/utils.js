@@ -37,3 +37,9 @@ export function feesFromAmount(amount) {
         amount.div(20),
     ].map(String);
 }
+
+export function strCompareIgnoreCase(a, b) {
+    if (a != undefined) a = a.toLowerCase()
+    if (b != undefined) b = b.toLowerCase()
+    return a == b;
+}
