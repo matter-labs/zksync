@@ -184,7 +184,7 @@ rescue: confirm_action
 	@node js/loadtest/rescue.js
 
 contracts-test: confirm_action
-	@python3 bin/prepare-test-contracts.py
+	@bin/prepare-test-contracts.sh
 	@bin/contracts-test.sh
 
 deposit: confirm_action
