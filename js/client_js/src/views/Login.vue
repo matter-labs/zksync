@@ -10,10 +10,10 @@
         </template>
         <hr class="my-4">
         <p v-if="!ethereumSupported" style="color: red">Ethereum support is not detected. Please use an Ethereum-compatible browser, e.g. install <a target="_blank" href="https://metamask.io">Metamask</a>.</p>
-        <h3 v-else-if="!correctNetwork" style="color: red">
+        <h3 id="change_network_alert" style="color: red; display: none">
             Please switch to <strong>{{ currentLocationNetworkName }}</strong> network in Metamask to try this demo.
         </h3>
-        <b-btn v-else variant="success" size="lg" @click="login">Login with Metamask</b-btn>
+        <b-btn id="login_button" style="display: none" variant="success" size="lg" @click="login">Login with Metamask</b-btn>
     </b-jumbotron>
 </b-container>
 </template>
