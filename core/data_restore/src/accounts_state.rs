@@ -229,14 +229,22 @@ mod test {
             ops: ops3,
         };
 
-        let data4 = "0500000000000000010001000000";
+        let data4 = "0500000100000000000001000000";
         let decoded4 = hex::decode(data4).expect("Decoding failed");
         let ops4 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded4)
             .expect("cant get ops from data 4");
-        println!("ops4 {:?} \n", ops4);
         let block4 = FranklinOpsBlock {
             block_num: 4,
             ops: ops4,
+        };
+
+        let data5 = "04000001";
+        let decoded5 = hex::decode(data5).expect("Decoding failed");
+        let ops5 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded5)
+            .expect("cant get ops from data 5");
+        let block5 = FranklinOpsBlock {
+            block_num: 5,
+            ops: ops5,
         };
 
         // let data3 = "06000002000000000000000000000000000000000000000000000000000000000000000052312ad6f01657413b2eae9287f6b9adad93d5fe000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000014cabd42a5b98000000";
@@ -266,5 +274,9 @@ mod test {
         println!("updates 4 {:?} \n", updates4);
         println!("root hash 4 {:?} \n", tree.root_hash());
         println!("accounts 4 {:?} \n", tree.get_accounts());
+        let updates5 = tree.update_accounts_states_from_ops_block(&block5).expect("Cant update state from block 4");
+        println!("updates 5 {:?} \n", updates5);
+        println!("root hash 5 {:?} \n", tree.root_hash());
+        println!("accounts 5 {:?} \n", tree.get_accounts());
     }
 }
