@@ -75,7 +75,7 @@ impl FranklinAccountsState {
                         .get_account(_op.from)
                         .ok_or(DataRestoreError::WrongData("Nonexistent account".to_string()))?;
                     _op.tx.from = from.address;
-                    // _op.tx.nonce = from.nonce + 1;
+                    _op.tx.nonce = from.nonce;
                     if let Ok(OpSuccess {
                         fee,
                         mut updates,
@@ -95,7 +95,7 @@ impl FranklinAccountsState {
                         .get_account(_op.account_id)
                         .ok_or(DataRestoreError::WrongData("Nonexistent account".to_string()))?;
                     _op.tx.account = account.address;
-                    // _op.tx.nonce = account.nonce + 1;
+                    _op.tx.nonce = account.nonce;
                     if let Ok(OpSuccess {
                         fee,
                         mut updates,
@@ -115,7 +115,7 @@ impl FranklinAccountsState {
                         .get_account(_op.account_id)
                         .ok_or(DataRestoreError::WrongData("Nonexistent account".to_string()))?;
                     _op.tx.account = account.address;
-                    // _op.tx.nonce = account.nonce + 1;
+                    _op.tx.nonce = account.nonce;
                     if let Ok(OpSuccess {
                         fee,
                         mut updates,
@@ -139,7 +139,7 @@ impl FranklinAccountsState {
                         .ok_or(DataRestoreError::WrongData("Nonexistent account".to_string()))?;
                     _op.tx.from = from.address;
                     _op.tx.to = to.address;
-                    // _op.tx.nonce = from.nonce + 1;
+                    _op.tx.nonce = from.nonce;
                     if let Ok(OpSuccess {
                         fee,
                         mut updates,
@@ -220,6 +220,15 @@ mod test {
             ops: ops2,
         };
 
+        let data3 = "02000000000000010008091011121314151617181920212223342526280000010000";
+        let decoded3 = hex::decode(data3).expect("Decoding failed");
+        let ops3 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded3)
+            .expect("cant get ops from data 3");
+        let block3 = FranklinOpsBlock {
+            block_num: 3,
+            ops: ops3,
+        };
+
         // let data3 = "06000002000000000000000000000000000000000000000000000000000000000000000052312ad6f01657413b2eae9287f6b9adad93d5fe000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000014cabd42a5b98000000";
         // let decoded3 = hex::decode(data3).expect("Decoding failed");
         // let ops3 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded3)
@@ -239,9 +248,9 @@ mod test {
         println!("updates 2 {:?} \n", updates2);
         println!("root hash 2 {:?} \n", tree.root_hash());
         println!("accounts 2 {:?} \n", tree.get_accounts());
-        // let updates3 = tree.update_accounts_states_from_ops_block(&block3).expect("Cant update state from block 3");
-        // println!("updates 3 {:?} \n", updates3);
-        // println!("root hash 3 {:?} \n", tree.root_hash());
-        // println!("accounts 3 {:?} \n", tree.get_accounts());
+        let updates3 = tree.update_accounts_states_from_ops_block(&block3).expect("Cant update state from block 3");
+        println!("updates 3 {:?} \n", updates3);
+        println!("root hash 3 {:?} \n", tree.root_hash());
+        println!("accounts 3 {:?} \n", tree.get_accounts());
     }
 }

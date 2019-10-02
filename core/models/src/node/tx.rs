@@ -58,7 +58,8 @@ impl Transfer {
         let token_id_pre_length = ACCOUNT_ID_BYTES_LEGTH;
         let amount_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH;
         let to_pre_length = amount_pre_length + PACKED_AMOUNT_BYTES_LEGTH;
-        let fee_pre_length = to_pre_length + ACCOUNT_ID_BYTES_LEGTH;
+        let fee_pre_length = to_pre_length + FR_ADDRESS_LEN + ACCOUNT_ID_BYTES_LEGTH;
+
         Some(Self {
             from: AccountAddress::zero(), // From pubdata its unknown
             to: AccountAddress::from_bytes(&bytes[to_pre_length..to_pre_length + FR_ADDRESS_LEN])
