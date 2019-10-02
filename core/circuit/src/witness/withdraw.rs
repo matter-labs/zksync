@@ -352,6 +352,7 @@ mod test {
     use models::circuit::account::{
         Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
+    use models::primitives::bytes_into_be_bits;
     use models::circuit::utils::*;
     use models::merkle_tree::PedersenHasher;
     use models::node::tx::PackedPublicKey;

@@ -42,23 +42,23 @@ impl FranklinOpsBlock {
         Ok(block)
     }
 
-    fn get_franklin_ops_from_data(data: &Vec<u8>) -> Result<Vec<FranklinOp>, DataRestoreError> {
+    pub fn get_franklin_ops_from_data(data: &Vec<u8>) -> Result<Vec<FranklinOp>, DataRestoreError> {
         let mut current_pointer = 0;
         let mut ops = vec![];
         while current_pointer < data.len() {
             let op_type: &u8 = &data[current_pointer];
 
             let chunks =
-                FranklinOp::chunks_by_op_number(op_type).ok_or(DataRestoreError::WrongType)?;
+                FranklinOp::chunks_by_op_number(op_type).ok_or(DataRestoreError::WrongData("Wrong op type".to_string()))?;
             let full_size: usize = 8 * chunks;
 
             let pub_data_size =
-                FranklinOp::public_data_length(op_type).ok_or(DataRestoreError::WrongType)?;
+                FranklinOp::public_data_length(op_type).ok_or(DataRestoreError::WrongData("Wrong op type".to_string()))?;
 
             let pre = current_pointer + TX_TYPE_BYTES_LEGTH;
             let post = pre + pub_data_size;
 
-            let op = FranklinOp::from_bytes(&data[pre..post]).ok_or(DataRestoreError::WrongType)?;
+            let op = FranklinOp::from_bytes(op_type, &data[pre..post]).ok_or(DataRestoreError::WrongData("Wrong data".to_string()))?;
             ops.push(op);
             current_pointer += full_size;
         }
@@ -103,5 +103,37 @@ impl FranklinOpsBlock {
                 "No commitment data in tx".to_string(),
             ));
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::franklin_ops::FranklinOpsBlock;
+    #[test]
+    fn test_deposit() {
+        let data = "0100000200010000000000000000041336c4e56f98000809101112131415161718192021222334252627000000000000";
+        let decoded = hex::decode(data).expect("Decoding failed");
+        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&decoded)
+            .expect("cant get ops from data");
+        println!("{:?}", ops);
+    }
+
+    #[test]
+    fn test_part_exit() {
+        let data = "030000020000000000000000000002c68af0bb14000000005711e991397fca8f5651c9bb6fa06b57e4a4dcc000000000";
+        let decoded = hex::decode(data).expect("Decoding failed");
+        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&decoded)
+            .expect("cant get ops from data");
+        println!("{:?}", ops);
+
+    }
+
+    #[test]
+    fn test_full_exit() {
+        let data = "06000002000000000000000000000000000000000000000000000000000000000000000052312ad6f01657413b2eae9287f6b9adad93d5fe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000014cabd42a5b98000000";
+        let decoded = hex::decode(data).expect("Decoding failed");
+        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&decoded)
+            .expect("cant get ops from data");
+        println!("{:?}", ops);
     }
 }

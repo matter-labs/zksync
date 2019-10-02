@@ -81,7 +81,7 @@ impl EventsState {
             .eth()
             .block_number()
             .wait()
-            .map_err(|e| DataRestoreError::Unknown(e.to_string()))?;
+            .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
         Ok(last_block_number.as_u64())
     }
 

@@ -441,6 +441,7 @@ mod test {
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use models::params as franklin_constants;
 
+    use models::primitives::bytes_into_be_bits;
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
 

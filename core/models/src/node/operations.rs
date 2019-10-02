@@ -4,9 +4,10 @@ use super::{pack_fee_amount, pack_token_amount, Deposit, FullExit};
 use super::{Close, Transfer, Withdraw};
 use crate::node::FranklinPriorityOp;
 use crate::params::FR_ADDRESS_LEN;
-use crate::primitives::{big_decimal_to_u128, bytes_slice_to_uint32};
+use crate::primitives::{big_decimal_to_u128, bytes_slice_to_uint32, bytes_slice_to_uint128, u128_to_bigdecimal};
 use bigdecimal::BigDecimal;
 
+pub const NOOP_OP_LENGTH: usize = 0;
 pub const DEPOSIT_OP_LENGTH: usize = 41;
 pub const TRANSFER_TO_NEW_OP_LENGTH: usize = 33;
 pub const WITHDRAW_OP_LENGTH: usize = 43;
@@ -14,6 +15,7 @@ pub const CLOSE_OP_LENGTH: usize = 3;
 pub const TRANSFER_OP_LENGTH: usize = 13;
 pub const FULL_EXIT_OP_LENGTH: usize = 141;
 
+pub const NOOP_OP_CODE: usize = 0;
 pub const DEPOSIT_OP_CODE: usize = 1;
 pub const TRANSFER_TO_NEW_OP_CODE: usize = 2;
 pub const WITHDRAW_OP_CODE: usize = 3;
@@ -65,6 +67,21 @@ impl DepositOp {
                 &bytes[pre_length..pre_length + ACCOUNT_ID_BYTES_LEGTH],
             )?,
         })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NoopOp {}
+
+impl NoopOp {
+    pub const CHUNKS: usize = 1;
+    pub const OP_CODE: u8 = 0x00;
+
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        if bytes != [0, 0, 0, 0, 0, 0, 0, 0] {
+            return None
+        }
+        Some(Self {})
     }
 }
 
@@ -264,10 +281,11 @@ impl FullExitOp {
         let acc_id = bytes_slice_to_uint32(
             &bytes[acc_id_pre_length..acc_id_pre_length + ACCOUNT_ID_BYTES_LEGTH],
         )?;
-        let amount = BigDecimal::parse_bytes(
-            &bytes[to_pre_length..to_pre_length + FULL_AMOUNT_BYTES_LEGTH],
-            18,
-        )?;
+        let amount = u128_to_bigdecimal(
+            bytes_slice_to_uint128(
+                &bytes[to_pre_length..to_pre_length + FULL_AMOUNT_BYTES_LEGTH]
+            )?
+        );
 
         Some(Self {
             priority_op: FullExit::from_bytes(bytes)?,
@@ -279,6 +297,7 @@ impl FullExitOp {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum FranklinOp {
+    Noop(NoopOp),
     Deposit(DepositOp),
     TransferToNew(TransferToNewOp),
     Withdraw(WithdrawOp),
@@ -290,6 +309,7 @@ pub enum FranklinOp {
 impl FranklinOp {
     pub fn chunks(&self) -> usize {
         match self {
+            FranklinOp::Noop(_) => NoopOp::CHUNKS,
             FranklinOp::Deposit(_) => DepositOp::CHUNKS,
             FranklinOp::TransferToNew(_) => TransferToNewOp::CHUNKS,
             FranklinOp::Withdraw(_) => WithdrawOp::CHUNKS,
@@ -301,6 +321,7 @@ impl FranklinOp {
 
     pub fn public_data(&self) -> Vec<u8> {
         match self {
+            FranklinOp::Noop(_) => vec![],
             FranklinOp::Deposit(op) => op.get_public_data(),
             FranklinOp::TransferToNew(op) => op.get_public_data(),
             FranklinOp::Withdraw(op) => op.get_public_data(),
@@ -312,6 +333,7 @@ impl FranklinOp {
 
     pub fn chunks_by_op_number(op_type: &u8) -> Option<usize> {
         match *op_type as usize {
+            NOOP_OP_CODE => Some(NoopOp::CHUNKS),
             DEPOSIT_OP_CODE => Some(DepositOp::CHUNKS),
             TRANSFER_TO_NEW_OP_CODE => Some(TransferToNewOp::CHUNKS),
             WITHDRAW_OP_CODE => Some(WithdrawOp::CHUNKS),
@@ -322,9 +344,9 @@ impl FranklinOp {
         }
     }
 
-    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        let op_type: &u8 = &bytes[0];
+    pub fn from_bytes(op_type: &u8, bytes: &[u8]) -> Option<Self> {
         match *op_type as usize {
+            NOOP_OP_CODE => Some(FranklinOp::Noop(NoopOp::from_bytes(&bytes)?)),
             DEPOSIT_OP_CODE => Some(FranklinOp::Deposit(DepositOp::from_bytes(&bytes)?)),
             TRANSFER_TO_NEW_OP_CODE => Some(FranklinOp::TransferToNew(
                 TransferToNewOp::from_bytes(&bytes)?,
@@ -339,6 +361,7 @@ impl FranklinOp {
 
     pub fn public_data_length(op_type: &u8) -> Option<usize> {
         match *op_type as usize {
+            NOOP_OP_CODE => Some(NOOP_OP_LENGTH),
             DEPOSIT_OP_CODE => Some(DEPOSIT_OP_LENGTH),
             TRANSFER_TO_NEW_OP_CODE => Some(TRANSFER_TO_NEW_OP_LENGTH),
             WITHDRAW_OP_CODE => Some(WITHDRAW_OP_LENGTH),

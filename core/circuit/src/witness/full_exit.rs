@@ -2,7 +2,7 @@ use super::utils::*;
 
 use crate::operation::*;
 use ff::{Field, PrimeField};
-
+use models::primitives::bytes_into_be_bits;
 use crate::operation::SignatureData;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;

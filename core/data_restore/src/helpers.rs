@@ -89,20 +89,12 @@ pub enum DataRestoreError {
     Unknown(String),
     /// Storage error with description
     Storage(String),
-    /// Wrong type
-    WrongType,
+    /// Wrong data
+    WrongData(String),
     /// Got no data with description
     NoData(String),
-    /// Account doesn't exists
-    NonexistentAccount,
-    /// Wrong amount
-    WrongAmount,
     /// Wrong endpoint
     WrongEndpoint,
-    /// Wrong public key
-    WrongPubKey,
-    /// Double exit in chain
-    DoubleExit,
     /// Updating failed with description
     StateUpdate(String),
 }
@@ -112,13 +104,9 @@ impl std::string::ToString for DataRestoreError {
         match self {
             DataRestoreError::Unknown(text) => format!("Unknown {}", text),
             DataRestoreError::Storage(text) => format!("Storage {}", text),
-            DataRestoreError::WrongType => "Wrong type".to_owned(),
+            DataRestoreError::WrongData(text) => format!("Wrong data {}", text),
             DataRestoreError::NoData(text) => format!("No data {}", text),
-            DataRestoreError::NonexistentAccount => "Nonexistent account".to_owned(),
-            DataRestoreError::WrongAmount => "Wrong amount".to_owned(),
             DataRestoreError::WrongEndpoint => "Wrong endpoint".to_owned(),
-            DataRestoreError::WrongPubKey => "Wrong pubkey".to_owned(),
-            DataRestoreError::DoubleExit => "Double exit".to_owned(),
             DataRestoreError::StateUpdate(text) => format!("Error during state update {}", text),
         }
     }

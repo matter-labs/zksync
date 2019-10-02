@@ -463,22 +463,24 @@ pub fn u128_to_bigdecimal(n: u128) -> BigDecimal {
 
 pub fn bytes_slice_to_uint32(bytes: &[u8]) -> Option<u32> {
     let size = bytes.len();
-    if size >= 4 || size == 0 {
+    if size > 4 || size == 0 {
         return None;
     }
     let mut array: [u8; 4] = Default::default();
-    for i in 0..4 - size {
-        array[i] = 0;
-    }
     for i in 4 - size..4 {
         array[i] = bytes[i - (4 - size)]
+    }
+    if size == 4 {
+        for i in 0..4 - size {
+            array[i] = 0;
+        }
     }
     Some(u32::from_be_bytes(array))
 }
 
 pub fn bytes_slice_to_uint16(bytes: &[u8]) -> Option<u16> {
     let size = bytes.len();
-    if size >= 2 || size == 0 {
+    if size > 2 || size == 0 {
         return None;
     }
     let mut array: [u8; 2] = Default::default();
@@ -488,7 +490,32 @@ pub fn bytes_slice_to_uint16(bytes: &[u8]) -> Option<u16> {
     for i in 2 - size..2 {
         array[i] = bytes[i - (2 - size)]
     }
+    if size == 2 {
+        for i in 0..2 - size {
+            array[i] = 0;
+        }
+    } 
     Some(u16::from_be_bytes(array))
+}
+
+pub fn bytes_slice_to_uint128(bytes: &[u8]) -> Option<u128> {
+    let size = bytes.len();
+    if size > 16 || size == 0 {
+        return None;
+    }
+    let mut array: [u8; 16] = Default::default();
+    for i in 0..16 - size {
+        array[i] = 0;
+    }
+    for i in 16 - size..16 {
+        array[i] = bytes[i - (16 - size)]
+    }
+    if size == 16 {
+        for i in 0..16 - size {
+            array[i] = 0;
+        }
+    } 
+    Some(u128::from_be_bytes(array))
 }
 
 pub fn bytes32_from_slice(bytes: &[u8]) -> Option<[u8; 32]> {

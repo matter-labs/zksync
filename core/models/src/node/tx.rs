@@ -17,7 +17,7 @@ use crypto::{digest::Digest, sha2::Sha256};
 use super::account::AccountAddress;
 use super::Engine;
 use crate::params::JUBJUB_PARAMS;
-use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
+use crate::primitives::{bytes_slice_to_uint128, big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
 use failure::{ensure, format_err};
 use ff::{PrimeField, PrimeFieldRepr};
 use franklin_crypto::alt_babyjubjub::fs::FsRepr;
@@ -152,7 +152,7 @@ impl Withdraw {
         let amount_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH;
         let fee_pre_length = amount_pre_length + FULL_AMOUNT_BYTES_LEGTH;
         let eth_address_pre_length = fee_pre_length + FEE_BYTES_LEGTH;
-
+            
         Some(Self {
             account: AccountAddress::zero(), // From pubdata its unknown
             eth_address: Address::from_slice(
@@ -161,10 +161,11 @@ impl Withdraw {
             token: bytes_slice_to_uint16(
                 &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BYTES_LENGTH],
             )?,
-            amount: BigDecimal::parse_bytes(
-                &bytes[amount_pre_length..amount_pre_length + FULL_AMOUNT_BYTES_LEGTH],
-                18,
-            )?,
+            amount: u128_to_bigdecimal(
+                bytes_slice_to_uint128(
+                    &bytes[amount_pre_length..amount_pre_length + FULL_AMOUNT_BYTES_LEGTH]
+                )?
+            ),
             fee: unpack_fee_amount(&bytes[fee_pre_length..fee_pre_length + FEE_BYTES_LEGTH])?,
             nonce: 0,                          // From pubdata its unknown
             signature: TxSignature::default(), // From pubdata its unknown

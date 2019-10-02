@@ -24,6 +24,15 @@ impl FranklinAccountsState {
         }
     }
 
+    fn new_test() -> Self {
+        Self {
+            state: PlasmaState::empty(),
+            fee_account_address: AccountAddress {
+                data: [08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 34, 25, 26, 27]
+            },
+        }
+    }
+
     /// Creates empty Franklin Accounts states
     pub fn load(accounts: AccountMap, current_block: u32) -> Self {
         Self {
@@ -66,9 +75,9 @@ impl FranklinAccountsState {
                     let from = self
                         .state
                         .get_account(_op.from)
-                        .ok_or(DataRestoreError::NonexistentAccount)?;
+                        .ok_or(DataRestoreError::WrongData("Nonexistent account".to_string()))?;
                     _op.tx.from = from.address;
-                    _op.tx.nonce = from.nonce + 1;
+                    // _op.tx.nonce = from.nonce + 1;
                     if let Ok(OpSuccess {
                         fee,
                         mut updates,
@@ -86,9 +95,9 @@ impl FranklinAccountsState {
                     let account = self
                         .state
                         .get_account(_op.account_id)
-                        .ok_or(DataRestoreError::NonexistentAccount)?;
+                        .ok_or(DataRestoreError::WrongData("Nonexistent account".to_string()))?;
                     _op.tx.account = account.address;
-                    _op.tx.nonce = account.nonce + 1;
+                    // _op.tx.nonce = account.nonce + 1;
                     if let Ok(OpSuccess {
                         fee,
                         mut updates,
@@ -106,9 +115,9 @@ impl FranklinAccountsState {
                     let account = self
                         .state
                         .get_account(_op.account_id)
-                        .ok_or(DataRestoreError::NonexistentAccount)?;
+                        .ok_or(DataRestoreError::WrongData("Nonexistent account".to_string()))?;
                     _op.tx.account = account.address;
-                    _op.tx.nonce = account.nonce + 1;
+                    // _op.tx.nonce = account.nonce + 1;
                     if let Ok(OpSuccess {
                         fee,
                         mut updates,
@@ -125,14 +134,14 @@ impl FranklinAccountsState {
                     let from = self
                         .state
                         .get_account(_op.from)
-                        .ok_or(DataRestoreError::NonexistentAccount)?;
+                        .ok_or(DataRestoreError::WrongData("Nonexistent account".to_string()))?;
                     let to = self
                         .state
                         .get_account(_op.to)
-                        .ok_or(DataRestoreError::NonexistentAccount)?;
+                        .ok_or(DataRestoreError::WrongData("Nonexistent account".to_string()))?;
                     _op.tx.from = from.address;
                     _op.tx.to = to.address;
-                    _op.tx.nonce = from.nonce + 1;
+                    // _op.tx.nonce = from.nonce + 1;
                     if let Ok(OpSuccess {
                         fee,
                         mut updates,
@@ -146,6 +155,7 @@ impl FranklinAccountsState {
                     }
                 }
                 FranklinOp::FullExit(_op) => {
+                    println!("fe {:?}", &_op);
                     let OpSuccess {
                         fee,
                         mut updates,
@@ -158,11 +168,12 @@ impl FranklinAccountsState {
                     }
                     accounts_updated.append(&mut updates);
                 }
+                _ => {}
             }
         }
 
-        let (_, fee_updates) = self.state.collect_fee(&fees, &self.fee_account_address);
-        accounts_updated.extend(fee_updates.into_iter());
+        // let (_, fee_updates) = self.state.collect_fee(&fees, &self.fee_account_address);
+        // accounts_updated.extend(fee_updates.into_iter());
 
         Ok(accounts_updated)
     }
@@ -180,5 +191,44 @@ impl FranklinAccountsState {
     /// Returns Franklin Account description by its id
     pub fn get_account_by_address(&self, address: &AccountAddress) -> Option<(AccountId, Account)> {
         self.state.get_account_by_address(address)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use models::node::account::{Account, AccountAddress};
+    use crate::franklin_ops::FranklinOpsBlock;
+    use crate::accounts_state::FranklinAccountsState;
+    #[test]
+    fn test_tree_update() {
+        let data1 = "0100000000000000000000000000041336c4e56f98000809101112131415161718192021222334252627000000000000";
+        let decoded1 = hex::decode(data1).expect("Decoding failed");
+        let ops1 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded1)
+            .expect("cant get ops from data 1");
+        println!("ops1 {:?} \n", &ops1);
+        let block1 = FranklinOpsBlock {
+            block_num: 1,
+            ops: ops1,
+        };
+
+        let data2 = "030000000000000000000000000002c68af0bb14000000005711e991397fca8f5651c9bb6fa06b57e4a4dcc000000000";
+        let decoded2 = hex::decode(data2).expect("Decoding failed");
+        let ops2 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded2)
+            .expect("cant get ops from data 2");
+        println!("ops2 {:?} \n", &ops2);
+        let block2 = FranklinOpsBlock {
+            block_num: 2,
+            ops: ops2,
+        };
+        
+        let mut tree = FranklinAccountsState::new_test();
+        let updates1 = tree.update_accounts_states_from_ops_block(&block1).expect("Cant update state from block 1");
+        println!("updates1 {:?} \n", updates1);
+        println!("root hash 1 {:?} \n", tree.root_hash());
+        println!("accounts 1 {:?} \n", tree.get_accounts());
+        let updates2 = tree.update_accounts_states_from_ops_block(&block2).expect("Cant update state from block 2");
+        println!("updates2 {:?} \n", updates2);
+        println!("root hash 2 {:?} \n", tree.root_hash());
+        println!("accounts 2 {:?} \n", tree.get_accounts());
     }
 }

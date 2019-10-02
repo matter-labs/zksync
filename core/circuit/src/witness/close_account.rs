@@ -182,7 +182,7 @@ mod test {
 
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
-
+    use models::primitives::bytes_into_be_bits;
     use ff::{Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
     use franklin_crypto::circuit::test::*;

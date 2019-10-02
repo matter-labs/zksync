@@ -3,7 +3,7 @@ use super::tx::{PackedPublicKey, PackedSignature, TxSignature};
 use super::Nonce;
 use super::{AccountAddress, TokenId};
 use crate::params::FR_ADDRESS_LEN;
-use crate::primitives::{bytes32_from_slice, bytes_slice_to_uint16, bytes_slice_to_uint32};
+use crate::primitives::{bytes32_from_slice, bytes_slice_to_uint128, bytes_slice_to_uint16, bytes_slice_to_uint32, u128_to_bigdecimal};
 use bigdecimal::BigDecimal;
 use ethabi::{decode, ParamType};
 use failure::{bail, ensure, format_err};
@@ -13,7 +13,7 @@ use web3::types::{Address, Log, U256};
 
 use super::operations::{
     ACCOUNT_ID_BYTES_LEGTH, DEPOSIT_OP_CODE, DEPOSIT_OP_LENGTH, ETH_ADDR_BYTES_LEGTH,
-    FEE_BYTES_LEGTH, FULL_AMOUNT_BYTES_LEGTH, FULL_EXIT_OP_CODE, FULL_EXIT_OP_LENGTH,
+    FULL_AMOUNT_BYTES_LEGTH, FULL_EXIT_OP_CODE, FULL_EXIT_OP_LENGTH,
     NONCE_BYTES_LEGTH, PUBKEY_PACKED_BYTES_LEGTH, SIGNATURE_R_BYTES_LEGTH, SIGNATURE_S_BYTES_LEGTH,
     TOKEN_BYTES_LENGTH,
 };
@@ -31,20 +31,23 @@ impl Deposit {
         if bytes.len() != DEPOSIT_OP_LENGTH {
             return None;
         }
+        
         let token_id_pre_length = ACCOUNT_ID_BYTES_LEGTH;
         let amount_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH;
-        let account_pre_length = amount_pre_length + FULL_AMOUNT_BYTES_LEGTH + FEE_BYTES_LEGTH;
+        let account_pre_length = amount_pre_length + FULL_AMOUNT_BYTES_LEGTH;
+
         Some(Self {
             sender: Address::zero(), // In current circuit there is no sender in deposit pubdata
             token: bytes_slice_to_uint16(
                 &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BYTES_LENGTH],
             )?,
-            amount: BigDecimal::parse_bytes(
-                &bytes[amount_pre_length..amount_pre_length + FULL_AMOUNT_BYTES_LEGTH],
-                18,
-            )?,
+            amount: u128_to_bigdecimal(
+                bytes_slice_to_uint128(
+                    &bytes[amount_pre_length..amount_pre_length + FULL_AMOUNT_BYTES_LEGTH]
+                )?
+            ),
             account: AccountAddress::from_bytes(
-                &bytes[account_pre_length..account_pre_length + FR_ADDRESS_LEN],
+                &bytes[account_pre_length..account_pre_length + FR_ADDRESS_LEN]
             )
             .ok()?,
         })
