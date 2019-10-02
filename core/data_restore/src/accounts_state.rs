@@ -198,6 +198,7 @@ impl FranklinAccountsState {
 
 #[cfg(test)]
 mod test {
+    use models::node::Fr;
     use crate::franklin_ops::FranklinOpsBlock;
     use crate::accounts_state::FranklinAccountsState;
 
@@ -280,6 +281,8 @@ mod test {
         println!("updates 5 {:?} \n", updates5);
         println!("root hash 5 {:?} \n", tree.root_hash());
         println!("accounts 5 {:?} \n", tree.get_accounts());
+
+        assert_eq!(tree.root_hash().to_string(), "Fr(0x0f220069602ed8f8c4557fdde71baf5220bbf237790adf67f49280b84588acf2)".to_string());
     }
 
     #[test]
@@ -298,5 +301,7 @@ mod test {
         println!("updates 1 {:?} \n", updates1);
         println!("root hash 1 {:?} \n", tree.root_hash());
         println!("accounts 1 {:?} \n", tree.get_accounts());
+
+        assert_eq!(tree.root_hash().to_string(), "Fr(0x0f220069602ed8f8c4557fdde71baf5220bbf237790adf67f49280b84588acf2)".to_string());
     }
 }
