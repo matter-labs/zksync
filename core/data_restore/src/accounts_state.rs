@@ -27,9 +27,7 @@ impl FranklinAccountsState {
     fn new_test() -> Self {
         Self {
             state: PlasmaState::empty(),
-            fee_account_address: AccountAddress {
-                data: [08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 34, 25, 26, 27]
-            },
+            fee_account_address: AccountAddress::from_hex(&"0x0809101112131415161718192021222334252627").unwrap()
         }
     }
 
@@ -171,9 +169,8 @@ impl FranklinAccountsState {
                 _ => {}
             }
         }
-
-        // let (_, fee_updates) = self.state.collect_fee(&fees, &self.fee_account_address);
-        // accounts_updated.extend(fee_updates.into_iter());
+        let (_, fee_updates) = self.state.collect_fee(&fees, &self.fee_account_address);
+        accounts_updated.extend(fee_updates.into_iter());
 
         Ok(accounts_updated)
     }
@@ -188,9 +185,14 @@ impl FranklinAccountsState {
         self.state.root_hash()
     }
 
-    /// Returns Franklin Account description by its id
+    /// Returns Franklin Account id and description by its address
     pub fn get_account_by_address(&self, address: &AccountAddress) -> Option<(AccountId, Account)> {
         self.state.get_account_by_address(address)
+    }
+
+    /// Returns Franklin Account description by its id
+    pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
+        self.state.get_account(account_id)
     }
 }
 
