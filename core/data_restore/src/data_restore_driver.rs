@@ -59,6 +59,8 @@ impl DataRestoreDriver {
 
     pub fn load_state_from_storage(&mut self) -> Result<(), DataRestoreError> {
         let state = storage_interactor::get_storage_state(self.connection_pool.clone())?;
+        let tree_state = storage_interactor::get_tree_state(self.connection_pool.clone())?;
+        self.accounts_state = FranklinAccountsState::load(tree_state.0, tree_state.1);
         match state {
             StorageUpdateState::Events => {
                 self.events_state = storage_interactor::get_events_state_from_storage(

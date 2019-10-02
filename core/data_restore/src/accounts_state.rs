@@ -11,12 +11,14 @@ use models::node::{AccountId, AccountMap, AccountUpdates, Fr};
 
 /// Franklin Accounts states with data restore configuration
 pub struct FranklinAccountsState {
-    /// Accounts stored in a spase Merkle tree and current block number
+    /// Accounts stored in a spase merkle tree
     pub state: PlasmaState,
+    /// Fee account will accumulate fees from transactions
     pub fee_account_address: AccountAddress,
 }
 
 impl FranklinAccountsState {
+    /// Returns new FranklinAccountsState instance
     pub fn new() -> Self {
         Self {
             state: PlasmaState::empty(),
@@ -24,6 +26,7 @@ impl FranklinAccountsState {
         }
     }
 
+    /// Returns new FranklinAccountsState instance for tests
     fn new_test() -> Self {
         Self {
             state: PlasmaState::empty(),
@@ -31,10 +34,10 @@ impl FranklinAccountsState {
         }
     }
 
-    /// Creates empty Franklin Accounts states
-    pub fn load(accounts: AccountMap, current_block: u32) -> Self {
+    /// Loads franklin
+    pub fn load(current_block: u32, accounts: AccountMap) -> Self {
         Self {
-            state: PlasmaState::new(accounts, current_block + 1),
+            state: PlasmaState::new(accounts, current_block),
             fee_account_address: DATA_RESTORE_CONFIG.fee_account_address.clone(),
         }
     }
