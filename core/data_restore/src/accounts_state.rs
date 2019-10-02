@@ -152,8 +152,8 @@ impl FranklinAccountsState {
                         accounts_updated.append(&mut updates);
                     }
                 }
-                FranklinOp::FullExit(_op) => {
-                    println!("fe {:?}", &_op);
+                FranklinOp::FullExit(mut _op) => {
+                    _op.priority_op.nonce -= 1;
                     let OpSuccess {
                         fee,
                         mut updates,
@@ -198,7 +198,6 @@ impl FranklinAccountsState {
 
 #[cfg(test)]
 mod test {
-    use models::node::account::{Account, AccountAddress};
     use crate::franklin_ops::FranklinOpsBlock;
     use crate::accounts_state::FranklinAccountsState;
     #[test]
@@ -207,7 +206,6 @@ mod test {
         let decoded1 = hex::decode(data1).expect("Decoding failed");
         let ops1 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded1)
             .expect("cant get ops from data 1");
-        println!("ops1 {:?} \n", &ops1);
         let block1 = FranklinOpsBlock {
             block_num: 1,
             ops: ops1,
@@ -217,20 +215,33 @@ mod test {
         let decoded2 = hex::decode(data2).expect("Decoding failed");
         let ops2 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded2)
             .expect("cant get ops from data 2");
-        println!("ops2 {:?} \n", &ops2);
         let block2 = FranklinOpsBlock {
             block_num: 2,
             ops: ops2,
         };
+
+        // let data3 = "06000002000000000000000000000000000000000000000000000000000000000000000052312ad6f01657413b2eae9287f6b9adad93d5fe000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000014cabd42a5b98000000";
+        // let decoded3 = hex::decode(data3).expect("Decoding failed");
+        // let ops3 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded3)
+        //     .expect("cant get ops from data");
+        // println!("ops3 {:?} \n", ops3);   
+        // let block3 = FranklinOpsBlock {
+        //     block_num: 3,
+        //     ops: ops3,
+        // };
         
         let mut tree = FranklinAccountsState::new_test();
         let updates1 = tree.update_accounts_states_from_ops_block(&block1).expect("Cant update state from block 1");
-        println!("updates1 {:?} \n", updates1);
+        println!("updates 1 {:?} \n", updates1);
         println!("root hash 1 {:?} \n", tree.root_hash());
         println!("accounts 1 {:?} \n", tree.get_accounts());
         let updates2 = tree.update_accounts_states_from_ops_block(&block2).expect("Cant update state from block 2");
-        println!("updates2 {:?} \n", updates2);
+        println!("updates 2 {:?} \n", updates2);
         println!("root hash 2 {:?} \n", tree.root_hash());
         println!("accounts 2 {:?} \n", tree.get_accounts());
+        // let updates3 = tree.update_accounts_states_from_ops_block(&block3).expect("Cant update state from block 3");
+        // println!("updates 3 {:?} \n", updates3);
+        // println!("root hash 3 {:?} \n", tree.root_hash());
+        // println!("accounts 3 {:?} \n", tree.get_accounts());
     }
 }
