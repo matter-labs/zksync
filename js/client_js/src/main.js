@@ -62,16 +62,17 @@ new Vue({
                         router.push('/login');
                     }
                 }
-
-                if (window.web3 == false) {
-                    document.getElementById("change_network_alert").style.display = "none";
-                    document.getElementById("login_button").style.display = "none";
-                } else if (correct) {
-                    document.getElementById("change_network_alert").style.display = "none";
-                    document.getElementById("login_button").style.display = "inline-block";
-                } else {
-                    document.getElementById("change_network_alert").style.display = "inline-block";
-                    document.getElementById("login_button").style.display = "none";
+                if (router.currentRoute.path === '/login') {
+                    if (window.web3 == false) {
+                        document.getElementById("change_network_alert").style.display = "none";
+                        document.getElementById("login_button").style.display = "none";
+                    } else if (correct) {
+                        document.getElementById("change_network_alert").style.display = "none";
+                        document.getElementById("login_button").style.display = "inline-block";
+                    } else {
+                        document.getElementById("change_network_alert").style.display = "inline-block";
+                        document.getElementById("login_button").style.display = "none";
+                    }
                 }
             });
         };
