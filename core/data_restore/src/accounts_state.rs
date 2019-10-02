@@ -200,8 +200,9 @@ impl FranklinAccountsState {
 mod test {
     use crate::franklin_ops::FranklinOpsBlock;
     use crate::accounts_state::FranklinAccountsState;
+
     #[test]
-    fn test_tree_update() {
+    fn test_tree_consistent_update() {
         let data1 = "0100000000000000000000000000041336c4e56f98000809101112131415161718192021222334252627000000000000";
         let decoded1 = hex::decode(data1).expect("Decoding failed");
         let ops1 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded1)
@@ -220,7 +221,7 @@ mod test {
             ops: ops2,
         };
 
-        let data3 = "02000000000000010008091011121314151617181920212223342526280000010000";
+        let data3 = "02000000000000010008091011121314151617181920212223342526280000010000000000000000";
         let decoded3 = hex::decode(data3).expect("Decoding failed");
         let ops3 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded3)
             .expect("cant get ops from data 3");
@@ -229,7 +230,7 @@ mod test {
             ops: ops3,
         };
 
-        let data4 = "0500000100000000000001000000";
+        let data4 = "05000001000000000000010000000000";
         let decoded4 = hex::decode(data4).expect("Decoding failed");
         let ops4 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded4)
             .expect("cant get ops from data 4");
@@ -238,7 +239,7 @@ mod test {
             ops: ops4,
         };
 
-        let data5 = "04000001";
+        let data5 = "0400000100000000";
         let decoded5 = hex::decode(data5).expect("Decoding failed");
         let ops5 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded5)
             .expect("cant get ops from data 5");
@@ -246,7 +247,8 @@ mod test {
             block_num: 5,
             ops: ops5,
         };
-
+        
+        // FULL EXIT WILL WORK WITH SIGNATURE
         // let data3 = "06000002000000000000000000000000000000000000000000000000000000000000000052312ad6f01657413b2eae9287f6b9adad93d5fe000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000014cabd42a5b98000000";
         // let decoded3 = hex::decode(data3).expect("Decoding failed");
         // let ops3 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded3)
@@ -278,5 +280,23 @@ mod test {
         println!("updates 5 {:?} \n", updates5);
         println!("root hash 5 {:?} \n", tree.root_hash());
         println!("accounts 5 {:?} \n", tree.get_accounts());
+    }
+
+    #[test]
+    fn test_tree_inconsistent_update() {
+        let data1 = "0100000000000000000000000000041336c4e56f98000809101112131415161718192021222334252627000000000000030000000000000000000000000002c68af0bb14000000005711e991397fca8f5651c9bb6fa06b57e4a4dcc00000000002000000000000010008091011121314151617181920212223342526280000010000000000000000050000010000000000000100000000000400000100000000";
+        let decoded1 = hex::decode(data1).expect("Decoding failed");
+        let ops1 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded1)
+            .expect("cant get ops from data 1");
+        let block1 = FranklinOpsBlock {
+            block_num: 1,
+            ops: ops1,
+        };
+
+        let mut tree = FranklinAccountsState::new_test();
+        let updates1 = tree.update_accounts_states_from_ops_block(&block1).expect("Cant update state from block 1");
+        println!("updates 1 {:?} \n", updates1);
+        println!("root hash 1 {:?} \n", tree.root_hash());
+        println!("accounts 1 {:?} \n", tree.get_accounts());
     }
 }
