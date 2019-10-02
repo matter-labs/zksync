@@ -11,12 +11,14 @@ const FUNC_NAME_HASH_LENGTH: usize = 4;
 /// Description of a Franklin operations block
 #[derive(Debug, Clone)]
 pub struct FranklinOpsBlock {
+    /// Franklin block number
     pub block_num: u32,
     /// Franklin operations in block
     pub ops: Vec<FranklinOp>,
 }
 
 impl FranklinOpsBlock {
+    // Get ops block from Franklin Contract event description
     pub fn get_from_event(event_data: &EventData) -> Result<Self, DataRestoreError> {
         let ops_block = FranklinOpsBlock::get_franklin_ops_block(event_data)?;
         Ok(ops_block)
@@ -42,6 +44,12 @@ impl FranklinOpsBlock {
         Ok(block)
     }
 
+    /// Return Franklin operations vector
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - Franklin Contract event input data
+    ///
     pub fn get_franklin_ops_from_data(data: &Vec<u8>) -> Result<Vec<FranklinOp>, DataRestoreError> {
         let mut current_pointer = 0;
         let mut ops = vec![];

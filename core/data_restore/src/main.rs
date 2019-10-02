@@ -11,9 +11,11 @@ pub mod storage_interactor;
 
 use crate::data_restore_driver::DataRestoreDriver;
 use std::env;
-// use std::str::FromStr;
 use storage::ConnectionPool;
 use storage_interactor::remove_storage_data;
+
+static ETH_BLOCKS_DELTA: u64 = 250; /// Step of the considered blocks ethereum block
+static END_ETH_BLOCKS_DELTA: u64 = 25; /// Delta between last ethereum block and last watched ethereum block to prevent restart in case of reorder
 
 fn main() {
     env_logger::init();
@@ -36,7 +38,7 @@ fn main() {
 /// * `connection_pool` - Database connection pool
 ///
 fn create_data_restore_driver(connection_pool: ConnectionPool) -> DataRestoreDriver {
-    DataRestoreDriver::new(connection_pool, 12, 250, 25) // TODO: - rethinks how to get blocks
+    DataRestoreDriver::new(connection_pool, ETH_BLOCKS_DELTA, END_ETH_BLOCKS_DELTA)
 }
 
 /// Loads state from the beginning

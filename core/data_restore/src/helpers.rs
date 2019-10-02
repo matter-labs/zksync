@@ -22,6 +22,8 @@ pub struct DataRestoreConfig {
     pub franklin_contract: Contract,
     /// Ethereum Franklin contract address is type of H160
     pub franklin_contract_address: Address,
+    /// Franklin contract genesis block number: u64
+    pub genesis_block_number: u64,
     /// Operator address (fee)
     pub fee_account_address: AccountAddress,
 }
@@ -43,6 +45,9 @@ impl DataRestoreConfig {
                 .as_str()
                 .parse()
                 .expect("Cant create data restore config"), //"4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()
+            genesis_block_number: u64::from_str_radix(
+                std::env::var("FRANKLIN_GENESIS_NUMBER").expect("FRANKLIN_GENESIS_NUMBER env missing").as_str(),
+                10).expect("Cant get genesis number"), // 0
             fee_account_address: std::env::var("OPERATOR_FRANKLIN_ADDRESS")
                 .map(|addr| {
                     AccountAddress::from_hex(&addr).expect("Incorrect franklin account address")
@@ -89,7 +94,7 @@ pub enum DataRestoreError {
     Unknown(String),
     /// Storage error with description
     Storage(String),
-    /// Wrong data
+    /// Wrong data with description
     WrongData(String),
     /// Got no data with description
     NoData(String),

@@ -5,6 +5,7 @@ use crate::helpers::DataRestoreError;
 use crate::storage_interactor;
 use storage::ConnectionPool;
 
+/// Storage state update
 pub enum StorageUpdateState {
     None,
     Events,
@@ -38,7 +39,6 @@ impl DataRestoreDriver {
     ///
     pub fn new(
         connection_pool: ConnectionPool,
-        genesis_block_number: u64,
         eth_blocks_delta: u64,
         end_eth_blocks_delta: u64,
     ) -> Self {
@@ -47,7 +47,7 @@ impl DataRestoreDriver {
             eth_blocks_delta,
             end_eth_blocks_delta,
             run_updates: false,
-            events_state: EventsState::new(genesis_block_number),
+            events_state: EventsState::new(),
             accounts_state: FranklinAccountsState::new(),
         }
     }

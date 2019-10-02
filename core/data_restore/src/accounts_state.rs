@@ -34,7 +34,13 @@ impl FranklinAccountsState {
         }
     }
 
-    /// Loads franklin
+    /// Returns FranklinAccountsState from accounts map and current block number
+    /// 
+    /// # Arguments
+    ///
+    /// * `current_block` - current block number
+    /// * `accounts` - accounts map
+    ///
     pub fn load(current_block: u32, accounts: AccountMap) -> Self {
         Self {
             state: PlasmaState::new(accounts, current_block),
@@ -42,11 +48,12 @@ impl FranklinAccountsState {
         }
     }
 
-    /// Updates Franklin Accounts states from Franklin op
+    /// Updates Franklin Accounts states from Franklin operations block
+    /// Returns updated accounts
     ///
     /// # Arguments
     ///
-    /// * `op` - Franklin operation
+    /// * `block` - Franklin operations blocks
     ///
     pub fn update_accounts_states_from_ops_block(
         &mut self,

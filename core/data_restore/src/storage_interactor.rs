@@ -26,6 +26,14 @@ pub fn remove_storage_data(connection_pool: ConnectionPool) -> Result<(), DataRe
     Ok(())
 }
 
+/// Updates stored tree state
+///
+/// # Arguments
+/// 
+/// * `block_number` - current block number
+/// * `account_updates` - accounts updates
+/// * `connection_pool` - Database Connection Pool
+///
 pub fn update_tree_state(
     block_number: u32,
     account_updates: &AccountUpdates,
@@ -113,6 +121,13 @@ pub fn save_last_watched_block_number(
     Ok(())
 }
 
+/// Saves update storage state
+///
+/// # Arguments
+///
+/// * `state` - storage state update
+/// * `connection_pool` - Database Connection Pool
+///
 pub fn save_storage_state(
     state: StorageUpdateState,
     connection_pool: ConnectionPool,
@@ -136,11 +151,11 @@ pub fn save_storage_state(
     Ok(())
 }
 
-/// Saves franklin operation blocks in storage
+/// Saves franklin operations blocks in storage
 ///
 /// # Arguments
 ///
-/// * `blocks` - Franklin operation blocks
+/// * `blocks` - Franklin operations blocks
 /// * `connection_pool` - Database Connection Pool
 ///
 pub fn save_franklin_ops_blocks(
@@ -160,7 +175,11 @@ pub fn save_franklin_ops_blocks(
     Ok(())
 }
 
-/// Data removes
+/// Removes events state from storage
+///
+/// # Arguments
+///
+/// * `connection_pool` - Database Connection Pool
 ///
 pub fn remove_events_state(connection_pool: ConnectionPool) -> Result<(), DataRestoreError> {
     let storage = connection_pool.access_storage().map_err(|_| {
@@ -172,6 +191,12 @@ pub fn remove_events_state(connection_pool: ConnectionPool) -> Result<(), DataRe
     Ok(())
 }
 
+/// Removes franklin operations from storage
+///
+/// # Arguments
+///
+/// * `connection_pool` - Database Connection Pool
+///
 pub fn remove_franklin_ops(connection_pool: ConnectionPool) -> Result<(), DataRestoreError> {
     let storage = connection_pool.access_storage().map_err(|_| {
         DataRestoreError::Storage("db connection failed for data restore remove data".to_string())
@@ -182,6 +207,12 @@ pub fn remove_franklin_ops(connection_pool: ConnectionPool) -> Result<(), DataRe
     Ok(())
 }
 
+/// Removes tree state from storage
+///
+/// # Arguments
+///
+/// * `connection_pool` - Database Connection Pool
+///
 pub fn remove_tree_state(connection_pool: ConnectionPool) -> Result<(), DataRestoreError> {
     let storage = connection_pool.access_storage().map_err(|_| {
         DataRestoreError::Storage("db connection failed for data restore remove data".to_string())
@@ -192,6 +223,12 @@ pub fn remove_tree_state(connection_pool: ConnectionPool) -> Result<(), DataRest
     Ok(())
 }
 
+/// Removes last watched block number from storage
+///
+/// # Arguments
+///
+/// * `connection_pool` - Database Connection Pool
+///
 pub fn remove_last_watched_block_number(
     connection_pool: ConnectionPool,
 ) -> Result<(), DataRestoreError> {
@@ -204,6 +241,12 @@ pub fn remove_last_watched_block_number(
     Ok(())
 }
 
+/// Removes update storage statae from storage
+///
+/// # Arguments
+///
+/// * `connection_pool` - Database Connection Pool
+///
 pub fn remove_storage_state(connection_pool: ConnectionPool) -> Result<(), DataRestoreError> {
     let storage = connection_pool.access_storage().map_err(|_| {
         DataRestoreError::Storage("db connection failed for data restore remove data".to_string())
@@ -249,6 +292,12 @@ pub fn stored_ops_block_into_ops_block(op_block: &StoredFranklinOpsBlock) -> Fra
     }
 }
 
+/// Get storage update state from storage
+///
+/// # Arguments
+///
+/// * `connection_pool` - Database Connection Pool
+///
 pub fn get_storage_state(
     connection_pool: ConnectionPool,
 ) -> Result<StorageUpdateState, DataRestoreError> {
@@ -362,6 +411,12 @@ pub fn stored_block_event_into_block_event(block: StoredBlockEvent) -> Option<Ev
     })
 }
 
+/// Get tree accounts state and last block number from storage
+///
+/// # Arguments
+///
+/// * `connection_pool` - Database Connection Pool
+///
 pub fn get_tree_state(
     connection_pool: ConnectionPool,
 ) -> Result<(u32, AccountMap), DataRestoreError> {

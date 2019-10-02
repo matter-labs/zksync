@@ -25,12 +25,9 @@ pub struct EventsState {
 /// New blocks -> last watching block ++
 /// Check if txs in last watching block
 impl EventsState {
-    /// Create new franklin contract events state///
-    /// # Arguments
-    ///
-    /// * `genesis_block_number` - contract creation block number
-    ///
-    pub fn new(genesis_block_number: u64) -> Self {
+    /// Create new franklin contract events state
+    pub fn new() -> Self {
+        let genesis_block_number = DATA_RESTORE_CONFIG.genesis_block_number;
         Self {
             committed_events: vec![],
             verified_events: vec![],
