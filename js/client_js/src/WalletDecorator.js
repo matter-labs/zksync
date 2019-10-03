@@ -1,6 +1,12 @@
-import { BigNumberish, BigNumber, bigNumberify } from 'ethers/utils';
+import { BigNumberish, BigNumber, bigNumberify, Interface } from 'ethers/utils';
+import { Contract } from 'ethers';
 import { FranklinProvider, Wallet, Address } from 'franklin_lib';
 import { readableEther, sleep } from './utils';
+
+// TODO:
+import env_config from './env-config'
+import priority_queue_abi from '../../../contracts/build/PriorityQueue.json'
+import franklinContract from '../../franklin_lib/abi/Franklin.json'
 
 function info(msg) {
     return {
@@ -306,8 +312,10 @@ export class WalletDecorator {
             yield * this.verboseGetRevertReason(tx_hash);
     
             yield info(`Withdraw succeeded!`);
+            await sleep(5000);
         } catch (e) {
             yield error('Withdraw failed with ', e.message);
+            await sleep(5000);
         }
     }
 
@@ -349,15 +357,54 @@ export class WalletDecorator {
             yield info(`Deposit <code>${tx_hash}</code> sent to Mainchain...`);
         } catch (e) {
             yield error(`Onchain deposit failed with "${e.message}"`);
+            await sleep(5000)
             return;
         }
 
         try {
             yield * await this.verboseGetRevertReason(tx_hash);
+            await sleep(5000);
         } catch (e) {
             yield error(`Onchain deposit failed with "${e.message}"`);
+            await sleep(5000)
             return;
         }
+
+        let priorityQueueInterface = new Interface(priority_queue_abi.interface);
+        let receipt = await this.wallet.ethWallet.provider.getTransactionReceipt(tx_hash);
+        let pq_id = receipt.logs
+            .map(l => priorityQueueInterface.parseLog(l)) // the only way to get it to work
+            .filter(Boolean)
+            .filter(log => log.name == 'NewPriorityRequest')
+
+        if (pq_id.length == 1) {
+            pq_id = pq_id[0].values[0].toString();
+            yield info(`PQ id is ${pq_id}`);
+        } else {
+            console.log('pq_id : ', pq_id);
+            yield error(`Found ${pq_id.length} PQ ids.`);
+            return;
+        }
+
+        let pq_op = await this.wallet.provider.getPriorityOpReceipt(pq_id);
+        while (pq_op.prover_run == undefined) {
+            await sleep(2000);
+            pq_op = await this.wallet.provider.getPriorityOpReceipt(pq_id);
+            console.log(pq_op);
+        }
+
+        yield info(`Prover ${pq_op.prover_run.worker} started `
+            + `proving block ${pq_op.prover_run.block_number} `
+            + `at ${pq_op.prover_run.created_at}`);
+
+        while ( ! pq_op.verified) {
+            pq_op = await this.wallet.provider.getPriorityOpReceipt(pq_id);
+            await sleep(2000);
+        }
+        
+        yield info (`PQ op <code>${pq_id}</code> got proved!`);
+        await sleep(5000);
+        return;
     }
 
     async * verboseGetRevertReason(tx_hash) {

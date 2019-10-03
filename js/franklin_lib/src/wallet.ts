@@ -95,6 +95,12 @@ export class FranklinProvider {
             .then(reps => reps.data)
             .catch(error => console.log(error.response));
     }
+
+    async getPriorityOpReceipt(pq_id) {
+        return await Axios.get(`${this.providerAddress}/api/v0.1/priority_operations/${pq_id}/`)
+            .then(reps => reps.data)
+            .catch(error => console.log(error.response));
+    }
 }
 
 export interface Token {

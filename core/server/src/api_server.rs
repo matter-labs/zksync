@@ -2,7 +2,7 @@
 
 use actix_web::{
     http::Method, middleware, middleware::cors::Cors, server, App, AsyncResponder, Body, Error,
-    HttpMessage, HttpRequest, HttpResponse,
+    HttpMessage, HttpRequest, HttpResponse, error
 };
 use models::node::{tx::FranklinTx, Account, AccountId, ExecutedOperations};
 use models::{NetworkStatus, StateKeeperRequest};
@@ -303,6 +303,20 @@ fn handle_get_executed_transaction_by_hash(
     }
 }
 
+fn handle_get_priority_op_receipt(
+    req: &HttpRequest<AppState>,
+) -> ActixResult<HttpResponse> {
+    req.state()
+        .connection_pool.clone()
+        .access_storage()
+        .map_err(|e| error::ErrorBadRequest(e))
+        .and_then(|storage| {
+            let id: i64 = req.match_info().get("pq_id").unwrap().parse::<i64>().unwrap();
+            let res = storage.get_priority_op_receipt(id).unwrap();
+            Ok(HttpResponse::Ok().json(res))
+        })
+}
+
 fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let network_status = req.state().network_status.read();
     Ok(HttpResponse::Ok().json(network_status))
@@ -562,6 +576,9 @@ fn start_server(state: AppState, bind_to: String) {
                     .resource("/transactions/{tx_hash}", |r| {
                         r.method(Method::GET)
                             .f(handle_get_executed_transaction_by_hash);
+                    })
+                    .resource("/priority_operations/{pq_id}/", |r| {
+                        r.method(Method::GET).f(handle_get_priority_op_receipt);
                     })
                     .resource("/blocks/{block_id}/transactions/{tx_id}", |r| {
                         r.method(Method::GET).f(handle_get_transaction_by_id);
