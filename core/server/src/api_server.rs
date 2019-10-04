@@ -317,6 +317,51 @@ fn handle_get_priority_op_receipt(
         })
 }
 
+fn handle_get_account_transactions_history(
+    req: &HttpRequest<AppState>,
+) -> ActixResult<HttpResponse> {
+    
+    let storage = req.state()
+        .connection_pool.clone()
+        .access_storage()
+        .map_err(|e| error::ErrorBadRequest(e))?;
+
+    let address = req
+        .match_info()
+        .get("address")
+        .and_then(|address| AccountAddress::from_hex(address).ok())
+        .ok_or_else(|| error::ErrorBadRequest("Invalid address parameter"))?;
+
+
+    let offset = req
+        .match_info()
+        .get("offset")
+        .and_then(|offset| offset.parse::<i64>().ok())
+        .ok_or_else(|| error::ErrorBadRequest("Invalid offset parameter"))?;
+
+    const MAX_LIMIT: i64 = 100;
+
+    let limit = req
+        .match_info()
+        .get("limit")
+        .and_then(|limit| limit.parse::<i64>().ok())
+        .ok_or_else(|| "Invalid limit parameter")
+        .and_then(|limit| {
+            if limit <= MAX_LIMIT {
+                Ok(limit)
+            } else {
+                Err("Limit too large")
+            }
+        })
+        .map_err(|e| error::ErrorBadRequest(e))?;
+
+    let res = storage
+        .get_account_transactions_history(&address, offset, limit)
+        .map_err(|e| error::ErrorBadRequest(e))?;
+
+    Ok(HttpResponse::Ok().json(res))
+}
+
 fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let network_status = req.state().network_status.read();
     Ok(HttpResponse::Ok().json(network_status))
@@ -573,9 +618,11 @@ fn start_server(state: AppState, bind_to: String) {
                     .resource("/account/{id}/transactions", |r| {
                         r.method(Method::GET).f(handle_get_account_transactions);
                     })
+                    .resource("/account/{address}/history/{offset}/{limit}", |r| {
+                        r.method(Method::GET).f(handle_get_account_transactions_history);
+                    })
                     .resource("/transactions/{tx_hash}", |r| {
-                        r.method(Method::GET)
-                            .f(handle_get_executed_transaction_by_hash);
+                        r.method(Method::GET).f(handle_get_executed_transaction_by_hash);
                     })
                     .resource("/priority_operations/{pq_id}/", |r| {
                         r.method(Method::GET).f(handle_get_priority_op_receipt);

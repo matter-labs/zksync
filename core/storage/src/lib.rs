@@ -592,7 +592,8 @@ struct InsertTx {
     tx: Value,
 }
 
-#[derive(Debug, Queryable)]
+#[derive(Debug, Queryable, QueryableByName)]
+#[table_name = "mempool"]
 struct ReadTx {
     hash: Vec<u8>,
     primary_account_address: Vec<u8>,
@@ -628,6 +629,29 @@ enum ConnectionHolder {
 
 pub struct StorageProcessor {
     conn: ConnectionHolder,
+}
+
+use diesel::sql_types::{Bool, Jsonb, Binary};
+
+#[derive(Debug, Serialize, Deserialize, QueryableByName)]
+pub struct TransactionsHistoryItem {
+    #[sql_type = "Nullable<Text>"]
+    pub hash: Option<String>,
+
+    #[sql_type = "Jsonb"]
+    pub tx: Value,
+
+    #[sql_type = "Nullable<Bool>"]
+    pub success: Option<bool>,
+
+    #[sql_type = "Nullable<Text>"]
+    pub fail_reason: Option<String>,
+
+    #[sql_type = "Bool"]
+    pub commited: bool,
+
+    #[sql_type = "Bool"]
+    pub verified: bool,
 }
 
 fn restore_account(
@@ -768,6 +792,85 @@ impl StorageProcessor {
             verified: confirm.is_some(),
             prover_run: prover_run,
         })
+    }
+
+    pub fn get_account_transactions_history(
+        &self,
+        address: &AccountAddress,
+        offset: i64,
+        limit: i64
+    ) -> QueryResult<Vec<TransactionsHistoryItem>> {
+        let query = format!(
+            "
+            select
+                encode(hash, 'hex') as hash,
+                tx,
+                success,
+                fail_reason,
+                coalesce(commited, false) as commited,
+                coalesce(verified, false) as verified
+            from (
+                select 
+                    *
+                from
+                    (select
+                        tx,
+                        hash,
+                        success,
+                        fail_reason,
+                        block_number
+                    from
+                        mempool
+                    left join 
+                        executed_transactions
+                    on 
+                        tx_hash = hash
+                    where 
+                        encode(primary_account_address, 'hex') = '{address}'
+                        or 
+                        tx->>'to' = '0x{address}'
+                    union all
+                    select 
+                        operation as tx,
+                        null as hash,
+                        null as success,
+                        null as fail_reason,
+                        block_number
+                    from 
+                        executed_priority_operations
+                    where 
+                        operation->'priority_op'->>'account' = '0x{address}') t
+                offset 
+                    {offset}
+                limit 
+                    {limit}
+            ) t
+            left join
+                crosstab($$
+                    select 
+                        block_number as rowid, 
+                        action_type as category, 
+                        true as values 
+                    from 
+                        operations
+                    order by
+                        block_number
+                    $$) t3 (
+                        block_number bigint, 
+                        commited boolean, 
+                        verified boolean)
+            using 
+                (block_number)
+            order by
+                block_number
+            "
+            , address = hex::encode(address.data)
+            , offset = offset
+            , limit = limit
+        );
+
+        diesel::sql_query(query)
+            .load::<TransactionsHistoryItem>(self.conn())
     }
 
     pub fn get_account_transactions(
