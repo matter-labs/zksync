@@ -1,8 +1,11 @@
-import {Contract, ethers} from "ethers";
-import {franklinContractCode} from "../src.ts/deploy";
+import {ethers} from "ethers";
+import {franklinContractCode, governanceContractCode, priorityQueueContractCode} from "../src.ts/deploy";
+import {Interface} from "ethers/utils";
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
-const franklinDeployedContract = new Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, wallet);
+const franklinInterface = new Interface(franklinContractCode.interface);
+const priorityQueueInterface = new Interface(priorityQueueContractCode.interface);
+const governanceInterface = new Interface(governanceContractCode.interface);
 
 function hex_to_ascii(str1) {
 	const hex  = str1.toString();
@@ -44,8 +47,18 @@ async function reason() {
         }
 
         for (let log of receipt.logs){
-            console.log(franklinDeployedContract.interface.parseLog(log));
-
+            let parsedLog = franklinInterface.parseLog(log);
+            if (!parsedLog) {
+                parsedLog = priorityQueueInterface.parseLog(log);
+            }
+            if (!parsedLog) {
+                parsedLog = governanceInterface.parseLog(log);
+            }
+            if (parsedLog) {
+                console.log(parsedLog);
+            } else {
+                console.log(log);
+            }
         }
 
     }
