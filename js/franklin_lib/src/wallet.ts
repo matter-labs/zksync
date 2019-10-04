@@ -66,40 +66,49 @@ export class FranklinProvider {
         return req;
     }
 
-    async submitTx(tx) {
-        return await Axios.post(this.providerAddress + '/api/v0.1/submit_tx', tx)
+    private static async axiosRequest(promise) {
+        promise = promise
             .then(reps => reps.data)
-            .catch(error => console.log(error.response));
+            .catch(error => { 
+                let response;
+                if (!error.response) {
+                    response = 'Error: Network Error';
+                } else {
+                    response = error.response.data.message;
+                }
+                throw new Error(response);
+            });
+        return await promise;
+    }
+
+    async submitTx(tx) {
+        return await FranklinProvider.axiosRequest(
+            Axios.post(this.providerAddress + '/api/v0.1/submit_tx', tx));
     }
 
     async getTokens() {
-        return await Axios.get(this.providerAddress + '/api/v0.1/tokens')
-            .then(reps => reps.data)
-            .catch(error => console.log(error.response));
+        return await FranklinProvider.axiosRequest(
+            Axios.get(this.providerAddress + '/api/v0.1/tokens'));
     }
 
     async getTransactionsHistory(address: Address) {
-        return await Axios.get(this.providerAddress + '/api/v0.1/account/' + `0x${address.toString("hex")}` + '/transactions')
-            .then(reps => reps.data)
-            .catch(error => console.log(error.response));
+        return await FranklinProvider.axiosRequest(
+            Axios.get(this.providerAddress + '/api/v0.1/account/' + `0x${address.toString("hex")}` + '/transactions'));
     }
 
     async getState(address: Address): Promise<FranklinAccountState> {
-        return await Axios.get(this.providerAddress + '/api/v0.1/account/' + `0x${address.toString("hex")}`)
-            .then(reps => reps.data)
-            .catch(error => console.log(error.response));
+        return await FranklinProvider.axiosRequest(
+            Axios.get(this.providerAddress + '/api/v0.1/account/' + `0x${address.toString("hex")}`));
     }
 
     async getTxReceipt(tx_hash) {
-        return await Axios.get(this.providerAddress + '/api/v0.1/transactions/' + tx_hash)
-            .then(reps => reps.data)
-            .catch(error => console.log(error.response));
+        return await FranklinProvider.axiosRequest(
+            Axios.get(this.providerAddress + '/api/v0.1/transactions/' + tx_hash));
     }
 
     async getPriorityOpReceipt(pq_id) {
-        return await Axios.get(`${this.providerAddress}/api/v0.1/priority_operations/${pq_id}/`)
-            .then(reps => reps.data)
-            .catch(error => console.log(error.response));
+        return await FranklinProvider.axiosRequest(
+            Axios.get(`${this.providerAddress}/api/v0.1/priority_operations/${pq_id}/`));
     }
 }
 

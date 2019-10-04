@@ -18,6 +18,7 @@
     "ethjs": "^0.4.0",
     "ethjs-util": "^0.1.6",
     "franklin_lib": "../franklin_lib",
+    "is-reachable": "^4.0.0",
     "vue": "^2.6.10",
     "vue-router": "^3.0.3"
   },

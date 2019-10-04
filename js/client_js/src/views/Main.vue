@@ -53,6 +53,7 @@
 
 <script>
 import ClipboardJS from 'clipboard'
+import isReachable from 'is-reachable'
 
 import Wallet from '../components/Wallet.vue'
 import History from '../components/History.vue'
@@ -90,23 +91,38 @@ export default {
             this.$refs.alert.display(kwargs);
         },
         async updateAccountInfo() {
-            await window.walletDecorator.updateState();
-            let onchainBalances = window.walletDecorator.onchainBalancesAsRenderableList();
-            let contractBalances = window.walletDecorator.contractBalancesAsRenderableList();
-            let franklinBalances = window.walletDecorator.franklinBalancesAsRenderableList();
-            let franklinBalancesWithInfo = window.walletDecorator.franklinBalancesAsRenderableListWithInfo();
-            this.walletInfo = {
-                onchainBalances,
-                contractBalances,
-                franklinBalances,
-                franklinBalancesWithInfo,
-            };
+            try {
+                await window.walletDecorator.updateState();
 
-            this.historyInfo = {
-                transactions: await window.walletDecorator.transactionsAsNeeded(),
-            };
+                let onchainBalances = window.walletDecorator.onchainBalancesAsRenderableList();
+                let contractBalances = window.walletDecorator.contractBalancesAsRenderableList();
+                let franklinBalances = window.walletDecorator.franklinBalancesAsRenderableList();
+                let franklinBalancesWithInfo = window.walletDecorator.franklinBalancesAsRenderableListWithInfo();
+                this.walletInfo = {
+                    onchainBalances,
+                    contractBalances,
+                    franklinBalances,
+                    franklinBalancesWithInfo,
+                };
 
-            await sleep(1000);
+                this.historyInfo = {
+                    transactions: await window.walletDecorator.transactionsAsNeeded(),
+                };
+            } catch (e) {
+                let message = e.message;
+                let franklinServerReachable = await isReachable(this.config.API_SERVER);
+                if (franklinServerReachable == false) {
+                    message = "Franklin server unavailable, check you internet connection.";
+                }
+                
+                this.displayAlert({
+                    message: message,
+                    variant: 'danger',
+                    countdown: 10,
+                })
+            }
+
+            await sleep(1997);
             this.updateAccountInfo();
         }
     },
