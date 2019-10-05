@@ -306,6 +306,7 @@ fn handle_get_executed_transaction_by_hash(
 fn handle_get_priority_op_receipt(
     req: &HttpRequest<AppState>,
 ) -> ActixResult<HttpResponse> {
+    // TODO: jazzandrock remove bad unwraps
     req.state()
         .connection_pool.clone()
         .access_storage()

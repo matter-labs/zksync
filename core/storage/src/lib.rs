@@ -261,6 +261,7 @@ pub struct TxReceiptResponse {
     prover_run: Option<ProverRun>,
 }
 
+// TODO: jazzandrock add more info(?)
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PriorityOpReceiptResponse {
     committed: bool,
@@ -766,6 +767,7 @@ impl StorageProcessor {
     }
 
     pub fn get_priority_op_receipt(&self, op_id: i64) -> QueryResult<PriorityOpReceiptResponse> {
+        // TODO: jazzandrock maybe use one db query(?).
         let stored_executed_prior_op: StoredExecutedPriorityOperation = executed_priority_operations::table
             .filter(executed_priority_operations::priority_op_serialid.eq(op_id))
             .first::<StoredExecutedPriorityOperation>(self.conn())?;

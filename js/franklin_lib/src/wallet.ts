@@ -66,6 +66,7 @@ export class FranklinProvider {
         return req;
     }
 
+    // TODO: reconsider when wallet refactor.
     private static async axiosRequest(promise) {
         promise = promise
             .then(reps => reps.data)
