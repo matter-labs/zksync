@@ -78,6 +78,49 @@ library BlsOperations {
         }
     }
 
+    // TODO: - probably not working
+    function addG2(
+        G2Point memory _point1,
+        G2Point memory _point2
+    ) internal view returns (G2Point memory output) {
+        uint256[8] memory input;
+        input[0] = _point1.x[0];
+        input[1] = _point1.x[1];
+        input[2] = _point1.y[0];
+        input[3] = _point1.y[1];
+        input[4] = _point2.x[0];
+        input[5] = _point2.x[1];
+        input[6] = _point2.y[0];
+        input[7] = _point2.y[1];
+        assembly {
+            if iszero(
+                staticcall(
+                    sub(gas, 2000),
+                    6,
+                    input,
+                    0x150,
+                    output,
+                    0x60
+                )
+            ) {
+                invalid()
+            }
+        }
+    }
+
+    function messageToG1(bytes memory _message) internal view returns (G1Point memory) {
+        uint256 hash = uint256(keccak256(_message));
+        return mulG1(generatorG1(), hash);
+    }
+
+    function negate(G1Point memory _point) internal pure returns (G1Point memory) {
+        uint256 prime = 0x30644E72E131A029B85045B68181585D97816A916871CA8D3C208C16D87CFD47;
+        if (_point.x == 0 && _point.y == 0) {
+            return G1Point(0, 0);
+        }
+        return G1Point(_point.x, prime - (_point.y % prime));
+    }
+
     function pairing(
         G1Point[] memory _g1points,
         G2Point[] memory _g2points

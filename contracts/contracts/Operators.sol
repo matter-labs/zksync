@@ -11,12 +11,12 @@ contract Operators {
 
     struct Operator {
         bool exists;
-        BlsOperations.G1Point pubKey;
+        BlsOperations.G2Point pubKey;
     }
 
     struct Signature {
         address operator;
-        BlsOperations.G2Point signature;
+        BlsOperations.G1Point signature;
     }
 
     uint256 public operatorsCount = 0;
@@ -31,7 +31,7 @@ contract Operators {
         _validOperatorsMinimalPercentage = _validOperatorsMinimalPercentage;
     }
 
-    function addOperator(address _addr, BlsOperations.G1Point calldata pubKey) external {
+    function addOperator(address _addr, BlsOperations.G2Point calldata pubKey) external {
         requireOwner();
         require(
             !operators[_addr].exists,
@@ -49,11 +49,6 @@ contract Operators {
         ); // osar11 - operator does not exists
         delete(operators[_addr]);
         operatorsCount--;
-    }
-
-    function messageToG1(bytes memory _message) internal view returns (BlsOperations.G1Point memory) {
-        uint256 hash = uint256(keccak256(_message));
-        return BlsOperations.mulG1(BlsOperations.generatorG1(), hash);
     }
     
     function verify(
@@ -73,14 +68,17 @@ contract Operators {
 
         BlsOperations.G1Point memory aggrPubKey;
         for(uint256 i = 0; i < _signatures.length; i++) {
-            aggrPubKey = BlsOperations.addG1(aggrPubKey, operators[_signatures[i].operator].pubKey);
+            aggrPubKey = BlsOperations.addG2(aggrPubKey, operators[_signatures[i].operator].pubKey);
         }
 
-        BlsOperations.G1Point memory mpoint = messageToG1(_message);
+        BlsOperations.G1Point memory mpoint = BlsOperations.messageToG1(_message);
 
-        BlsOperations.G2Point memory signature; // TODO: - aggregate signatures
+        BlsOperations.G1Point memory aggrSignature;
+        for(uint256 i = 0; i < _signatures.length; i++) {
+            aggrSignature = BlsOperations.addG1(aggrSignature, _signatures[i].signature);
+        }
         
-        return BlsOperations.twoPointsPairing(aggrPubKey, mpoint, signature, BlsOperations.generatorG2());
+        return BlsOperations.twoPointsPairing(BlsOperations.negate(aggrSignature), mpoint, BlsOperations.generatorG2(), aggrPubKey);
     }
 
     // Check if the sender is owner
