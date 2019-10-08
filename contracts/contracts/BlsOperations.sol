@@ -35,15 +35,19 @@ library BlsOperations {
         G1Point memory _point,
         uint256 _scalar
     ) internal view returns (G1Point memory output) {
-        uint256[3] memory input = [_point.x, _point.y, _scalar];
-
+        uint256[3] memory input = [
+            _point.x,
+            _point.y,
+            _scalar
+        ];
+        uint256 inputSize = input.length;
         assembly {
             if iszero(
                 staticcall(
                     sub(gas, 2000),
                     7,
-                    input,
-                    0x80,
+                    add(input, 0x20),
+                    inputSize,
                     output,
                     0x60
                 )
@@ -57,18 +61,20 @@ library BlsOperations {
         G1Point memory _point1,
         G1Point memory _point2
     ) internal view returns (G1Point memory output) {
-        uint256[4] memory input;
-        input[0] = _point1.x;
-        input[1] = _point1.y;
-        input[2] = _point2.x;
-        input[3] = _point2.y;
+        uint256[4] memory input = [
+            _point1.x,
+            _point1.y,
+            _point2.x,
+            _point2.y
+        ];
+        uint256 inputSize = input.length;
         assembly {
             if iszero(
                 staticcall(
                     sub(gas, 2000),
                     6,
-                    input,
-                    0xc0,
+                    add(input, 0x20),
+                    inputSize,
                     output,
                     0x60
                 )
@@ -83,22 +89,24 @@ library BlsOperations {
         G2Point memory _point1,
         G2Point memory _point2
     ) internal view returns (G2Point memory output) {
-        uint256[8] memory input;
-        input[0] = _point1.x[0];
-        input[1] = _point1.x[1];
-        input[2] = _point1.y[0];
-        input[3] = _point1.y[1];
-        input[4] = _point2.x[0];
-        input[5] = _point2.x[1];
-        input[6] = _point2.y[0];
-        input[7] = _point2.y[1];
+        uint256[8] memory input = [
+            _point1.x[0],
+            _point1.x[1],
+            _point1.y[0],
+            _point1.y[1],
+            _point2.x[0],
+            _point2.x[1],
+            _point2.y[0],
+            _point2.y[1]
+        ];
+        uint256 inputSize = input.length;
         assembly {
             if iszero(
                 staticcall(
                     sub(gas, 2000),
                     6,
-                    input,
-                    0x150,
+                    add(input, 0x20),
+                    inputSize,
                     output,
                     0x60
                 )
