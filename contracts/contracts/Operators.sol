@@ -66,7 +66,7 @@ contract Operators {
             }
         }
 
-        BlsOperations.G1Point memory aggrPubKey;
+        BlsOperations.G2Point memory aggrPubKey;
         for(uint256 i = 0; i < _signatures.length; i++) {
             aggrPubKey = BlsOperations.addG2(aggrPubKey, operators[_signatures[i].operator].pubKey);
         }
