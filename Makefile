@@ -147,6 +147,9 @@ deploy-contracts: confirm_action
 build-contracts: confirm_action
 	@cd contracts && yarn build
 
+test-bls-operations-contract: confirm_action
+	@cbin/bls-operations-test.sh
+
 # deploy-contracts: confirm_action
 # 	@bin/deploy-contracts
 
