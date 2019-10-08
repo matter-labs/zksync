@@ -10,6 +10,7 @@ import { sleep } from '../utils.js'
 
 import Alert from './Alert.vue'
 import ProgressBar from './ProgressBar.vue'
+import timeConstants from '../timeConstants'
 
 const components = {
     Alert,
@@ -20,8 +21,6 @@ export default {
     name: 'AlertWithProgressBar',
     props: ['shower'],
     async created() {
-        console.log('refs in AlertWithProgressBar:', this.$refs);
-        console.log('this.generator',);
         for await (const progress of this.shower.generator.getGenerator()) {
             if (progress.message.includes(`waiting for creating new block`)) {
                 this.$refs.progress_bar.startProgressBarHalfLife(10000);
@@ -30,7 +29,7 @@ export default {
                 this.$refs.progress_bar.startProgressBarHalfLife(10000);
             }
 
-            let countdown = 60;
+            let countdown = timeConstants.countdown;
             if (progress.message.includes(`got proved!`)) {
                 console.log(`got proved received`);
                 this.$refs.progress_bar.cancelAnimation();

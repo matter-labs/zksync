@@ -60,14 +60,28 @@ export default {
         franklinBalancesWithInfo: [],
         verboseShowerId: 0,
     }),
+    created() {
+        console.log('Wallet component created.');
+        this.updateInfo();
+        this.verboseShowerId = this.store.verboseShowerId;
+    },
+    destroyed() {
+        console.log('Wallet component destroyed.');
+        this.store.verboseShowerId = this.verboseShowerId;
+    },
     watch: {
         info: function() {
-            for (let [key, val] of Object.entries(this.info)) {
-                this[key] = val;
-            }
+            this.updateInfo();
         }
     },
     methods: {
+        updateInfo() {
+            console.log('updating wallet info, info:', this.info);
+            if (this.info == null) return;
+            for (let [key, val] of Object.entries(this.info)) {
+                this[key] = val;
+            }
+        },
         displayAlert(kwargs) {
             this.$emit('alert', kwargs);
         },

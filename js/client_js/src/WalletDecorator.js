@@ -43,7 +43,7 @@ export class WalletDecorator {
 
     async updateState() {
         await this.wallet.updateState();
-        this.tx_history = await this.wallet.provider.getTransactionsHistory(this.address.substr(2));
+        let address = this.wallet.address;
     }
 
     tokenNameFromId(tokenId) {
@@ -65,34 +65,40 @@ export class WalletDecorator {
 
     // #region renderable
     async transactionsAsNeeded() {
-        let res = (this.tx_history).map(async (tx, index) => {
+        let transactions = await this.wallet.provider.getTransactionsHistory(this.wallet.address);
+        let res = transactions.map(async (tx, index) => {
             let elem_id      = `history_${index}`;
-            let hash         = tx.tx_hash;
-            let success      = tx.success     || '';
-            let nonce        = tx.tx.nonce    || '';
-            let from         = null;
-            let type         = tx.tx.type     || '';
-            let to           = tx.tx.to       || '';
-            let token        = tx.tx.token    || '';
-            let amount       = tx.tx.amount   || '';
-            let fee          = tx.tx.fee      || '';
-            let fail_reason  = tx.fail_reason || '';
-            let is_committed = tx.committed   || '';
-            let is_verified  = tx.verified    || '';
+            let type         = tx.tx.type || '';
+            let hash         = tx.hash;
+            let direction    = 
+                (type == 'Deposit') || (type == 'Transfer' && tx.tx.to == this.address)
+                ? 'incoming' : 'outcoming';
 
-            let status = (() => {
-                if (is_verified) return `<span style="color: green">(verified)</span>`;
-                if (is_committed) return `<span style="color: grey">(committed)</span>`;
-                if (success) return `<span style="color: grey">(succeeded)</span>`;
-                if (fail_reason) return `<span style="color: red">(failed)</span>`;
-                return `<span style="color: red">(WTF)</span>`;
-            })();
+            // pub hash: Option<String>,
+            // pub tx: Value,
+            // pub success: Option<bool>,
+            // pub fail_reason: Option<String>,
+            // pub commited: bool,
+            // pub verified: bool,
+
+            let status
+                = tx.verified            ? `<span style="color: green">(verified)</span>`
+                : tx.success == null     ? `<span style="color: grey">(pending)</span>`
+                : tx.success == true     ? `<span style="color: grey">(succeeded)</span>`
+                : tx.commited            ? `<span style="color: grey">(committed)</span>`
+                : tx.fail_reason != null ? `<span style="color: red">(failed)</span>`
+                : `<span style="color: red">(WTF)</span>`;
+
+            let row_status
+                = tx.verified     ? `<span style="color: green">Verified</span>`
+                : tx.commited     ? `<span style="color: grey">Committed</span>`
+                : tx.fail_reason  ? `<span style="color: red">Failed with ${fail_reason}</span>`
+                : `<span style="color: red">Not committed, not verified, no fail reason.</span>`
 
             let status_tooltip = await (async () => {
-                if ( ! is_committed) {
-                    return 'Nothing';
-                }
-                
+                if (tx.commited == false) return 'Nothing';
+                if (hash == null) return 'hash_null';
+
                 let receipt = await this.wallet.provider.getTxReceipt(hash);
                 /**
                 pub struct ProverRun {
@@ -103,9 +109,6 @@ export class WalletDecorator {
                     pub updated_at: NaiveDateTime,
                 }
                 */
-                // on hover, show tooltip with 
-                //      "waiting for prover..."
-                //      "prover <code>default</code> started proving at <code>created_at</code>"
                 
                 if (receipt == null || receipt.prover_run == null) {
                     return 'Waiting for prover..';
@@ -116,30 +119,90 @@ export class WalletDecorator {
                 return `Is being proved since ${started_time}`;
             })();
 
-            let row_status = await (async () => {
-                if (is_verified) return `<span style="color: green">Verified</span>`;
-                if (is_committed) return `<span style="color: grey">Committed</span>`;
-                if (success) return `<span style="color: grey">Succeeded</span>`;
-                if (fail_reason) return `<span style="color: red">Failed with ${fail_reason}</span>`;
-            })();
-
-            const directions = {
-                in: `<span style="color: green">(in)</span>`,
-                out: `<span style="color: red">(out)</span>`,
+            // here is common data to all tx types
+            let data = {
+                elem_id,
+                type, direction,
+                status, status_tooltip, row_status,
             };
 
-            // TODO: add incoming transactions
-            let direction = type == 'Deposit' ? 'incoming' : 'outcoming';
-
-            return {
-                type, to, amount, success, fail_reason, 
-                is_committed, is_verified, elem_id,
-                hash, status, status_tooltip, 
-                row_status, direction,
-            };
+            switch (true) {
+                case type == 'Deposit': {
+                    let token = this.tokenNameFromId(tx.tx.priority_op.token);
+                    let amount = token == 'ETH' 
+                        ? readableEther(tx.tx.priority_op.amount) 
+                        : bigNumberify(tx.tx.priority_op.amount);
+                    return {
+                        fields: [
+                            { key: 'amount',      label: 'Amount' },
+                            { key: 'row_status',  label: 'Status' },
+                            { key: 'pq_id',       label: 'Priority op' },
+                        ],
+                        data: Object.assign(data, {
+                            pq_id: tx.pq_id,
+                            token, amount,
+                        }),
+                    };
+                }
+                case type == 'Transfer' && direction == 'incoming': {
+                    let token = this.tokenNameFromId(tx.tx.token);
+                    let amount = token == 'ETH' 
+                        ? readableEther(tx.tx.amount) 
+                        : bigNumberify(tx.tx.amount);
+                    return {
+                        fields: [
+                            { key: 'amount',      label: 'Amount' },
+                            { key: 'from',        label: 'From' },
+                            { key: 'row_status',  label: 'Status' },
+                            { key: 'hash',        label: 'Tx hash' },
+                        ],
+                        data: Object.assign(data, {
+                            from: tx.tx.from,
+                            token, amount,
+                            hash: tx.hash,
+                        }),                    
+                    }
+                }
+                case type == 'Transfer' && direction == 'outcoming': {
+                    let token = this.tokenNameFromId(tx.tx.token);
+                    let amount = token == 'ETH' 
+                        ? readableEther(tx.tx.amount) 
+                        : bigNumberify(tx.tx.amount);
+                    return {
+                        fields: [
+                            { key: 'amount',      label: 'Amount' },
+                            { key: 'to',          label: 'To' },
+                            { key: 'row_status',  label: 'Status' },
+                            { key: 'hash',        label: 'Tx hash' },
+                        ],
+                        data: Object.assign(data, {
+                            to: tx.tx.to,
+                            token, amount,
+                            hash: tx.hash,
+                        }),
+                    }
+                }
+                case type == 'Withdraw': {
+                    let token = this.tokenNameFromId(tx.tx.token);
+                    let amount = token == 'ETH' 
+                        ? readableEther(tx.tx.amount) 
+                        : bigNumberify(tx.tx.amount);
+                    return {
+                        fields: [
+                            { key: 'amount',      label: 'Amount' },
+                            { key: 'row_status',  label: 'Status' },
+                            { key: 'hash',        label: 'Tx hash' },
+                        ],
+                        data: Object.assign(data, {
+                            token, amount,
+                            hash: tx.hash,
+                        }),
+                    }
+                }
+            }
         });
 
-        return Promise.all(res);
+        return await Promise.all(res);
     }
 
     onchainBalancesAsRenderableList() {

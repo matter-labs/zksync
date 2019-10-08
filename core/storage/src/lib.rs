@@ -29,7 +29,7 @@ use diesel::r2d2::{ConnectionManager, Pool, PoolError, PooledConnection};
 use serde_json::value::Value;
 use std::env;
 
-use diesel::sql_types::{BigInt, Nullable, Text, Timestamp};
+use diesel::sql_types::{BigInt, Nullable, Text, Timestamp, Bool, Jsonb};
 sql_function!(coalesce, Coalesce, (x: Nullable<BigInt>, y: BigInt) -> BigInt);
 
 use itertools::Itertools;
@@ -632,12 +632,13 @@ pub struct StorageProcessor {
     conn: ConnectionHolder,
 }
 
-use diesel::sql_types::{Bool, Jsonb, Binary};
-
 #[derive(Debug, Serialize, Deserialize, QueryableByName)]
 pub struct TransactionsHistoryItem {
     #[sql_type = "Nullable<Text>"]
     pub hash: Option<String>,
+
+    #[sql_type = "Nullable<BigInt>"]
+    pub pq_id: Option<i64>,
 
     #[sql_type = "Jsonb"]
     pub tx: Value,
@@ -802,10 +803,12 @@ impl StorageProcessor {
         offset: i64,
         limit: i64
     ) -> QueryResult<Vec<TransactionsHistoryItem>> {
+        // TODO: txs are not ordered
         let query = format!(
             "
             select
                 encode(hash, 'hex') as hash,
+                pq_id,
                 tx,
                 success,
                 fail_reason,
@@ -814,10 +817,11 @@ impl StorageProcessor {
             from (
                 select 
                     *
-                from
-                    (select
+                from (
+                    select
                         tx,
                         hash,
+                        null as pq_id,
                         success,
                         fail_reason,
                         block_number
@@ -835,6 +839,7 @@ impl StorageProcessor {
                     select 
                         operation as tx,
                         null as hash,
+                        priority_op_serialid as pq_id,
                         null as success,
                         null as fail_reason,
                         block_number
@@ -842,6 +847,8 @@ impl StorageProcessor {
                         executed_priority_operations
                     where 
                         operation->'priority_op'->>'account' = '0x{address}') t
+                order by
+                    block_number
                 offset 
                     {offset}
                 limit 
@@ -863,8 +870,6 @@ impl StorageProcessor {
                         verified boolean)
             using 
                 (block_number)
-            order by
-                block_number
             "
             , address = hex::encode(address.data)
             , offset = offset

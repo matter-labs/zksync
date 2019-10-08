@@ -5,7 +5,7 @@
                 (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+ethereumAddress"
                     target="blanc">block explorer</a>):
             <CopyableAddress id="ethereumAddressFormInput" :address="ethereumAddress"></CopyableAddress>
-            <b-table class="b-table-balances-width-hack" borderless small responsive :fields="fields" :items="displayableBalances">
+            <b-table v-if="displayableBalances.length" class="b-table-balances-width-hack" borderless small responsive :fields="fields" :items="displayableBalances">
                 <template v-slot:cell(tokenName)="data">
                     <TokenNameButton :data="data"></TokenNameButton>
                 </template>
@@ -13,6 +13,9 @@
                     <span style="vertical-align: middle;"> {{ data.item.amount }} </span>
                 </template>
             </b-table>
+            <p class="mt-3" v-else>
+                <b>Your Main chain balance is empty.</b>
+            </p>
         </b-col>
     </b-card>
 </template>
@@ -43,12 +46,18 @@ export default {
         'balances',
         'balanceListId'
     ],
+    created() {
+        this.updateInfo();
+    },
     watch: {
         balances() {
-            this.displayableBalances = getDisplayableBalanceList(this.balances);
+            this.updateInfo();
         },
     },
     methods: {
+        updateInfo() {
+            this.displayableBalances = getDisplayableBalanceList(this.balances);
+        },
         clickedWhatever: function(evt) {
             let tgt = evt.target;
             tgt.setAttribute('data-original-title', 'copied');

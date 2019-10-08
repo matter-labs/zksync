@@ -60,15 +60,11 @@ export default {
     }),
     async created() {
         this.depositFee = await window.walletDecorator.getDepositFee();
+        this.createDisplayableBalancesDict();
     },
     watch: {
         balances: function() {
-            this.balancesDict = this.balances
-                .reduce((acc, bal) => {
-                    acc[bal.tokenName] = bal.amount;
-                    return acc;
-                }, {});
-            this.displayableBalancesDict = getDisplayableBalanceDict(this.balancesDict);
+            this.createDisplayableBalancesDict();
         },
         token: function() {
             this.maxAmountVisible = true;
@@ -78,6 +74,14 @@ export default {
         localDisplayAlert(msg) {
             this.alertVisible = true;
             this.alertText = msg;
+        },
+        createDisplayableBalancesDict() {
+            this.balancesDict = this.balances
+                .reduce((acc, bal) => {
+                    acc[bal.tokenName] = bal.amount;
+                    return acc;
+                }, {});
+            this.displayableBalancesDict = getDisplayableBalanceDict(this.balancesDict);
         },
         getAmount() {
             try {
@@ -135,8 +139,10 @@ export default {
                 }
             } else {
                 let fee = parseEther(this.depositFee);
-                amount = amount.add(fee);
-                if (amount.add(fee).gt(bigNumberify(this.balancesDict[this.token]))) {
+                let tooMuch = (this.token == 'ETH' && amount.add(fee).gt(bigNumberify(this.balancesDict[this.token])))
+                    || (amount.gt(bigNumberify(this.balancesDict[this.token])));
+
+                if (tooMuch) {
                     this.localDisplayAlert(`It's too much, man!`);
                     return;
                 }

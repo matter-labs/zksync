@@ -4,7 +4,12 @@ import { ethers } from 'ethers'
 export const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
 
 export function readableEther(wei) {
-    return ethers.utils.formatUnits(wei, 18).match(/\d+\.\d{1,3}/)[0];
+    let formatted = ethers.utils.formatUnits(wei, 18);
+    if (formatted.startsWith('0.') == false) {
+        return formatted.match(/\d+\.\d{1,3}/)[0];
+    } else {
+        return formatted.match(/0\.0*[^0]{1,3}/)[0]
+    }
 }
 
 export function getDisplayableBalanceDict(dict) {

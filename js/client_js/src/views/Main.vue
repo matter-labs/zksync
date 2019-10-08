@@ -61,6 +61,7 @@ import Alert from '../components/Alert.vue'
 import AlertWithProgressBar from '../components/AlertWithProgressBar.vue'
 
 import { sleep } from '../utils.js'
+import timeConstants from '../timeConstants'
 
 const components = {
     History,
@@ -84,6 +85,12 @@ export default {
     },
     async created() {
         this.updateAccountInfo();
+            await this.updateAccountInfo();
+            await sleep(timeConstants.updateInfo);
+            timeOut();
+        };
+        timeOut();
+
         new ClipboardJS('.copyable');
     },
     methods: {
@@ -106,9 +113,11 @@ export default {
                 };
 
                 this.historyInfo = {
+                    // TODO: lazily load in transactions component
                     transactions: await window.walletDecorator.transactionsAsNeeded(),
                 };
             } catch (e) {
+                console.log(e);
                 let message = e.message;
                 let franklinServerReachable = await isReachable(this.config.API_SERVER);
                 if (franklinServerReachable == false) {
@@ -121,9 +130,6 @@ export default {
                     countdown: 10,
                 })
             }
-
-            await sleep(1997);
-            this.updateAccountInfo();
         }
     },
     components,

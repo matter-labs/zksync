@@ -94,7 +94,7 @@ export class FranklinProvider {
 
     async getTransactionsHistory(address: Address) {
         return await FranklinProvider.axiosRequest(
-            Axios.get(this.providerAddress + '/api/v0.1/account/' + `0x${address.toString("hex")}` + '/transactions'));
+            Axios.get(`${this.providerAddress}/api/v0.1/account/0x${address.toString("hex")}/history/0/100`));
     }
 
     async getState(address: Address): Promise<FranklinAccountState> {

@@ -5,7 +5,7 @@
                 <!-- (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+franklinAddress"
                     target="blanc">block explorer</a>): -->
             <CopyableAddress id="franklinAddressFormInput" :address="franklinAddress"></CopyableAddress>
-            <b-table class="b-table-balances-width-hack" borderless small responsive :fields="fields" :items="displayableBalances">
+            <b-table v-if="displayableBalances.length" class="b-table-balances-width-hack" borderless small responsive :fields="fields" :items="displayableBalances">
                 <template v-slot:cell(tokenName)="data" style="width: 100px !important">
                     <TokenNameButton :data="data"></TokenNameButton>
                 </template>
@@ -29,6 +29,9 @@
                     </span>
                 </template>
             </b-table>
+            <p class="mt-3" v-else>
+                <b>Your Matter balance is empty.</b>
+            </p>
         </b-col>
     </b-card>
 </template>
@@ -59,8 +62,17 @@ export default {
         'balances',
         'balanceListId'
     ],
+    created() {
+        this.updateInfo();
+    },
     watch: {
         balances() {
+            this.updateInfo();
+        },
+    },
+    methods: {
+        updateInfo() {
+            console.log("FranklinBalancesList updateInfo(), balances:", this.balances);
             this.displayableBalances = this.balances.map(bal => {
                 if (bal.tokenName != 'ETH') return bal;
                 let res = Object.assign({}, bal);
@@ -69,8 +81,6 @@ export default {
                 return res;
             }).filter(entry => Number(entry.committedAmount) || Number(entry.verifiedAmount));
         },
-    },
-    methods: {
         clickedWhatever: function(evt) {
             let tgt = evt.target;
             tgt.setAttribute('data-original-title', 'copied');

@@ -12,7 +12,7 @@
             :tokens="tokensList"
             :selected.sync="token">
         </TokenSelector>
-        Amount <span v-if="maxAmountVisible">(<span v-if="token == 'ETH'">in ETH tokens, </span> max {{ token }} {{ displayableBalancesDict[token] }})</span>:
+        Amount <span v-if="maxAmountVisible">(<span v-if="token == 'ETH'">in ETH tokens, </span>max {{ token }} {{ displayableBalancesDict[token] }})</span>:
         <b-form-input autocomplete="off" type="number" v-model="amountSelected" class="mb-3"></b-form-input>
         Choose fee:
         <FeeSelector 
@@ -21,7 +21,8 @@
             :selected.sync="feeButtonSelectedIndex">
         </FeeSelector>
         <!-- <b-form-input autocomplete="off" type="number" class="mb-3" v-model="fee"></b-form-input> -->
-        <b-button class="mt-2 w-50" variant="primary" @click='buttonClicked'> Transfer </b-button>
+        <img v-if="transferPending" style="margin-right: 1.5em" src="../assets/loading.gif" width="100em">
+        <b-button v-else class="mt-2 w-50" variant="primary" @click='buttonClicked'> Transfer </b-button>
     </b-card>
 </template>
 
@@ -30,6 +31,7 @@ import { bigNumberify, parseEther } from 'ethers/utils'
 import TokenSelector from './TokenSelector.vue'
 import FeeSelector from './FeeSelector.vue'
 import { getDisplayableBalanceDict, feesFromAmount } from '../utils';
+import timeConstants from '../timeConstants'
 
 const components = {
     TokenSelector,
@@ -49,9 +51,22 @@ export default {
         amountSelected: null,
         feeButtonSelectedIndex: null,
         fees: ['0%', '1%', '5%'],
+
+        transferPending: false,
     }),
+    created() {
+        this.updateInfo();  
+    },
     watch: {
         balances: function() {
+            this.updateInfo();
+        },
+        token: function() {
+            this.maxAmountVisible = true;
+        },
+    },
+    methods: {
+        updateInfo() {
             this.balancesDict = this.balances
                 .reduce((acc, bal) => {
                     acc[bal.tokenName] = bal.amount;
@@ -60,11 +75,6 @@ export default {
             this.displayableBalancesDict = getDisplayableBalanceDict(this.balancesDict);
             this.tokensList = this.balances.map(bal => bal.tokenName);
         },
-        token: function() {
-            this.maxAmountVisible = true;
-        },
-    },
-    methods: {
         localDisplayAlert(message) {
             this.$emit('alert', { message, variant: 'warning' });
         },
@@ -134,6 +144,11 @@ export default {
                 this.localDisplayAlert(`It's too much, man!`);
                 return;
             }
+
+            this.transferPending = true;
+            setTimeout(() => {
+                this.transferPending = false;
+            }, timeConstants.transferPending);
 
             this.$emit('buttonClicked', {
                 address: this.address,

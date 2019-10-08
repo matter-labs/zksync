@@ -14,6 +14,7 @@ Vue.use(BootstrapVue);
 
 const store = {
     pendingTransactionGenerators: [],
+    verboseShowerId: 0,
 };
 
 Vue.mixin({
