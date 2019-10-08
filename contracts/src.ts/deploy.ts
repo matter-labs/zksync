@@ -20,8 +20,9 @@ export const franklinTestContractCode = require('../build/FranklinTest');
 export const verifierTestContractCode = require('../build/VerifierTest');
 export const governanceTestContractCode = require('../build/GovernanceTest');
 export const priorityQueueTestContractCode = require('../build/PriorityQueueTest');
-export const operatorsTestContractCode = require('../build/OperatorsTests');
-export const BlsOperationsTestContractCode = require('../build/BlsOperations');
+export const operatorsTestContractCode = require('../build/OperatorsTest');
+
+export const BlsOperationsContractCode = require('../build/BlsOperations');
 
 export async function deployGovernance(
     wallet,

@@ -8,6 +8,10 @@ cp ./contracts/contracts/Governance.sol ./contracts/contracts/generated/Governan
 cp ./contracts/contracts/Franklin.sol ./contracts/contracts/generated/FranklinTest.sol
 cp ./contracts/contracts/PriorityQueue.sol ./contracts/contracts/generated/PriorityQueueTest.sol
 cp ./contracts/contracts/Verifier.sol ./contracts/contracts/generated/VerifierTest.sol
+cp ./contracts/contracts/Operators.sol ./contracts/contracts/generated/OperatorsTest.sol
+
+sed -i '' 's/contract Operators/contract OperatorsTest/' ./contracts/contracts/generated/OperatorsTest.sol
+sed -i '' 's/.\/BlsOperations/..\/BlsOperations/' ./contracts/contracts/generated/OperatorsTest.sol
 
 sed -i '' 's/Governance/GovernanceTest/' ./contracts/contracts/generated/GovernanceTest.sol
 
