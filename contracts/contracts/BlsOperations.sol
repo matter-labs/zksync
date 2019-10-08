@@ -21,12 +21,12 @@ library BlsOperations {
     function generatorG2() internal pure returns (G2Point memory) {
         return G2Point({
             x: [
-                0x198e9393920d483a7260bfb731fb5d25f1aa493335a9e71297e485b7aef312c2,
-                0x1800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992f6ed
+                11559732032986387107991004021392285783925812861821192530917403151452391805634,
+                10857046999023057135944570762232829481370756359578518086990519993285655852781
             ],
             y: [
-                0x90689d0585ff075ec9e99ad690c3395bc4b313370b38ef355acdadcd122975b,
-                0x12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa
+                4082367875863433681332203403145435568316851327593401208105741076214120093531,
+                8495653923123431417604973247489272438418190587263600148770280649306958101930
             ]
         });
     }
@@ -40,14 +40,13 @@ library BlsOperations {
             _point.y,
             _scalar
         ];
-        uint256 inputSize = input.length;
         assembly {
             if iszero(
                 staticcall(
                     sub(gas, 2000),
                     7,
-                    add(input, 0x20),
-                    inputSize,
+                    input,
+                    0x80,
                     output,
                     0x60
                 )
@@ -67,14 +66,13 @@ library BlsOperations {
             _point2.x,
             _point2.y
         ];
-        uint256 inputSize = input.length;
         assembly {
             if iszero(
                 staticcall(
                     sub(gas, 2000),
                     6,
-                    add(input, 0x20),
-                    inputSize,
+                    input,
+                    0xc0,
                     output,
                     0x60
                 )
@@ -99,16 +97,15 @@ library BlsOperations {
             _point2.y[0],
             _point2.y[1]
         ];
-        uint256 inputSize = input.length;
         assembly {
             if iszero(
                 staticcall(
                     sub(gas, 2000),
                     6,
-                    add(input, 0x20),
-                    inputSize,
+                    input,
+                    0x384,
                     output,
-                    0x60
+                    0xc0
                 )
             ) {
                 invalid()
@@ -122,7 +119,7 @@ library BlsOperations {
     }
 
     function negate(G1Point memory _point) internal pure returns (G1Point memory) {
-        uint256 prime = 0x30644E72E131A029B85045B68181585D97816A916871CA8D3C208C16D87CFD47;
+        uint256 prime = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
         if (_point.x == 0 && _point.y == 0) {
             return G1Point(0, 0);
         }

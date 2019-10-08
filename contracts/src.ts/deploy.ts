@@ -22,7 +22,7 @@ export const governanceTestContractCode = require('../build/GovernanceTest');
 export const priorityQueueTestContractCode = require('../build/PriorityQueueTest');
 export const operatorsTestContractCode = require('../build/OperatorsTest');
 
-export const BlsOperationsContractCode = require('../build/BlsOperations');
+export const blsOpsTesterContractCode = require('../build/BlsOpsTester');
 
 export async function deployGovernance(
     wallet,
@@ -128,23 +128,23 @@ export async function deployOperators(
     }
 }
 
-export async function deployBlsOperations(
+export async function deployBlsOpsTester(
     wallet,
-    blsOperationsCode,
+    blsOpsTesterCode,
 ) {
     try {
         let contract = await deployContract(
             wallet,
-            blsOperationsCode,
+            blsOpsTesterCode,
             [],
             {
                 gasLimit: 6600000,
             });
-        console.log(`BLS_OPERATIONS_CONTRACT_ADDR=${contract.address}`);
+        console.log(`BLS_OPERATIONS_TESTER_CONTRACT_ADDR=${contract.address}`);
 
         return contract
     } catch (err) {
-        console.log("BLS operations deploy error:" + err);
+        console.log("BLS operations tester deploy error:" + err);
     }
 }
 
