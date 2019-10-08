@@ -139,6 +139,7 @@ push-image-rust: image-rust
 # Contracts
 
 test-contracts: confirm_action 
+	@bin/prepare-test-contracts.sh
 	@bin/contracts-test.sh
 
 deploy-contracts: confirm_action
