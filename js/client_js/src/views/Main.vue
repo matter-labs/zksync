@@ -84,7 +84,8 @@ export default {
         }
     },
     async created() {
-        this.updateAccountInfo();
+        console.log("Main component created");
+        const timeOut = async () => {
             await this.updateAccountInfo();
             await sleep(timeConstants.updateInfo);
             timeOut();
@@ -98,6 +99,7 @@ export default {
             this.$refs.alert.display(kwargs);
         },
         async updateAccountInfo() {
+            console.log('info updated');
             try {
                 await window.walletDecorator.updateState();
 
