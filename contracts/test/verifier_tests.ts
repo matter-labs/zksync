@@ -39,7 +39,7 @@ describe("VERIFIER", function() {
 
     it("Operators", async () => {
         console.log("\n - Operators add/remove started");
-        const operatorsDeployedContract = await deployOperators(wallet, wallet.address, 60, operatorsTestContractCode);
+        const operatorsDeployedContract = await deployOperators(wallet, wallet.address, 51, operatorsTestContractCode);
 
         const result1 = await operatorsDeployedContract.addOperator(
             wallet.address,
@@ -64,6 +64,13 @@ describe("VERIFIER", function() {
         expect(result4).to.eq(false);
 
         console.log("\n + Operators add/remove passed");
+
+        console.log("\n - Changing min sigs percentage started");
+        const result5 = await operatorsDeployedContract.changeMinSigsPercentage(60);
+        await result5.wait();
+
+        expect(await operatorsDeployedContract.minSigsPercentage()).equal(60);
+        console.log("\n + Changing min sigs percentage passed");
     });
 
 });
