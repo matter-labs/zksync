@@ -82,16 +82,20 @@ contract Operators {
 
     function aggregateSignersPubKeys(address[] calldata _signers) external view returns (uint256, uint256, uint256, uint256) {
         require(
-            _signers.length >= operatorsCount * minSigsPercentage / 100,
+            _signers.length > 0,
             "osas1"
-        ); // osas1 - signers array length must be equal or more than allowed operators minimal count to verify message
+        ); // osas1 - signers array length cant be empty
+        require(
+            _signers.length >= operatorsCount * minSigsPercentage / 100,
+            "osas2"
+        ); // osas2 - signers array length must be equal or more than allowed operators minimal count to verify message
         BlsOperations.G2Point memory aggrPubKey;
         if (_signers.length == 1) {
             aggrPubKey = operators[_signers[0]].pubKey;
         } else {
             for (uint256 i = 0; i < _signers.length; i++) {
                 if(!operators[_signers[i]].exists) {
-                    revert("osas2"); // osas2 - unknown operator
+                    revert("osas3"); // osas3 - unknown operator
                 }
                 aggrPubKey = BlsOperations.addG2(aggrPubKey, operators[_signers[i]].pubKey);
             }
@@ -101,9 +105,13 @@ contract Operators {
 
     function aggregateSignatures(uint256[] calldata _signatures, uint256 _signersCount) external view returns (uint256, uint256) {
         require(
+            _signersCount > 0,
+            "osas4"
+        ); // osas4 - signers count must be more than 0
+        require(
             _signatures.length == 2 * _signersCount,
-            "osas3"
-        ); // osas3 - signatures array length must be equal to 2 * signers array length (signature is G1 point that consists of uint256 x and y)
+            "osas5"
+        ); // osas5 - signatures array length must be equal to 2 * signers array length (signature is G1 point that consists of uint256 x and y)
         BlsOperations.G1Point memory aggrSignature;
         if (_signatures.length == 2) {
             aggrSignature = BlsOperations.G1Point({
