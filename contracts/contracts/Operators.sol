@@ -1,5 +1,4 @@
 pragma solidity ^0.5.8;
-pragma experimental ABIEncoderV2;
 
 import "./BlsOperations.sol";
 
@@ -15,7 +14,7 @@ contract Operators {
     uint256 public minSigsPercentage;
 
     uint256 public operatorsCount = 0;
-    mapping (address => Operator) public operators;
+    mapping (address => Operator) private operators;
 
     constructor(address _ownerAddress, uint256 _minSigsPercentage) public {
         require(
@@ -24,6 +23,10 @@ contract Operators {
         ); // osar11 - we need operators percentage be between 0% and 100%
         ownerAddress = _ownerAddress;
         minSigsPercentage = _minSigsPercentage;
+    }
+
+    function isOperator(address _addr) external view returns (bool) {
+        return operators[_addr].exists;
     }
 
     function addOperator(
