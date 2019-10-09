@@ -108,6 +108,7 @@ export async function deployFranklin(
 export async function deployOperators(
     wallet,
     ownerAddress,
+    minSigsPercent,
     operatorsCode,
 ) {
     try {
@@ -115,7 +116,8 @@ export async function deployOperators(
             wallet,
             operatorsCode,
             [
-                ownerAddress
+                ownerAddress,
+                minSigsPercent
             ],
             {
                 gasLimit: 6600000,
