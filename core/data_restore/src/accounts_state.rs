@@ -219,6 +219,7 @@ mod test {
         let block1 = FranklinOpsBlock {
             block_num: 1,
             ops: ops1,
+            fee_account: 0
         };
 
         let data2 = "030000000000000000000000000002c68af0bb14000000005711e991397fca8f5651c9bb6fa06b57e4a4dcc000000000";
@@ -228,6 +229,7 @@ mod test {
         let block2 = FranklinOpsBlock {
             block_num: 2,
             ops: ops2,
+            fee_account: 0
         };
 
         let data3 = "02000000000000010008091011121314151617181920212223342526280000010000000000000000";
@@ -237,6 +239,7 @@ mod test {
         let block3 = FranklinOpsBlock {
             block_num: 3,
             ops: ops3,
+            fee_account: 0
         };
 
         let data4 = "05000001000000000000010000000000";
@@ -246,6 +249,7 @@ mod test {
         let block4 = FranklinOpsBlock {
             block_num: 4,
             ops: ops4,
+            fee_account: 0
         };
 
         let data5 = "0400000100000000";
@@ -255,6 +259,7 @@ mod test {
         let block5 = FranklinOpsBlock {
             block_num: 5,
             ops: ops5,
+            fee_account: 0
         };
         
         // FULL EXIT WILL WORK WITH SIGNATURE
@@ -302,6 +307,7 @@ mod test {
         let block1 = FranklinOpsBlock {
             block_num: 1,
             ops: ops1,
+            fee_account: 0
         };
 
         let mut tree = FranklinAccountsState::new_test();
