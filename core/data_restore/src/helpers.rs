@@ -24,8 +24,6 @@ pub struct DataRestoreConfig {
     pub franklin_contract_address: Address,
     /// Franklin contract genesis block number: u64
     pub genesis_block_number: u64,
-    /// Operator address (fee)
-    pub fee_account_address: AccountAddress,
 }
 
 impl DataRestoreConfig {
@@ -48,11 +46,6 @@ impl DataRestoreConfig {
             genesis_block_number: u64::from_str_radix(
                 std::env::var("FRANKLIN_GENESIS_NUMBER").expect("FRANKLIN_GENESIS_NUMBER env missing").as_str(),
                 10).expect("Cant get genesis number"), // 0
-            fee_account_address: std::env::var("OPERATOR_FRANKLIN_ADDRESS")
-                .map(|addr| {
-                    AccountAddress::from_hex(&addr).expect("Incorrect franklin account address")
-                })
-                .expect("OPERATOR_FRANKLIN_ADDRESS must be set"), // AccountAddress::from_hex("4fbf331db438c88a83b1316d072b7d73d8366367".to_string()).expect("Incorrect franklin account address")
         }
     }
 }

@@ -21,6 +21,8 @@ pub struct EventData {
     pub transaction_hash: H256,
     /// Franklin Block type
     pub block_type: EventType,
+    /// Fee account
+    pub fee_account: u32
 }
 
 impl PartialOrd for EventData {

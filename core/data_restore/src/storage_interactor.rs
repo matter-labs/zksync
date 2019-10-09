@@ -91,6 +91,7 @@ pub fn block_event_into_stored_block_event(event: &EventData) -> Option<NewBlock
         },
         transaction_hash: event.transaction_hash.as_bytes().to_vec(),
         block_num: i64::from(event.block_num),
+        fee_account: i64::from(event.fee_account),
     })
 }
 
@@ -169,7 +170,7 @@ pub fn save_franklin_ops_blocks(
     })?;
     for block in blocks {
         storage
-            .save_franklin_ops_block(block.ops.as_slice(), block.block_num)
+            .save_franklin_ops_block(block.ops.as_slice(), block.block_num, block.fee_account)
             .map_err(|_| DataRestoreError::Storage("cant save franklin transaction".to_string()))?;
     }
     Ok(())
@@ -289,6 +290,7 @@ pub fn stored_ops_block_into_ops_block(op_block: &StoredFranklinOpsBlock) -> Fra
     FranklinOpsBlock {
         block_num: op_block.block_num,
         ops: op_block.ops.clone(),
+        fee_account: op_block.fee_account
     }
 }
 
@@ -408,6 +410,7 @@ pub fn stored_block_event_into_block_event(block: StoredBlockEvent) -> Option<Ev
             v if v == "Verified" => EventType::Verified,
             _ => return None,
         },
+        fee_account: u32::try_from(block.fee_account).ok()?,
     })
 }
 

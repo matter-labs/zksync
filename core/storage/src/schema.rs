@@ -82,6 +82,7 @@ table! {
         block_type -> Text,
         transaction_hash -> Bytea,
         block_num -> Int8,
+        fee_account -> Int8,
     }
 }
 
@@ -114,6 +115,7 @@ table! {
         id -> Int4,
         block_num -> Int8,
         operation -> Jsonb,
+        fee_account -> Int8,
     }
 }
 

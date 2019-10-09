@@ -15,6 +15,8 @@ pub struct FranklinOpsBlock {
     pub block_num: u32,
     /// Franklin operations in block
     pub ops: Vec<FranklinOp>,
+    /// Fee account
+    pub fee_account: u32
 }
 
 impl FranklinOpsBlock {
@@ -40,6 +42,7 @@ impl FranklinOpsBlock {
         let block = FranklinOpsBlock {
             block_num: event_data.block_num,
             ops,
+            fee_account: event_data.fee_account
         };
         Ok(block)
     }

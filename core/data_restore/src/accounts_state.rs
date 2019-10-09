@@ -13,8 +13,6 @@ use models::node::{AccountId, AccountMap, AccountUpdates, Fr};
 pub struct FranklinAccountsState {
     /// Accounts stored in a spase merkle tree
     pub state: PlasmaState,
-    /// Fee account will accumulate fees from transactions
-    pub fee_account_address: AccountAddress,
 }
 
 impl FranklinAccountsState {
@@ -22,7 +20,6 @@ impl FranklinAccountsState {
     pub fn new() -> Self {
         Self {
             state: PlasmaState::empty(),
-            fee_account_address: DATA_RESTORE_CONFIG.fee_account_address.clone(),
         }
     }
 
@@ -30,7 +27,6 @@ impl FranklinAccountsState {
     fn new_test() -> Self {
         Self {
             state: PlasmaState::empty(),
-            fee_account_address: AccountAddress::from_hex(&"0x0809101112131415161718192021222334252627").unwrap()
         }
     }
 
@@ -44,7 +40,6 @@ impl FranklinAccountsState {
     pub fn load(current_block: u32, accounts: AccountMap) -> Self {
         Self {
             state: PlasmaState::new(accounts, current_block),
-            fee_account_address: DATA_RESTORE_CONFIG.fee_account_address.clone(),
         }
     }
 
@@ -179,7 +174,10 @@ impl FranklinAccountsState {
                 _ => {}
             }
         }
-        let (_, fee_updates) = self.state.collect_fee(&fees, &self.fee_account_address);
+        let fee_account_address = self.get_account(block.fee_account)
+            .ok_or(DataRestoreError::WrongData("Nonexistent fee account".to_string()))?
+            .address;
+        let (_, fee_updates) = self.state.collect_fee(&fees, &fee_account_address);
         accounts_updated.extend(fee_updates.into_iter());
 
         Ok(accounts_updated)

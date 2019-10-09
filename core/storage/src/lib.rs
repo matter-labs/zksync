@@ -529,6 +529,7 @@ pub struct NewBlockEvent {
     pub block_type: String, // 'Committed', 'Verified'
     pub transaction_hash: Vec<u8>,
     pub block_num: i64,
+    pub fee_account: i64,
 }
 
 #[derive(Insertable, Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
@@ -538,6 +539,7 @@ pub struct StoredBlockEvent {
     pub block_type: String, // 'Committed', 'Verified'
     pub transaction_hash: Vec<u8>,
     pub block_num: i64,
+    pub fee_account: i64,
 }
 
 #[derive(Debug, Insertable)]
@@ -545,13 +547,15 @@ pub struct StoredBlockEvent {
 pub struct NewFranklinOp {
     pub block_num: i64,
     pub operation: Value,
+    pub fee_account: i64,
 }
 
 impl NewFranklinOp {
-    fn prepare_stored_op(franklin_op: &FranklinOp, block: BlockNumber) -> Self {
+    fn prepare_stored_op(franklin_op: &FranklinOp, block: BlockNumber, fee_account: AccountId) -> Self {
         Self {
             block_num: i64::from(block),
             operation: serde_json::to_value(franklin_op.clone()).unwrap(),
+            fee_account: i64::from(fee_account)
         }
     }
 }
@@ -562,6 +566,7 @@ pub struct StoredFranklinOp {
     pub id: i32,
     pub block_num: i64,
     pub operation: Value,
+    pub fee_account: i64,
 }
 
 impl StoredFranklinOp {
@@ -574,6 +579,7 @@ impl StoredFranklinOp {
 pub struct StoredFranklinOpsBlock {
     pub block_num: BlockNumber,
     pub ops: Vec<FranklinOp>,
+    pub fee_account: AccountId,
 }
 
 #[derive(Debug, Insertable)]
@@ -1691,9 +1697,10 @@ impl StorageProcessor {
         &self,
         ops: &[FranklinOp],
         block_num: BlockNumber,
+        fee_account: AccountId
     ) -> QueryResult<()> {
         for op in ops.iter() {
-            let stored_op = NewFranklinOp::prepare_stored_op(&op, block_num);
+            let stored_op = NewFranklinOp::prepare_stored_op(&op, block_num, fee_account);
             diesel::insert_into(franklin_ops::table)
                 .values(&stored_op)
                 .execute(self.conn())?;
@@ -1718,15 +1725,18 @@ impl StorageProcessor {
                 // let stored_ops = group.clone();
                 // let mut ops: Vec<FranklinOp> = vec![];
                 let mut block_num: i64 = 0;
+                let mut fee_account: i64 = 0;
                 let ops: Vec<FranklinOp> = stored_ops
                     .map(|stored_op| {
                         block_num = stored_op.block_num;
+                        fee_account = stored_op.fee_account;
                         stored_op.into_franklin_op()
                     })
                     .collect();
                 StoredFranklinOpsBlock {
                     block_num: block_num as u32,
                     ops: ops,
+                    fee_account: fee_account as u32,
                 }
             })
             .collect();
