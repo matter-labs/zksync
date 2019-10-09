@@ -2,7 +2,7 @@ pragma solidity ^0.5.8;
 
 import "./BlsOperations.sol";
 
-contract BlsOpsTester {
+contract BlsVerifyRawTester {
 
     BlsOperations.G2Point verificationKey;
 

@@ -1,5 +1,7 @@
 pragma solidity ^0.5.8;
 
+import "./BN256G2.sol";
+
 library BlsOperations {
     struct G1Point {
         uint256 x;
@@ -56,6 +58,34 @@ library BlsOperations {
         }
     }
 
+    function mulG2(
+        G2Point memory _point,
+        uint256 _scalar
+    ) internal view returns (G2Point memory) {
+        (
+            uint256 pt2xx,
+            uint256 pt2xy,
+            uint256 pt2yx,
+            uint256 pt2yy
+        ) = BN256G2.ECTwistMul(
+            _scalar,
+            _point.x[0],
+            _point.x[1],
+            _point.y[0],
+            _point.y[1]
+        );
+        return G2Point ({
+            x: [
+                pt2xx,
+                pt2xy
+            ],
+            y: [
+                pt2yx,
+                pt2yy
+            ]
+        });
+    }
+
     function addG1(
         G1Point memory _point1,
         G1Point memory _point2
@@ -82,12 +112,16 @@ library BlsOperations {
         }
     }
 
-    // TODO: - probably not working
     function addG2(
         G2Point memory _point1,
         G2Point memory _point2
-    ) internal view returns (G2Point memory output) {
-        uint256[8] memory input = [
+    ) internal view returns (G2Point memory) {
+        (
+            uint256 pt3xx,
+            uint256 pt3xy,
+            uint256 pt3yx,
+            uint256 pt3yy
+        ) = BN256G2.ECTwistAdd(
             _point1.x[0],
             _point1.x[1],
             _point1.y[0],
@@ -96,21 +130,17 @@ library BlsOperations {
             _point2.x[1],
             _point2.y[0],
             _point2.y[1]
-        ];
-        assembly {
-            if iszero(
-                staticcall(
-                    sub(gas, 2000),
-                    6,
-                    input,
-                    0x384,
-                    output,
-                    0xc0
-                )
-            ) {
-                invalid()
-            }
-        }
+        );
+        return G2Point ({
+            x: [
+                pt3xx,
+                pt3xy
+            ],
+            y: [
+                pt3yx,
+                pt3yy
+            ]
+        });
     }
 
     function messageToG1(bytes memory _message) internal view returns (G1Point memory) {
@@ -118,12 +148,38 @@ library BlsOperations {
         return mulG1(generatorG1(), hash);
     }
 
+    function messageToG2(bytes memory _message) internal view returns (G2Point memory) {
+        uint256 hash = uint256(keccak256(_message));
+        G2Point memory g2 = generatorG2();
+        uint256 x1;
+        uint256 x2;
+        uint256 y1;
+        uint256 y2;
+        (x1, x2, y1, y2) = BN256G2.ECTwistMul(
+            hash,
+            g2.x[1],
+            g2.x[0],
+            g2.y[1],
+            g2.y[0]
+        );
+        return G2Point({
+            x: [
+                x2,
+                x1
+            ],
+            y: [
+                y2,
+                y1
+            ]
+        });
+    }
+
     function negate(G1Point memory _point) internal pure returns (G1Point memory) {
-        uint256 prime = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        uint256 field_modulus = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
         if (_point.x == 0 && _point.y == 0) {
             return G1Point(0, 0);
         }
-        return G1Point(_point.x, prime - (_point.y % prime));
+        return G1Point(_point.x, field_modulus - (_point.y % field_modulus));
     }
 
     function pairing(
