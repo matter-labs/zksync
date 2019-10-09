@@ -29,6 +29,10 @@ contract Operators {
         return operators[_addr].exists;
     }
 
+    function getOperatorPubkey(address _addr) external view returns (uint256, uint256, uint256, uint256) {
+        return (operators[_addr].pubKey.x[0], operators[_addr].pubKey.x[1], operators[_addr].pubKey.y[0], operators[_addr].pubKey.y[1]);
+    }
+
     function addOperator(
         address _addr,
         uint256 _pbkxx,
@@ -75,43 +79,74 @@ contract Operators {
         delete(operators[_addr]);
         operatorsCount--;
     }
-    
-    function verify(
-        address[] calldata _signers,
-        uint256[] calldata _signatures,
-        bytes calldata _message
-    ) external view returns (bool) {
+
+    function aggregateSignersPubKeys(address[] calldata _signers) external view returns (uint256, uint256, uint256, uint256) {
         require(
             _signers.length >= operatorsCount * minSigsPercentage / 100,
-            "osvy1"
-        ); // osvy1 - signers array length must be equal or more than allowed operators minimal count to verify message
-        require(
-            _signatures.length == 2 * _signers.length,
-            "osvy2"
-        ); // osvy2 - signatures array length must be equal to 2 * signers array length (signature is G1 point that consists of uint256 x and y)
-
+            "osas1"
+        ); // osas1 - signers array length must be equal or more than allowed operators minimal count to verify message
         BlsOperations.G2Point memory aggrPubKey;
-        BlsOperations.G1Point memory aggrSignature;
-        uint256 k = 0;
-        for (uint256 i = 0; i < _signers.length; i++) {
-            if(!operators[_signers[i]].exists) {
-                revert("osvy3"); // osvy3 - unknown operator
+        if (_signers.length == 1) {
+            aggrPubKey = operators[_signers[0]].pubKey;
+        } else {
+            for (uint256 i = 0; i < _signers.length; i++) {
+                if(!operators[_signers[i]].exists) {
+                    revert("osas2"); // osas2 - unknown operator
+                }
+                aggrPubKey = BlsOperations.addG2(aggrPubKey, operators[_signers[i]].pubKey);
             }
-
-            BlsOperations.G1Point memory sign = BlsOperations.G1Point({
-                x: _signatures[k],
-                y: _signatures[k+1]
-            });
-
-            aggrPubKey = BlsOperations.addG2(aggrPubKey, operators[_signers[i]].pubKey);
-            aggrSignature = BlsOperations.addG1(aggrSignature, sign);
-
-            k += 2;
         }
+        return (aggrPubKey.x[0], aggrPubKey.x[1], aggrPubKey.y[0], aggrPubKey.y[1]);
+    }
 
+    function aggregateSignatures(uint256[] calldata _signatures, uint256 _signersCount) external view returns (uint256, uint256) {
+        require(
+            _signatures.length == 2 * _signersCount,
+            "osas3"
+        ); // osas3 - signatures array length must be equal to 2 * signers array length (signature is G1 point that consists of uint256 x and y)
+        BlsOperations.G1Point memory aggrSignature;
+        if (_signatures.length == 2) {
+            aggrSignature = BlsOperations.G1Point({
+                x: _signatures[0],
+                y: _signatures[1]
+            });
+        } else {
+            for (uint256 i = 0; i < _signatures.length; i += 2) {
+                BlsOperations.G1Point memory sign = BlsOperations.G1Point({
+                    x: _signatures[i],
+                    y: _signatures[i+1]
+                });
+                aggrSignature = BlsOperations.addG1(aggrSignature, sign);
+            }
+        }
+        return (aggrSignature.x, aggrSignature.y);
+    }
+
+    function verify(
+        uint256 _signatureX,
+        uint256 _signatureY,
+        uint256 _pubkeyXX,
+        uint256 _pubkeyXY,
+        uint256 _pubkeyYX,
+        uint256 _pubkeyYY,
+        bytes calldata _message
+    ) external view returns (bool) {
         BlsOperations.G1Point memory mpoint = BlsOperations.messageToG1(_message);
-
-        return BlsOperations.twoPointsPairing(BlsOperations.negate(aggrSignature), mpoint, BlsOperations.generatorG2(), aggrPubKey);
+        BlsOperations.G1Point memory signature = BlsOperations.G1Point({
+            x: _signatureX,
+            y: _signatureY
+        });
+        BlsOperations.G2Point memory pubkey = BlsOperations.G2Point({
+            x: [
+                _pubkeyXX,
+                _pubkeyXY
+            ],
+            y: [
+                _pubkeyYX,
+                _pubkeyYY
+            ]
+        });
+        return BlsOperations.twoPointsPairing(BlsOperations.negate(signature), mpoint, BlsOperations.generatorG2(), pubkey);
     }
 
     // Check if the sender is owner

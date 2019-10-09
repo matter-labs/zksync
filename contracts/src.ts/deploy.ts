@@ -22,8 +22,6 @@ export const governanceTestContractCode = require('../build/GovernanceTest');
 export const priorityQueueTestContractCode = require('../build/PriorityQueueTest');
 export const operatorsTestContractCode = require('../build/OperatorsTest');
 
-export const blsVerifyRawTesterContractCode = require('../build/BlsVerifyRawTester');
-
 export async function deployGovernance(
     wallet,
     governorAddress,
@@ -127,26 +125,6 @@ export async function deployOperators(
         return contract
     } catch (err) {
         console.log("Operators deploy error:" + err);
-    }
-}
-
-export async function deployBlsVerifyRawTester(
-    wallet,
-    blsVerifyRawTesterCode,
-) {
-    try {
-        let contract = await deployContract(
-            wallet,
-            blsVerifyRawTesterCode,
-            [],
-            {
-                gasLimit: 6600000,
-            });
-        console.log(`BLS_VERIFY_RAW_TESTER_CONTRACT_ADDR=${contract.address}`);
-
-        return contract
-    } catch (err) {
-        console.log("BLS verify raw tester deploy error:" + err);
     }
 }
 
