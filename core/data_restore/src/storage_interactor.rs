@@ -11,20 +11,20 @@ use storage::{
 };
 use web3::types::H256;
 
-/// Removes stored data
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database Connection Pool
-///
-pub fn remove_storage_data(connection_pool: ConnectionPool) -> Result<(), DataRestoreError> {
-    remove_last_watched_block_number(connection_pool.clone())?;
-    remove_events_state(connection_pool.clone())?;
-    remove_franklin_ops(connection_pool.clone())?;
-    remove_tree_state(connection_pool.clone())?;
-    remove_storage_state_status(connection_pool.clone())?;
-    Ok(())
-}
+// /// Removes stored data
+// ///
+// /// # Arguments
+// ///
+// /// * `connection_pool` - Database Connection Pool
+// ///
+// pub fn remove_storage_data(connection_pool: ConnectionPool) -> Result<(), DataRestoreError> {
+//     remove_last_watched_block_number(connection_pool.clone())?;
+//     remove_events_state(connection_pool.clone())?;
+//     remove_franklin_ops(connection_pool.clone())?;
+//     remove_tree_state(connection_pool.clone())?;
+//     remove_storage_state_status(connection_pool.clone())?;
+//     Ok(())
+// }
 
 /// Updates stored tree state
 ///
