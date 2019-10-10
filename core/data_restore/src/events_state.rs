@@ -169,7 +169,7 @@ impl EventsState {
         let mut committed_events: Vec<EventData> = vec![];
         let mut verified_events: Vec<EventData> = vec![];
         let block_verified_topic = "BlockVerified(uint32)";
-        let block_committed_topic = "BlockCommitted(uint32,uint32)";
+        let block_committed_topic = "BlockCommitted(uint32)";
         let block_verified_topic_h256: H256 = get_topic_keccak_hash(block_verified_topic);
         let block_committed_topic_h256: H256 = get_topic_keccak_hash(block_committed_topic);
         for log in logs {
@@ -177,7 +177,6 @@ impl EventsState {
                 block_num: 0,
                 transaction_hash: H256::zero(),
                 block_type: EventType::Unknown,
-                fee_account: 0,
             };
             let tx_hash = log.transaction_hash;
             let topic = log.topics[0];
@@ -193,7 +192,6 @@ impl EventsState {
                         verified_events.push(block);
                     } else if topic == block_committed_topic_h256 {
                         block.block_type = EventType::Committed;
-                        block.fee_account = U256::from(log.topics[2].as_bytes()).as_u32();
                         committed_events.push(block);
                     }
                 }

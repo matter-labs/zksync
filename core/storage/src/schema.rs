@@ -82,7 +82,6 @@ table! {
         block_type -> Text,
         transaction_hash -> Bytea,
         block_num -> Int8,
-        fee_account -> Int8,
     }
 }
 

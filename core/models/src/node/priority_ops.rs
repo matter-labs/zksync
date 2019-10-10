@@ -87,12 +87,9 @@ impl FullExit {
             token: bytes_slice_to_uint16(
                 &bytes[token_pre_length..token_pre_length + TOKEN_BYTES_LENGTH],
             )?,
-            nonce: Nonce::from_be_bytes(
-                bytes_slice_to_uint32(
-                    &bytes[nonce_pre_length..nonce_pre_length + NONCE_BYTES_LENGTH],
-                )?
-                .to_be_bytes(),
-            ),
+            nonce: bytes_slice_to_uint32(
+                &bytes[nonce_pre_length..nonce_pre_length + NONCE_BYTES_LENGTH],
+            )?,
             signature_r: Box::from(bytes32_from_slice(
                 &bytes[signature_r_pre_length..signature_r_pre_length + SIGNATURE_R_BYTES_LENGTH],
             )?),

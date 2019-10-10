@@ -529,7 +529,6 @@ pub struct NewBlockEvent {
     pub block_type: String, // 'Committed', 'Verified'
     pub transaction_hash: Vec<u8>,
     pub block_num: i64,
-    pub fee_account: i64,
 }
 
 #[derive(Insertable, Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
@@ -539,7 +538,6 @@ pub struct StoredBlockEvent {
     pub block_type: String, // 'Committed', 'Verified'
     pub transaction_hash: Vec<u8>,
     pub block_num: i64,
-    pub fee_account: i64,
 }
 
 #[derive(Debug, Insertable)]
