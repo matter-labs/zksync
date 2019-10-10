@@ -26,7 +26,7 @@ export default {
                 this.$refs.alert.display({
                     message: progress.displayMessage.message,
                     variant: progress.displayMessage.error ? 'danger' : 'success',
-                    countdown: progress.displayMessage.countdown || timeConstants.countdown,
+                    countdown: progress.displayMessage.countdown,
                 });
             }
 

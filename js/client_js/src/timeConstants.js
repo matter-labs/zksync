@@ -5,4 +5,5 @@ export default Object.freeze({
     ethereumMiningHalfLife: 10000,
     provingHalfLife: 60000,
     waitingForProverHalfLife: 10000,
+    transactionsRefresh: 3000,
 });

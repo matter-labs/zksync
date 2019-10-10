@@ -114,10 +114,6 @@ export default {
                     franklinBalancesWithInfo,
                 };
 
-                this.historyInfo = {
-                    // TODO: lazily load in transactions component
-                    transactions: await window.walletDecorator.transactionsAsNeeded(),
-                };
             } catch (e) {
                 console.log(e);
                 let message = e.message;

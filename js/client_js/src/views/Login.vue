@@ -63,6 +63,7 @@ export default {
                 this.$refs.alertLogin.display({
                     message: `Login failed with ${e.message}`,
                     variant: 'info',
+                    countdown: 10,
                 });
             }
         }

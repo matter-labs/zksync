@@ -7,6 +7,8 @@
 </template>
 
 <script>
+import timeConstants from '../timeConstants'
+
 import HistoryRow from './HistoryRow.vue'
 
 const components = {
@@ -15,23 +17,23 @@ const components = {
 
 export default {
     name: 'History',
-    props: ['info'],
     data: () => ({
         transactions: [],
         perPage: 3,
         currentPage: 1,
+
+        intervalHandle: null,
     }),
-    created() {
-        this.transactions = this.info.transactions;
+    async created() {
+        await this.load();
+        this.intervalHandle = setInterval(() => this.load(), timeConstants.transactionsRefresh);
     },
-    watch: {
-        info: function() {
-            this.transactions = this.info.transactions;
-        },
+    destroyed() {
+        clearInterval(this.intervalHandle); 
     },
     methods: {
-        onPageChanged(...args) {
-            console.log('onPageChanged', args);
+        async load() {
+            this.transactions = await window.walletDecorator.transactionsAsNeeded();
         },
     },
     components,
