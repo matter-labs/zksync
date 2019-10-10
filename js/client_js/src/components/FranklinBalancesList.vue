@@ -15,7 +15,7 @@
                     > 
                         {{ data.item.committedAmount }} 
                         <span 
-                            v-if="data.item.committedAmount == data.item.verifiedAmount" 
+                            v-if="data.item.verified" 
                             style="color: #2a2;">
                             (Verified)
                         </span>
@@ -76,6 +76,7 @@ export default {
             this.displayableBalances = this.balances.map(bal => {
                 if (bal.tokenName != 'ETH') return bal;
                 let res = Object.assign({}, bal);
+                res.verified = res.verifiedAmount == res.committedAmount;
                 res.verifiedAmount = readableEther(res.verifiedAmount);
                 res.committedAmount = readableEther(res.committedAmount);
                 return res;

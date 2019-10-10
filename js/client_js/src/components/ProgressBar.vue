@@ -49,7 +49,7 @@ export default {
                 let progress = (Date.now() - start) / duration;
                 progress = animation(progress);
                 progress = Math.min(1.0, progress);
-                this.value = Math.round(this.max * progress);
+                this.value = Math.floor(this.max * progress);
                 window.requestAnimationFrame(draw);
             };
             window.requestAnimationFrame(draw);
