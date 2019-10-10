@@ -7,33 +7,17 @@ use crate::params::FR_ADDRESS_LEN;
 use crate::primitives::{big_decimal_to_u128, bytes_slice_to_uint32, bytes_slice_to_uint128, u128_to_bigdecimal};
 use bigdecimal::BigDecimal;
 
-pub const NOOP_OP_LENGTH: usize = 0;
-pub const DEPOSIT_OP_LENGTH: usize = 41;
-pub const TRANSFER_TO_NEW_OP_LENGTH: usize = 33;
-pub const WITHDRAW_OP_LENGTH: usize = 43;
-pub const CLOSE_OP_LENGTH: usize = 3;
-pub const TRANSFER_OP_LENGTH: usize = 13;
-pub const FULL_EXIT_OP_LENGTH: usize = 141;
-
-pub const NOOP_OP_CODE: usize = 0;
-pub const DEPOSIT_OP_CODE: usize = 1;
-pub const TRANSFER_TO_NEW_OP_CODE: usize = 2;
-pub const WITHDRAW_OP_CODE: usize = 3;
-pub const CLOSE_OP_CODE: usize = 4;
-pub const TRANSFER_OP_CODE: usize = 5;
-pub const FULL_EXIT_OP_CODE: usize = 6;
-
-pub const TX_TYPE_BYTES_LEGTH: usize = 1;
-pub const ACCOUNT_ID_BYTES_LEGTH: usize = 3;
+pub const TX_TYPE_BYTES_LENGTH: usize = 1;
+pub const ACCOUNT_ID_BYTES_LENGTH: usize = 3;
 pub const TOKEN_BYTES_LENGTH: usize = 2;
-pub const FULL_AMOUNT_BYTES_LEGTH: usize = 16;
-pub const FEE_BYTES_LEGTH: usize = 2;
-pub const ETH_ADDR_BYTES_LEGTH: usize = 20;
-pub const PACKED_AMOUNT_BYTES_LEGTH: usize = 3;
-pub const NONCE_BYTES_LEGTH: usize = 4;
-pub const SIGNATURE_R_BYTES_LEGTH: usize = 32;
-pub const SIGNATURE_S_BYTES_LEGTH: usize = 32;
-pub const PUBKEY_PACKED_BYTES_LEGTH: usize = 32;
+pub const FULL_AMOUNT_BYTES_LENGTH: usize = 16;
+pub const FEE_BYTES_LENGTH: usize = 2;
+pub const ETH_ADDR_BYTES_LENGTH: usize = 20;
+pub const PACKED_AMOUNT_BYTES_LENGTH: usize = 3;
+pub const NONCE_BYTES_LENGTH: usize = 4;
+pub const SIGNATURE_R_BYTES_LENGTH: usize = 32;
+pub const SIGNATURE_S_BYTES_LENGTH: usize = 32;
+pub const PUBKEY_PACKED_BYTES_LENGTH: usize = 32;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositOp {
@@ -43,7 +27,8 @@ pub struct DepositOp {
 
 impl DepositOp {
     pub const CHUNKS: usize = 6;
-    const OP_CODE: u8 = 0x01;
+    pub const OP_CODE: u8 = 0x01;
+    pub const OP_LENGTH: usize = 41;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -57,14 +42,14 @@ impl DepositOp {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != DEPOSIT_OP_LENGTH {
+        if bytes.len() != Self::OP_LENGTH {
             return None;
         }
         let pre_length = 0;
         Some(Self {
             priority_op: Deposit::from_bytes(bytes)?,
             account_id: bytes_slice_to_uint32(
-                &bytes[pre_length..pre_length + ACCOUNT_ID_BYTES_LEGTH],
+                &bytes[pre_length..pre_length + ACCOUNT_ID_BYTES_LENGTH],
             )?,
         })
     }
@@ -76,6 +61,7 @@ pub struct NoopOp {}
 impl NoopOp {
     pub const CHUNKS: usize = 1;
     pub const OP_CODE: u8 = 0x00;
+    pub const OP_LENGTH: usize = 0;
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
         if bytes != [0, 0, 0, 0, 0, 0, 0, 0] {
@@ -95,6 +81,7 @@ pub struct TransferToNewOp {
 impl TransferToNewOp {
     pub const CHUNKS: usize = 5;
     pub const OP_CODE: u8 = 0x02;
+    pub const OP_LENGTH: usize = 33;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -110,21 +97,21 @@ impl TransferToNewOp {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != TRANSFER_TO_NEW_OP_LENGTH {
+        if bytes.len() != Self::OP_LENGTH {
             return None;
         }
         let from_pre_length = 0;
-        let to_pre_length = ACCOUNT_ID_BYTES_LEGTH
+        let to_pre_length = ACCOUNT_ID_BYTES_LENGTH
             + TOKEN_BYTES_LENGTH
-            + PACKED_AMOUNT_BYTES_LEGTH
+            + PACKED_AMOUNT_BYTES_LENGTH
             + FR_ADDRESS_LEN;
         Some(Self {
             tx: Transfer::from_transfer_to_new_bytes(bytes)?,
             from: bytes_slice_to_uint32(
-                &bytes[from_pre_length..from_pre_length + ACCOUNT_ID_BYTES_LEGTH],
+                &bytes[from_pre_length..from_pre_length + ACCOUNT_ID_BYTES_LENGTH],
             )?,
             to: bytes_slice_to_uint32(
-                &bytes[to_pre_length..to_pre_length + ACCOUNT_ID_BYTES_LEGTH],
+                &bytes[to_pre_length..to_pre_length + ACCOUNT_ID_BYTES_LENGTH],
             )?,
         })
     }
@@ -140,6 +127,7 @@ pub struct TransferOp {
 impl TransferOp {
     pub const CHUNKS: usize = 2;
     pub const OP_CODE: u8 = 0x05;
+    pub const OP_LENGTH: usize = 13;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -154,18 +142,18 @@ impl TransferOp {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != TRANSFER_OP_LENGTH {
+        if bytes.len() != Self::OP_LENGTH {
             return None;
         }
         let from_pre_length = 0;
-        let to_pre_length = ACCOUNT_ID_BYTES_LEGTH + TOKEN_BYTES_LENGTH;
+        let to_pre_length = ACCOUNT_ID_BYTES_LENGTH + TOKEN_BYTES_LENGTH;
         Some(Self {
             tx: Transfer::from_transfer_bytes(bytes)?,
             from: bytes_slice_to_uint32(
-                &bytes[from_pre_length..from_pre_length + ACCOUNT_ID_BYTES_LEGTH],
+                &bytes[from_pre_length..from_pre_length + ACCOUNT_ID_BYTES_LENGTH],
             )?,
             to: bytes_slice_to_uint32(
-                &bytes[to_pre_length..to_pre_length + ACCOUNT_ID_BYTES_LEGTH],
+                &bytes[to_pre_length..to_pre_length + ACCOUNT_ID_BYTES_LENGTH],
             )?,
         })
     }
@@ -179,7 +167,8 @@ pub struct WithdrawOp {
 
 impl WithdrawOp {
     pub const CHUNKS: usize = 6;
-    const OP_CODE: u8 = 0x03;
+    pub const OP_CODE: u8 = 0x03;
+    pub const OP_LENGTH: usize = 43;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -194,14 +183,14 @@ impl WithdrawOp {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != WITHDRAW_OP_LENGTH {
+        if bytes.len() != Self::OP_LENGTH {
             return None;
         }
         let pre_length = 0;
         Some(Self {
             tx: Withdraw::from_bytes(bytes)?,
             account_id: bytes_slice_to_uint32(
-                &bytes[pre_length..pre_length + ACCOUNT_ID_BYTES_LEGTH],
+                &bytes[pre_length..pre_length + ACCOUNT_ID_BYTES_LENGTH],
             )?,
         })
     }
@@ -216,6 +205,7 @@ pub struct CloseOp {
 impl CloseOp {
     pub const CHUNKS: usize = 1;
     pub const OP_CODE: u8 = 0x04;
+    pub const OP_LENGTH: usize = 3;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -226,14 +216,14 @@ impl CloseOp {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != CLOSE_OP_LENGTH {
+        if bytes.len() != Self::OP_LENGTH {
             return None;
         }
         let pre_length = 0;
         Some(Self {
             tx: Close::from_bytes(bytes)?,
             account_id: bytes_slice_to_uint32(
-                &bytes[pre_length..pre_length + ACCOUNT_ID_BYTES_LEGTH],
+                &bytes[pre_length..pre_length + ACCOUNT_ID_BYTES_LENGTH],
             )?,
         })
     }
@@ -247,7 +237,8 @@ pub struct FullExitOp {
 
 impl FullExitOp {
     pub const CHUNKS: usize = 18;
-    const OP_CODE: u8 = 0x06;
+    pub const OP_CODE: u8 = 0x06;
+    pub const OP_LENGTH: usize = 141;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -266,24 +257,24 @@ impl FullExitOp {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != FULL_EXIT_OP_LENGTH {
+        if bytes.len() != Self::OP_LENGTH {
             return None;
         }
         let acc_id_pre_length = 0;
-        let to_pre_length = ACCOUNT_ID_BYTES_LEGTH
-            + PUBKEY_PACKED_BYTES_LEGTH
-            + ETH_ADDR_BYTES_LEGTH
+        let to_pre_length = ACCOUNT_ID_BYTES_LENGTH
+            + PUBKEY_PACKED_BYTES_LENGTH
+            + ETH_ADDR_BYTES_LENGTH
             + TOKEN_BYTES_LENGTH
-            + NONCE_BYTES_LEGTH
-            + SIGNATURE_R_BYTES_LEGTH
-            + SIGNATURE_S_BYTES_LEGTH;
+            + NONCE_BYTES_LENGTH
+            + SIGNATURE_R_BYTES_LENGTH
+            + SIGNATURE_S_BYTES_LENGTH;
 
         let acc_id = bytes_slice_to_uint32(
-            &bytes[acc_id_pre_length..acc_id_pre_length + ACCOUNT_ID_BYTES_LEGTH],
+            &bytes[acc_id_pre_length..acc_id_pre_length + ACCOUNT_ID_BYTES_LENGTH],
         )?;
         let amount = u128_to_bigdecimal(
             bytes_slice_to_uint128(
-                &bytes[to_pre_length..to_pre_length + FULL_AMOUNT_BYTES_LEGTH]
+                &bytes[to_pre_length..to_pre_length + FULL_AMOUNT_BYTES_LENGTH]
             )?
         );
 
@@ -332,42 +323,42 @@ impl FranklinOp {
     }
 
     pub fn chunks_by_op_number(op_type: &u8) -> Option<usize> {
-        match *op_type as usize {
-            NOOP_OP_CODE => Some(NoopOp::CHUNKS),
-            DEPOSIT_OP_CODE => Some(DepositOp::CHUNKS),
-            TRANSFER_TO_NEW_OP_CODE => Some(TransferToNewOp::CHUNKS),
-            WITHDRAW_OP_CODE => Some(WithdrawOp::CHUNKS),
-            CLOSE_OP_CODE => Some(CloseOp::CHUNKS),
-            TRANSFER_OP_CODE => Some(TransferOp::CHUNKS),
-            FULL_EXIT_OP_CODE => Some(FullExitOp::CHUNKS),
+        match *op_type {
+            NoopOp::OP_CODE => Some(NoopOp::CHUNKS),
+            DepositOp::OP_CODE => Some(DepositOp::CHUNKS),
+            TransferToNewOp::OP_CODE => Some(TransferToNewOp::CHUNKS),
+            WithdrawOp::OP_CODE => Some(WithdrawOp::CHUNKS),
+            CloseOp::OP_CODE => Some(CloseOp::CHUNKS),
+            TransferOp::OP_CODE => Some(TransferOp::CHUNKS),
+            FullExitOp::OP_CODE => Some(FullExitOp::CHUNKS),
             _ => None,
         }
     }
 
     pub fn from_bytes(op_type: &u8, bytes: &[u8]) -> Option<Self> {
-        match *op_type as usize {
-            NOOP_OP_CODE => Some(FranklinOp::Noop(NoopOp::from_bytes(&bytes)?)),
-            DEPOSIT_OP_CODE => Some(FranklinOp::Deposit(DepositOp::from_bytes(&bytes)?)),
-            TRANSFER_TO_NEW_OP_CODE => Some(FranklinOp::TransferToNew(
+        match *op_type {
+            NoopOp::OP_CODE => Some(FranklinOp::Noop(NoopOp::from_bytes(&bytes)?)),
+            DepositOp::OP_CODE => Some(FranklinOp::Deposit(DepositOp::from_bytes(&bytes)?)),
+            TransferToNewOp::OP_CODE => Some(FranklinOp::TransferToNew(
                 TransferToNewOp::from_bytes(&bytes)?,
             )),
-            WITHDRAW_OP_CODE => Some(FranklinOp::Withdraw(WithdrawOp::from_bytes(&bytes)?)),
-            CLOSE_OP_CODE => Some(FranklinOp::Close(CloseOp::from_bytes(&bytes)?)),
-            TRANSFER_OP_CODE => Some(FranklinOp::Transfer(TransferOp::from_bytes(&bytes)?)),
-            FULL_EXIT_OP_CODE => Some(FranklinOp::FullExit(FullExitOp::from_bytes(&bytes)?)),
+            WithdrawOp::OP_CODE => Some(FranklinOp::Withdraw(WithdrawOp::from_bytes(&bytes)?)),
+            CloseOp::OP_CODE => Some(FranklinOp::Close(CloseOp::from_bytes(&bytes)?)),
+            TransferOp::OP_CODE => Some(FranklinOp::Transfer(TransferOp::from_bytes(&bytes)?)),
+            FullExitOp::OP_CODE => Some(FranklinOp::FullExit(FullExitOp::from_bytes(&bytes)?)),
             _ => None,
         }
     }
 
     pub fn public_data_length(op_type: &u8) -> Option<usize> {
-        match *op_type as usize {
-            NOOP_OP_CODE => Some(NOOP_OP_LENGTH),
-            DEPOSIT_OP_CODE => Some(DEPOSIT_OP_LENGTH),
-            TRANSFER_TO_NEW_OP_CODE => Some(TRANSFER_TO_NEW_OP_LENGTH),
-            WITHDRAW_OP_CODE => Some(WITHDRAW_OP_LENGTH),
-            CLOSE_OP_CODE => Some(CLOSE_OP_LENGTH),
-            TRANSFER_OP_CODE => Some(TRANSFER_OP_LENGTH),
-            FULL_EXIT_OP_CODE => Some(FULL_EXIT_OP_LENGTH),
+        match *op_type {
+            NoopOp::OP_CODE => Some(NoopOp::OP_LENGTH),
+            DepositOp::OP_CODE => Some(DepositOp::OP_LENGTH),
+            TransferToNewOp::OP_CODE => Some(TransferToNewOp::OP_LENGTH),
+            WithdrawOp::OP_CODE => Some(WithdrawOp::OP_LENGTH),
+            CloseOp::OP_CODE => Some(CloseOp::OP_LENGTH),
+            TransferOp::OP_CODE => Some(TransferOp::OP_LENGTH),
+            FullExitOp::OP_CODE => Some(FullExitOp::OP_LENGTH),
             _ => None,
         }
     }

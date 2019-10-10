@@ -4,7 +4,7 @@ use web3::types::{Transaction, TransactionId, H256};
 use crate::events::EventData;
 use crate::helpers::{DataRestoreError, DATA_RESTORE_CONFIG};
 
-use models::node::operations::{FranklinOp, TX_TYPE_BYTES_LEGTH};
+use models::node::operations::{FranklinOp, TX_TYPE_BYTES_LENGTH};
 
 const FUNC_NAME_HASH_LENGTH: usize = 4;
 
@@ -66,7 +66,7 @@ impl FranklinOpsBlock {
             let pub_data_size =
                 FranklinOp::public_data_length(op_type).ok_or(DataRestoreError::WrongData("Wrong op type".to_string()))?;
 
-            let pre = current_pointer + TX_TYPE_BYTES_LEGTH;
+            let pre = current_pointer + TX_TYPE_BYTES_LENGTH;
             let post = pre + pub_data_size;
 
             let op = FranklinOp::from_bytes(op_type, &data[pre..post]).ok_or(DataRestoreError::WrongData("Wrong data".to_string()))?;
