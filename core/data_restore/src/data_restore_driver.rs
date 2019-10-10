@@ -1,6 +1,7 @@
 use crate::accounts_state::FranklinAccountsState;
 use crate::events_state::EventsState;
 use crate::franklin_ops::FranklinOpsBlock;
+use crate::genesis_state::get_genesis_state;
 use crate::helpers::DataRestoreError;
 use crate::storage_interactor;
 use storage::ConnectionPool;
@@ -60,7 +61,10 @@ impl DataRestoreDriver {
     pub fn load_state_from_storage(&mut self) -> Result<(), DataRestoreError> {
         let state = storage_interactor::get_storage_state(self.connection_pool.clone());
         if state.is_err() {
-            return Ok(()) // If state is unknown then its empty or broken - start from beginning
+            // If state is unknown then its empty or broken - start from beginning
+            let genesis_acc_map = get_genesis_state()?;
+            self.accounts_state = FranklinAccountsState::load(genesis_acc_map.0, genesis_acc_map.1);
+            return Ok(());
         }
         let unwraped_state = state.unwrap();
         let tree_state = storage_interactor::get_tree_state(self.connection_pool.clone())?;

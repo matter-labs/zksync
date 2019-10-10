@@ -8,8 +8,8 @@ use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
 use franklin_crypto::jubjub::{edwards, JubjubEngine, Unknown};
 use pairing::bn256::Bn256;
 use pairing::{CurveAffine, Engine};
-use std::str::FromStr;
 use std::convert::TryInto;
+use std::str::FromStr;
 use web3::types::U256;
 
 // TODO: replace Vec with Iterator?
@@ -466,7 +466,7 @@ pub fn bytes_slice_to_uint32(bytes: &[u8]) -> Option<u32> {
     let size = bytes.len();
     let mut vec: Vec<u8> = bytes.clone().to_vec();
     vec.reverse();
-    for _ in 0..4-size {
+    for _ in 0..4 - size {
         vec.push(0);
     }
     vec.reverse();
@@ -478,7 +478,7 @@ pub fn bytes_slice_to_uint16(bytes: &[u8]) -> Option<u16> {
     let size = bytes.len();
     let mut vec: Vec<u8> = bytes.clone().to_vec();
     vec.reverse();
-    for _ in 0..2-size {
+    for _ in 0..2 - size {
         vec.push(0);
     }
     vec.reverse();
@@ -490,7 +490,7 @@ pub fn bytes_slice_to_uint128(bytes: &[u8]) -> Option<u128> {
     let size = bytes.len();
     let mut vec: Vec<u8> = bytes.clone().to_vec();
     vec.reverse();
-    for _ in 0..16-size {
+    for _ in 0..16 - size {
         vec.push(0);
     }
     vec.reverse();

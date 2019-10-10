@@ -3,10 +3,14 @@ use models::abi::FRANKLIN_CONTRACT;
 use serde_json;
 use std::str::FromStr;
 use tiny_keccak::keccak256;
+use web3::futures::Future;
 use web3::types::{Address, H256};
+use web3::types::{Transaction, TransactionId};
 
 use lazy_static::lazy_static;
 use std::env;
+
+pub const FUNC_NAME_HASH_LENGTH: usize = 4;
 
 lazy_static! {
     pub static ref DATA_RESTORE_CONFIG: DataRestoreConfig = DataRestoreConfig::new();
@@ -23,6 +27,8 @@ pub struct DataRestoreConfig {
     pub franklin_contract_address: Address,
     /// Franklin contract genesis block number: u64
     pub genesis_block_number: u64,
+    /// Franklin contract creation tx hash
+    pub genesis_tx_hash: H256,
 }
 
 impl DataRestoreConfig {
@@ -49,6 +55,12 @@ impl DataRestoreConfig {
                 10,
             )
             .expect("Cant get genesis number"), // 0
+            genesis_tx_hash: H256::from_str(
+                std::env::var("GENESIS_TX_HASH")
+                    .expect("GENESIS_TX_HASH env missing")
+                    .as_str(),
+            )
+            .expect("Cant get genesis tx hash"),
         }
     }
 }
@@ -57,6 +69,46 @@ impl Default for DataRestoreConfig {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Return Ethereum transaction input data
+///
+/// # Arguments
+///
+/// * `transaction` - Ethereum transaction description
+///
+pub fn get_input_data_from_ethereum_transaction(
+    transaction: &Transaction,
+) -> Result<Vec<u8>, DataRestoreError> {
+    let input_data = transaction.clone().input.0;
+    if input_data.len() > FUNC_NAME_HASH_LENGTH {
+        return Ok(input_data[FUNC_NAME_HASH_LENGTH..input_data.len()].to_vec());
+    } else {
+        return Err(DataRestoreError::NoData(
+            "No commitment data in tx".to_string(),
+        ));
+    }
+}
+
+/// Return Ethereum transaction description
+///
+/// # Arguments
+///
+/// * `transaction_hash` - The identifier of the particular Ethereum transaction
+///
+pub fn get_ethereum_transaction(transaction_hash: &H256) -> Result<Transaction, DataRestoreError> {
+    let tx_id = TransactionId::Hash(transaction_hash.clone());
+    let (_eloop, transport) =
+        web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
+            .map_err(|_| DataRestoreError::WrongEndpoint)?;
+    let web3 = web3::Web3::new(transport);
+    let web3_transaction = web3
+        .eth()
+        .transaction(tx_id)
+        .wait()
+        .map_err(|e| DataRestoreError::Unknown(e.to_string()))?
+        .ok_or(DataRestoreError::NoData("No tx by this hash".to_string()))?;
+    Ok(web3_transaction)
 }
 
 /// Returns bytes vec of keccak256 hash from bytes

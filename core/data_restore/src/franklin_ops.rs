@@ -1,13 +1,10 @@
-use web3::futures::Future;
-use web3::types::{Transaction, TransactionId, H256};
-
 use crate::events::EventData;
-use crate::helpers::{DataRestoreError, DATA_RESTORE_CONFIG};
-
+use crate::helpers::{
+    get_ethereum_transaction, get_input_data_from_ethereum_transaction, DataRestoreError,
+};
 use models::node::operations::{FranklinOp, TX_TYPE_BYTES_LENGTH};
-use models::primitives::{bytes_slice_to_uint32};
+use models::primitives::bytes_slice_to_uint32;
 
-const FUNC_NAME_HASH_LENGTH: usize = 4;
 const BLOCK_NUMBER_LENGTH: usize = 32;
 const FEE_ACC_LENGTH: usize = 32;
 const ROOT_LENGTH: usize = 32;
@@ -40,11 +37,12 @@ impl FranklinOpsBlock {
     fn get_franklin_ops_block(
         event_data: &EventData,
     ) -> Result<FranklinOpsBlock, DataRestoreError> {
-        let transaction = FranklinOpsBlock::get_ethereum_transaction(&event_data.transaction_hash)?;
-        let commitment_data =
-            FranklinOpsBlock::get_commitment_data_from_ethereum_transaction(&transaction)?;
-        let fee_account = FranklinOpsBlock::get_fee_account_from_ethereum_transaction(&transaction)?;
-        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&commitment_data)?;
+        let transaction = get_ethereum_transaction(&event_data.transaction_hash)?;
+        let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
+        let commitment_data = &input_data
+            [BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH + ROOT_LENGTH + EMPTY_LENGTH..input_data.len()];
+        let fee_account = FranklinOpsBlock::get_fee_account_from_tx_input(&input_data)?;
+        let ops = FranklinOpsBlock::get_franklin_ops_from_data(commitment_data)?;
         let block = FranklinOpsBlock {
             block_num: event_data.block_num,
             ops,
@@ -59,7 +57,7 @@ impl FranklinOpsBlock {
     ///
     /// * `data` - Franklin Contract event input data
     ///
-    pub fn get_franklin_ops_from_data(data: &Vec<u8>) -> Result<Vec<FranklinOp>, DataRestoreError> {
+    pub fn get_franklin_ops_from_data(data: &[u8]) -> Result<Vec<FranklinOp>, DataRestoreError> {
         let mut current_pointer = 0;
         let mut ops = vec![];
         while current_pointer < data.len() {
@@ -83,67 +81,20 @@ impl FranklinOpsBlock {
         Ok(ops)
     }
 
-    /// Return Ethereum transaction description
-    ///
-    /// # Arguments
-    ///
-    /// * `transaction_hash` - The identifier of the particular Ethereum transaction
-    ///
-    fn get_ethereum_transaction(&transaction_hash: &H256) -> Result<Transaction, DataRestoreError> {
-        let tx_id = TransactionId::Hash(transaction_hash);
-        let (_eloop, transport) =
-            web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
-                .map_err(|_| DataRestoreError::WrongEndpoint)?;
-        let web3 = web3::Web3::new(transport);
-        let web3_transaction = web3
-            .eth()
-            .transaction(tx_id)
-            .wait()
-            .map_err(|e| DataRestoreError::Unknown(e.to_string()))?
-            .ok_or(DataRestoreError::NoData("No tx by this hash".to_string()))?;
-        Ok(web3_transaction)
-    }
-
-    /// Return commitment data from Ethereum transaction input data
-    ///
-    /// # Arguments
-    ///
-    /// * `transaction` - Ethereum transaction description
-    ///
-    fn get_commitment_data_from_ethereum_transaction(
-        transaction: &Transaction,
-    ) -> Result<Vec<u8>, DataRestoreError> {
-        let input_data = transaction.clone().input.0;
-        let pre_length = FUNC_NAME_HASH_LENGTH+BLOCK_NUMBER_LENGTH+FEE_ACC_LENGTH+ROOT_LENGTH+EMPTY_LENGTH;
-        if input_data.len() > pre_length {
-            return Ok(input_data[pre_length..input_data.len()].to_vec());
-        } else {
-            return Err(DataRestoreError::NoData(
-                "No commitment data in tx".to_string(),
-            ));
-        }
-    }
-
     /// Return fee account from Ethereum transaction input data
     ///
     /// # Arguments
     ///
-    /// * `transaction` - Ethereum transaction description
+    /// * `input` - Ethereum transaction input
     ///
-    fn get_fee_account_from_ethereum_transaction(
-        transaction: &Transaction,
-    ) -> Result<u32, DataRestoreError> {
-        let input_data = transaction.clone().input.0;
-        let pre_length = FUNC_NAME_HASH_LENGTH+BLOCK_NUMBER_LENGTH;
-        if input_data.len() == pre_length+FEE_ACC_LENGTH {
-            return Ok(
-                bytes_slice_to_uint32(
-                    &input_data[pre_length..pre_length+FEE_ACC_LENGTH]
-                )
-                .ok_or(DataRestoreError::NoData(
-                    "Cant convert bytes to fee account number".to_string(),
-                ))?
-            );
+    fn get_fee_account_from_tx_input(input_data: &Vec<u8>) -> Result<u32, DataRestoreError> {
+        if input_data.len() == BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH {
+            return Ok(bytes_slice_to_uint32(
+                &input_data[BLOCK_NUMBER_LENGTH..BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH],
+            )
+            .ok_or(DataRestoreError::NoData(
+                "Cant convert bytes to fee account number".to_string(),
+            ))?);
         } else {
             return Err(DataRestoreError::NoData(
                 "No fee account data in tx".to_string(),
