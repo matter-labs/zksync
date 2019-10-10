@@ -1,9 +1,9 @@
 use super::{Nonce, TokenId};
 
 use super::operations::{
-    ACCOUNT_ID_BYTES_LENGTH, CloseOp, ETH_ADDR_BYTES_LENGTH, FEE_BYTES_LENGTH,
-    FULL_AMOUNT_BYTES_LENGTH, PACKED_AMOUNT_BYTES_LENGTH, TOKEN_BYTES_LENGTH, TransferOp,
-    TransferToNewOp, WithdrawOp,
+    CloseOp, TransferOp, TransferToNewOp, WithdrawOp, ACCOUNT_ID_BYTES_LENGTH,
+    ETH_ADDR_BYTES_LENGTH, FEE_BYTES_LENGTH, FULL_AMOUNT_BYTES_LENGTH, PACKED_AMOUNT_BYTES_LENGTH,
+    TOKEN_BYTES_LENGTH,
 };
 use crate::node::{
     is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount,
@@ -17,7 +17,9 @@ use crypto::{digest::Digest, sha2::Sha256};
 use super::account::AccountAddress;
 use super::Engine;
 use crate::params::JUBJUB_PARAMS;
-use crate::primitives::{bytes_slice_to_uint128, big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
+use crate::primitives::{
+    big_decimal_to_u128, bytes_slice_to_uint128, pedersen_hash_tx_msg, u128_to_bigdecimal,
+};
 use failure::{ensure, format_err};
 use ff::{PrimeField, PrimeFieldRepr};
 use franklin_crypto::alt_babyjubjub::fs::FsRepr;
@@ -153,7 +155,7 @@ impl Withdraw {
         let amount_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH;
         let fee_pre_length = amount_pre_length + FULL_AMOUNT_BYTES_LENGTH;
         let eth_address_pre_length = fee_pre_length + FEE_BYTES_LENGTH;
-            
+
         Some(Self {
             account: AccountAddress::zero(), // From pubdata its unknown
             eth_address: Address::from_slice(
@@ -162,11 +164,9 @@ impl Withdraw {
             token: bytes_slice_to_uint16(
                 &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BYTES_LENGTH],
             )?,
-            amount: u128_to_bigdecimal(
-                bytes_slice_to_uint128(
-                    &bytes[amount_pre_length..amount_pre_length + FULL_AMOUNT_BYTES_LENGTH]
-                )?
-            ),
+            amount: u128_to_bigdecimal(bytes_slice_to_uint128(
+                &bytes[amount_pre_length..amount_pre_length + FULL_AMOUNT_BYTES_LENGTH],
+            )?),
             fee: unpack_fee_amount(&bytes[fee_pre_length..fee_pre_length + FEE_BYTES_LENGTH])?,
             nonce: 0,                          // From pubdata its unknown
             signature: TxSignature::default(), // From pubdata its unknown

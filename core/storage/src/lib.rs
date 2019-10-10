@@ -551,11 +551,15 @@ pub struct NewFranklinOp {
 }
 
 impl NewFranklinOp {
-    fn prepare_stored_op(franklin_op: &FranklinOp, block: BlockNumber, fee_account: AccountId) -> Self {
+    fn prepare_stored_op(
+        franklin_op: &FranklinOp,
+        block: BlockNumber,
+        fee_account: AccountId,
+    ) -> Self {
         Self {
             block_num: i64::from(block),
             operation: serde_json::to_value(franklin_op.clone()).unwrap(),
-            fee_account: i64::from(fee_account)
+            fee_account: i64::from(fee_account),
         }
     }
 }
@@ -1665,7 +1669,7 @@ impl StorageProcessor {
         Ok(())
     }
 
-    pub fn delete_storage_state(&self) -> QueryResult<()> {
+    pub fn delete_data_restore_storage_state_status(&self) -> QueryResult<()> {
         diesel::delete(storage_state_update::table).execute(self.conn())?;
         Ok(())
     }
@@ -1697,7 +1701,7 @@ impl StorageProcessor {
         &self,
         ops: &[FranklinOp],
         block_num: BlockNumber,
-        fee_account: AccountId
+        fee_account: AccountId,
     ) -> QueryResult<()> {
         for op in ops.iter() {
             let stored_op = NewFranklinOp::prepare_stored_op(&op, block_num, fee_account);

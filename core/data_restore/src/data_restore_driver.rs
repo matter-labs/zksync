@@ -126,7 +126,7 @@ impl DataRestoreDriver {
         storage_interactor::remove_events_state(self.connection_pool.clone())?;
         storage_interactor::save_events_state(&events, self.connection_pool.clone())?;
 
-        storage_interactor::remove_storage_state(self.connection_pool.clone())?;
+        storage_interactor::remove_storage_state_status(self.connection_pool.clone())?;
         storage_interactor::save_storage_state(
             StorageUpdateState::Events,
             self.connection_pool.clone(),
@@ -152,7 +152,7 @@ impl DataRestoreDriver {
             )?;
         }
 
-        storage_interactor::remove_storage_state(self.connection_pool.clone())?;
+        storage_interactor::remove_storage_state_status(self.connection_pool.clone())?;
         storage_interactor::save_storage_state(
             StorageUpdateState::None,
             self.connection_pool.clone(),
@@ -170,7 +170,7 @@ impl DataRestoreDriver {
         storage_interactor::remove_franklin_ops(self.connection_pool.clone())?;
         storage_interactor::save_franklin_ops_blocks(&new_blocks, self.connection_pool.clone())?;
 
-        storage_interactor::remove_storage_state(self.connection_pool.clone())?;
+        storage_interactor::remove_storage_state_status(self.connection_pool.clone())?;
         storage_interactor::save_storage_state(
             StorageUpdateState::Operations,
             self.connection_pool.clone(),

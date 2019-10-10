@@ -494,7 +494,7 @@ pub fn bytes_slice_to_uint16(bytes: &[u8]) -> Option<u16> {
         for i in 0..2 - size {
             array[i] = 0;
         }
-    } 
+    }
     Some(u16::from_be_bytes(array))
 }
 
@@ -514,7 +514,7 @@ pub fn bytes_slice_to_uint128(bytes: &[u8]) -> Option<u128> {
         for i in 0..16 - size {
             array[i] = 0;
         }
-    } 
+    }
     Some(u128::from_be_bytes(array))
 }
 

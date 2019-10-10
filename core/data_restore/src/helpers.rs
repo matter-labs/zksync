@@ -1,6 +1,5 @@
 use ethabi::Contract;
 use models::abi::FRANKLIN_CONTRACT;
-use models::node::AccountAddress;
 use serde_json;
 use std::str::FromStr;
 use tiny_keccak::keccak256;
@@ -44,8 +43,12 @@ impl DataRestoreConfig {
                 .parse()
                 .expect("Cant create data restore config"), //"4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()
             genesis_block_number: u64::from_str_radix(
-                std::env::var("FRANKLIN_GENESIS_NUMBER").expect("FRANKLIN_GENESIS_NUMBER env missing").as_str(),
-                10).expect("Cant get genesis number"), // 0
+                std::env::var("FRANKLIN_GENESIS_NUMBER")
+                    .expect("FRANKLIN_GENESIS_NUMBER env missing")
+                    .as_str(),
+                10,
+            )
+            .expect("Cant get genesis number"), // 0
         }
     }
 }

@@ -4,7 +4,9 @@ use super::{pack_fee_amount, pack_token_amount, Deposit, FullExit};
 use super::{Close, Transfer, Withdraw};
 use crate::node::FranklinPriorityOp;
 use crate::params::FR_ADDRESS_LEN;
-use crate::primitives::{big_decimal_to_u128, bytes_slice_to_uint32, bytes_slice_to_uint128, u128_to_bigdecimal};
+use crate::primitives::{
+    big_decimal_to_u128, bytes_slice_to_uint128, bytes_slice_to_uint32, u128_to_bigdecimal,
+};
 use bigdecimal::BigDecimal;
 
 pub const TX_TYPE_BYTES_LENGTH: usize = 1;
@@ -65,7 +67,7 @@ impl NoopOp {
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
         if bytes != [0, 0, 0, 0, 0, 0, 0, 0] {
-            return None
+            return None;
         }
         Some(Self {})
     }
@@ -272,11 +274,9 @@ impl FullExitOp {
         let acc_id = bytes_slice_to_uint32(
             &bytes[acc_id_pre_length..acc_id_pre_length + ACCOUNT_ID_BYTES_LENGTH],
         )?;
-        let amount = u128_to_bigdecimal(
-            bytes_slice_to_uint128(
-                &bytes[to_pre_length..to_pre_length + FULL_AMOUNT_BYTES_LENGTH]
-            )?
-        );
+        let amount = u128_to_bigdecimal(bytes_slice_to_uint128(
+            &bytes[to_pre_length..to_pre_length + FULL_AMOUNT_BYTES_LENGTH],
+        )?);
 
         Some(Self {
             priority_op: FullExit::from_bytes(bytes)?,

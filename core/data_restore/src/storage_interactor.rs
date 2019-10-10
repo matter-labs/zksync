@@ -22,14 +22,14 @@ pub fn remove_storage_data(connection_pool: ConnectionPool) -> Result<(), DataRe
     remove_events_state(connection_pool.clone())?;
     remove_franklin_ops(connection_pool.clone())?;
     remove_tree_state(connection_pool.clone())?;
-    remove_storage_state(connection_pool.clone())?;
+    remove_storage_state_status(connection_pool.clone())?;
     Ok(())
 }
 
 /// Updates stored tree state
 ///
 /// # Arguments
-/// 
+///
 /// * `block_number` - current block number
 /// * `account_updates` - accounts updates
 /// * `connection_pool` - Database Connection Pool
@@ -248,12 +248,14 @@ pub fn remove_last_watched_block_number(
 ///
 /// * `connection_pool` - Database Connection Pool
 ///
-pub fn remove_storage_state(connection_pool: ConnectionPool) -> Result<(), DataRestoreError> {
+pub fn remove_storage_state_status(
+    connection_pool: ConnectionPool,
+) -> Result<(), DataRestoreError> {
     let storage = connection_pool.access_storage().map_err(|_| {
         DataRestoreError::Storage("db connection failed for data restore remove data".to_string())
     })?;
     storage
-        .delete_storage_state()
+        .delete_data_restore_storage_state_status()
         .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
     Ok(())
 }
@@ -290,7 +292,7 @@ pub fn stored_ops_block_into_ops_block(op_block: &StoredFranklinOpsBlock) -> Fra
     FranklinOpsBlock {
         block_num: op_block.block_num,
         ops: op_block.ops.clone(),
-        fee_account: op_block.fee_account
+        fee_account: op_block.fee_account,
     }
 }
 

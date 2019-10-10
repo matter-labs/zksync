@@ -1,7 +1,7 @@
 use plasma::state::{OpSuccess, PlasmaState};
 
 use crate::franklin_ops::FranklinOpsBlock;
-use crate::helpers::{DataRestoreError, DATA_RESTORE_CONFIG};
+use crate::helpers::DataRestoreError;
 
 use models::node::account::{Account, AccountAddress};
 use models::node::operations::FranklinOp;
@@ -31,7 +31,7 @@ impl FranklinAccountsState {
     }
 
     /// Returns FranklinAccountsState from accounts map and current block number
-    /// 
+    ///
     /// # Arguments
     ///
     /// * `current_block` - current block number
@@ -61,31 +61,33 @@ impl FranklinAccountsState {
 
         for operation in operations {
             match operation {
-                FranklinOp::Deposit(_op) => {
+                FranklinOp::Deposit(op) => {
                     let OpSuccess {
                         fee,
                         mut updates,
                         executed_op: _,
                     } = self
                         .state
-                        .execute_priority_op(FranklinPriorityOp::Deposit(_op.priority_op));
+                        .execute_priority_op(FranklinPriorityOp::Deposit(op.priority_op));
                     if let Some(fee) = fee {
                         fees.push(fee);
                     }
                     accounts_updated.append(&mut updates);
                 }
-                FranklinOp::TransferToNew(mut _op) => {
-                    let from = self
-                        .state
-                        .get_account(_op.from)
-                        .ok_or(DataRestoreError::WrongData("Nonexistent account".to_string()))?;
-                    _op.tx.from = from.address;
-                    _op.tx.nonce = from.nonce;
+                FranklinOp::TransferToNew(mut op) => {
+                    let from =
+                        self.state
+                            .get_account(op.from)
+                            .ok_or(DataRestoreError::WrongData(
+                                "Nonexistent account".to_string(),
+                            ))?;
+                    op.tx.from = from.address;
+                    op.tx.nonce = from.nonce;
                     if let Ok(OpSuccess {
                         fee,
                         mut updates,
                         executed_op: _,
-                    }) = self.state.execute_tx(FranklinTx::Transfer(_op.tx))
+                    }) = self.state.execute_tx(FranklinTx::Transfer(op.tx))
                     {
                         if let Some(fee) = fee {
                             fees.push(fee);
@@ -93,19 +95,18 @@ impl FranklinAccountsState {
                         accounts_updated.append(&mut updates);
                     }
                 }
-                FranklinOp::Withdraw(mut _op) => {
+                FranklinOp::Withdraw(mut op) => {
                     // Withdraw op comes with empty Account Address and Nonce fields
-                    let account = self
-                        .state
-                        .get_account(_op.account_id)
-                        .ok_or(DataRestoreError::WrongData("Nonexistent account".to_string()))?;
-                    _op.tx.account = account.address;
-                    _op.tx.nonce = account.nonce;
+                    let account = self.state.get_account(op.account_id).ok_or(
+                        DataRestoreError::WrongData("Nonexistent account".to_string()),
+                    )?;
+                    op.tx.account = account.address;
+                    op.tx.nonce = account.nonce;
                     if let Ok(OpSuccess {
                         fee,
                         mut updates,
                         executed_op: _,
-                    }) = self.state.execute_tx(FranklinTx::Withdraw(_op.tx))
+                    }) = self.state.execute_tx(FranklinTx::Withdraw(op.tx))
                     {
                         if let Some(fee) = fee {
                             fees.push(fee);
@@ -113,19 +114,18 @@ impl FranklinAccountsState {
                         accounts_updated.append(&mut updates);
                     }
                 }
-                FranklinOp::Close(mut _op) => {
+                FranklinOp::Close(mut op) => {
                     // Close op comes with empty Account Address and Nonce fields
-                    let account = self
-                        .state
-                        .get_account(_op.account_id)
-                        .ok_or(DataRestoreError::WrongData("Nonexistent account".to_string()))?;
-                    _op.tx.account = account.address;
-                    _op.tx.nonce = account.nonce;
+                    let account = self.state.get_account(op.account_id).ok_or(
+                        DataRestoreError::WrongData("Nonexistent account".to_string()),
+                    )?;
+                    op.tx.account = account.address;
+                    op.tx.nonce = account.nonce;
                     if let Ok(OpSuccess {
                         fee,
                         mut updates,
                         executed_op: _,
-                    }) = self.state.execute_tx(FranklinTx::Close(_op.tx))
+                    }) = self.state.execute_tx(FranklinTx::Close(op.tx))
                     {
                         if let Some(fee) = fee {
                             fees.push(fee);
@@ -133,23 +133,27 @@ impl FranklinAccountsState {
                         accounts_updated.append(&mut updates);
                     }
                 }
-                FranklinOp::Transfer(mut _op) => {
-                    let from = self
-                        .state
-                        .get_account(_op.from)
-                        .ok_or(DataRestoreError::WrongData("Nonexistent account".to_string()))?;
+                FranklinOp::Transfer(mut op) => {
+                    let from =
+                        self.state
+                            .get_account(op.from)
+                            .ok_or(DataRestoreError::WrongData(
+                                "Nonexistent account".to_string(),
+                            ))?;
                     let to = self
                         .state
-                        .get_account(_op.to)
-                        .ok_or(DataRestoreError::WrongData("Nonexistent account".to_string()))?;
-                    _op.tx.from = from.address;
-                    _op.tx.to = to.address;
-                    _op.tx.nonce = from.nonce;
+                        .get_account(op.to)
+                        .ok_or(DataRestoreError::WrongData(
+                            "Nonexistent account".to_string(),
+                        ))?;
+                    op.tx.from = from.address;
+                    op.tx.to = to.address;
+                    op.tx.nonce = from.nonce;
                     if let Ok(OpSuccess {
                         fee,
                         mut updates,
                         executed_op: _,
-                    }) = self.state.execute_tx(FranklinTx::Transfer(_op.tx))
+                    }) = self.state.execute_tx(FranklinTx::Transfer(op.tx))
                     {
                         if let Some(fee) = fee {
                             fees.push(fee);
@@ -157,15 +161,15 @@ impl FranklinAccountsState {
                         accounts_updated.append(&mut updates);
                     }
                 }
-                FranklinOp::FullExit(mut _op) => {
-                    _op.priority_op.nonce -= 1;
+                FranklinOp::FullExit(mut op) => {
+                    op.priority_op.nonce -= 1;
                     let OpSuccess {
                         fee,
                         mut updates,
                         executed_op: _,
                     } = self
                         .state
-                        .execute_priority_op(FranklinPriorityOp::FullExit(_op.priority_op));
+                        .execute_priority_op(FranklinPriorityOp::FullExit(op.priority_op));
                     if let Some(fee) = fee {
                         fees.push(fee);
                     }
@@ -174,8 +178,11 @@ impl FranklinAccountsState {
                 _ => {}
             }
         }
-        let fee_account_address = self.get_account(block.fee_account)
-            .ok_or(DataRestoreError::WrongData("Nonexistent fee account".to_string()))?
+        let fee_account_address = self
+            .get_account(block.fee_account)
+            .ok_or(DataRestoreError::WrongData(
+                "Nonexistent fee account".to_string(),
+            ))?
             .address;
         let (_, fee_updates) = self.state.collect_fee(&fees, &fee_account_address);
         accounts_updated.extend(fee_updates.into_iter());
@@ -206,9 +213,8 @@ impl FranklinAccountsState {
 
 #[cfg(test)]
 mod test {
-    use models::node::Fr;
-    use crate::franklin_ops::FranklinOpsBlock;
     use crate::accounts_state::FranklinAccountsState;
+    use crate::franklin_ops::FranklinOpsBlock;
 
     #[test]
     fn test_tree_consistent_update() {
@@ -219,7 +225,7 @@ mod test {
         let block1 = FranklinOpsBlock {
             block_num: 1,
             ops: ops1,
-            fee_account: 0
+            fee_account: 0,
         };
 
         let data2 = "030000000000000000000000000002c68af0bb14000000005711e991397fca8f5651c9bb6fa06b57e4a4dcc000000000";
@@ -229,17 +235,18 @@ mod test {
         let block2 = FranklinOpsBlock {
             block_num: 2,
             ops: ops2,
-            fee_account: 0
+            fee_account: 0,
         };
 
-        let data3 = "02000000000000010008091011121314151617181920212223342526280000010000000000000000";
+        let data3 =
+            "02000000000000010008091011121314151617181920212223342526280000010000000000000000";
         let decoded3 = hex::decode(data3).expect("Decoding failed");
         let ops3 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded3)
             .expect("cant get ops from data 3");
         let block3 = FranklinOpsBlock {
             block_num: 3,
             ops: ops3,
-            fee_account: 0
+            fee_account: 0,
         };
 
         let data4 = "05000001000000000000010000000000";
@@ -249,7 +256,7 @@ mod test {
         let block4 = FranklinOpsBlock {
             block_num: 4,
             ops: ops4,
-            fee_account: 0
+            fee_account: 0,
         };
 
         let data5 = "0400000100000000";
@@ -259,43 +266,56 @@ mod test {
         let block5 = FranklinOpsBlock {
             block_num: 5,
             ops: ops5,
-            fee_account: 0
+            fee_account: 0,
         };
-        
+
         // FULL EXIT WILL WORK WITH SIGNATURE
         // let data3 = "06000002000000000000000000000000000000000000000000000000000000000000000052312ad6f01657413b2eae9287f6b9adad93d5fe000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000014cabd42a5b98000000";
         // let decoded3 = hex::decode(data3).expect("Decoding failed");
         // let ops3 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded3)
         //     .expect("cant get ops from data");
-        // println!("ops3 {:?} \n", ops3);   
+        // println!("ops3 {:?} \n", ops3);
         // let block3 = FranklinOpsBlock {
         //     block_num: 3,
         //     ops: ops3,
         // };
-        
+
         let mut tree = FranklinAccountsState::new_test();
-        let updates1 = tree.update_accounts_states_from_ops_block(&block1).expect("Cant update state from block 1");
+        let updates1 = tree
+            .update_accounts_states_from_ops_block(&block1)
+            .expect("Cant update state from block 1");
         println!("updates 1 {:?} \n", updates1);
         println!("root hash 1 {:?} \n", tree.root_hash());
         println!("accounts 1 {:?} \n", tree.get_accounts());
-        let updates2 = tree.update_accounts_states_from_ops_block(&block2).expect("Cant update state from block 2");
+        let updates2 = tree
+            .update_accounts_states_from_ops_block(&block2)
+            .expect("Cant update state from block 2");
         println!("updates 2 {:?} \n", updates2);
         println!("root hash 2 {:?} \n", tree.root_hash());
         println!("accounts 2 {:?} \n", tree.get_accounts());
-        let updates3 = tree.update_accounts_states_from_ops_block(&block3).expect("Cant update state from block 3");
+        let updates3 = tree
+            .update_accounts_states_from_ops_block(&block3)
+            .expect("Cant update state from block 3");
         println!("updates 3 {:?} \n", updates3);
         println!("root hash 3 {:?} \n", tree.root_hash());
         println!("accounts 3 {:?} \n", tree.get_accounts());
-        let updates4 = tree.update_accounts_states_from_ops_block(&block4).expect("Cant update state from block 4");
+        let updates4 = tree
+            .update_accounts_states_from_ops_block(&block4)
+            .expect("Cant update state from block 4");
         println!("updates 4 {:?} \n", updates4);
         println!("root hash 4 {:?} \n", tree.root_hash());
         println!("accounts 4 {:?} \n", tree.get_accounts());
-        let updates5 = tree.update_accounts_states_from_ops_block(&block5).expect("Cant update state from block 4");
+        let updates5 = tree
+            .update_accounts_states_from_ops_block(&block5)
+            .expect("Cant update state from block 4");
         println!("updates 5 {:?} \n", updates5);
         println!("root hash 5 {:?} \n", tree.root_hash());
         println!("accounts 5 {:?} \n", tree.get_accounts());
 
-        assert_eq!(tree.root_hash().to_string(), "Fr(0x0f220069602ed8f8c4557fdde71baf5220bbf237790adf67f49280b84588acf2)".to_string());
+        assert_eq!(
+            tree.root_hash().to_string(),
+            "Fr(0x0f220069602ed8f8c4557fdde71baf5220bbf237790adf67f49280b84588acf2)".to_string()
+        );
     }
 
     #[test]
@@ -307,15 +327,20 @@ mod test {
         let block1 = FranklinOpsBlock {
             block_num: 1,
             ops: ops1,
-            fee_account: 0
+            fee_account: 0,
         };
 
         let mut tree = FranklinAccountsState::new_test();
-        let updates1 = tree.update_accounts_states_from_ops_block(&block1).expect("Cant update state from block 1");
+        let updates1 = tree
+            .update_accounts_states_from_ops_block(&block1)
+            .expect("Cant update state from block 1");
         println!("updates 1 {:?} \n", updates1);
         println!("root hash 1 {:?} \n", tree.root_hash());
         println!("accounts 1 {:?} \n", tree.get_accounts());
 
-        assert_eq!(tree.root_hash().to_string(), "Fr(0x0f220069602ed8f8c4557fdde71baf5220bbf237790adf67f49280b84588acf2)".to_string());
+        assert_eq!(
+            tree.root_hash().to_string(),
+            "Fr(0x0f220069602ed8f8c4557fdde71baf5220bbf237790adf67f49280b84588acf2)".to_string()
+        );
     }
 }

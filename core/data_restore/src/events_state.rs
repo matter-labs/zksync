@@ -177,7 +177,7 @@ impl EventsState {
                 block_num: 0,
                 transaction_hash: H256::zero(),
                 block_type: EventType::Unknown,
-                fee_account: 0
+                fee_account: 0,
             };
             let tx_hash = log.transaction_hash;
             let topic = log.topics[0];
