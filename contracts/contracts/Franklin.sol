@@ -193,6 +193,7 @@ contract Franklin {
         address _governanceAddress,
         address _verifierAddress,
         address _priorityQueueAddress,
+        address _genesisAccAddress,
         bytes32 _genesisRoot
     ) public {
         verifier = Verifier(_verifierAddress);
