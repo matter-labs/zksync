@@ -8,7 +8,7 @@ export function readableEther(wei) {
     if (formatted.startsWith('0.') == false) {
         return formatted.match(/\d+\.\d{1,3}/)[0];
     } else {
-        return formatted.match(/0\.0*[^0]{1,3}/)[0]
+        return formatted.match(/0\.0*[^0]{0,3}/)[0];
     }
 }
 
