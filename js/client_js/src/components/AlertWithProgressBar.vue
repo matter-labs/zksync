@@ -21,31 +21,32 @@ export default {
     name: 'AlertWithProgressBar',
     props: ['shower'],
     async created() {
-        for await (const progress of this.shower.generator.getGenerator()) {
-            if (progress.message.includes(`waiting for creating new block`)) {
-                this.$refs.progress_bar.startProgressBarHalfLife(10000);
-            }
-            if (progress.message.includes(`started proving block`)) {
-                this.$refs.progress_bar.startProgressBarHalfLife(10000);
+        for await (const progress of this.shower.generator.gencopy()) {
+            if (progress.displayMessage) {
+                this.$refs.alert.display({
+                    message: progress.displayMessage.message,
+                    variant: progress.displayMessage.error ? 'danger' : 'success',
+                    countdown: progress.displayMessage.countdown || timeConstants.countdown,
+                });
             }
 
-            let countdown = timeConstants.countdown;
-            if (progress.message.includes(`got proved!`)) {
-                console.log(`got proved received`);
+            if (progress.startProgressBar) {
+                switch (progress.startProgressBar.variant) {
+                    case 'half':
+                        this.$refs.progress_bar.startProgressBarHalfLife(progress.startProgressBar.duration);
+                        break;
+                    default: 
+                        throw new Error('switch reached default state');
+                }
+            }
+
+            if (progress.stopProgressBar) {
                 this.$refs.progress_bar.cancelAnimation();
-                countdown = 10;
             }
-
-            this.$refs.alert.display({
-                message: progress.message,
-                variant: progress.error ? 'danger' : 'success',
-                countdown,
-            });
         }
-        
+
         {            
             let elem = document.getElementById(this.shower.id);
-            console.log('elem removing', elem);
             elem.parentElement.removeChild(elem);
         }
     },

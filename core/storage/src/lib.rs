@@ -769,32 +769,44 @@ impl StorageProcessor {
 
     pub fn get_priority_op_receipt(&self, op_id: i64) -> QueryResult<PriorityOpReceiptResponse> {
         // TODO: jazzandrock maybe use one db query(?).
-        let stored_executed_prior_op: StoredExecutedPriorityOperation = executed_priority_operations::table
+        let stored_executed_prior_op = executed_priority_operations::table
             .filter(executed_priority_operations::priority_op_serialid.eq(op_id))
-            .first::<StoredExecutedPriorityOperation>(self.conn())?;
-
-        let prover_run: Option<ProverRun> = prover_runs::table
-            .filter(prover_runs::block_number.eq(stored_executed_prior_op.block_number))
-            .first::<ProverRun>(self.conn())
+            .first::<StoredExecutedPriorityOperation>(self.conn())
             .optional()?;
 
-        let commit = operations::table
-            .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
-            .filter(operations::action_type.eq("Commit"))
-            .first::<StoredOperation>(self.conn())
-            .optional()?;
+        match stored_executed_prior_op {
+            Some(stored_executed_prior_op) => {
+                let prover_run: Option<ProverRun> = prover_runs::table
+                    .filter(prover_runs::block_number.eq(stored_executed_prior_op.block_number))
+                    .first::<ProverRun>(self.conn())
+                    .optional()?;
 
-        let confirm = operations::table
-            .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
-            .filter(operations::action_type.eq("Verify"))
-            .first::<StoredOperation>(self.conn())
-            .optional()?;
+                let commit = operations::table
+                    .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
+                    .filter(operations::action_type.eq("Commit"))
+                    .first::<StoredOperation>(self.conn())
+                    .optional()?;
 
-        Ok(PriorityOpReceiptResponse {
-            committed: commit.is_some(),
-            verified: confirm.is_some(),
-            prover_run: prover_run,
-        })
+                let confirm = operations::table
+                    .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
+                    .filter(operations::action_type.eq("Verify"))
+                    .first::<StoredOperation>(self.conn())
+                    .optional()?;
+
+                Ok(PriorityOpReceiptResponse {
+                    committed: commit.is_some(),
+                    verified: confirm.is_some(),
+                    prover_run: prover_run,
+                })
+            }
+            None => {
+                Ok(PriorityOpReceiptResponse {
+                    committed: false,
+                    verified: false,
+                    prover_run: None,
+                })
+            }
+        }
     }
 
     pub fn get_account_transactions_history(

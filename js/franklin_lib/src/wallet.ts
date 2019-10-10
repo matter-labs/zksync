@@ -259,6 +259,7 @@ export class Wallet {
         }
     }
 
+    // TODO: remove this method
     async waitTxReceipt(tx_hash) {
         while (true) {
             let receipt = await this.provider.getTxReceipt(tx_hash);

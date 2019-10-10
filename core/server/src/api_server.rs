@@ -306,33 +306,32 @@ fn handle_get_executed_transaction_by_hash(
 fn handle_get_priority_op_receipt(
     req: &HttpRequest<AppState>,
 ) -> ActixResult<HttpResponse> {
-    // TODO: jazzandrock remove bad unwraps
-    req.state()
-        .connection_pool.clone()
-        .access_storage()
-        .map_err(|e| error::ErrorBadRequest(e))
-        .and_then(|storage| {
-            let id: i64 = req.match_info().get("pq_id").unwrap().parse::<i64>().unwrap();
-            let res = storage.get_priority_op_receipt(id).unwrap();
-            Ok(HttpResponse::Ok().json(res))
-        })
-}
+    let id = req
+        .match_info()
+        .get("pq_id")
+        .and_then(|offset| offset.parse::<i64>().ok())
+        .ok_or_else(|| error::ErrorBadRequest("Invalid pq_id parameter"))?;
 
-fn handle_get_account_transactions_history(
-    req: &HttpRequest<AppState>,
-) -> ActixResult<HttpResponse> {
-    
     let storage = req.state()
         .connection_pool.clone()
         .access_storage()
         .map_err(|e| error::ErrorBadRequest(e))?;
 
+    let res = storage
+        .get_priority_op_receipt(id)
+        .map_err(|e| error::ErrorBadRequest(e))?;
+
+    Ok(HttpResponse::Ok().json(res))
+}
+
+fn handle_get_account_transactions_history(
+    req: &HttpRequest<AppState>,
+) -> ActixResult<HttpResponse> {
     let address = req
         .match_info()
         .get("address")
         .and_then(|address| AccountAddress::from_hex(address).ok())
         .ok_or_else(|| error::ErrorBadRequest("Invalid address parameter"))?;
-
 
     let offset = req
         .match_info()
@@ -354,6 +353,11 @@ fn handle_get_account_transactions_history(
                 Err("Limit too large")
             }
         })
+        .map_err(|e| error::ErrorBadRequest(e))?;
+
+    let storage = req.state()
+        .connection_pool.clone()
+        .access_storage()
         .map_err(|e| error::ErrorBadRequest(e))?;
 
     let res = storage

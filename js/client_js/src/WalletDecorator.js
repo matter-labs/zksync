@@ -2,27 +2,58 @@ import { BigNumberish, BigNumber, bigNumberify, Interface } from 'ethers/utils';
 import { Contract } from 'ethers';
 import { FranklinProvider, Wallet, Address } from 'franklin_lib';
 import { readableEther, sleep } from './utils';
+import timeConstants from './timeConstants';
 
 // TODO:
 import env_config from './env-config'
 import priority_queue_abi from '../../../contracts/build/PriorityQueue.json'
 import franklinContract from '../../franklin_lib/abi/Franklin.json'
 
-function info(msg) {
-    return {
-        message: msg, 
+function combineMessages(...args) {
+    return Object.assign({}, ...args);
+}
+
+function info(msg, countdown) {
+    let displayMessage = {
+        kind: 'display message',
+        message: msg,
         error: false,
+        countdown,
+    };
+    return { displayMessage };
+}
+
+function error(msg, countdown) {
+    let displayMessage = {
+        kind: 'display message',
+        message: msg,
+        error: true,
+        countdown,
+    };
+    return { displayMessage };
+};
+
+function start_progress_bar(kwargs) {
+    kwargs.kind = 'start progress bar';
+    return {
+        startProgressBar: kwargs,
     };
 }
 
-function error(msg) {
-    return {
-        message: msg,
-        error: true,
-    }
-};
+function stop_progress_bar(kwargs) {
+    let stopProgressBar = kwargs || {};
+    stopProgressBar.kind = 'stop progress bar';
+    return { stopProgressBar };
+}
+
+function shortenedTxHash(tx_hash) {
+    return `<code class="clickable copyable" data-clipboard-text="${tx_hash}">
+                ${ tx_hash.substr(0, 10) }
+            </code>`;
+}
 
 export class WalletDecorator {
+    // #region everything
     constructor (wallet) {
         this.wallet = wallet;
         this.address = '0x' + this.wallet.address.toString('hex');
@@ -62,6 +93,7 @@ export class WalletDecorator {
         });
         return second[0];
     }
+    // #endregion
 
     // #region renderable
     async transactionsAsNeeded() {
@@ -256,18 +288,6 @@ export class WalletDecorator {
     // #endregion
 
     // #region actions
-    async transfer(kwargs) {
-        let token = this.tokenFromName(kwargs.token);
-        let amount = bigNumberify(kwargs.amount);
-        let fee = bigNumberify(kwargs.fee);
-        
-        let res = await this.wallet.transfer(kwargs.address, token, amount, fee);
-
-        if (res.err) throw new Error(res.err);
-        let receipt = await this.wallet.waitTxReceipt(res.hash);
-        if (receipt.fail_reason) throw new Error(receipt.fail_reason);
-    }
-
     async * verboseTransfer(kwargs) {
         let token = this.tokenFromName(kwargs.token);
         let amount = bigNumberify(kwargs.amount);
@@ -287,38 +307,12 @@ export class WalletDecorator {
             return;
         }
 
-        let receipt = await this.wallet.waitTxReceipt(res.hash);
-
-        if (receipt.fail_reason) {
-            yield error(`Transaction failed with ${receipt.fail_reason}`);
-        } else {
-            yield info(`Tx <code>${res.hash}</code> got included in block ${receipt.block_number}, waiting for prover`);
-        }
-
-        while ( ! receipt.prover_run) {
-            receipt = await this.wallet.waitTxReceipt(res.hash)
-            await sleep(1000);
-        }
-
-        yield info(`Prover ${receipt.prover_run.worker} started `
-            + `proving block ${receipt.prover_run.block_number} `
-            + `at ${receipt.prover_run.created_at}`);
-
-        await sleep(3000);
-
-        while ( ! receipt.verified) {
-            receipt = await this.wallet.waitTxReceipt(res.hash)
-            await sleep(1000);
-        }
-
-        yield info (`Transfer <code>${res.hash}</code> got proved!`);
-        await sleep(5000);
+        yield * this.verboseGetFranklinOpStatus(res.hash);
         return;
     }
 
     async * verboseWithdraw(kwargs) {
         try {
-
             yield info(`Sending withdraw...`);
     
             let token = this.tokenFromName(kwargs.token);
@@ -330,84 +324,58 @@ export class WalletDecorator {
             if (res.err) {
                 yield error(`Offchain withdraw failed with ${res.err}`);
                 return;
-            } else {
-                yield info(`Sent withdraw tx to Franklin server`);
             }
-        
-            yield info(`Getting receipt...`);
+            
+            yield info(`Sent withdraw tx to Franklin server`);
+            yield * this.verboseGetFranklinOpStatus(res.hash);
     
-            try {
-                var receipt = await this.wallet.waitTxReceipt(res.hash);
-            } catch (e) {
-                yield error(`Failed to get the receipt with ${e.message}`);
-                return;  
-            }
-    
-            if (receipt.fail_reason) {
-                yield error(`Transaction failed with ${receipt.fail_reason}`);
-                return;
-            } else {
-                yield info(`Tx <code>${res.hash}</code> got included in block ${receipt.block_number}, waiting for prover`);
-            }
-    
-            while ( ! receipt.prover_run) {
-                receipt = await this.wallet.waitTxReceipt(res.hash)
-                await sleep(1000);
-            }
-    
-            yield info(`Prover ${receipt.prover_run.worker} started `
-                + `proving block ${receipt.prover_run.block_number} `
-                + `at ${receipt.prover_run.created_at}`);
-    
-            await sleep(3000);
-    
-            while ( ! receipt.verified) {
-                receipt = await this.wallet.waitTxReceipt(res.hash)
-                await sleep(1000);
-            }
-    
-            yield info(`Tx <code>${res.hash}</code> got proved! Starting onchain withdraw...`);
-    
-            await sleep(5000);
-    
-            var tx_hash = await this.wallet.widthdrawOnchain(token, amount);
+            let tx_hash = await this.wallet.widthdrawOnchain(token, amount);
 
             yield * this.verboseGetRevertReason(tx_hash);
     
             yield info(`Withdraw succeeded!`);
-            await sleep(5000);
         } catch (e) {
             yield error('Withdraw failed with ', e.message);
-            await sleep(5000);
         }
     }
 
-    async depositOnchain(kwargs) {
-        let token = this.tokenFromName(kwargs.token);
-        let amount = bigNumberify(kwargs.amount);
-        let fee = bigNumberify(kwargs.fee);
-        let fullAmount = amount.add(fee);
-        let tx_hash = await this.wallet.depositOnchain(token, fullAmount);
-        return tx_hash;
-    }
+    async * verboseGetFranklinOpStatus(tx_hash) {
+        let tx_hash_html = shortenedTxHash(tx_hash);
 
-    async depositOffchain(kwargs) {
-        let token = this.tokenFromName(kwargs.token);
-        let amount = bigNumberify(kwargs.amount);
-        let fee = bigNumberify(kwargs.fee);
-
-        let res = await this.wallet.depositOffchain(token, amount, fee);
-
-        if (res.err) {
-            throw new Error(res.err);
-        }
-
-        let receipt = await this.wallet.waitTxReceipt(res.hash);
+        let receipt = await this.wallet.waitTxReceipt(tx_hash);
 
         if (receipt.fail_reason) {
-            throw new Error(receipt.fail_reason);
+            yield error(`Transaction ${tx_hash_html} failed with <code>${receipt.fail_reason}</code>`);
+            return;
+        } 
+        
+        yield combineMessages(
+            info(`Transaction ${tx_hash_html} got included in block <code>${receipt.block_number}</code>, waiting for prover...`),
+            start_progress_bar({variant: 'half', duration: timeConstants.waitingForProverHalfLife})
+        );
+
+        while ( ! receipt.prover_run) {
+            receipt = await this.wallet.provider.getTxReceipt(tx_hash);
+            await sleep(2000);
         }
-        return 0;
+
+        yield combineMessages(
+            info(`Prover <code>${receipt.prover_run.worker}</code> started `
+                + `proving block <code>${receipt.prover_run.block_number}</code> `
+                + `at <code>${receipt.prover_run.created_at}</code>`),
+            start_progress_bar({variant: 'half', duration: timeConstants.provingHalfLife}) 
+        );
+
+        while ( ! receipt.verified) {
+            receipt = await this.wallet.provider.getTxReceipt(tx_hash);
+            await sleep(2000);
+        }
+
+        yield combineMessages(
+            info (`Transaction ${tx_hash_html} got proved!`, 10),
+            stop_progress_bar()
+        );
+        return;
     }
 
     async * verboseDeposit(kwargs) {
@@ -417,34 +385,39 @@ export class WalletDecorator {
             var token = this.tokenFromName(kwargs.token);
             var amount = bigNumberify(kwargs.amount);
             var tx_hash = await this.wallet.deposit(token, amount);
-            yield info(`Deposit <code>${tx_hash}</code> sent to Mainchain...`);
         } catch (e) {
             yield error(`Onchain deposit failed with "${e.message}"`);
-            await sleep(5000)
             return;
         }
+
+        const tx_hash_html = shortenedTxHash(tx_hash);
+        yield info(`Deposit ${tx_hash_html} sent to Mainchain...`);
 
         try {
             yield * await this.verboseGetRevertReason(tx_hash);
-            await sleep(5000);
         } catch (e) {
             yield error(`Onchain deposit failed with "${e.message}"`);
-            await sleep(5000)
             return;
         }
 
+        yield * this.verboseGetPriorityOpStatus(tx_hash);
+    }
+
+    async * verboseGetPriorityOpStatus(tx_hash) {
         let priorityQueueInterface = new Interface(priority_queue_abi.interface);
         let receipt = await this.wallet.ethWallet.provider.getTransactionReceipt(tx_hash);
         let pq_id = receipt.logs
             .map(l => priorityQueueInterface.parseLog(l)) // the only way to get it to work
             .filter(Boolean)
-            .filter(log => log.name == 'NewPriorityRequest')
+            .filter(log => log.name == 'NewPriorityRequest');
 
         if (pq_id.length == 1) {
             pq_id = pq_id[0].values[0].toString();
-            yield info(`PQ id is ${pq_id}`);
+            yield combineMessages(
+                info(`Priority operation id is <code>${pq_id}</code>. Waiting for prover..`),
+                start_progress_bar({variant: 'half', duration: timeConstants.waitingForProverHalfLife})
+            );
         } else {
-            console.log('pq_id : ', pq_id);
             yield error(`Found ${pq_id.length} PQ ids.`);
             return;
         }
@@ -453,47 +426,53 @@ export class WalletDecorator {
         while (pq_op.prover_run == undefined) {
             await sleep(2000);
             pq_op = await this.wallet.provider.getPriorityOpReceipt(pq_id);
-            console.log(pq_op);
         }
 
-        yield info(`Prover ${pq_op.prover_run.worker} started `
-            + `proving block ${pq_op.prover_run.block_number} `
-            + `at ${pq_op.prover_run.created_at}`);
+        yield combineMessages(
+            info(`Prover <code>${pq_op.prover_run.worker}</code> started `
+                + `proving block <code>${pq_op.prover_run.block_number}</code> `
+                + `at <code>${pq_op.prover_run.created_at}</code>`),
+            start_progress_bar({variant: 'half', duration: timeConstants.provingHalfLife}) 
+        );
 
         while ( ! pq_op.verified) {
             pq_op = await this.wallet.provider.getPriorityOpReceipt(pq_id);
             await sleep(2000);
         }
         
-        yield info (`PQ op <code>${pq_id}</code> got proved!`);
-        await sleep(5000);
+        yield combineMessages(
+            info (`Priority op <code>${pq_id}</code> got proved!`, 10),
+            stop_progress_bar()
+        );
         return;
     }
 
     async * verboseGetRevertReason(tx_hash) {
+        const tx_hash_html = shortenedTxHash(tx_hash);
+        yield combineMessages(
+            info(`Waiting for transaction ${tx_hash_html} to mine...`),
+            start_progress_bar({variant: 'half', duration: timeConstants.ethereumMiningHalfLife})
+        );
+
         let receipt;
-        for (let i = 1; i <= 5 && !receipt; i++) {
-            yield info(`Getting tx receipt...`);
-            
+        while (true) {
             receipt = await this.wallet.ethWallet.provider.getTransactionReceipt(tx_hash);
             
             if (receipt) break;
-            await sleep(4000);
-        }
-
-        if (receipt == null) {
-            yield error(`Can't get tx receipt after 5 retries`);
-            return;
+            await sleep(timeConstants.ethereumReceiptRetry);
         }
 
         if (receipt.status) {
-            yield info(`Transaction succeeded.`);
+            yield combineMessages(
+                info(`Transaction ${tx_hash_html} succeeded.`),
+                stop_progress_bar()
+            );
         } else {
             const tx = await this.wallet.ethWallet.provider.getTransaction(tx_hash);
             const code = await this.wallet.ethWallet.provider.call(tx, tx.blockNumber);
 
             if (code == '0x') {
-                yield error('Empty revert reason code');
+                yield error(`Transaction ${tx_hash_html} failed with empty revert reason.`);
             } else {
                 const reason = code
                     .substr(138)
@@ -501,7 +480,7 @@ export class WalletDecorator {
                     .map(h => parseInt(h, 16))
                     .map(String.fromCharCode)
                     .join('');
-                yield error(`Revert reason is: ${reason}`);
+                yield error(`Transaction ${tx_hash_html} failed with <code>${reason}<code>.`);
             }
         }
     }

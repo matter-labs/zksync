@@ -29,7 +29,7 @@
 </template>
 
 <script>
-import { GeneratorMultiplier } from '../GeneratorMultiplier.js';
+import { GeneratorMultiplierMinTime } from '../GeneratorMultiplier.js';
 
 import Alert from './Alert.vue'
 import BalancesList from './BalancesList.vue'
@@ -97,38 +97,8 @@ export default {
         async verboseShower(generator) {
             this.store.pendingTransactionGenerators.push({
                 id: `verbose_shower_${this.verboseShowerId++}`,
-                generator: new GeneratorMultiplier(generator),
+                generator: new GeneratorMultiplierMinTime(generator),
             });
-        },
-        async verboseFunctionShower(generator) {
-            for await (const progress of generator) {
-                if (progress.message.includes(`waiting for creating new block`)) {
-                    this.$refs.progress_bar && this.$refs.progress_bar.startProgressBarHalfLife(10000);
-                }
-                if (progress.message.includes(`started proving block`)) {
-                    this.$refs.progress_bar && this.$refs.progress_bar.startProgressBarHalfLife(10000);
-                }
-                if (progress.message.includes(`got proved!`)) {
-                    this.$refs.progress_bar && this.$refs.progress_bar.cancelAnimation();
-                }
-                this.$emit('alert', {
-                    message: progress.message,
-                    variant: progress.error ? 'danger' : 'success',
-                });
-            }
-        },
-        async transferFranklin(kwargs) {
-            console.log('transfer', kwargs);
-            try {
-                if ( ! window.walletDecorator) {
-                    displayAlert({ message: `Wallet is ${window.walletDecorator}` });
-                    return;
-                }
-
-                await window.walletDecorator.transfer(kwargs);
-            } catch (e) {
-                this.displayAlert({ message: `unknown error: ${e}` });
-            }
         },
     },
     components
