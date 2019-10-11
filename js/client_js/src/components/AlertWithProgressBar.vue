@@ -21,6 +21,7 @@ export default {
     name: 'AlertWithProgressBar',
     props: ['shower'],
     async created() {
+        let wait = null;
         for await (const progress of this.shower.generator.gencopy()) {
             if (progress.displayMessage) {
                 this.$refs.alert.display({
@@ -28,6 +29,7 @@ export default {
                     variant: progress.displayMessage.error ? 'danger' : 'success',
                     countdown: progress.displayMessage.countdown,
                 });
+                wait = progress.displayMessage.countdown;
             }
 
             if (progress.startProgressBar) {
@@ -44,6 +46,8 @@ export default {
                 this.$refs.progress_bar.cancelAnimation();
             }
         }
+
+        wait && await sleep(wait * 1000);
 
         {            
             let elem = document.getElementById(this.shower.id);

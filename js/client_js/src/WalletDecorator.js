@@ -272,6 +272,7 @@ export class WalletDecorator {
         return Object.values(res).map(val => {
             val['committedAmount'] = val['committedAmount'] || bigNumberify(0);
             val['verifiedAmount']  = val['verifiedAmount']  || bigNumberify(0);
+            val.verified        = val.verifiedAmount  == val.committedAmount;
             return val;
         }).filter(entry => Number(entry.committedAmount) || Number(entry.verifiedAmount));
     }
@@ -372,7 +373,7 @@ export class WalletDecorator {
         }
 
         yield combineMessages(
-            info (`Transaction ${tx_hash_html} got proved!`, 10),
+            info(`Transaction ${tx_hash_html} got proved!`, 10),
             stop_progress_bar()
         );
         return;

@@ -5,7 +5,8 @@
                 <!-- (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+franklinAddress"
                     target="blanc">block explorer</a>): -->
             <CopyableAddress id="franklinAddressFormInput" :address="franklinAddress"></CopyableAddress>
-            <b-table v-if="displayableBalances.length" class="b-table-balances-width-hack" borderless small responsive :fields="fields" :items="displayableBalances">
+            <img v-if="loading" style="margin-right: 1.5em" src="../assets/loading.gif" width="100em">
+            <b-table v-else-if="displayableBalances.length" class="b-table-balances-width-hack" borderless small responsive :fields="fields" :items="displayableBalances">
                 <template v-slot:cell(tokenName)="data" style="width: 100px !important">
                     <TokenNameButton :data="data"></TokenNameButton>
                 </template>
@@ -56,6 +57,7 @@ export default {
             'amount',
         ],
         displayableBalances: [],
+        loading: true,
     }),
     props: [
         // balances are like [{ tokenName: 'eth', amount: '120' }]
@@ -68,6 +70,7 @@ export default {
     watch: {
         balances() {
             this.updateInfo();
+            this.loading = false;
         },
     },
     methods: {
@@ -76,7 +79,6 @@ export default {
             this.displayableBalances = this.balances.map(bal => {
                 if (bal.tokenName != 'ETH') return bal;
                 let res = Object.assign({}, bal);
-                res.verified = res.verifiedAmount == res.committedAmount;
                 res.verifiedAmount = readableEther(res.verifiedAmount);
                 res.committedAmount = readableEther(res.committedAmount);
                 return res;

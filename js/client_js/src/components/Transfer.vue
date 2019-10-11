@@ -76,7 +76,7 @@ export default {
             this.tokensList = this.balances.map(bal => bal.tokenName);
         },
         localDisplayAlert(message) {
-            this.$emit('alert', { message, variant: 'warning' });
+            this.$emit('alert', { message, variant: 'warning', countdown: 6 });
         },
         getAmount() {
             try {
@@ -136,7 +136,7 @@ export default {
 
             let fee = this.getFee();
             if (fee == null) {
-                this.localDisplayAlert(`Problem with fee.`); // TODO:
+                this.localDisplayAlert(`Problem with fee.`);
                 return;
             }
 

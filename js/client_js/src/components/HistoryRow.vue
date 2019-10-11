@@ -19,12 +19,17 @@
                     <span style="width: 5em" class="heightened"><b>{{ tx.data.type }}</b></span>
                 </b-col>
                 <b-col class="col-auto">
+                    <div style="width: 7em">
+                        <span style="font-weight: 300;" class="heightened">{{ tx.data.token }}</span> {{ tx.data.amount }}
+                    </div>
+                </b-col>
+                <b-col class="col-auto">
                     <span v-html="tx.data.status" class="heightened"></span>
                 </b-col>
                 <b-col class="col-auto heightened">
-                    <span v-if="tx.data.direction == 'incoming' " style="color: green; font-weight: bold" v-html="'<-'">
+                    <span v-if="tx.data.direction == 'incoming' " style="color: green; font-weight: bold" v-html="'<—'">
                     </span>
-                    <span v-else style="color: red; font-weight: bold" v-html="'->'">
+                    <span v-else style="color: red; font-weight: bold" v-html="'—>'">
                     </span>
                 </b-col>
             </b-row>
@@ -41,7 +46,7 @@
                     class="ml-auto b-table-stacked-position-hack"
                 >
                     <template v-slot:cell(amount)="data">
-                        <span style="font-weight: 300">{{ tx.data.token }}</span style="font-weight: 300"> {{ tx.data.amount }}
+                        <span style="font-weight: 300">{{ tx.data.token }}</span> {{ tx.data.amount }}
                     </template>
                     <template v-slot:cell(to)="data">
                         <code class="clickable copyable" :data-clipboard-text="data.item.to">{{ data.item.to }}</code>
