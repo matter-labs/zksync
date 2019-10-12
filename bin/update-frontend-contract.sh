@@ -5,3 +5,4 @@
 FRANKLIN_HOME=`dirname $0`/..
 
 jq '{ abi: .abi, interface: .interface }' $FRANKLIN_HOME/contracts/build/Franklin.json > $FRANKLIN_HOME/js/franklin_lib/abi/Franklin.json
+jq '{ abi: .abi, interface: .interface }' $FRANKLIN_HOME/contracts/build/PriorityQueue.json > $FRANKLIN_HOME/js/franklin_lib/abi/PriorityQueue.json

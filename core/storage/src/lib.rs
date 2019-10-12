@@ -222,14 +222,14 @@ impl NewExecutedPriorityOperation {
 
 #[derive(Debug, Queryable, QueryableByName)]
 #[table_name = "executed_priority_operations"]
-struct StoredExecutedPriorityOperation {
-    id: i32,
-    block_number: i64,
-    block_index: i32,
-    operation: Value,
-    priority_op_serialid: i64,
-    deadline_block: i64,
-    eth_fee: BigDecimal,
+pub struct StoredExecutedPriorityOperation {
+    pub id: i32,
+    pub block_number: i64,
+    pub block_index: i32,
+    pub operation: Value,
+    pub priority_op_serialid: i64,
+    pub deadline_block: i64,
+    pub eth_fee: BigDecimal,
 }
 
 impl Into<ExecutedPriorityOp> for StoredExecutedPriorityOperation {
@@ -861,6 +861,16 @@ impl StorageProcessor {
 
             Ok(executed_operations)
         })
+    }
+
+    pub fn get_executed_priority_op(
+        &self,
+        priority_op_id: u32,
+    ) -> QueryResult<Option<StoredExecutedPriorityOperation>> {
+        executed_priority_operations::table
+            .filter(executed_priority_operations::priority_op_serialid.eq(priority_op_id as i64))
+            .first::<StoredExecutedPriorityOperation>(self.conn())
+            .optional()
     }
 
     pub fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {

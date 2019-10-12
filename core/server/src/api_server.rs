@@ -534,6 +534,57 @@ fn handle_search(
         .responder()
 }
 
+#[derive(Debug, Clone, Serialize)]
+struct PriorityOpStatus {
+    executed: bool,
+    block: Option<i64>,
+}
+
+fn handle_get_priority_op_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    let pool = req.state().connection_pool.clone();
+
+    let storage = if let Ok(storage) = pool.access_storage() {
+        storage
+    } else {
+        return Ok(HttpResponse::Ok().json(ApiError {
+            error: "rate limit".to_string(),
+        }));
+    };
+
+    let priority_op_id = {
+        let priority_op_id_string =
+            if let Some(priority_op_id_string) = req.match_info().get("priority_op_id") {
+                priority_op_id_string
+            } else {
+                return Ok(HttpResponse::Ok().json(ApiError {
+                    error: "invalid parameters".to_string(),
+                }));
+            };
+
+        if let Ok(priority_op_id) = priority_op_id_string.parse::<u32>() {
+            priority_op_id
+        } else {
+            return Ok(HttpResponse::Ok().json(ApiError {
+                error: "invalid priority_op_id".to_string(),
+            }));
+        }
+    };
+
+    match storage.get_executed_priority_op(priority_op_id) {
+        Ok(priority_op) => {
+            return Ok(HttpResponse::Ok().json(PriorityOpStatus {
+                executed: priority_op.is_some(),
+                block: priority_op.map(|op| op.block_number),
+            }));
+        }
+        Err(e) => {
+            return Ok(HttpResponse::Ok().json(ApiError {
+                error: format!("db error: {}", e),
+            }));
+        }
+    };
+}
+
 fn start_server(state: AppState, bind_to: String) {
     server::new(move || {
         App::with_state(state.clone()) // <- create app with shared state
@@ -574,6 +625,9 @@ fn start_server(state: AppState, bind_to: String) {
                     })
                     .resource("/blocks", |r| {
                         r.method(Method::GET).f(handle_get_blocks);
+                    })
+                    .resource("/priority_op/{priority_op_id}", |r| {
+                        r.method(Method::GET).f(handle_get_priority_op_status);
                     })
                     .resource("/search", |r| {
                         r.method(Method::GET).f(handle_search);
