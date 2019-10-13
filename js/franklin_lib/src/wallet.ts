@@ -9,6 +9,7 @@ import {
 import {Contract, ContractTransaction, ethers, utils} from 'ethers';
 import {packAmount, packFee} from "./utils";
 import {curve} from "elliptic";
+import {parseEther} from "ethers/utils";
 
 const IERC20Conract = require("../abi/IERC20.json");
 const franklinContractCode = require("../abi/Franklin.json");
@@ -17,6 +18,10 @@ const priorityQueueInterface = new utils.Interface(require("../abi/PriorityQueue
 export type Address = Buffer;
 // Buffer or 0x prefixed hex string
 export type AddressLike = Buffer | string;
+
+// token, symbol/eth erc20 contract address, token id
+export type TokenLike = Token | string | number;
+export type Nonce= number | "commited" | "pending";
 
 export function toAddress(addressLike: AddressLike): Address {
     if (typeof(addressLike) == "string") {
@@ -63,43 +68,58 @@ export class FranklinProvider {
     async submitTx(tx) {
         return await Axios.post(this.providerAddress + '/api/v0.1/submit_tx', tx)
             .then(reps => reps.data)
-            .catch(error => console.log(error.response));
     }
 
     async getTokens() {
         return await Axios.get(this.providerAddress + '/api/v0.1/tokens')
             .then(reps => reps.data)
-            .catch(error => console.log(error.response));
     }
 
     async getTransactionsHistory(address: Address) {
         return await Axios.get(this.providerAddress + '/api/v0.1/account/' + `0x${address.toString("hex")}` + '/transactions')
             .then(reps => reps.data)
-            .catch(error => console.log(error.response));
     }
 
     async getState(address: Address): Promise<FranklinAccountState> {
         return await Axios.get(this.providerAddress + '/api/v0.1/account/' + `0x${address.toString("hex")}`)
             .then(reps => reps.data)
-            .catch(error => console.log(error.response));
     }
 
     async getTxReceipt(tx_hash) {
         return await Axios.get(this.providerAddress + '/api/v0.1/transactions/' + tx_hash)
             .then(reps => reps.data)
-            .catch(error => console.log(error.response));
     }
 
     async getPriorityOpStatus(opId: number) {
         return await Axios.get(this.providerAddress + '/api/v0.1/priority_op/' + opId)
             .then(reps => reps.data)
-            .catch(error => console.log(error.response));
     }
 
     async getBlockStatus(block: number) {
         return await Axios.get(this.providerAddress + '/api/v0.1/search?query=' + block)
             .then(reps => reps.data)
-            .catch(error => console.log(error.response));
+    }
+
+    async resolveToken(token: TokenLike): Promise<Token> {
+        if(typeof(token) == "string") {
+            let tokens = await this.getTokens();
+            let resolvedToken = tokens.find( (t, idx, arr) => {return t.symbol == token || t.address == token});
+            if (resolvedToken) {
+                return resolvedToken;
+            } else {
+                throw "Token address or symbol not found";
+            }
+        } else if (typeof(token) == "number") {
+            let tokens = await this.getTokens();
+            let resolvedToken = tokens.find( (t, idx, arr) => {return t.id == token});
+            if (resolvedToken) {
+                return resolvedToken;
+            } else {
+                throw "Token id not found";
+            }
+        } else {
+            return token;
+        }
     }
 }
 
@@ -328,7 +348,6 @@ export class Wallet {
     address: Address;
     walletKeys: WalletKeys;
 
-    supportedTokens: Token[];
     franklinState: FranklinAccountState;
     ethState: ETHAccountState;
     pendingNonce: number;
@@ -339,21 +358,24 @@ export class Wallet {
         this.address = pubkeyToAddress(this.walletKeys.publicKey);
     }
 
-    async deposit(token: Token, amount: utils.BigNumberish): Promise<DepositTransactionHandle> {
+    async deposit(tokenLike: TokenLike, amount: utils.BigNumberish, fee: utils.BigNumberish = parseEther("0.001")): Promise<DepositTransactionHandle> {
+        let token = await this.provider.resolveToken(tokenLike);
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
         let contractTx;
         if (token.id == 0) {
-            contractTx = await franklinDeployedContract.depositETH(this.address, {value: amount, gasLimit: utils.bigNumberify("200000")});
+            let totalAmount = utils.bigNumberify(amount).add(fee);
+            contractTx = await franklinDeployedContract.depositETH(amount, this.address, {value: totalAmount, gasLimit: utils.bigNumberify("200000")});
         } else {
-            const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
+            const erc20DeployedToken = new Contract(token.address, IERC20Conract.interface, this.ethWallet);
             await erc20DeployedToken.approve(franklinDeployedContract.address, amount);
             const contractTx = await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address,
-                {gasLimit: utils.bigNumberify("300000"), value: utils.parseEther("0.05")});
+                {gasLimit: utils.bigNumberify("300000"), value: fee});
         }
         return new DepositTransactionHandle(contractTx, {to: this.address, amount, token}, this.provider);
     }
 
-    async widthdrawOnchain(token: Token, amount: utils.BigNumberish): Promise<ContractTransaction> {
+    async widthdrawOnchain(tokenLike: TokenLike, amount: utils.BigNumberish): Promise<ContractTransaction> {
+        let token = await this.provider.resolveToken(tokenLike);
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
         if (token.id == 0) {
             return await franklinDeployedContract.withdrawETH(amount, {gasLimit: 200000});
@@ -362,14 +384,15 @@ export class Wallet {
         }
     }
 
-    async widthdrawOffchain(token: Token, amount: utils.BigNumberish, fee: utils.BigNumberish): Promise<TransactionHandle> {
+    async widthdrawOffchain(tokenLike: TokenLike, amount: utils.BigNumberish, fee: utils.BigNumberish, nonce: Nonce = "commited"): Promise<TransactionHandle> {
+        let token = await this.provider.resolveToken(tokenLike);
         let tx = {
             account: this.address,
             eth_address: await this.ethWallet.getAddress(),
             token: token.id,
             amount,
             fee,
-            nonce: await this.getNonce(),
+            nonce: await this.getNonce(nonce),
         };
         let signature = this.walletKeys.signWithdraw(tx);
         let tx_req = FranklinProvider.prepareWithdrawRequestForNode(tx, signature);
@@ -378,28 +401,31 @@ export class Wallet {
         return new TransactionHandle(tx, submitResponse.hash, this.provider);
     }
 
-    async emergencyWithdraw(token: Token) {
+    async emergencyWithdraw(tokenLike: TokenLike, nonce: Nonce = "commited") {
+        let token = await this.provider.resolveToken(tokenLike);
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
-        let nonce = await this.getNonce();
-        let signature = this.walletKeys.signFullExit({token: token.id, eth_address: await this.ethWallet.getAddress(), nonce});
-        let tx = await franklinDeployedContract.fullExit(serializePointPacked(this.walletKeys.publicKey), token.address,  signature, nonce,
+        let nonceNumber = await this.getNonce(nonce);
+        let signature = this.walletKeys.signFullExit({token: token.id, eth_address: await this.ethWallet.getAddress(), nonce: nonceNumber});
+        let tx = await franklinDeployedContract.fullExit(serializePointPacked(this.walletKeys.publicKey), token.address,  signature, nonceNumber,
             {gasLimit: utils.bigNumberify("500000"), value: utils.parseEther("0.02")});
         return tx.hash;
     }
 
-    async transfer(to: AddressLike, token: Token, amount: utils.BigNumberish, fee: utils.BigNumberish): Promise<TransactionHandle> {
+    async transfer(to: AddressLike, tokenLike: number, amount: utils.BigNumberish, fee: utils.BigNumberish, nonce: Nonce = "commited"): Promise<TransactionHandle> {
+        // let tokenLike = await this.provider.resolveToken(tokenLike);
         let tx = {
             from: this.address,
             to: toAddress(to),
-            token: token.id,
+            // TODO: fix
+            token: tokenLike,
             amount,
             fee,
-            nonce: await this.getNonce(),
+            nonce: await this.getNonce(nonce),
         };
         let signature = this.walletKeys.signTransfer(tx);
         let tx_req = FranklinProvider.prepareTransferRequestForNode(tx, signature);
 
-        let submitResponse = await this.provider.submitTx(tx_req);
+        let submitResponse = await this.provider.submitTx(tx_req).catch(e => console.log(e));
         return new TransactionHandle(tx, submitResponse.hash, this.provider);
     }
 
@@ -416,8 +442,15 @@ export class Wallet {
         return new TransactionHandle(tx, submitResponse.hash, this.provider);
     }
 
-    async getNonce(): Promise<number> {
-            this.pendingNonce = this.franklinState.commited.nonce + this.franklinState.pending_txs.length;
+    async getNonce(nonce: Nonce = "commited"): Promise<number> {
+        if (nonce == "commited") {
+            return (await this.provider.getState(this.address)).commited.nonce;
+        } else if (typeof(nonce) == "number") {
+            return nonce;
+        } else if (nonce == "pending") {
+            let state = await this.provider.getState(this.address);
+            return state.commited.nonce + state.pending_txs.length;
+        }
     }
 
     static async fromEthWallet(wallet: ethers.Signer, franklinProvider: FranklinProvider = new FranklinProvider()) {
@@ -427,21 +460,22 @@ export class Wallet {
         return frankinWallet;
     }
 
-    async fetchEthState() {
-        let onchainBalances = new Array<utils.BigNumber>(this.supportedTokens.length);
-        let contractBalances = new Array<utils.BigNumber>(this.supportedTokens.length);
+    async getOnchainBalances() {
+        let tokens = await this.provider.getTokens();
+        let onchainBalances = new Array<utils.BigNumber>(tokens.length);
+        let contractBalances = new Array<utils.BigNumber>(tokens.length);
 
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
-        for (let token of this.supportedTokens) {
+        for (let token of tokens) {
             if (token.id == 0) {
                 onchainBalances[token.id] = await this.ethWallet.provider.getBalance(this.ethAddress);
             } else {
-                const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
+                const erc20DeployedToken = new Contract(token.address, IERC20Conract.interface, this.ethWallet);
                 onchainBalances[token.id] = await erc20DeployedToken.balanceOf(this.ethAddress).then(n => n.toString());
             }
             contractBalances[token.id] = await franklinDeployedContract.balancesToWithdraw(this.ethAddress, token.id);
         }
 
-        this.ethState = {onchainBalances, contractBalances};
+        return {onchainBalances, contractBalances};
     }
 }

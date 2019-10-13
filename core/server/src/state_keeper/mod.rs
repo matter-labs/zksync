@@ -1,6 +1,6 @@
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::tx::FranklinTx;
-use models::node::{Account, AccountAddress, AccountMap, AccountUpdate, PriorityOp};
+use models::node::{Account, AccountAddress, AccountMap, AccountUpdate, PriorityOp, TransferOp};
 use plasma::state::{OpSuccess, PlasmaState};
 use std::sync::{Arc, RwLock};
 use web3::types::H256;
@@ -16,7 +16,7 @@ use crate::eth_watch::ETHState;
 use crate::ThreadPanicNotify;
 use itertools::Itertools;
 use models::params::BLOCK_SIZE_CHUNKS;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
@@ -24,7 +24,8 @@ pub struct PlasmaStateKeeper {
     state: PlasmaState,
 
     /// Promised latest UNIX timestamp of the next block
-    next_block_at_max: SystemTime,
+    next_block_try_timer: Instant,
+    block_tries: usize,
 
     db_conn_pool: ConnectionPool,
 
@@ -76,7 +77,8 @@ impl PlasmaStateKeeper {
         // Keeper starts with the NEXT block
         let keeper = PlasmaStateKeeper {
             state,
-            next_block_at_max: SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL),
+            next_block_try_timer: Instant::now(),
+            block_tries: 0,
             db_conn_pool: pool,
             // TODO: load pk from config.
             fee_account_address,
@@ -132,12 +134,21 @@ impl PlasmaStateKeeper {
             match req {
                 StateKeeperRequest::GetNetworkStatus(sender) => {
                     let r = sender.send(NetworkStatus {
-                        next_block_at_max: Some(
-                            self.next_block_at_max
+                        next_block_at_max: if self.block_tries > 0 {
+                            Some({
+                                let tries_left =
+                                    config::BLOCK_FORMATION_TRIES.saturating_sub(self.block_tries);
+                                (SystemTime::now()
+                                    + Duration::from_secs(
+                                        (tries_left as u64) * config::PADDING_SUB_INTERVAL,
+                                    ))
                                 .duration_since(UNIX_EPOCH)
-                                .unwrap()
-                                .as_secs(),
-                        ),
+                                .unwrap_or_default()
+                                .as_secs()
+                            })
+                        } else {
+                            None
+                        },
                         last_committed: 0,
                         last_verified: 0,
                         outstanding_txs: 0,
@@ -160,23 +171,58 @@ impl PlasmaStateKeeper {
                     }
                 }
                 StateKeeperRequest::TimerTick => {
-                    if self.next_block_at_max <= SystemTime::now() {
-                        self.create_new_block(&tx_for_commitments);
+                    if self.next_block_try_timer.elapsed()
+                        >= Duration::from_secs(config::PADDING_SUB_INTERVAL)
+                    {
+                        self.next_block_try_timer = Instant::now();
+
+                        let (chunks_left, proposed_ops, proposed_txs) = self.propose_new_block();
+                        if proposed_ops.is_empty() && proposed_txs.is_empty() {
+                            continue;
+                        }
+                        let old_tries = self.block_tries;
+
+                        let commit_block = if self.block_tries >= config::BLOCK_FORMATION_TRIES {
+                            self.block_tries = 0;
+                            true
+                        } else {
+                            // Try filling 4/5 of a block;
+                            if chunks_left < (1 * BLOCK_SIZE_CHUNKS) / 5 {
+                                self.block_tries = 0;
+                                true
+                            } else {
+                                self.block_tries += 1;
+                                false
+                            }
+                        };
+
+                        if commit_block {
+                            debug!(
+                                "Commiting block, chunks left {}, tries {}",
+                                chunks_left, old_tries
+                            );
+                            self.create_new_block(proposed_ops, proposed_txs, &tx_for_commitments);
+                        }
                     }
                 }
             }
         }
     }
 
-    fn create_new_block(&mut self, tx_for_commitments: &Sender<CommitRequest>) {
-        self.next_block_at_max = SystemTime::now() + Duration::from_secs(config::PADDING_INTERVAL);
+    fn propose_new_block(&self) -> (usize, Vec<PriorityOp>, Vec<FranklinTx>) {
         let (chunks_left, prior_ops) = self.select_priority_ops();
-        let txs = self.prepare_tx_for_block(chunks_left);
-        debug!("Priority ops for block: {:#?}", prior_ops);
-        debug!("Txs for block: {:#?}", txs);
-        if prior_ops.is_empty() && txs.is_empty() {
-            return;
-        }
+        let (chunks_left, txs) = self.prepare_tx_for_block(chunks_left);
+        trace!("Proposed priority ops for block: {:#?}", prior_ops);
+        trace!("Proposed txs for block: {:#?}", txs);
+        (chunks_left, prior_ops, txs)
+    }
+
+    fn create_new_block(
+        &mut self,
+        prior_ops: Vec<PriorityOp>,
+        txs: Vec<FranklinTx>,
+        tx_for_commitments: &Sender<CommitRequest>,
+    ) {
         let commit_request = self.apply_txs(prior_ops, txs);
 
         if !commit_request.accounts_updated.is_empty() {
@@ -210,27 +256,29 @@ impl PlasmaStateKeeper {
         (chunks_left, selected_ops)
     }
 
-    fn prepare_tx_for_block(&self, chunks_left: usize) -> Vec<FranklinTx> {
-        // TODO: get proper number of txs from db.
+    fn prepare_tx_for_block(&self, chunks_left: usize) -> (usize, Vec<FranklinTx>) {
         let txs = self
             .db_conn_pool
             .access_storage()
             .map(|m| {
-                m.mempool_get_txs(config::RUNTIME_CONFIG.tx_batch_size)
+                m.mempool_get_txs((BLOCK_SIZE_CHUNKS / TransferOp::CHUNKS) * 2)
                     .expect("Failed to get tx from db")
             })
             .expect("Failed to get txs from mempool");
-        let filtered_txs = self.filter_invalid_txs(chunks_left, txs);
-        filtered_txs
+
+        let (chunks_left, filtered_txs) = self.filter_invalid_txs(chunks_left, txs);
+
+        (chunks_left, filtered_txs)
     }
 
     fn filter_invalid_txs(
         &self,
-        chunks_left: usize,
-        transfer_txs: Vec<FranklinTx>,
-    ) -> Vec<FranklinTx> {
+        mut chunks_left: usize,
+        mut transfer_txs: Vec<FranklinTx>,
+    ) -> (usize, Vec<FranklinTx>) {
         let mut filtered_txs = Vec::new();
 
+        transfer_txs.sort_by_key(|tx| tx.account());
         let txs_with_correct_nonce = transfer_txs
             .into_iter()
             .group_by(|tx| tx.account())
@@ -241,6 +289,7 @@ impl PlasmaStateKeeper {
 
                 let mut valid_txs = Vec::new();
                 let mut current_nonce = self.account(&from).nonce;
+
                 for tx in txs {
                     if tx.nonce() < current_nonce {
                         continue;
@@ -260,15 +309,19 @@ impl PlasmaStateKeeper {
 
         filtered_txs.extend(txs_with_correct_nonce.into_iter());
 
-        // Conservative chunk number estimation
-        let mut total_chunks = 0;
-        filtered_txs
+        let filtered_txs = filtered_txs
             .into_iter()
             .take_while(|tx| {
-                total_chunks += self.state.chunks_for_tx(&tx);
-                total_chunks <= chunks_left
+                let tx_chunks = self.state.chunks_for_tx(&tx);
+                if chunks_left < tx_chunks {
+                    false
+                } else {
+                    chunks_left -= tx_chunks;
+                    true
+                }
             })
-            .collect()
+            .collect();
+        (chunks_left, filtered_txs)
     }
 
     fn apply_txs(
@@ -276,7 +329,11 @@ impl PlasmaStateKeeper {
         priority_ops: Vec<PriorityOp>,
         transactions: Vec<FranklinTx>,
     ) -> CommitRequest {
-        info!("Creating block, size: {}", transactions.len());
+        info!(
+            "Creating block, txs: {}, priority_ops: {}",
+            transactions.len(),
+            priority_ops.len()
+        );
         // collect updated state
         let mut accounts_updated = Vec::new();
         let mut fees = Vec::new();

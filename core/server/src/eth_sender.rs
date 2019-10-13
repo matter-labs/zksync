@@ -30,7 +30,7 @@ use web3::Transport;
 
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 // TODO: fix rare nonce bug, when pending nonce is not equal to real pending nonce.
-const MAX_UNCONFIRMED_TX: usize = 1;
+const MAX_UNCONFIRMED_TX: usize = 10;
 const TX_POLL_PERIOD: Duration = Duration::from_secs(5);
 const WAIT_CONFIRMATIONS: u64 = 10;
 
@@ -200,8 +200,10 @@ impl<T: Transport> ETHSender<T> {
 
                 if let OperationState::Commited { hash, success } = &op_state {
                     info!(
-                        "Operation {} commited, tx: {:#x} success: {}",
+                        "Operation {}, {}  block: {}, commited, tx: {:#x} success: {}",
                         op.id.unwrap(),
+                        op.action.to_string(),
+                        op.block.block_number,
                         hash,
                         success
                     );
@@ -444,10 +446,11 @@ impl<T: Transport> ETHSender<T> {
                     .write_be(be_bytes.as_mut())
                     .expect("Write commit bytes");
                 let root = H256::from(be_bytes);
+                let public_data = op.block.get_eth_public_data();
                 debug!(
-                    "public_data for block_number {}: {:x?}",
+                    "public_data for block_number {}: {}",
                     op.block.block_number,
-                    op.block.get_eth_public_data()
+                    hex::encode(&public_data)
                 );
                 // function commitBlock(uint32 _blockNumber, uint24 _feeAccount, bytes32 _newRoot, bytes calldata _publicData)
                 self.eth_client.sign_call_tx(
@@ -456,7 +459,7 @@ impl<T: Transport> ETHSender<T> {
                         u64::from(op.block.block_number),
                         u64::from(op.block.fee_account),
                         root,
-                        op.block.get_eth_public_data(),
+                        public_data,
                     ),
                     tx_options,
                 )

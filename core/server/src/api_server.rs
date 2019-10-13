@@ -76,7 +76,6 @@ fn handle_submit_tx(
     req.json()
         .map_err(|e| format!("{}", e)) // convert all errors to String
         .and_then(move |tx: FranklinTx| {
-            // Rate limit check
             let tx_hash = hex::encode(&tx.hash());
 
             let storage = pool
@@ -634,6 +633,7 @@ fn start_server(state: AppState, bind_to: String) {
                     })
             })
     })
+    .client_timeout(0)
     .bind(&bind_to)
     .unwrap()
     .shutdown_timeout(1)

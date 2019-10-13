@@ -259,7 +259,7 @@ contract Franklin {
     // Deposit ETH
     // Params:
     // - _franklinAddr - the receiver Franklin address
-    function depositETH(bytes calldata _franklinAddr) external payable {
+    function depositETH(uint128 _amount, bytes calldata _franklinAddr) external payable {
         // Fee is:
         //   fee coeff * (base tx gas cost + remained gas) * gas price
         uint256 fee = FEE_COEFF * (BASE_GAS + gasleft()) * tx.gasprice;
@@ -267,17 +267,20 @@ contract Franklin {
         requireActive();
 
         require(
-            msg.value >= fee,
+            msg.value >= fee + _amount,
             "fdh11"
-        ); // fdh11 - Not enough ETH provided to pay the fee
+        ); // fdh11 - Not enough ETH provided
         
-        uint256 amount = msg.value-fee;
         require(
-            amount <= MAX_VALUE,
+            _amount <= MAX_VALUE,
             "fdh12"
         ); // fdh12 - deposit amount value is heigher than Franklin is able to process
 
-        registerDeposit(0, uint128(amount), fee, _franklinAddr);
+        if (msg.value != fee + _amount) {
+            msg.sender.transfer(msg.value-(fee + _amount));
+        }
+
+        registerDeposit(0, _amount, fee, _franklinAddr);
     }
 
     // Withdraw ETH

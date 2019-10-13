@@ -30,7 +30,6 @@ use serde_json::value::Value;
 use std::env;
 
 use diesel::sql_types::{BigInt, Nullable, Text, Timestamp};
-sql_function!(coalesce, Coalesce, (x: Nullable<BigInt>, y: BigInt) -> BigInt);
 
 use itertools::Itertools;
 use models::node::AccountAddress;
@@ -1425,11 +1424,26 @@ impl StorageProcessor {
                 .optional()?;
 
             if let Some(tx) = tx {
-                let confirm = operations::table
+                let commited = operations::table
+                    .filter(operations::block_number.eq(tx.block_number))
+                    .filter(operations::action_type.eq("Commit"))
+                    .first::<StoredOperation>(self.conn())
+                    .optional()?
+                    .map(|c| c.confirmed)
+                    .unwrap_or(false);
+
+                // Make shure that ETHereum "knowns" that block is commited.
+                if !commited {
+                    return Ok(None);
+                }
+
+                let verified = operations::table
                     .filter(operations::block_number.eq(tx.block_number))
                     .filter(operations::action_type.eq("Verify"))
                     .first::<StoredOperation>(self.conn())
-                    .optional()?;
+                    .optional()?
+                    .map(|v| v.confirmed)
+                    .unwrap_or(false);
 
                 let prover_run: Option<ProverRun> = prover_runs::table
                     .filter(prover_runs::block_number.eq(tx.block_number))
@@ -1440,7 +1454,7 @@ impl StorageProcessor {
                     tx_hash: hash.to_vec(),
                     block_number: tx.block_number,
                     success: tx.success,
-                    verified: confirm.is_some(),
+                    verified,
                     fail_reason: tx.fail_reason,
                     prover_run: prover_run,
                 }))
@@ -1829,7 +1843,7 @@ impl StorageProcessor {
 
     pub fn mempool_get_txs(&self, max_size: usize) -> QueryResult<Vec<FranklinTx>> {
         //TODO use "gaps and islands" sql solution for this.
-        let stored_txs: Vec<_> = mempool::table
+        let query = mempool::table
             .left_join(
                 executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),
             )
@@ -1838,15 +1852,16 @@ impl StorageProcessor {
             .filter(
                 accounts::nonce
                     .is_null()
-                    .or(accounts::nonce.ge(mempool::nonce)),
+                    .or(mempool::nonce.ge(accounts::nonce)),
             )
             .order(mempool::created_at.asc())
-            .limit(max_size as i64)
-            .load::<(
-                ReadTx,
-                Option<StoredExecutedTransaction>,
-                Option<StorageAccount>,
-            )>(self.conn())?;
+            .limit(max_size as i64);
+
+        let stored_txs: Vec<_> = query.load::<(
+            ReadTx,
+            Option<StoredExecutedTransaction>,
+            Option<StorageAccount>,
+        )>(self.conn())?;
 
         Ok(stored_txs
             .into_iter()
@@ -2412,5 +2427,4 @@ mod test {
     //            tx_meta: None,
     //        }
     //    }
-
 }

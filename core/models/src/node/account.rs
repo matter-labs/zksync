@@ -17,7 +17,7 @@ use crate::circuit::utils::pub_key_hash_bytes;
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use franklin_crypto::eddsa::PublicKey;
 
-#[derive(Clone, PartialEq, Default, Eq, Hash)]
+#[derive(Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
 pub struct AccountAddress {
     pub data: [u8; params::FR_ADDRESS_LEN],
 }
