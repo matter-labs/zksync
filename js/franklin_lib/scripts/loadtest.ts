@@ -22,6 +22,7 @@ async function makeTxsWallet(wallet: Wallet, wallets: Wallet[]) {
         let amount = parseEther("0.0001");
         let transferHandle = await wallet.transfer(target.address, 0, amount, 0, nonce++);
         console.log(`${wallet.address.toString("hex")} -> ${target.address.toString("hex")} amount: ${formatEther(amount)} eth , nonce: ${nonce}` );
+        await transferHandle.waitCommit();
     }
 }
 
@@ -42,10 +43,10 @@ async function main() {
     for(let i = 0; i < WALLETS; ++i) {
         let ethWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, `m/44'/60'/0'/0/${i + 2}`).connect(provider);
         let franklinWallet = await Wallet.fromEthWallet(ethWallet);
-        // lastFundTx = await mainFranklinWallet.transfer(franklinWallet.address, 0, parseEther("1"), 0, nonce++);
+        lastFundTx = await mainFranklinWallet.transfer(franklinWallet.address, 0, parseEther("1"), 0, nonce++);
         wallets.push(franklinWallet);
     }
-    // await lastFundTx.waitCommit();
+    await lastFundTx.waitCommit();
 
     for(let i = 0; i < WALLETS; ++i) {
         makeTxsWallet(wallets[i], wallets).catch(( e => console.log(`Wallet ${i} error: ${e.toString()}`)));

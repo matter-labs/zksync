@@ -15,7 +15,7 @@ use crate::ThreadPanicNotify;
 use bigdecimal::BigDecimal;
 use eth_client::{ETHClient, SignedCallResult};
 use ff::{PrimeField, PrimeFieldRepr};
-use futures::Future;
+use futures::{sync::mpsc as fmpsc, Future};
 use models::abi::FRANKLIN_CONTRACT;
 use models::{Action, Operation};
 use std::collections::VecDeque;
@@ -161,7 +161,7 @@ impl<T: Transport> ETHSender<T> {
         Ok(())
     }
 
-    fn run(&mut self, rx_for_eth: Receiver<Operation>) {
+    fn run(&mut self, rx_for_eth: Receiver<Operation>, mut op_notify: fmpsc::Sender<Operation>) {
         loop {
             let last_poll_end_time = Instant::now();
 
@@ -210,6 +210,10 @@ impl<T: Transport> ETHSender<T> {
                     if !success {
                         panic!("Operation failed");
                     }
+                    op_notify
+                        .try_send(op)
+                        .map_err(|e| warn!("Failed notify about op confirmation: {}", e))
+                        .unwrap_or_default();
                 } else {
                     self.unconfirmed_ops.push_front((op, op_state));
                     break;
@@ -476,8 +480,12 @@ impl<T: Transport> ETHSender<T> {
     }
 }
 
-pub fn start_eth_sender(pool: ConnectionPool, panic_notify: Sender<bool>) -> Sender<Operation> {
+pub fn start_eth_sender(
+    pool: ConnectionPool,
+    panic_notify: Sender<bool>,
+) -> (Sender<Operation>, fmpsc::Receiver<Operation>) {
     let (tx_for_eth, rx_for_eth) = channel::<Operation>();
+    let (op_notify_sender, op_notify_receiver) = fmpsc::channel(256);
 
     std::thread::Builder::new()
         .name("eth_sender".to_string())
@@ -488,9 +496,9 @@ pub fn start_eth_sender(pool: ConnectionPool, panic_notify: Sender<bool>) -> Sen
             let (_event_loop, transport) =
                 Http::new(&web3_url).expect("failed to start web3 transport");
             let mut eth_sender = ETHSender::new(transport, pool);
-            eth_sender.run(rx_for_eth);
+            eth_sender.run(rx_for_eth, op_notify_sender);
         })
         .expect("Eth sender thread");
 
-    tx_for_eth
+    (tx_for_eth, op_notify_receiver)
 }

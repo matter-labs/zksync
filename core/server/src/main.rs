@@ -75,11 +75,6 @@ fn main() {
     info!("starting actors");
 
     let (tx_for_state, rx_for_state) = channel();
-    start_api_server(
-        tx_for_state.clone(),
-        connection_pool.clone(),
-        stop_signal_sender.clone(),
-    );
     let shared_eth_state = start_eth_watch(connection_pool.clone(), stop_signal_sender.clone());
     let (tx_for_ops, rx_for_ops) = channel();
     let state_keeper = PlasmaStateKeeper::new(connection_pool.clone(), shared_eth_state);
@@ -89,11 +84,17 @@ fn main() {
         tx_for_ops.clone(),
         stop_signal_sender.clone(),
     );
-    let tx_for_eth =
+    let (tx_for_eth, ops_notify_receiver) =
         eth_sender::start_eth_sender(connection_pool.clone(), stop_signal_sender.clone());
     start_committer(
         rx_for_ops,
         tx_for_eth,
+        connection_pool.clone(),
+        stop_signal_sender.clone(),
+    );
+    start_api_server(
+        tx_for_state.clone(),
+        ops_notify_receiver,
         connection_pool.clone(),
         stop_signal_sender.clone(),
     );

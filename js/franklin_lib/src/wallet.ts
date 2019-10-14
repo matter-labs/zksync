@@ -95,6 +95,16 @@ export class FranklinProvider {
             .then(reps => reps.data)
     }
 
+    async notifyPriorityOp(opId: number, action: "commit" | "verify") {
+        return await Axios.get(this.providerAddress + `/api/v0.1/priority_op_notify/${action}/${opId}`)
+            .then(reps => reps.data)
+    }
+
+    async notifyTransaction(hash: string, action: "commit" | "verify") {
+        return await Axios.get(this.providerAddress + `/api/v0.1/tx_notify/${action}/${hash}`)
+            .then(reps => reps.data)
+    }
+
     async getBlockStatus(block: number) {
         return await Axios.get(this.providerAddress + '/api/v0.1/search?query=' + block)
             .then(reps => reps.data)
@@ -274,20 +284,7 @@ class DepositTransactionHandle {
     async waitCommit() {
         await this.waitTxMine();
         if(this.state != "Mined") return;
-
-        let commited = false;
-        while(!commited) {
-            let status = await this.franklinProvider.getPriorityOpStatus(this.priorityOpId.toNumber());
-            if (status.executed) {
-                let blockStatus = await this.franklinProvider.getBlockStatus(status.block);
-                if(blockStatus.commit_tx_hash) {
-                    commited = true;
-                    this.sideChainBlock = status.block;
-                }
-            }
-            await sleep(500);
-        }
-
+        await this.franklinProvider.notifyPriorityOp(this.priorityOpId.toNumber(), "commit");
         this.state = "Commited";
     }
 
@@ -295,14 +292,7 @@ class DepositTransactionHandle {
         await this.waitCommit();
         if(this.state != "Commited") return;
 
-        let verified = false;
-        while(!verified) {
-            let blockStatus = await this.franklinProvider.getBlockStatus(this.sideChainBlock);
-            if(blockStatus.verify_tx_hash) {
-                verified = true;
-            }
-            await sleep(500);
-        }
+        await this.franklinProvider.notifyPriorityOp(this.priorityOpId.toNumber(), "verify");
         this.state = "Verified";
     }
 }
@@ -318,29 +308,14 @@ class TransactionHandle {
     async waitCommit() {
         if (this.state != "Sent") return;
 
-        let commited = false;
-        while(!commited) {
-            let receipt = await this.franklinProvider.getTxReceipt(this.txHash);
-            if (receipt) {
-                commited = true;
-                this.txReceipt = receipt;
-            }
-            await sleep(500);
-        }
+        await this.franklinProvider.notifyTransaction(this.txHash, "commit");
         this.state = "Commited";
     }
 
     async waitVerify() {
         await this.waitCommit();
-        let verified = false;
-        while(!verified) {
-            let receipt = await this.franklinProvider.getTxReceipt(this.txHash);
-            if (receipt && receipt.verified) {
-                verified = true;
-                this.txReceipt = receipt;
-            }
-            await sleep(500);
-        }
+        await this.franklinProvider.notifyTransaction(this.txHash, "verify");
+        this.state = "Verified"
     }
 }
 

@@ -252,12 +252,12 @@ impl Into<ExecutedPriorityOp> for StoredExecutedPriorityOperation {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxReceiptResponse {
-    tx_hash: Vec<u8>,
-    block_number: i64,
-    success: bool,
-    verified: bool,
-    fail_reason: Option<String>,
-    prover_run: Option<ProverRun>,
+    pub tx_hash: Vec<u8>,
+    pub block_number: i64,
+    pub success: bool,
+    pub verified: bool,
+    pub fail_reason: Option<String>,
+    pub prover_run: Option<ProverRun>,
 }
 
 #[derive(Debug)]

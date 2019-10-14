@@ -1,26 +1,29 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
+mod event_notify;
 
 use actix_cors::Cors;
 use actix_web::{
-    middleware, web, App, HttpRequest, HttpResponse, HttpServer, Result as ActixResult,
+    middleware, web, App, Error as ActixError, HttpResponse, HttpServer, Result as ActixResult,
 };
 use models::node::{tx::FranklinTx, Account, AccountId, ExecutedOperations};
-use models::{NetworkStatus, StateKeeperRequest};
+use models::{ActionType, NetworkStatus, Operation, StateKeeperRequest};
 use std::sync::mpsc;
-use storage::{BlockDetails, ConnectionPool, StorageProcessor, TxReceiptResponse};
+use storage::{ConnectionPool, StorageProcessor};
 
 use crate::ThreadPanicNotify;
-use failure::format_err;
-use futures::{sync::oneshot, Future};
+use futures::{
+    sync::{mpsc as fmpsc, oneshot},
+    Future, IntoFuture, Sink, Stream,
+};
 use models::node::AccountAddress;
-use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::env;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
-use tokio::prelude::*;
 use tokio::timer::Interval;
+
+use self::event_notify::{start_sub_notifier, EventSubscribe};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ApiError {
@@ -62,6 +65,7 @@ pub struct AppState {
     contract_address: String,
     connection_pool: ConnectionPool,
     network_status: SharedNetworkStatus,
+    event_sub_sender: fmpsc::Sender<EventSubscribe>,
 }
 
 impl AppState {
@@ -69,40 +73,6 @@ impl AppState {
         self.connection_pool
             .access_storage()
             .map_err(|_| HttpResponse::RequestTimeout().finish().into())
-    }
-}
-
-#[derive(Debug)]
-struct OperationNotifier {
-    watched_txs: BTreeMap<Vec<u8>, Vec<oneshot::Sender<TxReceiptResponse>>>,
-}
-
-impl OperationNotifier {
-    fn sub_tx_update(&mut self, tx_hash: Vec<u8>, recv_notify: oneshot::Sender<TxReceiptResponse>) {
-        let mut subs = self.watched_txs.remove(&tx_hash).unwrap_or_default();
-        subs.push(recv_notify);
-        self.watched_txs.insert(tx_hash, subs);
-    }
-
-    fn poll_updates_db(&mut self, conn_pool: ConnectionPool) {
-        let storage = if let Ok(storage) = conn_pool.access_storage() {
-            storage
-        } else {
-            return;
-        };
-
-        self.watched_txs = std::mem::replace(&mut self.watched_txs, BTreeMap::default())
-            .into_iter()
-            .filter_map(|(k, v)| match storage.tx_receipt(&k) {
-                Ok(Some(receipt)) => {
-                    for subs in v.into_iter() {
-                        subs.send(receipt.clone()).unwrap_or_default();
-                    }
-                    None
-                }
-                _ => Some((k, v)),
-            })
-            .collect();
     }
 }
 
@@ -116,7 +86,6 @@ fn handle_submit_tx(
     data: web::Data<AppState>,
     tx: web::Json<FranklinTx>,
 ) -> ActixResult<HttpResponse> {
-    let pool = data.connection_pool.clone();
     let hash = hex::encode(tx.hash().as_ref());
     let storage = data.access_storage()?;
 
@@ -147,17 +116,13 @@ fn handle_get_account_state(
 
     let storage = data.access_storage()?;
 
-    let (id, verified, commited) = {
-        storage
-            .account_state_by_address(&address)
-            .map_err(|_| HttpResponse::InternalServerError().finish())?
-    };
+    let (id, verified, commited) = storage
+        .account_state_by_address(&address)
+        .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
-    let pending_txs = {
-        storage
-            .get_pending_txs(&address)
-            .map_err(|_| HttpResponse::InternalServerError().finish())?
-    };
+    let pending_txs = storage
+        .get_pending_txs(&address)
+        .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
     let empty_state = |address: &AccountAddress| {
         let mut acc = Account::default();
@@ -204,19 +169,22 @@ fn handle_get_account_transactions(
     Ok(HttpResponse::Ok().json(txs))
 }
 
+fn decode_tx_hash(hex_input: &str) -> Result<[u8; 32], ActixError> {
+    if hex_input.len() != 32 * 2 {
+        return Err(HttpResponse::BadRequest().finish().into());
+    }
+
+    let vec = hex::decode(hex_input).map_err(|_| HttpResponse::BadRequest().finish())?;
+    Ok(vec.as_slice().try_into().unwrap())
+}
+
 fn handle_get_executed_transaction_by_hash(
     data: web::Data<AppState>,
     tx_hash: web::Path<String>,
 ) -> ActixResult<HttpResponse> {
     let storage = data.access_storage()?;
+    let tx_hash = decode_tx_hash(&tx_hash.into_inner())?;
 
-    let tx_hash: [u8; 32] = {
-        if tx_hash.len() != 32 * 2 {
-            return Err(HttpResponse::BadRequest().finish().into());
-        }
-        let vec = hex::decode(tx_hash.as_ref()).map_err(|_| HttpResponse::BadRequest().finish())?;
-        vec.as_slice().try_into().unwrap()
-    };
     let receipt = storage
         .tx_receipt(&tx_hash)
         .map_err(|_| HttpResponse::InternalServerError().finish())?;
@@ -338,6 +306,82 @@ fn handle_get_priority_op_status(
     }))
 }
 
+fn decode_action_type(action_type: &str) -> ActixResult<ActionType> {
+    if action_type == "commit" {
+        Ok(ActionType::COMMIT)
+    } else if action_type == "verify" {
+        Ok(ActionType::VERIFY)
+    } else {
+        Err(HttpResponse::BadRequest().finish().into())
+    }
+}
+
+fn handle_notify_priority_op(
+    data: web::Data<AppState>,
+    path: web::Path<(String, u64)>,
+) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>> {
+    let (action_type, serial_id) = path.into_inner();
+    let commit = match decode_action_type(&action_type) {
+        Ok(ActionType::COMMIT) => true,
+        Ok(ActionType::VERIFY) => false,
+        Err(e) => return Box::new(Ok(e.as_response_error().error_response()).into_future()),
+    };
+
+    let (notify_sender, notify_recv) = oneshot::channel();
+
+    let sub = EventSubscribe::PriorityOp {
+        serial_id,
+        commit,
+        notify: notify_sender,
+    };
+
+    Box::new(
+        data.event_sub_sender
+            .clone()
+            .send(sub)
+            .map_err(|_| HttpResponse::InternalServerError().finish().into())
+            .and_then(|_| {
+                notify_recv.map_err(|_| HttpResponse::InternalServerError().finish().into())
+            })
+            .map(|_| HttpResponse::Ok().finish()),
+    )
+}
+
+fn handle_notify_tx(
+    data: web::Data<AppState>,
+    path: web::Path<(String, String)>,
+) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>> {
+    let (action_type, tx_hash) = path.into_inner();
+    let commit = match decode_action_type(&action_type) {
+        Ok(ActionType::COMMIT) => true,
+        Ok(ActionType::VERIFY) => false,
+        Err(e) => return Box::new(Ok(e.as_response_error().error_response()).into_future()),
+    };
+    let hash = match decode_tx_hash(&tx_hash) {
+        Ok(hash) => Box::new(hash),
+        Err(e) => return Box::new(Ok(e.as_response_error().error_response()).into_future()),
+    };
+
+    let (notify_sender, notify_recv) = oneshot::channel();
+
+    let sub = EventSubscribe::Transaction {
+        hash,
+        commit,
+        notify: notify_sender,
+    };
+
+    Box::new(
+        data.event_sub_sender
+            .clone()
+            .send(sub)
+            .map_err(|_| HttpResponse::InternalServerError().finish().into())
+            .and_then(|_| {
+                notify_recv.map_err(|_| HttpResponse::InternalServerError().finish().into())
+            })
+            .map(|_| HttpResponse::Ok().finish()),
+    )
+}
+
 fn start_server(state: AppState, bind_to: String) {
     HttpServer::new(move || {
         App::new()
@@ -376,6 +420,14 @@ fn start_server(state: AppState, bind_to: String) {
                         "/priority_op/{priority_op_id}",
                         web::get().to(handle_get_priority_op_status),
                     )
+                    .route(
+                        "/priority_op_notify/{action_type}/{serial_id}",
+                        web::get().to(handle_notify_priority_op),
+                    )
+                    .route(
+                        "/tx_notify/{action_type}/{tx_hash}",
+                        web::get().to(handle_notify_tx),
+                    )
                     .route("/search", web::get().to(handle_search)),
             )
     })
@@ -412,13 +464,14 @@ pub fn start_status_interval(state: AppState) {
         .map(|_| ())
         .map_err(|e| panic!("interval errored; err={:?}", e));
 
-        actix::System::with_current(|_| {
-            actix::spawn(state_checker);
-        });
+    actix::System::with_current(|_| {
+        actix::spawn(state_checker);
+    });
 }
 
 pub fn start_api_server(
     tx_for_state: mpsc::Sender<StateKeeperRequest>,
+    op_notify_receiver: fmpsc::Receiver<Operation>,
     connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
 ) {
@@ -433,16 +486,23 @@ pub fn start_api_server(
 
             let runtime = actix_rt::System::new("api-server");
 
+            let (event_sub_sender, event_sub_receiver) = fmpsc::channel(2048);
             let state = AppState {
                 tx_for_state: tx_for_state.clone(),
                 contract_address: env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR env missing"),
                 connection_pool: connection_pool.clone(),
                 network_status: SharedNetworkStatus::default(),
+                event_sub_sender,
             };
 
             start_server(state.clone(), bind_to.clone());
-            info!("Started http server at {}", &bind_to);
             start_status_interval(state.clone());
+            start_sub_notifier(
+                connection_pool.clone(),
+                op_notify_receiver,
+                event_sub_receiver,
+            );
+
             runtime.run().unwrap_or_default();
         })
         .expect("Api server thread");
