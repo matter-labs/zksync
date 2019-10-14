@@ -5,8 +5,11 @@
                 (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+ethereumAddress"
                     target="blanc">block explorer</a>):
             <CopyableAddress id="ethereumAddressFormInput" :address="ethereumAddress"></CopyableAddress>
-            <img v-if="loading" style="margin-right: 1.5em" src="../assets/loading.gif" width="100em">
-            <b-table v-else-if="displayableBalances.length" class="b-table-balances-width-hack" borderless small responsive :fields="fields" :items="displayableBalances">
+            <img v-if="disabledReason == 'Not loaded yet.'" style="margin-right: 1.5em" src="../assets/loading.gif" width="100em">
+            <p class="mt-3" v-else-if="disabledReason == 'No tokens'">
+                <b>Your Main chain balance is empty.</b>
+            </p>
+            <b-table v-else class="b-table-balances-width-hack" borderless small responsive :fields="fields" :items="displayableBalances">
                 <template v-slot:cell(tokenName)="data">
                     <TokenNameButton :data="data"></TokenNameButton>
                 </template>
@@ -14,9 +17,6 @@
                     <span style="vertical-align: middle;"> {{ data.item.amount }} </span>
                 </template>
             </b-table>
-            <p class="mt-3" v-else>
-                <b>Your Main chain balance is empty.</b>
-            </p>
         </b-col>
     </b-card>
 </template>
@@ -41,7 +41,6 @@ export default {
             'amount'
         ],
         displayableBalances: [],
-        loading: true
     }),
     props: [
         // balances are like [{ tokenName: 'eth', amount: '120' }]
@@ -54,17 +53,24 @@ export default {
     watch: {
         balances() {
             this.updateInfo();
-            this.loading = false;
+        },
+    },
+    computed: {
+        disabledReason() {
+            return this.balances == null        ? "Not loaded yet."
+                 : this.balances.length == 0    ? "No tokens"
+                 : null;
         },
     },
     methods: {
         updateInfo() {
+            if (this.balances == null) return;
+            
             this.displayableBalances = getDisplayableBalanceList(this.balances);
         },
         clickedWhatever: function(evt) {
             let tgt = evt.target;
             tgt.setAttribute('data-original-title', 'copied');
-            console.log(tgt);
         },
     },
     components,

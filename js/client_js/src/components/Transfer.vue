@@ -4,9 +4,6 @@
         <b-form-input autocomplete="off" type="text" v-model="address" class="mb-2"></b-form-input>
         <p>(for testing, use <code style="cursor: pointer" @click="address='0x2d5bf7a3ab29f0ff424d738a83f9b0588bc9241e'">0x2d5bf7a3ab29f0ff424d738a83f9b0588bc9241e</code>)</p>
         Choose token:
-        <!-- <b-form-select v-model="token" class="mb-2">
-            <option v-for="balance in balances" :key="balance.tokenName">{{ balance.tokenName }}</option>
-        </b-form-select> -->
         <TokenSelector 
             class="mb-3"
             :tokens="tokensList"
@@ -20,7 +17,6 @@
             :fees="fees"
             :selected.sync="feeButtonSelectedIndex">
         </FeeSelector>
-        <!-- <b-form-input autocomplete="off" type="number" class="mb-3" v-model="fee"></b-form-input> -->
         <img v-if="transferPending" style="margin-right: 1.5em" src="../assets/loading.gif" width="100em">
         <b-button v-else class="mt-2 w-50" variant="primary" @click='buttonClicked'> Transfer </b-button>
     </b-card>
@@ -30,7 +26,7 @@
 import { bigNumberify, parseEther } from 'ethers/utils'
 import TokenSelector from './TokenSelector.vue'
 import FeeSelector from './FeeSelector.vue'
-import { getDisplayableBalanceDict, feesFromAmount } from '../utils';
+import { getDisplayableBalanceDict, feesFromAmount, isReadablyPrintable } from '../utils';
 import timeConstants from '../timeConstants'
 
 const components = {
@@ -47,7 +43,7 @@ export default {
 
         maxAmountVisible: false,
         balancesDict: {},
-        tokensList: [],
+        tokensList: null,
         amountSelected: null,
         feeButtonSelectedIndex: null,
         fees: ['0%', '1%', '5%'],
@@ -67,6 +63,8 @@ export default {
     },
     methods: {
         updateInfo() {
+            if (this.balances == null) return;
+            
             this.balancesDict = this.balances
                 .reduce((acc, bal) => {
                     acc[bal.tokenName] = bal.amount;
@@ -80,7 +78,7 @@ export default {
         },
         getAmount() {
             try {
-                return this.token == 'ETH'
+                return isReadablyPrintable(this.token)
                     ? parseEther(this.amountSelected)
                     : bigNumberify(this.amountSelected);
             } catch (e) {

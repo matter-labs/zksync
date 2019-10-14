@@ -1,7 +1,11 @@
 <template>
     <div class="clickable">
+        <img v-if="disabledReason == 'Not loaded'" style="margin-right: 1.5em" src="../assets/loading.gif" width="100em">
+        <p v-else-if="disabledReason">
+            <b> {{ disabledReason }} </b>
+        </p>
         <b-form-radio-group
-            v-if="tokens.length > 0"
+            v-else
             class="w-100"
             button-variant="outline-info"
             id="btn-radios-1"
@@ -10,9 +14,6 @@
             buttons
             name="radios-btn-default"
         ></b-form-radio-group>
-        <p v-else>
-            <b>You don't have any tokens yet.</b>
-        </p>
     </div>
 </template>
 
@@ -24,7 +25,6 @@ export default {
         selected: null,
     }),
     created() {
-        console.log('TokenSelector component created, tokens:', this.tokens);
         this.maybeSetDefaultToken();
     },
     watch: {
@@ -35,9 +35,16 @@ export default {
             this.$emit('update:selected', this.selected);
         },
     },
+    computed: {
+        disabledReason() {
+            return this.tokens == null     ? "Not loaded"
+                 : this.tokens.length == 0 ? "You don't have any tokens yet."
+                 : null;
+        },
+    },
     methods: {
         maybeSetDefaultToken() {
-            if (this.selected == null && this.tokens.length > 0) {
+            if (this.selected == null && this.tokens && this.tokens.length > 0) {
                 this.selected = this.tokens[0];
             }
         },

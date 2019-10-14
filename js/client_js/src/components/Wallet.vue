@@ -54,19 +54,16 @@ export default {
     props: ['info'],
     data: () => ({
         message: '',
-        onchainBalances: [],
-        contractBalances: [],
-        franklinBalances: [],
-        franklinBalancesWithInfo: [],
+        onchainBalances: null,
+        franklinBalances: null,
+        franklinBalancesWithInfo: null,
         verboseShowerId: 0,
     }),
     created() {
-        console.log('Wallet component created.');
         this.updateInfo();
         this.verboseShowerId = this.store.verboseShowerId;
     },
     destroyed() {
-        console.log('Wallet component destroyed.');
         this.store.verboseShowerId = this.verboseShowerId;
     },
     watch: {
@@ -76,7 +73,6 @@ export default {
     },
     methods: {
         updateInfo() {
-            console.log('updating wallet info, info:', this.info);
             if (this.info == null) return;
             for (let [key, val] of Object.entries(this.info)) {
                 this[key] = val;

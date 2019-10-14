@@ -3,6 +3,12 @@ import { ethers } from 'ethers'
 
 export const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
 
+const readablyPrintableTokens = ['ETH', 'FAU'];
+
+export function isReadablyPrintable(tokenName) {
+    return readablyPrintableTokens.includes(tokenName);
+}
+
 export function readableEther(wei) {
     let formatted = ethers.utils.formatUnits(wei, 18);
     if (formatted.startsWith('0.') == false) {
@@ -14,14 +20,18 @@ export function readableEther(wei) {
 
 export function getDisplayableBalanceDict(dict) {
     let res = Object.assign({}, dict);
-    if (res['ETH'] != undefined)
-        res['ETH'] = readableEther(dict['ETH']);
+    for (let token of readablyPrintableTokens) {
+        if (res[token] != undefined) {
+            res[token] = readableEther(dict[token]);
+        }
+    }
     return res;
 }
 
 export function getDisplayableBalanceList(list) {
     return list.map(bal => {
-        if (bal.tokenName != 'ETH') return bal;
+        if (isReadablyPrintable(bal.tokenName) == false) 
+            return bal;
         let res = Object.assign({}, bal);
         res.amount = readableEther(res.amount);
         return res;

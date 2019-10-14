@@ -84,7 +84,6 @@ export default {
         }
     },
     async created() {
-        console.log("Main component created");
         const timeOut = async () => {
             await this.updateAccountInfo();
             await sleep(timeConstants.updateInfo);
@@ -99,7 +98,6 @@ export default {
             this.$refs.alert.display(kwargs);
         },
         async updateAccountInfo() {
-            console.log('info updated');
             try {
                 await window.walletDecorator.updateState();
 
@@ -115,11 +113,11 @@ export default {
                 };
 
             } catch (e) {
-                console.log(e);
+                console.log('updateaccountinfo error:', e);
                 let message = e.message;
                 let franklinServerReachable = await isReachable(this.config.API_SERVER);
                 if (franklinServerReachable == false) {
-                    message = "Franklin server unavailable, check you internet connection.";
+                    message = "Franklin server unavailable, check your internet connection.";
                 }
                 
                 this.displayAlert({

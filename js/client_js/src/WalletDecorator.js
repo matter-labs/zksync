@@ -1,13 +1,10 @@
 import { BigNumberish, BigNumber, bigNumberify, Interface } from 'ethers/utils';
 import { Contract } from 'ethers';
 import { FranklinProvider, Wallet, Address } from 'franklin_lib';
-import { readableEther, sleep } from './utils';
+import { readableEther, sleep, isReadablyPrintable } from './utils';
 import timeConstants from './timeConstants';
 
-// TODO:
-import env_config from './env-config'
 import priority_queue_abi from '../../../contracts/build/PriorityQueue.json'
-import franklinContract from '../../franklin_lib/abi/Franklin.json'
 
 function combineMessages(...args) {
     return Object.assign({}, ...args);
@@ -161,7 +158,7 @@ export class WalletDecorator {
             switch (true) {
                 case type == 'Deposit': {
                     let token = this.tokenNameFromId(tx.tx.priority_op.token);
-                    let amount = token == 'ETH' 
+                    let amount = isReadablyPrintable(token)
                         ? readableEther(tx.tx.priority_op.amount) 
                         : bigNumberify(tx.tx.priority_op.amount);
                     return {
@@ -178,7 +175,7 @@ export class WalletDecorator {
                 }
                 case type == 'Transfer' && direction == 'incoming': {
                     let token = this.tokenNameFromId(tx.tx.token);
-                    let amount = token == 'ETH' 
+                    let amount = isReadablyPrintable(token)
                         ? readableEther(tx.tx.amount) 
                         : bigNumberify(tx.tx.amount);
                     return {
@@ -197,7 +194,7 @@ export class WalletDecorator {
                 }
                 case type == 'Transfer' && direction == 'outcoming': {
                     let token = this.tokenNameFromId(tx.tx.token);
-                    let amount = token == 'ETH' 
+                    let amount = isReadablyPrintable(token)
                         ? readableEther(tx.tx.amount) 
                         : bigNumberify(tx.tx.amount);
                     return {
@@ -216,7 +213,7 @@ export class WalletDecorator {
                 }
                 case type == 'Withdraw': {
                     let token = this.tokenNameFromId(tx.tx.token);
-                    let amount = token == 'ETH' 
+                    let amount = isReadablyPrintable(token)
                         ? readableEther(tx.tx.amount) 
                         : bigNumberify(tx.tx.amount);
                     return {
