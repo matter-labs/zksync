@@ -9,7 +9,6 @@ import {
 import {Contract, ContractTransaction, ethers, utils} from 'ethers';
 import {packAmount, packFee} from "./utils";
 import {curve} from "elliptic";
-import {parseEther} from "ethers/utils";
 
 const IERC20Conract = require("../abi/IERC20.json");
 const franklinContractCode = require("../abi/Franklin.json");
@@ -333,7 +332,7 @@ export class Wallet {
         this.address = pubkeyToAddress(this.walletKeys.publicKey);
     }
 
-    async deposit(tokenLike: TokenLike, amount: utils.BigNumberish, fee: utils.BigNumberish = parseEther("0.001")): Promise<DepositTransactionHandle> {
+    async deposit(tokenLike: TokenLike, amount: utils.BigNumberish, fee: utils.BigNumberish = utils.parseEther("0.001")): Promise<DepositTransactionHandle> {
         let token = await this.provider.resolveToken(tokenLike);
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
         let contractTx;

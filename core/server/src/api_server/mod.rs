@@ -340,9 +340,7 @@ fn handle_notify_priority_op(
             .clone()
             .send(sub)
             .map_err(|_| HttpResponse::InternalServerError().finish().into())
-            .and_then(|_| {
-                notify_recv.map_err(|_| HttpResponse::InternalServerError().finish().into())
-            })
+            .and_then(|_| notify_recv.map_err(|_| HttpResponse::TooManyRequests().finish().into()))
             .map(|_| HttpResponse::Ok().finish()),
     )
 }
@@ -375,9 +373,7 @@ fn handle_notify_tx(
             .clone()
             .send(sub)
             .map_err(|_| HttpResponse::InternalServerError().finish().into())
-            .and_then(|_| {
-                notify_recv.map_err(|_| HttpResponse::InternalServerError().finish().into())
-            })
+            .and_then(|_| notify_recv.map_err(|_| HttpResponse::TooManyRequests().finish().into()))
             .map(|_| HttpResponse::Ok().finish()),
     )
 }

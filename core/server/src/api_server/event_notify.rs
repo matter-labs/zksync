@@ -4,6 +4,8 @@ use models::{node::block::ExecutedOperations, Action, ActionType, Operation};
 use std::collections::BTreeMap;
 use storage::ConnectionPool;
 
+const MAX_LISTENERS_PER_ENTITY: usize = 4096;
+
 pub enum EventSubscribe {
     Transaction {
         hash: Box<[u8; 32]>,
@@ -25,11 +27,11 @@ enum BlockNotifierInput {
 struct OperationNotifier {
     db_pool: ConnectionPool,
 
-    tx_commit_subs: BTreeMap<[u8; 32], oneshot::Sender<()>>,
-    prior_op_commit_subs: BTreeMap<u64, oneshot::Sender<()>>,
+    tx_commit_subs: BTreeMap<[u8; 32], Vec<oneshot::Sender<()>>>,
+    prior_op_commit_subs: BTreeMap<u64, Vec<oneshot::Sender<()>>>,
 
-    prior_op_verify_subs: BTreeMap<u64, oneshot::Sender<()>>,
-    tx_verify_subs: BTreeMap<[u8; 32], oneshot::Sender<()>>,
+    prior_op_verify_subs: BTreeMap<u64, Vec<oneshot::Sender<()>>>,
+    tx_verify_subs: BTreeMap<[u8; 32], Vec<oneshot::Sender<()>>>,
 }
 
 impl OperationNotifier {
@@ -72,9 +74,23 @@ impl OperationNotifier {
                 }
 
                 if commit {
-                    self.tx_commit_subs.insert(*hash, notify);
+                    let mut listeners = self
+                        .tx_commit_subs
+                        .remove(hash.as_ref())
+                        .unwrap_or_default();
+                    if listeners.len() < MAX_LISTENERS_PER_ENTITY {
+                        listeners.push(notify);
+                    }
+                    self.tx_commit_subs.insert(*hash, listeners);
                 } else {
-                    self.tx_verify_subs.insert(*hash, notify);
+                    let mut listeners = self
+                        .tx_verify_subs
+                        .remove(hash.as_ref())
+                        .unwrap_or_default();
+                    if listeners.len() < MAX_LISTENERS_PER_ENTITY {
+                        listeners.push(notify);
+                    }
+                    self.tx_verify_subs.insert(*hash, listeners);
                 }
             }
             EventSubscribe::PriorityOp {
@@ -109,9 +125,23 @@ impl OperationNotifier {
                 }
 
                 if commit {
-                    self.prior_op_commit_subs.insert(serial_id, notify);
+                    let mut listeners = self
+                        .prior_op_commit_subs
+                        .remove(&serial_id)
+                        .unwrap_or_default();
+                    if listeners.len() < MAX_LISTENERS_PER_ENTITY {
+                        listeners.push(notify);
+                    }
+                    self.prior_op_commit_subs.insert(serial_id, listeners);
                 } else {
-                    self.prior_op_verify_subs.insert(serial_id, notify);
+                    let mut listeners = self
+                        .prior_op_verify_subs
+                        .remove(&serial_id)
+                        .unwrap_or_default();
+                    if listeners.len() < MAX_LISTENERS_PER_ENTITY {
+                        listeners.push(notify);
+                    }
+                    self.prior_op_verify_subs.insert(serial_id, listeners);
                 }
             }
         }
@@ -127,25 +157,33 @@ impl OperationNotifier {
                 ExecutedOperations::Tx(tx) => {
                     let hash = tx.tx.hash();
                     if commit {
-                        self.tx_commit_subs
-                            .remove(hash.as_ref())
-                            .map(|n| n.send(()).unwrap_or_default());
+                        self.tx_commit_subs.remove(hash.as_ref()).map(|notifiers| {
+                            for n in notifiers {
+                                n.send(()).unwrap_or_default();
+                            }
+                        });
                     } else {
-                        self.tx_verify_subs
-                            .remove(hash.as_ref())
-                            .map(|n| n.send(()).unwrap_or_default());
+                        self.tx_verify_subs.remove(hash.as_ref()).map(|notifiers| {
+                            for n in notifiers {
+                                n.send(()).unwrap_or_default();
+                            }
+                        });
                     }
                 }
                 ExecutedOperations::PriorityOp(op) => {
                     let id = op.priority_op.serial_id;
                     if commit {
-                        self.prior_op_commit_subs
-                            .remove(&id)
-                            .map(|n| n.send(()).unwrap_or_default());
+                        self.prior_op_commit_subs.remove(&id).map(|notifiers| {
+                            for n in notifiers {
+                                n.send(()).unwrap_or_default();
+                            }
+                        });
                     } else {
-                        self.prior_op_verify_subs
-                            .remove(&id)
-                            .map(|n| n.send(()).unwrap_or_default());
+                        self.prior_op_verify_subs.remove(&id).map(|notifiers| {
+                            for n in notifiers {
+                                n.send(()).unwrap_or_default();
+                            }
+                        });
                     }
                 }
             }
