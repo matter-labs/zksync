@@ -92,9 +92,9 @@ export class FranklinProvider {
             Axios.get(this.providerAddress + '/api/v0.1/tokens'));
     }
 
-    async getTransactionsHistory(address: Address) {
+    async getTransactionsHistory(address: Address, offset: number, limit: number) {
         return await FranklinProvider.axiosRequest(
-            Axios.get(`${this.providerAddress}/api/v0.1/account/0x${address.toString("hex")}/history/0/100`));
+            Axios.get(`${this.providerAddress}/api/v0.1/account/0x${address.toString("hex")}/history/${offset}/${limit}`));
     }
 
     async getState(address: Address): Promise<FranklinAccountState> {
@@ -262,7 +262,7 @@ export class Wallet {
     // TODO: remove this method
     async waitTxReceipt(tx_hash) {
         while (true) {
-            let receipt = await this.provider.getTxReceipt(tx_hash);
+        let receipt = await this.provider.getTxReceipt(tx_hash);
             if (receipt != null) {
                 return receipt
             }

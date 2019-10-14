@@ -93,8 +93,8 @@ export class WalletDecorator {
     // #endregion
 
     // #region renderable
-    async transactionsAsNeeded() {
-        let transactions = await this.wallet.provider.getTransactionsHistory(this.wallet.address);
+    async transactionsAsNeeded(offset, limit) {
+        let transactions = await this.wallet.provider.getTransactionsHistory(this.wallet.address, offset, limit);
         let res = transactions.map(async (tx, index) => {
             let elem_id      = `history_${index}`;
             let type         = tx.tx.type || '';
@@ -116,13 +116,13 @@ export class WalletDecorator {
                 : tx.success == true     ? `<span style="color: grey">(succeeded)</span>`
                 : tx.commited            ? `<span style="color: grey">(committed)</span>`
                 : tx.fail_reason != null ? `<span style="color: red">(failed)</span>`
-                : `<span style="color: red">(WTF)</span>`;
+                : `<span style="color: red">(Unknown status)</span>`;
 
             let row_status
                 = tx.verified     ? `<span style="color: green">Verified</span>`
                 : tx.commited     ? `<span style="color: grey">Committed</span>`
                 : tx.fail_reason  ? `<span style="color: red">Failed with ${fail_reason}</span>`
-                : `<span style="color: red">Not committed, not verified, no fail reason.</span>`
+                : `<span style="color: red">(Unknown status)</span>`
 
             let status_tooltip = await (async () => {
                 if (tx.commited == false) return 'Nothing';

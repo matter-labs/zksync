@@ -19,7 +19,7 @@
                     <span style="width: 5em" class="heightened"><b>{{ tx.data.type }}</b></span>
                 </b-col>
                 <b-col class="col-auto">
-                    <div style="width: 7em">
+                    <div style="width: 14em">
                         <span style="font-weight: 300;" class="heightened">{{ tx.data.token }}</span> {{ tx.data.amount }}
                     </div>
                 </b-col>

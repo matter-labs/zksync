@@ -18,7 +18,14 @@
             :selected.sync="feeButtonSelectedIndex">
         </FeeSelector>
         <img v-if="transferPending" style="margin-right: 1.5em" src="../assets/loading.gif" width="100em">
-        <b-button v-else class="mt-2 w-50" variant="primary" @click='buttonClicked'> Transfer </b-button>
+        <b-button 
+            v-else 
+            :disabled="!!buttonDisabledReason"
+            :title="buttonDisabledReason"
+            class="mt-2 w-50" 
+            variant="primary" 
+            @click='buttonClicked'
+        > Transfer </b-button>
     </b-card>
 </template>
 
@@ -59,6 +66,13 @@ export default {
         },
         token: function() {
             this.maxAmountVisible = true;
+        },
+    },
+    computed: {
+        buttonDisabledReason() {
+            return this.balances == null      ? "Not loaded yet."
+                :  this.balances.length == 0  ? "You have no tokens."
+                :  null;
         },
     },
     methods: {
