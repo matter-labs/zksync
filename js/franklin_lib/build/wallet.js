@@ -141,11 +141,15 @@ var FranklinProvider = /** @class */ (function () {
             });
         });
     };
-    FranklinProvider.prototype.getTransactionsHistory = function (address) {
+    FranklinProvider.prototype.getTransactionsHistory = function (address, offset, limit) {
         return __awaiter(this, void 0, void 0, function () {
+            var link;
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, FranklinProvider.axiosRequest(axios_1.default.get(this.providerAddress + '/api/v0.1/account/' + ("0x" + address.toString("hex")) + '/transactions'))];
+                    case 0:
+                        link = this.providerAddress + "/api/v0.1/account/0x" + address.toString("hex") + "/history/" + offset + "/" + limit;
+                        console.log("In wallet, we request " + link);
+                        return [4 /*yield*/, FranklinProvider.axiosRequest(axios_1.default.get(link))];
                     case 1: return [2 /*return*/, _a.sent()];
                 }
             });
@@ -275,6 +279,7 @@ var Wallet = /** @class */ (function () {
             });
         });
     };
+    // TODO: remove this method
     Wallet.prototype.waitTxReceipt = function (tx_hash) {
         return __awaiter(this, void 0, void 0, function () {
             var receipt;

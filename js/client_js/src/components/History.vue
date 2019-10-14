@@ -56,9 +56,10 @@ export default {
         await this.load();
     },
     watch: {
+        totalRows: (...args) => console.log('totalRows changes: ', ...args),
         currentPage: function() {
             this.load();
-        } 
+        },
     },
     methods: {
         async load() {
@@ -73,16 +74,26 @@ export default {
                 this.pagesOfTransactions[this.currentPage] 
                     = await window.walletDecorator.transactionsAsNeeded(offset, limit);
             
-            // maybe load the next page
-            if (this.pagesOfTransactions[this.currentPage + 1] == undefined)
-                this.pagesOfTransactions[this.currentPage + 1] 
-                    = await window.walletDecorator.transactionsAsNeeded(offset + limit, limit);
 
-            // we now know if we can add a new page button
-            this.totalRows = Math.max(
-                offset + limit + this.pagesOfTransactions[this.currentPage + 1].length,
-                this.totalRows
-            );
+            let numNextPageTransactions = null;
+            
+            // maybe load the next page
+            if (this.pagesOfTransactions[this.currentPage + 1] == undefined) {
+                let txs = await window.walletDecorator.transactionsAsNeeded(offset + limit, limit);
+                numNextPageTransactions = txs.length;
+                // Once we assign txs to pagesOfTransactions,
+                // it gets wrapped in vue watchers and stuff.
+                // 
+                // Sometimes this.pagesOfTransactions[this.currentPage + 1].length
+                // is > limit, which I can only explain by vue's wrapping.
+                // Hopefully, this will fix it.
+                this.pagesOfTransactions[this.currentPage + 1] = txs;
+            }
+
+            if (numNextPageTransactions !== null) {
+                // we now know if we can add a new page button
+                this.totalRows = offset + limit + numNextPageTransactions;
+            }
 
             // display the page
             this.transactions = this.pagesOfTransactions[this.currentPage];

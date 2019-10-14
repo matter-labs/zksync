@@ -58,7 +58,7 @@
                         <span v-html="data.item.row_status"></span>
                     </template>
                     <template v-slot:cell(hash)="data">
-                        <code class="clickable copyable" :data-clipboard-text="data.item.hash">{{ data.item.hash }}</code>
+                        <a :href="`/explorer/transactions/${data.item.hash}`"><code :data-clipboard-text="data.item.hash">{{ data.item.hash }}</code></a>
                     </template>
                     <template v-slot:cell(pq_id)="data">
                         <code class="clickable copyable" :data-clipboard-text="data.item.pq_id">{{ data.item.pq_id }}</code>

@@ -18,7 +18,7 @@ export declare class FranklinProvider {
     private static axiosRequest;
     submitTx(tx: any): Promise<any>;
     getTokens(): Promise<any>;
-    getTransactionsHistory(address: Address): Promise<any>;
+    getTransactionsHistory(address: Address, offset: number, limit: number): Promise<any>;
     getState(address: Address): Promise<FranklinAccountState>;
     getTxReceipt(tx_hash: any): Promise<any>;
     getPriorityOpReceipt(pq_id: any): Promise<any>;

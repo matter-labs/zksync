@@ -93,8 +93,10 @@ export class FranklinProvider {
     }
 
     async getTransactionsHistory(address: Address, offset: number, limit: number) {
+        const link = `${this.providerAddress}/api/v0.1/account/0x${address.toString("hex")}/history/${offset}/${limit}`;
+        console.log(`In wallet, we request ${link}`);
         return await FranklinProvider.axiosRequest(
-            Axios.get(`${this.providerAddress}/api/v0.1/account/0x${address.toString("hex")}/history/${offset}/${limit}`));
+            Axios.get(link));
     }
 
     async getState(address: Address): Promise<FranklinAccountState> {
