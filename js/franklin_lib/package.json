@@ -31,6 +31,7 @@
   "scripts": {
     "test": "mocha -r ts-node/register tests/**/*.test.ts",
     "loadtest": "ts-node scripts/loadtest.ts",
+    "integration-test": "ts-node scripts/integration-test.ts",
     "fmt": "prettier --parser typescript --write \"**/*.ts\"",
     "build": "tsc",
     "sign-gen": "ts-node tests/spec-test.ts",

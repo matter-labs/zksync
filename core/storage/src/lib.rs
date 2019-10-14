@@ -142,7 +142,7 @@ impl NewExecutedTransaction {
     fn prepare_stored_tx(exec_tx: &ExecutedTx, block: BlockNumber) -> Self {
         Self {
             block_number: i64::from(block),
-            tx_hash: exec_tx.tx.hash(),
+            tx_hash: exec_tx.tx.hash().to_vec(),
             operation: exec_tx.op.clone().map(|o| serde_json::to_value(o).unwrap()),
             success: exec_tx.success,
             fail_reason: exec_tx.fail_reason.clone(),
@@ -250,7 +250,7 @@ impl Into<ExecutedPriorityOp> for StoredExecutedPriorityOperation {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxReceiptResponse {
     tx_hash: Vec<u8>,
     block_number: i64,
@@ -443,7 +443,7 @@ pub struct StoredProof {
 }
 
 // Every time before a prover worker starts generating the proof, a prover run is recorded for monitoring purposes
-#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize, Deserialize)]
+#[derive(Debug, Clone, Insertable, Queryable, QueryableByName, Serialize, Deserialize)]
 #[table_name = "prover_runs"]
 pub struct ProverRun {
     pub id: i32,
@@ -1794,7 +1794,7 @@ impl StorageProcessor {
         }
 
         let tx_failed = executed_transactions::table
-            .filter(executed_transactions::tx_hash.eq(tx.hash()))
+            .filter(executed_transactions::tx_hash.eq(tx.hash().to_vec()))
             .filter(executed_transactions::success.eq(false))
             .first::<StoredExecutedTransaction>(self.conn())
             .optional()?;
@@ -1808,7 +1808,7 @@ impl StorageProcessor {
             // TODO Check tx and add only txs with valid nonce.
             insert_into(mempool::table)
                 .values(&InsertTx {
-                    hash: tx.hash(),
+                    hash: tx.hash().to_vec(),
                     primary_account_address: tx.account().data.to_vec(),
                     nonce: i64::from(tx.nonce()),
                     tx: serde_json::to_value(tx).unwrap(),

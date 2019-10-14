@@ -411,13 +411,13 @@ export class Wallet {
         return tx.hash;
     }
 
-    async transfer(to: AddressLike, tokenLike: number, amount: utils.BigNumberish, fee: utils.BigNumberish, nonce: Nonce = "commited"): Promise<TransactionHandle> {
-        // let tokenLike = await this.provider.resolveToken(tokenLike);
+    async transfer(to: AddressLike, tokenLike: TokenLike, amount: utils.BigNumberish, fee: utils.BigNumberish, nonce: Nonce = "commited"): Promise<TransactionHandle> {
+        let token = await this.provider.resolveToken(tokenLike);
         let tx = {
             from: this.address,
             to: toAddress(to),
             // TODO: fix
-            token: tokenLike,
+            token: token.id,
             amount,
             fee,
             nonce: await this.getNonce(nonce),

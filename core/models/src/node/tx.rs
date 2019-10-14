@@ -156,7 +156,7 @@ pub enum FranklinTx {
 }
 
 impl FranklinTx {
-    pub fn hash(&self) -> Vec<u8> {
+    pub fn hash(&self) -> Box<[u8; 32]> {
         let bytes = match self {
             FranklinTx::Transfer(tx) => tx.get_bytes(),
             FranklinTx::Withdraw(tx) => tx.get_bytes(),
@@ -165,9 +165,9 @@ impl FranklinTx {
 
         let mut hasher = Sha256::new();
         hasher.input(&bytes);
-        let mut out = vec![0u8; 32];
+        let mut out = [0u8; 32];
         hasher.result(&mut out);
-        out
+        Box::new(out)
     }
 
     pub fn account(&self) -> AccountAddress {
