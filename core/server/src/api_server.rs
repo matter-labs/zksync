@@ -118,9 +118,7 @@ fn handle_submit_tx(
 ) -> ActixResult<HttpResponse> {
     let pool = data.connection_pool.clone();
     let hash = hex::encode(tx.hash().as_ref());
-    let storage = pool
-        .access_storage()
-        .map_err(|_| HttpResponse::RequestTimeout().finish())?;
+    let storage = data.access_storage()?;
 
     let tx_add_result = storage
         .mempool_add_tx(&tx)
@@ -147,10 +145,7 @@ fn handle_get_account_state(
     let address = AccountAddress::from_hex(&account_address)
         .map_err(|_| HttpResponse::BadRequest().finish())?;
 
-    let storage = data
-        .connection_pool
-        .access_storage()
-        .map_err(|_| HttpResponse::RequestTimeout().finish())?;
+    let storage = data.access_storage()?;
 
     let (id, verified, commited) = {
         storage
@@ -181,10 +176,7 @@ fn handle_get_account_state(
 }
 
 fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
-    let storage = data
-        .connection_pool
-        .access_storage()
-        .map_err(|_| HttpResponse::RequestTimeout().finish())?;
+    let storage = data.access_storage()?;
     let tokens = storage
         .load_tokens()
         .map_err(|_| HttpResponse::InternalServerError().finish())?;
@@ -216,10 +208,7 @@ fn handle_get_executed_transaction_by_hash(
     data: web::Data<AppState>,
     tx_hash: web::Path<String>,
 ) -> ActixResult<HttpResponse> {
-    let storage = data
-        .connection_pool
-        .access_storage()
-        .map_err(|_| HttpResponse::RequestTimeout().finish())?;
+    let storage = data.access_storage()?;
 
     let tx_hash: [u8; 32] = {
         if tx_hash.len() != 32 * 2 {
@@ -395,60 +384,6 @@ fn start_server(state: AppState, bind_to: String) {
     .unwrap()
     .shutdown_timeout(1)
     .start();
-
-    //    server::new(move || {
-    //        App::with_state(state.clone()) // <- create app with shared state
-    //            .middleware(middleware::Logger::default())
-    //            .middleware(Cors::build().send_wildcard().max_age(3600).finish())
-    //            .scope("/api/v0.1", |api_scope| {
-    //                api_scope
-    //                    .resource("/testnet_config", |r| {
-    //                        r.method(Method::GET).f(handle_get_testnet_config);
-    //                    })
-    //                    .resource("/status", |r| {
-    //                        r.method(Method::GET).f(handle_get_network_status);
-    //                    })
-    //                    .resource("/submit_tx", |r| {
-    //                        r.method(Method::POST).f(handle_submit_tx);
-    //                    })
-    //                    .resource("/account/{address}", |r| {
-    //                        r.method(Method::GET).f(handle_get_account_state);
-    //                    })
-    //                    .resource("/tokens", |r| {
-    //                        r.method(Method::GET).f(handle_get_tokens);
-    //                    })
-    //                    .resource("/account/{id}/transactions", |r| {
-    //                        r.method(Method::GET).f(handle_get_account_transactions);
-    //                    })
-    //                    .resource("/transactions/{tx_hash}", |r| {
-    //                        r.method(Method::GET)
-    //                            .f(handle_get_executed_transaction_by_hash);
-    //                    })
-    //                    .resource("/blocks/{block_id}/transactions/{tx_id}", |r| {
-    //                        r.method(Method::GET).f(handle_get_transaction_by_id);
-    //                    })
-    //                    .resource("/blocks/{block_id}/transactions", |r| {
-    //                        r.method(Method::GET).f(handle_get_block_transactions);
-    //                    })
-    //                    .resource("/blocks/{block_id}", |r| {
-    //                        r.method(Method::GET).f(handle_get_block_by_id);
-    //                    })
-    //                    .resource("/blocks", |r| {
-    //                        r.method(Method::GET).f(handle_get_blocks);
-    //                    })
-    //                    .resource("/priority_op/{priority_op_id}", |r| {
-    //                        r.method(Method::GET).f(handle_get_priority_op_status);
-    //                    })
-    //                    .resource("/search", |r| {
-    //                        r.method(Method::GET).f(handle_search);
-    //                    })
-    //            })
-    //    })
-    //    .client_timeout(0)
-    //    .bind(&bind_to)
-    //    .unwrap()
-    //    .shutdown_timeout(1)
-    //    .start();
 }
 
 pub fn start_status_interval(state: AppState) {
