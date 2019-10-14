@@ -412,9 +412,9 @@ pub fn start_status_interval(state: AppState) {
         .map(|_| ())
         .map_err(|e| panic!("interval errored; err={:?}", e));
 
-    //    actix::System::with_current(|_| {
-    //        actix::spawn(state_checker);
-    //    });
+        actix::System::with_current(|_| {
+            actix::spawn(state_checker);
+        });
 }
 
 pub fn start_api_server(

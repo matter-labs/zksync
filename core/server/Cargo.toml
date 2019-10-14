@@ -42,7 +42,8 @@ rayon = "1.0.3"
 tokio = "0.1.18"
 actix-rt = "0.2.5"
 actix-cors = "0.1.0"
-actix-web = "1.0"
+actix = "0.8.3"
+actix-web = "1.0.8"
 
 bigdecimal = { version = "0.0.14", features = ["serde"]}
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
