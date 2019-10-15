@@ -31,7 +31,12 @@
                 </b-col>
                 <Alert class="w-100 m-0" style="position: absolute; top: -1.3em;" ref="alert"></Alert>
             </b-row>
-            <b-row class="px-0 mt-4">
+            <div style="min-height: 1.5em;">
+                <b-row class="px-3 py-0 my-0" v-for="shower in store.pendingTransactionGenerators" :key="shower.id" :id="shower.id">
+                    <AlertWithProgressBar :shower="shower"></AlertWithProgressBar>
+                </b-row>
+            </div>
+            <b-row class="px-0 mt-0">
                 <Wallet 
                     v-if="componentToBeShown=='Wallet'" 
                     v-on:alert="displayAlert"
@@ -48,17 +53,21 @@
 
 <script>
 import ClipboardJS from 'clipboard'
+import isReachable from 'is-reachable'
 
 import Wallet from '../components/Wallet.vue'
 import History from '../components/History.vue'
 import Alert from '../components/Alert.vue'
+import AlertWithProgressBar from '../components/AlertWithProgressBar.vue'
 
-const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
+import { sleep } from '../utils.js'
+import timeConstants from '../timeConstants'
 
 const components = {
     History,
     Alert,
-    Wallet
+    Wallet,
+    AlertWithProgressBar,
 }
 
 export default {
@@ -75,7 +84,13 @@ export default {
         }
     },
     async created() {
-        this.updateAccountInfo();
+        const timeOut = async () => {
+            await this.updateAccountInfo();
+            await sleep(timeConstants.updateInfo);
+            timeOut();
+        };
+        timeOut();
+
         new ClipboardJS('.copyable');
     },
     methods: {
@@ -83,24 +98,34 @@ export default {
             this.$refs.alert.display(kwargs);
         },
         async updateAccountInfo() {
-            await window.walletDecorator.updateState();
-            let onchainBalances = window.walletDecorator.onchainBalancesAsRenderableList();
-            let contractBalances = window.walletDecorator.contractBalancesAsRenderableList();
-            let franklinBalances = window.walletDecorator.franklinBalancesAsRenderableList();
-            let franklinBalancesWithInfo = window.walletDecorator.franklinBalancesAsRenderableListWithInfo();
-            this.walletInfo = {
-                onchainBalances,
-                contractBalances,
-                franklinBalances,
-                franklinBalancesWithInfo,
-            };
+            try {
+                await window.walletDecorator.updateState();
 
-            this.historyInfo = {
-                transactions: await window.walletDecorator.transactionsAsNeeded(),
-            };
+                let onchainBalances = window.walletDecorator.onchainBalancesAsRenderableList();
+                let contractBalances = window.walletDecorator.contractBalancesAsRenderableList();
+                let franklinBalances = window.walletDecorator.franklinBalancesAsRenderableList();
+                let franklinBalancesWithInfo = window.walletDecorator.franklinBalancesAsRenderableListWithInfo();
+                this.walletInfo = {
+                    onchainBalances,
+                    contractBalances,
+                    franklinBalances,
+                    franklinBalancesWithInfo,
+                };
 
-            await sleep(3000);
-            this.updateAccountInfo();
+            } catch (e) {
+                console.log('updateaccountinfo error:', e);
+                let message = e.message;
+                let franklinServerReachable = await isReachable(this.config.API_SERVER);
+                if (franklinServerReachable == false) {
+                    message = "Franklin server unavailable, check your internet connection.";
+                }
+                
+                this.displayAlert({
+                    message: message,
+                    variant: 'danger',
+                    countdown: 10,
+                })
+            }
         }
     },
     components,

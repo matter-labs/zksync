@@ -1,8 +1,5 @@
 <template>
 <b-container>
-    <b-row class="w-100 px-0 mx-0">
-        <ProgressBar ref="progress_bar"></ProgressBar>
-    </b-row>
     <b-row>
         <b-col xl="6" class="pr-3">
             <BalancesList class="mb-1" balanceListId="onchain" :balances="onchainBalances"></BalancesList>
@@ -32,6 +29,8 @@
 </template>
 
 <script>
+import { GeneratorMultiplierMinTime } from '../GeneratorMultiplier.js';
+
 import Alert from './Alert.vue'
 import BalancesList from './BalancesList.vue'
 import FranklinBalancesList from './FranklinBalancesList.vue'
@@ -48,67 +47,54 @@ const components = {
     ProgressBar,
 };
 
-const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
+import { sleep } from '../utils.js'
 
 export default {
     name: 'wallet',
     props: ['info'],
     data: () => ({
         message: '',
-        onchainBalances: [],
-        contractBalances: [],
-        franklinBalances: [],
-        franklinBalancesWithInfo: [],
+        onchainBalances: null,
+        franklinBalances: null,
+        franklinBalancesWithInfo: null,
+        verboseShowerId: 0,
     }),
+    created() {
+        this.updateInfo();
+        this.verboseShowerId = this.store.verboseShowerId;
+    },
+    destroyed() {
+        this.store.verboseShowerId = this.verboseShowerId;
+    },
     watch: {
         info: function() {
-            for (let [key, val] of Object.entries(this.info)) {
-                this[key] = val;
-            }
+            this.updateInfo();
         }
     },
     methods: {
+        updateInfo() {
+            if (this.info == null) return;
+            for (let [key, val] of Object.entries(this.info)) {
+                this[key] = val;
+            }
+        },
         displayAlert(kwargs) {
             this.$emit('alert', kwargs);
         },
         async deposit(kwargs) {
-            await this.verboseFunctionShower(window.walletDecorator.verboseDeposit(kwargs));
+            await this.verboseShower(window.walletDecorator.verboseDeposit(kwargs));
         },
         async withdraw(kwargs) {
-            await this.verboseFunctionShower(window.walletDecorator.verboseWithdraw(kwargs));
+            await this.verboseShower(window.walletDecorator.verboseWithdraw(kwargs));
         },
         async transfer(kwargs) {
-            await this.verboseFunctionShower(window.walletDecorator.verboseTransfer(kwargs));
+            await this.verboseShower(window.walletDecorator.verboseTransfer(kwargs));
         },
-        async verboseFunctionShower(generator) {
-            for await (const progress of generator) {
-                if (progress.message.includes(`waiting for creating new block`)) {
-                    this.$refs.progress_bar.startProgressBarHalfLife(10000);
-                }
-                if (progress.message.includes(`started proving block`)) {
-                    this.$refs.progress_bar.startProgressBarHalfLife(10000);
-                }
-                if (progress.message.includes(`got proved!`)) {
-                    this.$refs.progress_bar.cancelAnimation();
-                }
-                this.$emit('alert', {
-                    message: progress.message,
-                    variant: progress.error ? 'danger' : 'success',
-                });
-            }
-        },
-        async transferFranklin(kwargs) {
-            console.log('transfer', kwargs);
-            try {
-                if ( ! window.walletDecorator) {
-                    displayAlert({ message: `Wallet is ${window.walletDecorator}` });
-                    return;
-                }
-
-                await window.walletDecorator.transfer(kwargs);
-            } catch (e) {
-                this.displayAlert({ message: `unknown error: ${e}` });
-            }
+        async verboseShower(generator) {
+            this.store.pendingTransactionGenerators.push({
+                id: `verbose_shower_${this.verboseShowerId++}`,
+                generator: new GeneratorMultiplierMinTime(generator),
+            });
         },
     },
     components

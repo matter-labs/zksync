@@ -14,6 +14,7 @@ const router = new Router({
     { path: '*', redirect: '/login' },
   ],
   mode:   'history',
+  base:   process.env.NODE_ENV === 'production' ? '/client/' : '/',
 });
 
 router.beforeEach((to, from, next) => {

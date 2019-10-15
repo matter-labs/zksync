@@ -64,51 +64,36 @@ export class FranklinProvider {
         return req;
     }
 
-    async submitTx(tx) {
-        return await Axios.post(this.providerAddress + '/api/v0.1/submit_tx', tx)
+    // TODO: reconsider when wallet refactor.
+    private static async axiosRequest(promise) {
+        promise = promise
             .then(reps => reps.data)
+            .catch(error => { 
+                throw new Error(error.response ? error.response.data.message : 'Error: Network Error');
+            });
+        return await promise;
     }
-
-    async getTokens() {
-        return await Axios.get(this.providerAddress + '/api/v0.1/tokens')
-            .then(reps => reps.data)
-    }
-
-    async getTransactionsHistory(address: Address) {
-        return await Axios.get(this.providerAddress + '/api/v0.1/account/' + `0x${address.toString("hex")}` + '/transactions')
-            .then(reps => reps.data)
-    }
-
-    async getState(address: Address): Promise<FranklinAccountState> {
-        return await Axios.get(this.providerAddress + '/api/v0.1/account/' + `0x${address.toString("hex")}`)
-            .then(reps => reps.data)
-    }
-
-    async getTxReceipt(tx_hash) {
-        return await Axios.get(this.providerAddress + '/api/v0.1/transactions/' + tx_hash)
-            .then(reps => reps.data)
-    }
-
+    
     async getPriorityOpStatus(opId: number) {
-        return await Axios.get(this.providerAddress + '/api/v0.1/priority_op/' + opId)
-            .then(reps => reps.data)
+        return FranklinProvider.axiosRequest(
+            Axios.get(this.providerAddress + '/api/v0.1/priority_op/' + opId));
     }
-
+    
     async notifyPriorityOp(opId: number, action: "commit" | "verify") {
-        return await Axios.get(this.providerAddress + `/api/v0.1/priority_op_notify/${action}/${opId}`)
-            .then(reps => reps.data)
+        return FranklinProvider.axiosRequest(
+            Axios.get(this.providerAddress + `/api/v0.1/priority_op_notify/${action}/${opId}`));
     }
-
+    
     async notifyTransaction(hash: string, action: "commit" | "verify") {
-        return await Axios.get(this.providerAddress + `/api/v0.1/tx_notify/${action}/${hash}`)
-            .then(reps => reps.data)
+        return FranklinProvider.axiosRequest(
+            Axios.get(this.providerAddress + `/api/v0.1/tx_notify/${action}/${hash}`));
     }
-
+    
     async getBlockStatus(block: number) {
-        return await Axios.get(this.providerAddress + '/api/v0.1/search?query=' + block)
-            .then(reps => reps.data)
+        return FranklinProvider.axiosRequest(
+            Axios.get(this.providerAddress + '/api/v0.1/search?query=' + block));
     }
-
+    
     async resolveToken(token: TokenLike): Promise<Token> {
         if(typeof(token) == "string") {
             let tokens = await this.getTokens();
@@ -130,8 +115,39 @@ export class FranklinProvider {
             return token;
         }
     }
-}
-
+    
+    async submitTx(tx) {
+        return await FranklinProvider.axiosRequest(
+            Axios.post(this.providerAddress + '/api/v0.1/submit_tx', tx));
+    }
+    
+    async getTokens() {
+        return await FranklinProvider.axiosRequest(
+            Axios.get(this.providerAddress + '/api/v0.1/tokens'));
+    }
+    
+    async getTransactionsHistory(address: Address, offset: number, limit: number) {
+        const link = `${this.providerAddress}/api/v0.1/account/0x${address.toString("hex")}/history/${offset}/${limit}`;
+        console.log(`In wallet, we request ${link}`);
+        return await FranklinProvider.axiosRequest(
+            Axios.get(link));
+    }
+    
+    async getState(address: Address): Promise<FranklinAccountState> {
+        return await FranklinProvider.axiosRequest(
+            Axios.get(this.providerAddress + '/api/v0.1/account/' + `0x${address.toString("hex")}`));
+    }
+    
+    async getTxReceipt(tx_hash) {
+        return await FranklinProvider.axiosRequest(
+            Axios.get(this.providerAddress + '/api/v0.1/transactions/' + tx_hash));
+    }
+    
+    async getPriorityOpReceipt(pq_id) {
+        return await FranklinProvider.axiosRequest(
+            Axios.get(`${this.providerAddress}/api/v0.1/priority_operations/${pq_id}/`));
+    }
+}    
 export interface Token {
     id: number,
     address: string,
