@@ -38,7 +38,7 @@ then
 
     # use gsed in mac os
     ssed() {
-        if which gsed > /dev/null
+        if which gsed &> /dev/null
         then
             gsed "$@"
         else
