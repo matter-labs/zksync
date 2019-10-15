@@ -2,27 +2,36 @@
 
 . .setup_env
 
-rm -rf ./contracts/contracts/generated
-mkdir -p ./contracts/contracts/generated
-cp ./contracts/contracts/Governance.sol ./contracts/contracts/generated/GovernanceTest.sol
-cp ./contracts/contracts/Franklin.sol ./contracts/contracts/generated/FranklinTest.sol
-cp ./contracts/contracts/PriorityQueue.sol ./contracts/contracts/generated/PriorityQueueTest.sol
-cp ./contracts/contracts/Verifier.sol ./contracts/contracts/generated/VerifierTest.sol
+IN_DIR=./contracts/contracts/
+OUT_DIR=./contracts/contracts/generated
 
-sed 's/Governance/GovernanceTest/' -i ./contracts/contracts/generated/GovernanceTest.sol
+rm -rf $OUT_DIR
+mkdir -p $OUT_DIR
+cp $IN_DIR/Governance.sol $OUT_DIR/GovernanceTest.sol
+cp $IN_DIR/Franklin.sol $OUT_DIR/FranklinTest.sol
+cp $IN_DIR/PriorityQueue.sol $OUT_DIR/PriorityQueueTest.sol
+cp $IN_DIR/Verifier.sol $OUT_DIR/VerifierTest.sol
 
-sed 's/.\/Bytes/..\/Bytes/' -i ./contracts/contracts/generated/FranklinTest.sol
-sed 's/Governance/GovernanceTest/' -i ./contracts/contracts/generated/FranklinTest.sol
-sed 's/Verifier/VerifierTest/' -i ./contracts/contracts/generated/FranklinTest.sol
-sed 's/Franklin/FranklinTest/' -i ./contracts/contracts/generated/FranklinTest.sol
-sed 's/PriorityQueue/PriorityQueueTest/' -i ./contracts/contracts/generated/FranklinTest.sol
-sed 's/60/1/' -i ./contracts/contracts/generated/FranklinTest.sol
-sed 's/100/1/' -i ./contracts/contracts/generated/FranklinTest.sol
+# Rename contracts
+sed 's/Governance/GovernanceTest/' -i $OUT_DIR/*.sol
+sed 's/Franklin/FranklinTest/' -i $OUT_DIR/*.sol
+sed 's/PriorityQueue/PriorityQueueTest/' -i $OUT_DIR/*.sol
+sed 's/Verifier/VerifierTest/' -i $OUT_DIR/*.sol
+# Workaround -> priority queue has FranklinTest in method names.
+sed 's/FranklinTest/Franklin/' -i $OUT_DIR/PriorityQueueTest.sol
 
-sed 's/.\/Bytes/..\/Bytes/' -i ./contracts/contracts/generated/PriorityQueueTest.sol
-sed 's/PriorityQueue/PriorityQueueTest/' -i ./contracts/contracts/generated/PriorityQueueTest.sol
-sed 's/250/16/' -i ./contracts/contracts/generated/PriorityQueueTest.sol
 
-sed 's/.\/VerificationKey/..\/VerificationKey/' -i ./contracts/contracts/generated/VerifierTest.sol
-sed 's/Verifier/VerifierTest/' -i ./contracts/contracts/generated/VerifierTest.sol
-sed 's/\/\/ Start/return true;/' -i ./contracts/contracts/generated/VerifierTest.sol
+# Changes solidity constant to provided value
+# In solidity constant should be in the following form.
+# $SOME_TYPE constant $NAME = $VALUE;
+set_constant() {
+	sed -E "s/(.*constant $1)(.*)\;/\1 = $2\;/" -i  $3
+}
+
+# Change constants
+set_constant EXPECT_VERIFICATION_IN 8 $OUT_DIR/FranklinTest.sol
+set_constant MAX_UNVERIFIED_BLOCKS 4 $OUT_DIR/FranklinTest.sol
+set_constant PRIORITY_EXPIRATION 16 $OUT_DIR/PriorityQueueTest.sol
+
+# Verify always true
+set_constant DUMMY_VERIFIER true $OUT_DIR/VerifierTest.sol
