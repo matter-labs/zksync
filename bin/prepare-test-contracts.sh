@@ -12,24 +12,20 @@ cp $IN_DIR/Franklin.sol $OUT_DIR/FranklinTest.sol
 cp $IN_DIR/PriorityQueue.sol $OUT_DIR/PriorityQueueTest.sol
 cp $IN_DIR/Verifier.sol $OUT_DIR/VerifierTest.sol
 
-sedi () {
-    sed --version >/dev/null 2>&1 && sed -i -- -E "$@" || sed -i "" -E "$@"
-}
-
 # Rename contracts
-sedi 's/Governance/GovernanceTest/' $OUT_DIR/*.sol
-sedi 's/Franklin/FranklinTest/' $OUT_DIR/*.sol
-sedi 's/PriorityQueue/PriorityQueueTest/' $OUT_DIR/*.sol
-sedi 's/Verifier/VerifierTest/' $OUT_DIR/*.sol
+sed 's/Governance/GovernanceTest/' -i $OUT_DIR/*.sol
+sed 's/Franklin/FranklinTest/' -i $OUT_DIR/*.sol
+sed 's/PriorityQueue/PriorityQueueTest/' -i $OUT_DIR/*.sol
+sed 's/Verifier/VerifierTest/' -i $OUT_DIR/*.sol
 # Workaround -> priority queue has FranklinTest in method names.
-sedi 's/FranklinTest/Franklin/' $OUT_DIR/PriorityQueueTest.sol
+sed 's/FranklinTest/Franklin/' -i $OUT_DIR/PriorityQueueTest.sol
 
 
 # Changes solidity constant to provided value
 # In solidity constant should be in the following form.
 # $SOME_TYPE constant $NAME = $VALUE;
 set_constant() {
-	sedi "s/(.*constant $1)(.*)\;/\1 = $2\;/" $3
+	sed -E "s/(.*constant $1)(.*)\;/\1 = $2\;/" -i $3
 }
 
 # Change constants
