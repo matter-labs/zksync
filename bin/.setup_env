@@ -36,5 +36,15 @@ then
     #     export WEB3_URL=http://localhost:8545
     # fi
 
+    # use gsed in mac os
+    ssed() {
+        if which gsed > /dev/null
+        then
+            gsed "$@"
+        else
+            sed "$@"
+        fi
+    }
+
     popd > /dev/null
 fi
