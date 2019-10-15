@@ -287,9 +287,9 @@ fn handle_search(
 }
 
 #[derive(Debug, Clone, Serialize)]
-struct PriorityOpStatus {
-    executed: bool,
-    block: Option<i64>,
+pub struct PriorityOpStatus {
+    pub executed: bool,
+    pub block: Option<i64>,
 }
 
 fn handle_get_priority_op_status(
@@ -341,7 +341,7 @@ fn handle_notify_priority_op(
             .send(sub)
             .map_err(|_| HttpResponse::InternalServerError().finish().into())
             .and_then(|_| notify_recv.map_err(|_| HttpResponse::TooManyRequests().finish().into()))
-            .map(|_| HttpResponse::Ok().finish()),
+            .map(|op_status| HttpResponse::Ok().json(op_status)),
     )
 }
 
@@ -374,7 +374,7 @@ fn handle_notify_tx(
             .send(sub)
             .map_err(|_| HttpResponse::InternalServerError().finish().into())
             .and_then(|_| notify_recv.map_err(|_| HttpResponse::TooManyRequests().finish().into()))
-            .map(|_| HttpResponse::Ok().finish()),
+            .map(|tx_receipt| HttpResponse::Ok().json(tx_receipt)),
     )
 }
 

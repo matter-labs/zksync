@@ -53,6 +53,15 @@ pub enum Action {
     Verify { proof: Box<EncodedProof> },
 }
 
+impl Action {
+    pub fn get_type(&self) -> ActionType {
+        match self {
+            Action::Commit => ActionType::COMMIT,
+            Action::Verify { .. } => ActionType::VERIFY,
+        }
+    }
+}
+
 impl std::string::ToString for Action {
     fn to_string(&self) -> String {
         match self {
@@ -91,6 +100,7 @@ pub struct CommitRequest {
 pub const ACTION_COMMIT: &str = "Commit";
 pub const ACTION_VERIFY: &str = "Verify";
 
+#[derive(PartialEq)]
 pub enum ActionType {
     COMMIT,
     VERIFY,

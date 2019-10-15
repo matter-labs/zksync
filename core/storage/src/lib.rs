@@ -252,7 +252,7 @@ impl Into<ExecutedPriorityOp> for StoredExecutedPriorityOperation {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxReceiptResponse {
-    pub tx_hash: Vec<u8>,
+    pub tx_hash: String,
     pub block_number: i64,
     pub success: bool,
     pub verified: bool,
@@ -1451,7 +1451,7 @@ impl StorageProcessor {
                     .optional()?;
 
                 Ok(Some(TxReceiptResponse {
-                    tx_hash: hash.to_vec(),
+                    tx_hash: hex::encode(&hash),
                     block_number: tx.block_number,
                     success: tx.success,
                     verified,

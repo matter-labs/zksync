@@ -1,8 +1,9 @@
+use super::PriorityOpStatus;
 use actix::FinishStream;
 use futures::{sync::oneshot, Future, Stream};
 use models::{node::block::ExecutedOperations, Action, ActionType, Operation};
 use std::collections::BTreeMap;
-use storage::ConnectionPool;
+use storage::{ConnectionPool, TxReceiptResponse};
 
 const MAX_LISTENERS_PER_ENTITY: usize = 4096;
 
@@ -10,12 +11,12 @@ pub enum EventSubscribe {
     Transaction {
         hash: Box<[u8; 32]>,
         commit: bool, // commit of verify
-        notify: oneshot::Sender<()>,
+        notify: oneshot::Sender<TxReceiptResponse>,
     },
     PriorityOp {
         serial_id: u64,
         commit: bool,
-        notify: oneshot::Sender<()>,
+        notify: oneshot::Sender<PriorityOpStatus>,
     },
 }
 
@@ -27,11 +28,11 @@ enum BlockNotifierInput {
 struct OperationNotifier {
     db_pool: ConnectionPool,
 
-    tx_commit_subs: BTreeMap<[u8; 32], Vec<oneshot::Sender<()>>>,
-    prior_op_commit_subs: BTreeMap<u64, Vec<oneshot::Sender<()>>>,
+    tx_commit_subs: BTreeMap<[u8; 32], Vec<oneshot::Sender<TxReceiptResponse>>>,
+    prior_op_commit_subs: BTreeMap<u64, Vec<oneshot::Sender<PriorityOpStatus>>>,
 
-    prior_op_verify_subs: BTreeMap<u64, Vec<oneshot::Sender<()>>>,
-    tx_verify_subs: BTreeMap<[u8; 32], Vec<oneshot::Sender<()>>>,
+    tx_verify_subs: BTreeMap<[u8; 32], Vec<oneshot::Sender<TxReceiptResponse>>>,
+    prior_op_verify_subs: BTreeMap<u64, Vec<oneshot::Sender<PriorityOpStatus>>>,
 }
 
 impl OperationNotifier {
@@ -63,11 +64,11 @@ impl OperationNotifier {
                     .and_then(|s| s.tx_receipt(hash.as_ref()).ok().unwrap_or(None))
                 {
                     if commit {
-                        notify.send(()).unwrap_or_default();
+                        notify.send(receipt).unwrap_or_default();
                         return;
                     } else {
                         if receipt.verified {
-                            notify.send(()).unwrap_or_default();
+                            notify.send(receipt).unwrap_or_default();
                             return;
                         }
                     }
@@ -104,8 +105,12 @@ impl OperationNotifier {
                         .unwrap_or(None)
                 });
                 if let Some(executed_op) = executed_op {
+                    let prior_op_status = PriorityOpStatus {
+                        executed: true,
+                        block: Some(executed_op.block_number),
+                    };
                     if commit {
-                        notify.send(()).unwrap_or_default();
+                        notify.send(prior_op_status).unwrap_or_default();
                         return;
                     } else {
                         if let Some(block_verify) =
@@ -117,7 +122,7 @@ impl OperationNotifier {
                             })
                         {
                             if block_verify.confirmed {
-                                notify.send(()).unwrap_or_default();
+                                notify.send(prior_op_status).unwrap_or_default();
                                 return;
                             }
                         }
@@ -156,34 +161,42 @@ impl OperationNotifier {
             match tx {
                 ExecutedOperations::Tx(tx) => {
                     let hash = tx.tx.hash();
-                    if commit {
-                        self.tx_commit_subs.remove(hash.as_ref()).map(|notifiers| {
-                            for n in notifiers {
-                                n.send(()).unwrap_or_default();
-                            }
-                        });
+                    let subs = if commit {
+                        self.tx_commit_subs.remove(hash.as_ref())
                     } else {
-                        self.tx_verify_subs.remove(hash.as_ref()).map(|notifiers| {
-                            for n in notifiers {
-                                n.send(()).unwrap_or_default();
-                            }
-                        });
+                        self.tx_verify_subs.remove(hash.as_ref())
+                    };
+                    if let Some(channels) = subs {
+                        let receipt = TxReceiptResponse {
+                            tx_hash: hex::encode(hash.as_ref()),
+                            block_number: op.block.block_number as i64,
+                            success: tx.success,
+                            fail_reason: tx.fail_reason,
+                            verified: op.action.get_type() == ActionType::VERIFY,
+                            prover_run: None,
+                        };
+                        for ch in channels {
+                            ch.send(receipt.clone()).unwrap_or_default();
+                        }
                     }
                 }
-                ExecutedOperations::PriorityOp(op) => {
-                    let id = op.priority_op.serial_id;
-                    if commit {
-                        self.prior_op_commit_subs.remove(&id).map(|notifiers| {
-                            for n in notifiers {
-                                n.send(()).unwrap_or_default();
-                            }
-                        });
+                ExecutedOperations::PriorityOp(prior_op) => {
+                    let id = prior_op.priority_op.serial_id;
+                    let subs = if commit {
+                        self.prior_op_commit_subs.remove(&id)
                     } else {
-                        self.prior_op_verify_subs.remove(&id).map(|notifiers| {
-                            for n in notifiers {
-                                n.send(()).unwrap_or_default();
-                            }
-                        });
+                        self.prior_op_verify_subs.remove(&id)
+                    };
+
+                    if let Some(channels) = subs {
+                        let prior_op_status = PriorityOpStatus {
+                            executed: true,
+                            block: Some(op.block.block_number as i64),
+                        };
+
+                        for ch in channels {
+                            ch.send(prior_op_status.clone()).unwrap_or_default();
+                        }
                     }
                 }
             }
