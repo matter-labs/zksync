@@ -450,6 +450,7 @@ export class Wallet {
         return frankinWallet;
     }
 
+    // TODO: rename to getOnchainState ?
     async getOnchainBalances() {
         let tokens = await this.provider.getTokens();
         let onchainBalances = new Array<utils.BigNumber>(tokens.length);
@@ -467,5 +468,9 @@ export class Wallet {
         }
 
         return {onchainBalances, contractBalances};
+    }
+
+    async getFranklinState() {
+        return this.provider.getState(this.address);
     }
 }

@@ -1,4 +1,4 @@
-import { Token } from '../../src/wallet';
+import { Token, FranklinProvider } from '../../src/wallet';
 import { LocalWallet } from "./LocalWallet";
 import { ReceiveMoneyOperation } from './ReceiveMoneyOperation';
 import { DepositOperation } from './DepositOperation';
@@ -27,7 +27,7 @@ export class Tester {
         for (let i = 0; i < kwargs.initNumWallets; i++) {
             await tester.addNewWallet();
         }
-        tester.tokens = tester.wallets[0].franklinWallet.supportedTokens;
+        tester.tokens = await new FranklinProvider().getTokens();
         return tester;
     }
 
@@ -143,8 +143,7 @@ export class Tester {
 
     async run(): Promise<void> {
         await Promise.all(this.wallets.map(async wallet => {
-            for (let i = 0; i < wallet.actions.length; i++) {
-                const action = wallet.actions[i];
+            for (let action of wallet.getActions()) {
                 await action.start();
                 console.log(action.humanReadableLogs());
             }

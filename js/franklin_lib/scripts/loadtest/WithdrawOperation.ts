@@ -18,6 +18,5 @@ export class WithdrawOperation extends AbstractOperation {
     public async action() {
         this.logStart(`trying withdraw(${this.kwargs.token.id} | ${this.kwargs.amount.toString()} | ${this.kwargs.fee.toString()})`);
         await this.kwargs.wallet.withdraw(this.kwargs.token, this.kwargs.amount, this.kwargs.fee);
-        await this.kwargs.wallet.franklinWallet.updateState();
     }
 }

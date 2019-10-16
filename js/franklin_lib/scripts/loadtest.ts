@@ -1,7 +1,7 @@
 import BN = require('bn.js');
 import { Wallet } from '../src/wallet';
 import { ethers } from 'ethers';
-import {bigNumberify, parseEther, formatEther} from "ethers/utils";
+import { bigNumberify, parseEther, formatEther } from "ethers/utils";
 
 const WALLETS=100;
 
@@ -40,7 +40,7 @@ async function main() {
     let wallets = [];
     let lastFundTx;
     let nonce = await mainFranklinWallet.getNonce("commited");
-    for(let i = 0; i < WALLETS; ++i) {
+    for (let i = 0; i < WALLETS; ++i) {
         let ethWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, `m/44'/60'/0'/0/${i + 2}`).connect(provider);
         let franklinWallet = await Wallet.fromEthWallet(ethWallet);
         lastFundTx = await mainFranklinWallet.transfer(franklinWallet.address, 0, parseEther("1"), 0, nonce++);
@@ -48,7 +48,7 @@ async function main() {
     }
     await lastFundTx.waitCommit();
 
-    for(let i = 0; i < WALLETS; ++i) {
+    for (let i = 0; i < WALLETS; ++i) {
         makeTxsWallet(wallets[i], wallets).catch(( e => console.log(`Wallet ${i} error: ${e.toString()}`)));
     }
 

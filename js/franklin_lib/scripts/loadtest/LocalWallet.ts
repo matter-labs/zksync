@@ -1,167 +1,104 @@
 import { AbstractOperation } from './AbstractOperation'
 import { bigNumberify, BigNumber, BigNumberish } from "ethers/utils";
-import { ethers } from 'ethers';
-import { Wallet, Token } from '../../src/wallet';
+import { ethers, Contract } from 'ethers';
+import { Wallet, Token, Address } from '../../src/wallet';
+const IERC20Conract = require('openzeppelin-solidity/build/contracts/ERC20Mintable.json');
 
 const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 
+function bignumberifyOrZero(bal) {
+    return bal == undefined 
+        ? bigNumberify(0) 
+        : bigNumberify(bal);
+}
+
+function copyBalancesDictionary(dict) {
+    let res = {};
+    for (let [token, bal] of Object.entries(dict)) {
+        res[token] = bal;
+    }
+    return res;
+}
+
 export class LocalWallet {
-    public resetNonce(): void {
-        this.franklinWallet.pendingNonce = null;
-    }
-
-    public franklinWallet: Wallet;
-    public actions: AbstractOperation[] = [];
-    public addAction(op: AbstractOperation): void {
-        this.actions.push(op);
-    }
-    
-    // #region computedBalances
-
-    computedOnchainBalances = {};
-    computedLockedBalances = {};
-    computedFranklinBalances = {};
-    static getComputedBalance(dict, token): BigNumber {
-        if (dict[token.id] === undefined) {
-            dict[token.id] = bigNumberify(0);
-        }
-        return dict[token.id];
-    }
-    getComputedOnchainBalance(token: Token): BigNumber {
-        return LocalWallet.getComputedBalance(this.computedOnchainBalances, token);
-    }
-    getComputedLockedBalance(token: Token): BigNumber {
-        return LocalWallet.getComputedBalance(this.computedLockedBalances, token);
-    }
-    getComputedFranklinBalance(token: Token): BigNumber {
-        return LocalWallet.getComputedBalance(this.computedFranklinBalances, token);
-    }
-
-    addToComputedBalance(dict, token, amount: BigNumberish) {
-        dict[token.id] = LocalWallet.getComputedBalance(dict, token).add(amount);
-    }
-    addToComputedOnchainBalance(token, amount: BigNumberish) {
-        this.addToComputedBalance(this.computedOnchainBalances, token, amount);
-    }
-    addToComputedLockedBalance(token, amount: BigNumberish) {
-        this.addToComputedBalance(this.computedLockedBalances, token, amount);
-    }
-    addToComputedFranklinBalance(token, amount: BigNumberish) {
-        this.addToComputedBalance(this.computedFranklinBalances, token, amount);
-    }
-
-    // #endregion
-
     // #region construct
+    private franklinWallet: Wallet;
+    private actions: AbstractOperation[] = [];
+    
+    private franklinCommitedBalances = {};
+    private franklinVerifiedBalances = {};
+    private contractBalances = {};
+    private onchainBalances = {};
+
+    private computedFranklinCommitedBalances = {};
+    private computedFranklinVerifiedBalances = {};
+    private computedContractBalances = {};
+    private computedOnchainBalances = {};
+    
+    private constructor(public id) {}
     private static id: number = 0;
-    static async new(): Promise<LocalWallet> {
+    
+    public  static async new(): Promise<LocalWallet> {
         let wallet = new LocalWallet(LocalWallet.id++);
         await wallet.prepare();
         return wallet;
     }
-
-    private constructor(public id) {}
-
+    
+    public ethAddress: string;
+    public address: string;
     private async prepare(): Promise<void> {
         let signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/3/" + this.id).connect(provider);
-        this.franklinWallet = await Wallet.fromEthWallet(signer);        
-        await this.franklinWallet.updateState();
-        for (let i = 0; i < this.franklinWallet.supportedTokens.length; i++) {
-            let token = this.franklinWallet.supportedTokens[i];
-            if (this.franklinWallet.ethState.onchainBalances[token.id] !== undefined) {
-                this.computedOnchainBalances[token.id] = bigNumberify(this.franklinWallet.ethState.onchainBalances[token.id]);
-            }
-            if (this.franklinWallet.ethState.contractBalances[token.id] !== undefined) {
-                this.computedLockedBalances[token.id] = bigNumberify(this.franklinWallet.ethState.contractBalances[token.id]);
-            }
-            if (this.franklinWallet.franklinState.commited.balances[token.id] !== undefined) {
-                this.computedFranklinBalances[token.id] = bigNumberify(this.franklinWallet.franklinState.commited.balances[token.id]);
-            }
+        this.franklinWallet = await Wallet.fromEthWallet(signer);
+        
+        this.ethAddress = await signer.getAddress();
+        this.address = this.franklinWallet.address.toString('hex');
+
+        await this.updateState();
+
+        this.computedFranklinCommitedBalances = copyBalancesDictionary(this.franklinCommitedBalances);
+        this.computedFranklinVerifiedBalances = copyBalancesDictionary(this.franklinVerifiedBalances);
+        this.computedContractBalances         = copyBalancesDictionary(this.contractBalances);
+        this.computedOnchainBalances          = copyBalancesDictionary(this.onchainBalances);
+    }
+
+    public async updateState() {
+        let ethState = await this.franklinWallet.getOnchainBalances();
+        let franklinState = await this.franklinWallet.getFranklinState();
+
+        for (let token of await this.franklinWallet.provider.getTokens()) {
+            this.onchainBalances[token.id]          = bignumberifyOrZero(ethState.onchainBalances[token.id]);
+            this.contractBalances[token.id]         = bignumberifyOrZero(ethState.contractBalances[token.id])
+            this.franklinCommitedBalances[token.id] = bignumberifyOrZero(franklinState.commited.balances[token.id])
+            this.franklinVerifiedBalances[token.id] = bignumberifyOrZero(franklinState.verified.balances[token.id])
         }
     }
 
     // #endregion
 
-    // #region realBalances
+    // #region unclassified
+    private addComputedDict(dict, token: Token, amount: BigNumber) { dict[token.id] = dict[token.id].add(amount); }
+    private addComputedOnchain              (token: Token, amount: BigNumber) { this.addComputedDict(this.computedOnchainBalances,          token, amount); }
+    private addComputedContract             (token: Token, amount: BigNumber) { this.addComputedDict(this.computedContractBalances,         token, amount); }
+    private addComputedCommitedFranklin     (token: Token, amount: BigNumber) { this.addComputedDict(this.computedFranklinCommitedBalances, token, amount); }
+    private addComputedVerifiedFranklin     (token: Token, amount: BigNumber) { this.addComputedDict(this.computedFranklinVerifiedBalances, token, amount); }
+    private subtractComputedOnchain         (token: Token, amount: BigNumber) { this.addComputedOnchain         (token, bigNumberify(0).sub(amount)); }
+    private subtractComputedContract        (token: Token, amount: BigNumber) { this.addComputedContract        (token, bigNumberify(0).sub(amount)); }
+    private subtractComputedCommitedFranklin(token: Token, amount: BigNumber) { this.addComputedCommitedFranklin(token, bigNumberify(0).sub(amount)); }
+    private subtractComputedVerifiedFranklin(token: Token, amount: BigNumber) { this.addComputedVerifiedFranklin(token, bigNumberify(0).sub(amount)); }
 
-    onchainBalance(id: number): string {
-        return this.franklinWallet.ethState.onchainBalances[id].toString();    
-    }
-
-    lockedBalance(id: number): string {
-        return this.franklinWallet.ethState.contractBalances[id].toString();
-    }
-
-    franklinCommittedBalance(id: number): string {
-        return (this.franklinWallet.franklinState.commited.balances[id] || bigNumberify(0)).toString();
-    }
-
+    public getActions(): AbstractOperation[] { return this.actions; }
+    public addAction(op: AbstractOperation): void { this.actions.push(op); }
+    public resetNonce(): void { this.franklinWallet.pendingNonce = null; }
     // #endregion
 
-    // #region info
+    // #region get stuff
     public async toJSON(): Promise<string> {
         return JSON.stringify({
             address: this.franklinWallet.address,
             balances: await this.getAllBalancesString(),
             actions: this.actions
         }, null, 4);
-    }
-
-    public async getBalanceForTokenAsString(token: Token): Promise<string[]> {
-        await this.franklinWallet.updateState();
-        let res: string[] = [];
-        res.push(`for token(${token.id}) has computed`);
-        res.push(
-            `onchain: ${this.getComputedOnchainBalance(token)}, `
-            + `locked: ${this.getComputedLockedBalance(token)}, `
-            + `franklin: ${this.getComputedFranklinBalance(token)}`
-            + ` and actual`
-        );
-        res.push(
-            `onchain: ${this.onchainBalance(token.id)}`
-            + `, locked: ${this.lockedBalance(token.id)}`
-            + `, franklin: ${this.franklinCommittedBalance(token.id)}`
-        );
-        return res;
-    }
-
-    public async getAllBalancesString(): Promise<string[]> {
-        await this.franklinWallet.updateState();
-        let res: string[] = [];
-        for (let i = 0; i < this.franklinWallet.supportedTokens.length; ++i) {
-            let token = this.franklinWallet.supportedTokens[i];
-            res = res.concat(await this.getBalanceForTokenAsString(token));
-        }
-        return res;
-    }
-
-    public async getWalletDescriptionString(): Promise<string> {
-        let balances = await this.getAllBalancesString();
-        return `${this.franklinWallet.address.toString('hex')}\n${balances.join('\n')}`;
-    }
-    // #endregion
-
-    // #region actions
-    async withdraw(token: Token, amount: BigNumberish, fee: BigNumberish) {
-        let res = await this.franklinWallet.widthdrawOffchain(token, amount, fee);
-        
-        if (res.err) throw new Error(res.err);
-    
-        var receipt = await this.franklinWallet.waitTxReceipt(res.hash);
-
-        if (receipt.fail_reason) throw new Error(receipt.fail_reason);
-
-        while ( ! receipt.verified) {
-            receipt = await this.franklinWallet.waitTxReceipt(res.hash)
-            await sleep(1000);
-        }
-
-        var tx_hash = await this.franklinWallet.widthdrawOnchain(token, amount);
-
-        let status = await this.getOnchainTxStatus(tx_hash);
-
-        if (status.success == false) throw new Error(status.message);
     }
 
     private async getOnchainTxStatus(tx_hash: string) {
@@ -203,50 +140,81 @@ export class LocalWallet {
         };
     }
 
-    private async depositOnchain(token: Token, amount: BigNumber) {
-        await this.franklinWallet.updateState();
-        let hash = await this.franklinWallet.deposit(token, amount);
-        console.log('hash', hash);
-
-        let status = await this.getOnchainTxStatus(hash);
-        if (status.success == false) {
-            throw new Error(status.message);
-        }
-
-        await this.franklinWallet.updateState();
+    public getBalanceForTokenAsString(token: Token): string[] {
+        let res: string[] = [];
+        res.push(`for token(${token.id}) has computed\n`);
+        res.push(
+            `onchain: ${this.computedOnchainBalances[token.id]}, `
+            + `locked: ${this.computedContractBalances[token.id]}, `
+            + `franklin: ${this.computedFranklinCommitedBalances[token.id]}`
+        );
+        res.push(` and actual\n`);
+        res.push(
+            `onchain: ${this.onchainBalances[token.id]}, `
+            + `locked: ${this.contractBalances[token.id]}, `
+            + `franklin: ${this.franklinCommitedBalances[token.id]}`
+        );
+        return res;
     }
 
-    async deposit(token: Token, amount: BigNumber, fee: BigNumber) {
+    public async getAllBalancesString(): Promise<string[]> {
+        return Promise.all(
+            (await this.franklinWallet.provider.getTokens())
+            .map(token => this.getBalanceForTokenAsString(token))
+        );
+    }
+
+    public async getWalletDescriptionString(): Promise<string> {
+        let balances = await this.getAllBalancesString();
+        return `${this.franklinWallet.address.toString('hex')}\n${balances.join('\n')}`;
+    }
+    // #endregion
+
+    // #region actions
+    public async receiveMoney(from: ethers.Wallet, token: Token, amount: BigNumber, nonce: number) {
+        if (token.id == 0) {
+            let tx = await from.sendTransaction({
+                to:     this.ethAddress,
+                value:  amount,
+                nonce:  nonce,
+            });
+            
+            let mined = await tx.wait(2);
+        } else {
+            const contract = new Contract(token.address, IERC20Conract.abi, from);
+            let tx = await contract.transfer(this.ethAddress, amount, { nonce, gasLimit: bigNumberify("1500000") });
+            await tx.wait(2);
+        }
+
+        this.addComputedOnchain(token, amount);
+    }
+
+    public async withdraw(token: Token, amount: BigNumberish, fee: BigNumberish) {
+        // TODO: rewrite
+        let handle = await this.franklinWallet.widthdrawOffchain(token, amount, fee);
+        let handle2 = await this.franklinWallet.widthdrawOnchain(token, amount);
+    }
+
+    public async deposit(token: Token, amount: BigNumber, fee: BigNumber) {
         let total_amount = amount.add(fee);
-
-        const zero = bigNumberify(0);
-        const negative_amount = zero.sub(total_amount);
         
-        if (this.getComputedOnchainBalance(token).gte(total_amount)) {
-            // console.log("transaction should work");
-            this.addToComputedOnchainBalance(token, negative_amount);
-            this.addToComputedFranklinBalance(token, amount);
+        if (this.computedOnchainBalances[token.id].gte(total_amount)) {
+            this.subtractComputedOnchain(token, total_amount);
+            this.addComputedCommitedFranklin(token, amount);
         }
 
-        await this.depositOnchain(token, total_amount);
-        await sleep(1000);
+        let handle = await this.franklinWallet.deposit(token, amount);
+        await handle.waitTxMine();
     }
 
-    async sendTransaction(wallet2: LocalWallet, token: Token, amount: BigNumberish, fee: BigNumberish) {        
-        amount = bigNumberify(amount);
-        fee = bigNumberify(fee);
-        const zero = bigNumberify(0);
-        const total_amount = amount.add(fee);
-        const negative_amount = zero.sub(total_amount);
-        if (this.getComputedFranklinBalance(token).gte(total_amount)) {
-            this.addToComputedFranklinBalance(token, negative_amount);
-            wallet2.addToComputedFranklinBalance(token, amount);
+    public async sendTransaction(wallet2: LocalWallet, token: Token, amount: BigNumber, fee: BigNumber) {        
+        let total_amount = amount.add(fee);
+        if (this.computedFranklinCommitedBalances[token.id].gte(total_amount)) {
+            this.subtractComputedCommitedFranklin(token, total_amount);
+            wallet2.addComputedCommitedFranklin(token, amount);
         }
 
-        let res = await this.franklinWallet.transfer(wallet2.franklinWallet.address, token, amount, fee);
-        if (res.err) throw new Error(res.err);
-        let receipt = await this.franklinWallet.waitTxReceipt(res.hash);
-        if (receipt.fail_reason) throw new Error(receipt.fail_reason);
+        let handle = await this.franklinWallet.transfer(wallet2.franklinWallet.address, token, amount, fee);
     }
 
     // #endregion

@@ -14,7 +14,7 @@ export abstract class AbstractOperation {
     
     public constructor(public mainWallet: LocalWallet) {
         this.info = {
-            operationId: `${mainWallet.franklinWallet.address.toString('hex')} ${AbstractOperation.getOperationId()}`,
+            operationId: `${mainWallet.address} ${AbstractOperation.getOperationId()}`,
             start: null,
             logs: [],
             finish: null,
