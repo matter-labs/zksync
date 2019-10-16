@@ -312,7 +312,7 @@ fn handle_get_priority_op_status(
     }))
 }
 
-fn decode_action_type(action_type: &str) -> ActixResult<ActionType> {
+fn decode_action_type(action_type: &str) -> Result<ActionType, HttpResponse> {
     if action_type == "commit" {
         Ok(ActionType::COMMIT)
     } else if action_type == "verify" {
@@ -329,7 +329,7 @@ fn handle_notify_priority_op(
     let (action_type, serial_id) = path.into_inner();
     let action = match decode_action_type(&action_type) {
         Ok(action) => action,
-        Err(e) => return Box::new(Ok(e.as_response_error().error_response()).into_future()),
+        Err(e) => return Box::new(Ok(e).into_future()),
     };
 
     let (notify_sender, notify_recv) = oneshot::channel();
@@ -357,7 +357,7 @@ fn handle_notify_tx(
     let (action_type, tx_hash) = path.into_inner();
     let action = match decode_action_type(&action_type) {
         Ok(action) => action,
-        Err(e) => return Box::new(Ok(e.as_response_error().error_response()).into_future()),
+        Err(e) => return Box::new(Ok(e).into_future()),
     };
     let hash = match decode_tx_hash(&tx_hash) {
         Ok(hash) => Box::new(hash),
@@ -382,6 +382,45 @@ fn handle_notify_tx(
     )
 }
 
+fn handle_notify_account_updates(
+    data: web::Data<AppState>,
+    path: web::Path<(String, String)>,
+) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>> {
+    let (action_type, account_address) = path.into_inner();
+    let address = match AccountAddress::from_hex(&account_address)
+        .map_err(|_| HttpResponse::BadRequest().finish())
+    {
+        Ok(address) => address,
+        Err(e) => return Box::new(Ok(e).into_future()),
+    };
+    let action = match decode_action_type(&action_type) {
+        Ok(action) => action,
+        Err(e) => return Box::new(Ok(e).into_future()),
+    };
+
+    let (notify_sender, notify_recv) = fmpsc::channel(256);
+
+    let sub = EventSubscribe::Account {
+        address,
+        action,
+        notify: notify_sender,
+    };
+
+    Box::new(
+        data.event_sub_sender
+            .clone()
+            .send(sub)
+            .map_err(|_| HttpResponse::InternalServerError().finish().into())
+            .and_then(|_| {
+                notify_recv
+                    .into_future()
+                    .map(|(responce, _)| responce.unwrap())
+                    .map_err(|_| HttpResponse::TooManyRequests().finish().into())
+            })
+            .map(|op_status| HttpResponse::Ok().json(op_status)),
+    )
+}
+
 fn start_server(state: AppState, bind_to: String) {
     HttpServer::new(move || {
         App::new()
@@ -396,6 +435,10 @@ fn start_server(state: AppState, bind_to: String) {
                     .route(
                         "/account/{address}",
                         web::get().to(handle_get_account_state),
+                    )
+                    .route(
+                        "/account_updates/{action_type}/{address}",
+                        web::get().to(handle_notify_account_updates),
                     )
                     .route("/tokens", web::get().to(handle_get_tokens))
                     .route(

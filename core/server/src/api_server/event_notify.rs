@@ -4,6 +4,7 @@ use futures::{
     sync::{mpsc, oneshot},
     Future, Stream,
 };
+use itertools::Itertools;
 use models::{
     node::block::ExecutedOperations,
     node::{Account, AccountAddress, AccountId, AccountUpdate},
@@ -24,6 +25,11 @@ pub enum EventSubscribe {
         serial_id: u64,
         action: ActionType,
         notify: oneshot::Sender<PriorityOpStatus>,
+    },
+    Account {
+        address: AccountAddress,
+        action: ActionType,
+        notify: mpsc::Sender<Account>,
     },
 }
 
@@ -74,6 +80,11 @@ impl OperationNotifier {
                 action,
                 notify,
             } => self.handle_priority_op_sub(serial_id, action, notify),
+            EventSubscribe::Account {
+                address,
+                action,
+                notify,
+            } => self.handle_account_update_sub(address, action, notify),
         };
 
         if let Err(e) = sub_result {
@@ -161,7 +172,7 @@ impl OperationNotifier {
         &mut self,
         address: AccountAddress,
         action: ActionType,
-        notify: mpsc::Sender<Account>,
+        mut notify: mpsc::Sender<Account>,
     ) -> Result<(), failure::Error> {
         let account_state = self
             .db_pool
@@ -172,6 +183,12 @@ impl OperationNotifier {
             ActionType::COMMIT => account_state.commited,
             ActionType::VERIFY => account_state.verified,
         };
+
+        let initial_account_state = resolved_account
+            .clone()
+            .map(|(_, a)| a)
+            .unwrap_or_else(|| Account::default_with_address(&address));
+        notify.try_send(initial_account_state).unwrap_or_default();
 
         if let Some((resolved_id, account)) = resolved_account {
             let mut subscription = self
@@ -242,6 +259,53 @@ impl OperationNotifier {
                         }
                     }
                 }
+            }
+        }
+
+        for (id, update) in &op.accounts_updated {
+            match update {
+                AccountUpdate::Create { address, .. } => {
+                    if let Some(subscription) = self
+                        .account_subs_unknown_id
+                        .remove(&(address.clone(), action))
+                    {
+                        self.account_subs_known_id
+                            .insert((*id, action), subscription)
+                            .expect("Listeners for new account id should be empty");
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let mut updates = op.accounts_updated;
+        updates.sort_by_key(|(id, _)| *id);
+        let updates = updates
+            .into_iter()
+            .group_by(|(id, _)| *id)
+            .into_iter()
+            .map(|(id, grouped_updates)| {
+                let acc_updates = grouped_updates.map(|(_, u)| u).collect::<Vec<_>>();
+                (id, acc_updates)
+            })
+            .collect::<Vec<_>>();
+
+        for (id, updates) in updates.into_iter() {
+            if let Some(mut listeners) = self.account_subs_known_id.remove(&(id, action)) {
+                let new_state = Account::apply_updates(listeners.account.take(), &updates);
+                listeners.listeners = listeners
+                    .listeners
+                    .into_iter()
+                    .filter_map(|mut ch| {
+                        if let Some(new_state) = &new_state {
+                            ch.try_send(new_state.clone()).ok().map(|_| ch)
+                        } else {
+                            // account was deleted -- drop channel
+                            None
+                        }
+                    })
+                    .collect();
+                listeners.account = new_state;
             }
         }
     }
