@@ -100,7 +100,7 @@ pub struct CommitRequest {
 pub const ACTION_COMMIT: &str = "Commit";
 pub const ACTION_VERIFY: &str = "Verify";
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum ActionType {
     COMMIT,
     VERIFY,

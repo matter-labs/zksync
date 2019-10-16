@@ -321,9 +321,8 @@ fn handle_notify_priority_op(
     path: web::Path<(String, u64)>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>> {
     let (action_type, serial_id) = path.into_inner();
-    let commit = match decode_action_type(&action_type) {
-        Ok(ActionType::COMMIT) => true,
-        Ok(ActionType::VERIFY) => false,
+    let action = match decode_action_type(&action_type) {
+        Ok(action) => action,
         Err(e) => return Box::new(Ok(e.as_response_error().error_response()).into_future()),
     };
 
@@ -331,7 +330,7 @@ fn handle_notify_priority_op(
 
     let sub = EventSubscribe::PriorityOp {
         serial_id,
-        commit,
+        action,
         notify: notify_sender,
     };
 
@@ -350,9 +349,8 @@ fn handle_notify_tx(
     path: web::Path<(String, String)>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>> {
     let (action_type, tx_hash) = path.into_inner();
-    let commit = match decode_action_type(&action_type) {
-        Ok(ActionType::COMMIT) => true,
-        Ok(ActionType::VERIFY) => false,
+    let action = match decode_action_type(&action_type) {
+        Ok(action) => action,
         Err(e) => return Box::new(Ok(e.as_response_error().error_response()).into_future()),
     };
     let hash = match decode_tx_hash(&tx_hash) {
@@ -364,7 +362,7 @@ fn handle_notify_tx(
 
     let sub = EventSubscribe::Transaction {
         hash,
-        commit,
+        action,
         notify: notify_sender,
     };
 
