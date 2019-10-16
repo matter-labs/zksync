@@ -1,7 +1,14 @@
 use super::PriorityOpStatus;
 use actix::FinishStream;
-use futures::{sync::oneshot, Future, Stream};
-use models::{node::block::ExecutedOperations, ActionType, Operation};
+use futures::{
+    sync::{mpsc, oneshot},
+    Future, Stream,
+};
+use models::{
+    node::block::ExecutedOperations,
+    node::{Account, AccountAddress, AccountId, AccountUpdate},
+    ActionType, Operation,
+};
 use std::collections::BTreeMap;
 use storage::{ConnectionPool, TxReceiptResponse};
 
@@ -25,13 +32,20 @@ enum BlockNotifierInput {
     EventSubscription(EventSubscribe),
 }
 
+struct AccountSubscriptionState {
+    account: Option<Account>,
+    listeners: Vec<mpsc::Sender<Account>>,
+}
+
 struct OperationNotifier {
     db_pool: ConnectionPool,
-
     /// (tx_hash, action) -> subscriber channels
     tx_subs: BTreeMap<([u8; 32], ActionType), Vec<oneshot::Sender<TxReceiptResponse>>>,
     /// (tx_hash, action) -> subscriber channels
     prior_op_subs: BTreeMap<(u64, ActionType), Vec<oneshot::Sender<PriorityOpStatus>>>,
+
+    account_subs_unknown_id: BTreeMap<(AccountAddress, ActionType), AccountSubscriptionState>,
+    account_subs_known_id: BTreeMap<(AccountId, ActionType), AccountSubscriptionState>,
 }
 
 impl OperationNotifier {
@@ -143,6 +157,55 @@ impl OperationNotifier {
         Ok(())
     }
 
+    fn handle_account_update_sub(
+        &mut self,
+        address: AccountAddress,
+        action: ActionType,
+        notify: mpsc::Sender<Account>,
+    ) -> Result<(), failure::Error> {
+        let account_state = self
+            .db_pool
+            .access_storage()?
+            .account_state_by_address(&address)?;
+
+        let resolved_account = match action {
+            ActionType::COMMIT => account_state.commited,
+            ActionType::VERIFY => account_state.verified,
+        };
+
+        if let Some((resolved_id, account)) = resolved_account {
+            let mut subscription = self
+                .account_subs_known_id
+                .remove(&(resolved_id, action))
+                .unwrap_or_else(|| AccountSubscriptionState {
+                    account: Some(account),
+                    listeners: Vec::new(),
+                });
+            if subscription.listeners.len() < MAX_LISTENERS_PER_ENTITY {
+                subscription.listeners.push(notify);
+            }
+            self.account_subs_known_id
+                .insert((resolved_id, action), subscription);
+        } else {
+            let mut subscription = self
+                .account_subs_unknown_id
+                .remove(&(address.clone(), action))
+                .unwrap_or_else(|| AccountSubscriptionState {
+                    account: None,
+                    listeners: Vec::new(),
+                });
+
+            if subscription.listeners.len() < MAX_LISTENERS_PER_ENTITY {
+                subscription.listeners.push(notify);
+            }
+
+            self.account_subs_unknown_id
+                .insert((address, action), subscription);
+        }
+
+        Ok(())
+    }
+
     fn handle_new_block(&mut self, op: Operation) {
         let action = op.action.get_type();
 
@@ -196,6 +259,8 @@ pub fn start_sub_notifier<BStream, SStream>(
         db_pool,
         tx_subs: BTreeMap::new(),
         prior_op_subs: BTreeMap::new(),
+        account_subs_known_id: BTreeMap::new(),
+        account_subs_unknown_id: BTreeMap::new(),
     };
     let input_stream = new_block_stream
         .map(BlockNotifierInput::NewOperationCommited)

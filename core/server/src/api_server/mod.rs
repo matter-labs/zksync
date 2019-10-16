@@ -9,7 +9,7 @@ use actix_web::{
 use models::node::{tx::FranklinTx, Account, AccountId, ExecutedOperations};
 use models::{ActionType, NetworkStatus, Operation, StateKeeperRequest};
 use std::sync::mpsc;
-use storage::{ConnectionPool, StorageProcessor};
+use storage::{ConnectionPool, StorageProcessor, StoredAccountState};
 
 use crate::ThreadPanicNotify;
 use futures::{
@@ -116,9 +116,15 @@ fn handle_get_account_state(
 
     let storage = data.access_storage()?;
 
-    let (id, verified, commited) = storage
-        .account_state_by_address(&address)
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+    let (id, commited, verified) = {
+        let StoredAccountState { verified, commited } = storage
+            .account_state_by_address(&address)
+            .map_err(|_| HttpResponse::InternalServerError().finish())?;
+        let id = commited.as_ref().map(|(id, _)| *id);
+        let verified = verified.map(|(_, a)| a);
+        let commited = commited.map(|(_, a)| a);
+        (id, commited, verified)
+    };
 
     let pending_txs = storage
         .get_pending_txs(&address)
