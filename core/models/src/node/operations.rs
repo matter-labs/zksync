@@ -1,13 +1,21 @@
 use super::AccountId;
 use super::FranklinTx;
-use super::{pack_fee_amount, pack_token_amount, Deposit, FullExit};
-use super::{Close, Transfer, Withdraw};
-use crate::node::FranklinPriorityOp;
+use super::tx::TxSignature;
+use crate::node::{
+    pack_fee_amount, pack_token_amount,
+    unpack_fee_amount, unpack_token_amount, Deposit, FullExit, Close, Transfer, Withdraw, FranklinPriorityOp
+};
+use super::AccountAddress;
 use crate::params::FR_ADDRESS_LEN;
 use crate::primitives::{
-    big_decimal_to_u128, bytes_slice_to_uint128, bytes_slice_to_uint32, u128_to_bigdecimal,
+    bytes_slice_to_uint128, bytes_slice_to_uint32,
+    bytes32_from_slice,
+    u128_to_bigdecimal, big_decimal_to_u128
 };
 use bigdecimal::BigDecimal;
+use ethabi::{decode, ParamType};
+use web3::types::{Address, U256};
+use std::convert::TryFrom;
 
 pub const TX_TYPE_BYTES_LENGTH: usize = 1;
 pub const ACCOUNT_ID_BYTES_LENGTH: usize = 3;
@@ -54,6 +62,58 @@ impl DepositOp {
                 &bytes[pre_length..pre_length + ACCOUNT_ID_BYTES_LENGTH],
             )?,
         })
+        // let mut dec = decode(
+        //     &[
+        //         ParamType::Uint(ACCOUNT_ID_BYTES_LENGTH * 8),  // account id
+        //         ParamType::Uint(TOKEN_BYTES_LENGTH * 8),       // token
+        //         ParamType::Uint(FULL_AMOUNT_BYTES_LENGTH * 8), // full amount
+        //         ParamType::FixedBytes(FR_ADDRESS_LEN),         // new pubkey hash
+        //     ],
+        //     &bytes,
+        // )
+        // .ok()?;
+
+        // let acc_id = dec
+        // .remove(0)
+        // .to_uint()
+        // .as_ref()
+        // .map(|ui| U256::as_u32(ui))?;
+
+        // let token = dec
+        // .remove(0)
+        // .to_uint()
+        // .as_ref()
+        // .map(
+        //     |ui| u16::try_from(
+        //         U256::as_u32(ui)
+        //     ).ok()
+        // )??;
+
+        // let amount = dec
+        // .remove(0)
+        // .to_uint()
+        // .as_ref()
+        // .map(
+        //     |ui| u128_to_bigdecimal(U256::as_u128(ui))
+        // )?;
+
+        // let address = AccountAddress::from_bytes(
+        //     dec
+        //     .remove(0)
+        //     .to_bytes()?
+        //     .as_slice()
+        // )
+        // .ok()?;
+
+        // Some(Self {
+        //     priority_op: Deposit {
+        //         sender: Address::zero(), // In current circuit there is no sender in deposit pubdata
+        //         token: token,
+        //         amount: amount,
+        //         account: address
+        //     },
+        //     account_id: acc_id,
+        // })
     }
 }
 
@@ -116,6 +176,76 @@ impl TransferToNewOp {
                 &bytes[to_pre_length..to_pre_length + ACCOUNT_ID_BYTES_LENGTH],
             )?,
         })
+        // let mut dec = decode(
+        //     &[
+        //         ParamType::Uint(ACCOUNT_ID_BYTES_LENGTH * 8),       // from account id
+        //         ParamType::Uint(TOKEN_BYTES_LENGTH * 8),            // token
+        //         ParamType::Uint(FULL_AMOUNT_BYTES_LENGTH * 8),      // amount
+        //         ParamType::FixedBytes(PACKED_AMOUNT_BYTES_LENGTH),  // new pubkey hash
+        //         ParamType::Uint(ACCOUNT_ID_BYTES_LENGTH * 8),       // to account id
+        //         ParamType::FixedBytes(FEE_BYTES_LENGTH),            // fee
+        //     ],
+        //     &bytes,
+        // )
+        // .ok()?;
+
+        // let from_acc_id = dec
+        // .remove(0)
+        // .to_uint()
+        // .as_ref()
+        // .map(|ui| U256::as_u32(ui))?;
+
+        // let token = dec
+        // .remove(0)
+        // .to_uint()
+        // .as_ref()
+        // .map(
+        //     |ui| u16::try_from(
+        //         U256::as_u32(ui)
+        //     ).ok()
+        // )??;
+
+        // let amount = unpack_token_amount(
+        //     dec
+        //     .remove(0)
+        //     .to_bytes()?
+        //     .as_slice()
+        // )?;
+
+        // let to_address = AccountAddress::from_bytes(
+        //     dec
+        //     .remove(0)
+        //     .to_bytes()?
+        //     .as_slice()
+        // )
+        // .ok()?;
+
+        // let to_acc_id = dec
+        // .remove(0)
+        // .to_uint()
+        // .as_ref()
+        // .map(|ui| U256::as_u32(ui))?;
+
+        // let fee = unpack_fee_amount(
+        //     dec
+        //     .remove(0)
+        //     .to_bytes()?
+        //     .as_slice()
+        // )?;
+
+        // Some(Self {
+        //     tx: Transfer {
+        //         from: AccountAddress::zero(),      // From pubdata its unknown
+        //         to: to_address,
+        //         token: token,
+        //         amount: amount,
+        //         fee: fee,
+        //         nonce: 0,                          // From pubdata its unknown
+        //         signature: TxSignature::default(), // From pubdata its unknown
+        //     },
+        //     from: from_acc_id,
+        //     to: to_acc_id,
+        // })
     }
 }
 
@@ -158,6 +288,67 @@ impl TransferOp {
                 &bytes[to_pre_length..to_pre_length + ACCOUNT_ID_BYTES_LENGTH],
             )?,
         })
+        // let mut dec = decode(
+        //     &[
+        //         ParamType::Uint(ACCOUNT_ID_BYTES_LENGTH * 8),       // from account id
+        //         ParamType::Uint(TOKEN_BYTES_LENGTH * 8),            // token
+        //         ParamType::Uint(ACCOUNT_ID_BYTES_LENGTH * 8),       // to account id
+        //         ParamType::FixedBytes(PACKED_AMOUNT_BYTES_LENGTH),  // amount
+        //         ParamType::FixedBytes(FEE_BYTES_LENGTH),            // fee
+        //     ],
+        //     &bytes,
+        // )
+        // .ok()?;
+
+        // let from_acc_id = dec
+        // .remove(0)
+        // .to_uint()
+        // .as_ref()
+        // .map(|ui| U256::as_u32(ui))?;
+
+        // let token = dec
+        // .remove(0)
+        // .to_uint()
+        // .as_ref()
+        // .map(
+        //     |ui| u16::try_from(
+        //         U256::as_u32(ui)
+        //     ).ok()
+        // )??;
+
+        // let to_acc_id = dec
+        // .remove(0)
+        // .to_uint()
+        // .as_ref()
+        // .map(|ui| U256::as_u32(ui))?;
+
+        // let amount = unpack_token_amount(
+        //     dec
+        //     .remove(0)
+        //     .to_bytes()?
+        //     .as_slice()
+        // )?;
+
+        // let fee = unpack_fee_amount(
+        //     dec
+        //     .remove(0)
+        //     .to_bytes()?
+        //     .as_slice()
+        // )?;
+
+        // Some(Self {
+        //     tx: Transfer {
+        //         from: AccountAddress::zero(),      // From pubdata its unknown
+        //         to: AccountAddress::zero(),        // From pubdata its unknown
+        //         token: token,
+        //         amount: amount,
+        //         fee: fee,
+        //         nonce: 0,                          // From pubdata its unknown
+        //         signature: TxSignature::default(), // From pubdata its unknown
+        //     },
+        //     from: from_acc_id,
+        //     to: to_acc_id,
+        // })
     }
 }
 
@@ -195,6 +386,65 @@ impl WithdrawOp {
                 &bytes[pre_length..pre_length + ACCOUNT_ID_BYTES_LENGTH],
             )?,
         })
+        // let mut dec = decode(
+        //     &[
+        //         ParamType::Uint(ACCOUNT_ID_BYTES_LENGTH * 8),       // account id
+        //         ParamType::Uint(TOKEN_BYTES_LENGTH * 8),            // token
+        //         ParamType::Uint(FULL_AMOUNT_BYTES_LENGTH * 8),      // amount
+        //         ParamType::FixedBytes(FEE_BYTES_LENGTH),            // fee
+        //         ParamType::Address,                                 // eth address
+        //     ],
+        //     &bytes,
+        // )
+        // .ok()?;
+
+        // let acc_id = dec
+        // .remove(0)
+        // .to_uint()
+        // .as_ref()
+        // .map(|ui| U256::as_u32(ui))?;
+
+        // let token = dec
+        // .remove(0)
+        // .to_uint()
+        // .as_ref()
+        // .map(
+        //     |ui| u16::try_from(
+        //         U256::as_u32(ui)
+        //     ).ok()
+        // )??;
+
+        // let amount = dec
+        // .remove(0)
+        // .to_uint()
+        // .as_ref()
+        // .map(
+        //     |ui| u128_to_bigdecimal(U256::as_u128(ui))
+        // )?;
+
+        // let fee = unpack_fee_amount(
+        //     dec
+        //     .remove(0)
+        //     .to_bytes()?
+        //     .as_slice()
+        // )?;
+
+        // let eth_address = dec
+        // .remove(0)
+        // .to_address()?;
+
+        // Some(Self {
+        //     tx: Withdraw {
+        //         account: AccountAddress::zero(),   // From pubdata its unknown
+        //         eth_address: eth_address,
+        //         token: token,
+        //         amount: amount,
+        //         fee: fee,
+        //         nonce: 0,                          // From pubdata its unknown
+        //         signature: TxSignature::default(), // From pubdata its unknown
+        //     },
+        //     account_id: acc_id,
+        // })
     }
 }
 
@@ -228,6 +478,28 @@ impl CloseOp {
                 &bytes[pre_length..pre_length + ACCOUNT_ID_BYTES_LENGTH],
             )?,
         })
+        // let mut dec = decode(
+        //     &[
+        //         ParamType::Uint(ACCOUNT_ID_BYTES_LENGTH * 8),       // account id
+        //     ],
+        //     &bytes,
+        // )
+        // .ok()?;
+
+        // let acc_id = dec
+        // .remove(0)
+        // .to_uint()
+        // .as_ref()
+        // .map(|ui| U256::as_u32(ui))?;
+
+        // Some(Self {
+        //     tx: Close{
+        //         account: AccountAddress::zero(),   // From pubdata its unknown
+        //         nonce: 0,                          // From pubdata its unknown
+        //         signature: TxSignature::default(), // From pubdata its unknown
+        //     },
+        //     account_id: acc_id,
+        // })
     }
 }
 
@@ -282,6 +554,89 @@ impl FullExitOp {
             priority_op: FullExit::from_bytes(bytes)?,
             account_data: Some((acc_id, amount)),
         })
+        // let mut dec = decode(
+        //     &[
+        //         ParamType::Uint(ACCOUNT_ID_BYTES_LENGTH * 8),      // account id
+        //         ParamType::FixedBytes(PUBKEY_PACKED_BYTES_LENGTH), // pubkey
+        //         ParamType::Address,                                // eth address
+        //         ParamType::Uint(TOKEN_BYTES_LENGTH * 8),           // token
+        //         ParamType::Uint(NONCE_BYTES_LENGTH * 8),           // nonce
+        //         ParamType::FixedBytes(SIGNATURE_R_BYTES_LENGTH),   // sig r
+        //         ParamType::FixedBytes(SIGNATURE_S_BYTES_LENGTH),   // sig s
+        //         ParamType::Uint(FULL_AMOUNT_BYTES_LENGTH * 8),     // full amount
+        //     ],
+        //     &bytes,
+        // )
+        // .ok()?;
+
+        // let acc_id = dec
+        // .remove(0)
+        // .to_uint()
+        // .as_ref()
+        // .map(|ui| U256::as_u32(ui))?;
+
+        // let pubkey = Box::from(bytes32_from_slice(
+        //     dec
+        //     .remove(0)
+        //     .to_bytes()?
+        //     .as_slice()
+        // )?);
+
+        // let eth_address = dec
+        // .remove(0)
+        // .to_address()?;
+
+        // let token = dec
+        // .remove(0)
+        // .to_uint()
+        // .as_ref()
+        // .map(
+        //     |ui| u16::try_from(
+        //         U256::as_u32(ui)
+        //     ).ok()
+        // )??;
+
+        // let nonce = dec
+        // .remove(0)
+        // .to_uint()
+        // .as_ref()
+        // .map(
+        //     |ui| U256::as_u32(ui)
+        // )?;
+
+        // let sig_r = Box::from(bytes32_from_slice(
+        //     dec
+        //         .remove(0)
+        //         .to_bytes()?
+        //         .as_slice()
+        // )?);
+
+        // let sig_s = Box::from(bytes32_from_slice(
+        //     dec
+        //         .remove(0)
+        //         .to_bytes()?
+        //         .as_slice()
+        // )?);
+
+        // let amount = dec
+        // .remove(0)
+        // .to_uint()
+        // .as_ref()
+        // .map(
+        //     |ui| u128_to_bigdecimal(U256::as_u128(ui))
+        // )?;
+
+        // Some(Self {
+        //     priority_op: FullExit {
+        //         packed_pubkey: pubkey,
+        //         eth_address: eth_address,
+        //         token: token,
+        //         nonce: nonce,
+        //         signature_r: sig_r,
+        //         signature_s: sig_s,
+        //     },
+        //     account_data: Some((acc_id, amount)),
+        // })
     }
 }
 
