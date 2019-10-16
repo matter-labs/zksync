@@ -111,30 +111,6 @@ pub fn get_ethereum_transaction(transaction_hash: &H256) -> Result<Transaction, 
     Ok(web3_transaction)
 }
 
-/// Returns bytes vec of keccak256 hash from bytes
-///
-/// # Arguments
-///
-/// * `bytes` - ref to bytes array
-///
-pub fn keccak256_hash(bytes: &[u8]) -> Vec<u8> {
-    keccak256(bytes).iter().cloned().collect()
-}
-
-/// Returns keccak256 topic hash (H256) from topic str
-///
-/// # Arguments
-///
-/// * `topic` - indexed func name and args, represented in ref to str
-///
-pub fn get_topic_keccak_hash(topic: &str) -> web3::types::H256 {
-    let topic_data: Vec<u8> = From::from(topic);
-    let topic_data_vec: &[u8] = topic_data.as_slice();
-    let topic_keccak_data: Vec<u8> = keccak256_hash(topic_data_vec);
-    let topic_keccak_data_vec: &[u8] = topic_keccak_data.as_slice();
-    H256::from_slice(topic_keccak_data_vec)
-}
-
 /// Specific errors that may occure during data restoring
 #[derive(Debug, Clone)]
 pub enum DataRestoreError {

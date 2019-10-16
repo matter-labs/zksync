@@ -2,7 +2,7 @@ use web3::futures::Future;
 use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256, U64};
 
 use crate::events::{EventData, EventType};
-use crate::helpers::{get_topic_keccak_hash, DataRestoreError, DATA_RESTORE_CONFIG};
+use crate::helpers::{DataRestoreError, DATA_RESTORE_CONFIG};
 
 type CommittedAndVerifiedEvents = (Vec<EventData>, Vec<EventData>);
 // type BlockNumber256 = U256;
@@ -129,19 +129,24 @@ impl EventsState {
         from_block_number: BlockNumber,
         to_block_number: BlockNumber,
     ) -> Result<Vec<Log>, DataRestoreError> {
-        let block_verified_topic = "BlockVerified(uint32)";
-        let block_committed_topic = "BlockCommitted(uint32,uint32)";
-        let block_verified_topic_h256: H256 = get_topic_keccak_hash(block_verified_topic);
-        let block_committed_topic_h256: H256 = get_topic_keccak_hash(block_committed_topic);
+        let block_verified_topic = DATA_RESTORE_CONFIG.franklin_contract
+            .event("BlockVerified")
+            .map_err(|_| DataRestoreError::NoData("Main contract abi error".to_string()))?
+            .signature();
 
-        let topics_vec_h256: Vec<H256> =
-            vec![block_verified_topic_h256, block_committed_topic_h256];
+        let block_comitted_topic = DATA_RESTORE_CONFIG.franklin_contract
+            .event("BlockCommitted")
+            .map_err(|_| DataRestoreError::NoData("Main contract abi error".to_string()))?
+            .signature();
+
+        let topics_vec: Vec<H256> =
+            vec![block_verified_topic, block_comitted_topic];
 
         let filter = FilterBuilder::default()
             .address(vec![DATA_RESTORE_CONFIG.franklin_contract_address])
             .from_block(from_block_number)
             .to_block(to_block_number)
-            .topics(Some(topics_vec_h256), None, None, None)
+            .topics(Some(topics_vec), None, None, None)
             .build();
 
         let (_eloop, transport) =
@@ -168,10 +173,16 @@ impl EventsState {
         }
         let mut committed_events: Vec<EventData> = vec![];
         let mut verified_events: Vec<EventData> = vec![];
-        let block_verified_topic = "BlockVerified(uint32)";
-        let block_committed_topic = "BlockCommitted(uint32)";
-        let block_verified_topic_h256: H256 = get_topic_keccak_hash(block_verified_topic);
-        let block_committed_topic_h256: H256 = get_topic_keccak_hash(block_committed_topic);
+
+        let block_verified_topic = DATA_RESTORE_CONFIG.franklin_contract
+            .event("BlockVerified")
+            .map_err(|_| DataRestoreError::NoData("Main contract abi error".to_string()))?
+            .signature();
+        let block_comitted_topic = DATA_RESTORE_CONFIG.franklin_contract
+            .event("BlockCommitted")
+            .map_err(|_| DataRestoreError::NoData("Main contract abi error".to_string()))?
+            .signature();
+
         for log in logs {
             let mut block: EventData = EventData {
                 block_num: 0,
@@ -187,10 +198,10 @@ impl EventsState {
                     block.block_num = U256::from(block_num.as_bytes()).as_u32();
                     block.transaction_hash = hash;
 
-                    if topic == block_verified_topic_h256 {
+                    if topic == block_verified_topic {
                         block.block_type = EventType::Verified;
                         verified_events.push(block);
-                    } else if topic == block_committed_topic_h256 {
+                    } else if topic == block_comitted_topic {
                         committed_events.push(block);
                     }
                 }
