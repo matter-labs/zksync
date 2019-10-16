@@ -4,15 +4,12 @@
         <b-form-input autocomplete="off" type="text" v-model="address" class="mb-2"></b-form-input>
         <p>(for testing, use <code style="cursor: pointer" @click="address='0x2d5bf7a3ab29f0ff424d738a83f9b0588bc9241e'">0x2d5bf7a3ab29f0ff424d738a83f9b0588bc9241e</code>)</p>
         Choose token:
-        <!-- <b-form-select v-model="token" class="mb-2">
-            <option v-for="balance in balances" :key="balance.tokenName">{{ balance.tokenName }}</option>
-        </b-form-select> -->
         <TokenSelector 
             class="mb-3"
             :tokens="tokensList"
             :selected.sync="token">
         </TokenSelector>
-        Amount <span v-if="maxAmountVisible">(<span v-if="token == 'ETH'">in ETH tokens, </span> max {{ token }} {{ displayableBalancesDict[token] }})</span>:
+        Amount <span v-if="maxAmountVisible">(<span v-if="token == 'ETH'">in ETH tokens, </span>max {{ token }} {{ displayableBalancesDict[token] }})</span>:
         <b-form-input autocomplete="off" type="number" v-model="amountSelected" class="mb-3"></b-form-input>
         Choose fee:
         <FeeSelector 
@@ -20,8 +17,15 @@
             :fees="fees"
             :selected.sync="feeButtonSelectedIndex">
         </FeeSelector>
-        <!-- <b-form-input autocomplete="off" type="number" class="mb-3" v-model="fee"></b-form-input> -->
-        <b-button class="mt-2 w-50" variant="primary" @click='buttonClicked'> Transfer </b-button>
+        <img v-if="transferPending" style="margin-right: 1.5em" src="../assets/loading.gif" width="100em">
+        <b-button 
+            v-else 
+            :disabled="!!buttonDisabledReason"
+            :title="buttonDisabledReason"
+            class="mt-2 w-50" 
+            variant="primary" 
+            @click='buttonClicked'
+        > Transfer </b-button>
     </b-card>
 </template>
 
@@ -29,7 +33,8 @@
 import { bigNumberify, parseEther } from 'ethers/utils'
 import TokenSelector from './TokenSelector.vue'
 import FeeSelector from './FeeSelector.vue'
-import { getDisplayableBalanceDict, feesFromAmount } from '../utils';
+import { getDisplayableBalanceDict, feesFromAmount, isReadablyPrintable } from '../utils';
+import timeConstants from '../timeConstants'
 
 const components = {
     TokenSelector,
@@ -45,13 +50,35 @@ export default {
 
         maxAmountVisible: false,
         balancesDict: {},
-        tokensList: [],
+        tokensList: null,
         amountSelected: null,
         feeButtonSelectedIndex: null,
         fees: ['0%', '1%', '5%'],
+
+        transferPending: false,
     }),
+    created() {
+        this.updateInfo();  
+    },
     watch: {
         balances: function() {
+            this.updateInfo();
+        },
+        token: function() {
+            this.maxAmountVisible = true;
+        },
+    },
+    computed: {
+        buttonDisabledReason() {
+            return this.balances == null      ? "Not loaded yet."
+                :  this.balances.length == 0  ? "You have no tokens."
+                :  null;
+        },
+    },
+    methods: {
+        updateInfo() {
+            if (this.balances == null) return;
+            
             this.balancesDict = this.balances
                 .reduce((acc, bal) => {
                     acc[bal.tokenName] = bal.amount;
@@ -60,17 +87,12 @@ export default {
             this.displayableBalancesDict = getDisplayableBalanceDict(this.balancesDict);
             this.tokensList = this.balances.map(bal => bal.tokenName);
         },
-        token: function() {
-            this.maxAmountVisible = true;
-        },
-    },
-    methods: {
         localDisplayAlert(message) {
-            this.$emit('alert', { message, variant: 'warning' });
+            this.$emit('alert', { message, variant: 'warning', countdown: 6 });
         },
         getAmount() {
             try {
-                return this.token == 'ETH'
+                return isReadablyPrintable(this.token)
                     ? parseEther(this.amountSelected)
                     : bigNumberify(this.amountSelected);
             } catch (e) {
@@ -126,7 +148,7 @@ export default {
 
             let fee = this.getFee();
             if (fee == null) {
-                this.localDisplayAlert(`Problem with fee.`); // TODO:
+                this.localDisplayAlert(`Problem with fee.`);
                 return;
             }
 
@@ -134,6 +156,11 @@ export default {
                 this.localDisplayAlert(`It's too much, man!`);
                 return;
             }
+
+            this.transferPending = true;
+            setTimeout(() => {
+                this.transferPending = false;
+            }, timeConstants.transferPending);
 
             this.$emit('buttonClicked', {
                 address: this.address,

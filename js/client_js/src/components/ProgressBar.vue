@@ -7,7 +7,7 @@
 </template>
 
 <script>
-const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
+import { sleep } from '../utils.js'
 
 export default {
     name: 'ProgressBar',
@@ -39,18 +39,17 @@ export default {
             
             this.value = 0;
             this.animationInProgress = true;
-            const self = this;
             const start = Date.now();
             const draw = () => {
-                if (self.value >= self.max) {
-                    self.animationInProgress = false;
+                if (this.value >= this.max) {
+                    this.animationInProgress = false;
                     return;
                 }
 
                 let progress = (Date.now() - start) / duration;
                 progress = animation(progress);
                 progress = Math.min(1.0, progress);
-                self.value = Math.round(self.max * progress);
+                this.value = Math.floor(this.max * progress);
                 window.requestAnimationFrame(draw);
             };
             window.requestAnimationFrame(draw);

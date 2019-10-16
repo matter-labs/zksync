@@ -97,13 +97,35 @@ var FranklinProvider = /** @class */ (function () {
         req.signature = signature;
         return req;
     };
+    // TODO: reconsider when wallet refactor.
+    FranklinProvider.axiosRequest = function (promise) {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        promise = promise
+                            .then(function (reps) { return reps.data; })
+                            .catch(function (error) {
+                            var response;
+                            if (!error.response) {
+                                response = 'Error: Network Error';
+                            }
+                            else {
+                                response = error.response.data.message;
+                            }
+                            throw new Error(response);
+                        });
+                        return [4 /*yield*/, promise];
+                    case 1: return [2 /*return*/, _a.sent()];
+                }
+            });
+        });
+    };
     FranklinProvider.prototype.submitTx = function (tx) {
         return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, axios_1.default.post(this.providerAddress + '/api/v0.1/submit_tx', tx)
-                            .then(function (reps) { return reps.data; })
-                            .catch(function (error) { return console.log(error.response); })];
+                    case 0: return [4 /*yield*/, FranklinProvider.axiosRequest(axios_1.default.post(this.providerAddress + '/api/v0.1/submit_tx', tx))];
                     case 1: return [2 /*return*/, _a.sent()];
                 }
             });
@@ -113,21 +135,21 @@ var FranklinProvider = /** @class */ (function () {
         return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, axios_1.default.get(this.providerAddress + '/api/v0.1/tokens')
-                            .then(function (reps) { return reps.data; })
-                            .catch(function (error) { return console.log(error.response); })];
+                    case 0: return [4 /*yield*/, FranklinProvider.axiosRequest(axios_1.default.get(this.providerAddress + '/api/v0.1/tokens'))];
                     case 1: return [2 /*return*/, _a.sent()];
                 }
             });
         });
     };
-    FranklinProvider.prototype.getTransactionsHistory = function (address) {
+    FranklinProvider.prototype.getTransactionsHistory = function (address, offset, limit) {
         return __awaiter(this, void 0, void 0, function () {
+            var link;
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, axios_1.default.get(this.providerAddress + '/api/v0.1/account/' + ("0x" + address.toString("hex")) + '/transactions')
-                            .then(function (reps) { return reps.data; })
-                            .catch(function (error) { return console.log(error.response); })];
+                    case 0:
+                        link = this.providerAddress + "/api/v0.1/account/0x" + address.toString("hex") + "/history/" + offset + "/" + limit;
+                        console.log("In wallet, we request " + link);
+                        return [4 /*yield*/, FranklinProvider.axiosRequest(axios_1.default.get(link))];
                     case 1: return [2 /*return*/, _a.sent()];
                 }
             });
@@ -137,9 +159,7 @@ var FranklinProvider = /** @class */ (function () {
         return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, axios_1.default.get(this.providerAddress + '/api/v0.1/account/' + ("0x" + address.toString("hex")))
-                            .then(function (reps) { return reps.data; })
-                            .catch(function (error) { return console.log(error.response); })];
+                    case 0: return [4 /*yield*/, FranklinProvider.axiosRequest(axios_1.default.get(this.providerAddress + '/api/v0.1/account/' + ("0x" + address.toString("hex"))))];
                     case 1: return [2 /*return*/, _a.sent()];
                 }
             });
@@ -149,9 +169,17 @@ var FranklinProvider = /** @class */ (function () {
         return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, axios_1.default.get(this.providerAddress + '/api/v0.1/transactions/' + tx_hash)
-                            .then(function (reps) { return reps.data; })
-                            .catch(function (error) { return console.log(error.response); })];
+                    case 0: return [4 /*yield*/, FranklinProvider.axiosRequest(axios_1.default.get(this.providerAddress + '/api/v0.1/transactions/' + tx_hash))];
+                    case 1: return [2 /*return*/, _a.sent()];
+                }
+            });
+        });
+    };
+    FranklinProvider.prototype.getPriorityOpReceipt = function (pq_id) {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0: return [4 /*yield*/, FranklinProvider.axiosRequest(axios_1.default.get(this.providerAddress + "/api/v0.1/priority_operations/" + pq_id + "/"))];
                     case 1: return [2 /*return*/, _a.sent()];
                 }
             });
@@ -251,6 +279,7 @@ var Wallet = /** @class */ (function () {
             });
         });
     };
+    // TODO: remove this method
     Wallet.prototype.waitTxReceipt = function (tx_hash) {
         return __awaiter(this, void 0, void 0, function () {
             var receipt;
