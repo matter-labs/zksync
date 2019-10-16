@@ -4,7 +4,9 @@ mod event_notify;
 
 use actix_cors::Cors;
 use actix_web::{
-    middleware, web, App, Error as ActixError, HttpResponse, HttpServer, Result as ActixResult,
+    middleware,
+    web::{self, Bytes},
+    App, Error as ActixError, HttpResponse, HttpServer, Result as ActixResult,
 };
 use models::node::{tx::FranklinTx, Account, AccountId, ExecutedOperations};
 use models::{ActionType, NetworkStatus, Operation, StateKeeperRequest};
@@ -412,12 +414,14 @@ fn handle_notify_account_updates(
             .send(sub)
             .map_err(|_| HttpResponse::InternalServerError().finish().into())
             .and_then(|_| {
-                notify_recv
-                    .into_future()
-                    .map(|(responce, _)| responce.unwrap())
-                    .map_err(|_| HttpResponse::TooManyRequests().finish().into())
-            })
-            .map(|op_status| HttpResponse::Ok().json(op_status)),
+                let account_stream = notify_recv.map(|acc| {
+                    Bytes::from(["data: ", &serde_json::to_string(&acc).unwrap(), "\n\n"].concat())
+                });
+                HttpResponse::Ok()
+                    .header("content-type", "text/event-stream")
+                    .no_chunking()
+                    .streaming(account_stream)
+            }),
     )
 }
 

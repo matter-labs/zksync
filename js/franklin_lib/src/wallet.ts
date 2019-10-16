@@ -10,6 +10,8 @@ import {Contract, ContractTransaction, ethers, utils} from 'ethers';
 import {packAmount, packFee} from "./utils";
 import {curve} from "elliptic";
 
+import EventSource from 'eventsource';
+
 const IERC20Conract = require("../abi/IERC20.json");
 const franklinContractCode = require("../abi/Franklin.json");
 const priorityQueueInterface = new utils.Interface(require("../abi/PriorityQueue.json").interface);
@@ -107,6 +109,11 @@ export class FranklinProvider {
     async getBlockStatus(block: number) {
         return await Axios.get(this.providerAddress + '/api/v0.1/search?query=' + block)
             .then(reps => reps.data)
+    }
+
+    getAccountUpdates(address: Address, action: "commit" | "verify"): EventSource {
+        console.log("curl " + this.providerAddress + `/api/v0.1/account_updates/${action}/0x${address.toString("hex")}`);
+        return new EventSource(this.providerAddress + `/api/v0.1/account_updates/${action}/0x${address.toString("hex")}`);
     }
 
     async resolveToken(token: TokenLike): Promise<Token> {

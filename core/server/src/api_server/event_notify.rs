@@ -201,6 +201,7 @@ impl OperationNotifier {
             if subscription.listeners.len() < MAX_LISTENERS_PER_ENTITY {
                 subscription.listeners.push(notify);
             }
+            debug!("Inserting listender for id: {}", resolved_id);
             self.account_subs_known_id
                 .insert((resolved_id, action), subscription);
         } else {
@@ -216,6 +217,7 @@ impl OperationNotifier {
                 subscription.listeners.push(notify);
             }
 
+            debug!("Inserting listender for address: {}", address.to_hex());
             self.account_subs_unknown_id
                 .insert((address, action), subscription);
         }
@@ -269,9 +271,20 @@ impl OperationNotifier {
                         .account_subs_unknown_id
                         .remove(&(address.clone(), action))
                     {
+                        let subscription = self
+                            .account_subs_known_id
+                            .remove(&(*id, action))
+                            .map(|mut id_sub| {
+                                id_sub
+                                    .listeners
+                                    .extend(subscription.listeners.clone().into_iter());
+                                id_sub.account = None;
+                                id_sub
+                            })
+                            .unwrap_or_else(|| subscription);
+
                         self.account_subs_known_id
-                            .insert((*id, action), subscription)
-                            .expect("Listeners for new account id should be empty");
+                            .insert((*id, action), subscription);
                     }
                 }
                 _ => {}
@@ -291,21 +304,16 @@ impl OperationNotifier {
             .collect::<Vec<_>>();
 
         for (id, updates) in updates.into_iter() {
-            if let Some(mut listeners) = self.account_subs_known_id.remove(&(id, action)) {
-                let new_state = Account::apply_updates(listeners.account.take(), &updates);
-                listeners.listeners = listeners
-                    .listeners
-                    .into_iter()
-                    .filter_map(|mut ch| {
-                        if let Some(new_state) = &new_state {
-                            ch.try_send(new_state.clone()).ok().map(|_| ch)
-                        } else {
-                            // account was deleted -- drop channel
-                            None
-                        }
-                    })
-                    .collect();
-                listeners.account = new_state;
+            if let Some(mut sub) = self.account_subs_known_id.remove(&(id, action)) {
+                if let Some(account) = Account::apply_updates(sub.account.take(), &updates) {
+                    sub.listeners = sub
+                        .listeners
+                        .into_iter()
+                        .filter_map(|mut ch| ch.try_send(account.clone()).ok().map(|_| ch))
+                        .collect();
+                    sub.account = Some(account);
+                    self.account_subs_known_id.insert((id, action), sub);
+                }
             }
         }
     }

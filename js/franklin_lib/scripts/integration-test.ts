@@ -18,6 +18,8 @@ async function main() {
     let ethWallet2 = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
     let wallet2 = await Wallet.fromEthWallet(ethWallet2);
 
+    wallet.provider.getAccountUpdates(wallet.address, "commit").onmessage = (evt => console.log("event: ", evt.data) );
+
     // let onchainBalances = await wallet2.getOnchainBalances();
     // onchainBalances.contractBalances.map((value => console.log(value.toString())));
 
