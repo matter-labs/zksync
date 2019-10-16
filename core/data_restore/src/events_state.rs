@@ -176,7 +176,7 @@ impl EventsState {
             let mut block: EventData = EventData {
                 block_num: 0,
                 transaction_hash: H256::zero(),
-                block_type: EventType::Unknown,
+                block_type: EventType::Committed,
             };
             let tx_hash = log.transaction_hash;
             let topic = log.topics[0];
@@ -191,7 +191,6 @@ impl EventsState {
                         block.block_type = EventType::Verified;
                         verified_events.push(block);
                     } else if topic == block_committed_topic_h256 {
-                        block.block_type = EventType::Committed;
                         committed_events.push(block);
                     }
                 }

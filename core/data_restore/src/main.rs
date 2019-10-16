@@ -10,15 +10,15 @@ pub mod genesis_state;
 pub mod helpers;
 pub mod storage_interactor;
 
-use crate::data_restore_driver::DataRestoreDriver;
 // use std::env;
-use storage::ConnectionPool;
+use crate::data_restore_driver::DataRestoreDriver;
 // use storage_interactor::remove_storage_data;
+use storage::ConnectionPool;
 
-const ETH_BLOCKS_DELTA: u64 = 250;
 /// Step of the considered blocks ethereum block
-const END_ETH_BLOCKS_DELTA: u64 = 25;
+const ETH_BLOCKS_DELTA: u64 = 250;
 /// Delta between last ethereum block and last watched ethereum block to prevent restart in case of reorder
+const END_ETH_BLOCKS_DELTA: u64 = 25;
 
 fn main() {
     env_logger::init();

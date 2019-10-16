@@ -60,38 +60,38 @@ impl DataRestoreDriver {
 
     pub fn load_state_from_storage(&mut self) -> Result<(), DataRestoreError> {
         let state = storage_interactor::get_storage_state(self.connection_pool.clone());
-        if state.is_err() {
+        if let Ok(state) = state {
+            let tree_state = storage_interactor::get_tree_state(self.connection_pool.clone())?;
+            self.accounts_state = FranklinAccountsState::load(tree_state.0, tree_state.1);
+            match state {
+                StorageUpdateState::Events => {
+                    self.events_state = storage_interactor::get_events_state_from_storage(
+                        self.connection_pool.clone(),
+                    )?;
+                    // Update operations
+                    let new_ops_blocks = self.update_operations_state()?;
+                    // Update tree
+                    self.update_tree_state(new_ops_blocks)?;
+                }
+                StorageUpdateState::Operations => {
+                    self.events_state = storage_interactor::get_events_state_from_storage(
+                        self.connection_pool.clone(),
+                    )?;
+                    // Update operations
+                    let new_ops_blocks =
+                        storage_interactor::get_ops_blocks_from_storage(self.connection_pool.clone())?;
+                    // Update tree
+                    self.update_tree_state(new_ops_blocks)?;
+                }
+                StorageUpdateState::None => {}
+            }
+            Ok(())
+        } else {
             // If state is unknown then its empty or broken - start from beginning
             let genesis_acc_map = get_genesis_state()?;
             self.accounts_state = FranklinAccountsState::load(genesis_acc_map.0, genesis_acc_map.1);
             return Ok(());
         }
-        let unwraped_state = state.unwrap();
-        let tree_state = storage_interactor::get_tree_state(self.connection_pool.clone())?;
-        self.accounts_state = FranklinAccountsState::load(tree_state.0, tree_state.1);
-        match unwraped_state {
-            StorageUpdateState::Events => {
-                self.events_state = storage_interactor::get_events_state_from_storage(
-                    self.connection_pool.clone(),
-                )?;
-                // Update operations
-                let new_ops_blocks = self.update_operations_state()?;
-                // Update tree
-                self.update_tree_state(new_ops_blocks)?;
-            }
-            StorageUpdateState::Operations => {
-                self.events_state = storage_interactor::get_events_state_from_storage(
-                    self.connection_pool.clone(),
-                )?;
-                // Update operations
-                let new_ops_blocks =
-                    storage_interactor::get_ops_blocks_from_storage(self.connection_pool.clone())?;
-                // Update tree
-                self.update_tree_state(new_ops_blocks)?;
-            }
-            StorageUpdateState::None => {}
-        }
-        Ok(())
     }
 
     pub fn run_state_updates(&mut self) -> Result<(), DataRestoreError> {

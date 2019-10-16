@@ -87,7 +87,6 @@ pub fn block_event_into_stored_block_event(event: &EventData) -> Option<NewBlock
         block_type: match event.block_type {
             EventType::Committed => "Committed".to_string(),
             EventType::Verified => "Verified".to_string(),
-            EventType::Unknown => return None,
         },
         transaction_hash: event.transaction_hash.as_bytes().to_vec(),
         block_num: i64::from(event.block_num),
