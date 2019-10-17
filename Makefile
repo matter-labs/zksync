@@ -142,7 +142,8 @@ deploy-contracts: confirm_action
 	@bin/deploy-contracts.sh
 
 test-contracts: confirm_action
-	@cd contracts && yarn test
+	@bin/prepare-test-contracts.sh
+	@bin/contracts-test.sh
 
 build-contracts: confirm_action
 	@cd contracts && yarn build
@@ -183,9 +184,6 @@ prepare-loadtest: confirm_action
 
 rescue: confirm_action
 	@node js/loadtest/rescue.js
-
-contracts-test: confirm_action 
-	@bin/contracts-test.sh
 
 deposit: confirm_action
 	@node contracts/scripts/deposit.js

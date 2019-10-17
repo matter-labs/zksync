@@ -182,6 +182,12 @@ impl GetBits for Account {
 }
 
 impl Account {
+    pub fn default_with_address(address: &AccountAddress) -> Account {
+        let mut account = Account::default();
+        account.address = address.clone();
+        account
+    }
+
     pub fn create_account(id: AccountId, address: AccountAddress) -> (Account, AccountUpdates) {
         let mut account = Account::default();
         account.address = address;
@@ -213,6 +219,13 @@ impl Account {
         let mut balance = self.balances.remove(&token).unwrap_or_default();
         balance -= amount;
         self.balances.insert(token, balance);
+    }
+
+    pub fn apply_updates(mut account: Option<Self>, updates: &[AccountUpdate]) -> Option<Self> {
+        for update in updates {
+            account = Account::apply_update(account, update.clone());
+        }
+        account
     }
 
     pub fn apply_update(account: Option<Self>, update: AccountUpdate) -> Option<Self> {

@@ -672,6 +672,11 @@ fn restore_account(
     (stored_account.id as u32, account)
 }
 
+pub struct StoredAccountState {
+    pub commited: Option<(AccountId, Account)>,
+    pub verified: Option<(AccountId, Account)>,
+}
+
 impl StorageProcessor {
     pub fn establish_connection() -> ConnectionResult<Self> {
         let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
@@ -1556,7 +1561,7 @@ impl StorageProcessor {
     pub fn account_state_by_address(
         &self,
         address: &AccountAddress,
-    ) -> QueryResult<(Option<AccountId>, Option<Account>, Option<Account>)> {
+    ) -> QueryResult<StoredAccountState> {
         let account_create_record = account_creates::table
             .filter(account_creates::address.eq(address.data.to_vec()))
             .filter(account_creates::is_create.eq(true))
@@ -1567,12 +1572,19 @@ impl StorageProcessor {
         let account_id = if let Some(account_create_record) = account_create_record {
             account_create_record.account_id as AccountId
         } else {
-            return Ok((None, None, None));
+            return Ok(StoredAccountState {
+                commited: None,
+                verified: None,
+            });
         };
 
-        let commited_state = self.last_committed_state_for_account(account_id)?;
-        let verified_state = self.last_verified_state_for_account(account_id)?;
-        Ok((Some(account_id), verified_state, commited_state))
+        let commited = self
+            .last_committed_state_for_account(account_id)?
+            .map(|a| (account_id, a));
+        let verified = self
+            .last_verified_state_for_account(account_id)?
+            .map(|a| (account_id, a));
+        Ok(StoredAccountState { commited, verified })
     }
 
     pub fn tx_receipt(&self, hash: &[u8]) -> QueryResult<Option<TxReceiptResponse>> {
@@ -1946,8 +1958,13 @@ impl StorageProcessor {
             return Ok(Err(TxAddError::IncorrectTx));
         }
 
-        let (_, _, commited_state) = self.account_state_by_address(&tx.account())?;
-        let lowest_possible_nonce = commited_state.map(|a| a.nonce as u32).unwrap_or_default();
+        let StoredAccountState {
+            commited: commited_state,
+            ..
+        } = self.account_state_by_address(&tx.account())?;
+        let lowest_possible_nonce = commited_state
+            .map(|(_, a)| a.nonce as u32)
+            .unwrap_or_default();
         if tx.nonce() < lowest_possible_nonce {
             return Ok(Err(TxAddError::NonceTooLow));
         }
@@ -1980,9 +1997,12 @@ impl StorageProcessor {
     }
 
     pub fn get_pending_txs(&self, address: &AccountAddress) -> QueryResult<Vec<FranklinTx>> {
-        let (_, _, commited_state) = self.account_state_by_address(address)?;
+        let StoredAccountState {
+            commited: commited_state,
+            ..
+        } = self.account_state_by_address(address)?;
         let commited_nonce = commited_state
-            .map(|a| i64::from(a.nonce))
+            .map(|(_, a)| i64::from(a.nonce))
             .unwrap_or_default();
 
         let pending_txs: Vec<_> = mempool::table
