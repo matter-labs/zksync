@@ -1,8 +1,19 @@
 import BN = require('bn.js');
 import { ethers } from 'ethers';
 
+function reverseByte(byte: number) {
+    let res = 0;
+    for (let i = 0; i < 8; ++i) {
+        res <<= 1;
+        res |= byte & 1;
+        byte >>= 1;
+    }
+    return res;
+}
+
 export function floatToInteger(floatBytes: Buffer, exp_bits: number, mantissa_bits: number, exp_base: number): BN {
-    const floatHolder = new BN(floatBytes, 16, 'be'); // keep bit order
+    let floatBytesReversed = floatBytes.map(reverseByte);
+    const floatHolder = new BN(floatBytesReversed, 16, 'be'); // keep bit order
     const totalBits = floatBytes.length * 8 - 1; // starts from zero
     let expBase = new BN(exp_base);
     let exponent = new BN(0);
@@ -92,7 +103,7 @@ export function integerToFloat(integer: BN, exp_bits: number, mantissa_bits: num
         }
     }
 
-    for (let i =0; i < mantissa_bits; ++i) {
+    for (let i = 0; i < mantissa_bits; ++i) {
         if (mantissa.and(new BN(1 << i)).eqn(0)) {
             encoding.push(false);
         } else {
