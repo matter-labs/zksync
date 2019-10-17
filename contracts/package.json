@@ -21,12 +21,12 @@
     "typescript": "^3.5.3"
   },
   "scripts": {
-    "build": "waffle",
-    "test": "waffle && mocha -r ts-node/register test/**/*.ts",
-    "deploy": "waffle && ts-node scripts/testnet-deploy.ts",
+    "build": "prepare-test-contracts.sh && waffle",
+    "test": "yarn build && mocha -r ts-node/register test/**/*.ts",
+    "deploy": "yarn build && ts-node scripts/testnet-deploy.ts",
     "print-operator-wallet": "ts-node scripts/init-operator-acc.ts",
     "submit-proof": "ts-node scripts/submit-proof.ts",
-    "submit-test-proof": "waffle && ts-node scripts/submit-test-proof.ts",
+    "submit-test-proof": "yarn build && ts-node scripts/submit-test-proof.ts",
     "lint:solidity": "solhint contracts/**/*.sol",
     "lint:ts": "tslint -c tslint.json {scripts,test}/**/*.ts",
     "lint:ts-fix": "tslint -c tslint.json --fix {scripts,test}/**/*.ts",

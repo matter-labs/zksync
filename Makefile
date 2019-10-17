@@ -18,7 +18,6 @@ init:
 yarn:
 	@cd js/franklin_lib && yarn
 	@cd js/client && yarn
-	@cd js/loadtest && yarn
 	@cd js/explorer && yarn
 	@cd contracts && yarn
 
@@ -142,7 +141,6 @@ deploy-contracts: confirm_action
 	@bin/deploy-contracts.sh
 
 test-contracts: confirm_action
-	@bin/prepare-test-contracts.sh
 	@bin/contracts-test.sh
 
 build-contracts: confirm_action
