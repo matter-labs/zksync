@@ -13,6 +13,6 @@ jobs:
       run: |
         export PATH="`pwd`/bin:$PATH"
         export FRANKLIN_HOME=`pwd`
-        franklin yarn
+        franklin yarn || true
         franklin build-contracts
         cargo check
