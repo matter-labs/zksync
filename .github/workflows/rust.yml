@@ -12,4 +12,7 @@ jobs:
     - name: init
       run: |
         export PATH="`pwd`/bin:$PATH"
-        franklin init
+        export FRANKLIN_HOME=`pwd`
+        franklin yarn
+        franklin build-contracts
+        cargo check
