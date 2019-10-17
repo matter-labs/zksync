@@ -54,8 +54,8 @@ export class Tester {
     }
 
     private randomNum(from: number, to: number): BigNumberish {
-        // return (this.prando.nextBoolean() ? from : to).toString();
-        return this.prando.nextInt(from, to).toString();
+        return (this.prando.nextBoolean() ? from : to).toString();
+        // return this.prando.nextInt(from, to).toString();
     }
     
     private selectRandomAmount(from: number, to: number): BigNumber {
@@ -86,7 +86,7 @@ export class Tester {
         kwargs.wallet = kwargs.wallet || this.selectRandomWallet();
         kwargs.token  = kwargs.token  || this.selectRandomToken();
         kwargs.amount = kwargs.amount || this.selectRandomAmount(0, 1000);
-        kwargs.fee    = kwargs.fee    || this.selectRandomFee(0, 1000);
+        kwargs.fee    = kwargs.fee    || this.selectRandomFee(1500000, 3000000);
         return new DepositOperation(kwargs);
     }
 

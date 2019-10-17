@@ -62,6 +62,7 @@ export abstract class AbstractOperation {
             this.mainWallet.resetNonce();
             this.log(`failed with ${err.message}`);
         }
+        await this.mainWallet.updateState();
         let balanceStrings = await this.mainWallet.getBalanceForTokenAsString(this.kwargs.token);
         balanceStrings.forEach(this.log.bind(this));
         this.info.balanceAtEnd = balanceStrings;

@@ -17,7 +17,7 @@ export class TransferOperation extends AbstractOperation {
     }
 
     public async action(): Promise<void> {
-        this.logStart(`trying transfer (${this.kwargs.token.id} | ${this.kwargs.amount.toString()})`);
+        this.logStart(`trying transfer (${this.kwargs.token.id} | ${this.kwargs.amount.toString()} | ${this.kwargs.fee.toString()})`);
         await this.kwargs.wallet1.sendTransaction(this.kwargs.wallet2, this.kwargs.token, this.kwargs.amount, this.kwargs.fee);
     }
 }

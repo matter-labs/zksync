@@ -1,5 +1,5 @@
 import { AbstractOperation } from './AbstractOperation'
-import { bigNumberify, BigNumber, BigNumberish } from "ethers/utils";
+import { bigNumberify, BigNumber, BigNumberish, parseEther } from "ethers/utils";
 import { ethers, Contract } from 'ethers';
 import { Wallet, Token, Address } from '../../src/wallet';
 const IERC20Conract = require('openzeppelin-solidity/build/contracts/ERC20Mintable.json');
@@ -101,6 +101,11 @@ export class LocalWallet {
         }, null, 4);
     }
 
+    private async getTransactionFee(tx_hash: string) {
+        let receipt = await this.franklinWallet.ethWallet.provider.getTransactionReceipt(tx_hash);
+        console.log(receipt.gasUsed);
+    }
+
     private async getOnchainTxStatus(tx_hash: string) {
         let receipt = null;
         for (let i = 1; i <= 5 && !receipt; i++) {            
@@ -196,15 +201,14 @@ export class LocalWallet {
     }
 
     public async deposit(token: Token, amount: BigNumber, fee: BigNumber) {
-        let total_amount = amount.add(fee);
-        
-        if (this.computedOnchainBalances[token.id].gte(total_amount)) {
-            this.subtractComputedOnchain(token, total_amount);
+        if (this.computedOnchainBalances[token.id].gte(amount)) {
+            this.subtractComputedOnchain(token, amount);
             this.addComputedCommitedFranklin(token, amount);
         }
 
-        let handle = await this.franklinWallet.deposit(token, amount);
+        let handle = await this.franklinWallet.deposit(token, amount, fee);
         await handle.waitTxMine();
+        return handle;
     }
 
     public async sendTransaction(wallet2: LocalWallet, token: Token, amount: BigNumber, fee: BigNumber) {        
@@ -215,6 +219,7 @@ export class LocalWallet {
         }
 
         let handle = await this.franklinWallet.transfer(wallet2.franklinWallet.address, token, amount, fee);
+        await handle.waitCommit();
     }
 
     // #endregion

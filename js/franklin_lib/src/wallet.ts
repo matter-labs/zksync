@@ -95,7 +95,7 @@ export class FranklinProvider {
     }
     
     async resolveToken(token: TokenLike): Promise<Token> {
-        if(typeof(token) == "string") {
+        if (typeof(token) == "string") {
             let tokens = await this.getTokens();
             let resolvedToken = tokens.find( (t, idx, arr) => {return t.symbol == token || t.address == token});
             if (resolvedToken) {
@@ -282,30 +282,32 @@ class DepositTransactionHandle {
     async waitTxMine() {
         if (this.state != "Sent") return;
 
-        let txReceipt =  await this.ethTx.wait();
-        for (let log of txReceipt.logs) {
-            let priorityQueueLog = priorityQueueInterface.parseLog(txReceipt.logs[0]);
-            if (priorityQueueLog) {
-                this.priorityOpId = priorityQueueLog.values.serialId;
-            }
-        }
-        if (!this.priorityOpId) {
+        let txReceipt = await this.ethTx.wait();
+
+        let priorityOpIds = txReceipt.logs
+            .map(log => priorityQueueInterface.parseLog(log))
+            .filter(Boolean)
+            .map(priorityQueueLog => priorityQueueLog.values.serialId);
+
+        if (priorityOpIds.length == 0) {
             throw "Failed to parse tx logs";
         }
 
+        this.priorityOpId = priorityOpIds.shift();
+        
         this.state = "Mined"
     }
 
     async waitCommit() {
         await this.waitTxMine();
-        if(this.state != "Mined") return;
+        if (this.state != "Mined") return;
         await this.franklinProvider.notifyPriorityOp(this.priorityOpId.toNumber(), "commit");
         this.state = "Commited";
     }
 
     async waitVerify() {
         await this.waitCommit();
-        if(this.state != "Commited") return;
+        if (this.state != "Commited") return;
 
         await this.franklinProvider.notifyPriorityOp(this.priorityOpId.toNumber(), "verify");
         this.state = "Verified";
@@ -358,7 +360,7 @@ export class Wallet {
         } else {
             const erc20DeployedToken = new Contract(token.address, IERC20Conract.interface, this.ethWallet);
             await erc20DeployedToken.approve(franklinDeployedContract.address, amount);
-            const contractTx = await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address,
+            contractTx = await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address,
                 {gasLimit: utils.bigNumberify("300000"), value: fee});
         }
         return new DepositTransactionHandle(contractTx, {to: this.address, amount, token}, this.provider);

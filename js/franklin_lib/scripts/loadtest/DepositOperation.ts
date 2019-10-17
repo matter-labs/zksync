@@ -16,7 +16,9 @@ export class DepositOperation extends AbstractOperation {
     }
 
     public async action() {
-        this.logStart(`trying deposit(${this.kwargs.token.id} | ${this.kwargs.amount.toString()})`);
-        await this.kwargs.wallet.deposit(this.kwargs.token, this.kwargs.amount, this.kwargs.fee);
+        this.logStart(`trying deposit(${this.kwargs.token.id} | ${this.kwargs.amount.toString()} | ${this.kwargs.fee.toString()})`);
+        let handle = await this.kwargs.wallet.deposit(this.kwargs.token, this.kwargs.amount, this.kwargs.fee);
+        this.log(`Deposit tx hash is ${handle.ethTx.hash}`);
+        await handle.waitCommit();
     }
 }
