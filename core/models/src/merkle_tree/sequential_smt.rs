@@ -1,5 +1,4 @@
-// Sparse Merkle tree with flexible hashing strategy
-
+/// Sparse Merkle tree with flexible hashing strategy
 use super::hasher::Hasher;
 use crate::primitives::GetBits;
 use std::collections::HashMap;

@@ -1,11 +1,14 @@
-use super::tx::{Close, Deposit, Transfer, Withdraw};
 use super::AccountId;
-use crate::node::{pack_fee_amount, pack_token_amount};
-use bigdecimal::ToPrimitive;
+use super::FranklinTx;
+use super::{pack_fee_amount, pack_token_amount, Deposit, FullExit};
+use super::{Close, Transfer, Withdraw};
+use crate::node::FranklinPriorityOp;
+use crate::primitives::big_decimal_to_u128;
+use bigdecimal::BigDecimal;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositOp {
-    pub tx: Deposit,
+    pub priority_op: Deposit,
     pub account_id: AccountId,
 }
 
@@ -17,10 +20,9 @@ impl DepositOp {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
         data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
-        data.extend_from_slice(&self.tx.token.to_be_bytes());
-        data.extend_from_slice(&self.tx.amount.to_u128().unwrap().to_be_bytes());
-        data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
-        data.extend_from_slice(&self.tx.to.data);
+        data.extend_from_slice(&self.priority_op.token.to_be_bytes());
+        data.extend_from_slice(&big_decimal_to_u128(&self.priority_op.amount).to_be_bytes());
+        data.extend_from_slice(&self.priority_op.account.data);
         data.resize(Self::CHUNKS * 8, 0x00);
         data
     }
@@ -90,7 +92,7 @@ impl WithdrawOp {
         data.push(Self::OP_CODE); // opcode
         data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
         data.extend_from_slice(&self.tx.token.to_be_bytes());
-        data.extend_from_slice(&self.tx.amount.to_u128().unwrap().to_be_bytes());
+        data.extend_from_slice(&big_decimal_to_u128(&self.tx.amount).to_be_bytes());
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
         data.extend_from_slice(self.tx.eth_address.as_bytes());
         data.resize(Self::CHUNKS * 8, 0x00);
@@ -118,6 +120,33 @@ impl CloseOp {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FullExitOp {
+    pub priority_op: FullExit,
+    pub account_data: Option<(AccountId, BigDecimal)>,
+}
+
+impl FullExitOp {
+    pub const CHUNKS: usize = 18;
+    const OP_CODE: u8 = 0x06;
+
+    fn get_public_data(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.push(Self::OP_CODE); // opcode
+        let (account_id, amount) = self.account_data.clone().unwrap_or_default();
+        data.extend_from_slice(&account_id.to_be_bytes()[1..]);
+        data.extend_from_slice(&*self.priority_op.packed_pubkey);
+        data.extend_from_slice(self.priority_op.eth_address.as_bytes());
+        data.extend_from_slice(&self.priority_op.token.to_be_bytes());
+        data.extend_from_slice(&self.priority_op.nonce.to_be_bytes());
+        data.extend_from_slice(&*self.priority_op.signature_r);
+        data.extend_from_slice(&*self.priority_op.signature_s);
+        data.extend_from_slice(&big_decimal_to_u128(&amount).to_be_bytes());
+        data.resize(Self::CHUNKS * 8, 0x00);
+        data
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum FranklinOp {
     Deposit(DepositOp),
@@ -125,6 +154,7 @@ pub enum FranklinOp {
     Withdraw(WithdrawOp),
     Close(CloseOp),
     Transfer(TransferOp),
+    FullExit(FullExitOp),
 }
 
 impl FranklinOp {
@@ -135,6 +165,7 @@ impl FranklinOp {
             FranklinOp::Withdraw(_) => WithdrawOp::CHUNKS,
             FranklinOp::Close(_) => CloseOp::CHUNKS,
             FranklinOp::Transfer(_) => TransferOp::CHUNKS,
+            FranklinOp::FullExit(_) => FullExitOp::CHUNKS,
         }
     }
 
@@ -145,6 +176,25 @@ impl FranklinOp {
             FranklinOp::Withdraw(op) => op.get_public_data(),
             FranklinOp::Close(op) => op.get_public_data(),
             FranklinOp::Transfer(op) => op.get_public_data(),
+            FranklinOp::FullExit(op) => op.get_public_data(),
+        }
+    }
+
+    pub fn try_get_tx(&self) -> Option<FranklinTx> {
+        match self {
+            FranklinOp::Transfer(op) => Some(FranklinTx::Transfer(op.tx.clone())),
+            FranklinOp::TransferToNew(op) => Some(FranklinTx::Transfer(op.tx.clone())),
+            FranklinOp::Withdraw(op) => Some(FranklinTx::Withdraw(op.tx.clone())),
+            FranklinOp::Close(op) => Some(FranklinTx::Close(op.tx.clone())),
+            _ => None,
+        }
+    }
+
+    pub fn try_get_priority_op(&self) -> Option<FranklinPriorityOp> {
+        match self {
+            FranklinOp::Deposit(op) => Some(FranklinPriorityOp::Deposit(op.priority_op.clone())),
+            FranklinOp::FullExit(op) => Some(FranklinPriorityOp::FullExit(op.priority_op.clone())),
+            _ => None,
         }
     }
 }

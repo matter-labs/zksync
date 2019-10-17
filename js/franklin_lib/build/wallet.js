@@ -37,15 +37,33 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
+var _this = this;
 Object.defineProperty(exports, "__esModule", { value: true });
 var BN = require("bn.js");
 var axios_1 = __importDefault(require("axios"));
-var sign_1 = require("./sign");
-var crypto_js_1 = require("crypto-js");
+var crypto_1 = require("./crypto");
 var ethers_1 = require("ethers");
+var utils_1 = require("./utils");
+var parseEther = ethers_1.ethers.utils.parseEther;
 var bigNumberify = ethers_1.ethers.utils.bigNumberify;
-var IERC20Conract = require("../abi/IERC20");
-var franklinContractCode = require("../abi/Franklin");
+var PUBKEY_HASH_LEN = 20;
+var IERC20Conract = require("../abi/IERC20.json");
+var franklinContractCode = require("../abi/Franklin.json");
+function toAddress(addressLike) {
+    if (typeof (addressLike) == "string") {
+        return Buffer.from(addressLike.substr(2), "hex");
+    }
+    else {
+        return addressLike;
+    }
+}
+exports.toAddress = toAddress;
+var sleep = function (ms) { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
+    switch (_a.label) {
+        case 0: return [4 /*yield*/, new Promise(function (resolve) { return setTimeout(resolve, ms); })];
+        case 1: return [2 /*return*/, _a.sent()];
+    }
+}); }); };
 var FranklinProvider = /** @class */ (function () {
     function FranklinProvider(providerAddress, contractAddress) {
         if (providerAddress === void 0) { providerAddress = 'http://127.0.0.1:3000'; }
@@ -53,11 +71,61 @@ var FranklinProvider = /** @class */ (function () {
         this.providerAddress = providerAddress;
         this.contractAddress = contractAddress;
     }
+    FranklinProvider.prepareTransferRequestForNode = function (tx, signature) {
+        var req = tx;
+        req.type = "Transfer";
+        req.from = "0x" + tx.from.toString("hex");
+        req.to = "0x" + tx.to.toString("hex");
+        req.amount = bigNumberify(tx.amount).toString();
+        req.fee = bigNumberify(tx.fee).toString();
+        req.signature = signature;
+        return req;
+    };
+    FranklinProvider.prepareWithdrawRequestForNode = function (tx, signature) {
+        var req = tx;
+        req.type = "Withdraw";
+        req.account = "0x" + tx.account.toString("hex");
+        req.amount = bigNumberify(tx.amount).toString();
+        req.fee = bigNumberify(tx.fee).toString();
+        req.signature = signature;
+        return req;
+    };
+    FranklinProvider.prepareCloseRequestForNode = function (tx, signature) {
+        var req = tx;
+        req.type = "Close";
+        req.account = "0x" + tx.account.toString("hex");
+        req.signature = signature;
+        return req;
+    };
+    // TODO: reconsider when wallet refactor.
+    FranklinProvider.axiosRequest = function (promise) {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        promise = promise
+                            .then(function (reps) { return reps.data; })
+                            .catch(function (error) {
+                            var response;
+                            if (!error.response) {
+                                response = 'Error: Network Error';
+                            }
+                            else {
+                                response = error.response.data.message;
+                            }
+                            throw new Error(response);
+                        });
+                        return [4 /*yield*/, promise];
+                    case 1: return [2 /*return*/, _a.sent()];
+                }
+            });
+        });
+    };
     FranklinProvider.prototype.submitTx = function (tx) {
         return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, axios_1.default.post(this.providerAddress + '/api/v0.1/submit_tx', tx).then(function (reps) { return reps.data; })];
+                    case 0: return [4 /*yield*/, FranklinProvider.axiosRequest(axios_1.default.post(this.providerAddress + '/api/v0.1/submit_tx', tx))];
                     case 1: return [2 /*return*/, _a.sent()];
                 }
             });
@@ -67,7 +135,21 @@ var FranklinProvider = /** @class */ (function () {
         return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, axios_1.default.get(this.providerAddress + '/api/v0.1/tokens').then(function (reps) { return reps.data; })];
+                    case 0: return [4 /*yield*/, FranklinProvider.axiosRequest(axios_1.default.get(this.providerAddress + '/api/v0.1/tokens'))];
+                    case 1: return [2 /*return*/, _a.sent()];
+                }
+            });
+        });
+    };
+    FranklinProvider.prototype.getTransactionsHistory = function (address, offset, limit) {
+        return __awaiter(this, void 0, void 0, function () {
+            var link;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        link = this.providerAddress + "/api/v0.1/account/0x" + address.toString("hex") + "/history/" + offset + "/" + limit;
+                        console.log("In wallet, we request " + link);
+                        return [4 /*yield*/, FranklinProvider.axiosRequest(axios_1.default.get(link))];
                     case 1: return [2 /*return*/, _a.sent()];
                 }
             });
@@ -77,7 +159,27 @@ var FranklinProvider = /** @class */ (function () {
         return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, axios_1.default.get(this.providerAddress + '/api/v0.1/account/' + address).then(function (reps) { return reps.data; })];
+                    case 0: return [4 /*yield*/, FranklinProvider.axiosRequest(axios_1.default.get(this.providerAddress + '/api/v0.1/account/' + ("0x" + address.toString("hex"))))];
+                    case 1: return [2 /*return*/, _a.sent()];
+                }
+            });
+        });
+    };
+    FranklinProvider.prototype.getTxReceipt = function (tx_hash) {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0: return [4 /*yield*/, FranklinProvider.axiosRequest(axios_1.default.get(this.providerAddress + '/api/v0.1/transactions/' + tx_hash))];
+                    case 1: return [2 /*return*/, _a.sent()];
+                }
+            });
+        });
+    };
+    FranklinProvider.prototype.getPriorityOpReceipt = function (pq_id) {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0: return [4 /*yield*/, FranklinProvider.axiosRequest(axios_1.default.get(this.providerAddress + "/api/v0.1/priority_operations/" + pq_id + "/"))];
                     case 1: return [2 /*return*/, _a.sent()];
                 }
             });
@@ -86,69 +188,116 @@ var FranklinProvider = /** @class */ (function () {
     return FranklinProvider;
 }());
 exports.FranklinProvider = FranklinProvider;
+var WalletKeys = /** @class */ (function () {
+    function WalletKeys(privateKey) {
+        this.privateKey = privateKey;
+        this.publicKey = crypto_1.privateKeyToPublicKey(privateKey);
+    }
+    WalletKeys.prototype.signTransfer = function (tx) {
+        var type = Buffer.from([5]); // tx type
+        var from = tx.from;
+        var to = tx.to;
+        var token = Buffer.alloc(2);
+        token.writeUInt16BE(tx.token, 0);
+        var bnAmount = new BN(bigNumberify(tx.amount).toString());
+        var amount = utils_1.packAmount(bnAmount);
+        var bnFee = new BN(bigNumberify(tx.fee).toString());
+        var fee = utils_1.packFee(bnFee);
+        var nonce = Buffer.alloc(4);
+        nonce.writeUInt32BE(tx.nonce, 0);
+        var msg = Buffer.concat([type, from, to, token, amount, fee, nonce]);
+        return crypto_1.signTransactionBytes(this.privateKey, msg);
+    };
+    WalletKeys.prototype.signWithdraw = function (tx) {
+        var type = Buffer.from([3]);
+        var account = tx.account;
+        var eth_address = Buffer.from(tx.eth_address.slice(2), "hex");
+        var token = Buffer.alloc(2);
+        token.writeUInt16BE(tx.token, 0);
+        var bnAmount = new BN(bigNumberify(tx.amount).toString());
+        var amount = bnAmount.toArrayLike(Buffer, "be", 16);
+        var bnFee = new BN(bigNumberify(tx.fee).toString());
+        var fee = utils_1.packFee(bnFee);
+        var nonce = Buffer.alloc(4);
+        nonce.writeUInt32BE(tx.nonce, 0);
+        var msg = Buffer.concat([type, account, eth_address, token, amount, fee, nonce]);
+        return crypto_1.signTransactionBytes(this.privateKey, msg);
+    };
+    WalletKeys.prototype.signClose = function (tx) {
+        var type = Buffer.from([4]);
+        var account = tx.account;
+        var nonce = Buffer.alloc(4);
+        nonce.writeUInt32BE(tx.nonce, 0);
+        var msg = Buffer.concat([type, account, nonce]);
+        return crypto_1.signTransactionBytes(this.privateKey, msg);
+    };
+    WalletKeys.prototype.signFullExit = function (op) {
+        var type = Buffer.from([6]);
+        var packed_pubkey = crypto_1.serializePointPacked(this.publicKey);
+        var eth_address = Buffer.from(op.eth_address.slice(2), "hex");
+        var token = Buffer.alloc(2);
+        token.writeUInt16BE(op.token, 0);
+        var nonce = Buffer.alloc(4);
+        nonce.writeUInt32BE(op.nonce, 0);
+        var msg = Buffer.concat([type, packed_pubkey, eth_address, token, nonce]);
+        return Buffer.from(crypto_1.signTransactionBytes(this.privateKey, msg).sign, "hex");
+    };
+    return WalletKeys;
+}());
+exports.WalletKeys = WalletKeys;
 var Wallet = /** @class */ (function () {
     function Wallet(seed, provider, ethWallet, ethAddress) {
         this.provider = provider;
         this.ethWallet = ethWallet;
         this.ethAddress = ethAddress;
-        var privateKey = new BN(crypto_js_1.HmacSHA512(seed.toString('hex'), 'Matter seed').toString(), 'hex');
-        this.privateKey = privateKey.mod(sign_1.altjubjubCurve.n);
-        this.publicKey = sign_1.altjubjubCurve.g.mul(this.privateKey).normalize();
-        var _a = [this.publicKey.getX(), this.publicKey.getY()], x = _a[0], y = _a[1];
-        var buff = Buffer.from(x.toString('hex').padStart(64, '0') + y.toString('hex').padStart(64, '0'), 'hex');
-        var hash = sign_1.pedersenHash(buff);
-        this.address = '0x' + (hash.getX().toString('hex').padStart(64, '0') + hash.getY().toString('hex').padStart(64, '0')).slice(0, 27 * 2);
+        var privateKey = crypto_1.privateKeyFromSeed(seed).privateKey;
+        this.walletKeys = new WalletKeys(privateKey);
+        this.address = crypto_1.pubkeyToAddress(this.walletKeys.publicKey);
     }
-    Wallet.prototype.depositOnchain = function (token, amount) {
+    Wallet.prototype.deposit = function (token, amount) {
         return __awaiter(this, void 0, void 0, function () {
-            var franklinDeployedContract, franklinAddressBinary, tx, erc20DeployedToken, tx;
+            var franklinDeployedContract, tx, erc20DeployedToken, tx;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
                         franklinDeployedContract = new ethers_1.Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
-                        franklinAddressBinary = Buffer.from(this.address.substr(2), "hex");
-                        if (!(token.id == 0)) return [3 /*break*/, 3];
-                        return [4 /*yield*/, franklinDeployedContract.depositETH(franklinAddressBinary, { value: amount })];
+                        if (!(token.id == 0)) return [3 /*break*/, 2];
+                        return [4 /*yield*/, franklinDeployedContract.depositETH(this.address, { value: amount, gasLimit: bigNumberify("200000") })];
                     case 1:
                         tx = _a.sent();
-                        return [4 /*yield*/, tx.wait(2)];
-                    case 2:
-                        _a.sent();
                         return [2 /*return*/, tx.hash];
-                    case 3:
+                    case 2:
                         erc20DeployedToken = new ethers_1.Contract(token.address, IERC20Conract.abi, this.ethWallet);
                         return [4 /*yield*/, erc20DeployedToken.approve(franklinDeployedContract.address, amount)];
+                    case 3:
+                        _a.sent();
+                        return [4 /*yield*/, franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address, { gasLimit: bigNumberify("300000"), value: parseEther("0.05") })];
                     case 4:
-                        _a.sent();
-                        return [4 /*yield*/, franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, franklinAddressBinary, { gasLimit: bigNumberify("150000") })];
-                    case 5:
                         tx = _a.sent();
-                        return [4 /*yield*/, tx.wait(2)];
-                    case 6:
-                        _a.sent();
                         return [2 /*return*/, tx.hash];
                 }
             });
         });
     };
-    Wallet.prototype.depositOffchain = function (token, amount, fee) {
+    // TODO: remove this method
+    Wallet.prototype.waitTxReceipt = function (tx_hash) {
         return __awaiter(this, void 0, void 0, function () {
-            var nonce, tx;
+            var receipt;
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.getNonce()];
+                    case 0:
+                        if (!true) return [3 /*break*/, 3];
+                        return [4 /*yield*/, this.provider.getTxReceipt(tx_hash)];
                     case 1:
-                        nonce = _a.sent();
-                        tx = {
-                            type: 'Deposit',
-                            to: this.address,
-                            token: token.id,
-                            amount: bigNumberify(amount).toString(),
-                            fee: bigNumberify(fee).toString(),
-                            nonce: nonce,
-                        };
-                        return [4 /*yield*/, this.provider.submitTx(tx)];
-                    case 2: return [2 /*return*/, _a.sent()];
+                        receipt = _a.sent();
+                        if (receipt != null) {
+                            return [2 /*return*/, receipt];
+                        }
+                        return [4 /*yield*/, sleep(1000)];
+                    case 2:
+                        _a.sent();
+                        return [3 /*break*/, 0];
+                    case 3: return [2 /*return*/];
                 }
             });
         });
@@ -181,49 +330,96 @@ var Wallet = /** @class */ (function () {
     };
     Wallet.prototype.widthdrawOffchain = function (token, amount, fee) {
         return __awaiter(this, void 0, void 0, function () {
-            var nonce, tx, _a;
+            var tx, _a, signature, tx_req;
             return __generator(this, function (_b) {
                 switch (_b.label) {
-                    case 0: return [4 /*yield*/, this.getNonce()];
-                    case 1:
-                        nonce = _b.sent();
+                    case 0:
                         _a = {
-                            type: 'Withdraw',
                             account: this.address
                         };
                         return [4 /*yield*/, this.ethWallet.getAddress()];
-                    case 2:
-                        tx = (_a.eth_address = _b.sent(),
+                    case 1:
+                        _a.eth_address = _b.sent(),
                             _a.token = token.id,
-                            _a.amount = bigNumberify(amount).toString(),
-                            _a.fee = bigNumberify(fee).toString(),
-                            _a.nonce = nonce,
+                            _a.amount = amount,
+                            _a.fee = fee;
+                        return [4 /*yield*/, this.getNonce()];
+                    case 2:
+                        tx = (_a.nonce = _b.sent(),
                             _a);
-                        return [4 /*yield*/, this.provider.submitTx(tx)];
+                        signature = this.walletKeys.signWithdraw(tx);
+                        tx_req = FranklinProvider.prepareWithdrawRequestForNode(tx, signature);
+                        return [4 /*yield*/, this.provider.submitTx(tx_req)];
                     case 3: return [2 /*return*/, _b.sent()];
                 }
             });
         });
     };
-    Wallet.prototype.transfer = function (address, token, amount, fee) {
+    Wallet.prototype.emergencyWithdraw = function (token) {
         return __awaiter(this, void 0, void 0, function () {
-            var nonce, tx;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.getNonce()];
+            var franklinDeployedContract, nonce, signature, _a, _b, _c, tx;
+            return __generator(this, function (_d) {
+                switch (_d.label) {
+                    case 0:
+                        franklinDeployedContract = new ethers_1.Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
+                        return [4 /*yield*/, this.getNonce()];
                     case 1:
-                        nonce = _a.sent();
-                        tx = {
-                            type: 'Transfer',
+                        nonce = _d.sent();
+                        _b = (_a = this.walletKeys).signFullExit;
+                        _c = { token: token.id };
+                        return [4 /*yield*/, this.ethWallet.getAddress()];
+                    case 2:
+                        signature = _b.apply(_a, [(_c.eth_address = _d.sent(), _c.nonce = nonce, _c)]);
+                        return [4 /*yield*/, franklinDeployedContract.fullExit(crypto_1.serializePointPacked(this.walletKeys.publicKey), token.address, signature, nonce, { gasLimit: bigNumberify("500000"), value: parseEther("0.02") })];
+                    case 3:
+                        tx = _d.sent();
+                        return [2 /*return*/, tx.hash];
+                }
+            });
+        });
+    };
+    Wallet.prototype.transfer = function (to, token, amount, fee) {
+        return __awaiter(this, void 0, void 0, function () {
+            var tx, _a, signature, tx_req;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0:
+                        _a = {
                             from: this.address,
-                            to: address,
+                            to: toAddress(to),
                             token: token.id,
-                            amount: bigNumberify(amount).toString(),
-                            fee: bigNumberify(fee).toString(),
-                            nonce: nonce,
+                            amount: amount,
+                            fee: fee
                         };
-                        return [4 /*yield*/, this.provider.submitTx(tx)];
-                    case 2: return [2 /*return*/, _a.sent()];
+                        return [4 /*yield*/, this.getNonce()];
+                    case 1:
+                        tx = (_a.nonce = _b.sent(),
+                            _a);
+                        signature = this.walletKeys.signTransfer(tx);
+                        tx_req = FranklinProvider.prepareTransferRequestForNode(tx, signature);
+                        return [4 /*yield*/, this.provider.submitTx(tx_req)];
+                    case 2: return [2 /*return*/, _b.sent()];
+                }
+            });
+        });
+    };
+    Wallet.prototype.close = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var tx, _a, signature, tx_req;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0:
+                        _a = {
+                            account: this.address
+                        };
+                        return [4 /*yield*/, this.getNonce()];
+                    case 1:
+                        tx = (_a.nonce = _b.sent(),
+                            _a);
+                        signature = this.walletKeys.signClose(tx);
+                        tx_req = FranklinProvider.prepareCloseRequestForNode(tx, signature);
+                        return [4 /*yield*/, this.provider.submitTx(tx_req)];
+                    case 2: return [2 /*return*/, _b.sent()];
                 }
             });
         });
@@ -232,10 +428,14 @@ var Wallet = /** @class */ (function () {
         return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.fetchFranklinState()];
+                    case 0:
+                        if (!(this.pendingNonce == null)) return [3 /*break*/, 2];
+                        return [4 /*yield*/, this.fetchFranklinState()];
                     case 1:
                         _a.sent();
-                        return [2 /*return*/, this.franklinState.commited.nonce];
+                        this.pendingNonce = this.franklinState.commited.nonce + this.franklinState.pending_txs.length;
+                        _a.label = 2;
+                    case 2: return [2 /*return*/, this.pendingNonce++];
                 }
             });
         });
@@ -260,48 +460,45 @@ var Wallet = /** @class */ (function () {
     };
     Wallet.prototype.fetchEthState = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var onchainBalances, contractBalances, lockedBlocksLeft, currentBlock, franklinDeployedContract, _i, _a, token, _b, _c, erc20DeployedToken, _d, _e, balanceStorage;
-            return __generator(this, function (_f) {
-                switch (_f.label) {
+            var onchainBalances, contractBalances, franklinDeployedContract, _i, _a, token, _b, _c, erc20DeployedToken, _d, _e, _f, _g;
+            return __generator(this, function (_h) {
+                switch (_h.label) {
                     case 0:
                         onchainBalances = new Array(this.supportedTokens.length);
                         contractBalances = new Array(this.supportedTokens.length);
-                        lockedBlocksLeft = new Array(this.supportedTokens.length);
-                        return [4 /*yield*/, this.ethWallet.provider.getBlockNumber()];
-                    case 1:
-                        currentBlock = _f.sent();
                         franklinDeployedContract = new ethers_1.Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
                         _i = 0, _a = this.supportedTokens;
-                        _f.label = 2;
-                    case 2:
-                        if (!(_i < _a.length)) return [3 /*break*/, 9];
+                        _h.label = 1;
+                    case 1:
+                        if (!(_i < _a.length)) return [3 /*break*/, 8];
                         token = _a[_i];
-                        if (!(token.id == 0)) return [3 /*break*/, 4];
+                        if (!(token.id == 0)) return [3 /*break*/, 3];
                         _b = onchainBalances;
                         _c = token.id;
                         return [4 /*yield*/, this.ethWallet.provider.getBalance(this.ethAddress)];
+                    case 2:
+                        _b[_c] = _h.sent();
+                        return [3 /*break*/, 5];
                     case 3:
-                        _b[_c] = _f.sent();
-                        return [3 /*break*/, 6];
-                    case 4:
                         erc20DeployedToken = new ethers_1.Contract(token.address, IERC20Conract.abi, this.ethWallet);
                         _d = onchainBalances;
                         _e = token.id;
                         return [4 /*yield*/, erc20DeployedToken.balanceOf(this.ethAddress).then(function (n) { return n.toString(); })];
+                    case 4:
+                        _d[_e] = _h.sent();
+                        _h.label = 5;
                     case 5:
-                        _d[_e] = _f.sent();
-                        _f.label = 6;
-                    case 6: return [4 /*yield*/, franklinDeployedContract.balances(this.ethAddress, token.id)];
+                        _f = contractBalances;
+                        _g = token.id;
+                        return [4 /*yield*/, franklinDeployedContract.balancesToWithdraw(this.ethAddress, token.id)];
+                    case 6:
+                        _f[_g] = _h.sent();
+                        _h.label = 7;
                     case 7:
-                        balanceStorage = _f.sent();
-                        contractBalances[token.id] = balanceStorage.balance;
-                        lockedBlocksLeft[token.id] = Math.max(balanceStorage.lockedUntilBlock - currentBlock, 0);
-                        _f.label = 8;
-                    case 8:
                         _i++;
-                        return [3 /*break*/, 2];
-                    case 9:
-                        this.ethState = { onchainBalances: onchainBalances, contractBalances: contractBalances, lockedBlocksLeft: lockedBlocksLeft };
+                        return [3 /*break*/, 1];
+                    case 8:
+                        this.ethState = { onchainBalances: onchainBalances, contractBalances: contractBalances };
                         return [2 /*return*/];
                 }
             });

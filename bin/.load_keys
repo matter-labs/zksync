@@ -1,13 +1,14 @@
 #!/bin/bash
 
-echo "Checking keys in $KEY_DIR/"
-mkdir -p $KEY_DIR
+DIR=$KEY_DIR$BLOCK_SIZE_CHUNKS
+echo "Checking keys in $DIR"
+mkdir -p $DIR
 #cd $KEY_DIR
 
 for i in $KEY_FILES; do
-    if ! [ -f $KEY_DIR/$i ]; then
+    if ! [ -f $DIR/$i ]; then
         echo "Downloading file $SPACE_URL/$i"
-        axel -o $KEY_DIR/$i -a $SPACE_URL/$i 2>&1
+        axel -o $DIR/$i -a $SPACE_URL/$i 2>&1
         #curl -o $KEY_DIR/$i $SPACE_URL/$i 2>&1
     fi
 done

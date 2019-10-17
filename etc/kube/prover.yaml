@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: ${FRANKLIN_ENV}-prover
-          image: gluk64/franklin:prover
+          image: matterlabs/prover:latest
           imagePullPolicy: Always
           resources:
             requests:

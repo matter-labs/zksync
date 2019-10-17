@@ -1,20 +1,19 @@
 use super::utils::*;
-use crate::utils::*;
 
+use crate::operation::SignatureData;
 use crate::operation::*;
 use ff::{Field, PrimeField};
-use num_traits::cast::ToPrimitive;
-
 use franklin_crypto::circuit::float_point::{convert_to_float, parse_float_to_u128};
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
+use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
 use models::node::DepositOp;
 use models::params as franklin_constants;
+use num_traits::cast::ToPrimitive;
 use pairing::bn256::*;
 
 pub struct DepositData {
     pub amount: u128,
-    pub fee: u128,
     pub token: u32,
     pub account_address: u32,
     pub new_pub_key_hash: Fr,
@@ -54,12 +53,6 @@ impl<E: JubjubEngine> DepositWitness<E> {
 
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.fee.unwrap(),
-            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-        );
-
-        append_be_fixed_width(
-            &mut pubdata_bits,
             &self.args.new_pub_key_hash.unwrap(),
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         );
@@ -91,11 +84,6 @@ impl<E: JubjubEngine> DepositWitness<E> {
         );
         append_be_fixed_width(
             &mut sig_bits,
-            &self.args.fee.unwrap(),
-            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
             &self.before.witness.account_witness.nonce.unwrap(),
             franklin_constants::NONCE_BIT_WIDTH,
         );
@@ -107,11 +95,10 @@ pub fn apply_deposit_tx(
     tree: &mut CircuitAccountTree,
     deposit: &DepositOp,
 ) -> DepositWitness<Bn256> {
-    let alt_new_pubkey_hash = Fr::from_hex(&deposit.tx.to.to_hex()).unwrap();
+    let alt_new_pubkey_hash = Fr::from_hex(&deposit.priority_op.account.to_hex()).unwrap();
     let deposit_data = DepositData {
-        amount: deposit.tx.amount.to_u128().unwrap(),
-        fee: deposit.tx.fee.to_u128().unwrap(),
-        token: u32::from(deposit.tx.token),
+        amount: deposit.priority_op.amount.to_string().parse().unwrap(),
+        token: u32::from(deposit.priority_op.token),
         account_address: deposit.account_id,
         new_pub_key_hash: alt_new_pubkey_hash,
     };
@@ -132,47 +119,10 @@ pub fn apply_deposit(
     let account_address_fe = Fr::from_str(&deposit.account_address.to_string()).unwrap();
     let token_fe = Fr::from_str(&deposit.token.to_string()).unwrap();
     let amount_as_field_element = Fr::from_str(&deposit.amount.to_string()).unwrap();
-
-    let amount_bits = convert_to_float(
-        deposit.amount,
-        franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap();
-    let reparsed_amount = parse_float_to_u128(
-        amount_bits.clone(),
-        franklin_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        franklin_constants::AMOUNT_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap();
-    assert_eq!(reparsed_amount, deposit.amount);
-
-    let amount_encoded: Fr = le_bit_vector_into_field_element(&amount_bits);
-
-    let fee_as_field_element = Fr::from_str(&deposit.fee.to_string()).unwrap();
-
-    let fee_bits = convert_to_float(
-        deposit.fee,
-        franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-        franklin_constants::FEE_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap();
-    let reparsed_fee = parse_float_to_u128(
-        fee_bits.clone(),
-        franklin_constants::FEE_EXPONENT_BIT_WIDTH,
-        franklin_constants::FEE_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap();
-    assert_eq!(reparsed_fee, deposit.fee);
-    let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
-
+    println!("amount_as_field_element is: {}", amount_as_field_element);
     //calculate a and b
     let a = amount_as_field_element;
-    let b = fee_as_field_element;
+    let b = Fr::zero();
 
     //applying deposit
     let (account_witness_before, account_witness_after, balance_before, balance_after) =
@@ -186,7 +136,6 @@ pub fn apply_deposit(
                         || (acc.pub_key_hash == Fr::zero())
                 );
                 acc.pub_key_hash = deposit.new_pub_key_hash;
-                acc.nonce.add_assign(&Fr::from_str("1").unwrap());
             },
             |bal| bal.value.add_assign(&amount_as_field_element),
         );
@@ -219,11 +168,12 @@ pub fn apply_deposit(
         },
         args: OperationArguments {
             ethereum_key: Some(Fr::zero()),
-            amount_packed: Some(amount_encoded),
+            amount_packed: Some(Fr::zero()),
             full_amount: Some(amount_as_field_element),
-            fee: Some(fee_encoded),
+            fee: Some(Fr::zero()),
             a: Some(a),
             b: Some(b),
+            pub_nonce: Some(Fr::zero()),
             new_pub_key_hash: Some(deposit.new_pub_key_hash),
         },
         before_root: Some(before_root),
@@ -237,9 +187,8 @@ pub fn calculate_deposit_operations_from_witness(
     first_sig_msg: &Fr,
     second_sig_msg: &Fr,
     third_sig_msg: &Fr,
-    signature: Option<TransactionSignature<Bn256>>,
-    signer_pub_key_x: &Fr,
-    signer_pub_key_y: &Fr,
+    signature_data: &SignatureData,
+    signer_pub_key_packed: &[Option<bool>],
 ) -> Vec<Operation<Bn256>> {
     let pubdata_chunks: Vec<_> = deposit_witness
         .get_pubdata()
@@ -260,9 +209,8 @@ pub fn calculate_deposit_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signature_data: signature_data.clone(),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: deposit_witness.args.clone(),
         lhs: deposit_witness.before.clone(),
         rhs: deposit_witness.before.clone(),
@@ -276,9 +224,8 @@ pub fn calculate_deposit_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signature_data: signature_data.clone(),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: deposit_witness.args.clone(),
         lhs: deposit_witness.after.clone(),
         rhs: deposit_witness.after.clone(),
@@ -292,12 +239,11 @@ pub fn calculate_deposit_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: deposit_witness.args.clone(),
         lhs: deposit_witness.after.clone(),
         rhs: deposit_witness.after.clone(),
+        signature_data: signature_data.clone(),
     };
 
     let operation_three = Operation {
@@ -308,12 +254,11 @@ pub fn calculate_deposit_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: deposit_witness.args.clone(),
         lhs: deposit_witness.after.clone(),
         rhs: deposit_witness.after.clone(),
+        signature_data: signature_data.clone(),
     };
 
     let operation_four = Operation {
@@ -324,12 +269,11 @@ pub fn calculate_deposit_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: deposit_witness.args.clone(),
         lhs: deposit_witness.after.clone(),
         rhs: deposit_witness.after.clone(),
+        signature_data: signature_data.clone(),
     };
 
     let operation_five = Operation {
@@ -340,12 +284,11 @@ pub fn calculate_deposit_operations_from_witness(
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
-        signature: signature.clone(),
-        signer_pub_key_x: Some(*signer_pub_key_x),
-        signer_pub_key_y: Some(*signer_pub_key_y),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: deposit_witness.args.clone(),
         lhs: deposit_witness.after.clone(),
         rhs: deposit_witness.after.clone(),
+        signature_data: signature_data.clone(),
     };
     let operations: Vec<Operation<_>> = vec![
         operation_zero,
@@ -375,8 +318,10 @@ mod test {
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use franklin_crypto::jubjub::FixedGenerators;
     use models::circuit::account::{CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
+    use models::circuit::utils::*;
     use models::params as franklin_constants;
 
+    use models::node::tx::PackedPublicKey;
     use rand::{Rng, SeedableRng, XorShiftRng};
 
     #[test]
@@ -395,7 +340,7 @@ mod test {
         println!("empty tree root_hash is: {}", tree.root_hash());
         let sender_sk = PrivateKey::<Bn256>(rng.gen());
         let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
-        let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
+        let sender_pub_key_hash = pub_key_hash_fe(&sender_pk, &phasher);
         let (sender_x, sender_y) = sender_pk.0.into_xy();
         let sender_leaf = CircuitAccount::<Bn256> {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
@@ -407,7 +352,7 @@ mod test {
         // give some funds to sender and make zero balance for recipient
         let validator_sk = PrivateKey::<Bn256>(rng.gen());
         let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
-        let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
+        let validator_pub_key_hash = pub_key_hash_fe(&validator_pk, &phasher);
 
         let validator_leaf = CircuitAccount::<Bn256> {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
@@ -432,7 +377,6 @@ mod test {
         let mut account_address: u32 = rng.gen();
         account_address %= tree.capacity();
         let amount: u128 = 500;
-        let fee: u128 = 80;
         let token: u32 = 2;
 
         //-------------- Start applying changes to state
@@ -440,13 +384,12 @@ mod test {
             &mut tree,
             &DepositData {
                 amount,
-                fee,
                 token,
                 account_address,
                 new_pub_key_hash: sender_pub_key_hash,
             },
         );
-        let (signature, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
+        let (signature_data, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
             &deposit_witness.get_sig_bits(),
             &phasher,
             &sender_sk,
@@ -458,15 +401,14 @@ mod test {
             &first_sig_part,
             &second_sig_part,
             &third_sig_part,
-            signature,
-            &sender_x,
-            &sender_y,
+            &signature_data,
+            &[Some(false); 256],
         );
 
         println!("tree before_applying fees: {}", tree.root_hash());
 
         let (root_after_fee, validator_account_witness) =
-            apply_fee(&mut tree, validator_address_number, token, fee);
+            apply_fee(&mut tree, validator_address_number, token, 0);
         println!("test root after fees {}", root_after_fee);
         let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
 
@@ -523,7 +465,7 @@ mod test {
         println!("empty tree root_hash is: {}", tree.root_hash());
         let sender_sk = PrivateKey::<Bn256>(rng.gen());
         let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
-        let sender_pub_key_hash = pub_key_hash(&sender_pk, &phasher);
+        let sender_pub_key_hash = pub_key_hash_fe(&sender_pk, &phasher);
         let (sender_x, sender_y) = sender_pk.0.into_xy();
         let sender_leaf = CircuitAccount::<Bn256> {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
@@ -535,7 +477,7 @@ mod test {
         // give some funds to sender and make zero balance for recipient
         let validator_sk = PrivateKey::<Bn256>(rng.gen());
         let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
-        let validator_pub_key_hash = pub_key_hash(&validator_pk, &phasher);
+        let validator_pub_key_hash = pub_key_hash_fe(&validator_pk, &phasher);
 
         let validator_leaf = CircuitAccount::<Bn256> {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
@@ -552,7 +494,6 @@ mod test {
         let mut account_address: u32 = rng.gen();
         account_address %= tree.capacity();
         let amount: u128 = 500;
-        let fee: u128 = 80;
         let token: u32 = 2;
 
         //-------------- Start applying changes to state
@@ -560,7 +501,6 @@ mod test {
             &mut tree,
             &DepositData {
                 amount,
-                fee,
                 token,
                 account_address,
                 new_pub_key_hash: sender_pub_key_hash,
@@ -579,15 +519,14 @@ mod test {
             &first_sig_part,
             &second_sig_part,
             &third_sig_part,
-            signature,
-            &sender_x,
-            &sender_y,
+            &signature,
+            &[Some(false); 256],
         );
 
         println!("tree before_applying fees: {}", tree.root_hash());
 
         let (root_after_fee, validator_account_witness) =
-            apply_fee(&mut tree, validator_address_number, token, fee);
+            apply_fee(&mut tree, validator_address_number, token, 0);
         println!("test root after fees {}", root_after_fee);
         let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
 

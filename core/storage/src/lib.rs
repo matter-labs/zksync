@@ -3,16 +3,14 @@ extern crate diesel;
 #[macro_use]
 extern crate log;
 
-use bigdecimal::{BigDecimal, Zero};
+use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
-use failure::Fail;
-use models::node::block::{Block, ExecutedTx};
+use failure::{bail, Fail};
+use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::{
-    apply_updates, reverse_updates,
-    tx::{FranklinTx, TxType},
-    Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, FranklinOp, Nonce,
-    TokenId,
+    apply_updates, reverse_updates, tx::FranklinTx, Account, AccountId, AccountMap, AccountUpdate,
+    AccountUpdates, BlockNumber, Fr, FranklinOp, PriorityOp, TokenId,
 };
 use models::{Action, ActionType, EncodedProof, Operation, ACTION_COMMIT, ACTION_VERIFY};
 use serde_derive::{Deserialize, Serialize};
@@ -31,7 +29,7 @@ use diesel::r2d2::{ConnectionManager, Pool, PoolError, PooledConnection};
 use serde_json::value::Value;
 use std::env;
 
-use diesel::sql_types::{BigInt, Nullable, Text, Timestamp};
+use diesel::sql_types::{BigInt, Nullable, Text, Timestamp, Bool, Jsonb};
 sql_function!(coalesce, Coalesce, (x: Nullable<BigInt>, y: BigInt) -> BigInt);
 
 use itertools::Itertools;
@@ -138,6 +136,20 @@ struct NewExecutedTransaction {
     operation: Option<Value>,
     success: bool,
     fail_reason: Option<String>,
+    block_index: Option<i32>,
+}
+
+impl NewExecutedTransaction {
+    fn prepare_stored_tx(exec_tx: &ExecutedTx, block: BlockNumber) -> Self {
+        Self {
+            block_number: i64::from(block),
+            tx_hash: exec_tx.tx.hash(),
+            operation: exec_tx.op.clone().map(|o| serde_json::to_value(o).unwrap()),
+            success: exec_tx.success,
+            fail_reason: exec_tx.fail_reason.clone(),
+            block_index: exec_tx.block_index.map(|idx| idx as i32),
+        }
+    }
 }
 
 #[derive(Debug, Queryable, QueryableByName)]
@@ -149,6 +161,94 @@ struct StoredExecutedTransaction {
     operation: Option<Value>,
     success: bool,
     fail_reason: Option<String>,
+    block_index: Option<i32>,
+}
+
+impl StoredExecutedTransaction {
+    fn into_executed_tx(self, stored_tx: Option<ReadTx>) -> Result<ExecutedTx, failure::Error> {
+        if let Some(op) = self.operation {
+            let franklin_op: FranklinOp =
+                serde_json::from_value(op).expect("Unparsable FranklinOp in db");
+            Ok(ExecutedTx {
+                tx: franklin_op
+                    .try_get_tx()
+                    .expect("FranklinOp should not have tx"),
+                success: true,
+                op: Some(franklin_op),
+                fail_reason: None,
+                block_index: Some(self.block_index.expect("Block idx should be set") as u32),
+            })
+        } else {
+            if let Some(stored_tx) = stored_tx {
+                let tx: FranklinTx =
+                    serde_json::from_value(stored_tx.tx).expect("Unparsable tx in db");
+                Ok(ExecutedTx {
+                    tx,
+                    success: false,
+                    op: None,
+                    fail_reason: self.fail_reason,
+                    block_index: None,
+                })
+            } else {
+                bail!("Unsuccessful tx was lost from db.");
+            }
+        }
+    }
+}
+
+#[derive(Debug, Insertable)]
+#[table_name = "executed_priority_operations"]
+struct NewExecutedPriorityOperation {
+    block_number: i64,
+    block_index: i32,
+    operation: Value,
+    priority_op_serialid: i64,
+    deadline_block: i64,
+    eth_fee: BigDecimal,
+}
+
+impl NewExecutedPriorityOperation {
+    fn prepare_stored_priority_op(exec_prior_op: &ExecutedPriorityOp, block: BlockNumber) -> Self {
+        Self {
+            block_number: i64::from(block),
+            block_index: exec_prior_op.block_index as i32,
+            operation: serde_json::to_value(&exec_prior_op.op).unwrap(),
+            priority_op_serialid: exec_prior_op.priority_op.serial_id as i64,
+            deadline_block: exec_prior_op.priority_op.deadline_block as i64,
+            eth_fee: exec_prior_op.priority_op.eth_fee.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Queryable, QueryableByName)]
+#[table_name = "executed_priority_operations"]
+struct StoredExecutedPriorityOperation {
+    id: i32,
+    block_number: i64,
+    block_index: i32,
+    operation: Value,
+    priority_op_serialid: i64,
+    deadline_block: i64,
+    eth_fee: BigDecimal,
+}
+
+impl Into<ExecutedPriorityOp> for StoredExecutedPriorityOperation {
+    fn into(self) -> ExecutedPriorityOp {
+        let franklin_op: FranklinOp =
+            serde_json::from_value(self.operation).expect("Unparsable priority op in db");
+        ExecutedPriorityOp {
+            priority_op: PriorityOp {
+                serial_id: self.priority_op_serialid as u64,
+                data: franklin_op
+                    .try_get_priority_op()
+                    .expect("FranklinOp should have priority op"),
+                deadline_block: self.deadline_block as u64,
+                eth_fee: self.eth_fee,
+            },
+            op: franklin_op,
+            block_index: self.block_index as u32,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -158,18 +258,15 @@ pub struct TxReceiptResponse {
     success: bool,
     verified: bool,
     fail_reason: Option<String>,
+    prover_run: Option<ProverRun>,
 }
 
-impl NewExecutedTransaction {
-    fn prepare_stored_tx(exec_tx: &ExecutedTx, block: BlockNumber) -> Self {
-        Self {
-            block_number: i64::from(block),
-            tx_hash: exec_tx.tx.hash(),
-            operation: exec_tx.op.clone().map(|o| serde_json::to_value(o).unwrap()),
-            success: exec_tx.success,
-            fail_reason: exec_tx.fail_reason.clone(),
-        }
-    }
+// TODO: jazzandrock add more info(?)
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PriorityOpReceiptResponse {
+    committed: bool,
+    verified: bool,
+    prover_run: Option<ProverRun>,
 }
 
 #[derive(Debug)]
@@ -262,10 +359,9 @@ impl StorageAccountDiff {
     }
 }
 
-#[derive(Insertable)]
+#[derive(Debug, Insertable)]
 #[table_name = "operations"]
 struct NewOperation {
-    pub data: Value,
     pub block_number: i64,
     pub action_type: String,
 }
@@ -274,7 +370,6 @@ struct NewOperation {
 #[table_name = "operations"]
 pub struct StoredOperation {
     pub id: i64,
-    pub data: serde_json::Value,
     pub block_number: i64,
     pub action_type: String,
     pub created_at: NaiveDateTime,
@@ -303,90 +398,41 @@ struct NewETHOperation {
     tx_hash: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Queryable)]
-pub struct StoredTx {
-    pub tx_type: TxType, // 'Transfer', 'Deposit', 'Withdraw', 'CLose'
-    pub from: Option<AccountAddress>,
-    pub to: Option<AccountAddress>,
-    pub nonce: Option<Nonce>,
-    pub token: Option<TokenId>,
-    pub amount: Option<BigDecimal>,
-    pub fee: Option<BigDecimal>,
+#[derive(Debug, Insertable, Queryable)]
+#[table_name = "blocks"]
+struct StorageBlock {
+    number: i64,
+    root_hash: String,
+    fee_account_id: i64,
+    unprocessed_prior_op_before: i64,
+    unprocessed_prior_op_after: i64,
 }
 
 impl StoredOperation {
     pub fn into_op(self, conn: &StorageProcessor) -> QueryResult<Operation> {
-        let debug_data = format!("data: {}", &self.data);
+        let block_number = self.block_number as BlockNumber;
+        let id = Some(self.id);
 
-        // let op: Result<Operation, serde_json::Error> = serde_json::from_value(self.data);
-        let op: Result<Operation, serde_json::Error> = serde_json::from_str(&self.data.to_string());
-
-        if let Err(err) = &op {
-            debug!("Error: {} on {}", err, debug_data)
-        }
-
-        let mut op = op.expect("Operation deserialization");
-        op.id = Some(self.id);
-
-        if op.accounts_updated.is_empty() {
-            let updates = conn.load_state_diff_for_block(op.block.block_number)?;
-            op.accounts_updated = updates;
+        let action = if self.action_type == ActionType::COMMIT.to_string() {
+            Action::Commit
+        } else if self.action_type == ActionType::VERIFY.to_string() {
+            // verify
+            let proof = Box::new(conn.load_proof(block_number)?);
+            Action::Verify { proof }
+        } else {
+            unreachable!("Incorrect action type in db");
         };
 
-        Ok(op)
-    }
-
-    pub fn get_txs(&self) -> QueryResult<Vec<StoredTx>> {
-        let debug_data = format!("data: {}", &self.data);
-        let op: Result<Operation, serde_json::Error> = serde_json::from_str(&self.data.to_string());
-        if let Err(err) = &op {
-            debug!("Error: {} on {}", err, debug_data)
-        }
-        let op = op.expect("Operation deserialization");
-        let txs: Vec<StoredTx> = op
-            .block
-            .block_transactions
-            .into_iter()
-            .map(|x| match x.tx {
-                FranklinTx::Transfer(transfer) => StoredTx {
-                    tx_type: TxType::Transfer,
-                    from: Some(transfer.from),
-                    to: Some(transfer.to),
-                    nonce: Some(transfer.nonce),
-                    token: Some(transfer.token),
-                    amount: Some(transfer.amount),
-                    fee: Some(transfer.fee),
-                },
-                FranklinTx::Deposit(deposit) => StoredTx {
-                    tx_type: TxType::Deposit,
-                    from: None,
-                    to: Some(deposit.to),
-                    nonce: Some(deposit.nonce),
-                    token: Some(deposit.token),
-                    amount: Some(deposit.amount),
-                    fee: Some(deposit.fee),
-                },
-                FranklinTx::Withdraw(withdraw) => StoredTx {
-                    tx_type: TxType::Withdraw,
-                    from: Some(withdraw.account),
-                    to: None,
-                    nonce: Some(withdraw.nonce),
-                    token: Some(withdraw.token),
-                    amount: Some(withdraw.amount),
-                    fee: Some(withdraw.fee),
-                },
-                FranklinTx::Close(close) => StoredTx {
-                    tx_type: TxType::Close,
-                    from: Some(close.account),
-                    to: None,
-                    nonce: Some(close.nonce),
-                    token: None,
-                    amount: None,
-                    fee: None,
-                },
-            })
-            .collect();
-        Ok(txs)
+        let block = conn
+            .get_block(block_number)?
+            .expect("Block for action does not exist");
+        let accounts_updated = conn.load_state_diff_for_block(block_number)?;
+        Ok(Operation {
+            id,
+            action,
+            block,
+            accounts_updated,
+        })
     }
 }
 
@@ -406,7 +452,7 @@ pub struct StoredProof {
 }
 
 // Every time before a prover worker starts generating the proof, a prover run is recorded for monitoring purposes
-#[derive(Debug, Insertable, Queryable, QueryableByName)]
+#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize, Deserialize)]
 #[table_name = "prover_runs"]
 pub struct ProverRun {
     pub id: i32,
@@ -547,7 +593,8 @@ struct InsertTx {
     tx: Value,
 }
 
-#[derive(Debug, Queryable)]
+#[derive(Debug, Queryable, QueryableByName)]
+#[table_name = "mempool"]
 struct ReadTx {
     hash: Vec<u8>,
     primary_account_address: Vec<u8>,
@@ -562,8 +609,18 @@ pub enum TxAddError {
     NonceTooLow,
     #[fail(display = "Tx signature is incorrect.")]
     InvalidSignature,
-    #[fail(display = "Tx amount is zero.")]
-    ZeroAmount,
+    #[fail(display = "Tx is incorrect")]
+    IncorrectTx,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AccountTransaction {
+    tx: Value,
+    tx_hash: String,
+    success: bool,
+    fail_reason: Option<String>,
+    committed: bool,
+    verified: bool,
 }
 
 enum ConnectionHolder {
@@ -573,6 +630,30 @@ enum ConnectionHolder {
 
 pub struct StorageProcessor {
     conn: ConnectionHolder,
+}
+
+#[derive(Debug, Serialize, Deserialize, QueryableByName)]
+pub struct TransactionsHistoryItem {
+    #[sql_type = "Nullable<Text>"]
+    pub hash: Option<String>,
+
+    #[sql_type = "Nullable<BigInt>"]
+    pub pq_id: Option<i64>,
+
+    #[sql_type = "Jsonb"]
+    pub tx: Value,
+
+    #[sql_type = "Nullable<Bool>"]
+    pub success: Option<bool>,
+
+    #[sql_type = "Nullable<Text>"]
+    pub fail_reason: Option<String>,
+
+    #[sql_type = "Bool"]
+    pub commited: bool,
+
+    #[sql_type = "Bool"]
+    pub verified: bool,
 }
 
 fn restore_account(
@@ -626,44 +707,327 @@ impl StorageProcessor {
             match &op.action {
                 Action::Commit => {
                     self.commit_state_update(op.block.block_number, &op.accounts_updated)?;
-                    self.save_block_transactions(&op.block)?;
+                    self.save_block(&op.block)?;
                 }
                 Action::Verify { .. } => self.apply_state_update(op.block.block_number)?,
             };
 
-            // NOTE: tx meta is inserted automatically with sender addr and next expected nonce
-            // see SQL migration code for `operations` table
             let stored: StoredOperation = diesel::insert_into(operations::table)
                 .values(&NewOperation {
                     block_number: i64::from(op.block.block_number),
                     action_type: op.action.to_string(),
-                    data: serde_json::to_value(&op).unwrap(),
                 })
                 .get_result(self.conn())?;
             stored.into_op(self)
         })
     }
 
+    fn save_block(&self, block: &Block) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            self.save_block_transactions(block)?;
+
+            let new_block = StorageBlock {
+                number: block.block_number as i64,
+                root_hash: block.new_root_hash.to_hex(),
+                fee_account_id: block.fee_account as i64,
+                unprocessed_prior_op_before: block.processed_priority_ops.0 as i64,
+                unprocessed_prior_op_after: block.processed_priority_ops.1 as i64,
+            };
+
+            diesel::insert_into(blocks::table)
+                .values(&new_block)
+                .execute(self.conn())?;
+
+            Ok(())
+        })
+    }
+
     pub fn save_block_transactions(&self, block: &Block) -> QueryResult<()> {
         for block_tx in block.block_transactions.iter() {
-            let stored_tx = NewExecutedTransaction::prepare_stored_tx(block_tx, block.block_number);
-            diesel::insert_into(executed_transactions::table)
-                .values(&stored_tx)
-                .execute(self.conn())?;
+            match block_tx {
+                ExecutedOperations::Tx(tx) => {
+                    let stored_tx =
+                        NewExecutedTransaction::prepare_stored_tx(tx, block.block_number);
+                    diesel::insert_into(executed_transactions::table)
+                        .values(&stored_tx)
+                        .execute(self.conn())?;
+                }
+                ExecutedOperations::PriorityOp(prior_op) => {
+                    let stored_priority_op =
+                        NewExecutedPriorityOperation::prepare_stored_priority_op(
+                            prior_op,
+                            block.block_number,
+                        );
+                    diesel::insert_into(executed_priority_operations::table)
+                        .values(&stored_priority_op)
+                        .execute(self.conn())?;
+                }
+            }
         }
         Ok(())
     }
 
-    pub fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {
-        let executed_txs: Vec<_> = executed_transactions::table
-            .filter(executed_transactions::block_number.eq(i64::from(block)))
-            .load::<StoredExecutedTransaction>(self.conn())?;
-        Ok(executed_txs
+    pub fn get_priority_op_receipt(&self, op_id: i64) -> QueryResult<PriorityOpReceiptResponse> {
+        // TODO: jazzandrock maybe use one db query(?).
+        let stored_executed_prior_op = executed_priority_operations::table
+            .filter(executed_priority_operations::priority_op_serialid.eq(op_id))
+            .first::<StoredExecutedPriorityOperation>(self.conn())
+            .optional()?;
+
+        match stored_executed_prior_op {
+            Some(stored_executed_prior_op) => {
+                let prover_run: Option<ProverRun> = prover_runs::table
+                    .filter(prover_runs::block_number.eq(stored_executed_prior_op.block_number))
+                    .first::<ProverRun>(self.conn())
+                    .optional()?;
+
+                let commit = operations::table
+                    .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
+                    .filter(operations::action_type.eq("Commit"))
+                    .first::<StoredOperation>(self.conn())
+                    .optional()?;
+
+                let confirm = operations::table
+                    .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
+                    .filter(operations::action_type.eq("Verify"))
+                    .first::<StoredOperation>(self.conn())
+                    .optional()?;
+
+                Ok(PriorityOpReceiptResponse {
+                    committed: commit.is_some(),
+                    verified: confirm.is_some(),
+                    prover_run: prover_run,
+                })
+            }
+            None => {
+                Ok(PriorityOpReceiptResponse {
+                    committed: false,
+                    verified: false,
+                    prover_run: None,
+                })
+            }
+        }
+    }
+
+    pub fn get_account_transactions_history(
+        &self,
+        address: &AccountAddress,
+        offset: i64,
+        limit: i64
+    ) -> QueryResult<Vec<TransactionsHistoryItem>> {
+        // TODO: txs are not ordered
+        let query = format!(
+            "
+            select
+                encode(hash, 'hex') as hash,
+                pq_id,
+                tx,
+                success,
+                fail_reason,
+                coalesce(commited, false) as commited,
+                coalesce(verified, false) as verified
+            from (
+                select 
+                    *
+                from (
+                    select
+                        tx,
+                        hash,
+                        null as pq_id,
+                        success,
+                        fail_reason,
+                        block_number
+                    from
+                        mempool
+                    left join 
+                        executed_transactions
+                    on 
+                        tx_hash = hash
+                    where 
+                        encode(primary_account_address, 'hex') = '{address}'
+                        or 
+                        tx->>'to' = '0x{address}'
+                    union all
+                    select 
+                        operation as tx,
+                        null as hash,
+                        priority_op_serialid as pq_id,
+                        null as success,
+                        null as fail_reason,
+                        block_number
+                    from 
+                        executed_priority_operations
+                    where 
+                        operation->'priority_op'->>'account' = '0x{address}') t
+                order by
+                    block_number
+                offset 
+                    {offset}
+                limit 
+                    {limit}
+            ) t
+            left join
+                crosstab($$
+                    select 
+                        block_number as rowid, 
+                        action_type as category, 
+                        true as values 
+                    from 
+                        operations
+                    order by
+                        block_number
+                    $$) t3 (
+                        block_number bigint, 
+                        commited boolean, 
+                        verified boolean)
+            using 
+                (block_number)
+            "
+            , address = hex::encode(address.data)
+            , offset = offset
+            , limit = limit
+        );
+
+        diesel::sql_query(query)
+            .load::<TransactionsHistoryItem>(self.conn())
+    }
+
+    pub fn get_account_transactions(
+        &self,
+        address: &AccountAddress,
+    ) -> QueryResult<Vec<AccountTransaction>> {
+        let all_txs: Vec<_> = mempool::table
+            .filter(mempool::primary_account_address.eq(address.data.to_vec()))
+            .left_join(
+                executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),
+            )
+            .left_join(
+                operations::table
+                    .on(operations::block_number.eq(executed_transactions::block_number)),
+            )
+            .load::<(
+                ReadTx,
+                Option<StoredExecutedTransaction>,
+                Option<StoredOperation>,
+            )>(self.conn())?;
+
+        let res = all_txs
             .into_iter()
-            .filter_map(|exec_tx| {
-                exec_tx
-                    .operation
-                    .map(|op| serde_json::from_value(op).expect("stored op"))
+            .group_by(|(mempool_tx, _, _)| mempool_tx.hash.clone())
+            .into_iter()
+            .map(|(_op_id, mut group_iter)| {
+                // TODO: replace the query with pivot
+                let (mempool_tx, executed_tx, operation) = group_iter.next().unwrap();
+                let mut res = AccountTransaction {
+                    tx: mempool_tx.tx,
+                    tx_hash: hex::encode(mempool_tx.hash.as_slice()),
+                    success: false,
+                    fail_reason: None,
+                    committed: false,
+                    verified: false,
+                };
+                if let Some(executed_tx) = executed_tx {
+                    res.success = executed_tx.success;
+                    res.fail_reason = executed_tx.fail_reason;
+                }
+                if let Some(operation) = operation {
+                    if operation.action_type == "Commit" {
+                        res.committed = operation.confirmed;
+                    } else {
+                        res.verified = operation.confirmed;
+                    }
+                }
+                if let Some((_mempool_tx, _executed_tx, operation)) = group_iter.next() {
+                    if let Some(operation) = operation {
+                        if operation.action_type == "Commit" {
+                            res.committed = operation.confirmed;
+                        } else {
+                            res.verified = operation.confirmed;
+                        }
+                    };
+                }
+                res
+            })
+            .collect::<Vec<AccountTransaction>>();
+
+        Ok(res)
+    }
+
+    pub fn get_block(&self, block: BlockNumber) -> QueryResult<Option<Block>> {
+        let stored_block = if let Some(block) = blocks::table
+            .find(block as i64)
+            .first::<StorageBlock>(self.conn())
+            .optional()?
+        {
+            block
+        } else {
+            return Ok(None);
+        };
+
+        let block_transactions = self.get_block_executed_ops(block)?;
+
+        Ok(Some(Block {
+            block_number: block,
+            new_root_hash: Fr::from_hex(&stored_block.root_hash).expect("Unparsable root hash"),
+            fee_account: stored_block.fee_account_id as AccountId,
+            block_transactions,
+            processed_priority_ops: (
+                stored_block.unprocessed_prior_op_before as u64,
+                stored_block.unprocessed_prior_op_after as u64,
+            ),
+        }))
+    }
+
+    pub fn get_block_executed_ops(
+        &self,
+        block: BlockNumber,
+    ) -> QueryResult<Vec<ExecutedOperations>> {
+        self.conn().transaction(|| {
+            let mut executed_operations = Vec::new();
+
+            let stored_executed_txs: Vec<_> = executed_transactions::table
+                .left_join(mempool::table.on(executed_transactions::tx_hash.eq(mempool::hash)))
+                .filter(executed_transactions::block_number.eq(block as i64))
+                .load::<(StoredExecutedTransaction, Option<ReadTx>)>(self.conn())?;
+            let executed_txs = stored_executed_txs
+                .into_iter()
+                .filter_map(|(stored_exec, stored_tx)| stored_exec.into_executed_tx(stored_tx).ok())
+                .map(ExecutedOperations::Tx);
+            executed_operations.extend(executed_txs);
+
+            let stored_executed_prior_ops: Vec<_> = executed_priority_operations::table
+                .filter(executed_priority_operations::block_number.eq(block as i64))
+                .load::<StoredExecutedPriorityOperation>(self.conn())?;
+            let executed_prior_ops = stored_executed_prior_ops
+                .into_iter()
+                .map(|op| ExecutedOperations::PriorityOp(op.into()));
+            executed_operations.extend(executed_prior_ops);
+
+            executed_operations.sort_by_key(|exec_op| {
+                match exec_op {
+                    ExecutedOperations::Tx(tx) => {
+                        if let Some(idx) = tx.block_index {
+                            idx
+                        } else {
+                            // failed operations are at the end.
+                            u32::max_value()
+                        }
+                    }
+                    ExecutedOperations::PriorityOp(op) => op.block_index,
+                }
+            });
+
+            Ok(executed_operations)
+        })
+    }
+
+    pub fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {
+        let executed_ops = self.get_block_executed_ops(block)?;
+        Ok(executed_ops
+            .into_iter()
+            .filter_map(|exec_op| match exec_op {
+                ExecutedOperations::Tx(tx) => tx.op,
+                ExecutedOperations::PriorityOp(priorop) => Some(priorop.op),
             })
             .collect())
     }
@@ -965,29 +1329,31 @@ impl StorageProcessor {
     ) -> QueryResult<Vec<BlockDetails>> {
         let query = format!(
             "
-            with committed as (
-                select 
-                    data -> 'block' ->> 'new_root_hash' as new_state_root,    
-                    block_number,
-                    tx_hash as commit_tx_hash,
-                    created_at as committed_at
-                from operations
-                where 
-                    block_number <= {max_block}
-                    and action_type = 'Commit'
-                order by block_number desc
-                limit {limit}
+            with eth_ops as (
+            	select
+            		operations.block_number,
+            		eth_operations.tx_hash,
+            		operations.action_type,
+            		operations.created_at
+            	from operations
+            		left join eth_operations on eth_operations.op_id = operations.id
             )
-            select 
-                committed.*, 
-                verified.tx_hash as verify_tx_hash,
-                verified.created_at as verified_at
-            from committed
-            left join operations verified
-            on
-                committed.block_number = verified.block_number
-                and action_type = 'Verify'
-            order by committed.block_number desc
+            select
+            	blocks.number as block_number,
+            	blocks.root_hash as new_state_root,
+            	commited.tx_hash as commit_tx_hash,
+            	verified.tx_hash as verify_tx_hash,
+            	commited.created_at as committed_at,
+            	verified.created_at as verified_at
+            from blocks
+            inner join eth_ops commited on
+            	commited.block_number = blocks.number and commited.action_type = 'Commit'
+            left join eth_ops verified on
+            	verified.block_number = blocks.number and verified.action_type = 'Verify'
+            where
+            	blocks.number <= {max_block}
+            order by blocks.number desc
+            limit {limit};
         ",
             max_block = i64::from(max_block),
             limit = i64::from(limit)
@@ -998,46 +1364,41 @@ impl StorageProcessor {
     pub fn handle_search(&self, query: String) -> Option<BlockDetails> {
         let block_number = query.parse::<i64>().unwrap_or(i64::max_value());
         let l_query = query.to_lowercase();
-        let has_prefix = l_query.starts_with("0x");
-        let prefix = "0x".to_owned();
-        let query_with_prefix = if has_prefix {
-            l_query
-        } else {
-            format!("{}{}", prefix, l_query)
-        };
         let sql_query = format!(
             "
-            with committed as (
-                select 
-                    data -> 'block' ->> 'new_root_hash' as new_state_root,    
-                    block_number,
-                    tx_hash as commit_tx_hash,
-                    created_at as committed_at
-                from operations
-                where action_type = 'Commit'
-                order by block_number desc
+                        with eth_ops as (
+            	select
+            		operations.block_number,
+            		eth_operations.tx_hash,
+            		operations.action_type,
+            		operations.created_at
+            	from operations
+            		left join eth_operations on eth_operations.op_id = operations.id
             )
-            select 
-                committed.*, 
-                verified.tx_hash as verify_tx_hash,
-                verified.created_at as verified_at
-            from committed
-            left join operations verified
-            on
-                committed.block_number = verified.block_number
-                and action_type = 'Verify'
+            select
+            	blocks.number as block_number,
+            	blocks.root_hash as new_state_root,
+            	commited.tx_hash as commit_tx_hash,
+            	verified.tx_hash as verify_tx_hash,
+            	commited.created_at as committed_at,
+            	verified.created_at as verified_at
+            from blocks
+            inner join eth_ops commited on
+            	commited.block_number = blocks.number and commited.action_type = 'Commit'
+            left join eth_ops verified on
+            	verified.block_number = blocks.number and verified.action_type = 'Verify'
             where false
-                or lower(commit_tx_hash) = $1
+                or lower(commited.tx_hash) = $1
                 or lower(verified.tx_hash) = $1
-                or lower(new_state_root) = $1
-                or committed.block_number = {block_number}
-            order by committed.block_number desc
-            limit 1
+                or lower(blocks.root_hash) = $1
+                or blocks.number = {block_number}
+            order by blocks.number desc
+            limit 1;
         ",
             block_number = block_number
         );
         diesel::sql_query(sql_query)
-            .bind::<Text, _>(query_with_prefix)
+            .bind::<Text, _>(l_query)
             .get_result(self.conn())
             .ok()
     }
@@ -1218,12 +1579,18 @@ impl StorageProcessor {
                     .first::<StoredOperation>(self.conn())
                     .optional()?;
 
+                let prover_run: Option<ProverRun> = prover_runs::table
+                    .filter(prover_runs::block_number.eq(tx.block_number))
+                    .first::<ProverRun>(self.conn())
+                    .optional()?;
+
                 Ok(Some(TxReceiptResponse {
                     tx_hash: hash.to_vec(),
                     block_number: tx.block_number,
                     success: tx.success,
                     verified: confirm.is_some(),
                     fail_reason: tx.fail_reason,
+                    prover_run: prover_run,
                 }))
             } else {
                 Ok(None)
@@ -1296,12 +1663,14 @@ impl StorageProcessor {
     }
 
     pub fn count_total_transactions(&self) -> QueryResult<u32> {
-        use crate::schema::executed_transactions::dsl::*;
-        let count: i64 = executed_transactions
-            .filter(success.eq(true))
+        let count_tx: i64 = executed_transactions::table
+            .filter(executed_transactions::success.eq(true))
             .select(count_star())
             .first(self.conn())?;
-        Ok(count as u32)
+        let prior_ops: i64 = executed_priority_operations::table
+            .select(count_star())
+            .first(self.conn())?;
+        Ok((count_tx + prior_ops) as u32)
     }
 
     pub fn get_last_committed_block(&self) -> QueryResult<BlockNumber> {
@@ -1548,16 +1917,14 @@ impl StorageProcessor {
             return Ok(Err(TxAddError::InvalidSignature));
         }
 
+        if !tx.check_correctness() {
+            return Ok(Err(TxAddError::IncorrectTx));
+        }
+
         let (_, _, commited_state) = self.account_state_by_address(&tx.account())?;
         let lowest_possible_nonce = commited_state.map(|a| a.nonce as u32).unwrap_or_default();
         if tx.nonce() < lowest_possible_nonce {
             return Ok(Err(TxAddError::NonceTooLow));
-        }
-
-        if let FranklinTx::Deposit(deposit_tx) = tx {
-            if deposit_tx.amount == bigdecimal::BigDecimal::zero() {
-                return Ok(Err(TxAddError::ZeroAmount));
-            }
         }
 
         let tx_failed = executed_transactions::table

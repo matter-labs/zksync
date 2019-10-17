@@ -2,13 +2,14 @@
 
 use actix_web::{
     http::Method, middleware, middleware::cors::Cors, server, App, AsyncResponder, Body, Error,
-    HttpMessage, HttpRequest, HttpResponse,
+    HttpMessage, HttpRequest, HttpResponse, error
 };
-use models::node::{tx::FranklinTx, Account, AccountId};
-use models::{ActionType, NetworkStatus, StateKeeperRequest};
+use models::node::{tx::FranklinTx, Account, AccountId, ExecutedOperations};
+use models::{NetworkStatus, StateKeeperRequest};
 use std::sync::mpsc;
 use storage::{BlockDetails, ConnectionPool};
 
+use crate::ThreadPanicNotify;
 use actix_web::Result as ActixResult;
 use failure::format_err;
 use futures::Future;
@@ -60,20 +61,6 @@ pub struct AppState {
     connection_pool: ConnectionPool,
     network_status: SharedNetworkStatus,
 }
-
-//let storage = pool
-//.access_mempool()
-//.map_err(|_| HttpResponse::InternalServerError().body(Body::Empty));
-//let storage_query_result = storage.and_then(|storage| {
-//storage.add_tx(tx)
-//.map(|tx_add_result| {
-//match tx_add_result {
-//Ok(_) => HttpResponse::Ok().body(Body::Empty),
-//Err(e) => HttpResponse::BadRequest().json(e),
-//}
-//})
-//.map_err(|_| HttpResponse::InternalServerError().body(Body::Empty))
-//});
 
 #[derive(Debug, Serialize, Deserialize)]
 struct NewTxResponse {
@@ -258,40 +245,34 @@ fn handle_get_testnet_config(req: &HttpRequest<AppState>) -> ActixResult<HttpRes
 //     Ok(HttpResponse::Ok().json(status))
 // }
 
-//fn handle_get_account_transactions(_req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-//    Ok(HttpResponse::Ok().json("{}"))
-//}
+fn handle_get_account_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    let account_address = req.match_info().get("id");
+    let address = if let Some(account_address) = account_address {
+        AccountAddress::from_hex(account_address)?
+    } else {
+        return Err(format_err!("Invalid parameters").into());
+    };
 
-//fn handle_get_transaction_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-//    let pool = req.state().connection_pool.clone();
-//
-//    let storage = pool.access_storage();
-//    if storage.is_err() {
-//        return Ok(HttpResponse::Ok().json(ApiError {
-//            error: "rate limit".to_string(),
-//        }));
-//    }
-//    let storage = storage.unwrap();
-//
-//    let transaction_id_string = req.match_info().get("tx_id");
-//    if transaction_id_string.is_none() {
-//        return Ok(HttpResponse::Ok().json(ApiError {
-//            error: "invalid parameters".to_string(),
-//        }));
-//    }
-//    let transaction_id = transaction_id_string.unwrap().parse::<u32>();
-//    if transaction_id.is_err() {
-//        return Ok(HttpResponse::Ok().json(ApiError {
-//            error: "invalid transaction_id".to_string(),
-//        }));
-//    }
-//
-//    let transaction_id_u32 = transaction_id.unwrap();
-//
-//    let tx = storage.load_transaction_with_id(transaction_id_u32);
-//
-//    Ok(HttpResponse::Ok().json(tx))
-//}
+    let pool = req.state().connection_pool.clone();
+
+    let storage = pool
+        .access_storage()
+        .map_err(|_| HttpResponse::InternalServerError().body(Body::Empty));
+    let storage_query_result = storage.and_then(|storage| {
+        storage
+            .get_account_transactions(&address)
+            .map_err(|_| HttpResponse::InternalServerError().body(Body::Empty))
+    });
+
+    let res = match storage_query_result {
+        Ok(txs) => txs,
+        Err(e) => {
+            return Ok(e);
+        }
+    };
+
+    Ok(HttpResponse::Ok().json(res))
+}
 
 fn handle_get_executed_transaction_by_hash(
     req: &HttpRequest<AppState>,
@@ -322,67 +303,73 @@ fn handle_get_executed_transaction_by_hash(
     }
 }
 
+fn handle_get_priority_op_receipt(
+    req: &HttpRequest<AppState>,
+) -> ActixResult<HttpResponse> {
+    let id = req
+        .match_info()
+        .get("pq_id")
+        .and_then(|offset| offset.parse::<i64>().ok())
+        .ok_or_else(|| error::ErrorBadRequest("Invalid pq_id parameter"))?;
+
+    let storage = req.state()
+        .connection_pool.clone()
+        .access_storage()
+        .map_err(|e| error::ErrorBadRequest(e))?;
+
+    let res = storage
+        .get_priority_op_receipt(id)
+        .map_err(|e| error::ErrorBadRequest(e))?;
+
+    Ok(HttpResponse::Ok().json(res))
+}
+
+fn handle_get_account_transactions_history(
+    req: &HttpRequest<AppState>,
+) -> ActixResult<HttpResponse> {
+    let address = req
+        .match_info()
+        .get("address")
+        .and_then(|address| AccountAddress::from_hex(address).ok())
+        .ok_or_else(|| error::ErrorBadRequest("Invalid address parameter"))?;
+
+    let offset = req
+        .match_info()
+        .get("offset")
+        .and_then(|offset| offset.parse::<i64>().ok())
+        .ok_or_else(|| error::ErrorBadRequest("Invalid offset parameter"))?;
+
+    const MAX_LIMIT: i64 = 100;
+
+    let limit = req
+        .match_info()
+        .get("limit")
+        .and_then(|limit| limit.parse::<i64>().ok())
+        .ok_or_else(|| "Invalid limit parameter")
+        .and_then(|limit| {
+            if limit <= MAX_LIMIT {
+                Ok(limit)
+            } else {
+                Err("Limit too large")
+            }
+        })
+        .map_err(|e| error::ErrorBadRequest(e))?;
+
+    let storage = req.state()
+        .connection_pool.clone()
+        .access_storage()
+        .map_err(|e| error::ErrorBadRequest(e))?;
+
+    let res = storage
+        .get_account_transactions_history(&address, offset, limit)
+        .map_err(|e| error::ErrorBadRequest(e))?;
+
+    Ok(HttpResponse::Ok().json(res))
+}
+
 fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let network_status = req.state().network_status.read();
     Ok(HttpResponse::Ok().json(network_status))
-}
-
-fn handle_get_block_by_id(_req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-    unimplemented!()
-    //    let pool = req.state().connection_pool.clone();
-    //
-    //    let storage = pool.access_storage();
-    //    if storage.is_err() {
-    //        return Ok(HttpResponse::Ok().json(ApiError {
-    //            error: "rate limit".to_string(),
-    //        }));
-    //    }
-    //    let storage = storage.unwrap();
-    //
-    //    let block_id_string = req.match_info().get("block_id");
-    //    if block_id_string.is_none() {
-    //        return Ok(HttpResponse::Ok().json(ApiError {
-    //            error: "invalid parameters".to_string(),
-    //        }));
-    //    }
-    //    let block_id = block_id_string.unwrap().parse::<u32>();
-    //    if block_id.is_err() {
-    //        return Ok(HttpResponse::Ok().json(ApiError {
-    //            error: "invalid block_id".to_string(),
-    //        }));
-    //    }
-    //
-    //    let block_id_u32 = block_id.unwrap();
-    //
-    //    let stored_commit_operation =
-    //        storage.load_stored_op_with_block_number(block_id_u32, ActionType::COMMIT);
-    //    if stored_commit_operation.is_none() {
-    //        return Ok(HttpResponse::Ok().json(ApiError {
-    //            error: "not found".to_string(),
-    //        }));
-    //    }
-    //
-    //    let commit = stored_commit_operation.unwrap();
-    //    let operation = commit.clone().into_op(&storage);
-    //    if let Err(ref err) = &operation {
-    //        return Ok(HttpResponse::Ok().json(ApiError {
-    //            error: format!("db error: {}", err),
-    //        }));
-    //    }
-    //    let operation = operation.unwrap();
-    //
-    //    let verify = storage.load_stored_op_with_block_number(block_id_u32, ActionType::VERIFY);
-    //
-    //    let response = BlockDetails {
-    //        block_number: commit.block_number as i64,
-    //        new_state_root: format!("0x{}", operation.block.new_root_hash.to_hex()),
-    //        commit_tx_hash: commit.tx_hash,
-    //        verify_tx_hash: verify.as_ref().and_then(|op| op.tx_hash.clone()),
-    //        committed_at: commit.created_at,
-    //        verified_at: verify.as_ref().map(|op| op.created_at),
-    //    };
-    //
-    //    Ok(HttpResponse::Ok().json(response))
 }
 
 fn handle_get_blocks(
@@ -420,26 +407,7 @@ fn handle_get_blocks(
                 .load_block_range(max_block, limit)
                 .map_err(|e| format!("db err: {}", e))?;
 
-            // let commited_stored_operations = storage.load_stored_ops_in_blocks_range(max_block, limit, ActionType::COMMIT);
-            // let verified_operations = storage.load_stored_ops_in_blocks_range(max_block, limit, ActionType::VERIFY);
-
-            // let commited_operations: Vec<Operation> = commited_stored_operations.clone().iter()
-            // .map(|x| x.clone().into_op(&storage).expect("into_op must work")).collect();
-
-            // // FIXME: oy vey!
-            // let response: Vec<BlockDetailsResponse> = commited_stored_operations.into_iter().map(|x|
-            //     BlockDetailsResponse {
-            //         block_number:        x.clone().block_number as u32,
-            //         new_state_root:      commited_operations.iter().find(|&y| y.id.unwrap() == x.id).unwrap().block.new_root_hash.to_hex(),
-            //         commit_tx_hash:      x.clone().tx_hash,
-            //         verify_tx_hash:      verified_operations.iter().find(|&y| y.id == x.id).map_or(None, |x| x.clone().tx_hash),
-            //         committed_at:        None,
-            //         verified_at:         None,
-            //     }
-            // ).collect();
             Ok(HttpResponse::Ok().json(response))
-
-            //Ok(HttpResponse::Ok().json(format!("offset = {:?}", offset)))
         })
         .or_else(|err: String| {
             let resp = TransactionResponse {
@@ -451,55 +419,163 @@ fn handle_get_blocks(
         .responder()
 }
 
-fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let pool = req.state().connection_pool.clone();
 
-    let storage = pool.access_storage();
-    if storage.is_err() {
+    let storage = if let Ok(storage) = pool.access_storage() {
+        storage
+    } else {
         return Ok(HttpResponse::Ok().json(ApiError {
             error: "rate limit".to_string(),
         }));
-    }
-    let storage = storage.unwrap();
+    };
 
-    let block_id_string = req.match_info().get("block_id");
-    if block_id_string.is_none() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "invalid parameters".to_string(),
-        }));
-    }
-    let block_id = block_id_string.unwrap().parse::<u32>();
-    if block_id.is_err() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "invalid block_id".to_string(),
-        }));
-    }
+    let block_id = {
+        let block_id_string = if let Some(block_id_string) = req.match_info().get("block_id") {
+            block_id_string
+        } else {
+            return Ok(HttpResponse::Ok().json(ApiError {
+                error: "invalid parameters".to_string(),
+            }));
+        };
 
-    let block_id_u32 = block_id.unwrap();
+        if let Ok(block_id) = block_id_string.parse::<u32>() {
+            block_id
+        } else {
+            return Ok(HttpResponse::Ok().json(ApiError {
+                error: "invalid block_id".to_string(),
+            }));
+        }
+    };
 
-    let stored_commit_operation =
-        storage.load_stored_op_with_block_number(block_id_u32, ActionType::COMMIT);
-    if stored_commit_operation.is_none() {
-        return Ok(HttpResponse::Ok().json(ApiError {
-            error: "not found".to_string(),
-        }));
-    }
-
-    let commit = stored_commit_operation.unwrap();
-
-    let txs = commit.get_txs();
-    match txs {
-        Ok(res) => Ok(HttpResponse::Ok().json(res)),
-        Err(err) => Ok(HttpResponse::Ok().json(ApiError {
-            error: format!("error: {}", err),
-        })),
-    }
+    match storage.load_block_range(block_id, 1) {
+        Ok(mut block_range) => {
+            if let Some(response) = block_range.pop() {
+                return Ok(HttpResponse::Ok().json(response));
+            } else {
+                return Ok(HttpResponse::Ok().json(ApiError {
+                    error: "Block not found".to_string(),
+                }));
+            }
+        }
+        Err(e) => {
+            return Ok(HttpResponse::Ok().json(ApiError {
+                error: format!("db_error {}", e),
+            }));
+        }
+    };
 }
 
-//#[allow(dead_code)]
-//struct GetBlocksQuery {
-//    pub from_block: Option<u32>,
-//}
+fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    let pool = req.state().connection_pool.clone();
+
+    let storage = if let Ok(storage) = pool.access_storage() {
+        storage
+    } else {
+        return Ok(HttpResponse::Ok().json(ApiError {
+            error: "rate limit".to_string(),
+        }));
+    };
+
+    let block_id = {
+        let block_id_string = if let Some(block_id_string) = req.match_info().get("block_id") {
+            block_id_string
+        } else {
+            return Ok(HttpResponse::Ok().json(ApiError {
+                error: "invalid parameters".to_string(),
+            }));
+        };
+
+        if let Ok(block_id) = block_id_string.parse::<u32>() {
+            block_id
+        } else {
+            return Ok(HttpResponse::Ok().json(ApiError {
+                error: "invalid block_id".to_string(),
+            }));
+        }
+    };
+
+    let executed_ops = match storage.get_block_executed_ops(block_id) {
+        Ok(ops) => ops
+            .into_iter()
+            .filter(|op| match op {
+                ExecutedOperations::Tx(tx) => tx.op.is_some(),
+                _ => true,
+            })
+            .collect::<Vec<_>>(),
+        Err(e) => {
+            return Ok(HttpResponse::Ok().json(ApiError {
+                error: format!("db error: {}", e),
+            }));
+        }
+    };
+    Ok(HttpResponse::Ok().json(executed_ops))
+}
+
+fn handle_get_transaction_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    let pool = req.state().connection_pool.clone();
+
+    let storage = if let Ok(storage) = pool.access_storage() {
+        storage
+    } else {
+        return Ok(HttpResponse::Ok().json(ApiError {
+            error: "rate limit".to_string(),
+        }));
+    };
+
+    let block_id = {
+        let block_id_string = if let Some(block_id_string) = req.match_info().get("block_id") {
+            block_id_string
+        } else {
+            return Ok(HttpResponse::Ok().json(ApiError {
+                error: "invalid parameters".to_string(),
+            }));
+        };
+
+        if let Ok(block_id) = block_id_string.parse::<u32>() {
+            block_id
+        } else {
+            return Ok(HttpResponse::Ok().json(ApiError {
+                error: "invalid block_id".to_string(),
+            }));
+        }
+    };
+
+    let tx_id = {
+        let tx_id_string = if let Some(tx_id_string) = req.match_info().get("tx_id") {
+            tx_id_string
+        } else {
+            return Ok(HttpResponse::Ok().json(ApiError {
+                error: "invalid parameters".to_string(),
+            }));
+        };
+
+        if let Ok(tx_id) = tx_id_string.parse::<u32>() {
+            tx_id
+        } else {
+            return Ok(HttpResponse::Ok().json(ApiError {
+                error: "invalid tx_id".to_string(),
+            }));
+        }
+    };
+
+    match storage.get_block_executed_ops(block_id) {
+        Ok(ops) => {
+            if let Some(exec_op) = ops.get(tx_id as usize) {
+                return Ok(HttpResponse::Ok().json(exec_op));
+            } else {
+                return Ok(HttpResponse::Ok().json(ApiError {
+                    error: "Executed op not found in block".to_string(),
+                }));
+            }
+        }
+        Err(e) => {
+            return Ok(HttpResponse::Ok().json(ApiError {
+                error: format!("db error: {}", e),
+            }));
+        }
+    };
+}
 
 fn handle_search(
     req: &HttpRequest<AppState>,
@@ -544,15 +620,20 @@ fn start_server(state: AppState, bind_to: String) {
                     .resource("/tokens", |r| {
                         r.method(Method::GET).f(handle_get_tokens);
                     })
-                    // .resource("/account/{id}/transactions", |r| {
-                    //     r.method(Method::GET).f(handle_get_account_transactions);
-                    // })
-                    // .resource("/blocks/transactions/{tx_id}", |r| {
-                    //     r.method(Method::GET).f(handle_get_transaction_by_id);
-                    // })
+                    .resource("/account/{id}/transactions", |r| {
+                        r.method(Method::GET).f(handle_get_account_transactions);
+                    })
+                    .resource("/account/{address}/history/{offset}/{limit}", |r| {
+                        r.method(Method::GET).f(handle_get_account_transactions_history);
+                    })
                     .resource("/transactions/{tx_hash}", |r| {
-                        r.method(Method::GET)
-                            .f(handle_get_executed_transaction_by_hash);
+                        r.method(Method::GET).f(handle_get_executed_transaction_by_hash);
+                    })
+                    .resource("/priority_operations/{pq_id}/", |r| {
+                        r.method(Method::GET).f(handle_get_priority_op_receipt);
+                    })
+                    .resource("/blocks/{block_id}/transactions/{tx_id}", |r| {
+                        r.method(Method::GET).f(handle_get_transaction_by_id);
                     })
                     .resource("/blocks/{block_id}/transactions", |r| {
                         r.method(Method::GET).f(handle_get_block_transactions);
@@ -608,11 +689,13 @@ pub fn start_status_interval(state: AppState) {
 pub fn start_api_server(
     tx_for_state: mpsc::Sender<StateKeeperRequest>,
     connection_pool: ConnectionPool,
+    panic_notify: mpsc::Sender<bool>,
 ) {
     std::thread::Builder::new()
         .name("actix".to_string())
         .spawn(move || {
             env::set_var("RUST_LOG", "actix_web=info");
+            let _panic_sentinel = ThreadPanicNotify(panic_notify);
 
             let address = env::var("BIND_TO").unwrap_or_else(|_| "127.0.0.1".to_string());
             let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());

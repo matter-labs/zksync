@@ -46,7 +46,7 @@ spec:
     spec:
       containers:
         - name: ${FRANKLIN_ENV}-nginx
-          image: gluk64/franklin-nginx:${FRANKLIN_ENV}
+          image: matterlabs/nginx:${FRANKLIN_ENV}
           imagePullPolicy: Always
           ports:
             - containerPort: 80
@@ -73,7 +73,7 @@ spec:
     spec:
       containers:
         - name: server
-          image: gluk64/franklin:server
+          image: matterlabs/server:latest
           imagePullPolicy: Always
           ports: 
             - containerPort: 3000

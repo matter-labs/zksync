@@ -1,40 +1,40 @@
 use bellman::{ConstraintSystem, SynthesisError};
 use ff::{BitIterator, Field, PrimeField};
 
-use franklin_crypto::circuit::boolean;
+use franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
 use franklin_crypto::circuit::num::{AllocatedNum, Num};
 use franklin_crypto::circuit::Assignment;
+use franklin_crypto::eddsa::Signature;
 use franklin_crypto::eddsa::{PrivateKey, PublicKey};
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
 
+use crate::operation::SignatureData;
 use crate::operation::TransactionSignature;
+use models::circuit::utils::le_bit_vector_into_field_element;
 use models::params as franklin_constants;
+use models::primitives::*;
 
+pub fn reverse_bytes<T: Clone>(bits: &[T]) -> Vec<T> {
+    bits.chunks(8)
+        .rev()
+        .map(|x| x.to_vec())
+        .fold(Vec::new(), |mut acc, mut byte| {
+            acc.append(&mut byte);
+            acc
+        })
+}
 pub fn sign_pedersen<R, E>(
     msg_data: &[bool],
     private_key: &PrivateKey<E>,
     p_g: FixedGenerators,
     params: &E::Params,
     rng: &mut R,
-) -> Option<TransactionSignature<E>>
+) -> SignatureData
 where
     R: rand::Rng,
     E: JubjubEngine,
 {
-    let raw_data: Vec<bool> = msg_data.to_vec();
-
-    let mut message_bytes: Vec<u8> = vec![];
-
-    let byte_chunks = raw_data.chunks(8);
-    for byte_chunk in byte_chunks {
-        let mut byte = 0u8;
-        for (i, bit) in byte_chunk.iter().enumerate() {
-            if *bit {
-                byte |= 1 << i;
-            }
-        }
-        message_bytes.push(byte);
-    }
+    let message_bytes = pack_bits_into_bytes(msg_data.to_vec());
 
     let signature = private_key.musig_pedersen_sign(&message_bytes, rng, p_g, params);
 
@@ -42,19 +42,53 @@ where
     let is_valid_signature =
         pk.verify_musig_pedersen(&message_bytes, &signature.clone(), p_g, params);
 
-    if !is_valid_signature {
-        return None;
+    // TODO: handle the case where it is not valid
+    // if !is_valid_signature {
+    //     return None;
+    // }
+    let (sig_r_x, sig_r_y) = signature.r.into_xy();
+    debug!("signature.s: {}", signature.s);
+    debug!("signature.r.x: {}", sig_r_x);
+    debug!("signature.r.y: {}", sig_r_y);
+
+    convert_signature_to_representation(signature)
+}
+
+pub fn convert_signature_to_representation<E>(signature: Signature<E>) -> SignatureData
+where
+    E: JubjubEngine,
+{
+    let (sig_x, sig_y) = signature.clone().r.into_xy();
+    let mut signature_s_be_bits: Vec<bool> = BitIterator::new(signature.s.into_repr()).collect();
+    signature_s_be_bits.reverse();
+    signature_s_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+    signature_s_be_bits.reverse();
+    let mut signature_r_x_be_bits: Vec<bool> = BitIterator::new(sig_x.into_repr()).collect();
+    signature_r_x_be_bits.reverse();
+    signature_r_x_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+    signature_r_x_be_bits.reverse();
+    let mut signature_r_y_be_bits: Vec<bool> = BitIterator::new(sig_y.into_repr()).collect();
+    signature_r_y_be_bits.reverse();
+    signature_r_y_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+    signature_r_y_be_bits.reverse();
+    let mut sig_r_packed_bits = vec![];
+    sig_r_packed_bits
+        .push(signature_r_x_be_bits[franklin_constants::FR_BIT_WIDTH_PADDED - 1].clone());
+    sig_r_packed_bits.extend(signature_r_y_be_bits[1..].iter());
+    let sig_r_packed_bits = reverse_bytes(&sig_r_packed_bits);
+
+    assert_eq!(
+        sig_r_packed_bits.len(),
+        franklin_constants::FR_BIT_WIDTH_PADDED
+    );
+
+    let sig_s_bits = signature_s_be_bits.clone();
+    let sig_s_bits = reverse_bytes(&sig_s_bits);
+
+    SignatureData {
+        r_packed: sig_r_packed_bits.iter().map(|x| Some(*x)).collect(),
+        s: sig_s_bits.iter().map(|x| Some(*x)).collect(),
     }
-
-    let mut sigs_le_bits: Vec<bool> = BitIterator::new(signature.s.into_repr()).collect();
-    sigs_le_bits.reverse();
-
-    let sigs_converted = le_bit_vector_into_field_element(&sigs_le_bits);
-
-    Some(TransactionSignature {
-        r: signature.r,
-        s: sigs_converted,
-    })
 }
 
 pub fn sign_sha<R, E>(
@@ -102,6 +136,23 @@ where
         s: sigs_converted,
     })
 }
+pub fn multi_and<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    x: &[Boolean],
+) -> Result<Boolean, SynthesisError> {
+    let mut result = Boolean::constant(true);
+
+    for (i, bool_x) in x.iter().enumerate() {
+        result = Boolean::and(
+            cs.namespace(|| format!("multi and iteration number: {}", i)),
+            &result,
+            bool_x,
+        )?;
+    }
+
+    Ok(result)
+}
+
 pub fn allocate_sum<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     a: &AllocatedNum<E>,
@@ -124,7 +175,7 @@ pub fn allocate_sum<E: JubjubEngine, CS: ConstraintSystem<E>>(
 
 pub fn pack_bits_to_element<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
-    bits: &[boolean::Boolean],
+    bits: &[Boolean],
 ) -> Result<AllocatedNum<E>, SynthesisError> {
     let mut data_from_lc = Num::<E>::zero();
     let mut coeff = E::Fr::one();
@@ -150,7 +201,7 @@ pub fn pack_bits_to_element<E: JubjubEngine, CS: ConstraintSystem<E>>(
 // count a number of non-zero bits in a bit decomposition
 pub fn count_number_of_ones<E, CS>(
     mut cs: CS,
-    a: &[boolean::Boolean],
+    a: &[Boolean],
 ) -> Result<AllocatedNum<E>, SynthesisError>
 where
     E: JubjubEngine,
@@ -175,7 +226,7 @@ where
     Ok(result)
 }
 
-pub fn allocate_audit_path<E, CS>(
+pub fn allocate_numbers_vec<E, CS>(
     mut cs: CS,
     audit_path: &[Option<E::Fr>],
 ) -> Result<Vec<AllocatedNum<E>>, SynthesisError>
@@ -195,96 +246,33 @@ where
     Ok(allocated)
 }
 
+pub fn allocate_bits_vector<E, CS>(
+    mut cs: CS,
+    bits: &[Option<bool>],
+) -> Result<Vec<Boolean>, SynthesisError>
+where
+    E: JubjubEngine,
+    CS: ConstraintSystem<E>,
+{
+    let mut allocated = vec![];
+    for (i, e) in bits.iter().enumerate() {
+        let element = Boolean::from(AllocatedBit::alloc(
+            cs.namespace(|| format!("path element{}", i)),
+            e.clone(),
+        )?);
+        allocated.push(element);
+    }
+
+    Ok(allocated)
+}
+
 pub fn append_packed_public_key(
-    content: &mut Vec<boolean::Boolean>,
-    x_bits: Vec<boolean::Boolean>,
-    y_bits: Vec<boolean::Boolean>,
+    content: &mut Vec<Boolean>,
+    x_bits: Vec<Boolean>,
+    y_bits: Vec<Boolean>,
 ) {
     assert_eq!(franklin_constants::FR_BIT_WIDTH - 1, y_bits.len());
     assert_eq!(1, x_bits.len());
     content.extend(y_bits);
     content.extend(x_bits);
-}
-
-pub fn append_le_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, width: usize) {
-    let mut token_bits: Vec<bool> = BitIterator::new(x.into_repr()).collect();
-    token_bits.reverse();
-    // token_bits.truncate(width);
-    token_bits.resize(width, false);
-    content.extend(token_bits.clone());
-}
-
-pub fn append_be_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, width: usize) {
-    let mut token_bits: Vec<bool> = BitIterator::new(x.into_repr()).collect();
-    token_bits.reverse();
-    token_bits.resize(width, false);
-    token_bits.reverse();
-    content.extend(token_bits.clone());
-}
-
-pub fn le_bit_vector_into_field_element<P: PrimeField>(bits: &[bool]) -> P {
-    // double and add
-    let mut fe = P::zero();
-    let mut base = P::one();
-
-    for bit in bits {
-        if *bit {
-            fe.add_assign(&base);
-        }
-        base.double();
-    }
-
-    fe
-}
-
-pub fn be_bit_vector_into_bytes(bits: &[bool]) -> Vec<u8> {
-    let mut bytes: Vec<u8> = vec![];
-
-    let byte_chunks = bits.chunks(8);
-
-    for byte_chunk in byte_chunks {
-        let mut byte = 0u8;
-        // pack just in order
-        for (i, bit) in byte_chunk.iter().enumerate() {
-            if *bit {
-                byte |= 1 << (7 - i);
-            }
-        }
-        bytes.push(byte);
-    }
-
-    bytes
-}
-
-pub fn le_bit_vector_into_bytes(bits: &[bool]) -> Vec<u8> {
-    let mut bytes: Vec<u8> = vec![];
-
-    let byte_chunks = bits.chunks(8);
-
-    for byte_chunk in byte_chunks {
-        let mut byte = 0u8;
-        // pack just in order
-        for (i, bit) in byte_chunk.iter().enumerate() {
-            if *bit {
-                byte |= 1 << i;
-            }
-        }
-        bytes.push(byte);
-    }
-
-    bytes
-}
-
-pub fn encode_fs_into_fr<E: JubjubEngine>(input: E::Fs) -> E::Fr {
-    let mut fs_le_bits: Vec<bool> = BitIterator::new(input.into_repr()).collect();
-    fs_le_bits.reverse();
-
-    le_bit_vector_into_field_element::<E::Fr>(&fs_le_bits)
-}
-
-pub fn encode_fr_into_fs<E: JubjubEngine>(input: E::Fr) -> E::Fs {
-    let mut fr_le_bits: Vec<bool> = BitIterator::new(input.into_repr()).collect();
-    fr_le_bits.reverse();
-
-    le_bit_vector_into_field_element::<E::Fs>(&fr_le_bits)
 }

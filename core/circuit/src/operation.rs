@@ -27,12 +27,11 @@ pub struct Operation<E: JubjubEngine> {
     pub tx_type: Option<E::Fr>,
     pub chunk: Option<E::Fr>,
     pub pubdata_chunk: Option<E::Fr>,
-    pub signer_pub_key_x: Option<E::Fr>,
-    pub signer_pub_key_y: Option<E::Fr>,
+    pub signer_pub_key_packed: Vec<Option<bool>>,
     pub first_sig_msg: Option<E::Fr>,
     pub second_sig_msg: Option<E::Fr>,
     pub third_sig_msg: Option<E::Fr>,
-    pub signature: Option<TransactionSignature<E>>,
+    pub signature_data: SignatureData,
     pub args: OperationArguments<E>,
     pub lhs: OperationBranch<E>,
     pub rhs: OperationBranch<E>,
@@ -47,6 +46,7 @@ pub struct OperationArguments<E: JubjubEngine> {
     pub fee: Option<E::Fr>,
     pub new_pub_key_hash: Option<E::Fr>,
     pub ethereum_key: Option<E::Fr>,
+    pub pub_nonce: Option<E::Fr>,
 }
 
 #[derive(Clone)]
@@ -64,4 +64,10 @@ impl<E: JubjubEngine> TransactionSignature<E> {
             s: E::Fr::zero(),
         }
     }
+}
+
+#[derive(Clone)]
+pub struct SignatureData {
+    pub r_packed: Vec<Option<bool>>,
+    pub s: Vec<Option<bool>>,
 }
