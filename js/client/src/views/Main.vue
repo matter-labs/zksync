@@ -36,7 +36,11 @@
                     <AlertWithProgressBar :shower="shower"></AlertWithProgressBar>
                 </b-row>
             </div>
-            <b-row class="px-0 mt-0">
+            <PendingDepositNotifier 
+                v-if="pendingDeposits && pendingDeposits.length"
+                :pendingDeposits="pendingDeposits"
+                ></PendingDepositNotifier>
+            <b-row v-else class="px-0 mt-0">
                 <Wallet 
                     v-if="componentToBeShown=='Wallet'" 
                     v-on:alert="displayAlert"
@@ -59,6 +63,7 @@ import Wallet from '../components/Wallet.vue'
 import History from '../components/History.vue'
 import Alert from '../components/Alert.vue'
 import AlertWithProgressBar from '../components/AlertWithProgressBar.vue'
+import PendingDepositNotifier from '../components/PendingDepositNotifier.vue'
 
 import { sleep } from '../utils.js'
 import timeConstants from '../timeConstants'
@@ -68,7 +73,8 @@ const components = {
     Alert,
     Wallet,
     AlertWithProgressBar,
-}
+    PendingDepositNotifier,
+};
 
 export default {
     name: 'Main',
@@ -77,6 +83,7 @@ export default {
         walletInfo: null,
         historyInfo: null,
         message: null,
+        pendingDeposits: null,
     }),
     watch: {
         componentToBeShown: async function() {
@@ -105,6 +112,9 @@ export default {
                 let contractBalances = window.walletDecorator.contractBalancesAsRenderableList();
                 let franklinBalances = window.walletDecorator.franklinBalancesAsRenderableList();
                 let franklinBalancesWithInfo = window.walletDecorator.franklinBalancesAsRenderableListWithInfo();
+                
+                this.pendingDeposits = await window.walletDecorator.pendingDepositsAsRenderableList();
+
                 this.walletInfo = {
                     onchainBalances,
                     contractBalances,

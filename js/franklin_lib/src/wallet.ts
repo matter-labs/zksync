@@ -247,17 +247,32 @@ export class Wallet {
         this.address = pubkeyToAddress(this.walletKeys.publicKey);
     }
 
-    async deposit(token: Token, amount: BigNumberish) {
+    protected async depositETH(amount: BigNumberish) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
+        const tx = await franklinDeployedContract.depositETH(this.address, {value: amount, gasLimit: bigNumberify("200000")});
+        return tx.hash;
+    }
+
+    protected async approveERC20(token: Token, amount: BigNumberish) {
+        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
+        const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
+        return await erc20DeployedToken.approve(franklinDeployedContract.address, amount);
+    }
+
+    protected async depositApprovedERC20(token: Token, amount: BigNumberish) {
+        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
+        const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
+        const tx = await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address,
+            {gasLimit: bigNumberify("300000"), value: parseEther("0.05")});
+        return tx.hash;
+    }
+
+    async deposit(token: Token, amount: BigNumberish) {
         if (token.id == 0) {
-            const tx = await franklinDeployedContract.depositETH(this.address, {value: amount, gasLimit: bigNumberify("200000")});
-            return tx.hash;
+            return await this.depositETH(amount);
         } else {
-            const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
-            await erc20DeployedToken.approve(franklinDeployedContract.address, amount);
-            const tx = await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address,
-                {gasLimit: bigNumberify("300000"), value: parseEther("0.05")});
-            return tx.hash;
+            await this.approveERC20(token, amount);
+            return await this.depositApprovedERC20(token, amount);
         }
     }
 

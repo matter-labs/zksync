@@ -3,6 +3,8 @@ import { Contract } from 'ethers';
 import { FranklinProvider, Wallet, Address } from 'franklin_lib';
 import { readableEther, sleep, isReadablyPrintable } from './utils';
 import timeConstants from './timeConstants';
+import IERC20Conract from '../../franklin_lib/abi/IERC20.json';
+import config from './env-config';
 
 import priority_queue_abi from '../../../contracts/build/PriorityQueue.json'
 
@@ -233,7 +235,27 @@ export class WalletDecorator {
 
         return await Promise.all(res);
     }
-
+    async pendingDepositsAsRenderableList() {
+        let tokens = await this.wallet.provider.getTokens();
+        tokens.shift(); // skip ETH
+        let allowances = tokens.map(async token => {
+            let erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.wallet.ethWallet);
+            let allowance = await erc20DeployedToken.allowance(this.ethAddress, config.CONTRACT_ADDR);
+            return {
+                token,
+                allowance: allowance.toString(),
+            };
+        });
+        allowances = await Promise.all(allowances);
+        
+        return allowances
+            .filter(a => a.allowance != '0')
+            .map((entry, i) => {
+                entry.allowanceRenderable = readableEther(entry.allowance);
+                entry.elem_id = `pendingDeposit_${i}`;
+                return entry;
+            });
+    }
     onchainBalancesAsRenderableList() {
         return this.wallet.ethState.onchainBalances
             .map((balance, tokenId) => ({
@@ -286,6 +308,9 @@ export class WalletDecorator {
     // #endregion
 
     // #region actions
+    async completeDeposit(token, amount) {
+        await this.wallet.depositApprovedERC20(token, amount);
+    }
     async * verboseTransfer(kwargs) {
         let token = this.tokenFromName(kwargs.token);
         let amount = bigNumberify(kwargs.amount);
@@ -382,7 +407,8 @@ export class WalletDecorator {
         try {
             var token = this.tokenFromName(kwargs.token);
             var amount = bigNumberify(kwargs.amount);
-            var tx_hash = await this.wallet.deposit(token, amount);
+            this.wallet.approveERC20(token, amount); // no need to await
+            var tx_hash = await this.wallet.depositApprovedERC20(token, amount);
         } catch (e) {
             yield error(`Onchain deposit failed with "${e.message}"`);
             return;

@@ -77,7 +77,7 @@ export default {
             return isReadablyPrintable(this.token);
         },
     },
-    methods: {  
+    methods: {
         localDisplayAlert(msg) {
             this.alertVisible = true;
             this.alertText = msg;

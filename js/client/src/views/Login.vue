@@ -28,7 +28,7 @@ const components = {
 import Eth from 'ethjs'
 import { ethers } from 'ethers'
 import { Wallet, FranklinProvider } from 'franklin_lib'
-import { walletDecorator, WalletDecorator } from '../WalletDecorator'
+import { WalletDecorator } from '../WalletDecorator'
 
 export default {
     name: 'login',

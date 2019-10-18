@@ -254,27 +254,64 @@ var Wallet = /** @class */ (function () {
         this.walletKeys = new WalletKeys(privateKey);
         this.address = crypto_1.pubkeyToAddress(this.walletKeys.publicKey);
     }
-    Wallet.prototype.deposit = function (token, amount) {
+    Wallet.prototype.depositETH = function (amount) {
         return __awaiter(this, void 0, void 0, function () {
-            var franklinDeployedContract, tx, erc20DeployedToken, tx;
+            var franklinDeployedContract, tx;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
                         franklinDeployedContract = new ethers_1.Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
-                        if (!(token.id == 0)) return [3 /*break*/, 2];
                         return [4 /*yield*/, franklinDeployedContract.depositETH(this.address, { value: amount, gasLimit: bigNumberify("200000") })];
                     case 1:
                         tx = _a.sent();
                         return [2 /*return*/, tx.hash];
-                    case 2:
+                }
+            });
+        });
+    };
+    Wallet.prototype.approveERC20 = function (token, amount) {
+        return __awaiter(this, void 0, void 0, function () {
+            var franklinDeployedContract, erc20DeployedToken;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        franklinDeployedContract = new ethers_1.Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
                         erc20DeployedToken = new ethers_1.Contract(token.address, IERC20Conract.abi, this.ethWallet);
                         return [4 /*yield*/, erc20DeployedToken.approve(franklinDeployedContract.address, amount)];
-                    case 3:
-                        _a.sent();
+                    case 1: return [2 /*return*/, _a.sent()];
+                }
+            });
+        });
+    };
+    Wallet.prototype.depositApprovedERC20 = function (token, amount) {
+        return __awaiter(this, void 0, void 0, function () {
+            var franklinDeployedContract, erc20DeployedToken, tx;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        franklinDeployedContract = new ethers_1.Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
+                        erc20DeployedToken = new ethers_1.Contract(token.address, IERC20Conract.abi, this.ethWallet);
                         return [4 /*yield*/, franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address, { gasLimit: bigNumberify("300000"), value: parseEther("0.05") })];
-                    case 4:
+                    case 1:
                         tx = _a.sent();
                         return [2 /*return*/, tx.hash];
+                }
+            });
+        });
+    };
+    Wallet.prototype.deposit = function (token, amount) {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        if (!(token.id == 0)) return [3 /*break*/, 2];
+                        return [4 /*yield*/, this.depositETH(amount)];
+                    case 1: return [2 /*return*/, _a.sent()];
+                    case 2: return [4 /*yield*/, this.approveERC20(token, amount)];
+                    case 3:
+                        _a.sent();
+                        return [4 /*yield*/, this.depositApprovedERC20(token, amount)];
+                    case 4: return [2 /*return*/, _a.sent()];
                 }
             });
         });

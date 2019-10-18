@@ -97,6 +97,9 @@ export declare class Wallet {
     ethState: ETHAccountState;
     pendingNonce: number;
     constructor(seed: Buffer, provider: FranklinProvider, ethWallet: ethers.Signer, ethAddress: string);
+    protected depositETH(amount: BigNumberish): Promise<any>;
+    protected approveERC20(token: Token, amount: BigNumberish): Promise<any>;
+    protected depositApprovedERC20(token: Token, amount: BigNumberish): Promise<any>;
     deposit(token: Token, amount: BigNumberish): Promise<any>;
     waitTxReceipt(tx_hash: any): Promise<any>;
     widthdrawOnchain(token: Token, amount: BigNumberish): Promise<any>;
