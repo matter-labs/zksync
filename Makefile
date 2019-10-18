@@ -70,17 +70,17 @@ genesis: confirm_action db-reset
 # Frontend clients
 
 dist-config:
-	bin/.gen_js_config > js/client_js/src/env-config.js
+	bin/.gen_js_config > js/client/src/env-config.js
 	bin/.gen_js_config > js/explorer/src/env-config.js
 
 client: dist-config
-	@cd js/client && yarn dev
+	@cd js/client && yarn serve
 
 explorer: dist-config
 	@cd js/explorer && yarn dev
 
 dist-client: dist-config
-	@cd js/client_js && yarn && yarn build
+	@cd js/client && yarn && yarn build
 
 dist-explorer: dist-config
 	@cd js/explorer && yarn build
