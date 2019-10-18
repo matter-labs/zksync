@@ -10,7 +10,11 @@ Prepare dev environment prerequisites: see [docs/setup-dev.md](docs/setup-dev.md
 
 ## Setup local dev environment
 
-First-time setup:
+
+(TODO(furkhat): remove when this step is implented and merged with https://github.com/matter-labs/franklin/pull/104) On a fresh copy of a project, run this once to generate test contracts:
+```./bin/prepare-test-contracts.sh```
+
+Setup:
 
 ```franklin init```
 
@@ -62,13 +66,36 @@ Blockscout will be available at http://localhost:4000/txs
 
 ## Build and run server + prover locally:
 
+Run server:
 ```
 franklin server
-franklin prover
-franklin client
 ```
 
-Client UI will be available at http://localhost:8080
+By default block chunk size set to `100`. For testing & development purposes you
+ca change it to smaller values. Two places requires a change:
+1. Environment variable value in `./etc/env/dev.env` `BLOCK_SIZE_CHUNKS`
+2. Rust constant at `./core/models/params.rs` `BLOCK_SIZE_CHUNKS`
+If you apply changes, do not forget to redeploy contracts `franklin redeploy`.
+
+You must prepare keys. This only needs to be done once:
+```
+./bin/gen-keys
+franklin redeploy
+```
+Run prover:
+```
+franklin prover
+```
+
+Run client
+```
+franklin dist-config
+cd js/client_js && yarn all_serve
+```
+
+Client UI will be available at http://localhost:8080.
+Make sure you have environment variables set right, you can check it by running:
+```franklin env```. You should see `* dev` in output.
 
 ## Start server and prover as local docker containers:
 
