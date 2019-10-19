@@ -2,6 +2,9 @@ kind: pipeline
 type: docker
 name: default
 
+clone:
+  depth: 1
+
 steps:
 - name: restore-cache
   image: drillster/drone-volume-cache
@@ -56,3 +59,7 @@ volumes:
   - name: cache
     host:
       path: /tmp/cache
+
+trigger:
+  event:
+  - pull_request
