@@ -3,7 +3,40 @@ type: docker
 name: default
 
 steps:
+- name: restore-cache
+  image: drillster/drone-volume-cache
+  volumes:
+  - name: cache
+    path: /cache
+  settings:
+    restore: true
+    mount:
+      - ./contracts/node_modules
+      - ./js/client_js/node_modules
+      - ./js/explorer/node_modules
+      - ./js/franklin_lib/node_modules
+      - ./target
+
 - name: run
   image: rust
   commands:
   - cargo check
+
+- name: rebuild-cache
+  image: drillster/drone-volume-cache
+  volumes:
+  - name: cache
+    path: /cache
+  settings:
+    rebuild: true
+    mount:
+      - ./contracts/node_modules
+      - ./js/client_js/node_modules
+      - ./js/explorer/node_modules
+      - ./js/franklin_lib/node_modules
+      - ./target
+
+volumes:
+  - name: cache
+    host: 
+      path: /tmp/cache
