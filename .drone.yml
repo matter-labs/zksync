@@ -1,0 +1,9 @@
+kind: pipeline
+type: docker
+name: default
+
+steps:
+- name: run
+  image: rust
+  commands:
+  - cargo check
