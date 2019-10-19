@@ -15,12 +15,14 @@ steps:
       - ./js/client_js/node_modules
       - ./js/explorer/node_modules
       - ./js/franklin_lib/node_modules
-      - ./target
 
-- name: run
-  image: rust
+- name: yarn init
+  image: node:10.16.3
   commands:
-  - cargo check
+  - export FRANKLIN_HOME=`pwd`
+  - export CARGO_HOME=$FRANKLIN_HOME/.cargo
+  - export PATH=$FRANKLIN_HOME/bin:$PATH
+  - franklin yarn
 
 - name: rebuild-cache
   image: drillster/drone-volume-cache
@@ -34,9 +36,8 @@ steps:
       - ./js/client_js/node_modules
       - ./js/explorer/node_modules
       - ./js/franklin_lib/node_modules
-      - ./target
 
 volumes:
   - name: cache
-    host: 
+    host:
       path: /tmp/cache
