@@ -20,9 +20,23 @@ steps:
   image: node:10.16.3
   commands:
   - export FRANKLIN_HOME=`pwd`
-  - export CARGO_HOME=$FRANKLIN_HOME/.cargo
   - export PATH=$FRANKLIN_HOME/bin:$PATH
   - franklin yarn
+
+- name: build contracts
+  image: node:10.16.3
+  commands:
+  - export FRANKLIN_HOME=`pwd`
+  - export PATH=$FRANKLIN_HOME/bin:$PATH
+  - franklin build-contracts
+
+- name: rust check
+  image: rust
+  commands:
+  - export FRANKLIN_HOME=`pwd`
+  - export PATH=$FRANKLIN_HOME/bin:$PATH
+  - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
+  - cargo check
 
 - name: rebuild-cache
   image: drillster/drone-volume-cache
@@ -36,6 +50,7 @@ steps:
       - ./js/client_js/node_modules
       - ./js/explorer/node_modules
       - ./js/franklin_lib/node_modules
+      - ./target
 
 volumes:
   - name: cache
