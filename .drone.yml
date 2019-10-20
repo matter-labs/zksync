@@ -15,16 +15,18 @@ steps:
       - ./js/client_js/node_modules
       - ./js/explorer/node_modules
       - ./js/franklin_lib/node_modules
-      - ./target
+      - ./target/cargo
 
 - name: init
   image: matterlabs/ci
   commands:
   - export FRANKLIN_HOME=`pwd`
   - export PATH=$FRANKLIN_HOME/bin:$PATH
+  - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
   - franklin env ci
   - franklin yarn
   - franklin db-wait
+  - franklin db-setup
   depends_on:
   - restore-cache
 
@@ -33,6 +35,7 @@ steps:
   commands:
   - export FRANKLIN_HOME=`pwd`
   - export PATH=$FRANKLIN_HOME/bin:$PATH
+  - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
   - franklin build-contracts
   depends_on:
   - init
@@ -64,6 +67,7 @@ steps:
   commands:
   - export FRANKLIN_HOME=`pwd`
   - export PATH=$FRANKLIN_HOME/bin:$PATH
+  - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
   - franklin test-contracts
   depends_on:
   - build-contracts
@@ -81,7 +85,7 @@ steps:
       - ./js/client_js/node_modules
       - ./js/explorer/node_modules
       - ./js/franklin_lib/node_modules
-      - ./target
+      - ./target/cargo
   depends_on:
      - init
      - rust-checks

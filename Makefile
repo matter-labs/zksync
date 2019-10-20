@@ -225,6 +225,8 @@ endif
 ifeq (dev,$(FRANKLIN_ENV))
 stop: confirm_action
 	@docker-compose stop server prover
+else ifeq (ci,$(FRANKLIN_ENV))
+stop:
 else
 stop: confirm_action stop-prover stop-server stop-nginx
 endif
