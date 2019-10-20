@@ -29,7 +29,7 @@ use diesel::r2d2::{ConnectionManager, Pool, PoolError, PooledConnection};
 use serde_json::value::Value;
 use std::env;
 
-use diesel::sql_types::{BigInt, Nullable, Text, Timestamp, Bool, Jsonb};
+use diesel::sql_types::{BigInt, Bool, Jsonb, Nullable, Text, Timestamp};
 sql_function!(coalesce, Coalesce, (x: Nullable<BigInt>, y: BigInt) -> BigInt);
 
 use itertools::Itertools;
@@ -799,13 +799,11 @@ impl StorageProcessor {
                     prover_run: prover_run,
                 })
             }
-            None => {
-                Ok(PriorityOpReceiptResponse {
-                    committed: false,
-                    verified: false,
-                    prover_run: None,
-                })
-            }
+            None => Ok(PriorityOpReceiptResponse {
+                committed: false,
+                verified: false,
+                prover_run: None,
+            }),
         }
     }
 
@@ -813,7 +811,7 @@ impl StorageProcessor {
         &self,
         address: &AccountAddress,
         offset: i64,
-        limit: i64
+        limit: i64,
     ) -> QueryResult<Vec<TransactionsHistoryItem>> {
         // TODO: txs are not ordered
         let query = format!(
@@ -882,14 +880,13 @@ impl StorageProcessor {
                         verified boolean)
             using 
                 (block_number)
-            "
-            , address = hex::encode(address.data)
-            , offset = offset
-            , limit = limit
+            ",
+            address = hex::encode(address.data),
+            offset = offset,
+            limit = limit
         );
 
-        diesel::sql_query(query)
-            .load::<TransactionsHistoryItem>(self.conn())
+        diesel::sql_query(query).load::<TransactionsHistoryItem>(self.conn())
     }
 
     pub fn get_account_transactions(
@@ -2560,5 +2557,4 @@ mod test {
     //            tx_meta: None,
     //        }
     //    }
-
 }

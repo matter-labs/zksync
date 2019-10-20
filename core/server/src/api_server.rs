@@ -1,8 +1,8 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
 use actix_web::{
-    http::Method, middleware, middleware::cors::Cors, server, App, AsyncResponder, Body, Error,
-    HttpMessage, HttpRequest, HttpResponse, error
+    error, http::Method, middleware, middleware::cors::Cors, server, App, AsyncResponder, Body,
+    Error, HttpMessage, HttpRequest, HttpResponse,
 };
 use models::node::{tx::FranklinTx, Account, AccountId, ExecutedOperations};
 use models::{NetworkStatus, StateKeeperRequest};
@@ -303,17 +303,17 @@ fn handle_get_executed_transaction_by_hash(
     }
 }
 
-fn handle_get_priority_op_receipt(
-    req: &HttpRequest<AppState>,
-) -> ActixResult<HttpResponse> {
+fn handle_get_priority_op_receipt(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let id = req
         .match_info()
         .get("pq_id")
         .and_then(|offset| offset.parse::<i64>().ok())
         .ok_or_else(|| error::ErrorBadRequest("Invalid pq_id parameter"))?;
 
-    let storage = req.state()
-        .connection_pool.clone()
+    let storage = req
+        .state()
+        .connection_pool
+        .clone()
         .access_storage()
         .map_err(|e| error::ErrorBadRequest(e))?;
 
@@ -355,8 +355,10 @@ fn handle_get_account_transactions_history(
         })
         .map_err(|e| error::ErrorBadRequest(e))?;
 
-    let storage = req.state()
-        .connection_pool.clone()
+    let storage = req
+        .state()
+        .connection_pool
+        .clone()
         .access_storage()
         .map_err(|e| error::ErrorBadRequest(e))?;
 
@@ -624,10 +626,12 @@ fn start_server(state: AppState, bind_to: String) {
                         r.method(Method::GET).f(handle_get_account_transactions);
                     })
                     .resource("/account/{address}/history/{offset}/{limit}", |r| {
-                        r.method(Method::GET).f(handle_get_account_transactions_history);
+                        r.method(Method::GET)
+                            .f(handle_get_account_transactions_history);
                     })
                     .resource("/transactions/{tx_hash}", |r| {
-                        r.method(Method::GET).f(handle_get_executed_transaction_by_hash);
+                        r.method(Method::GET)
+                            .f(handle_get_executed_transaction_by_hash);
                     })
                     .resource("/priority_operations/{pq_id}/", |r| {
                         r.method(Method::GET).f(handle_get_priority_op_receipt);
