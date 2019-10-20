@@ -3,7 +3,7 @@
 set -e
 
 check_tool() {
-    which $1 > /dev/null || (echo $1 not found && exit 1)
+    command -v $1 > /dev/null || (echo $1 not found && exit 1)
 }
 
 echo Checking environment

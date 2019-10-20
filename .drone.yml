@@ -2,9 +2,6 @@ kind: pipeline
 type: docker
 name: default
 
-clone:
-  depth: 1
-
 steps:
 - name: restore-cache
   image: drillster/drone-volume-cache
@@ -18,28 +15,39 @@ steps:
       - ./js/client_js/node_modules
       - ./js/explorer/node_modules
       - ./js/franklin_lib/node_modules
+      - ./target
 
-- name: yarn init
-  image: node:10.16.3
+- name: init
+  image: matterlabs/ci
   commands:
   - export FRANKLIN_HOME=`pwd`
   - export PATH=$FRANKLIN_HOME/bin:$PATH
+  - franklin env ci
   - franklin yarn
+  - franklin db-wait
+  depends_on:
+    - restore-cache
+   
 
-- name: build contracts
-  image: node:10.16.3
+- name: build-contracts
+  image: matterlabs/ci
   commands:
   - export FRANKLIN_HOME=`pwd`
   - export PATH=$FRANKLIN_HOME/bin:$PATH
   - franklin build-contracts
+  depends_on:
+    - init
 
-- name: rust check
-  image: rust
+- name: rust-checks
+  image: matterlabs/ci
   commands:
   - export FRANKLIN_HOME=`pwd`
   - export PATH=$FRANKLIN_HOME/bin:$PATH
   - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
+  - cargo fmt --all -- --check
   - cargo check
+  depends_on:
+    - build-contracts
 
 - name: rebuild-cache
   image: drillster/drone-volume-cache
@@ -59,6 +67,12 @@ volumes:
   - name: cache
     host:
       path: /tmp/cache
+
+services:
+  - name: geth
+    image: gluk64/franklin:geth
+  - name: postgres
+    image: postgres:10.4
 
 trigger:
   event:
