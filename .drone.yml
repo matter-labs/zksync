@@ -25,9 +25,6 @@ steps:
   - franklin env ci
   - franklin yarn
   - franklin db-wait
-  depends_on:
-    - restore-cache
-   
 
 - name: build-contracts
   image: matterlabs/ci
@@ -35,8 +32,6 @@ steps:
   - export FRANKLIN_HOME=`pwd`
   - export PATH=$FRANKLIN_HOME/bin:$PATH
   - franklin build-contracts
-  depends_on:
-    - init
 
 - name: rust-checks
   image: matterlabs/ci
@@ -44,10 +39,8 @@ steps:
   - export FRANKLIN_HOME=`pwd`
   - export PATH=$FRANKLIN_HOME/bin:$PATH
   - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
-  - cargo fmt --all -- --check
+  - cargo fmt -- --check
   - cargo check
-  depends_on:
-    - build-contracts
 
 - name: rebuild-cache
   image: drillster/drone-volume-cache
