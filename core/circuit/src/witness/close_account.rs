@@ -179,6 +179,7 @@ mod test {
     use super::*;
     use crate::witness::utils::public_data_commitment;
     use models::merkle_tree::PedersenHasher;
+    use models::primitives::bytes_into_be_bits;
 
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;

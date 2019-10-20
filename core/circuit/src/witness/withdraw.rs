@@ -358,6 +358,7 @@ mod test {
     use models::params as franklin_constants;
     use num_traits::cast::ToPrimitive;
     use rand::{Rng, SeedableRng, XorShiftRng};
+    use models::primitives::bytes_into_be_bits;
     #[test]
     #[ignore]
     fn test_withdraw_franklin() {
