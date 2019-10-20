@@ -121,7 +121,7 @@ impl PlasmaState {
         OpSuccess {
             fee: None,
             updates,
-            executed_op: FranklinOp::Deposit(deposit_op),
+            executed_op: FranklinOp::Deposit(Box::new(deposit_op)),
         }
     }
 
@@ -144,7 +144,7 @@ impl PlasmaState {
         OpSuccess {
             fee: None,
             updates: self.apply_full_exit_op(&op),
-            executed_op: FranklinOp::FullExit(op),
+            executed_op: FranklinOp::FullExit(Box::new(op)),
         }
     }
 
@@ -201,7 +201,7 @@ impl PlasmaState {
             Ok(OpSuccess {
                 fee: Some(fee),
                 updates,
-                executed_op: FranklinOp::Transfer(transfer_op),
+                executed_op: FranklinOp::Transfer(Box::new(transfer_op)),
             })
         } else {
             let to = self.get_free_account_id();
@@ -211,7 +211,7 @@ impl PlasmaState {
             Ok(OpSuccess {
                 fee: Some(fee),
                 updates,
-                executed_op: FranklinOp::TransferToNew(transfer_to_new_op),
+                executed_op: FranklinOp::TransferToNew(Box::new(transfer_to_new_op)),
             })
         }
     }
@@ -230,7 +230,7 @@ impl PlasmaState {
         Ok(OpSuccess {
             fee: Some(fee),
             updates,
-            executed_op: FranklinOp::Withdraw(withdraw_op),
+            executed_op: FranklinOp::Withdraw(Box::new(withdraw_op)),
         })
     }
 
@@ -244,7 +244,7 @@ impl PlasmaState {
         Ok(OpSuccess {
             fee: Some(fee),
             updates,
-            executed_op: FranklinOp::Close(close_op),
+            executed_op: FranklinOp::Close(Box::new(close_op)),
         })
     }
 

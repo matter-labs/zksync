@@ -315,11 +315,11 @@ fn handle_get_priority_op_receipt(req: &HttpRequest<AppState>) -> ActixResult<Ht
         .connection_pool
         .clone()
         .access_storage()
-        .map_err(|e| error::ErrorBadRequest(e))?;
+        .map_err(error::ErrorBadRequest)?;
 
     let res = storage
         .get_priority_op_receipt(id)
-        .map_err(|e| error::ErrorBadRequest(e))?;
+        .map_err(error::ErrorBadRequest)?;
 
     Ok(HttpResponse::Ok().json(res))
 }
@@ -353,18 +353,18 @@ fn handle_get_account_transactions_history(
                 Err("Limit too large")
             }
         })
-        .map_err(|e| error::ErrorBadRequest(e))?;
+        .map_err(error::ErrorBadRequest)?;
 
     let storage = req
         .state()
         .connection_pool
         .clone()
         .access_storage()
-        .map_err(|e| error::ErrorBadRequest(e))?;
+        .map_err(error::ErrorBadRequest)?;
 
     let res = storage
         .get_account_transactions_history(&address, offset, limit)
-        .map_err(|e| error::ErrorBadRequest(e))?;
+        .map_err(error::ErrorBadRequest)?;
 
     Ok(HttpResponse::Ok().json(res))
 }
@@ -453,19 +453,17 @@ fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpRespon
     match storage.load_block_range(block_id, 1) {
         Ok(mut block_range) => {
             if let Some(response) = block_range.pop() {
-                return Ok(HttpResponse::Ok().json(response));
+                Ok(HttpResponse::Ok().json(response))
             } else {
-                return Ok(HttpResponse::Ok().json(ApiError {
+                Ok(HttpResponse::Ok().json(ApiError {
                     error: "Block not found".to_string(),
-                }));
+                }))
             }
         }
-        Err(e) => {
-            return Ok(HttpResponse::Ok().json(ApiError {
-                error: format!("db_error {}", e),
-            }));
-        }
-    };
+        Err(e) => Ok(HttpResponse::Ok().json(ApiError {
+            error: format!("db_error {}", e),
+        })),
+    }
 }
 
 fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
@@ -564,19 +562,17 @@ fn handle_get_transaction_by_id(req: &HttpRequest<AppState>) -> ActixResult<Http
     match storage.get_block_executed_ops(block_id) {
         Ok(ops) => {
             if let Some(exec_op) = ops.get(tx_id as usize) {
-                return Ok(HttpResponse::Ok().json(exec_op));
+                Ok(HttpResponse::Ok().json(exec_op))
             } else {
-                return Ok(HttpResponse::Ok().json(ApiError {
+                Ok(HttpResponse::Ok().json(ApiError {
                     error: "Executed op not found in block".to_string(),
-                }));
+                }))
             }
         }
-        Err(e) => {
-            return Ok(HttpResponse::Ok().json(ApiError {
-                error: format!("db error: {}", e),
-            }));
-        }
-    };
+        Err(e) => Ok(HttpResponse::Ok().json(ApiError {
+            error: format!("db error: {}", e),
+        })),
+    }
 }
 
 fn handle_search(

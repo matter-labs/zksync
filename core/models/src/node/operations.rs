@@ -149,12 +149,12 @@ impl FullExitOp {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum FranklinOp {
-    Deposit(DepositOp),
-    TransferToNew(TransferToNewOp),
-    Withdraw(WithdrawOp),
-    Close(CloseOp),
-    Transfer(TransferOp),
-    FullExit(FullExitOp),
+    Deposit(Box<DepositOp>),
+    TransferToNew(Box<TransferToNewOp>),
+    Withdraw(Box<WithdrawOp>),
+    Close(Box<CloseOp>),
+    Transfer(Box<TransferOp>),
+    FullExit(Box<FullExitOp>),
 }
 
 impl FranklinOp {

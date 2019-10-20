@@ -30,7 +30,6 @@ use serde_json::value::Value;
 use std::env;
 
 use diesel::sql_types::{BigInt, Bool, Jsonb, Nullable, Text, Timestamp};
-sql_function!(coalesce, Coalesce, (x: Nullable<BigInt>, y: BigInt) -> BigInt);
 
 use itertools::Itertools;
 use models::node::AccountAddress;
@@ -178,20 +177,17 @@ impl StoredExecutedTransaction {
                 fail_reason: None,
                 block_index: Some(self.block_index.expect("Block idx should be set") as u32),
             })
+        } else if let Some(stored_tx) = stored_tx {
+            let tx: FranklinTx = serde_json::from_value(stored_tx.tx).expect("Unparsable tx in db");
+            Ok(ExecutedTx {
+                tx,
+                success: false,
+                op: None,
+                fail_reason: self.fail_reason,
+                block_index: None,
+            })
         } else {
-            if let Some(stored_tx) = stored_tx {
-                let tx: FranklinTx =
-                    serde_json::from_value(stored_tx.tx).expect("Unparsable tx in db");
-                Ok(ExecutedTx {
-                    tx,
-                    success: false,
-                    op: None,
-                    fail_reason: self.fail_reason,
-                    block_index: None,
-                })
-            } else {
-                bail!("Unsuccessful tx was lost from db.");
-            }
+            bail!("Unsuccessful tx was lost from db.");
         }
     }
 }
@@ -727,9 +723,9 @@ impl StorageProcessor {
             self.save_block_transactions(block)?;
 
             let new_block = StorageBlock {
-                number: block.block_number as i64,
+                number: i64::from(block.block_number),
                 root_hash: block.new_root_hash.to_hex(),
-                fee_account_id: block.fee_account as i64,
+                fee_account_id: i64::from(block.fee_account),
                 unprocessed_prior_op_before: block.processed_priority_ops.0 as i64,
                 unprocessed_prior_op_after: block.processed_priority_ops.1 as i64,
             };
@@ -796,7 +792,7 @@ impl StorageProcessor {
                 Ok(PriorityOpReceiptResponse {
                     committed: commit.is_some(),
                     verified: confirm.is_some(),
-                    prover_run: prover_run,
+                    prover_run,
                 })
             }
             None => Ok(PriorityOpReceiptResponse {
@@ -952,7 +948,7 @@ impl StorageProcessor {
 
     pub fn get_block(&self, block: BlockNumber) -> QueryResult<Option<Block>> {
         let stored_block = if let Some(block) = blocks::table
-            .find(block as i64)
+            .find(i64::from(block))
             .first::<StorageBlock>(self.conn())
             .optional()?
         {
@@ -984,20 +980,20 @@ impl StorageProcessor {
 
             let stored_executed_txs: Vec<_> = executed_transactions::table
                 .left_join(mempool::table.on(executed_transactions::tx_hash.eq(mempool::hash)))
-                .filter(executed_transactions::block_number.eq(block as i64))
+                .filter(executed_transactions::block_number.eq(i64::from(block)))
                 .load::<(StoredExecutedTransaction, Option<ReadTx>)>(self.conn())?;
             let executed_txs = stored_executed_txs
                 .into_iter()
                 .filter_map(|(stored_exec, stored_tx)| stored_exec.into_executed_tx(stored_tx).ok())
-                .map(ExecutedOperations::Tx);
+                .map(|tx| ExecutedOperations::Tx(Box::new(tx)));
             executed_operations.extend(executed_txs);
 
             let stored_executed_prior_ops: Vec<_> = executed_priority_operations::table
-                .filter(executed_priority_operations::block_number.eq(block as i64))
+                .filter(executed_priority_operations::block_number.eq(i64::from(block)))
                 .load::<StoredExecutedPriorityOperation>(self.conn())?;
             let executed_prior_ops = stored_executed_prior_ops
                 .into_iter()
-                .map(|op| ExecutedOperations::PriorityOp(op.into()));
+                .map(|op| ExecutedOperations::PriorityOp(Box::new(op.into())));
             executed_operations.extend(executed_prior_ops);
 
             executed_operations.sort_by_key(|exec_op| {
@@ -1587,7 +1583,7 @@ impl StorageProcessor {
                     success: tx.success,
                     verified: confirm.is_some(),
                     fail_reason: tx.fail_reason,
-                    prover_run: prover_run,
+                    prover_run,
                 }))
             } else {
                 Ok(None)

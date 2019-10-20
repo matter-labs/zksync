@@ -4,8 +4,6 @@ extern crate log;
 use bellman::groth16::{
     create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
 };
-use bellman::Circuit;
-use circuit::account::AccountWitness;
 use circuit::circuit::FranklinCircuit;
 use circuit::operation::SignatureData;
 use circuit::witness::close_account::*;
@@ -18,12 +16,9 @@ use circuit::witness::utils::*;
 use circuit::witness::withdraw::*;
 use ff::{Field, PrimeField};
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-use franklin_crypto::circuit::test::*;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccount;
-use models::circuit::utils::{pub_key_hash_bytes, pub_key_hash_fe};
 use models::circuit::CircuitAccountTree;
-use models::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use models::merkle_tree::PedersenHasher;
 use models::node::Account;
 use models::node::*;
@@ -31,7 +26,6 @@ use models::params as franklin_constants;
 use models::primitives::bytes_into_be_bits;
 use models::primitives::pack_bits_into_bytes_in_order;
 use models::EncodedProof;
-use num_traits::cast::ToPrimitive;
 use plasma::state::PlasmaState;
 use rand::OsRng;
 use std::fmt;
@@ -312,7 +306,7 @@ impl BabyProver {
             let ops = storage.get_block_operations(block.block_number).unwrap();
 
             drop(storage);
-            let (root, acc_witness) = apply_fee(&mut self.accounts_tree, block.fee_account, 0, 0);
+            let _ = apply_fee(&mut self.accounts_tree, block.fee_account, 0, 0);
             let mut operations = vec![];
             let mut pub_data = vec![];
             let mut fees = vec![];
@@ -330,7 +324,7 @@ impl BabyProver {
                                 r_packed: vec![Some(false); 256],
                                 s: vec![Some(false); 256],
                             },
-                            &vec![Some(false); 256], //doesn't matter for deposit
+                            &[Some(false); 256], //doesn't matter for deposit
                         );
                         operations.extend(deposit_operations);
                         pub_data.extend(deposit_witness.get_pubdata());
@@ -472,8 +466,7 @@ impl BabyProver {
 
                         let (first_sig_msg, second_sig_msg, third_sig_msg) =
                             generate_sig_witness(&sig_bits, &phasher, &params);
-                        let mut signer_packed_key_bytes =
-                            full_exit.priority_op.packed_pubkey.to_vec();
+                        let signer_packed_key_bytes = full_exit.priority_op.packed_pubkey.to_vec();
                         let signer_packed_key_bits: Vec<_> =
                             bytes_into_be_bits(&signer_packed_key_bytes)
                                 .iter()
@@ -503,8 +496,8 @@ impl BabyProver {
                         first_sig_msg,
                         second_sig_msg,
                         third_sig_msg,
-                        sender_x,
-                        sender_y,
+                        _sender_x,
+                        _sender_y,
                     ) = generate_dummy_sig_data(&[false], &phasher, &params);
                     operations.push(noop_operation(
                         &self.accounts_tree,
@@ -513,7 +506,7 @@ impl BabyProver {
                         &second_sig_msg,
                         &third_sig_msg,
                         &signature,
-                        &vec![Some(false); 256],
+                        &[Some(false); 256],
                     ));
                     pub_data.extend(vec![false; 64]);
                 }
@@ -534,7 +527,7 @@ impl BabyProver {
                 };
                 validator_balances.push(Some(balance_value));
             }
-            let mut root_after_fee: Fr = self.accounts_tree.root_hash();
+            let _: Fr = self.accounts_tree.root_hash();
             let (mut root_after_fee, mut validator_account_witness) =
                 apply_fee(&mut self.accounts_tree, block.fee_account, 0, 0);
             for (fee, token) in fees {

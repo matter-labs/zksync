@@ -220,8 +220,7 @@ impl PlasmaStateKeeper {
                     .expect("Failed to get tx from db")
             })
             .expect("Failed to get txs from mempool");
-        let filtered_txs = self.filter_invalid_txs(chunks_left, txs);
-        filtered_txs
+        self.filter_invalid_txs(chunks_left, txs)
     }
 
     fn filter_invalid_txs(
@@ -310,7 +309,7 @@ impl PlasmaStateKeeper {
                 priority_op,
                 block_index,
             };
-            ops.push(ExecutedOperations::PriorityOp(exec_result));
+            ops.push(ExecutedOperations::PriorityOp(Box::new(exec_result)));
             self.current_unprocessed_priority_op += 1;
         }
 
@@ -343,7 +342,7 @@ impl PlasmaStateKeeper {
                         fail_reason: None,
                         block_index: Some(block_index),
                     };
-                    ops.push(ExecutedOperations::Tx(exec_result));
+                    ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
                 }
                 Err(e) => {
                     error!("Failed to execute transaction: {:?}, {}", tx, e);
@@ -354,7 +353,7 @@ impl PlasmaStateKeeper {
                         fail_reason: Some(e.to_string()),
                         block_index: None,
                     };
-                    ops.push(ExecutedOperations::Tx(exec_result));
+                    ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
                 }
             };
         }

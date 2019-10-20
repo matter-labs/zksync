@@ -317,9 +317,7 @@ pub fn convert_to_float(
     }
 
     let mut exponent: usize = 0;
-    let mut mantissa = integer;
-
-    if integer > max_mantissa {
+    let mantissa = if integer > max_mantissa {
         // always try best precision
         let exponent_guess = integer / max_mantissa;
         let mut exponent_temp = exponent_guess;
@@ -328,22 +326,24 @@ pub fn convert_to_float(
             if exponent_temp < exponent_base {
                 break;
             }
-            exponent_temp = exponent_temp / exponent_base;
+            exponent_temp /= exponent_base;
             exponent += 1;
         }
 
         exponent_temp = 1u128;
         for _ in 0..exponent {
-            exponent_temp = exponent_temp * exponent_base;
+            exponent_temp *= exponent_base;
         }
 
         if exponent_temp * max_mantissa < integer {
             exponent += 1;
-            exponent_temp = exponent_temp * exponent_base;
+            exponent_temp *= exponent_base;
         }
 
-        mantissa = integer / exponent_temp;
-    }
+        integer / exponent_temp
+    } else {
+        integer
+    };
 
     // encode into bits. First bits of mantissa in LE order
 
@@ -389,8 +389,7 @@ pub fn pedersen_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
     let hash_fr = hasher.hash_bits(msg_bits.into_iter());
     let mut hash_bits = Vec::new();
     append_le_fixed_width(&mut hash_bits, &hash_fr, 256);
-    let result = pack_bits_into_bytes(hash_bits);
-    result
+    pack_bits_into_bytes(hash_bits)
 }
 
 /// Its important to use this, instead of bit_decimal.to_u128()

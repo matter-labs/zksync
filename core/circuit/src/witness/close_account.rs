@@ -213,7 +213,6 @@ mod test {
         let sender_sk = PrivateKey::<Bn256>(rng.gen());
         let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
         let sender_pub_key_hash = pub_key_hash_fe(&sender_pk, &phasher);
-        let (sender_x, sender_y) = sender_pk.0.into_xy();
         let sender_leaf = CircuitAccount::<Bn256> {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
@@ -254,7 +253,7 @@ mod test {
             params,
         );
         let packed_public_key = PackedPublicKey(sender_pk);
-        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+        let packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
         let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
             .iter()
             .map(|x| Some(*x))
@@ -306,9 +305,8 @@ mod test {
             println!("{}", cs.find_unconstrained());
 
             println!("number of constraints {}", cs.num_constraints());
-            let err = cs.which_is_unsatisfied();
-            if err.is_some() {
-                panic!("ERROR satisfying in {}", err.unwrap());
+            if let Some(err) = cs.which_is_unsatisfied() {
+                panic!("ERROR satisfying in {}", err);
             }
         }
     }

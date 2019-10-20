@@ -10,8 +10,6 @@ use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
 
-use num_traits::cast::ToPrimitive;
-
 use models::node::WithdrawOp;
 use models::params as franklin_constants;
 use models::primitives::big_decimal_to_u128;
@@ -356,9 +354,8 @@ mod test {
     use models::merkle_tree::PedersenHasher;
     use models::node::tx::PackedPublicKey;
     use models::params as franklin_constants;
-    use num_traits::cast::ToPrimitive;
-    use rand::{Rng, SeedableRng, XorShiftRng};
     use models::primitives::bytes_into_be_bits;
+    use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
     #[ignore]
     fn test_withdraw_franklin() {
@@ -444,7 +441,7 @@ mod test {
             params,
         );
         let packed_public_key = PackedPublicKey(sender_pk);
-        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+        let packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
         let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
             .iter()
             .map(|x| Some(*x))
@@ -494,9 +491,8 @@ mod test {
 
             println!("{}", cs.num_constraints());
 
-            let err = cs.which_is_unsatisfied();
-            if err.is_some() {
-                panic!("ERROR satisfying in {}", err.unwrap());
+            if let Some(err) = cs.which_is_unsatisfied() {
+                panic!("ERROR satisfying in {}", err);
             }
         }
     }

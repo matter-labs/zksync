@@ -267,12 +267,12 @@ pub fn calculate_full_exit_operations_from_witness(
         signature_data: signature_data.clone(),
     });
 
-    for i in 1..18 {
+    for (i, pubdata_chunk) in pubdata_chunks.iter().cloned().enumerate().take(18).skip(1) {
         operations.push(Operation {
             new_root: full_exit_witness.after_root,
             tx_type: full_exit_witness.tx_type,
             chunk: Some(Fr::from_str(&i.to_string()).unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[i]),
+            pubdata_chunk: Some(pubdata_chunk),
             first_sig_msg: Some(*first_sig_msg),
             second_sig_msg: Some(*second_sig_msg),
             third_sig_msg: Some(*third_sig_msg),
@@ -377,7 +377,7 @@ mod test {
         let packed_public_key = PackedPublicKey(sender_pk.clone());
         let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
         packed_public_key_bytes.reverse();
-        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
+        let _signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
             .iter()
             .map(|x| Some(*x))
             .collect();
@@ -408,7 +408,7 @@ mod test {
         println!("sig_bits outside: ");
         for (i, bit) in sig_bits.iter().enumerate() {
             if i % 64 == 0 {
-                println!("")
+                println!()
             } else if i % 8 == 0 {
                 print!(" ")
             };
@@ -421,7 +421,7 @@ mod test {
             };
             print!("{}", numb);
         }
-        println!("");
+        println!();
         tree.insert(account_address, sender_leaf_initial);
 
         sig_bits.resize(franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS, false);
@@ -521,7 +521,7 @@ mod test {
             .enumerate()
         {
             if i % 64 == 0 {
-                println!("")
+                println!()
             } else if i % 8 == 0 {
                 print!(" ")
             };
@@ -534,7 +534,7 @@ mod test {
             };
             print!("{}", numb);
         }
-        println!("");
+        println!();
         println!(
             "full_exit_witness.before_root: {:?},",
             full_exit_witness.before_root
@@ -575,9 +575,8 @@ mod test {
 
             println!("{}", cs.num_constraints());
 
-            let err = cs.which_is_unsatisfied();
-            if err.is_some() {
-                panic!("ERROR satisfying in {}", err.unwrap());
+            if let Some(err) = cs.which_is_unsatisfied() {
+                panic!("ERROR satisfying in {}", err);
             }
         }
     }
@@ -647,7 +646,7 @@ mod test {
         };
 
         let packed_public_key = PackedPublicKey(sender_pk.clone());
-        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+        let packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
         let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
             .iter()
             .map(|x| Some(*x))
@@ -795,9 +794,8 @@ mod test {
 
             println!("{}", cs.num_constraints());
 
-            let err = cs.which_is_unsatisfied();
-            if err.is_some() {
-                panic!("ERROR satisfying in {}", err.unwrap());
+            if let Some(err) = cs.which_is_unsatisfied() {
+                panic!("ERROR satisfying in {}", err);
             }
         }
     }

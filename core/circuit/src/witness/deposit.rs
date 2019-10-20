@@ -3,13 +3,11 @@ use super::utils::*;
 use crate::operation::SignatureData;
 use crate::operation::*;
 use ff::{Field, PrimeField};
-use franklin_crypto::circuit::float_point::{convert_to_float, parse_float_to_u128};
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
 use models::node::DepositOp;
 use models::params as franklin_constants;
-use num_traits::cast::ToPrimitive;
 use pairing::bn256::*;
 
 pub struct DepositData {
@@ -321,7 +319,6 @@ mod test {
     use models::circuit::utils::*;
     use models::params as franklin_constants;
 
-    use models::node::tx::PackedPublicKey;
     use rand::{Rng, SeedableRng, XorShiftRng};
 
     #[test]
@@ -341,7 +338,6 @@ mod test {
         let sender_sk = PrivateKey::<Bn256>(rng.gen());
         let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
         let sender_pub_key_hash = pub_key_hash_fe(&sender_pk, &phasher);
-        let (sender_x, sender_y) = sender_pk.0.into_xy();
         let sender_leaf = CircuitAccount::<Bn256> {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
@@ -441,9 +437,8 @@ mod test {
 
             println!("unconstrained: {}", cs.find_unconstrained());
             println!("number of constraints {}", cs.num_constraints());
-            let err = cs.which_is_unsatisfied();
-            if err.is_some() {
-                panic!("ERROR satisfying in {}", err.unwrap());
+            if let Some(err) = cs.which_is_unsatisfied() {
+                panic!("ERROR satisfying in {}", err);
             }
         }
     }
@@ -466,7 +461,6 @@ mod test {
         let sender_sk = PrivateKey::<Bn256>(rng.gen());
         let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
         let sender_pub_key_hash = pub_key_hash_fe(&sender_pk, &phasher);
-        let (sender_x, sender_y) = sender_pk.0.into_xy();
         let sender_leaf = CircuitAccount::<Bn256> {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
