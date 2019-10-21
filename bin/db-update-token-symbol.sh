@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Usage: db-update-token-symbol.sh token_address new_token_symbol
+
 . .setup_env
 
 set -e
