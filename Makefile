@@ -321,16 +321,16 @@ make-keys:
 
  # Data Restore
 
-data-restore-setup-and-run: data-restore-db-prepare data-restore-build data-restore-run
+data-restore-setup-and-run: data-restore-build data-restore-restart
 
 data-restore-db-prepare: db-drop db-wait db-setup
 
 data-restore-build:
 	@cargo build -p data_restore --release --bin data_restore
 
-data-restore-run:
-	@./target/release/data_restore 15
+data-restore-restart: confirm_action data-restore-db-prepare
+	@./target/release/data_restore
 
 data-restore-continue:
-	@./target/release/data_restore storage 15
+	@./target/release/data_restore
 	

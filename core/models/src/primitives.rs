@@ -8,6 +8,8 @@ use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
 use franklin_crypto::jubjub::{edwards, JubjubEngine, Unknown};
 use pairing::bn256::Bn256;
 use pairing::{CurveAffine, Engine};
+use std::convert::TryInto;
+use std::str::FromStr;
 use web3::types::U256;
 
 // TODO: replace Vec with Iterator?
@@ -295,6 +297,63 @@ pub fn pack_as_float(number: &BigDecimal, exponent_len: usize, mantissa_len: usi
     pack_bits_into_bytes_in_order(vec)
 }
 
+pub fn unpack_as_big_decimal(
+    bytes: &[u8],
+    exponent_len: usize,
+    mantissa_len: usize,
+) -> Option<BigDecimal> {
+    let bool_vec: Vec<bool> = bytes_into_be_bits(bytes);
+    let amount_u128: u128 = parse_float_to_u128(bool_vec, exponent_len, mantissa_len, 10)?;
+    BigDecimal::from_str(&amount_u128.to_string()).ok()
+}
+
+pub fn parse_float_to_u128(
+    bool_vec: Vec<bool>,
+    exponent_length: usize,
+    mantissa_length: usize,
+    exponent_base: u32,
+) -> Option<u128> {
+    if exponent_length + mantissa_length != bool_vec.len() {
+        return None;
+    }
+
+    let exponent_base: u128 = u128::from(exponent_base);
+    let mut exponent_power_of_two = exponent_base;
+    let mut exponent: u128 = 1;
+    for i in 0..exponent_length {
+        if bool_vec[i] {
+            let max_exponent: u128 = 1 + (u128::max_value() / exponent_power_of_two);
+            if exponent >= max_exponent {
+                return None;
+            }
+            exponent = exponent.checked_mul(exponent_power_of_two)?;
+        }
+        exponent_power_of_two = exponent_power_of_two.checked_mul(exponent_power_of_two)?;
+    }
+
+    let mut max_mantissa: u128 = u128::max_value();
+    if exponent != 1 {
+        max_mantissa = 1 + (u128::max_value() / exponent);
+    }
+
+    let mut mantissa_power_of_two: u128 = 1;
+    let mut mantissa: u128 = 0;
+    for i in exponent_length..(exponent_length + mantissa_length) {
+        if bool_vec[i] {
+            let _max_mantissa: u128 = 1 + (max_mantissa / 2);
+            if mantissa >= _max_mantissa {
+                return None;
+            }
+            mantissa = mantissa.checked_add(mantissa_power_of_two)?;
+        }
+        mantissa_power_of_two = mantissa_power_of_two.checked_mul(2)?;
+    }
+
+    let result = mantissa.checked_mul(exponent)?;
+
+    Some(result)
+}
+
 pub fn convert_to_float(
     integer: u128,
     exponent_length: usize,
@@ -400,6 +459,52 @@ pub fn big_decimal_to_u128(big_decimal: &BigDecimal) -> u128 {
 /// Its important to use this, instead of BigDecimal::from_u128()
 pub fn u128_to_bigdecimal(n: u128) -> BigDecimal {
     n.to_string().parse().unwrap()
+}
+
+pub fn bytes_slice_to_uint32(bytes: &[u8]) -> Option<u32> {
+    let size = bytes.len();
+    let mut vec: Vec<u8> = bytes.clone().to_vec();
+    vec.reverse();
+    for _ in 0..4 - size {
+        vec.push(0);
+    }
+    vec.reverse();
+    let new_bytes = vec.as_slice();
+    Some(u32::from_be_bytes(new_bytes.try_into().ok()?))
+}
+
+pub fn bytes_slice_to_uint16(bytes: &[u8]) -> Option<u16> {
+    let size = bytes.len();
+    let mut vec: Vec<u8> = bytes.clone().to_vec();
+    vec.reverse();
+    for _ in 0..2 - size {
+        vec.push(0);
+    }
+    vec.reverse();
+    let new_bytes = vec.as_slice();
+    Some(u16::from_be_bytes(new_bytes.try_into().ok()?))
+}
+
+pub fn bytes_slice_to_uint128(bytes: &[u8]) -> Option<u128> {
+    let size = bytes.len();
+    let mut vec: Vec<u8> = bytes.clone().to_vec();
+    vec.reverse();
+    for _ in 0..16 - size {
+        vec.push(0);
+    }
+    vec.reverse();
+    let new_bytes = vec.as_slice();
+    Some(u128::from_be_bytes(new_bytes.try_into().ok()?))
+}
+
+pub fn bytes32_from_slice(bytes: &[u8]) -> Option<[u8; 32]> {
+    if bytes.len() != 32 {
+        return None;
+    }
+    let mut array = [0; 32];
+    let bytes = &bytes[..array.len()];
+    array.copy_from_slice(bytes);
+    Some(array)
 }
 
 #[test]

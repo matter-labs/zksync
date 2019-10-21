@@ -10,11 +10,17 @@ Install Node.
 
 Install yarn.
 
+`yarn global add @vue/cli-service`
+
 ## Axel
 
 Install axel for downloading keys:
 
 ```brew install axel```
+
+## gnu-sed for MAC
+
+`brew install gnu-sed`
 
 ## Envsubst for mac (to transpile k8s yaml files)
 
@@ -62,8 +68,30 @@ Edit the lines below and add them to your shell profile file (e.g. `~/.bash_prof
 export FRANKLIN_HOME=/path/to/franklin
 
 export PATH=$FRANKLIN_HOME/bin:$PATH
-complete -W "\`grep -oE '^[a-zA-Z0-9_.-]+:([^=]|$)' $FRANKLIN_HOME/Makefile | sed 's/[^a-zA-Z0-9_.-]*$//'\`" franklin
 
 # If you're like me, uncomment:
 # cd $FRANKLIN_HOME
 ```
+
+Autocomplete configuration.
+
+`bash`:
+```
+complete -W "\`grep -oE '^[a-zA-Z0-9_.-]+:([^=]|$)' $FRANKLIN_HOME/Makefile | sed 's/[^a-zA-Z0-9_.-]*$//'\`" franklin
+```
+
+`zsh`:
+```
+echo "fpath=(~/.zsh_comp $fpath)" >> ~/.zshrc
+
+mkdir -p ~/.zsh_comp
+```
+add `~/.zsh_comp/_franklin`:
+```
+#compdef franklin
+
+cmds=( ${(uf)"$(grep -oE '^[a-zA-Z0-9_.-]+:([^=]|$)' $FRANKLIN_HOME/Makefile | sed 's/[^a-zA-Z0-9_.-]*$//')"} )
+
+_describe 'franklin make cmds' cmds
+```
+

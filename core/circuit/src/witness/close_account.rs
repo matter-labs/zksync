@@ -183,7 +183,6 @@ mod test {
 
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
-
     use ff::{Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
     use franklin_crypto::circuit::test::*;
@@ -193,6 +192,7 @@ mod test {
     use models::circuit::utils::*;
     use models::node::tx::PackedPublicKey;
     use models::params as franklin_constants;
+    use models::primitives::bytes_into_be_bits;
     use rand::{Rng, SeedableRng, XorShiftRng};
 
     #[test]
