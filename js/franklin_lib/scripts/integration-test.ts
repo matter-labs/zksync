@@ -18,10 +18,8 @@ async function main() {
     let ethWallet2 = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
     let wallet2 = await Wallet.fromEthWallet(ethWallet2);
 
-    wallet.provider.getAccountUpdates(wallet.address, "commit").onmessage = (evt => console.log("event: ", evt.data) );
-
-    // let onchainBalances = await wallet2.getOnchainBalances();
-    // onchainBalances.contractBalances.map((value => console.log(value.toString())));
+    let walletUpdates = wallet.provider.getAccountUpdates(wallet.address, "commit");
+    walletUpdates.onmessage = (evt => console.log("event: ", evt.data) );
 
     // fund wallet 2
     await ethWallet.sendTransaction({to: ethWallet2.address, value: ethers.utils.parseEther("1")});
@@ -41,6 +39,11 @@ async function main() {
     let onchainWithdrawHandle = await wallet2.widthdrawOnchain("ETH", ethers.utils.parseEther("0.1"));
     await onchainWithdrawHandle.wait();
     console.log(`Onchain withdraw successful ${onchainWithdrawHandle.hash}`);
+
+    console.log("Wallet 2 onchain: ", await wallet2.getOnchainBalances());
+    console.log("Wallet 2 offchain: ", await wallet2.getAccountState());
+
+    walletUpdates.close();
 }
 
 main();
