@@ -1,8 +1,11 @@
-use super::operations::{DepositOp, FullExitOp};
 use super::tx::{PackedPublicKey, PackedSignature, TxSignature};
 use super::Nonce;
 use super::{AccountAddress, TokenId};
 use crate::params::FR_ADDRESS_LEN;
+use crate::primitives::{
+    bytes32_from_slice, bytes_slice_to_uint128, bytes_slice_to_uint16, bytes_slice_to_uint32,
+    u128_to_bigdecimal,
+};
 use bigdecimal::BigDecimal;
 use ethabi::{decode, ParamType};
 use failure::{bail, ensure, format_err};
@@ -10,9 +13,11 @@ use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 use web3::types::{Address, Log, U256};
 
-// From enum OpType in Franklin.sol
-const DEPOSIT_OPTYPE_ID: u8 = 1u8;
-const FULLEXIT_OPTYPE_ID: u8 = 6u8;
+use super::operations::{
+    DepositOp, FullExitOp, ACCOUNT_ID_BYTES_LENGTH, ETH_ADDR_BYTES_LENGTH,
+    FULL_AMOUNT_BYTES_LENGTH, NONCE_BYTES_LENGTH, PUBKEY_PACKED_BYTES_LENGTH,
+    SIGNATURE_R_BYTES_LENGTH, SIGNATURE_S_BYTES_LENGTH, TOKEN_BYTES_LENGTH,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Deposit {
@@ -22,18 +27,78 @@ pub struct Deposit {
     pub account: AccountAddress,
 }
 
+impl Deposit {
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() != DepositOp::OP_LENGTH {
+            return None;
+        }
+
+        let token_id_pre_length = ACCOUNT_ID_BYTES_LENGTH;
+        let amount_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH;
+        let account_pre_length = amount_pre_length + FULL_AMOUNT_BYTES_LENGTH;
+
+        Some(Self {
+            sender: Address::zero(), // In current circuit there is no sender in deposit pubdata
+            token: bytes_slice_to_uint16(
+                &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BYTES_LENGTH],
+            )?,
+            amount: u128_to_bigdecimal(bytes_slice_to_uint128(
+                &bytes[amount_pre_length..amount_pre_length + FULL_AMOUNT_BYTES_LENGTH],
+            )?),
+            account: AccountAddress::from_bytes(
+                &bytes[account_pre_length..account_pre_length + FR_ADDRESS_LEN],
+            )
+            .ok()?,
+        })
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FullExit {
-    pub packed_pubkey: Box<[u8; 32]>,
+    pub packed_pubkey: Box<[u8; PUBKEY_PACKED_BYTES_LENGTH]>,
     pub eth_address: Address,
     pub token: TokenId,
     pub nonce: Nonce,
-    pub signature_r: Box<[u8; 32]>,
-    pub signature_s: Box<[u8; 32]>,
+    pub signature_r: Box<[u8; SIGNATURE_R_BYTES_LENGTH]>,
+    pub signature_s: Box<[u8; SIGNATURE_S_BYTES_LENGTH]>,
 }
 
 impl FullExit {
     const TX_TYPE: u8 = 6;
+
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() != FullExitOp::OP_LENGTH {
+            return None;
+        }
+        let packed_pubkey_pre_length = ACCOUNT_ID_BYTES_LENGTH;
+        let eth_address_pre_length = packed_pubkey_pre_length + PUBKEY_PACKED_BYTES_LENGTH;
+        let token_pre_length = eth_address_pre_length + ETH_ADDR_BYTES_LENGTH;
+        let nonce_pre_length = token_pre_length + TOKEN_BYTES_LENGTH;
+        let signature_r_pre_length = nonce_pre_length + NONCE_BYTES_LENGTH;
+        let signature_s_pre_length = signature_r_pre_length + SIGNATURE_R_BYTES_LENGTH;
+        Some(Self {
+            packed_pubkey: Box::from(bytes32_from_slice(
+                &bytes[packed_pubkey_pre_length
+                    ..packed_pubkey_pre_length + PUBKEY_PACKED_BYTES_LENGTH],
+            )?),
+            eth_address: Address::from_slice(
+                &bytes[eth_address_pre_length..eth_address_pre_length + ETH_ADDR_BYTES_LENGTH],
+            ),
+            token: bytes_slice_to_uint16(
+                &bytes[token_pre_length..token_pre_length + TOKEN_BYTES_LENGTH],
+            )?,
+            nonce: bytes_slice_to_uint32(
+                &bytes[nonce_pre_length..nonce_pre_length + NONCE_BYTES_LENGTH],
+            )?,
+            signature_r: Box::from(bytes32_from_slice(
+                &bytes[signature_r_pre_length..signature_r_pre_length + SIGNATURE_R_BYTES_LENGTH],
+            )?),
+            signature_s: Box::from(bytes32_from_slice(
+                &bytes[signature_s_pre_length..signature_s_pre_length + SIGNATURE_S_BYTES_LENGTH],
+            )?),
+        })
+    }
+
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
@@ -80,7 +145,7 @@ pub enum FranklinPriorityOp {
 impl FranklinPriorityOp {
     pub fn parse_pubdata(pub_data: &[u8], op_type_id: u8) -> Result<Self, failure::Error> {
         match op_type_id {
-            DEPOSIT_OPTYPE_ID => {
+            DepositOp::OP_CODE => {
                 ensure!(
                     pub_data.len() == 20 + 2 + 16 + FR_ADDRESS_LEN,
                     "Pub data len mismatch"
@@ -100,7 +165,7 @@ impl FranklinPriorityOp {
                     account,
                 }))
             }
-            FULLEXIT_OPTYPE_ID => {
+            FullExitOp::OP_CODE => {
                 ensure!(
                     pub_data.len() == 32 + 20 + 2 + 64 + 4,
                     "Pub data len mismatch"

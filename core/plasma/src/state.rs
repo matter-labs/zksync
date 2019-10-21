@@ -66,7 +66,7 @@ impl PlasmaState {
         self.balance_tree.root_hash()
     }
 
-    fn get_account(&self, account_id: AccountId) -> Option<Account> {
+    pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
         self.balance_tree.items.get(&account_id).cloned()
     }
 

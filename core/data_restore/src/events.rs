@@ -8,8 +8,6 @@ pub enum EventType {
     Committed,
     /// Verified event
     Verified,
-    /// Unknown event - error type
-    Unknown,
 }
 
 /// Franklin Contract event description
