@@ -5,7 +5,11 @@
                 (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+ethereumAddress"
                     target="blanc">block explorer</a>):
             <CopyableAddress id="ethereumAddressFormInput" :address="ethereumAddress"></CopyableAddress>
-            <b-table class="b-table-balances-width-hack" borderless small responsive :fields="fields" :items="displayableBalances">
+            <img v-if="disabledReason == 'Not loaded yet.'" style="margin-right: 1.5em" src="../assets/loading.gif" width="100em">
+            <p class="mt-3" v-else-if="disabledReason == 'No tokens'">
+                <b>Your Main chain balance is empty.</b>
+            </p>
+            <b-table v-else class="b-table-balances-width-hack" borderless small responsive :fields="fields" :items="displayableBalances">
                 <template v-slot:cell(tokenName)="data">
                     <TokenNameButton :data="data"></TokenNameButton>
                 </template>
@@ -43,16 +47,30 @@ export default {
         'balances',
         'balanceListId'
     ],
+    created() {
+        this.updateInfo();
+    },
     watch: {
         balances() {
-            this.displayableBalances = getDisplayableBalanceList(this.balances);
+            this.updateInfo();
+        },
+    },
+    computed: {
+        disabledReason() {
+            return this.balances == null        ? "Not loaded yet."
+                 : this.balances.length == 0    ? "No tokens"
+                 : null;
         },
     },
     methods: {
+        updateInfo() {
+            if (this.balances == null) return;
+            
+            this.displayableBalances = getDisplayableBalanceList(this.balances);
+        },
         clickedWhatever: function(evt) {
             let tgt = evt.target;
             tgt.setAttribute('data-original-title', 'copied');
-            console.log(tgt);
         },
     },
     components,

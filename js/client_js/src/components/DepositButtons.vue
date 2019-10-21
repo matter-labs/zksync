@@ -2,10 +2,22 @@
     <div>
         <b-row>
             <b-col align-h="around">
-                <b-button class="my-2 w-100" variant="outline-primary" v-b-modal="`${componentId}_depositModal`">&#x21E9; Deposit</b-button>
+                <b-button 
+                    class="my-2 w-100" 
+                    variant="outline-primary" 
+                    v-b-modal="`${componentId}_depositModal`"
+                    :disabled="!!depositButtonDisabledReason"
+                    :title="depositButtonDisabledReason"
+                >&#x21E9; Deposit</b-button>
             </b-col>
             <b-col align-h="around">
-                <b-button class="my-2 w-100" variant="outline-primary" v-b-modal="`${componentId}_withdrawModal`">Withdraw &#x21E7;</b-button>
+                <b-button 
+                    class="my-2 w-100" 
+                    variant="outline-primary" 
+                    v-b-modal="`${componentId}_withdrawModal`"
+                    :disabled="!!withdrawButtonDisabledReason"
+                    :title="withdrawButtonDisabledReason"
+                >Withdraw &#x21E7;</b-button>
             </b-col>
         </b-row>
         <b-modal title="Deposit" :id="`${componentId}_depositModal`" hide-footer>
@@ -41,8 +53,29 @@ export default {
         'depositFeeNeeded', 'withdrawFeeNeeded'
     ],
     data: () => ({
-        
+        depositButtonDisabledBool: true,
+        withdrawButtonDisabledBool: true,
     }),
+    watch: {
+        topBalances: function() {
+            this.depositButtonDisabledBool = false;
+        },
+        bottomBalances: function() {
+            this.withdrawButtonDisabledBool = false;
+        }
+    },
+    computed: {
+        depositButtonDisabledReason() {
+            return this.depositButtonDisabledBool        ? "Balances not loaded yet."
+                 : this.topBalances.length == 0          ? "You don't have any tokens yet."
+                 : null;
+        },
+        withdrawButtonDisabledReason() {
+            return this.withdrawButtonDisabledBool       ? "Balances not loaded yet."
+                 : this.bottomBalances.length == 0       ? "You don't have any tokens yet."
+                 : null;
+        },
+    },
     methods: {
         emitDeposit(kwargs) {
             this.$bvModal.hide(`${this.componentId}_depositModal`);
