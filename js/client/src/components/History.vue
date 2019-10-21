@@ -56,7 +56,6 @@ export default {
         await this.load();
     },
     watch: {
-        totalRows: (...args) => console.log('totalRows changes: ', ...args),
         currentPage: function() {
             this.load();
         },

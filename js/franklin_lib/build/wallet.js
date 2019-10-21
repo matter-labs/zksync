@@ -143,13 +143,9 @@ var FranklinProvider = /** @class */ (function () {
     };
     FranklinProvider.prototype.getTransactionsHistory = function (address, offset, limit) {
         return __awaiter(this, void 0, void 0, function () {
-            var link;
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0:
-                        link = this.providerAddress + "/api/v0.1/account/0x" + address.toString("hex") + "/history/" + offset + "/" + limit;
-                        console.log("In wallet, we request " + link);
-                        return [4 /*yield*/, FranklinProvider.axiosRequest(axios_1.default.get(link))];
+                    case 0: return [4 /*yield*/, FranklinProvider.axiosRequest(axios_1.default.get(this.providerAddress + "/api/v0.1/account/0x" + address.toString("hex") + "/history/" + offset + "/" + limit))];
                     case 1: return [2 /*return*/, _a.sent()];
                 }
             });
@@ -341,26 +337,16 @@ var Wallet = /** @class */ (function () {
     };
     Wallet.prototype.widthdrawOnchain = function (token, amount) {
         return __awaiter(this, void 0, void 0, function () {
-            var franklinDeployedContract, tx, tx;
+            var franklinDeployedContract;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
                         franklinDeployedContract = new ethers_1.Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
-                        if (!(token.id == 0)) return [3 /*break*/, 3];
+                        if (!(token.id == 0)) return [3 /*break*/, 2];
                         return [4 /*yield*/, franklinDeployedContract.withdrawETH(amount, { gasLimit: 200000 })];
-                    case 1:
-                        tx = _a.sent();
-                        return [4 /*yield*/, tx.wait(2)];
-                    case 2:
-                        _a.sent();
-                        return [2 /*return*/, tx.hash];
-                    case 3: return [4 /*yield*/, franklinDeployedContract.withdrawERC20(token.address, amount, { gasLimit: bigNumberify("150000") })];
-                    case 4:
-                        tx = _a.sent();
-                        return [4 /*yield*/, tx.wait(2)];
-                    case 5:
-                        _a.sent();
-                        return [2 /*return*/, tx.hash];
+                    case 1: return [2 /*return*/, _a.sent()];
+                    case 2: return [4 /*yield*/, franklinDeployedContract.withdrawERC20(token.address, amount, { gasLimit: bigNumberify("150000") })];
+                    case 3: return [2 /*return*/, _a.sent()];
                 }
             });
         });

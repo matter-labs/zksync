@@ -26,7 +26,7 @@ export default {
             if (progress.displayMessage) {
                 this.$refs.alert.display({
                     message: progress.displayMessage.message,
-                    variant: progress.displayMessage.error ? 'danger' : 'success',
+                    variant: progress.displayMessage.variant || (progress.displayMessage.error ? 'danger' : 'success'),
                     countdown: progress.displayMessage.countdown,
                 });
                 wait = progress.displayMessage.countdown;
@@ -45,14 +45,22 @@ export default {
             if (progress.stopProgressBar) {
                 this.$refs.progress_bar.cancelAnimation();
             }
+
+            if (progress.action) {
+                switch (progress.action.actionString) {
+                    case 'refresh pending ops':
+                        this.$parent.startPollingPendingOps();
+                        break;
+                    default: 
+                        throw new Error('switch reached default state');
+                }
+            }
         }
 
         wait && await sleep(wait * 1000);
 
-        {            
-            let elem = document.getElementById(this.shower.id);
-            elem.parentElement.removeChild(elem);
-        }
+        let elem = document.getElementById(this.shower.id);
+        elem.parentElement.removeChild(elem);
     },
     components,
 }

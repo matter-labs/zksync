@@ -36,10 +36,11 @@
                     <AlertWithProgressBar :shower="shower"></AlertWithProgressBar>
                 </b-row>
             </div>
-            <PendingDepositNotifier 
-                v-if="pendingDeposits && pendingDeposits.length"
-                :pendingDeposits="pendingDeposits"
-                ></PendingDepositNotifier>
+            <PendingOperationNotifier 
+                v-if="pendingOps && pendingOps.length"
+                :pendingOps="pendingOps"
+                v-on:completionSuccess="updatePendingOps"
+                ></PendingOperationNotifier>
             <b-row v-else class="px-0 mt-0">
                 <Wallet 
                     v-if="componentToBeShown=='Wallet'" 
@@ -63,7 +64,7 @@ import Wallet from '../components/Wallet.vue'
 import History from '../components/History.vue'
 import Alert from '../components/Alert.vue'
 import AlertWithProgressBar from '../components/AlertWithProgressBar.vue'
-import PendingDepositNotifier from '../components/PendingDepositNotifier.vue'
+import PendingOperationNotifier from '../components/PendingOperationNotifier.vue'
 
 import { sleep } from '../utils.js'
 import timeConstants from '../timeConstants'
@@ -73,7 +74,7 @@ const components = {
     Alert,
     Wallet,
     AlertWithProgressBar,
-    PendingDepositNotifier,
+    PendingOperationNotifier,
 };
 
 export default {
@@ -83,12 +84,13 @@ export default {
         walletInfo: null,
         historyInfo: null,
         message: null,
-        pendingDeposits: null,
+        pendingOps: null,
+        shouldPollPendingOps: false,
     }),
     watch: {
         componentToBeShown: async function() {
             await this.updateAccountInfo()
-        }
+        },
     },
     async created() {
         const timeOut = async () => {
@@ -97,12 +99,41 @@ export default {
             timeOut();
         };
         timeOut();
+        
+        this.updatePendingOps();
 
         new ClipboardJS('.copyable');
     },
     methods: {
         displayAlert(kwargs) {
             this.$refs.alert.display(kwargs);
+        },
+        async startPollingPendingOps() {
+            console.log('Started polling pending ops');
+            this.shouldPollPendingOps = true;
+            let state = 'before start';
+            while (this.shouldPollPendingOps) {
+                await this.updatePendingOps();
+                
+                if (this.pendingOps.length != 0 && state == 'before start') {
+                    state = 'found some';
+                }
+    
+                if (this.pendingOps.length == 0 && state == 'found some') {
+                    state = 'done';
+                    break;
+                }
+                
+                await sleep(timeConstants.updatePendingOpsTimeout);
+            }
+            console.log('Stopped polling pending ops');
+        },
+        stopPollingPendingOps() {
+            this.shouldPollPendingOps = false;
+        },
+        async updatePendingOps() {
+            let pendingOps = await window.walletDecorator.pendingOperationsAsRenderableList();
+            this.pendingOps = pendingOps;
         },
         async updateAccountInfo() {
             try {
@@ -112,8 +143,6 @@ export default {
                 let contractBalances = window.walletDecorator.contractBalancesAsRenderableList();
                 let franklinBalances = window.walletDecorator.franklinBalancesAsRenderableList();
                 let franklinBalancesWithInfo = window.walletDecorator.franklinBalancesAsRenderableListWithInfo();
-                
-                this.pendingDeposits = await window.walletDecorator.pendingDepositsAsRenderableList();
 
                 this.walletInfo = {
                     onchainBalances,

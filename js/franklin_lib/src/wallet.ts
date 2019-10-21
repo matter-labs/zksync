@@ -93,10 +93,8 @@ export class FranklinProvider {
     }
 
     async getTransactionsHistory(address: Address, offset: number, limit: number) {
-        const link = `${this.providerAddress}/api/v0.1/account/0x${address.toString("hex")}/history/${offset}/${limit}`;
-        console.log(`In wallet, we request ${link}`);
         return await FranklinProvider.axiosRequest(
-            Axios.get(link));
+            Axios.get(`${this.providerAddress}/api/v0.1/account/0x${address.toString("hex")}/history/${offset}/${limit}`));
     }
 
     async getState(address: Address): Promise<FranklinAccountState> {
@@ -291,13 +289,9 @@ export class Wallet {
     async widthdrawOnchain(token: Token, amount: BigNumberish) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
         if (token.id == 0) {
-            const tx = await franklinDeployedContract.withdrawETH(amount, {gasLimit: 200000});
-            await tx.wait(2);
-            return tx.hash;
+            return await franklinDeployedContract.withdrawETH(amount, {gasLimit: 200000});
         } else {
-            const tx = await franklinDeployedContract.withdrawERC20(token.address, amount, {gasLimit: bigNumberify("150000")});
-            await tx.wait(2);
-            return tx.hash;
+            return await franklinDeployedContract.withdrawERC20(token.address, amount, {gasLimit: bigNumberify("150000")});
         }
     }
 
