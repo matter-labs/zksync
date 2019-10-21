@@ -8,7 +8,6 @@ use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
 use models::node::FullExitOp;
 use models::params as franklin_constants;
-use models::primitives::bytes_into_be_bits;
 use pairing::bn256::*;
 pub struct FullExitData {
     pub token: u32,

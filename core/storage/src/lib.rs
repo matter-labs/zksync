@@ -1888,7 +1888,7 @@ impl StorageProcessor {
                     .collect();
                 StoredFranklinOpsBlock {
                     block_num: block_num as u32,
-                    ops: ops,
+                    ops,
                     fee_account: fee_account as u32,
                 }
             })
@@ -1899,7 +1899,7 @@ impl StorageProcessor {
     pub fn update_tree_state(
         &self,
         block_number: BlockNumber,
-        updates: &AccountUpdates,
+        updates: &[(u32, AccountUpdate)],
     ) -> QueryResult<()> {
         self.commit_state_update(block_number, &updates)?;
         self.apply_state_update(block_number)?;

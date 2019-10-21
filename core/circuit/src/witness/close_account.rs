@@ -192,7 +192,6 @@ mod test {
     use models::circuit::utils::*;
     use models::node::tx::PackedPublicKey;
     use models::params as franklin_constants;
-    use models::primitives::bytes_into_be_bits;
     use rand::{Rng, SeedableRng, XorShiftRng};
 
     #[test]
