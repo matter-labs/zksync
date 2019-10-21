@@ -73,11 +73,12 @@ export async function deployVerifier(
 }
 
 export async function deployFranklin(
+    franklinCode,
     wallet,
     governanceAddress,
     priorityQueueAddress,
     verifierAddress,
-    franklinCode,
+    genesisAddress,
     genesisRoot = ethers.constants.HashZero
 ) {
     try {
@@ -88,6 +89,7 @@ export async function deployFranklin(
                 governanceAddress,
                 verifierAddress,
                 priorityQueueAddress,
+                genesisAddress,
                 genesisRoot,
             ],
             {

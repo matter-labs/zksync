@@ -4,6 +4,7 @@ pragma solidity ^0.5.8;
 import "./VerificationKey.sol";
 
 contract Verifier is VerificationKey {
+    bool constant DUMMY_VERIFIER = false;
 
     // Proof verification
     // Params:
@@ -53,6 +54,10 @@ contract Verifier is VerificationKey {
         uint256[8] memory in_proof,
         uint256[] memory proof_inputs
     ) internal view returns (bool) {
+        if (DUMMY_VERIFIER) {
+            return true;
+        }
+
         // Start
         require(
             ((vk_gammaABC.length / 2) - 1) == proof_inputs.length,

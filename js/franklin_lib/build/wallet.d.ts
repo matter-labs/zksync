@@ -15,11 +15,13 @@ export declare class FranklinProvider {
     static prepareTransferRequestForNode(tx: TransferTx, signature: any): any;
     static prepareWithdrawRequestForNode(tx: WithdrawTx, signature: any): any;
     static prepareCloseRequestForNode(tx: CloseTx, signature: any): any;
+    private static axiosRequest;
     submitTx(tx: any): Promise<any>;
     getTokens(): Promise<any>;
-    getTransactionsHistory(address: Address): Promise<any>;
+    getTransactionsHistory(address: Address, offset: number, limit: number): Promise<any>;
     getState(address: Address): Promise<FranklinAccountState>;
     getTxReceipt(tx_hash: any): Promise<any>;
+    getPriorityOpReceipt(pq_id: any): Promise<any>;
 }
 export interface Token {
     id: number;

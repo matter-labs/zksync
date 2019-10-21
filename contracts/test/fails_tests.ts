@@ -51,11 +51,12 @@ describe("PLANNED FAILS", function() {
         governanceDeployedContract = await deployGovernance(wallet, wallet.address, governanceTestContractCode);
         priorityQueueDeployedContract = await deployPriorityQueue(wallet, wallet.address, priorityQueueTestContractCode);
         franklinDeployedContract = await deployFranklin(
+            franklinTestContractCode,
             wallet,
             governanceDeployedContract.address,
             priorityQueueDeployedContract.address,
             verifierDeployedContract.address,
-            franklinTestContractCode
+            wallet.address
         );
         erc20DeployedToken1 = await addTestERC20Token(wallet, governanceDeployedContract);
         erc20DeployedToken2 = await addTestNotApprovedERC20Token(wallet);

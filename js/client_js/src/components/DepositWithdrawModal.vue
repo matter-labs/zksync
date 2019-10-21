@@ -3,10 +3,10 @@
         Token:
         <TokenSelector 
             class="mb-2"
-            :tokens="balances.map(b => b.tokenName)"
+            :tokens="tokensForTokenSelector"
             :selected.sync="token">
         </TokenSelector>
-        Amount <span v-if="maxAmountVisible">(<span v-if="token == 'ETH'">in ETH coins, </span>max {{ displayableBalancesDict[token] }} {{ token }})</span>:
+        Amount <span v-if="maxAmountVisible">(<span v-if="tokenReadablyPrintable">in {{ token }} coins, </span>max {{ displayableBalancesDict[token] }} {{ token }})</span>:
         <b-form-input autocomplete="off" v-model="amountSelected" class="mb-2"></b-form-input>
         <div v-if="feeNeeded">
             Fee:
@@ -27,7 +27,7 @@
 <script>
 import { bigNumberify, parseEther, formatUnits } from 'ethers/utils'
 import { ethers } from 'ethers'
-import { getDisplayableBalanceDict, feesFromAmount } from '../utils'
+import { getDisplayableBalanceDict, feesFromAmount, isReadablyPrintable } from '../utils'
 
 import TokenSelector from './TokenSelector.vue'
 import FeeSelector from './FeeSelector.vue'
@@ -57,31 +57,46 @@ export default {
         alertVisible: false,
         alertText: '',
         depositFee: '',
+
+        tokensForTokenSelector: null,
     }),
     async created() {
         this.depositFee = await window.walletDecorator.getDepositFee();
+        this.createDisplayableBalancesDict();
     },
     watch: {
         balances: function() {
-            this.balancesDict = this.balances
-                .reduce((acc, bal) => {
-                    acc[bal.tokenName] = bal.amount;
-                    return acc;
-                }, {});
-            this.displayableBalancesDict = getDisplayableBalanceDict(this.balancesDict);
+            this.createDisplayableBalancesDict();
         },
         token: function() {
             this.maxAmountVisible = true;
         }
     },
-    methods: {
+    computed: {
+        tokenReadablyPrintable: function() {
+            return isReadablyPrintable(this.token);
+        },
+    },
+    methods: {  
         localDisplayAlert(msg) {
             this.alertVisible = true;
             this.alertText = msg;
         },
+        createDisplayableBalancesDict() {
+            if (this.balances) {
+                this.tokensForTokenSelector = this.balances.map(b => b.tokenName);
+
+                this.balancesDict = this.balances
+                    .reduce((acc, bal) => {
+                        acc[bal.tokenName] = bal.amount;
+                        return acc;
+                    }, {});
+                this.displayableBalancesDict = getDisplayableBalanceDict(this.balancesDict);
+            }
+        },
         getAmount() {
             try {
-                return this.token == 'ETH'
+                return isReadablyPrintable(this.token)
                     ? parseEther(this.amountSelected)
                     : bigNumberify(this.amountSelected);
             } catch (e) {
@@ -92,11 +107,9 @@ export default {
         getFee() {
             try {
                 let amount = this.getAmount();
-                console.log('amount', amount);
-                console.log('this.feeButtonSelectedIndex', this.feeButtonSelectedIndex);
                 return feesFromAmount(amount)[this.feeButtonSelectedIndex];
             } catch (e) {
-                console.log(e);
+                console.log('getFee error:', e);
                 return null;
             }
         },
@@ -130,14 +143,16 @@ export default {
                 }
     
                 if (amount.add(fee).gt(bigNumberify(this.balancesDict[this.token]))) {
-                    this.localDisplayAlert(`It's too much, man!`);
+                    this.localDisplayAlert(`The amount is too large.`);
                     return;
                 }
             } else {
                 let fee = parseEther(this.depositFee);
-                amount = amount.add(fee);
-                if (amount.add(fee).gt(bigNumberify(this.balancesDict[this.token]))) {
-                    this.localDisplayAlert(`It's too much, man!`);
+                let tooMuch = (this.token == 'ETH' && amount.add(fee).gt(bigNumberify(this.balancesDict[this.token])))
+                    || (amount.gt(bigNumberify(this.balancesDict[this.token])));
+
+                if (tooMuch) {
+                    this.localDisplayAlert(`The amount is too large.`);
                     return;
                 }
             }

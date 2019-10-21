@@ -138,12 +138,12 @@ push-image-rust: image-rust
 
 # Contracts
 
-test-contracts: confirm_action 
-	@bin/prepare-test-contracts.sh
-	@bin/contracts-test.sh
-
 deploy-contracts: confirm_action
 	@bin/deploy-contracts.sh
+
+test-contracts: confirm_action
+	@bin/prepare-test-contracts.sh
+	@bin/contracts-test.sh
 
 build-contracts: confirm_action
 	@cd contracts && yarn build

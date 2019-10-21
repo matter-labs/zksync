@@ -347,6 +347,10 @@
           "type": "address"
         },
         {
+          "name": "_genesisAccAddress",
+          "type": "address"
+        },
+        {
           "name": "_genesisRoot",
           "type": "bytes32"
         }
@@ -802,6 +806,10 @@
         },
         {
           "name": "_priorityQueueAddress",
+          "type": "address"
+        },
+        {
+          "name": "_genesisAccAddress",
           "type": "address"
         },
         {

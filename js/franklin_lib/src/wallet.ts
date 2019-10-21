@@ -66,34 +66,52 @@ export class FranklinProvider {
         return req;
     }
 
-    async submitTx(tx) {
-        return await Axios.post(this.providerAddress + '/api/v0.1/submit_tx', tx)
+    // TODO: reconsider when wallet refactor.
+    private static async axiosRequest(promise) {
+        promise = promise
             .then(reps => reps.data)
-            .catch(error => console.log(error.response));
+            .catch(error => { 
+                let response;
+                if (!error.response) {
+                    response = 'Error: Network Error';
+                } else {
+                    response = error.response.data.message;
+                }
+                throw new Error(response);
+            });
+        return await promise;
+    }
+
+    async submitTx(tx) {
+        return await FranklinProvider.axiosRequest(
+            Axios.post(this.providerAddress + '/api/v0.1/submit_tx', tx));
     }
 
     async getTokens() {
-        return await Axios.get(this.providerAddress + '/api/v0.1/tokens')
-            .then(reps => reps.data)
-            .catch(error => console.log(error.response));
+        return await FranklinProvider.axiosRequest(
+            Axios.get(this.providerAddress + '/api/v0.1/tokens'));
     }
 
-    async getTransactionsHistory(address: Address) {
-        return await Axios.get(this.providerAddress + '/api/v0.1/account/' + `0x${address.toString("hex")}` + '/transactions')
-            .then(reps => reps.data)
-            .catch(error => console.log(error.response));
+    async getTransactionsHistory(address: Address, offset: number, limit: number) {
+        const link = `${this.providerAddress}/api/v0.1/account/0x${address.toString("hex")}/history/${offset}/${limit}`;
+        console.log(`In wallet, we request ${link}`);
+        return await FranklinProvider.axiosRequest(
+            Axios.get(link));
     }
 
     async getState(address: Address): Promise<FranklinAccountState> {
-        return await Axios.get(this.providerAddress + '/api/v0.1/account/' + `0x${address.toString("hex")}`)
-            .then(reps => reps.data)
-            .catch(error => console.log(error.response));
+        return await FranklinProvider.axiosRequest(
+            Axios.get(this.providerAddress + '/api/v0.1/account/' + `0x${address.toString("hex")}`));
     }
 
     async getTxReceipt(tx_hash) {
-        return await Axios.get(this.providerAddress + '/api/v0.1/transactions/' + tx_hash)
-            .then(reps => reps.data)
-            .catch(error => console.log(error.response));
+        return await FranklinProvider.axiosRequest(
+            Axios.get(this.providerAddress + '/api/v0.1/transactions/' + tx_hash));
+    }
+
+    async getPriorityOpReceipt(pq_id) {
+        return await FranklinProvider.axiosRequest(
+            Axios.get(`${this.providerAddress}/api/v0.1/priority_operations/${pq_id}/`));
     }
 }
 
@@ -243,9 +261,10 @@ export class Wallet {
         }
     }
 
+    // TODO: remove this method
     async waitTxReceipt(tx_hash) {
         while (true) {
-            let receipt = await this.provider.getTxReceipt(tx_hash);
+        let receipt = await this.provider.getTxReceipt(tx_hash);
             if (receipt != null) {
                 return receipt
             }

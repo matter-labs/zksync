@@ -24,10 +24,12 @@ export default {
 
             window.clearTimeout(this.timeoutHandle);
             
-            const self = this;
-            this.timeoutHandle = setTimeout(() => {
-                self.dismiss();
-            }, (kwargs.countdown || 10) * 1000);
+            if (kwargs.countdown) {
+                const self = this;
+                this.timeoutHandle = setTimeout(() => {
+                    self.dismiss();
+                }, kwargs.countdown * 1000);
+            }
         }
     }
 }
