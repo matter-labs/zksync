@@ -78,8 +78,9 @@ impl DataRestoreDriver {
                         self.connection_pool.clone(),
                     )?;
                     // Update operations
-                    let new_ops_blocks =
-                        storage_interactor::get_ops_blocks_from_storage(self.connection_pool.clone())?;
+                    let new_ops_blocks = storage_interactor::get_ops_blocks_from_storage(
+                        self.connection_pool.clone(),
+                    )?;
                     // Update tree
                     self.update_tree_state(new_ops_blocks)?;
                 }

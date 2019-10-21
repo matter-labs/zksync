@@ -129,18 +129,19 @@ impl EventsState {
         from_block_number: BlockNumber,
         to_block_number: BlockNumber,
     ) -> Result<Vec<Log>, DataRestoreError> {
-        let block_verified_topic = DATA_RESTORE_CONFIG.franklin_contract
+        let block_verified_topic = DATA_RESTORE_CONFIG
+            .franklin_contract
             .event("BlockVerified")
             .map_err(|_| DataRestoreError::NoData("Main contract abi error".to_string()))?
             .signature();
 
-        let block_comitted_topic = DATA_RESTORE_CONFIG.franklin_contract
+        let block_comitted_topic = DATA_RESTORE_CONFIG
+            .franklin_contract
             .event("BlockCommitted")
             .map_err(|_| DataRestoreError::NoData("Main contract abi error".to_string()))?
             .signature();
 
-        let topics_vec: Vec<H256> =
-            vec![block_verified_topic, block_comitted_topic];
+        let topics_vec: Vec<H256> = vec![block_verified_topic, block_comitted_topic];
 
         let filter = FilterBuilder::default()
             .address(vec![DATA_RESTORE_CONFIG.franklin_contract_address])
@@ -174,11 +175,13 @@ impl EventsState {
         let mut committed_events: Vec<EventData> = vec![];
         let mut verified_events: Vec<EventData> = vec![];
 
-        let block_verified_topic = DATA_RESTORE_CONFIG.franklin_contract
+        let block_verified_topic = DATA_RESTORE_CONFIG
+            .franklin_contract
             .event("BlockVerified")
             .map_err(|_| DataRestoreError::NoData("Main contract abi error".to_string()))?
             .signature();
-        let block_comitted_topic = DATA_RESTORE_CONFIG.franklin_contract
+        let block_comitted_topic = DATA_RESTORE_CONFIG
+            .franklin_contract
             .event("BlockCommitted")
             .map_err(|_| DataRestoreError::NoData("Main contract abi error".to_string()))?
             .signature();

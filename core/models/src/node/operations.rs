@@ -1,21 +1,20 @@
+use super::tx::TxSignature;
+use super::AccountAddress;
 use super::AccountId;
 use super::FranklinTx;
-use super::tx::TxSignature;
 use crate::node::{
-    pack_fee_amount, pack_token_amount,
-    unpack_fee_amount, unpack_token_amount, Deposit, FullExit, Close, Transfer, Withdraw, FranklinPriorityOp
+    pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount, Close, Deposit,
+    FranklinPriorityOp, FullExit, Transfer, Withdraw,
 };
-use super::AccountAddress;
 use crate::params::FR_ADDRESS_LEN;
 use crate::primitives::{
-    bytes_slice_to_uint128, bytes_slice_to_uint32,
-    bytes32_from_slice,
-    u128_to_bigdecimal, big_decimal_to_u128
+    big_decimal_to_u128, bytes32_from_slice, bytes_slice_to_uint128, bytes_slice_to_uint32,
+    u128_to_bigdecimal,
 };
 use bigdecimal::BigDecimal;
 use ethabi::{decode, ParamType};
-use web3::types::{Address, U256};
 use std::convert::TryFrom;
+use web3::types::{Address, U256};
 
 pub const TX_TYPE_BYTES_LENGTH: usize = 1;
 pub const ACCOUNT_ID_BYTES_LENGTH: usize = 3;
