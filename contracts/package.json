@@ -21,7 +21,7 @@
     "typescript": "^3.5.3"
   },
   "scripts": {
-    "build": "prepare-test-contracts.sh && waffle",
+    "build": "waffle",
     "test": "yarn build && mocha -r ts-node/register test/**/*.ts",
     "deploy": "yarn build && ts-node scripts/testnet-deploy.ts",
     "print-operator-wallet": "ts-node scripts/init-operator-acc.ts",
