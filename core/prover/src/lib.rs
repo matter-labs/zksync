@@ -494,6 +494,7 @@ impl BabyProver {
                             &bytes_into_be_bits(&signer_packed_key_bytes),
                         ));
                     }
+                    _ => {}
                 }
             }
             if operations.len() < franklin_constants::BLOCK_SIZE_CHUNKS {

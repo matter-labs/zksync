@@ -1,12 +1,20 @@
-use bigdecimal::BigDecimal;
-use bitvec::prelude::*;
 use ethabi::Contract;
-use franklin_crypto::circuit::float_point::parse_float_to_u128;
-use models::abi::{PROD_PLASMA, TEST_PLASMA_ALWAYS_VERIFY};
-use models::config::RuntimeConfig;
-use models::plasma::params as plasma_constants;
+use models::abi::FRANKLIN_CONTRACT;
+use serde_json;
+use std::str::FromStr;
 use tiny_keccak::keccak256;
+use web3::futures::Future;
 use web3::types::{Address, H256};
+use web3::types::{Transaction, TransactionId};
+
+use lazy_static::lazy_static;
+use std::env;
+
+pub const FUNC_NAME_HASH_LENGTH: usize = 4;
+
+lazy_static! {
+    pub static ref DATA_RESTORE_CONFIG: DataRestoreConfig = DataRestoreConfig::new();
+}
 
 /// Configuratoin of DataRestore driver
 #[derive(Debug, Clone)]
@@ -17,104 +25,90 @@ pub struct DataRestoreConfig {
     pub franklin_contract: Contract,
     /// Ethereum Franklin contract address is type of H160
     pub franklin_contract_address: Address,
+    /// Franklin contract genesis block number: u64
+    pub genesis_block_number: u64,
+    /// Franklin contract creation tx hash
+    pub genesis_tx_hash: H256,
 }
 
 impl DataRestoreConfig {
     /// Return the configuration for setted Infura web3 endpoint
     pub fn new() -> Self {
-        let config = RuntimeConfig::new();
+        let abi_string = serde_json::Value::from_str(FRANKLIN_CONTRACT)
+            .expect("Cant get plasma contract")
+            .get("abi")
+            .expect("Cant get plasma contract abi")
+            .to_string();
         Self {
-            web3_endpoint: config.data_restore_http_endpoint_string, //"https://rinkeby.infura.io/".to_string(),
-            franklin_contract: ethabi::Contract::load(PROD_PLASMA.0)
+            web3_endpoint: env::var("WEB3_URL").expect("WEB3_URL env missing"), //"https://rinkeby.infura.io/".to_string(),
+            franklin_contract: ethabi::Contract::load(abi_string.as_bytes())
                 .expect("Cant get plasma contract in data restore config"),
-            franklin_contract_address: config
-                .data_restore_franklin_contract_address
+            franklin_contract_address: env::var("CONTRACT_ADDR")
+                .expect("CONTRACT_ADDR env missing")
                 .as_str()
                 .parse()
                 .expect("Cant create data restore config"), //"4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()
+            genesis_block_number: u64::from_str_radix(
+                std::env::var("FRANKLIN_GENESIS_NUMBER")
+                    .expect("FRANKLIN_GENESIS_NUMBER env missing")
+                    .as_str(),
+                10,
+            )
+            .expect("Cant get genesis number"), // 0
+            genesis_tx_hash: H256::from_str(
+                std::env::var("GENESIS_TX_HASH")
+                    .expect("GENESIS_TX_HASH env missing")
+                    .as_str(),
+            )
+            .expect("Cant get genesis tx hash"),
         }
     }
 }
 
-/// Infura web3 endpoints
-#[derive(Debug, Copy, Clone)]
-pub enum InfuraEndpoint {
-    /// Mainnet Infura endpoint
-    Mainnet,
-    /// Rinkeby Infura endpoint
-    Rinkeby,
-}
-
-/// Returns bytes vec of keccak256 hash from bytes
-///
-/// # Arguments
-///
-/// * `bytes` - ref to bytes array
-///
-pub fn keccak256_hash(bytes: &[u8]) -> Vec<u8> {
-    keccak256(bytes).iter().cloned().collect()
-}
-
-/// Returns keccak256 topic hash (H256) from topic str
-///
-/// # Arguments
-///
-/// * `topic` - indexed func name and args, represented in ref to str
-///
-pub fn get_topic_keccak_hash(topic: &str) -> web3::types::H256 {
-    let topic_data: Vec<u8> = From::from(topic);
-    let topic_data_vec: &[u8] = topic_data.as_slice();
-    let topic_keccak_data: Vec<u8> = keccak256_hash(topic_data_vec);
-    let topic_keccak_data_vec: &[u8] = topic_keccak_data.as_slice();
-    H256::from_slice(topic_keccak_data_vec)
-}
-
-/// Returns BigDecimal repr of amount bytes slice
-///
-/// # Arguments
-///
-/// * `bytes` - amount bytes slice
-///
-pub fn amount_bytes_slice_to_big_decimal(bytes: &[u8]) -> BigDecimal {
-    let vec = bytes.to_vec();
-    let bit_vec: BitVec = vec.into();
-    let mut bool_vec: Vec<bool> = vec![];
-    for i in bit_vec {
-        bool_vec.push(i);
+impl Default for DataRestoreConfig {
+    fn default() -> Self {
+        Self::new()
     }
-    let amount_u128: u128 = parse_float_to_u128(
-        bool_vec,
-        plasma_constants::AMOUNT_EXPONENT_BIT_WIDTH,
-        plasma_constants::AMOUNT_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap_or(0);
-    let amount_u64 = amount_u128 as u64;
-    // amount_f64 = amount_f64 / f64::from(1000000);
-    BigDecimal::from(amount_u64)
 }
 
-/// Returns BigDecimal repr of fee bytes slice
+/// Return Ethereum transaction input data
 ///
 /// # Arguments
 ///
-/// * `bytes` - fee bytes slice
+/// * `transaction` - Ethereum transaction description
 ///
-pub fn fee_bytes_slice_to_big_decimal(byte: u8) -> BigDecimal {
-    let bit_vec: BitVec = BitVec::from_element(byte);
-    let mut bool_vec: Vec<bool> = vec![];
-    for i in bit_vec {
-        bool_vec.push(i);
+pub fn get_input_data_from_ethereum_transaction(
+    transaction: &Transaction,
+) -> Result<Vec<u8>, DataRestoreError> {
+    let input_data = transaction.clone().input.0;
+    if input_data.len() > FUNC_NAME_HASH_LENGTH {
+        return Ok(input_data[FUNC_NAME_HASH_LENGTH..input_data.len()].to_vec());
+    } else {
+        return Err(DataRestoreError::NoData(
+            "No commitment data in tx".to_string(),
+        ));
     }
-    let fee_u128: u128 = parse_float_to_u128(
-        bool_vec,
-        plasma_constants::FEE_EXPONENT_BIT_WIDTH,
-        plasma_constants::FEE_MANTISSA_BIT_WIDTH,
-        10,
-    )
-    .unwrap_or(0);
-    let fee_u64 = fee_u128 as u64;
-    BigDecimal::from(fee_u64)
+}
+
+/// Return Ethereum transaction description
+///
+/// # Arguments
+///
+/// * `transaction_hash` - The identifier of the particular Ethereum transaction
+///
+pub fn get_ethereum_transaction(transaction_hash: &H256) -> Result<Transaction, DataRestoreError> {
+    let tx_id = TransactionId::Hash(transaction_hash.clone());
+    let (_eloop, transport) =
+        web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
+            .map_err(|_| DataRestoreError::WrongEndpoint)?;
+    let web3 = web3::Web3::new(transport);
+    let web3_transaction = web3
+        .eth()
+        .transaction(tx_id)
+        .wait()
+        .map_err(|e| DataRestoreError::Unknown(e.to_string()))?
+        .ok_or(DataRestoreError::NoData("No tx by this hash".to_string()))?;
+    Ok(web3_transaction)
 }
 
 /// Specific errors that may occure during data restoring
@@ -122,20 +116,14 @@ pub fn fee_bytes_slice_to_big_decimal(byte: u8) -> BigDecimal {
 pub enum DataRestoreError {
     /// Unknown error with description
     Unknown(String),
-    /// Wrong type
-    WrongType,
+    /// Storage error with description
+    Storage(String),
+    /// Wrong data with description
+    WrongData(String),
     /// Got no data with description
     NoData(String),
-    /// Account doesn't exists
-    NonexistentAccount,
-    /// Wrong amount
-    WrongAmount,
     /// Wrong endpoint
     WrongEndpoint,
-    /// Wrong public key
-    WrongPubKey,
-    /// Double exit in chain
-    DoubleExit,
     /// Updating failed with description
     StateUpdate(String),
 }
@@ -144,13 +132,10 @@ impl std::string::ToString for DataRestoreError {
     fn to_string(&self) -> String {
         match self {
             DataRestoreError::Unknown(text) => format!("Unknown {}", text),
-            DataRestoreError::WrongType => "Wrong type".to_owned(),
+            DataRestoreError::Storage(text) => format!("Storage {}", text),
+            DataRestoreError::WrongData(text) => format!("Wrong data {}", text),
             DataRestoreError::NoData(text) => format!("No data {}", text),
-            DataRestoreError::NonexistentAccount => "Nonexistent account".to_owned(),
-            DataRestoreError::WrongAmount => "Wrong amount".to_owned(),
             DataRestoreError::WrongEndpoint => "Wrong endpoint".to_owned(),
-            DataRestoreError::WrongPubKey => "Wrong pubkey".to_owned(),
-            DataRestoreError::DoubleExit => "Double exit".to_owned(),
             DataRestoreError::StateUpdate(text) => format!("Error during state update {}", text),
         }
     }
