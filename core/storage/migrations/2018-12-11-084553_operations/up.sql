@@ -51,4 +51,3 @@ CREATE TABLE account_updates (
 );
 
 CREATE INDEX account_updates_block_index ON account_updates (block_number);
-

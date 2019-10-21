@@ -5,7 +5,7 @@
             class="p-1 noselect clickable" 
             role="tab"
             @click="cardHeaderClicked"  
-            v-b-toggle='`${tx.elem_id}_body`'
+            v-b-toggle='`${tx.data.elem_id}_body`'
         >
             <b-row>
                 <b-col class="col-auto">
@@ -16,38 +16,52 @@
                     </b-button>
                 </b-col>
                 <b-col class="col-auto">
-                    <span style="width: 5em" class="heightened"><b>{{ tx.type }}</b></span>
+                    <span style="width: 5em" class="heightened"><b>{{ tx.data.type }}</b></span>
                 </b-col>
                 <b-col class="col-auto">
-                    <span v-html="tx.status" class="heightened"></span>
+                    <div style="width: 14em">
+                        <span style="font-weight: 300;" class="heightened">{{ tx.data.token }}</span> {{ tx.data.amount }}
+                    </div>
+                </b-col>
+                <b-col class="col-auto">
+                    <span v-html="tx.data.status" class="heightened"></span>
                 </b-col>
                 <b-col class="col-auto heightened">
-                    <span v-if="tx.direction == 'incoming' " style="color: green; font-weight: bold" v-html="'<-'">
+                    <span v-if="tx.data.direction == 'incoming' " style="color: green; font-weight: bold" v-html="'<—'">
                     </span>
-                    <span v-else style="color: red; font-weight: bold" v-html="'->'">
+                    <span v-else style="color: red; font-weight: bold" v-html="'—>'">
                     </span>
                 </b-col>
             </b-row>
         </b-card-header>
-        <b-collapse :id="`${tx.elem_id}_body`">
+        <b-collapse :id="`${tx.data.elem_id}_body`">
             <b-card-body>
                 <b-table 
                     stacked 
                     borderless 
                     small 
                     responsive 
-                    :items="[tx]" 
-                    :fields="fields[tx.type]" 
+                    :items="[tx.data]" 
+                    :fields="tx.fields" 
                     class="ml-auto b-table-stacked-position-hack"
                 >
+                    <template v-slot:cell(amount)="data">
+                        <span style="font-weight: 300">{{ tx.data.token }}</span> {{ tx.data.amount }}
+                    </template>
                     <template v-slot:cell(to)="data">
                         <code class="clickable copyable" :data-clipboard-text="data.item.to">{{ data.item.to }}</code>
+                    </template>
+                    <template v-slot:cell(from)="data">
+                        <code class="clickable copyable" :data-clipboard-text="data.item.from">{{ data.item.from }}</code>
                     </template>
                     <template v-slot:cell(row_status)="data">
                         <span v-html="data.item.row_status"></span>
                     </template>
                     <template v-slot:cell(hash)="data">
-                        <code class="clickable copyable" :data-clipboard-text="data.item.hash">{{ data.item.hash }}</code>
+                        <a :href="`/explorer/transactions/${data.item.hash}`"><code :data-clipboard-text="data.item.hash">{{ data.item.hash }}</code></a>
+                    </template>
+                    <template v-slot:cell(pq_id)="data">
+                        <code class="clickable copyable" :data-clipboard-text="data.item.pq_id">{{ data.item.pq_id }}</code>
                     </template>
                 </b-table>
             </b-card-body>
@@ -69,19 +83,6 @@ export default {
         bButtonClasses: {
             expandButton: true,
             rotated: true,
-        },
-        fields: {
-            Transfer: [
-                { key: 'amount',      label: 'Amount' },
-                { key: 'to',          label: 'To' },
-                { key: 'row_status',  label: 'Status' },
-                { key: 'hash',        label: 'Tx hash' },
-            ],
-            Withdraw: [
-                { key: 'amount',      label: 'Amount' },
-                { key: 'row_status',  label: 'Status' },
-                { key: 'hash',        label: 'Tx hash' },
-            ],
         },
     }),
     methods: {

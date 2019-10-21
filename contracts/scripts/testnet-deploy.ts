@@ -15,7 +15,7 @@ async function main() {
     const governance = await deployGovernance(wallet, wallet.address, governanceContractCode);
     const priorityQueue = await deployPriorityQueue(wallet, wallet.address, priorityQueueContractCode)
     const verifier = await deployVerifier(wallet, verifierContractCode);
-    const franklin = await deployFranklin(wallet, governance.address, priorityQueue.address, verifier.address, franklinContractCode, process.env.GENESIS_ROOT);
+    const franklin = await deployFranklin(franklinContractCode, wallet, governance.address, priorityQueue.address, verifier.address, wallet.address, process.env.GENESIS_ROOT);
     await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true);
     await addTestERC20Token(wallet, governance);
 

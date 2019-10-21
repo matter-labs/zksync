@@ -29,7 +29,8 @@ use web3::types::{Transaction, TransactionId, TransactionReceipt, H256, U256};
 use web3::Transport;
 
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
-const MAX_UNCONFIRMED_TX: usize = 5;
+// TODO: fix rare nonce bug, when pending nonce is not equal to real pending nonce.
+const MAX_UNCONFIRMED_TX: usize = 1;
 const TX_POLL_PERIOD: Duration = Duration::from_secs(5);
 const WAIT_CONFIRMATIONS: u64 = 10;
 
