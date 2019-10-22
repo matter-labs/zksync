@@ -1,12 +1,12 @@
 <template>
-    <b-container>
-        <div class="py-5">
+    <b-container v-if="pendingOps && pendingOps.length">
+        <div class="mb-1">
             <b-row>
                 <b-col class="px-0 w-100" style="text-align: center">
-                    <h3>You have operations not yet completed.</h3>
+                    <h6>You have operations not yet completed.</h6>
                 </b-col>
             </b-row>
-            <b-row v-for="op in pendingOps" :key="op.elem_id" class="mt-3">
+            <b-row v-for="op in pendingOps" :key="op.elem_id" class="mb-2">
                 <CompleteOperationButton
                     class="w-100"
                     :op="op"
@@ -26,10 +26,19 @@ const components = {
 
 export default {
     name: 'PendingOperationNotifier',
-    props: ['pendingOps'],
+    data: () => ({
+        pendingOps: null,
+    }),
+    created() {
+        this.updatePendingOps();
+    },
     methods: {
+        updatePendingOps() {
+            let pendingOps = window.walletDecorator.pendingOperationsAsRenderableList();
+            this.pendingOps = pendingOps;
+        },
         completionSuccess(...args) {
-            this.$emit('completionSuccess', ...args);
+            this.updatePendingOps();
         },
     },
     components,

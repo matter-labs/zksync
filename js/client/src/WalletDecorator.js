@@ -292,7 +292,7 @@ export class WalletDecorator {
                 return op;
             });
     }
-    async pendingOperationsAsRenderableList() {
+    pendingOperationsAsRenderableList() {
         return this.pendingWithdrawsAsRenderableList();
     }
     onchainBalancesAsRenderableList() {
