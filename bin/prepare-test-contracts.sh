@@ -2,6 +2,8 @@
 
 . .setup_env
 
+cd $FRANKLIN_HOME
+
 IN_DIR=./contracts/contracts/
 OUT_DIR=./contracts/contracts/generated
 

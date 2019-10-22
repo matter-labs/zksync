@@ -46,7 +46,7 @@ impl FranklinOpsBlock {
         let block = FranklinOpsBlock {
             block_num: event_data.block_num,
             ops,
-            fee_account: fee_account,
+            fee_account,
         };
         Ok(block)
     }
@@ -61,20 +61,20 @@ impl FranklinOpsBlock {
         let mut current_pointer = 0;
         let mut ops = vec![];
         while current_pointer < data.len() {
-            let op_type: &u8 = &data[current_pointer];
+            let op_type: u8 = data[current_pointer];
 
             let chunks = FranklinOp::chunks_by_op_number(op_type)
-                .ok_or(DataRestoreError::WrongData("Wrong op type".to_string()))?;
+                .ok_or_else(|| DataRestoreError::WrongData("Wrong op type".to_string()))?;
             let full_size: usize = 8 * chunks;
 
             let pub_data_size = FranklinOp::public_data_length(op_type)
-                .ok_or(DataRestoreError::WrongData("Wrong op type".to_string()))?;
+                .ok_or_else(|| DataRestoreError::WrongData("Wrong op type".to_string()))?;
 
             let pre = current_pointer + TX_TYPE_BYTES_LENGTH;
             let post = pre + pub_data_size;
 
             let op = FranklinOp::from_bytes(op_type, &data[pre..post])
-                .ok_or(DataRestoreError::WrongData("Wrong data".to_string()))?;
+                .ok_or_else(|| DataRestoreError::WrongData("Wrong data".to_string()))?;
             ops.push(op);
             current_pointer += full_size;
         }
@@ -87,18 +87,18 @@ impl FranklinOpsBlock {
     ///
     /// * `input` - Ethereum transaction input
     ///
-    fn get_fee_account_from_tx_input(input_data: &Vec<u8>) -> Result<u32, DataRestoreError> {
+    fn get_fee_account_from_tx_input(input_data: &[u8]) -> Result<u32, DataRestoreError> {
         if input_data.len() == BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH {
-            return Ok(bytes_slice_to_uint32(
+            Ok(bytes_slice_to_uint32(
                 &input_data[BLOCK_NUMBER_LENGTH..BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH],
             )
-            .ok_or(DataRestoreError::NoData(
-                "Cant convert bytes to fee account number".to_string(),
-            ))?);
+            .ok_or_else(|| {
+                DataRestoreError::NoData("Cant convert bytes to fee account number".to_string())
+            })?)
         } else {
-            return Err(DataRestoreError::NoData(
+            Err(DataRestoreError::NoData(
                 "No fee account data in tx".to_string(),
-            ));
+            ))
         }
     }
 }

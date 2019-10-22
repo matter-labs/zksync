@@ -1,6 +1,6 @@
 use crate::account;
 use crate::account::AccountContent;
-use crate::element::{CircuitElement, CircuitPubkey};
+use crate::element::CircuitElement;
 use crate::operation::{Operation, OperationBranch};
 use crate::utils;
 use bellman::{ConstraintSystem, SynthesisError};
@@ -108,7 +108,7 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
     pub fn from_witness<CS: ConstraintSystem<E>>(
         mut cs: CS,
         op: &Operation<E>,
-        params: &E::Params, //TODO: probably move out
+        _params: &E::Params, //TODO: probably move out
     ) -> Result<AllocatedOperationData<E>, SynthesisError> {
         let ethereum_key = CircuitElement::from_fe_strict(
             cs.namespace(|| "ethereum_key"),

@@ -120,11 +120,7 @@ impl Transfer {
 
     pub fn verify_signature(&self) -> bool {
         if let Some(pub_key) = self.signature.verify_musig_pedersen(&self.get_bytes()) {
-            if AccountAddress::from_pubkey(pub_key) == self.from {
-                true
-            } else {
-                false
-            }
+            AccountAddress::from_pubkey(pub_key) == self.from
         } else {
             false
         }
@@ -191,11 +187,7 @@ impl Withdraw {
 
     pub fn verify_signature(&self) -> bool {
         if let Some(pub_key) = self.signature.verify_musig_pedersen(&self.get_bytes()) {
-            if AccountAddress::from_pubkey(pub_key) == self.account {
-                true
-            } else {
-                false
-            }
+            AccountAddress::from_pubkey(pub_key) == self.account
         } else {
             false
         }
@@ -233,11 +225,7 @@ impl Close {
 
     pub fn verify_signature(&self) -> bool {
         if let Some(pub_key) = self.signature.verify_musig_pedersen(&self.get_bytes()) {
-            if AccountAddress::from_pubkey(pub_key) == self.account {
-                true
-            } else {
-                false
-            }
+            AccountAddress::from_pubkey(pub_key) == self.account
         } else {
             false
         }
