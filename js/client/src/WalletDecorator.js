@@ -254,20 +254,23 @@ export class WalletDecorator {
 
         return await Promise.all(res);
     }
-    async pendingDepositsAsRenderableList() {
+    async allowancesForAllTokens() {
         let tokens = await this.wallet.provider.getTokens();
         tokens.shift(); // skip ETH
         let allowances = tokens.map(async token => {
             let erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.wallet.ethWallet);
-            let allowance = await erc20DeployedToken.allowance(this.ethAddress, config.CONTRACT_ADDR);
-            return {
-                token,
-                amount: allowance.toString(),
-            };
+            let amount = await erc20DeployedToken.allowance(this.ethAddress, config.CONTRACT_ADDR);
+            return { token, amount };
         });
-        allowances = await Promise.all(allowances);
-        
+        return await Promise.all(allowances);
+    }
+    async pendingDepositsAsRenderableList() {
+        let allowances = await this.allowancesForAllTokens();
         return allowances
+            .map(a => ({
+                token: a.token,
+                amount: a.amount.toString()
+            }))
             .filter(a => a.amount != '0')
             .map((op, i) => {
                 op.operation = 'Deposit';
@@ -290,10 +293,7 @@ export class WalletDecorator {
             });
     }
     async pendingOperationsAsRenderableList() {
-        return [].concat(
-            await this.pendingDepositsAsRenderableList(),
-            this.pendingWithdrawsAsRenderableList()
-        );
+        return this.pendingWithdrawsAsRenderableList();
     }
     onchainBalancesAsRenderableList() {
         return this.wallet.ethState.onchainBalances
@@ -480,7 +480,6 @@ export class WalletDecorator {
             if (kwargs.token == 'ETH') {
                 tx_hash = await this.wallet.depositETH(amount);
             } else {
-                this.wallet.approveERC20(token, amount); // no need to await
                 tx_hash = await this.wallet.depositApprovedERC20(token, amount);
             }
 
