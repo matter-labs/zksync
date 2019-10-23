@@ -48,9 +48,6 @@ export default {
 
             if (progress.action) {
                 switch (progress.action.actionString) {
-                    case 'refresh pending ops':
-                        this.$parent.startPollingPendingOps();
-                        break;
                     default: 
                         throw new Error('switch reached default state');
                 }

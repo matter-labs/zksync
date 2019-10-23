@@ -1,12 +1,6 @@
 <template>
 <b-container>
     <b-row>
-        <b-col>
-            <PendingOperationNotifier
-                ></PendingOperationNotifier>
-        </b-col>
-    </b-row>
-    <b-row>
         <b-col xl="6" class="pr-3">
             <BalancesList class="mb-1" balanceListId="onchain" :balances="onchainBalances"></BalancesList>
             <DepositButtons
@@ -43,7 +37,6 @@ import FranklinBalancesList from './FranklinBalancesList.vue'
 import DepositButtons from './DepositButtons.vue'
 import Transfer from './Transfer.vue'
 import ProgressBar from './ProgressBar.vue'
-import PendingOperationNotifier from './PendingOperationNotifier.vue'
 
 const components = {
     Alert,
@@ -52,7 +45,6 @@ const components = {
     DepositButtons,
     Transfer,
     ProgressBar,
-    PendingOperationNotifier,
 };
 
 import { sleep } from '../utils.js'

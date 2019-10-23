@@ -8,6 +8,8 @@ import config from './env-config';
 
 import priority_queue_abi from '../../../contracts/build/PriorityQueue.json'
 
+const NUMERIC_LIMITS_UINT_256 = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
+
 function combineMessages(...args) {
     return Object.assign({}, ...args);
 }
@@ -60,7 +62,14 @@ function shortenedTxHash(tx_hash) {
 
 function addPendingWithdrawOffchainOperation(kwargs, hash) {
     let already = JSON.parse(window.localStorage.getItem('pendingWithdrawOps') || '{}');
+    kwargs.pendingStatus = 'not started';
     already[hash] = kwargs;
+    window.localStorage.setItem('pendingWithdrawOps', JSON.stringify(already));
+}
+
+function setPendingWithdrawOffchainOperationStatus(hash, new_status) {
+    let already = JSON.parse(window.localStorage.getItem('pendingWithdrawOps') || '{}');
+    already[hash].pendingStatus = new_status;
     window.localStorage.setItem('pendingWithdrawOps', JSON.stringify(already));
 }
 
@@ -354,10 +363,6 @@ export class WalletDecorator {
         } while (tx.blockHash || await sleep(2000));
         return tx;
     }
-    async completeDeposit(token, amount) {
-        let hash = await this.wallet.depositApprovedERC20(token, amount);
-        // await this.waitTxMine(hash);
-    }
     async completeWithdraw(token, amount, hash) {
         await this.wallet.widthdrawOnchain(token, amount);
         removePendingWithdrawOffchainOperation(hash);
@@ -418,7 +423,6 @@ export class WalletDecorator {
         } catch (e) {
             yield combineMessages(
                 error('Withdraw failed with ', e.message, { timeout: 7 }),
-                action('refresh pending ops')
             );
             return;
         }
@@ -480,6 +484,12 @@ export class WalletDecorator {
             if (kwargs.token == 'ETH') {
                 tx_hash = await this.wallet.depositETH(amount);
             } else {
+                let erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.wallet.ethWallet);
+                let allowance = await erc20DeployedToken.allowance(this.ethAddress, config.CONTRACT_ADDR);
+                if (allowance.toString().length != NUMERIC_LIMITS_UINT_256.length) {
+                    await this.wallet.approveERC20(token, NUMERIC_LIMITS_UINT_256);
+                }
+
                 tx_hash = await this.wallet.depositApprovedERC20(token, amount);
             }
 
@@ -492,7 +502,6 @@ export class WalletDecorator {
         } catch (e) {
             yield combineMessages(
                 error(`Onchain deposit failed with "${e.message}"`, { timeout: 7 }),
-                action('refresh pending ops')
             );
             return;
         }

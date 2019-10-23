@@ -15,6 +15,7 @@ Vue.use(BootstrapVue);
 const store = {
     pendingTransactionGenerators: [],
     verboseShowerId: 0,
+    withdrawCompletionStatusDict: {},
 };
 
 Vue.mixin({
@@ -57,8 +58,8 @@ new Vue({
                 })[currentNetwork]
                 || 'unknown';
                                 
-                let correct = this.config.ETH_NETWORK.toLowerCase() == net.toLowerCase();
-                if (correct == false) {
+                let correctNetwork = this.config.ETH_NETWORK.toLowerCase() == net.toLowerCase();
+                if (correctNetwork == false) {
                     if (router.currentRoute.path !== '/login') {
                         router.push('/login');
                     }
@@ -67,7 +68,7 @@ new Vue({
                     if (window.web3 == false) {
                         document.getElementById("change_network_alert").style.display = "none";
                         document.getElementById("login_button").style.display = "none";
-                    } else if (correct) {
+                    } else if (correctNetwork) {
                         document.getElementById("change_network_alert").style.display = "none";
                         document.getElementById("login_button").style.display = "inline-block";
                     } else {

@@ -15,6 +15,11 @@
                 </template>
                 <template v-slot:cell(amount)="data">
                     <span style="vertical-align: middle;"> {{ data.item.amount }} </span>
+                    <CompleteOperationButton
+                        v-if="data.item.op"
+                        :op="data.item.op"
+                        v-on:completionSuccess="updatePendingOps"
+                        ></CompleteOperationButton>
                 </template>
             </b-table>
         </b-col>
@@ -26,10 +31,12 @@ import { ethers } from 'ethers';
 import { readableEther, getDisplayableBalanceList } from '../utils';
 import TokenNameButton from './TokenNameButton.vue';
 import CopyableAddress from './CopyableAddress.vue';
+import CompleteOperationButton from './CompleteOperationButton.vue';
 
 const components = {
     TokenNameButton,
     CopyableAddress,
+    CompleteOperationButton,
 };
 
 
@@ -41,6 +48,7 @@ export default {
             'amount'
         ],
         displayableBalances: [],
+        pendingOps: null,
     }),
     props: [
         // balances are like [{ tokenName: 'eth', amount: '120' }]
@@ -48,11 +56,12 @@ export default {
         'balanceListId'
     ],
     created() {
-        this.updateInfo();
+        this.updateBalanceList();
+        this.updatePendingOps();
     },
     watch: {
         balances() {
-            this.updateInfo();
+            this.updateBalanceList();
         },
     },
     computed: {
@@ -63,10 +72,25 @@ export default {
         },
     },
     methods: {
-        updateInfo() {
-            if (this.balances == null) return;
-            
-            this.displayableBalances = getDisplayableBalanceList(this.balances);
+        updateBalanceList() {
+            if (this.balances != null) {
+                this.displayableBalances = getDisplayableBalanceList(this.balances);
+            }
+
+            if (this.pendingOps != null) {
+                this.displayableBalances = this.displayableBalances
+                    .map(bal => {
+                        let ops = this.pendingOps
+                            .filter(op => op.token.address == bal.address);
+                        if (ops.length == 1) {
+                            bal.op = ops[0];
+                        }
+                        return bal;
+                    });
+            }
+        },
+        updatePendingOps() {
+            this.pendingOps = window.walletDecorator.pendingOperationsAsRenderableList();
         },
         clickedWhatever: function(evt) {
             let tgt = evt.target;
