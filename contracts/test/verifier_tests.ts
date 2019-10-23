@@ -1,7 +1,7 @@
 import {ethers} from "ethers";
 import {
-    operatorsTestContractCode,
-    deployOperators
+    signersTestContractCode,
+    deploySigners
 } from "../src.ts/deploy";
 
 import {expect, use, assert} from "chai";
@@ -11,7 +11,7 @@ use(solidity);
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
-const operatorAddress = "0809101112131415161718192021222334252627";
+const signerAddress = "0809101112131415161718192021222334252627";
 
 describe("VERIFIER", function() {
     this.timeout(50000);
@@ -24,12 +24,12 @@ describe("VERIFIER", function() {
         console.log("---\n");
     });
 
-    it("Operators full test", async () => {
-        console.log("\n - Operators add tarted");
-        const operatorsDeployedContract = await deployOperators(wallet, wallet.address, 51, operatorsTestContractCode);
+    it("Signers full test", async () => {
+        console.log("\n - Signers add started");
+        const signersDeployedContract = await deploySigners(wallet, wallet.address, 51, signersTestContractCode);
 
-        const result1 = await operatorsDeployedContract.addOperator(
-            operatorAddress,
+        const result1 = await signersDeployedContract.addSigner(
+            signerAddress,
             '18523194229674161632574346342370534213928970227736813349975332190798837787897',
             '5725452645840548248571879966249653216818629536104756116202892528545334967238',
             '3816656720215352836236372430537606984911914992659540439626020770732736710924',
@@ -37,33 +37,33 @@ describe("VERIFIER", function() {
         );
         await result1.wait();
         
-        expect(await operatorsDeployedContract.operatorsCount()).equal(1);
+        expect(await signersDeployedContract.signersCount()).equal(1);
 
-        const result2 = await operatorsDeployedContract.isOperator(operatorAddress);
+        const result2 = await signersDeployedContract.isSigner(signerAddress);
         expect(result2).to.eq(true);
 
-        console.log("\n + Operators add passed");
+        console.log("\n + Signers add passed");
 
         console.log("\n - Changing min sigs percentage started");
 
-        const result3 = await operatorsDeployedContract.changeMinSigsPercentage(60);
+        const result3 = await signersDeployedContract.changeMinSigsPercentage(60);
         await result3.wait();
 
-        expect(await operatorsDeployedContract.minSigsPercentage()).equal(60);
+        expect(await signersDeployedContract.minSigsPercentage()).equal(60);
 
         console.log("\n + Changing min sigs percentage passed");
         
         console.log("\n - Verifying message started");
 
-        const aggrPubKey = await operatorsDeployedContract.aggregateSignersPubKeys(
-            [operatorAddress]
+        const aggrPubKey = await signersDeployedContract.aggregatePubKeys(
+            [signerAddress]
         );
 
-        const aggrSignature = await operatorsDeployedContract.aggregateSignatures(
+        const aggrSignature = await signersDeployedContract.aggregateSignatures(
             [sigX, sigY], 1
         );
 
-        const result4 = await operatorsDeployedContract.verify(
+        const result4 = await signersDeployedContract.verify(
             aggrSignature[0],
             aggrSignature[1],
             aggrPubKey[0],

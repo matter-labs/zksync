@@ -14,13 +14,13 @@ export const franklinContractCode = require('../build/Franklin');
 export const verifierContractCode = require('../build/Verifier');
 export const governanceContractCode = require('../build/Governance');
 export const priorityQueueContractCode = require('../build/PriorityQueue');
-export const operatorsContractCode = require('../build/Operators');
+export const signersContractCode = require('../build/Signers');
 
 export const franklinTestContractCode = require('../build/FranklinTest');
 export const verifierTestContractCode = require('../build/VerifierTest');
 export const governanceTestContractCode = require('../build/GovernanceTest');
 export const priorityQueueTestContractCode = require('../build/PriorityQueueTest');
-export const operatorsTestContractCode = require('../build/OperatorsTest');
+export const signersTestContractCode = require('../build/SignersTest');
 
 export async function deployGovernance(
     wallet,
@@ -105,16 +105,16 @@ export async function deployFranklin(
     }
 }
 
-export async function deployOperators(
+export async function deploySigners(
     wallet,
     ownerAddress,
     minSigsPercent,
-    operatorsCode,
+    signersCode,
 ) {
     try {
         let contract = await deployContract(
             wallet,
-            operatorsCode,
+            signersCode,
             [
                 ownerAddress,
                 minSigsPercent
@@ -122,11 +122,11 @@ export async function deployOperators(
             {
                 gasLimit: 6600000,
             });
-        console.log(`OPERATORS_CONTRACT_ADDR=${contract.address}`);
+        console.log(`SIGNERS_CONTRACT_ADDR=${contract.address}`);
 
         return contract
     } catch (err) {
-        console.log("Operators deploy error:" + err);
+        console.log("Signers deploy error:" + err);
     }
 }
 

@@ -2,38 +2,38 @@ pragma solidity ^0.5.8;
 
 import "./BlsOperations.sol";
 
-contract Operators {
+contract Signers {
 
     address internal ownerAddress;
 
-    struct Operator {
+    struct Signer {
         bool exists;
         BlsOperations.G2Point pubKey;
     }
 
     uint256 public minSigsPercentage;
 
-    uint256 public operatorsCount = 0;
-    mapping (address => Operator) private operators;
+    uint256 public signersCount = 0;
+    mapping (address => Signer) private signers;
 
     constructor(address _ownerAddress, uint256 _minSigsPercentage) public {
         require(
             _minSigsPercentage <= 100 && _minSigsPercentage > 0,
             "oscr11"
-        ); // osar11 - we need operators percentage be between 0% and 100%
+        ); // osar11 - we need signers percentage be between 0% and 100%
         ownerAddress = _ownerAddress;
         minSigsPercentage = _minSigsPercentage;
     }
 
-    function isOperator(address _addr) external view returns (bool) {
-        return operators[_addr].exists;
+    function isSigner(address _addr) external view returns (bool) {
+        return signers[_addr].exists;
     }
 
-    function getOperatorPubkey(address _addr) external view returns (uint256, uint256, uint256, uint256) {
-        return (operators[_addr].pubKey.x[0], operators[_addr].pubKey.x[1], operators[_addr].pubKey.y[0], operators[_addr].pubKey.y[1]);
+    function getSignerPubkey(address _addr) external view returns (uint256, uint256, uint256, uint256) {
+        return (signers[_addr].pubKey.x[0], signers[_addr].pubKey.x[1], signers[_addr].pubKey.y[0], signers[_addr].pubKey.y[1]);
     }
 
-    function addOperator(
+    function addSigner(
         address _addr,
         uint256 _pbkxx,
         uint256 _pbkxy,
@@ -42,10 +42,10 @@ contract Operators {
     ) external {
         requireOwner();
         require(
-            !operators[_addr].exists,
+            !signers[_addr].exists,
             "osar11"
         ); // osar11 - operator exists
-        operators[_addr] = Operator(
+        signers[_addr] = Signer(
             true,
             BlsOperations.G2Point({
                 x: [
@@ -58,7 +58,7 @@ contract Operators {
                 ]
             })
         );
-        operatorsCount++;
+        signersCount++;
     }
 
     function changeMinSigsPercentage(uint256 _newMinSigsPercentage) external {
@@ -66,38 +66,38 @@ contract Operators {
         require(
             _newMinSigsPercentage <= 100 && _newMinSigsPercentage > 0,
             "osce11"
-        ); // osce11 - we need operators percentage be between 0% and 100%
+        ); // osce11 - we need signers percentage be between 0% and 100%
         minSigsPercentage = _newMinSigsPercentage;
     }
 
-    function removeOperator(address _addr) external {
+    function removeSigner(address _addr) external {
         requireOwner();
         require(
-            operators[_addr].exists,
+            signers[_addr].exists,
             "osrr11"
         ); // osar11 - operator does not exists
-        delete(operators[_addr]);
-        operatorsCount--;
+        delete(signers[_addr]);
+        signersCount--;
     }
 
-    function aggregateSignersPubKeys(address[] calldata _signers) external view returns (uint256, uint256, uint256, uint256) {
+    function aggregatePubKeys(address[] calldata _signers) external view returns (uint256, uint256, uint256, uint256) {
         require(
             _signers.length > 0,
             "osas1"
         ); // osas1 - signers array length cant be empty
         require(
-            _signers.length >= operatorsCount * minSigsPercentage / 100,
+            _signers.length >= signersCount * minSigsPercentage / 100,
             "osas2"
-        ); // osas2 - signers array length must be equal or more than allowed operators minimal count to verify message
+        ); // osas2 - signers array length must be equal or more than allowed signers minimal count to verify message
         BlsOperations.G2Point memory aggrPubKey;
         if (_signers.length == 1) {
-            aggrPubKey = operators[_signers[0]].pubKey;
+            aggrPubKey = signers[_signers[0]].pubKey;
         } else {
             for (uint256 i = 0; i < _signers.length; i++) {
-                if(!operators[_signers[i]].exists) {
+                if(!signers[_signers[i]].exists) {
                     revert("osas3"); // osas3 - unknown operator
                 }
-                aggrPubKey = BlsOperations.addG2(aggrPubKey, operators[_signers[i]].pubKey);
+                aggrPubKey = BlsOperations.addG2(aggrPubKey, signers[_signers[i]].pubKey);
             }
         }
         return (aggrPubKey.x[0], aggrPubKey.x[1], aggrPubKey.y[0], aggrPubKey.y[1]);
