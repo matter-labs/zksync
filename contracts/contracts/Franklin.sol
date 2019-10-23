@@ -899,7 +899,7 @@ contract Franklin {
         ); // frw22 - lending exists
         if (_tokenId == 0) {
             LendingEther lending = LendingEther(lendingsAddresses[_tokenId]);
-            lending.repayBorrow.value(_amount)(_amount);
+            lending.repayBorrow.value(_amount)();
         } else {
             LendingErc20 lending = LendingErc20(lendingsAddresses[_tokenId]);
             lending.repayBorrow(_amount);

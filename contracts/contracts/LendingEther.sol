@@ -18,8 +18,8 @@ contract LendingEther is LendingToken, ReentrancyGuard {
         _owner
     ) {}
 
-    function supply(uint256 _amount, address _to) external payable nonReentrant {
-        supplyInternal(_amount, _to);
+    function supply(address _to) external payable nonReentrant {
+        supplyInternal(msg.value, _to);
     }
 
     function transferIn(uint256 _amount) internal;
@@ -57,13 +57,12 @@ contract LendingEther is LendingToken, ReentrancyGuard {
     function fulfillOrder(
         uint32 _blockNumber,
         uint32 _orderId,
-        uint256 _sendingAmount,
         address _lender
     ) external payable nonReentrant {
         fulfillOrderInternal(
             _blockNumber,
             _orderId,
-            _sendingAmount,
+            msg.value,
             _lender
         );
     }
@@ -72,7 +71,7 @@ contract LendingEther is LendingToken, ReentrancyGuard {
         newVerifiedBlockInternal(_blockNumber);
     }
 
-    function repayBorrow(uint256 _amount) external payable nonReentrant {
-        repayBorrowInternal(_amount);
+    function repayBorrow() external payable nonReentrant {
+        repayBorrowInternal(msg.value);
     }
 }
