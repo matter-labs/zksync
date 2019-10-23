@@ -107,12 +107,12 @@ contract LendingToken {
     function withdrawInternal(uint256 _amount, address _to) internal {
         require(
             lendersSupplies[msg.sender] >= _amount,
-            "lww11"
-        ); // "lww11" - not enouth lender supply
+            "ltwl11"
+        ); // "ltwl11" - not enouth lender supply
         require(
             _amount <= totalSupply - totalBorrowed,
-            "lww12"
-        ); // "lww12" - not enouth availabl supplies
+            "ltwl12"
+        ); // "ltwl12" - not enouth available supplies
         transferOut(_amount, _to);
         totalSupply -= _amount;
         lendersSupplies[msg.sender] -= _amount;
@@ -142,20 +142,20 @@ contract LendingToken {
     ) internal {
         require(
             lastVerifiedBlock < _blockNumber,
-            "lrw11"
-        ); // "lrw11" - verified block
+            "ltrl11"
+        ); // "ltrl11" - verified block
         require(
             _amount > 0,
-            "lrw11"
-        ); // "lrw11" - zero amount
+            "ltrl12"
+        ); // "ltrl12" - zero amount
         require(
             verifier.verifySignature(_txHash, _signature),
-            "lrw11"
-        ); // "lrw11" - wrong signature
+            "ltrl13"
+        ); // "ltrl13" - wrong signature
         require(
             verifier.verifyTx(_amount, token.tokenAddress, _borrower, _blockNumber, _txHash),
-            "lrw12"
-        ); // "lrw12" - wrong tx
+            "ltrl14"
+        ); // "ltrl14" - wrong tx
         if (_amount <= (totalSupply - totalBorrowed)) {
             immediateBorrow(_amount, _receiver, _blockNumber);
         } else {
@@ -232,16 +232,16 @@ contract LendingToken {
     ) internal {
         require(
             lastVerifiedBlock < _blockNumber,
-            "lrw11"
-        ); // "lrw11" - verified block
+            "ltfl11"
+        ); // "ltfl11" - verified block
         require(
             _orderId < blocksInfo[_blockNumber].borrowOrdersCount,
-            "lrw11"
-        ); // "lrw11" - wrong block order number
+            "ltfl12"
+        ); // "ltfl12" - wrong block order number
         require(
             _sendingAmount >= blockBorrowOrders[_blockNumber][_orderId].amount,
-            "lrw11"
-        ); // "lrw11" - wrong amount
+            "ltfl13"
+        ); // "ltfl13" - wrong amount
         supplyInternal(_sendingAmount, _lender);
         immediateBorrow(
             blockBorrowOrders[_blockNumber][_orderId].amount,
@@ -286,7 +286,7 @@ contract LendingToken {
     function requireFranklin() internal view {
         require(
             msg.sender == franklinAddress,
-            "prn11"
-        ); // prn11 - only by franklin
+            "ltrn11"
+        ); // ltrn11 - only by franklin
     }
 }

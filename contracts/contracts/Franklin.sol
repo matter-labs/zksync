@@ -896,7 +896,7 @@ contract Franklin {
         require(
             lendingsAddresses[_tokenId] != address(0),
             "frw22"
-        ); // frw22 - lending exists
+        ); // frw22 - lending doesn't exists
         if (_tokenId == 0) {
             LendingEther lending = LendingEther(lendingsAddresses[_tokenId]);
             lending.repayBorrow.value(_amount)();

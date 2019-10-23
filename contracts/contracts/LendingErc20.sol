@@ -28,8 +28,8 @@ contract LendingErc20 is LendingToken, ReentrancyGuard {
     function transferIn(uint256 _amount) internal {
         require(
             IERC20(token.tokenAddress).transferFrom(msg.sender, address(this), _amount),
-            "fd012"
-        ); // fd012 - token transfer failed deposit
+            "lctn11"
+        ); // lctn11 - token transfer in failed
     }
 
     function withdraw(uint256 _amount, address _to) external nonReentrant {
@@ -39,8 +39,8 @@ contract LendingErc20 is LendingToken, ReentrancyGuard {
     function transferOut(uint256 _amount, address _to) internal {
         require(
             IERC20(token.tokenAddress).transfer(_to, _amount),
-            "fw011"
-        ); // fw011 - token transfer failed withdraw
+            "lctt11"
+        ); // lctt11 - token transfer out failed
     }
 
     function requestBorrow(
