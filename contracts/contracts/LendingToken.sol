@@ -277,6 +277,11 @@ contract LendingToken {
         totalBorrowed -= blocksInfo[_blockNumber].borrowed;
     }
 
+    function repayBorrowInternal(uint256 _amount) internal {
+        requireFranklin();
+        transferIn(_amount);
+    }
+
     // Check if the sender is franklin contract
     function requireFranklin() internal view {
         require(

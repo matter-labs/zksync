@@ -71,4 +71,8 @@ contract LendingEther is LendingToken, ReentrancyGuard {
     function newVerifiedBlock(uint32 _blockNumber) external nonReentrant {
         newVerifiedBlockInternal(_blockNumber);
     }
+
+    function repayBorrow(uint256 _amount) external payable nonReentrant {
+        repayBorrowInternal(_amount);
+    }
 }

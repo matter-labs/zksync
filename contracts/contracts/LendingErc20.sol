@@ -82,4 +82,8 @@ contract LendingErc20 is LendingToken, ReentrancyGuard {
     function newVerifiedBlock(uint32 _blockNumber) external nonReentrant {
         newVerifiedBlockInternal(_blockNumber);
     }
+
+    function repayBorrow(uint256 _amount) external nonReentrant {
+        repayBorrowInternal(_amount);
+    }
 }
