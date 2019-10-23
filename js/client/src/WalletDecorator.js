@@ -289,7 +289,7 @@ export class WalletDecorator {
             });
     }
     pendingWithdrawsAsRenderableList() {
-        return [window.localStorage.getItem('pendingWithdrawOps')]
+        return [window.localStorage.getItem('pendingWithdrawOps') || "{}"]
             .map(JSON.parse)
             .map(Object.entries)
             .pop()

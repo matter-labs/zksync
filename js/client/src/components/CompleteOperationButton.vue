@@ -1,5 +1,5 @@
 <template>
-    <div class="operationButtonContainer ml-3">
+    <span class="operationButtonContainer ml-3">
         <a href="#" 
             v-if="completionStatus == 'not clicked'"
             variant="primary" 
@@ -8,7 +8,7 @@
             >Complete {{ op.operation }} {{ op.token.symbol }} {{ op.amountRenderable }}</a>
         <img v-else-if="completionStatus == 'loading'" style="margin-right: 1.5em" src="../assets/loading.gif" width="100em">
         <span v-else>{{ completionStatus }}</span>
-    </div>
+    </span>
 </template>
 
 <script>
@@ -30,8 +30,8 @@ export default {
             this.store.withdrawCompletionStatusDict[this.op.hash] = 'Sending operation...';
             try {
                 await window.walletDecorator.completeWithdraw(this.op.token, this.op.amount, this.op.hash);
-                this.completionStatus = 'Success, waiting for transaction to complete...';
-                this.store.withdrawCompletionStatusDict[this.op.hash] = 'Success, waiting for transaction to complete...';
+                this.completionStatus = 'Success';
+                this.store.withdrawCompletionStatusDict[this.op.hash] = 'Success';
                 this.$emit('completionSuccess', { uniq_id: this.op.uniq_id });
             } catch (e) {
                 console.log('error in CompleteOperationButton:', e);
@@ -49,7 +49,6 @@ export default {
 
 <style scoped>
 .operationButtonContainer {
-    display: inline-block; 
     vertical-align: middle;
     opacity: 0.7;
 }
