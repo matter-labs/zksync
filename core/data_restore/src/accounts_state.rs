@@ -29,13 +29,6 @@ impl FranklinAccountsState {
         }
     }
 
-    /// Returns new FranklinAccountsState instance for tests
-    fn new_test() -> Self {
-        Self {
-            state: PlasmaState::empty(),
-        }
-    }
-
     /// Returns FranklinAccountsState from accounts map and current block number
     ///
     /// # Arguments
@@ -263,7 +256,7 @@ mod test {
         //     ops: ops3,
         // };
 
-        let mut tree = FranklinAccountsState::new_test();
+        let mut tree = FranklinAccountsState::new();
         let updates1 = tree
             .update_accounts_states_from_ops_block(&block1)
             .expect("Cant update state from block 1");
@@ -313,7 +306,7 @@ mod test {
             fee_account: 0,
         };
 
-        let mut tree = FranklinAccountsState::new_test();
+        let mut tree = FranklinAccountsState::new();
         let updates1 = tree
             .update_accounts_states_from_ops_block(&block1)
             .expect("Cant update state from block 1");
