@@ -30,8 +30,8 @@ contract Token {
     struct BlockInfo {
         uint32 feeOrdersCount;
         uint32 borrowOrdersCount;
-        uint256 totalFee;
-        uint256 totalBorrowed;
+        uint256 fee;
+        uint256 borrowed;
     }
 
     struct FeeOrder {
@@ -69,9 +69,11 @@ contract Token {
     function supply(uint256 _amount, address _lender) external {
         transaction(_amount, address(this));
         totalSupply += _amount;
+        if (lendersSupplies[_lender] == 0) {
+            lenders[lendersCount] = _lender;
+            lendersCount++;
+        }
         lendersSupplies[_lender] += _amount;
-        lenders[lendersCount] = _lender;
-        lendersCount++;
     }
 
     function withdraw(uint256 _amount) external {
@@ -139,22 +141,23 @@ contract Token {
     ) internal {
         (uint256 lendersFees, uint256 ownerFee) = calculateFees(_amount);
         transaction((_amount-ownerFee-lendersFees), _receiver);
-        BlockInfo blockInfo = blocksInfo[_blockNumber];
         for (uint32 i = 0; i <= lendersCount; i++) {
-            blockFeeOrders[_blockNumber][blocksInfo[_blockNumber].feeOrdersCount] = FeeOrder({
+            uint32 currentFeeOrdersCount = blocksInfo[_blockNumber].feeOrdersCount;
+            blockFeeOrders[_blockNumber][currentFeeOrdersCount] = FeeOrder({
                 lendersFees * (lendersSupplies[lenders[i]] / totalSupply),
                 lenders[i]
             });
             blocksInfo[_blockNumber].feeOrdersCount++;
         }
-        blockFeeOrders[_blockNumber][blocksInfo[_blockNumber].feeOrdersCount] = FeeOrder({
+        uint32 currentFeeOrdersCount = blocksInfo[_blockNumber].feeOrdersCount;
+        blockFeeOrders[_blockNumber][currentFeeOrdersCount] = FeeOrder({
             ownerFee,
             owner
         });
         blocksInfo[_blockNumber].feeOrdersCount++;
 
-        blocksInfo[_blockNumber].totalBorrowed += _amount-ownerFee-lendersFees;
-        blocksInfo[_blockNumber].totalFee += ownerFee+lendersFees;
+        blocksInfo[_blockNumber].borrowed += _amount-ownerFee-lendersFees;
+        blocksInfo[_blockNumber].fee += ownerFee+lendersFees;
 
         totalBorrowed += _amount-ownerFee-lendersFees;
     }
@@ -174,7 +177,8 @@ contract Token {
         address _receiver,
         uint32 _blockNumber
     ) internal {
-        blockBorrowOrders[_blockNumber][blocksInfo[_blockNumber].borrowOrdersCount] = BorrowOrder({
+        uint32 currentBorrowOrdersCount = blocksInfo[_blockNumber].borrowOrdersCount;
+        blockBorrowOrders[_blockNumber][currentBorrowOrdersCount] = BorrowOrder({
             _amount,
             _receiver
         });
@@ -182,7 +186,7 @@ contract Token {
             _amount,
             _receiver,
             _blockNumber,
-            blocksInfo[_blockNumber].borrowOrdersCount
+            currentBorrowOrdersCount
         );
         blocksInfo[_blockNumber].borrowOrdersCount++;
     }
@@ -219,14 +223,20 @@ contract Token {
         delete blockBorrowOrders[_blockNumber];
         consummateBlockFees(_blockNumber);
         delete blocksInfo[_blockNumber];
+        delete blockFeeOrders[_blockNumber];
     }
 
     function consummateBlockFees(uint32 _blockNumber) internal {
         for (uint32 i = 0; i < blocksInfo[_blockNumber].feeOrdersCount; i++) {
-            lendersSupplies[blockFeeOrders[_blockNumber][i].lender] += blockFeeOrders[_blockNumber][i].fee;
+            address feeOrder = blockFeeOrders[_blockNumber][i];
+            if (lendersSupplies[feeOrder.lender] == 0) {
+                lenders[lendersCount] = feeOrder.lender;
+                lendersCount++;
+            }
+            lendersSupplies[feeOrder.lender] += feeOrder.fee;
         }
-        totalSupply += blocksInfo[_blockNumber].totalFee;
-        totalBorrowed -= blocksInfo[_blockNumber].totalBorrowed;
+        totalSupply += blocksInfo[_blockNumber].fee;
+        totalBorrowed -= blocksInfo[_blockNumber].borrowed;
     }
 
     // Check if the sender is franklin contract
