@@ -149,11 +149,11 @@ contract LendingToken {
             "lrw11"
         ); // "lrw11" - zero amount
         require(
-            verifySignature(_txHash, _signature),
+            verifier.verifySignature(_txHash, _signature),
             "lrw11"
         ); // "lrw11" - wrong signature
         require(
-            verifyTx(_amount, token.tokenAddress, _borrower, _blockNumber, _txHash),
+            verifier.verifyTx(_amount, token.tokenAddress, _borrower, _blockNumber, _txHash),
             "lrw12"
         ); // "lrw12" - wrong tx
         if (_amount <= (totalSupply - totalBorrowed)) {

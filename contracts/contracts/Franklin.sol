@@ -6,6 +6,8 @@ import "./Governance.sol";
 import "./Verifier.sol";
 import "./PriorityQueue.sol";
 import "./Bytes.sol";
+import "./LendingEther.sol";
+import "./LendingErc20.sol";
 
 // GLOBAL TODOS:
 // - check overflows
@@ -184,6 +186,9 @@ contract Franklin {
     // bool    public migrationSealed;
 
     // mapping (uint32 => bool) tokenMigrated;
+
+    // // Lendings
+    mapping(uint16 => address) internal ledingsAddresses;
 
     // MARK: - CONSTRUCTOR
 
@@ -859,5 +864,31 @@ contract Franklin {
 
         balancesToWithdraw[_owner][_tokenId] += _amount;
         exited[_owner][_tokenId] == false;
+    }
+
+    // MARK: - Lending
+
+    function addLending(uint16 _tokenId, address _lendingAddress) external {
+        governance.requireGovernor();
+        lendingsAddresses[_tokenId] = _lendingAddress;
+    }
+
+    // Repays borrow in lending
+    function repayBorrow(uint16 _tokenId, uint256 _amount, address _owner, bytes calldata _signature) external {
+        require(
+            verifier.verifyRepayBorrow(_tokenId, _owner, _amount, _signature),
+            "frw21"
+        ); // frw21 - verification failed
+        require(
+            lendingsAddresses[_tokenId] != address(0),
+            "frw22"
+        ); // frw22 - lending exists
+        if (_tokenId == 0) {
+            LendingEther lending = LendingEther(lendingsAddresses[_tokenId]);
+            lending.repayBorrow.value(_amount)(_amount);
+        } else {
+            LendingErc20 lending = LendingErc20(lendingsAddresses[_tokenId]);
+            lending.repayBorrow(_amount);
+        }
     }
 }
