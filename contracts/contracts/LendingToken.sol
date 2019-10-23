@@ -47,19 +47,13 @@ contract LendingToken {
         address receiver;
     }
 
-    event NewBorrowOrder(
+    event NewDefferedBorrowOrder(
         uint32 blockNumber,
         uint32 orderId,
         uint256 amount
     );
 
-    event NewBorrowOrder(
-        uint32 blockNumber,
-        uint32 orderId,
-        uint256 amount
-    );
-
-    event FulfilledBorrowOrder(
+    event FulfilledDefferedBorrowOrder(
         uint32 blockNumber,
         uint32 orderId
     );
@@ -216,7 +210,7 @@ contract LendingToken {
             amount: _amount,
             receiver: _receiver
         });
-        emit NewBorrowOrder(
+        emit NewDefferedBorrowOrder(
             _blockNumber,
             currentBorrowOrdersCount,
             _amount
@@ -249,7 +243,7 @@ contract LendingToken {
             _blockNumber
         );
         delete blockBorrowOrders[_blockNumber][_orderId];
-        emit FulfilledBorrowOrder(
+        emit FulfilledDefferedBorrowOrder(
             _blockNumber,
             _orderId
         );
