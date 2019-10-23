@@ -78,7 +78,10 @@ contract LendingToken {
         address _owner
     ) public {
         governance = Governance(_governanceAddress);
-        uint16 tokenId = governance.validateTokenAddress(_token);
+        uint16 tokenId = 0;
+        if (_tokenAddress != address(0)) {
+            tokenId = governance.validateTokenAddress(_token);
+        }
         token = Token({
             tokenAddress: _tokenAddress,
             tokenId: tokenId
@@ -153,7 +156,7 @@ contract LendingToken {
             "lrw11"
         ); // "lrw11" - wrong signature
         require(
-            verifyTx(_amount, token.tokenAddress, _borrower, _blockNumber, _txHash)
+            verifyTx(_amount, token.tokenAddress, _borrower, _blockNumber, _txHash),
             "lrw12"
         ); // "lrw12" - wrong tx
         if (_amount <= (totalSupply - totalBorrowed)) {
@@ -173,15 +176,15 @@ contract LendingToken {
         for (uint32 i = 0; i <= lendersCount; i++) {
             uint32 currentFeeOrdersCount = blocksInfo[_blockNumber].feeOrdersCount;
             blockFeeOrders[_blockNumber][currentFeeOrdersCount] = FeeOrder({
-                lendersFees * (lendersSupplies[lenders[i]] / totalSupply),
-                lenders[i]
+                fee: lendersFees * (lendersSupplies[lenders[i]] / totalSupply),
+                lender: lenders[i]
             });
             blocksInfo[_blockNumber].feeOrdersCount++;
         }
         uint32 currentFeeOrdersCount = blocksInfo[_blockNumber].feeOrdersCount;
         blockFeeOrders[_blockNumber][currentFeeOrdersCount] = FeeOrder({
-            ownerFee,
-            owner
+            fee: ownerFee,
+            lender: owner
         });
         blocksInfo[_blockNumber].feeOrdersCount++;
 
@@ -213,8 +216,8 @@ contract LendingToken {
     ) internal {
         uint32 currentBorrowOrdersCount = blocksInfo[_blockNumber].borrowOrdersCount;
         blockBorrowOrders[_blockNumber][currentBorrowOrdersCount] = BorrowOrder({
-            _amount,
-            _receiver
+            amount: _amount,
+            receiver: _receiver
         });
         emit NewBorrowOrder(
             _blockNumber,
