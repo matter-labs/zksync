@@ -1,7 +1,5 @@
 pragma solidity ^0.5.8;
 
-import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
-
 import "./Governance.sol";
 import "./Franklin.sol";
 import "./Verifier.sol";
@@ -94,19 +92,19 @@ contract LendingToken {
         owner = _owner;
     }
 
-    function supplyInternal(uint256 _amount, address _lender) internal {
-        transferIn(_amount, _lender);
+    function supplyInternal(uint256 _amount, address _to) internal {
+        transferIn(_amount);
         totalSupply += _amount;
-        if (lendersSupplies[_lender] == 0) {
-            lenders[lendersCount] = _lender;
+        if (lendersSupplies[_to] == 0) {
+            lenders[lendersCount] = _to;
             lendersCount++;
         }
-        lendersSupplies[_lender] += _amount;
+        lendersSupplies[_to] += _amount;
     }
 
-    function transferIn(uint256 _amount, address _lender) internal;
+    function transferIn(uint256 _amount) internal;
 
-    function withdrawInternal(uint256 _amount) internal {
+    function withdrawInternal(uint256 _amount, address _to) internal {
         require(
             lendersSupplies[msg.sender] >= _amount,
             "lww11"
@@ -115,8 +113,7 @@ contract LendingToken {
             _amount <= totalSupply - totalBorrowed,
             "lww12"
         ); // "lww12" - not enouth availabl supplies
-        
-        transferOut(_amount, msg.sender);
+        transferOut(_amount, _to);
         totalSupply -= _amount;
         lendersSupplies[msg.sender] -= _amount;
         // delete
@@ -133,7 +130,7 @@ contract LendingToken {
         }
     }
 
-    function transferOut(uint256 _amount, address _lender) internal;
+    function transferOut(uint256 _amount, address _to) internal;
 
     function requestBorrowInternal(
         bytes32 _txHash,

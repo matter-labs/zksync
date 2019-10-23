@@ -1,35 +1,46 @@
 pragma solidity ^0.5.8;
 
+import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
+
 import "./LendingToken.sol";
 import "./ReentrancyGuard.sol";
 
-contract LendingEther is LendingToken, ReentrancyGuard {
+contract LendingErc20 is LendingToken, ReentrancyGuard {
     constructor(
+        address _tokenAddress,
         address _governanceAddress,
         address _franklinAddress,
         address _verifierAddress,
         address _owner
     ) public
     LendingToken(
-        address(0),
+        _tokenAddress,
         _governanceAddress,
         _franklinAddress,
         _verifierAddress,
         _owner
     ) {}
 
-    function supply(uint256 _amount, address _to) external payable nonReentrant {
+    function supply(uint256 _amount, address _to) external nonReentrant {
         supplyInternal(_amount, _to);
     }
 
-    function transferIn(uint256 _amount) internal;
+    function transferIn(uint256 _amount) internal {
+        require(
+            IERC20(token.tokenAddress).transferFrom(msg.sender, address(this), _amount),
+            "fd012"
+        ); // fd012 - token transfer failed deposit
+    }
 
     function withdraw(uint256 _amount, address _to) external nonReentrant {
         withdrawInternal(_amount, _to);
     }
 
     function transferOut(uint256 _amount, address _to) internal {
-        _to.transfer(_amount);
+        require(
+            IERC20(token.tokenAddress).transfer(_to, _amount),
+            "fw011"
+        ); // fw011 - token transfer failed withdraw
     }
 
     function requestBorrow(
@@ -59,7 +70,7 @@ contract LendingEther is LendingToken, ReentrancyGuard {
         uint32 _orderId,
         uint256 _sendingAmount,
         address _lender
-    ) external payable nonReentrant {
+    ) external nonReentrant {
         fulfillOrderInternal(
             _blockNumber,
             _orderId,
