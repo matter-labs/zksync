@@ -1,0 +1,3 @@
+#!/bin/bash
+
+echo http://$(bin/cluster-ip):$(kubectl get svc dev-nginx -o=jsonpath='{.spec.ports[0].nodePort}')/client/login

@@ -31,7 +31,7 @@ brew link --force gettext
 
 ## Rust
 
-Install the latest rust version (>= 1.32):
+Install the latest rust version (>= 1.32) https://www.rust-lang.org/tools/install:
 
 ```
 rustc --version
