@@ -868,15 +868,29 @@ contract Franklin {
 
     // MARK: - Lending
 
+    // Governor can add lending address
+    // Params:
+    // - _tokenId - token id
+    // - _lendingAddress - lending address
     function addLending(uint16 _tokenId, address _lendingAddress) external {
         governance.requireGovernor();
         lendingsAddresses[_tokenId] = _lendingAddress;
     }
 
     // Repays borrow in lending
-    function repayBorrow(uint16 _tokenId, uint256 _amount, address _owner, bytes calldata _signature) external {
+    // Params:
+    // - _borrower - borrower
+    // - _tokenId - token id
+    // - _amount - token amount
+    // - _signature - signature
+    function repayBorrow(
+        address _borrower,
+        uint16 _tokenId,
+        uint256 _amount,
+        bytes calldata _signature
+    ) external {
         require(
-            verifier.verifyRepayBorrow(_tokenId, _owner, _amount, _signature),
+            verifier.verifyRepayBorrow(_borrower, _tokenId, _amount, _signature),
             "frw21"
         ); // frw21 - verification failed
         require(
