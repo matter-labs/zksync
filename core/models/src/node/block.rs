@@ -23,8 +23,8 @@ pub struct ExecutedPriorityOp {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ExecutedOperations {
-    Tx(ExecutedTx),
-    PriorityOp(ExecutedPriorityOp),
+    Tx(Box<ExecutedTx>),
+    PriorityOp(Box<ExecutedPriorityOp>),
 }
 
 impl ExecutedOperations {

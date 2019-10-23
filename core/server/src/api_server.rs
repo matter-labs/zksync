@@ -1,8 +1,8 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
 use actix_web::{
-    http::Method, middleware, middleware::cors::Cors, server, App, AsyncResponder, Body, Error,
-    HttpMessage, HttpRequest, HttpResponse, error
+    error, http::Method, middleware, middleware::cors::Cors, server, App, AsyncResponder, Body,
+    Error, HttpMessage, HttpRequest, HttpResponse,
 };
 use models::node::{tx::FranklinTx, Account, AccountId, ExecutedOperations};
 use models::{NetworkStatus, StateKeeperRequest};
@@ -303,23 +303,23 @@ fn handle_get_executed_transaction_by_hash(
     }
 }
 
-fn handle_get_priority_op_receipt(
-    req: &HttpRequest<AppState>,
-) -> ActixResult<HttpResponse> {
+fn handle_get_priority_op_receipt(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let id = req
         .match_info()
         .get("pq_id")
         .and_then(|offset| offset.parse::<i64>().ok())
         .ok_or_else(|| error::ErrorBadRequest("Invalid pq_id parameter"))?;
 
-    let storage = req.state()
-        .connection_pool.clone()
+    let storage = req
+        .state()
+        .connection_pool
+        .clone()
         .access_storage()
-        .map_err(|e| error::ErrorBadRequest(e))?;
+        .map_err(error::ErrorBadRequest)?;
 
     let res = storage
         .get_priority_op_receipt(id)
-        .map_err(|e| error::ErrorBadRequest(e))?;
+        .map_err(error::ErrorBadRequest)?;
 
     Ok(HttpResponse::Ok().json(res))
 }
@@ -353,16 +353,18 @@ fn handle_get_account_transactions_history(
                 Err("Limit too large")
             }
         })
-        .map_err(|e| error::ErrorBadRequest(e))?;
+        .map_err(error::ErrorBadRequest)?;
 
-    let storage = req.state()
-        .connection_pool.clone()
+    let storage = req
+        .state()
+        .connection_pool
+        .clone()
         .access_storage()
-        .map_err(|e| error::ErrorBadRequest(e))?;
+        .map_err(error::ErrorBadRequest)?;
 
     let res = storage
         .get_account_transactions_history(&address, offset, limit)
-        .map_err(|e| error::ErrorBadRequest(e))?;
+        .map_err(error::ErrorBadRequest)?;
 
     Ok(HttpResponse::Ok().json(res))
 }
@@ -451,19 +453,17 @@ fn handle_get_block_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpRespon
     match storage.load_block_range(block_id, 1) {
         Ok(mut block_range) => {
             if let Some(response) = block_range.pop() {
-                return Ok(HttpResponse::Ok().json(response));
+                Ok(HttpResponse::Ok().json(response))
             } else {
-                return Ok(HttpResponse::Ok().json(ApiError {
+                Ok(HttpResponse::Ok().json(ApiError {
                     error: "Block not found".to_string(),
-                }));
+                }))
             }
         }
-        Err(e) => {
-            return Ok(HttpResponse::Ok().json(ApiError {
-                error: format!("db_error {}", e),
-            }));
-        }
-    };
+        Err(e) => Ok(HttpResponse::Ok().json(ApiError {
+            error: format!("db_error {}", e),
+        })),
+    }
 }
 
 fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
@@ -562,19 +562,17 @@ fn handle_get_transaction_by_id(req: &HttpRequest<AppState>) -> ActixResult<Http
     match storage.get_block_executed_ops(block_id) {
         Ok(ops) => {
             if let Some(exec_op) = ops.get(tx_id as usize) {
-                return Ok(HttpResponse::Ok().json(exec_op));
+                Ok(HttpResponse::Ok().json(exec_op))
             } else {
-                return Ok(HttpResponse::Ok().json(ApiError {
+                Ok(HttpResponse::Ok().json(ApiError {
                     error: "Executed op not found in block".to_string(),
-                }));
+                }))
             }
         }
-        Err(e) => {
-            return Ok(HttpResponse::Ok().json(ApiError {
-                error: format!("db error: {}", e),
-            }));
-        }
-    };
+        Err(e) => Ok(HttpResponse::Ok().json(ApiError {
+            error: format!("db error: {}", e),
+        })),
+    }
 }
 
 fn handle_search(
@@ -624,10 +622,12 @@ fn start_server(state: AppState, bind_to: String) {
                         r.method(Method::GET).f(handle_get_account_transactions);
                     })
                     .resource("/account/{address}/history/{offset}/{limit}", |r| {
-                        r.method(Method::GET).f(handle_get_account_transactions_history);
+                        r.method(Method::GET)
+                            .f(handle_get_account_transactions_history);
                     })
                     .resource("/transactions/{tx_hash}", |r| {
-                        r.method(Method::GET).f(handle_get_executed_transaction_by_hash);
+                        r.method(Method::GET)
+                            .f(handle_get_executed_transaction_by_hash);
                     })
                     .resource("/priority_operations/{pq_id}/", |r| {
                         r.method(Method::GET).f(handle_get_priority_op_receipt);

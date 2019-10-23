@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ ! "$FRANKLIN_ENV" == "dev" ]
+if [ "$FRANKLIN_ENV" != "dev" ] && [ "$FRANKLIN_ENV" != "ci" ]
 then
     echo -n "Dangerous action. Type environment name ('$FRANKLIN_ENV') to confirm: "
     read CONFIRMED

@@ -2,7 +2,6 @@ use ethabi::Contract;
 use models::abi::FRANKLIN_CONTRACT;
 use serde_json;
 use std::str::FromStr;
-use tiny_keccak::keccak256;
 use web3::futures::Future;
 use web3::types::{Address, H256};
 use web3::types::{Transaction, TransactionId};
@@ -82,11 +81,11 @@ pub fn get_input_data_from_ethereum_transaction(
 ) -> Result<Vec<u8>, DataRestoreError> {
     let input_data = transaction.clone().input.0;
     if input_data.len() > FUNC_NAME_HASH_LENGTH {
-        return Ok(input_data[FUNC_NAME_HASH_LENGTH..input_data.len()].to_vec());
+        Ok(input_data[FUNC_NAME_HASH_LENGTH..input_data.len()].to_vec())
     } else {
-        return Err(DataRestoreError::NoData(
+        Err(DataRestoreError::NoData(
             "No commitment data in tx".to_string(),
-        ));
+        ))
     }
 }
 
@@ -97,7 +96,7 @@ pub fn get_input_data_from_ethereum_transaction(
 /// * `transaction_hash` - The identifier of the particular Ethereum transaction
 ///
 pub fn get_ethereum_transaction(transaction_hash: &H256) -> Result<Transaction, DataRestoreError> {
-    let tx_id = TransactionId::Hash(transaction_hash.clone());
+    let tx_id = TransactionId::Hash(*transaction_hash);
     let (_eloop, transport) =
         web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
             .map_err(|_| DataRestoreError::WrongEndpoint)?;
@@ -107,7 +106,7 @@ pub fn get_ethereum_transaction(transaction_hash: &H256) -> Result<Transaction, 
         .transaction(tx_id)
         .wait()
         .map_err(|e| DataRestoreError::Unknown(e.to_string()))?
-        .ok_or(DataRestoreError::NoData("No tx by this hash".to_string()))?;
+        .ok_or_else(|| DataRestoreError::NoData("No tx by this hash".to_string()))?;
     Ok(web3_transaction)
 }
 

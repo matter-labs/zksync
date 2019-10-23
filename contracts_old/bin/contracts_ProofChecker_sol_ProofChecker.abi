@@ -1,1 +1,0 @@
-[{"constant":true,"inputs":[{"name":"circuitType","type":"uint8"},{"name":"proof","type":"uint256[8]"},{"name":"oldRoot","type":"bytes32"},{"name":"newRoot","type":"bytes32"},{"name":"finalHash","type":"bytes32"}],"name":"verifyProof","outputs":[{"name":"valid","type":"bool"}],"payable":false,"stateMutability":"view","type":"function"}]

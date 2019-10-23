@@ -18,7 +18,6 @@ init:
 yarn:
 	@cd js/franklin_lib && yarn
 	@cd js/client && yarn
-	@cd js/loadtest && yarn
 	@cd js/explorer && yarn
 	@cd contracts && yarn
 
@@ -141,11 +140,11 @@ push-image-rust: image-rust
 deploy-contracts: confirm_action
 	@bin/deploy-contracts.sh
 
-test-contracts: confirm_action
-	@bin/prepare-test-contracts.sh
+test-contracts: confirm_action build-contracts
 	@bin/contracts-test.sh
 
 build-contracts: confirm_action
+	@bin/prepare-test-contracts.sh
 	@cd contracts && yarn build
 
 # deploy-contracts: confirm_action
@@ -227,6 +226,8 @@ endif
 ifeq (dev,$(FRANKLIN_ENV))
 stop: confirm_action
 	@docker-compose stop server prover
+else ifeq (ci,$(FRANKLIN_ENV))
+stop:
 else
 stop: confirm_action stop-prover stop-server stop-nginx
 endif
