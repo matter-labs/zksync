@@ -6,26 +6,31 @@ import "./Governance.sol";
 import "./Franklin.sol";
 import "./Verifier.sol";
 
-contract Token {
-    address owner;
+contract LendingToken {
+    address internal owner;
+    Token public token;
 
-    uint256 multiplier;
-    uint256 baseRate;
-    uint256 spread;
+    uint256 constant MULTIPLIER = 45;
+    uint256 constant BASE_RATE = 5;
+    uint256 constant SPREAD = 10;
 
-    uint256 lastVerifiedBlock;
+    uint256 internal lastVerifiedBlock;
 
-    uint256 totalSupply;
-    uint256 matterFee;
-    uint256 totalBorrowed;
+    uint256 internal totalSupply;
+    uint256 internal totalBorrowed;
 
-    mapping(uint32 => address) public lenders;
+    mapping(uint32 => address) internal lenders;
     mapping(address => uint256) public lendersSupplies;
-    uint32 lendersCount;
+    uint32 internal lendersCount;
 
-    mapping(uint32 => mapping(uint32 => FeeOrder)) blockFeeOrders;
-    mapping(uint32 => BlockInfo) blocksInfo;
-    mapping(uint32 => mapping(uint32 => BorrowOrder)) blockBorrowOrders;
+    mapping(uint32 => mapping(uint32 => FeeOrder)) public blockFeeOrders;
+    mapping(uint32 => BlockInfo) public blocksInfo;
+    mapping(uint32 => mapping(uint32 => BorrowOrder)) public blockBorrowOrders;
+
+    struct Token {
+        address tokenAddress;
+        uint16 tokenId;
+    }
 
     struct BlockInfo {
         uint32 feeOrdersCount;
@@ -44,30 +49,50 @@ contract Token {
         address receiver;
     }
 
+    event NewBorrowOrder(
+        uint32 blockNumber,
+        uint32 orderId,
+        uint256 amount
+    );
+
+    event NewBorrowOrder(
+        uint32 blockNumber,
+        uint32 orderId,
+        uint256 amount
+    );
+
+    event FulfilledBorrowOrder(
+        uint32 blockNumber,
+        uint32 orderId
+    );
+
     Verifier internal verifier;
     Governance internal governance;
     Franklin internal franklin;
 
     constructor(
-        uint256 _multiplier,
-        uint256 _baseRate,
-        uint256 _spread,
+        address _tokenAddress,
         address _governanceAddress,
         address _franklinAddress,
         address _verifierAddress,
         address _owner
     ) public {
         governance = Governance(_governanceAddress);
+        uint16 tokenId = governance.validateTokenAddress(_token);
+        token = Token({
+            tokenAddress: _tokenAddress,
+            tokenId: tokenId
+        });
+
         franklin = Franklin(_priorityQueueAddress);
+        lastVerifiedBlock = Franklin.totalBlocksVerified;
+
         verifier = Verifier(_verifierAddress);
         owner = _owner;
-        multiplier = _multiplier;
-        baseRate = _baseRate;
-        spread = _spread;
     }
 
-    function supply(uint256 _amount, address _lender) external {
-        transaction(_amount, address(this));
+    function supplyInternal(uint256 _amount, address _lender) internal {
+        transferIn(_amount, _lender);
         totalSupply += _amount;
         if (lendersSupplies[_lender] == 0) {
             lenders[lendersCount] = _lender;
@@ -76,7 +101,9 @@ contract Token {
         lendersSupplies[_lender] += _amount;
     }
 
-    function withdraw(uint256 _amount) external {
+    function transferIn(uint256 _amount, address _lender) internal;
+
+    function withdrawInternal(uint256 _amount) internal {
         require(
             lendersSupplies[msg.sender] >= _amount,
             "lww11"
@@ -86,7 +113,7 @@ contract Token {
             "lww12"
         ); // "lww12" - not enouth availabl supplies
         
-        transaction(_amount, msg.sender);
+        transferOut(_amount, msg.sender);
         totalSupply -= _amount;
         lendersSupplies[msg.sender] -= _amount;
         // delete
@@ -103,14 +130,16 @@ contract Token {
         }
     }
 
-    function requestBorrow(
+    function transferOut(uint256 _amount, address _lender) internal;
+
+    function requestBorrowInternal(
         bytes32 _txHash,
         bytes _signature,
         uint256 _amount,
         address _borrower,
         address _receiver,
         uint32 _blockNumber
-    ) external {
+    ) internal {
         require(
             lastVerifiedBlock < _blockNumber,
             "lrw11"
@@ -124,7 +153,7 @@ contract Token {
             "lrw11"
         ); // "lrw11" - wrong signature
         require(
-            verifyTx(_amount, _borrower, _blockNumber, _txHash)
+            verifyTx(_amount, token.tokenAddress, _borrower, _blockNumber, _txHash)
             "lrw12"
         ); // "lrw12" - wrong tx
         if (_amount <= (totalSupply - totalBorrowed)) {
@@ -140,7 +169,7 @@ contract Token {
         uint32 _blockNumber
     ) internal {
         (uint256 lendersFees, uint256 ownerFee) = calculateFees(_amount);
-        transaction((_amount-ownerFee-lendersFees), _receiver);
+        transferOut((_amount-ownerFee-lendersFees), _receiver);
         for (uint32 i = 0; i <= lendersCount; i++) {
             uint32 currentFeeOrdersCount = blocksInfo[_blockNumber].feeOrdersCount;
             blockFeeOrders[_blockNumber][currentFeeOrdersCount] = FeeOrder({
@@ -162,17 +191,22 @@ contract Token {
         totalBorrowed += _amount-ownerFee-lendersFees;
     }
 
-    function calculateFees(uint256 _amount) internal returns (uint256 lendersFees, uint256 ownerFee) {
+    function calculateFees(uint256 _amount) internal returns (uint256 _lendersFees, uint256 _ownerFee) {
         // TODO: - safe math
-        uint256 u = totalBorrowed / (totalSupply + totatBorrowed);
-        uint256 bir = multiplier * u + baseRate;
+        (uint256 bir, uint256 sir) = getCurrentInterestRatesInternal();
         uint256 borrowerFee = bir * _amount;
-        uint256 sir = bir * u * (1 - spread);
-        lendersFees = borrowerFee * sir;
-        ownerFee = borrowerFee - lendersFees;
+        _lendersFees = borrowerFee * sir;
+        _ownerFee = borrowerFee - lendersFees;
     }
 
-    function differedBorrow(
+    function getCurrentInterestRatesInternal() internal pure returns (uint256 _borrowing, uint256 _supply) {
+        // TODO: - safe math
+        uint256 u = totalBorrowed / (totalSupply + totatBorrowed);
+        _borrowing = MULTIPLIER * u + BASE_RATE;
+        _supply = _borrowing * u * (1 - SPREAD);
+    }
+
+    function defferedBorrow(
         uint256 _amount,
         address _receiver,
         uint32 _blockNumber
@@ -183,41 +217,45 @@ contract Token {
             _receiver
         });
         emit NewBorrowOrder(
-            _amount,
-            _receiver,
             _blockNumber,
-            currentBorrowOrdersCount
+            currentBorrowOrdersCount,
+            _amount
         );
         blocksInfo[_blockNumber].borrowOrdersCount++;
     }
 
-    function fulfillOrder(uint32 _blockNumber, uint32 _orderNumber, uint256 _sendingAmount, address _lender) external {
+    function fulfillOrderInternal(
+        uint32 _blockNumber,
+        uint32 _orderId,
+        uint256 _sendingAmount,
+        address _lender
+    ) internal {
         require(
             lastVerifiedBlock < _blockNumber,
             "lrw11"
         ); // "lrw11" - verified block
         require(
-            _orderNumber < blocksInfo[_blockNumber].borrowOrdersCount,
+            _orderId < blocksInfo[_blockNumber].borrowOrdersCount,
             "lrw11"
         ); // "lrw11" - wrong block order number
         require(
-            _sendingAmount >= blockBorrowOrders[_blockNumber][_orderNumber].amount,
+            _sendingAmount >= blockBorrowOrders[_blockNumber][_orderId].amount,
             "lrw11"
         ); // "lrw11" - wrong amount
-        supply(_sendingAmount, _lender);
+        supplyInternal(_sendingAmount, _lender);
         immediateBorrow(
-            blockBorrowOrders[_blockNumber][_orderNumber].amount,
-            blockBorrowOrders[_blockNumber][_orderNumber].receiver,
+            blockBorrowOrders[_blockNumber][_orderId].amount,
+            blockBorrowOrders[_blockNumber][_orderId].receiver,
             _blockNumber
         );
-        delete blockBorrowOrders[_blockNumber][_orderNumber];
+        delete blockBorrowOrders[_blockNumber][_orderId];
         emit FulfilledBorrowOrder(
             _blockNumber,
-            _orderNumber
+            _orderId
         );
     }
 
-    function newVerifiedBlock(uint32 _blockNumber) external {
+    function newVerifiedBlockInternal(uint32 _blockNumber) internal {
         requireFranklin();
         lastVerifiedBlock = _blockNumber;
         delete blockBorrowOrders[_blockNumber];
