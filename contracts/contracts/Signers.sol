@@ -130,6 +130,14 @@ contract Signers {
         return (aggrSignature.x, aggrSignature.y);
     }
 
+    // function messageToG11(bytes memory _message) public view returns (uint256, uint256) {
+    //     return BlsOperations.messageToG11(_message);
+    // }
+
+    // function messageToG12(bytes memory _message) public view returns (uint256, uint256) {
+    //     return BlsOperations.messageToG12(_message);
+    // }
+
     function verify(
         uint256 _signatureX,
         uint256 _signatureY,

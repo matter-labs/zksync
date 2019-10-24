@@ -2,6 +2,9 @@ pragma solidity ^0.5.8;
 
 // Source: https://github.com/musalbas/solidity-BN256G2/blob/master/BN256G2.sol
 library BN256G2 {
+    // a = (FIELD_ORDER+1) // 4
+    uint256 internal constant CURVE_A = 0xc19139cb84c680a6e14116da060561765e05aa45a1c72a34f082305b61f3f52;
+    
     uint256 internal constant FIELD_MODULUS = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47;
     uint256 internal constant TWISTBX = 0x2b149d40ceb8aaae81be18991be06ac3b5b4c5e559dbefa33267e6dc24a138e5;
     uint256 internal constant TWISTBY = 0x9713b03af0fed4cd2cafadeed8fdf4a74fa084e52d1852e4a2bd0685c315d2;
@@ -11,6 +14,14 @@ library BN256G2 {
     uint256 internal constant PTYY = 3;
     uint256 internal constant PTZX = 4;
     uint256 internal constant PTZY = 5;
+
+    function fieldModulus() internal pure returns (uint256) {
+        return FIELD_MODULUS;
+    }
+
+    function curveA() internal pure returns (uint256) {
+        return CURVE_A;
+    }
 
     /**
      * @notice Add two twist points

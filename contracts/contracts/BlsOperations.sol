@@ -144,114 +144,64 @@ library BlsOperations {
         });
     }
 
-    // Source: https://github.com/matter-labs/RSAAccumulator/blob/master/contracts/RSAAccumulator.sol#L317
-    // this assumes that exponent in never larger than 256 bits
-    function modularExpU512(
-        uint256[2] memory base,
-        uint256 e,
-        uint256[2] memory m)
-    public view returns (uint256[2] output) {
-        uint256 modulusLength = 64;
-        uint256 memoryPointer = 0;
-        uint256 dataLength = 0;
-        assembly {
-            // define pointer
-            memoryPointer := mload(0x40)
-            // store data assembly-favouring ways
-            mstore(memoryPointer, modulusLength)    // Length of Base
-            mstore(add(memoryPointer, 0x20), 0x20)  // Length of Exponent
-            mstore(add(memoryPointer, 0x40), modulusLength)  // Length of Modulus
-        }
-        dataLength = 0x60;
-        // now properly pack bases, etc
-        uint256 limb = 0;
-        for (uint256 i = 0; i < 2; i++) {
-            limb = base[i];
-            assembly {
-                mstore(add(memoryPointer, dataLength), limb)  // cycle over base
-            }
-            dataLength += 0x20;
-        }
+    // function messageToG11(bytes memory _message) internal view returns (uint256, uint256) {
+    //     uint256 h = uint256(keccak256(_message));
+    //     return (mulG1(generatorG1(), h).x, mulG1(generatorG1(), h).y);
+    // }
 
-        assembly {
-            mstore(add(memoryPointer, dataLength), e)     // Put exponent
-        }
-        dataLength += 0x20;
-
-        for (i = 0; i < 2; i++) {
-            limb = m[i];
-            assembly {
-                mstore(add(memoryPointer, dataLength), limb)  // cycle over base
-            }
-            dataLength += 0x20;
-        }
-        // do the call
-        assembly {
-            let success := staticcall(sub(gas, 2000), 0x05, memoryPointer, dataLength, memoryPointer, modulusLength) // here we overwrite!
-            // gas fiddling
-            switch success case 0 {
-                revert(0, 0)
-            }
-        }
-        dataLength = 0;
-        limb = 0;
-        for (i = 0; i < 2; i++) {
-            assembly {
-                limb := mload(add(memoryPointer, dataLength))
-            }
-            dataLength += 0x20;
-            output[i] = limb;
-        }
-        return output;
-    }
-
-    function hash512(bytes memory _input) internal view returns (bytes32, bytes32) {
-        bytes memory zero = [0];
-        bytes memory one = [1];
-        return 
-        (
-            keccak256(
-                Bytes.concat(_input, zero)
-            ),
-            keccak256(
-                Bytes.concat(_input, one)
-            )
-        );
-    }
+    // function messageToG12(bytes memory _message) internal view returns (uint256, uint256) {
+    //     uint256 message = uint256(keccak256(_message));
+    //     uint256 beta = 0;
+    //     uint256 y = 0;
+    //     uint256 x = message % BN256G2.fieldModulus();
+    //     while( true ) {
+    //         (beta, y) = findYforX(x);
+    //         if(beta == mulmod(y, y, BN256G2.fieldModulus())) {
+    //             return (x, y);
+    //         }
+    //         x = addmod(x, 1, BN256G2.fieldModulus());
+    //     }
+    // }
 
     function messageToG1(bytes memory _message) internal view returns (G1Point memory) {
-        bytes memory h = Bytes.toBytesFromBytes32(keccak256(_message), 32);
-        
-        uint256[2] memory h1_256;
-        (bytes32 h1_256_0, bytes32 h1_256_1) = hash512(
-            Bytes.concat(
-                h,
-                Bytes.toBytesFromUInt256(generatorG1().x)
-            )
-        );
-        h1_256[0] = uint256(h1_256_0);
-        h1_256[1] = uint256(h1_256_1);
-        uint256[2] memory q1;
-        q1[0] = 0;
-        q1[1] = BN256G2.FIELD_MODULUS;
-        (uint256 t00, uint256 t01) = modularExpU512(h1_256, 1, q1);
+        uint256 message = uint256(keccak256(_message));
+        uint256 beta = 0;
+        uint256 y = 0;
+        uint256 x = message % BN256G2.fieldModulus();
+        while( true ) {
+            (beta, y) = findYforX(x);
+            if(beta == mulmod(y, y, BN256G2.fieldModulus())) {
+                return G1Point(x, y);
+            }
+            x = addmod(x, 1, BN256G2.fieldModulus());
+        }
+    }
 
-        uint256[2] memory h2_256;
-        (bytes32 h2_256_0, bytes32 h2_256_1) = hash512(
-            Bytes.concat(
-                h,
-                Bytes.toBytesFromUInt256(generatorG1().y)
-            )
-        );
-        h2_256[0] = uint256(h2_256_0);
-        h2_256[1] = uint256(h2_256_1);
-        uint256[2] memory q2;
-        q2[0] = 0;
-        q2[1] = BN256G2.FIELD_MODULUS;
-        (uint256 t10, uint256 t11) = modularExpU512(h2_256, 1, q2);
+    function findYforX(uint256 x) internal view returns (uint256, uint256) {
+        // beta = (x^3 + b) % p
+        uint256 beta = addmod(mulmod(mulmod(x, x, BN256G2.fieldModulus()), x, BN256G2.fieldModulus()), 3, BN256G2.fieldModulus());
+        uint256 y = modPow(beta, BN256G2.curveA(), BN256G2.fieldModulus());
+        return (beta, y);
+    }
 
-        // p <- swEncode(t0) * swEncode(t1)
-        // return p;
+    function modPow(uint256 base, uint256 exponent, uint256 modulus) internal view returns (uint256) {
+        uint256[6] memory input = [32, 32, 32, base, exponent, modulus];
+        uint256[1] memory result;
+        assembly {
+            if iszero(
+                staticcall(
+                    sub(gas, 2000),
+                    5,
+                    input,
+                    0xc0,
+                    result,
+                    0x20
+                )
+            ) {
+                invalid()
+            }
+        }
+        return result[0];
     }
 
     // function messageToG2(bytes memory _message) internal view returns (G2Point memory) {

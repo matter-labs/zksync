@@ -1,4 +1,5 @@
 import {ethers} from "ethers";
+import {bigNumberify, parseEther, hexlify} from "ethers/utils";
 import {
     signersTestContractCode,
     deploySigners
@@ -63,6 +64,18 @@ describe("VERIFIER", function() {
             [sigX, sigY], 1
         );
 
+        // const h1 = await signersDeployedContract.messageToG11(
+        //     message
+        // );
+
+        // console.log(h1);
+
+        // const h2 = await signersDeployedContract.messageToG12(
+        //     message
+        // );
+
+        // console.log(h2);
+
         const result4 = await signersDeployedContract.verify(
             aggrSignature[0],
             aggrSignature[1],
@@ -70,7 +83,7 @@ describe("VERIFIER", function() {
             aggrPubKey[1],
             aggrPubKey[2],
             aggrPubKey[3],
-            message
+            message,
         );
         expect(result4).to.eq(true);
 
