@@ -16,41 +16,50 @@ function combineMessages(...args) {
 
 function info(msg, kwargs) {
     let displayMessage = {
-        kind: 'display message',
         message: msg,
         error: false,
+        variant: 'success',
+        countdown: 100,
     };
+    
+    // update default displayMessage with values from kwargs dict.
     Object.assign(displayMessage, kwargs);
+
     return { displayMessage };
 }
 
 function error(msg, kwargs) {
     let displayMessage = {
-        kind: 'display message',
         message: msg,
         error: true,
+        variant: 'danger',
+        countdown: 100,
     };
+    
+    // update default displayMessage with values from kwargs dict.
     Object.assign(displayMessage, kwargs);
+
     return { displayMessage };
 };
 
-function action(actionString) {
-    let action = {
-        actionString,
-    };
-    return { action };
-}
-
 function start_progress_bar(kwargs) {
-    kwargs.kind = 'start progress bar';
-    return {
-        startProgressBar: kwargs,
+    let startProgressBar = {
+        variant: 'half',
+        duration: timeConstants.waitingForProverHalfLife,
     };
+
+    // update default startProgressBar with values from kwargs dict.
+    Object.assign(startProgressBar, kwargs);
+
+    return { startProgressBar };
 }
 
 function stop_progress_bar(kwargs) {
-    let stopProgressBar = kwargs || {};
-    stopProgressBar.kind = 'stop progress bar';
+    let stopProgressBar = {};
+
+    // update default stopProgressBar with values from kwargs dict.
+    Object.assign(stopProgressBar, kwargs);
+
     return { stopProgressBar };
 }
 

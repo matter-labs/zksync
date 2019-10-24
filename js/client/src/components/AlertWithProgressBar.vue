@@ -24,11 +24,7 @@ export default {
         let wait = null;
         for await (const progress of this.shower.generator.gencopy()) {
             if (progress.displayMessage) {
-                this.$refs.alert.display({
-                    message: progress.displayMessage.message,
-                    variant: progress.displayMessage.variant || (progress.displayMessage.error ? 'danger' : 'success'),
-                    countdown: progress.displayMessage.countdown,
-                });
+                this.$refs.alert.display(progress.displayMessage);
                 wait = progress.displayMessage.countdown;
             }
 
@@ -45,19 +41,14 @@ export default {
             if (progress.stopProgressBar) {
                 this.$refs.progress_bar.cancelAnimation();
             }
-
-            if (progress.action) {
-                switch (progress.action.actionString) {
-                    default: 
-                        throw new Error('switch reached default state');
-                }
-            }
         }
 
         wait && await sleep(wait * 1000);
 
-        let elem = document.getElementById(this.shower.id);
-        elem.parentElement.removeChild(elem);
+        let idx = this.store.pendingTransactionGenerators.indexOf(this.shower);
+        if (idx != -1) {
+            this.store.pendingTransactionGenerators = this.store.pendingTransactionGenerators.slice(idx, 1);
+        }
     },
     components,
 }
