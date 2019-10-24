@@ -82,18 +82,16 @@ export default {
         maybeUpdateInfo() {
             if (this.balances == null) return;
             
-            this.displayableBalances = this.balances.map(bal => {
-                if (isReadablyPrintable(bal.tokenName) == false) return bal;
-                let res = Object.assign({}, bal);
-                res.verifiedAmount = readableEther(res.verifiedAmount);
-                res.committedAmount = readableEther(res.committedAmount);
-                return res;
-            }).filter(entry => Number(entry.committedAmount) || Number(entry.verifiedAmount));
+            this.displayableBalances = this.balances
+                .map(bal => {
+                    if (isReadablyPrintable(bal.tokenName) == false) return bal;
+                    let res = Object.assign({}, bal);
+                    res.verifiedAmount = readableEther(res.verifiedAmount);
+                    res.committedAmount = readableEther(res.committedAmount);
+                    return res;
+                })
+                .filter(entry => Number(entry.committedAmount) || Number(entry.verifiedAmount));
         },
-        clickedWhatever: function(evt) {
-            let tgt = evt.target;
-            tgt.setAttribute('data-original-title', 'copied');
-        }
     },
     components,
 }

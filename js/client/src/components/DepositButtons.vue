@@ -77,13 +77,13 @@ export default {
         },
     },
     methods: {
-        emitDeposit(kwargs) {
+        emitDeposit(options) {
             this.$bvModal.hide(`${this.componentId}_depositModal`);
-            this.$emit('depositEvent', kwargs);
+            this.$emit('depositEvent', options);
         },
-        emitWithdraw(kwargs) {
+        emitWithdraw(options) {
             this.$bvModal.hide(`${this.componentId}_withdrawModal`);
-            this.$emit('withdrawEvent', kwargs);
+            this.$emit('withdrawEvent', options);
         },
     },
     components

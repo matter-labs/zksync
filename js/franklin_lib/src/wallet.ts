@@ -247,8 +247,7 @@ export class Wallet {
 
     protected async depositETH(amount: BigNumberish) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
-        const tx = await franklinDeployedContract.depositETH(this.address, {value: amount, gasLimit: bigNumberify("200000")});
-        return tx.hash;
+        return await franklinDeployedContract.depositETH(this.address, {value: amount, gasLimit: bigNumberify("200000")});
     }
 
     protected async approveERC20(token: Token, amount: BigNumberish) {
@@ -260,9 +259,8 @@ export class Wallet {
     protected async depositApprovedERC20(token: Token, amount: BigNumberish) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
         const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
-        const tx = await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address,
+        return await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address,
             {gasLimit: bigNumberify("300000"), value: parseEther("0.05")});
-        return tx.hash;
     }
 
     async deposit(token: Token, amount: BigNumberish) {

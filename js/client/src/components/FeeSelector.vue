@@ -19,20 +19,24 @@ export default {
         selected: 0,
     }),
     created() {
-        this.renderableFees();
+        this.updateRenderableFees();
         this.$emit('update:selected', this.selected);
     },
     watch: {
-        fees: function() {
-            this.renderableFees();
+        fees() {
+            this.updateRenderableFees();
         },
-        selected: function () {
+        selected() {
             this.$emit('update:selected', this.selected);
         },
     },
     methods: {
-        renderableFees() {
-            this.feesOptions = this.fees.map((text, value) => ({text, value}));
+        updateRenderableFees() {
+            this.feesOptions = this.fees
+                .map((text, i) => ({
+                    text, 
+                    value: i,
+                }));
         },
     },
 }

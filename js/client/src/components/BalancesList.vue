@@ -78,12 +78,16 @@ export default {
             }
 
             if (this.pendingOps != null) {
+                let pendingOpsIndex = this.pendingOps
+                    .reduce((acc, op) => {
+                        acc[op.token.address] = op;
+                        return acc;
+                    }, {});
+
                 this.displayableBalances = this.displayableBalances
                     .map(bal => {
-                        let ops = this.pendingOps
-                            .filter(op => op.token.address == bal.address);
-                        if (ops.length == 1) {
-                            bal.op = ops[0];
+                        if (pendingOpsIndex[bal.address]) {
+                            bal.op = pendingOpsIndex[bal.address];
                         }
                         return bal;
                     });
@@ -91,10 +95,6 @@ export default {
         },
         updatePendingOps() {
             this.pendingOps = window.walletDecorator.pendingOperationsAsRenderableList();
-        },
-        clickedWhatever: function(evt) {
-            let tgt = evt.target;
-            tgt.setAttribute('data-original-title', 'copied');
         },
     },
     components,

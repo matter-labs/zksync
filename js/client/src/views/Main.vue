@@ -94,8 +94,8 @@ export default {
         new ClipboardJS('.copyable');
     },
     methods: {
-        displayAlert(kwargs) {
-            this.$refs.alert.display(kwargs);
+        displayAlert(options) {
+            this.$refs.alert.display(options);
         },
         async updateAccountInfo() {
             try {

@@ -45,10 +45,8 @@ export default {
 
         wait && await sleep(wait * 1000);
 
-        let idx = this.store.pendingTransactionGenerators.indexOf(this.shower);
-        if (idx != -1) {
-            this.store.pendingTransactionGenerators = this.store.pendingTransactionGenerators.slice(idx, 1);
-        }
+        let elem = document.getElementById(this.shower.id);
+        elem.parentElement.removeChild(elem);
     },
     components,
 }

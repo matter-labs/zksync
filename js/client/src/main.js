@@ -5,7 +5,6 @@ import BootstrapVue from 'bootstrap-vue';
 import "bootstrap/dist/css/bootstrap.min.css"
 import "bootstrap-vue/dist/bootstrap-vue.css"
 
-import { strCompareIgnoreCase } from './utils'
 import config from "./env-config.js"
 
 Vue.config.productionTip = false;
@@ -14,7 +13,7 @@ Vue.use(BootstrapVue);
 
 const store = {
     pendingTransactionGenerators: [],
-    verboseShowerId: 0,
+    verboseOperationId: 0,
     withdrawCompletionStatusDict: {},
 };
 
@@ -57,9 +56,9 @@ new Vue({
                     '9': 'localhost',
                 })[currentNetwork]
                 || 'unknown';
-                                
-                let correctNetwork = this.config.ETH_NETWORK.toLowerCase() == net.toLowerCase();
-                if (correctNetwork == false) {
+
+                let networkCorrect = this.config.ETH_NETWORK.toLowerCase() == net.toLowerCase();
+                if (networkCorrect == false) {
                     if (router.currentRoute.path !== '/login') {
                         router.push('/login');
                     }
@@ -68,7 +67,7 @@ new Vue({
                     if (window.web3 == false) {
                         document.getElementById("change_network_alert").style.display = "none";
                         document.getElementById("login_button").style.display = "none";
-                    } else if (correctNetwork) {
+                    } else if (networkCorrect) {
                         document.getElementById("change_network_alert").style.display = "none";
                         document.getElementById("login_button").style.display = "inline-block";
                     } else {
