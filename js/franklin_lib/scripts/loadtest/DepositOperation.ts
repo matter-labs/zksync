@@ -1,7 +1,7 @@
 import { AbstractOperation } from './AbstractOperation'
 import { Wallet, Token } from '../../src/wallet';
 import { LocalWallet } from './LocalWallet';
-import { BigNumberish, BigNumber } from 'ethers/utils';
+import { BigNumberish, BigNumber, parseEther, formatEther } from 'ethers/utils';
 
 interface DepositOperationKwargs {
     wallet: LocalWallet,
@@ -16,9 +16,9 @@ export class DepositOperation extends AbstractOperation {
     }
 
     public async action() {
-        this.logStart(`trying deposit(${this.kwargs.token.id} | ${this.kwargs.amount.toString()} | ${this.kwargs.fee.toString()})`);
+        this.logStart(`deposit(${this.kwargs.token.id} | ${formatEther(this.kwargs.amount)} | ${formatEther(this.kwargs.fee)})`);
         let handle = await this.kwargs.wallet.deposit(this.kwargs.token, this.kwargs.amount, this.kwargs.fee);
-        this.log(`Deposit tx hash is ${handle.ethTx.hash}`);
+        // this.log(`Deposit tx hash is ${handle.ethTx.hash}`);
         await handle.waitCommit();
     }
 }

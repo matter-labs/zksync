@@ -12,21 +12,26 @@ const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms))
 
 interface TesterKwargs {
     initNumWallets: number,
+    shardWalletOffset: number, 
+    shardWalletLimit: number,
     randomSeed: string | number | null
 }
 export class Tester {
     wallets: LocalWallet[] = [];
+    walletsShard: LocalWallet[] = null;
     prando: Prando;
     tokens: Token[];
 
     private constructor() {}
     
     public static async new(kwargs: TesterKwargs): Promise<Tester> {
-        const tester: Tester = new Tester();        
+        const tester: Tester = new Tester();
         tester.prando = new Prando(kwargs.randomSeed);
         for (let i = 0; i < kwargs.initNumWallets; i++) {
             await tester.addNewWallet();
         }
+        tester.walletsShard = tester.wallets.slice(
+            kwargs.shardWalletOffset, kwargs.shardWalletOffset + kwargs.shardWalletLimit);
         tester.tokens = await new FranklinProvider().getTokens();
         return tester;
     }
@@ -36,13 +41,14 @@ export class Tester {
     }
     
     private selectRandomWallet(): LocalWallet {
-        return this.prando.nextArrayItem(this.wallets);
+        return this.prando.nextArrayItem(this.walletsShard);
     }
     
     private selectAnotherRandomWallet(wallet: LocalWallet): LocalWallet {
         if (this.wallets.length < 2) throw new Error('there is no two wallets.');
         do {
-            var wallet2 = this.selectRandomWallet();
+            // var wallet2 = this.selectRandomWallet();
+            var wallet2 = this.prando.nextArrayItem(this.wallets); 
         } while (wallet === wallet2);
         return wallet2;
     }
@@ -141,18 +147,21 @@ export class Tester {
         op.mainWallet.addAction(op);
     }
 
-    async run(): Promise<void> {
+    async runForAll(): Promise<void> {
         await Promise.all(this.wallets.map(async wallet => {
             for (let action of wallet.getActions()) {
                 await action.start();
                 console.log(action.humanReadableLogs());
             }
-        }))
-    
-        await sleep(5000);
-    
-        await Promise.all(this.wallets.map(async wallet => {
-            console.log(`\n\n${await wallet.getWalletDescriptionString()}`);
+        }));
+    }
+
+    async run(): Promise<void> {
+        await Promise.all(this.walletsShard.map(async wallet => {
+            for (let action of wallet.getActions()) {
+                await action.start();
+                console.log(action.humanReadableLogs());
+            }
         }));
     }
 

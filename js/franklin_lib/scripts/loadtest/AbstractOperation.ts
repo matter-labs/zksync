@@ -39,9 +39,11 @@ export abstract class AbstractOperation {
     public static humanReadableLogsFromJSON(json: string): string {
         let info: AbstractOperationLog = JSON.parse(json);
         
-        let logs = info.logs;
-        logs.unshift(info.start);
-        logs.push(info.finish);
+        let logs = [
+            info.start,
+            ...info.logs,
+            // info.finish
+        ];
 
         return logs.map(l => `${info.operationId} ${l}`).join('\n');
     }
@@ -55,7 +57,7 @@ export abstract class AbstractOperation {
         try {
             this.info.balanceAtStart = await this.mainWallet.getAllBalancesString();
             await this.action();
-            this.log(`succeeded`);
+            // this.log(`succeeded`);
             this.info.success = true;
         } catch (err) {
             this.info.success = false;
@@ -64,8 +66,8 @@ export abstract class AbstractOperation {
         }
         await this.mainWallet.updateState();
         let balanceStrings = await this.mainWallet.getBalanceForTokenAsString(this.kwargs.token);
-        balanceStrings.forEach(this.log.bind(this));
+        // balanceStrings.forEach(this.log.bind(this));
         this.info.balanceAtEnd = balanceStrings;
-        this.logFinish(`finished.`);
+        // this.logFinish(`finished.`);
     }
 }

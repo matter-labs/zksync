@@ -13,14 +13,6 @@ function bignumberifyOrZero(bal) {
         : bigNumberify(bal);
 }
 
-function copyBalancesDictionary(dict) {
-    let res = {};
-    for (let [token, bal] of Object.entries(dict)) {
-        res[token] = bal;
-    }
-    return res;
-}
-
 export class LocalWallet {
     // #region construct
     private franklinWallet: Wallet;
@@ -39,7 +31,7 @@ export class LocalWallet {
     private constructor(public id) {}
     private static id: number = 0;
     
-    public  static async new(): Promise<LocalWallet> {
+    public static async new(): Promise<LocalWallet> {
         let wallet = new LocalWallet(LocalWallet.id++);
         await wallet.prepare();
         return wallet;
@@ -52,25 +44,41 @@ export class LocalWallet {
         this.franklinWallet = await Wallet.fromEthWallet(signer);
         
         this.ethAddress = await signer.getAddress();
-        this.address = this.franklinWallet.address.toString('hex');
+        this.address = this.franklinWallet.address.toString();
 
         await this.updateState();
 
-        this.computedFranklinCommitedBalances = copyBalancesDictionary(this.franklinCommitedBalances);
-        this.computedFranklinVerifiedBalances = copyBalancesDictionary(this.franklinVerifiedBalances);
-        this.computedContractBalances         = copyBalancesDictionary(this.contractBalances);
-        this.computedOnchainBalances          = copyBalancesDictionary(this.onchainBalances);
+        this.computedFranklinCommitedBalances = Object.assign({}, this.franklinCommitedBalances);
+        this.computedFranklinVerifiedBalances = Object.assign({}, this.franklinVerifiedBalances);
+        this.computedContractBalances         = Object.assign({}, this.contractBalances);
+        this.computedOnchainBalances          = Object.assign({}, this.onchainBalances);
     }
 
     public async updateState() {
         let ethState = await this.franklinWallet.getOnchainBalances();
-        let franklinState = await this.franklinWallet.getFranklinState();
+        let franklinState = await this.franklinWallet.getAccountState();
 
         for (let token of await this.franklinWallet.provider.getTokens()) {
             this.onchainBalances[token.id]          = bignumberifyOrZero(ethState.onchainBalances[token.id]);
             this.contractBalances[token.id]         = bignumberifyOrZero(ethState.contractBalances[token.id])
             this.franklinCommitedBalances[token.id] = bignumberifyOrZero(franklinState.commited.balances[token.id])
             this.franklinVerifiedBalances[token.id] = bignumberifyOrZero(franklinState.verified.balances[token.id])
+            this.updateComputedOnchainBalanceIfCloseToActual(token);
+        }
+    }
+
+    private updateComputedOnchainBalanceIfCloseToActual(token: Token) {
+        if (this.computedOnchainBalances[token.id] == undefined) return;
+
+        let diff = this.computedOnchainBalances[token.id].sub(this.onchainBalances[token.id]);
+        
+        let zero = bigNumberify(0);
+        if (diff.lt(zero)) {
+            diff = zero.sub(diff);
+        }
+
+        if (diff.lt('1000000')) {
+            this.computedOnchainBalances[token.id] = this.onchainBalances[token.id];
         }
     }
 
@@ -171,7 +179,7 @@ export class LocalWallet {
 
     public async getWalletDescriptionString(): Promise<string> {
         let balances = await this.getAllBalancesString();
-        return `${this.franklinWallet.address.toString('hex')}\n${balances.join('\n')}`;
+        return `${this.franklinWallet.address.toString()}\n${balances.join('\n')}`;
     }
     // #endregion
 
@@ -182,6 +190,7 @@ export class LocalWallet {
                 to:     this.ethAddress,
                 value:  amount,
                 nonce:  nonce,
+                gasLimit: bigNumberify("1500000"),
             });
             
             let mined = await tx.wait(2);
@@ -194,10 +203,16 @@ export class LocalWallet {
         this.addComputedOnchain(token, amount);
     }
 
-    public async withdraw(token: Token, amount: BigNumberish, fee: BigNumberish) {
-        // TODO: rewrite
+    public async withdraw(token: Token, amount: BigNumber, fee: BigNumber) {
+        let total_amount = amount.add(fee);
+        if (this.computedFranklinCommitedBalances[token.id].ge(total_amount)) {
+            this.subtractComputedCommitedFranklin(token, total_amount);
+        }
+
         let handle = await this.franklinWallet.widthdrawOffchain(token, amount, fee);
+        handle.waitVerify();
         let handle2 = await this.franklinWallet.widthdrawOnchain(token, amount);
+        handle2.wait(2);
     }
 
     public async deposit(token: Token, amount: BigNumber, fee: BigNumber) {

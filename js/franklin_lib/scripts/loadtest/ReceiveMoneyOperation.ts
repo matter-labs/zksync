@@ -17,9 +17,9 @@ const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL)
 const richWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC).connect(provider);
 let nonce = null;
 
-// Wallet.fromEthWallet(richWallet)
-//     .then(wallet => wallet.getOnchainBalances())
-//     .then(console.log);
+Wallet.fromEthWallet(richWallet)
+    .then(wallet => wallet.getOnchainBalances())
+    .then(console.log);
 
 export class ReceiveMoneyOperation extends AbstractOperation {
     constructor(protected kwargs: ReceiveMoneyOperationKwargs) {

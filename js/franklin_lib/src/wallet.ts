@@ -81,6 +81,7 @@ export class FranklinProvider {
         promise = promise
             .then(reps => reps.data)
             .catch(error => { 
+                console.log(error);
                 throw new Error(error.response ? error.response.data.message : 'Error: Network Error');
             });
         return await promise;
@@ -141,7 +142,7 @@ export class FranklinProvider {
             return findToken(this.cachedTokens);
         }
     }
-    
+        
     async submitTx(tx) {
         return await FranklinProvider.axiosRequest(
             Axios.post(this.providerAddress + '/api/v0.1/submit_tx', tx));
@@ -153,7 +154,7 @@ export class FranklinProvider {
     }
     
     async getTransactionsHistory(address: Address, offset: number, limit: number) {
-        const link = `${this.providerAddress}/api/v0.1/account/0x${address.toString("hex")}/history/${offset}/${limit}`;
+        const link = `${this.providerAddress}/api/v0.1/account/${address.toString()}/history/${offset}/${limit}`;
         console.log(`In wallet, we request ${link}`);
         return await FranklinProvider.axiosRequest(
             Axios.get(link));
@@ -161,7 +162,7 @@ export class FranklinProvider {
     
     async getState(address: Address): Promise<FranklinAccountState> {
         return await FranklinProvider.axiosRequest(
-            Axios.get(this.providerAddress + '/api/v0.1/account/' + `0x${address.toString("hex")}`));
+            Axios.get(this.providerAddress + '/api/v0.1/account/' + `${address.toString()}`));
     }
     
     async getTxReceipt(tx_hash) {
@@ -178,16 +179,6 @@ export interface Token {
     id: number,
     address: string,
     symbol?: string,
-}
-        // search cached tokens
-
-        try {
-            return findToken(this.cachedTokens);
-        } catch (e) {
-            this.cachedTokens = await this.getTokens();
-            return findToken(this.cachedTokens);
-        }
-    }
 }
 
 export interface DepositTx {

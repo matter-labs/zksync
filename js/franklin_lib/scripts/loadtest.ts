@@ -21,7 +21,7 @@ async function makeTxsWallet(wallet: Wallet, wallets: Wallet[]) {
 
         let amount = parseEther("0.0001");
         let transferHandle = await wallet.transfer(target.address, 0, amount, 0, nonce++);
-        console.log(`${wallet.address.toString("hex")} -> ${target.address.toString("hex")} amount: ${formatEther(amount)} eth , nonce: ${nonce}` );
+        console.log(`${wallet.address.toString()} -> ${target.address.toString()} amount: ${formatEther(amount)} eth , nonce: ${nonce}` );
         await transferHandle.waitCommit();
     }
 }

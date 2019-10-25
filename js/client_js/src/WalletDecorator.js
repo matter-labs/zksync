@@ -53,7 +53,7 @@ export class WalletDecorator {
     // #region everything
     constructor (wallet) {
         this.wallet = wallet;
-        this.address = '0x' + this.wallet.address.toString('hex');
+        this.address = '0x' + this.wallet.address.toString();
     }
 
     static async new(wallet) {
