@@ -97,3 +97,27 @@ BorrowOrder привязан к соответствующему блоку и �
 ### Repay borrow
 
 Средства поступят на контракт Lending через метод repayBorrow(amount) при его вызове из контракта Franklin. Данный вызов предполагается производить при верификации соответствующего Franklin блока.
+
+## Расчет Interest Rate
+
+Utilization ratio: 
+u = totalBorrowed / (totalSupply + totatBorrowed)
+
+Borrowing Interest Rate:
+BIR = MULTIPLIER * u + BASE_RATE
+
+Supply Interest Rate:
+SIR = BIR * u * (1 - SPREAD)
+
+Borrower fee:
+borrowerFee = bir * amount
+
+Lenders fees:
+lendersFees = borrowerFee * SIR
+
+Owner (Matter) fee:
+ownerFee = borrowerFee - lendersFees
+
+Single lender fee:
+fee = lendersFees * (lendersSupplies[lenderId] / totalSupply)
+
