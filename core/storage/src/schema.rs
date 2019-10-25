@@ -65,13 +65,6 @@ table! {
 }
 
 table! {
-    data_restore_network (id) {
-        id -> Int4,
-        network_id -> Int2,
-    }
-}
-
-table! {
     eth_operations (id) {
         id -> Int8,
         op_id -> Int8,
@@ -117,22 +110,11 @@ table! {
 }
 
 table! {
-    franklin_op_blocks (id) {
+    franklin_ops (id) {
         id -> Int4,
-        franklin_op_block_type -> Text,
-        block_number -> Int8,
-        eth_tx_hash -> Bytea,
-        eth_tx_nonce -> Text,
-        eth_tx_block_hash -> Nullable<Bytea>,
-        eth_tx_block_number -> Nullable<Text>,
-        eth_tx_transaction_index -> Nullable<Text>,
-        eth_tx_from -> Bytea,
-        eth_tx_to -> Nullable<Bytea>,
-        eth_tx_value -> Text,
-        eth_tx_gas_price -> Text,
-        eth_tx_gas -> Text,
-        eth_tx_input -> Bytea,
-        commitment_data -> Bytea,
+        block_num -> Int8,
+        operation -> Jsonb,
+        fee_account -> Int8,
     }
 }
 
@@ -189,6 +171,13 @@ table! {
 }
 
 table! {
+    storage_state_update (id) {
+        id -> Int4,
+        storage_state -> Text,
+    }
+}
+
+table! {
     tokens (id) {
         id -> Int4,
         address -> Text,
@@ -210,17 +199,17 @@ allow_tables_to_appear_in_same_query!(
     balances,
     blocks,
     data_restore_last_watched_eth_block,
-    data_restore_network,
     eth_operations,
     events_state,
     executed_priority_operations,
     executed_transactions,
-    franklin_op_blocks,
+    franklin_ops,
     mempool,
     op_config,
     operations,
     proofs,
     prover_runs,
     server_config,
+    storage_state_update,
     tokens,
 );
