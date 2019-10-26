@@ -204,12 +204,12 @@ contract LendingToken {
     function transferOut(uint256 _amount, address _to) internal;
 
     function requestBorrowInternal(
-        bytes32 _txNumber,
-        bytes _signature,
+        uint32 _blockNumber,
+        uint32 _requestNumber,
         uint256 _amount,
-        address _borrower,
+        uint24 _borrower,
         address _receiver,
-        uint32 _blockNumber
+        bytes _signature
     ) internal {
         require(
             lastVerifiedBlock < _blockNumber,
@@ -224,7 +224,7 @@ contract LendingToken {
             "ltrl13"
         ); // "ltrl13" - wrong signature
         require(
-            franklin.verifyBorrowTx(_amount, token.tokenAddress, _borrower, _blockNumber, _txNumber),
+            franklin.verifyBorrowRequest(_blockNumber, _requestNumber, _borrower, token.tokenId, _amount),
             "ltrl14"
         ); // "ltrl14" - wrong tx
         if (_amount <= (totalSupply - totalBorrowed)) {

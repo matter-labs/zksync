@@ -189,6 +189,24 @@ contract Franklin {
 
     // // Lendings
     mapping(uint16 => address) internal ledingsAddresses;
+    mapping(address => bool) internal areLendings;
+    mapping(uint32 => mapping(uint32 => BorrowRequest)) public borrowRequests;
+    mapping(uint32 => uint32) borrowRequestsCountInBlocks;
+
+    struct BorrowRequest{
+        bool processed;
+        uint24 from;
+        uint16 tokenId;
+        uint128 amount;
+    }
+
+    event NewBorrowRequest(
+        uint32 indexed blockNumber,
+        uint32 indexed requestNumber,
+        uint24 indexed from,
+        uint16 tokenId,
+        uint128 amount
+    );
 
     // MARK: - CONSTRUCTOR
 
@@ -486,7 +504,7 @@ contract Franklin {
             // Unpack onchain operations and store them.
             // Get onchain operations start id for global onchain operations counter,
             // onchain operations number for this block, priority operations number for this block.
-            (uint64 startId, uint64 totalProcessed, uint64 priorityNumber) = collectOnchainOps(_publicData);
+            (uint64 startId, uint64 totalProcessed, uint64 priorityNumber) = processAndCollectOnchainOps(_publicData);
 
             // Verify that priority operations from this block are valid
             // (their data is similar to data from priority requests mapping)
@@ -526,7 +544,7 @@ contract Franklin {
     // onchain operations number for this block, priority operations number for this block
     // Params:
     // - _publicData - operations packed in bytes array
-    function collectOnchainOps(bytes memory _publicData)
+    function processAndCollectOnchainOps(bytes memory _publicData)
         internal
         returns (uint64 onchainOpsStartId, uint64 processedOnchainOps, uint64 priorityCount)
     {
@@ -593,15 +611,16 @@ contract Franklin {
         }
 
         if (_opType == uint8(OpType.PartialExit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer + ACC_NUM_BYTES, TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES);
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES);
             require(
-                pubData.length == TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES,
+                pubData.length == ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES,
                 "fpp12"
             ); // fpp12 - wrong partial exit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
                 OpType.PartialExit,
                 pubData
             );
+            appendBorrowRequestIfNeeded(pubData);
             return (PARTIAL_EXIT_LENGTH, 1, 0);
         }
 
@@ -736,21 +755,28 @@ contract Franklin {
                 // partial exit was successful, accrue balance
                 bytes memory tokenBytes = new bytes(TOKEN_BYTES);
                 for (uint8 i = 0; i < TOKEN_BYTES; ++i) {
-                    tokenBytes[i] = op.pubData[i];
+                    tokenBytes[i] = op.pubData[ACC_NUM_BYTES + i];
                 }
                 uint16 tokenId = Bytes.bytesToUInt16(tokenBytes);
 
                 bytes memory amountBytes = new bytes(AMOUNT_BYTES);
                 for (uint256 i = 0; i < AMOUNT_BYTES; ++i) {
-                    amountBytes[i] = op.pubData[TOKEN_BYTES + i];
+                    amountBytes[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + i];
                 }
                 uint128 amount = Bytes.bytesToUInt128(amountBytes);
 
                 bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
                 for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
-                    ethAddress[i] = op.pubData[TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
+                    ethAddress[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
                 }
-                balancesToWithdraw[Bytes.bytesToAddress(ethAddress)][tokenId] += amount;
+                address ethAddr = Bytes.bytesToAddress(ethAddress);
+                
+                address lendingAddr = lendingsAddresses[tokenId];
+                if (lendingAddr != address(0)) {
+                    repayBorrow(lendingAddr, tokenId, amount);
+                } else {
+                    balancesToWithdraw[ethAddr][tokenId] += amount;
+                }
             }
             if (op.opType == OpType.FullExit) {
                 // full exit was successful, accrue balance
@@ -874,34 +900,93 @@ contract Franklin {
     // - _lendingAddress - lending address
     function addLending(uint16 _tokenId, address _lendingAddress) external {
         governance.requireGovernor();
+        areLendings[_lendingAddress] = true;
         lendingsAddresses[_tokenId] = _lendingAddress;
+    }
+
+    // Appends new borrow request if needed
+    // Params:
+    // - _pubData - partial_exit pubdata
+    function appendBorrowRequestIfNeeded(bytes memory _pubData) internal {
+        bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
+        for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
+            ethAddress[i] = _pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
+        }
+        balancesToWithdraw[Bytes.bytesToAddress(ethAddress)][tokenId] += amount;
+        
+        if (areLendings[ethAddress]) {
+            bytes memory tokenBytes = new bytes(TOKEN_BYTES);
+            for (uint8 i = 0; i < TOKEN_BYTES; ++i) {
+                tokenBytes[i] = _pubData[ACC_NUM_BYTES + i];
+            }
+            uint16 tokenId = Bytes.bytesToUInt16(tokenBytes);
+
+            bytes memory fromBytes = new bytes(ACC_NUM_BYTES);
+            for (uint8 i = 0; i < TOKEN_BYTES; ++i) {
+                fromBytes[i] = _pubData[ACC_NUM_BYTES + i];
+            }
+            uint24 fromId = Bytes.bytesToUInt24(tokenBytes);
+            
+            bytes memory amountBytes = new bytes(AMOUNT_BYTES);
+            for (uint256 i = 0; i < AMOUNT_BYTES; ++i) {
+                amountBytes[i] = _pubData[ACC_NUM_BYTES + TOKEN_BYTES + i];
+            }
+            uint128 amount = Bytes.bytesToUInt128(amountBytes);
+
+            uint32 blockNumber = totalBlocksCommitted + 1;
+            borrowRequests[blockNumber][borrowRequestsCountInBlocks[blockNumber]] = BorrowRequest({
+                processed: false,
+                from: fromId,
+                tokenId: tokenId,
+                amount: amount
+            });
+
+            emit NewBorrowRequest(
+                blockNumber,
+                borrowRequestsCountInBlocks[blockNumber],
+                fromId,
+                tokenId,
+                amount
+            );
+
+            borrowRequestsCountInBlocks[blockNumber] += 1;
+        }
+    }
+
+    function verifyBorrowRequest(
+        uint32 _blockNumber,
+        uint32 _requestNumber,
+        uint24 _borrower,
+        uint16 _tokenId,
+        uint256 _amount
+    ) external view returns (bool) {
+        BorrowRequest request = borrowRequests[_blockNumber][_requestNumber];
+        return !request.processed &&
+            request.from == _borrower &&
+            request.tokenId == _tokenId &&
+            request.amount == _amount;
     }
 
     // Repays borrow in lending
     // Params:
-    // - _borrower - borrower
+    // - _lendingAddr - lending
     // - _tokenId - token id
     // - _amount - token amount
-    // - _signature - signature
     function repayBorrow(
-        address _borrower,
+        address _lendingAddr,
         uint16 _tokenId,
-        uint256 _amount,
-        bytes calldata _signature
-    ) external {
-        require(
-            verifier.verifyRepayBorrow(_borrower, _tokenId, _amount, _signature),
-            "frw21"
-        ); // frw21 - verification failed
-        require(
-            lendingsAddresses[_tokenId] != address(0),
-            "frw22"
-        ); // frw22 - lending doesn't exists
+        uint256 _amount
+    ) internal {
         if (_tokenId == 0) {
-            LendingEther lending = LendingEther(lendingsAddresses[_tokenId]);
+            LendingEther lending = LendingEther(_lendingAddr);
             lending.repayBorrow.value(_amount)();
         } else {
-            LendingErc20 lending = LendingErc20(lendingsAddresses[_tokenId]);
+            LendingErc20 lending = LendingErc20(_lendingAddr);
+            address tokenAddr = governance.tokenAddresses[_tokenId];
+            require(
+                IERC20(tokenAddr).approve(_lendingAddr, _amount),
+                "fcs21"
+            ); // fcs21 - cant approve token
             lending.repayBorrow(_amount);
         }
     }

@@ -87,6 +87,26 @@ library Bytes {
         return tempUint;
     }
 
+    // Compies bytes 'self' into a new 'uint24'.
+    // Returns the newly created 'uint24'.
+    function bytesToUInt24(bytes memory self)
+        internal
+        pure
+        returns (uint24)
+    {
+        require(
+            self.length >= 3,
+            "bb411"
+        ); // bb411 - wrong bytes length to 24
+        uint24 tempUint;
+
+        assembly {
+            tempUint := mload(add(add(self, 0x3), 0))
+        }
+
+        return tempUint;
+    }
+
     // Compies bytes 'self' into a new 'uint128'.
     // Returns the newly created 'uint128'.
     function bytesToUInt128(bytes memory self)
