@@ -24,8 +24,8 @@ contract LendingEther is LendingToken, ReentrancyGuard {
 
     function transferIn(uint256 _amount) internal;
 
-    function withdraw(uint256 _amount, address _to) external nonReentrant {
-        withdrawInternal(_amount, _to);
+    function requestWithdraw(uint256 _amount, address _to) external nonReentrant {
+        requestWithdrawInternal(_amount, _to);
     }
 
     function transferOut(uint256 _amount, address _to) internal {

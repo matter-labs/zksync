@@ -32,8 +32,8 @@ contract LendingErc20 is LendingToken, ReentrancyGuard {
         ); // lctn11 - token transfer in failed
     }
 
-    function withdraw(uint256 _amount, address _to) external nonReentrant {
-        withdrawInternal(_amount, _to);
+    function requestWithdraw(uint256 _amount, address _to) external nonReentrant {
+        requestWithdrawInternal(_amount, _to);
     }
 
     function transferOut(uint256 _amount, address _to) internal {

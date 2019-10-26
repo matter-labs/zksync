@@ -3,8 +3,11 @@ pragma solidity ^0.5.8;
 import "./Governance.sol";
 import "./Franklin.sol";
 import "./Verifier.sol";
+import "./SafeMath.sol";
 
 contract LendingToken {
+    using SafeMath for uint256;
+
     address internal owner;
     Token public token;
 
@@ -24,6 +27,15 @@ contract LendingToken {
     mapping(uint32 => mapping(uint32 => FeeOrder)) public blockFeeOrders;
     mapping(uint32 => BlockInfo) public blocksInfo;
     mapping(uint32 => mapping(uint32 => BorrowOrder)) public blockBorrowOrders;
+
+    mapping(uint32 => DefferedWithdrawOrder) public defferedWithdrawOrders;
+    uint32 internal startDefferedWithdrawOrdersIndex;
+    uint32 internal defferedWithdrawOrdersCount;
+
+    struct DefferedWithdrawOrder {
+        uint256 amountLeft;
+        address lender;
+    }
 
     struct Token {
         address tokenAddress;
@@ -58,6 +70,12 @@ contract LendingToken {
         uint32 orderId
     );
 
+    event UpdatedDefferedWithdrawOrder(
+        uint32 orderNumber,
+        address lender,
+        uint256 amountLeft
+    );
+
     Verifier internal verifier;
     Governance internal governance;
     Franklin internal franklin;
@@ -88,25 +106,80 @@ contract LendingToken {
 
     function supplyInternal(uint256 _amount, address _to) internal {
         transferIn(_amount);
-        totalSupply += _amount;
+        totalSupply = totalSupply.add(_amount);
         if (lendersSupplies[_to] == 0) {
             lenders[lendersCount] = _to;
             lendersCount++;
         }
         lendersSupplies[_to] += _amount;
+        fulfillDefferedWithdrawOrders();
     }
 
     function transferIn(uint256 _amount) internal;
 
-    function withdrawInternal(uint256 _amount, address _to) internal {
+    function fulfillDefferedWithdrawOrders() internal {
+        uint256 amount = totalSupply - totalBorrowed;
+        uint32 i = 0;
+        uint32 deletedOrdersCount = 0;
+        for (uint32 i = 0; i < defferedWithdrawOrdersCount; i++) {
+            uint256 amountToFulfill = defferedWithdrawOrders[startDefferedWithdrawOrdersIndex + i].amountLeft;
+            if (amountToFulfill >= amount) {
+                defferedWithdrawOrders[startDefferedWithdrawOrdersIndex + i].amount = amountToFulfill - amount;
+                emit UpdatedDefferedWithdrawOrder(
+                    startDefferedWithdrawOrdersIndex + i,
+                    defferedWithdrawOrders[startDefferedWithdrawOrdersIndex + i].lender,
+                    amountToFulfill - amount
+                );
+                if (amountToFulfill == amount) {
+                    deletedOrdersCount++;
+                }
+                break;
+            } else {
+                defferedWithdrawOrders[startDefferedWithdrawOrdersIndex + i].amount = 0;
+                emit UpdatedDefferedWithdrawOrder(
+                    startDefferedWithdrawOrdersIndex + i,
+                    defferedWithdrawOrders[startDefferedWithdrawOrdersIndex + i].lender,
+                    0
+                );
+                deletedOrdersCount++;
+                amount -= amountToFulfill;
+            }
+        }
+        startDefferedWithdrawOrdersIndex += deletedOrdersCount;
+    }
+
+    function requestWithdrawInternal(uint256 _amount, address _to) internal {
         require(
             lendersSupplies[msg.sender] >= _amount,
             "ltwl11"
         ); // "ltwl11" - not enouth lender supply
+        if (_amount <= totalSupply - totalBorrowed) {
+            immediateWithdraw(_amount, _to);
+        } else {
+            defferedWithdraw(_amount, _to);
+        }
+    }
+
+    function defferedWithdraw(uint256 _amount, address _to) internal {
+        uint256 immediateAmount = totalSupply - totalBorrowed;
         require(
-            _amount <= totalSupply - totalBorrowed,
-            "ltwl12"
-        ); // "ltwl12" - not enouth available supplies
+            _amount >= immediateAmount,
+            "ltdw11"
+        ); // "ltwl11" - wrong amount
+        immediateWithdraw(immediateAmount, _to);
+        defferedWithdrawOrders[startDefferedWithdrawOrdersIndex + defferedWithdrawOrdersCount] = DefferedWithdrawOrder({
+            amountLeft: immediateAmount,
+            lender: _to
+        });
+        emit UpdatedDefferedWithdrawOrder(
+            startDefferedWithdrawOrdersIndex + defferedWithdrawOrdersCount,
+            _to,
+            immediateAmount
+        );
+        defferedWithdrawOrdersCount++;
+    }
+
+    function immediateWithdraw(uint256 _amount, address _to) internal {
         transferOut(_amount, _to);
         totalSupply -= _amount;
         lendersSupplies[msg.sender] -= _amount;
@@ -127,7 +200,7 @@ contract LendingToken {
     function transferOut(uint256 _amount, address _to) internal;
 
     function requestBorrowInternal(
-        bytes32 _txHash,
+        bytes32 _txNumber,
         bytes _signature,
         uint256 _amount,
         address _borrower,
@@ -143,11 +216,11 @@ contract LendingToken {
             "ltrl12"
         ); // "ltrl12" - zero amount
         require(
-            verifier.verifySignature(_txHash, _signature),
+            verifier.verifyBorrowSignature(_txNumber, _signature),
             "ltrl13"
         ); // "ltrl13" - wrong signature
         require(
-            verifier.verifyTx(_amount, token.tokenAddress, _borrower, _blockNumber, _txHash),
+            franklin.verifyBorrowTx(_amount, token.tokenAddress, _borrower, _blockNumber, _txNumber),
             "ltrl14"
         ); // "ltrl14" - wrong tx
         if (_amount <= (totalSupply - totalBorrowed)) {
@@ -267,8 +340,9 @@ contract LendingToken {
             }
             lendersSupplies[feeOrder.lender] += feeOrder.fee;
         }
-        totalSupply += blocksInfo[_blockNumber].fee;
+        totalSupply = totalSupply.add(blocksInfo[_blockNumber].fee);
         totalBorrowed -= blocksInfo[_blockNumber].borrowed;
+        fulfillDefferedWithdrawOrders();
     }
 
     function repayBorrowInternal(uint256 _amount) internal {
