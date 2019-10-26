@@ -953,6 +953,13 @@ contract Franklin {
         }
     }
 
+    // Verify borrow request
+    // Params:
+    // - _blockNumber - number of Franklin block
+    // - _requestNumber - request number
+    // - _borrower - borrower address
+    // - _tokenId - token id
+    // - _amount - token amount
     function verifyBorrowRequest(
         uint32 _blockNumber,
         uint32 _requestNumber,

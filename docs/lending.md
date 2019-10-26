@@ -1,127 +1,128 @@
 # Lending
 
-## Цели
+## Goals
 
-Основаня цель - обеспечение непрерывности user flow. Пользователь не должен ждать, когда пройдет верификация блока, в котором находятся его средства. Он может запросить немедленный вывод средств на любой эфириумный адрес, указав Committed блок, в котором содержится транзакция с поступлением на его счет данных средств. В данном случае верификаторы, выступая в роли кредиторов, доверяют системе и тому, что блок пройдет верификацию, и предоставляют свои средства для проведения транзакции вывода. Данная операция условно называется кредитованием и за нее кредиторы получат комиссионные, зависящие от текущего состояния балансов свободных и занятых средств.
+The main goal is to ensure the continuity of user flow. A typical use case is that the user has funds in the **committed** block and she wants to send them to an external address. But for this, she needs to wait for the verification of the block where she receives the funds, then the block where she performs the withdrawal operation. So lending allows requesting an immediate withdrawal of users' funds to any ethereum address, indicating the **committed** block, which contains withdrawal transaction with a lending address as a recipient. In this case, the verifiers, acting as lenders, trust the system and the fact that the block will be **verified**, and provide their funds for conducting the withdrawal transaction. This operation is conditionally called lending and for it, lenders will receive a fee, depending on the current state of the supplied and borrowed balances.
 
 ## Structure
 
-- LendingToken
-- LendingEther
-- LendingErc20
+Main contracts:
+- `LendingToken`
+- `LendingEther`
+- `LendingErc20`
+- `Franklin`
 
-## LendingToken contract
+## `LendingToken` contract
 
-Этот контракт содержит только internal методы, общие для LendingEther и LendingErc20. Эти методы вызываются из публичных методов данных контрактов.
-Также контракт содержит неимплементированные методы получения и отправки денежных средств, имплементация которых зависит от того, являются данные средства Ether или ERC-20 токеном. Методы переопределены и имплементированы в соответствующих контрактах (LendingEther и LendingErc20).
+This contract contains only internal methods common to `LendingEther` and `LendingErc20`. These methods are called from public methods of these contracts.
+The contract also contains non-implementing methods for receiving and sending funds, the implementation of which depends on whether the funds are *Ether* or *ERC-20* token. Methods are redefined and implemented in the respective contracts (`LendingEther` and `LendingErc20`).
 
-## Создание контракта
+## Contract creation
 
-Конструкторы контрактов LendingEther и LendingErc20 включают в себя создание контракта LendingToken.
-Для создания контракта необходимо указать
-- адрес контракта токена (address(0) в случае Ether)
-- адрес governance контракта
-- адрес основного контракта Franklin
-- адрес контракта-верификатора
-- адрес владельца контракта
+The `LendingEther` and `LendingErc20` contract constructors include the creation of the `LendingToken` contract.
+To create a contract, you must specify:
+- token contract address (`address(0)` in case of *Ether*)
+- contract management address
+- address of `Franklin` contract
+- address of `Verifier` contract
+- address of the contract `owner`
 
-При создании контракта произойдет проверка наличия токена в governance контракте.
-Также из контракта Franklin будет получен последний верифицированный блок.
+When creating a contract, a token is checked in Governance contract.
+Also, the last **verified** block will be received from `Franklin` contract.
 
-Governor контракта governance должен будет указать адрес созданного контракта в Franklin контракте путем вызова метода addLending(tokenId, lendingAddress).
+The governor of Governance contract will need to specify the address of the created lending contract in the `Franklin` contract by calling the `addLending(tokenId, lendingAddress)` method.
 
-## Пополенение счета **кредитора**
+## **Lenders'** deposit
 
-Кредиторы могут пополнить свой Ether счет напрямую путем вызова метода LendingEther контракта supply(to) с указанием value желаемого депозита в Ether.
-Для пополнения счета в токенах ERC-20 необходимо на соответствующем контракте LendingErc20 вызвать метод supply(amount, to) с указание количества токенов amount.
-Поле *to* существует для того, чтобы пользователь при желании мог пополнять счет другого пользователя.
+Lenders can supply their *Ether* account directly by calling the `supply(to)` method of `LendingEther` contract with the value of the desired deposit in *Ether*.
+To supply the account in *ERC-20* tokens, it is necessary to call the `supply(amount, to)` method on the corresponding `LendingErc20` contract.  Value of *Ether* is specified in the transactions' value option field.
+The *to* field exists so that the user can replenish the account of another user if desired.
 
-При выполнении данных методов будет вызван внутренний метод supplyInternal(amount, to) контракта LendingToken. При этом произойдет поступление токенов ERC-20 на контракт через метод transferIn(amount) (Ether поступает без дополнительных затрат).
+When these methods are executed, the internal method `supplyInternal(amount, to)` of `LendingToken` contract, will be called. In this case, *ERC-20* tokens will be received on the contract through the `transferIn(amount)` method.
 
-Далее будут созданы соответствующие записи в mapping'ах LendingToken контракта, отражающие зачисление средств на счет пользователя (по его ethereum адресу), а также увеличение доступных для займа средств.
+Next, corresponding records will be created in the mapping of the `LendingToken` contract, reflecting the funds supplied to the user's account (by his ethereum address), as well as an increase in the funds available for lending.
 
-## Состояние счета **кредитора**
+## **Lenders'** balance
 
-Кредитор в любой момент может узнать баланс своего счета из mapping lendersSupplies, указав свой ethereum адрес в качестве ключа.
+The lender can find out the balance of his account from the lenders' supplies mapping at any time, indicating his ethereum address as a key.
 
-## Немеделенный вывод средств со счета **кредитора**
+## **Lenders'** funds withdrawal
 
-Кредитор может вывести средства со счета, привязанного к его ethereum адресу (кредитор ДОЛЖЕН владеть данным аккаунтом).
+The lender can call `requestWithdraw(amount, to)` method to withdraw his funds from his lending account (the lender MUST own this account and have enough funds on it).
 
-Для этого он вызывает метод withdraw(amount, to) на контрактах LendingEther и LendingErc20.
-Поле *to* существует для того, чтобы пользователь при желании мог вывести средства на аккаунт другого пользователя.
+In the case of a sufficient amount of non-borrowed funds on the contract, an immediate withdrawal of funds will occur.
 
-ри выполнении данных методов будет вызван внутренний метод withdrawInternal(amount, to) контракта LendingToken. Пройдут проверки на наличие на аккаунте пользователя указанной суммы, а также наличия достаточного количества средств из числа незанятых.
+Otherwise, a request for a deferred withdrawal of funds will be created.
 
-На контракте LendingToken произойдут изменения в соответствующих записях, отразающих изменение баланса пользователя, уменьшится количество доступных для займа средств. Если пользователь выводит полную сумму то его аккаунт будет удален.
+### Immediate withdrawal
 
-Для отправки средств будет вызван метод transferOut(amount, to) контрактов LendingEther или LendingErc20.
+On `LendingToken` contract, changes will occur: the change in the user's balance and the amount of funds available for the borrowing will decrease. If the user withdraws the full amount, then his account will be deleted.
 
-## Отложенный вывод средств со счета **кредитора**
+### Deferred withdrawal
 
-In progress
+The available amount of funds will be withdrawn, for a gradual automatic withdrawal of the remaining, a `DefferedWithdrawOrder` will be created. Each time the available funds will be increased, all `DefferedWithdrawOrder`s will spend these funds until all of them are fulfilled.
 
-## Запрос отправки средств **заемщиком**
+## Borrow request
 
-При наличии подтверждения поступления определенного количества средств в будущем (наличие соответствующей транзакции в одном из Committed блоков сети Franklin), пользователь данной сети может отправить запрос на контракты  LendingEther и LendingErc20 для немедленной отправки указанных средств по некоему ethereum адресу.
+If there is a **committed** block containing the withdrawal transaction with the address of this lending contract as the recipient of the withdrawal, the user can send a request for the `LendingEther` and `LendingErc20` contracts to immediately send the indicated funds to an ethereum address (he MUST be this transactions' "owner")
 
-Тем самым он займет свободные средства кредиторов. Данный долг будет погашен автоматически когда произойдет верификация указанного Franklin блока, содержащего данную транзакцию. При этом средства пользователя в сети Franklin будут изменены в результате данной транзакции на сумму, учитывающую вычет занятых средств.
+Thus, he will borrow the free funds of creditors. This debt will be repaid automatically when verification of the specified `Franklin` block containing the transaction occurs.
 
-Пользователь должен вызывать метод requestBorrow(txHash, signature, amount, borrower, receiver, blockNumber) контрактов LendingEther и LendingErc20.
-Далее будет вызван метод requestBorrowInternal контракта LendingToken, на котором произойдут необходимые проверки:
-- блок должен быть неверифицированным
-- заемная сумма должа быть положительной
-- верификация подписи должна быть успешной
-- верификация транзакции в блоке должна быть успешной (в транзакции присутствует достаточно средств в указанной валюте, а назначением платежа является аккаунт пользователя-заемщика).
+The user must call the `requestBorrow(blockNumber, requestNumber, amount, borrower, receiver, signature)` method of the `LendingEther` and` LendingErc20` contracts.
+Next, the `requestBorrowInternal` method of the contract `LendingToken` will be called, on which the necessary checks will occur:
+- the block must be unverified
+- the borrowing amount must be positive
+- signature verification must be successful
+- verification of the borrow request in the specified Franklin block must be successful (on the `Franklin` contract MUST be the corresponding request, that must contain the same number, token amount, borrower).
 
 ### Immediate borrow
 
-Если есть достаточное количество свободных средств, то произвойдет немедленный заем в методе immediateBorrow, в противном случае будет создан запрос на заем (BorrowOrder) в методе defferedBorrow.
+If there is a sufficient amount of free funds, then an immediate borrow will occur, otherwise a borrow request (`BorrowOrder`) will be created.
 
-BorrowOrder привязан к соответствующему блоку и содержит информацию о сумме средств и назначении платежа.
+`BorrowOrder` is tied to the corresponding block and contains information about the amount of funds and a payment recepient.
 
 ### Deffered borrow
 
-Кредитор может выполнить этот запрос по его идентефикатору в блоке запросов через метод fulfillOrder(blockNumber, orderId, sendingAmount, lender). Тем самым кредитор пополнит баланс своего аккаунта и заемных средств, а в результате будет вызван метод immediateBorrow, после которого запись о данном запросе будет удалена.
+The lender can fulfill this request by its identifier in the request block through the `fulfillOrder(blockNumber, orderId, sendingAmount, lender)` method. Thus, the lender will supply the balance of his account and free contract funds, and as a result, the `immediateBorrow` method will be called, after which the record of this request will be deleted.
 
 ### Borrow process
 
-В методе transferOut(amount, receiver) произойдет перечисление указанных средств с контракта по указанному адресу назначения платежа.
+In the `transferOut(amount, receiver)` method, the specified funds will be transferred from the contract to the specified withdraw destination address.
 
-Будут расчитаны комиссионные средства для каждого кредитора и владельца контракта. Зачисление комиссионных произойдет при верификации указанного блока Franklin.
+Fees for each lender and contract holder will be calculated. The fee will be credited upon verification of the specified Franklin block.
 
-Также произойдет удержание указанного количества средств из доступных средств кредиторов.
+Also, a deduction of a specified amount of funds from available funds of creditors will occur.
 
-Комиссии считаются в методе getCurrentInterestRates, который могут вызвать также кредиторы и пользователи для оценки необходимости для себя участвовать в процессе кредитования-займа.
+Fees are calculated in the `getCurrentInterestRates()` method, which lenders and users can call to determine the need for themselves to participate in the lending process.
 
-## Fulfill borrow
+## Borrow fulfillment
 
-При верификации очередного Franklin блока будут удалены запросы на займ, начислены комиссионные, а также освобождены занятые средства. Данная операция производится с контракта Franklin путем вызова метода newVerifiedBlock(blockNumber).
+Upon verification of the next `Franklin` block, its borrow orders will be deleted, fees charged, and borrowed funds released. This operation is performed from the `Franklin` contract by calling the `newVerifiedBlock (blockNumber)` method.
 
-### Repay borrow
+### Borrow repayment
 
-Средства поступят на контракт Lending через метод repayBorrow(amount) при его вызове из контракта Franklin. Данный вызов предполагается производить при верификации соответствующего Franklin блока.
+Funds will be transferred to the Lending contract through the call of `repayBorrow(amount)` method from the Franklin contract. This call is supposed to be made during verification of the corresponding `Franklin` block.
 
-## Расчет Interest Rate
+## Interest Rate calculations
 
 Utilization ratio: 
-u = totalBorrowed / (totalSupply + totatBorrowed)
+`u = totalBorrowed / (totalSupply + totatBorrowed)`
 
 Borrowing Interest Rate:
-BIR = MULTIPLIER * u + BASE_RATE
+`BIR = MULTIPLIER * u + BASE_RATE`
 
 Supply Interest Rate:
-SIR = BIR * u * (1 - SPREAD)
+`SIR = BIR * u * (1 - SPREAD)`
 
 Borrower fee:
-borrowerFee = bir * amount
+`borrowerFee = bir * amount`
 
 Lenders fees:
-lendersFees = borrowerFee * SIR
+`lendersFees = borrowerFee * SIR`
 
 Owner (Matter) fee:
-ownerFee = borrowerFee - lendersFees
+`ownerFee = borrowerFee - lendersFees`
 
 Single lender fee:
-fee = lendersFees * (lendersSupplies[lenderId] / totalSupply)
+`fee = lendersFees * (lendersSupplies[lenderId] / totalSupply)`
 
