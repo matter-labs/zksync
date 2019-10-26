@@ -18,6 +18,10 @@ contract LendingEther is LendingToken, ReentrancyGuard {
         _owner
     ) {}
 
+    function() external payable {
+        fallbackInternal();
+    }
+
     function supply(address _to) external payable nonReentrant {
         supplyInternal(msg.value, _to);
     }

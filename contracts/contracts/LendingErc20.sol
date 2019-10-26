@@ -21,6 +21,10 @@ contract LendingErc20 is LendingToken, ReentrancyGuard {
         _owner
     ) {}
 
+    function() external payable {
+        fallbackInternal();
+    }
+
     function supply(uint256 _amount, address _to) external nonReentrant {
         supplyInternal(_amount, _to);
     }

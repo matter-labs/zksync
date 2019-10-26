@@ -104,6 +104,10 @@ contract LendingToken {
         owner = _owner;
     }
 
+    function fallbackInternal() internal {
+        revert("Cant accept ether through fallback function");
+    }
+
     function supplyInternal(uint256 _amount, address _to) internal {
         transferIn(_amount);
         totalSupply = totalSupply.add(_amount);
