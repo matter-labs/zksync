@@ -5,43 +5,94 @@ import "./Franklin.sol";
 import "./Verifier.sol";
 import "./SafeMath.sol";
 
+/// @title Lending Token Contract
+/// @notice Inner logic for LendingEther and LendingErc20 token contracts
+/// @author Matter Labs
 contract LendingToken {
+
     using SafeMath for uint256;
 
-    address internal owner;
-    Token public token;
-
+    /// @notice Multiplier is used in calculation of borrowing interest rate
     uint256 constant MULTIPLIER = 45;
+
+    /// @notice Base rate is used in calculation of borrowing interest rate
     uint256 constant BASE_RATE = 5;
+
+    /// @notice Spread represents the economic profit of the protocol
     uint256 constant SPREAD = 10;
 
+    /// @notice Owner of the contract (Matter Labs)
+    address internal owner;
+
+    /// @notice verifier contract
+    Verifier internal verifier;
+
+    /// @notice governance contract
+    Governance internal governance;
+
+    /// @notice Franklin contract
+    Franklin internal franklin;
+
+    /// @notice last verified Fraklin block
     uint256 internal lastVerifiedBlock;
 
+    /// @notice total funds supply on contract
     uint256 internal totalSupply;
+
+    /// @notice total funds borrowed on contract
     uint256 internal totalBorrowed;
 
-    mapping(uint32 => address) internal lenders;
-    mapping(address => uint256) public lendersSupplies;
-    uint32 internal lendersCount;
-
-    mapping(uint32 => mapping(uint32 => FeeOrder)) public blockFeeOrders;
-    mapping(uint32 => BlockInfo) public blocksInfo;
-    mapping(uint32 => mapping(uint32 => BorrowOrder)) public blockBorrowOrders;
-
-    mapping(uint32 => DefferedWithdrawOrder) public defferedWithdrawOrders;
-    uint32 internal startDefferedWithdrawOrdersIndex;
-    uint32 internal defferedWithdrawOrdersCount;
-
-    struct DefferedWithdrawOrder {
-        uint256 amountLeft;
-        address lender;
-    }
-
+    /// @notice Container for information about this contracts' token
+    /// @member tokenAddress Token ethereum address
+    /// @member tokenId Token Franklin id
     struct Token {
         address tokenAddress;
         uint16 tokenId;
     }
 
+    /// @notice This contracts' token
+    Token public token;
+
+    /// @notice Lenders list
+    mapping(uint32 => address) internal lenders;
+
+    /// @notice Each lenders' supply
+    mapping(address => uint256) public lendersSupplies;
+
+    /// @notice Funded supply for each lender
+    uint32 internal lendersCount;
+
+    /// @notice Fee orders by Franklin block number
+    mapping(uint32 => mapping(uint32 => FeeOrder)) public blockFeeOrders;
+
+    /// @notice Franklin blocks details by its number
+    mapping(uint32 => BlockInfo) public blocksInfo;
+
+    /// @notice Borrow orders by Franklin block number
+    mapping(uint32 => mapping(uint32 => BorrowOrder)) public blockBorrowOrders;
+
+    /// @notice Deffered withdraw orders list
+    mapping(uint32 => DefferedWithdrawOrder) public defferedWithdrawOrders;
+
+    /// @notice Index of the current first (not fulfilled) deffered withdraw order
+    uint32 internal startDefferedWithdrawOrdersIndex;
+
+    /// @notice Current withdraw orders count
+    uint32 internal defferedWithdrawOrdersCount;
+
+    /// @notice Container for information about deffered withdraw order
+    /// @member amountLeft The amount that left to withdraw
+    /// @member lender Order owner
+    struct DefferedWithdrawOrder {
+        uint256 amountLeft;
+        address lender;
+    }
+
+    /// @notice Container for block details
+    /// @member feeOrdersCount Fee orders count in this block
+    /// @member borrowOrdersCount Borrow orders count in this block
+    /// @member fee Blocks' total fee amount
+    /// @member borrowed Blocks' total borrowed token amount
     struct BlockInfo {
         uint32 feeOrdersCount;
         uint32 borrowOrdersCount;
@@ -49,37 +100,48 @@ contract LendingToken {
         uint256 borrowed;
     }
 
+    /// @notice Container for information about fee order
+    /// @member fee This orders' fee
+    /// @member borrowed Fee orders' recipient (lender)
     struct FeeOrder {
         uint256 fee;
         address lender;
     }
 
+    /// @notice Container for information about borrow order
+    /// @member fee This orders' amount
+    /// @member borrowed Borrow orders' recipient (receiver)
     struct BorrowOrder {
         uint256 amount;
         address receiver;
     }
 
+    /// @notice Event emitted when a new deffered borrow is created
     event NewDefferedBorrowOrder(
         uint32 blockNumber,
         uint32 orderId,
         uint256 amount
     );
 
+    /// @notice Event emitted when a deffered borrow is fulfilled
     event FulfilledDefferedBorrowOrder(
         uint32 blockNumber,
         uint32 orderId
     );
 
+    /// @notice Event emitted when a deffered withdraw order is updated
     event UpdatedDefferedWithdrawOrder(
         uint32 orderNumber,
         address lender,
         uint256 amountLeft
     );
 
-    Verifier internal verifier;
-    Governance internal governance;
-    Franklin internal franklin;
-
+    /// @notice Construct a new token lending
+    /// @param _tokenAddress The address of the specified token
+    /// @param _governanceAddress The address of Governance contract
+    /// @param _franklinAddress The address of Franklin contract
+    /// @param _verifierAddress The address of Verifier contract
+    /// @param _owner The address of this contracts owner (Matter Labs)
     constructor(
         address _tokenAddress,
         address _governanceAddress,
@@ -104,23 +166,34 @@ contract LendingToken {
         owner = _owner;
     }
 
+    /// @notice Fallback function always reverts
     function fallbackInternal() internal {
         revert("Cant accept ether through fallback function");
     }
 
-    function supplyInternal(uint256 _amount, address _to) internal {
+    /// @dev Performs a transfer in
+    function transferIn(uint256 _amount) internal;
+
+    /// @dev Performs a transfer out
+    function transferOut(uint256 _amount, address _to) internal;
+
+    /// @notice Supplies specified amount of tokens from lender
+    /// @dev Calls transferIn function of specified token and fulfillDefferedWithdrawOrders to fulfill deffered withdraw orders
+    /// @param _amount Token amount
+    /// @param _lender Lender account address
+    function supplyInternal(uint256 _amount, address _lender) internal {
         transferIn(_amount);
         totalSupply = totalSupply.add(_amount);
-        if (lendersSupplies[_to] == 0) {
-            lenders[lendersCount] = _to;
+        if (lendersSupplies[_lender] == 0) {
+            lenders[lendersCount] = _lender;
             lendersCount++;
         }
-        lendersSupplies[_to] += _amount;
+        lendersSupplies[_lender] += _amount;
         fulfillDefferedWithdrawOrders();
     }
 
-    function transferIn(uint256 _amount) internal;
-
+    /// @notice Fulfills deffered withdraw orders
+    /// @dev The amount of supply is: totalSupply - totalBorrowed. Emits UpdatedDefferedWithdrawOrder event
     function fulfillDefferedWithdrawOrders() internal {
         uint256 amount = totalSupply - totalBorrowed;
         uint32 i = 0;
@@ -152,6 +225,10 @@ contract LendingToken {
         startDefferedWithdrawOrdersIndex += deletedOrdersCount;
     }
 
+    /// @notice Starts withdrawing process
+    /// @dev If there is enought free tokens, calls immediateWithdraw. Else calls defferedWithdraw
+    /// @param _amount Token amount
+    /// @param _to Receiver address
     function requestWithdrawInternal(uint256 _amount, address _to) internal {
         require(
             lendersSupplies[msg.sender] >= _amount,
@@ -164,6 +241,10 @@ contract LendingToken {
         }
     }
 
+    /// @notice The available amount of funds will be withdrawn through immediateWithdraw, for a gradual automatic withdrawal of the remaining, a `DefferedWithdrawOrder` will be created
+    /// @dev Emits UpdatedDefferedWithdrawOrder event
+    /// @param _amount Token amount
+    /// @param _to Receiver address
     function defferedWithdraw(uint256 _amount, address _to) internal {
         uint256 immediateAmount = totalSupply - totalBorrowed;
         require(
@@ -183,6 +264,9 @@ contract LendingToken {
         defferedWithdrawOrdersCount++;
     }
 
+    /// @notice The specified amount of funds will be withdrawn
+    /// @param _amount Token amount
+    /// @param _to Receiver address
     function immediateWithdraw(uint256 _amount, address _to) internal {
         transferOut(_amount, _to);
         totalSupply -= _amount;
@@ -201,8 +285,18 @@ contract LendingToken {
         }
     }
 
-    function transferOut(uint256 _amount, address _to) internal;
-
+    /// @notice Borrows the free funds of creditors for user to perform sending operation
+    /// @dev If there is enought free tokens, calls immediateBorrow. Else calls defferedBorrow. The necessary checks will occur:
+    /// - the block must be unverified
+    /// - the borrowing amount must be positive
+    /// - signature verification must be successful
+    /// - verification of the borrow request in the specified Franklin block must
+    /// @param _blockNumber The number of committed block with withdraw operation
+    /// @param _requestNumber Withdraw operation creates request. The user is needed to provide this number
+    /// @param _amount The borrow amount
+    /// @param _borrower Borrower address
+    /// @param _receiver Receiver address
+    /// @param _signature Borrow request signature
     function requestBorrowInternal(
         uint32 _blockNumber,
         uint32 _requestNumber,
@@ -234,6 +328,34 @@ contract LendingToken {
         }
     }
 
+    /// @notice Creates deffered BorrowOrder
+    /// @dev Emits NewDefferedBorrowOrder
+    /// @param _amount Token amount
+    /// @param _receiver Receiver address
+    /// @param _blockNumber The number of committed block with withdraw operation
+    function defferedBorrow(
+        uint256 _amount,
+        address _receiver,
+        uint32 _blockNumber
+    ) internal {
+        uint32 currentBorrowOrdersCount = blocksInfo[_blockNumber].borrowOrdersCount;
+        blockBorrowOrders[_blockNumber][currentBorrowOrdersCount] = BorrowOrder({
+            amount: _amount,
+            receiver: _receiver
+        });
+        emit NewDefferedBorrowOrder(
+            _blockNumber,
+            currentBorrowOrdersCount,
+            _amount
+        );
+        blocksInfo[_blockNumber].borrowOrdersCount++;
+    }
+
+    /// @notice Sends borrowed funds to receiver
+    /// @dev Creates FeeOrder that will be used to provide fees to lenders when the block is verified
+    /// @param _amount Token amount
+    /// @param _receiver Receiver address
+    /// @param _blockNumber The number of committed block with withdraw operation
     function immediateBorrow(
         uint256 _amount,
         address _receiver,
@@ -262,40 +384,34 @@ contract LendingToken {
         totalBorrowed += _amount-ownerFee-lendersFees;
     }
 
+    /// @notice Calculates lenders and owner fees
+    /// @param _amount Token amount
+    /// @return Lenders fees and owner fee
     function calculateFees(uint256 _amount) internal returns (uint256 _lendersFees, uint256 _ownerFee) {
-        // TODO: - safe math
         (uint256 bir, uint256 sir) = getCurrentInterestRatesInternal();
         uint256 borrowerFee = bir * _amount;
         _lendersFees = borrowerFee * sir;
         _ownerFee = borrowerFee - lendersFees;
     }
 
+    /// @notice Calculates current interest rates
+    /// @return Borrowing and supply interest rates
     function getCurrentInterestRatesInternal() internal pure returns (uint256 _borrowing, uint256 _supply) {
-        // TODO: - safe math
         uint256 u = totalBorrowed / (totalSupply + totatBorrowed);
         _borrowing = MULTIPLIER * u + BASE_RATE;
         _supply = _borrowing * u * (1 - SPREAD);
     }
 
-    function defferedBorrow(
-        uint256 _amount,
-        address _receiver,
-        uint32 _blockNumber
-    ) internal {
-        uint32 currentBorrowOrdersCount = blocksInfo[_blockNumber].borrowOrdersCount;
-        blockBorrowOrders[_blockNumber][currentBorrowOrdersCount] = BorrowOrder({
-            amount: _amount,
-            receiver: _receiver
-        });
-        emit NewDefferedBorrowOrder(
-            _blockNumber,
-            currentBorrowOrdersCount,
-            _amount
-        );
-        blocksInfo[_blockNumber].borrowOrdersCount++;
-    }
-
-    function fulfillOrderInternal(
+    /// @notice Fulfills deffered borrow order
+    /// @dev Calls supplyInternal and immediateBorrow. Emits FulfilledDefferedBorrowOrder. The necessary checks will occur:
+    /// - the block must be unverified
+    /// - order id must be less than borrow orders count in this block
+    /// - sending amount must be more or equal to order amount
+    /// @param _blockNumber The number of committed block with withdraw operation
+    /// @param _orderId Specified order id
+    /// @param _sendingAmount Specified amount
+    /// @param _lender Lender address
+    function fulfillDefferedBorrowOrderInternal(
         uint32 _blockNumber,
         uint32 _orderId,
         uint256 _sendingAmount,
@@ -326,6 +442,8 @@ contract LendingToken {
         );
     }
 
+    /// @notice Called by Franklin contract when a new block is verified. Removes this blocks' orders and consummates fees
+    /// @param _blockNumber The number of committed block with withdraw operation
     function newVerifiedBlockInternal(uint32 _blockNumber) internal {
         requireFranklin();
         lastVerifiedBlock = _blockNumber;
@@ -335,6 +453,9 @@ contract LendingToken {
         delete blockFeeOrders[_blockNumber];
     }
 
+    /// @notice Consummates block fees, frees borrowed funds
+    /// @dev Calls fulfillDefferedWithdrawOrders
+    /// @param _blockNumber The number of committed block with withdraw operation
     function consummateBlockFees(uint32 _blockNumber) internal {
         for (uint32 i = 0; i < blocksInfo[_blockNumber].feeOrdersCount; i++) {
             address feeOrder = blockFeeOrders[_blockNumber][i];
@@ -349,12 +470,14 @@ contract LendingToken {
         fulfillDefferedWithdrawOrders();
     }
 
+    /// @notice Called by Franklin contract to provide borrowed fees from withdraw operation
+    /// @param _amount The amount specified in withdraw operation
     function repayBorrowInternal(uint256 _amount) internal {
         requireFranklin();
         transferIn(_amount);
     }
 
-    // Check if the sender is franklin contract
+    /// @notice Check if the sender is franklin contract
     function requireFranklin() internal view {
         require(
             msg.sender == franklinAddress,

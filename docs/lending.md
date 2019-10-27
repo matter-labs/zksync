@@ -36,7 +36,7 @@ The governor of Governance contract will need to specify the address of the crea
 
 Lenders can supply their *Ether* account directly by calling the `supply(to)` method of `LendingEther` contract with the value of the desired deposit in *Ether*.
 To supply the account in *ERC-20* tokens, it is necessary to call the `supply(amount, to)` method on the corresponding `LendingErc20` contract.  Value of *Ether* is specified in the transactions' value option field.
-The *to* field exists so that the user can replenish the account of another user if desired.
+The *to* field exists so that the user can supply to the account of another user if desired.
 
 When these methods are executed, the internal method `supplyInternal(amount, to)` of `LendingToken` contract, will be called. In this case, *ERC-20* tokens will be received on the contract through the `transferIn(amount)` method.
 
