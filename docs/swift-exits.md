@@ -10,7 +10,7 @@ Main contracts:
 - `SwiftExitsInternal` - contains the main internal landing methods that are responsible for the operation of the entire swift exits system, the processing of transaction, as well as for the storage of validators funds. This contract contains only internal methods common for `SwiftExitsEther` and `SwiftExitsErc20`. These methods are called from public methods of these contracts. The contract also contains non-implementing methods for receiving and sending funds, the implementation of which depends on whether the funds are *Ether* or *ERC-20* token. Methods are redefined and implemented in the respective contracts (`SwiftExitsEther` and `SwiftExitsErc20`).
 - `SwiftExitsEther` - wraps an underlying `SwiftExitsInternal`, provides an interface for Ether transactions
 - `SwiftExitsErc20` - wraps an underlying `SwiftExitsInternal`, provides an interface for ERC-20 tokens transactions
-- `Franklin` - the main rollup contract, it processes withdraw operations
+- `Rollup` - the main rollup contract, it processes withdraw operations
 
 ## Contract creation
 
@@ -18,14 +18,14 @@ The `SwiftExitsEther` and `SwiftExitsErc20` contract constructors include the cr
 To create a contract, you must specify:
 - token contract address (`address(0)` in case of *Ether*)
 - contract management address
-- address of `Franklin` contract
+- address of `Rollup` contract
 - address of `BlsVerifier` contract
 - address of the contract `owner`
 
 When creating a contract, a token is checked in Governance contract.
-Also, the last **verified** block will be received from `Franklin` contract.
+Also, the last **verified** block will be received from `Rollup` contract.
 
-The governor of Governance contract will need to specify the address of the created `SwiftExitsInternal` contract in the `Franklin` contract by calling the `addSwiftExits(tokenId, lendingAddress)` method.
+The governor of Governance contract will need to specify the address of the created `SwiftExitsInternal` contract in the `Rollup` contract by calling the `addSwiftExits(tokenId, lendingAddress)` method.
 
 ## **Validators'** deposit
 
@@ -61,11 +61,11 @@ The available amount of funds will be withdrawn, for a gradual automatic withdra
 
 The user can create and sign a request for a swift exit for his withdraw operation. Validators can verify the user's signature, as well as to sign this request themselves. When the required number of signatures is collected (2/3 of the total number of validators), they are aggregated and validated on the contract.
 
-After that, on `Franklin` contract specified recipient balance will be reduced by the operation amount. So after validating the block with this operation, the total amount for it is equal to 0.
+After that, on `Rollup` contract specified recipient balance will be reduced by the operation amount. So after validating the block with this operation, the total amount for it is equal to 0.
 
 Depending on the amount of free funds on the `SwiftExitsInternal` contract, there will be created an Immediate exit request or Deffered exit request.
 
-Thus, the user will borrow the free funds of validators. This debt will be repaid automatically when verification of the specified `Franklin` block containing the operation occurs. The full amount of this operation will be sent from `Franklin` contract to `SwiftExitsInternal` contract to cover costs and accrue validators fees.
+Thus, the user will borrow the free funds of validators. This debt will be repaid automatically when verification of the specified `Rollup` block containing the operation occurs. The full amount of this operation will be sent from `Rollup` contract to `SwiftExitsInternal` contract to cover costs and accrue validators fees.
 
 ### Immediate exit
 
@@ -81,7 +81,7 @@ The validator can fulfill `SwiftExitOrder` request by its identifier in the requ
 
 In the `transferOut(amount, receiver)` method, the specified funds will be transferred from the contract to the specified withdraw destination address.
 
-Fees for each validator and contract holder will be calculated. The fee will be credited upon verification of the specified `Franklin` block.
+Fees for each validator and contract holder will be calculated. The fee will be credited upon verification of the specified `Rollup` block.
 
 Also, a deduction of a specified amount of funds from available funds of creditors will occur.
 
@@ -89,11 +89,11 @@ Fees are calculated in the `getCurrentInterestRates()` method, which validators 
 
 ## Swift exit fulfillment
 
-Upon verification of the next `Franklin` block, its borrow orders will be deleted, fees charged, and borrowed funds released. This operation is performed from the `Franklin` contract by calling the `newVerifiedBlock (blockNumber)` method.
+Upon verification of the next `Rollup` block, its borrow orders will be deleted, fees charged, and borrowed funds released. This operation is performed from the `Rollup` contract by calling the `newVerifiedBlock (blockNumber)` method.
 
 ### Swift exit repayment
 
-Funds will be transferred to the SwiftExits contract through the call of `repayBorrow(amount)` method from the Franklin contract. This call is supposed to be made during verification of the corresponding `Franklin` block.
+Funds will be transferred to the SwiftExits contract through the call of `repayBorrow(amount)` method from the Rollup contract. This call is supposed to be made during verification of the corresponding `Rollup` block.
 
 ## Interest Rate calculations
 
