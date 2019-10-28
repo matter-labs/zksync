@@ -1,11 +1,11 @@
 <template>
     <span class="operationButtonContainer ml-3">
-        <a href="#" 
+        <b-button
             v-if="completionStatus == 'not clicked'"
             variant="primary" 
-            class="w-100"
+            size="sm"
             @click="completeOperation"
-            >Complete {{ op.operation }} {{ op.token.symbol }} {{ op.amountRenderable }}</a>
+            >Complete {{ op.operation }} {{ op.token.symbol }} {{ op.amountRenderable }}</b-button>
         <img v-else-if="completionStatus == 'loading'" style="margin-right: 1.5em" src="../assets/loading.gif" width="50em">
         <span v-else>{{ completionStatus }}</span>
     </span>
