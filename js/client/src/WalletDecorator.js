@@ -452,10 +452,12 @@ export class WalletDecorator {
                 let erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.wallet.ethWallet);
                 let allowance = await erc20DeployedToken.allowance(this.ethAddress, config.CONTRACT_ADDR);
                 if (allowance.toString().length != NUMERIC_LIMITS_UINT_256.length) {
-                    await this.wallet.approveERC20(token, NUMERIC_LIMITS_UINT_256);
+                    let nonce = await this.wallet.ethWallet.getTransactionCount();
+                    this.wallet.approveERC20(token, NUMERIC_LIMITS_UINT_256, { nonce });
+                    eth_tx = await this.wallet.depositApprovedERC20(token, amount, { nonce: nonce + 1});
+                } else {
+                    eth_tx = await this.wallet.depositApprovedERC20(token, amount);
                 }
-
-                eth_tx = await this.wallet.depositApprovedERC20(token, amount);
             }
 
             const tx_hash_html = shortenedTxHash(eth_tx.hash);

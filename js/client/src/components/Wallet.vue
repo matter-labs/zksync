@@ -94,7 +94,7 @@ export default {
         },
         async showVerboseOperation(generator) {
             this.store.pendingTransactionGenerators.push({
-                id: `verbose_shower_${this.store.verboseOperationId++}`,
+                id: `verbose_verboseOp_${this.store.verboseOperationId++}`,
                 generator: new GeneratorMultiplierMinTime(generator),
             });
         },

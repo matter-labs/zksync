@@ -32,8 +32,8 @@
                 <Alert class="w-100 m-0" style="position: absolute; top: -1.3em;" ref="alert"></Alert>
             </b-row>
             <div style="min-height: 1.5em;">
-                <b-row class="px-3 py-0 my-0" v-for="shower in store.pendingTransactionGenerators" :key="shower.id" :id="shower.id">
-                    <AlertWithProgressBar :shower="shower"></AlertWithProgressBar>
+                <b-row class="px-3 py-0 my-0" v-for="verboseOp in store.pendingTransactionGenerators" :key="verboseOp.id" :id="verboseOp.id">
+                    <AlertWithProgressBar :verboseOp="verboseOp"></AlertWithProgressBar>
                 </b-row>
             </div>
             <b-row class="px-0 mt-0">
