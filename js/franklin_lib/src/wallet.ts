@@ -360,6 +360,28 @@ export class Wallet {
         return frankinWallet;
     }
 
+    async getBalancesToWithdraw() {
+        let franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
+        let tokens = await this.provider.getTokens();
+        let amounts = tokens
+            .map(async token => {
+                let amount = await franklinDeployedContract.balancesToWithdraw(this.ethAddress, token.id);
+                return { token, amount };
+            });
+        return await Promise.all(amounts);
+    }
+
+    async getAllowancesForAllTokens() {
+        let tokens = await this.provider.getTokens();
+        tokens.shift(); // skip ETH
+        let allowances = tokens.map(async token => {
+            let erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
+            let amount = await erc20DeployedToken.allowance(this.ethAddress, this.provider.contractAddress);
+            return { token, amount };
+        });
+        return await Promise.all(allowances);
+    }
+
     async fetchEthState() {
         let onchainBalances = new Array<BigNumber>(this.supportedTokens.length);
         let contractBalances = new Array<BigNumber>(this.supportedTokens.length);

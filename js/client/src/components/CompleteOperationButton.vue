@@ -6,7 +6,7 @@
             class="w-100"
             @click="completeOperation"
             >Complete {{ op.operation }} {{ op.token.symbol }} {{ op.amountRenderable }}</a>
-        <img v-else-if="completionStatus == 'loading'" style="margin-right: 1.5em" src="../assets/loading.gif" width="100em">
+        <img v-else-if="completionStatus == 'loading'" style="margin-right: 1.5em" src="../assets/loading.gif" width="50em">
         <span v-else>{{ completionStatus }}</span>
     </span>
 </template>
@@ -16,32 +16,14 @@ export default {
     name: 'CompleteOperationButton',
     props: ['op'],
     data: () => ({
-        completionStatus: 'not clicked',
+        completionStatus: null,
     }),
     created() {
-        let status = this.store.withdrawCompletionStatusDict[this.op.hash];
-        if (status != undefined) {
-            this.completionStatus = status;
-        }
+        this.completionStatus = this.op.status || 'not clicked';
     },
     methods: {
         async completeOperation() {
-            this.completionStatus = 'Sending operation...';
-            this.store.withdrawCompletionStatusDict[this.op.hash] = 'Sending operation...';
-            try {
-                await window.walletDecorator.completeWithdraw(this.op.token, this.op.amount, this.op.hash);
-                this.completionStatus = 'Success';
-                this.store.withdrawCompletionStatusDict[this.op.hash] = 'Success';
-                this.$emit('completionSuccess', { uniq_id: this.op.uniq_id });
-            } catch (e) {
-                console.log('error in CompleteOperationButton:', e);
-                this.completionStatus = 'Something went wrong..';
-                this.store.withdrawCompletionStatusDict[this.op.hash] = 'Something went wrong..';
-                setTimeout(() => {
-                    delete this.store.withdrawCompletionStatusDict[this.op.hash];
-                    this.completionStatus = 'not clicked';
-                }, 2000);
-            }
+            this.$emit('withdrawOnchainEvent', this.op);
         },
     },
 }

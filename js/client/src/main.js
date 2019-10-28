@@ -14,7 +14,6 @@ Vue.use(BootstrapVue);
 const store = {
     pendingTransactionGenerators: [],
     verboseOperationId: 0,
-    withdrawCompletionStatusDict: {},
 };
 
 Vue.mixin({

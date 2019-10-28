@@ -62,27 +62,6 @@ function stop_progress_bar() {
 }
 // #endregion
 
-// #region 
-function addPendingWithdrawOffchainOperation(opInfo, opHash) {
-    let storedOps = JSON.parse(window.localStorage.getItem('pendingWithdrawOps') || '{}');
-    opInfo.pendingStatus = 'not started';
-    storedOps[opHash] = opInfo;
-    window.localStorage.setItem('pendingWithdrawOps', JSON.stringify(storedOps));
-}
-
-function setPendingWithdrawOffchainOperationStatus(opHash, new_status) {
-    let storedOps = JSON.parse(window.localStorage.getItem('pendingWithdrawOps') || '{}');
-    storedOps[opHash].pendingStatus = new_status;
-    window.localStorage.setItem('pendingWithdrawOps', JSON.stringify(storedOps));
-}
-
-function removePendingWithdrawOffchainOperation(opHash) {
-    let storedOps = JSON.parse(window.localStorage.getItem('pendingWithdrawOps') || '{}');
-    delete storedOps[opHash];
-    window.localStorage.setItem('pendingWithdrawOps', JSON.stringify(storedOps));
-}
-// #endregion
-
 function shortenedTxHash(tx_hash) {
     return `<code class="clickable copyable" data-clipboard-text="${tx_hash}">
                 ${ tx_hash.substr(0, 10) }
@@ -281,18 +260,8 @@ export class WalletDecorator {
 
         return await Promise.all(res);
     }
-    async allowancesForAllTokens() {
-        let tokens = await this.wallet.provider.getTokens();
-        tokens.shift(); // skip ETH
-        let allowances = tokens.map(async token => {
-            let erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.wallet.ethWallet);
-            let amount = await erc20DeployedToken.allowance(this.ethAddress, config.CONTRACT_ADDR);
-            return { token, amount };
-        });
-        return await Promise.all(allowances);
-    }
     async pendingDepositsAsRenderableList() {
-        let allowances = await this.allowancesForAllTokens();
+        let allowances = await this.wallet.getAllowancesForAllTokens();
         return allowances
             .map(a => ({
                 token: a.token,
@@ -306,21 +275,39 @@ export class WalletDecorator {
                 return op;
             });
     }
-    pendingWithdrawsAsRenderableList() {
-        return [window.localStorage.getItem('pendingWithdrawOps') || "{}"]
-            .map(JSON.parse)
-            .map(Object.entries)
-            .pop()
-            .map(([hash, op], i) => {
-                op.hash = hash;
+    
+    setPendingWithdrawStatus(withdrawTokenId, status) {
+        let withdrawsStatusesDict = JSON.parse(localStorage.getItem('withdrawsStatusesDict') || "{}");
+        withdrawsStatusesDict[withdrawTokenId] = status;
+        localStorage.setItem('withdrawsStatusesDict', JSON.stringify(withdrawsStatusesDict));
+    }
+    removePendingWithdraw(withdrawTokenId) {
+        let withdrawsStatusesDict = JSON.parse(localStorage.getItem('withdrawsStatusesDict') || "{}");
+        delete withdrawsStatusesDict[withdrawTokenId];
+        localStorage.setItem('withdrawsStatusesDict', JSON.stringify(withdrawsStatusesDict));
+    }
+    getWithdrawsStatusesDict(withdrawTokenId) {
+        return JSON.parse(localStorage.getItem('withdrawsStatusesDict') || "{}")[withdrawTokenId];
+    }
+    async pendingWithdrawsAsRenderableList() {
+        let balances = await this.wallet.getBalancesToWithdraw();
+        return balances
+            .map(a => ({
+                token: a.token,
+                amount: a.amount.toString()
+            }))
+            .filter(bal => bal.token.symbol == 'ETH' ? bal.amount.length > 15 : bal.amount != '0')
+            .map((op, i) => {
                 op.operation = 'Withdraw';
+                op.uniq_id = `${op.token.id}`,
                 op.elem_id = `pendingWithdraw_${i}`;
                 op.amountRenderable = readableEther(op.amount);
+                op.status = this.getWithdrawsStatusesDict(op.uniq_id);
                 return op;
             });
     }
-    pendingOperationsAsRenderableList() {
-        return this.pendingWithdrawsAsRenderableList();
+    async pendingOperationsAsRenderableList() {
+        return await this.pendingWithdrawsAsRenderableList();
     }
     onchainBalancesAsRenderableList() {
         return this.wallet.ethState.onchainBalances
@@ -375,11 +362,6 @@ export class WalletDecorator {
     // #endregion
 
     // #region actions
-    async completeWithdraw(token, amount, hash) {
-        await this.wallet.widthdrawOnchain(token, amount);
-        removePendingWithdrawOffchainOperation(hash);
-    }
-
     async * verboseTransfer(options) {
         let token = this.tokenFromName(options.token);
         let amount = bigNumberify(options.amount);
@@ -404,37 +386,50 @@ export class WalletDecorator {
         }
     }
 
-    async * verboseWithdraw(options) {
+    async * verboseWithdrawOffchain(options) {
         let token = this.tokenFromName(options.token);
         let amount = bigNumberify(options.amount);
         let fee = bigNumberify(options.fee);
 
         try {
-            yield info(`Sending withdraw...`);    
+            yield info(`Sending withdraw...`);
 
             let fra_tx = await this.wallet.widthdrawOffchain(token, amount, fee);
+            this.removePendingWithdraw(`${token.id}`);
             
-            let optionsForPendingWithdraw = {
-                token: token,
-                amount: amount.toString(),
-            };
-            addPendingWithdrawOffchainOperation(optionsForPendingWithdraw, fra_tx.hash);
-    
             if (fra_tx.err) {
                 yield error(`Offchain withdraw failed with ${fra_tx.err}`);
                 return;
             }
-            
-            yield info(`Sent withdraw to Matter server`);
-            yield * this.verboseGetFranklinOpStatus(fra_tx.hash);
-    
-            let eth_tx = await this.wallet.widthdrawOnchain(token, amount);
-            removePendingWithdrawOffchainOperation(fra_tx.hash);
 
+            yield * this.verboseGetFranklinOpStatus(fra_tx.hash);
+
+            yield info(`Offchain withdraw succeeded!`);
+        } catch (e) {
+            yield combineMessages(
+                error('Withdraw failed with ', e.message, { timeout: 7 }),
+            );
+            return;
+        }
+    }
+
+    async * verboseWithdrawOnchain(options) {
+        let token = options.token
+        let amount = bigNumberify(options.amount);
+
+        try {
+            this.setPendingWithdrawStatus(`${token.id}`, 'loading');
+
+            yield info(`Completing withdraw...`);
+            let eth_tx = await this.wallet.widthdrawOnchain(token, amount);
+            
+            this.setPendingWithdrawStatus(`${token.id}`, 'hidden');
+            
             await eth_tx.wait(2);
             yield * this.verboseGetRevertReason(eth_tx.hash);
     
             yield info(`Withdraw succeeded!`);
+            this.removePendingWithdraw(`${token.id}`);
         } catch (e) {
             yield combineMessages(
                 error('Withdraw failed with ', e.message, { timeout: 7 }),

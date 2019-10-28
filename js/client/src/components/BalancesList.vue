@@ -16,9 +16,9 @@
                 <template v-slot:cell(amount)="data">
                     <span style="vertical-align: middle;"> {{ data.item.amount }} </span>
                     <CompleteOperationButton
-                        v-if="data.item.op"
+                        v-if="data.item.op && data.item.op.status != 'hidden'"
                         :op="data.item.op"
-                        v-on:completionSuccess="updatePendingOps"
+                        v-on:withdrawOnchainEvent="withdrawOnchainEvent"
                         ></CompleteOperationButton>
                 </template>
             </b-table>
@@ -28,7 +28,8 @@
 
 <script>
 import { ethers } from 'ethers';
-import { readableEther, getDisplayableBalanceList } from '../utils';
+import { readableEther, getDisplayableBalanceList, sleep } from '../utils';
+
 import TokenNameButton from './TokenNameButton.vue';
 import CopyableAddress from './CopyableAddress.vue';
 import CompleteOperationButton from './CompleteOperationButton.vue';
@@ -48,19 +49,21 @@ export default {
             'amount'
         ],
         displayableBalances: [],
-        pendingOps: null,
     }),
     props: [
         // balances are like [{ tokenName: 'eth', amount: '120' }]
         'balances',
-        'balanceListId'
+        'balanceListId',
+        'pendingOps',
     ],
     created() {
         this.updateBalanceList();
-        this.updatePendingOps();
     },
     watch: {
         balances() {
+            this.updateBalanceList();
+        },
+        pendingOps() {
             this.updateBalanceList();
         },
     },
@@ -72,12 +75,15 @@ export default {
         },
     },
     methods: {
+        async withdrawOnchainEvent(options) {
+            this.$emit('withdrawOnchainEvent', options);
+        },
         updateBalanceList() {
             if (this.balances != null) {
                 this.displayableBalances = getDisplayableBalanceList(this.balances);
             }
 
-            if (this.pendingOps != null) {
+            if (this.pendingOps != null && this.pendingOps.length) {
                 let pendingOpsIndex = this.pendingOps
                     .reduce((acc, op) => {
                         acc[op.token.address] = op;
@@ -92,9 +98,6 @@ export default {
                         return bal;
                     });
             }
-        },
-        updatePendingOps() {
-            this.pendingOps = window.walletDecorator.pendingOperationsAsRenderableList();
         },
     },
     components,

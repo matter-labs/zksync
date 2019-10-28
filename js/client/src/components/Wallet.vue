@@ -2,7 +2,13 @@
 <b-container>
     <b-row>
         <b-col xl="6" class="pr-3">
-            <BalancesList class="mb-1" balanceListId="onchain" :balances="onchainBalances"></BalancesList>
+            <BalancesList 
+                class="mb-1" 
+                balanceListId="onchain" 
+                :balances="onchainBalances"
+                :pendingOps="pendingOps"
+                v-on:withdrawOnchainEvent="withdrawOnchain"
+                ></BalancesList>
             <DepositButtons
                 componentId="offchain"
                 :topBalances="onchainBalances" 
@@ -10,7 +16,7 @@
                 :depositFeeNeeded="false"
                 :withdrawFeeNeeded="true"
                 v-on:depositEvent="deposit"
-                v-on:withdrawEvent="withdraw"
+                v-on:withdrawEvent="withdrawOffchain"
                 ></DepositButtons>
             <FranklinBalancesList class="mt-1" 
                 balanceListId="franklin" 
@@ -77,8 +83,11 @@ export default {
         async deposit(options) {
             await this.showVerboseOperation(window.walletDecorator.verboseDeposit(options));
         },
-        async withdraw(options) {
-            await this.showVerboseOperation(window.walletDecorator.verboseWithdraw(options));
+        async withdrawOffchain(options) {
+            await this.showVerboseOperation(window.walletDecorator.verboseWithdrawOffchain(options));
+        },
+        async withdrawOnchain(options) {
+            await this.showVerboseOperation(window.walletDecorator.verboseWithdrawOnchain(options));
         },
         async transfer(options) {
             await this.showVerboseOperation(window.walletDecorator.verboseTransfer(options));
