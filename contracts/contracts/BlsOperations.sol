@@ -185,9 +185,16 @@ library BlsOperations {
     }
 
     function modPow(uint256 base, uint256 exponent, uint256 modulus) internal view returns (uint256) {
-        uint256[6] memory input = [32, 32, 32, base, exponent, modulus];
         uint256[1] memory result;
         assembly {
+            let input := mload(0x40)
+            mstore(input, 0x20)
+            mstore(add(input, 0x20), 0x20)
+            mstore(add(input, 0x40), 0x20)
+            mstore(add(input, 0x60), base)
+            mstore(add(input, 0x80), exponent)
+            mstore(add(input, 0xa0), modulus)
+            let value := mload(0xc0)
             if iszero(
                 staticcall(
                     sub(gas, 2000),
@@ -231,7 +238,7 @@ library BlsOperations {
     // }
 
     function negate(G1Point memory _point) internal pure returns (G1Point memory) {
-        uint256 field_modulus = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        uint256 field_modulus = BN256G2.fieldModulus();
         if (_point.x == 0 && _point.y == 0) {
             return G1Point(0, 0);
         }
