@@ -24,6 +24,7 @@ export default {
     methods: {
         async completeOperation() {
             this.$emit('withdrawOnchainEvent', this.op);
+            completionStatus = 'loading';
         },
     },
 }
