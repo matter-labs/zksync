@@ -9,7 +9,7 @@ import "./SafeMath.sol";
 /// @notice Inner logic for LendingEther and LendingErc20 token contracts
 /// @author Matter Labs
 contract LendingToken {
-
+    
     using SafeMath for uint256;
 
     /// @notice Multiplier is used in calculation of borrowing interest rate
@@ -109,9 +109,11 @@ contract LendingToken {
     }
 
     /// @notice Container for information about borrow order
+    /// @member onchainOpNumber Onchain op number
     /// @member fee This orders' amount
     /// @member borrowed Borrow orders' recipient (receiver)
     struct BorrowOrder {
+        uint64 onchainOpNumber;
         uint256 amount;
         address receiver;
     }
@@ -291,15 +293,13 @@ contract LendingToken {
     /// - the borrowing amount must be positive
     /// - signature verification must be successful
     /// - verification of the borrow request in the specified Franklin block must
-    /// @param _blockNumber The number of committed block with withdraw operation
-    /// @param _requestNumber Withdraw operation creates request. The user is needed to provide this number
+    /// @param _onchainOpNumber Franklin onchain operation number
     /// @param _amount The borrow amount
-    /// @param _borrower Borrower address
+    /// @param _borrower Borrower id
     /// @param _receiver Receiver address
     /// @param _signature Borrow request signature
     function requestBorrowInternal(
-        uint32 _blockNumber,
-        uint32 _requestNumber,
+        uint64 _onchainOpNumber,
         uint256 _amount,
         uint24 _borrower,
         address _receiver,
@@ -314,55 +314,53 @@ contract LendingToken {
             "ltrl12"
         ); // "ltrl12" - zero amount
         require(
-            verifier.verifyBorrowSignature(_txNumber, _signature),
+            verifier.verifyBorrowSignature(_signature), // TODO: !!!!!
             "ltrl13"
         ); // "ltrl13" - wrong signature
         require(
-            franklin.verifyBorrowRequest(_blockNumber, _requestNumber, _borrower, token.tokenId, _amount),
+            franklin.verifyBorrowRequest(_onchainOpNumber, _borrower, _receiver, token.tokenId, _amount),
             "ltrl14"
         ); // "ltrl14" - wrong tx
+        BorrowOrder order = BorrowOrder({
+            onchainOpNumber: _onchainOpNumber,
+            amount: _amount,
+            receiver: _receiver
+        });
         if (_amount <= (totalSupply - totalBorrowed)) {
-            immediateBorrow(_amount, _receiver, _blockNumber);
+            immediateBorrow(_blockNumber, order);
         } else {
-            defferedBorrow(_amount, _receiver, _blockNumber);
+            defferedBorrow(_blockNumber, order);
         }
     }
 
     /// @notice Creates deffered BorrowOrder
     /// @dev Emits NewDefferedBorrowOrder
-    /// @param _amount Token amount
-    /// @param _receiver Receiver address
     /// @param _blockNumber The number of committed block with withdraw operation
+    /// @param _order Borrow order
     function defferedBorrow(
-        uint256 _amount,
-        address _receiver,
-        uint32 _blockNumber
+        uint32 _blockNumber,
+        BorrowOrder _order
     ) internal {
         uint32 currentBorrowOrdersCount = blocksInfo[_blockNumber].borrowOrdersCount;
-        blockBorrowOrders[_blockNumber][currentBorrowOrdersCount] = BorrowOrder({
-            amount: _amount,
-            receiver: _receiver
-        });
+        blockBorrowOrders[_blockNumber][currentBorrowOrdersCount] = _order;
         emit NewDefferedBorrowOrder(
             _blockNumber,
             currentBorrowOrdersCount,
-            _amount
+            _order.amount
         );
         blocksInfo[_blockNumber].borrowOrdersCount++;
     }
 
-    /// @notice Sends borrowed funds to receiver
+    /// @notice Sends borrowed funds to receiver. Changes Franklin withdraw op type to lending type
     /// @dev Creates FeeOrder that will be used to provide fees to lenders when the block is verified
-    /// @param _amount Token amount
-    /// @param _receiver Receiver address
     /// @param _blockNumber The number of committed block with withdraw operation
+    /// @param _order Borrow order
     function immediateBorrow(
-        uint256 _amount,
-        address _receiver,
-        uint32 _blockNumber
+        uint32 _blockNumber,
+        BorrowOrder _order
     ) internal {
-        (uint256 lendersFees, uint256 ownerFee) = calculateFees(_amount);
-        transferOut((_amount-ownerFee-lendersFees), _receiver);
+        (uint256 lendersFees, uint256 ownerFee) = calculateFees(_order.amount);
+        transferOut((_order.amount-ownerFee-lendersFees), _order.receiver);
         for (uint32 i = 0; i <= lendersCount; i++) {
             uint32 currentFeeOrdersCount = blocksInfo[_blockNumber].feeOrdersCount;
             blockFeeOrders[_blockNumber][currentFeeOrdersCount] = FeeOrder({
@@ -378,10 +376,12 @@ contract LendingToken {
         });
         blocksInfo[_blockNumber].feeOrdersCount++;
 
-        blocksInfo[_blockNumber].borrowed += _amount-ownerFee-lendersFees;
+        blocksInfo[_blockNumber].borrowed += _order.amount-ownerFee-lendersFees;
         blocksInfo[_blockNumber].fee += ownerFee+lendersFees;
 
-        totalBorrowed += _amount-ownerFee-lendersFees;
+        totalBorrowed += _order.amount-ownerFee-lendersFees;
+
+        franklin.withdrawOpToLending(token.tokenId, _order.onchainOpNumber);
     }
 
     /// @notice Calculates lenders and owner fees
@@ -431,8 +431,7 @@ contract LendingToken {
         ); // "ltfl13" - wrong amount
         supplyInternal(_sendingAmount, _lender);
         immediateBorrow(
-            blockBorrowOrders[_blockNumber][_orderId].amount,
-            blockBorrowOrders[_blockNumber][_orderId].receiver,
+            blockBorrowOrders[_blockNumber][_orderId],
             _blockNumber
         );
         delete blockBorrowOrders[_blockNumber][_orderId];
@@ -442,7 +441,7 @@ contract LendingToken {
         );
     }
 
-    /// @notice Called by Franklin contract when a new block is verified. Removes this blocks' orders and consummates fees
+    /// @notice Calls by Franklin contract when a new block is verified. Removes this blocks' orders and consummates fees
     /// @param _blockNumber The number of committed block with withdraw operation
     function newVerifiedBlockInternal(uint32 _blockNumber) internal {
         requireFranklin();
@@ -470,7 +469,7 @@ contract LendingToken {
         fulfillDefferedWithdrawOrders();
     }
 
-    /// @notice Called by Franklin contract to provide borrowed fees from withdraw operation
+    /// @notice Calls by Franklin contract to provide borrowed fees from withdraw operation
     /// @param _amount The amount specified in withdraw operation
     function repayBorrowInternal(uint256 _amount) internal {
         requireFranklin();

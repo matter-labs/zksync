@@ -140,7 +140,7 @@ contract Franklin {
     // Blocks by Franklin block id
     mapping(uint32 => Block) public blocks;
 
-    // Types of franklin operations in blocks
+    // Types of franklin operations in blocks. Lending is separate type
     enum OpType {
         Noop,
         Deposit,
@@ -148,7 +148,8 @@ contract Franklin {
         PartialExit,
         CloseAccount,
         Transfer,
-        FullExit
+        FullExit,
+        Lending
     }
 
     // Onchain operations -- processed inside blocks (see docs)
@@ -189,9 +190,6 @@ contract Franklin {
 
     // // Lendings
     mapping(uint16 => address) internal ledingsAddresses;
-    mapping(address => bool) internal areLendings;
-    mapping(uint32 => mapping(uint32 => BorrowRequest)) public borrowRequests;
-    mapping(uint32 => uint32) borrowRequestsCountInBlocks;
 
     struct BorrowRequest{
         bool processed;
@@ -200,12 +198,9 @@ contract Franklin {
         uint128 amount;
     }
 
-    event NewBorrowRequest(
-        uint32 indexed blockNumber,
-        uint32 indexed requestNumber,
-        uint24 indexed from,
-        uint16 tokenId,
-        uint128 amount
+    event WithdrawAvailableForBorrow(
+        uint64 index,
+        bytes pubData
     );
 
     // MARK: - CONSTRUCTOR
@@ -620,7 +615,7 @@ contract Franklin {
                 OpType.PartialExit,
                 pubData
             );
-            appendBorrowRequestIfNeeded(pubData);
+            emit withdrawAvailableForBorrow(_currentOnchainOp, pubData);
             return (PARTIAL_EXIT_LENGTH, 1, 0);
         }
 
@@ -751,6 +746,35 @@ contract Franklin {
         uint64 end = start + blocks[_blockNumber].onchainOperations;
         for (uint64 current = start; current < end; ++current) {
             OnchainOperation memory op = onchainOps[current];
+            if (op.opType == OpType.Lending) {
+                bytes memory tokenBytes = new bytes(TOKEN_BYTES);
+                for (uint8 i = 0; i < TOKEN_BYTES; ++i) {
+                    tokenBytes[i] = op.pubData[ACC_NUM_BYTES + i];
+                }
+                uint16 tokenId = Bytes.bytesToUInt16(tokenBytes);
+
+                address lendingAddr = ledingsAddresses[tokenId];
+
+                bytes memory amountBytes = new bytes(AMOUNT_BYTES);
+                for (uint256 i = 0; i < AMOUNT_BYTES; ++i) {
+                    amountBytes[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + i];
+                }
+                uint128 amount = Bytes.bytesToUInt128(amountBytes);
+                
+                address lendingAddr = lendingsAddresses[tokenId];
+
+                if (lendingAddr != address(0)) {
+                    repayBorrow(lendingAddr, tokenId, amount);
+                } else {
+                    bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
+                    for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
+                        ethAddress[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
+                    }
+                    address ethAddr = Bytes.bytesToAddress(ethAddress);
+
+                    balancesToWithdraw[ethAddr][tokenId] += amount;
+                }
+            }
             if (op.opType == OpType.PartialExit) {
                 // partial exit was successful, accrue balance
                 bytes memory tokenBytes = new bytes(TOKEN_BYTES);
@@ -900,78 +924,73 @@ contract Franklin {
     // - _lendingAddress - lending address
     function addLending(uint16 _tokenId, address _lendingAddress) external {
         governance.requireGovernor();
-        areLendings[_lendingAddress] = true;
         lendingsAddresses[_tokenId] = _lendingAddress;
-    }
-
-    // Appends new borrow request if needed
-    // Params:
-    // - _pubData - partial_exit pubdata
-    function appendBorrowRequestIfNeeded(bytes memory _pubData) internal {
-        bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
-        for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
-            ethAddress[i] = _pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
-        }
-        balancesToWithdraw[Bytes.bytesToAddress(ethAddress)][tokenId] += amount;
-        
-        if (areLendings[ethAddress]) {
-            bytes memory tokenBytes = new bytes(TOKEN_BYTES);
-            for (uint8 i = 0; i < TOKEN_BYTES; ++i) {
-                tokenBytes[i] = _pubData[ACC_NUM_BYTES + i];
-            }
-            uint16 tokenId = Bytes.bytesToUInt16(tokenBytes);
-
-            bytes memory fromBytes = new bytes(ACC_NUM_BYTES);
-            for (uint8 i = 0; i < TOKEN_BYTES; ++i) {
-                fromBytes[i] = _pubData[ACC_NUM_BYTES + i];
-            }
-            uint24 fromId = Bytes.bytesToUInt24(tokenBytes);
-            
-            bytes memory amountBytes = new bytes(AMOUNT_BYTES);
-            for (uint256 i = 0; i < AMOUNT_BYTES; ++i) {
-                amountBytes[i] = _pubData[ACC_NUM_BYTES + TOKEN_BYTES + i];
-            }
-            uint128 amount = Bytes.bytesToUInt128(amountBytes);
-
-            uint32 blockNumber = totalBlocksCommitted + 1;
-            borrowRequests[blockNumber][borrowRequestsCountInBlocks[blockNumber]] = BorrowRequest({
-                processed: false,
-                from: fromId,
-                tokenId: tokenId,
-                amount: amount
-            });
-
-            emit NewBorrowRequest(
-                blockNumber,
-                borrowRequestsCountInBlocks[blockNumber],
-                fromId,
-                tokenId,
-                amount
-            );
-
-            borrowRequestsCountInBlocks[blockNumber] += 1;
-        }
     }
 
     // Verify borrow request
     // Params:
-    // - _blockNumber - number of Franklin block
-    // - _requestNumber - request number
-    // - _borrower - borrower address
+    // - _onchainOpNumber - onchain op number
+    // - _borrower - borrower id
+    // - _receiver - receiver address
     // - _tokenId - token id
     // - _amount - token amount
     function verifyBorrowRequest(
-        uint32 _blockNumber,
-        uint32 _requestNumber,
+        uint64 _onchainOpNumber,
         uint24 _borrower,
+        address receiver,
         uint16 _tokenId,
         uint256 _amount
     ) external view returns (bool) {
-        BorrowRequest request = borrowRequests[_blockNumber][_requestNumber];
-        return !request.processed &&
-            request.from == _borrower &&
-            request.tokenId == _tokenId &&
-            request.amount == _amount;
+        OnchainOperation op = onchainOps[_onchainOpNumber];
+
+        bytes memory fromBytes = new bytes(ACC_NUM_BYTES);
+        for (uint8 i = 0; i < TOKEN_BYTES; ++i) {
+            fromBytes[i] = _pubData[ACC_NUM_BYTES + i];
+        }
+        uint24 fromId = Bytes.bytesToUInt24(tokenBytes);
+
+        bytes memory tokenBytes = new bytes(TOKEN_BYTES);
+        for (uint8 i = 0; i < TOKEN_BYTES; ++i) {
+            tokenBytes[i] = op.pubData[ACC_NUM_BYTES + i];
+        }
+        uint16 tokenId = Bytes.bytesToUInt16(tokenBytes);
+
+        bytes memory amountBytes = new bytes(AMOUNT_BYTES);
+        for (uint256 i = 0; i < AMOUNT_BYTES; ++i) {
+            amountBytes[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + i];
+        }
+        uint128 amount = Bytes.bytesToUInt128(amountBytes);
+
+        bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
+        for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
+            ethAddress[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
+        }
+        address ethAddr = Bytes.bytesToAddress(ethAddress);
+
+        return op.opType == OpType.PartialExit &&
+            fromId == _borrower &&
+            ethAddr == _receiver &&
+            tokenId == _tokenId &&
+            amount == _amount;
+    }
+
+    // Changes onchain op type from withdraw to lending
+    // Params:
+    // - _lendingToken - lending token id
+    // - _onchainOpNumber - onchain op number
+    function withdrawOpToLending(
+        uint16 _lendingToken,
+        uint64 _onchainOpNumber
+    ) external {
+        require(
+            lendingsAddresses[_tokenId] != address(0),
+            "fwg11"
+        ); // fwg11 - cant approve token
+        require(
+            onchainOps[_onchainOpNumber].opType == OpType.PartialExit,
+            "fwg12"
+        ); // fwg12 - not withdraw op
+        onchainOps[_onchainOpNumber] = OpType.Lending;
     }
 
     // Repays borrow in lending

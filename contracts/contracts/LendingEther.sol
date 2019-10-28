@@ -58,15 +58,13 @@ contract LendingEther is LendingToken, ReentrancyGuard {
     }
 
     /// @notice User can request borrow, providing his withdraw operation in Franklin block
-    /// @param _blockNumber The number of committed block with withdraw operation
-    /// @param _requestNumber Withdraw operation creates request. The user is needed to provide this number
+    /// @param _onchainOpNumber Franklin onchain operation number
     /// @param _amount The borrow amount
     /// @param _borrower Borrower address
     /// @param _receiver Receiver address
     /// @param _signature Borrow request signature
     function requestBorrow(
-        uint32 _blockNumber,
-        uint32 _requestNumber,
+        uint64 _onchainOpNumber,
         uint256 _amount,
         uint24 _borrower,
         address _receiver,

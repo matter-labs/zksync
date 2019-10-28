@@ -2,7 +2,7 @@
 
 ## Goals
 
-The main goal is to ensure the continuity of user flow. A typical use case is that the user has funds in the **committed** block and she wants to send them to an external address. But for this, she needs to wait for the verification of the block where she receives the funds, then the block where she performs the withdrawal operation. So lending allows requesting an immediate withdrawal of users' funds to any ethereum address, indicating the **committed** block, which contains withdrawal transaction with a lending address as a recipient. In this case, the verifiers, acting as lenders, trust the system and the fact that the block will be **verified**, and provide their funds for conducting the withdrawal transaction. This operation is conditionally called lending and for it, lenders will receive a fee, depending on the current state of the supplied and borrowed balances.
+The main goal is to ensure the continuity of user flow. A typical use case is that the user has funds in the **committed** block and she wants to send them to an external address. But for this, she needs to wait for the verification of the block where she receives the funds, then the block where she performs the withdrawal operation. So lending allows requesting an immediate withdrawal of users' funds to any ethereum address, indicating the **committed** block withdrawal transaction. In this case, the verifiers, acting as lenders, trust the system and the fact that the block will be **verified**, and provide their funds for conducting the withdrawal transaction. This operation is conditionally called lending and for it, lenders will receive a fee, depending on the current state of the supplied and borrowed balances.
 
 ## Structure
 
@@ -68,7 +68,7 @@ If there is a **committed** block containing the withdrawal transaction with the
 
 Thus, he will borrow the free funds of creditors. This debt will be repaid automatically when verification of the specified `Franklin` block containing the transaction occurs.
 
-The user must call the `requestBorrow(blockNumber, requestNumber, amount, borrower, receiver, signature)` method of the `LendingEther` and` LendingErc20` contracts.
+The user must call the `requestBorrow(onchainOpNumber, amount, borrower, receiver, signature)` method of the `LendingEther` and` LendingErc20` contracts.
 Next, the `requestBorrowInternal` method of the contract `LendingToken` will be called, on which the necessary checks will occur:
 - the block must be unverified
 - the borrowing amount must be positive
