@@ -23,6 +23,8 @@ Main contracts:
 6. If **swift exit succeeded** and the block with the corresponding operation passed verification, **the funds borrowed from validators, including fees, will be sent from the `Rollup` contract to `SwiftExitsInternal` contract**.
 7. **Validators** can create a **request to withdraw** their funds from `SwiftExitsInternal` contract. With a sufficient amount of free funds, this request will be satisfied immediately, or a withdrawal order will be created, which is gradually executed when available funds appear on the contract.
 
+// TODO: - стоит ли в эту схему припиливать компаунд?
+
 ## Contract creation
 
 The `SwiftExitsEther` and `SwiftExitsErc20` contract constructors include the creation of the `SwiftExitsInternal` contract.
