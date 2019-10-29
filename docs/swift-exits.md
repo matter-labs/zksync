@@ -11,6 +11,17 @@ Main contracts:
 - `SwiftExitsEther` - wraps an underlying `SwiftExitsInternal`, provides an interface for Ether transactions
 - `SwiftExitsErc20` - wraps an underlying `SwiftExitsInternal`, provides an interface for ERC-20 tokens transactions
 - `Rollup` - the main rollup contract, it processes withdraw operations
+- `BlsVerifier` - the library for verifying BLS signatures over BN256 curve
+
+## Work algorithm
+
+1. While creating an **withdraw operation**, the user can create and sign a request for a **swift exit for this operation**. To indicate this operation, its hash will be used.
+2. Since validators are responsible for including a user’s operation in a block, they can take responsibility for processing this request. Validators can **verify the user's signature**, as well as to **sign this request** themselves. When the required number of signatures is collected (**2/3 of the total number of validators**), they are aggregated and validated on the `BlsVerifier` contract.
+3. Depending on the amount of free validators funds on the `SwiftExitsInternal` contract, there they will be processed as **immediate swift exit** or **deffered swift exit**. Thus, the swift exit will be executed either **immediately**, using **available funds** on the contract, or a **deffered exit order** will be created for which **validators can supply additional funds** to the `SwiftExitsInternal` contract.
+4. After sending funds to the recipient address via swift exit, on `Rollup` contract specified recipient balance will be reduced by the operation amount. So **after processing swift exit and validating the block** with this operation, **the resulting recipient balance on `Rollup` contract will not change**.
+5. **If funds are not sent via swift exit**, they will be charged on the `Rollup` contract as a result of a normal withdrawal operation - **the user will not lose her funds**.
+6. If **swift exit succeeded** and the block with the corresponding operation passed verification, **the funds borrowed from validators, including fees, will be sent from the `Rollup` contract to `SwiftExitsInternal` contract**.
+7. **Validators** can create a **request to withdraw** their funds from `SwiftExitsInternal` contract. With a sufficient amount of free funds, this request will be satisfied immediately, or a withdrawal order will be created, which is gradually executed when available funds appear on the contract.
 
 ## Contract creation
 
