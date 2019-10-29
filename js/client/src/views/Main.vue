@@ -32,8 +32,8 @@
                 <Alert class="w-100 m-0" style="position: absolute; top: -1.3em;" ref="alert"></Alert>
             </b-row>
             <div style="min-height: 1.5em;">
-                <b-row class="px-3 py-0 my-0" v-for="shower in store.pendingTransactionGenerators" :key="shower.id" :id="shower.id">
-                    <AlertWithProgressBar :shower="shower"></AlertWithProgressBar>
+                <b-row class="px-3 py-0 my-0" v-for="verboseOp in store.pendingTransactionGenerators" :key="verboseOp.id" :id="verboseOp.id">
+                    <AlertWithProgressBar :verboseOp="verboseOp"></AlertWithProgressBar>
                 </b-row>
             </div>
             <b-row class="px-0 mt-0">
@@ -68,7 +68,7 @@ const components = {
     Alert,
     Wallet,
     AlertWithProgressBar,
-}
+};
 
 export default {
     name: 'Main',
@@ -79,9 +79,9 @@ export default {
         message: null,
     }),
     watch: {
-        componentToBeShown: async function() {
+        async componentToBeShown() {
             await this.updateAccountInfo()
-        }
+        },
     },
     async created() {
         const timeOut = async () => {
@@ -94,8 +94,8 @@ export default {
         new ClipboardJS('.copyable');
     },
     methods: {
-        displayAlert(kwargs) {
-            this.$refs.alert.display(kwargs);
+        displayAlert(options) {
+            this.$refs.alert.display(options);
         },
         async updateAccountInfo() {
             try {
@@ -105,11 +105,14 @@ export default {
                 let contractBalances = window.walletDecorator.contractBalancesAsRenderableList();
                 let franklinBalances = window.walletDecorator.franklinBalancesAsRenderableList();
                 let franklinBalancesWithInfo = window.walletDecorator.franklinBalancesAsRenderableListWithInfo();
+                let pendingOps = await window.walletDecorator.pendingOperationsAsRenderableList();
+
                 this.walletInfo = {
                     onchainBalances,
                     contractBalances,
                     franklinBalances,
                     franklinBalancesWithInfo,
+                    pendingOps,
                 };
 
             } catch (e) {

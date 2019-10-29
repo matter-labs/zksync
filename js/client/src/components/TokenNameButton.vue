@@ -21,13 +21,14 @@ export default {
     }),
     methods: {
         clicked() {
-            if (this.data.item.address) {
+            if (this.data.item.tokenName != 'ETH') {
                 this.hover_title = 'copied';
             }
         },
         mouseEnter() {
-            this.hover_title = this.data.item.address 
-                ? `Click to copy token address` : `ETH token doesn't have address`;
+            this.hover_title = this.data.item.tokenName != 'ETH'
+                ? `Click to copy token address` 
+                : `ETH token doesn't have address`;
         },
     },
 }

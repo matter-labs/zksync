@@ -42,7 +42,7 @@ export function bigNumberMax(a, b) {
     return a.gt(b) ? a : b;
 }
 export function bigNumberMin(a, b) {
-    return a.gt(b) ? a : b;
+    return a.lt(b) ? a : b;
 }
 
 export function feesFromAmount(amount) {
@@ -51,10 +51,4 @@ export function feesFromAmount(amount) {
         amount.div(100),
         amount.div(20),
     ].map(String);
-}
-
-export function strCompareIgnoreCase(a, b) {
-    if (a != undefined) a = a.toLowerCase()
-    if (b != undefined) b = b.toLowerCase()
-    return a == b;
 }

@@ -6,21 +6,23 @@
             :tokens="tokensForTokenSelector"
             :selected.sync="token">
         </TokenSelector>
-        Amount <span v-if="maxAmountVisible">(<span v-if="tokenReadablyPrintable">in {{ token }} coins, </span>max {{ displayableBalancesDict[token] }} {{ token }})</span>:
-        <b-form-input autocomplete="off" v-model="amountSelected" class="mb-2"></b-form-input>
-        <div v-if="feeNeeded">
-            Fee:
-            <FeeSelector 
-                class="mb-2"
-                :fees="fees"
-                :selected.sync="feeButtonSelectedIndex">
-            </FeeSelector>
+        <div>
+            Amount <span v-if="maxAmountVisible">(<span v-if="tokenReadablyPrintable">in {{ token }} coins, </span>max {{ displayableBalancesDict[token] }} {{ token }})</span>:
+            <b-form-input autocomplete="off" v-model="amountSelected" class="mb-2"></b-form-input>
+            <div v-if="feeNeeded">
+                Fee:
+                <FeeSelector 
+                    class="mb-2"
+                    :fees="fees"
+                    :selected.sync="feeButtonSelectedIndex">
+                </FeeSelector>
+            </div>
+            <div v-else>
+                The fee is <b>ETH</b> {{ depositFee }}. The change will be put on your Matter account.
+            </div>
+            <p v-if="alertVisible"> {{ alertText }} </p>
+            <b-button class="w-50 mt-3" variant="primary" @click='buttonClicked'> {{ buttonText }} </b-button>
         </div>
-        <div v-else>
-            The fee is <b>ETH</b> {{ depositFee }}. The change will be put on your Matter account.
-        </div>
-        <p v-if="alertVisible"> {{ alertText }} </p>
-        <b-button class="w-50 mt-3" variant="primary" @click='buttonClicked'> {{ buttonText }} </b-button>
     </div>
 </template>
 
@@ -65,19 +67,19 @@ export default {
         this.createDisplayableBalancesDict();
     },
     watch: {
-        balances: function() {
+        balances() {
             this.createDisplayableBalancesDict();
         },
-        token: function() {
+        token() {
             this.maxAmountVisible = true;
-        }
+        },
     },
     computed: {
-        tokenReadablyPrintable: function() {
+        tokenReadablyPrintable() {
             return isReadablyPrintable(this.token);
         },
     },
-    methods: {  
+    methods: {
         localDisplayAlert(msg) {
             this.alertVisible = true;
             this.alertText = msg;

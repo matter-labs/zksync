@@ -56,7 +56,6 @@ export default {
         await this.load();
     },
     watch: {
-        totalRows: (...args) => console.log('totalRows changes: ', ...args),
         currentPage: function() {
             this.load();
         },
@@ -72,14 +71,14 @@ export default {
             // maybe load the requested page
             if (this.pagesOfTransactions[this.currentPage] == undefined)
                 this.pagesOfTransactions[this.currentPage] 
-                    = await window.walletDecorator.transactionsAsNeeded(offset, limit);
+                    = await window.walletDecorator.transactionsAsRenderableList(offset, limit);
             
 
             let numNextPageTransactions = null;
             
             // maybe load the next page
             if (this.pagesOfTransactions[this.currentPage + 1] == undefined) {
-                let txs = await window.walletDecorator.transactionsAsNeeded(offset + limit, limit);
+                let txs = await window.walletDecorator.transactionsAsRenderableList(offset + limit, limit);
                 numNextPageTransactions = txs.length;
                 // Once we assign txs to pagesOfTransactions,
                 // it gets wrapped in vue watchers and stuff.

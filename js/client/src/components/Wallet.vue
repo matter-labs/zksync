@@ -2,7 +2,13 @@
 <b-container>
     <b-row>
         <b-col xl="6" class="pr-3">
-            <BalancesList class="mb-1" balanceListId="onchain" :balances="onchainBalances"></BalancesList>
+            <BalancesList 
+                class="mb-1" 
+                balanceListId="onchain" 
+                :balances="onchainBalances"
+                :pendingOps="pendingOps"
+                v-on:withdrawOnchainEvent="withdrawOnchain"
+                ></BalancesList>
             <DepositButtons
                 componentId="offchain"
                 :topBalances="onchainBalances" 
@@ -10,7 +16,7 @@
                 :depositFeeNeeded="false"
                 :withdrawFeeNeeded="true"
                 v-on:depositEvent="deposit"
-                v-on:withdrawEvent="withdraw"
+                v-on:withdrawEvent="withdrawOffchain"
                 ></DepositButtons>
             <FranklinBalancesList class="mt-1" 
                 balanceListId="franklin" 
@@ -57,42 +63,38 @@ export default {
         onchainBalances: null,
         franklinBalances: null,
         franklinBalancesWithInfo: null,
-        verboseShowerId: 0,
+        pendingOps: null,
     }),
     created() {
         this.updateInfo();
-        this.verboseShowerId = this.store.verboseShowerId;
-    },
-    destroyed() {
-        this.store.verboseShowerId = this.verboseShowerId;
     },
     watch: {
-        info: function() {
+        info() {
             this.updateInfo();
         }
     },
     methods: {
         updateInfo() {
-            if (this.info == null) return;
-            for (let [key, val] of Object.entries(this.info)) {
-                this[key] = val;
-            }
+            Object.assign(this, this.info);
         },
-        displayAlert(kwargs) {
-            this.$emit('alert', kwargs);
+        displayAlert(options) {
+            this.$emit('alert', options);
         },
-        async deposit(kwargs) {
-            await this.verboseShower(window.walletDecorator.verboseDeposit(kwargs));
+        async deposit(options) {
+            await this.showVerboseOperation(window.walletDecorator.verboseDeposit(options));
         },
-        async withdraw(kwargs) {
-            await this.verboseShower(window.walletDecorator.verboseWithdraw(kwargs));
+        async withdrawOffchain(options) {
+            await this.showVerboseOperation(window.walletDecorator.verboseWithdrawOffchain(options));
         },
-        async transfer(kwargs) {
-            await this.verboseShower(window.walletDecorator.verboseTransfer(kwargs));
+        async withdrawOnchain(options) {
+            await this.showVerboseOperation(window.walletDecorator.verboseWithdrawOnchain(options));
         },
-        async verboseShower(generator) {
+        async transfer(options) {
+            await this.showVerboseOperation(window.walletDecorator.verboseTransfer(options));
+        },
+        async showVerboseOperation(generator) {
             this.store.pendingTransactionGenerators.push({
-                id: `verbose_shower_${this.verboseShowerId++}`,
+                id: `verbose_verboseOp_${this.store.verboseOperationId++}`,
                 generator: new GeneratorMultiplierMinTime(generator),
             });
         },

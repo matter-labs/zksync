@@ -32,3 +32,5 @@ Cargo.lock
 /tmp
 /volumes
 /logs
+
+/js/franklin_lib/build

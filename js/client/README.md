@@ -1,18 +1,29 @@
-# plasma-client
+# client
 
-> Plasma client app
+## Project setup
+```
+yarn install
+```
 
-## Build Setup
+### Compiles and hot-reloads for development
+```
+yarn run serve
+```
 
-``` bash
-# install dependencies
-yarn
-
-# serve with hot reload at localhost:8080; API server will be queried at localhost:3000
-yarn run dev
-
-# build for production with minification
+### Compiles and minifies for production
+```
 yarn run build
 ```
 
-For detailed explanation on how things work, consult the [docs for vue-loader](http://vuejs.github.io/vue-loader).
+### Run your tests
+```
+yarn run test
+```
+
+### Lints and fixes files
+```
+yarn run lint
+```
+
+### Customize configuration
+See [Configuration Reference](https://cli.vuejs.org/config/).

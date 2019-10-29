@@ -862,7 +862,7 @@ impl StorageProcessor {
                     where 
                         operation->'priority_op'->>'account' = '0x{address}') t
                 order by
-                    block_number
+                    block_number desc
                 offset 
                     {offset}
                 limit 

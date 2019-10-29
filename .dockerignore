@@ -6,6 +6,5 @@
 !bin/.load_keys
 !js/client/index.html
 !js/client/dist
-!js/client_js/dist
 !js/explorer/index.html
 !js/explorer/dist

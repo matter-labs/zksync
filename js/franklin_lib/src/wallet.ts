@@ -93,10 +93,8 @@ export class FranklinProvider {
     }
 
     async getTransactionsHistory(address: Address, offset: number, limit: number) {
-        const link = `${this.providerAddress}/api/v0.1/account/0x${address.toString("hex")}/history/${offset}/${limit}`;
-        console.log(`In wallet, we request ${link}`);
         return await FranklinProvider.axiosRequest(
-            Axios.get(link));
+            Axios.get(`${this.providerAddress}/api/v0.1/account/0x${address.toString("hex")}/history/${offset}/${limit}`));
     }
 
     async getState(address: Address): Promise<FranklinAccountState> {
@@ -247,17 +245,30 @@ export class Wallet {
         this.address = pubkeyToAddress(this.walletKeys.publicKey);
     }
 
-    async deposit(token: Token, amount: BigNumberish) {
+    protected async depositETH(amount: BigNumberish) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
+        return await franklinDeployedContract.depositETH(this.address, {value: amount, gasLimit: bigNumberify("200000")});
+    }
+
+    protected async approveERC20(token: Token, amount: BigNumberish, options?: Object) {
+        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
+        const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
+        return await erc20DeployedToken.approve(franklinDeployedContract.address, amount, options);
+    }
+
+    protected async depositApprovedERC20(token: Token, amount: BigNumberish, options?: Object) {
+        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
+        const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
+        return await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address,
+            Object.assign({gasLimit: bigNumberify("300000"), value: parseEther("0.05")}, options));
+    }
+
+    async deposit(token: Token, amount: BigNumberish) {
         if (token.id == 0) {
-            const tx = await franklinDeployedContract.depositETH(this.address, {value: amount, gasLimit: bigNumberify("200000")});
-            return tx.hash;
+            return await this.depositETH(amount);
         } else {
-            const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
-            await erc20DeployedToken.approve(franklinDeployedContract.address, amount);
-            const tx = await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address,
-                {gasLimit: bigNumberify("300000"), value: parseEther("0.05")});
-            return tx.hash;
+            await this.approveERC20(token, amount);
+            return await this.depositApprovedERC20(token, amount);
         }
     }
 
@@ -276,13 +287,9 @@ export class Wallet {
     async widthdrawOnchain(token: Token, amount: BigNumberish) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
         if (token.id == 0) {
-            const tx = await franklinDeployedContract.withdrawETH(amount, {gasLimit: 200000});
-            await tx.wait(2);
-            return tx.hash;
+            return await franklinDeployedContract.withdrawETH(amount, {gasLimit: 200000});
         } else {
-            const tx = await franklinDeployedContract.withdrawERC20(token.address, amount, {gasLimit: bigNumberify("150000")});
-            await tx.wait(2);
-            return tx.hash;
+            return await franklinDeployedContract.withdrawERC20(token.address, amount, {gasLimit: bigNumberify("150000")});
         }
     }
 
@@ -351,6 +358,28 @@ export class Wallet {
         let ethAddress = await wallet.getAddress();
         let frankinWallet = new Wallet(Buffer.from(seed, 'hex'), franklinProvider, wallet, ethAddress);
         return frankinWallet;
+    }
+
+    async getBalancesToWithdraw() {
+        let franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
+        let tokens = await this.provider.getTokens();
+        let amounts = tokens
+            .map(async token => {
+                let amount = await franklinDeployedContract.balancesToWithdraw(this.ethAddress, token.id);
+                return { token, amount };
+            });
+        return await Promise.all(amounts);
+    }
+
+    async getAllowancesForAllTokens() {
+        let tokens = await this.provider.getTokens();
+        tokens.shift(); // skip ETH
+        let allowances = tokens.map(async token => {
+            let erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
+            let amount = await erc20DeployedToken.allowance(this.ethAddress, this.provider.contractAddress);
+            return { token, amount };
+        });
+        return await Promise.all(allowances);
     }
 
     async fetchEthState() {

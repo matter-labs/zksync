@@ -15,6 +15,11 @@
                 </template>
                 <template v-slot:cell(amount)="data">
                     <span style="vertical-align: middle;"> {{ data.item.amount }} </span>
+                    <CompleteOperationButton
+                        v-if="data.item.op && data.item.op.status != 'hidden'"
+                        :op="data.item.op"
+                        v-on:withdrawOnchainEvent="withdrawOnchainEvent"
+                        ></CompleteOperationButton>
                 </template>
             </b-table>
         </b-col>
@@ -23,13 +28,16 @@
 
 <script>
 import { ethers } from 'ethers';
-import { readableEther, getDisplayableBalanceList } from '../utils';
+import { readableEther, getDisplayableBalanceList, sleep } from '../utils';
+
 import TokenNameButton from './TokenNameButton.vue';
 import CopyableAddress from './CopyableAddress.vue';
+import CompleteOperationButton from './CompleteOperationButton.vue';
 
 const components = {
     TokenNameButton,
     CopyableAddress,
+    CompleteOperationButton,
 };
 
 
@@ -45,14 +53,18 @@ export default {
     props: [
         // balances are like [{ tokenName: 'eth', amount: '120' }]
         'balances',
-        'balanceListId'
+        'balanceListId',
+        'pendingOps',
     ],
     created() {
-        this.updateInfo();
+        this.updateBalanceList();
     },
     watch: {
         balances() {
-            this.updateInfo();
+            this.updateBalanceList();
+        },
+        pendingOps() {
+            this.updateBalanceList();
         },
     },
     computed: {
@@ -63,14 +75,29 @@ export default {
         },
     },
     methods: {
-        updateInfo() {
-            if (this.balances == null) return;
-            
-            this.displayableBalances = getDisplayableBalanceList(this.balances);
+        async withdrawOnchainEvent(options) {
+            this.$emit('withdrawOnchainEvent', options);
         },
-        clickedWhatever: function(evt) {
-            let tgt = evt.target;
-            tgt.setAttribute('data-original-title', 'copied');
+        updateBalanceList() {
+            if (this.balances != null) {
+                this.displayableBalances = getDisplayableBalanceList(this.balances);
+            }
+
+            if (this.pendingOps != null && this.pendingOps.length) {
+                let pendingOpsIndex = this.pendingOps
+                    .reduce((acc, op) => {
+                        acc[op.token.address] = op;
+                        return acc;
+                    }, {});
+
+                this.displayableBalances = this.displayableBalances
+                    .map(bal => {
+                        if (pendingOpsIndex[bal.address]) {
+                            bal.op = pendingOpsIndex[bal.address];
+                        }
+                        return bal;
+                    });
+            }
         },
     },
     components,

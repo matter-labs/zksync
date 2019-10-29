@@ -28,28 +28,16 @@ const components = {
 import Eth from 'ethjs'
 import { ethers } from 'ethers'
 import { Wallet, FranklinProvider } from 'franklin_lib'
-import { walletDecorator, WalletDecorator } from '../WalletDecorator'
+import { WalletDecorator } from '../WalletDecorator'
 
 export default {
     name: 'login',
     computed: {
         ethereumSupported: () => typeof window.web3 !== 'undefined',
     },
-    created() {
-        // TODO: remove this method
-        // this.login()
-    },
     methods: {
         async login() {
             try {
-                // // TODO: delete next block of code
-                // let franklinProvider = new FranklinProvider(this.config.API_SERVER, this.config.CONTRACT_ADDR);
-                // let provider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
-                // window.signer = ethers.Wallet.fromMnemonic("fine music test violin matrix prize squirrel panther purchase material script deal").connect(provider);
-                // window.wallet = await Wallet.fromEthWallet(signer, franklinProvider);
-                // window.walletDecorator = await WalletDecorator.new(window.wallet);
-
-                // uncomment this one 
                 await window.ethereum.enable();
                 window.eth = new Eth(window.web3.currentProvider);
                 window.ethersProvider = new ethers.providers.Web3Provider(window.web3.currentProvider);

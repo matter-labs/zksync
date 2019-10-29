@@ -19,16 +19,12 @@ const components = {
 
 export default {
     name: 'AlertWithProgressBar',
-    props: ['shower'],
+    props: ['verboseOp'],
     async created() {
         let wait = null;
-        for await (const progress of this.shower.generator.gencopy()) {
+        for await (const progress of this.verboseOp.generator.gencopy()) {
             if (progress.displayMessage) {
-                this.$refs.alert.display({
-                    message: progress.displayMessage.message,
-                    variant: progress.displayMessage.error ? 'danger' : 'success',
-                    countdown: progress.displayMessage.countdown,
-                });
+                this.$refs.alert.display(progress.displayMessage);
                 wait = progress.displayMessage.countdown;
             }
 
@@ -49,10 +45,8 @@ export default {
 
         wait && await sleep(wait * 1000);
 
-        {            
-            let elem = document.getElementById(this.shower.id);
-            elem.parentElement.removeChild(elem);
-        }
+        let elem = document.getElementById(this.verboseOp.id);
+        elem.parentElement.removeChild(elem);
     },
     components,
 }

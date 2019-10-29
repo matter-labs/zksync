@@ -1,15 +1,15 @@
 import { sleep } from "./utils";
 
 class GeneratorMultiplierSomewhatAbstract {
-	constructor(start) {
+    constructor(start) {
         this.promises = [];
         start();
     }
 
-	/**
-	 * gencopy() can be called by everyone who wants to know how progress() is doing now.
-	 */
-	gencopy() {
+    /**
+     * gencopy() can be called by everyone who wants to know how progress() is doing now.
+     */
+    gencopy() {
         // I should do a talk at some conference about this.
         const self = this;
         let firstTime = true;
@@ -35,7 +35,7 @@ class GeneratorMultiplierSomewhatAbstract {
 }
 
 export class GeneratorMultiplierMinTime extends GeneratorMultiplierSomewhatAbstract {
-	constructor(gen, minWaitTime = 1000) {
+    constructor(gen, minWaitTime = 1000) {
         const start = async () => {
             let prevEnd = Date.now();
             do {
@@ -56,7 +56,7 @@ export class GeneratorMultiplierMinTime extends GeneratorMultiplierSomewhatAbstr
 }
 
 export class GeneratorMultiplier extends GeneratorMultiplierSomewhatAbstract {
-	constructor(gen) {
+    constructor(gen) {
         const start = async () => {
             do {
                 this.current = await gen.next();

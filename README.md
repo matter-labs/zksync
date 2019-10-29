@@ -89,8 +89,7 @@ franklin prover
 
 Run client
 ```
-franklin dist-config
-cd js/client_js && yarn all_serve
+franklin client
 ```
 
 Client UI will be available at http://localhost:8080.

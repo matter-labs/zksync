@@ -6,4 +6,5 @@ export default Object.freeze({
     provingHalfLife: 60000,
     waitingForProverHalfLife: 10000,
     transactionsRefresh: 3000,
+    updatePendingOpsTimeout: 3000,
 });

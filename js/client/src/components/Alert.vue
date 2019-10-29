@@ -17,18 +17,22 @@ export default {
             window.clearTimeout(this.timeoutHandle);
             this.alertVisible = false;
         },
-        display(kwargs) {
-            this.message = kwargs.message;
-            this.variant = kwargs.variant || this.variant;
+        display(options) {
+            let message = options.message || 'default message';
+            let variant = options.variant || this.variant;
+            let countdown = options.countdown || 0;
+
+            this.message = message;
+            this.variant = variant;
             this.alertVisible = true;
 
             window.clearTimeout(this.timeoutHandle);
             
-            if (kwargs.countdown) {
+            if (countdown) {
                 const self = this;
                 this.timeoutHandle = setTimeout(() => {
                     self.dismiss();
-                }, kwargs.countdown * 1000);
+                }, countdown * 1000);
             }
         }
     }
