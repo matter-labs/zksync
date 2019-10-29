@@ -23,7 +23,7 @@ Main contracts:
 6. If **swift exit succeeded** and the block with the corresponding operation passed verification, **the funds borrowed from validators, including fees, will be sent from the `Rollup` contract to `SwiftExitsInternal` contract**.
 7. **Validators** can create a **request to withdraw** their funds from `SwiftExitsInternal` contract. With a sufficient amount of free funds, this request will be satisfied immediately, or a withdrawal order will be created, which is gradually executed when available funds appear on the contract.
 
-// TODO: - стоит ли в эту схему припиливать компаунд? Не думаю что нужно прикручивать. Это добавит сильно ответственности на контракте за выполнение обязательств компаунду, внесет проблемы в расчет комиссий. Занять деньги могут и сами валидаторы
+// TODO: - стоит ли в эту схему припиливать компаунд? Не думаю что нужно прикручивать. Это добавит сильно ответственности на контракте за выполнение обязательств компаунду в случае колебаний курса, внесет проблемы в расчет комиссий, добавит дополнительных комиссий. Занять деньги могут и сами валидаторы
 
 ## Contract creation
 
