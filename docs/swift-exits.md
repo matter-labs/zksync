@@ -39,7 +39,7 @@ All process we can divide into 3 parts:
 4. **Current rate and collateral factor** for the token will be taken from `Compound` contract to **calculate validators supply tokens amount**.
 5. Using this info the **validators fees and systems (Matter) fee will be calculated**.
 6. **`SwiftExitRequest`, that contains swift exit and fees information, will be stored** on `SwiftExits` contract
-7. The required amount of **validators tokens will be borrowed** on `SwiftExits` contract
+7. The required amount of **validators tokens will be borrowed** on `SwiftExits` contract to support borrow from compound and refund it if the desired withdraw operation will not appear in the specified block (see Punishment at *Repaying borrow on contract* section)
 8. **A borrow of tokens from `Compound` contract** to `SwiftExits` contract for validators tokens will occurre
 9. **Tokens will be sent to the recipient** from `SwiftExits` contract
 10. **New `RepaymentRequest`, that contains swift exit information and its status (committed/none),** will be created **on `Rollup` contract**.
@@ -50,9 +50,7 @@ All process we can divide into 3 parts:
 2. When the specified **block is verified on `Rollup` contract**, it will check relevant `RepaymentRequest`s for `committed` mark and **send required number of tokens to `SwiftExits` contract**.
 3. **`SwiftExits` contract will repay a debt to `Compound`** and will get validators tokens
 4. **Fees will be charged to validators**, and **borrowed tokens will** also **be released**
-5. If **the verified block does not have the corresponding withdrawal operation**, but **`RepaymentRequest` for it created**, the **punishment process** will start:
-   1. An intersection of the validators who signed the swift exit request and the validators who verified the block without corresponding withdraw operation will be found. The amount for the execution of the specified swift exit request in favor of the remaining number of validators will be proportionally withdrawn from them.
-   2. // TODO: - whats with supplied tokens on Compound contract?
+5. If **the verified block does not have the corresponding withdrawal operation**, but **`RepaymentRequest` for it created**, the **punishment process** will start. **An intersection of the validators who signed the swift exit request and the validators who verified the block without corresponding withdraw operation will be found.** **The amount for refunding borrow on `Compound` contract will be held from them** in no return. The rest of the validators will receive their tokens without comissions. // TODO: - is it correct?
 
 Full swift exit process without special cases of early verified block and punishment of validators. Contains complete inner contracts logic:
 [Algorithm scheme](https://i.imgur.com/5UDLLGi.png)
