@@ -8,10 +8,10 @@
 /docs/          @gluk64
 *.md            @gluk64
 
-# notify dvush and TymurKhr about any circuit, prover and server changes
-/core/circuit/  @dvush @TymurKhr
-/core/server/   @dvush @TymurKhr
-/core/prover/   @dvush @TymurKhr
+# notify dvush about any circuit, prover and server changes
+/core/circuit/  @dvush
+/core/server/   @dvush
+/core/prover/   @dvush
 
 # notify BaldyAsh and dvush about contracts changes
 /contracts/     @dvush @BaldyAsh
